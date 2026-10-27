@@ -57,6 +57,15 @@ class AppActions(private val context: Context, private val catalog: AppCatalog) 
             query(ShortcutQuery().setQueryFlags(ShortcutQuery.FLAG_MATCH_PINNED), profile.serial)
         }
 
+    /** Starts the shortcut [id] of [packageName] (static, dynamic or pinned) for the profile [user]. */
+    fun startShortcut(packageName: String, id: String, user: Long): Boolean {
+        val query = ShortcutQuery()
+            .setPackage(packageName)
+            .setShortcutIds(listOf(id))
+            .setQueryFlags(ShortcutQuery.FLAG_MATCH_MANIFEST or ShortcutQuery.FLAG_MATCH_DYNAMIC or ShortcutQuery.FLAG_MATCH_PINNED)
+        return query(query, user).firstOrNull { it.isEnabled }?.let { startShortcut(it) } ?: false
+    }
+
     fun startShortcut(info: ShortcutInfo, bounds: Rect? = null): Boolean = tryStart {
         launcherApps.startShortcut(info, bounds, null)
     }

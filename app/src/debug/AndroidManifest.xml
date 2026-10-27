@@ -8,5 +8,11 @@
             android:exported="false"
             android:label="@string/debug_title"
             android:windowSoftInputMode="adjustResize" />
+        <!-- Override any field of the context snapshot, live (plan Phase 2). -->
+        <activity
+            android:name=".debug.ContextPanelActivity"
+            android:exported="true"
+            android:label="@string/debug_context_title"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>

@@ -3,6 +3,9 @@ package com.samosaai.masala
 import com.samosaai.masala.core.tool.ToolFiles
 import android.app.Application
 import android.content.Context
+import com.samosaai.masala.actions.ActionDispatcher
+import com.samosaai.masala.actions.ConfirmationGate
+import com.samosaai.masala.context.ContextService
 import com.samosaai.masala.data.MasalaDatabase
 import com.samosaai.masala.data.SettingsStore
 import com.samosaai.masala.files.AppStorageFileAccess
@@ -10,6 +13,8 @@ import com.samosaai.masala.launcher.AppActions
 import com.samosaai.masala.launcher.AppCatalog
 import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.LauncherModel
+import com.samosaai.masala.layout.LayoutRepository
+import com.samosaai.masala.layout.ModeStore
 import com.samosaai.masala.core.scheduled.ScheduledTaskStore
 import com.samosaai.masala.pro.ProTools
 import com.samosaai.masala.scheduled.PrefsTaskStorage
@@ -21,6 +26,7 @@ import com.samosaai.masala.tools.MasalaToolExecutor
 import com.samosaai.masala.tools.MasalaToolRegistry
 import com.samosaai.masala.tools.MasalaTools
 import com.samosaai.masala.tools.ToolGate
+import com.samosaai.masala.core.tool.name
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -54,6 +60,11 @@ class MasalaApp : Application() {
     /** Runs tools for one caller; [gate] confirms anything that isn't read-only. */
     fun toolExecutor(gate: ToolGate) = MasalaToolExecutor(this, tools, actionLog, gate)
 
+    val modes by lazy { ModeStore(this) }
+
+    /** The one gate for taps, gestures and widget buttons; the home screen shows its question. */
+    val confirmationGate by lazy { ConfirmationGate(actionLog) }
+
     lateinit var catalog: AppCatalog
         private set
     lateinit var icons: IconCache
@@ -61,6 +72,12 @@ class MasalaApp : Application() {
     lateinit var actions: AppActions
         private set
     lateinit var launcher: LauncherModel
+        private set
+    lateinit var contextService: ContextService
+        private set
+    lateinit var layouts: LayoutRepository
+        private set
+    lateinit var dispatcher: ActionDispatcher
         private set
 
     override fun onCreate() {
@@ -70,6 +87,20 @@ class MasalaApp : Application() {
         actions = AppActions(this, catalog)
         launcher = LauncherModel(scope, catalog, database.appOverrides(), actions)
         catalog.start()
+
+        contextService = ContextService(this, scope, modes).also { it.start() }
+        layouts = LayoutRepository(
+            context = this,
+            scope = scope,
+            dao = database.layoutVersions(),
+            catalog = catalog,
+            launcher = launcher,
+            modes = modes,
+            contextService = contextService,
+            skills = { skills },
+            toolNames = { tools.tools.map { it.name }.toSet() },
+        )
+        dispatcher = ActionDispatcher(this, actions, launcher, modes, confirmationGate, tools) { toolExecutor(confirmationGate) }
 
         // A force-stop drops the alarm; the store still has the tasks.
         scope.launch(Dispatchers.IO) { ScheduledTaskScheduler.reschedule(this@MasalaApp) }

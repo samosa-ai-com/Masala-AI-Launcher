@@ -176,6 +176,9 @@ class DebugActivity : ComponentActivity() {
                             .onFailure { events += DebugAgent.Event.Error("${it::class.simpleName}: ${it.message}") }
                     }
                 }) { Text(stringResource(R.string.debug_models)) }
+                OutlinedButton(onClick = { startActivity(android.content.Intent(this@DebugActivity, ContextPanelActivity::class.java)) }) {
+                    Text(stringResource(R.string.debug_context_button))
+                }
                 OutlinedButton(onClick = {
                     events.clear()
                     events += DebugAgent.Event.Raw(masala.actionLog.tail(20).joinToString("\n").ifEmpty { "(empty)" })

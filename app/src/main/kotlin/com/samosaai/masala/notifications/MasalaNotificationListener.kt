@@ -1,5 +1,6 @@
 package com.samosaai.masala.notifications
 
+import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +24,7 @@ class MasalaNotificationListener : NotificationListenerService() {
     override fun onListenerDisconnected() {
         instance = null
         _count.value = 0
+        _urgent.value = 0
         super.onListenerDisconnected()
     }
 
@@ -50,7 +52,9 @@ class MasalaNotificationListener : NotificationListenerService() {
     fun dismissAll() = cancelAllNotifications()
 
     private fun updateCount() {
-        _count.value = currentNotifications().count { it.isClearable && it.packageName != packageName }
+        val others = currentNotifications().filter { it.isClearable && it.packageName != packageName }
+        _count.value = others.size
+        _urgent.value = others.count { it.notification.category in URGENT_CATEGORIES }
     }
 
     companion object {
@@ -63,5 +67,21 @@ class MasalaNotificationListener : NotificationListenerService() {
 
         /** Clearable notifications from other apps; 0 without access. */
         val count: StateFlow<Int> = _count.asStateFlow()
+
+        private val _urgent = MutableStateFlow(0)
+
+        /**
+         * Calls, messages, alarms, reminders and events among them: the `UrgentCount` condition's
+         * signal until the urgent filter (starred contacts, wiki people, keywords) exists.
+         */
+        val urgent: StateFlow<Int> = _urgent.asStateFlow()
+
+        private val URGENT_CATEGORIES = setOf(
+            Notification.CATEGORY_CALL,
+            Notification.CATEGORY_MESSAGE,
+            Notification.CATEGORY_ALARM,
+            Notification.CATEGORY_REMINDER,
+            Notification.CATEGORY_EVENT,
+        )
     }
 }

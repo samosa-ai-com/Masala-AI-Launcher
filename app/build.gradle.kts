@@ -33,6 +33,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // The model endpoint (plan 0.2): Samosa's OpenAI-compatible proxy by default. MASALA_LLM_*
         // override it, for example with a local LM Studio server for testing.
@@ -104,4 +105,12 @@ dependencies {
 
     testImplementation(kotlin("test-junit"))
     testImplementation(libs.okhttp.mockwebserver)
+
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    // 3.7 reads input through APIs that exist on Android 16; older ones throw NoSuchMethodException.
+    androidTestImplementation(libs.androidx.test.espresso.core)
+    debugImplementation(libs.compose.ui.test.manifest)
 }
