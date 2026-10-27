@@ -23,6 +23,7 @@ uses-permission android.permission.EXPAND_STATUS_BAR  # Swipe down opens notific
 uses-permission android.permission.POST_NOTIFICATIONS  # Price watches, job progress, reminders
 uses-permission android.permission.RECEIVE_BOOT_COMPLETED  # Re-arm scheduled skills and reminders after reboot
 uses-permission android.permission.VIBRATE  # Haptics on long press and gestures
+uses-permission android.permission.REQUEST_DELETE_PACKAGES  # Uninstall from the app's long-press menu (ACTION_DELETE)
 uses-permission android.permission.FOREGROUND_SERVICE  # Recording service and long skill jobs
 uses-permission android.permission.FOREGROUND_SERVICE_MICROPHONE  # Recording service for meeting notes
 uses-permission android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING  # Long media jobs on Android 15+
@@ -37,3 +38,8 @@ library androidx.work  # WorkManager: WAKE_LOCK, its job services and receivers
 library androidx.core  # DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
 library androidx.startup  # The InitializationProvider
 library androidx.profileinstaller  # ProfileInstallReceiver
+library androidx.room  # MultiInstanceInvalidationService, not exported
+
+# AndroidX startup's provider. The merger credits it to whichever library declares it first (emoji2
+# through Compose), so it's listed by name instead of allowing all of that library.
+provider androidx.startup.InitializationProvider  # AndroidX initializers (emoji2, lifecycle, profileinstaller)

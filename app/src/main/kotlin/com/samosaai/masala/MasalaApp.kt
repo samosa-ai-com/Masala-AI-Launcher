@@ -1,0 +1,49 @@
+package com.samosaai.masala
+
+import android.app.Application
+import android.content.Context
+import com.samosaai.masala.data.MasalaDatabase
+import com.samosaai.masala.data.SettingsStore
+import com.samosaai.masala.launcher.AppActions
+import com.samosaai.masala.launcher.AppCatalog
+import com.samosaai.masala.launcher.IconCache
+import com.samosaai.masala.launcher.LauncherModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
+
+/** Holds the launcher's long-lived parts. Home and settings both read them through [masala]. */
+class MasalaApp : Application() {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    val database by lazy { MasalaDatabase.create(this) }
+    val settings by lazy { SettingsStore(this) }
+
+    lateinit var catalog: AppCatalog
+        private set
+    lateinit var icons: IconCache
+        private set
+    lateinit var actions: AppActions
+        private set
+    lateinit var launcher: LauncherModel
+        private set
+
+    override fun onCreate() {
+        super.onCreate()
+        catalog = AppCatalog(this, scope)
+        icons = IconCache(this, catalog)
+        actions = AppActions(this, catalog)
+        launcher = LauncherModel(scope, catalog, database.appOverrides(), actions)
+        catalog.start()
+
+        scope.launch {
+            catalog.removals.collect { database.appOverrides().deletePackage(it.packageName, it.user) }
+        }
+        // Updated apps may have new icons.
+        scope.launch { catalog.state.drop(1).collect { icons.clear() } }
+    }
+}
+
+val Context.masala: MasalaApp get() = applicationContext as MasalaApp
