@@ -13,3 +13,10 @@ plugins {
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.serialization) apply false
 }
+
+// The root project has no check task of its own; this one runs build-logic's tests with everyone else's.
+if (subprojects.any { it.path == ":app" }) {
+    tasks.register("check") {
+        dependsOn(gradle.includedBuild("build-logic").task(":test"))
+    }
+}

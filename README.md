@@ -19,6 +19,20 @@ An AI home-screen launcher for Android. Start with the docs:
 ```sh
 ./gradlew :core:test     # JVM tests, seconds; works anywhere with a JDK 17+
 ./gradlew assembleDebug  # needs the Android SDK (local.properties sdk.dir or ANDROID_HOME)
+./gradlew check          # what CI runs: all tests, the manifest check, lint
 ```
 
 Without an Android SDK, `settings.gradle.kts` builds `core` only.
+
+## Manifest check and Play readiness report
+
+`build-logic/` holds a Gradle plugin applied to `app` (arch §4, plan 0.4). Before each
+`assemble<Variant>` and with `check`, it:
+
+- fails the build if a permission, service, receiver, provider or `<queries>` package in the merged
+  manifest comes from outside `pro` and isn't in [`app/manifest-allowlist.txt`](app/manifest-allowlist.txt);
+- writes `build/reports/play-readiness-<variant>.md`: everything `pro` adds, described in
+  [`pro/play-readiness.txt`](pro/play-readiness.txt), and the core entries with their reasons;
+- fails if `app` imports anything from `pro` other than `ProTools`.
+
+Every line in either list needs a reason after `#`.

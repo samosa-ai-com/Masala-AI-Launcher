@@ -1,0 +1,43 @@
+name: CI
+
+# ./gradlew check on every push and PR (plan 0.3): :core and build-logic tests, the manifest check,
+# the :pro import check and lint. The Play readiness reports are kept as a build artifact.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # GitHub-hosted runners come with the Android SDK and ANDROID_HOME set.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Check
+        run: ./gradlew check --console=plain
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            build/reports/play-readiness-*.md
+            app/build/reports/lint-results-*.html
+            */build/reports/tests/
+          if-no-files-found: ignore

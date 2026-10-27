@@ -1,5 +1,6 @@
 package com.samosaai.masala
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.os.Build
 import android.os.Bundle
@@ -24,8 +25,8 @@ class HomeActivity : Activity() {
         }
     }
 
-    // Back does nothing on the home screen. Only called below API 33.
+    // Back does nothing on the home screen. Only called below API 33; the callback above covers the rest.
     @Deprecated("Back does nothing on the home screen")
-    @Suppress("MissingSuperCall")
+    @SuppressLint("GestureBackNavigation", "MissingSuperCall")
     override fun onBackPressed() = Unit
 }

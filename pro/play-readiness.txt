@@ -1,0 +1,10 @@
+# What each restricted entry in pro/src/main/AndroidManifest.xml is for (arch §2.3, §4). The manifest
+# check copies these lines into build/reports/play-readiness-<variant>.md for the decision in arch §9.
+#
+# Format: <kind> <name>  # the :pro tool that needs it; the Pro skills that use that tool.
+# An entry :pro adds without a line here shows up in the report as not described.
+
+uses-permission android.permission.MANAGE_EXTERNAL_STORAGE  # All-files FileAccess (the private prototype's FileResolver) and the file, glob, grep and file_search tools; File finder and Security scanner, and file paths in PDF editor, File converter and Reel
+uses-permission android.permission.REQUEST_INSTALL_PACKAGES  # APK export (PackageInstaller code from the private prototype's AppUpdateManager); App maker and Game maker
+uses-permission com.termux.permission.RUN_COMMAND  # Termux bridge for ffmpeg in convert_file (MediaConvertTool, FfmpegCommand); File converter
+package com.termux  # Lets the Termux bridge find Termux (RUN_COMMAND); File converter

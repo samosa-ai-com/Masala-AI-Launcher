@@ -1,4 +1,6 @@
 pluginManagement {
+    // The manifest check plugin. Needs AGP's API, so it's only built when :app is.
+    includeBuild("build-logic")
     repositories {
         google()
         mavenCentral()

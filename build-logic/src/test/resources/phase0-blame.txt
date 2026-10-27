@@ -1,0 +1,89 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.samosaai.masala"
+4    android:versionCode="1"
+5    android:versionName="0.1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="30"
+9        android:targetSdkVersion="36" />
+10
+11    <!-- Apps with a launcher activity, instead of QUERY_ALL_PACKAGES (arch §4) -->
+12    <queries>
+12-->/repo/app/src/main/AndroidManifest.xml:5:5-10:15
+13        <intent>
+13-->/repo/app/src/main/AndroidManifest.xml:6:9-9:18
+14            <action android:name="android.intent.action.MAIN" />
+14-->/repo/app/src/main/AndroidManifest.xml:7:13-65
+14-->/repo/app/src/main/AndroidManifest.xml:7:21-62
+15
+16            <category android:name="android.intent.category.LAUNCHER" />
+16-->/repo/app/src/main/AndroidManifest.xml:8:13-73
+16-->/repo/app/src/main/AndroidManifest.xml:8:23-70
+17        </intent>
+18
+19        <package android:name="com.termux" />
+19-->[:pro] /repo/pro/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml:21:9-46
+19-->[:pro] /repo/pro/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml:21:18-43
+20    </queries>
+21    <!-- File finder, security scanner, file paths in other Pro skills -->
+22    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" /> <!-- APK export from the game and app makers -->
+22-->[:pro] /repo/pro/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml:10:5-12:40
+22-->[:pro] /repo/pro/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml:11:9-66
+23    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" /> <!-- File converter: ffmpeg through Termux -->
+23-->[:pro] /repo/pro/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml:15:5-83
+23-->[:pro] /repo/pro/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml:15:22-80
+24    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
+24-->[:pro] /repo/pro/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml:18:5-73
+24-->[:pro] /repo/pro/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml:18:22-70
+25
+26    <application
+26-->/repo/app/src/main/AndroidManifest.xml:12:5-34:19
+27        android:allowBackup="true"
+27-->/repo/app/src/main/AndroidManifest.xml:13:9-35
+28        android:debuggable="true"
+29        android:extractNativeLibs="false"
+30        android:label="@string/app_name"
+30-->/repo/app/src/main/AndroidManifest.xml:14:9-41
+31        android:supportsRtl="true" >
+31-->/repo/app/src/main/AndroidManifest.xml:15:9-35
+32        <activity
+32-->/repo/app/src/main/AndroidManifest.xml:17:9-33:20
+33            android:name="com.samosaai.masala.HomeActivity"
+33-->/repo/app/src/main/AndroidManifest.xml:18:13-41
+34            android:clearTaskOnLaunch="true"
+34-->/repo/app/src/main/AndroidManifest.xml:19:13-45
+35            android:excludeFromRecents="true"
+35-->/repo/app/src/main/AndroidManifest.xml:20:13-46
+36            android:exported="true"
+36-->/repo/app/src/main/AndroidManifest.xml:21:13-36
+37            android:launchMode="singleTask"
+37-->/repo/app/src/main/AndroidManifest.xml:22:13-44
+38            android:resumeWhilePausing="true"
+38-->/repo/app/src/main/AndroidManifest.xml:23:13-46
+39            android:stateNotNeeded="true"
+39-->/repo/app/src/main/AndroidManifest.xml:24:13-42
+40            android:theme="@android:style/Theme.DeviceDefault.Wallpaper.NoTitleBar"
+40-->/repo/app/src/main/AndroidManifest.xml:25:13-84
+41            android:windowSoftInputMode="adjustPan" >
+41-->/repo/app/src/main/AndroidManifest.xml:26:13-52
+42            <intent-filter>
+42-->/repo/app/src/main/AndroidManifest.xml:27:13-32:29
+43                <action android:name="android.intent.action.MAIN" />
+43-->/repo/app/src/main/AndroidManifest.xml:7:13-65
+43-->/repo/app/src/main/AndroidManifest.xml:7:21-62
+44
+45                <category android:name="android.intent.category.HOME" />
+45-->/repo/app/src/main/AndroidManifest.xml:29:17-73
+45-->/repo/app/src/main/AndroidManifest.xml:29:27-70
+46                <category android:name="android.intent.category.DEFAULT" />
+46-->/repo/app/src/main/AndroidManifest.xml:30:17-76
+46-->/repo/app/src/main/AndroidManifest.xml:30:27-73
+47                <category android:name="android.intent.category.LAUNCHER" />
+47-->/repo/app/src/main/AndroidManifest.xml:8:13-73
+47-->/repo/app/src/main/AndroidManifest.xml:8:23-70
+48            </intent-filter>
+49        </activity>
+50    </application>
+51
+52</manifest>
