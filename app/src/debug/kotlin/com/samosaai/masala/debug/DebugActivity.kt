@@ -191,7 +191,7 @@ class DebugActivity : ComponentActivity() {
                             health.launch(HealthTool.PERMISSIONS)
                         } else if (capability != null) {
                             capability.settingsIntent(this@DebugActivity)?.let(::startActivity)
-                        } else if (marker.startsWith("android.permission.")) {
+                        } else if (marker.startsWith("android.permission.") || marker.startsWith("com.termux.permission.")) {
                             permission.launch(marker)
                         }
                     }

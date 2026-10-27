@@ -1,5 +1,7 @@
 package com.samosaai.masala.tools
 
+import com.samosaai.masala.core.tool.ActionResult
+import com.samosaai.masala.core.tool.ToolFiles
 import android.content.Context
 import androidx.annotation.OptIn
 import androidx.media3.common.audio.SonicAudioProcessor

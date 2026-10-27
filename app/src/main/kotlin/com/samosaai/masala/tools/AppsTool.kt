@@ -1,5 +1,6 @@
 package com.samosaai.masala.tools
 
+import com.samosaai.masala.core.tool.ActionResult
 import android.app.AppOpsManager
 import android.app.usage.UsageStatsManager
 import android.content.Context

@@ -1,5 +1,6 @@
 package com.samosaai.masala.tools
 
+import com.samosaai.masala.core.tool.ToolFiles
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import org.jsoup.Jsoup

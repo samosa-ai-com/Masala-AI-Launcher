@@ -1,5 +1,7 @@
 package com.samosaai.masala.tools
 
+import com.samosaai.masala.core.tool.FunctionTool
+import com.samosaai.masala.core.tool.ToolFiles
 import android.content.Context
 import com.samosaai.masala.core.tool.Tool
 import com.samosaai.masala.core.tool.ToolSensitivity.CHANGES_SOMETHING

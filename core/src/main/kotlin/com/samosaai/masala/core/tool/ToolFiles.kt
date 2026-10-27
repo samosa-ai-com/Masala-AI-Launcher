@@ -1,8 +1,5 @@
-package com.samosaai.masala.tools
+package com.samosaai.masala.core.tool
 
-import com.samosaai.masala.core.tool.FileAccess
-import com.samosaai.masala.core.tool.FileAccessDeniedException
-import com.samosaai.masala.core.tool.FileScope
 import java.io.File
 
 /**
@@ -45,6 +42,9 @@ class ToolFiles(private val access: () -> FileAccess) {
     companion object {
         /** The marker for "All files access", which `:pro` asks for. */
         const val ALL_FILES_ACCESS = "special:all_files_access"
+
+        /** Starts a tool result that carries an image for the vision model (the private prototype's `FileResolver.IMAGE_DATA_PREFIX`). */
+        const val IMAGE_DATA_PREFIX = "IMAGE_DATA:"
 
         fun formatSizeStatic(bytes: Long): String = when {
             bytes >= 1024L * 1024 * 1024 -> "%.1f GB".format(bytes.toDouble() / (1024 * 1024 * 1024))

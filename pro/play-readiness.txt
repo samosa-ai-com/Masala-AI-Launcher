@@ -4,7 +4,9 @@
 # Format: <kind> <name>  # the :pro tool that needs it; the Pro skills that use that tool.
 # An entry :pro adds without a line here shows up in the report as not described.
 
-uses-permission android.permission.MANAGE_EXTERNAL_STORAGE  # All-files FileAccess (the private prototype's FileResolver) and the file, glob, grep and file_search tools; File finder and Security scanner, and file paths in PDF editor, File converter and Reel
-uses-permission android.permission.REQUEST_INSTALL_PACKAGES  # APK export (PackageInstaller code from the private prototype's AppUpdateManager); App maker and Game maker
-uses-permission com.termux.permission.RUN_COMMAND  # Termux bridge for ffmpeg in convert_file (MediaConvertTool, FfmpegCommand); File converter
+uses-permission android.permission.MANAGE_EXTERNAL_STORAGE  # All-files FileAccess (ProFileAccess) and the list_files, read_file, write_file, glob, grep and file_search tools; File finder and Security scanner, and file paths in PDF editor, File converter and Reel
+uses-permission android.permission.REQUEST_INSTALL_PACKAGES  # APK export through a PackageInstaller session (ApkInstaller); App maker and Game maker
+uses-permission com.termux.permission.RUN_COMMAND  # Termux bridge for ffmpeg in media_convert (TermuxBridge, MediaConvertTool, FfmpegCommand); File converter
 package com.termux  # Lets the Termux bridge find Termux (RUN_COMMAND); File converter
+receiver com.samosaai.masala.pro.termux.TermuxResultReceiver  # Gets ffmpeg's result back from Termux, not exported; File converter
+receiver com.samosaai.masala.pro.install.InstallResultReceiver  # Gets the install status back from PackageInstaller, not exported; App maker and Game maker
