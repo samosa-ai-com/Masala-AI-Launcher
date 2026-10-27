@@ -66,5 +66,7 @@
     <string name="settings_auto_launch">Open the app when one result is left</string>
     <string name="settings_hidden_apps">Hidden apps</string>
     <string name="settings_hidden_apps_summary">Hidden: %1$d · Search only: %2$d</string>
+    <string name="settings_debug">Debug</string>
+    <string name="settings_debug_summary">Model calls and tools (debug builds only)</string>
     <string name="settings_hidden_apps_empty">No hidden apps. Long-press an app in the drawer to hide it.</string>
 </resources>

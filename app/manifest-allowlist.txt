@@ -24,6 +24,7 @@ uses-permission android.permission.POST_NOTIFICATIONS  # Price watches, job prog
 uses-permission android.permission.RECEIVE_BOOT_COMPLETED  # Re-arm scheduled skills and reminders after reboot
 uses-permission android.permission.VIBRATE  # Haptics on long press and gestures
 uses-permission android.permission.REQUEST_DELETE_PACKAGES  # Uninstall from the app's long-press menu (ACTION_DELETE)
+uses-permission com.android.alarm.permission.SET_ALARM  # set_alarm and set_timer hand off to the clock app (AlarmClock intents)
 uses-permission android.permission.FOREGROUND_SERVICE  # Recording service and long skill jobs
 uses-permission android.permission.FOREGROUND_SERVICE_MICROPHONE  # Recording service for meeting notes
 uses-permission android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING  # Long media jobs on Android 15+

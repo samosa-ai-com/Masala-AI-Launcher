@@ -1,5 +1,6 @@
 package com.samosaai.masala.ui.settings
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -30,6 +31,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.samosaai.masala.BuildConfig
 import com.samosaai.masala.R
 import com.samosaai.masala.core.apps.AppEntry
 import com.samosaai.masala.core.apps.Visibility
@@ -141,6 +143,13 @@ class SettingsActivity : ComponentActivity() {
                 ),
                 onClick = onHiddenApps,
             )
+
+            if (BuildConfig.DEBUG) {
+                // The debug screen lives in the debug source set, so it's started by name.
+                SettingsNavRow(stringResource(R.string.settings_debug), stringResource(R.string.settings_debug_summary)) {
+                    startActivity(Intent().setClassName(this@SettingsActivity, "com.samosaai.masala.debug.DebugActivity"))
+                }
+            }
         }
     }
 

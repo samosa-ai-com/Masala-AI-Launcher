@@ -1,11 +1,26 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
     id("androidx.room")
     id("masala.manifest-check")
 }
+
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
+/**
+ * the private prototype's samosaConfig: endpoints and keys come from an environment variable or `local.properties`
+ * (both gitignored), never from Git. A checkout without them builds against inert placeholders.
+ */
+fun samosaConfig(name: String, placeholder: String): String =
+    providers.environmentVariable(name).orNull ?: localProps.getProperty(name) ?: placeholder
 
 android {
     namespace = "com.samosaai.masala"
@@ -18,10 +33,18 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+
+        // The model endpoint (plan 0.2): Samosa's OpenAI-compatible proxy by default. MASALA_LLM_*
+        // override it, for example with a local LM Studio server for testing.
+        val samosaApi = samosaConfig("SAMOSA_API_URL", "https://api.samosa-ai.example")
+        buildConfigField("String", "MASALA_LLM_BASE_URL", "\"${samosaConfig("MASALA_LLM_BASE_URL", "$samosaApi/v1/")}\"")
+        buildConfigField("String", "MASALA_LLM_API_KEY", "\"${samosaConfig("MASALA_LLM_API_KEY", "")}\"")
+        buildConfigField("String", "MASALA_LLM_MODEL", "\"${samosaConfig("MASALA_LLM_MODEL", "chai-small")}\"")
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {
@@ -62,4 +85,11 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
     implementation(libs.datastore.preferences)
+
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.kotlinx.serialization)
+    implementation(libs.okhttp.logging)
+    implementation(libs.jsoup)
+
+    testImplementation(kotlin("test-junit"))
 }
