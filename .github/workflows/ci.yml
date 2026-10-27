@@ -1,7 +1,7 @@
 name: CI
 
 # ./gradlew check on every push and PR (plan 0.3): :core and build-logic tests, the manifest check,
-# the :pro import check and lint. The Play readiness reports are kept as a build artifact.
+# the :pro import check and lint. The Play readiness report is shown in the job summary.
 
 on:
   push:
@@ -31,11 +31,19 @@ jobs:
       - name: Check
         run: ./gradlew check --console=plain
 
-      - name: Upload reports
+      # The readiness report goes in the job summary rather than an artifact, so reading it needs no
+      # artifact storage.
+      - name: Play readiness report
         if: always()
+        run: cat build/reports/play-readiness-release.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+
+      - name: Upload reports
+        if: failure()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: reports
+          retention-days: 7
           path: |
             build/reports/play-readiness-*.md
             app/build/reports/lint-results-*.html
