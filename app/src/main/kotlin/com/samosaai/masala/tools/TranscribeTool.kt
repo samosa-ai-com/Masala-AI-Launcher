@@ -1,5 +1,7 @@
 package com.samosaai.masala.tools
 
+import com.samosaai.masala.core.tool.ActionResult
+import com.samosaai.masala.core.tool.ToolFiles
 import com.samosaai.masala.audio.AudioApi
 import com.samosaai.masala.audio.AudioModel
 import com.samosaai.masala.audio.ModelCategory

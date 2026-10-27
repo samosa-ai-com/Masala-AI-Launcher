@@ -11,7 +11,7 @@ import kotlinx.serialization.Serializable
 data class MasalaSkill(
     // the private prototype's fields
     val id: String,
-    val title: String,
+    val title: String = "",
     val description: String = "",
     val instructions: String,
     val requiresTools: List<String> = emptyList(),

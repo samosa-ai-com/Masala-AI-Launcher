@@ -74,4 +74,23 @@
     <string name="settings_debug">Debug</string>
     <string name="settings_debug_summary">Model calls and tools (debug builds only)</string>
     <string name="settings_hidden_apps_empty">No hidden apps. Long-press an app in the drawer to hide it.</string>
+
+    <!-- Speech -->
+    <string name="language_english">English</string>
+    <string name="language_spanish">Spanish</string>
+    <string name="language_french">French</string>
+    <string name="language_german">German</string>
+    <string name="language_hindi">Hindi</string>
+    <string name="language_japanese">Japanese</string>
+    <string name="language_chinese">Chinese</string>
+    <string name="language_italian">Italian</string>
+    <string name="language_portuguese">Portuguese</string>
+    <string name="language_russian">Russian</string>
+    <string name="stt_on_device_unavailable">This phone can’t recognise speech on the device. Turn off “On-device only” in the speech settings.</string>
+    <string name="stt_language_not_on_device">%1$s isn’t downloaded for on-device speech recognition. Download it in Android’s settings, or turn off “On-device only” in the speech settings.</string>
+    <string name="stt_language_unsupported">The speech recognizer can’t recognise %1$s. Pick another recognizer in the speech settings.</string>
+
+    <!-- Scheduled tasks -->
+    <string name="scheduled_task_gone">That scheduled task no longer exists.</string>
+    <string name="scheduled_task_no_runner">Scheduled runs need the agent, which isn’t in this build yet.</string>
 </resources>

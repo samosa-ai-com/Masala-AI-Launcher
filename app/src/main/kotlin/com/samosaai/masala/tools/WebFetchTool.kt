@@ -1,5 +1,6 @@
 package com.samosaai.masala.tools
 
+import com.samosaai.masala.core.tool.ActionResult
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup

@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <uses-permission
@@ -119,6 +120,24 @@
                 <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
             </intent-filter>
         </activity-alias>
+
+        <!-- Scheduled tasks: the alarm that starts a run (Masala's own PendingIntent only) -->
+        <receiver
+            android:name=".scheduled.ScheduledTaskReceiver"
+            android:exported="false" />
+
+        <!-- Re-arms that alarm after a reboot, an app update or a clock change; all four broadcasts
+             are protected and exempt from the implicit-broadcast limits -->
+        <receiver
+            android:name=".scheduled.ScheduledTaskRebootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+            </intent-filter>
+        </receiver>
 
         <activity
             android:name=".ui.settings.SettingsActivity"

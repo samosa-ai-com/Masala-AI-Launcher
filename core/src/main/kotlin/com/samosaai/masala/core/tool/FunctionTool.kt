@@ -1,10 +1,5 @@
-package com.samosaai.masala.tools
+package com.samosaai.masala.core.tool
 
-import com.samosaai.masala.core.tool.Tool
-import com.samosaai.masala.core.tool.ToolDefinition
-import com.samosaai.masala.core.tool.ToolOrigin
-import com.samosaai.masala.core.tool.ToolResult
-import com.samosaai.masala.core.tool.ToolSensitivity
 import kotlinx.serialization.json.JsonObject
 
 /**

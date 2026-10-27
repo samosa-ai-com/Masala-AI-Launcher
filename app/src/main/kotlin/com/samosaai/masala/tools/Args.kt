@@ -1,5 +1,6 @@
 package com.samosaai.masala.tools
 
+import com.samosaai.masala.core.tool.ActionResult
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull

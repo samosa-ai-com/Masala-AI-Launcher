@@ -1,5 +1,7 @@
 package com.samosaai.masala.tools
 
+import com.samosaai.masala.core.tool.ActionResult
+import com.samosaai.masala.core.tool.ToolFiles
 import android.app.AppOpsManager
 import android.app.NotificationManager
 import android.content.Context

@@ -17,4 +17,16 @@
     <queries>
         <package android:name="com.termux" />
     </queries>
+
+    <application>
+        <!-- Termux hands a command's result back through a PendingIntent that names this receiver -->
+        <receiver
+            android:name=".termux.TermuxResultReceiver"
+            android:exported="false" />
+
+        <!-- PackageInstaller reports an install session's status here (APK export) -->
+        <receiver
+            android:name=".install.InstallResultReceiver"
+            android:exported="false" />
+    </application>
 </manifest>

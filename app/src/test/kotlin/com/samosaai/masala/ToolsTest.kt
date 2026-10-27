@@ -1,5 +1,8 @@
 package com.samosaai.masala
 
+import com.samosaai.masala.core.tool.ActionResult
+import com.samosaai.masala.core.tool.FunctionTool
+import com.samosaai.masala.core.tool.ToolFiles
 import com.samosaai.masala.core.tool.FileAccess
 import com.samosaai.masala.core.tool.FileAccessDeniedException
 import com.samosaai.masala.core.tool.FileScope
@@ -10,12 +13,9 @@ import com.samosaai.masala.core.tool.ToolSensitivity
 import com.samosaai.masala.llm.ChatMessage
 import com.samosaai.masala.llm.ChatRequest
 import com.samosaai.masala.llm.ResponseFormat
-import com.samosaai.masala.tools.ActionResult
 import com.samosaai.masala.tools.Capability
-import com.samosaai.masala.tools.FunctionTool
 import com.samosaai.masala.tools.MasalaToolDefinitions
 import com.samosaai.masala.tools.MasalaToolRegistry
-import com.samosaai.masala.tools.ToolFiles
 import com.samosaai.masala.tools.boolean
 import com.samosaai.masala.tools.int
 import com.samosaai.masala.tools.stringList

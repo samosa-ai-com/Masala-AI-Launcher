@@ -1,6 +1,5 @@
-package com.samosaai.masala.tools
+package com.samosaai.masala.core.tool
 
-import com.samosaai.masala.core.tool.ToolResult
 
 /**
  * What a tool copied from the private prototype returns: the private prototype's `ToolResult`, renamed so it doesn't clash with

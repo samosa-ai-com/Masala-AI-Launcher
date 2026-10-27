@@ -1,5 +1,7 @@
 package com.samosaai.masala.tools
 
+import com.samosaai.masala.core.tool.ActionResult
+import com.samosaai.masala.core.tool.ToolFiles
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
