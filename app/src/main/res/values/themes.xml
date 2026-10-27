@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose draws everything; these only set the window. -->
+    <style name="Theme.Masala" parent="android:Theme.Material.NoActionBar" />
+
+    <!-- Home: the wallpaper shows through. -->
+    <style name="Theme.Masala.Home">
+        <item name="android:windowShowWallpaper">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+
+    <!-- Dialog-only activities. -->
+    <style name="Theme.Masala.Translucent">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">true</item>
+    </style>
+</resources>

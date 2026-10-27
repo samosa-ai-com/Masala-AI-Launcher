@@ -1,0 +1,45 @@
+# Core allowlist for the manifest check (arch §4, plan 0.4). Read by build-logic's ManifestCheckPlugin.
+#
+# Any permission, service, receiver, provider or <queries> package in the merged manifest that doesn't
+# come from :pro must be listed here, or the build fails. Entries from :pro never fail it; they go into
+# build/reports/play-readiness-<variant>.md, described in pro/play-readiness.txt.
+#
+# Format: <kind> <name>  # reason. The reason is required. Kinds: uses-permission, permission,
+# service, receiver, provider, package, and library <maven group> for everything a library adds.
+# Not allowed here: SCHEDULE_EXACT_ALARM (Play allows it only for alarm and calendar apps) and
+# QUERY_ALL_PACKAGES (the MAIN/LAUNCHER <queries> entry covers the app list).
+
+uses-permission android.permission.INTERNET  # Model calls, web search and fetch, Skill Hub
+uses-permission android.permission.ACCESS_NETWORK_STATE  # Skip model calls and hub sync when offline
+uses-permission android.permission.SET_WALLPAPER  # WallpaperTool and AI home screens
+uses-permission android.permission.READ_CALENDAR  # Next-event conditions, calendar cards, daily brief
+uses-permission android.permission.READ_CONTACTS  # Speech name hints, urgent filter for quiet nights
+uses-permission android.permission.RECORD_AUDIO  # Push-to-talk and meeting notes recording
+uses-permission android.permission.ACCESS_NOTIFICATION_POLICY  # Quiet nights automatic zen rule
+uses-permission android.permission.ACCESS_COARSE_LOCATION  # Weather for the daily brief and the Weather condition
+uses-permission android.permission.BLUETOOTH_CONNECT  # BluetoothConnected condition
+uses-permission android.permission.PACKAGE_USAGE_STATS  # Usage ranking for the drawer and layout prompts
+uses-permission android.permission.EXPAND_STATUS_BAR  # Swipe down opens notifications
+uses-permission android.permission.POST_NOTIFICATIONS  # Price watches, job progress, reminders
+uses-permission android.permission.RECEIVE_BOOT_COMPLETED  # Re-arm scheduled skills and reminders after reboot
+uses-permission android.permission.VIBRATE  # Haptics on long press and gestures
+uses-permission android.permission.REQUEST_DELETE_PACKAGES  # Uninstall from the app's long-press menu (ACTION_DELETE)
+uses-permission android.permission.FOREGROUND_SERVICE  # Recording service and long skill jobs
+uses-permission android.permission.FOREGROUND_SERVICE_MICROPHONE  # Recording service for meeting notes
+uses-permission android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING  # Long media jobs on Android 15+
+uses-permission android.permission.FOREGROUND_SERVICE_DATA_SYNC  # Long jobs below Android 15, acapella upload
+uses-permission android.permission.health.READ_SLEEP  # Sleep condition and widgets through Health Connect
+uses-permission android.permission.health.READ_STEPS  # Steps condition and widgets through Health Connect
+
+# The notification listener and the recording service are added here, by class name, in the commit
+# that creates them.
+
+library androidx.work  # WorkManager: WAKE_LOCK, its job services and receivers
+library androidx.core  # DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+library androidx.startup  # The InitializationProvider
+library androidx.profileinstaller  # ProfileInstallReceiver
+library androidx.room  # MultiInstanceInvalidationService, not exported
+
+# AndroidX startup's provider. The merger credits it to whichever library declares it first (emoji2
+# through Compose), so it's listed by name instead of allowing all of that library.
+provider androidx.startup.InitializationProvider  # AndroidX initializers (emoji2, lifecycle, profileinstaller)
