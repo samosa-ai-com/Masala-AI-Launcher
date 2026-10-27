@@ -1,0 +1,17 @@
+[versions]
+# AGP can't be resolved from this cloud container (Google Maven is blocked); bump it together with the
+# Gradle wrapper from Android Studio. AGP 8.13 needs Gradle 8.13+.
+agp = "8.13.0"
+kotlin = "2.4.21"
+serialization = "1.11.0"
+jsonSchemaValidator = "1.5.9"
+
+[libraries]
+android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+json-schema-validator = { module = "com.networknt:json-schema-validator", version.ref = "jsonSchemaValidator" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

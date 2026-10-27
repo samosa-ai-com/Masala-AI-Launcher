@@ -1,0 +1,1410 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/masala/schema/layout-v1.json",
+  "title": "Masala layout, version 1",
+  "description": "Kept by hand to match the Kotlin contracts in com.samosaai.masala.core.contract. LayoutSchemaTest keeps them in step. $defs/ModePatch is the mode patch schema.",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "pages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Page"
+      },
+      "minItems": 1
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "pages"
+  ],
+  "$defs": {
+    "Page": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string"
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Section"
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Rule"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sections"
+      ]
+    },
+    "Section": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "header"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "showClock": {
+              "type": "boolean"
+            },
+            "showDate": {
+              "type": "boolean"
+            },
+            "rules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Rule"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "grid"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "columns": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "title": {
+              "type": "string"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Item"
+              }
+            },
+            "rules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Rule"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "items"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "list"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title": {
+              "type": "string"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Item"
+              }
+            },
+            "rules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Rule"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "items"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "group"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string"
+            },
+            "icon": {
+              "$ref": "#/$defs/IconRef"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Item"
+              }
+            },
+            "rules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Rule"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "label",
+            "items"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "dock"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Item"
+              }
+            },
+            "rules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Rule"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "items"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "widget"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "widget": {
+              "$ref": "#/$defs/WidgetSpec"
+            },
+            "rules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Rule"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "widget"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "stack"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "widgets": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/WidgetSpec"
+              },
+              "minItems": 1
+            },
+            "rules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Rule"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "widgets"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "skill_widget"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "skillId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "size": {
+              "enum": [
+                "small",
+                "medium",
+                "large"
+              ]
+            },
+            "rules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Rule"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "skillId"
+          ]
+        }
+      ]
+    },
+    "Item": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string"
+        },
+        "icon": {
+          "$ref": "#/$defs/IconRef"
+        },
+        "action": {
+          "$ref": "#/$defs/MasalaAction"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Rule"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "icon",
+        "action"
+      ]
+    },
+    "IconRef": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "app"
+            },
+            "packageName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "activity": {
+              "type": "string"
+            },
+            "user": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "packageName"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "symbol"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tint": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "override"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id"
+          ]
+        }
+      ]
+    },
+    "MasalaAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "launch_app"
+            },
+            "packageName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "activity": {
+              "type": "string"
+            },
+            "user": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "packageName"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "launch_shortcut"
+            },
+            "packageName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "shortcutId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "user": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "packageName",
+            "shortcutId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "open_url"
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "url"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "dial"
+            },
+            "number": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "number"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "compose_message"
+            },
+            "to": {
+              "type": "string"
+            },
+            "body": {
+              "type": "string"
+            },
+            "packageName": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "set_alarm"
+            },
+            "hour": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 23
+            },
+            "minute": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 59
+            },
+            "label": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "hour",
+            "minute"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "start_timer"
+            },
+            "seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "label": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "seconds"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "open_drawer"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "expand_notifications"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "search"
+            },
+            "query": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "ask_masala"
+            },
+            "prompt": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "prompt"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "set_mode"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "on": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "on"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "run_skill"
+            },
+            "skillId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "prompt": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "skillId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "open_mini_app"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "run_tool"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "args": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "name"
+          ]
+        }
+      ]
+    },
+    "Condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "time_window"
+            },
+            "start": {
+              "type": "string",
+              "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+            },
+            "end": {
+              "type": "string",
+              "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+            },
+            "days": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "mon",
+                  "tue",
+                  "wed",
+                  "thu",
+                  "fri",
+                  "sat",
+                  "sun"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "start",
+            "end"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "minutes_to_next_event"
+            },
+            "maxMinutes": {
+              "type": "integer"
+            },
+            "minMinutes": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "maxMinutes"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "charging"
+            },
+            "charging": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "bluetooth_connected"
+            },
+            "deviceName": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "mode_active"
+            },
+            "modeId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "modeId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "urgent_count"
+            },
+            "atLeast": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "sleep"
+            },
+            "minHours": {
+              "type": "number"
+            },
+            "maxHours": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "steps"
+            },
+            "min": {
+              "type": "integer"
+            },
+            "max": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "weather"
+            },
+            "kinds": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "clear",
+                  "cloudy",
+                  "rain",
+                  "snow",
+                  "storm",
+                  "fog"
+                ]
+              }
+            },
+            "minTempC": {
+              "type": "number"
+            },
+            "maxTempC": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "all"
+            },
+            "conditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Condition"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "conditions"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "any"
+            },
+            "conditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Condition"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "conditions"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "not"
+            },
+            "condition": {
+              "$ref": "#/$defs/Condition"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "condition"
+          ]
+        }
+      ]
+    },
+    "Effect": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "show"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "hide"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "size"
+            },
+            "rows": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "rows"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "priority"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        }
+      ]
+    },
+    "Rule": {
+      "type": "object",
+      "properties": {
+        "condition": {
+          "$ref": "#/$defs/Condition"
+        },
+        "effect": {
+          "$ref": "#/$defs/Effect"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "condition",
+        "effect"
+      ]
+    },
+    "SizeRange": {
+      "type": "object",
+      "properties": {
+        "min": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "default": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "Binding": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "enum": [
+            "storage",
+            "next_event",
+            "battery",
+            "media",
+            "sleep",
+            "steps",
+            "weather",
+            "urgent_count"
+          ]
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "source"
+      ]
+    },
+    "WidgetComponent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "text"
+            },
+            "text": {
+              "type": "string"
+            },
+            "binding": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "counter"
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string"
+            },
+            "step": {
+              "type": "integer"
+            },
+            "goal": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "key",
+            "label"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "checklist"
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "key",
+            "items"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "timer"
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1
+            },
+            "label": {
+              "type": "string"
+            },
+            "seconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "key",
+            "label",
+            "seconds"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "progress"
+            },
+            "label": {
+              "type": "string"
+            },
+            "binding": {
+              "$ref": "#/$defs/Binding"
+            },
+            "max": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "label",
+            "binding",
+            "max"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "chart"
+            },
+            "binding": {
+              "$ref": "#/$defs/Binding"
+            },
+            "kind": {
+              "enum": [
+                "bar",
+                "line"
+              ]
+            },
+            "days": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "binding"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "button"
+            },
+            "label": {
+              "type": "string"
+            },
+            "action": {
+              "$ref": "#/$defs/MasalaAction"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "label",
+            "action"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "image"
+            },
+            "icon": {
+              "$ref": "#/$defs/IconRef"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "icon"
+          ]
+        }
+      ]
+    },
+    "WidgetSpec": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string"
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/WidgetComponent"
+          },
+          "minItems": 1
+        },
+        "size": {
+          "$ref": "#/$defs/SizeRange"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Rule"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "components"
+      ]
+    },
+    "ModeTrigger": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "manual"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "rule"
+            },
+            "condition": {
+              "$ref": "#/$defs/Condition"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "condition"
+          ]
+        }
+      ]
+    },
+    "ModePatch": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer"
+        },
+        "trigger": {
+          "$ref": "#/$defs/ModeTrigger"
+        },
+        "hideItems": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hideSections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "addItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sectionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "item": {
+                "$ref": "#/$defs/Item"
+              },
+              "after": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "sectionId",
+              "item"
+            ]
+          }
+        },
+        "addSections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pageId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "section": {
+                "$ref": "#/$defs/Section"
+              },
+              "after": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "pageId",
+              "section"
+            ]
+          }
+        },
+        "dnd": {
+          "type": "object",
+          "properties": {
+            "filter": {
+              "enum": [
+                "priority",
+                "alarms",
+                "none"
+              ]
+            },
+            "allowUrgent": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "filter"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ]
+    }
+  }
+}

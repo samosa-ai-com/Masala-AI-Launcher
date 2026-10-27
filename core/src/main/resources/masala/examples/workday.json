@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "pages": [
+    {
+      "id": "today",
+      "title": "Today",
+      "sections": [
+        { "type": "header", "id": "clock" },
+        {
+          "type": "widget",
+          "id": "next-event-card",
+          "widget": {
+            "id": "next-event",
+            "components": [
+              { "type": "text", "binding": { "source": "next_event" } },
+              {
+                "type": "button",
+                "label": "Directions",
+                "action": { "type": "ask_masala", "prompt": "Directions to my next event" }
+              }
+            ],
+            "size": { "min": 1, "default": 1, "max": 2 },
+            "rules": [
+              { "condition": { "type": "minutes_to_next_event", "maxMinutes": 60 }, "effect": { "type": "show" } },
+              { "condition": { "type": "not", "condition": { "type": "minutes_to_next_event", "maxMinutes": 60 } }, "effect": { "type": "hide" } },
+              { "condition": { "type": "minutes_to_next_event", "maxMinutes": 15 }, "effect": { "type": "size", "rows": 2 } }
+            ]
+          }
+        },
+        {
+          "type": "stack",
+          "id": "focus-stack",
+          "widgets": [
+            {
+              "id": "water",
+              "title": "Water",
+              "components": [ { "type": "counter", "key": "glasses", "label": "Glasses", "goal": 8 } ],
+              "size": { "min": 1, "default": 1, "max": 2 }
+            },
+            {
+              "id": "steps",
+              "title": "Steps",
+              "components": [
+                { "type": "progress", "label": "Steps", "binding": { "source": "steps" }, "max": 8000 }
+              ],
+              "rules": [
+                {
+                  "condition": { "type": "time_window", "start": "17:00", "end": "21:00" },
+                  "effect": { "type": "priority", "value": 10 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "grid",
+          "id": "routine",
+          "title": "Routine",
+          "columns": 3,
+          "items": [
+            {
+              "id": "gym",
+              "label": "Gym",
+              "icon": { "type": "symbol", "name": "fitness_center", "tint": "orange" },
+              "action": { "type": "start_timer", "seconds": 2700, "label": "Workout" },
+              "rules": [
+                {
+                  "condition": {
+                    "type": "not",
+                    "condition": { "type": "time_window", "start": "06:00", "end": "09:00", "days": ["mon", "wed", "fri"] }
+                  },
+                  "effect": { "type": "hide" }
+                }
+              ]
+            },
+            {
+              "id": "playlist",
+              "label": "Playlist",
+              "icon": { "type": "symbol", "name": "queue_music", "tint": "green" },
+              "action": { "type": "launch_app", "packageName": "com.spotify.music" }
+            },
+            {
+              "id": "dinner",
+              "label": "Dinner",
+              "icon": { "type": "symbol", "name": "restaurant", "tint": "red" },
+              "action": { "type": "run_skill", "skillId": "chef", "prompt": "Something quick for dinner" },
+              "rules": [
+                {
+                  "condition": { "type": "not", "condition": { "type": "time_window", "start": "16:00", "end": "21:00" } },
+                  "effect": { "type": "hide" }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "dock",
+          "id": "dock",
+          "items": [
+            {
+              "id": "phone",
+              "label": "Phone",
+              "icon": { "type": "app", "packageName": "com.google.android.dialer" },
+              "action": { "type": "launch_app", "packageName": "com.google.android.dialer" }
+            },
+            {
+              "id": "ask",
+              "label": "Ask Masala",
+              "icon": { "type": "symbol", "name": "mic" },
+              "action": { "type": "ask_masala", "prompt": "" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "skills",
+      "title": "Skills",
+      "sections": [
+        { "type": "skill_widget", "id": "notes-widget", "skillId": "meeting_notes", "size": "large" },
+        { "type": "skill_widget", "id": "chef-widget", "skillId": "chef" },
+        { "type": "skill_widget", "id": "brief-widget", "skillId": "daily_brief", "size": "small" },
+        {
+          "type": "group",
+          "id": "mini-apps",
+          "label": "My apps",
+          "icon": { "type": "symbol", "name": "widgets" },
+          "items": [
+            {
+              "id": "snake",
+              "label": "Snake",
+              "icon": { "type": "override", "id": "mini-snake" },
+              "action": { "type": "open_mini_app", "id": "snake" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

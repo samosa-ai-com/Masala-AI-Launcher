@@ -1,0 +1,28 @@
+{
+  "id": "focus",
+  "name": "Focus",
+  "order": 10,
+  "trigger": {
+    "type": "rule",
+    "condition": {
+      "type": "all",
+      "conditions": [
+        { "type": "time_window", "start": "09:30", "end": "12:30", "days": ["mon", "tue", "wed", "thu", "fri"] },
+        { "type": "not", "condition": { "type": "mode_active", "modeId": "quiet-nights" } }
+      ]
+    }
+  },
+  "hideItems": ["playlist", "dinner"],
+  "addItems": [
+    {
+      "sectionId": "routine",
+      "item": {
+        "id": "focus-timer",
+        "label": "25 min",
+        "icon": { "type": "symbol", "name": "timer" },
+        "action": { "type": "start_timer", "seconds": 1500, "label": "Focus" }
+      }
+    }
+  ],
+  "dnd": { "filter": "priority", "allowUrgent": true }
+}

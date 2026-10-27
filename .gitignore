@@ -12,3 +12,12 @@ reference/upstream/*/.git/
 # APK analysis output: commit docs + metadata only, never the REDACTED bulk
 reference/reversed/*/analysis-output/
 reference/reversed/*/analysis-output/
+
+# Gradle / Android Studio
+.gradle/
+.kotlin/
+build/
+local.properties
+.idea/
+*.iml
+captures/
