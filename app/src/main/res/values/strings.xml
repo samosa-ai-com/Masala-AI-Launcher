@@ -1,4 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Masala</string>
+
+    <!-- Home -->
+    <string name="home_set_default_title">Make Masala your home screen</string>
+    <string name="home_set_default_action">Set as home</string>
+    <string name="home_empty">Long-press an app in the drawer and choose Pin to home.</string>
+    <string name="home_open_drawer">Apps</string>
+    <string name="home_open_drawer_description">Open the app drawer</string>
+    <string name="home_open_settings_description">Open Masala settings</string>
+
+    <!-- Drawer -->
+    <string name="drawer_search_hint">Search apps</string>
+    <string name="drawer_work_header">Work</string>
+    <string name="drawer_work_paused">Work apps are paused</string>
+    <string name="drawer_work_toggle">Work apps on</string>
+    <string name="drawer_work_toggle_failed">Only the default home app can pause work apps</string>
+    <string name="drawer_no_match">Ask Masala: “%1$s”</string>
+    <string name="drawer_ask_stub">Asking Masala arrives in a later build</string>
+    <string name="drawer_settings">Settings</string>
+    <string name="drawer_launch_failed">Couldn’t open %1$s</string>
+
+    <!-- App menu -->
+    <string name="menu_options">Options</string>
+    <string name="menu_pin">Pin to home</string>
+    <string name="menu_unpin">Unpin from home</string>
+    <string name="menu_rename">Rename</string>
+    <string name="menu_app_info">App info</string>
+    <string name="menu_uninstall">Uninstall</string>
+    <string name="menu_visibility">Show in</string>
+    <string name="menu_shortcut_pin">Pin %1$s to home</string>
+    <string name="menu_shortcuts_need_default">Set Masala as home to see this app’s shortcuts</string>
+    <string name="menu_work_badge">Work</string>
+    <string name="menu_renamed_from">Renamed from %1$s</string>
+    <string name="visibility_default">Drawer and search</string>
+    <string name="visibility_search_only">Search only</string>
+    <string name="visibility_hidden">Hidden</string>
+
+    <!-- Rename -->
+    <string name="rename_title">Rename %1$s</string>
+    <string name="rename_reset">Use original name</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_back">Back</string>
+
+    <!-- Pinned shortcuts from other apps -->
+    <string name="pin_shortcut_title">Add to home?</string>
+    <string name="pin_shortcut_body">%1$s wants to add “%2$s” to your home screen.</string>
+    <string name="pin_shortcut_add">Add</string>
+    <string name="shortcut_unpin">Remove from home</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_home_app">Home app</string>
+    <string name="settings_home_app_is_default">Masala is your home app</string>
+    <string name="settings_home_app_not_default">Masala isn’t your home app yet</string>
+    <string name="settings_home_app_choose">Choose home app</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_text_scale">Text size: %1$d%%</string>
+    <string name="settings_drawer">Drawer</string>
+    <string name="settings_auto_launch">Open the app when one result is left</string>
+    <string name="settings_hidden_apps">Hidden apps</string>
+    <string name="settings_hidden_apps_summary">Hidden: %1$d · Search only: %2$d</string>
+    <string name="settings_hidden_apps_empty">No hidden apps. Long-press an app in the drawer to hide it.</string>
 </resources>
