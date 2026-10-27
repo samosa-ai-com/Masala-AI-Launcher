@@ -37,6 +37,9 @@ service com.samosaai.masala.notifications.MasalaNotificationListener  # Notifica
 package com.google.android.apps.healthdata  # Finds Health Connect on Android 13 and below (sleep and steps)
 service androidx.health.platform.client.impl.sdkservice.HealthDataSdkService  # The Health Connect client library's own SDK service
 
+receiver com.samosaai.masala.scheduled.ScheduledTaskRebootReceiver  # Re-arms the scheduled-task alarm after reboot, app update and clock changes (the only boot receiver)
+receiver com.samosaai.masala.scheduled.ScheduledTaskReceiver  # The scheduled-task alarm itself; not exported
+
 # The recording service is added here, by class name, in the commit that creates it (Phase 3).
 
 library androidx.work  # WorkManager: WAKE_LOCK, its job services and receivers

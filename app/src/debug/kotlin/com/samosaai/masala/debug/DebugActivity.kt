@@ -152,7 +152,10 @@ class DebugActivity : ComponentActivity() {
                                     val (name, json) = direct.destructured
                                     val args = Json.parseToJsonElement(json.ifBlank { "{}" }).jsonObject
                                     events += DebugAgent.Event.Call(name, args.toString())
-                                    events += DebugAgent.Event.Result(name, app.toolExecutor(gate).execute(name, args))
+                                    events += DebugAgent.Event.Result(
+                                        name,
+                                        if (name in DebugCommands.names) DebugCommands.run(app, name, args) else app.toolExecutor(gate).execute(name, args),
+                                    )
                                 } else {
                                     DebugAgent(config.client(app), app.tools.tools, app.toolExecutor(gate)).run(prompt) { events += it }
                                 }

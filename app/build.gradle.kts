@@ -103,4 +103,5 @@ dependencies {
     implementation(libs.pdfbox.android)
 
     testImplementation(kotlin("test-junit"))
+    testImplementation(libs.okhttp.mockwebserver)
 }
