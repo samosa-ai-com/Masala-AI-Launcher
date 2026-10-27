@@ -36,3 +36,26 @@ Without an Android SDK, `settings.gradle.kts` builds `core` only.
 - fails if `app` imports anything from `pro` other than `ProTools`.
 
 Every line in either list needs a reason after `#`.
+
+## Model endpoint and the debug screen
+
+Model calls go to any OpenAI-compatible endpoint, set in `local.properties` (gitignored; the private prototype's
+`samosaConfig` pattern, environment variables win):
+
+```properties
+SAMOSA_API_URL=https://…                 # default base URL is $SAMOSA_API_URL/v1/
+MASALA_LLM_BASE_URL=http://10.0.2.2:1234/v1/   # optional override, e.g. LM Studio from the emulator
+MASALA_LLM_API_KEY=…
+MASALA_LLM_MODEL=qwen2.5-14b-instruct
+```
+
+Samosa's proxy expects a signed-in user's token as the key, and Masala has no sign-in yet, so a local
+server is the easy way to test. Debug builds allow plain HTTP to `10.0.2.2` and `localhost` only.
+
+In debug builds, **Settings → Debug** sends a prompt with every registered tool and shows the raw
+responses, tool calls and results. Tools that change something ask first; missing permissions and
+special access get a Grant button. A prompt like `/pdf_edit {"operation":"info","input":"…"}` runs one
+tool directly, without the model.
+
+Speech-to-text uses the same endpoint unless `MASALA_STT_BASE_URL`, `MASALA_STT_API_KEY` and
+`MASALA_STT_MODEL` say otherwise.

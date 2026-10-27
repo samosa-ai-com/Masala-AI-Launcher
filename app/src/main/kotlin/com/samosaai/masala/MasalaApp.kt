@@ -4,10 +4,18 @@ import android.app.Application
 import android.content.Context
 import com.samosaai.masala.data.MasalaDatabase
 import com.samosaai.masala.data.SettingsStore
+import com.samosaai.masala.files.AppStorageFileAccess
 import com.samosaai.masala.launcher.AppActions
 import com.samosaai.masala.launcher.AppCatalog
 import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.LauncherModel
+import com.samosaai.masala.pro.ProTools
+import com.samosaai.masala.tools.ActionLog
+import com.samosaai.masala.tools.MasalaToolExecutor
+import com.samosaai.masala.tools.MasalaToolRegistry
+import com.samosaai.masala.tools.MasalaTools
+import com.samosaai.masala.tools.ToolFiles
+import com.samosaai.masala.tools.ToolGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,6 +28,18 @@ class MasalaApp : Application() {
 
     val database by lazy { MasalaDatabase.create(this) }
     val settings by lazy { SettingsStore(this) }
+    val actionLog by lazy { ActionLog(this) }
+
+    /** `:app`'s tools, then `:pro`'s, which also swaps in all-files access (arch §3.1). */
+    val tools by lazy {
+        MasalaToolRegistry(AppStorageFileAccess(this)).also { registry ->
+            MasalaTools.create(this, ToolFiles { registry.fileAccess }).forEach(registry::register)
+            ProTools.register(registry, this)
+        }
+    }
+
+    /** Runs tools for one caller; [gate] confirms anything that isn't read-only. */
+    fun toolExecutor(gate: ToolGate) = MasalaToolExecutor(this, tools, actionLog, gate)
 
     lateinit var catalog: AppCatalog
         private set

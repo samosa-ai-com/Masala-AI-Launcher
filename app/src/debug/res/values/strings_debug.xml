@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="debug_title">Masala debug</string>
+    <string name="debug_base_url">Base URL</string>
+    <string name="debug_api_key">API key</string>
+    <string name="debug_model">Model</string>
+    <string name="debug_prompt">Prompt, or /tool {json} to run one tool</string>
+    <string name="debug_send">Send</string>
+    <string name="debug_clear">Clear</string>
+    <string name="debug_running">Running…</string>
+    <string name="debug_models">Models</string>
+    <string name="debug_action_log">Action log</string>
+    <string name="debug_tools">%1$d tools registered</string>
+    <string name="debug_confirm_title">Allow %1$s?</string>
+    <string name="debug_allow">Allow</string>
+    <string name="debug_deny">Deny</string>
+    <string name="debug_grant">Grant access</string>
+    <string name="debug_event_raw">Response</string>
+    <string name="debug_event_call">Tool call: %1$s</string>
+    <string name="debug_event_result">Result: %1$s</string>
+    <string name="debug_event_answer">Answer</string>
+    <string name="debug_event_error">Error</string>
+</resources>

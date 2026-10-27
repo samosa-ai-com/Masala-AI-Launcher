@@ -24,15 +24,20 @@ uses-permission android.permission.POST_NOTIFICATIONS  # Price watches, job prog
 uses-permission android.permission.RECEIVE_BOOT_COMPLETED  # Re-arm scheduled skills and reminders after reboot
 uses-permission android.permission.VIBRATE  # Haptics on long press and gestures
 uses-permission android.permission.REQUEST_DELETE_PACKAGES  # Uninstall from the app's long-press menu (ACTION_DELETE)
+uses-permission com.android.alarm.permission.SET_ALARM  # set_alarm and set_timer hand off to the clock app (AlarmClock intents)
 uses-permission android.permission.FOREGROUND_SERVICE  # Recording service and long skill jobs
 uses-permission android.permission.FOREGROUND_SERVICE_MICROPHONE  # Recording service for meeting notes
 uses-permission android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING  # Long media jobs on Android 15+
 uses-permission android.permission.FOREGROUND_SERVICE_DATA_SYNC  # Long jobs below Android 15, acapella upload
 uses-permission android.permission.health.READ_SLEEP  # Sleep condition and widgets through Health Connect
 uses-permission android.permission.health.READ_STEPS  # Steps condition and widgets through Health Connect
+uses-permission android.permission.WAKE_LOCK  # Media3 (Transformer pulls in ExoPlayer) and WorkManager keep the CPU up during media and background jobs
 
-# The notification listener and the recording service are added here, by class name, in the commit
-# that creates them.
+service com.samosaai.masala.notifications.MasalaNotificationListener  # Notification access for read_notifications, media sessions, quiet nights
+package com.google.android.apps.healthdata  # Finds Health Connect on Android 13 and below (sleep and steps)
+service androidx.health.platform.client.impl.sdkservice.HealthDataSdkService  # The Health Connect client library's own SDK service
+
+# The recording service is added here, by class name, in the commit that creates it (Phase 3).
 
 library androidx.work  # WorkManager: WAKE_LOCK, its job services and receivers
 library androidx.core  # DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
