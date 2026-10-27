@@ -6,7 +6,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import com.samosaai.masala.core.layout.LayoutChecker
+import com.samosaai.masala.layout.LayoutTransfer
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -48,7 +52,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -64,8 +68,9 @@ class SettingsActivity : ComponentActivity() {
                     var page by rememberSaveable { mutableStateOf(Page.MAIN) }
                     BackHandler(enabled = page != Page.MAIN) { page = Page.MAIN }
                     when (page) {
-                        Page.MAIN -> MainPage(settings, onHiddenApps = { page = Page.HIDDEN_APPS })
+                        Page.MAIN -> MainPage(settings, onHiddenApps = { page = Page.HIDDEN_APPS }, onLayout = { page = Page.LAYOUT })
                         Page.HIDDEN_APPS -> HiddenAppsPage(onBack = { page = Page.MAIN })
+                        Page.LAYOUT -> LayoutPage(settings, onBack = { page = Page.MAIN })
                     }
                 }
             }
@@ -73,7 +78,7 @@ class SettingsActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun MainPage(settings: LauncherSettings, onHiddenApps: () -> Unit) {
+    private fun MainPage(settings: LauncherSettings, onHiddenApps: () -> Unit, onLayout: () -> Unit) {
         val scope = rememberCoroutineScope()
         val apps by masala.launcher.apps.collectAsStateWithLifecycle()
         var isDefault by remember { mutableStateOf(HomeRole.isDefault(this)) }
@@ -130,6 +135,12 @@ class SettingsActivity : ComponentActivity() {
                 modifier = Modifier.semantics { contentDescription = scaleLabel },
             )
 
+            SettingsNavRow(
+                title = stringResource(R.string.settings_home_layout),
+                summary = stringResource(R.string.settings_home_layout_summary),
+                onClick = onLayout,
+            )
+
             SettingsSectionTitle(stringResource(R.string.settings_drawer))
             SettingsToggleRow(stringResource(R.string.settings_auto_launch), settings.autoLaunch) { on ->
                 update { it.copy(autoLaunch = on) }
@@ -151,6 +162,43 @@ class SettingsActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    @Composable
+    private fun LayoutPage(settings: LauncherSettings, onBack: () -> Unit) {
+        val scope = rememberCoroutineScope()
+        val transfer = remember { LayoutTransfer(masala.layouts, masala.database.appOverrides()) }
+        var problems by remember { mutableStateOf<List<LayoutChecker.Problem>?>(null) }
+        var message by remember { mutableStateOf<String?>(null) }
+        val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+            if (uri != null) scope.launch {
+                val text = transfer.export()
+                val ok = text != null && runCatching {
+                    contentResolver.openOutputStream(uri, "wt")!!.use { it.write(text.toByteArray()) }
+                }.isSuccess
+                message = getString(if (ok) R.string.settings_export_done else R.string.settings_export_failed)
+            }
+        }
+        val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) scope.launch {
+                val text = runCatching { contentResolver.openInputStream(uri)!!.use { it.readBytes().decodeToString() } }.getOrNull()
+                when (val r = if (text == null) null else transfer.import(text)) {
+                    LayoutTransfer.Result.Imported -> message = getString(R.string.settings_import_done)
+                    is LayoutTransfer.Result.Rejected -> problems = r.problems
+                    null -> message = getString(R.string.settings_export_failed)
+                }
+            }
+        }
+        HomeLayoutPage(
+            settings = settings,
+            update = { change -> scope.launch { masala.settings.update(change) } },
+            problems = problems,
+            message = message,
+            onDismissProblems = { problems = null },
+            onExport = { export.launch("masala-layout.json") },
+            onImport = { import.launch(arrayOf("application/json", "text/plain", "*/*")) },
+            onBack = onBack,
+        )
     }
 
     /** Apps that are hidden or search-only, with their level; picking "Drawer and search" shows them again. */

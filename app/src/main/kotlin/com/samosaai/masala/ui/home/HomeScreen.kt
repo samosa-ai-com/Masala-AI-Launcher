@@ -1,7 +1,6 @@
 package com.samosaai.masala.ui.home
 
 import android.content.pm.ShortcutInfo
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -43,7 +42,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.samosaai.masala.R
-import com.samosaai.masala.core.apps.AppEntry
+import com.samosaai.masala.core.layout.ResolvedLayout
 import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.launcher.rememberShortcutIcon
@@ -51,40 +50,38 @@ import com.samosaai.masala.ui.components.LauncherRow
 import com.samosaai.masala.ui.components.wallpaperText
 
 /**
- * The Phase 1 home screen: pinned apps and shortcuts on the wallpaper. Phase 2 replaces the list with
- * the layout renderer; the gestures stay. Swipe up opens the drawer, a long press on empty space opens
- * settings.
+ * The home screen (plan Phase 2): the resolved layout drawn by [LayoutRenderer], the default-home banner
+ * on top, shortcuts other apps pinned below the layout, and the gestures. A vertical swipe runs the
+ * user's swipe-up or swipe-down action; a long press on empty space opens settings.
  */
 @Composable
 fun HomeScreen(
-    pinnedApps: List<AppEntry>,
+    layout: ResolvedLayout,
+    render: RenderContext,
     pinnedShortcuts: List<ShortcutInfo>,
-    icons: IconCache,
     isDefault: Boolean,
     onSetDefault: () -> Unit,
-    onOpenDrawer: () -> Unit,
+    onSwipeUp: () -> Unit,
+    onSwipeDown: () -> Unit,
     onOpenSettings: () -> Unit,
-    onLaunch: (AppEntry) -> Unit,
-    onMenu: (AppEntry) -> Unit,
     onLaunchShortcut: (ShortcutInfo) -> Unit,
     onUnpinShortcut: (ShortcutInfo) -> Unit,
+    homePresses: Int = 0,
 ) {
     val swipeThreshold = with(LocalDensity.current) { 64.dp.toPx() }
-    val openDrawerLabel = stringResource(R.string.home_open_drawer_description)
+    val swipeUpLabel = stringResource(R.string.home_swipe_up_description)
+    val swipeDownLabel = stringResource(R.string.home_swipe_down_description)
     val openSettingsLabel = stringResource(R.string.home_open_settings_description)
-    // The pinned list scrolls, and a scrollable keeps the drag even with nothing to scroll, so the
-    // swipe up arrives here as the scroll the list couldn't use.
-    val swipeUp = remember(swipeThreshold) {
+    // The page scrolls, and a scrollable keeps the drag even with nothing to scroll, so a swipe arrives
+    // here as the scroll the list couldn't use.
+    val swipes = remember(swipeThreshold, onSwipeUp, onSwipeDown) {
         object : NestedScrollConnection {
             var pulled = 0f
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (source == NestedScrollSource.UserInput && available.y < 0) {
+                if (source == NestedScrollSource.UserInput && available.y != 0f) {
                     pulled += available.y
-                    if (pulled < -swipeThreshold) {
-                        pulled = 0f
-                        onOpenDrawer()
-                    }
+                    if (pulled < -swipeThreshold) { pulled = 0f; onSwipeUp() } else if (pulled > swipeThreshold) { pulled = 0f; onSwipeDown() }
                 }
                 return Offset.Zero
             }
@@ -98,20 +95,21 @@ fun HomeScreen(
     Box(
         Modifier
             .fillMaxSize()
-            .nestedScroll(swipeUp)
-            .pointerInput(Unit) {
+            .nestedScroll(swipes)
+            .pointerInput(onSwipeUp, onSwipeDown) {
                 var dragged = 0f
                 detectVerticalDragGestures(
                     onDragStart = { dragged = 0f },
-                    onDragEnd = { if (dragged < -swipeThreshold) onOpenDrawer() },
+                    onDragEnd = { if (dragged < -swipeThreshold) onSwipeUp() else if (dragged > swipeThreshold) onSwipeDown() },
                     onVerticalDrag = { _, dy -> dragged += dy },
                 )
             }
             .pointerInput(Unit) { detectTapGestures(onLongPress = { onOpenSettings() }) }
-            // TalkBack can't swipe or long-press empty space, so both are offered as actions.
+            // TalkBack can't swipe or long-press empty space, so each is offered as an action.
             .semantics {
                 customActions = listOf(
-                    CustomAccessibilityAction(openDrawerLabel) { onOpenDrawer(); true },
+                    CustomAccessibilityAction(swipeUpLabel) { onSwipeUp(); true },
+                    CustomAccessibilityAction(swipeDownLabel) { onSwipeDown(); true },
                     CustomAccessibilityAction(openSettingsLabel) { onOpenSettings(); true },
                 )
             }
@@ -119,42 +117,16 @@ fun HomeScreen(
     ) {
         Column(Modifier.fillMaxSize()) {
             if (!isDefault) DefaultBanner(onSetDefault)
-            Column(
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.Center,
-            ) {
-                pinnedApps.forEach { entry ->
-                    LauncherRow(
-                        label = entry.label,
-                        icon = rememberAppIcon(icons, entry.key),
-                        onClick = { onLaunch(entry) },
-                        onLongClick = { onMenu(entry) },
-                        longClickLabel = stringResource(R.string.menu_options),
-                        textStyle = wallpaperText(MaterialTheme.typography.headlineSmall),
-                    )
-                }
-                pinnedShortcuts.forEach { ShortcutRow(it, icons, onLaunchShortcut, onUnpinShortcut) }
-                if (pinnedApps.isEmpty() && pinnedShortcuts.isEmpty()) {
+            LayoutRenderer(layout, render, Modifier.weight(1f), resetSignal = homePresses) {
+                if (pinnedShortcuts.isNotEmpty()) {
                     Text(
-                        stringResource(R.string.home_empty),
-                        style = wallpaperText(MaterialTheme.typography.bodyLarge),
-                        modifier = Modifier.padding(horizontal = 24.dp),
+                        stringResource(R.string.home_shortcuts_title),
+                        style = wallpaperText(MaterialTheme.typography.titleSmall),
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                     )
+                    pinnedShortcuts.forEach { ShortcutRow(it, render.icons, onLaunchShortcut, onUnpinShortcut) }
                 }
             }
-            Text(
-                "↑  " + stringResource(R.string.home_open_drawer),
-                style = wallpaperText(MaterialTheme.typography.labelLarge),
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .heightIn(min = 48.dp)
-                    .clickable(role = Role.Button, onClick = onOpenDrawer)
-                    .semantics { contentDescription = openDrawerLabel }
-                    .padding(horizontal = 24.dp, vertical = 14.dp),
-            )
         }
     }
 }

@@ -20,4 +20,6 @@
     <string name="debug_event_result">Result: %1$s</string>
     <string name="debug_event_answer">Answer</string>
     <string name="debug_event_error">Error</string>
+    <string name="debug_context_title">Context panel</string>
+    <string name="debug_context_button">Context panel</string>
 </resources>

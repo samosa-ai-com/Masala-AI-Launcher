@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.Flow
 )
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
+    abstract fun layoutVersions(): LayoutVersionDao
 
     companion object {
         fun create(context: Context): MasalaDatabase =
@@ -53,6 +54,18 @@ data class LayoutVersionEntity(
     val json: String,
     val createdAt: Long,
 )
+
+@Dao
+interface LayoutVersionDao {
+    @Query("SELECT * FROM layout_versions ORDER BY id")
+    suspend fun all(): List<LayoutVersionEntity>
+
+    @Upsert
+    suspend fun upsert(entity: LayoutVersionEntity)
+
+    @Query("DELETE FROM layout_versions WHERE id IN (:ids)")
+    suspend fun delete(ids: List<Long>)
+}
 
 /** The user's changes to one app in one profile, keyed by [AppKey.id]. */
 @Entity(tableName = "app_overrides", indices = [Index("packageName", "user")])
