@@ -1,0 +1,11 @@
+{
+  "id": "meeting_notes",
+  "title": "Meeting notes",
+  "description": "Record a meeting and get a summary, decisions and action items.",
+  "instructions": "Remind the user to get everyone's consent before recording. Transcribe each recorded piece, then write Markdown notes with: Summary, Decisions, Action items (owner and date when said), Open questions. Offer each action item as a reminder; never create one without the user's confirmation.",
+  "requiresTools": ["start_recording", "stop_recording", "transcribe_file", "save_note", "create_reminder"],
+  "keywords": ["meeting", "notes", "minutes", "record", "transcribe"],
+  "platforms": ["masala"],
+  "tier": "pro",
+  "widget": { "icon": "mic", "tint": "teal", "inputs": ["record_audio", "audio_file"], "output": "markdown" }
+}

@@ -1,0 +1,12 @@
+{
+  "id": "daily_brief",
+  "title": "Daily brief",
+  "description": "A morning card with your calendar, weather and the topics you follow.",
+  "instructions": "Write a short Markdown brief: today's first three events, the weather, and 3 to 5 news items on the topics in the wiki page 'Topics'. One line each, with a link.",
+  "requiresTools": ["calendar_read", "weather", "wiki_read", "websearch", "webfetch"],
+  "keywords": ["brief", "morning", "news", "today"],
+  "platforms": ["masala"],
+  "tier": "pro",
+  "widget": { "icon": "wb_sunny", "tint": "amber", "inputs": [], "output": "markdown" },
+  "schedule": { "default": "daily 07:30" }
+}

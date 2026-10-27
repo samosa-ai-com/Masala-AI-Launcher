@@ -1,0 +1,39 @@
+{
+  "id": "quiet-nights",
+  "name": "Quiet nights",
+  "order": 20,
+  "trigger": {
+    "type": "rule",
+    "condition": { "type": "time_window", "start": "22:30", "end": "07:00" }
+  },
+  "hideSections": ["focus-stack", "routine"],
+  "addSections": [
+    {
+      "pageId": "today",
+      "after": "clock",
+      "section": {
+        "type": "list",
+        "id": "night",
+        "title": "Tonight",
+        "items": [
+          {
+            "id": "alarm",
+            "label": "Alarm 7:00",
+            "icon": { "type": "symbol", "name": "alarm" },
+            "action": { "type": "set_alarm", "hour": 7, "minute": 0 }
+          },
+          {
+            "id": "urgent",
+            "label": "Urgent messages",
+            "icon": { "type": "symbol", "name": "priority_high", "tint": "red" },
+            "action": { "type": "expand_notifications" },
+            "rules": [
+              { "condition": { "type": "not", "condition": { "type": "urgent_count", "atLeast": 1 } }, "effect": { "type": "hide" } }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "dnd": { "filter": "alarms", "allowUrgent": true }
+}

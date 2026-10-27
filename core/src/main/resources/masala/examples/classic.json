@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "pages": [
+    {
+      "id": "home",
+      "sections": [
+        { "type": "header", "id": "clock" },
+        {
+          "type": "grid",
+          "id": "favorites",
+          "columns": 4,
+          "items": [
+            {
+              "id": "camera",
+              "label": "Camera",
+              "icon": { "type": "app", "packageName": "com.google.android.GoogleCamera" },
+              "action": { "type": "launch_app", "packageName": "com.google.android.GoogleCamera" }
+            },
+            {
+              "id": "store",
+              "label": "Play Store",
+              "icon": { "type": "app", "packageName": "com.android.vending" },
+              "action": { "type": "launch_app", "packageName": "com.android.vending" }
+            }
+          ]
+        },
+        {
+          "type": "dock",
+          "id": "dock",
+          "items": [
+            {
+              "id": "phone",
+              "label": "Phone",
+              "icon": { "type": "app", "packageName": "com.google.android.dialer" },
+              "action": { "type": "launch_app", "packageName": "com.google.android.dialer" }
+            },
+            {
+              "id": "messages",
+              "label": "Messages",
+              "icon": { "type": "app", "packageName": "com.google.android.apps.messaging" },
+              "action": { "type": "launch_app", "packageName": "com.google.android.apps.messaging" }
+            },
+            {
+              "id": "browser",
+              "label": "Chrome",
+              "icon": { "type": "app", "packageName": "com.android.chrome" },
+              "action": { "type": "launch_app", "packageName": "com.android.chrome" }
+            },
+            {
+              "id": "drawer",
+              "label": "All apps",
+              "icon": { "type": "symbol", "name": "apps" },
+              "action": { "type": "open_drawer" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
