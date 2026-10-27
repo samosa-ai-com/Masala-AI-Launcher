@@ -40,6 +40,12 @@ android {
         buildConfigField("String", "MASALA_LLM_BASE_URL", "\"${samosaConfig("MASALA_LLM_BASE_URL", "$samosaApi/v1/")}\"")
         buildConfigField("String", "MASALA_LLM_API_KEY", "\"${samosaConfig("MASALA_LLM_API_KEY", "")}\"")
         buildConfigField("String", "MASALA_LLM_MODEL", "\"${samosaConfig("MASALA_LLM_MODEL", "chai-small")}\"")
+        // Speech-to-text: the model endpoint unless MASALA_STT_* say otherwise. An empty model means
+        // "use the first speech model the server lists".
+        val llmBase = samosaConfig("MASALA_LLM_BASE_URL", "$samosaApi/v1/")
+        buildConfigField("String", "MASALA_STT_BASE_URL", "\"${samosaConfig("MASALA_STT_BASE_URL", llmBase)}\"")
+        buildConfigField("String", "MASALA_STT_API_KEY", "\"${samosaConfig("MASALA_STT_API_KEY", samosaConfig("MASALA_LLM_API_KEY", ""))}\"")
+        buildConfigField("String", "MASALA_STT_MODEL", "\"${samosaConfig("MASALA_STT_MODEL", "")}\"")
     }
 
     buildFeatures {
@@ -90,6 +96,11 @@ dependencies {
     implementation(libs.retrofit.kotlinx.serialization)
     implementation(libs.okhttp.logging)
     implementation(libs.jsoup)
+    implementation(libs.media3.transformer)
+    implementation(libs.media3.effect)
+    implementation(libs.media3.common)
+    implementation(libs.health.connect)
+    implementation(libs.pdfbox.android)
 
     testImplementation(kotlin("test-junit"))
 }

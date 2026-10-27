@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.R
 import com.samosaai.masala.core.tool.ToolResult
@@ -51,14 +52,18 @@ import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.llm.LlmConfig
 import com.samosaai.masala.masala
 import com.samosaai.masala.tools.Capability
+import com.samosaai.masala.tools.HealthTool
 import com.samosaai.masala.tools.ToolGate
 import com.samosaai.masala.ui.theme.MasalaTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 
 /**
  * Debug builds only (plan Phase 1, lane B): send a prompt with every registered tool, see the raw
- * responses, the tool calls and their results. Tools that change something ask first, as Phase 2's
+ * responses, the tool calls and their results. A prompt like `/set_alarm {"hour":7,"minute":30}`
+ * runs that one tool directly, without the model. Tools that change something ask first, as Phase 2's
  * confirmation gate will.
  */
 class DebugActivity : ComponentActivity() {
@@ -84,6 +89,10 @@ class DebugActivity : ComponentActivity() {
     private fun saveConfig(c: LlmConfig) =
         prefs.edit().putString("base_url", c.baseUrl).putString("api_key", c.apiKey).putString("model", c.model).apply()
 
+    private companion object {
+        val DIRECT_CALL = Regex("""/(\w+)\s*(\{.*\})?""", RegexOption.DOT_MATCHES_ALL)
+    }
+
     /** A tool waiting for the user's answer. */
     private class Pending(val tool: String, val args: String, val answer: CompletableDeferred<Boolean>)
 
@@ -99,6 +108,8 @@ class DebugActivity : ComponentActivity() {
         LaunchedEffect(events.size) { if (events.isNotEmpty()) listState.animateScrollToItem(events.size - 1) }
 
         val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+        // Health Connect grants go through its own request screen, not a settings page.
+        val health = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {}
         val gate = remember {
             ToolGate { tool, args ->
                 val answer = CompletableDeferred<Boolean>()
@@ -118,7 +129,13 @@ class DebugActivity : ComponentActivity() {
                 )
                 OutlinedTextField(config.model, { config = config.copy(model = it) }, label = { Text(stringResource(R.string.debug_model)) }, singleLine = true, modifier = Modifier.weight(1f))
             }
-            OutlinedTextField(prompt, { prompt = it }, label = { Text(stringResource(R.string.debug_prompt)) }, modifier = Modifier.fillMaxWidth().testTag("debug_prompt"))
+            OutlinedTextField(
+                prompt, { prompt = it },
+                label = { Text(stringResource(R.string.debug_prompt)) },
+                maxLines = 4,
+                trailingIcon = { TextButton(onClick = { prompt = "" }) { Text(stringResource(R.string.debug_clear)) } },
+                modifier = Modifier.fillMaxWidth().testTag("debug_prompt"),
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     enabled = !running && config.isConfigured && prompt.isNotBlank(),
@@ -129,7 +146,16 @@ class DebugActivity : ComponentActivity() {
                         scope.launch {
                             val app = masala
                             try {
-                                DebugAgent(config.client(app), app.tools.tools, app.toolExecutor(gate)).run(prompt) { events += it }
+                                val direct = DIRECT_CALL.matchEntire(prompt.trim())
+                                if (direct != null) {
+                                    // "/tool {json}": run one tool through the executor, no model.
+                                    val (name, json) = direct.destructured
+                                    val args = Json.parseToJsonElement(json.ifBlank { "{}" }).jsonObject
+                                    events += DebugAgent.Event.Call(name, args.toString())
+                                    events += DebugAgent.Event.Result(name, app.toolExecutor(gate).execute(name, args))
+                                } else {
+                                    DebugAgent(config.client(app), app.tools.tools, app.toolExecutor(gate)).run(prompt) { events += it }
+                                }
                             } catch (e: Exception) {
                                 events += DebugAgent.Event.Error("${e::class.simpleName}: ${e.message}")
                             } finally {
@@ -158,7 +184,9 @@ class DebugActivity : ComponentActivity() {
                 items(events) { event ->
                     EventRow(event) { marker ->
                         val capability = Capability.byMarker(marker)
-                        if (capability != null) {
+                        if (capability == Capability.HEALTH_CONNECT) {
+                            health.launch(HealthTool.PERMISSIONS)
+                        } else if (capability != null) {
                             capability.settingsIntent(this@DebugActivity)?.let(::startActivity)
                         } else if (marker.startsWith("android.permission.")) {
                             permission.launch(marker)

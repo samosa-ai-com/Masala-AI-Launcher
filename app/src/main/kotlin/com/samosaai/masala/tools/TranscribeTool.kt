@@ -1,0 +1,152 @@
+package com.samosaai.masala.tools
+
+import com.samosaai.masala.audio.AudioApi
+import com.samosaai.masala.audio.AudioModel
+import com.samosaai.masala.audio.ModelCategory
+import com.samosaai.masala.audio.SpeechConfig
+import java.io.File
+
+/**
+ * Transcribes an audio file already on disk through the configured STT API. From the private prototype's
+ * TranscribeTool, reading the endpoint from [SpeechConfig] instead of the private prototype's speech settings.
+ *
+ * This is the missing middle of the voice-memo-to-podcast flow:
+ * `start_audio_recording(output_path=…)` puts a recording on disk,
+ * `synthesize_podcast` wants a script, and nothing in between could read a
+ * saved file back as text — the private prototype's SttEngine only transcribes
+ * recordings it made itself, and its `transcribeApi` *deletes its input* after
+ * upload (its files are its own throwaways). This tool wraps
+ * [AudioApi.transcribe] directly, which reads the file and touches nothing.
+ *
+ * Requires an API-based STT provider: Android's `SpeechRecognizer` listens to
+ * the microphone and has no file input. Only available to Operator — the file
+ * content leaves the device for the configured STT endpoint.
+ */
+class TranscribeTool(
+    private val resolver: ToolFiles,
+    private val loadSettings: () -> SpeechConfig = { SpeechConfig.default },
+    private val onUnauthorized: (() -> Unit)? = null,
+    private val sttBackendFactory: (baseUrl: String, apiKey: String) -> SttBackend = { url, key ->
+        ApiSttBackend(AudioApi(url, key, timeoutSeconds = STT_TIMEOUT_SECONDS, onUnauthorized = onUnauthorized))
+    }
+) {
+
+    /** The two calls transcription needs from the STT API, extracted for tests. */
+    interface SttBackend {
+        fun listModels(): List<AudioModel>
+        fun transcribe(file: File, model: String, language: String?, contentType: String): Result<String>
+    }
+
+    private class ApiSttBackend(private val api: AudioApi) : SttBackend {
+        override fun listModels(): List<AudioModel> = api.listAudioModels()
+        override fun transcribe(file: File, model: String, language: String?, contentType: String): Result<String> =
+            api.transcribe(file, model, language, contentType)
+    }
+
+
+    companion object {
+        /**
+         * Upload ceiling. Matches the common OpenAI-compatible transcription
+         * limit; a bigger file should be trimmed or split with media_edit
+         * first rather than bounced by the server after a slow upload.
+         */
+        const val MAX_INPUT_BYTES = 25L * 1024 * 1024
+
+        /** Transcripts are pasted into the conversation; past this they drown it. */
+        const val MAX_TRANSCRIPT_CHARS = 30_000
+
+        private const val STT_TIMEOUT_SECONDS = 300L
+        private const val ERROR_DETAIL_CHARS = 200
+
+        /** Extension → MIME type for the multipart upload. Also the supported-format list. */
+        private val CONTENT_TYPES = mapOf(
+            "m4a" to "audio/m4a",
+            "mp4" to "audio/mp4",
+            "aac" to "audio/aac",
+            "mp3" to "audio/mpeg",
+            "wav" to "audio/wav",
+            "ogg" to "audio/ogg",
+            "opus" to "audio/ogg",
+            "flac" to "audio/flac",
+            "webm" to "audio/webm"
+        )
+    }
+
+    @Suppress("ReturnCount")
+    fun transcribe(path: String, model: String? = null, language: String? = null): ActionResult {
+        val settings = loadSettings()
+        credentialError(settings)?.let { return it }
+
+        val file = when (val r = resolver.resolveForRead(path)) {
+            is ToolFiles.ResolveResult.PermissionNeeded -> return r.result
+            is ToolFiles.ResolveResult.Error -> return ActionResult.error(r.message)
+            is ToolFiles.ResolveResult.Ok -> r.file
+        }
+        resolver.checkReadPermission(file)?.let { return it }
+        fileError(file, path)?.let { return it }
+        val contentType = CONTENT_TYPES[file.extension.lowercase()]
+            ?: return ActionResult.error(
+                "'.${file.extension}' is not a format this tool can send for transcription. Supported: " +
+                    CONTENT_TYPES.keys.sorted().joinToString(", ") { ".$it" } +
+                    ". Convert it first with media_convert."
+            )
+
+        val backend = sttBackendFactory(settings.baseUrl, settings.apiKey)
+        val resolvedModel = resolveModel(model, settings, backend)
+            ?: return ActionResult.error(
+                "No STT model is configured and none could be discovered from the API. Pass model " +
+                    "explicitly, or set MASALA_STT_MODEL."
+            )
+        val resolvedLanguage = (language ?: settings.sttLanguage).trim().ifBlank { null }
+
+        val transcript = backend.transcribe(file, resolvedModel, resolvedLanguage, contentType)
+            .getOrElse { e ->
+                return ActionResult.error(
+                    "Transcription failed: ${e.message?.take(ERROR_DETAIL_CHARS) ?: "no detail"}. " +
+                        "The file was not modified."
+                )
+            }
+        if (transcript.isBlank()) {
+            return ActionResult.error(
+                "The STT endpoint returned an empty transcript for '${file.name}' — the file may contain " +
+                    "no speech, or the model/language may not match it."
+            )
+        }
+        val clipped = transcript.length > MAX_TRANSCRIPT_CHARS
+        val text = if (clipped) transcript.take(MAX_TRANSCRIPT_CHARS) else transcript
+        val truncationNote = if (clipped) {
+            "\n\n[Transcript truncated at $MAX_TRANSCRIPT_CHARS characters — the audio continues beyond " +
+                "this point. Trim the file with media_edit and transcribe the rest separately if needed.]"
+        } else {
+            ""
+        }
+        return ActionResult.ok(
+            "Transcript of '${file.name}' (${resolver.formatSize(file.length())}, spoken content sent to " +
+                "the configured STT API; the file itself was not modified):\n\n$text$truncationNote"
+        )
+    }
+
+    private fun credentialError(settings: SpeechConfig): ActionResult? =
+        if (settings.baseUrl.isBlank()) ActionResult.error("No speech-to-text endpoint is configured.") else null
+
+    private fun fileError(file: File, path: String): ActionResult? = when {
+        !file.exists() -> ActionResult.error(
+            "'$path' does not exist (resolved: ${file.canonicalPath}). You may use list_files or glob to find it."
+        )
+        !file.isFile -> ActionResult.error("'$path' is not a regular file.")
+        file.length() == 0L -> ActionResult.error("'${file.name}' is empty — there is nothing to transcribe.")
+        file.length() > MAX_INPUT_BYTES -> ActionResult.error(
+            "'${file.name}' is ${resolver.formatSize(file.length())}; the transcription limit is " +
+                "${resolver.formatSize(MAX_INPUT_BYTES)}. Trim it into parts with media_edit and " +
+                "transcribe each part."
+        )
+        else -> null
+    }
+
+    private fun resolveModel(modelArg: String?, settings: SpeechConfig, backend: SttBackend): String? {
+        val explicit = (modelArg ?: settings.sttModel).trim()
+        if (explicit.isNotBlank()) return explicit
+        return runCatching { backend.listModels() }.getOrDefault(emptyList())
+            .firstOrNull { it.category == ModelCategory.STT }?.id
+    }
+}

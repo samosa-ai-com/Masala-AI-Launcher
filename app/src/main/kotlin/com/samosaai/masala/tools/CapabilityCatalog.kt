@@ -39,7 +39,7 @@ enum class Capability(
     HEALTH_CONNECT("Health Connect", setOf("get_health_summary", "get_health_records"), ActionResult.HEALTH_CONNECT),
 
     // :pro (lane C registers these tools).
-    ALL_FILES("all-files access", setOf("list_files", "read_file", "write_file", "glob", "grep", "file_search"), "special:all_files_access"),
+    ALL_FILES("all-files access", setOf("list_files", "read_file", "write_file", "glob", "grep", "file_search"), ToolFiles.ALL_FILES_ACCESS),
     TERMUX("Termux (from F-Droid, with ffmpeg)", setOf("media_convert"), null),
 
     // The APK export tool joins this in Phase 5.

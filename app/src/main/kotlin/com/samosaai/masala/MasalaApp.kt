@@ -14,6 +14,7 @@ import com.samosaai.masala.tools.ActionLog
 import com.samosaai.masala.tools.MasalaToolExecutor
 import com.samosaai.masala.tools.MasalaToolRegistry
 import com.samosaai.masala.tools.MasalaTools
+import com.samosaai.masala.tools.ToolFiles
 import com.samosaai.masala.tools.ToolGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +33,7 @@ class MasalaApp : Application() {
     /** `:app`'s tools, then `:pro`'s, which also swaps in all-files access (arch §3.1). */
     val tools by lazy {
         MasalaToolRegistry(AppStorageFileAccess(this)).also { registry ->
-            MasalaTools.create(this).forEach(registry::register)
+            MasalaTools.create(this, ToolFiles { registry.fileAccess }).forEach(registry::register)
             ProTools.register(registry, this)
         }
     }

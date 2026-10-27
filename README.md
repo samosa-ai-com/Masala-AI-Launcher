@@ -54,4 +54,8 @@ server is the easy way to test. Debug builds allow plain HTTP to `10.0.2.2` and 
 
 In debug builds, **Settings → Debug** sends a prompt with every registered tool and shows the raw
 responses, tool calls and results. Tools that change something ask first; missing permissions and
-special access get a Grant button.
+special access get a Grant button. A prompt like `/pdf_edit {"operation":"info","input":"…"}` runs one
+tool directly, without the model.
+
+Speech-to-text uses the same endpoint unless `MASALA_STT_BASE_URL`, `MASALA_STT_API_KEY` and
+`MASALA_STT_MODEL` say otherwise.

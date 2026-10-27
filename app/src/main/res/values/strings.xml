@@ -43,6 +43,11 @@
     <string name="action_save">Save</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_back">Back</string>
+    <string name="action_close">Close</string>
+
+    <!-- Health Connect rationale -->
+    <string name="health_rationale_title">Health data in Masala</string>
+    <string name="health_rationale_body">Masala reads your steps and sleep from Health Connect to answer questions about them and to show them on your home screen. It reads them on the phone, never writes health data, and doesn’t keep a copy.</string>
 
     <!-- Pinned shortcuts from other apps -->
     <string name="pin_shortcut_title">Add to home?</string>

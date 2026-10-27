@@ -4,8 +4,9 @@
     <string name="debug_base_url">Base URL</string>
     <string name="debug_api_key">API key</string>
     <string name="debug_model">Model</string>
-    <string name="debug_prompt">Prompt</string>
+    <string name="debug_prompt">Prompt, or /tool {json} to run one tool</string>
     <string name="debug_send">Send</string>
+    <string name="debug_clear">Clear</string>
     <string name="debug_running">Running…</string>
     <string name="debug_models">Models</string>
     <string name="debug_action_log">Action log</string>

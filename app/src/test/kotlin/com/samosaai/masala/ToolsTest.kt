@@ -1,6 +1,7 @@
 package com.samosaai.masala
 
 import com.samosaai.masala.core.tool.FileAccess
+import com.samosaai.masala.core.tool.FileAccessDeniedException
 import com.samosaai.masala.core.tool.FileScope
 import com.samosaai.masala.core.tool.Tool
 import com.samosaai.masala.core.tool.ToolDefinition
@@ -10,9 +11,11 @@ import com.samosaai.masala.llm.ChatMessage
 import com.samosaai.masala.llm.ChatRequest
 import com.samosaai.masala.llm.ResponseFormat
 import com.samosaai.masala.tools.ActionResult
+import com.samosaai.masala.tools.Capability
 import com.samosaai.masala.tools.FunctionTool
 import com.samosaai.masala.tools.MasalaToolDefinitions
 import com.samosaai.masala.tools.MasalaToolRegistry
+import com.samosaai.masala.tools.ToolFiles
 import com.samosaai.masala.tools.boolean
 import com.samosaai.masala.tools.int
 import com.samosaai.masala.tools.stringList
@@ -117,5 +120,21 @@ class ToolsTest {
         ).jsonObject["response_format"]!!.jsonObject
         assertEquals("json_schema", structured["type"]?.jsonPrimitive?.content)
         assertEquals("layout", structured["json_schema"]?.jsonObject?.get("name")?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `files outside app storage ask for all-files access, unless pro already has it`() {
+        fun files(scope: FileScope) = ToolFiles {
+            object : FileAccess {
+                override val scope = scope
+                override fun resolve(path: String) = if (path.startsWith("/app")) File(path) else throw FileAccessDeniedException(path, "outside")
+                override fun outputDir() = File("/app/output")
+            }
+        }
+        assertEquals(ToolFiles.ResolveResult.Ok(File("/app/a.pdf")), files(FileScope.APP_STORAGE).resolveForRead("/app/a.pdf"))
+        val denied = files(FileScope.APP_STORAGE).resolveForRead("/sdcard/a.pdf") as ToolFiles.ResolveResult.PermissionNeeded
+        assertEquals(ToolFiles.ALL_FILES_ACCESS, denied.result.needsPermission)
+        assertTrue(files(FileScope.SHARED_STORAGE).resolveForRead("/sdcard/a.pdf") is ToolFiles.ResolveResult.Error)
+        assertEquals(ToolFiles.ALL_FILES_ACCESS, Capability.ALL_FILES.marker)
     }
 }

@@ -13,7 +13,7 @@ import com.samosaai.masala.tools.MasalaToolDefinitions as Defs
  * confirmation gate; [Tool.readsPrivateData] and [Tool.usesNetwork] feed the Skill Hub policy.
  */
 object MasalaTools {
-    fun create(context: Context): List<Tool> {
+    fun create(context: Context, files: ToolFiles): List<Tool> {
         val app = context.applicationContext
         val alarms = AlarmTool(app)
         val apps = AppsTool(app)
@@ -25,6 +25,12 @@ object MasalaTools {
         val wallpaper = WallpaperTool(app)
         val webSearch = WebSearchTool()
         val webFetch = WebFetchTool()
+        val capture = MediaCaptureTool(app, files)
+        val health = HealthTool(app)
+        val mediaEdit = MediaEditTool(app, files)
+        val notifications = NotificationTool(app)
+        val pdf = PdfTool(app, files)
+        val transcribe = TranscribeTool(files)
 
         return listOf(
             FunctionTool(Defs.dialNumber, READ_ONLY) { phone.dialNumber(it.string("number") ?: return@FunctionTool missing("number")) },
@@ -106,6 +112,74 @@ object MasalaTools {
             },
             FunctionTool(Defs.getBatteryInfo, READ_ONLY) { system.getBatteryInfo() },
             FunctionTool(Defs.toggleWifi, CHANGES_SOMETHING) { system.toggleWifi(it.boolean("enabled") ?: return@FunctionTool missing("enabled")) },
+
+            // Files, through ToolFiles: app storage, or anywhere once :pro adds all-files access.
+            FunctionTool(Defs.pdfEdit, CHANGES_SOMETHING, readsPrivateData = true) {
+                pdf.edit(
+                    operation = it.string("operation") ?: return@FunctionTool missing("operation"),
+                    input = it.string("input"),
+                    inputs = it.stringList("inputs"),
+                    output = it.string("output"),
+                    pages = it.string("pages"),
+                    degrees = it.int("degrees"),
+                    password = it.string("password"),
+                    overwrite = it.boolean("overwrite") ?: false,
+                    confirmed = it.boolean("confirmed") ?: false,
+                )
+            },
+            FunctionTool(Defs.mediaEdit, CHANGES_SOMETHING, readsPrivateData = true) {
+                mediaEdit.edit(
+                    operation = it.string("operation") ?: return@FunctionTool missing("operation"),
+                    input = it.string("input"),
+                    inputs = it.stringList("inputs"),
+                    output = it.string("output"),
+                    start = it.string("start"),
+                    end = it.string("end"),
+                    height = it.int("height"),
+                    speed = it.double("speed"),
+                    overwrite = it.boolean("overwrite") ?: false,
+                )
+            },
+            // Changes nothing on the phone, but sends the audio to the speech endpoint.
+            FunctionTool(Defs.transcribeFile, READ_ONLY, readsPrivateData = true, usesNetwork = true) {
+                transcribe.transcribe(
+                    path = it.string("path") ?: return@FunctionTool missing("path"),
+                    model = it.string("model"),
+                    language = it.string("language"),
+                )
+            },
+            FunctionTool(Defs.startAudioRecording, CHANGES_SOMETHING) {
+                capture.startAudioRecording(
+                    source = it.string("source"),
+                    maxDurationSeconds = it.int("max_duration_seconds"),
+                    outputPath = it.string("output_path"),
+                    quality = it.string("quality"),
+                )
+            },
+            FunctionTool(Defs.stopAudioRecording, CHANGES_SOMETHING) { capture.stopAudioRecording() },
+            FunctionTool(Defs.pauseAudioRecording, CHANGES_SOMETHING) { capture.pauseAudioRecording() },
+            FunctionTool(Defs.resumeAudioRecording, CHANGES_SOMETHING) { capture.resumeAudioRecording() },
+            FunctionTool(Defs.getAudioRecordingStatus, READ_ONLY) { capture.getAudioRecordingStatus() },
+
+            // Notification access.
+            FunctionTool(Defs.readNotifications, READ_ONLY, readsPrivateData = true) {
+                notifications.readNotifications(limit = it.int("limit") ?: 15, app = it.string("app"))
+            },
+            FunctionTool(Defs.dismissNotifications, CHANGES_SOMETHING) { notifications.dismissNotifications(it.string("key")) },
+            FunctionTool(Defs.mediaControl, CHANGES_SOMETHING) {
+                notifications.mediaControl(
+                    action = it.string("action") ?: return@FunctionTool missing("action"),
+                    app = it.string("app"),
+                    positionSeconds = it.int("position_seconds"),
+                )
+            },
+            FunctionTool(Defs.getNowPlaying, READ_ONLY, readsPrivateData = true) { notifications.getNowPlaying() },
+
+            // Health Connect: steps and sleep.
+            FunctionTool(Defs.getHealthSummary, READ_ONLY, readsPrivateData = true) { health.getSummary(it.int("days")) },
+            FunctionTool(Defs.getHealthRecords, READ_ONLY, readsPrivateData = true) {
+                health.getRecords(type = it.string("type") ?: return@FunctionTool missing("type"), daysArg = it.int("days"))
+            },
         )
     }
 }
