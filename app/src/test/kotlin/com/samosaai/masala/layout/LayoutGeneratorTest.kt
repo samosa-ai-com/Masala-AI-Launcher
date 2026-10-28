@@ -247,6 +247,12 @@ class LayoutGeneratorTest {
         assertEquals(null, (action as MasalaAction.RunSkill).prompt)
     }
 
+    @Test
+    fun `system prompt explains the photo`() {
+        val system = LayoutGenerator.buildMessages(request()).first().textContent
+        assertTrue(system.contains("photo", ignoreCase = true), system.take(200))
+    }
+
     companion object {
         private const val ITEMS_JSON = """
             {"id":"i1","label":"Phone","icon":{"type":"app","packageName":"com.example.phone","activity":"com.example.phone.Main","user":0},"action":{"type":"launch_app","packageName":"com.example.phone","activity":"com.example.phone.Main","user":0}},

@@ -161,6 +161,7 @@ class GenerateActivity : ComponentActivity() {
                     if (!generating && phase !is Phase.Idle) phase = Phase.Idle
                 },
                 label = { Text(stringResource(R.string.generate_prompt_label)) },
+                supportingText = { Text(stringResource(R.string.generate_prompt_hint)) },
                 maxLines = 3,
                 enabled = !generating,
                 modifier = Modifier.fillMaxWidth(),

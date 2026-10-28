@@ -223,7 +223,7 @@ class LayoutGenerator(
 
         internal val SYSTEM_PROMPT = """
             You design an Android home-screen layout. Reply with ONLY the layout object, no prose.
-            Rules: every page, section and item needs a unique id. Use only the installed apps listed below (copy package, activity and user exactly). Use only the listed symbol names. Every grid, list, dock or group section needs at least one item. Put a clock header first. Never invent packages, icons or skills.
+            Rules: every page, section and item needs a unique id. Use only the installed apps listed below (copy package, activity and user exactly). Use only the listed symbol names. Every grid, list, dock or group section needs at least one item. Put a clock header first. Never invent packages, icons or skills. A photo may be attached: sketches and screenshots define the layout structure, scenes set the theme. The text request overrides the photo where they conflict.
         """.trimIndent()
 
         internal fun isSchemaRejection(e: Exception): Boolean {
