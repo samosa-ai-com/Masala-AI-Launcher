@@ -54,6 +54,8 @@ import com.samosaai.masala.ui.home.rememberMicPress
 import com.samosaai.masala.ui.home.ConfirmationSheet
 import com.samosaai.masala.ui.home.HomeScreen
 import com.samosaai.masala.ui.home.RenderContext
+import com.samosaai.masala.scheduled.ScheduledTaskScheduler
+import com.samosaai.masala.skills.SkillScheduling
 import com.samosaai.masala.ui.home.SkillWidgetSource
 import com.samosaai.masala.ui.settings.SettingsActivity
 import com.samosaai.masala.ui.theme.MasalaTheme
@@ -143,6 +145,13 @@ class HomeActivity : ComponentActivity() {
             object : SkillWidgetSource {
                 override fun skill(id: String) = app.skills.getSkillById(id)
                 override fun latest(skillId: String) = app.database.skillRuns().latestFor(skillId)
+                override fun nextRunAt(skillId: String) = app.skillScheduling.nextRunAt(skillId)
+                override fun scheduleOffer(skillId: String) = app.skills.getSkillById(skillId)?.let { app.skillScheduling.offerFor(it, SkillScheduling.now()) }
+                override fun acceptSchedule(offer: SkillScheduling.Offer) {
+                    app.skillScheduling.accept(offer, System.currentTimeMillis(), java.time.ZoneId.systemDefault())
+                    scope.launch(kotlinx.coroutines.Dispatchers.IO) { ScheduledTaskScheduler.reschedule(app) }
+                }
+                override fun declineSchedule(skillId: String) = app.skillScheduling.decline(skillId)
             }
         }
         val screen = remember {

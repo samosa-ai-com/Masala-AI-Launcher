@@ -70,8 +70,8 @@ class SkillRunnerTest {
 
     private fun runner(vararg replies: ChatMessage, tool: (String) -> ToolResult = { ToolResult.Success("ok") }): SkillRunner {
         val queue = ArrayDeque(replies.toList())
-        return SkillRunner(scope, runs, artifacts, { if (it == "chef") chef else null }, { skill ->
-            val toolScope = ToolScope.skill(skill, infos)
+        return SkillRunner(scope, runs, artifacts, { if (it == "chef") chef else null }, { skill, unattended ->
+            val toolScope = ToolScope.skill(skill, infos).let { if (unattended) ToolScope.unattended(it, infos) else it }
             scopesSeen += toolScope.names
             MasalaAgent(AgentModel { _, _ -> queue.removeFirst() }, { name, _ -> tool(name) }, definitions, toolScope, { "system" })
         })
@@ -120,7 +120,7 @@ class SkillRunnerTest {
     }
 
     @Test fun failedModelMarksTheRunFailed() = runBlocking {
-        val r = SkillRunner(scope, runs, artifacts, { chef }, { MasalaAgent(AgentModel { _, _ -> error("offline") }, { _, _ -> ToolResult.Success("") }, definitions, ToolScope.command(infos), { "s" }) })
+        val r = SkillRunner(scope, runs, artifacts, { chef }, { _, _ -> MasalaAgent(AgentModel { _, _ -> error("offline") }, { _, _ -> ToolResult.Success("") }, definitions, ToolScope.command(infos), { "s" }) })
         val id = r.start("chef", user("x"))!!
         val state = r.finished(id)
         assertEquals(SkillRunEvent.Failed("offline"), state.events.last())
@@ -134,6 +134,40 @@ class SkillRunnerTest {
         r.send(id, user("b"))
         val state = withTimeout(5_000) { r.open(id)!!.first { !it.running && it.events.count { e -> e is SkillRunEvent.Done } == 2 } }
         assertEquals(listOf("a", "one", "b", "two"), state.events.filterIsInstance<SkillRunEvent.Message>().map { it.text })
+    }
+
+    @Test fun unattendedRunsRefuseToolsThatChangeSomething() = runBlocking<Unit> {
+        val ran = mutableListOf<String>()
+        val skill = chef.copy(requiresTools = listOf("web_search", "set_alarm"))
+        val queue = ArrayDeque(listOf(reply("", call("1", "set_alarm")), reply("I couldn't set it")))
+        val r = SkillRunner(scope, runs, artifacts, { skill }, { s, unattended ->
+            val toolScope = ToolScope.skill(s, infos).let { if (unattended) ToolScope.unattended(it, infos) else it }
+            MasalaAgent(AgentModel { _, _ -> queue.removeFirst() }, { name, _ -> ran += name; ToolResult.Success("ok") }, definitions, toolScope, { "system" })
+        })
+        val id = r.start("chef", user("wake me"), unattended = true)!!
+        val state = r.finished(id)
+        assertEquals(emptyList(), ran)
+        // A refused call never starts a step, so the sheet shows no tool ran.
+        assertTrue(state.events.none { it is SkillRunEvent.ToolStep })
+        assertEquals("done", r.outcome(id)!!.first)
+    }
+
+    @Test fun attendedRunsKeepTheirChangingTools() = runBlocking<Unit> {
+        val ran = mutableListOf<String>()
+        val skill = chef.copy(requiresTools = listOf("web_search", "set_alarm"))
+        val queue = ArrayDeque(listOf(reply("", call("1", "set_alarm")), reply("Set")))
+        val r = SkillRunner(scope, runs, artifacts, { skill }, { s, _ ->
+            MasalaAgent(AgentModel { _, _ -> queue.removeFirst() }, { name, _ -> ran += name; ToolResult.Success("ok") }, definitions, ToolScope.skill(s, infos), { "system" })
+        })
+        r.finished(r.start("chef", user("wake me"))!!)
+        assertEquals(listOf("set_alarm"), ran)
+    }
+
+    @Test fun outcomeReportsFailuresWithTheirError() = runBlocking<Unit> {
+        val r = SkillRunner(scope, runs, artifacts, { chef }, { _, _ -> MasalaAgent(AgentModel { _, _ -> error("offline") }, { _, _ -> ToolResult.Success("") }, definitions, ToolScope.command(infos), { "s" }) })
+        val id = r.start("chef", user("x"))!!
+        r.finished(id)
+        assertEquals("failed" to "offline", r.outcome(id))
     }
 
     @Test fun reopeningRestoresFromTheDatabase() = runBlocking {

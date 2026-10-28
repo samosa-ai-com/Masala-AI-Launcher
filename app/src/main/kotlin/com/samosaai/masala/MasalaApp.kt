@@ -27,7 +27,10 @@ import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.core.tool.ActionResult
 import com.samosaai.masala.llm.LlmConfig
 import com.samosaai.masala.skills.AiReports
+import com.samosaai.masala.skills.PrefsDeclinedSchedules
 import com.samosaai.masala.skills.SkillRunner
+import com.samosaai.masala.skills.SkillScheduling
+import com.samosaai.masala.scheduled.ScheduledSkillRunner
 import com.samosaai.masala.ui.skills.SkillSheetActivity
 import com.samosaai.masala.core.agent.ToolInfo
 import com.samosaai.masala.core.agent.ToolScope
@@ -72,7 +75,7 @@ class MasalaApp : Application() {
 
     val scheduledTasks by lazy { ScheduledTaskStore(PrefsTaskStorage(this)) }
 
-    /** Starts a scheduled task's run. Null until Phase 4's skill runner sets it. */
+    /** Starts a scheduled task's run as a foreground job (plan Phase 4 M6). */
     @Volatile var taskRunner: TaskRunner? = null
 
     /** `:app`'s tools, then `:pro`'s, which also swaps in all-files access (arch §3.1). */
@@ -111,13 +114,16 @@ class MasalaApp : Application() {
 
     /** Runs skills; app-scoped, so a run goes on after its sheet closes. */
     val skillRunner by lazy {
-        SkillRunner(scope, database.skillRuns(), database.skillArtifacts(), { skills.getSkillById(it) }, ::skillAgent)
+        SkillRunner(scope, database.skillRuns(), database.skillArtifacts(), { if (it == COMMAND_SKILL_ID) COMMAND_SKILL else skills.getSkillById(it) }, ::skillAgent)
     }
 
     val aiReports by lazy { AiReports(this) }
 
     /** The user's MCP servers; their tools join the registry as `mcp_…`. Touched in [onCreate] so saved servers register at startup. */
     val mcp by lazy { McpServerStore(PrefsMcpStorage(this), tools::setDynamic) }
+
+    /** Skill widgets and their default schedules. */
+    val skillScheduling by lazy { SkillScheduling(scheduledTasks, PrefsDeclinedSchedules(this)) }
 
     /** The Personal Wiki; approved writes are recorded in the action log. */
     val wiki by lazy {
@@ -157,15 +163,22 @@ class MasalaApp : Application() {
         )
     }
 
+    companion object {
+        /** A scheduled task with no skill runs a plain command under this id. */
+        const val COMMAND_SKILL_ID = "command"
+        private val COMMAND_SKILL = MasalaSkill(id = COMMAND_SKILL_ID, title = "Command", instructions = "")
+    }
+
     private object NoScreen : ActionDispatcher.Screen {
         override fun openDrawer(query: String?) = Unit
         override fun ask(prompt: String) = Unit
     }
 
     /** The agent for one skill run: the persona's and skill's instructions, the skill's tools, more steps. */
-    private fun skillAgent(skill: MasalaSkill) = agent(
+    private fun skillAgent(skill: MasalaSkill, unattended: Boolean) = agent(
         model = LlmAgentModel(LlmConfig.default.client(this)),
-        scope = { ToolScope.skill(skill, it) },
+        // A run nobody watches can't ask, so it only gets tools that never need a confirmation.
+        scope = { infos -> ToolScope.skill(skill, infos).let { if (unattended) ToolScope.unattended(it, infos) else it } },
         instructions = listOfNotNull(skill.persona?.systemPrompt, skill.instructions).joinToString("\n\n"),
         maxSteps = MasalaAgent.SKILL_MAX_STEPS,
     )
@@ -224,6 +237,8 @@ class MasalaApp : Application() {
         WikiTools.create(wiki).forEach(tools::register)
         mcp.servers
         dispatcher = ActionDispatcher(this, actions, launcher, modes, confirmationGate, tools, { skills }) { toolExecutor(confirmationGate) }
+
+        taskRunner = ScheduledSkillRunner(this)
 
         // A force-stop drops the alarm; the store still has the tasks.
         scope.launch(Dispatchers.IO) { ScheduledTaskScheduler.reschedule(this@MasalaApp) }

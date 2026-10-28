@@ -52,3 +52,4 @@ library androidx.room  # MultiInstanceInvalidationService, not exported
 # through Compose), so it's listed by name instead of allowing all of that library.
 provider androidx.startup.InitializationProvider  # AndroidX initializers (emoji2, lifecycle, profileinstaller)
 provider androidx.core.content.FileProvider  # Open and Share skill result files
+service androidx.work.impl.foreground.SystemForegroundService  # WorkManager foreground service for scheduled skill runs and long jobs; merged with dataSync and mediaProcessing types

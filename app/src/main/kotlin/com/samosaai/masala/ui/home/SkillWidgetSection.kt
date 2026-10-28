@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -16,6 +17,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,12 +38,26 @@ import com.samosaai.masala.core.contract.SkillWidgetSection
 import com.samosaai.masala.core.contract.SkillWidgetSize
 import com.samosaai.masala.data.SkillRunEntity
 import com.samosaai.masala.skills.SkillRunner
+import com.samosaai.masala.skills.SkillScheduling
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import kotlinx.coroutines.flow.Flow
 
 /** What the skill widget needs: the skill, and its newest run for the result line. */
 interface SkillWidgetSource {
     fun skill(id: String): MasalaSkill?
     fun latest(skillId: String): Flow<SkillRunEntity?>
+
+    /** When the skill's scheduled task runs next, or null. */
+    fun nextRunAt(skillId: String): Long? = null
+
+    /** The skill's default schedule, if the user hasn't been asked about it yet. */
+    fun scheduleOffer(skillId: String): SkillScheduling.Offer? = null
+    fun acceptSchedule(offer: SkillScheduling.Offer) = Unit
+    fun declineSchedule(skillId: String) = Unit
 }
 
 /**
@@ -68,6 +84,19 @@ fun SkillWidgetCard(section: SkillWidgetSection, source: SkillWidgetSource, onAc
     }
     val title = skill.title.ifBlank { skill.id }
     val open = { onAction(MasalaAction.RunSkill(skill.id)) }
+    // The default schedule is only set up after the user says yes.
+    var offer by remember(skill.id) { mutableStateOf<SkillScheduling.Offer?>(null) }
+    LaunchedEffect(skill.id) { offer = source.scheduleOffer(skill.id) }
+    var nextRun by remember(skill.id, latest) { mutableStateOf(source.nextRunAt(skill.id)) }
+    offer?.let { o ->
+        AlertDialog(
+            onDismissRequest = { source.declineSchedule(skill.id); offer = null },
+            title = { Text(stringResource(R.string.skill_schedule_title, title)) },
+            text = { Text(stringResource(R.string.skill_schedule_body, o.schedule.summary)) },
+            confirmButton = { TextButton(onClick = { source.acceptSchedule(o); offer = null; nextRun = source.nextRunAt(skill.id) }) { Text(stringResource(R.string.skill_schedule_yes)) } },
+            dismissButton = { TextButton(onClick = { source.declineSchedule(skill.id); offer = null }) { Text(stringResource(R.string.skill_schedule_no)) } },
+        )
+    }
     Card(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         shape = RoundedCornerShape(20.dp),
@@ -95,6 +124,7 @@ fun SkillWidgetCard(section: SkillWidgetSection, source: SkillWidgetSource, onAc
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                nextRun?.let { Text(stringResource(R.string.skill_widget_next_run, formatNextRun(it)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (SkillInput.TEXT in skill.widget?.inputs.orEmpty()) {
                     QuickInput(title) { onAction(MasalaAction.RunSkill(skill.id, it)) }
                 } else {
@@ -103,6 +133,13 @@ fun SkillWidgetCard(section: SkillWidgetSection, source: SkillWidgetSource, onAc
             }
         }
     }
+}
+
+/** "07:30" today, "Thu 07:30" otherwise. */
+internal fun formatNextRun(millis: Long, zone: ZoneId = ZoneId.systemDefault(), today: LocalDate = LocalDate.now(zone)): String {
+    val at = Instant.ofEpochMilli(millis).atZone(zone)
+    val time = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).format(at)
+    return if (at.toLocalDate() == today) time else DateTimeFormatter.ofPattern("EEE").format(at) + " " + time
 }
 
 @Composable

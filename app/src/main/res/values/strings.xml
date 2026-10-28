@@ -134,6 +134,14 @@
     <string name="settings_export_failed">Couldn’t write the file</string>
 
     <!-- Phase 4 -->
+    <string name="jobs_channel">Background jobs</string>
+    <string name="jobs_running">Masala is working</string>
+    <string name="scheduled_skill_gone">The skill “%1$s” is no longer installed.</string>
+    <string name="skill_widget_next_run">Next run %1$s</string>
+    <string name="skill_schedule_title">Run %1$s on a schedule?</string>
+    <string name="skill_schedule_body">Masala can run it %1$s and show the result here. Runs nobody is watching can only use tools that don’t change anything.</string>
+    <string name="skill_schedule_yes">Yes, schedule it</string>
+    <string name="skill_schedule_no">No thanks</string>
     <string name="mcp_title">Connected tools (MCP)</string>
     <string name="mcp_summary">Your own tool servers. Every call asks first</string>
     <string name="mcp_add">Add a server</string>

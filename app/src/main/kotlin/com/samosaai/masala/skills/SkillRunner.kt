@@ -31,14 +31,15 @@ import java.util.concurrent.ConcurrentHashMap
  * transcript saved after every turn, and result files recorded as `skill_artifacts`. App-scoped: a run
  * goes on when the sheet closes, and the widget shows its result.
  *
- * [agentFor] builds the agent for a skill; the app passes one with the skill's [com.samosaai.masala.core.agent.ToolScope].
+ * [agentFor] builds the agent for a skill; the app passes one with the skill's [com.samosaai.masala.core.agent.ToolScope],
+ * cut down to read-only tools when the run is `unattended` (scheduled runs nobody watches, arch §3.9).
  */
 class SkillRunner(
     private val scope: CoroutineScope,
     private val runs: SkillRunDao,
     private val artifacts: SkillArtifactDao,
     private val skill: (String) -> MasalaSkill?,
-    private val agentFor: (MasalaSkill) -> MasalaAgent,
+    private val agentFor: (skill: MasalaSkill, unattended: Boolean) -> MasalaAgent,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private class Active(val skill: MasalaSkill, val agent: MasalaAgent, val state: MutableStateFlow<SkillRunState>) {
@@ -49,12 +50,12 @@ class SkillRunner(
     private val transcript = ListSerializer(ChatMessage.serializer())
 
     /** Starts a new run of [skillId]; null if there is no such skill. */
-    suspend fun start(skillId: String, message: ChatMessage): Long? {
+    suspend fun start(skillId: String, message: ChatMessage, unattended: Boolean = false): Long? {
         val skill = skill(skillId) ?: return null
         val id = runs.insert(
             SkillRunEntity(skillId = skillId, prompt = message.textContent, status = "running", transcriptJson = "[]", startedAt = clock()),
         )
-        val run = Active(skill, agentFor(skill), MutableStateFlow(SkillRunState(id, skillId)))
+        val run = Active(skill, agentFor(skill, unattended), MutableStateFlow(SkillRunState(id, skillId)))
         active[id] = run
         turn(id, run, message)
         return id
@@ -73,10 +74,13 @@ class SkillRunner(
         val row = runs.get(runId) ?: return null
         val skill = skill(row.skillId) ?: return null
         val history = runCatching { MasalaJson.lenient.decodeFromString(transcript, row.transcriptJson) }.getOrDefault(emptyList())
-        val agent = agentFor(skill).also { it.restore(history) }
+        val agent = agentFor(skill, false).also { it.restore(history) }
         val state = MutableStateFlow(SkillRunState(runId, row.skillId, eventsFrom(agent.history), running = false))
         return (active.putIfAbsent(runId, Active(skill, agent, state)) ?: active[runId]!!).state.asStateFlow()
     }
+
+    /** How a finished run ended, as saved: the status (`done`, `failed`, `cancelled`) and its error, or null for an unknown run. */
+    suspend fun outcome(runId: Long): Pair<String, String?>? = runs.get(runId)?.let { it.status to it.error }
 
     fun stop(runId: Long) {
         active[runId]?.job?.cancel()
