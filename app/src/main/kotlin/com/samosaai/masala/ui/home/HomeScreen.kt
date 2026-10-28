@@ -1,8 +1,10 @@
 package com.samosaai.masala.ui.home
 
 import android.content.pm.ShortcutInfo
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -74,37 +76,52 @@ fun HomeScreen(
     val swipeUpLabel = stringResource(R.string.home_swipe_up_description)
     val swipeDownLabel = stringResource(R.string.home_swipe_down_description)
     val openSettingsLabel = stringResource(R.string.home_open_settings_description)
-    // The page scrolls, and a scrollable keeps the drag even with nothing to scroll, so a swipe arrives
-    // here as the scroll the list couldn't use.
+    // The page scrolls, and a scrollable keeps the drag even with nothing to scroll, so a swipe
+    // arrives here as the scroll the list couldn't use. Only that leftover counts toward a
+    // gesture — mid-list scrolling never does — and the action fires once, on finger lift, so a
+    // trip to the end of a long layout never triggers anything by itself.
     val swipes = remember(swipeThreshold, onSwipeUp, onSwipeDown) {
         object : NestedScrollConnection {
             var pulled = 0f
+            var tracking = false
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 if (source == NestedScrollSource.UserInput && available.y != 0f) {
+                    if (!tracking) {
+                        tracking = true
+                        pulled = 0f
+                    } else if ((pulled < 0) != (available.y < 0)) {
+                        // Direction flipped mid-gesture: a wiggle is scrolling, not a swipe.
+                        pulled = 0f
+                    }
                     pulled += available.y
-                    if (pulled < -swipeThreshold) { pulled = 0f; onSwipeUp() } else if (pulled > swipeThreshold) { pulled = 0f; onSwipeDown() }
                 }
                 return Offset.Zero
             }
 
-            override suspend fun onPreFling(available: Velocity): Velocity {
+            fun onFingerLift() {
+                if (!tracking) return
+                tracking = false
+                if (pulled < -swipeThreshold) onSwipeUp() else if (pulled > swipeThreshold) onSwipeDown()
                 pulled = 0f
-                return Velocity.Zero
             }
+
+            override suspend fun onPreFling(available: Velocity): Velocity = Velocity.Zero
         }
     }
+    // Finger lift, observed without consuming anything: the one place swipe actions fire, so a
+    // trip to the end of a long layout never triggers anything by itself.
     Box(
         Modifier
             .fillMaxSize()
             .nestedScroll(swipes)
-            .pointerInput(onSwipeUp, onSwipeDown) {
-                var dragged = 0f
-                detectVerticalDragGestures(
-                    onDragStart = { dragged = 0f },
-                    onDragEnd = { if (dragged < -swipeThreshold) onSwipeUp() else if (dragged > swipeThreshold) onSwipeDown() },
-                    onVerticalDrag = { _, dy -> dragged += dy },
-                )
+            .pointerInput(swipes) {
+                // Observes only (consumes nothing): when every finger is up, the gesture is
+                // over, which is the single moment a tracked swipe fires.
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    if (waitForUpOrCancellation() != null) swipes.onFingerLift()
+                }
             }
             .pointerInput(Unit) { detectTapGestures(onLongPress = { onOpenSettings() }) }
             // TalkBack can't swipe or long-press empty space, so each is offered as an action.
