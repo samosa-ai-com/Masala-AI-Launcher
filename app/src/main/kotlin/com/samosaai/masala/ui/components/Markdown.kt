@@ -30,66 +30,21 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.halilibo.richtext.markdown.Markdown as RichMarkdown
+import com.halilibo.richtext.ui.material3.Material3RichText
 import com.samosaai.masala.R
 
-/** Chat Markdown (see [MarkdownParser]); code blocks scroll sideways and have a copy button. */
+/** Chat Markdown: rendered by compose-richtext, with code blocks drawn here (scroll sideways, copy button). */
 @Composable
 fun Markdown(markdown: String, modifier: Modifier = Modifier) {
     val segments = remember(markdown) { MarkdownParser.segments(markdown) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         segments.forEach { segment ->
             when (segment) {
-                is MarkdownSegment.Prose -> ProseBlocks(segment.markdown)
+                is MarkdownSegment.Prose -> Material3RichText { RichMarkdown(segment.markdown) }
                 is MarkdownSegment.Code -> CodeBox(segment.code, segment.language)
             }
         }
-    }
-}
-
-@Composable
-private fun ProseBlocks(prose: String) {
-    val blocks = remember(prose) { MarkdownParser.blocks(prose) }
-    val codeBackground = MaterialTheme.colorScheme.surfaceContainerHighest
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        blocks.forEach { block ->
-            when (block) {
-                is MdBlock.Heading -> Text(
-                    styled(block.spans, codeBackground),
-                    style = when (block.level) {
-                        1 -> MaterialTheme.typography.titleLarge
-                        2 -> MaterialTheme.typography.titleMedium
-                        else -> MaterialTheme.typography.titleSmall
-                    },
-                )
-                is MdBlock.Paragraph -> Text(styled(block.spans, codeBackground), style = MaterialTheme.typography.bodyLarge)
-                is MdBlock.Bullet -> Row(Modifier.padding(start = (block.indent * 16).dp)) {
-                    Text("•  ", style = MaterialTheme.typography.bodyLarge)
-                    Text(styled(block.spans, codeBackground), style = MaterialTheme.typography.bodyLarge)
-                }
-                is MdBlock.Numbered -> Row {
-                    Text("${block.number}.  ", style = MaterialTheme.typography.bodyLarge)
-                    Text(styled(block.spans, codeBackground), style = MaterialTheme.typography.bodyLarge)
-                }
-                is MdBlock.Quote -> Text(
-                    styled(block.spans, codeBackground),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 12.dp),
-                )
-            }
-        }
-    }
-}
-
-private fun styled(spans: List<MdSpan>, codeBackground: androidx.compose.ui.graphics.Color): AnnotatedString = buildAnnotatedString {
-    for (span in spans) {
-        val style = SpanStyle(
-            fontWeight = if (span.bold) FontWeight.Bold else null,
-            fontStyle = if (span.italic) FontStyle.Italic else null,
-            fontFamily = if (span.code) FontFamily.Monospace else null,
-            background = if (span.code) codeBackground else androidx.compose.ui.graphics.Color.Unspecified,
-        )
-        withStyle(style) { append(span.text) }
     }
 }
 

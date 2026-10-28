@@ -98,6 +98,8 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.jsoup)
     implementation(libs.workmanager)
+    implementation(libs.richtext.material3)
+    implementation(libs.richtext.commonmark)
     implementation(libs.media3.transformer)
     implementation(libs.media3.effect)
     implementation(libs.media3.common)
