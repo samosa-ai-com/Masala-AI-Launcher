@@ -1,16 +1,12 @@
 package com.samosaai.masala.ui.settings
 
-import android.app.WallpaperManager
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,8 +33,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -92,8 +86,11 @@ class PreviewActivity : ComponentActivity() {
             failed = layout == null
         }
 
+        // The window itself is wallpaper-backed (Theme.Masala.Home, like the real home
+        // screen), so the layout draws over the user's actual wallpaper — live ones included.
+        // My earlier WallpaperManager-bitmap attempt is gone: it could come back null and could
+        // never match parallax anyway.
         Box(Modifier.fillMaxSize()) {
-            WallpaperBackground(Modifier.fillMaxSize())
             Column(Modifier.fillMaxSize()) {
                 // Scrimmed bars so controls stay readable over any wallpaper.
                 Row(
@@ -148,37 +145,6 @@ class PreviewActivity : ComponentActivity() {
                     }) { Text(stringResource(R.string.settings_refine_version)) }
                 }
             }
-        }
-    }
-
-    /** The user's current wallpaper, or nothing when it can't be read (live wallpapers, lock-only). */
-    @Composable
-    private fun WallpaperBackground(modifier: Modifier = Modifier) {
-        var wallpaper by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
-        LaunchedEffect(Unit) {
-            wallpaper = withContext(Dispatchers.IO) {
-                runCatching {
-                    val drawable = WallpaperManager.getInstance(this@PreviewActivity).drawable
-                        ?: return@runCatching null
-                    val w = drawable.intrinsicWidth.takeIf { it > 0 } ?: 1080
-                    val h = drawable.intrinsicHeight.takeIf { it > 0 } ?: 1920
-                    val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                    drawable.setBounds(0, 0, w, h)
-                    drawable.draw(Canvas(bmp))
-                    bmp
-                }.getOrNull()
-            }
-        }
-        val bmp = wallpaper
-        if (bmp != null) {
-            Image(
-                bitmap = bmp.asImageBitmap(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = modifier,
-            )
-        } else {
-            Box(modifier.background(MaterialTheme.colorScheme.background))
         }
     }
 

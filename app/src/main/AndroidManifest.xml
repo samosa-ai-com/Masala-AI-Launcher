@@ -171,10 +171,11 @@
             android:label="@string/generate_title"
             android:windowSoftInputMode="adjustResize" />
 
-        <!-- Full-screen version preview over the current wallpaper -->
+        <!-- Full-screen version preview over the current wallpaper (same window as home) -->
         <activity
             android:name=".ui.settings.PreviewActivity"
             android:exported="false"
-            android:label="@string/settings_title" />
+            android:label="@string/settings_title"
+            android:theme="@style/Theme.Masala.Home" />
     </application>
 </manifest>
