@@ -4,7 +4,8 @@ import android.content.pm.ShortcutInfo
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -77,46 +78,59 @@ fun HomeScreen(
     val swipeUpLabel = stringResource(R.string.home_swipe_up_description)
     val swipeDownLabel = stringResource(R.string.home_swipe_down_description)
     val openSettingsLabel = stringResource(R.string.home_open_settings_description)
-    // The page scrolls, and a scrollable keeps the drag even with nothing to scroll, so a swipe
-    // arrives here as the scroll the list couldn't use. Only that leftover counts toward a
-    // gesture — mid-list scrolling never does — and the action fires once, on finger lift, so a
-    // trip to the end of a long layout never triggers anything by itself.
+    // Two detectors feed one decision, because neither sees every gesture alone. A scrollable
+    // child consumes the drag, so the outer drag detector only survives on empty space; the
+    // nested connection only sees the scroll the list couldn't use. Both feed peak overscroll
+    // here, and the action fires exactly once, on finger lift — never mid-gesture, so a trip to
+    // the end of a long layout never triggers anything by itself.
     //
-    // The connection object is stable across recompositions (callbacks go through UpdatedState);
+    // The tracker object is stable across recompositions (callbacks go through UpdatedState);
     // otherwise a recomposition mid-swipe would restart tracking and swallow the gesture.
     val latestUp by rememberUpdatedState(onSwipeUp)
     val latestDown by rememberUpdatedState(onSwipeDown)
     val swipes = remember(swipeThreshold) {
-        object : NestedScrollConnection {
+        object {
             var peakUp = 0f
             var peakDown = 0f
             var tracking = false
+            var handled = false
 
-            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (source == NestedScrollSource.UserInput && available.y != 0f) {
-                    if (!tracking) {
-                        tracking = true
-                        peakUp = 0f
-                        peakDown = 0f
-                    }
-                    // Peaks, not a running total: lift jitter or a mid-gesture wiggle can shrink
-                    // the current run, but a swipe that already traveled far enough still counts.
-                    if (available.y < 0) peakUp = minOf(peakUp, peakUp + available.y) else peakDown = maxOf(peakDown, peakDown + available.y)
+            val connection = object : NestedScrollConnection {
+                override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                    if (source == NestedScrollSource.UserInput && available.y != 0f) add(available.y)
+                    return Offset.Zero
                 }
-                return Offset.Zero
+
+                override suspend fun onPreFling(available: Velocity): Velocity = Velocity.Zero
             }
 
-            fun onFingerLift() {
+            fun add(dy: Float) {
+                if (!tracking) {
+                    tracking = true
+                    peakUp = 0f
+                    peakDown = 0f
+                    handled = false
+                }
+                // Peaks, not a running total: lift jitter or a mid-gesture wiggle can shrink
+                // the current run, but a swipe that already traveled far enough still counts.
+                if (dy < 0) peakUp = minOf(peakUp, peakUp + dy) else peakDown = maxOf(peakDown, peakDown + dy)
+            }
+
+            fun onLift() {
                 if (!tracking) return
                 tracking = false
+                if (handled) {
+                    peakUp = 0f
+                    peakDown = 0f
+                    return
+                }
+                handled = true
                 // The further excursion wins; ties and sub-threshold lifts do nothing.
                 if (-peakUp >= swipeThreshold && -peakUp >= peakDown) latestUp()
                 else if (peakDown >= swipeThreshold && peakDown > -peakUp) latestDown()
                 peakUp = 0f
                 peakDown = 0f
             }
-
-            override suspend fun onPreFling(available: Velocity): Velocity = Velocity.Zero
         }
     }
     // Finger lift, observed without consuming anything: the one place swipe actions fire, so a
@@ -124,15 +138,41 @@ fun HomeScreen(
     Box(
         Modifier
             .fillMaxSize()
-            .nestedScroll(swipes)
+            .nestedScroll(swipes.connection)
+            .pointerInput(swipes) {
+                // The outer drag detector: the only path that sees swipes on empty space,
+                // where there is no scrollable child to start nested scrolling. Feeds the
+                // same tracker; the lift below decides and fires exactly once.
+                var dragged = 0f
+                detectVerticalDragGestures(
+                    onDragStart = {
+                        dragged = 0f
+                        swipes.add(0f)
+                    },
+                    onDragEnd = { swipes.onLift() },
+                    onDragCancel = { /* the nested path may still be live; lift decides */ },
+                    onVerticalDrag = { change, dy ->
+                        dragged += dy
+                        swipes.add(dy)
+                        change.consume()
+                    },
+                )
+            }
             .pointerInput(Unit) {
                 // Observes only (consumes nothing): when every finger is up, the gesture is
                 // over, which is the single moment a tracked swipe fires. Unit key: never
                 // restarts, so a recomposition mid-swipe cannot swallow the lift.
+                // Final pass on purpose: siblings may consume the up event (which cancels
+                // Main-pass waiters), but Final still sees it.
                 while (true) {
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false)
-                        if (waitForUpOrCancellation() != null) swipes.onFingerLift()
+                        var up = false
+                        while (!up) {
+                            val event = awaitPointerEvent(PointerEventPass.Final)
+                            up = event.changes.isNotEmpty() && event.changes.all { !it.pressed }
+                        }
+                        swipes.onLift()
                     }
                 }
             }
@@ -164,8 +204,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun DefaultBanner(onSetDefault: () -> Unit) {
-    Card(Modifier.fillMaxWidth().padding(16.dp)) {
+private fun DefaultBanner(onSetDefault: () -> Unit) {    Card(Modifier.fillMaxWidth().padding(16.dp)) {
         Column(Modifier.padding(16.dp)) {
             Text(stringResource(R.string.home_set_default_title), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.heightIn(min = 8.dp))
