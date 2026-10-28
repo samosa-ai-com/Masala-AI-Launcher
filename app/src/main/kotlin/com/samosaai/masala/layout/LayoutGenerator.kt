@@ -59,7 +59,7 @@ class LayoutGenerator(
             caller.call(messages, ResponseFormat.jsonSchema("layout", schema), maxTokens, request.temperature)
         } catch (e: Exception) {
             if (isSchemaRejection(e)) return generateJsonObject(request, system, user, schema)
-            return GenerateResult.Failed
+            return GenerateResult.Failed(short(e))
         }
         val firstResult = checkText(first, request)
         if (firstResult is GenerateResult.Generated) return firstResult
@@ -80,7 +80,7 @@ class LayoutGenerator(
         val second = try {
             caller.call(repair, ResponseFormat.jsonSchema("layout", schema), maxTokens, request.temperature)
         } catch (e: Exception) {
-            return GenerateResult.Failed
+            return GenerateResult.Failed(short(e))
         }
         return checkText(second, request)
     }
@@ -105,7 +105,7 @@ class LayoutGenerator(
                 request.temperature,
             )
         } catch (e: Exception) {
-            return GenerateResult.Failed
+            return GenerateResult.Failed(short(e))
         }
         val json = extractJsonObject(second)
             ?: return GenerateResult.Rejected(
@@ -189,6 +189,11 @@ class LayoutGenerator(
         /** Reasoning-heavy model: the model check needs 3000+ or long replies starve. */
         const val MAX_TOKENS = 3000
 
+        internal fun short(e: Exception): String {
+            val detail = (e.message ?: "").take(300)
+            return if (detail.isBlank()) e::class.simpleName ?: "error" else "${e::class.simpleName}: $detail"
+        }
+
         internal val SYSTEM_PROMPT = """
             You design an Android home-screen layout. Reply with ONLY the layout object, no prose.
             Rules: every page, section and item needs a unique id. Use only the installed apps listed below (copy package, activity and user exactly). Use only the listed symbol names. Every grid, list, dock or group section needs at least one item. Put a clock header first. Never invent packages, icons or skills.
@@ -256,5 +261,5 @@ sealed interface GenerateResult {
     data class Rejected(val problems: List<LayoutChecker.Problem>) : GenerateResult
 
     /** Transport trouble (no usable reply). Keep the current layout. */
-    data object Failed : GenerateResult
+    data class Failed(val message: String) : GenerateResult
 }

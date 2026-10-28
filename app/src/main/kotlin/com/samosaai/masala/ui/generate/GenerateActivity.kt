@@ -136,7 +136,9 @@ class GenerateActivity : ComponentActivity() {
                     when (val result = LayoutGenerator(caller).generate(request)) {
                         is GenerateResult.Generated -> Phase.Preview(result.layout)
                         is GenerateResult.Rejected -> Phase.Rejected(result.problems.map { it.toString() })
-                        GenerateResult.Failed -> Phase.Failed(getString(R.string.generate_failed))
+                        is GenerateResult.Failed -> Phase.Failed(
+                            getString(R.string.generate_failed) + "\n" + result.message
+                        )
                     }
                 } catch (e: Exception) {
                     Phase.Failed("${e::class.simpleName}: ${e.message}")
