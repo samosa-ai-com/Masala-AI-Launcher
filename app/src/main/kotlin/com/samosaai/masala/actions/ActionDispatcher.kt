@@ -13,7 +13,9 @@ import com.samosaai.masala.core.tool.ToolSensitivity
 import com.samosaai.masala.launcher.AppActions
 import com.samosaai.masala.launcher.LauncherModel
 import com.samosaai.masala.layout.ModeStore
+import com.samosaai.masala.skills.SkillRegistry
 import com.samosaai.masala.tools.MasalaToolExecutor
+import com.samosaai.masala.ui.skills.SkillSheetActivity
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -32,6 +34,7 @@ class ActionDispatcher(
     private val modes: ModeStore,
     private val gate: ConfirmationGate,
     private val registry: ToolRegistry,
+    private val skills: () -> SkillRegistry,
     private val executor: () -> MasalaToolExecutor,
 ) {
     /** What the screen has to do for actions that are about the screen. */
@@ -91,8 +94,9 @@ class ActionDispatcher(
         is MasalaAction.AskMasala -> Outcome.Done().also { screen.ask(action.prompt) }
         is MasalaAction.SetMode -> setMode(action)
         is MasalaAction.RunTool -> tool(action.name, action.args)
-        // The agent and the skill runner arrive in Phase 4; the buttons are already wired.
-        is MasalaAction.RunSkill -> Outcome.Done().also { screen.ask(action.prompt ?: action.skillId) }
+        is MasalaAction.RunSkill ->
+            if (skills().getSkillById(action.skillId) == null) Outcome.Failed("There is no skill '${action.skillId}'")
+            else start(SkillSheetActivity.intent(context, action.skillId, action.prompt))
         is MasalaAction.OpenMiniApp -> Outcome.Failed("Mini apps arrive in a later phase")
     }
 

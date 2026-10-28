@@ -197,6 +197,10 @@ class DebugActivity : ComponentActivity() {
                 }
                 OutlinedButton(onClick = {
                     events.clear()
+                    events += DebugEvent.Raw(masala.aiReports.tail(20).joinToString("\n").ifEmpty { "(no AI reports)" })
+                }) { Text(stringResource(R.string.debug_ai_reports)) }
+                OutlinedButton(onClick = {
+                    events.clear()
                     events += DebugEvent.Raw(masala.actionLog.tail(20).joinToString("\n").ifEmpty { "(empty)" })
                 }) { Text(stringResource(R.string.debug_action_log)) }
             }

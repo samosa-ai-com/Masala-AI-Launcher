@@ -132,4 +132,47 @@
     <string name="settings_import_done">Layout imported</string>
     <string name="settings_export_done">Layout exported</string>
     <string name="settings_export_failed">Couldn’t write the file</string>
+
+    <!-- Phase 4 -->
+    <string name="skill_missing">That skill isn’t available</string>
+    <string name="skill_new_chat">New chat</string>
+    <string name="skill_input_hint">Message</string>
+    <string name="skill_send">Send</string>
+    <string name="skill_stop">Stop</string>
+    <string name="skill_step_running">Running %1$s…</string>
+    <string name="skill_step_done">Ran %1$s</string>
+    <string name="skill_step_failed">%1$s didn’t work</string>
+    <string name="skill_widget_working">Working on it…</string>
+    <string name="skill_widget_open">Open</string>
+    <string name="skill_widget_hint">Ask %1$s</string>
+    <string name="input_text">Text</string>
+    <string name="input_photo">Photo</string>
+    <string name="input_video">Video</string>
+    <string name="input_audio_file">Audio file</string>
+    <string name="input_document">Document</string>
+    <string name="input_folder">Folder</string>
+    <string name="input_path">Path</string>
+    <string name="input_record">Record</string>
+    <string name="input_later">later</string>
+    <string name="input_pick_failed">Couldn’t read that file</string>
+    <string name="result_open">Open</string>
+    <string name="result_share">Share</string>
+    <string name="result_save">Save</string>
+    <string name="result_saved">Saved</string>
+    <string name="result_save_failed">Couldn’t save the file</string>
+    <string name="result_cant_open">Nothing can open that file</string>
+    <string name="result_not_yet">This kind of result isn’t supported yet</string>
+    <string name="message_copy">Copy</string>
+    <string name="message_copied">Copied</string>
+    <string name="code_copy">Copy</string>
+    <string name="code_copied">Code copied</string>
+    <string name="report_action">Report</string>
+    <string name="report_title">Report this answer</string>
+    <string name="report_reason_wrong">Wrong or misleading</string>
+    <string name="report_reason_harmful">Harmful or unsafe</string>
+    <string name="report_reason_offensive">Offensive</string>
+    <string name="report_reason_other">Something else</string>
+    <string name="report_note">Add a note (optional)</string>
+    <string name="report_send">Report</string>
+    <string name="report_thanks">Thanks, the report is saved on this phone</string>
 </resources>

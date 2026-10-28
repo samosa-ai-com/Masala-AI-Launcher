@@ -41,6 +41,7 @@ import com.samosaai.masala.core.contract.MasalaAction
 import com.samosaai.masala.ui.home.ConfirmationSheet
 import com.samosaai.masala.ui.home.HomeScreen
 import com.samosaai.masala.ui.home.RenderContext
+import com.samosaai.masala.ui.home.SkillWidgetSource
 import com.samosaai.masala.ui.settings.SettingsActivity
 import com.samosaai.masala.ui.theme.MasalaTheme
 import kotlinx.coroutines.launch
@@ -125,6 +126,12 @@ class HomeActivity : ComponentActivity() {
             if (!app.actions.startShortcut(shortcut)) toast(getString(R.string.drawer_launch_failed, shortcut.shortLabel))
         }
 
+        val skillWidgets = remember {
+            object : SkillWidgetSource {
+                override fun skill(id: String) = app.skills.getSkillById(id)
+                override fun latest(skillId: String) = app.database.skillRuns().latestFor(skillId)
+            }
+        }
         val screen = remember {
             object : ActionDispatcher.Screen {
                 override fun openDrawer(query: String?) { drawerOpen = true }
@@ -152,6 +159,7 @@ class HomeActivity : ComponentActivity() {
                 onAction = ::run,
                 onAppMenu = { menuFor = it },
                 onClockClick = { run(MasalaAction.RunTool("show_alarms")) },
+                skillWidgets = skillWidgets,
             ),
             pinnedShortcuts = pinnedShortcuts,
             isDefault = isDefault,

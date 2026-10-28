@@ -51,3 +51,4 @@ library androidx.room  # MultiInstanceInvalidationService, not exported
 # AndroidX startup's provider. The merger credits it to whichever library declares it first (emoji2
 # through Compose), so it's listed by name instead of allowing all of that library.
 provider androidx.startup.InitializationProvider  # AndroidX initializers (emoji2, lifecycle, profileinstaller)
+provider androidx.core.content.FileProvider  # Open and Share skill result files

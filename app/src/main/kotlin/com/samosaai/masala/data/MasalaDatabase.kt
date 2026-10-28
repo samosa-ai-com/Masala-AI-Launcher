@@ -6,10 +6,12 @@ import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
+import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.Update
 import androidx.room.Upsert
 import com.samosaai.masala.core.apps.AppKey
 import com.samosaai.masala.core.apps.AppOverride
@@ -38,6 +40,8 @@ import kotlinx.coroutines.flow.Flow
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
     abstract fun layoutVersions(): LayoutVersionDao
+    abstract fun skillRuns(): SkillRunDao
+    abstract fun skillArtifacts(): SkillArtifactDao
 
     companion object {
         fun create(context: Context): MasalaDatabase =
@@ -148,6 +152,34 @@ data class SkillRunEntity(
     val startedAt: Long,
     val finishedAt: Long? = null,
 )
+
+@Dao
+interface SkillRunDao {
+    @Insert
+    suspend fun insert(run: SkillRunEntity): Long
+
+    @Update
+    suspend fun update(run: SkillRunEntity)
+
+    @Query("SELECT * FROM skill_runs WHERE id = :id")
+    suspend fun get(id: Long): SkillRunEntity?
+
+    /** The newest run of a skill, for the widget's result line and for reopening the sheet. */
+    @Query("SELECT * FROM skill_runs WHERE skillId = :skillId ORDER BY startedAt DESC, id DESC LIMIT 1")
+    fun latestFor(skillId: String): Flow<SkillRunEntity?>
+
+    @Query("SELECT * FROM skill_runs WHERE skillId = :skillId ORDER BY startedAt DESC, id DESC")
+    fun runsFor(skillId: String): Flow<List<SkillRunEntity>>
+}
+
+@Dao
+interface SkillArtifactDao {
+    @Insert
+    suspend fun insert(artifact: SkillArtifactEntity): Long
+
+    @Query("SELECT * FROM skill_artifacts WHERE runId = :runId ORDER BY id")
+    fun forRun(runId: Long): Flow<List<SkillArtifactEntity>>
+}
 
 /** A result a skill run produced: a note, a file, a mini app, an installed app. */
 @Entity(

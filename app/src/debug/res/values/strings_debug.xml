@@ -10,6 +10,7 @@
     <string name="debug_running">Running…</string>
     <string name="debug_models">Models</string>
     <string name="debug_action_log">Action log</string>
+    <string name="debug_ai_reports">AI reports</string>
     <string name="debug_tools">%1$d tools registered</string>
     <string name="debug_confirm_title">Allow %1$s?</string>
     <string name="debug_allow">Allow</string>

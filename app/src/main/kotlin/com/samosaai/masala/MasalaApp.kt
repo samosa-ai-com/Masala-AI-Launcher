@@ -3,12 +3,20 @@ package com.samosaai.masala
 import com.samosaai.masala.core.tool.ToolFiles
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import com.samosaai.masala.actions.ActionDispatcher
 import com.samosaai.masala.actions.ConfirmationGate
 import com.samosaai.masala.agent.AgentModel
 import com.samosaai.masala.agent.AgentPrompt
 import com.samosaai.masala.agent.AgentTools
+import com.samosaai.masala.agent.LlmAgentModel
 import com.samosaai.masala.agent.MasalaAgent
+import com.samosaai.masala.core.contract.MasalaSkill
+import com.samosaai.masala.core.tool.ActionResult
+import com.samosaai.masala.llm.LlmConfig
+import com.samosaai.masala.skills.AiReports
+import com.samosaai.masala.skills.SkillRunner
+import com.samosaai.masala.ui.skills.SkillSheetActivity
 import com.samosaai.masala.core.agent.ToolInfo
 import com.samosaai.masala.core.agent.ToolScope
 import com.samosaai.masala.context.ContextService
@@ -89,6 +97,28 @@ class MasalaApp : Application() {
         )
     }
 
+    /** Runs skills; app-scoped, so a run goes on after its sheet closes. */
+    val skillRunner by lazy {
+        SkillRunner(scope, database.skillRuns(), database.skillArtifacts(), { skills.getSkillById(it) }, ::skillAgent)
+    }
+
+    val aiReports by lazy { AiReports(this) }
+
+    /** The agent for one skill run: the persona's and skill's instructions, the skill's tools, more steps. */
+    private fun skillAgent(skill: MasalaSkill) = agent(
+        model = LlmAgentModel(LlmConfig.default.client(this)),
+        scope = { ToolScope.skill(skill, it) },
+        instructions = listOfNotNull(skill.persona?.systemPrompt, skill.instructions).joinToString("\n\n"),
+        maxSteps = MasalaAgent.SKILL_MAX_STEPS,
+    )
+
+    /** The `run_skill` tool: opens the skill sheet on a prompt. */
+    private fun openSkillSheet(skillId: String, prompt: String?): ActionResult {
+        if (skills.getSkillById(skillId) == null) return ActionResult.error("There is no skill '$skillId'.")
+        startActivity(SkillSheetActivity.intent(this, skillId, prompt).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        return ActionResult.ok("Opened the $skillId skill for the user.")
+    }
+
     /** Runs tools for one caller; [gate] confirms anything that isn't read-only. */
     fun toolExecutor(gate: ToolGate) = MasalaToolExecutor(this, tools, actionLog, gate)
 
@@ -132,8 +162,8 @@ class MasalaApp : Application() {
             skills = { skills },
             toolNames = { tools.tools.map { it.name }.toSet() },
         )
-        AgentTools.create(this, layouts, modes).forEach(tools::register)
-        dispatcher = ActionDispatcher(this, actions, launcher, modes, confirmationGate, tools) { toolExecutor(confirmationGate) }
+        AgentTools.create(this, layouts, modes, runSkill = ::openSkillSheet).forEach(tools::register)
+        dispatcher = ActionDispatcher(this, actions, launcher, modes, confirmationGate, tools, { skills }) { toolExecutor(confirmationGate) }
 
         // A force-stop drops the alarm; the store still has the tasks.
         scope.launch(Dispatchers.IO) { ScheduledTaskScheduler.reschedule(this@MasalaApp) }

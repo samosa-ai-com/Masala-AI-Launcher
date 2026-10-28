@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only Masala's own result folders can be opened or shared (skill run results). -->
+<paths>
+    <external-files-path name="output" path="output/" />
+    <files-path name="work" path="work/" />
+</paths>
