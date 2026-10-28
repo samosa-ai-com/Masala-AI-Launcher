@@ -9,6 +9,7 @@ import com.samosaai.masala.core.layout.LayoutChecker
 import com.samosaai.masala.llm.ChatMessage
 import com.samosaai.masala.llm.ResponseFormat
 import com.samosaai.masala.llm.visionUserMessage
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -57,6 +58,8 @@ class LayoutGenerator(
         )
         val first = try {
             caller.call(messages, ResponseFormat.jsonSchema("layout", schema), maxTokens, request.temperature)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             if (isSchemaRejection(e)) return generateJsonObject(request, system, user, schema)
             return GenerateResult.Failed(short(e))
@@ -79,6 +82,8 @@ class LayoutGenerator(
         )
         val second = try {
             caller.call(repair, ResponseFormat.jsonSchema("layout", schema), maxTokens, request.temperature)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             return GenerateResult.Failed(short(e))
         }
@@ -104,6 +109,8 @@ class LayoutGenerator(
                 maxTokens,
                 request.temperature,
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             return GenerateResult.Failed(short(e))
         }

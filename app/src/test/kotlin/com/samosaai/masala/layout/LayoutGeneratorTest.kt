@@ -12,6 +12,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonPrimitive
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 
 class LayoutGeneratorTest {
 
@@ -127,6 +130,21 @@ class LayoutGeneratorTest {
     }
 
     @Test
+    fun `jpeg format reaches the vision message`() = runBlocking<Unit> {
+        val bad = validLayout(BAD_ICON_ITEM_JSON)
+        val caller = FakeCaller(ArrayDeque(listOf(Result.success(bad), Result.success(validLayout()))))
+        val vision = LayoutGenerator.Request(
+            userText = "copy this",
+            context = input(),
+            imageBase64 = "aGVsbG8=",
+            imageFormat = "jpeg",
+        )
+        assertIs<GenerateResult.Generated>(LayoutGenerator(caller).generate(vision))
+        val url = caller.seen[0].messages[1].imageUrl()
+        assertTrue(url != null && url.startsWith("data:image/jpeg;base64,aGVsbG8="), url ?: "no image")
+    }
+
+    @Test
     fun `photo request sends vision and keeps it through repair`() = runBlocking<Unit> {
         val bad = validLayout(BAD_ICON_ITEM_JSON)
         val caller = FakeCaller(ArrayDeque(listOf(Result.success(bad), Result.success(validLayout()))))
@@ -178,6 +196,19 @@ class LayoutGeneratorTest {
         val caller = FakeCaller(ArrayDeque(listOf(Result.success(empty), Result.success(empty))))
         val result = LayoutGenerator(caller).generate(request())
         assertIs<GenerateResult.Rejected>(result)
+    }
+
+    @Test
+    fun `http 400 naming the schema counts as schema rejection`() {
+        val body = """{"error":{"message":"response_format json_schema is not supported"}}"""
+            .toResponseBody("application/json".toMediaType())
+        val e = retrofit2.HttpException(retrofit2.Response.error<String>(400, body))
+        assertTrue(LayoutGenerator.isSchemaRejection(e))
+    }
+
+    @Test
+    fun `plain errors are not schema rejections`() {
+        assertTrue(!LayoutGenerator.isSchemaRejection(RuntimeException("timeout")))
     }
 
     @Test

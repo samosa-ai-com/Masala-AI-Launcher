@@ -43,6 +43,22 @@ class LlmChatCallerTest {
     }
 
     @Test
+    fun `empty choices throws IllegalStateException`() = runBlocking<Unit> {
+        server.enqueue(MockResponse().setBody("""{"choices":[]}""").addHeader("Content-Type", "application/json"))
+        assertFailsWith<IllegalStateException> {
+            LlmChatCaller(client()).call(listOf(ChatMessage("user", JsonPrimitive("hi"))), null, 3000, null)
+        }
+    }
+
+    @Test
+    fun `http errors surface as HttpException`() = runBlocking<Unit> {
+        server.enqueue(MockResponse().setResponseCode(400).setBody("""{"error":"bad schema"}"""))
+        assertFailsWith<retrofit2.HttpException> {
+            LlmChatCaller(client()).call(listOf(ChatMessage("user", JsonPrimitive("hi"))), null, 3000, null)
+        }
+    }
+
+    @Test
     fun `blank reply is a failure`() = runBlocking<Unit> {
         server.enqueue(MockResponse().setBody(chatBody("")).addHeader("Content-Type", "application/json"))
         assertFailsWith<IllegalStateException> {

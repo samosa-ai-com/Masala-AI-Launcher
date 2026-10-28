@@ -15,10 +15,14 @@ object CalendarCards {
     private val TIME = DateTimeFormatter.ofPattern("HH:mm")
     private val DAY_TIME = DateTimeFormatter.ofPattern("EEE HH:mm", Locale.US)
 
-    /** "Next: Standup in 12 min". Null with no event. */
+    /** Events older than this are over; never call them "next". */
+    const val PAST_CUTOFF_MINUTES = -15L
+
+    /** "Next: Standup in 12 min". Null with no event, or one that started a while ago. */
     fun nextEventLine(now: LocalDateTime, event: NextEvent?): String? {
         if (event == null) return null
         val minutes = ChronoUnit.MINUTES.between(now, event.start)
+        if (minutes < PAST_CUTOFF_MINUTES) return null
         val whenText = when {
             minutes < 1 -> "now"
             minutes < 120 -> "in $minutes min"

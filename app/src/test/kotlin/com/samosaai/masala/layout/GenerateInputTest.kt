@@ -38,6 +38,21 @@ class GenerateInputTest {
     }
 
     @Test
+    fun `image format is passed through to the request`() {
+        val req = buildGenerateRequest(
+            apps = emptyList(),
+            layout = null,
+            snapshot = ContextSnapshot(now = now),
+            skills = emptyList(),
+            userText = "x",
+            imageBase64 = "abc",
+            imageFormat = "jpeg",
+        )
+        assertEquals("jpeg", req.imageFormat)
+        assertEquals("abc", req.imageBase64)
+    }
+
+    @Test
     fun `skill titles fall back to ids only when blank`() {
         val request = buildGenerateRequest(
             apps = emptyList(),

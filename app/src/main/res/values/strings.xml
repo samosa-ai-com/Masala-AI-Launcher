@@ -128,6 +128,7 @@
     <string name="generate_failed">The model did not answer. Check the endpoint and retry.</string>
     <string name="generate_rejected_title">The model needs another try</string>
     <string name="generate_applied">Applied — see it on home</string>
+    <string name="generate_undone">Undone — previous layout restored</string>
     <string name="generate_version_label">AI: %1$s</string>
 
     <!-- Home layout settings -->

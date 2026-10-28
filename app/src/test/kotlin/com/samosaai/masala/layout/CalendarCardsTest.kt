@@ -33,11 +33,9 @@ class CalendarCardsTest {
     }
 
     @Test
-    fun `past events read as now`() {
-        assertEquals(
-            "Next: Standup now",
-            CalendarCards.nextEventLine(now, event(start = now.minusHours(1)))
-        )
+    fun `long-past events are ignored, just-started read as now`() {
+        assertNull(CalendarCards.nextEventLine(now, event(start = now.minusHours(1))))
+        assertEquals("Next: Standup now", CalendarCards.nextEventLine(now, event(start = now.minusMinutes(5))))
     }
 
     @Test

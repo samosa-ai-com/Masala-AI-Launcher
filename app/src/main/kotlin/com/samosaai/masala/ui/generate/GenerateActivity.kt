@@ -10,12 +10,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -49,7 +48,9 @@ import com.samosaai.masala.llm.LlmConfig
 import com.samosaai.masala.masala
 import com.samosaai.masala.ui.home.HomeScreen
 import com.samosaai.masala.ui.home.RenderContext
+import com.samosaai.masala.ui.settings.SettingsScaffold
 import com.samosaai.masala.ui.theme.MasalaTheme
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -93,16 +94,19 @@ class GenerateActivity : ComponentActivity() {
         val scope = rememberCoroutineScope()
         var prompt by rememberSaveable { mutableStateOf("") }
         var imageBase64 by remember { mutableStateOf<String?>(null) }
+        var imageFormat by remember { mutableStateOf("png") }
         var photoName by remember { mutableStateOf<String?>(null) }
         var phase by remember { mutableStateOf<Phase>(Phase.Idle) }
         var status by remember { mutableStateOf<String?>(null) }
-        val history by app.layouts.historyState.collectAsStateWithLifecycle()
+        var appliedLabel by remember { mutableStateOf<String?>(null) }
+        val apps by app.launcher.apps.collectAsStateWithLifecycle()
 
         fun toast(text: String) = Toast.makeText(this@GenerateActivity, text, Toast.LENGTH_SHORT).show()
 
         val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri == null) return@rememberLauncherForActivityResult
             scope.launch(Dispatchers.IO) {
+                val mime = runCatching { contentResolver.getType(uri) }.getOrNull().orEmpty()
                 val bytes = runCatching { contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
                 withContext(Dispatchers.Main) {
                     if (bytes == null) {
@@ -111,6 +115,11 @@ class GenerateActivity : ComponentActivity() {
                         toast(getString(R.string.generate_photo_too_big))
                     } else {
                         imageBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                        imageFormat = when {
+                            mime.contains("jpeg", ignoreCase = true) || mime.contains("jpg", ignoreCase = true) -> "jpeg"
+                            mime.contains("webp", ignoreCase = true) -> "webp"
+                            else -> "png"
+                        }
                         photoName = uri.lastPathSegment
                     }
                 }
@@ -121,6 +130,7 @@ class GenerateActivity : ComponentActivity() {
             scope.launch {
                 phase = Phase.Generating
                 status = null
+                appliedLabel = null
                 val config = loadConfig()
                 if (!config.isConfigured) {
                     phase = Phase.Failed(getString(R.string.generate_not_configured))
@@ -131,6 +141,7 @@ class GenerateActivity : ComponentActivity() {
                     val request = app.generateRequest(
                         prompt,
                         imageBase64 = imageBase64,
+                        imageFormat = imageFormat,
                         temperature = if (regenerate) REGENERATE_TEMPERATURE else null,
                     )
                     when (val result = LayoutGenerator(caller).generate(request)) {
@@ -140,30 +151,39 @@ class GenerateActivity : ComponentActivity() {
                             getString(R.string.generate_failed) + "\n" + result.message
                         )
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Phase.Failed("${e::class.simpleName}: ${e.message}")
                 }
             }
         }
 
-        Column(Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.generate_title), style = MaterialTheme.typography.titleLarge)
+        val generating = phase is Phase.Generating
+        SettingsScaffold(stringResource(R.string.generate_title), onBack = ::finish) {
             OutlinedTextField(
-                prompt, { prompt = it; if (phase !is Phase.Idle) phase = Phase.Idle },
+                prompt,
+                {
+                    prompt = it
+                    if (!generating && phase !is Phase.Idle) phase = Phase.Idle
+                },
                 label = { Text(stringResource(R.string.generate_prompt_label)) },
                 maxLines = 3,
+                enabled = !generating,
                 modifier = Modifier.fillMaxWidth(),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { pickPhoto.launch("image/*") }) {
+                OutlinedButton(enabled = !generating, onClick = { pickPhoto.launch("image/*") }) {
                     Text(stringResource(if (photoName == null) R.string.generate_pick_photo else R.string.generate_photo_picked))
                 }
                 if (imageBase64 != null) {
-                    TextButton(onClick = { imageBase64 = null; photoName = null }) { Text(stringResource(R.string.generate_photo_remove)) }
+                    TextButton(enabled = !generating, onClick = { imageBase64 = null; photoName = null }) {
+                        Text(stringResource(R.string.generate_photo_remove))
+                    }
                 }
             }
             Button(
-                enabled = phase !is Phase.Generating && (prompt.isNotBlank() || imageBase64 != null),
+                enabled = !generating && apps.isNotEmpty() && (prompt.isNotBlank() || imageBase64 != null),
                 onClick = { run(regenerate = false) },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(stringResource(R.string.generate_button)) }
@@ -176,15 +196,29 @@ class GenerateActivity : ComponentActivity() {
                 }
                 is Phase.Preview -> PreviewPane(
                     layout = p.layout,
-                    canUndo = history.canUndo,
+                    canApply = appliedLabel == null,
+                    canUndo = appliedLabel != null,
                     onApply = {
                         scope.launch {
-                            val problems = app.layouts.apply(getString(R.string.generate_version_label, prompt.take(40)), p.layout)
-                            status = if (problems.isEmpty()) getString(R.string.generate_applied) else problems.first().toString()
+                            val labelPrompt = prompt.ifBlank { photoName ?: "Photo" }.take(40)
+                            val problems = app.layouts.apply(getString(R.string.generate_version_label, labelPrompt), p.layout)
+                            if (problems.isEmpty()) {
+                                appliedLabel = labelPrompt
+                                status = getString(R.string.generate_applied)
+                            } else {
+                                status = problems.first().toString()
+                            }
                         }
                     },
                     onRegenerate = { run(regenerate = true) },
-                    onUndo = { scope.launch { app.layouts.undo() } },
+                    onUndo = {
+                        scope.launch {
+                            if (app.layouts.undo()) {
+                                appliedLabel = null
+                                status = getString(R.string.generate_undone)
+                            }
+                        }
+                    },
                 )
                 is Phase.Rejected -> {
                     Text(stringResource(R.string.generate_rejected_title), style = MaterialTheme.typography.titleMedium)
@@ -202,35 +236,45 @@ class GenerateActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun PreviewPane(layout: LayoutDoc, canUndo: Boolean, onApply: () -> Unit, onRegenerate: () -> Unit, onUndo: () -> Unit) {
+    private fun ColumnScope.PreviewPane(
+        layout: LayoutDoc,
+        canApply: Boolean,
+        canUndo: Boolean,
+        onApply: () -> Unit,
+        onRegenerate: () -> Unit,
+        onUndo: () -> Unit
+    ) {
         val app = masala
         val snapshot by app.contextService.snapshot.collectAsStateWithLifecycle()
         val apps by app.launcher.apps.collectAsStateWithLifecycle()
         val resolved = remember(layout, snapshot) { LayoutResolver.resolve(layout, emptyList(), snapshot) }
         fun toast(text: String) = Toast.makeText(this@GenerateActivity, text, Toast.LENGTH_SHORT).show()
 
-        HomeScreen(
-            layout = resolved,
-            render = RenderContext(
-                icons = app.icons,
-                apps = apps,
-                now = snapshot.now,
-                locked = true,
-                onAction = { toast(getString(R.string.generate_preview_only)) },
-                onAppMenu = {},
-                onClockClick = {},
-            ),
-            pinnedShortcuts = emptyList(),
-            isDefault = true,
-            onSetDefault = {},
-            onSwipeUp = {},
-            onSwipeDown = {},
-            onOpenSettings = { toast(getString(R.string.generate_preview_only)) },
-            onLaunchShortcut = {},
-            onUnpinShortcut = {},
-        )
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            HomeScreen(
+                layout = resolved,
+                render = RenderContext(
+                    icons = app.icons,
+                    apps = apps,
+                    now = snapshot.now,
+                    locked = true,
+                    onAction = { toast(getString(R.string.generate_preview_only)) },
+                    onAppMenu = {},
+                    onClockClick = {},
+                ),
+                pinnedShortcuts = emptyList(),
+                isDefault = true,
+                onSetDefault = {},
+                onSwipeUp = {},
+                onSwipeDown = {},
+                onOpenSettings = { toast(getString(R.string.generate_preview_only)) },
+                onLaunchShortcut = {},
+                onUnpinShortcut = {},
+                applyWindowInsets = false,
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Button(onClick = onApply) { Text(stringResource(R.string.generate_apply)) }
+            Button(enabled = canApply, onClick = onApply) { Text(stringResource(R.string.generate_apply)) }
             OutlinedButton(onClick = onRegenerate) { Text(stringResource(R.string.generate_regenerate)) }
             OutlinedButton(enabled = canUndo, onClick = onUndo) { Text(stringResource(R.string.generate_undo)) }
         }

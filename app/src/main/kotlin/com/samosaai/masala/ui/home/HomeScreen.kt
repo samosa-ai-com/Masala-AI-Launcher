@@ -67,6 +67,8 @@ fun HomeScreen(
     onLaunchShortcut: (ShortcutInfo) -> Unit,
     onUnpinShortcut: (ShortcutInfo) -> Unit,
     homePresses: Int = 0,
+    /** False when embedded in another screen that already handles insets (e.g. the AI preview). */
+    applyWindowInsets: Boolean = true,
 ) {
     val swipeThreshold = with(LocalDensity.current) { 64.dp.toPx() }
     val swipeUpLabel = stringResource(R.string.home_swipe_up_description)
@@ -113,7 +115,7 @@ fun HomeScreen(
                     CustomAccessibilityAction(openSettingsLabel) { onOpenSettings(); true },
                 )
             }
-            .systemBarsPadding(),
+            .then(if (applyWindowInsets) Modifier.systemBarsPadding() else Modifier),
     ) {
         Column(Modifier.fillMaxSize()) {
             if (!isDefault) DefaultBanner(onSetDefault)
