@@ -162,4 +162,19 @@
     <string name="settings_import_done">Layout imported</string>
     <string name="settings_export_done">Layout exported</string>
     <string name="settings_export_failed">Couldn’t write the file</string>
+    <string name="settings_version_search">Search versions</string>
+    <string name="settings_version_count">%1$d versions</string>
+    <string name="settings_version_empty">No versions match.</string>
+    <string name="settings_version_current">Current</string>
+    <string name="settings_version_apply">Apply</string>
+    <string name="settings_version_preview">Preview</string>
+    <string name="settings_version_hide_preview">Hide preview</string>
+    <string name="settings_version_rename">Rename</string>
+    <string name="settings_version_delete">Delete</string>
+    <string name="settings_version_rename_title">Rename version</string>
+    <string name="settings_version_name_label">Name</string>
+    <string name="settings_version_rename_empty">Enter a name</string>
+    <string name="settings_version_delete_title">Delete this version?</string>
+    <string name="settings_version_delete_message">“%1$s” will be removed. This can’t be undone.</string>
+    <string name="settings_version_preview_failed">Couldn’t load that version</string>
 </resources>

@@ -184,6 +184,28 @@ class LayoutRepository(
 
     suspend fun select(versionId: Long): Boolean = lock.withLock { history.select(versionId)?.also { savePointer(); publish() } != null }
 
+    /** Renames one saved version. Blank labels are rejected; false when unknown. */
+    suspend fun renameVersion(versionId: Long, label: String): Boolean = lock.withLock {
+        val clean = label.trim()
+        if (clean.isEmpty()) return false
+        val renamed = history.rename(versionId, clean) ?: return false
+        withContext(Dispatchers.IO) { dao.upsert(renamed.toEntity()) }
+        publish()
+        true
+    }
+
+    /**
+     * Deletes one saved version, moving current to its predecessor (else successor).
+     * False when unknown or when it is the last version.
+     */
+    suspend fun deleteVersion(versionId: Long): Boolean = lock.withLock {
+        history.delete(versionId) ?: return false
+        withContext(Dispatchers.IO) { dao.delete(listOf(versionId)) }
+        savePointer()
+        publish()
+        true
+    }
+
     /** Starts over from Classic, as a new version, so even this can be undone. */
     suspend fun resetToClassic(): List<LayoutChecker.Problem> =
         apply("Reset to Classic", ClassicLayoutBuilder.build(context, launcher.apps.value, emptyList()))

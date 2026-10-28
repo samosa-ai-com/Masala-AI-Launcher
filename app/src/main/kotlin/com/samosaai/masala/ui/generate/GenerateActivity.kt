@@ -39,7 +39,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.R
 import com.samosaai.masala.core.contract.LayoutDoc
-import com.samosaai.masala.core.layout.LayoutResolver
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.layout.GenerateResult
 import com.samosaai.masala.layout.LayoutGenerator
@@ -47,8 +46,7 @@ import com.samosaai.masala.layout.LlmChatCaller
 import com.samosaai.masala.layout.generateRequest
 import com.samosaai.masala.llm.LlmConfig
 import com.samosaai.masala.masala
-import com.samosaai.masala.ui.home.HomeScreen
-import com.samosaai.masala.ui.home.RenderContext
+import com.samosaai.masala.ui.settings.LayoutPreview
 import com.samosaai.masala.ui.settings.SettingsScaffold
 import com.samosaai.masala.ui.theme.MasalaTheme
 import kotlinx.coroutines.CancellationException
@@ -274,34 +272,8 @@ class GenerateActivity : ComponentActivity() {
         onRegenerate: () -> Unit,
         onUndo: () -> Unit
     ) {
-        val app = masala
-        val snapshot by app.contextService.snapshot.collectAsStateWithLifecycle()
-        val apps by app.launcher.apps.collectAsStateWithLifecycle()
-        val resolved = remember(layout, snapshot) { LayoutResolver.resolve(layout, emptyList(), snapshot) }
-        fun toast(text: String) = Toast.makeText(this@GenerateActivity, text, Toast.LENGTH_SHORT).show()
-
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            HomeScreen(
-                layout = resolved,
-                render = RenderContext(
-                    icons = app.icons,
-                    apps = apps,
-                    now = snapshot.now,
-                    locked = true,
-                    onAction = { toast(getString(R.string.generate_preview_only)) },
-                    onAppMenu = {},
-                    onClockClick = {},
-                ),
-                pinnedShortcuts = emptyList(),
-                isDefault = true,
-                onSetDefault = {},
-                onSwipeUp = {},
-                onSwipeDown = {},
-                onOpenSettings = { toast(getString(R.string.generate_preview_only)) },
-                onLaunchShortcut = {},
-                onUnpinShortcut = {},
-                applyWindowInsets = false,
-            )
+            LayoutPreview(layout, Modifier.fillMaxWidth())
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             Button(enabled = canApply, onClick = onApply) { Text(stringResource(R.string.generate_apply)) }

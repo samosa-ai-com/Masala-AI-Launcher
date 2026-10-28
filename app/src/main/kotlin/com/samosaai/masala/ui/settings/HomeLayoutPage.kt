@@ -2,16 +2,22 @@ package com.samosaai.masala.ui.settings
 
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -19,7 +25,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -29,6 +37,7 @@ import com.samosaai.masala.R
 import com.samosaai.masala.core.contract.MasalaAction
 import com.samosaai.masala.core.layout.LayoutChecker
 import com.samosaai.masala.data.LauncherSettings
+import com.samosaai.masala.layout.LayoutRepository
 import com.samosaai.masala.masala
 import com.samosaai.masala.ui.generate.GenerateActivity
 import kotlinx.coroutines.launch
@@ -36,9 +45,9 @@ import java.text.DateFormat
 import java.util.Date
 
 /**
- * "Home layout" (plan Phase 2): lock the layout, undo and redo with the saved versions, the swipe
- * gestures, and export or import of the layout with the app overrides. [onExport] and [onImport] start
- * the system file pickers, which only an activity can do.
+ * "Home layout": lock the layout, generate with AI, the saved versions with preview/rename/
+ * delete, the swipe gestures, and export or import. [onExport] and [onImport] start the system
+ * file pickers, which only an activity can do.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -60,65 +69,75 @@ fun HomeLayoutPage(
     val skills = remember { app.skills.getPersonas() }
 
     SettingsScaffold(stringResource(R.string.settings_home_layout), onBack = onBack) {
-        SettingsToggleRow(stringResource(R.string.settings_lock_home), settings.homeLocked) { on -> update { it.copy(homeLocked = on) } }
-        Text(stringResource(R.string.settings_lock_home_summary), style = MaterialTheme.typography.bodySmall)
-
-        SettingsSectionTitle(stringResource(R.string.settings_generate_ai))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = {
-                    context.startActivity(Intent(context, GenerateActivity::class.java))
-                },
-                modifier = Modifier.heightIn(min = 48.dp)
-            ) {
-                Text(stringResource(R.string.settings_generate_ai))
+        ElevatedCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SettingsToggleRow(stringResource(R.string.settings_lock_home), settings.homeLocked) { on -> update { it.copy(homeLocked = on) } }
+                Text(stringResource(R.string.settings_lock_home_summary), style = MaterialTheme.typography.bodySmall)
             }
         }
-        Text(stringResource(R.string.settings_generate_ai_summary), style = MaterialTheme.typography.bodySmall)
 
-        SettingsSectionTitle(stringResource(R.string.settings_layout_history))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(enabled = history.canUndo, onClick = { scope.launch { app.layouts.undo() } }, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(stringResource(R.string.settings_undo))
-            }
-            OutlinedButton(enabled = history.canRedo, onClick = { scope.launch { app.layouts.redo() } }, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(stringResource(R.string.settings_redo))
-            }
-            OutlinedButton(onClick = { scope.launch { status = app.layouts.resetToClassic().firstOrNull()?.toString() } }, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(stringResource(R.string.settings_reset_classic))
-            }
-        }
-        val format = remember { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT) }
-        history.versions.forEach { v ->
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                TextButton(onClick = { scope.launch { app.layouts.select(v.id) } }, enabled = !v.current) {
-                    Text(v.label + if (v.current) " ✓" else "")
+        ElevatedCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SettingsSectionTitle(stringResource(R.string.settings_generate_ai))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { context.startActivity(Intent(context, GenerateActivity::class.java)) },
+                        modifier = Modifier.heightIn(min = 48.dp)
+                    ) {
+                        Text(stringResource(R.string.settings_generate_ai))
+                    }
                 }
-                TextButton(onClick = {
-                    context.startActivity(
-                        Intent(context, GenerateActivity::class.java)
-                            .putExtra(GenerateActivity.EXTRA_REVISE_VERSION_ID, v.id)
-                    )
-                }) {
-                    Text(stringResource(R.string.settings_refine_version))
-                }
-                Text(format.format(Date(v.createdAt)), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 14.dp))
+                Text(stringResource(R.string.settings_generate_ai_summary), style = MaterialTheme.typography.bodySmall)
             }
         }
 
-        SettingsSectionTitle(stringResource(R.string.settings_gestures))
-        GesturePicker(stringResource(R.string.settings_swipe_up), settings.swipeUp, skills.map { it.id to it.title.ifBlank { it.id } }) { a -> update { it.copy(swipeUp = a) } }
-        GesturePicker(stringResource(R.string.settings_swipe_down), settings.swipeDown, skills.map { it.id to it.title.ifBlank { it.id } }) { a -> update { it.copy(swipeDown = a) } }
-
-        SettingsSectionTitle(stringResource(R.string.settings_layout_backup))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onExport, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.settings_export_layout)) }
-            OutlinedButton(onClick = onImport, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.settings_import_layout)) }
+        ElevatedCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SettingsSectionTitle(stringResource(R.string.settings_layout_history))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(enabled = history.canUndo, onClick = { scope.launch { app.layouts.undo() } }, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.settings_undo))
+                    }
+                    OutlinedButton(enabled = history.canRedo, onClick = { scope.launch { app.layouts.redo() } }, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.settings_redo))
+                    }
+                    OutlinedButton(onClick = { scope.launch { status = app.layouts.resetToClassic().firstOrNull()?.toString() } }, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.settings_reset_classic))
+                    }
+                }
+                VersionsSection(
+                    history = history,
+                    onSelect = { id -> scope.launch { app.layouts.select(id) } },
+                    onRename = { id, label -> scope.launch { app.layouts.renameVersion(id, label) } },
+                    onDelete = { id -> scope.launch { app.layouts.deleteVersion(id) } },
+                    onRefine = { id ->
+                        context.startActivity(
+                            Intent(context, GenerateActivity::class.java)
+                                .putExtra(GenerateActivity.EXTRA_REVISE_VERSION_ID, id)
+                        )
+                    },
+                )
+            }
         }
-        (message ?: status)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+
+        ElevatedCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SettingsSectionTitle(stringResource(R.string.settings_gestures))
+                GesturePicker(stringResource(R.string.settings_swipe_up), settings.swipeUp, skills.map { it.id to it.title.ifBlank { it.id } }) { a -> update { it.copy(swipeUp = a) } }
+                GesturePicker(stringResource(R.string.settings_swipe_down), settings.swipeDown, skills.map { it.id to it.title.ifBlank { it.id } }) { a -> update { it.copy(swipeDown = a) } }
+            }
+        }
+
+        ElevatedCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SettingsSectionTitle(stringResource(R.string.settings_layout_backup))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onExport, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.settings_export_layout)) }
+                    OutlinedButton(onClick = onImport, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.settings_import_layout)) }
+                }
+                (message ?: status)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            }
+        }
     }
 
     if (problems != null) {
@@ -127,6 +146,129 @@ fun HomeLayoutPage(
             title = { Text(stringResource(R.string.settings_import_rejected)) },
             text = { Text(problems.take(MAX_SHOWN).joinToString("\n") { it.toString() } + if (problems.size > MAX_SHOWN) "\n…" else "") },
             confirmButton = { TextButton(onClick = onDismissProblems) { Text(stringResource(R.string.confirm_allow)) } },
+        )
+    }
+}
+
+@Composable
+private fun VersionsSection(
+    history: LayoutRepository.HistoryState,
+    onSelect: (Long) -> Unit,
+    onRename: (Long, String) -> Unit,
+    onDelete: (Long) -> Unit,
+    onRefine: (Long) -> Unit,
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    var expanded by rememberSaveable { mutableStateOf<Long?>(null) }
+    var renameTarget by remember { mutableStateOf<LayoutRepository.Version?>(null) }
+    var deleteTarget by remember { mutableStateOf<LayoutRepository.Version?>(null) }
+    val format = remember { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT) }
+
+    val filtered = remember(history.versions, query) {
+        val q = query.trim().lowercase()
+        if (q.isEmpty()) history.versions else history.versions.filter { it.label.lowercase().contains(q) }
+    }
+
+    OutlinedTextField(
+        value = query,
+        onValueChange = { query = it },
+        label = { Text(stringResource(R.string.settings_version_search)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Text(
+        stringResource(R.string.settings_version_count, filtered.size),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    if (filtered.isEmpty()) {
+        Text(stringResource(R.string.settings_version_empty), style = MaterialTheme.typography.bodyMedium)
+    } else {
+        // Bounded height so the outer settings column still scrolls while the list virtualizes.
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(filtered, key = { it.id }) { v ->
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(v.label, style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    format.format(Date(v.createdAt)),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (v.current) AssistChip(onClick = {}, label = { Text(stringResource(R.string.settings_version_current)) })
+                        }
+                        if (expanded == v.id) VersionPreviewById(v.id, Modifier.fillMaxWidth())
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (!v.current) TextButton(onClick = { onSelect(v.id) }) { Text(stringResource(R.string.settings_version_apply)) }
+                            TextButton(onClick = { expanded = if (expanded == v.id) null else v.id }) {
+                                Text(stringResource(if (expanded == v.id) R.string.settings_version_hide_preview else R.string.settings_version_preview))
+                            }
+                            TextButton(onClick = { onRefine(v.id) }) { Text(stringResource(R.string.settings_refine_version)) }
+                            TextButton(onClick = { renameTarget = v }) { Text(stringResource(R.string.settings_version_rename)) }
+                            if (history.versions.size > 1) {
+                                TextButton(onClick = { deleteTarget = v }) { Text(stringResource(R.string.settings_version_delete)) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    renameTarget?.let { v ->
+        var name by remember(v.id) { mutableStateOf(v.label) }
+        val clean = name.trim()
+        AlertDialog(
+            onDismissRequest = { renameTarget = null },
+            title = { Text(stringResource(R.string.settings_version_rename_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { if (it.length <= 60) name = it },
+                        label = { Text(stringResource(R.string.settings_version_name_label)) },
+                        singleLine = true,
+                        isError = clean.isEmpty(),
+                        supportingText = if (clean.isEmpty()) {
+                            { Text(stringResource(R.string.settings_version_rename_empty)) }
+                        } else null,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = clean.isNotEmpty() && clean != v.label, onClick = {
+                    onRename(v.id, clean)
+                    renameTarget = null
+                }) { Text(stringResource(R.string.confirm_allow)) }
+            },
+            dismissButton = { TextButton(onClick = { renameTarget = null }) { Text(stringResource(R.string.action_back)) } },
+        )
+    }
+
+    deleteTarget?.let { v ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text(stringResource(R.string.settings_version_delete_title)) },
+            text = { Text(stringResource(R.string.settings_version_delete_message, v.label)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDelete(v.id)
+                    if (expanded == v.id) expanded = null
+                    deleteTarget = null
+                }) { Text(stringResource(R.string.settings_version_delete)) }
+            },
+            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text(stringResource(R.string.action_back)) } },
         )
     }
 }
