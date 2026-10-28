@@ -94,7 +94,7 @@ fun HomeLayoutPage(
         ElevatedCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SettingsSectionTitle(stringResource(R.string.settings_layout_history))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(enabled = history.canUndo, onClick = { scope.launch { app.layouts.undo() } }, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text(stringResource(R.string.settings_undo))
                     }
@@ -110,6 +110,12 @@ fun HomeLayoutPage(
                     onSelect = { id -> scope.launch { app.layouts.select(id) } },
                     onRename = { id, label -> scope.launch { app.layouts.renameVersion(id, label) } },
                     onDelete = { id -> scope.launch { app.layouts.deleteVersion(id) } },
+                    onPreview = { id ->
+                        context.startActivity(
+                            Intent(context, PreviewActivity::class.java)
+                                .putExtra(PreviewActivity.EXTRA_VERSION_ID, id)
+                        )
+                    },
                     onRefine = { id ->
                         context.startActivity(
                             Intent(context, GenerateActivity::class.java)
@@ -131,7 +137,7 @@ fun HomeLayoutPage(
         ElevatedCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SettingsSectionTitle(stringResource(R.string.settings_layout_backup))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onExport, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.settings_export_layout)) }
                     OutlinedButton(onClick = onImport, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.settings_import_layout)) }
                 }
@@ -150,16 +156,17 @@ fun HomeLayoutPage(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun VersionsSection(
     history: LayoutRepository.HistoryState,
     onSelect: (Long) -> Unit,
     onRename: (Long, String) -> Unit,
     onDelete: (Long) -> Unit,
+    onPreview: (Long) -> Unit,
     onRefine: (Long) -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    var expanded by rememberSaveable { mutableStateOf<Long?>(null) }
     var renameTarget by remember { mutableStateOf<LayoutRepository.Version?>(null) }
     var deleteTarget by remember { mutableStateOf<LayoutRepository.Version?>(null) }
     val format = remember { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT) }
@@ -207,12 +214,12 @@ private fun VersionsSection(
                             }
                             if (v.current) AssistChip(onClick = {}, label = { Text(stringResource(R.string.settings_version_current)) })
                         }
-                        if (expanded == v.id) VersionPreviewById(v.id, Modifier.fillMaxWidth())
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(0.dp),
+                        ) {
                             if (!v.current) TextButton(onClick = { onSelect(v.id) }) { Text(stringResource(R.string.settings_version_apply)) }
-                            TextButton(onClick = { expanded = if (expanded == v.id) null else v.id }) {
-                                Text(stringResource(if (expanded == v.id) R.string.settings_version_hide_preview else R.string.settings_version_preview))
-                            }
+                            TextButton(onClick = { onPreview(v.id) }) { Text(stringResource(R.string.settings_version_preview)) }
                             TextButton(onClick = { onRefine(v.id) }) { Text(stringResource(R.string.settings_refine_version)) }
                             TextButton(onClick = { renameTarget = v }) { Text(stringResource(R.string.settings_version_rename)) }
                             if (history.versions.size > 1) {
@@ -264,7 +271,6 @@ private fun VersionsSection(
             confirmButton = {
                 TextButton(onClick = {
                     onDelete(v.id)
-                    if (expanded == v.id) expanded = null
                     deleteTarget = null
                 }) { Text(stringResource(R.string.settings_version_delete)) }
             },

@@ -170,5 +170,11 @@
             android:exported="false"
             android:label="@string/generate_title"
             android:windowSoftInputMode="adjustResize" />
+
+        <!-- Full-screen version preview over the current wallpaper -->
+        <activity
+            android:name=".ui.settings.PreviewActivity"
+            android:exported="false"
+            android:label="@string/settings_title" />
     </application>
 </manifest>

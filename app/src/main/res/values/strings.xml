@@ -168,7 +168,6 @@
     <string name="settings_version_current">Current</string>
     <string name="settings_version_apply">Apply</string>
     <string name="settings_version_preview">Preview</string>
-    <string name="settings_version_hide_preview">Hide preview</string>
     <string name="settings_version_rename">Rename</string>
     <string name="settings_version_delete">Delete</string>
     <string name="settings_version_rename_title">Rename version</string>
