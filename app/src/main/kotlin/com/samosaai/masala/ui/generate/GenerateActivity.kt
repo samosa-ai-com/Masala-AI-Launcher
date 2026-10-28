@@ -26,6 +26,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -103,6 +104,19 @@ class GenerateActivity : ComponentActivity() {
         val homeLayout by app.layouts.base.collectAsStateWithLifecycle()
         val previewLayout = (phase as? Phase.Preview)?.layout
         val reviseBase = previewLayout ?: homeLayout
+
+        // Opened from a saved version: load it as the preview so Refine edits that layout.
+        val reviseVersionId = intent.getLongExtra(EXTRA_REVISE_VERSION_ID, -1)
+        LaunchedEffect(reviseVersionId) {
+            if (reviseVersionId >= 0 && phase is Phase.Idle) {
+                val layout = app.layouts.layoutFor(reviseVersionId)
+                if (layout == null) {
+                    status = getString(R.string.generate_version_gone)
+                } else {
+                    phase = Phase.Preview(layout)
+                }
+            }
+        }
 
         fun toast(text: String) = Toast.makeText(this@GenerateActivity, text, Toast.LENGTH_SHORT).show()
 
@@ -296,7 +310,10 @@ class GenerateActivity : ComponentActivity() {
         }
     }
 
-    private companion object {
+    companion object {
+        /** Open the screen with this saved version loaded as the preview, ready to refine. */
+        const val EXTRA_REVISE_VERSION_ID = "revise_version_id"
+
         const val REGENERATE_TEMPERATURE = 0.2f
 
         /** Longest side of a photo sent to the model; keeps the request small and fast. */

@@ -97,6 +97,14 @@ fun HomeLayoutPage(
                 TextButton(onClick = { scope.launch { app.layouts.select(v.id) } }, enabled = !v.current) {
                     Text(v.label + if (v.current) " ✓" else "")
                 }
+                TextButton(onClick = {
+                    context.startActivity(
+                        Intent(context, GenerateActivity::class.java)
+                            .putExtra(GenerateActivity.EXTRA_REVISE_VERSION_ID, v.id)
+                    )
+                }) {
+                    Text(stringResource(R.string.settings_refine_version))
+                }
                 Text(format.format(Date(v.createdAt)), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 14.dp))
             }
         }

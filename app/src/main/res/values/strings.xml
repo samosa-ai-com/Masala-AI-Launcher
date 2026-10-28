@@ -133,6 +133,7 @@
     <string name="generate_rejected_title">The model needs another try</string>
     <string name="generate_applied">Applied — see it on home</string>
     <string name="generate_undone">Undone — previous layout restored</string>
+    <string name="generate_version_gone">That saved version is gone</string>
     <string name="generate_version_label">AI: %1$s</string>
 
     <!-- Home layout settings -->
@@ -140,6 +141,7 @@
     <string name="settings_home_layout_summary">Lock, undo, gestures, export and import</string>
     <string name="settings_generate_ai">Generate with AI</string>
     <string name="settings_generate_ai_summary">Describe a home screen, preview it, then apply or undo</string>
+    <string name="settings_refine_version">Refine</string>
     <string name="settings_lock_home">Lock home layout</string>
     <string name="settings_lock_home_summary">Stops pinning, unpinning and the long-press menu on home.</string>
     <string name="settings_layout_history">Versions</string>

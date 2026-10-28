@@ -60,6 +60,9 @@ interface LayoutVersionDao {
     @Query("SELECT * FROM layout_versions ORDER BY id")
     suspend fun all(): List<LayoutVersionEntity>
 
+    @Query("SELECT * FROM layout_versions WHERE id = :id")
+    suspend fun get(id: Long): LayoutVersionEntity?
+
     @Upsert
     suspend fun upsert(entity: LayoutVersionEntity)
 

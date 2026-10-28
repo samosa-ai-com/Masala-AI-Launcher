@@ -174,6 +174,14 @@ class LayoutRepository(
 
     suspend fun redo(): Boolean = lock.withLock { history.redo()?.also { savePointer(); publish() } != null }
 
+    /** The saved document for one version, for the Refine flow. Null when unreadable. */
+    suspend fun layoutFor(versionId: Long): LayoutDoc? = withContext(Dispatchers.IO) {
+        runCatching {
+            val row = dao.get(versionId) ?: return@runCatching null
+            LayoutMigrations.decode(MasalaJson.strict.parseToJsonElement(row.json))
+        }.getOrNull()
+    }
+
     suspend fun select(versionId: Long): Boolean = lock.withLock { history.select(versionId)?.also { savePointer(); publish() } != null }
 
     /** Starts over from Classic, as a new version, so even this can be undone. */
