@@ -57,7 +57,11 @@ import com.samosaai.masala.tools.ToolGate
 import com.samosaai.masala.ui.theme.MasalaTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
+import com.samosaai.masala.agent.AgentEvent
+import com.samosaai.masala.agent.LlmAgentModel
+import com.samosaai.masala.llm.ChatMessage
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 
 /**
@@ -103,7 +107,7 @@ class DebugActivity : ComponentActivity() {
         var prompt by rememberSaveable { mutableStateOf("Set an alarm for 7:30 tomorrow called Standup") }
         var running by remember { mutableStateOf(false) }
         var pending by remember { mutableStateOf<Pending?>(null) }
-        val events = remember { mutableStateListOf<DebugAgent.Event>() }
+        val events = remember { mutableStateListOf<DebugEvent>() }
         val listState = rememberLazyListState()
         LaunchedEffect(events.size) { if (events.isNotEmpty()) listState.animateScrollToItem(events.size - 1) }
 
@@ -151,16 +155,28 @@ class DebugActivity : ComponentActivity() {
                                     // "/tool {json}": run one tool through the executor, no model.
                                     val (name, json) = direct.destructured
                                     val args = Json.parseToJsonElement(json.ifBlank { "{}" }).jsonObject
-                                    events += DebugAgent.Event.Call(name, args.toString())
-                                    events += DebugAgent.Event.Result(
+                                    events += DebugEvent.Call(name, args.toString())
+                                    events += DebugEvent.Result(
                                         name,
                                         if (name in DebugCommands.names) DebugCommands.run(app, name, args) else app.toolExecutor(gate).execute(name, args),
                                     )
                                 } else {
-                                    DebugAgent(config.client(app), app.tools.tools, app.toolExecutor(gate)).run(prompt) { events += it }
+                                    val json = Json { prettyPrint = true; explicitNulls = false }
+                                    val model = LlmAgentModel(config.client(app)) { events += DebugEvent.Raw(json.encodeToString(it)) }
+                                    app.agent(model, gate).run(ChatMessage("user", JsonPrimitive(prompt))).collect { event ->
+                                        when (event) {
+                                            is AgentEvent.ToolCall -> events += DebugEvent.Call(event.name, event.args.toString())
+                                            is AgentEvent.ToolDone -> events += DebugEvent.Result(event.name, event.result)
+                                            is AgentEvent.Done -> events += DebugEvent.Answer(event.text)
+                                            is AgentEvent.Failed -> events += DebugEvent.Error(event.message)
+                                            AgentEvent.StepLimit -> events += DebugEvent.Error("Stopped at the step limit.")
+                                            is AgentEvent.NeedsCapability -> events += DebugEvent.Error("Needs ${event.capability}: ${event.reason}")
+                                            else -> Unit
+                                        }
+                                    }
                                 }
                             } catch (e: Exception) {
-                                events += DebugAgent.Event.Error("${e::class.simpleName}: ${e.message}")
+                                events += DebugEvent.Error("${e::class.simpleName}: ${e.message}")
                             } finally {
                                 running = false
                             }
@@ -172,8 +188,8 @@ class DebugActivity : ComponentActivity() {
                     scope.launch {
                         events.clear()
                         config.client(masala).listModels()
-                            .onSuccess { events += DebugAgent.Event.Answer(it.joinToString("\n")) }
-                            .onFailure { events += DebugAgent.Event.Error("${it::class.simpleName}: ${it.message}") }
+                            .onSuccess { events += DebugEvent.Answer(it.joinToString("\n")) }
+                            .onFailure { events += DebugEvent.Error("${it::class.simpleName}: ${it.message}") }
                     }
                 }) { Text(stringResource(R.string.debug_models)) }
                 OutlinedButton(onClick = { startActivity(android.content.Intent(this@DebugActivity, ContextPanelActivity::class.java)) }) {
@@ -181,7 +197,7 @@ class DebugActivity : ComponentActivity() {
                 }
                 OutlinedButton(onClick = {
                     events.clear()
-                    events += DebugAgent.Event.Raw(masala.actionLog.tail(20).joinToString("\n").ifEmpty { "(empty)" })
+                    events += DebugEvent.Raw(masala.actionLog.tail(20).joinToString("\n").ifEmpty { "(empty)" })
                 }) { Text(stringResource(R.string.debug_action_log)) }
             }
             Text(stringResource(R.string.debug_tools, masala.tools.tools.size), style = MaterialTheme.typography.bodySmall)
@@ -214,21 +230,21 @@ class DebugActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun EventRow(event: DebugAgent.Event, onGrant: (String) -> Unit) {
+    private fun EventRow(event: DebugEvent, onGrant: (String) -> Unit) {
         val (label, body) = when (event) {
-            is DebugAgent.Event.Raw -> stringResource(R.string.debug_event_raw) to event.json
-            is DebugAgent.Event.Call -> stringResource(R.string.debug_event_call, event.name) to event.args
-            is DebugAgent.Event.Result -> stringResource(R.string.debug_event_result, event.name) to when (val r = event.result) {
+            is DebugEvent.Raw -> stringResource(R.string.debug_event_raw) to event.json
+            is DebugEvent.Call -> stringResource(R.string.debug_event_call, event.name) to event.args
+            is DebugEvent.Result -> stringResource(R.string.debug_event_result, event.name) to when (val r = event.result) {
                 is ToolResult.Success -> "OK: ${r.output}"
                 is ToolResult.Failure -> "FAIL: ${r.message}"
                 is ToolResult.NeedsCapability -> "NEEDS ${r.capability}: ${r.reason}"
             }
-            is DebugAgent.Event.Answer -> stringResource(R.string.debug_event_answer) to event.text
-            is DebugAgent.Event.Error -> stringResource(R.string.debug_event_error) to event.message
+            is DebugEvent.Answer -> stringResource(R.string.debug_event_answer) to event.text
+            is DebugEvent.Error -> stringResource(R.string.debug_event_error) to event.message
         }
         // Raw responses are long; they start collapsed and a tap shows the whole thing.
         var expanded by remember(event) { mutableStateOf(false) }
-        val raw = event is DebugAgent.Event.Raw
+        val raw = event is DebugEvent.Raw
         Column(
             Modifier
                 .fillMaxWidth()
@@ -240,11 +256,11 @@ class DebugActivity : ComponentActivity() {
             Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Text(
                 body,
-                fontFamily = if (raw || event is DebugAgent.Event.Call) FontFamily.Monospace else null,
+                fontFamily = if (raw || event is DebugEvent.Call) FontFamily.Monospace else null,
                 fontSize = if (raw) 11.sp else 14.sp,
                 maxLines = if (raw && !expanded) 6 else Int.MAX_VALUE,
             )
-            val needs = (event as? DebugAgent.Event.Result)?.result as? ToolResult.NeedsCapability
+            val needs = (event as? DebugEvent.Result)?.result as? ToolResult.NeedsCapability
             if (needs != null) TextButton(onClick = { onGrant(needs.capability) }) { Text(stringResource(R.string.debug_grant)) }
         }
     }

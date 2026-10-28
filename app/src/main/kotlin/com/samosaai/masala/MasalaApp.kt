@@ -5,6 +5,12 @@ import android.app.Application
 import android.content.Context
 import com.samosaai.masala.actions.ActionDispatcher
 import com.samosaai.masala.actions.ConfirmationGate
+import com.samosaai.masala.agent.AgentModel
+import com.samosaai.masala.agent.AgentPrompt
+import com.samosaai.masala.agent.AgentTools
+import com.samosaai.masala.agent.MasalaAgent
+import com.samosaai.masala.core.agent.ToolInfo
+import com.samosaai.masala.core.agent.ToolScope
 import com.samosaai.masala.context.ContextService
 import com.samosaai.masala.data.MasalaDatabase
 import com.samosaai.masala.data.SettingsStore
@@ -57,6 +63,32 @@ class MasalaApp : Application() {
         }
     }
 
+    /**
+     * A new agent conversation over [model]. [scope] picks the tools from what is registered (a typed
+     * command sees all of them); [instructions] is a persona's or skill's own text.
+     */
+    fun agent(
+        model: AgentModel,
+        gate: ToolGate = confirmationGate,
+        scope: (List<ToolInfo>) -> ToolScope = { ToolScope.command(it) },
+        instructions: String? = null,
+        maxSteps: Int = MasalaAgent.DEFAULT_MAX_STEPS,
+    ): MasalaAgent {
+        val executor = toolExecutor(gate)
+        val infos = tools.tools.map { ToolInfo(it.name, it.sensitivity, it.readsPrivateData) }
+        return MasalaAgent(
+            model = model,
+            tools = { name, args -> executor.execute(name, args) },
+            definitions = tools.tools.map { it.definition },
+            scope = scope(infos),
+            systemPrompt = {
+                val now = java.text.SimpleDateFormat("EEEE d MMMM yyyy, HH:mm", java.util.Locale.US).format(java.util.Date())
+                AgentPrompt.build("$now (${java.util.TimeZone.getDefault().id})", skills.getAllSkills(), instructions = instructions)
+            },
+            maxSteps = maxSteps,
+        )
+    }
+
     /** Runs tools for one caller; [gate] confirms anything that isn't read-only. */
     fun toolExecutor(gate: ToolGate) = MasalaToolExecutor(this, tools, actionLog, gate)
 
@@ -100,6 +132,7 @@ class MasalaApp : Application() {
             skills = { skills },
             toolNames = { tools.tools.map { it.name }.toSet() },
         )
+        AgentTools.create(this, layouts, modes).forEach(tools::register)
         dispatcher = ActionDispatcher(this, actions, launcher, modes, confirmationGate, tools) { toolExecutor(confirmationGate) }
 
         // A force-stop drops the alarm; the store still has the tasks.
