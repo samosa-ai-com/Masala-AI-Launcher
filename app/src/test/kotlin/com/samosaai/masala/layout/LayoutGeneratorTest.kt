@@ -242,6 +242,15 @@ class LayoutGeneratorTest {
         val system = caller.seen.single().messages.first().textContent
         assertTrue(system.contains("revise THIS document"), system.take(300))
         assertTrue(system.contains("\"id\": \"home\""), system.take(2000))
+        val user = caller.seen.single().messages[1].textContent
+        assertTrue(user.contains("Change request"), user.take(200))
+        assertTrue(user.contains("add a dock"), user.take(300))
+    }
+
+    @Test
+    fun `fresh generation sends the bare user text`() {
+        val messages = LayoutGenerator.buildMessages(request("morning screen"))
+        assertEquals("morning screen", messages[1].textContent)
     }
 
     @Test

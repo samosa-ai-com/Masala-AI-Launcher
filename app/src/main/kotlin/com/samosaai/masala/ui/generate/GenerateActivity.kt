@@ -22,6 +22,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -101,20 +104,32 @@ class GenerateActivity : ComponentActivity() {
         val apps by app.launcher.apps.collectAsStateWithLifecycle()
         val homeLayout by app.layouts.base.collectAsStateWithLifecycle()
         val previewLayout = (phase as? Phase.Preview)?.layout
-        val reviseBase = previewLayout ?: homeLayout
+
+        // Opened from a saved version: locked in refine mode for that layout.
+        // Opened fresh: the user picks New vs Refine with the segmented control.
+        val reviseVersionId = intent.getLongExtra(EXTRA_REVISE_VERSION_ID, -1)
+        val lockedRefine = reviseVersionId >= 0
+        var refineMode by rememberSaveable(lockedRefine) { mutableStateOf(lockedRefine) }
+        val reviseLabel = remember(reviseVersionId) {
+            if (lockedRefine) app.layouts.historyState.value.versions.find { it.id == reviseVersionId }?.label else null
+        }
+        var refineDoc by remember { mutableStateOf<LayoutDoc?>(null) }
 
         // Opened from a saved version: load it as the preview so Refine edits that layout.
-        val reviseVersionId = intent.getLongExtra(EXTRA_REVISE_VERSION_ID, -1)
         LaunchedEffect(reviseVersionId) {
             if (reviseVersionId >= 0 && phase is Phase.Idle) {
                 val layout = app.layouts.layoutFor(reviseVersionId)
                 if (layout == null) {
                     status = getString(R.string.generate_version_gone)
                 } else {
+                    refineDoc = layout
                     phase = Phase.Preview(layout)
                 }
             }
         }
+
+        /** The layout a refine run edits: the just-made preview, else the revise target, else home. */
+        val reviseBase: LayoutDoc? = if (refineMode) previewLayout ?: refineDoc ?: homeLayout else null
 
         fun toast(text: String) = Toast.makeText(this@GenerateActivity, text, Toast.LENGTH_SHORT).show()
 
@@ -134,7 +149,7 @@ class GenerateActivity : ComponentActivity() {
             }
         }
 
-        fun run(regenerate: Boolean, revise: LayoutDoc? = null) {
+        fun run(regenerate: Boolean) {
             scope.launch {
                 phase = Phase.Generating
                 status = null
@@ -151,7 +166,7 @@ class GenerateActivity : ComponentActivity() {
                         imageBase64 = imageBase64,
                         imageFormat = imageFormat,
                         temperature = if (regenerate) REGENERATE_TEMPERATURE else null,
-                        revise = revise,
+                        revise = if (refineMode) reviseBase else null,
                     )
                     when (val result = LayoutGenerator(caller).generate(request)) {
                         is GenerateResult.Generated -> Phase.Preview(result.layout)
@@ -170,6 +185,30 @@ class GenerateActivity : ComponentActivity() {
 
         val generating = phase is Phase.Generating
         SettingsScaffold(stringResource(R.string.generate_title), onBack = ::finish) {
+            // The mode is the whole point of the screen, so it comes first and the single
+            // primary button below always says what it will do. No separate Generate + Refine
+            // buttons to misread.
+            if (!lockedRefine) {
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = !refineMode,
+                        onClick = { refineMode = false },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    ) { Text(stringResource(R.string.generate_mode_new)) }
+                    SegmentedButton(
+                        selected = refineMode,
+                        onClick = { refineMode = true },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    ) { Text(stringResource(R.string.generate_mode_refine)) }
+                }
+            }
+            if (refineMode) {
+                Text(
+                    if (reviseLabel != null) stringResource(R.string.generate_refining, reviseLabel)
+                    else stringResource(R.string.generate_refining_home),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
             OutlinedTextField(
                 prompt,
                 {
@@ -177,7 +216,14 @@ class GenerateActivity : ComponentActivity() {
                     if (!generating && phase !is Phase.Idle) phase = Phase.Idle
                 },
                 label = { Text(stringResource(R.string.generate_prompt_label)) },
-                supportingText = { Text(stringResource(R.string.generate_prompt_hint)) },
+                supportingText = {
+                    Text(
+                        stringResource(
+                            if (refineMode) R.string.generate_refine_hint
+                            else R.string.generate_prompt_hint
+                        )
+                    )
+                },
                 maxLines = 3,
                 enabled = !generating,
                 modifier = Modifier.fillMaxWidth(),
@@ -191,30 +237,19 @@ class GenerateActivity : ComponentActivity() {
                         Text(stringResource(R.string.generate_photo_remove))
                     }
                 }
-                TextButton(
-                    enabled = !generating && (prompt.isNotBlank() || imageBase64 != null),
-                    onClick = {
-                        val request = app.generateRequest(prompt, imageBase64, imageFormat)
-                        val messages = LayoutGenerator.buildMessages(request)
-                        val userNote = if (imageBase64 == null) "" else "\n[photo attached as data URI]"
-                        val text = messages[0].textContent + "\n\n--- user ---\n" +
-                            request.userText + userNote
-                        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("masala-prompt", text))
-                        toast(getString(R.string.generate_prompt_copied))
-                    },
-                ) { Text(stringResource(R.string.generate_copy_prompt)) }
             }
             Button(
-                enabled = !generating && apps.isNotEmpty() && (prompt.isNotBlank() || imageBase64 != null),
+                enabled = !generating && apps.isNotEmpty() && (prompt.isNotBlank() || imageBase64 != null) &&
+                    (!refineMode || reviseBase != null),
                 onClick = { run(regenerate = false) },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.generate_button)) }
-            OutlinedButton(
-                enabled = !generating && prompt.isNotBlank() && reviseBase != null,
-                onClick = { run(regenerate = false, revise = reviseBase) },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.generate_refine)) }
+            ) {
+                Text(
+                    stringResource(
+                        if (refineMode) R.string.generate_refine else R.string.generate_button
+                    )
+                )
+            }
 
             when (val p = phase) {
                 Phase.Idle -> {}

@@ -211,14 +211,22 @@ class LayoutGenerator(
         internal fun buildMessages(request: Request): List<ChatMessage> {
             val contextText = PromptContext.build(request.context)
             val reviseBlock = request.revise?.let {
-                "\n\nCurrent layout JSON — revise THIS document and return the complete revised layout:\n" +
+                "\n\nYou are revising an existing layout — revise THIS document, do not start fresh. " +
+                    "Apply ONLY the change the user asks for and return the COMPLETE revised layout, " +
+                    "preserving every id, section and item the request doesn't touch.\nCurrent layout JSON:\n" +
                     MasalaJson.strict.encodeToString(LayoutDoc.serializer(), it)
             }.orEmpty()
             val system = SYSTEM_PROMPT + "\n\n" + contextText + reviseBlock
-            val user = if (request.imageBase64 == null) {
-                ChatMessage(role = "user", content = JsonPrimitive(request.userText))
+            val userText = if (request.revise == null) {
+                request.userText
             } else {
-                visionUserMessage(request.userText, request.imageBase64, request.imageFormat)
+                "Change request for the current layout in the system prompt — " +
+                    "return the complete revised layout object:\n" + request.userText
+            }
+            val user = if (request.imageBase64 == null) {
+                ChatMessage(role = "user", content = JsonPrimitive(userText))
+            } else {
+                visionUserMessage(userText, request.imageBase64, request.imageFormat)
             }
             return listOf(
                 ChatMessage(role = "system", content = JsonPrimitive(system)),
