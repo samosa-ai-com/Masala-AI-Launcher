@@ -29,14 +29,20 @@ class LayoutGeneratorTest {
         LayoutGenerator.Request(userText = userText, context = input())
 
     private class FakeCaller(val script: ArrayDeque<Result<String>>) : ChatCaller {
-        data class Call(val messages: List<ChatMessage>, val responseFormat: ResponseFormat?, val maxTokens: Int)
+        data class Call(
+            val messages: List<ChatMessage>,
+            val responseFormat: ResponseFormat?,
+            val maxTokens: Int,
+            val temperature: Float?,
+        )
         val seen = mutableListOf<Call>()
         override suspend fun call(
             messages: List<ChatMessage>,
             responseFormat: ResponseFormat?,
-            maxTokens: Int
+            maxTokens: Int,
+            temperature: Float?,
         ): String {
-            seen += Call(messages, responseFormat, maxTokens)
+            seen += Call(messages, responseFormat, maxTokens, temperature)
             return script.removeFirst().getOrThrow()
         }
     }
@@ -55,6 +61,7 @@ class LayoutGeneratorTest {
         val generated = assertIs<GenerateResult.Generated>(result)
         assertEquals("home", generated.layout.pages.single().id)
         assertEquals(1, caller.seen.size)
+        assertEquals(null, caller.seen.single().temperature)
         val format = caller.seen.single().responseFormat
         assertEquals("json_schema", format?.type)
         val schema = format?.jsonSchema?.schema
@@ -75,6 +82,15 @@ class LayoutGeneratorTest {
         assertTrue(repairMessages[1].textContent.contains("morning screen"))
         val repairText = repairMessages.last().textContent
         assertTrue(repairText.contains("Unknown icon"), repairText)
+    }
+
+    @Test
+    fun `temperature is forwarded to every turn`() = runBlocking<Unit> {
+        val bad = validLayout(BAD_ICON_ITEM_JSON)
+        val caller = FakeCaller(ArrayDeque(listOf(Result.success(bad), Result.success(validLayout()))))
+        val hot = request().copy(temperature = 0.2f)
+        assertIs<GenerateResult.Generated>(LayoutGenerator(caller).generate(hot))
+        assertEquals(listOf(0.2f, 0.2f), caller.seen.map { it.temperature })
     }
 
     @Test

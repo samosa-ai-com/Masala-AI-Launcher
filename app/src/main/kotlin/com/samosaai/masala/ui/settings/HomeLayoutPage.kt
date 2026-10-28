@@ -1,5 +1,6 @@
 package com.samosaai.masala.ui.settings
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -29,6 +30,7 @@ import com.samosaai.masala.core.contract.MasalaAction
 import com.samosaai.masala.core.layout.LayoutChecker
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.masala
+import com.samosaai.masala.ui.generate.GenerateActivity
 import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
@@ -51,6 +53,7 @@ fun HomeLayoutPage(
     onBack: () -> Unit,
 ) {
     val app = LocalContext.current.masala
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val history by app.layouts.historyState.collectAsStateWithLifecycle()
     var status by remember { mutableStateOf<String?>(null) }
@@ -59,6 +62,19 @@ fun HomeLayoutPage(
     SettingsScaffold(stringResource(R.string.settings_home_layout), onBack = onBack) {
         SettingsToggleRow(stringResource(R.string.settings_lock_home), settings.homeLocked) { on -> update { it.copy(homeLocked = on) } }
         Text(stringResource(R.string.settings_lock_home_summary), style = MaterialTheme.typography.bodySmall)
+
+        SettingsSectionTitle(stringResource(R.string.settings_generate_ai))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = {
+                    context.startActivity(Intent(context, GenerateActivity::class.java))
+                },
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) {
+                Text(stringResource(R.string.settings_generate_ai))
+            }
+        }
+        Text(stringResource(R.string.settings_generate_ai_summary), style = MaterialTheme.typography.bodySmall)
 
         SettingsSectionTitle(stringResource(R.string.settings_layout_history))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -163,5 +163,11 @@
             android:name=".ui.settings.SettingsActivity"
             android:exported="false"
             android:label="@string/settings_title" />
+
+        <!-- AI home screens: prompt → preview → apply (plan Phase 3, lane C) -->
+        <activity
+            android:name=".ui.generate.GenerateActivity"
+            android:exported="false"
+            android:label="@string/generate_title" />
     </application>
 </manifest>

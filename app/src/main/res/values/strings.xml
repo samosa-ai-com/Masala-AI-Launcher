@@ -109,9 +109,32 @@
     <string name="action_failed">%1$s</string>
     <string name="home_locked_toast">Home is locked. Unlock it in Settings to change it.</string>
 
+    <!-- AI home screens (plan Phase 3, lane C) -->
+    <string name="generate_title">Generate home screen</string>
+    <string name="generate_prompt_label">Describe the home screen you want</string>
+    <string name="generate_button">Generate</string>
+    <string name="generate_running">Asking the model…</string>
+    <string name="generate_pick_photo">Add a photo</string>
+    <string name="generate_photo_picked">Photo added</string>
+    <string name="generate_photo_remove">Remove</string>
+    <string name="generate_photo_failed">Could not read that photo</string>
+    <string name="generate_photo_too_big">That photo is too big (4 MB max)</string>
+    <string name="generate_apply">Apply</string>
+    <string name="generate_regenerate">Regenerate</string>
+    <string name="generate_undo">Undo</string>
+    <string name="generate_retry">Retry</string>
+    <string name="generate_preview_only">Preview only — apply it first</string>
+    <string name="generate_not_configured">No model configured. Add MASALA_LLM_* to local.properties and rebuild, or set them in Settings → Debug.</string>
+    <string name="generate_failed">The model did not answer. Check the endpoint and retry.</string>
+    <string name="generate_rejected_title">The model needs another try</string>
+    <string name="generate_applied">Applied — see it on home</string>
+    <string name="generate_version_label">AI: %1$s</string>
+
     <!-- Home layout settings -->
     <string name="settings_home_layout">Home layout</string>
     <string name="settings_home_layout_summary">Lock, undo, gestures, export and import</string>
+    <string name="settings_generate_ai">Generate with AI</string>
+    <string name="settings_generate_ai_summary">Describe a home screen, preview it, then apply or undo</string>
     <string name="settings_lock_home">Lock home layout</string>
     <string name="settings_lock_home_summary">Stops pinning, unpinning and the long-press menu on home.</string>
     <string name="settings_layout_history">Versions</string>

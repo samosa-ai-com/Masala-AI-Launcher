@@ -37,6 +37,8 @@ class LayoutGenerator(
         val context: PromptContextInput,
         val imageBase64: String? = null,
         val imageFormat: String = "png",
+        /** Non-zero skips the response cache (Regenerate); null reuses identical replies. */
+        val temperature: Float? = null,
     )
 
     suspend fun generate(request: Request): GenerateResult {
@@ -54,7 +56,7 @@ class LayoutGenerator(
             user,
         )
         val first = try {
-            caller.call(messages, ResponseFormat.jsonSchema("layout", schema), maxTokens)
+            caller.call(messages, ResponseFormat.jsonSchema("layout", schema), maxTokens, request.temperature)
         } catch (e: Exception) {
             if (isSchemaRejection(e)) return generateJsonObject(request, system, user, schema)
             return GenerateResult.Failed
@@ -76,7 +78,7 @@ class LayoutGenerator(
             ),
         )
         val second = try {
-            caller.call(repair, ResponseFormat.jsonSchema("layout", schema), maxTokens)
+            caller.call(repair, ResponseFormat.jsonSchema("layout", schema), maxTokens, request.temperature)
         } catch (e: Exception) {
             return GenerateResult.Failed
         }
@@ -100,6 +102,7 @@ class LayoutGenerator(
                 ),
                 ResponseFormat.JSON_OBJECT,
                 maxTokens,
+                request.temperature,
             )
         } catch (e: Exception) {
             return GenerateResult.Failed
@@ -240,6 +243,8 @@ fun interface ChatCaller {
         messages: List<ChatMessage>,
         responseFormat: ResponseFormat?,
         maxTokens: Int,
+        /** Null/0 hits the client's response cache; non-zero always reaches the model. */
+        temperature: Float?,
     ): String
 }
 
