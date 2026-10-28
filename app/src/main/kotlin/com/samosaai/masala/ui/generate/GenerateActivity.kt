@@ -106,20 +106,13 @@ class GenerateActivity : ComponentActivity() {
         val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri == null) return@rememberLauncherForActivityResult
             scope.launch(Dispatchers.IO) {
-                val mime = runCatching { contentResolver.getType(uri) }.getOrNull().orEmpty()
-                val bytes = runCatching { contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+                val prepared = runCatching { preparePhoto(uri) }.getOrNull()
                 withContext(Dispatchers.Main) {
-                    if (bytes == null) {
+                    if (prepared == null) {
                         toast(getString(R.string.generate_photo_failed))
-                    } else if (bytes.size > MAX_PHOTO_BYTES) {
-                        toast(getString(R.string.generate_photo_too_big))
                     } else {
-                        imageBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                        imageFormat = when {
-                            mime.contains("jpeg", ignoreCase = true) || mime.contains("jpg", ignoreCase = true) -> "jpeg"
-                            mime.contains("webp", ignoreCase = true) -> "webp"
-                            else -> "png"
-                        }
+                        imageBase64 = prepared.first
+                        imageFormat = prepared.second
                         photoName = uri.lastPathSegment
                     }
                 }
@@ -281,7 +274,45 @@ class GenerateActivity : ComponentActivity() {
     }
 
     private companion object {
-        const val MAX_PHOTO_BYTES = 4 * 1024 * 1024
         const val REGENERATE_TEMPERATURE = 0.2f
+
+        /** Longest side of a photo sent to the model; keeps the request small and fast. */
+        const val MAX_PHOTO_SIDE_PX = 1568
+
+        /** Re-encode budget; a two-step quality ladder fits almost any photo under it. */
+        const val MAX_PHOTO_BYTES = 1_500_000
+    }
+
+    /**
+     * Downscales to [MAX_PHOTO_SIDE_PX] and re-encodes as JPEG (quality 85, then 70), so the
+     * data URI is small and the format always matches what is sent. Null when unreadable or
+     * still over budget.
+     */
+    private fun preparePhoto(uri: android.net.Uri): Pair<String, String>? {
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_PHOTO_SIDE_PX) sample *= 2
+        val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+        val bitmap = contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, opts) }
+            ?: return null
+        return try {
+            var quality = 85
+            var bytes = compressJpeg(bitmap, quality)
+            if (bytes.size > MAX_PHOTO_BYTES) {
+                quality = 70
+                bytes = compressJpeg(bitmap, quality)
+            }
+            if (bytes.size > MAX_PHOTO_BYTES) null else Base64.encodeToString(bytes, Base64.NO_WRAP) to "jpeg"
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    private fun compressJpeg(bitmap: android.graphics.Bitmap, quality: Int): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, quality, out)
+        return out.toByteArray()
     }
 }

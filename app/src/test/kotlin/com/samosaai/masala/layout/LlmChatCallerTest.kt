@@ -59,11 +59,10 @@ class LlmChatCallerTest {
     }
 
     @Test
-    fun `blank reply is a failure`() = runBlocking<Unit> {
+    fun `blank reply passes through to the checker`() = runBlocking<Unit> {
         server.enqueue(MockResponse().setBody(chatBody("")).addHeader("Content-Type", "application/json"))
-        assertFailsWith<IllegalStateException> {
-            LlmChatCaller(client()).call(listOf(ChatMessage("user", JsonPrimitive("hi"))), null, 3000, null)
-        }
+        val out = LlmChatCaller(client()).call(listOf(ChatMessage("user", JsonPrimitive("hi"))), null, 3000, null)
+        assertEquals("", out)
     }
 
     @Test

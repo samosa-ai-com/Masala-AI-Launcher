@@ -212,6 +212,14 @@ class LayoutGeneratorTest {
     }
 
     @Test
+    fun `blank first reply is repaired, not failed`() = runBlocking<Unit> {
+        val caller = FakeCaller(ArrayDeque(listOf(Result.success(""), Result.success(validLayout()))))
+        val result = LayoutGenerator(caller).generate(request())
+        assertIs<GenerateResult.Generated>(result)
+        assertEquals(2, caller.seen.size)
+    }
+
+    @Test
     fun `blank skill prompt normalizes to absent`() = runBlocking<Unit> {
         val item = """
             {"id":"i9","label":"Notes","icon":{"type":"symbol","name":"mic"},

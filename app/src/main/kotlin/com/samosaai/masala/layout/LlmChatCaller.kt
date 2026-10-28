@@ -12,13 +12,16 @@ class LlmChatCaller(private val client: LLMClient) : ChatCaller {
         maxTokens: Int,
         temperature: Float?,
     ): String {
-        val reply = client.chat(
+        // Blank text passes through: the checker's parse problem sends it to the repair turn,
+        // which is how the generator heals a flaky empty reply. No choices at all is a broken
+        // response, so that still throws.
+        val message = client.chat(
             messages,
             responseFormat = responseFormat,
             maxTokens = maxTokens,
             temperature = temperature,
-        ).choices.firstOrNull()?.message?.textContent.orEmpty()
-        if (reply.isBlank()) throw IllegalStateException("The model returned no text.")
-        return reply
+        ).choices.firstOrNull()?.message
+            ?: throw IllegalStateException("The model returned no message.")
+        return message.textContent
     }
 }
