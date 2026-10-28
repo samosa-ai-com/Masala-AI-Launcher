@@ -47,6 +47,7 @@ import com.samosaai.masala.masala
 import com.samosaai.masala.ui.components.LauncherRow
 import com.samosaai.masala.ui.drawer.visibilityLabel
 import com.samosaai.masala.ui.theme.MasalaTheme
+import com.samosaai.masala.ui.wiki.WikiActivity
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -159,6 +160,10 @@ class SettingsActivity : ComponentActivity() {
                 ),
                 onClick = onHiddenApps,
             )
+
+            SettingsNavRow(stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) {
+                startActivity(Intent(this@SettingsActivity, WikiActivity::class.java))
+            }
 
             if (BuildConfig.DEBUG) {
                 // The debug screen lives in the debug source set, so it's started by name.

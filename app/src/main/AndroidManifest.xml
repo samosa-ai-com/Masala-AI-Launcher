@@ -173,6 +173,11 @@
             </intent-filter>
         </activity>
 
+        <!-- Personal Wiki: read, edit, delete, export (Phase 4) -->
+        <activity
+            android:name=".ui.wiki.WikiActivity"
+            android:exported="false" />
+
         <!-- A skill's conversation (Phase 4) -->
         <activity
             android:name=".ui.skills.SkillSheetActivity"

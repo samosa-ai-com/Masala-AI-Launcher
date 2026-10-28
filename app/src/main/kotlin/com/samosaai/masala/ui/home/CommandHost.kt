@@ -53,6 +53,7 @@ import com.samosaai.masala.agent.CommandState
 import com.samosaai.masala.agent.SkillChip
 import com.samosaai.masala.ui.components.Markdown
 import com.samosaai.masala.ui.skills.SkillSheetActivity
+import com.samosaai.masala.ui.wiki.ProposalCards
 import kotlinx.coroutines.launch
 
 /** Push-to-talk: what a held mic button does, with the microphone permission asked on the first press. */
@@ -136,6 +137,7 @@ fun ReplyCard(app: MasalaApp, readAloud: Boolean, modifier: Modifier = Modifier)
                         Steps(s.steps)
                         Markdown(s.text)
                         s.skill?.let { chip -> SkillChipButton(chip) { openSkill(context, app, chip, s.prompt) } }
+                        ProposalCards(app)
                     }
                     is CommandState.Error -> Text(s.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
                     CommandState.Input, CommandState.Idle -> Unit

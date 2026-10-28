@@ -59,6 +59,7 @@ import com.samosaai.masala.ui.home.ConfirmationSheet
 import com.samosaai.masala.ui.home.SymbolDisc
 import com.samosaai.masala.ui.home.SymbolIcons
 import com.samosaai.masala.ui.theme.MasalaTheme
+import com.samosaai.masala.ui.wiki.ProposalCards
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -194,6 +195,8 @@ class SkillSheetActivity : ComponentActivity() {
                     }
                 }
             }
+
+            ProposalCards(app, Modifier.padding(horizontal = 16.dp))
 
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val inputs = skill.widget?.inputs.orEmpty().filter { it != SkillInput.TEXT }

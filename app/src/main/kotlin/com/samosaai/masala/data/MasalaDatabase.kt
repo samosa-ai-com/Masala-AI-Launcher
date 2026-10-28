@@ -42,6 +42,7 @@ abstract class MasalaDatabase : RoomDatabase() {
     abstract fun layoutVersions(): LayoutVersionDao
     abstract fun skillRuns(): SkillRunDao
     abstract fun skillArtifacts(): SkillArtifactDao
+    abstract fun wikiPages(): WikiDao
 
     companion object {
         fun create(context: Context): MasalaDatabase =
@@ -121,6 +122,21 @@ data class WikiPageEntity(
     val source: String,
     val updatedAt: Long,
 )
+
+@Dao
+interface WikiDao {
+    @Query("SELECT * FROM wiki_pages ORDER BY title COLLATE NOCASE")
+    fun all(): Flow<List<WikiPageEntity>>
+
+    @Query("SELECT * FROM wiki_pages WHERE id = :id")
+    suspend fun get(id: String): WikiPageEntity?
+
+    @Upsert
+    suspend fun upsert(page: WikiPageEntity)
+
+    @Query("DELETE FROM wiki_pages WHERE id = :id")
+    suspend fun delete(id: String)
+}
 
 /** Per-widget storage for generated widgets (arch §3.7, Phase 6): counters, checklists and so on. */
 @Entity(tableName = "widget_state")

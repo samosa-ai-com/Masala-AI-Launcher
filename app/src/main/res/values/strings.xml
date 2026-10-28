@@ -134,6 +134,22 @@
     <string name="settings_export_failed">Couldn’t write the file</string>
 
     <!-- Phase 4 -->
+    <string name="wiki_title">Personal wiki</string>
+    <string name="wiki_summary">What Masala knows about you. You decide what goes in</string>
+    <string name="wiki_new">New page</string>
+    <string name="wiki_edit">Edit page</string>
+    <string name="wiki_export">Export</string>
+    <string name="wiki_exported">Wiki exported</string>
+    <string name="wiki_empty">No pages yet. Masala suggests pages when you tell it something worth keeping, and nothing is saved until you approve.</string>
+    <string name="wiki_page_title">Title</string>
+    <string name="wiki_page_text">Text (Markdown)</string>
+    <string name="wiki_save">Save</string>
+    <string name="wiki_delete">Delete</string>
+    <string name="wiki_delete_title">Delete “%1$s”?</string>
+    <string name="wiki_delete_body">The page is removed from this phone and can’t be brought back.</string>
+    <string name="wiki_remember">Remember “%1$s”?</string>
+    <string name="wiki_approve">Approve</string>
+    <string name="wiki_dismiss">Dismiss</string>
     <string name="settings_ask">Ask Masala</string>
     <string name="settings_read_replies">Read replies aloud</string>
     <string name="command_hint">Ask or tell Masala</string>
