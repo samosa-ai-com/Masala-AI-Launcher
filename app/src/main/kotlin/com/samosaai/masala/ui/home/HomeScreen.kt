@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,21 +81,27 @@ fun HomeScreen(
     // arrives here as the scroll the list couldn't use. Only that leftover counts toward a
     // gesture — mid-list scrolling never does — and the action fires once, on finger lift, so a
     // trip to the end of a long layout never triggers anything by itself.
-    val swipes = remember(swipeThreshold, onSwipeUp, onSwipeDown) {
+    //
+    // The connection object is stable across recompositions (callbacks go through UpdatedState);
+    // otherwise a recomposition mid-swipe would restart tracking and swallow the gesture.
+    val latestUp by rememberUpdatedState(onSwipeUp)
+    val latestDown by rememberUpdatedState(onSwipeDown)
+    val swipes = remember(swipeThreshold) {
         object : NestedScrollConnection {
-            var pulled = 0f
+            var peakUp = 0f
+            var peakDown = 0f
             var tracking = false
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 if (source == NestedScrollSource.UserInput && available.y != 0f) {
                     if (!tracking) {
                         tracking = true
-                        pulled = 0f
-                    } else if ((pulled < 0) != (available.y < 0)) {
-                        // Direction flipped mid-gesture: a wiggle is scrolling, not a swipe.
-                        pulled = 0f
+                        peakUp = 0f
+                        peakDown = 0f
                     }
-                    pulled += available.y
+                    // Peaks, not a running total: lift jitter or a mid-gesture wiggle can shrink
+                    // the current run, but a swipe that already traveled far enough still counts.
+                    if (available.y < 0) peakUp = minOf(peakUp, peakUp + available.y) else peakDown = maxOf(peakDown, peakDown + available.y)
                 }
                 return Offset.Zero
             }
@@ -102,8 +109,11 @@ fun HomeScreen(
             fun onFingerLift() {
                 if (!tracking) return
                 tracking = false
-                if (pulled < -swipeThreshold) onSwipeUp() else if (pulled > swipeThreshold) onSwipeDown()
-                pulled = 0f
+                // The further excursion wins; ties and sub-threshold lifts do nothing.
+                if (-peakUp >= swipeThreshold && -peakUp >= peakDown) latestUp()
+                else if (peakDown >= swipeThreshold && peakDown > -peakUp) latestDown()
+                peakUp = 0f
+                peakDown = 0f
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity = Velocity.Zero
@@ -115,12 +125,15 @@ fun HomeScreen(
         Modifier
             .fillMaxSize()
             .nestedScroll(swipes)
-            .pointerInput(swipes) {
+            .pointerInput(Unit) {
                 // Observes only (consumes nothing): when every finger is up, the gesture is
-                // over, which is the single moment a tracked swipe fires.
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
-                    if (waitForUpOrCancellation() != null) swipes.onFingerLift()
+                // over, which is the single moment a tracked swipe fires. Unit key: never
+                // restarts, so a recomposition mid-swipe cannot swallow the lift.
+                while (true) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        if (waitForUpOrCancellation() != null) swipes.onFingerLift()
+                    }
                 }
             }
             .pointerInput(Unit) { detectTapGestures(onLongPress = { onOpenSettings() }) }
