@@ -13,8 +13,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -31,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.R
@@ -69,31 +72,39 @@ fun HomeLayoutPage(
     val skills = remember { app.skills.getPersonas() }
 
     SettingsScaffold(stringResource(R.string.settings_home_layout), onBack = onBack) {
+        // The toggle labels itself, so this card needs no heading of its own.
         ElevatedCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SettingsToggleRow(stringResource(R.string.settings_lock_home), settings.homeLocked) { on -> update { it.copy(homeLocked = on) } }
-                Text(stringResource(R.string.settings_lock_home_summary), style = MaterialTheme.typography.bodySmall)
+                Text(
+                    stringResource(R.string.settings_lock_home_summary),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
 
+        // The one call to action on the page, so it gets a filled, full-width button.
         ElevatedCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SettingsSectionTitle(stringResource(R.string.settings_generate_ai))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = { context.startActivity(Intent(context, GenerateActivity::class.java)) },
-                        modifier = Modifier.heightIn(min = 48.dp)
-                    ) {
-                        Text(stringResource(R.string.settings_generate_ai))
-                    }
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                CardHeading(stringResource(R.string.settings_generate_ai))
+                Text(
+                    stringResource(R.string.settings_generate_ai_summary),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = { context.startActivity(Intent(context, GenerateActivity::class.java)) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) {
+                    Text(stringResource(R.string.settings_generate_ai))
                 }
-                Text(stringResource(R.string.settings_generate_ai_summary), style = MaterialTheme.typography.bodySmall)
             }
         }
 
         ElevatedCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SettingsSectionTitle(stringResource(R.string.settings_layout_history))
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                CardHeading(stringResource(R.string.settings_layout_history))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(enabled = history.canUndo, onClick = { scope.launch { app.layouts.undo() } }, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text(stringResource(R.string.settings_undo))
@@ -105,6 +116,8 @@ fun HomeLayoutPage(
                         Text(stringResource(R.string.settings_reset_classic))
                     }
                 }
+                // The reset result belongs next to the button that produced it.
+                status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 VersionsSection(
                     history = history,
                     onSelect = { id -> scope.launch { app.layouts.select(id) } },
@@ -127,21 +140,21 @@ fun HomeLayoutPage(
         }
 
         ElevatedCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SettingsSectionTitle(stringResource(R.string.settings_gestures))
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                CardHeading(stringResource(R.string.settings_gestures))
                 GesturePicker(stringResource(R.string.settings_swipe_up), settings.swipeUp, skills.map { it.id to it.title.ifBlank { it.id } }) { a -> update { it.copy(swipeUp = a) } }
                 GesturePicker(stringResource(R.string.settings_swipe_down), settings.swipeDown, skills.map { it.id to it.title.ifBlank { it.id } }) { a -> update { it.copy(swipeDown = a) } }
             }
         }
 
         ElevatedCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SettingsSectionTitle(stringResource(R.string.settings_layout_backup))
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                CardHeading(stringResource(R.string.settings_layout_backup))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onExport, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.settings_export_layout)) }
                     OutlinedButton(onClick = onImport, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.settings_import_layout)) }
                 }
-                (message ?: status)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
     }
@@ -180,17 +193,18 @@ private fun VersionsSection(
         value = query,
         onValueChange = { query = it },
         label = { Text(stringResource(R.string.settings_version_search)) },
+        supportingText = { Text(stringResource(R.string.settings_version_count, filtered.size)) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
-    Text(
-        stringResource(R.string.settings_version_count, filtered.size),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
     if (filtered.isEmpty()) {
-        Text(stringResource(R.string.settings_version_empty), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            stringResource(R.string.settings_version_empty),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     } else {
+        HorizontalDivider()
         // Bounded height so the outer settings column still scrolls while the list virtualizes.
         LazyColumn(
             modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
@@ -282,19 +296,34 @@ private fun VersionsSection(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun GesturePicker(title: String, current: MasalaAction, skills: List<Pair<String, String>>, onPick: (MasalaAction) -> Unit) {
-    Text(title, style = MaterialTheme.typography.bodyLarge)
-    val choices = buildList {
-        add(stringResource(R.string.gesture_drawer) to MasalaAction.OpenDrawer)
-        add(stringResource(R.string.gesture_notifications) to MasalaAction.ExpandNotifications)
-        add(stringResource(R.string.gesture_search) to MasalaAction.Search())
-        add(stringResource(R.string.gesture_ask) to MasalaAction.AskMasala(""))
-        skills.forEach { (id, label) -> add(label to MasalaAction.RunSkill(id)) }
-    }
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        choices.forEach { (label, action) ->
-            FilterChip(selected = current == action, onClick = { onPick(action) }, label = { Text(label) })
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+        val choices = buildList {
+            add(stringResource(R.string.gesture_drawer) to MasalaAction.OpenDrawer)
+            add(stringResource(R.string.gesture_notifications) to MasalaAction.ExpandNotifications)
+            add(stringResource(R.string.gesture_search) to MasalaAction.Search())
+            add(stringResource(R.string.gesture_ask) to MasalaAction.AskMasala(""))
+            skills.forEach { (id, label) -> add(label to MasalaAction.RunSkill(id)) }
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            choices.forEach { (label, action) ->
+                FilterChip(selected = current == action, onClick = { onPick(action) }, label = { Text(label) })
+            }
         }
     }
+}
+
+/**
+ * A heading inside a card. Unlike the page-level [SettingsSectionTitle] it carries no top offset
+ * and no primary colour — the card edge already frames it, so an offset only reads as a double gap.
+ */
+@Composable
+private fun CardHeading(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+    )
 }
 
 private const val MAX_SHOWN = 12
