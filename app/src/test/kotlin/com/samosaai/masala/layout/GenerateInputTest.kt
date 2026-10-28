@@ -7,6 +7,7 @@ import com.samosaai.masala.core.apps.Visibility
 import com.samosaai.masala.core.contract.ContextSnapshot
 import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.core.contract.NextEvent
+import com.samosaai.masala.core.layout.LayoutChecker
 import java.time.LocalDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,6 +36,22 @@ class GenerateInputTest {
         assertEquals(listOf(PromptSkill("meeting_notes", "meeting_notes")), request.context.skills)
         assertNull(request.imageBase64)
         assertNull(request.temperature)
+    }
+
+    @Test
+    fun `revise document passes through`() {
+        val base = LayoutChecker.parse(
+            """{"schemaVersion":1,"pages":[{"id":"home","title":"Home","sections":[]}]}"""
+        ).layout!!
+        val req = buildGenerateRequest(
+            apps = emptyList(),
+            layout = null,
+            snapshot = ContextSnapshot(now = now),
+            skills = emptyList(),
+            userText = "add clock",
+            revise = base,
+        )
+        assertEquals(base, req.revise)
     }
 
     @Test

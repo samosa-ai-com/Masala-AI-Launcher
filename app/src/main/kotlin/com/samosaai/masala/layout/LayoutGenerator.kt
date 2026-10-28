@@ -2,6 +2,7 @@ package com.samosaai.masala.layout
 
 import com.samosaai.masala.core.contract.ItemSection
 import com.samosaai.masala.core.contract.LayoutDoc
+import com.samosaai.masala.core.contract.MasalaJson
 import com.samosaai.masala.core.contract.MasalaAction
 import com.samosaai.masala.core.contract.StackSection
 import com.samosaai.masala.core.contract.WidgetSection
@@ -40,6 +41,11 @@ class LayoutGenerator(
         val imageFormat: String = "png",
         /** Non-zero skips the response cache (Regenerate); null reuses identical replies. */
         val temperature: Float? = null,
+        /**
+         * Revise this layout instead of starting fresh: the full document rides in the system
+         * prompt and the model returns the complete revised layout. Null generates from scratch.
+         */
+        val revise: LayoutDoc? = null,
     )
 
     suspend fun generate(request: Request): GenerateResult {
@@ -204,7 +210,11 @@ class LayoutGenerator(
         /** The exact messages a turn sends: system (rules + grounded context), then the user turn. */
         internal fun buildMessages(request: Request): List<ChatMessage> {
             val contextText = PromptContext.build(request.context)
-            val system = SYSTEM_PROMPT + "\n\n" + contextText
+            val reviseBlock = request.revise?.let {
+                "\n\nCurrent layout JSON — revise THIS document and return the complete revised layout:\n" +
+                    MasalaJson.strict.encodeToString(LayoutDoc.serializer(), it)
+            }.orEmpty()
+            val system = SYSTEM_PROMPT + "\n\n" + contextText + reviseBlock
             val user = if (request.imageBase64 == null) {
                 ChatMessage(role = "user", content = JsonPrimitive(request.userText))
             } else {

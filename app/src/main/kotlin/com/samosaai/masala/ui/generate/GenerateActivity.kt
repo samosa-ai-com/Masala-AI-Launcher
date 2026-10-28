@@ -100,6 +100,9 @@ class GenerateActivity : ComponentActivity() {
         var status by remember { mutableStateOf<String?>(null) }
         var appliedLabel by remember { mutableStateOf<String?>(null) }
         val apps by app.launcher.apps.collectAsStateWithLifecycle()
+        val homeLayout by app.layouts.base.collectAsStateWithLifecycle()
+        val previewLayout = (phase as? Phase.Preview)?.layout
+        val reviseBase = previewLayout ?: homeLayout
 
         fun toast(text: String) = Toast.makeText(this@GenerateActivity, text, Toast.LENGTH_SHORT).show()
 
@@ -119,7 +122,7 @@ class GenerateActivity : ComponentActivity() {
             }
         }
 
-        fun run(regenerate: Boolean) {
+        fun run(regenerate: Boolean, revise: LayoutDoc? = null) {
             scope.launch {
                 phase = Phase.Generating
                 status = null
@@ -136,6 +139,7 @@ class GenerateActivity : ComponentActivity() {
                         imageBase64 = imageBase64,
                         imageFormat = imageFormat,
                         temperature = if (regenerate) REGENERATE_TEMPERATURE else null,
+                        revise = revise,
                     )
                     when (val result = LayoutGenerator(caller).generate(request)) {
                         is GenerateResult.Generated -> Phase.Preview(result.layout)
@@ -194,6 +198,11 @@ class GenerateActivity : ComponentActivity() {
                 onClick = { run(regenerate = false) },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(stringResource(R.string.generate_button)) }
+            OutlinedButton(
+                enabled = !generating && prompt.isNotBlank() && reviseBase != null,
+                onClick = { run(regenerate = false, revise = reviseBase) },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(stringResource(R.string.generate_refine)) }
 
             when (val p = phase) {
                 Phase.Idle -> {}

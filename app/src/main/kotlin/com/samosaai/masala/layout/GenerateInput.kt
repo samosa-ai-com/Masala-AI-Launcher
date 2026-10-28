@@ -16,6 +16,7 @@ fun MasalaApp.generateRequest(
     imageBase64: String? = null,
     imageFormat: String = "png",
     temperature: Float? = null,
+    revise: LayoutDoc? = null,
 ): LayoutGenerator.Request = buildGenerateRequest(
     apps = launcher.apps.value,
     layout = layouts.base.value,
@@ -25,6 +26,7 @@ fun MasalaApp.generateRequest(
     imageBase64 = imageBase64,
     imageFormat = imageFormat,
     temperature = temperature,
+    revise = revise,
 )
 
 fun buildGenerateRequest(
@@ -36,6 +38,7 @@ fun buildGenerateRequest(
     imageBase64: String? = null,
     imageFormat: String = "png",
     temperature: Float? = null,
+    revise: LayoutDoc? = null,
 ): LayoutGenerator.Request = LayoutGenerator.Request(
     userText = userText,
     context = PromptContextInput(
@@ -47,4 +50,5 @@ fun buildGenerateRequest(
     imageBase64 = imageBase64,
     imageFormat = imageFormat,
     temperature = temperature,
+    revise = revise,
 )

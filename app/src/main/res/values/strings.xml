@@ -114,6 +114,7 @@
     <string name="generate_prompt_label">Describe the home screen you want</string>
     <string name="generate_prompt_hint">Words, plus optionally a photo: a sketch or screenshot to copy, or a scene to theme from</string>
     <string name="generate_button">Generate</string>
+    <string name="generate_refine">Refine current layout</string>
     <string name="generate_running">Asking the model…</string>
     <string name="generate_pick_photo">Add a photo</string>
     <string name="generate_copy_prompt">Copy prompt</string>

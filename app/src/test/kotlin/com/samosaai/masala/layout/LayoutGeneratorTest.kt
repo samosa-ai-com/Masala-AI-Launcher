@@ -5,6 +5,7 @@ import com.samosaai.masala.core.apps.AppKey
 import com.samosaai.masala.core.apps.ProfileKind
 import com.samosaai.masala.core.apps.Visibility
 import com.samosaai.masala.core.contract.MasalaAction
+import com.samosaai.masala.core.layout.LayoutChecker
 import com.samosaai.masala.llm.ChatMessage
 import com.samosaai.masala.llm.ResponseFormat
 import kotlin.test.Test
@@ -229,6 +230,18 @@ class LayoutGeneratorTest {
         val result = LayoutGenerator(caller).generate(request())
         assertIs<GenerateResult.Generated>(result)
         assertEquals(2, caller.seen.size)
+    }
+
+    @Test
+    fun `revise carries the full current layout`() = runBlocking<Unit> {
+        val revised = validLayout()
+        val caller = FakeCaller(ArrayDeque(listOf(Result.success(revised))))
+        val base = LayoutChecker.parse(validLayout()).layout!!
+        val req = request().copy(userText = "add a dock", revise = base)
+        assertIs<GenerateResult.Generated>(LayoutGenerator(caller).generate(req))
+        val system = caller.seen.single().messages.first().textContent
+        assertTrue(system.contains("revise THIS document"), system.take(300))
+        assertTrue(system.contains("\"id\": \"home\""), system.take(2000))
     }
 
     @Test
