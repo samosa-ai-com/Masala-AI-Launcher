@@ -45,17 +45,9 @@ class LayoutGenerator(
     suspend fun generate(request: Request): GenerateResult {
         val symbols = request.context.symbols
         val schema = LayoutSchema.schema(symbols)
-        val contextText = PromptContext.build(request.context)
-        val system = SYSTEM_PROMPT + "\n\n" + contextText
-        val user = if (request.imageBase64 == null) {
-            ChatMessage(role = "user", content = JsonPrimitive(request.userText))
-        } else {
-            visionUserMessage(request.userText, request.imageBase64, request.imageFormat)
-        }
-        val messages = listOf(
-            ChatMessage(role = "system", content = JsonPrimitive(system)),
-            user,
-        )
+        val messages = buildMessages(request)
+        val system = (messages[0].content as JsonPrimitive).content
+        val user = messages[1]
         val first = try {
             caller.call(messages, ResponseFormat.jsonSchema("layout", schema), maxTokens, request.temperature)
         } catch (e: CancellationException) {
@@ -68,7 +60,14 @@ class LayoutGenerator(
         if (firstResult is GenerateResult.Generated) return firstResult
         val problems = (firstResult as GenerateResult.Rejected).problems
 
-        // Repair keeps the full history: the model still sees the request (and photo).
+        // Repair keeps the full history: the model still sees the request (and photo). A reply
+        // cut off mid-JSON (length stop) says so explicitly, or the model truncates again.
+        val repairNote = if (extractJsonObject(first) == null && '{' in first) {
+            "Your previous reply was cut off mid-JSON. Return the COMPLETE layout object; " +
+                "keep it compact so it fits."
+        } else {
+            "Return the full corrected layout."
+        }
         val repair = messages + listOf(
             ChatMessage(role = "assistant", content = JsonPrimitive(first)),
             ChatMessage(
@@ -76,7 +75,7 @@ class LayoutGenerator(
                 content = JsonPrimitive(
                     "That layout has these problems:\n" +
                         problems.joinToString("\n") { "- $it" } +
-                        "\nReturn the full corrected layout."
+                        "\n$repairNote"
                 )
             ),
         )
@@ -192,9 +191,30 @@ class LayoutGenerator(
         }
     )
 
+    /** The exact messages a turn sends: system (rules + grounded context), then the user turn. */
+    internal fun buildMessages(request: Request): List<ChatMessage> = Companion.buildMessages(request)
+
     companion object {
-        /** Reasoning-heavy model: the model check needs 3000+ or long replies starve. */
-        const val MAX_TOKENS = 3000
+        /**
+         * Reasoning-heavy model: the model check needed 3000+, and real phone layouts run larger
+         * than the test fixtures, so truncations ("unexpected end of input") get headroom.
+         */
+        const val MAX_TOKENS = 8000
+
+        /** The exact messages a turn sends: system (rules + grounded context), then the user turn. */
+        internal fun buildMessages(request: Request): List<ChatMessage> {
+            val contextText = PromptContext.build(request.context)
+            val system = SYSTEM_PROMPT + "\n\n" + contextText
+            val user = if (request.imageBase64 == null) {
+                ChatMessage(role = "user", content = JsonPrimitive(request.userText))
+            } else {
+                visionUserMessage(request.userText, request.imageBase64, request.imageFormat)
+            }
+            return listOf(
+                ChatMessage(role = "system", content = JsonPrimitive(system)),
+                user,
+            )
+        }
 
         internal fun short(e: Exception): String {
             val detail = (e.message ?: "").take(300)

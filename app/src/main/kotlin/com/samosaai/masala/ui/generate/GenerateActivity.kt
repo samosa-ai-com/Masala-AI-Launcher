@@ -174,6 +174,19 @@ class GenerateActivity : ComponentActivity() {
                         Text(stringResource(R.string.generate_photo_remove))
                     }
                 }
+                TextButton(
+                    enabled = !generating && (prompt.isNotBlank() || imageBase64 != null),
+                    onClick = {
+                        val request = app.generateRequest(prompt, imageBase64, imageFormat)
+                        val messages = LayoutGenerator.buildMessages(request)
+                        val userNote = if (imageBase64 == null) "" else "\n[photo attached as data URI]"
+                        val text = messages[0].textContent + "\n\n--- user ---\n" +
+                            request.userText + userNote
+                        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("masala-prompt", text))
+                        toast(getString(R.string.generate_prompt_copied))
+                    },
+                ) { Text(stringResource(R.string.generate_copy_prompt)) }
             }
             Button(
                 enabled = !generating && apps.isNotEmpty() && (prompt.isNotBlank() || imageBase64 != null),

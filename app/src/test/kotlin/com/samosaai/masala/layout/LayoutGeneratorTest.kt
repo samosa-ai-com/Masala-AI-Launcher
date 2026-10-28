@@ -212,6 +212,18 @@ class LayoutGeneratorTest {
     }
 
     @Test
+    fun `cut-off reply names the cutoff and recovers`() = runBlocking<Unit> {
+        val full = validLayout()
+        val cut = full.take(full.length / 2)
+        assertTrue(!cut.trimEnd().endsWith("}"))
+        val caller = FakeCaller(ArrayDeque(listOf(Result.success(cut), Result.success(full))))
+        val result = LayoutGenerator(caller).generate(request())
+        assertIs<GenerateResult.Generated>(result)
+        val repairText = caller.seen[1].messages.last().textContent
+        assertTrue(repairText.contains("cut off"), repairText.take(300))
+    }
+
+    @Test
     fun `blank first reply is repaired, not failed`() = runBlocking<Unit> {
         val caller = FakeCaller(ArrayDeque(listOf(Result.success(""), Result.success(validLayout()))))
         val result = LayoutGenerator(caller).generate(request())

@@ -115,6 +115,8 @@
     <string name="generate_button">Generate</string>
     <string name="generate_running">Asking the model…</string>
     <string name="generate_pick_photo">Add a photo</string>
+    <string name="generate_copy_prompt">Copy prompt</string>
+    <string name="generate_prompt_copied">Prompt copied — paste it anywhere to read it</string>
     <string name="generate_photo_picked">Photo added</string>
     <string name="generate_photo_remove">Remove</string>
     <string name="generate_photo_failed">Could not read that photo</string>
