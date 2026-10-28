@@ -134,6 +134,36 @@
     <string name="settings_export_failed">Couldn’t write the file</string>
 
     <!-- Phase 4 -->
+    <string name="mcp_title">Connected tools (MCP)</string>
+    <string name="mcp_summary">Your own tool servers. Every call asks first</string>
+    <string name="mcp_add">Add a server</string>
+    <string name="mcp_name">Name</string>
+    <string name="mcp_url">Server URL</string>
+    <string name="mcp_token">Access token (optional)</string>
+    <string name="mcp_headers">Extra headers (optional, one “Name: value” per line)</string>
+    <string name="mcp_test">Test connection</string>
+    <string name="mcp_save">Save</string>
+    <string name="mcp_edit">Edit</string>
+    <string name="mcp_remove">Remove</string>
+    <string name="mcp_refresh">Refresh tools</string>
+    <string name="mcp_empty">No servers yet. Tools from a server are offered to Masala as mcp_… tools and ask before every call.</string>
+    <string name="mcp_server_line">%1$s · %2$d tools</string>
+    <string name="mcp_tools_count">%1$d tools</string>
+    <string name="mcp_connected">Connected to %1$s: %2$d tools.</string>
+    <string name="mcp_tools_capped">Only the first %1$d tools are kept.</string>
+    <string name="mcp_removed_while_saving">That server was removed.</string>
+    <string name="mcp_error_name">Give the server a name.</string>
+    <string name="mcp_error_bad_url">That isn’t a valid server address.</string>
+    <string name="mcp_error_cleartext">A token or header over plain http could be read on the way. Use https, or a server on your own network.</string>
+    <string name="mcp_error_bad_header">A header name isn’t valid. Use one “Name: value” per line.</string>
+    <string name="mcp_error_bad_token">The token or a header value has characters that can’t be sent.</string>
+    <string name="mcp_error_auth">The server refused the token or headers (HTTP %1$d).</string>
+    <string name="mcp_error_not_found">Nothing is served at that address.</string>
+    <string name="mcp_error_old_transport">This server uses the older HTTP+SSE transport, which Masala doesn’t support.</string>
+    <string name="mcp_error_not_mcp">The address answered, but not as an MCP server: %1$s</string>
+    <string name="mcp_error_http">The server answered HTTP %1$d: %2$s</string>
+    <string name="mcp_error_rpc">The server reported an error: %1$s</string>
+    <string name="mcp_error_network">Couldn’t reach the server: %1$s</string>
     <string name="wiki_title">Personal wiki</string>
     <string name="wiki_summary">What Masala knows about you. You decide what goes in</string>
     <string name="wiki_new">New page</string>
