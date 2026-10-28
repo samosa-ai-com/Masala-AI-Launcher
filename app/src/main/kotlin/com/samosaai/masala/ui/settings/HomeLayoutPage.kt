@@ -1,7 +1,9 @@
 package com.samosaai.masala.ui.settings
 
 import android.content.Intent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -10,13 +12,27 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -33,7 +49,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.R
@@ -105,15 +123,18 @@ fun HomeLayoutPage(
         ElevatedCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 CardHeading(stringResource(R.string.settings_layout_history))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(enabled = history.canUndo, onClick = { scope.launch { app.layouts.undo() } }, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.settings_undo))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    FilledTonalIconButton(enabled = history.canUndo, onClick = { scope.launch { app.layouts.undo() } }) {
+                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = stringResource(R.string.settings_undo))
                     }
-                    OutlinedButton(enabled = history.canRedo, onClick = { scope.launch { app.layouts.redo() } }, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.settings_redo))
+                    FilledTonalIconButton(enabled = history.canRedo, onClick = { scope.launch { app.layouts.redo() } }) {
+                        Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = stringResource(R.string.settings_redo))
                     }
-                    OutlinedButton(onClick = { scope.launch { status = app.layouts.resetToClassic().firstOrNull()?.toString() } }, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.settings_reset_classic))
+                    OutlinedButton(
+                        onClick = { scope.launch { status = app.layouts.resetToClassic().firstOrNull()?.toString() } },
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    ) {
+                        Text(stringResource(R.string.settings_reset_classic), maxLines = 1)
                     }
                 }
                 // The reset result belongs next to the button that produced it.
@@ -180,6 +201,7 @@ private fun VersionsSection(
     onRefine: (Long) -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
+    var menuFor by remember { mutableStateOf<Long?>(null) }
     var renameTarget by remember { mutableStateOf<LayoutRepository.Version?>(null) }
     var deleteTarget by remember { mutableStateOf<LayoutRepository.Version?>(null) }
     val format = remember { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT) }
@@ -204,40 +226,91 @@ private fun VersionsSection(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     } else {
-        HorizontalDivider()
-        // Bounded height so the outer settings column still scrolls while the list virtualizes.
+        // Dense rows: tapping a row previews it, the overflow holds the rest. Bounded height
+        // so the outer settings column still scrolls while the list virtualizes.
         LazyColumn(
             modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(filtered, key = { it.id }) { v ->
-                ElevatedCard(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(v.label, style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    format.format(Date(v.createdAt)),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            itemsIndexed(filtered, key = { _, v -> v.id }) { i, v ->
+                if (i > 0) HorizontalDivider()
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            role = Role.Button,
+                            onClickLabel = stringResource(R.string.settings_version_preview),
+                        ) { onPreview(v.id) }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
+                        Text(
+                            v.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            format.format(Date(v.createdAt)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (v.current) {
+                        AssistChip(
+                            onClick = {},
+                            label = { Text(stringResource(R.string.settings_version_current)) },
+                            modifier = Modifier.padding(end = 4.dp),
+                        )
+                    }
+                    Box {
+                        IconButton(onClick = { menuFor = v.id }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.menu_options))
+                        }
+                        DropdownMenu(expanded = menuFor == v.id, onDismissRequest = { menuFor = null }) {
+                            if (!v.current) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.settings_version_apply)) },
+                                    leadingIcon = { Icon(Icons.Filled.Check, contentDescription = null) },
+                                    onClick = {
+                                        menuFor = null
+                                        onSelect(v.id)
+                                    },
                                 )
                             }
-                            if (v.current) AssistChip(onClick = {}, label = { Text(stringResource(R.string.settings_version_current)) })
-                        }
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalArrangement = Arrangement.spacedBy(0.dp),
-                        ) {
-                            if (!v.current) TextButton(onClick = { onSelect(v.id) }) { Text(stringResource(R.string.settings_version_apply)) }
-                            TextButton(onClick = { onPreview(v.id) }) { Text(stringResource(R.string.settings_version_preview)) }
-                            TextButton(onClick = { onRefine(v.id) }) { Text(stringResource(R.string.settings_refine_version)) }
-                            TextButton(onClick = { renameTarget = v }) { Text(stringResource(R.string.settings_version_rename)) }
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.settings_version_preview)) },
+                                leadingIcon = { Icon(Icons.Filled.Visibility, contentDescription = null) },
+                                onClick = {
+                                    menuFor = null
+                                    onPreview(v.id)
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.settings_refine_version)) },
+                                leadingIcon = { Icon(Icons.Filled.AutoAwesome, contentDescription = null) },
+                                onClick = {
+                                    menuFor = null
+                                    onRefine(v.id)
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.settings_version_rename)) },
+                                leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                onClick = {
+                                    menuFor = null
+                                    renameTarget = v
+                                },
+                            )
                             if (history.versions.size > 1) {
-                                TextButton(onClick = { deleteTarget = v }) { Text(stringResource(R.string.settings_version_delete)) }
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.settings_version_delete)) },
+                                    leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+                                    onClick = {
+                                        menuFor = null
+                                        deleteTarget = v
+                                    },
+                                )
                             }
                         }
                     }
