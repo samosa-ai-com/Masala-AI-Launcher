@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -137,12 +138,18 @@ class PreviewActivity : ComponentActivity() {
                             onClose()
                         }
                     }) { Text(stringResource(R.string.settings_version_apply)) }
-                    OutlinedButton(onClick = {
-                        startActivity(
-                            Intent(this@PreviewActivity, GenerateActivity::class.java)
-                                .putExtra(GenerateActivity.EXTRA_REVISE_VERSION_ID, versionId)
-                        )
-                    }) { Text(stringResource(R.string.settings_refine_version)) }
+                    // Solid container: a transparent outline button is unreadable over a wallpaper.
+                    OutlinedButton(
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                        ),
+                        onClick = {
+                            startActivity(
+                                Intent(this@PreviewActivity, GenerateActivity::class.java)
+                                    .putExtra(GenerateActivity.EXTRA_REVISE_VERSION_ID, versionId)
+                            )
+                        },
+                    ) { Text(stringResource(R.string.settings_refine_version)) }
                 }
             }
         }

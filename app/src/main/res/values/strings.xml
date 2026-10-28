@@ -26,7 +26,7 @@
     <!-- App menu -->
     <string name="menu_options">Options</string>
     <string name="menu_pin">Pin to home</string>
-    <string name="menu_unpin">Unpin from home</string>
+    <string name="menu_remove_from_home">Remove from home layout</string>
     <string name="menu_rename">Rename</string>
     <string name="menu_app_info">App info</string>
     <string name="menu_uninstall">Uninstall</string>

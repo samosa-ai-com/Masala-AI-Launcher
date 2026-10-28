@@ -3,6 +3,8 @@ package com.samosaai.masala.ui.drawer
 import android.content.pm.ShortcutInfo
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -54,7 +56,7 @@ interface AppMenuActions {
  * The long-press menu (Olauncher §2.11): the app's shortcuts, pin to home, rename, the three
  * visibility levels, app info and uninstall.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AppMenu(
     entry: AppEntry,
@@ -117,7 +119,9 @@ fun AppMenu(
             }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
 
-            MenuButton(stringResource(if (entry.pinned) R.string.menu_unpin else R.string.menu_pin)) {
+            // Pinned means the app is somewhere in the home layout (any grid section), so the
+            // button reads as removing it rather than the vaguer "unpin".
+            MenuButton(stringResource(if (entry.pinned) R.string.menu_remove_from_home else R.string.menu_pin)) {
                 menu.setPinned(entry, !entry.pinned)
             }
             MenuButton(stringResource(R.string.menu_rename)) { menu.rename(entry) }
@@ -127,7 +131,9 @@ fun AppMenu(
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(start = 20.dp, top = 8.dp),
             )
-            Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // A row of three chips ("Drawer and search" is long) overflows narrow sheets and
+            // squeezes labels mid-word, so the levels wrap instead.
+            FlowRow(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Visibility.entries.forEach { level ->
                     FilterChip(
                         selected = entry.visibility == level,
