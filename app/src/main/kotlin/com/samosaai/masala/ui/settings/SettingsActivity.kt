@@ -141,6 +141,11 @@ class SettingsActivity : ComponentActivity() {
                 onClick = onLayout,
             )
 
+            SettingsSectionTitle(stringResource(R.string.settings_ask))
+            SettingsToggleRow(stringResource(R.string.settings_read_replies), settings.readRepliesAloud) { on ->
+                update { it.copy(readRepliesAloud = on) }
+            }
+
             SettingsSectionTitle(stringResource(R.string.settings_drawer))
             SettingsToggleRow(stringResource(R.string.settings_auto_launch), settings.autoLaunch) { on ->
                 update { it.copy(autoLaunch = on) }

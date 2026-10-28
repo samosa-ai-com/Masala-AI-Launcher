@@ -7,6 +7,13 @@ import android.content.Intent
 import com.samosaai.masala.actions.ActionDispatcher
 import com.samosaai.masala.actions.ConfirmationGate
 import com.samosaai.masala.agent.AgentModel
+import com.samosaai.masala.i18n.Language
+import com.samosaai.masala.core.contract.MasalaAction
+import com.samosaai.masala.core.apps.AppSearch
+import com.samosaai.masala.audio.TtsEngine
+import com.samosaai.masala.audio.SttEngine
+import com.samosaai.masala.agent.CommandController
+import com.samosaai.masala.agent.AndroidSpeechInput
 import com.samosaai.masala.agent.AgentPrompt
 import com.samosaai.masala.agent.AgentTools
 import com.samosaai.masala.agent.LlmAgentModel
@@ -103,6 +110,42 @@ class MasalaApp : Application() {
     }
 
     val aiReports by lazy { AiReports(this) }
+
+    private val stt by lazy { SttEngine(this) }
+    private val tts by lazy { TtsEngine(this) }
+
+    /** Reads [text] aloud on the phone's own voice. */
+    suspend fun speakReply(text: String) {
+        tts.speak(text, language = Language.entries.firstOrNull { it.matchesCode(java.util.Locale.getDefault().language) } ?: Language.ENGLISH)
+    }
+
+    fun stopSpeaking() = tts.stop()
+
+    /** Typed and spoken commands: the fast path, persona routing, then the agent. */
+    val commands by lazy {
+        CommandController(
+            scope = scope,
+            // Exact or leading words only: a command that happens to start with "open" must not launch a guess.
+            resolveApp = { label ->
+                val wanted = AppSearch.normalize(label)
+                val entry = launcher.apps.value.let { apps ->
+                    apps.firstOrNull { AppSearch.normalize(it.label) == wanted }
+                        ?: apps.firstOrNull { AppSearch.normalize(it.label).startsWith("$wanted ") }
+                }
+                entry?.let { MasalaAction.LaunchApp(it.key.packageName, it.key.activity, it.key.user) }
+            },
+            names = { launcher.apps.value.map { it.label } + modes.patches.value.map { it.id } + skills.getAllSkills().map { it.title } },
+            run = { dispatcher.dispatch(it, NoScreen) },
+            skills = { skills.getAllSkills() },
+            newAgent = { agent(LlmAgentModel(LlmConfig.default.client(this))) },
+            speech = AndroidSpeechInput(stt),
+        )
+    }
+
+    private object NoScreen : ActionDispatcher.Screen {
+        override fun openDrawer(query: String?) = Unit
+        override fun ask(prompt: String) = Unit
+    }
 
     /** The agent for one skill run: the persona's and skill's instructions, the skill's tools, more steps. */
     private fun skillAgent(skill: MasalaSkill) = agent(

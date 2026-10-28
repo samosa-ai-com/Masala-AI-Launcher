@@ -38,6 +38,19 @@ import com.samosaai.masala.ui.drawer.Drawer
 import com.samosaai.masala.ui.drawer.RenameDialog
 import com.samosaai.masala.actions.ActionDispatcher
 import com.samosaai.masala.core.contract.MasalaAction
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.samosaai.masala.agent.CommandState
+import com.samosaai.masala.ui.home.MicButton
+import com.samosaai.masala.ui.home.ReplyCard
+import com.samosaai.masala.ui.home.rememberMicPress
 import com.samosaai.masala.ui.home.ConfirmationSheet
 import com.samosaai.masala.ui.home.HomeScreen
 import com.samosaai.masala.ui.home.RenderContext
@@ -177,6 +190,18 @@ class HomeActivity : ComponentActivity() {
 
         ConfirmationSheet(app.confirmationGate)
 
+        // The reply card and the mic; the card stays up until closed, and the command runs on if home is left.
+        if (!drawerOpen) {
+            val command by app.commands.state.collectAsStateWithLifecycle()
+            val mic = rememberMicPress(app)
+            Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(), contentAlignment = Alignment.BottomCenter) {
+                ReplyCard(app, settings.readRepliesAloud)
+            }
+            if (command == CommandState.Idle) {
+                Box(Modifier.fillMaxSize().navigationBarsPadding().padding(end = 16.dp, bottom = 120.dp), contentAlignment = Alignment.BottomEnd) { MicButton(mic) }
+            }
+        }
+
         AnimatedVisibility(
             visible = drawerOpen,
             enter = slideInVertically { it / 4 } + fadeIn(),
@@ -248,9 +273,10 @@ class HomeActivity : ComponentActivity() {
         }
     }
 
-    /** `MasalaAction.AskMasala`. A stub until the agent arrives in Phase 4. */
+    /** `MasalaAction.AskMasala`; an empty prompt (the Ask gesture) opens the reply card for typing. */
     private fun askMasala(prompt: String) {
-        toast(getString(R.string.drawer_ask_stub))
+        masala.commands.ask(prompt)
+        drawerOpen = false
     }
 
     private fun openSettings() {

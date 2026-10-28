@@ -120,3 +120,22 @@ class NameCorrectorTest {
         assertEquals("anything", NameCorrector(emptyList()).correct("anything"))
     }
 }
+
+class SkillRouterTest {
+    private val persona = com.samosaai.masala.core.contract.Persona("You are a chef.")
+    private val chef = MasalaSkill(id = "chef", instructions = "i", keywords = listOf("cook", "recipe"), persona = persona)
+    private val noKeywords = MasalaSkill(id = "any", instructions = "i", persona = persona)
+    private val noPersona = MasalaSkill(id = "tool", instructions = "i", keywords = listOf("cook"))
+
+    @Test fun picksThePersonaWhoseKeywordMatches() {
+        assertEquals(chef, SkillRouter.route("what can I cook with eggs", listOf(noKeywords, noPersona, chef)))
+    }
+
+    @Test fun keywordsMatchWholeWordsOnly() {
+        assertNull(SkillRouter.route("I need a cookie", listOf(chef)))
+    }
+
+    @Test fun skillsWithoutKeywordsOrPersonaNeverRoute() {
+        assertNull(SkillRouter.route("anything", listOf(noKeywords, noPersona)))
+    }
+}

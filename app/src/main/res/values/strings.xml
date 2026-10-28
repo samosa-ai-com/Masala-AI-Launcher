@@ -134,6 +134,15 @@
     <string name="settings_export_failed">Couldn’t write the file</string>
 
     <!-- Phase 4 -->
+    <string name="settings_ask">Ask Masala</string>
+    <string name="settings_read_replies">Read replies aloud</string>
+    <string name="command_hint">Ask or tell Masala</string>
+    <string name="command_mic">Hold to talk</string>
+    <string name="command_listening">Listening…</string>
+    <string name="command_thinking">Thinking…</string>
+    <string name="command_read_aloud">Read aloud</string>
+    <string name="command_close">Close</string>
+    <string name="command_continue_in">Continue in %1$s</string>
     <string name="skill_missing">That skill isn’t available</string>
     <string name="skill_new_chat">New chat</string>
     <string name="skill_input_hint">Message</string>

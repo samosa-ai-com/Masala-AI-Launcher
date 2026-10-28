@@ -159,6 +159,20 @@
             </intent-filter>
         </receiver>
 
+        <!-- The assist gesture, once Masala is the assistant app (Phase 4) -->
+        <activity
+            android:name=".agent.AssistActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:launchMode="singleInstance"
+            android:theme="@style/Theme.Masala.Translucent"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <!-- A skill's conversation (Phase 4) -->
         <activity
             android:name=".ui.skills.SkillSheetActivity"
