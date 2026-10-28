@@ -137,4 +137,14 @@ class ToolsTest {
         assertTrue(files(FileScope.SHARED_STORAGE).resolveForRead("/sdcard/a.pdf") is ToolFiles.ResolveResult.Error)
         assertEquals(ToolFiles.ALL_FILES_ACCESS, Capability.ALL_FILES.marker)
     }
+
+    @Test
+    fun `chat request carries max tokens for layout calls`() {
+        val json = Json { explicitNulls = false; encodeDefaults = false }
+        val encoded = json.encodeToString(
+            ChatRequest("m", emptyList(), responseFormat = ResponseFormat.JSON_OBJECT, maxTokens = 3000)
+        )
+        assertTrue(encoded.contains("\"max_tokens\":3000"), encoded)
+        assertTrue(encoded.contains("\"response_format\""), encoded)
+    }
 }

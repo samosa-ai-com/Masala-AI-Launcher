@@ -17,6 +17,7 @@ reference/reversed/*/analysis-output/
 .gradle/
 .kotlin/
 build/
+bin/
 local.properties
 .env
 .idea/
