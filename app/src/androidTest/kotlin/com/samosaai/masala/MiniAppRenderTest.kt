@@ -57,12 +57,39 @@ class MiniAppRenderTest {
         // Poll until the page's own script has run: proves JS executed in the host.
         val deadline = System.currentTimeMillis() + 20_000
         while (System.currentTimeMillis() < deadline) {
-            if (MiniAppConsole.errors(id).any { it.contains("booted score=42 best=7") }) break
+            if (MiniAppConsole.logs(id).any { it.contains("booted score=42 best=7") }) break
             Thread.sleep(250)
         }
-        val log = MiniAppConsole.errors(id)
+        val log = MiniAppConsole.logs(id)
         assertTrue("page never booted; console=$log", log.any { it.contains("booted score=42 best=7") })
         assertTrue("console error not captured; console=$log", log.any { it.contains("deliberate test error") })
+        // The repair turn gets the error, not the app's own console.log.
+        assertEquals(listOf(true), MiniAppConsole.errors(id).map { it.contains("deliberate test error") }.distinct())
+    }
+
+    @Test
+    fun anInPageAnchorKeepsThePageAndItsState() {
+        val id = "testanchor"
+        MiniAppConsole.clear(id)
+        val html = """
+            <!doctype html><html><body><a id="a" href="#rules">Rules</a><div id="rules">Rules</div>
+            <script>
+              console.log('loaded');
+              window.marker = 'kept';
+              setTimeout(function () {
+                document.getElementById('a').click();
+                setTimeout(function () { console.log('after ' + location.hash + ' ' + window.marker); }, 500);
+              }, 300);
+            </script></body></html>
+        """.trimIndent()
+        compose.setContent { MasalaTheme(LauncherSettings()) { MiniAppView(id, html, networkAllowed = false) } }
+        compose.waitForIdle()
+
+        val deadline = System.currentTimeMillis() + 20_000
+        while (System.currentTimeMillis() < deadline && MiniAppConsole.logs(id).none { "after" in it }) Thread.sleep(250)
+        val log = MiniAppConsole.logs(id)
+        assertTrue("anchor lost the page's state; console=$log", log.any { "after #rules kept" in it })
+        assertEquals("page reloaded; console=$log", 1, log.count { it.startsWith("LOG: loaded") })
     }
 
     @Test

@@ -155,6 +155,15 @@ class SkillRouterTest {
         // A persona or a skill that doesn't make an app never takes a request this way.
         assertNull(SkillRouter.handoff("what can I cook with eggs", listOf(chef, maker)))
         assertNull(SkillRouter.handoff("make me a game", listOf(noPersona.copy(keywords = listOf("game")))))
+        // A keyword alone isn't a request to build something.
+        assertNull(SkillRouter.handoff("snake bite treatment", listOf(maker)))
+        assertNull(SkillRouter.handoff("what are the rules of this game", listOf(maker)))
+        assertEquals(maker, SkillRouter.handoff("I want to play snake", listOf(maker)))
+    }
+
+    @Test fun blankTextNeverRoutes() {
+        assertNull(SkillRouter.route("  ", listOf(chef)))
+        assertNull(SkillRouter.handoff("", listOf(chef)))
     }
 
     @Test fun requestsToActAreCommandsAdviceIsNot() {

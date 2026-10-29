@@ -38,7 +38,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -85,12 +84,10 @@ fun MiniAppView(
     onWebView: (WebView?) -> Unit = {},
 ) {
     var webView by remember(appId) { mutableStateOf<WebView?>(null) }
-    DisposableEffect(appId, html) {
-        onDispose { webView?.loadUrl("about:blank") }
-    }
-    // The network policy is fixed when the page loads (its CSP header and start script), so the
-    // switch gives the app a fresh WebView. Its localStorage survives; what it held in memory doesn't.
-    key(networkAllowed) {
+    // The document and network policy are fixed when the page loads (its CSP header and start
+    // script), so a new HTML or the switch gives the app a fresh WebView. Its localStorage survives;
+    // what it held in memory doesn't. The old one is destroyed in onRelease.
+    key(appId, html, networkAllowed) {
         AndroidView(
             factory = { ctx ->
                 WebView(ctx).apply {
@@ -117,10 +114,11 @@ fun MiniAppView(
 
 /**
  * With network off, what a CSP has to stop: `shouldInterceptRequest` never sees WebSocket
- * connections (from the page or its workers). Everything else stays allowed so the app runs as written.
+ * connections (from the page or its workers), and `shouldOverrideUrlLoading` never sees a form POST.
+ * Everything else stays allowed so the app runs as written.
  */
 private const val OFFLINE_CSP =
-    "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' data: blob:"
+    "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' data: blob:; form-action 'self'"
 
 /**
  * With network off, WebRTC goes too: a peer connection reaches STUN/TURN servers outside every
@@ -129,17 +127,20 @@ private const val OFFLINE_CSP =
  * So each window this runs in also strips its child frames: from a capture `load` listener on its
  * document (an `about:blank` iframe fires `load` while it is being inserted, before any page script
  * can reach it), from the frame getters, and after every DOM call that can insert a frame.
- * `MiniAppNetworkTest` tries each way around this.
+ * The builtins it calls later are captured first, so an app that replaces `forEach`, `apply` or
+ * `defineProperty` can't switch it off. `MiniAppNetworkTest` tries each way around this.
  */
 private const val NO_WEBRTC = """
 (function () {
   var NAMES = ['RTCPeerConnection', 'webkitRTCPeerConnection'];
+  var define = Object.defineProperty, describe = Object.getOwnPropertyDescriptor, call = Reflect.apply;
+  function each(list, f) { for (var i = 0; i < list.length; i++) f(list[i]); }
   function strip(w) {
     try {
       if (!w || w.__masalaNoRtc) return;
-      Object.defineProperty(w, '__masalaNoRtc', { value: true });
-      NAMES.forEach(function (n) {
-        try { Object.defineProperty(w, n, { value: undefined, writable: false, configurable: false }); } catch (e) {}
+      define(w, '__masalaNoRtc', { value: true });
+      each(NAMES, function (n) {
+        try { define(w, n, { value: undefined, writable: false, configurable: false }); } catch (e) {}
       });
       guard(w);
     } catch (e) {
@@ -156,21 +157,21 @@ private const val NO_WEBRTC = """
     sweep(t);
   }
   function wrap(proto, name, getter) {
-    var d = proto && Object.getOwnPropertyDescriptor(proto, name);
+    var d = proto && describe(proto, name);
     if (!d) return;
     if (typeof d.value === 'function') {
       var f = d.value;
-      d.value = function () { try { return f.apply(this, arguments); } finally { all(); } };
+      d.value = function () { try { return call(f, this, arguments); } finally { all(); } };
     } else if (getter && d.get) {
       var g = d.get;
-      d.get = function () { var r = g.call(this); all(); return r; };
+      d.get = function () { var r = call(g, this, []); all(); return r; };
     } else if (d.set) {
       var s = d.set;
-      d.set = function (v) { try { s.call(this, v); } finally { all(); } };
+      d.set = function (v) { try { call(s, this, [v]); } finally { all(); } };
     } else {
       return;
     }
-    Object.defineProperty(proto, name, d);
+    define(proto, name, d);
   }
   function guard(w) {
     // On the document: a `load` event's path stops there and never reaches the window.
@@ -181,10 +182,10 @@ private const val NO_WEBRTC = """
     var inserts = ['appendChild', 'insertBefore', 'replaceChild', 'append', 'prepend', 'before', 'after',
       'replaceWith', 'replaceChildren', 'insertAdjacentElement', 'insertAdjacentHTML', 'innerHTML', 'outerHTML',
       'setHTMLUnsafe', 'write', 'writeln', 'execCommand', 'insertNode', 'surroundContents'];
-    [w.Node, w.Element, w.Document, w.DocumentFragment, w.ShadowRoot, w.CharacterData, w.DocumentType, w.Range]
-      .forEach(function (C) { if (C) inserts.forEach(function (n) { wrap(C.prototype, n, false); }); });
-    [w.HTMLIFrameElement, w.HTMLFrameElement, w.HTMLObjectElement, w.HTMLEmbedElement].forEach(function (C) {
-      if (C) ['contentWindow', 'contentDocument', 'getSVGDocument'].forEach(function (n) { wrap(C.prototype, n, true); });
+    each([w.Node, w.Element, w.Document, w.DocumentFragment, w.ShadowRoot, w.CharacterData, w.DocumentType, w.Range],
+      function (C) { if (C) each(inserts, function (n) { wrap(C.prototype, n, false); }); });
+    each([w.HTMLIFrameElement, w.HTMLFrameElement, w.HTMLObjectElement, w.HTMLEmbedElement], function (C) {
+      if (C) each(['contentWindow', 'contentDocument', 'getSVGDocument'], function (n) { wrap(C.prototype, n, true); });
     });
   }
   strip(window);
@@ -213,8 +214,10 @@ internal fun hostMiniApp(
             // Every frame: this WebView only ever shows this one app.
             WebViewCompat.addDocumentStartJavaScript(wv, NO_WEBRTC, setOf("*"))
         } else {
-            // Older WebView: the main frame only, before any of the app's own script.
-            document = "<script>$NO_WEBRTC</script>$html"
+            // Older WebView: the main frame only, before any of the app's own script. After the
+            // doctype, or the page would render in quirks mode.
+            val doctype = Regex("^\\s*<!doctype[^>]*>", RegexOption.IGNORE_CASE).find(html)?.value.orEmpty()
+            document = "$doctype<script>$NO_WEBRTC</script>${html.substring(doctype.length)}"
         }
     }
     val htmlBytes = document.toByteArray(Charsets.UTF_8)
@@ -239,13 +242,10 @@ internal fun hostMiniApp(
 
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             val url = request.url.toString()
-            // Stay inside the mini-app: same-origin navigation is the app's own routing.
-            if (url.startsWith(origin)) {
-                view.loadUrl(url)
-                return true
-            }
+            // Stay inside the mini-app: same-origin navigation is the app's own routing, and the
+            // WebView handles it itself (an in-page anchor keeps the page and its state).
             // Leaving the app is never allowed, network on or off.
-            return true
+            return !url.startsWith(origin)
         }
 
         override fun onPageFinished(view: WebView, url: String) = onPageFinished()
@@ -275,7 +275,11 @@ object MiniAppConsole {
         Log.d("MiniApp", "$appId console: $line")
     }
 
-    fun errors(appId: String): List<String> = synchronized(lock) { logs[appId]?.toList().orEmpty() }
+    /** Every line the app logged, `console.log` included. */
+    fun logs(appId: String): List<String> = synchronized(lock) { logs[appId]?.toList().orEmpty() }
+
+    /** Only the lines worth a repair turn: errors and warnings, not the app's own `console.log`. */
+    fun errors(appId: String): List<String> = logs(appId).filter { it.startsWith("ERROR") || it.startsWith("WARNING") }
 
     fun clear(appId: String) {
         synchronized(lock) {

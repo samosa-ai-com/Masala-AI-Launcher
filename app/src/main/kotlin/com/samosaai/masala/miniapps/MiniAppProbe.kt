@@ -23,7 +23,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 class MiniAppProbe(private val context: Context) {
     private val mutex = Mutex()
 
-    /** Console error lines from loading [html], or null when it couldn't be checked. */
+    /** Console error lines from loading [html], or null when it couldn't be checked and logged nothing. */
     suspend fun errors(html: String, settleMillis: Long = SETTLE_MILLIS): List<String>? = mutex.withLock {
         withContext(Dispatchers.Main) {
             val lines = mutableListOf<String>()
@@ -35,9 +35,15 @@ class MiniAppProbe(private val context: Context) {
                 hostMiniApp(webView, PROBE_ID, html, networkAllowed = false, onPageFinished = { finished.complete(Unit) }) { line ->
                     if (line.startsWith("ERROR")) lines += line.take(500)
                 }
-                withTimeoutOrNull(LOAD_TIMEOUT_MILLIS) { finished.await() } ?: return@withContext null
-                delay(settleMillis)
-                lines.distinct().take(MAX_LINES)
+                val loaded = withTimeoutOrNull(LOAD_TIMEOUT_MILLIS) { finished.await() } != null
+                if (loaded) delay(settleMillis)
+                val errors = lines.distinct().take(MAX_LINES)
+                // A page that never finished loading usually hangs; what it logged before that still helps.
+                when {
+                    loaded -> errors
+                    errors.isNotEmpty() -> errors + "ERROR: The page didn't finish loading within ${LOAD_TIMEOUT_MILLIS / 1000} s."
+                    else -> null
+                }
             } finally {
                 webView.stopLoading()
                 webView.destroy()
