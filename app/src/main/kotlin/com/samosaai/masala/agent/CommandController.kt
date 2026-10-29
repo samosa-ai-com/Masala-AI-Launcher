@@ -100,6 +100,7 @@ class CommandController(
                 is ActionDispatcher.Outcome.Done -> CommandState.Reply(prompt, outcome.message?.takeIf { it.isNotBlank() } ?: "Done.", spoken = spoken)
                 ActionDispatcher.Outcome.Declined -> CommandState.Reply(prompt, "Okay, I didn't do it.", spoken = spoken)
                 is ActionDispatcher.Outcome.Failed -> CommandState.Error(prompt, outcome.message)
+                is ActionDispatcher.Outcome.NeedsCapability -> CommandState.Error(prompt, outcome.reason, outcome.marker)
             }
             return
         }
