@@ -61,9 +61,11 @@ import com.samosaai.masala.ui.home.SymbolDisc
 import com.samosaai.masala.ui.home.SymbolIcons
 import com.samosaai.masala.ui.theme.MasalaTheme
 import com.samosaai.masala.ui.wiki.ProposalCards
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -101,22 +103,30 @@ class SkillSheetActivity : ComponentActivity() {
         val scope = rememberCoroutineScope()
         val context = LocalContext.current
         var run by remember { mutableStateOf<StateFlow<SkillRunState>?>(null) }
+        // Survives rotation and process death, so the intent's prompt doesn't start a second run.
+        var runId by rememberSaveable { mutableStateOf<Long?>(null) }
         var loaded by remember { mutableStateOf(false) }
         var text by rememberSaveable { mutableStateOf("") }
         val attachments = remember { mutableStateListOf<Attachment>() }
         var reporting by remember { mutableStateOf<String?>(null) }
         var saving by remember { mutableStateOf<SkillRunEvent.Result?>(null) }
 
-        suspend fun begin(message: com.samosaai.masala.llm.ChatMessage) {
-            val id = app.skillRunner.start(skill.id, message) ?: return
+        suspend fun open(id: Long) {
             run = app.skillRunner.open(id)
+            runId = id.takeIf { run != null }
+        }
+
+        suspend fun begin(message: com.samosaai.masala.llm.ChatMessage) {
+            open(app.skillRunner.start(skill.id, message) ?: return)
         }
 
         fun send(prompt: String) {
-            val message = SkillMessage.build(prompt, attachments.toList(), SkillInputs::photoBase64)
+            val picked = attachments.toList()
             text = ""
             attachments.clear()
             scope.launch {
+                // Decoding and scaling a photo is too slow for the main thread.
+                val message = withContext(Dispatchers.IO) { SkillMessage.build(prompt, picked, SkillInputs::photoBase64) }
                 val current = run?.value
                 if (current == null) begin(message) else app.skillRunner.send(current.runId, message)
             }
@@ -127,10 +137,12 @@ class SkillSheetActivity : ComponentActivity() {
         val grant = rememberCapabilityGrant { granted -> if (granted) send(retryPrompt) }
 
         LaunchedEffect(Unit) {
+            val saved = runId
             when {
-                initialRunId != null -> run = app.skillRunner.open(initialRunId)
+                saved != null -> open(saved)
+                initialRunId != null -> open(initialRunId)
                 initialPrompt != null -> begin(SkillMessage.build(initialPrompt, emptyList(), SkillInputs::photoBase64))
-                else -> app.database.skillRuns().latestFor(skill.id).first()?.let { run = app.skillRunner.open(it.id) }
+                else -> app.database.skillRuns().latestFor(skill.id).first()?.let { open(it.id) }
             }
             loaded = true
         }
@@ -141,8 +153,9 @@ class SkillSheetActivity : ComponentActivity() {
 
         val pickDir = File(app.tools.fileAccess.outputDir(), "picked")
         fun picked(kind: SkillInput): (android.net.Uri?) -> Unit = { uri ->
-            if (uri != null) {
-                val attachment = SkillInputs.copyPicked(context, uri, kind, pickDir)
+            if (uri != null) scope.launch {
+                // A picked video can be large; copy it off the main thread.
+                val attachment = withContext(Dispatchers.IO) { SkillInputs.copyPicked(context, uri, kind, pickDir) }
                 if (attachment != null) attachments.add(attachment) else Toast.makeText(context, R.string.input_pick_failed, Toast.LENGTH_SHORT).show()
             }
         }
@@ -166,7 +179,7 @@ class SkillSheetActivity : ComponentActivity() {
                     Text(skill.title.ifBlank { skill.id }, style = MaterialTheme.typography.titleLarge)
                     skill.persona?.disclaimer?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
-                if (run != null) TextButton(onClick = { run = null; text = ""; attachments.clear() }) { Text(stringResource(R.string.skill_new_chat)) }
+                if (run != null) TextButton(onClick = { run = null; runId = null; text = ""; attachments.clear() }) { Text(stringResource(R.string.skill_new_chat)) }
             }
 
             LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp), state = listState, verticalArrangement = Arrangement.spacedBy(4.dp)) {
