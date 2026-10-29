@@ -336,7 +336,7 @@ class SettingsActivity : ComponentActivity() {
                         confirmButton = {
                             TextButton(onClick = {
                                 confirmDelete = false
-                                scope.launch { masala.miniApps.delete(row.id) }
+                                scope.launch { masala.deleteMiniApp(row.id) }
                             }) { Text(stringResource(R.string.settings_version_delete)) }
                         },
                         dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_back)) } },

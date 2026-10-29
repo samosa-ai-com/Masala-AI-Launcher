@@ -18,7 +18,8 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Typed and spoken commands (plan Phase 4 M3). Simple ones (timers, alarms, open an app) skip the
- * model; a request for a persona's advice gets a "Continue in …" chip; the rest goes to a
+ * model; a request for an app-making skill ("make me a snake game") opens its sheet; a request for a
+ * persona's advice gets a "Continue in …" chip; the rest goes to a
  * [MasalaAgent] with every tool (a persona that matches is offered next to its answer). App-scoped, so a command goes on if home is left, and the agent
  * keeps the last few exchanges for follow-ups.
  */
@@ -99,12 +100,12 @@ class CommandController(
 
     private suspend fun handle(prompt: String, spoken: Boolean) {
         CommandFastPath.match(prompt, resolveApp)?.let { action ->
-            _state.value = when (val outcome = run(action)) {
-                is ActionDispatcher.Outcome.Done -> CommandState.Reply(prompt, outcome.message?.takeIf { it.isNotBlank() } ?: "Done.", spoken = spoken)
-                ActionDispatcher.Outcome.Declined -> CommandState.Reply(prompt, "Okay, I didn't do it.", spoken = spoken)
-                is ActionDispatcher.Outcome.Failed -> CommandState.Error(prompt, outcome.message)
-                is ActionDispatcher.Outcome.NeedsCapability -> CommandState.Error(prompt, outcome.reason, outcome.marker)
-            }
+            _state.value = stateFor(prompt, run(action), spoken)
+            return
+        }
+        // No model call from home: the skill's own run builds the app, with its few tools.
+        SkillRouter.handoff(prompt, skills())?.let { skill ->
+            _state.value = stateFor(prompt, run(MasalaAction.RunSkill(skill.id, prompt)), spoken, "Opened ${skill.title.ifBlank { skill.id }}.")
             return
         }
         val chip = SkillRouter.route(prompt, skills())?.let { SkillChip(it.id, it.title.ifBlank { it.id }) }
@@ -134,5 +135,12 @@ class CommandController(
         } finally {
             history = agent.history
         }
+    }
+
+    private fun stateFor(prompt: String, outcome: ActionDispatcher.Outcome, spoken: Boolean, done: String? = null): CommandState = when (outcome) {
+        is ActionDispatcher.Outcome.Done -> CommandState.Reply(prompt, done ?: outcome.message?.takeIf { it.isNotBlank() } ?: "Done.", spoken = spoken)
+        ActionDispatcher.Outcome.Declined -> CommandState.Reply(prompt, "Okay, I didn't do it.", spoken = spoken)
+        is ActionDispatcher.Outcome.Failed -> CommandState.Error(prompt, outcome.message)
+        is ActionDispatcher.Outcome.NeedsCapability -> CommandState.Error(prompt, outcome.reason, outcome.marker)
     }
 }

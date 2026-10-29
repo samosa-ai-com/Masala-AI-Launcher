@@ -25,7 +25,6 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -156,10 +155,14 @@ class SkillRunner(
             is AgentEvent.Text -> add(SkillRunEvent.Message(SkillRunEvent.Message.Role.ASSISTANT, event.text))
             is AgentEvent.ToolCall -> add(SkillRunEvent.ToolStep(event.name, null))
             is AgentEvent.ToolDone -> run.state.update { it.copy(events = it.events.settleStep(event.name, event.result !is ToolResult.Failure)) }
-            is AgentEvent.Files -> for (path in event.paths) {
-                val title = File(path).name
-                artifacts.insert(SkillArtifactEntity(runId = runId, kind = kindOf(path), title = title, ref = path, createdAt = clock()))
-                add(SkillRunEvent.Result(kindOf(path), title, path))
+            is AgentEvent.Results -> for (item in event.items) {
+                // The same result again (a mini app updated after its create) replaces the earlier card.
+                artifacts.deleteSame(runId, item.kind, item.ref)
+                artifacts.insert(SkillArtifactEntity(runId = runId, kind = item.kind, title = item.title, ref = item.ref, createdAt = clock()))
+                val result = SkillRunEvent.Result(item.kind, item.title, item.ref)
+                run.state.update { s ->
+                    s.copy(events = s.events.withoutProgress().filterNot { it is SkillRunEvent.Result && it.kind == item.kind && it.ref == item.ref } + result)
+                }
             }
             is AgentEvent.Done -> {
                 add(SkillRunEvent.Message(SkillRunEvent.Message.Role.ASSISTANT, event.text))
@@ -228,12 +231,6 @@ class SkillRunner(
             val parts = m.content as? JsonArray ?: return@map m
             val text = parts.filterNot { ((it as? JsonObject)?.get("type") as? JsonPrimitive)?.content == "image_url" }
             if (text.size == parts.size) m else m.copy(content = JsonArray(text))
-        }
-
-        private fun kindOf(path: String) = when (File(path).extension.lowercase()) {
-            "mp3", "m4a", "wav", "ogg", "flac", "aac" -> "audio"
-            "mp4", "mkv", "webm", "mov", "3gp" -> "video"
-            else -> "file"
         }
 
         private fun List<SkillRunEvent>.withoutProgress() = filterNot { it is SkillRunEvent.Progress }

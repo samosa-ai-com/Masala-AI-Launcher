@@ -4,9 +4,12 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.samosaai.masala.miniapps.MiniAppConsole
+import com.samosaai.masala.miniapps.MiniAppProbe
 import com.samosaai.masala.miniapps.MiniAppView
 import com.samosaai.masala.ui.theme.MasalaTheme
 import com.samosaai.masala.data.LauncherSettings
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -54,11 +57,49 @@ class MiniAppRenderTest {
         // Poll until the page's own script has run: proves JS executed in the host.
         val deadline = System.currentTimeMillis() + 20_000
         while (System.currentTimeMillis() < deadline) {
-            if (MiniAppConsole.errors(id).any { it.contains("booted score=42 best=7") }) break
+            if (MiniAppConsole.logs(id).any { it.contains("booted score=42 best=7") }) break
             Thread.sleep(250)
         }
-        val log = MiniAppConsole.errors(id)
+        val log = MiniAppConsole.logs(id)
         assertTrue("page never booted; console=$log", log.any { it.contains("booted score=42 best=7") })
         assertTrue("console error not captured; console=$log", log.any { it.contains("deliberate test error") })
+        // The repair turn gets the error, not the app's own console.log.
+        assertEquals(listOf(true), MiniAppConsole.errors(id).map { it.contains("deliberate test error") }.distinct())
+    }
+
+    @Test
+    fun anInPageAnchorKeepsThePageAndItsState() {
+        val id = "testanchor"
+        MiniAppConsole.clear(id)
+        val html = """
+            <!doctype html><html><body><a id="a" href="#rules">Rules</a><div id="rules">Rules</div>
+            <script>
+              console.log('loaded');
+              window.marker = 'kept';
+              setTimeout(function () {
+                document.getElementById('a').click();
+                setTimeout(function () { console.log('after ' + location.hash + ' ' + window.marker); }, 500);
+              }, 300);
+            </script></body></html>
+        """.trimIndent()
+        compose.setContent { MasalaTheme(LauncherSettings()) { MiniAppView(id, html, networkAllowed = false) } }
+        compose.waitForIdle()
+
+        val deadline = System.currentTimeMillis() + 20_000
+        while (System.currentTimeMillis() < deadline && MiniAppConsole.logs(id).none { "after" in it }) Thread.sleep(250)
+        val log = MiniAppConsole.logs(id)
+        assertTrue("anchor lost the page's state; console=$log", log.any { "after #rules kept" in it })
+        assertEquals("page reloaded; console=$log", 1, log.count { it.startsWith("LOG: loaded") })
+    }
+
+    @Test
+    fun probeReportsLoadErrorsAndNothingForACleanApp() = runBlocking {
+        val probe = MiniAppProbe(app)
+        val broken = "<html><body><script>var a = 1; missingFunction(a);</script></body></html>"
+        val errors = probe.errors(broken)
+        assertTrue("expected a ReferenceError; got $errors", errors.orEmpty().any { "missingFunction" in it })
+        val timer = "<html><body><script>setTimeout(function () { null.x; }, 200);</script></body></html>"
+        assertTrue("timer error missed; got ${probe.errors(timer)}", probe.errors(timer).orEmpty().isNotEmpty())
+        assertEquals(emptyList<String>(), probe.errors(gameHtml.replace("console.error('deliberate test error');", "")))
     }
 }

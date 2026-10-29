@@ -84,7 +84,7 @@ class MasalaAgent(
                     val result = tools.run(name, args)
                     messages = messages + toolMessage(call.id, result)
                     emit(AgentEvent.ToolDone(name, result))
-                    if (result is ToolResult.Success && result.files.isNotEmpty()) emit(AgentEvent.Files(result.files))
+                    if (result is ToolResult.Success) result.results().takeIf { it.isNotEmpty() }?.let { emit(AgentEvent.Results(it)) }
                     if (result is ToolResult.NeedsCapability) {
                         messages = AgentHistory.repairOrphanedToolCalls(messages)
                         return@flow emit(AgentEvent.NeedsCapability(result.capability, result.reason))

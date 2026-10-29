@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.R
@@ -38,7 +39,8 @@ fun ConfirmationSheet(gate: ConfirmationGate) {
                 stringResource(if (r.destructive) R.string.confirm_destructive_title else R.string.confirm_title),
                 style = MaterialTheme.typography.titleLarge,
             )
-            Text(r.summary, style = MaterialTheme.typography.bodyLarge)
+            // Capped as well, so Allow is always reachable whatever a caller puts in the summary.
+            Text(r.summary, style = MaterialTheme.typography.bodyLarge, maxLines = 8, overflow = TextOverflow.Ellipsis)
             Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(onClick = { gate.answer(false) }, Modifier.weight(1f).heightIn(min = 48.dp)) {
                     Text(stringResource(R.string.confirm_cancel))

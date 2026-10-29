@@ -231,6 +231,14 @@ class LayoutRepository(
         return insert(item)
     }
 
+    /** Takes every home item that opens mini-app [id] off home, so deleting the app leaves no dead pin. */
+    suspend fun unpinMiniApp(id: String): List<LayoutChecker.Problem> {
+        val doc = history.current?.layout ?: return emptyList()
+        val label = doc.pages.flatMap { it.sections }.filterIsInstance<ItemSection>().flatMap { it.items }
+            .firstOrNull { (it.action as? MasalaAction.OpenMiniApp)?.id == id }?.label ?: return emptyList()
+        return apply("Unpin $label", withoutMiniApp(doc, id))
+    }
+
     /** Whether the mini-app already has an item on home, so pinning twice can't duplicate its id. */
     fun isMiniAppPinned(id: String): Boolean =
         base.value?.let { doc -> favorites(doc).any { (it.action as? MasalaAction.OpenMiniApp)?.id == id } } ?: false
@@ -302,8 +310,19 @@ class LayoutRepository(
         }.onFailure { Log.w(TAG, "Can't write layout cache", it) }
     }
 
-    private companion object {
-        const val TAG = "LayoutRepository"
-        const val KEY_CURRENT = "current"
+    internal companion object {
+        private const val TAG = "LayoutRepository"
+        private const val KEY_CURRENT = "current"
+
+        /** [doc] without the items that open mini-app [id], in any section, the dock included. */
+        fun withoutMiniApp(doc: LayoutDoc, id: String): LayoutDoc = doc.copy(
+            pages = doc.pages.map { page ->
+                page.copy(
+                    sections = page.sections.map { s ->
+                        if (s is ItemSection) s.withItems(s.items.filterNot { (it.action as? MasalaAction.OpenMiniApp)?.id == id }) else s
+                    },
+                )
+            },
+        )
     }
 }

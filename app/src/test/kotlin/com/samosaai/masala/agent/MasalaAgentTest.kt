@@ -2,6 +2,7 @@ package com.samosaai.masala.agent
 
 import com.samosaai.masala.core.agent.ToolInfo
 import com.samosaai.masala.core.agent.ToolScope
+import com.samosaai.masala.core.tool.Produced
 import com.samosaai.masala.core.tool.ToolDefinition
 import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.core.tool.ToolSensitivity
@@ -66,6 +67,16 @@ class MasalaAgentTest {
         assertEquals(listOf("user", "assistant", "tool", "assistant"), a.history.map { it.role })
         assertEquals("get_time ok", a.history[2].textContent)
         assertEquals("system", model.requests[1].first().textContent)
+    }
+
+    @Test fun filesAndTypedResultsAreReportedTogether() = runBlocking {
+        val app = Produced("mini_app", "Snake", "ab12cd34")
+        val runner = AgentToolRunner { _, _ -> ToolResult.Success("made", listOf("/out/song.mp3"), listOf(app)) }
+        val events = agent(script(assistant("", call("1", "get_time")), assistant("Done")), runner = runner).run(user("x")).toList()
+        assertEquals(
+            AgentEvent.Results(listOf(Produced("audio", "song.mp3", "/out/song.mp3"), app)),
+            events.filterIsInstance<AgentEvent.Results>().single(),
+        )
     }
 
     @Test fun twoParallelCallsGetTwoResults() = runBlocking {
