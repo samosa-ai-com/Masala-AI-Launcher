@@ -4,6 +4,7 @@ import com.samosaai.masala.data.MiniAppDao
 import com.samosaai.masala.data.MiniAppEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
@@ -16,6 +17,11 @@ class MiniAppStore(private val dao: MiniAppDao) {
     val all: Flow<List<MiniAppEntity>> = dao.all()
 
     suspend fun get(id: String): MiniAppEntity? = withContext(Dispatchers.IO) { dao.get(id) }
+
+    /** Every stored app, newest update first, for the tool listing and the settings page. */
+    suspend fun list(): List<MiniAppEntity> = withContext(Dispatchers.IO) {
+        dao.all().first()
+    }
 
     /** Stores new HTML under a random id; returns the id, or null when the HTML is too large. */
     suspend fun create(title: String, html: String): String? = withContext(Dispatchers.IO) {

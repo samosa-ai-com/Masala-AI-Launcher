@@ -138,10 +138,117 @@ object MasalaToolDefinitions {
         }
     )
 
+    val listMiniApps = tool(
+        "list_mini_apps",
+        "List the HTML mini-apps stored on this phone, with their ids, titles and last update.",
+        schema { putJsonObject("properties") {} }
+    )
+
+    val openMiniAppTool = tool(
+        "open_mini_app",
+        "Open a stored mini-app on screen.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Mini-app id from list_mini_apps or create_mini_app.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        }
+    )
+
+    val pinMiniAppTool = tool(
+        "pin_mini_app",
+        "Put a stored mini-app on the home screen so the user can tap it. Use this after " +
+            "creating an app if it isn't on home yet.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Mini-app id.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        }
+    )
+
+    val deleteMiniAppTool = tool(
+        "delete_mini_app",
+        "Delete a stored mini-app. Home items pointing at it stop working.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Mini-app id.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        }
+    )
+
+    val createCalendarEvent = tool(
+        "create_calendar_event",
+        "Add an event to the phone's calendar.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("title") {
+                    put("type", "string")
+                    put("description", "Event title.")
+                }
+                putJsonObject("start") {
+                    put("type", "string")
+                    put(
+                        "description",
+                        "Start time, ISO local like 2026-11-02T09:00, or a date for an all-day event (2026-11-02).",
+                    )
+                }
+                putJsonObject("end") {
+                    put("type", "string")
+                    put("description", "End time in the same form. Defaults to one hour after start.")
+                }
+                putJsonObject("location") {
+                    put("type", "string")
+                    put("description", "Optional place.")
+                }
+                putJsonObject("notes") {
+                    put("type", "string")
+                    put("description", "Optional description.")
+                }
+                putJsonObject("calendar") {
+                    put("type", "string")
+                    put("description", "Optional calendar name; defaults to the primary calendar.")
+                }
+            }
+            putJsonArray("required") {
+                add("title")
+                add("start")
+            }
+        }
+    )
+
+    val searchContacts = tool(
+        "search_contacts",
+        "Look up phone numbers and email addresses in the phone's contacts by name.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("query") {
+                    put("type", "string")
+                    put("description", "Part of a name. Empty lists the first few contacts.")
+                }
+                putJsonObject("limit") {
+                    put("type", "integer")
+                    put("description", "Maximum matches, default 10.")
+                }
+            }
+        }
+    )
+
     val setAlarm = tool(
         "set_alarm",
-        "Set an alarm in the system clock app. To change or remove alarms, use show_alarms to open " +
-            "the clock app's list.",
+        "Set an alarm in the system clock app. Android has no API to delete a scheduled alarm: to " +
+            "remove or change one, open the clock app with show_alarms. dismiss_alarm only silences " +
+            "an alarm that is ringing.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("hour") {
@@ -227,6 +334,28 @@ object MasalaToolDefinitions {
         "Dismiss a currently ringing system-clock-app timer. Only has an effect if a timer is " +
             "actively ringing there right now; support varies by clock app.",
         schema { putJsonObject("properties") {} }
+    )
+
+    val dismissAlarm = tool(
+        "dismiss_alarm",
+        "Dismiss an alarm that is ringing right now. Android has no API to delete or cancel a " +
+            "scheduled alarm that is not ringing: to remove one, open the clock app with " +
+            "show_alarms and tell the user to tap it there.",
+        schema { putJsonObject("properties") {} }
+    )
+
+    val openUrl = tool(
+        "open_url",
+        "Open a web link in the phone's browser.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("url") {
+                    put("type", "string")
+                    put("description", "Full http:// or https:// URL.")
+                }
+            }
+            putJsonArray("required") { add("url") }
+        }
     )
 
     val toggleTorch = tool(
@@ -903,11 +1032,15 @@ object MasalaToolDefinitions {
         openApp,
         setWallpaper,
         listCalendarEvents,
+        createCalendarEvent,
+        searchContacts,
+        openUrl,
         setAlarm,
         setTimer,
         showAlarms,
         snoozeAlarm,
         dismissTimer,
+        dismissAlarm,
         toggleTorch,
         setVolume,
         getVolume,
@@ -938,5 +1071,11 @@ object MasalaToolDefinitions {
         getNowPlaying,
         getHealthSummary,
         getHealthRecords,
+        createMiniApp,
+        updateMiniApp,
+        listMiniApps,
+        openMiniAppTool,
+        pinMiniAppTool,
+        deleteMiniAppTool,
     )
 }

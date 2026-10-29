@@ -180,6 +180,10 @@
     <string name="settings_version_delete_message">“%1$s” will be removed. This can’t be undone.</string>
     <string name="settings_version_preview_failed">Couldn’t load that version</string>
     <string name="miniapp_title">Mini app</string>
+    <string name="miniapp_open">Open</string>
+    <string name="settings_miniapps">Mini apps</string>
+    <string name="settings_miniapps_summary">Apps the model built — open, pin or delete</string>
+    <string name="miniapps_empty">No mini apps yet. Ask the model to build one, then it appears here and on home.</string>
     <string name="miniapp_gone">That mini app is gone</string>
     <string name="miniapp_network">Allow network access</string>
     <string name="miniapp_network_summary">Off unless you turn it on for this app.</string>

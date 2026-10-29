@@ -21,12 +21,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -52,6 +55,7 @@ import com.samosaai.masala.data.ThemeMode
 import com.samosaai.masala.launcher.HomeRole
 import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.masala
+import com.samosaai.masala.miniapps.MiniAppActivity
 import com.samosaai.masala.ui.components.LauncherRow
 import com.samosaai.masala.ui.drawer.visibilityLabel
 import com.samosaai.masala.ui.theme.MasalaTheme
@@ -60,7 +64,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -76,10 +80,17 @@ class SettingsActivity : ComponentActivity() {
                     var page by rememberSaveable { mutableStateOf(Page.MAIN) }
                     BackHandler(enabled = page != Page.MAIN) { page = Page.MAIN }
                     when (page) {
-                        Page.MAIN -> MainPage(settings, onHiddenApps = { page = Page.HIDDEN_APPS }, onLayout = { page = Page.LAYOUT }, onRecording = { page = Page.RECORDING })
+                        Page.MAIN -> MainPage(
+                            settings,
+                            onHiddenApps = { page = Page.HIDDEN_APPS },
+                            onLayout = { page = Page.LAYOUT },
+                            onRecording = { page = Page.RECORDING },
+                            onMiniApps = { page = Page.MINI_APPS },
+                        )
                         Page.HIDDEN_APPS -> HiddenAppsPage(onBack = { page = Page.MAIN })
                         Page.LAYOUT -> LayoutPage(settings, onBack = { page = Page.MAIN })
                         Page.RECORDING -> RecordingPage(onBack = { page = Page.MAIN })
+                        Page.MINI_APPS -> MiniAppsPage(onBack = { page = Page.MAIN })
                     }
                 }
             }
@@ -87,7 +98,13 @@ class SettingsActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun MainPage(settings: LauncherSettings, onHiddenApps: () -> Unit, onLayout: () -> Unit, onRecording: () -> Unit) {
+    private fun MainPage(
+        settings: LauncherSettings,
+        onHiddenApps: () -> Unit,
+        onLayout: () -> Unit,
+        onRecording: () -> Unit,
+        onMiniApps: () -> Unit,
+    ) {
         val scope = rememberCoroutineScope()
         val apps by masala.launcher.apps.collectAsStateWithLifecycle()
         var isDefault by remember { mutableStateOf(HomeRole.isDefault(this)) }
@@ -148,6 +165,12 @@ class SettingsActivity : ComponentActivity() {
                 title = stringResource(R.string.settings_home_layout),
                 summary = stringResource(R.string.settings_home_layout_summary),
                 onClick = onLayout,
+            )
+
+            SettingsNavRow(
+                title = stringResource(R.string.settings_miniapps),
+                summary = stringResource(R.string.settings_miniapps_summary),
+                onClick = onMiniApps,
             )
 
             SettingsNavRow(
@@ -214,6 +237,63 @@ class SettingsActivity : ComponentActivity() {
             onImport = { import.launch(arrayOf("application/json", "text/plain", "*/*")) },
             onBack = onBack,
         )
+    }
+
+    /** Every stored mini-app, so a created app is never invisible (plan: Lane D follow-ups). */
+    @Composable
+    private fun MiniAppsPage(onBack: () -> Unit) {
+        val scope = rememberCoroutineScope()
+        val apps by remember { masala.miniApps.all }.collectAsStateWithLifecycle(emptyList())
+        val format = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
+        SettingsScaffold(stringResource(R.string.settings_miniapps), onBack = onBack) {
+            if (apps.isEmpty()) {
+                Text(stringResource(R.string.miniapps_empty), style = MaterialTheme.typography.bodyMedium)
+            }
+            apps.forEach { row ->
+                var confirmDelete by remember(row.id) { mutableStateOf(false) }
+                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Text(row.title, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        format.format(java.util.Date(row.updatedAt)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { startActivity(Intent(this@SettingsActivity, MiniAppActivity::class.java).putExtra(MiniAppActivity.EXTRA_APP_ID, row.id)) }) {
+                            Text(stringResource(R.string.miniapp_open))
+                        }
+                        TextButton(onClick = {
+                            scope.launch {
+                                val problems = masala.layouts.pinMiniApp(row.id, row.title)
+                                android.widget.Toast.makeText(
+                                    this@SettingsActivity,
+                                    getString(if (problems.isEmpty()) R.string.miniapp_pinned else R.string.miniapp_pin_failed),
+                                    android.widget.Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                        }) { Text(stringResource(R.string.miniapp_pin)) }
+                        TextButton(onClick = { confirmDelete = true }) {
+                            Text(stringResource(R.string.settings_version_delete))
+                        }
+                    }
+                }
+                HorizontalDivider()
+                if (confirmDelete) {
+                    AlertDialog(
+                        onDismissRequest = { confirmDelete = false },
+                        title = { Text(stringResource(R.string.miniapp_delete_title)) },
+                        text = { Text(stringResource(R.string.miniapp_delete_message, row.title)) },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                confirmDelete = false
+                                scope.launch { masala.miniApps.delete(row.id) }
+                            }) { Text(stringResource(R.string.settings_version_delete)) }
+                        },
+                        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_back)) } },
+                    )
+                }
+            }
+        }
     }
 
     /** Meeting-notes recording (plan Phase 3, Lane D): explicit Start/Stop for the mic service. */

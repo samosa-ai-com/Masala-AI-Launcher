@@ -101,11 +101,31 @@ class ToolsTest {
     fun `definitions don't point the model at the private prototype tools Masala left out`() {
         val leftOut = listOf(
             "call_number", "find_contact", "read_call_log", "list_alarms", "list_timers", "edit_alarm",
-            "delete_alarm", "delete_timer", "set_brightness", "create_calendar_event",
+            "delete_alarm", "delete_timer", "set_brightness",
         )
         for (def in MasalaToolDefinitions.all) {
             assertEquals(emptyList(), leftOut.filter { it in def.description }, def.name)
         }
+    }
+
+    @Test
+    fun `the Lane D follow-up tools are registered`() {
+        val names = MasalaToolDefinitions.all.map { it.name }.toSet()
+        for (expected in listOf(
+            "dismiss_alarm", "open_url", "create_calendar_event", "search_contacts",
+            "list_mini_apps", "open_mini_app", "pin_mini_app", "delete_mini_app",
+        )) {
+            assertTrue(expected in names, "missing tool $expected")
+        }
+    }
+
+    @Test
+    fun `alarm tools say plainly that a scheduled alarm cannot be deleted`() {
+        val set = MasalaToolDefinitions.all.single { it.name == "set_alarm" }
+        assertTrue("no API" in set.description, set.description)
+        val dismiss = MasalaToolDefinitions.all.single { it.name == "dismiss_alarm" }
+        assertTrue("no API" in dismiss.description, dismiss.description)
+        assertTrue("show_alarms" in dismiss.description, dismiss.description)
     }
 
     @Test

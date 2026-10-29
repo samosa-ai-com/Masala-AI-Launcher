@@ -11,7 +11,7 @@ import com.samosaai.masala.core.contract.MasalaSkill
  * ([buildGenerateRequest]) so tests cover it without an [MasalaApp]; the wiki slot stays empty
  * until Phase 4.
  */
-fun MasalaApp.generateRequest(
+suspend fun MasalaApp.generateRequest(
     userText: String,
     imageBase64: String? = null,
     imageFormat: String = "png",
@@ -22,6 +22,7 @@ fun MasalaApp.generateRequest(
     layout = layouts.base.value,
     snapshot = contextService.snapshot.value,
     skills = skills.getAllSkills(),
+    miniApps = miniApps.list().map { PromptMiniApp(it.id, it.title) },
     userText = userText,
     imageBase64 = imageBase64,
     imageFormat = imageFormat,
@@ -34,6 +35,7 @@ fun buildGenerateRequest(
     layout: LayoutDoc?,
     snapshot: ContextSnapshot,
     skills: List<MasalaSkill>,
+    miniApps: List<PromptMiniApp> = emptyList(),
     userText: String,
     imageBase64: String? = null,
     imageFormat: String = "png",
@@ -46,6 +48,7 @@ fun buildGenerateRequest(
         layout = layout,
         calendar = CalendarCards.summary(snapshot),
         skills = skills.map { PromptSkill(it.id, it.title.ifBlank { it.id }) },
+        miniApps = miniApps,
     ),
     imageBase64 = imageBase64,
     imageFormat = imageFormat,

@@ -47,6 +47,17 @@ class MiniAppStoreTest {
     }
 
     @Test
+    fun `list returns every app`() = runBlocking {
+        val store = MiniAppStore(FakeDao())
+        val a = store.create("One", "<html>1</html>")!!
+        val b = store.create("Two", "<html>2</html>")!!
+        val titles = store.list().map { it.title }.toSet()
+        assertEquals(setOf("One", "Two"), titles)
+        assertTrue(store.list().any { it.id == a && it.title == "One" })
+        assertTrue(store.list().any { it.id == b && it.title == "Two" })
+    }
+
+    @Test
     fun `blank title falls back and oversized html is refused`() = runBlocking {
         val store = MiniAppStore(FakeDao())
         val id = store.create("  ", "<html>ok</html>")!!

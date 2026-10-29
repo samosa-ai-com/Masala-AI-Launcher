@@ -195,4 +195,99 @@ class CalendarTool(private val context: Context) {
         }
         return emails
     }
+
+    /**
+     * Adds one event (plan: the model could read the calendar but not write to it).
+     * Times are ISO local (`2026-11-02T09:00`) or a plain date for an all-day event.
+     */
+    fun createEvent(
+        title: String,
+        start: String,
+        end: String? = null,
+        location: String? = null,
+        notes: String? = null,
+        calendarName: String? = null,
+    ): ActionResult {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            return ActionResult.permissionNeeded(
+                Manifest.permission.WRITE_CALENDAR,
+                "The Calendar permission (write) is not granted. Go to Settings → Permissions → " +
+                    "Calendar and enable it, then ask again.",
+            )
+        }
+        val cleanTitle = title.trim()
+        if (cleanTitle.isEmpty()) return ActionResult.error("The event needs a title.")
+        val allDay = start.length == 10
+        val startAt = parseMoment(start, endOfDay = false) ?: return ActionResult.error(
+            "Couldn't read the start time '$start'. Use 2026-11-02T09:00 or an all-day date 2026-11-02.",
+        )
+        val endAt = when {
+            end != null -> parseMoment(end, endOfDay = end.length == 10) ?: return ActionResult.error(
+                "Couldn't read the end time '$end'.",
+            )
+            allDay -> startAt + 86_400_000L
+            else -> startAt + 3_600_000L
+        }
+        if (endAt < startAt) return ActionResult.error("The event ends before it starts.")
+        val calendarId = calendarId(calendarName) ?: return ActionResult.error(
+            "No writable calendar on this phone" + (calendarName?.let { " named '$it'" } ?: "") + ".",
+        )
+        val values = ContentValues().apply {
+            put(CalendarContract.Events.CALENDAR_ID, calendarId)
+            put(CalendarContract.Events.TITLE, cleanTitle)
+            put(CalendarContract.Events.DTSTART, startAt)
+            put(CalendarContract.Events.DTEND, endAt)
+            put(CalendarContract.Events.ALL_DAY, if (allDay) 1 else 0)
+            put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
+            location?.takeIf { it.isNotBlank() }?.let { put(CalendarContract.Events.EVENT_LOCATION, it) }
+            notes?.takeIf { it.isNotBlank() }?.let { put(CalendarContract.Events.DESCRIPTION, it) }
+        }
+        return try {
+            val uri = context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values)
+                ?: return ActionResult.error("The calendar app refused the event.")
+            val id = uri.lastPathSegment
+            val whenText = readable.format(Date(startAt)) + if (allDay) " (all day)" else ""
+            ActionResult.ok("Added '$cleanTitle' on $whenText (event id $id).")
+        } catch (e: SecurityException) {
+            ActionResult.error("The calendar app refused the write: ${e.message}")
+        } catch (e: IllegalArgumentException) {
+            ActionResult.error("The calendar app rejected the event: ${e.message}")
+        }
+    }
+
+    /** First writable calendar, preferring [name] when given. */
+    private fun calendarId(name: String?): Long? {
+        val projection = arrayOf(CalendarContract.Calendars._ID, CalendarContract.Calendars.CALENDAR_DISPLAY_NAME)
+        val selection = "${CalendarContract.Calendars.IS_PRIMARY} = 1 OR ${CalendarContract.Calendars.VISIBLE} = 1"
+        var primary: Long? = null
+        var named: Long? = null
+        context.contentResolver.query(
+            CalendarContract.Calendars.CONTENT_URI, projection, selection, null, null,
+        )?.use { cursor ->
+            val idIdx = cursor.getColumnIndexOrThrow(CalendarContract.Calendars._ID)
+            val nameIdx = cursor.getColumnIndexOrThrow(CalendarContract.Calendars.CALENDAR_DISPLAY_NAME)
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idIdx)
+                if (primary == null) primary = id
+                val display = cursor.getString(nameIdx)
+                if (name != null && display != null && display.equals(name, ignoreCase = true)) named = id
+            }
+        }
+        return named ?: primary
+    }
+
+    /** ISO local time (`2026-11-02T09:00`), or a plain date (midnight, or the day's end for an end). */
+    private fun parseMoment(text: String, endOfDay: Boolean): Long? {
+        val trimmed = text.trim()
+        val zone = TimeZone.getDefault().toZoneId()
+        return runCatching {
+            java.time.LocalDateTime.parse(trimmed).atZone(zone).toInstant().toEpochMilli()
+        }.recoverCatching {
+            val date = java.time.LocalDate.parse(trimmed)
+            val moment = if (endOfDay) date.plusDays(1).atStartOfDay() else date.atStartOfDay()
+            moment.atZone(zone).toInstant().toEpochMilli()
+        }.getOrNull()
+    }
 }

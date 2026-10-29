@@ -4,6 +4,7 @@ import com.samosaai.masala.core.tool.FunctionTool
 import com.samosaai.masala.core.tool.ActionResult
 import com.samosaai.masala.core.tool.ToolFiles
 import com.samosaai.masala.miniapps.MiniAppConsole
+import com.samosaai.masala.miniapps.openMiniApp
 import com.samosaai.masala.miniapps.MiniAppStore
 import android.content.Context
 import com.samosaai.masala.core.tool.Tool
@@ -36,6 +37,11 @@ object MasalaTools {
         val notifications = NotificationTool(app)
         val pdf = PdfTool(app, files)
         val transcribe = TranscribeTool(files)
+        val contacts = ContactsTool(app)
+
+        // Read lazily: the layout repository is built after the tools, and only tools that pin
+        // need it.
+        fun host() = app as com.samosaai.masala.MasalaApp
 
         return listOf(
             FunctionTool(Defs.dialNumber, READ_ONLY) { phone.dialNumber(it.string("number") ?: return@FunctionTool missing("number")) },
@@ -50,6 +56,26 @@ object MasalaTools {
                     toDate = it.string("to_date"),
                     search = it.string("search"),
                 )
+            },
+            FunctionTool(Defs.createCalendarEvent, CHANGES_SOMETHING) {
+                calendar.createEvent(
+                    title = it.string("title") ?: return@FunctionTool missing("title"),
+                    start = it.string("start") ?: return@FunctionTool missing("start"),
+                    end = it.string("end"),
+                    location = it.string("location"),
+                    notes = it.string("notes"),
+                    calendarName = it.string("calendar"),
+                )
+            },
+            FunctionTool(Defs.searchContacts, READ_ONLY, readsPrivateData = true) {
+                contacts.search(it.string("query"), it.int("limit"))
+            },
+            FunctionTool(Defs.openUrl, READ_ONLY) {
+                val url = it.string("url") ?: return@FunctionTool missing("url")
+                if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                    return@FunctionTool ActionResult.error("Only http and https links can be opened.")
+                }
+                system.openUrl(url)
             },
             FunctionTool(Defs.setAlarm, CHANGES_SOMETHING) {
                 alarms.setAlarm(
@@ -72,6 +98,7 @@ object MasalaTools {
             FunctionTool(Defs.nextAlarm, READ_ONLY) { alarms.nextAlarm() },
             FunctionTool(Defs.snoozeAlarm, CHANGES_SOMETHING) { alarms.snoozeAlarm(minutes = it.int("minutes")) },
             FunctionTool(Defs.dismissTimer, CHANGES_SOMETHING) { alarms.dismissTimer() },
+            FunctionTool(Defs.dismissAlarm, CHANGES_SOMETHING) { alarms.dismissAlarm() },
             FunctionTool(Defs.toggleTorch, CHANGES_SOMETHING) {
                 device.toggleTorch(
                     on = it.boolean("on") ?: return@FunctionTool missing("on"),
@@ -188,13 +215,20 @@ object MasalaTools {
 
             // Generated HTML mini-apps (plan Phase 3, Lane D).
             FunctionTool(Defs.createMiniApp, CHANGES_SOMETHING) {
+                val title = it.string("title") ?: "Mini app"
                 val id = miniApps.create(
-                    title = it.string("title") ?: "Mini app",
+                    title = title,
                     html = it.string("html") ?: return@FunctionTool missing("html"),
                 ) ?: return@FunctionTool ActionResult.error(
                     "That HTML is too large (max ${MiniAppStore.MAX_HTML_CHARS} characters). Make it smaller."
                 )
-                ActionResult.ok("Mini app '$id' created. Pin it to home to open it from the launcher.")
+                // Pinning here is what makes "it created the app" true for the user: a stored app
+                // with no home item is invisible. The call is gated, so the user still confirms.
+                val problems = host().layouts.pinMiniApp(id, title)
+                ActionResult.ok(
+                    if (problems.isEmpty()) "Mini app '$id' created and pinned to home."
+                    else "Mini app '$id' created, but it couldn't be pinned: ${problems.first()}"
+                )
             },
             FunctionTool(Defs.updateMiniApp, CHANGES_SOMETHING) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")
@@ -207,6 +241,31 @@ object MasalaTools {
                 MiniAppConsole.clear(id)
                 if (errors.isEmpty()) ActionResult.ok("Mini app '$id' updated.")
                 else ActionResult.ok("Mini app '$id' updated. Console errors:\n" + errors.joinToString("\n"))
+            },
+            FunctionTool(Defs.listMiniApps, READ_ONLY) {
+                val rows = miniApps.list()
+                if (rows.isEmpty()) ActionResult.ok("No mini apps yet.")
+                else rows.joinToString("\n") { "${it.id}: ${it.title} (updated ${it.updatedAt})" }
+                    .let { ActionResult.ok(it) }
+            },
+            FunctionTool(Defs.openMiniAppTool, READ_ONLY) {
+                val id = it.string("id") ?: return@FunctionTool missing("id")
+                if (miniApps.get(id) == null) return@FunctionTool ActionResult.error("No mini app '$id'.")
+                context.openMiniApp(id)
+                ActionResult.ok("Opened mini app '$id'.")
+            },
+            FunctionTool(Defs.pinMiniAppTool, CHANGES_SOMETHING) {
+                val id = it.string("id") ?: return@FunctionTool missing("id")
+                val row = miniApps.get(id) ?: return@FunctionTool ActionResult.error("No mini app '$id'.")
+                val problems = host().layouts.pinMiniApp(id, row.title)
+                if (problems.isEmpty()) ActionResult.ok("Pinned '${row.title}' to home.")
+                else ActionResult.error("Couldn't pin it: ${problems.first()}")
+            },
+            FunctionTool(Defs.deleteMiniAppTool, DESTRUCTIVE) {
+                val id = it.string("id") ?: return@FunctionTool missing("id")
+                if (miniApps.get(id) == null) return@FunctionTool ActionResult.error("No mini app '$id'.")
+                miniApps.delete(id)
+                ActionResult.ok("Mini app '$id' deleted.")
             },
         )
     }

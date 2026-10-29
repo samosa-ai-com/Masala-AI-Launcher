@@ -341,5 +341,9 @@ class MiniAppActivity : ComponentActivity() {
 
 /** Opens a mini-app from anywhere an Activity starter is available. */
 fun Context.openMiniApp(appId: String) {
-    startActivity(Intent(this, MiniAppActivity::class.java).putExtra(MiniAppActivity.EXTRA_APP_ID, appId))
+    startActivity(
+        Intent(this, MiniAppActivity::class.java)
+            .putExtra(MiniAppActivity.EXTRA_APP_ID, appId)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+    )
 }

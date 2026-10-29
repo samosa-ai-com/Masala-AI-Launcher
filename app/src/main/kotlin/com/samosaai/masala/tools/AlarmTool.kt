@@ -95,6 +95,21 @@ class AlarmTool(private val context: Context) {
         }
     }
 
+    /** Dismisses a ringing alarm (ACTION_DISMISS_ALARM). A scheduled alarm can't be removed by API. */
+    fun dismissAlarm(): ActionResult {
+        val intent = Intent(AlarmClock.ACTION_DISMISS_ALARM).apply {
+            putExtra(AlarmClock.EXTRA_ALARM_SEARCH_MODE, AlarmClock.ALARM_SEARCH_MODE_NEXT)
+        }
+        return if (dispatchClockIntent(intent)) {
+            ActionResult.ok(
+                "Sent a dismiss request to the clock app. This only silences an alarm that is " +
+                    "ringing right now; it does not delete a scheduled alarm.",
+            )
+        } else {
+            ActionResult.error("No alarm is ringing, or the clock app doesn't support dismissing by intent.")
+        }
+    }
+
     /** Dismisses a ringing clock-app timer (best-effort; not all clock apps support it). */
     fun dismissTimer(): ActionResult =
         if (dispatchClockIntent(Intent(ACTION_DISMISS_TIMER))) {

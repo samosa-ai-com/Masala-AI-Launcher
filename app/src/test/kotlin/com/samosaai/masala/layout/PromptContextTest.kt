@@ -72,6 +72,18 @@ class PromptContextTest {
     }
 
     @Test
+    fun `stored mini apps are listed for the model`() {
+        val text = PromptContext.build(
+            PromptContextInput(
+                apps = emptyList(),
+                miniApps = listOf(PromptMiniApp("abc12345", "Musical calculator")),
+            )
+        )
+        assertTrue(text.contains("Mini apps (id: title):"), text.take(400))
+        assertTrue(text.contains("abc12345: Musical calculator"), text.take(600))
+    }
+
+    @Test
     fun `empty catalog and wiki stay explicit`() {
         val text = PromptContext.build(input(emptyList()).copy(skills = emptyList(), layout = null, calendar = null))
         assertTrue(text.contains("(none yet)"))

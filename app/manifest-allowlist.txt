@@ -13,6 +13,7 @@ uses-permission android.permission.INTERNET  # Model calls, web search and fetch
 uses-permission android.permission.ACCESS_NETWORK_STATE  # Skip model calls and hub sync when offline
 uses-permission android.permission.SET_WALLPAPER  # WallpaperTool and AI home screens
 uses-permission android.permission.READ_CALENDAR  # Next-event conditions, calendar cards, daily brief
+uses-permission android.permission.WRITE_CALENDAR  # create_calendar_event adds events from a prompt
 uses-permission android.permission.READ_CONTACTS  # Speech name hints, urgent filter for quiet nights
 uses-permission android.permission.RECORD_AUDIO  # Push-to-talk and meeting notes recording
 uses-permission android.permission.ACCESS_NOTIFICATION_POLICY  # Quiet nights automatic zen rule

@@ -11,6 +11,9 @@ import com.samosaai.masala.core.layout.KnownSymbols
 /** An installed skill the model may place as a widget. Titles only; instructions stay out. */
 data class PromptSkill(val id: String, val title: String)
 
+/** A stored mini-app the model may place on home. */
+data class PromptMiniApp(val id: String, val title: String)
+
 /**
  * Everything the layout prompt is grounded in (plan Phase 3, lane C): installed apps, the current
  * layout, today's calendar, the icon catalog, installed skills and wiki topics. Plain data in, one
@@ -24,6 +27,8 @@ data class PromptContextInput(
     /** Pre-rendered calendar lines, e.g. "Next: Standup in 12 min". Null omits the section. */
     val calendar: String? = null,
     val skills: List<PromptSkill> = emptyList(),
+    /** Stored mini-apps (id: title), so layouts can place "open_mini_app" items. */
+    val miniApps: List<PromptMiniApp> = emptyList(),
     /** Page titles the wiki holds. Empty until the Phase 4 wiki; shown as "(wiki empty)". */
     val wikiTopics: List<String> = emptyList(),
     val symbols: Set<String> = KnownSymbols.names,
@@ -56,6 +61,8 @@ object PromptContext {
         if (!input.calendar.isNullOrBlank()) out.append("\n\nCalendar:\n").append(input.calendar)
         out.append("\n\nInstalled skills (id: title):\n")
         out.append(if (input.skills.isEmpty()) "(none)" else input.skills.joinToString("\n") { "${it.id}: ${it.title}" })
+        out.append("\n\nMini apps (id: title):\n")
+        out.append(if (input.miniApps.isEmpty()) "(none)" else input.miniApps.joinToString("\n") { "${it.id}: ${it.title}" })
         out.append("\n\nWiki topics:\n")
         out.append(if (input.wikiTopics.isEmpty()) "(wiki empty)" else input.wikiTopics.joinToString(", "))
         out.append("\n\nIcons allowed (symbol names):\n")
@@ -92,6 +99,8 @@ object PromptContext {
         if (!input.calendar.isNullOrBlank()) n += "\n\nCalendar:\n".length + input.calendar.length
         n += "\n\nInstalled skills (id: title):\n".length +
             input.skills.sumOf { it.id.length + it.title.length + 3 }.coerceAtLeast("(none)".length)
+        n += "\n\nMini apps (id: title):\n".length +
+            input.miniApps.sumOf { it.id.length + it.title.length + 3 }.coerceAtLeast("(none)".length)
         n += "\n\nWiki topics:\n".length + wikiSummary.length
         n += "\n\nIcons allowed (symbol names):\n".length + input.symbols.sumOf { it.length + 2 }
         return n
