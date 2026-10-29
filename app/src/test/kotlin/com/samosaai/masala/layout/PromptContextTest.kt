@@ -56,7 +56,7 @@ class PromptContextTest {
         assertTrue(text.contains("Page 'Home'"))
         assertTrue(text.contains("Next: Standup in 12 min"))
         assertTrue(text.contains("meeting_notes: Meeting notes"))
-        assertTrue(text.contains("(wiki empty)"))
+        assertTrue(text.contains("(Second Brain empty)"))
         assertTrue(text.contains("call, home"))
     }
 
@@ -87,7 +87,7 @@ class PromptContextTest {
     fun `empty catalog and wiki stay explicit`() {
         val text = PromptContext.build(input(emptyList()).copy(skills = emptyList(), layout = null, calendar = null))
         assertTrue(text.contains("(none yet)"))
-        assertTrue(text.contains("(wiki empty)"))
+        assertTrue(text.contains("(Second Brain empty)"))
     }
 
     @Test

@@ -78,6 +78,20 @@ fun rememberMicPress(app: MasalaApp): MicPress {
     }
 }
 
+/** Opens the reply card for typing, without running anything yet. */
+@Composable
+fun AskButton(onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    val label = stringResource(R.string.command_open_chat)
+    Surface(
+        onClick = onOpen,
+        modifier.semantics { contentDescription = label },
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+    ) {
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { Text("💬") }
+    }
+}
+
 /** The mic: records while held. */
 @Composable
 fun MicButton(press: MicPress, modifier: Modifier = Modifier) {

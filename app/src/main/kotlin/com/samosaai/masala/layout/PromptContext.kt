@@ -29,7 +29,7 @@ data class PromptContextInput(
     val skills: List<PromptSkill> = emptyList(),
     /** Stored mini-apps (id: title), so layouts can place "open_mini_app" items. */
     val miniApps: List<PromptMiniApp> = emptyList(),
-    /** Page titles the wiki holds. Empty until the Phase 4 wiki; shown as "(wiki empty)". */
+    /** Page titles the Second Brain holds; shown as "(Second Brain empty)" when there are none. */
     val wikiTopics: List<String> = emptyList(),
     val symbols: Set<String> = KnownSymbols.names,
 )
@@ -63,8 +63,8 @@ object PromptContext {
         out.append(if (input.skills.isEmpty()) "(none)" else input.skills.joinToString("\n") { "${it.id}: ${it.title}" })
         out.append("\n\nMini apps (id: title):\n")
         out.append(if (input.miniApps.isEmpty()) "(none)" else input.miniApps.joinToString("\n") { "${it.id}: ${it.title}" })
-        out.append("\n\nWiki topics:\n")
-        out.append(if (input.wikiTopics.isEmpty()) "(wiki empty)" else input.wikiTopics.joinToString(", "))
+        out.append("\n\nSecond Brain topics:\n")
+        out.append(if (input.wikiTopics.isEmpty()) "(Second Brain empty)" else input.wikiTopics.joinToString(", "))
         out.append("\n\nIcons allowed (symbol names):\n")
         out.append(input.symbols.sorted().joinToString(", "))
         val text = out.toString()
@@ -92,7 +92,7 @@ object PromptContext {
      * an underestimate trims too little and the hard cut below eats the trailing icon catalog. */
     private fun sectionsSize(input: PromptContextInput): Int {
         val layoutSummary = if (input.layout == null) "(none yet)" else summarizeLayout(input.layout)
-        val wikiSummary = if (input.wikiTopics.isEmpty()) "(wiki empty)" else input.wikiTopics.joinToString(", ")
+        val wikiSummary = if (input.wikiTopics.isEmpty()) "(Second Brain empty)" else input.wikiTopics.joinToString(", ")
         // Omission notice appended when apps are trimmed.
         val omissionBuffer = 50
         var n = "\n\nCurrent layout:\n".length + layoutSummary.length + omissionBuffer
@@ -101,7 +101,7 @@ object PromptContext {
             input.skills.sumOf { it.id.length + it.title.length + 3 }.coerceAtLeast("(none)".length)
         n += "\n\nMini apps (id: title):\n".length +
             input.miniApps.sumOf { it.id.length + it.title.length + 3 }.coerceAtLeast("(none)".length)
-        n += "\n\nWiki topics:\n".length + wikiSummary.length
+        n += "\n\nSecond Brain topics:\n".length + wikiSummary.length
         n += "\n\nIcons allowed (symbol names):\n".length + input.symbols.sumOf { it.length + 2 }
         return n
     }
