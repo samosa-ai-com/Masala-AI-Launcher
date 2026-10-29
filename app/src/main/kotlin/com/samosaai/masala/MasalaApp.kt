@@ -13,7 +13,9 @@ import com.samosaai.masala.core.apps.AppSearch
 import com.samosaai.masala.audio.TtsEngine
 import com.samosaai.masala.audio.SttEngine
 import com.samosaai.masala.agent.CommandController
-import com.samosaai.masala.agent.AndroidSpeechInput
+import com.samosaai.masala.agent.ConfiguredSpeechInput
+import com.samosaai.masala.agent.SpeechStrings
+import com.samosaai.masala.audio.SpeechConfig
 import com.samosaai.masala.agent.AgentPrompt
 import com.samosaai.masala.agent.AgentTools
 import com.samosaai.masala.agent.LlmAgentModel
@@ -135,12 +137,24 @@ class MasalaApp : Application() {
         })
     }
 
-    private val stt by lazy { SttEngine(this) }
+    private val stt by lazy {
+        SttEngine(this, SpeechConfig.default.baseUrl, SpeechConfig.default.apiKey)
+    }
     private val tts by lazy { TtsEngine(this) }
 
-    /** Reads [text] aloud on the phone's own voice. */
-    suspend fun speakReply(text: String) {
-        tts.speak(text, language = Language.entries.firstOrNull { it.matchesCode(java.util.Locale.getDefault().language) } ?: Language.ENGLISH)
+    /** Reads [text] aloud on the phone's own voice. Null when it played to the end (or the user stopped it), else the user-facing reason. */
+    suspend fun speakReply(text: String): String? {
+        if (tts.speak(text, language = Language.entries.firstOrNull { it.matchesCode(java.util.Locale.getDefault().language) } ?: Language.ENGLISH)) {
+            return null
+        }
+        if (tts.androidInterrupted) return null
+        val missing = tts.lastLanguageUnavailable
+        android.util.Log.w("MasalaApp", "speakReply failed; languageUnavailable=$missing")
+        return if (missing != null) {
+            getString(R.string.read_aloud_no_voice, missing.label)
+        } else {
+            getString(R.string.read_aloud_no_engine)
+        }
     }
 
     fun stopSpeaking() = tts.stop()
@@ -162,7 +176,15 @@ class MasalaApp : Application() {
             run = { dispatcher.dispatch(it, NoScreen) },
             skills = { skills.getAllSkills() },
             newAgent = { agent(LlmAgentModel(LlmConfig.default.client(this))) },
-            speech = AndroidSpeechInput(stt),
+            speech = ConfiguredSpeechInput(
+                stt,
+                { SpeechConfig.default },
+                stt::isLocalRecognitionAvailable,
+                SpeechStrings(
+                    localUnavailable = getString(R.string.speech_local_unavailable),
+                    recordFailed = getString(R.string.speech_record_failed),
+                ),
+            ),
         )
     }
 

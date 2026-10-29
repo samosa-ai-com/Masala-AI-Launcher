@@ -74,8 +74,11 @@ class CommandController(
     fun startListening(): Boolean {
         val input = speech ?: return false
         job?.cancel()
-        if (!input.start { _state.value = CommandState.Error("", it) }) {
-            _state.value = CommandState.Error("", "Speech recognition isn't available")
+        // The specific reason first; async errors during listening update the card too.
+        var reason: String? = null
+        val async: (String) -> Unit = { reason = it; _state.value = CommandState.Error("", it) }
+        if (!input.start(async)) {
+            _state.value = CommandState.Error("", reason ?: "Speech recognition isn't available")
             return false
         }
         _state.value = CommandState.Listening

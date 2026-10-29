@@ -264,6 +264,14 @@
     <string name="wiki_dismiss">Dismiss</string>
     <string name="settings_ask">Ask Masala</string>
     <string name="settings_read_replies">Read replies aloud</string>
+    <string name="settings_test_voice">Test voice</string>
+    <string name="settings_test_voice_summary">Speaks a sentence to check read-aloud works</string>
+    <string name="settings_test_voice_sentence">This is Masala speaking. If you hear this, read-aloud works.</string>
+    <string name="settings_test_voice_ok">Voice check spoken</string>
+    <string name="read_aloud_no_voice">Voice data for %1$s isn’t installed on this phone</string>
+    <string name="read_aloud_no_engine">The speech engine didn’t start</string>
+    <string name="speech_local_unavailable">No speech recognition on this phone</string>
+    <string name="speech_record_failed">Recording for transcription didn’t start</string>
     <string name="command_hint">Ask or tell Masala</string>
     <string name="command_mic">Hold to talk</string>
     <string name="command_listening">Listening…</string>

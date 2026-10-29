@@ -1,7 +1,8 @@
 package com.samosaai.masala.agent
 
 import com.samosaai.masala.audio.AudioProvider
-import com.samosaai.masala.audio.SttEngine
+import com.samosaai.masala.audio.PttEngine
+import com.samosaai.masala.audio.SpeechConfig
 import com.samosaai.masala.i18n.Language
 import java.util.Locale
 
@@ -13,13 +14,85 @@ interface SpeechInput {
     fun cancel()
 }
 
-/** [SpeechInput] on Android's own recognizer, in the phone's language when Masala supports it. */
-class AndroidSpeechInput(private val stt: SttEngine) : SpeechInput {
+/**
+ * Which provider push-to-talk tries, in order. The configured cloud STT goes first when
+ * the app has one; the on-device recognizer is always the last resort, never the only try.
+ * Pure so unit tests can pin the policy without an Android runtime.
+ */
+internal object SpeechPolicy {
+    fun order(configured: AudioProvider): List<AudioProvider> = when {
+        configured.isApiBased() -> listOf(configured, AudioProvider.ANDROID)
+        else -> listOf(AudioProvider.ANDROID)
+    }
+}
+
+/** User-facing reasons [ConfiguredSpeechInput] can report; loaded from resources by the caller. */
+data class SpeechStrings(
+    val localUnavailable: String,
+    val recordFailed: String,
+)
+
+/**
+ * [SpeechInput] that follows the app's STT configuration: cloud transcription when
+ * [SpeechConfig] names an endpoint, otherwise the on-device recognizer — with the
+ * other one as fallback when the first can't start. A phone whose default recognizer
+ * is a stub (or has none) therefore records for the server instead of failing.
+ */
+class ConfiguredSpeechInput(
+    private val engine: PttEngine,
+    private val config: () -> SpeechConfig,
+    private val localAvailable: () -> Boolean,
+    private val strings: SpeechStrings,
+) : SpeechInput {
+    @Volatile
+    private var active: AudioProvider? = null
+
     private fun language() = Language.entries.firstOrNull { it.matchesCode(Locale.getDefault().language) } ?: Language.ENGLISH
 
-    override fun start(onFailure: (String) -> Unit) = stt.startListening(AudioProvider.ANDROID, language(), onFailure)
+    private fun configured(): AudioProvider =
+        if (config().baseUrl.isNotBlank()) AudioProvider.API else AudioProvider.ANDROID
 
-    override suspend fun stop() = stt.stopListeningAndTranscribe(AudioProvider.ANDROID, "")
+    override fun start(onFailure: (String) -> Unit): Boolean {
+        // A press while a previous session is still around must not leak its recorder.
+        cancel()
+        val reasons = mutableListOf<String>()
+        for (provider in SpeechPolicy.order(configured())) {
+            if (provider == AudioProvider.ANDROID && !localAvailable()) {
+                reasons += strings.localUnavailable
+                continue
+            }
+            val started = if (provider == AudioProvider.ANDROID) {
+                engine.startListening(provider, language(), onFailure)
+            } else {
+                engine.startListening(provider, language())
+            }
+            if (started) {
+                active = provider
+                return true
+            }
+            reasons += if (provider == AudioProvider.ANDROID) {
+                strings.localUnavailable
+            } else {
+                strings.recordFailed
+            }
+        }
+        active = null
+        onFailure(reasons.joinToString("; "))
+        return false
+    }
 
-    override fun cancel() = stt.cancelListening(AudioProvider.ANDROID)
+    override suspend fun stop(): Result<String> {
+        val provider = active ?: return Result.failure(Exception("Wasn't listening"))
+        active = null
+        val settings = config()
+        val model = if (provider.isApiBased()) settings.sttModel else ""
+        val language = if (provider.isApiBased()) settings.sttLanguage.ifBlank { language().iso639 } else ""
+        return engine.stopListeningAndTranscribe(provider, model, language)
+    }
+
+    override fun cancel() {
+        active = null
+        engine.cancelListening(AudioProvider.ANDROID)
+        engine.cancelListening(AudioProvider.API)
+    }
 }

@@ -172,7 +172,13 @@ fun ReplyCard(app: MasalaApp, readAloud: Boolean, modifier: Modifier = Modifier)
                 }
             }
             Row {
-                if (reply != null) TextButton(onClick = { scope.launch { app.speakReply(reply.text) } }) { Text(stringResource(R.string.command_read_aloud)) }
+                if (reply != null) TextButton(onClick = {
+                    scope.launch {
+                        app.speakReply(reply.text)?.let { reason ->
+                            android.widget.Toast.makeText(context, reason, android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }) { Text(stringResource(R.string.command_read_aloud)) }
                 Box(Modifier.weight(1f))
                 TextButton(onClick = { app.stopSpeaking(); app.commands.dismiss() }) { Text(stringResource(R.string.command_close)) }
             }

@@ -174,6 +174,37 @@ class CommandControllerTest {
         assertIs<CommandState.Error>(c.state.value)
     }
 
+    @Test fun startFailureKeepsTheSpecificReason() = runBlocking<Unit> {
+        val speech = object : SpeechInput {
+            override fun start(onFailure: (String) -> Unit): Boolean {
+                onFailure("no speech service")
+                return false
+            }
+            override suspend fun stop() = Result.failure<String>(Exception())
+            override fun cancel() = Unit
+        }
+        val c = controller(speech)
+        assertEquals(false, c.startListening())
+        assertEquals("no speech service", (c.state.value as CommandState.Error).message)
+    }
+
+    @Test fun asyncFailureDuringListeningUpdatesTheCard() = runBlocking<Unit> {
+        var fail: ((String) -> Unit)? = null
+        val speech = object : SpeechInput {
+            override fun start(onFailure: (String) -> Unit): Boolean {
+                fail = onFailure
+                return true
+            }
+            override suspend fun stop() = Result.failure<String>(Exception())
+            override fun cancel() = Unit
+        }
+        val c = controller(speech)
+        assertEquals(true, c.startListening())
+        assertEquals(CommandState.Listening, c.state.value)
+        fail!!("recognizer died")
+        assertEquals("recognizer died", (c.state.value as CommandState.Error).message)
+    }
+
     @Test fun emptyTextOpensTheInput() = runBlocking<Unit> {
         val c = controller()
         c.ask("  ")

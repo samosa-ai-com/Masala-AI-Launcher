@@ -185,6 +185,16 @@ class SettingsActivity : ComponentActivity() {
             SettingsToggleRow(stringResource(R.string.settings_read_replies), settings.readRepliesAloud) { on ->
                 update { it.copy(readRepliesAloud = on) }
             }
+            SettingsNavRow(stringResource(R.string.settings_test_voice), stringResource(R.string.settings_test_voice_summary)) {
+                scope.launch {
+                    val reason = masala.speakReply(getString(R.string.settings_test_voice_sentence))
+                    android.widget.Toast.makeText(
+                        this@SettingsActivity,
+                        reason ?: getString(R.string.settings_test_voice_ok),
+                        if (reason == null) android.widget.Toast.LENGTH_SHORT else android.widget.Toast.LENGTH_LONG,
+                    ).show()
+                }
+            }
             SettingsNavRow(stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) {
                 startActivity(Intent(this@SettingsActivity, WikiActivity::class.java))
             }
