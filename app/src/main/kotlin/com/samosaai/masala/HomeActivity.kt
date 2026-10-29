@@ -39,8 +39,7 @@ import com.samosaai.masala.ui.drawer.Drawer
 import com.samosaai.masala.ui.drawer.RenameDialog
 import com.samosaai.masala.actions.ActionDispatcher
 import com.samosaai.masala.core.contract.MasalaAction
-import com.samosaai.masala.permissions.CapabilityRequester
-import com.samosaai.masala.permissions.rememberCapabilityRequester
+import com.samosaai.masala.permissions.rememberCapabilityPrompt
 import com.samosaai.masala.ui.home.ConfirmationSheet
 import com.samosaai.masala.ui.home.HomeScreen
 import com.samosaai.masala.ui.home.RenderContext
@@ -134,36 +133,17 @@ class HomeActivity : ComponentActivity() {
                 override fun ask(prompt: String) = askMasala(prompt)
             }
         }
-        // A tap that needs a permission asks for it, then repeats the action once it is granted.
-        var lastAction by remember { mutableStateOf<MasalaAction?>(null) }
-        var needsPermission by remember { mutableStateOf<ActionDispatcher.Outcome.NeedsCapability?>(null) }
+        // Tools wait for the permission answer themselves; home only supplies the prompt.
+        rememberCapabilityPrompt(app.permissionBroker)
         fun run(action: MasalaAction) {
-            lastAction = action
             scope.launch {
                 when (val outcome = app.dispatcher.dispatch(action, screen)) {
-                    is ActionDispatcher.Outcome.Done -> {
-                        lastAction = null
-                        outcome.message?.takeIf { it.isNotBlank() }?.let(::toast)
-                    }
-                    ActionDispatcher.Outcome.Declined -> lastAction = null
-                    is ActionDispatcher.Outcome.Failed -> {
-                        lastAction = null
-                        toast(outcome.message)
-                    }
-                    is ActionDispatcher.Outcome.NeedsCapability -> needsPermission = outcome
+                    is ActionDispatcher.Outcome.Done -> outcome.message?.takeIf { it.isNotBlank() }?.let(::toast)
+                    ActionDispatcher.Outcome.Declined -> toast(getString(R.string.action_declined))
+                    is ActionDispatcher.Outcome.Failed -> toast(outcome.message)
+                    is ActionDispatcher.Outcome.NeedsCapability -> toast(outcome.reason)
                 }
             }
-        }
-        val permissions = rememberCapabilityRequester { _, granted ->
-            val retry = lastAction
-            lastAction = null
-            if (granted && retry != null) run(retry)
-        }
-        LaunchedEffect(needsPermission) {
-            val pending = needsPermission ?: return@LaunchedEffect
-            needsPermission = null
-            // Keep the action for a retry only when a dialog will actually report back.
-            if (permissions.request(pending.marker) != CapabilityRequester.Ask.OBSERVED) lastAction = null
         }
 
         // Hidden under the open drawer, so TalkBack and touches only reach the drawer.

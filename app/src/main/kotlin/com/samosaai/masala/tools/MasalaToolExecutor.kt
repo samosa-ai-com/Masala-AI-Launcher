@@ -7,7 +7,10 @@ import com.samosaai.masala.core.tool.ToolRegistry
 import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.core.tool.ToolSensitivity
 import kotlinx.coroutines.CancellationException
+import com.samosaai.masala.permissions.CapabilityPrompt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -30,7 +33,13 @@ class MasalaToolExecutor(
     private val registry: ToolRegistry,
     private val actionLog: ActionLog,
     private val gate: ToolGate,
+    /**
+     * Asks the user for a missing permission and waits for the answer, so a tool never reports
+     * "not granted" while the dialog is still on screen. Null in tests and headless callers.
+     */
+    private val capabilities: CapabilityPrompt? = null,
 ) {
+    private val askLock = Mutex()
     suspend fun execute(name: String, args: JsonObject): ToolResult {
         val tool = registry[name] ?: return ToolResult.Failure("Unknown tool '$name'. Only the listed tools are available.")
         val result = run(tool, args)
@@ -42,20 +51,52 @@ class MasalaToolExecutor(
 
     private suspend fun run(tool: Tool, args: JsonObject): ToolResult {
         Capability.of(tool.definition.name)?.takeUnless { it.isAvailable(context) }?.let { capability ->
-            return ToolResult.NeedsCapability(
-                capability.marker ?: capability.name,
-                "This needs ${capability.label}, which Masala doesn't have yet. Ask the user to grant it and try again.",
-            )
+            val marker = capability.marker
+            // Wait for the answer instead of failing the call while the dialog is open.
+            if (marker == null || !askAndVerify(marker) || !capability.isAvailable(context)) {
+                return ToolResult.NeedsCapability(
+                    marker ?: capability.name,
+                    "This needs ${capability.label}, which Masala doesn't have yet. Ask the user to grant it and try again.",
+                )
+            }
         }
         if (tool.sensitivity != ToolSensitivity.READ_ONLY) {
             gate.check(tool, args)?.let { return it }
         }
-        return try {
+        val result = try {
             withContext(Dispatchers.IO) { tool.execute(args) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            ToolResult.Failure("Tool '${tool.definition.name}' failed: ${e.message}")
+            return ToolResult.Failure("Tool '${tool.definition.name}' failed: ${e.message}")
+        }
+        // A tool can discover a missing permission only while running (Calendar, Contacts): ask,
+        // then repeat the same call once, so the user's grant is never wasted.
+        if (result is ToolResult.NeedsCapability && askAndVerify(result.capability)) {
+            return try {
+                withContext(Dispatchers.IO) { tool.execute(args) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ToolResult.Failure("Tool '${tool.definition.name}' failed: ${e.message}")
+            }
+        }
+        return result
+    }
+
+    /** Asks the UI for [marker] and reports whether the phone now holds it. One ask at a time. */
+    private suspend fun askAndVerify(marker: String): Boolean {
+        val prompt = capabilities ?: return false
+        return askLock.withLock {
+            val answered = try {
+                prompt.request(marker)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Permission request failed for $marker", e)
+                false
+            }
+            answered && com.samosaai.masala.permissions.hasMarker(context, marker)
         }
     }
 

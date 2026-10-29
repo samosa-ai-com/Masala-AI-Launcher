@@ -54,9 +54,7 @@ import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.llm.LlmConfig
 import com.samosaai.masala.masala
-import com.samosaai.masala.permissions.CapabilityRequester
-import com.samosaai.masala.permissions.capabilityNeeded
-import com.samosaai.masala.permissions.rememberCapabilityRequester
+import com.samosaai.masala.permissions.rememberCapabilityPrompt
 import com.samosaai.masala.tools.Capability
 import com.samosaai.masala.tools.HealthTool
 import com.samosaai.masala.tools.ToolGate
@@ -145,34 +143,16 @@ class DebugActivity : ComponentActivity() {
                 trailingIcon = { TextButton(onClick = { prompt = "" }) { Text(stringResource(R.string.debug_clear)) } },
                 modifier = Modifier.fillMaxWidth().testTag("debug_prompt"),
             )
-            // A tool that says it needs a permission triggers the request itself; once the user
-            // answers, the same prompt runs again so the call completes without a second tap.
-            var lastRun by remember { mutableStateOf<(() -> Unit)?>(null) }
-            var asking by remember { mutableStateOf<String?>(null) }
-            val requester = rememberCapabilityRequester { _, granted ->
-                asking = null
-                // Only a dialog gives a real answer; then the same prompt finishes the job.
-                if (granted) lastRun?.invoke()
-            }
+            // The executor itself waits for the permission answer, so this screen only has to
+            // provide the prompt; a tool call resumes on its own once the user allows it.
+            rememberCapabilityPrompt(masala.permissionBroker)
             fun send() {
-                lastRun = { if (!running) send() }
                 saveConfig(config)
                 events.clear()
                 running = true
                 val text = prompt
                 scope.launch {
                     val app = masala
-                    // One ask per run: an auto-retry that fails again must not loop.
-                    val asked = mutableSetOf<String>()
-                    fun maybeAsk(result: ToolResult) {
-                        val marker = result.capabilityNeeded() ?: return
-                        if (!asked.add(marker)) return
-                        when (requester.request(marker)) {
-                            CapabilityRequester.Ask.OBSERVED -> asking = marker
-                            // A settings screen: nothing to await, so no automatic retry.
-                            CapabilityRequester.Ask.SCREEN_ONLY, CapabilityRequester.Ask.UNSUPPORTED -> Unit
-                        }
-                    }
                     try {
                         val direct = DIRECT_CALL.matchEntire(text.trim())
                         if (direct != null) {
@@ -184,11 +164,9 @@ class DebugActivity : ComponentActivity() {
                                 if (name in DebugCommands.names) DebugCommands.run(app, name, args)
                                 else app.toolExecutor(gate).execute(name, args)
                             events += DebugAgent.Event.Result(name, result)
-                            maybeAsk(result)
                         } else {
                             DebugAgent(config.client(app), app.tools.tools, app.toolExecutor(gate)).run(text) { event ->
                                 events += event
-                                (event as? DebugAgent.Event.Result)?.let { maybeAsk(it.result) }
                             }
                         }
                     } catch (e: Exception) {
@@ -219,13 +197,6 @@ class DebugActivity : ComponentActivity() {
                     events.clear()
                     events += DebugAgent.Event.Raw(masala.actionLog.tail(20).joinToString("\n").ifEmpty { "(empty)" })
                 }) { Text(stringResource(R.string.debug_action_log)) }
-            }
-            asking?.let { marker ->
-                Text(
-                    stringResource(R.string.debug_permission_asking, Capability.byMarker(marker)?.label ?: marker),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
             }
             var showTools by rememberSaveable { mutableStateOf(false) }
             var toolFilter by rememberSaveable { mutableStateOf("") }
