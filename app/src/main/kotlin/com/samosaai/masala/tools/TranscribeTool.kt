@@ -2,6 +2,7 @@ package com.samosaai.masala.tools
 
 import com.samosaai.masala.core.tool.ActionResult
 import com.samosaai.masala.core.tool.ToolFiles
+import com.samosaai.masala.audio.AndroidTranscriber
 import com.samosaai.masala.audio.AudioApi
 import com.samosaai.masala.audio.AudioModel
 import com.samosaai.masala.audio.ModelCategory
@@ -25,6 +26,7 @@ import java.io.File
  * content leaves the device for the configured STT endpoint.
  */
 class TranscribeTool(
+    private val context: android.content.Context,
     private val resolver: ToolFiles,
     private val loadSettings: () -> SpeechConfig = { SpeechConfig.default },
     private val onUnauthorized: (() -> Unit)? = null,
@@ -75,9 +77,8 @@ class TranscribeTool(
     }
 
     @Suppress("ReturnCount")
-    fun transcribe(path: String, model: String? = null, language: String? = null): ActionResult {
+    suspend fun transcribe(path: String, model: String? = null, language: String? = null): ActionResult {
         val settings = loadSettings()
-        credentialError(settings)?.let { return it }
 
         val file = when (val r = resolver.resolveForRead(path)) {
             is ToolFiles.ResolveResult.PermissionNeeded -> return r.result
@@ -93,21 +94,56 @@ class TranscribeTool(
                     ". Convert it first with media_convert."
             )
 
-        val backend = sttBackendFactory(settings.baseUrl, settings.apiKey)
-        val resolvedModel = resolveModel(model, settings, backend)
-            ?: return ActionResult.error(
-                "No STT model is configured and none could be discovered from the API. Pass model " +
-                    "explicitly, or set MASALA_STT_MODEL."
-            )
-        val resolvedLanguage = (language ?: settings.sttLanguage).trim().ifBlank { null }
-
-        val transcript = backend.transcribe(file, resolvedModel, resolvedLanguage, contentType)
-            .getOrElse { e ->
-                return ActionResult.error(
-                    "Transcription failed: ${e.message?.take(ERROR_DETAIL_CHARS) ?: "no detail"}. " +
-                        "The file was not modified."
+        // No endpoint, or none with a transcription model: use Android's own speech service,
+        // which can read a file through RecognizerIntent.EXTRA_AUDIO_SOURCE (API 33+).
+        val backend = if (settings.baseUrl.isBlank()) null else sttBackendFactory(settings.baseUrl, settings.apiKey)
+        val resolvedModel = backend?.let { resolveModel(model, settings, it) }
+        if (backend == null || resolvedModel == null) {
+            val local = AndroidTranscriber.transcribe(context, file, language ?: settings.sttLanguage)
+            if (local != null) {
+                return local.fold(
+                    onSuccess = { text -> transcriptResult(file, text, engine = "Android's built-in speech service") },
+                    onFailure = { e ->
+                        ActionResult.error(
+                            "Android's built-in transcription failed (${e.message?.take(ERROR_DETAIL_CHARS)}). " +
+                                "The file was not modified.",
+                        )
+                    },
                 )
             }
+            return ActionResult.error(
+                "No transcription is available: no STT model is configured or discoverable, and this " +
+                    "device's Android version/service can't transcribe a file (needs Android 13+). " +
+                    "Pass model explicitly, or set MASALA_STT_MODEL.",
+            )
+        }
+        val resolvedLanguage = (language ?: settings.sttLanguage).trim().ifBlank { null }
+
+        val apiResult = backend.transcribe(file, resolvedModel, resolvedLanguage, contentType)
+        val transcript = apiResult.getOrElse { e ->
+            // The endpoint can list a transcription model and not serve the route at all (this
+            // one returns 404). Android's own speech service reads the file instead, so a
+            // configured-but-unusable endpoint does not leave transcription broken.
+            val local = AndroidTranscriber.transcribe(context, file, resolvedLanguage)
+            if (local != null) {
+                return local.fold(
+                    onSuccess = { text -> transcriptResult(file, text, "Android's built-in speech service") },
+                    onFailure = { localError ->
+                        ActionResult.error(
+                            "Transcription failed both ways. The API said: " +
+                                "${e.message?.take(ERROR_DETAIL_CHARS) ?: "no detail"}; Android's speech " +
+                                "service said: ${localError.message?.take(ERROR_DETAIL_CHARS)}. " +
+                                "The file was not modified.",
+                        )
+                    },
+                )
+            }
+            return ActionResult.error(
+                "Transcription failed: ${e.message?.take(ERROR_DETAIL_CHARS) ?: "no detail"}. " +
+                    "Android's built-in speech service can't take a file on this device. " +
+                    "The file was not modified.",
+            )
+        }
         if (transcript.isBlank()) {
             return ActionResult.error(
                 "The STT endpoint returned an empty transcript for '${file.name}' — the file may contain " +
@@ -128,8 +164,22 @@ class TranscribeTool(
         )
     }
 
-    private fun credentialError(settings: SpeechConfig): ActionResult? =
-        if (settings.baseUrl.isBlank()) ActionResult.error("No speech-to-text endpoint is configured.") else null
+    private fun transcriptResult(file: File, transcript: String, engine: String): ActionResult {
+        if (transcript.isBlank()) {
+            return ActionResult.error("No speech was recognised in '${file.name}'.")
+        }
+        val clipped = transcript.length > MAX_TRANSCRIPT_CHARS
+        val text = if (clipped) transcript.take(MAX_TRANSCRIPT_CHARS) else transcript
+        val truncationNote = if (clipped) {
+            "\n\n[Transcript truncated at $MAX_TRANSCRIPT_CHARS characters.]"
+        } else {
+            ""
+        }
+        return ActionResult.ok(
+            "Transcript of '${file.name}' via $engine (the file itself was not modified):\n\n$text$truncationNote",
+        )
+    }
+
 
     private fun fileError(file: File, path: String): ActionResult? = when {
         !file.exists() -> ActionResult.error(

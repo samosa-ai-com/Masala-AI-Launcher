@@ -112,7 +112,7 @@ class ToolsTest {
     fun `the Lane D follow-up tools are registered`() {
         val names = MasalaToolDefinitions.all.map { it.name }.toSet()
         for (expected in listOf(
-            "dismiss_alarm", "open_url", "create_calendar_event", "search_contacts",
+            "open_url", "create_calendar_event", "search_contacts",
             "list_mini_apps", "open_mini_app", "pin_mini_app", "delete_mini_app",
         )) {
             assertTrue(expected in names, "missing tool $expected")
@@ -123,9 +123,12 @@ class ToolsTest {
     fun `alarm tools say plainly that a scheduled alarm cannot be deleted`() {
         val set = MasalaToolDefinitions.all.single { it.name == "set_alarm" }
         assertTrue("no API" in set.description, set.description)
-        val dismiss = MasalaToolDefinitions.all.single { it.name == "dismiss_alarm" }
-        assertTrue("no API" in dismiss.description, dismiss.description)
-        assertTrue("show_alarms" in dismiss.description, dismiss.description)
+        assertTrue("show_alarms" in set.description, set.description)
+        // The clock app ignores the dismiss intents on real phones, so those tools were removed
+        // rather than left in the registry promising something they cannot do.
+        val names = MasalaToolDefinitions.all.map { it.name }
+        assertTrue("dismiss_alarm" !in names)
+        assertTrue("dismiss_timer" !in names)
     }
 
     @Test

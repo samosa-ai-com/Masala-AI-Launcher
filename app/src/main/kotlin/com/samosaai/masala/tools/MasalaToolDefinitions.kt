@@ -247,8 +247,7 @@ object MasalaToolDefinitions {
     val setAlarm = tool(
         "set_alarm",
         "Set an alarm in the system clock app. Android has no API to delete a scheduled alarm: to " +
-            "remove or change one, open the clock app with show_alarms. dismiss_alarm only silences " +
-            "an alarm that is ringing.",
+            "remove or change one, open the clock app with show_alarms and tell the user to tap it there.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("hour") {
@@ -285,7 +284,7 @@ object MasalaToolDefinitions {
 
     val setTimer = tool(
         "set_timer",
-        "Start a countdown timer in the system clock app; dismiss_timer stops a ringing one.",
+        "Start a countdown timer in the system clock app. The user stops it there.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("seconds") {
@@ -329,21 +328,6 @@ object MasalaToolDefinitions {
         }
     )
 
-    val dismissTimer = tool(
-        "dismiss_timer",
-        "Dismiss a currently ringing system-clock-app timer. Only has an effect if a timer is " +
-            "actively ringing there right now; support varies by clock app.",
-        schema { putJsonObject("properties") {} }
-    )
-
-    val dismissAlarm = tool(
-        "dismiss_alarm",
-        "Dismiss an alarm that is ringing right now. Android has no API to delete or cancel a " +
-            "scheduled alarm that is not ringing: to remove one, open the clock app with " +
-            "show_alarms and tell the user to tap it there.",
-        schema { putJsonObject("properties") {} }
-    )
-
     val openUrl = tool(
         "open_url",
         "Open a web link in the phone's browser.",
@@ -360,23 +344,24 @@ object MasalaToolDefinitions {
 
     val toggleTorch = tool(
         "toggle_torch",
-        "Turn the camera flashlight (torch) on or off. If the flashlight is already in the " +
-            "requested state, reports that without error.",
+        "Turn the phone's flashlight on or off. Pass on=true or on=false to set it; omit 'on' to " +
+            "flip whatever it is doing now. Use this for 'turn the torch on', 'turn it off' or " +
+            "'toggle the flashlight'.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("on") {
                     put("type", "boolean")
-                    put("description", "true to turn the flashlight on, false to turn it off.")
+                    put(
+                        "description",
+                        "true to turn the flashlight on, false to turn it off. Omit to flip the " +
+                            "current state, which is what a plain 'toggle' means.",
+                    )
                 }
                 putJsonObject("duration_seconds") {
                     put("type", "integer")
-                    put(
-                        "description",
-                        "Optional: auto-turn off after this many seconds (1-300). Only applies when turning on."
-                    )
+                    put("description", "Optional: switch it off again after this many seconds (1-300).")
                 }
             }
-            putJsonArray("required") { add("on") }
         }
     )
 
@@ -947,7 +932,8 @@ object MasalaToolDefinitions {
             "podcast player, anything with a media notification. Works without any per-service " +
             "API or account. When several apps hold a session, the one actually playing is " +
             "chosen; pass 'app' to target a specific one. Needs Notification access. " +
-            "Use get_now_playing first if you need to know what is playing.",
+            "Use get_now_playing first if you need to know what is playing. This does NOT change " +
+            "the volume: use set_volume with stream 'music' for that.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("action") {
@@ -1039,8 +1025,6 @@ object MasalaToolDefinitions {
         setTimer,
         showAlarms,
         snoozeAlarm,
-        dismissTimer,
-        dismissAlarm,
         toggleTorch,
         setVolume,
         getVolume,

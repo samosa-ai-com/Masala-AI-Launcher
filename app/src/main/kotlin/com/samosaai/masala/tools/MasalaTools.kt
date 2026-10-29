@@ -36,7 +36,7 @@ object MasalaTools {
         val mediaEdit = MediaEditTool(app, files)
         val notifications = NotificationTool(app)
         val pdf = PdfTool(app, files)
-        val transcribe = TranscribeTool(files)
+        val transcribe = TranscribeTool(app, files)
         val contacts = ContactsTool(app)
 
         // Read lazily: the layout repository is built after the tools, and only tools that pin
@@ -97,11 +97,10 @@ object MasalaTools {
             FunctionTool(Defs.showAlarms, READ_ONLY) { alarms.showAlarms() },
             FunctionTool(Defs.nextAlarm, READ_ONLY) { alarms.nextAlarm() },
             FunctionTool(Defs.snoozeAlarm, CHANGES_SOMETHING) { alarms.snoozeAlarm(minutes = it.int("minutes")) },
-            FunctionTool(Defs.dismissTimer, CHANGES_SOMETHING) { alarms.dismissTimer() },
-            FunctionTool(Defs.dismissAlarm, CHANGES_SOMETHING) { alarms.dismissAlarm() },
             FunctionTool(Defs.toggleTorch, CHANGES_SOMETHING) {
                 device.toggleTorch(
-                    on = it.boolean("on") ?: return@FunctionTool missing("on"),
+                    // Omitted = flip, which is what "toggle the torch" means.
+                    on = it.boolean("on"),
                     durationSeconds = it.int("duration_seconds"),
                 )
             },

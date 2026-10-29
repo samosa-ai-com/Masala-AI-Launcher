@@ -148,10 +148,10 @@ data class AudioModel(
         private fun classifyByName(id: String): ModelCategory {
             val lower = id.lowercase()
             return when {
-                lower.contains("whisper") -> ModelCategory.STT
-                lower.contains("stt") -> ModelCategory.STT
-                lower.contains("transcription") -> ModelCategory.STT
-                lower.contains("translate") -> ModelCategory.STT
+                // Transcription wins over "voice": a model called "voice-transcribe" records
+                // speech, it does not speak (it was being classified as TTS and never selected).
+                lower.contains("transcri") || lower.contains("whisper") || lower.contains("stt") ||
+                    lower.contains("asr") || lower.contains("translate") -> ModelCategory.STT
                 lower.contains("tts") -> ModelCategory.TTS
                 lower.contains("speech") -> ModelCategory.TTS
                 lower.contains("kokoro") -> ModelCategory.TTS

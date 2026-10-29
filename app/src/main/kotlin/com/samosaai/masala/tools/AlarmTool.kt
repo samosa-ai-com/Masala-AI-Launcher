@@ -19,12 +19,6 @@ import java.util.Locale
  */
 class AlarmTool(private val context: Context) {
 
-    companion object {
-        // Not a documented android.provider.AlarmClock constant; some clock apps
-        // (e.g. Google Clock) honor it best-effort to dismiss a ringing timer.
-        private const val ACTION_DISMISS_TIMER = "android.intent.action.DISMISS_TIMER"
-    }
-
     private val dayNames = mapOf(
         "sun" to Calendar.SUNDAY, "sunday" to Calendar.SUNDAY,
         "mon" to Calendar.MONDAY, "monday" to Calendar.MONDAY,
@@ -94,32 +88,6 @@ class AlarmTool(private val context: Context) {
             ActionResult.error("No clock app handled the snooze request.")
         }
     }
-
-    /** Dismisses a ringing alarm (ACTION_DISMISS_ALARM). A scheduled alarm can't be removed by API. */
-    fun dismissAlarm(): ActionResult {
-        val intent = Intent(AlarmClock.ACTION_DISMISS_ALARM).apply {
-            putExtra(AlarmClock.EXTRA_ALARM_SEARCH_MODE, AlarmClock.ALARM_SEARCH_MODE_NEXT)
-        }
-        return if (dispatchClockIntent(intent)) {
-            ActionResult.ok(
-                "Sent a dismiss request to the clock app. This only silences an alarm that is " +
-                    "ringing right now; it does not delete a scheduled alarm.",
-            )
-        } else {
-            ActionResult.error("No alarm is ringing, or the clock app doesn't support dismissing by intent.")
-        }
-    }
-
-    /** Dismisses a ringing clock-app timer (best-effort; not all clock apps support it). */
-    fun dismissTimer(): ActionResult =
-        if (dispatchClockIntent(Intent(ACTION_DISMISS_TIMER))) {
-            ActionResult.ok(
-                "Sent a dismiss request to the clock app. This only has an effect if a timer is " +
-                    "currently ringing there; support varies by clock app.",
-            )
-        } else {
-            ActionResult.error("No clock app handled the dismiss-timer request (not all clock apps support it).")
-        }
 
     /** The next alarm on the phone, from any app: the only part of the clock app's list Android exposes. */
     fun nextAlarm(): ActionResult {
