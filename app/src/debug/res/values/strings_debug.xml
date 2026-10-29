@@ -11,6 +11,12 @@
     <string name="debug_models">Models</string>
     <string name="debug_action_log">Action log</string>
     <string name="debug_tools">%1$d tools registered</string>
+    <string name="debug_tools_show">Show tools</string>
+    <string name="debug_tools_hide">Hide tools</string>
+    <string name="debug_tools_filter">Filter tools</string>
+    <string name="debug_tools_use">Use</string>
+    <string name="debug_tools_required">required: %1$s</string>
+    <string name="debug_tools_extra">Also: %1$s</string>
     <string name="debug_confirm_title">Allow %1$s?</string>
     <string name="debug_allow">Allow</string>
     <string name="debug_deny">Deny</string>
