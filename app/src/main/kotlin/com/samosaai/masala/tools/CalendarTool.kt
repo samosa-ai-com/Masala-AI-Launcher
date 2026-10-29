@@ -208,13 +208,23 @@ class CalendarTool(private val context: Context) {
         notes: String? = null,
         calendarName: String? = null,
     ): ActionResult {
+        // Reading the calendar list is part of writing an event, and Android grants the two
+        // separately on some phones, so both are needed and each is asked for on its own.
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            return ActionResult.permissionNeeded(
+                Manifest.permission.READ_CALENDAR,
+                "The Calendar permission (read) is not granted, and the app needs it to find a " +
+                    "calendar to write to.",
+            )
+        }
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR)
             != PackageManager.PERMISSION_GRANTED
         ) {
             return ActionResult.permissionNeeded(
                 Manifest.permission.WRITE_CALENDAR,
-                "The Calendar permission (write) is not granted. Go to Settings → Permissions → " +
-                    "Calendar and enable it, then ask again.",
+                "The Calendar permission (write) is not granted.",
             )
         }
         val cleanTitle = title.trim()
@@ -251,31 +261,63 @@ class CalendarTool(private val context: Context) {
             val whenText = readable.format(Date(startAt)) + if (allDay) " (all day)" else ""
             ActionResult.ok("Added '$cleanTitle' on $whenText (event id $id).")
         } catch (e: SecurityException) {
-            ActionResult.error("The calendar app refused the write: ${e.message}")
+            // The provider can still refuse (a read-only calendar, a work profile): report the
+            // permission when that is the cause so the executor can ask, otherwise say what failed.
+            val message = e.message.orEmpty()
+            when {
+                message.contains("READ_CALENDAR") -> ActionResult.permissionNeeded(
+                    Manifest.permission.READ_CALENDAR, "Reading the calendar was refused.",
+                )
+                message.contains("WRITE_CALENDAR") -> ActionResult.permissionNeeded(
+                    Manifest.permission.WRITE_CALENDAR, "Writing to the calendar was refused.",
+                )
+                else -> ActionResult.error("The calendar app refused the event: $message")
+            }
         } catch (e: IllegalArgumentException) {
             ActionResult.error("The calendar app rejected the event: ${e.message}")
         }
     }
 
-    /** First writable calendar, preferring [name] when given. */
+    /**
+     * The calendar to write to: the named one when given, else the primary writable one, else any
+     * writable one, else the first listed. Samsung calendars often mark neither IS_PRIMARY nor
+     * VISIBLE, so the access level decides writability, not those flags.
+     */
     private fun calendarId(name: String?): Long? {
-        val projection = arrayOf(CalendarContract.Calendars._ID, CalendarContract.Calendars.CALENDAR_DISPLAY_NAME)
-        val selection = "${CalendarContract.Calendars.IS_PRIMARY} = 1 OR ${CalendarContract.Calendars.VISIBLE} = 1"
-        var primary: Long? = null
-        var named: Long? = null
-        context.contentResolver.query(
-            CalendarContract.Calendars.CONTENT_URI, projection, selection, null, null,
-        )?.use { cursor ->
-            val idIdx = cursor.getColumnIndexOrThrow(CalendarContract.Calendars._ID)
-            val nameIdx = cursor.getColumnIndexOrThrow(CalendarContract.Calendars.CALENDAR_DISPLAY_NAME)
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(idIdx)
-                if (primary == null) primary = id
-                val display = cursor.getString(nameIdx)
-                if (name != null && display != null && display.equals(name, ignoreCase = true)) named = id
+        val projection = arrayOf(
+            CalendarContract.Calendars._ID,
+            CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
+            CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL,
+            CalendarContract.Calendars.IS_PRIMARY,
+        )
+        return try {
+            context.contentResolver.query(
+                CalendarContract.Calendars.CONTENT_URI, projection, null, null, null,
+            )?.use { cursor ->
+                var named: Long? = null
+                var primaryWritable: Long? = null
+                var writable: Long? = null
+                var primary: Long? = null
+                var any: Long? = null
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(0)
+                    val display = cursor.getString(1)
+                    val access = cursor.getInt(2)
+                    val isPrimary = cursor.getInt(3) == 1
+                    val canWrite = access >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR
+                    if (any == null) any = id
+                    if (isPrimary && primary == null) primary = id
+                    if (canWrite && writable == null) writable = id
+                    if (canWrite && isPrimary && primaryWritable == null) primaryWritable = id
+                    if (name != null && display != null && display.equals(name, ignoreCase = true)) named = id
+                }
+                named ?: primaryWritable ?: writable ?: primary ?: any
             }
+        } catch (_: SecurityException) {
+            null
+        } catch (_: IllegalArgumentException) {
+            null
         }
-        return named ?: primary
     }
 
     /** ISO local time (`2026-11-02T09:00`), or a plain date (midnight, or the day's end for an end). */

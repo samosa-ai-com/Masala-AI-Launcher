@@ -41,6 +41,7 @@ class MasalaToolExecutor(
     private val capabilities: CapabilityPrompt = PermissionGate,
 ) {
     private val askLock = Mutex()
+
     suspend fun execute(name: String, args: JsonObject): ToolResult {
         val tool = registry[name] ?: return ToolResult.Failure("Unknown tool '$name'. Only the listed tools are available.")
         val result = run(tool, args)
@@ -64,25 +65,21 @@ class MasalaToolExecutor(
         if (tool.sensitivity != ToolSensitivity.READ_ONLY) {
             gate.check(tool, args)?.let { return it }
         }
-        val result = try {
-            withContext(Dispatchers.IO) { tool.execute(args) }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            return ToolResult.Failure("Tool '${tool.definition.name}' failed: ${e.message}")
-        }
-        // A tool can discover a missing permission only while running (Calendar, Contacts): ask,
-        // then repeat the same call once, so the user's grant is never wasted.
-        if (result is ToolResult.NeedsCapability && askAndVerify(result.capability)) {
-            return try {
+        // A tool can discover missing permissions only while running, and one call may need
+        // several (a calendar write reads the calendar list first). Ask and repeat until nothing
+        // is left to ask for — with a cap, so a tool that keeps asking can never spin.
+        var attempts = 0
+        while (true) {
+            val result = try {
                 withContext(Dispatchers.IO) { tool.execute(args) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                ToolResult.Failure("Tool '${tool.definition.name}' failed: ${e.message}")
+                return ToolResult.Failure("Tool '${tool.definition.name}' failed: ${e.message}")
             }
+            if (result !is ToolResult.NeedsCapability) return result
+            if (attempts++ >= MAX_PERMISSION_ROUNDS || !askAndVerify(result.capability)) return result
         }
-        return result
     }
 
     /** Asks the UI for [marker] and reports whether the phone now holds it. One ask at a time. */
@@ -109,6 +106,9 @@ class MasalaToolExecutor(
         }
 
     private companion object {
+        /** A call can need a couple of permissions in a row; more than this means something is wrong. */
+        const val MAX_PERMISSION_ROUNDS = 3
+
         const val TAG = "MasalaToolExecutor"
         val REDACTED_KEYS = setOf("stdin", "password")
     }
