@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
+import android.view.ViewGroup
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -93,6 +94,9 @@ fun MiniAppView(
         AndroidView(
             factory = { ctx ->
                 WebView(ctx).apply {
+                    // Fill the slot: a wrap-content WebView gives the page a collapsed viewport, so
+                    // `height: 100%` layouts squash to the top.
+                    layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                     hostMiniApp(this, appId, html, networkAllowed) { line -> MiniAppConsole.record(appId, line) }
                     webView = this
                     onWebView(this)
