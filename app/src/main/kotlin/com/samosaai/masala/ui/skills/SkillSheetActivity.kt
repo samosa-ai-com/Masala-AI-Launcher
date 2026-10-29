@@ -185,8 +185,17 @@ class SkillSheetActivity : ComponentActivity() {
             LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp), state = listState, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (loaded && state.events.isEmpty()) {
                     item {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            skill.persona?.starters.orEmpty().forEach { starter -> AssistChip(onClick = { send(starter) }, label = { Text(starter) }) }
+                        val starters = skill.persona?.starters.orEmpty()
+                        if (starters.isNotEmpty()) {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                starters.forEach { starter -> AssistChip(onClick = { send(starter) }, label = { Text(starter) }) }
+                            }
+                        } else {
+                            Text(
+                                skill.description.ifBlank { stringResource(R.string.skill_empty_hint) },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                 }

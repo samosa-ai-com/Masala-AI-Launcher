@@ -26,12 +26,14 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +43,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -56,6 +59,7 @@ import com.samosaai.masala.launcher.HomeRole
 import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.masala
 import com.samosaai.masala.miniapps.MiniAppActivity
+import com.samosaai.masala.ui.skills.SkillSheetActivity
 import com.samosaai.masala.ui.components.LauncherRow
 import com.samosaai.masala.ui.drawer.visibilityLabel
 import com.samosaai.masala.ui.theme.MasalaTheme
@@ -66,7 +70,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -88,11 +92,13 @@ class SettingsActivity : ComponentActivity() {
                             onLayout = { page = Page.LAYOUT },
                             onRecording = { page = Page.RECORDING },
                             onMiniApps = { page = Page.MINI_APPS },
+                            onSkills = { page = Page.SKILLS },
                         )
                         Page.HIDDEN_APPS -> HiddenAppsPage(onBack = { page = Page.MAIN })
                         Page.LAYOUT -> LayoutPage(settings, onBack = { page = Page.MAIN })
                         Page.RECORDING -> RecordingPage(onBack = { page = Page.MAIN })
                         Page.MINI_APPS -> MiniAppsPage(onBack = { page = Page.MAIN })
+                        Page.SKILLS -> SkillsPage(onBack = { page = Page.MAIN })
                     }
                 }
             }
@@ -106,6 +112,7 @@ class SettingsActivity : ComponentActivity() {
         onLayout: () -> Unit,
         onRecording: () -> Unit,
         onMiniApps: () -> Unit,
+        onSkills: () -> Unit,
     ) {
         val scope = rememberCoroutineScope()
         val apps by masala.launcher.apps.collectAsStateWithLifecycle()
@@ -179,6 +186,12 @@ class SettingsActivity : ComponentActivity() {
                 title = stringResource(R.string.settings_recording),
                 summary = stringResource(R.string.settings_recording_summary),
                 onClick = onRecording,
+            )
+
+            SettingsNavRow(
+                title = stringResource(R.string.settings_skills),
+                summary = stringResource(R.string.settings_skills_summary),
+                onClick = onSkills,
             )
 
             SettingsSectionTitle(stringResource(R.string.settings_ask))
@@ -315,6 +328,121 @@ class SettingsActivity : ComponentActivity() {
                         dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_back)) } },
                     )
                 }
+            }
+        }
+    }
+
+    /** Every installed skill in one place, so a chat is one tap away (plan F4). */
+    @Composable
+    private fun SkillsPage(onBack: () -> Unit) {
+        val scope = rememberCoroutineScope()
+        var filter by rememberSaveable { mutableStateOf("") }
+        var url by rememberSaveable { mutableStateOf("") }
+        var version by remember { mutableIntStateOf(0) }
+        val communityIds = remember(version) { masala.skills.getCommunitySkills().map { it.id }.toSet() }
+        val skills = remember(filter, version) {
+            val q = filter.trim()
+            if (q.isEmpty()) masala.skills.getAllSkills() else masala.skills.searchSkills(q)
+        }
+        SettingsScaffold(stringResource(R.string.settings_skills), onBack = onBack) {
+            OutlinedTextField(
+                filter, { filter = it },
+                label = { Text(stringResource(R.string.skills_filter)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (skills.isEmpty()) {
+                Text(stringResource(R.string.skills_empty), style = MaterialTheme.typography.bodyMedium)
+            }
+            skills.forEach { skill ->
+                key(skill.id) {
+                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Text(skill.title.ifBlank { skill.id }, style = MaterialTheme.typography.titleMedium)
+                    if (communityIds.contains(skill.id)) {
+                        Text(stringResource(R.string.skills_community), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                    if (skill.description.isNotBlank()) {
+                        Text(
+                            skill.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = {
+                            startActivity(SkillSheetActivity.intent(this@SettingsActivity, skill.id, null))
+                        }) { Text(stringResource(R.string.skills_open)) }
+                        if (communityIds.contains(skill.id)) {
+                            var confirmDelete by remember(skill.id) { mutableStateOf(false) }
+                            TextButton(onClick = { confirmDelete = true }) { Text(stringResource(R.string.skills_delete)) }
+                            if (confirmDelete) {
+                                AlertDialog(
+                                    onDismissRequest = { confirmDelete = false },
+                                    title = { Text(stringResource(R.string.skills_delete_title)) },
+                                    text = { Text(stringResource(R.string.skills_delete_message, skill.title.ifBlank { skill.id })) },
+                                    confirmButton = {
+                                        TextButton(onClick = {
+                                            confirmDelete = false
+                                            scope.launch {
+                                                if (!masala.skills.removeCommunity(skill.id)) {
+                                                    android.widget.Toast.makeText(
+                                                        applicationContext,
+                                                        getString(R.string.skills_delete_failed),
+                                                        android.widget.Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                }
+                                                version++
+                                            }
+                                        }) { Text(stringResource(R.string.skills_delete)) }
+                                    },
+                                    dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_back)) } },
+                                )
+                            }
+                        }
+                    }
+                }
+                HorizontalDivider()
+                } // key(skill.id)
+            }
+            OutlinedTextField(
+                url, { url = it },
+                label = { Text(stringResource(R.string.skills_import_url)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            var confirmImport by remember { mutableStateOf(false) }
+            OutlinedButton(onClick = { if (url.trim().isNotBlank()) confirmImport = true }) {
+                Text(stringResource(R.string.skills_import))
+            }
+            if (confirmImport) {
+                val link = url.trim()
+                val host = runCatching { android.net.Uri.parse(link).host }.getOrNull().orEmpty()
+                AlertDialog(
+                    onDismissRequest = { confirmImport = false },
+                    title = { Text(stringResource(R.string.skills_import_title)) },
+                    text = { Text(stringResource(R.string.skills_import_message, host.ifBlank { link })) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            confirmImport = false
+                            scope.launch {
+                                val ok = host.isNotBlank() &&
+                                    runCatching { masala.skills.importCommunityFromUrl(link, setOf(host)) }.isSuccess
+                                android.widget.Toast.makeText(
+                                    applicationContext,
+                                    getString(if (ok) R.string.skills_imported else R.string.skills_import_failed),
+                                    android.widget.Toast.LENGTH_SHORT,
+                                ).show()
+                                if (ok) {
+                                    url = ""
+                                    version++
+                                }
+                            }
+                        }) { Text(stringResource(R.string.skills_import)) }
+                    },
+                    dismissButton = { TextButton(onClick = { confirmImport = false }) { Text(stringResource(R.string.action_back)) } },
+                )
             }
         }
     }
