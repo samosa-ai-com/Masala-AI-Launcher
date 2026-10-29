@@ -456,8 +456,7 @@ class MiniAppActivity : ComponentActivity() {
                     TextButton(onClick = {
                         confirmDelete = false
                         scope.launch {
-                            app.miniApps.delete(appId)
-                            MiniAppConsole.clear(appId)
+                            app.deleteMiniApp(appId)
                             onBack()
                         }
                     }) { Text(stringResource(R.string.settings_version_delete)) }

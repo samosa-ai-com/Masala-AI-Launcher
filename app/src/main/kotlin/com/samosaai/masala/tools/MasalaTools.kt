@@ -270,7 +270,7 @@ object MasalaTools {
             FunctionTool(Defs.deleteMiniAppTool, DESTRUCTIVE) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")
                 if (miniApps.get(id) == null) return@FunctionTool ActionResult.error("No mini app '$id'.")
-                miniApps.delete(id)
+                host().deleteMiniApp(id)
                 ActionResult.ok("Mini app '$id' deleted.")
             },
         )
