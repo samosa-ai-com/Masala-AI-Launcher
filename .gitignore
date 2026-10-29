@@ -21,5 +21,6 @@ bin/
 local.properties
 .env
 .idea/
+.vscode/
 *.iml
 captures/
