@@ -218,6 +218,9 @@ interface SkillArtifactDao {
 
     @Query("SELECT * FROM skill_artifacts WHERE runId = :runId ORDER BY id")
     fun forRun(runId: Long): Flow<List<SkillArtifactEntity>>
+
+    @Query("DELETE FROM skill_artifacts WHERE runId = :runId AND kind = :kind AND ref = :ref")
+    suspend fun deleteSame(runId: Long, kind: String, ref: String)
 }
 
 /** A result a skill run produced: a note, a file, a mini app, an installed app. */

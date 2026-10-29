@@ -26,8 +26,19 @@ data class ToolDefinition(
     val parameters: JsonObject,
 )
 
+/**
+ * Something a tool made that the user can open from a run: [kind] is a `SkillOutput` name (`file`,
+ * `audio`, `video`, `mini_app`, `installed_app`); [ref] is a path, a mini-app id or a package name.
+ */
+data class Produced(val kind: String, val title: String, val ref: String)
+
 sealed interface ToolResult {
-    data class Success(val output: String, val files: List<String> = emptyList()) : ToolResult
+    /** [files] are paths the tool wrote; [produced] are results with a known kind (a mini app, say). */
+    data class Success(
+        val output: String,
+        val files: List<String> = emptyList(),
+        val produced: List<Produced> = emptyList(),
+    ) : ToolResult
     data class Failure(val message: String) : ToolResult
 
     /** The tool needs a capability (permission, special access) the user hasn't granted yet. */

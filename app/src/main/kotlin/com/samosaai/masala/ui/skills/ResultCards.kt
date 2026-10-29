@@ -14,16 +14,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.samosaai.masala.R
+import com.samosaai.masala.masala
+import com.samosaai.masala.miniapps.openMiniApp
 import com.samosaai.masala.skills.SkillRunEvent
+import kotlinx.coroutines.launch
 import java.io.File
 
-/** A run's result: files, audio and video open in the system viewer; mini and installed apps come with their lanes. */
+/** A run's result: files, audio and video open in the system viewer, mini apps in their host; installed apps come with Phase 5. */
 @Composable
 fun ResultCard(result: SkillRunEvent.Result, onSave: (SkillRunEvent.Result) -> Unit) {
     val context = LocalContext.current
@@ -36,9 +45,34 @@ fun ResultCard(result: SkillRunEvent.Result, onSave: (SkillRunEvent.Result) -> U
                     TextButton(onClick = { ResultFiles.share(context, result.ref) }) { Text(stringResource(R.string.result_share)) }
                     TextButton(onClick = { onSave(result) }) { Text(stringResource(R.string.result_save)) }
                 }
+                "mini_app" -> MiniAppActions(result)
                 else -> Text(stringResource(R.string.result_not_yet), style = MaterialTheme.typography.bodySmall)
             }
         }
+    }
+}
+
+/** Open and Pin for a mini app the run made; a deleted one says so instead. */
+@Composable
+private fun MiniAppActions(result: SkillRunEvent.Result) {
+    val context = LocalContext.current
+    val app = context.masala
+    val scope = rememberCoroutineScope()
+    var exists by remember(result.ref) { mutableStateOf(true) }
+    LaunchedEffect(result.ref) { exists = app.miniApps.get(result.ref) != null }
+    if (!exists) {
+        Text(stringResource(R.string.result_miniapp_gone), style = MaterialTheme.typography.bodySmall)
+        return
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        TextButton(onClick = { context.openMiniApp(result.ref) }) { Text(stringResource(R.string.result_open)) }
+        TextButton(onClick = {
+            scope.launch {
+                val problems = app.layouts.pinMiniApp(result.ref, result.title)
+                val text = if (problems.isEmpty()) R.string.miniapp_pinned else R.string.miniapp_pin_failed
+                Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+            }
+        }) { Text(stringResource(R.string.miniapp_pin)) }
     }
 }
 

@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.samosaai.masala.BuildConfig
 import com.samosaai.masala.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,10 +25,11 @@ import java.io.File
  * past [KEEP_FILES].
  *
  * Chunking rides `MediaRecorder`'s own max-duration callback rather than a timer thread: no second
- * thread to race with Stop, and no gap between chunks.
+ * thread to race with Stop. Between chunks there is a short gap while the next recorder starts.
  */
 class RecordingService : Service() {
     private var recorder: MediaRecorder? = null
+    private var chunkMillis = CHUNK_MINUTES * 60_000L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -44,7 +46,12 @@ class RecordingService : Service() {
                 stopSelf()
                 return START_NOT_STICKY
             }
-            else -> startRecording()
+            else -> {
+                // Debug builds only: lets a test see chunks rotate in seconds instead of 15 minutes.
+                val seconds = intent.getIntExtra(EXTRA_CHUNK_SECONDS, 0)
+                if (BuildConfig.DEBUG && seconds > 0 && recorder == null) chunkMillis = seconds * 1_000L
+                startRecording()
+            }
         }
         return START_NOT_STICKY
     }
@@ -121,7 +128,7 @@ class RecordingService : Service() {
             recorder.setAudioChannels(1)
             recorder.setAudioEncodingBitRate(32_000)
             recorder.setOutputFile(file.absolutePath)
-            recorder.setMaxDuration((CHUNK_MINUTES * 60_000L).toInt())
+            recorder.setMaxDuration(chunkMillis.toInt())
         } catch (e: Exception) {
             recorder.release()
             throw e
@@ -169,6 +176,9 @@ class RecordingService : Service() {
     companion object {
         const val TAG = "RecordingService"
         const val ACTION_STOP = "com.samosaai.masala.audio.STOP"
+
+        /** Debug builds only: chunk length in seconds, for tests. */
+        const val EXTRA_CHUNK_SECONDS = "chunk_seconds"
         const val CHUNK_MINUTES = 15L
         const val KEEP_FILES = 48
         private const val CHANNEL = "recording"

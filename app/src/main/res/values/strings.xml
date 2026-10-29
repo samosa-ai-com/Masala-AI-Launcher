@@ -427,6 +427,7 @@
     <string name="result_save_failed">Couldn’t save the file</string>
     <string name="result_cant_open">Nothing can open that file</string>
     <string name="result_not_yet">This kind of result isn’t supported yet</string>
+    <string name="result_miniapp_gone">This mini app was deleted</string>
     <string name="message_copy">Copy</string>
     <string name="message_copied">Copied</string>
     <string name="code_copy">Copy</string>
@@ -441,4 +442,5 @@
     <string name="report_note">Add a note (optional)</string>
     <string name="report_send">Report</string>
     <string name="report_thanks">Thanks, the report is saved on this phone</string>
+    <string name="miniapp_report_title">Report this mini app</string>
 </resources>

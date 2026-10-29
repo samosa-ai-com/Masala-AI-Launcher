@@ -49,6 +49,7 @@ import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.LauncherModel
 import com.samosaai.masala.layout.LayoutRepository
 import com.samosaai.masala.layout.ModeStore
+import com.samosaai.masala.miniapps.MiniAppConsole
 import com.samosaai.masala.miniapps.MiniAppStore
 import com.samosaai.masala.permissions.PermissionGate
 import com.samosaai.masala.core.scheduled.ScheduledTaskStore
@@ -154,6 +155,13 @@ class MasalaApp : Application() {
         SttEngine(this, SpeechConfig.default.baseUrl, SpeechConfig.default.apiKey)
     }
     private val tts by lazy { TtsEngine(this) }
+
+    /** Deletes a mini app with its home pins and console log; every Delete (screen, settings, tool) goes through here. */
+    suspend fun deleteMiniApp(id: String) {
+        miniApps.delete(id)
+        layouts.unpinMiniApp(id)
+        MiniAppConsole.clear(id)
+    }
 
     /** Reads [text] aloud on the phone's own voice. Null when it played to the end (or the user stopped it), else the user-facing reason. */
     suspend fun speakReply(text: String): String? {

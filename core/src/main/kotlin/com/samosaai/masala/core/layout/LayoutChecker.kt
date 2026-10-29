@@ -294,7 +294,7 @@ object KnownSymbols {
         "alarm", "apps", "battery_full", "bedtime", "book", "calendar_today", "call", "camera", "chat", "checklist",
         "cloud", "directions_car", "email", "event", "fitness_center", "flag", "folder", "headphones", "home", "info",
         "language", "location_on", "mic", "music_note", "notifications", "photo", "play_arrow", "priority_high",
-        "queue_music", "restaurant", "school", "search", "settings", "shopping_cart", "star", "timer", "tune",
+        "queue_music", "restaurant", "school", "search", "settings", "shopping_cart", "sports_esports", "star", "timer", "tune",
         "wb_sunny", "widgets", "work",
     )
 }

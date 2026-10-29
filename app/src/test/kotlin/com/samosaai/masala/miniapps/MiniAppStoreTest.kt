@@ -47,6 +47,13 @@ class MiniAppStoreTest {
     }
 
     @Test
+    fun `a long title is capped like a rename`() = runBlocking {
+        val store = MiniAppStore(FakeDao())
+        val id = store.create("x".repeat(200), "<html/>")!!
+        assertEquals(MiniAppStore.MAX_TITLE_CHARS, store.get(id)?.title?.length)
+    }
+
+    @Test
     fun `list returns every app`() = runBlocking {
         val store = MiniAppStore(FakeDao())
         val a = store.create("One", "<html>1</html>")!!
