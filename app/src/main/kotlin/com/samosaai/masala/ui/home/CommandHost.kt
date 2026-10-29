@@ -119,7 +119,7 @@ fun ReplyCard(app: MasalaApp, readAloud: Boolean, modifier: Modifier = Modifier)
 
     val reply = state as? CommandState.Reply
     // "Read replies aloud" applies to every reply; the button reads one on request.
-    LaunchedEffect(reply) { if (readAloud && reply != null) app.speakReply(reply.text) }
+    LaunchedEffect(reply) { if (readAloud && reply != null && app.commands.claimReadAloud(reply)) app.speakReply(reply.text) }
     if (state == CommandState.Idle) return
 
     Card(

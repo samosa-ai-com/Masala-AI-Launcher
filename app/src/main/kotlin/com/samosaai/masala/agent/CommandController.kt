@@ -36,6 +36,17 @@ class CommandController(
 
     private var job: Job? = null
     private var history: List<ChatMessage> = emptyList()
+    private var readAloud: CommandState.Reply? = null
+
+    /**
+     * True the first time it is asked about [reply], so "Read replies aloud" speaks a reply once,
+     * however often a card showing it is composed again.
+     */
+    fun claimReadAloud(reply: CommandState.Reply): Boolean {
+        if (readAloud === reply) return false
+        readAloud = reply
+        return true
+    }
 
     /** Shows the card with its input field and nothing else. */
     fun openInput() {

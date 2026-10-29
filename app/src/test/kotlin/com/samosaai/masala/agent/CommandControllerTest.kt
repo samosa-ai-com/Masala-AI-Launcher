@@ -71,6 +71,21 @@ class CommandControllerTest {
         assertEquals(0, agentsBuilt)
     }
 
+    @Test fun eachReplyIsReadAloudOnce() = runBlocking<Unit> {
+        replies += reply("one")
+        replies += reply("one")
+        val c = controller()
+        c.ask("q")
+        val first = assertIs<CommandState.Reply>(c.settled())
+        assertTrue(c.claimReadAloud(first))
+        // The card composed again (drawer closed, assist opened) shows the same reply.
+        assertEquals(false, c.claimReadAloud(first))
+        c.ask("q")
+        val second = withTimeout(5_000) { c.state.first { it is CommandState.Reply && it !== first } as CommandState.Reply }
+        // An equal reply to a new command is still new.
+        assertTrue(c.claimReadAloud(second))
+    }
+
     @Test fun otherRequestsGoToTheAgent() = runBlocking<Unit> {
         replies += reply("It is sunny")
         val c = controller()

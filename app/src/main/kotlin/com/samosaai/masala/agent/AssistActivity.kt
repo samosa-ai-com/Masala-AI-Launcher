@@ -33,7 +33,8 @@ class AssistActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        masala.commands.openInput()
+        // Only from idle: a command still running (or this screen recreated on rotation) must not be cancelled.
+        if (masala.commands.state.value == CommandState.Idle) masala.commands.openInput()
         setContent {
             val settings by masala.settings.settings.collectAsStateWithLifecycle(LauncherSettings())
             MasalaTheme(settings, systemBars = false) {
