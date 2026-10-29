@@ -48,7 +48,9 @@ object MasalaTools {
             FunctionTool(Defs.openApp, READ_ONLY) {
                 system.openApp(it.string("package_name") ?: return@FunctionTool missing("package_name"))
             },
-            FunctionTool(Defs.setWallpaper, CHANGES_SOMETHING, usesNetwork = true) { wallpaper.setWallpaper(it.string("url")) },
+            FunctionTool(Defs.setWallpaper, CHANGES_SOMETHING, usesNetwork = true) {
+                wallpaper.setWallpaper(it.string("url"), it.string("target"))
+            },
             FunctionTool(Defs.listCalendarEvents, READ_ONLY, readsPrivateData = true) {
                 calendar.listEvents(
                     daysAhead = it.int("days_ahead"),

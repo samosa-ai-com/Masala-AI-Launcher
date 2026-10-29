@@ -315,9 +315,12 @@ class DebugActivity : ComponentActivity() {
             is DebugAgent.Event.Answer -> stringResource(R.string.debug_event_answer) to event.text
             is DebugAgent.Event.Error -> stringResource(R.string.debug_event_error) to event.message
         }
-        // Raw responses are long; they start collapsed and a tap shows the whole thing.
+        // Raw responses are long; they start collapsed and a tap shows a capped view. Laying out
+        // an entire 50 KB reply as one Text blocks the main thread for seconds (an ANR), so the
+        // body is trimmed head-and-tail and says how much it hid.
         var expanded by remember(event) { mutableStateOf(false) }
         val raw = event is DebugAgent.Event.Raw
+        val shown = if (raw && !expanded) body.take(PREVIEW_CHARS) else capped(body, MAX_BODY_CHARS)
         Column(
             Modifier
                 .fillMaxWidth()
@@ -328,16 +331,26 @@ class DebugActivity : ComponentActivity() {
         ) {
             Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Text(
-                body,
+                shown,
                 fontFamily = if (raw || event is DebugAgent.Event.Call) FontFamily.Monospace else null,
                 fontSize = if (raw) 11.sp else 14.sp,
-                maxLines = if (raw && !expanded) 6 else Int.MAX_VALUE,
             )
             val needs = (event as? DebugAgent.Event.Result)?.result as? ToolResult.NeedsCapability
             if (needs != null) TextButton(onClick = { onGrant(needs.capability) }) { Text(stringResource(R.string.debug_grant)) }
         }
     }
 }
+
+/** Keeps the head and tail of a long body, with the hidden size named in the middle. */
+internal fun capped(text: String, limit: Int): String {
+    if (text.length <= limit) return text
+    val half = (limit - 40).coerceAtLeast(200) / 2
+    val hidden = text.length - half * 2
+    return text.take(half) + "\n\n… $hidden characters hidden …\n\n" + text.takeLast(half)
+}
+
+private const val PREVIEW_CHARS = 1_200
+private const val MAX_BODY_CHARS = 8_000
 
 /**
  * A ready-to-edit argument object for the `/tool` prompt: one entry per required parameter, with a

@@ -57,12 +57,31 @@ object MasalaToolDefinitions {
 
     val setWallpaper = tool(
         "set_wallpaper",
-        "Set the home-screen wallpaper from an image URL, or a random image if no URL is given.",
+        "Set the phone's wallpaper from an image. Accepts a web link, a local file path " +
+            "(/sdcard/Download/photo.jpg), a file:// path, or a content:// URI from a picker. The " +
+            "image is fitted to the screen, not cropped, and the leftover edges are filled with a " +
+            "colour taken from the image. Omit the source for a random image.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("url") {
                     put("type", "string")
-                    put("description", "Direct image URL. Omit for a random wallpaper.")
+                    put(
+                        "description",
+                        "Image source: https://…, /sdcard/…, file://… or content://…. Omit for a " +
+                            "random wallpaper.",
+                    )
+                }
+                putJsonObject("target") {
+                    put("type", "string")
+                    put(
+                        "description",
+                        "Which screens: 'home' (default), 'lock', or 'both'.",
+                    )
+                    putJsonArray("enum") {
+                        add("home")
+                        add("lock")
+                        add("both")
+                    }
                 }
             }
         }
