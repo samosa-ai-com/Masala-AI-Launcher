@@ -99,6 +99,25 @@ class CommandControllerTest {
         assertEquals("offline", assertIs<CommandState.Error>(c.settled()).message)
     }
 
+    @Test fun aToolThatNeedsAPermissionOffersToGrantIt() = runBlocking<Unit> {
+        val calls = ArrayDeque(listOf(
+            ChatMessage("assistant", JsonPrimitive(""), toolCalls = listOf(com.samosaai.masala.llm.ToolCall("1", function = com.samosaai.masala.llm.FunctionCall("x", "{}")))),
+        ))
+        val c = CommandController(scope, { null }, { emptyList() }, { ActionDispatcher.Outcome.Done() }, { emptyList() }, {
+            MasalaAgent(
+                AgentModel { _, _ -> calls.removeFirst() },
+                { _, _ -> ToolResult.NeedsCapability("android.permission.READ_CALENDAR", "Calendar access is needed") },
+                listOf(ToolDefinition("x", "", JsonObject(emptyMap()))),
+                ToolScope.command(listOf(ToolInfo("x", ToolSensitivity.READ_ONLY))),
+                { "s" },
+            )
+        })
+        c.ask("what is on my calendar")
+        val error = assertIs<CommandState.Error>(c.settled())
+        assertEquals("android.permission.READ_CALENDAR", error.capability)
+        assertEquals("Calendar access is needed", error.message)
+    }
+
     @Test fun spokenCommandsGetNamesCorrected() = runBlocking<Unit> {
         val c = controller()
         c.ask("open spotfy", spoken = true)

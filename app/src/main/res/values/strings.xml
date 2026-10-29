@@ -134,6 +134,9 @@
     <string name="settings_export_failed">Couldn’t write the file</string>
 
     <!-- Phase 4 -->
+    <string name="command_grant">Grant</string>
+    <string name="command_try_again">Try again</string>
+    <string name="capability_retry_prompt">I’ve granted it. Please try again.</string>
     <string name="jobs_channel">Background jobs</string>
     <string name="jobs_running">Masala is working</string>
     <string name="scheduled_skill_gone">The skill “%1$s” is no longer installed.</string>

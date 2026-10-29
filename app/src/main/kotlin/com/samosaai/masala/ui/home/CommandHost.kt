@@ -52,6 +52,7 @@ import com.samosaai.masala.R
 import com.samosaai.masala.agent.CommandState
 import com.samosaai.masala.agent.SkillChip
 import com.samosaai.masala.ui.components.Markdown
+import com.samosaai.masala.ui.components.rememberCapabilityGrant
 import com.samosaai.masala.ui.skills.SkillSheetActivity
 import com.samosaai.masala.ui.wiki.ProposalCards
 import kotlinx.coroutines.launch
@@ -112,6 +113,9 @@ fun ReplyCard(app: MasalaApp, readAloud: Boolean, modifier: Modifier = Modifier)
     val scope = rememberCoroutineScope()
     val press = rememberMicPress(app)
     var text by remember { mutableStateOf("") }
+    val retryPrompt = stringResource(R.string.capability_retry_prompt)
+    // A dialog that was allowed carries on by itself; a settings screen needs Try again.
+    val grant = rememberCapabilityGrant { granted -> if (granted) app.commands.ask(retryPrompt) }
 
     val reply = state as? CommandState.Reply
     // "Read replies aloud" applies to every reply; the button reads one on request.
@@ -139,7 +143,15 @@ fun ReplyCard(app: MasalaApp, readAloud: Boolean, modifier: Modifier = Modifier)
                         s.skill?.let { chip -> SkillChipButton(chip) { openSkill(context, app, chip, s.prompt) } }
                         ProposalCards(app)
                     }
-                    is CommandState.Error -> Text(s.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
+                    is CommandState.Error -> {
+                        Text(s.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
+                        s.capability?.let { marker ->
+                            Row {
+                                TextButton(onClick = { grant(marker) }) { Text(stringResource(R.string.command_grant)) }
+                                TextButton(onClick = { app.commands.ask(retryPrompt) }) { Text(stringResource(R.string.command_try_again)) }
+                            }
+                        }
+                    }
                     CommandState.Input, CommandState.Idle -> Unit
                 }
             }

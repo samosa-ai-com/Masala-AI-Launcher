@@ -3,6 +3,7 @@ package com.samosaai.masala
 import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -141,6 +142,8 @@ class HomeActivity : ComponentActivity() {
             if (!app.actions.startShortcut(shortcut)) toast(getString(R.string.drawer_launch_failed, shortcut.shortLabel))
         }
 
+        // Job progress notifications need this on Android 13 and newer; asked for when a schedule is accepted.
+        val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
         val skillWidgets = remember {
             object : SkillWidgetSource {
                 override fun skill(id: String) = app.skills.getSkillById(id)
@@ -149,6 +152,11 @@ class HomeActivity : ComponentActivity() {
                 override fun scheduleOffer(skillId: String) = app.skills.getSkillById(skillId)?.let { app.skillScheduling.offerFor(it, SkillScheduling.now()) }
                 override fun acceptSchedule(offer: SkillScheduling.Offer) {
                     app.skillScheduling.accept(offer, System.currentTimeMillis(), java.time.ZoneId.systemDefault())
+                    if (Build.VERSION.SDK_INT >= 33 &&
+                        checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                    ) {
+                        notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    }
                     scope.launch(kotlinx.coroutines.Dispatchers.IO) { ScheduledTaskScheduler.reschedule(app) }
                 }
                 override fun declineSchedule(skillId: String) = app.skillScheduling.decline(skillId)

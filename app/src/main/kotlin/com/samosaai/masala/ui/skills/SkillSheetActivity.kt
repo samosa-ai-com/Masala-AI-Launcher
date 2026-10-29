@@ -55,6 +55,7 @@ import com.samosaai.masala.skills.Attachment
 import com.samosaai.masala.skills.SkillMessage
 import com.samosaai.masala.skills.SkillRunEvent
 import com.samosaai.masala.skills.SkillRunState
+import com.samosaai.masala.ui.components.rememberCapabilityGrant
 import com.samosaai.masala.ui.home.ConfirmationSheet
 import com.samosaai.masala.ui.home.SymbolDisc
 import com.samosaai.masala.ui.home.SymbolIcons
@@ -120,6 +121,10 @@ class SkillSheetActivity : ComponentActivity() {
                 if (current == null) begin(message) else app.skillRunner.send(current.runId, message)
             }
         }
+
+        val retryPrompt = stringResource(R.string.capability_retry_prompt)
+        // A dialog that was allowed carries on by itself; a settings screen needs Try again.
+        val grant = rememberCapabilityGrant { granted -> if (granted) send(retryPrompt) }
 
         LaunchedEffect(Unit) {
             when {
@@ -189,7 +194,13 @@ class SkillSheetActivity : ComponentActivity() {
                         )
                         is SkillRunEvent.Progress -> Text(event.label + "…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         is SkillRunEvent.Result -> ResultCard(event) { result -> saving = result; save.launch(File(result.ref).name) }
-                        is SkillRunEvent.NeedsCapability -> Text(event.reason, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                        is SkillRunEvent.NeedsCapability -> Column {
+                            Text(event.reason, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                            Row {
+                                TextButton(onClick = { grant(event.capability) }) { Text(stringResource(R.string.command_grant)) }
+                                TextButton(enabled = !state.running, onClick = { send(retryPrompt) }) { Text(stringResource(R.string.command_try_again)) }
+                            }
+                        }
                         is SkillRunEvent.Failed -> Text(event.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                         SkillRunEvent.Done -> Unit
                     }

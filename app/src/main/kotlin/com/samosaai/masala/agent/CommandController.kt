@@ -108,7 +108,7 @@ class CommandController(
                     }
                     is AgentEvent.Done -> _state.value = CommandState.Reply(prompt, event.text.ifBlank { "Done." }, steps.toList(), spoken = spoken)
                     is AgentEvent.Failed -> _state.value = CommandState.Error(prompt, event.message)
-                    is AgentEvent.NeedsCapability -> _state.value = CommandState.Error(prompt, event.reason)
+                    is AgentEvent.NeedsCapability -> _state.value = CommandState.Error(prompt, event.reason, event.capability)
                     AgentEvent.StepLimit -> _state.value = CommandState.Error(prompt, "That took too many steps. Try asking in smaller pieces.")
                     else -> Unit
                 }

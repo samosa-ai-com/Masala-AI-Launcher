@@ -12,5 +12,6 @@ sealed interface CommandState {
     data object Listening : CommandState
     data class Thinking(val prompt: String, val steps: List<String> = emptyList()) : CommandState
     data class Reply(val prompt: String, val text: String, val steps: List<String> = emptyList(), val skill: SkillChip? = null, val spoken: Boolean = false) : CommandState
-    data class Error(val prompt: String, val message: String) : CommandState
+    /** [capability] is the marker of a permission or special access that would fix it, for a Grant button. */
+    data class Error(val prompt: String, val message: String, val capability: String? = null) : CommandState
 }
