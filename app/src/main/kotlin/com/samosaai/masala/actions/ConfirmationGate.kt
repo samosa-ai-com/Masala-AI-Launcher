@@ -13,6 +13,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Asks the user before anything that isn't read-only runs (arch §3.6, plan Phase 2). The home screen shows
@@ -68,7 +69,7 @@ class ConfirmationGate(
 
     override suspend fun check(tool: Tool, args: JsonObject): ToolResult? {
         val decision = confirm(
-            summary = "${tool.definition.name} ${args}".trim(),
+            summary = summarize(tool.definition.name, args),
             destructive = tool.sensitivity == ToolSensitivity.DESTRUCTIVE,
             subject = tool.definition.name,
         )
@@ -81,5 +82,19 @@ class ConfirmationGate(
 
     companion object {
         const val DEFAULT_TIMEOUT_MS = 60_000L
+        private const val MAX_VALUE_CHARS = 120
+
+        /**
+         * The tool and its arguments as the sheet shows them. A long text value (a mini app's HTML, a
+         * layout) is cut to its start and its size, so the sheet's buttons stay on screen.
+         */
+        internal fun summarize(name: String, args: JsonObject): String {
+            val shown = JsonObject(args.mapValues { (_, value) ->
+                val text = (value as? JsonPrimitive)?.takeIf { it.isString }?.content ?: value.toString()
+                if (text.length <= MAX_VALUE_CHARS) value
+                else JsonPrimitive(text.take(MAX_VALUE_CHARS) + "… (${text.length} characters)")
+            })
+            return "$name $shown".trim()
+        }
     }
 }

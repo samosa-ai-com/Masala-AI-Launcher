@@ -85,4 +85,13 @@ class ConfirmationGateTest {
         gate.answer(false)
         check.await()
     }
+
+    @Test
+    fun `a long argument is cut in the summary so the sheet stays usable`() {
+        val html = "<html>" + "x".repeat(20_000) + "</html>"
+        val summary = ConfirmationGate.summarize("create_mini_app", JsonObject(mapOf("title" to JsonPrimitive("Snake"), "html" to JsonPrimitive(html))))
+        assertTrue(summary.length < 300, summary)
+        assertTrue(summary.contains("\"title\":\"Snake\""), summary)
+        assertTrue(summary.contains("(20013 characters)"), summary)
+    }
 }
