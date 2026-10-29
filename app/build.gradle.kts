@@ -112,6 +112,7 @@ dependencies {
     testImplementation(kotlin("test-junit"))
     testImplementation(libs.okhttp.mockwebserver)
 
+    androidTestImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.runner)
