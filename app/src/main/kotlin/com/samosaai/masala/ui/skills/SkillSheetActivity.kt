@@ -60,7 +60,7 @@ import com.samosaai.masala.ui.home.ConfirmationSheet
 import com.samosaai.masala.ui.home.SymbolDisc
 import com.samosaai.masala.ui.home.SymbolIcons
 import com.samosaai.masala.ui.theme.MasalaTheme
-import com.samosaai.masala.ui.wiki.ProposalCards
+import com.samosaai.masala.ui.secondbrain.ProposalCards
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first

@@ -1,4 +1,4 @@
-package com.samosaai.masala.ui.wiki
+package com.samosaai.masala.ui.secondbrain
 
 import android.os.Bundle
 import android.widget.Toast
@@ -55,7 +55,7 @@ import kotlinx.coroutines.launch
  * a profile editor that feeds user.md, and the approval queue. Entries can be read,
  * edited and deleted; everything exports as one Markdown file.
  */
-class WikiActivity : ComponentActivity() {
+class SecondBrainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -85,7 +85,7 @@ class WikiActivity : ComponentActivity() {
                         contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) } != null
                     }
                 }.getOrDefault(false)
-                Toast.makeText(this@WikiActivity, if (ok) R.string.wiki_exported else R.string.settings_export_failed, Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@SecondBrainActivity, if (ok) R.string.wiki_exported else R.string.settings_export_failed, Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -125,7 +125,7 @@ class WikiActivity : ComponentActivity() {
                 scope.launch {
                     val saved = app.secondBrain.save(entry.id.ifBlank { null }, title, body)
                     if (saved == null) {
-                        Toast.makeText(this@WikiActivity, R.string.result_save_failed, Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@SecondBrainActivity, R.string.result_save_failed, Toast.LENGTH_SHORT).show()
                     } else {
                         editing = null
                     }
@@ -147,7 +147,7 @@ class WikiActivity : ComponentActivity() {
                         if (fresh == null) {
                             viewingId = null
                         } else if (fresh.truncated) {
-                            Toast.makeText(this@WikiActivity, R.string.secondbrain_too_large, Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@SecondBrainActivity, R.string.secondbrain_too_large, Toast.LENGTH_SHORT).show()
                         } else {
                             editing = Editing(app.secondBrain.idOf(fresh), app.secondBrain.titleOf(fresh), app.secondBrain.bodyOf(fresh))
                         }

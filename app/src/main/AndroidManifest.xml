@@ -199,7 +199,7 @@
 
         <!-- Personal Wiki: read, edit, delete, export (Phase 4) -->
         <activity
-            android:name=".ui.wiki.WikiActivity"
+            android:name=".ui.secondbrain.SecondBrainActivity"
             android:exported="false" />
 
         <!-- A skill's conversation (Phase 4) -->

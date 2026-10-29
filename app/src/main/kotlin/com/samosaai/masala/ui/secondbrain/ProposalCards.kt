@@ -1,4 +1,4 @@
-package com.samosaai.masala.ui.wiki
+package com.samosaai.masala.ui.secondbrain
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

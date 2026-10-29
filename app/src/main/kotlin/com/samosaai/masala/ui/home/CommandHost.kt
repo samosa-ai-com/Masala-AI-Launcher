@@ -54,7 +54,7 @@ import com.samosaai.masala.agent.SkillChip
 import com.samosaai.masala.ui.components.Markdown
 import com.samosaai.masala.ui.components.rememberCapabilityGrant
 import com.samosaai.masala.ui.skills.SkillSheetActivity
-import com.samosaai.masala.ui.wiki.ProposalCards
+import com.samosaai.masala.ui.secondbrain.ProposalCards
 import kotlinx.coroutines.launch
 
 /** Push-to-talk: what a held mic button does, with the microphone permission asked on the first press. */

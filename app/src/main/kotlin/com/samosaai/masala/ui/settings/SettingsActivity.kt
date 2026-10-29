@@ -65,7 +65,7 @@ import com.samosaai.masala.ui.components.LauncherRow
 import com.samosaai.masala.ui.drawer.visibilityLabel
 import com.samosaai.masala.ui.theme.MasalaTheme
 import com.samosaai.masala.ui.mcp.McpActivity
-import com.samosaai.masala.ui.wiki.WikiActivity
+import com.samosaai.masala.ui.secondbrain.SecondBrainActivity
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -219,7 +219,7 @@ class SettingsActivity : ComponentActivity() {
                 }
             }
             SettingsNavRow(stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) {
-                startActivity(Intent(this@SettingsActivity, WikiActivity::class.java))
+                startActivity(Intent(this@SettingsActivity, SecondBrainActivity::class.java))
             }
             SettingsNavRow(stringResource(R.string.mcp_title), stringResource(R.string.mcp_summary)) {
                 startActivity(Intent(this@SettingsActivity, McpActivity::class.java))
