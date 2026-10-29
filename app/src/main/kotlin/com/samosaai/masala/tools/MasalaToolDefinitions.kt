@@ -118,8 +118,8 @@ object MasalaToolDefinitions {
     val createMiniApp = tool(
         "create_mini_app",
         "Save a self-contained HTML mini-app (single file: inline CSS and JS, no external " +
-            "requests unless the user enabled network for it). Returns the new mini-app id; tell " +
-            "the user to open it from home once pinned.",
+            "requests unless the user enabled network for it). Returns the new mini-app id and any " +
+            "console errors from loading it once; tell the user to open it from home once pinned.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("title") {
@@ -137,8 +137,8 @@ object MasalaToolDefinitions {
 
     val updateMiniApp = tool(
         "update_mini_app",
-        "Replace a mini-app's HTML, keeping its title and settings. Returns console errors when " +
-            "the app logged any, for the repair turn.",
+        "Replace a mini-app's HTML, keeping its title and settings. Returns console errors from " +
+            "loading the new version, and any the old one logged while the user had it open.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("id") {

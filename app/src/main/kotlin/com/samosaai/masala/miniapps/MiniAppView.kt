@@ -66,7 +66,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /** Each mini-app gets its own origin under this domain, so `localStorage` can't be shared. */
 private const val APP_DOMAIN = "appassets.androidplatform.net"
 
-private fun originOf(appId: String) = "https://$appId.$APP_DOMAIN/"
+internal fun originOf(appId: String) = "https://$appId.$APP_DOMAIN/"
 
 /**
  * One generated HTML mini-app on screen (plan Phase 3, Lane D). JavaScript on, no JS bridge,
@@ -90,50 +90,8 @@ fun MiniAppView(
     }
     AndroidView(
         factory = { ctx ->
-            val origin = originOf(appId)
-            val htmlBytes = html.toByteArray(Charsets.UTF_8)
             WebView(ctx).apply {
-                applyMiniAppSettings(this, networkAllowed)
-                webViewClient = object : WebViewClient() {
-                    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
-                        val url = request.url.toString()
-                        // The document itself, and in-page routing, come from the stored HTML.
-                        if (url == origin || url.startsWith(origin + "#") || url.startsWith(origin + "?")) {
-                            return WebResourceResponse(
-                                "text/html", "utf-8", 200, "OK", emptyMap(),
-                                ByteArrayInputStream(htmlBytes),
-                            )
-                        }
-                        // Nothing else is served from the app: no asset directory, no files.
-                        // With network off, every other request is refused outright.
-                        if (!allowNetwork.get()) {
-                            return WebResourceResponse("text/plain", "utf-8", 403, "Blocked", emptyMap(), null)
-                        }
-                        return null
-                    }
-
-                    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                        val url = request.url.toString()
-                        // Stay inside the mini-app: same-origin navigation is the app's own routing.
-                        if (url.startsWith(origin)) {
-                            view.loadUrl(url)
-                            return true
-                        }
-                        // Leaving the app is never allowed, network on or off.
-                        return true
-                    }
-                }
-                webChromeClient = object : WebChromeClient() {
-                    override fun onConsoleMessage(message: ConsoleMessage): Boolean {
-                        MiniAppConsole.record(
-                            appId,
-                            "${message.messageLevel()}: ${message.message()} " +
-                                "(${message.sourceId()}:${message.lineNumber()})",
-                        )
-                        return super.onConsoleMessage(message)
-                    }
-                }
-                loadUrl(origin)
+                hostMiniApp(this, appId, html, allowNetwork) { line -> MiniAppConsole.record(appId, line) }
                 webView = this
                 onWebView(this)
             }
@@ -150,6 +108,63 @@ fun MiniAppView(
             onWebView(null)
         },
     )
+}
+
+/**
+ * Sets [wv] up as the host for one app and loads it: the stored [html] is served as the app's own
+ * origin, nothing else from the app is reachable, every other request is refused while
+ * [allowNetwork] is false, and navigation never leaves the app. Shared by [MiniAppView] and
+ * [MiniAppProbe], so what the probe checks is what the user runs.
+ */
+internal fun hostMiniApp(
+    wv: WebView,
+    appId: String,
+    html: String,
+    allowNetwork: AtomicBoolean,
+    onPageFinished: () -> Unit = {},
+    onConsole: (String) -> Unit,
+) {
+    val origin = originOf(appId)
+    val htmlBytes = html.toByteArray(Charsets.UTF_8)
+    applyMiniAppSettings(wv, allowNetwork.get())
+    wv.webViewClient = object : WebViewClient() {
+        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+            val url = request.url.toString()
+            // The document itself, and in-page routing, come from the stored HTML.
+            if (url == origin || url.startsWith(origin + "#") || url.startsWith(origin + "?")) {
+                return WebResourceResponse(
+                    "text/html", "utf-8", 200, "OK", emptyMap(),
+                    ByteArrayInputStream(htmlBytes),
+                )
+            }
+            // Nothing else is served from the app: no asset directory, no files.
+            // With network off, every other request is refused outright.
+            if (!allowNetwork.get()) {
+                return WebResourceResponse("text/plain", "utf-8", 403, "Blocked", emptyMap(), null)
+            }
+            return null
+        }
+
+        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+            val url = request.url.toString()
+            // Stay inside the mini-app: same-origin navigation is the app's own routing.
+            if (url.startsWith(origin)) {
+                view.loadUrl(url)
+                return true
+            }
+            // Leaving the app is never allowed, network on or off.
+            return true
+        }
+
+        override fun onPageFinished(view: WebView, url: String) = onPageFinished()
+    }
+    wv.webChromeClient = object : WebChromeClient() {
+        override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+            onConsole("${message.messageLevel()}: ${message.message()} (${message.sourceId()}:${message.lineNumber()})")
+            return super.onConsoleMessage(message)
+        }
+    }
+    wv.loadUrl(origin)
 }
 
 /** In-memory console log per app, newest last (cap 20): what the repair turn reads. */

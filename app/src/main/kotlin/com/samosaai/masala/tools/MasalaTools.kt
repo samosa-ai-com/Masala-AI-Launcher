@@ -5,6 +5,7 @@ import com.samosaai.masala.core.tool.ActionResult
 import com.samosaai.masala.core.tool.Produced
 import com.samosaai.masala.core.tool.ToolFiles
 import com.samosaai.masala.miniapps.MiniAppConsole
+import com.samosaai.masala.miniapps.MiniAppProbe
 import com.samosaai.masala.miniapps.openMiniApp
 import com.samosaai.masala.miniapps.MiniAppStore
 import android.content.Context
@@ -38,6 +39,7 @@ object MasalaTools {
         val notifications = NotificationTool(app)
         val pdf = PdfTool(app, files)
         val transcribe = TranscribeTool(app, files)
+        val probe = MiniAppProbe(app)
         val contacts = ContactsTool(app)
 
         // Read lazily: the layout repository is built after the tools, and only tools that pin
@@ -218,33 +220,33 @@ object MasalaTools {
             // Generated HTML mini-apps (plan Phase 3, Lane D).
             FunctionTool(Defs.createMiniApp, CHANGES_SOMETHING) {
                 val title = it.string("title") ?: "Mini app"
-                val id = miniApps.create(
-                    title = title,
-                    html = it.string("html") ?: return@FunctionTool missing("html"),
-                ) ?: return@FunctionTool ActionResult.error(
+                val html = it.string("html") ?: return@FunctionTool missing("html")
+                val id = miniApps.create(title = title, html = html) ?: return@FunctionTool ActionResult.error(
                     "That HTML is too large (max ${MiniAppStore.MAX_HTML_CHARS} characters). Make it smaller."
                 )
                 // Pinning here is what makes "it created the app" true for the user: a stored app
                 // with no home item is invisible. The call is gated, so the user still confirms.
                 val problems = host().layouts.pinMiniApp(id, title)
+                val created = if (problems.isEmpty()) "Mini app '$id' created and pinned to home."
+                else "Mini app '$id' created, but it couldn't be pinned: ${problems.first()}"
                 ActionResult.ok(
-                    if (problems.isEmpty()) "Mini app '$id' created and pinned to home."
-                    else "Mini app '$id' created, but it couldn't be pinned: ${problems.first()}",
+                    created + "\n" + loadReport(probe.errors(html)),
                     listOf(Produced("mini_app", miniApps.get(id)?.title ?: title, id)),
                 )
             },
             FunctionTool(Defs.updateMiniApp, CHANGES_SOMETHING) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")
-                val ok = miniApps.update(id, html = it.string("html") ?: return@FunctionTool missing("html"))
+                val html = it.string("html") ?: return@FunctionTool missing("html")
+                val ok = miniApps.update(id, html = html)
                 if (!ok) return@FunctionTool ActionResult.error(
                     "No mini app '$id', or its HTML is over ${MiniAppStore.MAX_HTML_CHARS} characters."
                 )
-                // Errors reported here are cleared so the next repair turn starts fresh.
-                val errors = MiniAppConsole.errors(id)
+                // Errors from while the user had the old version open; cleared so the next repair turn starts fresh.
+                val seen = MiniAppConsole.errors(id)
                 MiniAppConsole.clear(id)
                 val produced = listOfNotNull(miniApps.get(id)?.let { row -> Produced("mini_app", row.title, id) })
-                if (errors.isEmpty()) ActionResult.ok("Mini app '$id' updated.", produced)
-                else ActionResult.ok("Mini app '$id' updated. Console errors:\n" + errors.joinToString("\n"), produced)
+                val earlier = if (seen.isEmpty()) "" else "\nWhile the user had the previous version open it logged:\n" + seen.joinToString("\n")
+                ActionResult.ok("Mini app '$id' updated.\n" + loadReport(probe.errors(html)) + earlier, produced)
             },
             FunctionTool(Defs.listMiniApps, READ_ONLY) {
                 val rows = miniApps.list()
@@ -272,5 +274,12 @@ object MasalaTools {
                 ActionResult.ok("Mini app '$id' deleted.")
             },
         )
+    }
+
+    /** What the model reads about the app's first load: its console errors, so it can fix them with update_mini_app. */
+    internal fun loadReport(errors: List<String>?): String = when {
+        errors == null -> "It couldn't be checked for errors."
+        errors.isEmpty() -> "It loaded with no console errors."
+        else -> "It logged console errors while loading; fix them with update_mini_app:\n" + errors.joinToString("\n")
     }
 }

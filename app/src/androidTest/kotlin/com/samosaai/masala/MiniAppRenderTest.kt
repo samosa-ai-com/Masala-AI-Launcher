@@ -4,9 +4,12 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.samosaai.masala.miniapps.MiniAppConsole
+import com.samosaai.masala.miniapps.MiniAppProbe
 import com.samosaai.masala.miniapps.MiniAppView
 import com.samosaai.masala.ui.theme.MasalaTheme
 import com.samosaai.masala.data.LauncherSettings
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -60,5 +63,16 @@ class MiniAppRenderTest {
         val log = MiniAppConsole.errors(id)
         assertTrue("page never booted; console=$log", log.any { it.contains("booted score=42 best=7") })
         assertTrue("console error not captured; console=$log", log.any { it.contains("deliberate test error") })
+    }
+
+    @Test
+    fun probeReportsLoadErrorsAndNothingForACleanApp() = runBlocking {
+        val probe = MiniAppProbe(app)
+        val broken = "<html><body><script>var a = 1; missingFunction(a);</script></body></html>"
+        val errors = probe.errors(broken)
+        assertTrue("expected a ReferenceError; got $errors", errors.orEmpty().any { "missingFunction" in it })
+        val timer = "<html><body><script>setTimeout(function () { null.x; }, 200);</script></body></html>"
+        assertTrue("timer error missed; got ${probe.errors(timer)}", probe.errors(timer).orEmpty().isNotEmpty())
+        assertEquals(emptyList<String>(), probe.errors(gameHtml.replace("console.error('deliberate test error');", "")))
     }
 }
