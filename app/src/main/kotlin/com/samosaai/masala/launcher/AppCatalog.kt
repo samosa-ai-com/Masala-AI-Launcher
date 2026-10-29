@@ -109,7 +109,9 @@ class AppCatalog(private val context: Context, private val scope: CoroutineScope
         return try {
             userManager.requestQuietModeEnabled(paused, work.user)
             true
-        } catch (e: SecurityException) {
+        } catch (e: Exception) {
+            // SecurityException when the profile refuses, but the framework can also answer with a
+            // RemoteException wrapped in a Parcel exception; neither may take the drawer down.
             Log.w(TAG, "Can't change work profile quiet mode", e)
             false
         }

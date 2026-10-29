@@ -72,6 +72,46 @@ object AndroidTranscriber {
         }
     }
 
+    /**
+     * Decodes any platform-supported audio track into 16-bit mono PCM at [SAMPLE_RATE], wrapped in
+     * a RIFF/WAVE header so a server that demands WAV can take it. The transcription endpoint
+     * accepts only mono 16-bit PCM WAV, and recordings here are AAC.
+     */
+    fun toWav(source: File, target: File): Boolean {
+        val pcm = File(source.parentFile ?: target.parentFile, source.nameWithoutExtension + ".tmp.pcm")
+        return try {
+            if (!decodeToPcm(source, pcm)) return false
+            writeWav(pcm, target)
+            true
+        } finally {
+            runCatching { pcm.delete() }
+        }
+    }
+
+    /** RIFF/WAVE header (44 bytes) in front of raw PCM. */
+    private fun writeWav(pcm: File, target: File) {
+        val dataSize = pcm.length().toInt()
+        val byteRate = SAMPLE_RATE * CHANNELS * 2
+        val header = java.nio.ByteBuffer.allocate(44).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        header.put("RIFF".toByteArray())
+        header.putInt(36 + dataSize)
+        header.put("WAVE".toByteArray())
+        header.put("fmt ".toByteArray())
+        header.putInt(16)
+        header.putShort(1) // PCM
+        header.putShort(CHANNELS.toShort())
+        header.putInt(SAMPLE_RATE)
+        header.putInt(byteRate)
+        header.putShort((CHANNELS * 2).toShort())
+        header.putShort(16) // bits per sample
+        header.put("data".toByteArray())
+        header.putInt(dataSize)
+        target.outputStream().use { out ->
+            out.write(header.array())
+            pcm.inputStream().use { it.copyTo(out) }
+        }
+    }
+
     /** Decodes any platform-supported audio track into 16-bit mono PCM at [SAMPLE_RATE]. */
     private fun decodeToPcm(source: File, target: File): Boolean {
         val extractor = MediaExtractor()

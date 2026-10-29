@@ -5,16 +5,20 @@ import com.samosaai.masala.BuildConfig
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import java.io.File
@@ -132,36 +136,66 @@ class AudioApi(
         }
     }
 
-    /** Speech-to-text: upload audio and return transcription. */
+    /**
+     * Speech-to-text through the documented ASR endpoint: a multipart request with a JSON
+     * `request` part and a WAV `audio` part, answered with a JSON transcript.
+     *
+     * The WAV must be mono 16-bit PCM at 16 kHz or 24 kHz; callers convert before calling.
+     */
+    fun transcribeWav(
+        wavFile: File,
+        model: String,
+        language: String? = null,
+        mode: String = DEFAULT_ASR_MODE,
+    ): Result<String> = runCatching {
+        val url = "${baseUrl.trimEnd('/')}/asr/transcribe"
+        val boundary = "Boundary-${System.currentTimeMillis()}"
+        val settings = buildJsonObject {
+            put("model", model)
+            put("mode", mode)
+            put("audioEncoding", "WAV")
+            val languageName = language?.trim()?.takeIf { it.isNotEmpty() }
+            if (languageName != null) putJsonArray("languageBias") { add(languageName) }
+        }
+        val body = MultipartBody.Builder(boundary)
+            .setType(MultipartBody.FORM)
+            .addFormDataPart(
+                "request",
+                null,
+                settings.toString().toRequestBody("application/json".toMediaType()),
+            )
+            .addFormDataPart("audio", wavFile.name, wavFile.asRequestBody("audio/wav".toMediaType()))
+            .build()
+        val request = Request.Builder().url(url).post(body).build()
+        client.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string() ?: throw IOException("Empty response")
+            if (!response.isSuccessful) throw IOException("HTTP ${response.code}: ${responseBody.take(300)}")
+            val jsonObj = jsonParser.parseToJsonElement(responseBody).jsonObject
+            // `transcript` is present in every mode; older/plain responses carry `text`.
+            jsonObj["transcript"]?.jsonPrimitive?.contentOrNull
+                ?: jsonObj["text"]?.jsonPrimitive?.contentOrNull
+                ?: ""
+        }
+    }
+
+    /**
+     * Transcription for callers that already hold a recording in any format: converts it to the
+     * WAV the endpoint requires, then uploads. Kept as the single entry point for live dictation.
+     */
     fun transcribe(
         audioFile: File,
         model: String,
         language: String? = null,
-        contentType: String = "audio/m4a"
-    ): Result<String> = runCatching {
-        val url = "${baseUrl.trimEnd('/')}/audio/transcriptions"
-        val boundary = "Boundary-${System.currentTimeMillis()}"
-        val extraFields = mutableMapOf("model" to model)
-        if (!language.isNullOrBlank()) {
-            extraFields["language"] = language.trim()
-        }
-        val body = buildMultipartBody(
-            boundary,
-            audioFile,
-            "file",
-            contentType,
-            extraFields
-        )
-        val request = Request.Builder()
-            .url(url)
-            .header("Content-Type", "multipart/form-data; boundary=$boundary")
-            .post(body)
-            .build()
-        client.newCall(request).execute().use { response ->
-            val responseBody = response.body?.string() ?: throw IOException("Empty response")
-            if (!response.isSuccessful) throw IOException("HTTP ${response.code}: $responseBody")
-            val jsonObj = jsonParser.parseToJsonElement(responseBody).jsonObject
-            jsonObj["text"]?.jsonPrimitive?.contentOrNull ?: ""
+        contentType: String = "audio/m4a",
+    ): Result<String> {
+        val wav = File(audioFile.parentFile, audioFile.nameWithoutExtension + ".asr.wav")
+        return try {
+            if (!AndroidTranscriber.toWav(audioFile, wav)) {
+                return Result.failure(IOException("Couldn't convert ${audioFile.name} to WAV"))
+            }
+            transcribeWav(wav, model, language)
+        } finally {
+            runCatching { wav.delete() }
         }
     }
 
@@ -216,5 +250,13 @@ class AudioApi(
         bos.write(closing)
 
         return bos.toByteArray().toRequestBody("multipart/form-data; boundary=$boundary".toMediaType())
+    }
+
+    companion object {
+        /**
+         * PUSH_TO_TALK returns one transcript for the whole file, which is what a recorded meeting
+         * note or voice memo wants. ENDPOINTING and DIARIZATION split it into turns instead.
+         */
+        const val DEFAULT_ASR_MODE = "PUSH_TO_TALK"
     }
 }

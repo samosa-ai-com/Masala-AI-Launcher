@@ -273,7 +273,14 @@ class DebugActivity : ComponentActivity() {
                     EventRow(event) { marker ->
                         val capability = Capability.byMarker(marker)
                         if (capability == Capability.HEALTH_CONNECT) {
-                            health.launch(HealthTool.PERMISSIONS)
+                            // Health Connect owns that screen; without it installed there is no
+                            // activity to launch, and the launcher throws.
+                            val opened = runCatching { health.launch(HealthTool.PERMISSIONS) }.isSuccess
+                            if (!opened) {
+                                events += DebugAgent.Event.Error(
+                                    "Health Connect isn't installed on this phone, so it can't be granted here.",
+                                )
+                            }
                         } else if (capability != null) {
                             capability.settingsIntent(this@DebugActivity)?.let(::startActivity)
                         } else if (marker.startsWith("android.permission.") || marker.startsWith("com.termux.permission.")) {

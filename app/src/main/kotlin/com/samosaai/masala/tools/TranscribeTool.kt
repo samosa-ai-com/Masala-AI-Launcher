@@ -44,7 +44,7 @@ class TranscribeTool(
     private class ApiSttBackend(private val api: AudioApi) : SttBackend {
         override fun listModels(): List<AudioModel> = api.listAudioModels()
         override fun transcribe(file: File, model: String, language: String?, contentType: String): Result<String> =
-            api.transcribe(file, model, language, contentType)
+            api.transcribeWav(file, model, language)
     }
 
 
@@ -125,7 +125,38 @@ class TranscribeTool(
         }
         val resolvedLanguage = (language ?: settings.sttLanguage).trim().ifBlank { null }
 
-        val apiResult = backend.transcribe(file, resolvedModel, resolvedLanguage, contentType)
+        // The endpoint accepts only mono 16-bit PCM WAV; recordings here are AAC/m4a.
+        val wav = File(context.cacheDir, "asr-${file.nameWithoutExtension}.wav")
+        val converted = try {
+            AndroidTranscriber.toWav(file, wav)
+        } finally {
+            // nothing to clean yet: wav is deleted below
+        }
+        if (!converted) {
+            val local = AndroidTranscriber.transcribe(context, file, resolvedLanguage)
+            return if (local != null) {
+                local.fold(
+                    onSuccess = { text -> transcriptResult(file, text, "Android's built-in speech service") },
+                    onFailure = { e ->
+                        ActionResult.error(
+                            "Couldn't convert '${file.name}' to WAV for the transcription endpoint " +
+                                "(${e.message?.take(ERROR_DETAIL_CHARS)}).",
+                        )
+                    },
+                )
+            } else {
+                ActionResult.error(
+                    "Couldn't convert '${file.name}' to the WAV the endpoint needs, and this device " +
+                        "can't transcribe a file itself.",
+                )
+            }
+        }
+
+        val apiResult = try {
+            backend.transcribe(wav, resolvedModel, resolvedLanguage, "audio/wav")
+        } finally {
+            runCatching { wav.delete() }
+        }
         val transcript = apiResult.getOrElse { e ->
             // A proxy can list a model and not serve the route (this one answers 404). Remember
             // that, so the next call doesn't spend a round-trip and a scary 404 on it.

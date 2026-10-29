@@ -44,7 +44,7 @@ class ToolSweepTest {
         val dialer = canHandle(Intent(Intent.ACTION_DIAL))
         return when (name) {
             "media_convert", "media_edit" -> "needs Termux + ffmpeg"
-            "transcribe_file" -> "needs a speech API key and an audio file"
+            "transcribe_file" -> "needs an audio file on the device; covered by ToolFollowupsTest"
             "get_health_summary", "get_health_records" -> "needs Health Connect"
             "uninstall_app" -> "would remove an app; tested on a phone"
             "set_wallpaper" -> "changes the wallpaper; tested on a phone"
