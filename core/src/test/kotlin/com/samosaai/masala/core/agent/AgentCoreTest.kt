@@ -146,6 +146,17 @@ class SkillRouterTest {
         assertNull(SkillRouter.route("anything", listOf(noKeywords, noPersona)))
     }
 
+    @Test fun gameRequestsHandOffToTheGameMaker() {
+        val maker = MasalaSkill(
+            id = "game_maker", instructions = "i", keywords = listOf("game", "snake"),
+            widget = com.samosaai.masala.core.contract.SkillWidget("sports_esports", output = com.samosaai.masala.core.contract.SkillOutput.MINI_APP),
+        )
+        assertEquals(maker, SkillRouter.handoff("make me a snake game", listOf(chef, maker)))
+        // A persona or a skill that doesn't make an app never takes a request this way.
+        assertNull(SkillRouter.handoff("what can I cook with eggs", listOf(chef, maker)))
+        assertNull(SkillRouter.handoff("make me a game", listOf(noPersona.copy(keywords = listOf("game")))))
+    }
+
     @Test fun requestsToActAreCommandsAdviceIsNot() {
         listOf(
             "add dinner with Anna to my calendar", "remind me about the doctor", "run my morning brief",

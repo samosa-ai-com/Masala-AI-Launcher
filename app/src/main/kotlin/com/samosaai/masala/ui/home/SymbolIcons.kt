@@ -16,7 +16,7 @@ object SymbolIcons {
         "flag" to "⚑", "folder" to "📁", "headphones" to "🎧", "home" to "🏠", "info" to "ℹ️",
         "language" to "🌐", "location_on" to "📍", "mic" to "🎤", "music_note" to "♪", "notifications" to "🔔",
         "photo" to "🖼️", "play_arrow" to "▶", "priority_high" to "❗", "queue_music" to "🎶", "restaurant" to "🍽️",
-        "school" to "🎓", "search" to "🔍", "settings" to "⚙️", "shopping_cart" to "🛒", "star" to "★",
+        "school" to "🎓", "search" to "🔍", "settings" to "⚙️", "shopping_cart" to "🛒", "sports_esports" to "🎮", "star" to "★",
         "timer" to "⏱️", "tune" to "🎚️", "wb_sunny" to "☀️", "widgets" to "▦", "work" to "💼",
     )
 

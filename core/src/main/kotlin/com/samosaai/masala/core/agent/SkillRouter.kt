@@ -1,6 +1,7 @@
 package com.samosaai.masala.core.agent
 
 import com.samosaai.masala.core.contract.MasalaSkill
+import com.samosaai.masala.core.contract.SkillOutput
 import com.samosaai.masala.core.tool.matchesIntent
 
 /**
@@ -18,6 +19,13 @@ object SkillRouter {
 
     fun route(text: String, skills: List<MasalaSkill>): MasalaSkill? =
         skills.firstOrNull { it.persona != null && it.keywords.isNotEmpty() && it.matchesIntent(text) }
+
+    /**
+     * A skill that makes a mini app and whose keyword is in [text] ("make me a snake game" → the game
+     * maker): the request goes straight to its sheet, since building the app is that skill's whole job.
+     */
+    fun handoff(text: String, skills: List<MasalaSkill>): MasalaSkill? =
+        skills.firstOrNull { it.widget?.output == SkillOutput.MINI_APP && it.keywords.isNotEmpty() && it.matchesIntent(text) }
 
     /**
      * True when [text] asks the phone to act ("add dinner with Anna to my calendar"), not only for

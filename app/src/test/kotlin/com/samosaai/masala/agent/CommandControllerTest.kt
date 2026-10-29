@@ -6,6 +6,8 @@ import com.samosaai.masala.core.agent.ToolScope
 import com.samosaai.masala.core.contract.MasalaAction
 import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.core.contract.Persona
+import com.samosaai.masala.core.contract.SkillOutput
+import com.samosaai.masala.core.contract.SkillWidget
 import com.samosaai.masala.core.tool.ToolDefinition
 import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.core.tool.ToolSensitivity
@@ -30,6 +32,10 @@ class CommandControllerTest {
     private var agentsBuilt = 0
     private val replies = ArrayDeque<ChatMessage>()
     private val chef = MasalaSkill(id = "chef", title = "Chef", instructions = "i", keywords = listOf("cook"), persona = Persona("chef"))
+    private val gameMaker = MasalaSkill(
+        id = "game_maker", title = "Game maker", instructions = "i", keywords = listOf("game"),
+        widget = SkillWidget("sports_esports", output = SkillOutput.MINI_APP),
+    )
     private val spotify = MasalaAction.LaunchApp("com.spotify")
 
     private fun reply(text: String) = ChatMessage("assistant", JsonPrimitive(text))
@@ -39,7 +45,7 @@ class CommandControllerTest {
         resolveApp = { if (it == "spotify") spotify else null },
         names = { listOf("Spotify") },
         run = { ran += it; ActionDispatcher.Outcome.Done("ok: $it") },
-        skills = { listOf(chef) },
+        skills = { listOf(chef, gameMaker) },
         newAgent = {
             agentsBuilt++
             MasalaAgent(
@@ -54,6 +60,14 @@ class CommandControllerTest {
     )
 
     private suspend fun CommandController.settled() = withTimeout(5_000) { state.first { it is CommandState.Reply || it is CommandState.Error } }
+
+    @Test fun aGameRequestOpensTheGameMaker() = runBlocking<Unit> {
+        val c = controller()
+        c.ask("make me a snake game")
+        assertEquals(CommandState.Reply("make me a snake game", "Opened Game maker."), c.settled())
+        assertEquals(listOf<MasalaAction>(MasalaAction.RunSkill("game_maker", "make me a snake game")), ran)
+        assertEquals(0, agentsBuilt)
+    }
 
     @Test fun fastPathBypassesTheModel() = runBlocking<Unit> {
         val c = controller()

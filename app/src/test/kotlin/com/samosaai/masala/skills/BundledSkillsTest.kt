@@ -6,7 +6,6 @@ import com.samosaai.masala.core.tool.SkillImportValidator
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /** Plan Phase 1 tests: every bundled skill decodes with the lenient reader and passes the validator. */
@@ -16,12 +15,13 @@ class BundledSkillsTest {
     private val skills = files.map { MasalaJson.lenient.decodeFromString<MasalaSkill>(it.readText()) }
 
     @Test
-    fun `the six personas are bundled`() {
+    fun `the six personas and the game maker are bundled`() {
         assertEquals(
             setOf("chef", "doctor", "fitness_coach", "handyman", "travel_planner", "tutor"),
-            skills.map { it.id }.toSet(),
+            skills.filter { it.persona != null }.map { it.id }.toSet(),
         )
-        skills.forEach { assertNotNull(it.persona, "${it.id} has no persona") }
+        // The game maker builds an app rather than holding a conversation: the one skill without a persona.
+        assertEquals(listOf("game_maker"), skills.filter { it.persona == null }.map { it.id })
     }
 
     @Test
