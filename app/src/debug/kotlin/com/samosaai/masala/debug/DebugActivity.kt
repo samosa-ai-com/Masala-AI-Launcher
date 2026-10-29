@@ -54,6 +54,9 @@ import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.llm.LlmConfig
 import com.samosaai.masala.masala
+import com.samosaai.masala.permissions.CapabilityRequester
+import com.samosaai.masala.permissions.capabilityNeeded
+import com.samosaai.masala.permissions.rememberCapabilityRequester
 import com.samosaai.masala.tools.Capability
 import com.samosaai.masala.tools.HealthTool
 import com.samosaai.masala.tools.ToolGate
@@ -142,36 +145,63 @@ class DebugActivity : ComponentActivity() {
                 trailingIcon = { TextButton(onClick = { prompt = "" }) { Text(stringResource(R.string.debug_clear)) } },
                 modifier = Modifier.fillMaxWidth().testTag("debug_prompt"),
             )
+            // A tool that says it needs a permission triggers the request itself; once the user
+            // answers, the same prompt runs again so the call completes without a second tap.
+            var lastRun by remember { mutableStateOf<(() -> Unit)?>(null) }
+            var asking by remember { mutableStateOf<String?>(null) }
+            val requester = rememberCapabilityRequester { _, granted ->
+                asking = null
+                // Only a dialog gives a real answer; then the same prompt finishes the job.
+                if (granted) lastRun?.invoke()
+            }
+            fun send() {
+                lastRun = { if (!running) send() }
+                saveConfig(config)
+                events.clear()
+                running = true
+                val text = prompt
+                scope.launch {
+                    val app = masala
+                    // One ask per run: an auto-retry that fails again must not loop.
+                    val asked = mutableSetOf<String>()
+                    fun maybeAsk(result: ToolResult) {
+                        val marker = result.capabilityNeeded() ?: return
+                        if (!asked.add(marker)) return
+                        when (requester.request(marker)) {
+                            CapabilityRequester.Ask.OBSERVED -> asking = marker
+                            // A settings screen: nothing to await, so no automatic retry.
+                            CapabilityRequester.Ask.SCREEN_ONLY, CapabilityRequester.Ask.UNSUPPORTED -> Unit
+                        }
+                    }
+                    try {
+                        val direct = DIRECT_CALL.matchEntire(text.trim())
+                        if (direct != null) {
+                            // "/tool {json}": run one tool through the executor, no model.
+                            val (name, json) = direct.destructured
+                            val args = Json.parseToJsonElement(json.ifBlank { "{}" }).jsonObject
+                            events += DebugAgent.Event.Call(name, args.toString())
+                            val result =
+                                if (name in DebugCommands.names) DebugCommands.run(app, name, args)
+                                else app.toolExecutor(gate).execute(name, args)
+                            events += DebugAgent.Event.Result(name, result)
+                            maybeAsk(result)
+                        } else {
+                            DebugAgent(config.client(app), app.tools.tools, app.toolExecutor(gate)).run(text) { event ->
+                                events += event
+                                (event as? DebugAgent.Event.Result)?.let { maybeAsk(it.result) }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        events += DebugAgent.Event.Error("${e::class.simpleName}: ${e.message}")
+                    } finally {
+                        running = false
+                    }
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     enabled = !running && config.isConfigured && prompt.isNotBlank(),
-                    onClick = {
-                        saveConfig(config)
-                        events.clear()
-                        running = true
-                        scope.launch {
-                            val app = masala
-                            try {
-                                val direct = DIRECT_CALL.matchEntire(prompt.trim())
-                                if (direct != null) {
-                                    // "/tool {json}": run one tool through the executor, no model.
-                                    val (name, json) = direct.destructured
-                                    val args = Json.parseToJsonElement(json.ifBlank { "{}" }).jsonObject
-                                    events += DebugAgent.Event.Call(name, args.toString())
-                                    events += DebugAgent.Event.Result(
-                                        name,
-                                        if (name in DebugCommands.names) DebugCommands.run(app, name, args) else app.toolExecutor(gate).execute(name, args),
-                                    )
-                                } else {
-                                    DebugAgent(config.client(app), app.tools.tools, app.toolExecutor(gate)).run(prompt) { events += it }
-                                }
-                            } catch (e: Exception) {
-                                events += DebugAgent.Event.Error("${e::class.simpleName}: ${e.message}")
-                            } finally {
-                                running = false
-                            }
-                        }
-                    },
+                    onClick = ::send,
                 ) { Text(stringResource(if (running) R.string.debug_running else R.string.debug_send)) }
                 OutlinedButton(enabled = !running, onClick = {
                     saveConfig(config)
@@ -189,6 +219,13 @@ class DebugActivity : ComponentActivity() {
                     events.clear()
                     events += DebugAgent.Event.Raw(masala.actionLog.tail(20).joinToString("\n").ifEmpty { "(empty)" })
                 }) { Text(stringResource(R.string.debug_action_log)) }
+            }
+            asking?.let { marker ->
+                Text(
+                    stringResource(R.string.debug_permission_asking, Capability.byMarker(marker)?.label ?: marker),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
             var showTools by rememberSaveable { mutableStateOf(false) }
             var toolFilter by rememberSaveable { mutableStateOf("") }

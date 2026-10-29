@@ -44,6 +44,9 @@ class ActionDispatcher(
         data class Done(val message: String? = null) : Outcome
         data object Declined : Outcome
         data class Failed(val message: String) : Outcome
+
+        /** A tool stopped because a permission is missing; the caller can ask for it. */
+        data class NeedsCapability(val marker: String, val reason: String) : Outcome
     }
 
     suspend fun dispatch(action: MasalaAction, screen: Screen): Outcome = try {
@@ -111,7 +114,7 @@ class ActionDispatcher(
 
     private suspend fun tool(name: String, args: JsonObject): Outcome = when (val r = executor().execute(name, args)) {
         is ToolResult.Success -> Outcome.Done(r.output)
-        is ToolResult.NeedsCapability -> Outcome.Failed(r.reason)
+        is ToolResult.NeedsCapability -> Outcome.NeedsCapability(r.capability, r.reason)
         is ToolResult.Failure -> if (r.message.startsWith("The user declined")) Outcome.Declined else Outcome.Failed(r.message)
     }
 
