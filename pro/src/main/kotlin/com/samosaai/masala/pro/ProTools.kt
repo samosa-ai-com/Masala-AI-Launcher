@@ -3,6 +3,7 @@ package com.samosaai.masala.pro
 import android.content.Context
 import android.os.Environment
 import com.samosaai.masala.core.files.FileIndex
+import com.samosaai.masala.core.files.IndexStatus
 import com.samosaai.masala.core.files.TextExtractor
 import com.samosaai.masala.core.tool.ActionResult
 import com.samosaai.masala.core.tool.FunctionTool
@@ -49,6 +50,8 @@ object ProTools {
             // Seeing access here for the first time (the user just granted it) starts the first run.
             indexedFiles = { index.refresh(); index.status.files },
             hasAccess = { Environment.isExternalStorageManager() },
+            storage = Environment.getExternalStorageDirectory().absolutePath,
+            indexing = { index.status.state == IndexStatus.State.RUNNING },
         )
 
         listOf(

@@ -279,12 +279,13 @@ class SkillMessageTest {
     }
 
     @Test fun pickerIdsBecomeStoragePaths() {
-        val path = com.samosaai.masala.ui.skills.SkillInputs::storagePath
+        val path = { id: String -> com.samosaai.masala.ui.skills.SkillInputs.storagePath(id, "/storage/emulated/0") }
         assertEquals("/storage/emulated/0/Download/Taxes", path("primary:Download/Taxes"))
         assertEquals("/storage/emulated/0", path("primary:"))
         assertEquals("/storage/emulated/0/Download/a.pdf", path("raw:/storage/emulated/0/Download/a.pdf"))
         assertEquals(null, path("1A2B-3C4D:Music"))
         assertEquals(null, path("msf:42"))
+        assertEquals("/storage/emulated/10/Music", com.samosaai.masala.ui.skills.SkillInputs.storagePath("primary:Music", "/storage/emulated/10"))
     }
 
     @Test fun unreadablePhotoIsLeftOut() {

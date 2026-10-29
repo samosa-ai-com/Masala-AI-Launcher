@@ -62,6 +62,8 @@ class FileIndexer(
         /** The walk hit [IndexRules.MAX_FILES]; files past it aren't indexed. */
         val capped: Boolean,
         val stoppedEarly: Boolean,
+        /** Storage couldn't be listed (access revoked, storage unmounted); nothing was changed. */
+        val unreadable: Boolean = false,
     )
 
     suspend fun run(
@@ -69,10 +71,16 @@ class FileIndexer(
         progress: (done: Int, total: Int) -> Unit = { _, _ -> },
         isStopped: () -> Boolean = { false },
     ): Result = withContext(Dispatchers.IO) {
-        val (onDisk, capped) = walk(root, isStopped)
         // A half-walked tree would make every file not reached yet look gone: change nothing.
-        if (isStopped()) return@withContext Result(store.count(), store.countWithText(), 0, 0, 0, capped, stoppedEarly = true)
-        val diff = IndexDiff.of(onDisk.mapValues { it.value.lastModified() }, store.stored())
+        suspend fun unchanged(capped: Boolean, unreadable: Boolean) =
+            Result(store.count(), store.countWithText(), 0, 0, 0, capped, stoppedEarly = true, unreadable = unreadable)
+        if (root.listFiles() == null) return@withContext unchanged(false, true)
+        val (onDisk, capped) = walk(root, isStopped)
+        if (isStopped()) return@withContext unchanged(capped, false)
+        val stored = store.stored()
+        // Storage that lists as empty while the index isn't almost always lost access partway, not a wiped phone.
+        if (onDisk.isEmpty() && stored.isNotEmpty()) return@withContext unchanged(false, true)
+        val diff = IndexDiff.of(onDisk.mapValues { it.value.lastModified() }, stored)
         diff.gone.chunked(batchSize).forEach { store.delete(it) }
 
         val toRead = diff.toRead

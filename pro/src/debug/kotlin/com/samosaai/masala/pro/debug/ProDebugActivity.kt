@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import com.samosaai.masala.pro.data.ExportedApp
-import com.samosaai.masala.pro.data.FileIndexEntry
 import com.samosaai.masala.pro.data.ProDatabase
 import com.samosaai.masala.pro.install.ApkInstaller
 import kotlinx.coroutines.MainScope
@@ -30,10 +29,11 @@ class ProDebugActivity : Activity() {
                 scope.launch { Log.i(TAG, "install: ${installer.install(File(intent.getStringExtra("apk").orEmpty()))}") }
             }
             "db" -> scope.launch {
-                val db = ProDatabase.create(this@ProDebugActivity)
-                db.fileIndex().upsert(listOf(FileIndexEntry(path = "/sdcard/Documents/tax-2025.txt", name = "tax-2025.txt", content = "income tax return for 2025", modified = 1L)))
+                val db = ProDatabase.get(this@ProDebugActivity)
+                // The real index: add one test row and remove only that row afterwards.
+                db.fileIndex().insert("/sdcard/Documents/tax-2025.txt", "tax-2025.txt", "income tax return for 2025", 1L)
                 Log.i(TAG, "fts match 'tax*': ${db.fileIndex().search("tax*").map { it.path }}; match 'nothing': ${db.fileIndex().search("nothing").size}")
-                db.fileIndex().clear()
+                db.fileIndex().deletePath("/sdcard/Documents/tax-2025.txt")
                 db.exportedApps().upsert(ExportedApp("com.samosaai.masala.apps.snake", "snake", "Snake", 1, 2L))
                 Log.i(TAG, "exported: ${db.exportedApps().all()}")
                 db.exportedApps().delete("com.samosaai.masala.apps.snake")

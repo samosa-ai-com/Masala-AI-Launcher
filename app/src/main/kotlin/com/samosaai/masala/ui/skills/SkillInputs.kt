@@ -22,7 +22,6 @@ object SkillInputs {
         SkillInput.TEXT, SkillInput.PHOTO, SkillInput.VIDEO, SkillInput.DOCUMENT, SkillInput.AUDIO_FILE, SkillInput.FOLDER, SkillInput.PATH,
     )
 
-    private const val STORAGE = "/storage/emulated/0"
     private const val EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage.documents"
 
     /** Folder and path inputs hand tools real paths in shared storage, which needs All files access. */
@@ -30,21 +29,23 @@ object SkillInputs {
 
     /**
      * The path in shared storage for a document or tree id from the system picker
-     * (`primary:Download/Taxes` → `/storage/emulated/0/Download/Taxes`; the Downloads provider's
-     * `raw:/storage/…`). Null for anything else: SD cards, cloud providers, media ids.
+     * (`primary:Download/Taxes` → `<storage>/Download/Taxes`; the Downloads provider's
+     * `raw:/storage/…`). Null for anything else: SD cards, cloud providers, media ids. [storage] is
+     * this user's shared storage, `/storage/emulated/<user>`.
      */
-    internal fun storagePath(documentId: String): String? = when {
+    internal fun storagePath(documentId: String, storage: String): String? = when {
         documentId.startsWith("raw:/") -> documentId.removePrefix("raw:")
-        documentId == "primary:" -> STORAGE
-        documentId.startsWith("primary:") -> "$STORAGE/" + documentId.removePrefix("primary:").trim('/')
+        documentId == "primary:" -> storage
+        documentId.startsWith("primary:") -> "$storage/" + documentId.removePrefix("primary:").trim('/')
         else -> null
     }
 
     /** A picked folder as its real path, or null when it isn't on this phone's storage. */
     fun pickedFolder(uri: Uri): Attachment? {
         if (uri.authority != EXTERNAL_STORAGE_AUTHORITY) return null
-        val path = storagePath(DocumentsContract.getTreeDocumentId(uri)) ?: return null
-        return Attachment(SkillInput.FOLDER, path, File(path).name.ifEmpty { "Storage" })
+        val storage = storageRoot()
+        val path = storagePath(DocumentsContract.getTreeDocumentId(uri), storage)?.takeIf { File(it).isDirectory } ?: return null
+        return Attachment(SkillInput.FOLDER, path, if (path == storage) "Storage" else File(path).name)
     }
 
     /**
@@ -53,12 +54,14 @@ object SkillInputs {
      */
     fun pickedPath(context: Context, uri: Uri, dir: File): Attachment? {
         val real = if (Environment.isExternalStorageManager() && DocumentsContract.isDocumentUri(context, uri)) {
-            storagePath(DocumentsContract.getDocumentId(uri))?.takeIf { File(it).isFile }
+            storagePath(DocumentsContract.getDocumentId(uri), storageRoot())?.takeIf { File(it).isFile }
         } else {
             null
         }
         return real?.let { Attachment(SkillInput.PATH, it, File(it).name) } ?: copyPicked(context, uri, SkillInput.PATH, dir)
     }
+
+    private fun storageRoot(): String = Environment.getExternalStorageDirectory().absolutePath
 
     /** Copies a picked [uri] into [dir], so tools get a path inside Masala's storage. */
     fun copyPicked(context: Context, uri: Uri, kind: SkillInput, dir: File): Attachment? = try {

@@ -56,6 +56,9 @@ fun FilesPage(index: FileIndex, onBack: () -> Unit) {
         SettingsSectionTitle(stringResource(R.string.files_index))
         SettingsToggleRow(stringResource(R.string.files_index_daily), status.enabled) { index.setEnabled(it) }
         Text(statusLine(status), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (status.failures > 0 && status.state == IndexStatus.State.IDLE) {
+            Text(stringResource(R.string.files_index_failures, status.failures), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         status.message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(

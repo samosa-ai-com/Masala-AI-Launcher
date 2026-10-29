@@ -16,10 +16,12 @@ class FileSearchToolTest {
         FileHit("/storage/emulated/0/Download/deposit.txt", "deposit.txt", 1_793_000_000_000L, "deposit.txt"),
     )
 
-    private fun tool(files: Int = 10, access: Boolean = true) = FileSearchTool(
+    private fun tool(files: Int = 10, access: Boolean = true, indexing: Boolean = false) = FileSearchTool(
         hits = { m, f, l -> asked += Triple(m, f, l); found },
         indexedFiles = { files },
         hasAccess = { access },
+        storage = "/storage/emulated/0",
+        indexing = { indexing },
         zone = ZoneOffset.UTC,
     )
 
@@ -35,10 +37,19 @@ class FileSearchToolTest {
     }
 
     @Test fun `folders the model names become path prefixes`() {
-        assertEquals("/", FileSearchTool.folderPrefix(null))
-        assertEquals("/storage/emulated/0/Download/", FileSearchTool.folderPrefix("Download"))
-        assertEquals("/storage/emulated/0/Documents/", FileSearchTool.folderPrefix("/sdcard/Documents/"))
-        assertEquals("/storage/emulated/0/Documents/", FileSearchTool.folderPrefix("/storage/emulated/0/Documents"))
+        val storage = "/storage/emulated/0"
+        assertEquals("/", FileSearchTool.folderPrefix(null, storage))
+        assertEquals("/storage/emulated/0/Download/", FileSearchTool.folderPrefix("Download", storage))
+        assertEquals("/storage/emulated/0/Documents/", FileSearchTool.folderPrefix("/sdcard/Documents/", storage))
+        assertEquals("/storage/emulated/0/Documents/", FileSearchTool.folderPrefix("/storage/emulated/0/Documents", storage))
+        assertEquals("/storage/emulated/10/Download/", FileSearchTool.folderPrefix("/sdcard/Download", "/storage/emulated/10"))
+    }
+
+    @Test fun `LIKE wildcards in a folder name match only themselves`() = runBlocking<Unit> {
+        assertEquals("/storage/emulated/0/my\\_files\\%/", FileSearchTool.likePrefix("/storage/emulated/0/my_files%/"))
+        assertEquals("a\\\\b", FileSearchTool.likePrefix("a\\b"))
+        tool().search("x", "Documents/my_files", null)
+        assertEquals("/storage/emulated/0/Documents/my\\_files/", asked.single().second)
     }
 
     @Test fun `the limit is kept in range`() = runBlocking<Unit> {
@@ -58,6 +69,9 @@ class FileSearchToolTest {
         assertFalse(empty.success)
         assertTrue("glob" in empty.message && "Index now" in empty.message)
         assertFalse(tool().search("?!", null, null).success)
+        val first = tool(files = 0, indexing = true).search("lease", null, null)
+        assertFalse(first.success)
+        assertTrue("being built" in first.message && "Index now" !in first.message)
     }
 
     @Test fun `no match is an answer, not an error`() = runBlocking {

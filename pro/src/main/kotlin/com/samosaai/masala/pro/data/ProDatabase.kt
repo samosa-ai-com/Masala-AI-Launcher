@@ -50,10 +50,6 @@ data class FileIndexEntry(
 
 @Dao
 interface FileIndexDao {
-    /** Keyed by [FileIndexEntry.rowId], which defaults to 0: entries without distinct ids replace each other. The indexer uses [insert]. */
-    @Upsert
-    suspend fun upsert(entries: List<FileIndexEntry>)
-
     /** Adds one file; SQLite picks the rowid. */
     @Query("INSERT INTO file_index(path, name, content, modified) VALUES (:path, :name, :content, :modified)")
     suspend fun insert(path: String, name: String, content: String, modified: Long)
@@ -64,11 +60,11 @@ interface FileIndexDao {
 
     /**
      * Matches with a passage around the hit (`[` and `]` mark the words), newest first; only paths
-     * under [folder] (a prefix, `/` for everything).
+     * under [folder] (a prefix with `\`, `%` and `_` escaped; `/` for everything).
      */
     @Query(
         "SELECT path, name, modified, snippet(file_index, '[', ']', '…', -1, 24) AS passage FROM file_index " +
-            "WHERE file_index MATCH :query AND path LIKE :folder || '%' ORDER BY modified DESC LIMIT :limit"
+            "WHERE file_index MATCH :query AND path LIKE :folder || '%' ESCAPE '\\' ORDER BY modified DESC LIMIT :limit"
     )
     suspend fun hits(query: String, folder: String, limit: Int): List<FileHit>
 

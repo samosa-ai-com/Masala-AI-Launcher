@@ -1,10 +1,10 @@
 package com.samosaai.masala
 
-import com.samosaai.masala.core.files.FileIndex
-import com.samosaai.masala.core.tool.ToolFiles
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import com.samosaai.masala.core.files.FileIndex
+import com.samosaai.masala.core.tool.ToolFiles
 import com.samosaai.masala.actions.ActionDispatcher
 import com.samosaai.masala.actions.ConfirmationGate
 import com.samosaai.masala.agent.AgentModel

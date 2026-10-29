@@ -117,6 +117,25 @@ class FileIndexerTest {
     }
 
     @Test
+    fun `an unreadable root changes nothing`() = runBlocking {
+        write("Documents/a.txt")
+        indexer().run(root)
+        val result = indexer().run(File(root, "missing"))
+        assertTrue(result.unreadable)
+        assertEquals(setOf("a.txt"), store.rows.values.map { it.name }.toSet())
+    }
+
+    @Test
+    fun `storage that suddenly lists empty keeps the index`() = runBlocking {
+        write("Documents/a.txt")
+        indexer().run(root)
+        File(root, "Documents").deleteRecursively()
+        val result = indexer().run(root)
+        assertTrue(result.unreadable)
+        assertEquals(1, store.rows.size)
+    }
+
+    @Test
     fun `progress reaches the total`() = runBlocking {
         (1..5).forEach { write("Documents/f$it.txt") }
         val seen = mutableListOf<Pair<Int, Int>>()

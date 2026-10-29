@@ -19,6 +19,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The file index as `:app` sees it (arch §3.10): daily runs while charging, Index now, Clear, and the
@@ -34,6 +36,12 @@ class ProFileIndex private constructor(private val context: Context) : FileIndex
     @Volatile var extractor: TextExtractor? = null
 
     @Volatile private var progress: Pair<Int, Int>? = null
+
+    /** The daily run and Index now are separate unique works: only one of them walks at a time. */
+    private val running = AtomicBoolean(false)
+
+    /** Bumped by [clear]; a run that started before it stops and doesn't report. */
+    private val generation = AtomicInteger(0)
 
     private val hasAccess get() = Environment.isExternalStorageManager()
 
@@ -74,7 +82,10 @@ class ProFileIndex private constructor(private val context: Context) : FileIndex
     }
 
     override fun clear() {
+        generation.incrementAndGet()
         work.cancelUniqueWork(NOW)
+        work.cancelUniqueWork(PERIODIC)
+        if (prefs.getBoolean(KEY_ENABLED, false)) schedule()
         scope.launch {
             ProDatabase.get(context).fileIndex().clear()
             prefs.edit().remove(KEY_FILES).remove(KEY_WITH_TEXT).remove(KEY_FAILURES).remove(KEY_LAST_RUN).remove(KEY_MESSAGE).apply()
@@ -92,13 +103,21 @@ class ProFileIndex private constructor(private val context: Context) : FileIndex
         }
     }
 
+    /** Claims the run; false while another worker is indexing. Pair with [end]. */
+    internal fun begin(): Boolean = running.compareAndSet(false, true)
+
+    internal fun end() = running.set(false)
+
+    internal val currentGeneration: Int get() = generation.get()
+
     internal fun onProgress(done: Int, total: Int) {
         progress = done to total
         publish()
     }
 
-    internal fun onFinished(result: FileIndexer.Result?, error: String?) {
+    internal fun onFinished(result: FileIndexer.Result?, error: String?, startedIn: Int = currentGeneration) {
         progress = null
+        if (startedIn != currentGeneration) return publish()
         prefs.edit().apply {
             if (result != null) {
                 putInt(KEY_FILES, result.files)
@@ -106,7 +125,14 @@ class ProFileIndex private constructor(private val context: Context) : FileIndex
                 putInt(KEY_FAILURES, result.failures)
                 if (!result.stoppedEarly) putLong(KEY_LAST_RUN, System.currentTimeMillis())
             }
-            putString(KEY_MESSAGE, error ?: if (result?.capped == true) "Stopped at the file limit" else null)
+            putString(
+                KEY_MESSAGE,
+                error ?: when {
+                    result?.unreadable == true -> "Couldn't read storage; the index was left as it was"
+                    result?.capped == true -> "Stopped at the file limit"
+                    else -> null
+                },
+            )
         }.apply()
         publish()
     }

@@ -206,8 +206,9 @@
     <string name="files_index_needs_access">Needs All files access.</string>
     <string name="files_index_never">Not run yet.</string>
     <string name="files_index_counting">Looking through your files…</string>
-    <string name="files_index_running">Indexing: %1$d of %2$d</string>
-    <string name="files_index_summary">%1$d files, %2$d with text. Last run %3$s.</string>
+    <string name="files_index_running">Indexing: %1$,d of %2$,d</string>
+    <string name="files_index_summary">%1$,d files, %2$,d with text. Last run %3$s.</string>
+    <string name="files_index_failures">%1$,d couldn\'t be read.</string>
     <string name="files_index_just_now">just now</string>
     <string name="files_index_now">Index now</string>
     <string name="files_index_clear">Clear</string>

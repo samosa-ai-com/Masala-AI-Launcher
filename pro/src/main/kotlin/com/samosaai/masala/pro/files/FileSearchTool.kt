@@ -16,6 +16,9 @@ class FileSearchTool(
     private val hits: suspend (match: String, folder: String, limit: Int) -> List<FileHit>,
     private val indexedFiles: () -> Int,
     private val hasAccess: () -> Boolean,
+    /** This user's shared storage (`/storage/emulated/<user>`), where folder names point. */
+    private val storage: String,
+    private val indexing: () -> Boolean = { false },
     private val zone: ZoneId = ZoneId.systemDefault(),
 ) {
     suspend fun search(query: String, folder: String?, limit: Int?): ActionResult {
@@ -27,12 +30,18 @@ class FileSearchTool(
         }
         val match = SearchQuery.match(query) ?: return ActionResult.error("Give some words to search for.")
         if (indexedFiles() == 0) {
+            if (indexing()) {
+                return ActionResult.error(
+                    "The file index is being built for the first time and has nothing yet. Use glob to find " +
+                        "files by name or grep to search text files, or try file_search again in a few minutes."
+                )
+            }
             return ActionResult.error(
                 "The file index is empty: it hasn't run yet. Use glob to find files by name or grep to " +
                     "search text files, or ask the user to run Index now in Settings → Files & search."
             )
         }
-        val found = hits(match, folderPrefix(folder), (limit ?: DEFAULT_LIMIT).coerceIn(1, MAX_LIMIT))
+        val found = hits(match, likePrefix(folderPrefix(folder, storage)), (limit ?: DEFAULT_LIMIT).coerceIn(1, MAX_LIMIT))
         if (found.isEmpty()) {
             return ActionResult.ok("No indexed file matches \"$query\". Files changed since the last index run, and text past the first part of long documents, aren't covered: grep can search text files directly.")
         }
@@ -48,17 +57,19 @@ class FileSearchTool(
     companion object {
         const val DEFAULT_LIMIT = 10
         const val MAX_LIMIT = 30
-        private const val STORAGE = "/storage/emulated/0"
-
-        /** A path prefix for the folder the model named: absolute, `/sdcard/…`, or relative to storage. */
-        internal fun folderPrefix(folder: String?): String {
+        /** A path prefix for the folder the model named: absolute, `/sdcard/…`, or relative to [storage]. */
+        internal fun folderPrefix(folder: String?, storage: String): String {
             val f = folder?.trim()?.trimEnd('/').orEmpty()
             return when {
                 f.isEmpty() -> "/"
-                f == "/sdcard" || f.startsWith("/sdcard/") -> STORAGE + f.removePrefix("/sdcard") + "/"
+                f == "/sdcard" || f.startsWith("/sdcard/") -> storage + f.removePrefix("/sdcard") + "/"
                 f.startsWith("/") -> "$f/"
-                else -> "$STORAGE/$f/"
+                else -> "$storage/$f/"
             }
         }
+
+        /** [prefix] for `LIKE … ESCAPE '\'`, so `%` and `_` in a folder name match only themselves. */
+        internal fun likePrefix(prefix: String): String =
+            prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     }
 }

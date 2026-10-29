@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import com.samosaai.masala.core.files.TextExtractor
 import com.samosaai.masala.pro.R
 import com.samosaai.masala.pro.data.ProDatabase
 import kotlinx.coroutines.CancellationException
@@ -29,6 +30,16 @@ class FileIndexWorker(context: Context, params: WorkerParameters) : CoroutineWor
             return Result.success()
         }
         val extractor = index.extractor ?: return Result.retry()
+        if (!index.begin()) return Result.success()
+        try {
+            return runIndex(extractor)
+        } finally {
+            index.end()
+        }
+    }
+
+    private suspend fun runIndex(extractor: TextExtractor): Result {
+        val generation = index.currentGeneration
         // From the background Android may refuse a foreground service; the run still goes on.
         runCatching { setForeground(info(0, 0)) }.onFailure { Log.w(TAG, "No foreground service: ${it.message}") }
         index.onProgress(0, 0)
@@ -44,16 +55,16 @@ class FileIndexWorker(context: Context, params: WorkerParameters) : CoroutineWor
                         runCatching { setForegroundAsync(info(done, total)) }
                     }
                 },
-                isStopped = { isStopped },
+                isStopped = { isStopped || index.currentGeneration != generation },
             )
-            index.onFinished(result, null)
+            index.onFinished(result, null, generation)
             Result.success()
         } catch (e: CancellationException) {
-            index.onFinished(null, null)
+            index.onFinished(null, null, generation)
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "Index run failed", e)
-            index.onFinished(null, e.message ?: e.javaClass.simpleName)
+            index.onFinished(null, e.message ?: e.javaClass.simpleName, generation)
             Result.failure()
         }
     }

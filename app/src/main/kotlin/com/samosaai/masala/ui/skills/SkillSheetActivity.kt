@@ -263,6 +263,7 @@ class SkillSheetActivity : ComponentActivity() {
                                         SkillInput.DOCUMENT -> pickDocument.launch(arrayOf("*/*"))
                                         SkillInput.AUDIO_FILE -> pickAudio.launch(arrayOf("audio/*"))
                                         // A folder only means something as a real path: ask for access first.
+                                        // After the grant screen the user taps the chip again; that's when the picker opens.
                                         SkillInput.FOLDER -> if (SkillInputs.needsAllFiles(input)) grant(ToolFiles.ALL_FILES_ACCESS) else pickFolder.launch(null)
                                         SkillInput.PATH -> pickPath.launch(arrayOf("*/*"))
                                         else -> Unit
