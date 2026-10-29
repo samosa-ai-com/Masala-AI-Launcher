@@ -44,8 +44,8 @@ object MasalaTools {
         fun host() = app as com.samosaai.masala.MasalaApp
 
         return listOf(
-            FunctionTool(Defs.dialNumber, READ_ONLY) { phone.dialNumber(it.string("number") ?: return@FunctionTool missing("number")) },
-            FunctionTool(Defs.openApp, READ_ONLY) {
+            FunctionTool(Defs.dialNumber, READ_ONLY, opensScreen = true) { phone.dialNumber(it.string("number") ?: return@FunctionTool missing("number")) },
+            FunctionTool(Defs.openApp, READ_ONLY, opensScreen = true) {
                 system.openApp(it.string("package_name") ?: return@FunctionTool missing("package_name"))
             },
             FunctionTool(Defs.setWallpaper, CHANGES_SOMETHING, usesNetwork = true) {
@@ -72,7 +72,7 @@ object MasalaTools {
             FunctionTool(Defs.searchContacts, READ_ONLY, readsPrivateData = true) {
                 contacts.search(it.string("query"), it.int("limit"))
             },
-            FunctionTool(Defs.openUrl, READ_ONLY) {
+            FunctionTool(Defs.openUrl, READ_ONLY, opensScreen = true) {
                 val url = it.string("url") ?: return@FunctionTool missing("url")
                 if (!url.startsWith("http://") && !url.startsWith("https://")) {
                     return@FunctionTool ActionResult.error("Only http and https links can be opened.")
@@ -96,7 +96,7 @@ object MasalaTools {
                     minutes = it.int("minutes"),
                 )
             },
-            FunctionTool(Defs.showAlarms, READ_ONLY) { alarms.showAlarms() },
+            FunctionTool(Defs.showAlarms, READ_ONLY, opensScreen = true) { alarms.showAlarms() },
             FunctionTool(Defs.nextAlarm, READ_ONLY) { alarms.nextAlarm() },
             FunctionTool(Defs.snoozeAlarm, CHANGES_SOMETHING) { alarms.snoozeAlarm(minutes = it.int("minutes")) },
             FunctionTool(Defs.toggleTorch, CHANGES_SOMETHING) {
@@ -249,7 +249,7 @@ object MasalaTools {
                 else rows.joinToString("\n") { "${it.id}: ${it.title} (updated ${it.updatedAt})" }
                     .let { ActionResult.ok(it) }
             },
-            FunctionTool(Defs.openMiniAppTool, READ_ONLY) {
+            FunctionTool(Defs.openMiniAppTool, READ_ONLY, opensScreen = true) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")
                 if (miniApps.get(id) == null) return@FunctionTool ActionResult.error("No mini app '$id'.")
                 context.openMiniApp(id)

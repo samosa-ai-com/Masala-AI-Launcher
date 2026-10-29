@@ -58,6 +58,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Each mini-app gets its own origin under this domain, so `localStorage` can't be shared. */
 private const val APP_DOMAIN = "appassets.androidplatform.net"
@@ -78,6 +79,8 @@ fun MiniAppView(
     onWebView: (WebView?) -> Unit = {},
 ) {
     var webView by remember(appId) { mutableStateOf<WebView?>(null) }
+    // Read by the WebView's request thread; the switch updates it in place, so the client never keeps a stale value.
+    val allowNetwork = remember(appId) { AtomicBoolean(networkAllowed) }
     // Keys are appId/html only: toggling the network switch must not destroy a running app.
     DisposableEffect(appId, html) {
         onDispose { webView?.loadUrl("about:blank") }
@@ -100,7 +103,7 @@ fun MiniAppView(
                         }
                         // Nothing else is served from the app: no asset directory, no files.
                         // With network off, every other request is refused outright.
-                        if (!networkAllowed) {
+                        if (!allowNetwork.get()) {
                             return WebResourceResponse("text/plain", "utf-8", 403, "Blocked", emptyMap(), null)
                         }
                         return null
@@ -133,7 +136,8 @@ fun MiniAppView(
             }
         },
         update = { wv ->
-            // Only settings change on recomposition; the page is never reloaded here.
+            // Only the network policy changes on recomposition; the page is never reloaded here.
+            allowNetwork.set(networkAllowed)
             wv.settings.blockNetworkLoads = !networkAllowed
         },
         modifier = modifier,

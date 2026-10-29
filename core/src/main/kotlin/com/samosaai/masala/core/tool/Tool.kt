@@ -49,6 +49,12 @@ interface Tool {
     /** Sends anything off the phone: web fetch or search, MCP, uploads. */
     val usesNetwork: Boolean get() = false
 
+    /**
+     * Brings up a screen (another app, a dialer, a sheet). Needs someone at the phone, so runs nobody
+     * is watching never get it: Android blocks the screen from the background.
+     */
+    val opensScreen: Boolean get() = false
+
     suspend fun execute(args: JsonObject): ToolResult
 }
 

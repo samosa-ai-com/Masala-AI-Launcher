@@ -118,8 +118,8 @@ class TranscribeTool(
             }
             return ActionResult.error(
                 "No transcription is available. Configure a working STT endpoint with " +
-                    "MASALA_STT_BASE_URL and MASALA_STT_API_KEY (the endpoint must accept " +
-                    "/audio/transcriptions), or use a device whose speech service can read a file " +
+                    "MASALA_STT_BASE_URL and MASALA_STT_API_KEY (the endpoint must serve " +
+                    "POST <base>/asr/transcribe, e.g. /v1/asr/transcribe), or use a device whose speech service can read a file " +
                     "(Android 13+; this one can't).",
             )
         }
@@ -127,32 +127,9 @@ class TranscribeTool(
 
         // The endpoint accepts only mono 16-bit PCM WAV; recordings here are AAC/m4a.
         val wav = File(context.cacheDir, "asr-${file.nameWithoutExtension}.wav")
-        val converted = try {
-            AndroidTranscriber.toWav(file, wav)
-        } finally {
-            // nothing to clean yet: wav is deleted below
-        }
-        if (!converted) {
-            val local = AndroidTranscriber.transcribe(context, file, resolvedLanguage)
-            return if (local != null) {
-                local.fold(
-                    onSuccess = { text -> transcriptResult(file, text, "Android's built-in speech service") },
-                    onFailure = { e ->
-                        ActionResult.error(
-                            "Couldn't convert '${file.name}' to WAV for the transcription endpoint " +
-                                "(${e.message?.take(ERROR_DETAIL_CHARS)}).",
-                        )
-                    },
-                )
-            } else {
-                ActionResult.error(
-                    "Couldn't convert '${file.name}' to the WAV the endpoint needs, and this device " +
-                        "can't transcribe a file itself.",
-                )
-            }
-        }
-
+        // The WAV is only for the upload: deleted however conversion or upload ends.
         val apiResult = try {
+            if (!AndroidTranscriber.toWav(file, wav)) return notConverted(file, resolvedLanguage)
             backend.transcribe(wav, resolvedModel, resolvedLanguage, "audio/wav")
         } finally {
             runCatching { wav.delete() }
@@ -185,7 +162,7 @@ class TranscribeTool(
                 "Transcription failed: ${e.message?.take(ERROR_DETAIL_CHARS) ?: "no detail"}. " +
                     "Android's speech service on this phone can't read a file, and the endpoint " +
                     "doesn't transcribe. Set MASALA_STT_BASE_URL and MASALA_STT_API_KEY to an " +
-                    "endpoint that serves /audio/transcriptions. The file was not modified.",
+                    "endpoint that serves POST <base>/asr/transcribe (e.g. /v1/asr/transcribe). The file was not modified.",
             )
         }
         if (transcript.isBlank()) {
@@ -206,6 +183,27 @@ class TranscribeTool(
             "Transcript of '${file.name}' (${resolver.formatSize(file.length())}, spoken content sent to " +
                 "the configured STT API; the file itself was not modified):\n\n$text$truncationNote"
         )
+    }
+
+    /** The file couldn't become the WAV the endpoint takes: Android's own speech service is the last try. */
+    private suspend fun notConverted(file: File, language: String?): ActionResult {
+        val local = AndroidTranscriber.transcribe(context, file, language)
+        return if (local != null) {
+            local.fold(
+                onSuccess = { text -> transcriptResult(file, text, "Android's built-in speech service") },
+                onFailure = { e ->
+                    ActionResult.error(
+                        "Couldn't convert '${file.name}' to WAV for the transcription endpoint " +
+                            "(${e.message?.take(ERROR_DETAIL_CHARS)}).",
+                    )
+                },
+            )
+        } else {
+            ActionResult.error(
+                "Couldn't convert '${file.name}' to the WAV the endpoint needs, and this device " +
+                    "can't transcribe a file itself.",
+            )
+        }
     }
 
     private fun transcriptResult(file: File, transcript: String, engine: String): ActionResult {

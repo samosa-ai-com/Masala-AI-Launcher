@@ -8,6 +8,7 @@ data class ToolInfo(
     val name: String,
     val sensitivity: ToolSensitivity,
     val readsPrivateData: Boolean = false,
+    val opensScreen: Boolean = false,
 )
 
 /**
@@ -35,10 +36,10 @@ class ToolScope private constructor(val names: Set<String>) {
             return ToolScope((basics + memory + required).toSet())
         }
 
-        /** A run nobody is watching: nothing that would need a confirmation. */
+        /** A run nobody is watching: nothing that would need a confirmation or bring up a screen. */
         fun unattended(scope: ToolScope, all: List<ToolInfo>): ToolScope {
-            val readOnly = all.filter { it.sensitivity == ToolSensitivity.READ_ONLY }.mapTo(HashSet()) { it.name }
-            return ToolScope(scope.names.filterTo(HashSet()) { it in readOnly })
+            val safe = all.filter { it.sensitivity == ToolSensitivity.READ_ONLY && !it.opensScreen }.mapTo(HashSet()) { it.name }
+            return ToolScope(scope.names.filterTo(HashSet()) { it in safe })
         }
     }
 }

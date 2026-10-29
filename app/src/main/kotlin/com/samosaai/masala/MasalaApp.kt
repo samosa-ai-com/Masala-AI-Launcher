@@ -33,6 +33,7 @@ import com.samosaai.masala.skills.AiReports
 import com.samosaai.masala.skills.PrefsDeclinedSchedules
 import com.samosaai.masala.skills.SkillRunner
 import com.samosaai.masala.skills.SkillScheduling
+import com.samosaai.masala.skills.TranscriptFiles
 import com.samosaai.masala.scheduled.ScheduledSkillRunner
 import com.samosaai.masala.ui.skills.SkillSheetActivity
 import com.samosaai.masala.core.agent.ToolInfo
@@ -104,7 +105,7 @@ class MasalaApp : Application() {
         maxSteps: Int = MasalaAgent.DEFAULT_MAX_STEPS,
     ): MasalaAgent {
         val executor = toolExecutor(gate)
-        val infos = tools.tools.map { ToolInfo(it.name, it.sensitivity, it.readsPrivateData) }
+        val infos = tools.tools.map { ToolInfo(it.name, it.sensitivity, it.readsPrivateData, it.opensScreen) }
         return MasalaAgent(
             model = model,
             tools = { name, args -> executor.execute(name, args) },
@@ -120,7 +121,7 @@ class MasalaApp : Application() {
 
     /** Runs skills; app-scoped, so a run goes on after its sheet closes. */
     val skillRunner by lazy {
-        SkillRunner(scope, database.skillRuns(), database.skillArtifacts(), { if (it == COMMAND_SKILL_ID) COMMAND_SKILL else skills.getSkillById(it) }, ::skillAgent)
+        SkillRunner(scope, database.skillRuns(), database.skillArtifacts(), TranscriptFiles(java.io.File(filesDir, "skill_runs")), { if (it == COMMAND_SKILL_ID) COMMAND_SKILL else skills.getSkillById(it) }, ::skillAgent)
     }
 
     val aiReports by lazy { AiReports(this) }

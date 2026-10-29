@@ -71,14 +71,19 @@ class RecordingService : Service() {
     /** Opens the next chunk file. False when the mic or the encoder refused. */
     @Synchronized
     private fun beginChunk(): Boolean {
-        recorder?.runCatching { stop(); release() }
+        // Separately, so a failed stop() never skips release().
+        recorder?.runCatching { stop() }
+        recorder?.runCatching { release() }
         recorder = null
         val dir = recordingsDir().apply { mkdirs() }
         RecordingFiles.prune(dir, KEEP_FILES)
         val startedAt = System.currentTimeMillis()
         val file = File(dir, RecordingFiles.chunkName(startedAt))
+        // Held outside the try, so a recorder that fails while being set up is still released.
+        var next: MediaRecorder? = null
         return try {
-            val next = newRecorder(file).apply {
+            next = newRecorder(file)
+            next.apply {
                 setOnInfoListener { _, what, _ ->
                     if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {
                         // Chunk full: start the next one; the service keeps running.
@@ -99,6 +104,7 @@ class RecordingService : Service() {
             true
         } catch (e: Exception) {
             Log.w(TAG, "Mic unavailable", e)
+            next?.runCatching { release() }
             recorder = null
             false
         }
@@ -107,14 +113,19 @@ class RecordingService : Service() {
     private fun newRecorder(file: File): MediaRecorder {
         @Suppress("DEPRECATION")
         val recorder = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(this) else MediaRecorder()
-        recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
-        recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-        recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-        recorder.setAudioSamplingRate(16_000)
-        recorder.setAudioChannels(1)
-        recorder.setAudioEncodingBitRate(32_000)
-        recorder.setOutputFile(file.absolutePath)
-        recorder.setMaxDuration((CHUNK_MINUTES * 60_000L).toInt())
+        try {
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            recorder.setAudioSamplingRate(16_000)
+            recorder.setAudioChannels(1)
+            recorder.setAudioEncodingBitRate(32_000)
+            recorder.setOutputFile(file.absolutePath)
+            recorder.setMaxDuration((CHUNK_MINUTES * 60_000L).toInt())
+        } catch (e: Exception) {
+            recorder.release()
+            throw e
+        }
         return recorder
     }
 

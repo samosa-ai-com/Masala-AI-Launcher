@@ -45,6 +45,13 @@ class ToolScopeTest {
         val scope = ToolScope.unattended(ToolScope.skill(skill("set_alarm"), all), all)
         assertEquals(setOf("web_search", "memory_read"), scope.names)
     }
+
+    @Test fun unattendedLeavesOutToolsThatOpenAScreen() {
+        val withScreens = all + ToolInfo("open_app", ToolSensitivity.READ_ONLY, opensScreen = true)
+        val scope = ToolScope.unattended(ToolScope.skill(skill("set_alarm"), withScreens), withScreens)
+        assertFalse(scope.allows("open_app"))
+        assertTrue(scope.allows("web_search"))
+    }
 }
 
 class CommandFastPathTest {
@@ -137,5 +144,13 @@ class SkillRouterTest {
 
     @Test fun skillsWithoutKeywordsOrPersonaNeverRoute() {
         assertNull(SkillRouter.route("anything", listOf(noKeywords, noPersona)))
+    }
+
+    @Test fun requestsToActAreCommandsAdviceIsNot() {
+        listOf(
+            "add dinner with Anna to my calendar", "remind me about the doctor", "run my morning brief",
+            "Can you set an alarm for 7?", "text Mum I'm cooking",
+        ).forEach { assertTrue(SkillRouter.isCommand(it), it) }
+        listOf("what can I cook with eggs", "explain this", "I need a recipe for dal").forEach { assertFalse(SkillRouter.isCommand(it), it) }
     }
 }

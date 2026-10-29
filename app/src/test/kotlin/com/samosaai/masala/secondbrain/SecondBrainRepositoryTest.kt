@@ -204,6 +204,22 @@ class SecondBrainRepositoryTest {
         assertTrue(text.contains("Mum"))
     }
 
+    @Test fun theSavedProfileReachesTheAgent() = runBlocking<Unit> {
+        fresh()
+        brain.ensure()
+        // An empty profile adds nothing to the prompt.
+        assertEquals(null, brain.promptNow().user)
+        brain.syncUser(mapOf("name" to "Asha", "location" to "Pune"))
+        val text = AgentPrompt.build("now", emptyList(), brain.promptNow(), null)
+        assertTrue(text.contains("<user_md>"))
+        assertTrue(text.contains("- name: Asha"))
+        assertTrue(text.contains("- location: Pune"))
+        // memory_read finds the card too.
+        val read = MemoryTools.create(brain).first { it.name == "memory_read" }
+        val found = read.execute(Json.parseToJsonElement("""{"query":"user.md"}""") as JsonObject)
+        assertTrue(found is ToolResult.Success && found.output.contains("Asha"), found.toString())
+    }
+
     @Test fun migrationSkipsUnusableRowsButKeepsThem() = runBlocking<Unit> {
         fresh()
         dao.upsert(WikiPageEntity("1", "Good", "keep me", "user", 0))

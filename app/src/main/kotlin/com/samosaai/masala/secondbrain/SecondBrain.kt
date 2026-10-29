@@ -83,11 +83,15 @@ data class BrainHealth(
 
 data class RecordValidation(val valid: Boolean, val errors: List<String>)
 
-/** The agent prompt block: capped SOUL.md + MEMORY.md plus entry titles. Null texts mean absent. */
+/**
+ * The agent prompt block: capped SOUL.md + MEMORY.md, the filled-in profile fields from user.md,
+ * plus entry titles. Null texts mean absent.
+ */
 data class SecondBrainPrompt(
     val soul: String?,
     val memory: String?,
     val soulTruncated: Boolean,
     val memoryTruncated: Boolean,
     val titles: List<String>,
+    val user: String? = null,
 )

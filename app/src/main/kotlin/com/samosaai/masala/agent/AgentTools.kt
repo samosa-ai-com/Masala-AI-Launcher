@@ -114,11 +114,11 @@ object AgentTools {
                 ActionResult.ok("Mode '$id' is ${if (on) "on" else "off"}.")
             },
             runSkill?.let { start ->
-                FunctionTool(this.runSkill, READ_ONLY) { args ->
+                FunctionTool(this.runSkill, READ_ONLY, opensScreen = true) { args ->
                     start(args.string("skill_id") ?: return@FunctionTool missing("skill_id"), args.string("prompt"))
                 }
             },
-            FunctionTool(composeMessage, READ_ONLY) { args ->
+            FunctionTool(composeMessage, READ_ONLY, opensScreen = true) { args ->
                 val body = args.string("body") ?: return@FunctionTool missing("body")
                 val to = args.string("to").orEmpty()
                 val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${Uri.encode(to)}"))

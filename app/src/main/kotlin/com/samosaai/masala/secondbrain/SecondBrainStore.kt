@@ -355,12 +355,18 @@ class SecondBrainStore(
             frontmatterOf(file.content)?.get("title")?.takeIf { it.isNotBlank() }
                 ?: file.name.removeSuffix(".md").removeSuffix(".markdown")
         }
+        // Only the filled-in profile bullets; the "(nothing filled in yet)" placeholder is left out.
+        val user = snapshot.userCard?.content?.let(::bodyAfterFrontmatter)?.lines()
+            ?.map { it.trim() }
+            ?.filter { it.startsWith("- ") && ':' in it && !it.substringAfter(':').trim().let { v -> v.isEmpty() || v.startsWith("(") } }
+            ?.joinToString("\n")?.takeIf { it.isNotEmpty() }?.take(USER_CAP_CHARS)
         return SecondBrainPrompt(
             soul = soul,
             memory = memory,
             soulTruncated = soulTruncated,
             memoryTruncated = memoryTruncated,
             titles = titles,
+            user = user,
         )
     }
 
@@ -788,6 +794,7 @@ class SecondBrainStore(
     companion object {
         const val SOUL_CAP_CHARS = 1500
         const val MEMORY_CAP_CHARS = 1500
+        const val USER_CAP_CHARS = 800
         const val VIEWER_FILE_CAP_CHARS = 8000
         const val LINK_SCAN_CAP_CHARS = 200_000
         /** Brain shell radii in graph units. Layout content is confined inside these. */

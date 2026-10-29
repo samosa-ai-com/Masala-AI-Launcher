@@ -71,6 +71,17 @@ class CommandControllerTest {
         assertEquals(0, agentsBuilt)
     }
 
+    @Test fun aCommandWithAPersonaKeywordStillRuns() = runBlocking<Unit> {
+        replies += reply("Added to your calendar")
+        val c = controller()
+        c.ask("add cook dinner with Anna to my calendar")
+        val reply = assertIs<CommandState.Reply>(c.settled())
+        assertEquals("Added to your calendar", reply.text)
+        assertEquals(1, agentsBuilt)
+        // The persona is still offered next to the answer.
+        assertEquals(SkillChip("chef", "Chef"), reply.skill)
+    }
+
     @Test fun eachReplyIsReadAloudOnce() = runBlocking<Unit> {
         replies += reply("one")
         replies += reply("one")

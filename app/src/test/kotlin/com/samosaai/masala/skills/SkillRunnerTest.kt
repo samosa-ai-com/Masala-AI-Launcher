@@ -64,6 +64,7 @@ class SkillRunnerTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val runs = FakeRuns()
     private val artifacts = FakeArtifacts()
+    private val transcripts = TranscriptFiles(kotlin.io.path.createTempDirectory("runs").toFile().apply { deleteOnExit() })
     private val scopesSeen = mutableListOf<Set<String>>()
 
     private fun reply(text: String, vararg calls: ToolCall) =
@@ -73,7 +74,7 @@ class SkillRunnerTest {
 
     private fun runner(vararg replies: ChatMessage, tool: (String) -> ToolResult = { ToolResult.Success("ok") }): SkillRunner {
         val queue = ArrayDeque(replies.toList())
-        return SkillRunner(scope, runs, artifacts, { if (it == "chef") chef else null }, { skill, unattended ->
+        return SkillRunner(scope, runs, artifacts, transcripts, { if (it == "chef") chef else null }, { skill, unattended ->
             val toolScope = ToolScope.skill(skill, infos).let { if (unattended) ToolScope.unattended(it, infos) else it }
             scopesSeen += toolScope.names
             MasalaAgent(AgentModel { _, _ -> queue.removeFirst() }, { name, _ -> tool(name) }, definitions, toolScope, { "system" })
@@ -123,7 +124,7 @@ class SkillRunnerTest {
     }
 
     @Test fun failedModelMarksTheRunFailed() = runBlocking {
-        val r = SkillRunner(scope, runs, artifacts, { chef }, { _, _ -> MasalaAgent(AgentModel { _, _ -> error("offline") }, { _, _ -> ToolResult.Success("") }, definitions, ToolScope.command(infos), { "s" }) })
+        val r = SkillRunner(scope, runs, artifacts, transcripts, { chef }, { _, _ -> MasalaAgent(AgentModel { _, _ -> error("offline") }, { _, _ -> ToolResult.Success("") }, definitions, ToolScope.command(infos), { "s" }) })
         val id = r.start("chef", user("x"))!!
         val state = r.finished(id)
         assertEquals(SkillRunEvent.Failed("offline"), state.events.last())
@@ -143,7 +144,7 @@ class SkillRunnerTest {
         val ran = mutableListOf<String>()
         val skill = chef.copy(requiresTools = listOf("web_search", "set_alarm"))
         val queue = ArrayDeque(listOf(reply("", call("1", "set_alarm")), reply("I couldn't set it")))
-        val r = SkillRunner(scope, runs, artifacts, { skill }, { s, unattended ->
+        val r = SkillRunner(scope, runs, artifacts, transcripts, { skill }, { s, unattended ->
             val toolScope = ToolScope.skill(s, infos).let { if (unattended) ToolScope.unattended(it, infos) else it }
             MasalaAgent(AgentModel { _, _ -> queue.removeFirst() }, { name, _ -> ran += name; ToolResult.Success("ok") }, definitions, toolScope, { "system" })
         })
@@ -159,7 +160,7 @@ class SkillRunnerTest {
         val ran = mutableListOf<String>()
         val skill = chef.copy(requiresTools = listOf("web_search", "set_alarm"))
         val queue = ArrayDeque(listOf(reply("", call("1", "set_alarm")), reply("Set")))
-        val r = SkillRunner(scope, runs, artifacts, { skill }, { s, _ ->
+        val r = SkillRunner(scope, runs, artifacts, transcripts, { skill }, { s, _ ->
             MasalaAgent(AgentModel { _, _ -> queue.removeFirst() }, { name, _ -> ran += name; ToolResult.Success("ok") }, definitions, ToolScope.skill(s, infos), { "system" })
         })
         r.finished(r.start("chef", user("wake me"))!!)
@@ -167,7 +168,7 @@ class SkillRunnerTest {
     }
 
     @Test fun outcomeReportsFailuresWithTheirError() = runBlocking<Unit> {
-        val r = SkillRunner(scope, runs, artifacts, { chef }, { _, _ -> MasalaAgent(AgentModel { _, _ -> error("offline") }, { _, _ -> ToolResult.Success("") }, definitions, ToolScope.command(infos), { "s" }) })
+        val r = SkillRunner(scope, runs, artifacts, transcripts, { chef }, { _, _ -> MasalaAgent(AgentModel { _, _ -> error("offline") }, { _, _ -> ToolResult.Success("") }, definitions, ToolScope.command(infos), { "s" }) })
         val id = r.start("chef", user("x"))!!
         r.finished(id)
         assertEquals("failed" to "offline", r.outcome(id))
@@ -181,10 +182,62 @@ class SkillRunnerTest {
             r.send(id, user("q$n"))
             withTimeout(5_000) { r.open(id)!!.first { !it.running && it.events.count { e -> e is SkillRunEvent.Done } == n + 1 } }
         }
-        val saved = MasalaJson.lenient.decodeFromString(ListSerializer(ChatMessage.serializer()), runs.get(id)!!.transcriptJson)
+        val saved = transcripts.read(id)!!
         assertEquals((0 until 7).flatMap { listOf("q$it", "a$it") }, saved.map { it.textContent })
         // Reopened after the app was killed, the sheet shows the whole conversation too.
         assertEquals(14, runner().open(id)!!.value.events.filterIsInstance<SkillRunEvent.Message>().size)
+    }
+
+    @Test fun theRowKeepsOnlyTheLastAnswerHoweverLongTheRunGets() = runBlocking {
+        val big = "x".repeat(200_000)
+        val r = runner(reply("", call("1", "web_search")), reply("the answer")) { ToolResult.Success(big) }
+        val id = r.start("chef", user("q"))!!
+        r.finished(id)
+        val row = runs.get(id)!!.transcriptJson
+        assertTrue(row.length < 1_000, "row is ${row.length} chars")
+        assertEquals("the answer", SkillRunner.lastAnswer(row))
+        assertTrue(transcripts.read(id)!!.any { it.role == "tool" && it.textContent == big })
+    }
+
+    @Test fun runsSavedInTheRowBeforeFilesStillOpen() = runBlocking {
+        val legacy = MasalaJson.strict.encodeToString(ListSerializer(ChatMessage.serializer()), listOf(user("eggs"), reply("Omelette")))
+        val id = runs.insert(SkillRunEntity(skillId = "chef", prompt = "eggs", status = "done", transcriptJson = legacy, startedAt = 0))
+        assertEquals(listOf("eggs", "Omelette"), runner().open(id)!!.value.events.filterIsInstance<SkillRunEvent.Message>().map { it.text })
+    }
+
+    @Test fun reopenedRunsShowTheirResultFiles() = runBlocking {
+        val r = runner(reply("", call("1", "web_search")), reply("saved")) { ToolResult.Success("ok", listOf("/data/out/song.mp3")) }
+        val id = r.start("chef", user("x"))!!
+        r.finished(id)
+        // A new runner stands for the app after it was killed.
+        val events = runner().open(id)!!.value.events
+        assertEquals(listOf(SkillRunEvent.Result("audio", "song.mp3", "/data/out/song.mp3")), events.filterIsInstance<SkillRunEvent.Result>())
+    }
+
+    @Test fun aFollowUpOnAnUnattendedRunGetsTheSkillsChangingTools() = runBlocking<Unit> {
+        val ran = mutableListOf<String>()
+        val skill = chef.copy(requiresTools = listOf("web_search", "set_alarm"))
+        val queue = ArrayDeque(listOf(reply("Morning brief"), reply("", call("1", "set_alarm")), reply("Set")))
+        val r = SkillRunner(scope, runs, artifacts, transcripts, { skill }, { s, unattended ->
+            val toolScope = ToolScope.skill(s, infos).let { if (unattended) ToolScope.unattended(it, infos) else it }
+            MasalaAgent(AgentModel { _, _ -> queue.removeFirst() }, { name, _ -> ran += name; ToolResult.Success("ok") }, definitions, toolScope, { "system" })
+        })
+        val id = r.start("chef", user("brief"), unattended = true)!!
+        r.finished(id)
+        r.send(id, user("set an alarm for 7"))
+        val state = withTimeout(5_000) { r.open(id)!!.first { !it.running && it.events.count { e -> e is SkillRunEvent.Done } == 2 } }
+        assertEquals(listOf("set_alarm"), ran)
+        assertEquals(listOf("brief", "Morning brief", "set an alarm for 7", "Set"), state.events.filterIsInstance<SkillRunEvent.Message>().map { it.text })
+    }
+
+    @Test fun finishedRunsAreLetGoAndRestoredWhenOpened() = runBlocking {
+        val r = runner(*Array(SkillRunner.KEEP_IDLE + 3) { reply("a$it") })
+        val ids = (0 until SkillRunner.KEEP_IDLE + 3).map { n -> r.start("chef", user("q$n"))!!.also { r.finished(it) } }
+        // The oldest run was let go; opening it reads it back.
+        withTimeout(5_000) { while (r.holds(ids.first())) kotlinx.coroutines.delay(10) }
+        assertTrue(r.holds(ids.last()))
+        val first = r.open(ids.first())!!
+        assertEquals(listOf("q0", "a0"), first.value.events.filterIsInstance<SkillRunEvent.Message>().map { it.text })
     }
 
     @Test fun photosAreNotSavedButTheirTextIs() {

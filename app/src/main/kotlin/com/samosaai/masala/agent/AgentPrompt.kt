@@ -11,7 +11,7 @@ object AgentPrompt {
     /**
      * @param now the current date, time and zone, already formatted
      * @param skills installed skills, listed so the model can start one with `run_skill`
-     * @param secondBrain the Second Brain: capped SOUL.md + MEMORY.md plus entry titles,
+     * @param secondBrain the Second Brain: capped SOUL.md + MEMORY.md, the profile, plus entry titles,
      * readable in detail with `memory_read`
      * @param instructions a persona's or skill's own instructions, for skill runs
      */
@@ -36,12 +36,17 @@ object AgentPrompt {
         secondBrain?.let { brain ->
             val soul = brain.soul
             val memory = brain.memory
-            if (soul != null || memory != null || brain.titles.isNotEmpty()) {
+            val user = brain.user
+            if (soul != null || memory != null || user != null || brain.titles.isNotEmpty()) {
                 append("\nSecond Brain (the user's memory: identity, routines, people, places, preferences).\n")
                 if (soul != null) {
                     append("<soul_md>\n").append(soul).append('\n')
                     if (brain.soulTruncated) append("(truncated: showing the first 1500 chars)\n")
                     append("</soul_md>\n")
+                }
+                if (user != null) {
+                    append("<user_md>\nThe user's profile, from their settings:\n").append(user).append('\n')
+                    append("</user_md>\n")
                 }
                 if (memory != null) {
                     append("<memory_md>\n").append(memory).append('\n')

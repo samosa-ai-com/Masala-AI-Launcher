@@ -12,6 +12,7 @@ class FunctionTool(
     override val readsPrivateData: Boolean = false,
     override val usesNetwork: Boolean = false,
     override val origin: ToolOrigin = ToolOrigin.CORE,
+    override val opensScreen: Boolean = false,
     private val run: suspend (JsonObject) -> ActionResult,
 ) : Tool {
     override suspend fun execute(args: JsonObject): ToolResult = run(args).toToolResult()

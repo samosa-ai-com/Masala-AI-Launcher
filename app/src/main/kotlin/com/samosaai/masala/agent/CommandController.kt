@@ -18,8 +18,8 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Typed and spoken commands (plan Phase 4 M3). Simple ones (timers, alarms, open an app) skip the
- * model; a request that belongs to a persona gets a "Continue in …" chip; the rest goes to a
- * [MasalaAgent] with every tool. App-scoped, so a command goes on if home is left, and the agent
+ * model; a request for a persona's advice gets a "Continue in …" chip; the rest goes to a
+ * [MasalaAgent] with every tool (a persona that matches is offered next to its answer). App-scoped, so a command goes on if home is left, and the agent
  * keeps the last few exchanges for follow-ups.
  */
 class CommandController(
@@ -107,9 +107,10 @@ class CommandController(
             }
             return
         }
-        SkillRouter.route(prompt, skills())?.let { skill ->
-            val title = skill.title.ifBlank { skill.id }
-            _state.value = CommandState.Reply(prompt, "$title can help with that.", skill = SkillChip(skill.id, title), spoken = spoken)
+        val chip = SkillRouter.route(prompt, skills())?.let { SkillChip(it.id, it.title.ifBlank { it.id }) }
+        // Asking for advice goes straight to the persona; asking the phone to act runs, with the persona offered beside it.
+        if (chip != null && !SkillRouter.isCommand(prompt)) {
+            _state.value = CommandState.Reply(prompt, "${chip.title} can help with that.", skill = chip, spoken = spoken)
             return
         }
         val agent = newAgent().also { it.restore(history) }
@@ -121,7 +122,7 @@ class CommandController(
                         steps += event.name
                         _state.value = CommandState.Thinking(prompt, steps.toList())
                     }
-                    is AgentEvent.Done -> _state.value = CommandState.Reply(prompt, event.text.ifBlank { "Done." }, steps.toList(), spoken = spoken)
+                    is AgentEvent.Done -> _state.value = CommandState.Reply(prompt, event.text.ifBlank { "Done." }, steps.toList(), chip, spoken)
                     is AgentEvent.Failed -> _state.value = CommandState.Error(prompt, event.message)
                     is AgentEvent.NeedsCapability -> _state.value = CommandState.Error(prompt, event.reason, event.capability)
                     AgentEvent.StepLimit -> _state.value = CommandState.Error(prompt, "That took too many steps. Try asking in smaller pieces.")

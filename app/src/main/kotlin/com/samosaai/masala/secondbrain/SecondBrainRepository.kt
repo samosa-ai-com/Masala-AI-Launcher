@@ -68,12 +68,16 @@ class SecondBrainRepository(
         return store.buildPrompt(snapshot)
     }
 
-    /** Up to [limit] entries for a request: title matches first, then content hits. */
+    /**
+     * Up to [limit] entries for a request: title matches first, then content hits. The user card
+     * (the profile) is found by its id or name ("user.md", "user", "profile"), not by its text.
+     */
     suspend fun read(query: String, limit: Int = 3): List<BrainFile> = withContext(Dispatchers.IO) {
         val snapshot = refreshSnapshot()
         val files = snapshot.details()
         val q = query.trim().lowercase()
         if (q.isEmpty()) return@withContext emptyList()
+        snapshot.userCard?.takeIf { q in USER_CARD_NAMES }?.let { return@withContext listOf(it) }
         val words = q.split(Regex("\\W+")).filter { it.length > 2 }
         fun score(file: BrainFile): Int {
             val title = titleOf(file).lowercase()
@@ -282,5 +286,6 @@ class SecondBrainRepository(
 
     companion object {
         const val MAX_PENDING = 5
+        private val USER_CARD_NAMES = setOf("user.md", "user", "profile", "user card", "user profile")
     }
 }

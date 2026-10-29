@@ -128,7 +128,8 @@ class SkillSheetActivity : ComponentActivity() {
                 // Decoding and scaling a photo is too slow for the main thread.
                 val message = withContext(Dispatchers.IO) { SkillMessage.build(prompt, picked, SkillInputs::photoBase64) }
                 val current = run?.value
-                if (current == null) begin(message) else app.skillRunner.send(current.runId, message)
+                // The runner may hand back a restored state if it had let the run go while this was in the background.
+                if (current == null) begin(message) else app.skillRunner.send(current.runId, message)?.let { run = it }
             }
         }
 
@@ -166,9 +167,12 @@ class SkillSheetActivity : ComponentActivity() {
         val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
             val result = saving
             saving = null
-            if (uri != null && result != null) {
-                val ok = ResultFiles.saveTo(context, result.ref, uri)
-                Toast.makeText(context, if (ok) R.string.result_saved else R.string.result_save_failed, Toast.LENGTH_SHORT).show()
+            if (uri != null && result != null) app.scope.launch {
+                // A long recording or a slow cloud folder would block the screen: copied off the main
+                // thread, in the app's scope so closing the sheet doesn't cut the copy short.
+                val appContext = context.applicationContext
+                val ok = withContext(Dispatchers.IO) { ResultFiles.saveTo(appContext, result.ref, uri) }
+                Toast.makeText(appContext, if (ok) R.string.result_saved else R.string.result_save_failed, Toast.LENGTH_SHORT).show()
             }
         }
 
