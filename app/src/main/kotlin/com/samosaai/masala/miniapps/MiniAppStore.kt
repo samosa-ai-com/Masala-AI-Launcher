@@ -31,7 +31,7 @@ class MiniAppStore(private val dao: MiniAppDao) {
         dao.upsert(
             MiniAppEntity(
                 id = id,
-                title = title.trim().ifEmpty { "Mini app" },
+                title = title.trim().ifEmpty { "Mini app" }.take(MAX_TITLE_CHARS),
                 html = html,
                 createdAt = now,
                 updatedAt = now,

@@ -2,6 +2,7 @@ package com.samosaai.masala.tools
 
 import com.samosaai.masala.core.tool.FunctionTool
 import com.samosaai.masala.core.tool.ActionResult
+import com.samosaai.masala.core.tool.Produced
 import com.samosaai.masala.core.tool.ToolFiles
 import com.samosaai.masala.miniapps.MiniAppConsole
 import com.samosaai.masala.miniapps.openMiniApp
@@ -228,7 +229,8 @@ object MasalaTools {
                 val problems = host().layouts.pinMiniApp(id, title)
                 ActionResult.ok(
                     if (problems.isEmpty()) "Mini app '$id' created and pinned to home."
-                    else "Mini app '$id' created, but it couldn't be pinned: ${problems.first()}"
+                    else "Mini app '$id' created, but it couldn't be pinned: ${problems.first()}",
+                    listOf(Produced("mini_app", miniApps.get(id)?.title ?: title, id)),
                 )
             },
             FunctionTool(Defs.updateMiniApp, CHANGES_SOMETHING) {
@@ -240,8 +242,9 @@ object MasalaTools {
                 // Errors reported here are cleared so the next repair turn starts fresh.
                 val errors = MiniAppConsole.errors(id)
                 MiniAppConsole.clear(id)
-                if (errors.isEmpty()) ActionResult.ok("Mini app '$id' updated.")
-                else ActionResult.ok("Mini app '$id' updated. Console errors:\n" + errors.joinToString("\n"))
+                val produced = listOfNotNull(miniApps.get(id)?.let { row -> Produced("mini_app", row.title, id) })
+                if (errors.isEmpty()) ActionResult.ok("Mini app '$id' updated.", produced)
+                else ActionResult.ok("Mini app '$id' updated. Console errors:\n" + errors.joinToString("\n"), produced)
             },
             FunctionTool(Defs.listMiniApps, READ_ONLY) {
                 val rows = miniApps.list()
