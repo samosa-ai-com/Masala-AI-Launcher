@@ -69,6 +69,9 @@ class CalendarCreateTest {
 
     @Test
     fun `creating an event succeeds once read and write are held`() = runBlocking {
+        // Emulator images have no calendar account; nothing to write to there.
+        Automation.assumeCalendar(app)
+
         // Revoking a runtime permission kills this process, so grant instead of revoking: the bug
         // was that only WRITE was ever asked for, and the list query then failed on READ.
         automation.grantRuntimePermission(app.packageName, Manifest.permission.READ_CALENDAR)
