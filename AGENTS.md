@@ -47,8 +47,8 @@ The repo goes public once via history rewrite. The strip list is authoritative: 
 
 ### 2.4 Test & verify
 
-- Toolchain: **JDK 21** (`JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64`), **Gradle 8.14.4** (the checked-in wrapper 9.7.1 is broken with AGP 8.13 — use the cached 8.14.4 binary), `ANDROID_HOME=$HOME/Android/Sdk`. Without an SDK only `:core` builds (`settings.gradle.kts`).
-- After any change: `./gradlew :core:test` at minimum; Android changes add `assembleDebug` + `adb install -r` + on-device check. `connectedDebugAndroidTest` uninstalls the app afterwards (`ANDROID_SERIAL`).
+- Toolchain: **JDK 21** (`JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64`), **Gradle 8.14.4** via the checked-in `./gradlew` wrapper (verified working 2026-10-29; an older note here said the wrapper was broken — it is not), `ANDROID_HOME=$HOME/Android/Sdk`. Without an SDK only `:core` builds (`settings.gradle.kts`).
+- After any change: `./gradlew :core:test` at minimum; Android changes add `assembleDebug` + `adb install --user 0 -r` + on-device check. Never bare `adb install` (this phone has three users: the DUAL_APP and Secure Folder clones would get the build too). `connectedDebugAndroidTest` uninstalls the app afterwards — on the phone, install the test APK and run `am instrument` by hand instead (see `McpLanTest`).
 - Existing tests take precedence: fix the code, not the test, unless the user explicitly asks otherwise. Never claim a result without exit codes / test output.
 - Secrets live only in gitignored `local.properties` (never commit, log, or paste keys).
 
@@ -103,8 +103,8 @@ Masala-Private/
 ## 5. Development workflow
 
 1. Set env: `JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64`, `ANDROID_HOME=$HOME/Android/Sdk`.
-2. JVM-only: `<gradle-8.14.4> :core:test` (seconds, no device).
-3. Full app: `<gradle-8.14.4> assembleDebug`, then `adb install -r app/build/outputs/apk/debug/app-debug.apk`.
+2. JVM-only: `./gradlew :core:test` (seconds, no device).
+3. Full app: `./gradlew assembleDebug`, then `adb install --user 0 -r app/build/outputs/apk/debug/app-debug.apk` (never bare `adb install` — the phone has three users).
 4. On device: set Masala as home → drawer/search/long-press → `Settings → Debug` (`/tool {json}` direct call or full prompt; `Context` panel fakes time/charging). `local.properties` holds `MASALA_LLM_*` / `MASALA_STT_*` (+ `SAMOSA_API_URL`).
 5. When new tooling/dependencies are needed, include them in the plan file and get approval before installing.
 
