@@ -417,4 +417,5 @@
     <string name="report_note">Add a note (optional)</string>
     <string name="report_send">Report</string>
     <string name="report_thanks">Thanks, the report is saved on this phone</string>
+    <string name="miniapp_report_title">Report this mini app</string>
 </resources>

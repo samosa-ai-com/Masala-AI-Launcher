@@ -20,6 +20,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -52,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.R
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.masala
+import com.samosaai.masala.ui.skills.ReportDialog
 import com.samosaai.masala.ui.theme.MasalaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -189,7 +192,7 @@ private fun applyMiniAppSettings(wv: WebView, networkAllowed: Boolean) {
     wv.settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
 }
 
-/** Full-screen host for one mini-app: Back, network toggle, Share, Pin, Delete. */
+/** Full-screen host for one mini-app: Back, network toggle, Share, Pin, Report, Delete. */
 class MiniAppActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
@@ -204,7 +207,7 @@ class MiniAppActivity : ComponentActivity() {
         }
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
+    @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
     @Composable
     private fun MiniAppScreen(appId: String, onBack: () -> Unit) {
         val context = LocalContext.current
@@ -215,6 +218,7 @@ class MiniAppActivity : ComponentActivity() {
         var networkAllowed by remember { mutableStateOf(false) }
         var gone by remember { mutableStateOf(false) }
         var confirmDelete by remember { mutableStateOf(false) }
+        var reporting by remember { mutableStateOf(false) }
         var webView by remember { mutableStateOf<WebView?>(null) }
         LaunchedEffect(appId) {
             val row = withContext(Dispatchers.IO) { app.miniApps.get(appId) }
@@ -275,7 +279,8 @@ class MiniAppActivity : ComponentActivity() {
                         Box(Modifier.weight(1f).fillMaxWidth()) {
                             MiniAppView(appId, doc, networkAllowed, Modifier.fillMaxSize()) { webView = it }
                         }
-                        Row(
+                        // Wraps on a narrow screen instead of squeezing the labels.
+                        FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                         ) {
@@ -312,11 +317,24 @@ class MiniAppActivity : ComponentActivity() {
                                     android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             }) { Text(stringResource(R.string.miniapp_pin)) }
+                            TextButton(onClick = { reporting = true }) { Text(stringResource(R.string.report_action)) }
                             TextButton(onClick = { confirmDelete = true }) { Text(stringResource(R.string.settings_version_delete)) }
                         }
                     }
                 }
             }
+        }
+        if (reporting) {
+            ReportDialog(
+                title = stringResource(R.string.miniapp_report_title),
+                onReport = { reasons, note ->
+                    // The app's id and title identify it; its HTML stays in the mini-app table.
+                    app.aiReports.add("mini_app:$appId", reasons, note, title)
+                    reporting = false
+                    android.widget.Toast.makeText(context, R.string.report_thanks, android.widget.Toast.LENGTH_SHORT).show()
+                },
+                onDismiss = { reporting = false },
+            )
         }
         if (confirmDelete) {
             AlertDialog(

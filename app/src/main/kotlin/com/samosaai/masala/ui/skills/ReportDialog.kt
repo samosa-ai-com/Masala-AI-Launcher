@@ -20,7 +20,11 @@ import com.samosaai.masala.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReportDialog(onReport: (reasons: List<String>, note: String) -> Unit, onDismiss: () -> Unit) {
+fun ReportDialog(
+    onReport: (reasons: List<String>, note: String) -> Unit,
+    onDismiss: () -> Unit,
+    title: String = stringResource(R.string.report_title),
+) {
     val reasons = listOf(
         R.string.report_reason_wrong, R.string.report_reason_harmful, R.string.report_reason_offensive, R.string.report_reason_other,
     ).map { stringResource(it) }
@@ -28,7 +32,7 @@ fun ReportDialog(onReport: (reasons: List<String>, note: String) -> Unit, onDism
     var note by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.report_title)) },
+        title = { Text(title) },
         text = {
             Column {
                 reasons.forEach { reason ->
