@@ -7,15 +7,17 @@ package com.samosaai.masala.core.tool
  *
  * @param needsPermission when non-null, the Android permission or special-access marker that must be
  *   granted before the tool can run.
+ * @param produced what a successful call made for the user to open (see [Produced]).
  */
 data class ActionResult(
     val success: Boolean,
     val message: String,
     val needsPermission: String? = null,
+    val produced: List<Produced> = emptyList(),
 ) {
     fun toToolResult(): ToolResult = when {
         needsPermission != null -> ToolResult.NeedsCapability(needsPermission, message)
-        success -> ToolResult.Success(message)
+        success -> ToolResult.Success(message, produced = produced)
         else -> ToolResult.Failure(message)
     }
 
@@ -33,6 +35,7 @@ data class ActionResult(
         const val HEALTH_CONNECT = "special:health_connect"
 
         fun ok(message: String) = ActionResult(true, message)
+        fun ok(message: String, produced: List<Produced>) = ActionResult(true, message, produced = produced)
         fun error(message: String) = ActionResult(false, message)
         fun permissionNeeded(permission: String, message: String) =
             ActionResult(false, message, needsPermission = permission)
