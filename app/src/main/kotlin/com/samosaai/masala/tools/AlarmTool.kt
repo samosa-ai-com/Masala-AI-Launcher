@@ -92,7 +92,10 @@ class AlarmTool(private val context: Context) {
     /** The next alarm on the phone, from any app: the only part of the clock app's list Android exposes. */
     fun nextAlarm(): ActionResult {
         val next = (context.getSystemService(Context.ALARM_SERVICE) as AlarmManager).nextAlarmClock
-            ?: return ActionResult.ok("No alarm is set on this phone.")
+            ?: return ActionResult.ok(
+                "No alarm is visible to apps on this phone. Android only shares the next alarm if a " +
+                    "clock app publishes it, so this does not prove no alarm is set.",
+            )
         val time = SimpleDateFormat("EEE MMM d HH:mm", Locale.getDefault()).format(Date(next.triggerTime))
         val pkg = next.showIntent?.creatorPackage
         return ActionResult.ok("Next alarm: $time" + (if (pkg != null) " (set by $pkg)" else "") + ".")

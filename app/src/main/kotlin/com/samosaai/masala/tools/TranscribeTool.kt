@@ -60,6 +60,10 @@ class TranscribeTool(
         const val MAX_TRANSCRIPT_CHARS = 30_000
 
         private const val STT_TIMEOUT_SECONDS = 300L
+
+        /** Set once this endpoint proves it has no transcription route, for the rest of the process. */
+        @Volatile
+        private var apiUnsupported = false
         private const val ERROR_DETAIL_CHARS = 200
 
         /** Extension → MIME type for the multipart upload. Also the supported-format list. */
@@ -96,7 +100,8 @@ class TranscribeTool(
 
         // No endpoint, or none with a transcription model: use Android's own speech service,
         // which can read a file through RecognizerIntent.EXTRA_AUDIO_SOURCE (API 33+).
-        val backend = if (settings.baseUrl.isBlank()) null else sttBackendFactory(settings.baseUrl, settings.apiKey)
+        val backend = if (settings.baseUrl.isBlank() || apiUnsupported) null
+        else sttBackendFactory(settings.baseUrl, settings.apiKey)
         val resolvedModel = backend?.let { resolveModel(model, settings, it) }
         if (backend == null || resolvedModel == null) {
             val local = AndroidTranscriber.transcribe(context, file, language ?: settings.sttLanguage)
@@ -112,15 +117,22 @@ class TranscribeTool(
                 )
             }
             return ActionResult.error(
-                "No transcription is available: no STT model is configured or discoverable, and this " +
-                    "device's Android version/service can't transcribe a file (needs Android 13+). " +
-                    "Pass model explicitly, or set MASALA_STT_MODEL.",
+                "No transcription is available. Configure a working STT endpoint with " +
+                    "MASALA_STT_BASE_URL and MASALA_STT_API_KEY (the endpoint must accept " +
+                    "/audio/transcriptions), or use a device whose speech service can read a file " +
+                    "(Android 13+; this one can't).",
             )
         }
         val resolvedLanguage = (language ?: settings.sttLanguage).trim().ifBlank { null }
 
         val apiResult = backend.transcribe(file, resolvedModel, resolvedLanguage, contentType)
         val transcript = apiResult.getOrElse { e ->
+            // A proxy can list a model and not serve the route (this one answers 404). Remember
+            // that, so the next call doesn't spend a round-trip and a scary 404 on it.
+            val message = e.message.orEmpty()
+            if (message.contains("404") || message.contains("405") || message.contains("not found", true)) {
+                apiUnsupported = true
+            }
             // The endpoint can list a transcription model and not serve the route at all (this
             // one returns 404). Android's own speech service reads the file instead, so a
             // configured-but-unusable endpoint does not leave transcription broken.
@@ -140,8 +152,9 @@ class TranscribeTool(
             }
             return ActionResult.error(
                 "Transcription failed: ${e.message?.take(ERROR_DETAIL_CHARS) ?: "no detail"}. " +
-                    "Android's built-in speech service can't take a file on this device. " +
-                    "The file was not modified.",
+                    "Android's speech service on this phone can't read a file, and the endpoint " +
+                    "doesn't transcribe. Set MASALA_STT_BASE_URL and MASALA_STT_API_KEY to an " +
+                    "endpoint that serves /audio/transcriptions. The file was not modified.",
             )
         }
         if (transcript.isBlank()) {

@@ -1,6 +1,7 @@
 package com.samosaai.masala.audio
 
 import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
 import android.media.AudioFormat
 import android.media.MediaCodec
@@ -38,6 +39,9 @@ object AndroidTranscriber {
     private const val SAMPLE_RATE = 16_000
     private const val CHANNELS = 1
 
+    /** Per-service ceiling: a recognizer that never answers must not block the next candidate. */
+    private const val ATTEMPT_MS = 60_000L
+
     fun isAvailable(context: Context): Boolean =
         Build.VERSION.SDK_INT >= 33 && SpeechRecognizer.isRecognitionAvailable(context)
 
@@ -50,13 +54,19 @@ object AndroidTranscriber {
         source: File,
         language: String?,
         timeoutMs: Long = 120_000,
-    ): Result<String>? = withContext(Dispatchers.IO) {
-        if (!isAvailable(context)) return@withContext null
+    ): Result<String>? {
+        if (!isAvailable(context)) return null
         val pcm = File(source.parentFile ?: context.cacheDir, source.nameWithoutExtension + ".pcm")
-        return@withContext try {
-            if (!decodeToPcm(source, pcm)) return@withContext null
-            withTimeoutOrNull(timeoutMs) { recognize(context, pcm, language) }
-                ?: Result.failure(IllegalStateException("Android's speech service timed out"))
+        return try {
+            // Decoding is heavy: keep it off the main thread.
+            val decoded = withContext(Dispatchers.IO) { decodeToPcm(source, pcm) }
+            if (!decoded) return null
+            // SpeechRecognizer may only be created and driven from the main thread; any other
+            // thread throws "should be used only from the application's main thread".
+            withContext(Dispatchers.Main) {
+                withTimeoutOrNull(timeoutMs) { recognizeAny(context, pcm, language) }
+                    ?: Result.failure(IllegalStateException("Android's speech service timed out"))
+            }
         } finally {
             runCatching { pcm.delete() }
         }
@@ -152,59 +162,113 @@ object AndroidTranscriber {
         return out
     }
 
-    private suspend fun recognize(context: Context, pcm: File, language: String?): Result<String> =
-        suspendCancellableCoroutine { cont ->
-            val recognizer = runCatching {
-                if (Build.VERSION.SDK_INT >= 33) SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-                else SpeechRecognizer.createSpeechRecognizer(context)
-            }.getOrElse {
-                cont.resume(Result.failure(it))
-                return@suspendCancellableCoroutine
+    /**
+     * Tries each installed recognition service in turn. The phone's *configured* service is often
+     * not the one that can read a file (this Samsung points at a TTS package, which answers
+     * ERROR_CLIENT), while Android System Intelligence does. A service that refuses is skipped.
+     */
+    private suspend fun recognizeAny(context: Context, pcm: File, language: String?): Result<String> {
+        val candidates = candidateServices(context)
+        var last: Result<String> = Result.failure(IllegalStateException("no speech service installed"))
+        for (component in candidates) {
+            val attempt = withTimeoutOrNull(ATTEMPT_MS) { recognize(context, component, pcm, language) }
+            if (attempt == null) {
+                last = Result.failure(IllegalStateException("${component.flattenToShortString()} timed out"))
+                continue
             }
-            val pfd = ParcelFileDescriptor.open(pcm, ParcelFileDescriptor.MODE_READ_ONLY)
-            var finished = false
-
-            fun finish(result: Result<String>) {
-                if (finished) return
-                finished = true
-                runCatching { recognizer.destroy() }
-                runCatching { pfd.close() }
-                if (cont.isActive) cont.resume(result)
-            }
-
-            recognizer.setRecognitionListener(object : RecognitionListener {
-                override fun onResults(results: Bundle?) {
-                    val text = results
-                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        ?.firstOrNull().orEmpty()
-                    finish(Result.success(text))
-                }
-
-                override fun onError(error: Int) {
-                    finish(Result.failure(IllegalStateException("Android speech error $error")))
-                }
-
-                override fun onReadyForSpeech(params: Bundle?) = Unit
-                override fun onBeginningOfSpeech() = Unit
-                override fun onRmsChanged(rmsdB: Float) = Unit
-                override fun onBufferReceived(buffer: ByteArray?) = Unit
-                override fun onEndOfSpeech() = Unit
-                override fun onPartialResults(partialResults: Bundle?) = Unit
-                override fun onEvent(eventType: Int, params: Bundle?) = Unit
-            })
-
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, pfd)
-                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
-                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, SAMPLE_RATE)
-                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, CHANNELS)
-                if (!language.isNullOrBlank()) putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
-            }
-            runCatching { recognizer.startListening(intent) }
-                .onFailure { finish(Result.failure(it as Exception)) }
-
-            cont.invokeOnCancellation { finish(Result.failure(IllegalStateException("cancelled"))) }
+            if (attempt.isSuccess) return attempt
+            last = attempt
         }
+        return last
+    }
+
+    /** Installed recognizers, best first: on-device intelligence, then Google's, then the rest. */
+    private fun candidateServices(context: Context): List<ComponentName> {
+        val intent = Intent("android.speech.RecognitionService")
+        val found = context.packageManager.queryIntentServices(intent, 0).mapNotNull { info ->
+            info.serviceInfo?.let { ComponentName(it.packageName, it.name) }
+        }
+        val preferred = listOf(
+            "com.google.android.as",
+            "com.google.android.googlequicksearchbox",
+            "com.google.android.tts",
+        )
+        return found.sortedBy { component ->
+            preferred.indexOfFirst { component.packageName.startsWith(it) }
+                .let { if (it < 0) preferred.size else it }
+        }
+    }
+
+    private suspend fun recognize(
+        context: Context,
+        component: ComponentName,
+        pcm: File,
+        language: String?,
+    ): Result<String> = suspendCancellableCoroutine { cont ->
+        val recognizer = runCatching {
+            SpeechRecognizer.createSpeechRecognizer(context, component)
+        }.getOrElse {
+            cont.resume(Result.failure(it as Exception))
+            return@suspendCancellableCoroutine
+        }
+        val pfd = ParcelFileDescriptor.open(pcm, ParcelFileDescriptor.MODE_READ_ONLY)
+        var finished = false
+
+        fun finish(result: Result<String>) {
+            if (finished) return
+            finished = true
+            // Both calls are main-thread-only, and this whole function runs there.
+            runCatching { recognizer.destroy() }
+            runCatching { pfd.close() }
+            if (cont.isActive) cont.resume(result)
+        }
+
+        recognizer.setRecognitionListener(object : RecognitionListener {
+            override fun onResults(results: Bundle?) {
+                val text = results
+                    ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull().orEmpty()
+                finish(Result.success(text))
+            }
+
+            override fun onError(error: Int) {
+                val reason = when (error) {
+                    SpeechRecognizer.ERROR_AUDIO -> "the audio could not be read"
+                    SpeechRecognizer.ERROR_CLIENT -> "it rejected the request"
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "microphone permission is missing"
+                    SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
+                        "it needs a network connection"
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "it is busy"
+                    SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED,
+                    SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> "that language isn't installed"
+                    SpeechRecognizer.ERROR_SERVER -> "it reported a server error"
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "no speech was detected in the file"
+                    else -> "error $error"
+                }
+                finish(Result.failure(IllegalStateException("${component.flattenToShortString()}: $reason")))
+            }
+
+            override fun onReadyForSpeech(params: Bundle?) = Unit
+            override fun onBeginningOfSpeech() = Unit
+            override fun onRmsChanged(rmsdB: Float) = Unit
+            override fun onBufferReceived(buffer: ByteArray?) = Unit
+            override fun onEndOfSpeech() = Unit
+            override fun onPartialResults(partialResults: Bundle?) = Unit
+            override fun onEvent(eventType: Int, params: Bundle?) = Unit
+        })
+
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, pfd)
+            putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
+            putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, SAMPLE_RATE)
+            putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, CHANNELS)
+            if (!language.isNullOrBlank()) putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
+        }
+        runCatching { recognizer.startListening(intent) }
+            .onFailure { finish(Result.failure(it as Exception)) }
+
+        cont.invokeOnCancellation { finish(Result.failure(IllegalStateException("cancelled"))) }
+    }
 }
