@@ -1,5 +1,6 @@
 package com.samosaai.masala
 
+import com.samosaai.masala.core.files.FileIndex
 import com.samosaai.masala.core.tool.ToolFiles
 import android.app.Application
 import android.content.Context
@@ -57,6 +58,7 @@ import com.samosaai.masala.scheduled.ScheduledTaskScheduler
 import com.samosaai.masala.scheduled.TaskRunner
 import com.samosaai.masala.skills.SkillRegistry
 import com.samosaai.masala.tools.ActionLog
+import com.samosaai.masala.tools.DocumentText
 import com.samosaai.masala.tools.MasalaToolExecutor
 import com.samosaai.masala.tools.MasalaToolRegistry
 import com.samosaai.masala.tools.MasalaTools
@@ -89,9 +91,13 @@ class MasalaApp : Application() {
     val tools by lazy {
         MasalaToolRegistry(AppStorageFileAccess(this)).also { registry ->
             MasalaTools.create(this, ToolFiles { registry.fileAccess }, miniApps).forEach(registry::register)
-            ProTools.register(registry, this)
+            fileIndex = ProTools.register(registry, this, DocumentText(this))
         }
     }
+
+    /** The index of shared storage behind `file_search` (Lane B); null in a build without `:pro`. */
+    var fileIndex: FileIndex? = null
+        private set
 
     /**
      * A new agent conversation over [model]. [scope] picks the tools from what is registered (a typed

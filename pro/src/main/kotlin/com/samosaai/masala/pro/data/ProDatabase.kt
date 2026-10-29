@@ -25,6 +25,12 @@ abstract class ProDatabase : RoomDatabase() {
     companion object {
         fun create(context: Context): ProDatabase =
             Room.databaseBuilder(context, ProDatabase::class.java, "pro.db").build()
+
+        @Volatile private var instance: ProDatabase? = null
+
+        /** The one instance per process: the index job and `file_search` share it. */
+        fun get(context: Context): ProDatabase =
+            instance ?: synchronized(this) { instance ?: create(context.applicationContext).also { instance = it } }
     }
 }
 

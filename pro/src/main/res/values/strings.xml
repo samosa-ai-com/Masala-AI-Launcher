@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="file_index_channel">File index</string>
+    <string name="file_index_running">Indexing files</string>
+    <string name="file_index_progress">%1$d of %2$d</string>
+    <string name="file_index_counting">Looking through your files…</string>
+</resources>

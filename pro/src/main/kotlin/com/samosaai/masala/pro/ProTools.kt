@@ -1,6 +1,8 @@
 package com.samosaai.masala.pro
 
 import android.content.Context
+import com.samosaai.masala.core.files.FileIndex
+import com.samosaai.masala.core.files.TextExtractor
 import com.samosaai.masala.core.tool.ActionResult
 import com.samosaai.masala.core.tool.FunctionTool
 import com.samosaai.masala.core.tool.ToolFiles
@@ -12,6 +14,7 @@ import com.samosaai.masala.pro.files.FileTool
 import com.samosaai.masala.pro.files.GlobTool
 import com.samosaai.masala.pro.files.GrepTool
 import com.samosaai.masala.pro.files.ProFileAccess
+import com.samosaai.masala.pro.files.ProFileIndex
 import com.samosaai.masala.pro.media.MediaConvertTool
 import com.samosaai.masala.pro.termux.TermuxBridge
 import com.samosaai.masala.pro.ProToolDefinitions as Defs
@@ -23,10 +26,12 @@ object ProTools {
      * (`list_files`, `read_file`, `write_file`, `glob`, `grep`) and `media_convert` through Termux's
      * ffmpeg. Every tool is registered with [ToolOrigin.PRO], so hub skills can't name them (arch §2.4).
      * The file tools read `registry.fileAccess` on every call, so the grant of All files access takes
-     * effect without a restart.
+     * effect without a restart. Returns the file index (arch §3.10), which reads documents through
+     * [extractor].
      */
-    fun register(registry: ToolRegistry, context: Context) {
+    fun register(registry: ToolRegistry, context: Context, extractor: TextExtractor): FileIndex {
         val app = context.applicationContext
+        val index = ProFileIndex.get(app).also { it.extractor = extractor }
         registry.fileAccess = ProFileAccess(app, registry.fileAccess)
         val files = ToolFiles { registry.fileAccess }
 
@@ -84,6 +89,7 @@ object ProTools {
                 )
             },
         ).forEach(registry::register)
+        return index
     }
 
     private fun missing(param: String) = ActionResult.error("Missing or invalid required parameter '$param'.")

@@ -19,6 +19,12 @@ interface FileIndex {
 
     /** Drops everything indexed; the next run starts over. */
     fun clear()
+
+    /**
+     * Looks at all-files access again (call after the user may have granted it). The first time it
+     * is granted, daily runs are turned on and a first run starts.
+     */
+    fun refresh()
 }
 
 data class IndexStatus(
