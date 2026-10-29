@@ -13,11 +13,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import com.samosaai.masala.ui.home.DrawerDrag
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -126,16 +129,43 @@ class HomeActivity : ComponentActivity() {
             if (!HomeRole.isDefault(this)) HomeRole.openSettings(this)
         }
 
-        val lightSurface = MaterialTheme.colorScheme.surface.luminance() > 0.5f
-        SideEffect {
-            WindowCompat.getInsetsController(window, window.decorView).apply {
-                isAppearanceLightStatusBars = drawerOpen && lightSurface
-                isAppearanceLightNavigationBars = drawerOpen && lightSurface
-            }
-        }
-
         // Always enabled, so Back never leaves home.
         BackHandler { drawerOpen = false }
+
+        // One progress (0 = home, 1 = drawer) drives both layers. Both stay composed, so opening and
+        // closing the drawer never rebuilds the home pager or the drawer list (plan UI refresh U0).
+        val drawerProgress = remember { Animatable(0f) }
+        val drawerShown by remember { derivedStateOf { drawerProgress.value > 0f } }
+        val drawerMostlyOpen by remember { derivedStateOf { drawerProgress.value > 0.5f } }
+        val drawerSettled by remember { derivedStateOf { drawerOpen && drawerProgress.value >= 1f } }
+        val drawerSpring = remember { spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow) }
+        LaunchedEffect(drawerOpen) { drawerProgress.animateTo(if (drawerOpen) 1f else 0f, drawerSpring) }
+        // Composed once home has drawn its first frame, so the first open is as quick as the rest.
+        var drawerReady by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            androidx.compose.runtime.withFrameNanos { }
+            drawerReady = true
+        }
+        val windowHeight = LocalWindowInfo.current.containerSize.height.toFloat()
+        val drawerDrag = remember(windowHeight) {
+            object : DrawerDrag {
+                // The drawer is fully open after this much travel.
+                val distance = (windowHeight * 0.4f).coerceAtLeast(1f)
+
+                override fun onDrag(upPx: Float) {
+                    drawerReady = true
+                    scope.launch { drawerProgress.snapTo((upPx / distance).coerceIn(0f, 1f)) }
+                }
+
+                override fun onRelease(velocityY: Float) {
+                    val open = velocityY < -FLING_VELOCITY || (velocityY < FLING_VELOCITY && drawerProgress.value > 0.35f)
+                    drawerOpen = open
+                    scope.launch {
+                        drawerProgress.animateTo(if (open) 1f else 0f, drawerSpring, initialVelocity = -velocityY / distance)
+                    }
+                }
+            }
+        }
 
         fun launch(entry: AppEntry) {
             if (!app.actions.launch(entry.key)) toast(getString(R.string.drawer_launch_failed, entry.label))
@@ -184,22 +214,43 @@ class HomeActivity : ComponentActivity() {
             }
         }
 
-        // Hidden under the open drawer, so TalkBack and touches only reach the drawer.
-        if (!drawerOpen) HomeScreen(
-            layout = layout,
-            render = RenderContext(
+        val lightSurface = MaterialTheme.colorScheme.surface.luminance() > 0.5f
+        SideEffect {
+            WindowCompat.getInsetsController(window, window.decorView).apply {
+                isAppearanceLightStatusBars = drawerMostlyOpen && lightSurface
+                isAppearanceLightNavigationBars = drawerMostlyOpen && lightSurface
+            }
+        }
+
+        val render = remember(apps, settings.homeLocked) {
+            RenderContext(
                 icons = app.icons,
                 apps = apps,
-                now = snapshot.now,
+                clock = { snapshot.now },
                 locked = settings.homeLocked,
                 onAction = ::run,
                 onAppMenu = { menuFor = it },
                 onClockClick = { run(MasalaAction.RunTool("show_alarms")) },
                 skillWidgets = skillWidgets,
-            ),
+            )
+        }
+        // Faded out under the open drawer and hidden from TalkBack; the drawer above takes the touches.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val p = drawerProgress.value
+                    alpha = 1f - p
+                    scaleX = 1f - 0.04f * p
+                    scaleY = 1f - 0.04f * p
+                }
+                .then(if (drawerOpen) Modifier.clearAndSetSemantics { } else Modifier),
+        ) { HomeScreen(
+            layout = layout,
+            render = render,
             pinnedShortcuts = pinnedShortcuts,
             isDefault = isDefault,
-            onSetDefault = { HomeRole.requestIntent(this)?.let(roleRequest::launch) ?: HomeRole.openSettings(this) },
+            onSetDefault = { HomeRole.requestIntent(this@HomeActivity)?.let(roleRequest::launch) ?: HomeRole.openSettings(this@HomeActivity) },
             onSwipeUp = { run(settings.swipeUp) },
             onSwipeDown = { run(settings.swipeDown) },
             onOpenSettings = ::openSettings,
@@ -209,12 +260,13 @@ class HomeActivity : ComponentActivity() {
                 launcher.refreshShortcuts()
             },
             homePresses = homePresses,
-        )
+            drawerDrag = drawerDrag.takeIf { settings.swipeUp == MasalaAction.OpenDrawer },
+        ) }
 
         ConfirmationSheet(app.confirmationGate)
 
         // The reply card and the mic; the card stays up until closed, and the command runs on if home is left.
-        if (!drawerOpen) {
+        if (!drawerOpen && !drawerShown) {
             val command by app.commands.state.collectAsStateWithLifecycle()
             val mic = rememberMicPress(app)
             Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(), contentAlignment = Alignment.BottomCenter) {
@@ -230,10 +282,16 @@ class HomeActivity : ComponentActivity() {
             }
         }
 
-        AnimatedVisibility(
-            visible = drawerOpen,
-            enter = slideInVertically { it / 4 } + fadeIn(),
-            exit = slideOutVertically { it / 4 } + fadeOut(),
+        if (drawerReady || drawerOpen) Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val p = drawerProgress.value
+                    alpha = p
+                    // Closed: moved off screen, so it neither draws nor takes touches.
+                    translationY = if (p <= 0f) size.height else (1f - p) * size.height / 4f
+                }
+                .then(if (!drawerShown) Modifier.clearAndSetSemantics { } else Modifier),
         ) {
             Drawer(
                 apps = apps,
@@ -247,6 +305,9 @@ class HomeActivity : ComponentActivity() {
                     if (!app.catalog.setWorkPaused(paused)) toast(getString(R.string.drawer_work_toggle_failed))
                 },
                 onOpenSettings = ::openSettings,
+                open = drawerOpen,
+                autoKeyboard = settings.drawerKeyboard,
+                settled = drawerSettled,
             )
         }
 
@@ -309,6 +370,11 @@ class HomeActivity : ComponentActivity() {
 
     private fun openSettings() {
         startActivity(Intent(this, SettingsActivity::class.java))
+    }
+
+    private companion object {
+        /** Release speed (px/s) that settles the drawer in the fling's direction whatever its position. */
+        const val FLING_VELOCITY = 1200f
     }
 
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()

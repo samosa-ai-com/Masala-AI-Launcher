@@ -245,6 +245,9 @@ class SettingsActivity : ComponentActivity() {
             SettingsToggleRow(stringResource(R.string.settings_auto_launch), settings.autoLaunch) { on ->
                 update { it.copy(autoLaunch = on) }
             }
+            SettingsToggleRow(stringResource(R.string.settings_drawer_keyboard), settings.drawerKeyboard) { on ->
+                update { it.copy(drawerKeyboard = on) }
+            }
             SettingsNavRow(
                 title = stringResource(R.string.settings_hidden_apps),
                 summary = stringResource(

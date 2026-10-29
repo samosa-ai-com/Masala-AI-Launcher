@@ -71,6 +71,7 @@
     <string name="settings_text_scale">Text size: %1$d%%</string>
     <string name="settings_drawer">Drawer</string>
     <string name="settings_auto_launch">Open the app when one result is left</string>
+    <string name="settings_drawer_keyboard">Open the keyboard with the drawer</string>
     <string name="settings_hidden_apps">Hidden apps</string>
     <string name="settings_hidden_apps_summary">Hidden: %1$d · Search only: %2$d</string>
     <string name="settings_debug">Debug</string>
