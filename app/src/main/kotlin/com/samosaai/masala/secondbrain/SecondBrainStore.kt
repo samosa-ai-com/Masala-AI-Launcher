@@ -672,6 +672,83 @@ class SecondBrainStore(
         }
     }
 
+    /**
+     * Deterministic force-directed layout (Fruchterman-Reingold on a cooling schedule)
+     * for the graph view: nodes start on a jittered ring, then repel, attract along
+     * edges and drift toward the centre. Pure math, no Android types, unit-tested.
+     */
+    fun forceLayout(
+        count: Int,
+        pairs: List<Pair<Int, Int>>,
+        iterations: Int,
+        seed: Long = 7L,
+    ): List<Pair<Float, Float>> {
+        if (count == 0) return emptyList()
+        if (count == 1) return listOf(0.5f to 0.5f)
+        val random = java.util.Random(seed)
+        val pos = Array(count) { i ->
+            val a = (i.toDouble() / count) * 2.0 * Math.PI
+            // Deterministic ring start with a small jitter so symmetric graphs still relax.
+            val r = 0.5 + (random.nextDouble() - 0.5) * 0.01
+            floatArrayOf((0.5 + r * Math.cos(a) / 2).toFloat(), (0.5 + r * Math.sin(a) / 2).toFloat())
+        }
+        val area = 1.0
+        val k = Math.sqrt(area / count)
+        val maxIter = iterations.coerceIn(1, 500)
+        // Undirected edges: (a, b) and (b, a) pull once, not twice.
+        val clampedPairs = pairs
+            .map { (a, b) -> minOf(a, b) to maxOf(a, b) }
+            .filter { (a, b) -> a in 0 until count && b in 0 until count && a != b }
+            .toSet().toList()
+        repeat(maxIter) { step ->
+            // Linear cooling tied to the iteration budget: full motion early, settled at the end.
+            val temperature = 0.1f * (1f - step.toFloat() / maxIter)
+            val disp = Array(count) { floatArrayOf(0f, 0f) }
+            // Repulsion between every pair.
+            for (i in 0 until count) {
+                for (j in i + 1 until count) {
+                    var dx = pos[i][0] - pos[j][0]
+                    var dy = pos[i][1] - pos[j][1]
+                    var dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
+                    if (dist < 0.001f) {
+                        dx = (random.nextFloat() - 0.5f) * 0.01f
+                        dy = (random.nextFloat() - 0.5f) * 0.01f
+                        dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat().coerceAtLeast(0.001f)
+                    }
+                    val force = (k * k / dist).toFloat().coerceAtMost(0.5f)
+                    disp[i][0] += dx / dist * force
+                    disp[i][1] += dy / dist * force
+                    disp[j][0] -= dx / dist * force
+                    disp[j][1] -= dy / dist * force
+                }
+            }
+            // Attraction along edges.
+            for ((a, b) in clampedPairs) {
+                val dx = pos[a][0] - pos[b][0]
+                val dy = pos[a][1] - pos[b][1]
+                val dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat().coerceAtLeast(0.001f)
+                val force = (dist * dist / k).toFloat().coerceAtMost(0.5f)
+                disp[a][0] -= dx / dist * force
+                disp[a][1] -= dy / dist * force
+                disp[b][0] += dx / dist * force
+                disp[b][1] += dy / dist * force
+            }
+            // Gravity toward the centre keeps disconnected nodes from drifting off.
+            // Scaled by the ideal edge length so it matters at any vault size.
+            for (i in 0 until count) {
+                disp[i][0] += (0.5f - pos[i][0]) * k.toFloat()
+                disp[i][1] += (0.5f - pos[i][1]) * k.toFloat()
+                val len = Math.sqrt((disp[i][0] * disp[i][0] + disp[i][1] * disp[i][1]).toDouble()).toFloat()
+                if (len > 0f) {
+                    val step = minOf(len, temperature)
+                    pos[i][0] = (pos[i][0] + disp[i][0] / len * step).coerceIn(0f, 1f)
+                    pos[i][1] = (pos[i][1] + disp[i][1] / len * step).coerceIn(0f, 1f)
+                }
+            }
+        }
+        return pos.map { it[0] to it[1] }
+    }
+
     companion object {
         const val SOUL_CAP_CHARS = 1500
         const val MEMORY_CAP_CHARS = 1500

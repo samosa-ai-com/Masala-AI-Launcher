@@ -160,6 +160,7 @@ class WikiActivity : ComponentActivity() {
         SettingsScaffold(stringResource(R.string.wiki_title), onBack = { finish() }) {
             ProposalCards(app)
             HealthCard(health, onOpen = { viewingId = it }, onRefresh = { scope.launch { reload() } })
+            SecondBrainGraph(app, snapshot, onOpenFile = { viewingId = it })
             Row2 {
                 Button(onClick = { editing = Editing("", "", "") }) { Text(stringResource(R.string.wiki_new)) }
                 OutlinedButton(enabled = pages.isNotEmpty(), onClick = { export.launch("masala-secondbrain.md") }) {

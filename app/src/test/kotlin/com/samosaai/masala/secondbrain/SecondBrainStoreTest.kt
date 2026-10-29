@@ -220,4 +220,32 @@ class SecondBrainStoreTest {
         // Links past the scan cap are not reported as dangling.
         assertTrue(health.dangling.none { it.fromId == "notes/big.md" })
     }
+
+    @Test fun forceLayoutIsDeterministicAndBounded() {
+        val pairs = listOf(0 to 1, 1 to 2, 2 to 0, 2 to 3)
+        val a = store.forceLayout(4, pairs, 60)
+        val b = store.forceLayout(4, pairs, 60)
+        assertEquals(a, b)
+        assertEquals(4, a.size)
+        assertTrue(a.all { (x, y) -> x.isFinite() && y.isFinite() && x in 0f..1f && y in 0f..1f })
+        assertTrue(a.distinct().size > 1)
+    }
+
+    @Test fun forceLayoutKeepsDisconnectedComponentsInBounds() {
+        // Two linked pairs plus two isolates: everything stays on the canvas and finite.
+        val pts = store.forceLayout(6, listOf(0 to 1, 2 to 3), 80)
+        assertEquals(6, pts.size)
+        assertTrue(pts.all { (x, y) -> x.isFinite() && y.isFinite() && x in 0f..1f && y in 0f..1f })
+        // Linked nodes end up nearer than the isolates drifted apart: no pile-up at one corner.
+        assertTrue(pts.distinct().size > 2)
+    }
+
+    @Test fun forceLayoutHandlesEdges() {
+        assertEquals(emptyList<Pair<Float, Float>>(), store.forceLayout(0, emptyList(), 10))
+        assertEquals(listOf(0.5f to 0.5f), store.forceLayout(1, emptyList(), 10))
+        // Out-of-range and self pairs are ignored, not crashed on.
+        val pts = store.forceLayout(3, listOf(0 to 9, -1 to 2, 1 to 1, 0 to 1), 20)
+        assertEquals(3, pts.size)
+        assertTrue(pts.all { (x, y) -> x.isFinite() && y.isFinite() })
+    }
 }

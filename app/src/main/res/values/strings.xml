@@ -308,6 +308,9 @@
     <string name="secondbrain_collapse">Hide</string>
     <string name="secondbrain_refresh">Re-check</string>
     <string name="secondbrain_binary">%1$s (%2$d KB)</string>
+    <string name="secondbrain_graph">Memory graph</string>
+    <string name="secondbrain_graph_loading">Laying out the graph…</string>
+    <string name="secondbrain_open">Open</string>
     <string name="secondbrain_too_large">That file is too large to edit here.</string>
     <string name="secondbrain_profile">Profile</string>
     <string name="secondbrain_profile_name">Name</string>

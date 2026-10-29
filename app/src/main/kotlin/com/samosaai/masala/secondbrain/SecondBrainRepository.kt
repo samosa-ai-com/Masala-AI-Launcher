@@ -152,6 +152,20 @@ class SecondBrainRepository(
         store.loadSnapshot().also { cached = it }
     }
 
+    /** The link graph plus a force-directed layout, computed off the main thread. */
+    suspend fun preparedGraph(): Pair<BrainGraph, List<Pair<Float, Float>>> = withContext(Dispatchers.Default) {
+        val graph = withContext(Dispatchers.IO) { store.loadSnapshot().also { cached = it } }
+            .let { store.buildGraph(it) }
+        val index = graph.nodes.indices.associateBy({ graph.nodes[it].id }, { it })
+        val pairs = graph.edges.mapNotNull { e ->
+            val a = index[e.fromId]
+            val b = index[e.toId]
+            if (a != null && b != null) a to b else null
+        }
+        val iterations = (16000 / maxOf(1, graph.nodes.size)).coerceIn(40, 160)
+        graph to store.forceLayout(graph.nodes.size, pairs, iterations)
+    }
+
     /** Vault health (unlinked, dangling, schema, unscanned; task links once tasks carry note refs). Never moves the tick. */
     suspend fun health(taskLinks: List<TaskLink> = emptyList()): BrainHealth = withContext(Dispatchers.IO) {
         val snapshot = store.loadSnapshot().also { cached = it }
