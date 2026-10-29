@@ -10,7 +10,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Runs new mini-app HTML once, off screen, before the tool answers, so the model sees the app's
@@ -33,7 +32,7 @@ class MiniAppProbe(private val context: Context) {
             try {
                 // A fixed size, as if on screen, so layout code that reads the viewport runs as it would.
                 webView.layout(0, 0, 1080, 1920)
-                hostMiniApp(webView, PROBE_ID, html, AtomicBoolean(false), onPageFinished = { finished.complete(Unit) }) { line ->
+                hostMiniApp(webView, PROBE_ID, html, networkAllowed = false, onPageFinished = { finished.complete(Unit) }) { line ->
                     if (line.startsWith("ERROR")) lines += line.take(500)
                 }
                 withTimeoutOrNull(LOAD_TIMEOUT_MILLIS) { finished.await() } ?: return@withContext null

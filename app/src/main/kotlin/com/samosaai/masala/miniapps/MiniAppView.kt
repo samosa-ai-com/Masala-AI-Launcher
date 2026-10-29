@@ -40,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,6 +52,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import com.samosaai.masala.R
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.masala
@@ -61,7 +64,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
-import java.util.concurrent.atomic.AtomicBoolean
 
 /** Each mini-app gets its own origin under this domain, so `localStorage` can't be shared. */
 private const val APP_DOMAIN = "appassets.androidplatform.net"
@@ -82,64 +84,150 @@ fun MiniAppView(
     onWebView: (WebView?) -> Unit = {},
 ) {
     var webView by remember(appId) { mutableStateOf<WebView?>(null) }
-    // Read by the WebView's request thread; the switch updates it in place, so the client never keeps a stale value.
-    val allowNetwork = remember(appId) { AtomicBoolean(networkAllowed) }
-    // Keys are appId/html only: toggling the network switch must not destroy a running app.
     DisposableEffect(appId, html) {
         onDispose { webView?.loadUrl("about:blank") }
     }
-    AndroidView(
-        factory = { ctx ->
-            WebView(ctx).apply {
-                hostMiniApp(this, appId, html, allowNetwork) { line -> MiniAppConsole.record(appId, line) }
-                webView = this
-                onWebView(this)
-            }
-        },
-        update = { wv ->
-            // Only the network policy changes on recomposition; the page is never reloaded here.
-            allowNetwork.set(networkAllowed)
-            wv.settings.blockNetworkLoads = !networkAllowed
-        },
-        modifier = modifier,
-        onRelease = {
-            it.destroy()
-            webView = null
-            onWebView(null)
-        },
-    )
+    // The network policy is fixed when the page loads (its CSP header and start script), so the
+    // switch gives the app a fresh WebView. Its localStorage survives; what it held in memory doesn't.
+    key(networkAllowed) {
+        AndroidView(
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    hostMiniApp(this, appId, html, networkAllowed) { line -> MiniAppConsole.record(appId, line) }
+                    webView = this
+                    onWebView(this)
+                }
+            },
+            modifier = modifier,
+            onRelease = {
+                it.destroy()
+                // The new WebView may already be in place by the time the old one goes.
+                if (webView === it) {
+                    webView = null
+                    onWebView(null)
+                }
+            },
+        )
+    }
 }
 
 /**
+ * With network off, what a CSP has to stop: `shouldInterceptRequest` never sees WebSocket
+ * connections (from the page or its workers). Everything else stays allowed so the app runs as written.
+ */
+private const val OFFLINE_CSP =
+    "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' data: blob:"
+
+/**
+ * With network off, WebRTC goes too: a peer connection reaches STUN/TURN servers outside every
+ * request hook and CSP. This runs at document start in every loaded frame, but a new iframe's
+ * first `about:blank` document gets no start script, and it comes with its own copy of every global.
+ * So each window this runs in also strips its child frames: from a capture `load` listener on its
+ * document (an `about:blank` iframe fires `load` while it is being inserted, before any page script
+ * can reach it), from the frame getters, and after every DOM call that can insert a frame.
+ * `MiniAppNetworkTest` tries each way around this.
+ */
+private const val NO_WEBRTC = """
+(function () {
+  var NAMES = ['RTCPeerConnection', 'webkitRTCPeerConnection'];
+  function strip(w) {
+    try {
+      if (!w || w.__masalaNoRtc) return;
+      Object.defineProperty(w, '__masalaNoRtc', { value: true });
+      NAMES.forEach(function (n) {
+        try { Object.defineProperty(w, n, { value: undefined, writable: false, configurable: false }); } catch (e) {}
+      });
+      guard(w);
+    } catch (e) {
+      // A cross-origin frame: it loaded a document, so its own start script covered it.
+    }
+  }
+  function sweep(w) {
+    try { for (var i = 0; i < w.length; i++) { strip(w[i]); sweep(w[i]); } } catch (e) {}
+  }
+  function all() {
+    var t = window;
+    try { if (window.top.length >= 0) t = window.top; } catch (e) {}
+    strip(t);
+    sweep(t);
+  }
+  function wrap(proto, name, getter) {
+    var d = proto && Object.getOwnPropertyDescriptor(proto, name);
+    if (!d) return;
+    if (typeof d.value === 'function') {
+      var f = d.value;
+      d.value = function () { try { return f.apply(this, arguments); } finally { all(); } };
+    } else if (getter && d.get) {
+      var g = d.get;
+      d.get = function () { var r = g.call(this); all(); return r; };
+    } else if (d.set) {
+      var s = d.set;
+      d.set = function (v) { try { s.call(this, v); } finally { all(); } };
+    } else {
+      return;
+    }
+    Object.defineProperty(proto, name, d);
+  }
+  function guard(w) {
+    // On the document: a `load` event's path stops there and never reaches the window.
+    w.document.addEventListener('load', function (e) {
+      try { if (e.target && e.target.contentWindow) strip(e.target.contentWindow); } catch (x) {}
+      all();
+    }, true);
+    var inserts = ['appendChild', 'insertBefore', 'replaceChild', 'append', 'prepend', 'before', 'after',
+      'replaceWith', 'replaceChildren', 'insertAdjacentElement', 'insertAdjacentHTML', 'innerHTML', 'outerHTML',
+      'setHTMLUnsafe', 'write', 'writeln', 'execCommand', 'insertNode', 'surroundContents'];
+    [w.Node, w.Element, w.Document, w.DocumentFragment, w.ShadowRoot, w.CharacterData, w.DocumentType, w.Range]
+      .forEach(function (C) { if (C) inserts.forEach(function (n) { wrap(C.prototype, n, false); }); });
+    [w.HTMLIFrameElement, w.HTMLFrameElement, w.HTMLObjectElement, w.HTMLEmbedElement].forEach(function (C) {
+      if (C) ['contentWindow', 'contentDocument', 'getSVGDocument'].forEach(function (n) { wrap(C.prototype, n, true); });
+    });
+  }
+  strip(window);
+})();
+"""
+
+/**
  * Sets [wv] up as the host for one app and loads it: the stored [html] is served as the app's own
- * origin, nothing else from the app is reachable, every other request is refused while
- * [allowNetwork] is false, and navigation never leaves the app. Shared by [MiniAppView] and
- * [MiniAppProbe], so what the probe checks is what the user runs.
+ * origin, nothing else from the app is reachable, and navigation never leaves the app. Without
+ * [networkAllowed] every other request is refused, a CSP stops WebSockets and WebRTC is removed.
+ * Shared by [MiniAppView] and [MiniAppProbe], so what the probe checks is what the user runs.
  */
 internal fun hostMiniApp(
     wv: WebView,
     appId: String,
     html: String,
-    allowNetwork: AtomicBoolean,
+    networkAllowed: Boolean,
     onPageFinished: () -> Unit = {},
     onConsole: (String) -> Unit,
 ) {
     val origin = originOf(appId)
-    val htmlBytes = html.toByteArray(Charsets.UTF_8)
-    applyMiniAppSettings(wv, allowNetwork.get())
+    applyMiniAppSettings(wv, networkAllowed)
+    var document = html
+    if (!networkAllowed) {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            // Every frame: this WebView only ever shows this one app.
+            WebViewCompat.addDocumentStartJavaScript(wv, NO_WEBRTC, setOf("*"))
+        } else {
+            // Older WebView: the main frame only, before any of the app's own script.
+            document = "<script>$NO_WEBRTC</script>$html"
+        }
+    }
+    val htmlBytes = document.toByteArray(Charsets.UTF_8)
+    val headers = if (networkAllowed) emptyMap() else mapOf("Content-Security-Policy" to OFFLINE_CSP)
     wv.webViewClient = object : WebViewClient() {
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
             val url = request.url.toString()
             // The document itself, and in-page routing, come from the stored HTML.
             if (url == origin || url.startsWith(origin + "#") || url.startsWith(origin + "?")) {
                 return WebResourceResponse(
-                    "text/html", "utf-8", 200, "OK", emptyMap(),
+                    "text/html", "utf-8", 200, "OK", headers,
                     ByteArrayInputStream(htmlBytes),
                 )
             }
             // Nothing else is served from the app: no asset directory, no files.
             // With network off, every other request is refused outright.
-            if (!allowNetwork.get()) {
+            if (!networkAllowed) {
                 return WebResourceResponse("text/plain", "utf-8", 403, "Blocked", emptyMap(), null)
             }
             return null
