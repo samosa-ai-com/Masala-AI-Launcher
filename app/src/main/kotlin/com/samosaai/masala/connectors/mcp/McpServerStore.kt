@@ -173,11 +173,13 @@ class McpServerStore(
     }
 
     /** Applies [change] unless the server was edited or removed since [seen] was read. */
-    private fun commit(seen: McpServerConfig, change: (McpServerConfig) -> McpServerConfig) = synchronized(lock) {
-        val current = server(seen.id) ?: return
-        if (current.url != seen.url || current.token != seen.token || current.headers != seen.headers) return
-        _servers.value = _servers.value.map { if (it.id == seen.id) change(it) else it }
-        persistAndRegister()
+    private fun commit(seen: McpServerConfig, change: (McpServerConfig) -> McpServerConfig) {
+        synchronized(lock) {
+            val current = server(seen.id) ?: return
+            if (current.url != seen.url || current.token != seen.token || current.headers != seen.headers) return
+            _servers.value = _servers.value.map { if (it.id == seen.id) change(it) else it }
+            persistAndRegister()
+        }
     }
 
     private fun persistAndRegister() {

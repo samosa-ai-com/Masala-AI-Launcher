@@ -90,7 +90,6 @@ class RecordingService : Service() {
                     Log.w(TAG, "Recorder error what=$what extra=$extra")
                     stopRecording()
                     stopSelf()
-                    true
                 }
                 prepare()
                 start()
