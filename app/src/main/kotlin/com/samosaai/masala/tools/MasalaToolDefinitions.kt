@@ -96,6 +96,48 @@ object MasalaToolDefinitions {
         }
     )
 
+    val createMiniApp = tool(
+        "create_mini_app",
+        "Save a self-contained HTML mini-app (single file: inline CSS and JS, no external " +
+            "requests unless the user enabled network for it). Returns the new mini-app id; tell " +
+            "the user to open it from home once pinned.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("title") {
+                    put("type", "string")
+                    put("description", "Short title shown in the host and on home.")
+                }
+                putJsonObject("html") {
+                    put("type", "string")
+                    put("description", "Complete HTML document, inline style and script only.")
+                }
+            }
+            putJsonArray("required") { add("html") }
+        }
+    )
+
+    val updateMiniApp = tool(
+        "update_mini_app",
+        "Replace a mini-app's HTML, keeping its title and settings. Returns console errors when " +
+            "the app logged any, for the repair turn.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Mini-app id from create_mini_app.")
+                }
+                putJsonObject("html") {
+                    put("type", "string")
+                    put("description", "Complete replacement HTML document.")
+                }
+            }
+            putJsonArray("required") {
+                add("id")
+                add("html")
+            }
+        }
+    )
+
     val setAlarm = tool(
         "set_alarm",
         "Set an alarm in the system clock app. To change or remove alarms, use show_alarms to open " +

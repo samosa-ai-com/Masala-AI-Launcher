@@ -15,6 +15,7 @@ import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.LauncherModel
 import com.samosaai.masala.layout.LayoutRepository
 import com.samosaai.masala.layout.ModeStore
+import com.samosaai.masala.miniapps.MiniAppStore
 import com.samosaai.masala.core.scheduled.ScheduledTaskStore
 import com.samosaai.masala.pro.ProTools
 import com.samosaai.masala.scheduled.PrefsTaskStorage
@@ -38,6 +39,7 @@ class MasalaApp : Application() {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     val database by lazy { MasalaDatabase.create(this) }
+    val miniApps by lazy { MiniAppStore(database.miniApps()) }
     val settings by lazy { SettingsStore(this) }
     val actionLog by lazy { ActionLog(this) }
 
@@ -52,7 +54,7 @@ class MasalaApp : Application() {
     /** `:app`'s tools, then `:pro`'s, which also swaps in all-files access (arch §3.1). */
     val tools by lazy {
         MasalaToolRegistry(AppStorageFileAccess(this)).also { registry ->
-            MasalaTools.create(this, ToolFiles { registry.fileAccess }).forEach(registry::register)
+            MasalaTools.create(this, ToolFiles { registry.fileAccess }, miniApps).forEach(registry::register)
             ProTools.register(registry, this)
         }
     }

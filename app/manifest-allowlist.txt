@@ -41,6 +41,9 @@ receiver com.samosaai.masala.scheduled.ScheduledTaskRebootReceiver  # Re-arms th
 receiver com.samosaai.masala.scheduled.ScheduledTaskReceiver  # The scheduled-task alarm itself; not exported
 
 # The recording service is added here, by class name, in the commit that creates it (Phase 3).
+service com.samosaai.masala.audio.RecordingService  # Meeting-notes recording (mic FGS, user-started)
+
+provider androidx.core.content.FileProvider  # Sharing a mini-app's HTML file (grant-uri only)
 
 library androidx.work  # WorkManager: WAKE_LOCK, its job services and receivers
 library androidx.core  # DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION

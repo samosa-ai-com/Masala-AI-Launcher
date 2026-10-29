@@ -179,4 +179,24 @@
     <string name="settings_version_delete_title">Delete this version?</string>
     <string name="settings_version_delete_message">“%1$s” will be removed. This can’t be undone.</string>
     <string name="settings_version_preview_failed">Couldn’t load that version</string>
+    <string name="miniapp_title">Mini app</string>
+    <string name="miniapp_gone">That mini app is gone</string>
+    <string name="miniapp_network">Allow network access</string>
+    <string name="miniapp_network_summary">Off unless you turn it on for this app.</string>
+    <string name="miniapp_share">Share</string>
+    <string name="miniapp_pin">Pin to home</string>
+    <string name="miniapp_pinned">Pinned — see it on home</string>
+    <string name="miniapp_pin_failed">Couldn’t pin it to home</string>
+    <string name="miniapp_delete_title">Delete this mini app?</string>
+    <string name="miniapp_delete_message">“%1$s” will be removed. Home items pointing at it will stop working.</string>
+    <string name="settings_recording">Recording</string>
+    <string name="settings_recording_summary">Meeting notes: 15-minute chunks in app storage</string>
+    <string name="recording_start">Start recording</string>
+    <string name="recording_stop">Stop</string>
+    <string name="recording_active">Recording meeting notes</string>
+    <string name="recording_channel">Meeting-notes recording</string>
+    <string name="recording_running">Recording… tap Stop to finish.</string>
+    <string name="recording_idle">Not recording.</string>
+    <string name="recording_files">%1$d files saved</string>
+    <string name="recording_needs_mic">Microphone access is needed to record.</string>
 </resources>

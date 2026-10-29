@@ -93,7 +93,7 @@ class ActionDispatcher(
         is MasalaAction.RunTool -> tool(action.name, action.args)
         // The agent and the skill runner arrive in Phase 4; the buttons are already wired.
         is MasalaAction.RunSkill -> Outcome.Done().also { screen.ask(action.prompt ?: action.skillId) }
-        is MasalaAction.OpenMiniApp -> Outcome.Failed("Mini apps arrive in a later phase")
+        is MasalaAction.OpenMiniApp -> openMiniApp(action)
     }
 
     private suspend fun setMode(action: MasalaAction.SetMode): Outcome {
@@ -113,6 +113,16 @@ class ActionDispatcher(
         is ToolResult.Success -> Outcome.Done(r.output)
         is ToolResult.NeedsCapability -> Outcome.Failed(r.reason)
         is ToolResult.Failure -> if (r.message.startsWith("The user declined")) Outcome.Declined else Outcome.Failed(r.message)
+    }
+
+    private fun openMiniApp(action: MasalaAction.OpenMiniApp): Outcome {
+        // Existence is checked in the activity, which shows a "gone" state for unknown ids.
+        context.startActivity(
+            android.content.Intent(context, com.samosaai.masala.miniapps.MiniAppActivity::class.java)
+                .putExtra(com.samosaai.masala.miniapps.MiniAppActivity.EXTRA_APP_ID, action.id)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+        return Outcome.Done()
     }
 
     private fun start(intent: Intent): Outcome = try {

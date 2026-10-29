@@ -1,7 +1,10 @@
 package com.samosaai.masala.tools
 
 import com.samosaai.masala.core.tool.FunctionTool
+import com.samosaai.masala.core.tool.ActionResult
 import com.samosaai.masala.core.tool.ToolFiles
+import com.samosaai.masala.miniapps.MiniAppConsole
+import com.samosaai.masala.miniapps.MiniAppStore
 import android.content.Context
 import com.samosaai.masala.core.tool.Tool
 import com.samosaai.masala.core.tool.ToolSensitivity.CHANGES_SOMETHING
@@ -15,7 +18,7 @@ import com.samosaai.masala.tools.MasalaToolDefinitions as Defs
  * confirmation gate; [Tool.readsPrivateData] and [Tool.usesNetwork] feed the Skill Hub policy.
  */
 object MasalaTools {
-    fun create(context: Context, files: ToolFiles): List<Tool> {
+    fun create(context: Context, files: ToolFiles, miniApps: MiniAppStore): List<Tool> {
         val app = context.applicationContext
         val alarms = AlarmTool(app)
         val apps = AppsTool(app)
@@ -181,6 +184,29 @@ object MasalaTools {
             FunctionTool(Defs.getHealthSummary, READ_ONLY, readsPrivateData = true) { health.getSummary(it.int("days")) },
             FunctionTool(Defs.getHealthRecords, READ_ONLY, readsPrivateData = true) {
                 health.getRecords(type = it.string("type") ?: return@FunctionTool missing("type"), daysArg = it.int("days"))
+            },
+
+            // Generated HTML mini-apps (plan Phase 3, Lane D).
+            FunctionTool(Defs.createMiniApp, CHANGES_SOMETHING) {
+                val id = miniApps.create(
+                    title = it.string("title") ?: "Mini app",
+                    html = it.string("html") ?: return@FunctionTool missing("html"),
+                ) ?: return@FunctionTool ActionResult.error(
+                    "That HTML is too large (max ${MiniAppStore.MAX_HTML_CHARS} characters). Make it smaller."
+                )
+                ActionResult.ok("Mini app '$id' created. Pin it to home to open it from the launcher.")
+            },
+            FunctionTool(Defs.updateMiniApp, CHANGES_SOMETHING) {
+                val id = it.string("id") ?: return@FunctionTool missing("id")
+                val ok = miniApps.update(id, html = it.string("html") ?: return@FunctionTool missing("html"))
+                if (!ok) return@FunctionTool ActionResult.error(
+                    "No mini app '$id', or its HTML is over ${MiniAppStore.MAX_HTML_CHARS} characters."
+                )
+                // Errors reported here are cleared so the next repair turn starts fresh.
+                val errors = MiniAppConsole.errors(id)
+                MiniAppConsole.clear(id)
+                if (errors.isEmpty()) ActionResult.ok("Mini app '$id' updated.")
+                else ActionResult.ok("Mini app '$id' updated. Console errors:\n" + errors.joinToString("\n"))
             },
         )
     }

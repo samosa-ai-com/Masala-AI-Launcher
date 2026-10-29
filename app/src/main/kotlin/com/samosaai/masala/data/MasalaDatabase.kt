@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.Flow
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
     abstract fun layoutVersions(): LayoutVersionDao
+    abstract fun miniApps(): MiniAppDao
 
     companion object {
         fun create(context: Context): MasalaDatabase =
@@ -68,6 +69,25 @@ interface LayoutVersionDao {
 
     @Query("DELETE FROM layout_versions WHERE id IN (:ids)")
     suspend fun delete(ids: List<Long>)
+}
+
+/** A generated HTML mini-app (arch §3.9, Phase 3): CRUD lives in `MiniAppStore`, rendering in `MiniAppView`. */
+@Dao
+interface MiniAppDao {
+    @Query("SELECT * FROM mini_apps ORDER BY updatedAt DESC")
+    fun all(): Flow<List<MiniAppEntity>>
+
+    @Query("SELECT * FROM mini_apps WHERE id = :id")
+    suspend fun get(id: String): MiniAppEntity?
+
+    @Upsert
+    suspend fun upsert(entity: MiniAppEntity)
+
+    @Query("DELETE FROM mini_apps WHERE id = :id")
+    suspend fun delete(id: String)
+
+    @Query("UPDATE mini_apps SET networkAllowed = :allowed, updatedAt = :now WHERE id = :id")
+    suspend fun setNetworkAllowed(id: String, allowed: Boolean, now: Long)
 }
 
 /** The user's changes to one app in one profile, keyed by [AppKey.id]. */

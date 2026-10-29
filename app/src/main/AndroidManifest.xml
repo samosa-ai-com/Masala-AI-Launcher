@@ -21,6 +21,9 @@
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Meeting-notes recording runs as a microphone foreground service (plan Phase 3, lane D) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
 
@@ -170,6 +173,27 @@
             android:exported="false"
             android:label="@string/generate_title"
             android:windowSoftInputMode="adjustResize" />
+
+        <!-- Generated HTML mini-apps (plan Phase 3, lane D) -->
+        <activity
+            android:name=".miniapps.MiniAppActivity"
+            android:exported="false"
+            android:label="@string/miniapp_title" />
+
+        <!-- Meeting-notes recording (plan Phase 3, lane D): microphone FGS, user-started -->
+        <service
+            android:name=".audio.RecordingService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.miniapp"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/miniapp_paths" />
+        </provider>
 
         <!-- Full-screen version preview over the current wallpaper (same window as home) -->
         <activity

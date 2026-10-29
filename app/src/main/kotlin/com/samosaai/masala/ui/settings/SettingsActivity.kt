@@ -1,6 +1,8 @@
 package com.samosaai.masala.ui.settings
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,11 +11,16 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.samosaai.masala.audio.RecordingService
 import com.samosaai.masala.core.layout.LayoutChecker
 import com.samosaai.masala.layout.LayoutTransfer
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -23,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,7 +60,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -68,9 +76,10 @@ class SettingsActivity : ComponentActivity() {
                     var page by rememberSaveable { mutableStateOf(Page.MAIN) }
                     BackHandler(enabled = page != Page.MAIN) { page = Page.MAIN }
                     when (page) {
-                        Page.MAIN -> MainPage(settings, onHiddenApps = { page = Page.HIDDEN_APPS }, onLayout = { page = Page.LAYOUT })
+                        Page.MAIN -> MainPage(settings, onHiddenApps = { page = Page.HIDDEN_APPS }, onLayout = { page = Page.LAYOUT }, onRecording = { page = Page.RECORDING })
                         Page.HIDDEN_APPS -> HiddenAppsPage(onBack = { page = Page.MAIN })
                         Page.LAYOUT -> LayoutPage(settings, onBack = { page = Page.MAIN })
+                        Page.RECORDING -> RecordingPage(onBack = { page = Page.MAIN })
                     }
                 }
             }
@@ -78,7 +87,7 @@ class SettingsActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun MainPage(settings: LauncherSettings, onHiddenApps: () -> Unit, onLayout: () -> Unit) {
+    private fun MainPage(settings: LauncherSettings, onHiddenApps: () -> Unit, onLayout: () -> Unit, onRecording: () -> Unit) {
         val scope = rememberCoroutineScope()
         val apps by masala.launcher.apps.collectAsStateWithLifecycle()
         var isDefault by remember { mutableStateOf(HomeRole.isDefault(this)) }
@@ -141,6 +150,12 @@ class SettingsActivity : ComponentActivity() {
                 onClick = onLayout,
             )
 
+            SettingsNavRow(
+                title = stringResource(R.string.settings_recording),
+                summary = stringResource(R.string.settings_recording_summary),
+                onClick = onRecording,
+            )
+
             SettingsSectionTitle(stringResource(R.string.settings_drawer))
             SettingsToggleRow(stringResource(R.string.settings_auto_launch), settings.autoLaunch) { on ->
                 update { it.copy(autoLaunch = on) }
@@ -199,6 +214,64 @@ class SettingsActivity : ComponentActivity() {
             onImport = { import.launch(arrayOf("application/json", "text/plain", "*/*")) },
             onBack = onBack,
         )
+    }
+
+    /** Meeting-notes recording (plan Phase 3, Lane D): explicit Start/Stop for the mic service. */
+    @Composable
+    private fun RecordingPage(onBack: () -> Unit) {
+        fun svc() = Intent(this@SettingsActivity, RecordingService::class.java)
+        fun countFiles() = java.io.File(filesDir, "recordings").listFiles()?.size ?: 0
+        // Reads the service's own state, so a Stop from the notification or a return to this page
+        // shows what is actually happening instead of a remembered tap.
+        val running by RecordingService.recording.collectAsStateWithLifecycle()
+        var files by remember { mutableIntStateOf(countFiles()) }
+        var denied by remember { mutableStateOf(false) }
+        val askMic = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                ContextCompat.startForegroundService(this@SettingsActivity, svc())
+            } else {
+                denied = true
+            }
+        }
+        fun start() {
+            if (ContextCompat.checkSelfPermission(this@SettingsActivity, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                ContextCompat.startForegroundService(this@SettingsActivity, svc())
+            } else {
+                askMic.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+        SettingsScaffold(stringResource(R.string.settings_recording), onBack = onBack) {
+            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    stringResource(if (running) R.string.recording_running else R.string.recording_idle),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    stringResource(R.string.recording_files, files),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (denied) {
+                    Text(
+                        stringResource(R.string.recording_needs_mic),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(enabled = !running, onClick = ::start) { Text(stringResource(R.string.recording_start)) }
+                    OutlinedButton(
+                        enabled = running,
+                        onClick = {
+                            stopService(svc())
+                            files = countFiles()
+                        },
+                    ) { Text(stringResource(R.string.recording_stop)) }
+                }
+            }
+        }
     }
 
     /** Apps that are hidden or search-only, with their level; picking "Drawer and search" shows them again. */
