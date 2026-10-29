@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -141,7 +143,7 @@ class SkillRunner(
     }
 
     private suspend fun save(runId: Long, run: Active, status: String, error: String?, finished: Boolean = false) {
-        val json = MasalaJson.strict.encodeToString(transcript, run.agent.history)
+        val json = MasalaJson.strict.encodeToString(transcript, withoutImages(run.agent.transcript))
         val row = runs.get(runId) ?: return
         runs.update(row.copy(status = status, transcriptJson = json, error = error, finishedAt = if (finished) clock() else row.finishedAt))
     }
@@ -160,6 +162,16 @@ class SkillRunner(
                 m.role == "assistant" && m.hasText -> SkillRunEvent.Message(SkillRunEvent.Message.Role.ASSISTANT, m.textContent)
                 else -> null
             }
+        }
+
+        /**
+         * The transcript as stored: photos are dropped (the text part stays), since a few base64 images
+         * would outgrow the 2 MB a database row can be read back with. The run in memory keeps them.
+         */
+        internal fun withoutImages(history: List<ChatMessage>): List<ChatMessage> = history.map { m ->
+            val parts = m.content as? JsonArray ?: return@map m
+            val text = parts.filterNot { ((it as? JsonObject)?.get("type") as? JsonPrimitive)?.content == "image_url" }
+            if (text.size == parts.size) m else m.copy(content = JsonArray(text))
         }
 
         private fun kindOf(path: String) = when (File(path).extension.lowercase()) {

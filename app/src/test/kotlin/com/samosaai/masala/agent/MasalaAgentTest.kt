@@ -141,6 +141,14 @@ class MasalaAgentTest {
         assertEquals(5, a.history.count { it.role == "user" })
         assertEquals("q3", a.history.first().textContent)
     }
+
+    @Test fun transcriptKeepsWhatTheHistoryDropped() = runBlocking {
+        val model = script(*Array(8) { assistant("a$it") })
+        val a = agent(model)
+        repeat(8) { a.run(user("q$it")).toList() }
+        assertEquals((0 until 8).flatMap { listOf("q$it", "a$it") }, a.transcript.map { it.textContent })
+        assertEquals(a.history, a.transcript.takeLast(a.history.size))
+    }
 }
 
 class AgentHistoryTest {

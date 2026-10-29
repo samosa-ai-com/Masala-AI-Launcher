@@ -16,6 +16,9 @@ import com.samosaai.masala.data.SkillRunEntity
 import com.samosaai.masala.llm.ChatMessage
 import com.samosaai.masala.llm.FunctionCall
 import com.samosaai.masala.llm.ToolCall
+import com.samosaai.masala.llm.attachmentsUserMessage
+import com.samosaai.masala.core.contract.MasalaJson
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -168,6 +171,28 @@ class SkillRunnerTest {
         val id = r.start("chef", user("x"))!!
         r.finished(id)
         assertEquals("failed" to "offline", r.outcome(id))
+    }
+
+    @Test fun savedTranscriptKeepsEveryExchange() = runBlocking {
+        val r = runner(*Array(7) { reply("a$it") })
+        val id = r.start("chef", user("q0"))!!
+        r.finished(id)
+        for (n in 1 until 7) {
+            r.send(id, user("q$n"))
+            withTimeout(5_000) { r.open(id)!!.first { !it.running && it.events.count { e -> e is SkillRunEvent.Done } == n + 1 } }
+        }
+        val saved = MasalaJson.lenient.decodeFromString(ListSerializer(ChatMessage.serializer()), runs.get(id)!!.transcriptJson)
+        assertEquals((0 until 7).flatMap { listOf("q$it", "a$it") }, saved.map { it.textContent })
+        // Reopened after the app was killed, the sheet shows the whole conversation too.
+        assertEquals(14, runner().open(id)!!.value.events.filterIsInstance<SkillRunEvent.Message>().size)
+    }
+
+    @Test fun photosAreNotSavedButTheirTextIs() {
+        val withPhoto = attachmentsUserMessage("what is this?", emptyList(), listOf("QUJD"))
+        val stored = SkillRunner.withoutImages(listOf(withPhoto, user("plain")))
+        assertEquals(0, stored[0].imageCount)
+        assertEquals("what is this?", stored[0].textContent)
+        assertEquals(user("plain"), stored[1])
     }
 
     @Test fun reopeningRestoresFromTheDatabase() = runBlocking {

@@ -36,16 +36,25 @@ class MasalaAgent(
 ) {
     private var messages: List<ChatMessage> = emptyList()
 
-    /** The conversation so far, without the system prompt. */
+    /** Older exchanges that no longer go to the model, kept for [transcript]. */
+    private var dropped: List<ChatMessage> = emptyList()
+
+    /** The conversation the model sees (the last [KEPT_EXCHANGES] exchanges), without the system prompt. */
     val history: List<ChatMessage> get() = messages
+
+    /** The whole conversation, including exchanges [history] has let go of: what a skill run saves. */
+    val transcript: List<ChatMessage> get() = dropped + messages
 
     /** Replaces the conversation, e.g. when a skill run is reopened. */
     fun restore(history: List<ChatMessage>) {
+        dropped = emptyList()
         messages = AgentHistory.repairOrphanedToolCalls(history)
     }
 
     fun run(user: ChatMessage): Flow<AgentEvent> = flow {
-        messages = AgentHistory.lastExchanges(messages, KEPT_EXCHANGES - 1) + user
+        val kept = AgentHistory.lastExchanges(messages, KEPT_EXCHANGES - 1)
+        dropped = dropped + messages.subList(0, messages.size - kept.size)
+        messages = kept + user
         val visible = definitions.filter { scope.allows(it.name) }.map { it.toLlm() }
         try {
             repeat(maxSteps) {
