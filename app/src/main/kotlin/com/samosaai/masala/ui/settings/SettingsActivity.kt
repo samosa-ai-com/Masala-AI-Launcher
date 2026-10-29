@@ -59,6 +59,8 @@ import com.samosaai.masala.miniapps.MiniAppActivity
 import com.samosaai.masala.ui.components.LauncherRow
 import com.samosaai.masala.ui.drawer.visibilityLabel
 import com.samosaai.masala.ui.theme.MasalaTheme
+import com.samosaai.masala.ui.mcp.McpActivity
+import com.samosaai.masala.ui.wiki.WikiActivity
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -178,6 +180,17 @@ class SettingsActivity : ComponentActivity() {
                 summary = stringResource(R.string.settings_recording_summary),
                 onClick = onRecording,
             )
+
+            SettingsSectionTitle(stringResource(R.string.settings_ask))
+            SettingsToggleRow(stringResource(R.string.settings_read_replies), settings.readRepliesAloud) { on ->
+                update { it.copy(readRepliesAloud = on) }
+            }
+            SettingsNavRow(stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) {
+                startActivity(Intent(this@SettingsActivity, WikiActivity::class.java))
+            }
+            SettingsNavRow(stringResource(R.string.mcp_title), stringResource(R.string.mcp_summary)) {
+                startActivity(Intent(this@SettingsActivity, McpActivity::class.java))
+            }
 
             SettingsSectionTitle(stringResource(R.string.settings_drawer))
             SettingsToggleRow(stringResource(R.string.settings_auto_launch), settings.autoLaunch) { on ->

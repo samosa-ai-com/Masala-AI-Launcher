@@ -25,6 +25,8 @@ data class LauncherSettings(
     /** Each gesture is a [MasalaAction] the user can change in settings (plan Phase 2). */
     val swipeUp: MasalaAction = MasalaAction.OpenDrawer,
     val swipeDown: MasalaAction = MasalaAction.ExpandNotifications,
+    /** Speak every reply from the reply card (plan Phase 4 M3). */
+    val readRepliesAloud: Boolean = false,
 ) {
     companion object {
         const val MIN_TEXT_SCALE = 0.5f
@@ -42,6 +44,7 @@ class SettingsStore(private val context: Context) {
         val homeLocked = booleanPreferencesKey("home_locked")
         val swipeUp = stringPreferencesKey("swipe_up")
         val swipeDown = stringPreferencesKey("swipe_down")
+        val readRepliesAloud = booleanPreferencesKey("read_replies_aloud")
     }
 
     val settings: Flow<LauncherSettings> = context.dataStore.data.map { it.toSettings() }
@@ -55,6 +58,7 @@ class SettingsStore(private val context: Context) {
             prefs[Keys.homeLocked] = next.homeLocked
             prefs[Keys.swipeUp] = MasalaJson.strict.encodeToString(MasalaAction.serializer(), next.swipeUp)
             prefs[Keys.swipeDown] = MasalaJson.strict.encodeToString(MasalaAction.serializer(), next.swipeDown)
+            prefs[Keys.readRepliesAloud] = next.readRepliesAloud
         }
     }
 
@@ -65,6 +69,7 @@ class SettingsStore(private val context: Context) {
         homeLocked = this[Keys.homeLocked] ?: false,
         swipeUp = this[Keys.swipeUp].toAction(MasalaAction.OpenDrawer),
         swipeDown = this[Keys.swipeDown].toAction(MasalaAction.ExpandNotifications),
+        readRepliesAloud = this[Keys.readRepliesAloud] ?: false,
     )
 
     // A gesture saved by a newer version, or damaged, falls back to its default.

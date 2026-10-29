@@ -60,7 +60,11 @@ import com.samosaai.masala.tools.ToolGate
 import com.samosaai.masala.ui.theme.MasalaTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
+import com.samosaai.masala.agent.AgentEvent
+import com.samosaai.masala.agent.LlmAgentModel
+import com.samosaai.masala.llm.ChatMessage
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -109,7 +113,7 @@ class DebugActivity : ComponentActivity() {
         var prompt by rememberSaveable { mutableStateOf("Set an alarm for 7:30 tomorrow called Standup") }
         var running by remember { mutableStateOf(false) }
         var pending by remember { mutableStateOf<Pending?>(null) }
-        val events = remember { mutableStateListOf<DebugAgent.Event>() }
+        val events = remember { mutableStateListOf<DebugEvent>() }
         val listState = rememberLazyListState()
         LaunchedEffect(events.size) { if (events.isNotEmpty()) listState.animateScrollToItem(events.size - 1) }
 
@@ -143,48 +147,56 @@ class DebugActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxWidth().testTag("debug_prompt"),
             )
             // The executor waits for the permission answer itself (permissions/PermissionGate).
-            fun send() {
-                saveConfig(config)
-                events.clear()
-                running = true
-                val text = prompt
-                scope.launch {
-                    val app = masala
-                    try {
-                        val direct = DIRECT_CALL.matchEntire(text.trim())
-                        if (direct != null) {
-                            // "/tool {json}": run one tool through the executor, no model.
-                            val (name, json) = direct.destructured
-                            val args = Json.parseToJsonElement(json.ifBlank { "{}" }).jsonObject
-                            events += DebugAgent.Event.Call(name, args.toString())
-                            val result =
-                                if (name in DebugCommands.names) DebugCommands.run(app, name, args)
-                                else app.toolExecutor(gate).execute(name, args)
-                            events += DebugAgent.Event.Result(name, result)
-                        } else {
-                            DebugAgent(config.client(app), app.tools.tools, app.toolExecutor(gate)).run(text) { event ->
-                                events += event
-                            }
-                        }
-                    } catch (e: Exception) {
-                        events += DebugAgent.Event.Error("${e::class.simpleName}: ${e.message}")
-                    } finally {
-                        running = false
-                    }
-                }
-            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     enabled = !running && config.isConfigured && prompt.isNotBlank(),
-                    onClick = ::send,
+                    onClick = {
+                        saveConfig(config)
+                        events.clear()
+                        running = true
+                        scope.launch {
+                            val app = masala
+                            try {
+                                val direct = DIRECT_CALL.matchEntire(prompt.trim())
+                                if (direct != null) {
+                                    // "/tool {json}": run one tool through the executor, no model.
+                                    val (name, json) = direct.destructured
+                                    val args = Json.parseToJsonElement(json.ifBlank { "{}" }).jsonObject
+                                    events += DebugEvent.Call(name, args.toString())
+                                    events += DebugEvent.Result(
+                                        name,
+                                        if (name in DebugCommands.names) DebugCommands.run(app, name, args) else app.toolExecutor(gate).execute(name, args),
+                                    )
+                                } else {
+                                    val json = Json { prettyPrint = true; explicitNulls = false }
+                                    val model = LlmAgentModel(config.client(app)) { events += DebugEvent.Raw(json.encodeToString(it)) }
+                                    app.agent(model, gate).run(ChatMessage("user", JsonPrimitive(prompt))).collect { event ->
+                                        when (event) {
+                                            is AgentEvent.ToolCall -> events += DebugEvent.Call(event.name, event.args.toString())
+                                            is AgentEvent.ToolDone -> events += DebugEvent.Result(event.name, event.result)
+                                            is AgentEvent.Done -> events += DebugEvent.Answer(event.text)
+                                            is AgentEvent.Failed -> events += DebugEvent.Error(event.message)
+                                            AgentEvent.StepLimit -> events += DebugEvent.Error("Stopped at the step limit.")
+                                            is AgentEvent.NeedsCapability -> events += DebugEvent.Error("Needs " + event.capability + ": " + event.reason)
+                                            else -> Unit
+                                        }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                events += DebugEvent.Error(e::class.simpleName + ": " + e.message)
+                            } finally {
+                                running = false
+                            }
+                        }
+                    },
                 ) { Text(stringResource(if (running) R.string.debug_running else R.string.debug_send)) }
                 OutlinedButton(enabled = !running, onClick = {
                     saveConfig(config)
                     scope.launch {
                         events.clear()
                         config.client(masala).listModels()
-                            .onSuccess { events += DebugAgent.Event.Answer(it.joinToString("\n")) }
-                            .onFailure { events += DebugAgent.Event.Error("${it::class.simpleName}: ${it.message}") }
+                            .onSuccess { events += DebugEvent.Answer(it.joinToString("\n")) }
+                            .onFailure { events += DebugEvent.Error("${it::class.simpleName}: ${it.message}") }
                     }
                 }) { Text(stringResource(R.string.debug_models)) }
                 OutlinedButton(onClick = { startActivity(android.content.Intent(this@DebugActivity, ContextPanelActivity::class.java)) }) {
@@ -192,7 +204,11 @@ class DebugActivity : ComponentActivity() {
                 }
                 OutlinedButton(onClick = {
                     events.clear()
-                    events += DebugAgent.Event.Raw(masala.actionLog.tail(20).joinToString("\n").ifEmpty { "(empty)" })
+                    events += DebugEvent.Raw(masala.aiReports.tail(20).joinToString("\n").ifEmpty { "(no AI reports)" })
+                }) { Text(stringResource(R.string.debug_ai_reports)) }
+                OutlinedButton(onClick = {
+                    events.clear()
+                    events += DebugEvent.Raw(masala.actionLog.tail(20).joinToString("\n").ifEmpty { "(empty)" })
                 }) { Text(stringResource(R.string.debug_action_log)) }
             }
             var showTools by rememberSaveable { mutableStateOf(false) }
@@ -277,7 +293,7 @@ class DebugActivity : ComponentActivity() {
                             // activity to launch, and the launcher throws.
                             val opened = runCatching { health.launch(HealthTool.PERMISSIONS) }.isSuccess
                             if (!opened) {
-                                events += DebugAgent.Event.Error(
+                                events += DebugEvent.Error(
                                     "Health Connect isn't installed on this phone, so it can't be granted here.",
                                 )
                             }
@@ -303,23 +319,23 @@ class DebugActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun EventRow(event: DebugAgent.Event, onGrant: (String) -> Unit) {
+    private fun EventRow(event: DebugEvent, onGrant: (String) -> Unit) {
         val (label, body) = when (event) {
-            is DebugAgent.Event.Raw -> stringResource(R.string.debug_event_raw) to event.json
-            is DebugAgent.Event.Call -> stringResource(R.string.debug_event_call, event.name) to event.args
-            is DebugAgent.Event.Result -> stringResource(R.string.debug_event_result, event.name) to when (val r = event.result) {
+            is DebugEvent.Raw -> stringResource(R.string.debug_event_raw) to event.json
+            is DebugEvent.Call -> stringResource(R.string.debug_event_call, event.name) to event.args
+            is DebugEvent.Result -> stringResource(R.string.debug_event_result, event.name) to when (val r = event.result) {
                 is ToolResult.Success -> "OK: ${r.output}"
                 is ToolResult.Failure -> "FAIL: ${r.message}"
                 is ToolResult.NeedsCapability -> "NEEDS ${r.capability}: ${r.reason}"
             }
-            is DebugAgent.Event.Answer -> stringResource(R.string.debug_event_answer) to event.text
-            is DebugAgent.Event.Error -> stringResource(R.string.debug_event_error) to event.message
+            is DebugEvent.Answer -> stringResource(R.string.debug_event_answer) to event.text
+            is DebugEvent.Error -> stringResource(R.string.debug_event_error) to event.message
         }
         // Raw responses are long; they start collapsed and a tap shows a capped view. Laying out
         // an entire 50 KB reply as one Text blocks the main thread for seconds (an ANR), so the
         // body is trimmed head-and-tail and says how much it hid.
         var expanded by remember(event) { mutableStateOf(false) }
-        val raw = event is DebugAgent.Event.Raw
+        val raw = event is DebugEvent.Raw
         val shown = if (raw && !expanded) body.take(PREVIEW_CHARS) else capped(body, MAX_BODY_CHARS)
         Column(
             Modifier
@@ -332,10 +348,10 @@ class DebugActivity : ComponentActivity() {
             Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Text(
                 shown,
-                fontFamily = if (raw || event is DebugAgent.Event.Call) FontFamily.Monospace else null,
+                fontFamily = if (raw || event is DebugEvent.Call) FontFamily.Monospace else null,
                 fontSize = if (raw) 11.sp else 14.sp,
             )
-            val needs = (event as? DebugAgent.Event.Result)?.result as? ToolResult.NeedsCapability
+            val needs = (event as? DebugEvent.Result)?.result as? ToolResult.NeedsCapability
             if (needs != null) TextButton(onClick = { onGrant(needs.capability) }) { Text(stringResource(R.string.debug_grant)) }
         }
     }

@@ -3,6 +3,7 @@ package com.samosaai.masala
 import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -39,9 +40,25 @@ import com.samosaai.masala.ui.drawer.Drawer
 import com.samosaai.masala.ui.drawer.RenameDialog
 import com.samosaai.masala.actions.ActionDispatcher
 import com.samosaai.masala.core.contract.MasalaAction
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.samosaai.masala.agent.CommandState
+import com.samosaai.masala.ui.home.MicButton
+import com.samosaai.masala.ui.home.ReplyCard
+import com.samosaai.masala.ui.home.rememberMicPress
 import com.samosaai.masala.ui.home.ConfirmationSheet
 import com.samosaai.masala.ui.home.HomeScreen
 import com.samosaai.masala.ui.home.RenderContext
+import com.samosaai.masala.scheduled.ScheduledTaskScheduler
+import com.samosaai.masala.skills.SkillScheduling
+import com.samosaai.masala.ui.home.SkillWidgetSource
 import com.samosaai.masala.ui.settings.SettingsActivity
 import com.samosaai.masala.ui.theme.MasalaTheme
 import kotlinx.coroutines.launch
@@ -126,6 +143,26 @@ class HomeActivity : ComponentActivity() {
             if (!app.actions.startShortcut(shortcut)) toast(getString(R.string.drawer_launch_failed, shortcut.shortLabel))
         }
 
+        // Job progress notifications need this on Android 13 and newer; asked for when a schedule is accepted.
+        val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+        val skillWidgets = remember {
+            object : SkillWidgetSource {
+                override fun skill(id: String) = app.skills.getSkillById(id)
+                override fun latest(skillId: String) = app.database.skillRuns().latestFor(skillId)
+                override fun nextRunAt(skillId: String) = app.skillScheduling.nextRunAt(skillId)
+                override fun scheduleOffer(skillId: String) = app.skills.getSkillById(skillId)?.let { app.skillScheduling.offerFor(it, SkillScheduling.now()) }
+                override fun acceptSchedule(offer: SkillScheduling.Offer) {
+                    app.skillScheduling.accept(offer, System.currentTimeMillis(), java.time.ZoneId.systemDefault())
+                    if (Build.VERSION.SDK_INT >= 33 &&
+                        checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                    ) {
+                        notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                    scope.launch(kotlinx.coroutines.Dispatchers.IO) { ScheduledTaskScheduler.reschedule(app) }
+                }
+                override fun declineSchedule(skillId: String) = app.skillScheduling.decline(skillId)
+            }
+        }
         val screen = remember {
             object : ActionDispatcher.Screen {
                 override fun openDrawer(query: String?) { drawerOpen = true }
@@ -155,6 +192,7 @@ class HomeActivity : ComponentActivity() {
                 onAction = ::run,
                 onAppMenu = { menuFor = it },
                 onClockClick = { run(MasalaAction.RunTool("show_alarms")) },
+                skillWidgets = skillWidgets,
             ),
             pinnedShortcuts = pinnedShortcuts,
             isDefault = isDefault,
@@ -171,6 +209,18 @@ class HomeActivity : ComponentActivity() {
         )
 
         ConfirmationSheet(app.confirmationGate)
+
+        // The reply card and the mic; the card stays up until closed, and the command runs on if home is left.
+        if (!drawerOpen) {
+            val command by app.commands.state.collectAsStateWithLifecycle()
+            val mic = rememberMicPress(app)
+            Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(), contentAlignment = Alignment.BottomCenter) {
+                ReplyCard(app, settings.readRepliesAloud)
+            }
+            if (command == CommandState.Idle) {
+                Box(Modifier.fillMaxSize().navigationBarsPadding().padding(end = 16.dp, bottom = 120.dp), contentAlignment = Alignment.BottomEnd) { MicButton(mic) }
+            }
+        }
 
         AnimatedVisibility(
             visible = drawerOpen,
@@ -243,9 +293,10 @@ class HomeActivity : ComponentActivity() {
         }
     }
 
-    /** `MasalaAction.AskMasala`. A stub until the agent arrives in Phase 4. */
+    /** `MasalaAction.AskMasala`; an empty prompt (the Ask gesture) opens the reply card for typing. */
     private fun askMasala(prompt: String) {
-        toast(getString(R.string.drawer_ask_stub))
+        masala.commands.ask(prompt)
+        drawerOpen = false
     }
 
     private fun openSettings() {

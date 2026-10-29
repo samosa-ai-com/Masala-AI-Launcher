@@ -24,6 +24,10 @@
     <!-- Meeting-notes recording runs as a microphone foreground service (plan Phase 3, lane D) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- Scheduled skill runs and long jobs run as foreground work with a progress notification -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
     <!-- create_calendar_event writes events; search_contacts looks up numbers and addresses -->
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
@@ -78,6 +82,8 @@
     <application
         android:name=".MasalaApp"
         android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
@@ -164,6 +170,54 @@
                 <action android:name="android.intent.action.TIME_SET" />
             </intent-filter>
         </receiver>
+
+        <!-- The assist gesture, once Masala is the assistant app (Phase 4) -->
+        <activity
+            android:name=".agent.AssistActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:launchMode="singleInstance"
+            android:theme="@style/Theme.Masala.Translucent"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- WorkManager's foreground service, typed for the jobs Masala runs: scheduled skills and uploads
+             (dataSync), media work on Android 15 and newer (mediaProcessing) -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync|mediaProcessing"
+            tools:node="merge" />
+
+        <!-- Connected tools (MCP) settings (Phase 4) -->
+        <activity
+            android:name=".ui.mcp.McpActivity"
+            android:exported="false" />
+
+        <!-- Personal Wiki: read, edit, delete, export (Phase 4) -->
+        <activity
+            android:name=".ui.wiki.WikiActivity"
+            android:exported="false" />
+
+        <!-- A skill's conversation (Phase 4) -->
+        <activity
+            android:name=".ui.skills.SkillSheetActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Opens and shares the files a skill run produced -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <activity
             android:name=".ui.settings.SettingsActivity"
