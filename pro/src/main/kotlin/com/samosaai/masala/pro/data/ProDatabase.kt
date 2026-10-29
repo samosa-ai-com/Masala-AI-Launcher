@@ -44,12 +44,34 @@ data class FileIndexEntry(
 
 @Dao
 interface FileIndexDao {
+    /** Keyed by [FileIndexEntry.rowId], which defaults to 0: entries without distinct ids replace each other. The indexer uses [insert]. */
     @Upsert
     suspend fun upsert(entries: List<FileIndexEntry>)
+
+    /** Adds one file; SQLite picks the rowid. */
+    @Query("INSERT INTO file_index(path, name, content, modified) VALUES (:path, :name, :content, :modified)")
+    suspend fun insert(path: String, name: String, content: String, modified: Long)
 
     /** [query] is an FTS4 MATCH expression, e.g. `tax* 2025`. */
     @Query("SELECT rowid, * FROM file_index WHERE file_index MATCH :query LIMIT :limit")
     suspend fun search(query: String, limit: Int = 50): List<FileIndexEntry>
+
+    /**
+     * Matches with a passage around the hit (`[` and `]` mark the words), newest first; only paths
+     * under [folder] (a prefix, `/` for everything).
+     */
+    @Query(
+        "SELECT path, name, modified, snippet(file_index, '[', ']', '…', -1, 24) AS passage FROM file_index " +
+            "WHERE file_index MATCH :query AND path LIKE :folder || '%' ORDER BY modified DESC LIMIT :limit"
+    )
+    suspend fun hits(query: String, folder: String, limit: Int): List<FileHit>
+
+    /** Every stored file and its modified time, for the next run's diff. */
+    @Query("SELECT path, modified FROM file_index")
+    suspend fun stored(): List<StoredFile>
+
+    @Query("SELECT COUNT(*) FROM file_index WHERE content != ''")
+    suspend fun countWithText(): Int
 
     @Query("DELETE FROM file_index WHERE path = :path")
     suspend fun deletePath(path: String)
@@ -60,6 +82,11 @@ interface FileIndexDao {
     @Query("SELECT COUNT(*) FROM file_index")
     suspend fun count(): Int
 }
+
+data class StoredFile(val path: String, val modified: Long)
+
+/** One `file_search` match: the file and a passage around the words that matched. */
+data class FileHit(val path: String, val name: String, val modified: Long, val passage: String)
 
 /** An app exported from a mini app (Phase 5): what was installed, so it can be updated or removed. */
 @Entity(tableName = "exported_apps")
