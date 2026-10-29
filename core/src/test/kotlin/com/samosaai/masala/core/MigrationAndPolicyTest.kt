@@ -55,7 +55,7 @@ class MigrationAndPolicyTest {
             override fun outputDir() = File(".")
         },
     ).apply {
-        register(FakeTool("wiki_read", readsPrivateData = true))
+        register(FakeTool("memory_read", readsPrivateData = true))
         register(FakeTool("calendar_read", readsPrivateData = true))
         register(FakeTool("weather", usesNetwork = true))
         register(FakeTool("websearch", usesNetwork = true))
@@ -72,7 +72,7 @@ class MigrationAndPolicyTest {
         assertIs<Decision.Reject>(HubSkillPolicy.decide(skill(listOf("file_search")), registry))
         assertIs<Decision.Reject>(HubSkillPolicy.decide(skill(listOf("send_sms")), registry))
         assertIs<Decision.Reject>(HubSkillPolicy.decide(skill(emptyList(), platforms = listOf("prototype")), registry))
-        assertIs<Decision.UserOnly>(HubSkillPolicy.decide(skill(listOf("wiki_read", "webfetch")), registry))
+        assertIs<Decision.UserOnly>(HubSkillPolicy.decide(skill(listOf("memory_read", "webfetch")), registry))
     }
 
     @Test

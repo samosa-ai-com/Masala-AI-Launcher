@@ -112,7 +112,8 @@ class LLMClient(
         temperature: Float? = null,
         sessionId: String? = null,
         modelOverride: String? = null,
-        responseFormat: ResponseFormat? = null
+        responseFormat: ResponseFormat? = null,
+        maxTokens: Int? = null
     ): ChatResponse {
         val targetModel = modelOverride ?: model
         // Safety net for histories that carried a malformed tool call before the
@@ -121,7 +122,7 @@ class LLMClient(
         // whole request and every later turn (issue #13). Runs before the cache
         // key so identical (sanitized) histories share a key.
         val sanitizedMessages = messages.map { it.withValidToolCallArguments() }
-        val cacheKey = buildCacheKey(targetModel, sanitizedMessages, tools, responseFormat)
+        val cacheKey = buildCacheKey(targetModel, sanitizedMessages, tools, responseFormat, maxTokens)
 
         if (temperature == null || temperature == 0f) {
             cache.get(cacheKey)?.let { return it }
@@ -133,7 +134,8 @@ class LLMClient(
             tools = tools.ifEmpty { null },
             temperature = temperature,
             promptCacheKey = sessionId,
-            responseFormat = responseFormat
+            responseFormat = responseFormat,
+            maxTokens = maxTokens
         )
 
         var response = apiService.chat(request, sessionId)
@@ -167,7 +169,8 @@ class LLMClient(
         model: String,
         messages: List<ChatMessage>,
         tools: List<ToolDefinition>,
-        responseFormat: ResponseFormat?
+        responseFormat: ResponseFormat?,
+        maxTokens: Int?
     ): String {
         val serialized = buildString {
             append(model)
@@ -177,6 +180,8 @@ class LLMClient(
             append(json.encodeToString(ListSerializer(ToolDefinition.serializer()), tools))
             append("|")
             if (responseFormat != null) append(json.encodeToString(ResponseFormat.serializer(), responseFormat))
+            append("|")
+            if (maxTokens != null) append(maxTokens)
         }
         val digest = MessageDigest.getInstance("SHA-256")
         return digest.digest(serialized.toByteArray())

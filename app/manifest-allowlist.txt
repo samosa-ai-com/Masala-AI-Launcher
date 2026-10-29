@@ -13,6 +13,7 @@ uses-permission android.permission.INTERNET  # Model calls, web search and fetch
 uses-permission android.permission.ACCESS_NETWORK_STATE  # Skip model calls and hub sync when offline
 uses-permission android.permission.SET_WALLPAPER  # WallpaperTool and AI home screens
 uses-permission android.permission.READ_CALENDAR  # Next-event conditions, calendar cards, daily brief
+uses-permission android.permission.WRITE_CALENDAR  # create_calendar_event adds events from a prompt
 uses-permission android.permission.READ_CONTACTS  # Speech name hints, urgent filter for quiet nights
 uses-permission android.permission.RECORD_AUDIO  # Push-to-talk and meeting notes recording
 uses-permission android.permission.ACCESS_NOTIFICATION_POLICY  # Quiet nights automatic zen rule
@@ -41,6 +42,9 @@ receiver com.samosaai.masala.scheduled.ScheduledTaskRebootReceiver  # Re-arms th
 receiver com.samosaai.masala.scheduled.ScheduledTaskReceiver  # The scheduled-task alarm itself; not exported
 
 # The recording service is added here, by class name, in the commit that creates it (Phase 3).
+service com.samosaai.masala.audio.RecordingService  # Meeting-notes recording (mic FGS, user-started)
+
+provider androidx.core.content.FileProvider  # Sharing a mini-app's HTML file (grant-uri only)
 
 library androidx.work  # WorkManager: WAKE_LOCK, its job services and receivers
 library androidx.core  # DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
@@ -51,3 +55,5 @@ library androidx.room  # MultiInstanceInvalidationService, not exported
 # AndroidX startup's provider. The merger credits it to whichever library declares it first (emoji2
 # through Compose), so it's listed by name instead of allowing all of that library.
 provider androidx.startup.InitializationProvider  # AndroidX initializers (emoji2, lifecycle, profileinstaller)
+provider androidx.core.content.FileProvider  # Open and Share skill result files
+service androidx.work.impl.foreground.SystemForegroundService  # WorkManager foreground service for scheduled skill runs and long jobs; merged with dataSync and mediaProcessing types

@@ -81,6 +81,8 @@ class RenderContext(
     val onAction: (MasalaAction) -> Unit,
     val onAppMenu: (AppEntry) -> Unit,
     val onClockClick: () -> Unit,
+    /** Where skill widgets get their skill and latest result; without it they stay placeholders. */
+    val skillWidgets: SkillWidgetSource? = null,
 )
 
 /**
@@ -148,7 +150,8 @@ private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: Render
         is StackSection -> section.widgets.firstOrNull()?.let {
             Placeholder(it.title ?: it.id, stringResource(R.string.home_stack_placeholder, section.widgets.size), layout.widgetRows[it.id])
         }
-        is SkillWidgetSection -> Placeholder(section.skillId, stringResource(R.string.home_skill_widget_placeholder), null)
+        is SkillWidgetSection -> ctx.skillWidgets?.let { SkillWidgetCard(section, it, ctx.onAction) }
+            ?: Placeholder(section.skillId, stringResource(R.string.home_skill_widget_placeholder), null)
     }
 }
 
@@ -314,7 +317,7 @@ private fun IconView(icon: IconRef, app: AppEntry?, ctx: RenderContext, size: In
 }
 
 @Composable
-private fun SymbolDisc(glyph: String, tint: Color?, size: Int) {
+internal fun SymbolDisc(glyph: String, tint: Color?, size: Int) {
     Box(
         Modifier.size(size.dp).clip(CircleShape).background((tint ?: MaterialTheme.colorScheme.primary).copy(alpha = 0.85f))
             .clearAndSetSemantics { },
@@ -325,7 +328,7 @@ private fun SymbolDisc(glyph: String, tint: Color?, size: Int) {
 }
 
 @Composable
-private fun Placeholder(title: String, note: String, rows: Int?) {
+internal fun Placeholder(title: String, note: String, rows: Int?) {
     Card(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = ((rows ?: 2) * 48).dp),
         shape = RoundedCornerShape(20.dp),

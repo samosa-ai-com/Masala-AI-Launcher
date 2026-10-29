@@ -24,7 +24,7 @@ class DeviceTool(private val context: Context) {
      * The point of prior-state reporting is to surface changes the user cannot
      * observe, and a flashlight is the one change here they always can.
      */
-    fun toggleTorch(on: Boolean, durationSeconds: Int?): ActionResult {
+    fun toggleTorch(on: Boolean?, durationSeconds: Int?): ActionResult {
         return try {
             val cm = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
             val cameraId = cm.cameraIdList.firstOrNull { id ->
@@ -32,16 +32,19 @@ class DeviceTool(private val context: Context) {
                     .get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
             } ?: return ActionResult.error("This device has no controllable flashlight.")
 
-            cm.setTorchMode(cameraId, on)
-            if (on && durationSeconds != null && durationSeconds > 0) {
+            // No synchronous torch getter exists: the callback is the only way to learn whether
+            // it is already on, which "toggle" needs. Bounded, because a silent callback must not
+            // hang the tool.
+            val target = on ?: !isTorchOn(cm, cameraId)
+            cm.setTorchMode(cameraId, target)
+            if (target && durationSeconds != null && durationSeconds > 0) {
                 val ms = durationSeconds.coerceIn(1, 300) * 1000L
                 Handler(Looper.getMainLooper()).postDelayed({
                     try { cm.setTorchMode(cameraId, false) } catch (_: Exception) {}
                 }, ms)
-                ActionResult.ok("Flashlight turned on for ${durationSeconds}s.")
-            } else {
-                ActionResult.ok("Flashlight turned ${if (on) "on" else "off"}.")
+                return ActionResult.ok("Flashlight turned on for ${durationSeconds}s.")
             }
+            ActionResult.ok("Flashlight turned ${if (target) "on" else "off"}.")
         } catch (e: Exception) {
             val msg = e.message?.lowercase() ?: ""
             if ("in use" in msg || "already" in msg) {
@@ -49,6 +52,30 @@ class DeviceTool(private val context: Context) {
             } else {
                 ActionResult.error("Could not toggle the flashlight: ${e.message}")
             }
+        }
+    }
+
+    /** Reads the torch state through the camera callback; false when it never answers. */
+    private fun isTorchOn(cm: CameraManager, cameraId: String): Boolean {
+        val latch = java.util.concurrent.CountDownLatch(1)
+        var on = false
+        val callback = object : CameraManager.TorchCallback() {
+            override fun onTorchModeChanged(id: String, enabled: Boolean) {
+                if (id == cameraId) {
+                    on = enabled
+                    latch.countDown()
+                }
+            }
+        }
+        return try {
+            cm.registerTorchCallback(callback, Handler(Looper.getMainLooper()))
+            // The current state is delivered on registration; wait briefly for it.
+            latch.await(700, java.util.concurrent.TimeUnit.MILLISECONDS)
+            on
+        } catch (_: Exception) {
+            false
+        } finally {
+            runCatching { cm.unregisterTorchCallback(callback) }
         }
     }
 

@@ -14,7 +14,6 @@ import com.samosaai.masala.masala
 import com.samosaai.masala.scheduled.ScheduledStart
 import com.samosaai.masala.scheduled.ScheduledTaskRuns
 import com.samosaai.masala.scheduled.ScheduledTaskScheduler
-import com.samosaai.masala.scheduled.TaskRunner
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
@@ -30,18 +29,14 @@ import java.time.ZoneId
  * - `/debug_skills` lists them; `{"import": "<json>"}`, `{"importFile": "<name in files/>"}` and `{"remove": "<id>"}` use the community store.
  * - `/debug_tts {"text": "...", "language": "English"}` speaks through [TtsEngine] (Android voice).
  * - `/debug_listen {"provider": "android" | "api"}` listens once through [SttEngine].
- * - `/debug_schedule {"name": "...", "inMinutes": 2, "repeat": ...}` adds a one-time task and arms the alarm.
+ * - `/debug_schedule {"name": "...", "inMinutes": 2, "skillId": "debug_ticker"}` adds a one-time task and arms the alarm.
  * - `/debug_tasks` lists the tasks with their history; `{"fire": "<id>"}` runs one now,
  *   `{"delete": "<id>"}` removes it.
  *
- * Fired tasks go to [DebugRunner], which only writes them to the action log; Phase 4 replaces it.
+ * Fired tasks run as foreground jobs through the app's `TaskRunner`; `debug_ticker` is a test skill that only exists in debug builds.
  */
 object DebugCommands {
     val names = setOf("debug_skills", "debug_tts", "debug_listen", "debug_schedule", "debug_tasks")
-
-    private object DebugRunner : TaskRunner {
-        override suspend fun start(task: ScheduledTask) = ScheduledStart.Started("debug-${System.currentTimeMillis()}")
-    }
 
     suspend fun run(context: Context, name: String, args: JsonObject): ToolResult = try {
         val app = context.masala
@@ -62,7 +57,6 @@ object DebugCommands {
                     .fold({ ToolResult.Success("Heard: $it") }, { ToolResult.Failure("${it.message} ${engine.androidFailure.orEmpty()}") })
             }
             "debug_schedule" -> {
-                app.taskRunner = DebugRunner
                 val zone = ZoneId.systemDefault()
                 val now = System.currentTimeMillis()
                 val minutes = args["inMinutes"]?.jsonPrimitive?.intOrNull ?: 2
@@ -70,7 +64,8 @@ object DebugCommands {
                 val task = ScheduledTaskPlanner.armed(
                     ScheduledTask(
                         id = "debug-${now}", name = args["name"]?.jsonPrimitive?.contentOrNull ?: "Debug task",
-                        prompt = "debug", startLocal = start.toString(),
+                        prompt = args["prompt"]?.jsonPrimitive?.contentOrNull ?: "Scheduled run: do what your instructions say now, and reply with just the result.",
+                        startLocal = start.toString(), skillId = args["skillId"]?.jsonPrimitive?.contentOrNull,
                     ),
                     now, zone,
                 )
@@ -80,7 +75,7 @@ object DebugCommands {
             }
             "debug_tasks" -> {
                 args["delete"]?.jsonPrimitive?.contentOrNull?.let { app.scheduledTasks.delete(it); ScheduledTaskScheduler.reschedule(context) }
-                args["fire"]?.jsonPrimitive?.contentOrNull?.let { app.taskRunner = DebugRunner; ScheduledTaskRuns(app).runNow(it) }
+                args["fire"]?.jsonPrimitive?.contentOrNull?.let { ScheduledTaskRuns(app).runNow(it) }
                 val tasks = app.scheduledTasks.all()
                 ToolResult.Success(
                     tasks.joinToString("\n").ifEmpty { "(no tasks)" } + "\nstatuses: " + TaskRunStatus.entries.joinToString(),

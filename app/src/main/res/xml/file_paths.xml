@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only Masala's own result folders can be opened or shared (skill run results). -->
+<paths>
+    <external-files-path name="output" path="output/" />
+    <!-- Where results go when there is no external files folder -->
+    <files-path name="output_internal" path="output/" />
+    <files-path name="work" path="work/" />
+    <!-- The Second Brain vault, for the Open button on binary files -->
+    <files-path name="secondbrain" path="secondbrain/" />
+</paths>

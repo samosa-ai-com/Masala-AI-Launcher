@@ -1,7 +1,11 @@
 package com.samosaai.masala.tools
 
 import com.samosaai.masala.core.tool.FunctionTool
+import com.samosaai.masala.core.tool.ActionResult
 import com.samosaai.masala.core.tool.ToolFiles
+import com.samosaai.masala.miniapps.MiniAppConsole
+import com.samosaai.masala.miniapps.openMiniApp
+import com.samosaai.masala.miniapps.MiniAppStore
 import android.content.Context
 import com.samosaai.masala.core.tool.Tool
 import com.samosaai.masala.core.tool.ToolSensitivity.CHANGES_SOMETHING
@@ -15,7 +19,7 @@ import com.samosaai.masala.tools.MasalaToolDefinitions as Defs
  * confirmation gate; [Tool.readsPrivateData] and [Tool.usesNetwork] feed the Skill Hub policy.
  */
 object MasalaTools {
-    fun create(context: Context, files: ToolFiles): List<Tool> {
+    fun create(context: Context, files: ToolFiles, miniApps: MiniAppStore): List<Tool> {
         val app = context.applicationContext
         val alarms = AlarmTool(app)
         val apps = AppsTool(app)
@@ -32,14 +36,21 @@ object MasalaTools {
         val mediaEdit = MediaEditTool(app, files)
         val notifications = NotificationTool(app)
         val pdf = PdfTool(app, files)
-        val transcribe = TranscribeTool(files)
+        val transcribe = TranscribeTool(app, files)
+        val contacts = ContactsTool(app)
+
+        // Read lazily: the layout repository is built after the tools, and only tools that pin
+        // need it.
+        fun host() = app as com.samosaai.masala.MasalaApp
 
         return listOf(
-            FunctionTool(Defs.dialNumber, READ_ONLY) { phone.dialNumber(it.string("number") ?: return@FunctionTool missing("number")) },
-            FunctionTool(Defs.openApp, READ_ONLY) {
+            FunctionTool(Defs.dialNumber, READ_ONLY, opensScreen = true) { phone.dialNumber(it.string("number") ?: return@FunctionTool missing("number")) },
+            FunctionTool(Defs.openApp, READ_ONLY, opensScreen = true) {
                 system.openApp(it.string("package_name") ?: return@FunctionTool missing("package_name"))
             },
-            FunctionTool(Defs.setWallpaper, CHANGES_SOMETHING, usesNetwork = true) { wallpaper.setWallpaper(it.string("url")) },
+            FunctionTool(Defs.setWallpaper, CHANGES_SOMETHING, usesNetwork = true) {
+                wallpaper.setWallpaper(it.string("url"), it.string("target"))
+            },
             FunctionTool(Defs.listCalendarEvents, READ_ONLY, readsPrivateData = true) {
                 calendar.listEvents(
                     daysAhead = it.int("days_ahead"),
@@ -47,6 +58,26 @@ object MasalaTools {
                     toDate = it.string("to_date"),
                     search = it.string("search"),
                 )
+            },
+            FunctionTool(Defs.createCalendarEvent, CHANGES_SOMETHING) {
+                calendar.createEvent(
+                    title = it.string("title") ?: return@FunctionTool missing("title"),
+                    start = it.string("start") ?: return@FunctionTool missing("start"),
+                    end = it.string("end"),
+                    location = it.string("location"),
+                    notes = it.string("notes"),
+                    calendarName = it.string("calendar"),
+                )
+            },
+            FunctionTool(Defs.searchContacts, READ_ONLY, readsPrivateData = true) {
+                contacts.search(it.string("query"), it.int("limit"))
+            },
+            FunctionTool(Defs.openUrl, READ_ONLY, opensScreen = true) {
+                val url = it.string("url") ?: return@FunctionTool missing("url")
+                if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                    return@FunctionTool ActionResult.error("Only http and https links can be opened.")
+                }
+                system.openUrl(url)
             },
             FunctionTool(Defs.setAlarm, CHANGES_SOMETHING) {
                 alarms.setAlarm(
@@ -65,13 +96,13 @@ object MasalaTools {
                     minutes = it.int("minutes"),
                 )
             },
-            FunctionTool(Defs.showAlarms, READ_ONLY) { alarms.showAlarms() },
+            FunctionTool(Defs.showAlarms, READ_ONLY, opensScreen = true) { alarms.showAlarms() },
             FunctionTool(Defs.nextAlarm, READ_ONLY) { alarms.nextAlarm() },
             FunctionTool(Defs.snoozeAlarm, CHANGES_SOMETHING) { alarms.snoozeAlarm(minutes = it.int("minutes")) },
-            FunctionTool(Defs.dismissTimer, CHANGES_SOMETHING) { alarms.dismissTimer() },
             FunctionTool(Defs.toggleTorch, CHANGES_SOMETHING) {
                 device.toggleTorch(
-                    on = it.boolean("on") ?: return@FunctionTool missing("on"),
+                    // Omitted = flip, which is what "toggle the torch" means.
+                    on = it.boolean("on"),
                     durationSeconds = it.int("duration_seconds"),
                 )
             },
@@ -181,6 +212,61 @@ object MasalaTools {
             FunctionTool(Defs.getHealthSummary, READ_ONLY, readsPrivateData = true) { health.getSummary(it.int("days")) },
             FunctionTool(Defs.getHealthRecords, READ_ONLY, readsPrivateData = true) {
                 health.getRecords(type = it.string("type") ?: return@FunctionTool missing("type"), daysArg = it.int("days"))
+            },
+
+            // Generated HTML mini-apps (plan Phase 3, Lane D).
+            FunctionTool(Defs.createMiniApp, CHANGES_SOMETHING) {
+                val title = it.string("title") ?: "Mini app"
+                val id = miniApps.create(
+                    title = title,
+                    html = it.string("html") ?: return@FunctionTool missing("html"),
+                ) ?: return@FunctionTool ActionResult.error(
+                    "That HTML is too large (max ${MiniAppStore.MAX_HTML_CHARS} characters). Make it smaller."
+                )
+                // Pinning here is what makes "it created the app" true for the user: a stored app
+                // with no home item is invisible. The call is gated, so the user still confirms.
+                val problems = host().layouts.pinMiniApp(id, title)
+                ActionResult.ok(
+                    if (problems.isEmpty()) "Mini app '$id' created and pinned to home."
+                    else "Mini app '$id' created, but it couldn't be pinned: ${problems.first()}"
+                )
+            },
+            FunctionTool(Defs.updateMiniApp, CHANGES_SOMETHING) {
+                val id = it.string("id") ?: return@FunctionTool missing("id")
+                val ok = miniApps.update(id, html = it.string("html") ?: return@FunctionTool missing("html"))
+                if (!ok) return@FunctionTool ActionResult.error(
+                    "No mini app '$id', or its HTML is over ${MiniAppStore.MAX_HTML_CHARS} characters."
+                )
+                // Errors reported here are cleared so the next repair turn starts fresh.
+                val errors = MiniAppConsole.errors(id)
+                MiniAppConsole.clear(id)
+                if (errors.isEmpty()) ActionResult.ok("Mini app '$id' updated.")
+                else ActionResult.ok("Mini app '$id' updated. Console errors:\n" + errors.joinToString("\n"))
+            },
+            FunctionTool(Defs.listMiniApps, READ_ONLY) {
+                val rows = miniApps.list()
+                if (rows.isEmpty()) ActionResult.ok("No mini apps yet.")
+                else rows.joinToString("\n") { "${it.id}: ${it.title} (updated ${it.updatedAt})" }
+                    .let { ActionResult.ok(it) }
+            },
+            FunctionTool(Defs.openMiniAppTool, READ_ONLY, opensScreen = true) {
+                val id = it.string("id") ?: return@FunctionTool missing("id")
+                if (miniApps.get(id) == null) return@FunctionTool ActionResult.error("No mini app '$id'.")
+                context.openMiniApp(id)
+                ActionResult.ok("Opened mini app '$id'.")
+            },
+            FunctionTool(Defs.pinMiniAppTool, CHANGES_SOMETHING) {
+                val id = it.string("id") ?: return@FunctionTool missing("id")
+                val row = miniApps.get(id) ?: return@FunctionTool ActionResult.error("No mini app '$id'.")
+                val problems = host().layouts.pinMiniApp(id, row.title)
+                if (problems.isEmpty()) ActionResult.ok("Pinned '${row.title}' to home.")
+                else ActionResult.error("Couldn't pin it: ${problems.first()}")
+            },
+            FunctionTool(Defs.deleteMiniAppTool, DESTRUCTIVE) {
+                val id = it.string("id") ?: return@FunctionTool missing("id")
+                if (miniApps.get(id) == null) return@FunctionTool ActionResult.error("No mini app '$id'.")
+                miniApps.delete(id)
+                ActionResult.ok("Mini app '$id' deleted.")
             },
         )
     }

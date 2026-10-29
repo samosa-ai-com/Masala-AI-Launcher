@@ -19,12 +19,6 @@ import java.util.Locale
  */
 class AlarmTool(private val context: Context) {
 
-    companion object {
-        // Not a documented android.provider.AlarmClock constant; some clock apps
-        // (e.g. Google Clock) honor it best-effort to dismiss a ringing timer.
-        private const val ACTION_DISMISS_TIMER = "android.intent.action.DISMISS_TIMER"
-    }
-
     private val dayNames = mapOf(
         "sun" to Calendar.SUNDAY, "sunday" to Calendar.SUNDAY,
         "mon" to Calendar.MONDAY, "monday" to Calendar.MONDAY,
@@ -95,21 +89,13 @@ class AlarmTool(private val context: Context) {
         }
     }
 
-    /** Dismisses a ringing clock-app timer (best-effort; not all clock apps support it). */
-    fun dismissTimer(): ActionResult =
-        if (dispatchClockIntent(Intent(ACTION_DISMISS_TIMER))) {
-            ActionResult.ok(
-                "Sent a dismiss request to the clock app. This only has an effect if a timer is " +
-                    "currently ringing there; support varies by clock app.",
-            )
-        } else {
-            ActionResult.error("No clock app handled the dismiss-timer request (not all clock apps support it).")
-        }
-
     /** The next alarm on the phone, from any app: the only part of the clock app's list Android exposes. */
     fun nextAlarm(): ActionResult {
         val next = (context.getSystemService(Context.ALARM_SERVICE) as AlarmManager).nextAlarmClock
-            ?: return ActionResult.ok("No alarm is set on this phone.")
+            ?: return ActionResult.ok(
+                "No alarm is visible to apps on this phone. Android only shares the next alarm if a " +
+                    "clock app publishes it, so this does not prove no alarm is set.",
+            )
         val time = SimpleDateFormat("EEE MMM d HH:mm", Locale.getDefault()).format(Date(next.triggerTime))
         val pkg = next.showIntent?.creatorPackage
         return ActionResult.ok("Next alarm: $time" + (if (pkg != null) " (set by $pkg)" else "") + ".")

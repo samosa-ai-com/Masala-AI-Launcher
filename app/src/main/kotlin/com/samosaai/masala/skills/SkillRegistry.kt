@@ -18,6 +18,7 @@ class SkillRegistry(
     private val importerFactory: (Set<String>) -> SkillImporter = { hosts -> SkillImporter(hosts) },
 ) {
     private var bundledSkills = emptyList<MasalaSkill>()
+    @Volatile
     private var communitySkills = emptyList<MasalaSkill>()
 
     /** Cached union of bundled and community skills, keyed by id. */

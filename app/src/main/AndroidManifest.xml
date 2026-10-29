@@ -21,6 +21,16 @@
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Meeting-notes recording runs as a microphone foreground service (plan Phase 3, lane D) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- Scheduled skill runs and long jobs run as foreground work with a progress notification -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
+    <!-- create_calendar_event writes events; search_contacts looks up numbers and addresses -->
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
 
@@ -71,7 +81,11 @@
 
     <application
         android:name=".MasalaApp"
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
@@ -159,9 +173,105 @@
             </intent-filter>
         </receiver>
 
+        <!-- The assist gesture, once Masala is the assistant app (Phase 4) -->
+        <activity
+            android:name=".agent.AssistActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:launchMode="singleInstance"
+            android:theme="@style/Theme.Masala.Translucent"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- WorkManager's foreground service, typed for the jobs Masala runs: scheduled skills and uploads
+             (dataSync), media work on Android 15 and newer (mediaProcessing) -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync|mediaProcessing"
+            tools:node="merge" />
+
+        <!-- Connected tools (MCP) settings (Phase 4) -->
+        <activity
+            android:name=".ui.mcp.McpActivity"
+            android:exported="false" />
+
+        <!-- Personal Wiki: read, edit, delete, export (Phase 4) -->
+        <activity
+            android:name=".ui.secondbrain.SecondBrainActivity"
+            android:exported="false" />
+
+        <!-- The user profile (Settings → Profile), saved into the Second Brain -->
+        <activity
+            android:name=".ui.profile.ProfileActivity"
+            android:exported="false" />
+
+        <!-- A skill's conversation (Phase 4) -->
+        <activity
+            android:name=".ui.skills.SkillSheetActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Opens and shares the files a skill run produced -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <activity
             android:name=".ui.settings.SettingsActivity"
             android:exported="false"
             android:label="@string/settings_title" />
+
+        <!-- AI home screens: prompt → preview → apply (plan Phase 3, lane C) -->
+        <activity
+            android:name=".ui.generate.GenerateActivity"
+            android:exported="false"
+            android:label="@string/generate_title"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Hosts one permission dialog and finishes (permissions/PermissionGate) -->
+        <activity
+            android:name=".permissions.PermissionRequestActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.Masala.Translucent" />
+
+        <!-- Generated HTML mini-apps (plan Phase 3, lane D) -->
+        <activity
+            android:name=".miniapps.MiniAppActivity"
+            android:exported="false"
+            android:label="@string/miniapp_title" />
+
+        <!-- Meeting-notes recording (plan Phase 3, lane D): microphone FGS, user-started -->
+        <service
+            android:name=".audio.RecordingService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.miniapp"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/miniapp_paths" />
+        </provider>
+
+        <!-- Full-screen version preview over the current wallpaper (same window as home) -->
+        <activity
+            android:name=".ui.settings.PreviewActivity"
+            android:exported="false"
+            android:label="@string/settings_title"
+            android:theme="@style/Theme.Masala.Home" />
     </application>
 </manifest>

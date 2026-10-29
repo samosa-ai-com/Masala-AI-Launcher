@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,12 +42,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.R
+import com.samosaai.masala.core.tool.ToolDefinition
 import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.llm.LlmConfig
@@ -57,8 +60,15 @@ import com.samosaai.masala.tools.ToolGate
 import com.samosaai.masala.ui.theme.MasalaTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
+import com.samosaai.masala.agent.AgentEvent
+import com.samosaai.masala.agent.LlmAgentModel
+import com.samosaai.masala.llm.ChatMessage
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Debug builds only (plan Phase 1, lane B): send a prompt with every registered tool, see the raw
@@ -103,7 +113,7 @@ class DebugActivity : ComponentActivity() {
         var prompt by rememberSaveable { mutableStateOf("Set an alarm for 7:30 tomorrow called Standup") }
         var running by remember { mutableStateOf(false) }
         var pending by remember { mutableStateOf<Pending?>(null) }
-        val events = remember { mutableStateListOf<DebugAgent.Event>() }
+        val events = remember { mutableStateListOf<DebugEvent>() }
         val listState = rememberLazyListState()
         LaunchedEffect(events.size) { if (events.isNotEmpty()) listState.animateScrollToItem(events.size - 1) }
 
@@ -136,6 +146,7 @@ class DebugActivity : ComponentActivity() {
                 trailingIcon = { TextButton(onClick = { prompt = "" }) { Text(stringResource(R.string.debug_clear)) } },
                 modifier = Modifier.fillMaxWidth().testTag("debug_prompt"),
             )
+            // The executor waits for the permission answer itself (permissions/PermissionGate).
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     enabled = !running && config.isConfigured && prompt.isNotBlank(),
@@ -151,16 +162,28 @@ class DebugActivity : ComponentActivity() {
                                     // "/tool {json}": run one tool through the executor, no model.
                                     val (name, json) = direct.destructured
                                     val args = Json.parseToJsonElement(json.ifBlank { "{}" }).jsonObject
-                                    events += DebugAgent.Event.Call(name, args.toString())
-                                    events += DebugAgent.Event.Result(
+                                    events += DebugEvent.Call(name, args.toString())
+                                    events += DebugEvent.Result(
                                         name,
                                         if (name in DebugCommands.names) DebugCommands.run(app, name, args) else app.toolExecutor(gate).execute(name, args),
                                     )
                                 } else {
-                                    DebugAgent(config.client(app), app.tools.tools, app.toolExecutor(gate)).run(prompt) { events += it }
+                                    val json = Json { prettyPrint = true; explicitNulls = false }
+                                    val model = LlmAgentModel(config.client(app)) { events += DebugEvent.Raw(json.encodeToString(it)) }
+                                    app.agent(model, gate).run(ChatMessage("user", JsonPrimitive(prompt))).collect { event ->
+                                        when (event) {
+                                            is AgentEvent.ToolCall -> events += DebugEvent.Call(event.name, event.args.toString())
+                                            is AgentEvent.ToolDone -> events += DebugEvent.Result(event.name, event.result)
+                                            is AgentEvent.Done -> events += DebugEvent.Answer(event.text)
+                                            is AgentEvent.Failed -> events += DebugEvent.Error(event.message)
+                                            AgentEvent.StepLimit -> events += DebugEvent.Error("Stopped at the step limit.")
+                                            is AgentEvent.NeedsCapability -> events += DebugEvent.Error("Needs " + event.capability + ": " + event.reason)
+                                            else -> Unit
+                                        }
+                                    }
                                 }
                             } catch (e: Exception) {
-                                events += DebugAgent.Event.Error("${e::class.simpleName}: ${e.message}")
+                                events += DebugEvent.Error(e::class.simpleName + ": " + e.message)
                             } finally {
                                 running = false
                             }
@@ -172,8 +195,8 @@ class DebugActivity : ComponentActivity() {
                     scope.launch {
                         events.clear()
                         config.client(masala).listModels()
-                            .onSuccess { events += DebugAgent.Event.Answer(it.joinToString("\n")) }
-                            .onFailure { events += DebugAgent.Event.Error("${it::class.simpleName}: ${it.message}") }
+                            .onSuccess { events += DebugEvent.Answer(it.joinToString("\n")) }
+                            .onFailure { events += DebugEvent.Error("${it::class.simpleName}: ${it.message}") }
                     }
                 }) { Text(stringResource(R.string.debug_models)) }
                 OutlinedButton(onClick = { startActivity(android.content.Intent(this@DebugActivity, ContextPanelActivity::class.java)) }) {
@@ -181,17 +204,99 @@ class DebugActivity : ComponentActivity() {
                 }
                 OutlinedButton(onClick = {
                     events.clear()
-                    events += DebugAgent.Event.Raw(masala.actionLog.tail(20).joinToString("\n").ifEmpty { "(empty)" })
+                    events += DebugEvent.Raw(masala.aiReports.tail(20).joinToString("\n").ifEmpty { "(no AI reports)" })
+                }) { Text(stringResource(R.string.debug_ai_reports)) }
+                OutlinedButton(onClick = {
+                    events.clear()
+                    events += DebugEvent.Raw(masala.actionLog.tail(20).joinToString("\n").ifEmpty { "(empty)" })
                 }) { Text(stringResource(R.string.debug_action_log)) }
             }
-            Text(stringResource(R.string.debug_tools, masala.tools.tools.size), style = MaterialTheme.typography.bodySmall)
+            var showTools by rememberSaveable { mutableStateOf(false) }
+            var toolFilter by rememberSaveable { mutableStateOf("") }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.debug_tools, masala.tools.tools.size), style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = { showTools = !showTools }) {
+                    Text(stringResource(if (showTools) R.string.debug_tools_hide else R.string.debug_tools_show))
+                }
+            }
+            if (showTools) {
+                OutlinedTextField(
+                    toolFilter, { toolFilter = it },
+                    label = { Text(stringResource(R.string.debug_tools_filter)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("debug_tool_filter"),
+                )
+                val tools = remember(toolFilter) {
+                    val q = toolFilter.trim().lowercase()
+                    masala.tools.tools
+                        .filter {
+                            q.isEmpty() || it.definition.name.lowercase().contains(q) ||
+                                it.definition.description.lowercase().contains(q)
+                        }
+                        .sortedBy { it.definition.name }
+                }
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(tools, key = { it.definition.name }) { tool ->
+                        val required = tool.definition.parameters["required"]
+                            ?.let { (it as? kotlinx.serialization.json.JsonArray) }
+                            ?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
+                        Column(Modifier.fillMaxWidth()) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    tool.definition.name,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 13.sp,
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
+                                TextButton(onClick = {
+                                    prompt = "/${tool.definition.name} " + commandTemplate(tool.definition)
+                                    showTools = false
+                                }) { Text(stringResource(R.string.debug_tools_use)) }
+                            }
+                            Text(
+                                tool.definition.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (required.isNotEmpty()) {
+                                Text(
+                                    stringResource(R.string.debug_tools_required, required.joinToString(", ")),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                )
+                            }
+                        }
+                    }
+                }
+                Text(
+                    stringResource(R.string.debug_tools_extra, DebugCommands.names.joinToString(" ") { "/$it" }),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
             LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(events) { event ->
                     EventRow(event) { marker ->
                         val capability = Capability.byMarker(marker)
                         if (capability == Capability.HEALTH_CONNECT) {
-                            health.launch(HealthTool.PERMISSIONS)
+                            // Health Connect owns that screen; without it installed there is no
+                            // activity to launch, and the launcher throws.
+                            val opened = runCatching { health.launch(HealthTool.PERMISSIONS) }.isSuccess
+                            if (!opened) {
+                                events += DebugEvent.Error(
+                                    "Health Connect isn't installed on this phone, so it can't be granted here.",
+                                )
+                            }
                         } else if (capability != null) {
                             capability.settingsIntent(this@DebugActivity)?.let(::startActivity)
                         } else if (marker.startsWith("android.permission.") || marker.startsWith("com.termux.permission.")) {
@@ -214,21 +319,24 @@ class DebugActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun EventRow(event: DebugAgent.Event, onGrant: (String) -> Unit) {
+    private fun EventRow(event: DebugEvent, onGrant: (String) -> Unit) {
         val (label, body) = when (event) {
-            is DebugAgent.Event.Raw -> stringResource(R.string.debug_event_raw) to event.json
-            is DebugAgent.Event.Call -> stringResource(R.string.debug_event_call, event.name) to event.args
-            is DebugAgent.Event.Result -> stringResource(R.string.debug_event_result, event.name) to when (val r = event.result) {
+            is DebugEvent.Raw -> stringResource(R.string.debug_event_raw) to event.json
+            is DebugEvent.Call -> stringResource(R.string.debug_event_call, event.name) to event.args
+            is DebugEvent.Result -> stringResource(R.string.debug_event_result, event.name) to when (val r = event.result) {
                 is ToolResult.Success -> "OK: ${r.output}"
                 is ToolResult.Failure -> "FAIL: ${r.message}"
                 is ToolResult.NeedsCapability -> "NEEDS ${r.capability}: ${r.reason}"
             }
-            is DebugAgent.Event.Answer -> stringResource(R.string.debug_event_answer) to event.text
-            is DebugAgent.Event.Error -> stringResource(R.string.debug_event_error) to event.message
+            is DebugEvent.Answer -> stringResource(R.string.debug_event_answer) to event.text
+            is DebugEvent.Error -> stringResource(R.string.debug_event_error) to event.message
         }
-        // Raw responses are long; they start collapsed and a tap shows the whole thing.
+        // Raw responses are long; they start collapsed and a tap shows a capped view. Laying out
+        // an entire 50 KB reply as one Text blocks the main thread for seconds (an ANR), so the
+        // body is trimmed head-and-tail and says how much it hid.
         var expanded by remember(event) { mutableStateOf(false) }
-        val raw = event is DebugAgent.Event.Raw
+        val raw = event is DebugEvent.Raw
+        val shown = if (raw && !expanded) body.take(PREVIEW_CHARS) else capped(body, MAX_BODY_CHARS)
         Column(
             Modifier
                 .fillMaxWidth()
@@ -239,13 +347,45 @@ class DebugActivity : ComponentActivity() {
         ) {
             Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Text(
-                body,
-                fontFamily = if (raw || event is DebugAgent.Event.Call) FontFamily.Monospace else null,
+                shown,
+                fontFamily = if (raw || event is DebugEvent.Call) FontFamily.Monospace else null,
                 fontSize = if (raw) 11.sp else 14.sp,
-                maxLines = if (raw && !expanded) 6 else Int.MAX_VALUE,
             )
-            val needs = (event as? DebugAgent.Event.Result)?.result as? ToolResult.NeedsCapability
+            val needs = (event as? DebugEvent.Result)?.result as? ToolResult.NeedsCapability
             if (needs != null) TextButton(onClick = { onGrant(needs.capability) }) { Text(stringResource(R.string.debug_grant)) }
         }
     }
+}
+
+/** Keeps the head and tail of a long body, with the hidden size named in the middle. */
+internal fun capped(text: String, limit: Int): String {
+    if (text.length <= limit) return text
+    val half = (limit - 40).coerceAtLeast(200) / 2
+    val hidden = text.length - half * 2
+    return text.take(half) + "\n\n… $hidden characters hidden …\n\n" + text.takeLast(half)
+}
+
+private const val PREVIEW_CHARS = 1_200
+private const val MAX_BODY_CHARS = 8_000
+
+/**
+ * A ready-to-edit argument object for the `/tool` prompt: one entry per required parameter, with a
+ * placeholder of the right JSON type, so tapping "Use" always produces a call that parses.
+ */
+internal fun commandTemplate(definition: ToolDefinition): String {
+    val properties = definition.parameters["properties"]?.jsonObject.orEmpty()
+    val required = definition.parameters["required"]?.jsonArray
+        ?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
+    val args = required.joinToString(",") { key ->
+        val type = properties[key]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull ?: "string"
+        val value = when (type) {
+            "integer", "number" -> "0"
+            "boolean" -> "false"
+            "array" -> "[]"
+            "object" -> "{}"
+            else -> "\"\""
+        }
+        "\"$key\":$value"
+    }
+    return "{$args}"
 }

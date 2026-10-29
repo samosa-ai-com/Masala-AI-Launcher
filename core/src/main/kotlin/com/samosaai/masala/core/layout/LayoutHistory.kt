@@ -48,6 +48,30 @@ class LayoutHistory(
     /** Jumps to [id], for the version list. */
     fun select(id: Long): Version? = list.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.also { index = it }?.let { list[it] }
 
+    /** Renames one version; returns it, or null when [id] is unknown. Blank labels are rejected upstream. */
+    fun rename(id: Long, label: String): Version? {
+        val i = list.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: return null
+        val renamed = list[i].copy(label = label)
+        list[i] = renamed
+        return renamed
+    }
+
+    /**
+     * Deletes one version and moves current to the predecessor (else the successor).
+     * Returns the version now in use, or null when [id] is unknown or it is the last row.
+     */
+    fun delete(id: Long): Version? {
+        if (list.size <= 1) return null
+        val i = list.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: return null
+        list.removeAt(i)
+        index = when {
+            i < index -> index - 1
+            i == index -> (i - 1).coerceAtLeast(0).coerceAtMost(list.lastIndex)
+            else -> index
+        }
+        return list.getOrNull(index)
+    }
+
     companion object {
         const val MAX_VERSIONS = 50
     }

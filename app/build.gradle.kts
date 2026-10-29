@@ -85,6 +85,9 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons)
+    implementation(libs.compose.material.icons.extended)
+    implementation(libs.androidx.webkit)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
 
@@ -97,6 +100,9 @@ dependencies {
     implementation(libs.retrofit.kotlinx.serialization)
     implementation(libs.okhttp.logging)
     implementation(libs.jsoup)
+    implementation(libs.workmanager)
+    implementation(libs.richtext.material3)
+    implementation(libs.richtext.commonmark)
     implementation(libs.media3.transformer)
     implementation(libs.media3.effect)
     implementation(libs.media3.common)
@@ -106,6 +112,7 @@ dependencies {
     testImplementation(kotlin("test-junit"))
     testImplementation(libs.okhttp.mockwebserver)
 
+    androidTestImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.runner)

@@ -168,8 +168,21 @@ class MediaCaptureTool(private val context: Context, private val files: ToolFile
             lastSavedDurationSeconds = dur
             ActionResult.ok("Recording saved to $path (${formatDuration(dur)}).")
         } catch (e: Exception) {
+            // The encoder can fail (no input, another app took the mic). Keep the user informed
+            // about the file instead of only saying "stop failed".
+            val path = recordingDisplayPath
+            val file = recordingFile
             releaseRecorder()
-            ActionResult.error("Could not stop the recording cleanly: ${e.message}")
+            val size = file?.length() ?: 0L
+            if (file != null && size == 0L) runCatching { file.delete() }
+            ActionResult.error(
+                "Could not stop the recording cleanly: ${e.message}. " +
+                    if (size == 0L) {
+                        "No audio was written to '$path', so the empty file was removed."
+                    } else {
+                        "'$path' may still hold ${size / 1024} KB of audio; try transcribing it, or record again."
+                    },
+            )
         }
     }
 

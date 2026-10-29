@@ -1,0 +1,10 @@
+{
+  "id": "debug_ticker",
+  "title": "Ticker",
+  "description": "Debug builds only: answers with the current time, to test scheduled runs and the widget.",
+  "instructions": "Answer with exactly one line, \"Tick at <the current time from the system prompt>\", and nothing else. Do not call any tool.",
+  "platforms": ["masala"],
+  "tier": "free",
+  "widget": { "icon": "timer", "tint": "teal", "inputs": [], "output": "markdown" },
+  "schedule": { "default": "daily 07:30" }
+}

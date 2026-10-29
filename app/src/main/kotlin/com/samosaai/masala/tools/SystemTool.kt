@@ -78,6 +78,18 @@ class SystemTool(private val context: Context) {
         }
     }
 
+    /** Opens a web link in the user's browser. */
+    fun openUrl(url: String): ActionResult {
+        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return try {
+            context.startActivity(intent)
+            ActionResult.ok("Opened the link.")
+        } catch (_: android.content.ActivityNotFoundException) {
+            ActionResult.error("No app can open web links on this phone.")
+        }
+    }
+
     fun openApp(packageName: String): ActionResult {
         return try {
             val pm = context.packageManager

@@ -75,8 +75,8 @@ class ContractsTest {
 
     @Test
     fun `confirmation is decided per tool`() {
-        val tools = mapOf("wiki_read" to ToolSensitivity.READ_ONLY, "delete_file" to ToolSensitivity.DESTRUCTIVE)
-        assertEquals(ToolSensitivity.READ_ONLY, MasalaAction.RunTool("wiki_read").sensitivity(tools::get))
+        val tools = mapOf("memory_read" to ToolSensitivity.READ_ONLY, "delete_file" to ToolSensitivity.DESTRUCTIVE)
+        assertEquals(ToolSensitivity.READ_ONLY, MasalaAction.RunTool("memory_read").sensitivity(tools::get))
         assertEquals(ToolSensitivity.DESTRUCTIVE, MasalaAction.RunTool("delete_file").sensitivity(tools::get))
         assertEquals(ToolSensitivity.DESTRUCTIVE, MasalaAction.RunTool("unknown").sensitivity(tools::get))
         assertEquals(ToolSensitivity.CHANGES_SOMETHING, MasalaAction.SetAlarm(7, 0).sensitivity(tools::get))

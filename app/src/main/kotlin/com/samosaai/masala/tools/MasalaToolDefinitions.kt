@@ -57,12 +57,31 @@ object MasalaToolDefinitions {
 
     val setWallpaper = tool(
         "set_wallpaper",
-        "Set the home-screen wallpaper from an image URL, or a random image if no URL is given.",
+        "Set the phone's wallpaper from an image. Accepts a web link, a local file path " +
+            "(/sdcard/Download/photo.jpg), a file:// path, or a content:// URI from a picker. The " +
+            "image is fitted to the screen, not cropped, and the leftover edges are filled with a " +
+            "colour taken from the image. Omit the source for a random image.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("url") {
                     put("type", "string")
-                    put("description", "Direct image URL. Omit for a random wallpaper.")
+                    put(
+                        "description",
+                        "Image source: https://…, /sdcard/…, file://… or content://…. Omit for a " +
+                            "random wallpaper.",
+                    )
+                }
+                putJsonObject("target") {
+                    put("type", "string")
+                    put(
+                        "description",
+                        "Which screens: 'home' (default), 'lock', or 'both'.",
+                    )
+                    putJsonArray("enum") {
+                        add("home")
+                        add("lock")
+                        add("both")
+                    }
                 }
             }
         }
@@ -96,10 +115,158 @@ object MasalaToolDefinitions {
         }
     )
 
+    val createMiniApp = tool(
+        "create_mini_app",
+        "Save a self-contained HTML mini-app (single file: inline CSS and JS, no external " +
+            "requests unless the user enabled network for it). Returns the new mini-app id; tell " +
+            "the user to open it from home once pinned.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("title") {
+                    put("type", "string")
+                    put("description", "Short title shown in the host and on home.")
+                }
+                putJsonObject("html") {
+                    put("type", "string")
+                    put("description", "Complete HTML document, inline style and script only.")
+                }
+            }
+            putJsonArray("required") { add("html") }
+        }
+    )
+
+    val updateMiniApp = tool(
+        "update_mini_app",
+        "Replace a mini-app's HTML, keeping its title and settings. Returns console errors when " +
+            "the app logged any, for the repair turn.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Mini-app id from create_mini_app.")
+                }
+                putJsonObject("html") {
+                    put("type", "string")
+                    put("description", "Complete replacement HTML document.")
+                }
+            }
+            putJsonArray("required") {
+                add("id")
+                add("html")
+            }
+        }
+    )
+
+    val listMiniApps = tool(
+        "list_mini_apps",
+        "List the HTML mini-apps stored on this phone, with their ids, titles and last update.",
+        schema { putJsonObject("properties") {} }
+    )
+
+    val openMiniAppTool = tool(
+        "open_mini_app",
+        "Open a stored mini-app on screen.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Mini-app id from list_mini_apps or create_mini_app.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        }
+    )
+
+    val pinMiniAppTool = tool(
+        "pin_mini_app",
+        "Put a stored mini-app on the home screen so the user can tap it. Use this after " +
+            "creating an app if it isn't on home yet.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Mini-app id.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        }
+    )
+
+    val deleteMiniAppTool = tool(
+        "delete_mini_app",
+        "Delete a stored mini-app. Home items pointing at it stop working.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Mini-app id.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        }
+    )
+
+    val createCalendarEvent = tool(
+        "create_calendar_event",
+        "Add an event to the phone's calendar.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("title") {
+                    put("type", "string")
+                    put("description", "Event title.")
+                }
+                putJsonObject("start") {
+                    put("type", "string")
+                    put(
+                        "description",
+                        "Start time, ISO local like 2026-11-02T09:00, or a date for an all-day event (2026-11-02).",
+                    )
+                }
+                putJsonObject("end") {
+                    put("type", "string")
+                    put("description", "End time in the same form. Defaults to one hour after start.")
+                }
+                putJsonObject("location") {
+                    put("type", "string")
+                    put("description", "Optional place.")
+                }
+                putJsonObject("notes") {
+                    put("type", "string")
+                    put("description", "Optional description.")
+                }
+                putJsonObject("calendar") {
+                    put("type", "string")
+                    put("description", "Optional calendar name; defaults to the primary calendar.")
+                }
+            }
+            putJsonArray("required") {
+                add("title")
+                add("start")
+            }
+        }
+    )
+
+    val searchContacts = tool(
+        "search_contacts",
+        "Look up phone numbers and email addresses in the phone's contacts by name.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("query") {
+                    put("type", "string")
+                    put("description", "Part of a name. Empty lists the first few contacts.")
+                }
+                putJsonObject("limit") {
+                    put("type", "integer")
+                    put("description", "Maximum matches, default 10.")
+                }
+            }
+        }
+    )
+
     val setAlarm = tool(
         "set_alarm",
-        "Set an alarm in the system clock app. To change or remove alarms, use show_alarms to open " +
-            "the clock app's list.",
+        "Set an alarm in the system clock app. Android has no API to delete a scheduled alarm: to " +
+            "remove or change one, open the clock app with show_alarms and tell the user to tap it there.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("hour") {
@@ -136,7 +303,7 @@ object MasalaToolDefinitions {
 
     val setTimer = tool(
         "set_timer",
-        "Start a countdown timer in the system clock app; dismiss_timer stops a ringing one.",
+        "Start a countdown timer in the system clock app. The user stops it there.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("seconds") {
@@ -180,32 +347,40 @@ object MasalaToolDefinitions {
         }
     )
 
-    val dismissTimer = tool(
-        "dismiss_timer",
-        "Dismiss a currently ringing system-clock-app timer. Only has an effect if a timer is " +
-            "actively ringing there right now; support varies by clock app.",
-        schema { putJsonObject("properties") {} }
+    val openUrl = tool(
+        "open_url",
+        "Open a web link in the phone's browser.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("url") {
+                    put("type", "string")
+                    put("description", "Full http:// or https:// URL.")
+                }
+            }
+            putJsonArray("required") { add("url") }
+        }
     )
 
     val toggleTorch = tool(
         "toggle_torch",
-        "Turn the camera flashlight (torch) on or off. If the flashlight is already in the " +
-            "requested state, reports that without error.",
+        "Turn the phone's flashlight on or off. Pass on=true or on=false to set it; omit 'on' to " +
+            "flip whatever it is doing now. Use this for 'turn the torch on', 'turn it off' or " +
+            "'toggle the flashlight'.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("on") {
                     put("type", "boolean")
-                    put("description", "true to turn the flashlight on, false to turn it off.")
+                    put(
+                        "description",
+                        "true to turn the flashlight on, false to turn it off. Omit to flip the " +
+                            "current state, which is what a plain 'toggle' means.",
+                    )
                 }
                 putJsonObject("duration_seconds") {
                     put("type", "integer")
-                    put(
-                        "description",
-                        "Optional: auto-turn off after this many seconds (1-300). Only applies when turning on."
-                    )
+                    put("description", "Optional: switch it off again after this many seconds (1-300).")
                 }
             }
-            putJsonArray("required") { add("on") }
         }
     )
 
@@ -776,7 +951,8 @@ object MasalaToolDefinitions {
             "podcast player, anything with a media notification. Works without any per-service " +
             "API or account. When several apps hold a session, the one actually playing is " +
             "chosen; pass 'app' to target a specific one. Needs Notification access. " +
-            "Use get_now_playing first if you need to know what is playing.",
+            "Use get_now_playing first if you need to know what is playing. This does NOT change " +
+            "the volume: use set_volume with stream 'music' for that.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("action") {
@@ -861,11 +1037,13 @@ object MasalaToolDefinitions {
         openApp,
         setWallpaper,
         listCalendarEvents,
+        createCalendarEvent,
+        searchContacts,
+        openUrl,
         setAlarm,
         setTimer,
         showAlarms,
         snoozeAlarm,
-        dismissTimer,
         toggleTorch,
         setVolume,
         getVolume,
@@ -896,5 +1074,11 @@ object MasalaToolDefinitions {
         getNowPlaying,
         getHealthSummary,
         getHealthRecords,
+        createMiniApp,
+        updateMiniApp,
+        listMiniApps,
+        openMiniAppTool,
+        pinMiniAppTool,
+        deleteMiniAppTool,
     )
 }

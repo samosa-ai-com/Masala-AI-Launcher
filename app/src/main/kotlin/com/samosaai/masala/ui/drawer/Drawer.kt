@@ -47,6 +47,10 @@ import com.samosaai.masala.launcher.AppCatalog
 import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.ui.components.LauncherRow
+import kotlinx.coroutines.delay
+
+/** Pause after the last keystroke before a composing single match auto-launches. */
+private const val AUTO_LAUNCH_PAUSE_MS = 800L
 
 /**
  * The app drawer: a search field on top, then personal apps and a Work section with its pause
@@ -76,15 +80,22 @@ fun Drawer(
         }
     }
     LaunchedEffect(text, composing, results) {
-        if (autoLaunch) AppSearch.autoLaunchTarget(text, composing, results)?.let(onLaunch)
+        if (!autoLaunch) return@LaunchedEffect
+        AppSearch.autoLaunchTarget(text, composing, results)?.let(onLaunch) ?: run {
+            // Keyboards that keep composition open while typing (Samsung autocomplete) would
+            // otherwise never auto-launch: a single match that survives a short pause launches
+            // too, so the keyboard never has to close first.
+            if (composing && AppSearch.autoLaunchTarget(text, false, results) != null) {
+                delay(AUTO_LAUNCH_PAUSE_MS)
+                AppSearch.autoLaunchTarget(text, false, results)?.let(onLaunch)
+            }
+        }
     }
 
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     val listState = rememberLazyListState()
-    LaunchedEffect(text) { listState.scrollToItem(0) }
-
-    // A Surface, not just a background, so text and icons get the scheme's on-surface colour.
+    LaunchedEffect(text) { listState.scrollToItem(0) }    // A Surface, not just a background, so text and icons get the scheme's on-surface colour.
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Column(
             Modifier

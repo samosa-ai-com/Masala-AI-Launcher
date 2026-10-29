@@ -13,7 +13,9 @@ import com.samosaai.masala.core.tool.ToolSensitivity
 import com.samosaai.masala.launcher.AppActions
 import com.samosaai.masala.launcher.LauncherModel
 import com.samosaai.masala.layout.ModeStore
+import com.samosaai.masala.skills.SkillRegistry
 import com.samosaai.masala.tools.MasalaToolExecutor
+import com.samosaai.masala.ui.skills.SkillSheetActivity
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -32,6 +34,7 @@ class ActionDispatcher(
     private val modes: ModeStore,
     private val gate: ConfirmationGate,
     private val registry: ToolRegistry,
+    private val skills: () -> SkillRegistry,
     private val executor: () -> MasalaToolExecutor,
 ) {
     /** What the screen has to do for actions that are about the screen. */
@@ -44,6 +47,9 @@ class ActionDispatcher(
         data class Done(val message: String? = null) : Outcome
         data object Declined : Outcome
         data class Failed(val message: String) : Outcome
+
+        /** A tool stopped because a permission is missing; the caller can ask for it. */
+        data class NeedsCapability(val marker: String, val reason: String) : Outcome
     }
 
     suspend fun dispatch(action: MasalaAction, screen: Screen): Outcome = try {
@@ -91,9 +97,10 @@ class ActionDispatcher(
         is MasalaAction.AskMasala -> Outcome.Done().also { screen.ask(action.prompt) }
         is MasalaAction.SetMode -> setMode(action)
         is MasalaAction.RunTool -> tool(action.name, action.args)
-        // The agent and the skill runner arrive in Phase 4; the buttons are already wired.
-        is MasalaAction.RunSkill -> Outcome.Done().also { screen.ask(action.prompt ?: action.skillId) }
-        is MasalaAction.OpenMiniApp -> Outcome.Failed("Mini apps arrive in a later phase")
+        is MasalaAction.OpenMiniApp -> openMiniApp(action)
+        is MasalaAction.RunSkill ->
+            if (skills().getSkillById(action.skillId) == null) Outcome.Failed("There is no skill '${action.skillId}'")
+            else start(SkillSheetActivity.intent(context, action.skillId, action.prompt))
     }
 
     private suspend fun setMode(action: MasalaAction.SetMode): Outcome {
@@ -111,8 +118,18 @@ class ActionDispatcher(
 
     private suspend fun tool(name: String, args: JsonObject): Outcome = when (val r = executor().execute(name, args)) {
         is ToolResult.Success -> Outcome.Done(r.output)
-        is ToolResult.NeedsCapability -> Outcome.Failed(r.reason)
+        is ToolResult.NeedsCapability -> Outcome.NeedsCapability(r.capability, r.reason)
         is ToolResult.Failure -> if (r.message.startsWith("The user declined")) Outcome.Declined else Outcome.Failed(r.message)
+    }
+
+    private fun openMiniApp(action: MasalaAction.OpenMiniApp): Outcome {
+        // Existence is checked in the activity, which shows a "gone" state for unknown ids.
+        context.startActivity(
+            android.content.Intent(context, com.samosaai.masala.miniapps.MiniAppActivity::class.java)
+                .putExtra(com.samosaai.masala.miniapps.MiniAppActivity.EXTRA_APP_ID, action.id)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+        return Outcome.Done()
     }
 
     private fun start(intent: Intent): Outcome = try {

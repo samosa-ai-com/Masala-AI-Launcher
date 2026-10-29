@@ -195,4 +195,141 @@ class CalendarTool(private val context: Context) {
         }
         return emails
     }
+
+    /**
+     * Adds one event (plan: the model could read the calendar but not write to it).
+     * Times are ISO local (`2026-11-02T09:00`) or a plain date for an all-day event.
+     */
+    fun createEvent(
+        title: String,
+        start: String,
+        end: String? = null,
+        location: String? = null,
+        notes: String? = null,
+        calendarName: String? = null,
+    ): ActionResult {
+        // Reading the calendar list is part of writing an event, and Android grants the two
+        // separately on some phones, so both are needed and each is asked for on its own.
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            return ActionResult.permissionNeeded(
+                Manifest.permission.READ_CALENDAR,
+                "The Calendar permission (read) is not granted, and the app needs it to find a " +
+                    "calendar to write to.",
+            )
+        }
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            return ActionResult.permissionNeeded(
+                Manifest.permission.WRITE_CALENDAR,
+                "The Calendar permission (write) is not granted.",
+            )
+        }
+        val cleanTitle = title.trim()
+        if (cleanTitle.isEmpty()) return ActionResult.error("The event needs a title.")
+        val allDay = start.length == 10
+        val startAt = parseMoment(start, endOfDay = false) ?: return ActionResult.error(
+            "Couldn't read the start time '$start'. Use 2026-11-02T09:00 or an all-day date 2026-11-02.",
+        )
+        val endAt = when {
+            end != null -> parseMoment(end, endOfDay = end.length == 10) ?: return ActionResult.error(
+                "Couldn't read the end time '$end'.",
+            )
+            allDay -> startAt + 86_400_000L
+            else -> startAt + 3_600_000L
+        }
+        if (endAt < startAt) return ActionResult.error("The event ends before it starts.")
+        val calendarId = calendarId(calendarName) ?: return ActionResult.error(
+            "No writable calendar on this phone" + (calendarName?.let { " named '$it'" } ?: "") + ".",
+        )
+        val values = ContentValues().apply {
+            put(CalendarContract.Events.CALENDAR_ID, calendarId)
+            put(CalendarContract.Events.TITLE, cleanTitle)
+            put(CalendarContract.Events.DTSTART, startAt)
+            put(CalendarContract.Events.DTEND, endAt)
+            put(CalendarContract.Events.ALL_DAY, if (allDay) 1 else 0)
+            put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
+            location?.takeIf { it.isNotBlank() }?.let { put(CalendarContract.Events.EVENT_LOCATION, it) }
+            notes?.takeIf { it.isNotBlank() }?.let { put(CalendarContract.Events.DESCRIPTION, it) }
+        }
+        return try {
+            val uri = context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values)
+                ?: return ActionResult.error("The calendar app refused the event.")
+            val id = uri.lastPathSegment
+            val whenText = readable.format(Date(startAt)) + if (allDay) " (all day)" else ""
+            ActionResult.ok("Added '$cleanTitle' on $whenText (event id $id).")
+        } catch (e: SecurityException) {
+            // The provider can still refuse (a read-only calendar, a work profile): report the
+            // permission when that is the cause so the executor can ask, otherwise say what failed.
+            val message = e.message.orEmpty()
+            when {
+                message.contains("READ_CALENDAR") -> ActionResult.permissionNeeded(
+                    Manifest.permission.READ_CALENDAR, "Reading the calendar was refused.",
+                )
+                message.contains("WRITE_CALENDAR") -> ActionResult.permissionNeeded(
+                    Manifest.permission.WRITE_CALENDAR, "Writing to the calendar was refused.",
+                )
+                else -> ActionResult.error("The calendar app refused the event: $message")
+            }
+        } catch (e: IllegalArgumentException) {
+            ActionResult.error("The calendar app rejected the event: ${e.message}")
+        }
+    }
+
+    /**
+     * The calendar to write to: the named one when given, else the primary writable one, else any
+     * writable one, else the first listed. Samsung calendars often mark neither IS_PRIMARY nor
+     * VISIBLE, so the access level decides writability, not those flags.
+     */
+    private fun calendarId(name: String?): Long? {
+        val projection = arrayOf(
+            CalendarContract.Calendars._ID,
+            CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
+            CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL,
+            CalendarContract.Calendars.IS_PRIMARY,
+        )
+        return try {
+            context.contentResolver.query(
+                CalendarContract.Calendars.CONTENT_URI, projection, null, null, null,
+            )?.use { cursor ->
+                var named: Long? = null
+                var primaryWritable: Long? = null
+                var writable: Long? = null
+                var primary: Long? = null
+                var any: Long? = null
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(0)
+                    val display = cursor.getString(1)
+                    val access = cursor.getInt(2)
+                    val isPrimary = cursor.getInt(3) == 1
+                    val canWrite = access >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR
+                    if (any == null) any = id
+                    if (isPrimary && primary == null) primary = id
+                    if (canWrite && writable == null) writable = id
+                    if (canWrite && isPrimary && primaryWritable == null) primaryWritable = id
+                    if (name != null && display != null && display.equals(name, ignoreCase = true)) named = id
+                }
+                named ?: primaryWritable ?: writable ?: primary ?: any
+            }
+        } catch (_: SecurityException) {
+            null
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+    }
+
+    /** ISO local time (`2026-11-02T09:00`), or a plain date (midnight, or the day's end for an end). */
+    private fun parseMoment(text: String, endOfDay: Boolean): Long? {
+        val trimmed = text.trim()
+        val zone = TimeZone.getDefault().toZoneId()
+        return runCatching {
+            java.time.LocalDateTime.parse(trimmed).atZone(zone).toInstant().toEpochMilli()
+        }.recoverCatching {
+            val date = java.time.LocalDate.parse(trimmed)
+            val moment = if (endOfDay) date.plusDays(1).atStartOfDay() else date.atStartOfDay()
+            moment.atZone(zone).toInstant().toEpochMilli()
+        }.getOrNull()
+    }
 }

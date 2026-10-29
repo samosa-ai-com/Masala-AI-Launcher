@@ -50,7 +50,7 @@ class SttEngine(
     apiBaseUrl: String = "",
     apiKey: String = "",
     private val onUnauthorized: (() -> Unit)? = null
-) {
+) : PttEngine {
     // API STT state
     private var audioApi: AudioApi? = if (apiBaseUrl.isNotBlank()) {
         AudioApi(apiBaseUrl, apiKey, onUnauthorized = onUnauthorized)
@@ -171,6 +171,9 @@ class SttEngine(
         apiSttModels
     }
 
+    /** Whether any on-device speech recognizer exists (a stub service counts as present but fails later). */
+    fun isLocalRecognitionAvailable(): Boolean = SpeechRecognizer.isRecognitionAvailable(context)
+
     /** Set API config at runtime. */
     fun configureApi(baseUrl: String, apiKey: String) {
         audioApi = if (baseUrl.isNotBlank()) {
@@ -224,10 +227,16 @@ class SttEngine(
         contentType: String = "audio/m4a"
     ): Result<String> = withContext(Dispatchers.IO) {
         val api = audioApi ?: return@withContext Result.failure(Exception("API not configured"))
+        // Empty means "ask the server": pick the first STT model it advertises, like TranscribeTool does.
+        val effectiveModel = model.ifBlank {
+            if (apiSttModels.isEmpty()) refreshApiModels()
+            apiSttModels.firstOrNull()?.id
+                ?: return@withContext Result.failure(Exception("No transcription model on the configured endpoint"))
+        }
         try {
             api.transcribe(
                 audioFile = audioFile,
-                model = model,
+                model = effectiveModel,
                 language = language,
                 contentType = contentType
             )
@@ -635,10 +644,10 @@ class SttEngine(
      * Start listening with the current provider. Returns false on failure.
      * [onAndroidFailure] is passed to [startAndroidListening].
      */
-    fun startListening(
+    override fun startListening(
         provider: AudioProvider,
-        language: Language = Language.ENGLISH,
-        onAndroidFailure: ((String) -> Unit)? = null
+        language: Language,
+        onAndroidFailure: ((String) -> Unit)?
     ): Boolean {
         return when {
             provider == AudioProvider.ANDROID -> startAndroidListening(language, onAndroidFailure)
@@ -651,10 +660,10 @@ class SttEngine(
      * Stop recording/listening and transcribe audio using [provider] and [model].
      * For API: stops the recorder, transcribes, returns the text or error.
      */
-    suspend fun stopListeningAndTranscribe(
+    override suspend fun stopListeningAndTranscribe(
         provider: AudioProvider,
         model: String,
-        language: String = ""
+        language: String
     ): Result<String> {
         return when {
             provider == AudioProvider.ANDROID -> {
@@ -680,7 +689,7 @@ class SttEngine(
      * Abort an active listen (pause/end of a call). Handles both providers.
      * Safe to call from any thread.
      */
-    fun cancelListening(provider: AudioProvider) {
+    override fun cancelListening(provider: AudioProvider) {
         when {
             provider == AudioProvider.ANDROID -> {
                 isContinuousListening = false

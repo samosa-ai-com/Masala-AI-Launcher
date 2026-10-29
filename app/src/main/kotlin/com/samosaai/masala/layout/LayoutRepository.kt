@@ -174,7 +174,37 @@ class LayoutRepository(
 
     suspend fun redo(): Boolean = lock.withLock { history.redo()?.also { savePointer(); publish() } != null }
 
+    /** The saved document for one version, for the Refine flow. Null when unreadable. */
+    suspend fun layoutFor(versionId: Long): LayoutDoc? = withContext(Dispatchers.IO) {
+        runCatching {
+            val row = dao.get(versionId) ?: return@runCatching null
+            LayoutMigrations.decode(MasalaJson.strict.parseToJsonElement(row.json))
+        }.getOrNull()
+    }
+
     suspend fun select(versionId: Long): Boolean = lock.withLock { history.select(versionId)?.also { savePointer(); publish() } != null }
+
+    /** Renames one saved version. Blank labels are rejected; false when unknown. */
+    suspend fun renameVersion(versionId: Long, label: String): Boolean = lock.withLock {
+        val clean = label.trim()
+        if (clean.isEmpty()) return false
+        val renamed = history.rename(versionId, clean) ?: return false
+        withContext(Dispatchers.IO) { dao.upsert(renamed.toEntity()) }
+        publish()
+        true
+    }
+
+    /**
+     * Deletes one saved version, moving current to its predecessor (else successor).
+     * False when unknown or when it is the last version.
+     */
+    suspend fun deleteVersion(versionId: Long): Boolean = lock.withLock {
+        history.delete(versionId) ?: return false
+        withContext(Dispatchers.IO) { dao.delete(listOf(versionId)) }
+        savePointer()
+        publish()
+        true
+    }
 
     /** Starts over from Classic, as a new version, so even this can be undone. */
     suspend fun resetToClassic(): List<LayoutChecker.Problem> =
@@ -186,6 +216,27 @@ class LayoutRepository(
         val doc = history.current?.layout ?: return emptyList()
         if (isPinned(entry)) return emptyList()
         val item = ClassicLayoutBuilder.appItem(ClassicLayoutBuilder.itemId(entry), entry)
+        return insert(item)
+    }
+
+    /** Pins a generated mini-app into the favorites section, like an app pin. */
+    suspend fun pinMiniApp(id: String, title: String): List<LayoutChecker.Problem> {
+        if (isMiniAppPinned(id)) return emptyList()
+        val item = com.samosaai.masala.core.contract.Item(
+            id = "miniapp-$id",
+            label = title.trim().ifEmpty { "Mini app" }.take(60),
+            icon = com.samosaai.masala.core.contract.IconRef.Symbol("widgets"),
+            action = MasalaAction.OpenMiniApp(id),
+        )
+        return insert(item)
+    }
+
+    /** Whether the mini-app already has an item on home, so pinning twice can't duplicate its id. */
+    fun isMiniAppPinned(id: String): Boolean =
+        base.value?.let { doc -> favorites(doc).any { (it.action as? MasalaAction.OpenMiniApp)?.id == id } } ?: false
+
+    private suspend fun insert(item: com.samosaai.masala.core.contract.Item): List<LayoutChecker.Problem> {
+        val doc = history.current?.layout ?: return emptyList()
         var added = false
         val pages = doc.pages.map { page ->
             page.copy(
@@ -203,7 +254,7 @@ class LayoutRepository(
         val result = if (added) pages else pages.mapIndexed { i, page ->
             if (i != 0) page else page.copy(sections = listOf(GridSection(ClassicLayoutBuilder.FAVORITES, items = listOf(item))) + page.sections)
         }
-        return apply("Pin ${entry.label}", doc.copy(pages = result))
+        return apply("Pin ${item.label}", doc.copy(pages = result))
     }
 
     suspend fun unpin(entry: AppEntry): List<LayoutChecker.Problem> {

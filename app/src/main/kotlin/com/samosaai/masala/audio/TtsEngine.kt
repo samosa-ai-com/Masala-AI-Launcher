@@ -37,6 +37,14 @@ class TtsEngine(
     @Volatile
     private var androidReady = false
 
+    /**
+     * Set when [stop] interrupted Android speech; [speakAndroid] clears it on entry.
+     * Callers treat a false [speak] with this set as "the user stopped it", not a failure.
+     */
+    @Volatile
+    var androidInterrupted = false
+        private set
+
     @Volatile
     private var ttsInitGate = CompletableDeferred<Boolean>()
 
@@ -130,6 +138,7 @@ class TtsEngine(
         lastLanguageUnavailable = null
         val sanitized = SpeechTextSanitizer.sanitize(text)
         if (sanitized.isBlank()) return@withContext true
+        androidInterrupted = false
         try {
             _isSpeaking.value = true
             when {
@@ -146,7 +155,12 @@ class TtsEngine(
 
     private suspend fun speakAndroid(text: String, language: Language, engine: String, voiceName: String): Boolean {
         if (engine != androidEngine) bindAndroidTts(engine)
-        val tts = readyAndroidTts() ?: return false
+        val tts = readyAndroidTts()
+        if (tts == null) {
+            android.util.Log.w(TAG, "speakAndroid: engine not ready (init failed or no default engine)")
+            lastLanguageUnavailable = null
+            return false
+        }
 
         val gate = CompletableDeferred<Boolean>()
         tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -160,7 +174,9 @@ class TtsEngine(
         })
         // A missing voice says nothing rather than reading the text with an
         // English one, which mangles it (#122); callers report why.
-        if (!isAvailable(tts.setLanguage(language.locale))) {
+        val langResult = tts.setLanguage(language.locale)
+        if (!isAvailable(langResult)) {
+            android.util.Log.w(TAG, "speakAndroid: no voice for ${language.locale.toLanguageTag()} (result=$langResult)")
             lastLanguageUnavailable = language
             return false
         }
@@ -171,6 +187,7 @@ class TtsEngine(
                 ?.let(tts::setVoice)
         }
         val result = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "tts_utterance")
+        if (result != TextToSpeech.SUCCESS) android.util.Log.w(TAG, "speakAndroid: speak() returned $result")
         return if (result == TextToSpeech.SUCCESS) gate.await() else false
     }
 
@@ -262,6 +279,7 @@ class TtsEngine(
 
     /** Stop any ongoing speech (both providers). Unblocks a suspended [speak]. */
     fun stop() {
+        androidInterrupted = true
         androidTts?.stop()
         try {
             currentTrack?.pause()
@@ -279,6 +297,7 @@ class TtsEngine(
     }
 
     private companion object {
+        const val TAG = "TtsEngine"
         const val SAMPLE_RATE_HZ = 24000
         const val PLAYBACK_TIMEOUT_SLACK_MS = 500L
     }
