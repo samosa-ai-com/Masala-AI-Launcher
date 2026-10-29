@@ -135,6 +135,31 @@ object ProToolDefinitions {
         }
     )
 
+    val fileSearch = tool(
+        "file_search",
+        "Find files anywhere in the phone's storage by words in their name or text (PDF, Word, Excel, " +
+            "PowerPoint, text and code files), using the file index. Returns each match's path, date and the " +
+            "passage that matched, newest first. Files changed since the last index run may be missing: " +
+            "use glob for names and grep for text files then.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("query") {
+                    put("type", "string")
+                    put("description", "Words to find, e.g. 'rental agreement deposit'. All words must match.")
+                }
+                putJsonObject("folder") {
+                    put("type", "string")
+                    put("description", "Only search under this folder, e.g. 'Download' or '/sdcard/Documents'. Default: everywhere.")
+                }
+                putJsonObject("limit") {
+                    put("type", "integer")
+                    put("description", "Most results to return (1-30). Default 10.")
+                }
+            }
+            putJsonArray("required") { add("query") }
+        }
+    )
+
     val grep = tool(
         "grep",
         "Search file contents by case-insensitive regex, returning path, line number and " +

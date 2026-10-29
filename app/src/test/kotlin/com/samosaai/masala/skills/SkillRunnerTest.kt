@@ -288,6 +288,21 @@ class SkillMessageTest {
         assertEquals("look\n\n[Attached file: /a/notes.pdf]", m.textContent)
     }
 
+    @Test fun aFolderIsNamedAsAFolder() {
+        val folder = Attachment(SkillInput.FOLDER, "/storage/emulated/0/Download/Taxes", "Taxes")
+        assertEquals("sort these\n\n[Attached folder: /storage/emulated/0/Download/Taxes]", SkillMessage.build("sort these", listOf(folder)) { null }.textContent)
+    }
+
+    @Test fun pickerIdsBecomeStoragePaths() {
+        val path = { id: String -> com.samosaai.masala.ui.skills.SkillInputs.storagePath(id, "/storage/emulated/0") }
+        assertEquals("/storage/emulated/0/Download/Taxes", path("primary:Download/Taxes"))
+        assertEquals("/storage/emulated/0", path("primary:"))
+        assertEquals("/storage/emulated/0/Download/a.pdf", path("raw:/storage/emulated/0/Download/a.pdf"))
+        assertEquals(null, path("1A2B-3C4D:Music"))
+        assertEquals(null, path("msf:42"))
+        assertEquals("/storage/emulated/10/Music", com.samosaai.masala.ui.skills.SkillInputs.storagePath("primary:Music", "/storage/emulated/10"))
+    }
+
     @Test fun unreadablePhotoIsLeftOut() {
         assertEquals(0, SkillMessage.build("look", listOf(photo)) { null }.imageCount)
     }

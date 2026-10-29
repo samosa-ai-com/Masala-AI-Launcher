@@ -72,7 +72,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, TASKS }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, TASKS, FILES }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -96,6 +96,7 @@ class SettingsActivity : ComponentActivity() {
                             onMiniApps = { page = Page.MINI_APPS },
                             onSkills = { page = Page.SKILLS },
                             onTasks = { page = Page.TASKS },
+                            onFiles = { page = Page.FILES },
                         )
                         Page.HIDDEN_APPS -> HiddenAppsPage(onBack = { page = Page.MAIN })
                         Page.LAYOUT -> LayoutPage(settings, onBack = { page = Page.MAIN })
@@ -103,6 +104,7 @@ class SettingsActivity : ComponentActivity() {
                         Page.MINI_APPS -> MiniAppsPage(onBack = { page = Page.MAIN })
                         Page.SKILLS -> SkillsPage(onBack = { page = Page.MAIN })
                         Page.TASKS -> ScheduledTasksPage(onBack = { page = Page.MAIN })
+                        Page.FILES -> masala.fileIndex?.let { FilesPage(it, onBack = { page = Page.MAIN }) }
                     }
                 }
             }
@@ -118,6 +120,7 @@ class SettingsActivity : ComponentActivity() {
         onMiniApps: () -> Unit,
         onSkills: () -> Unit,
         onTasks: () -> Unit,
+        onFiles: () -> Unit,
     ) {
         val scope = rememberCoroutineScope()
         val apps by masala.launcher.apps.collectAsStateWithLifecycle()
@@ -192,6 +195,15 @@ class SettingsActivity : ComponentActivity() {
                 summary = stringResource(R.string.settings_recording_summary),
                 onClick = onRecording,
             )
+
+            // Only with :pro in the build: without it there is no index and no all-files access.
+            if (masala.fileIndex != null) {
+                SettingsNavRow(
+                    title = stringResource(R.string.settings_files),
+                    summary = stringResource(R.string.settings_files_summary),
+                    onClick = onFiles,
+                )
+            }
 
             SettingsNavRow(
                 title = stringResource(R.string.settings_skills),
