@@ -40,6 +40,7 @@ import com.samosaai.masala.connectors.mcp.McpServerConfig
 import com.samosaai.masala.connectors.mcp.McpServerStore
 import com.samosaai.masala.connectors.mcp.McpStrings
 import com.samosaai.masala.connectors.mcp.formatHeaderLines
+import com.samosaai.masala.connectors.mcp.isCleartextWithSecret
 import com.samosaai.masala.connectors.mcp.parseHeaderLines
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.masala
@@ -133,7 +134,8 @@ class McpActivity : ComponentActivity() {
                     busy = true
                     scope.launch {
                         result = when (val p = store.probe(url, token, h, strings)) {
-                            is McpProbe.Ok -> getString(R.string.mcp_connected, p.server.name.ifBlank { McpServerStore.hostOf(url) }, p.tools.size)
+                            is McpProbe.Ok -> getString(R.string.mcp_connected, p.server.name.ifBlank { McpServerStore.hostOf(url) }, p.tools.size) +
+                                if (isCleartextWithSecret(url, token, h)) " " + getString(R.string.mcp_error_cleartext) else ""
                             is McpProbe.Failed -> p.message
                         }
                         busy = false

@@ -10,6 +10,7 @@ import com.samosaai.masala.connectors.mcp.McpServerStore
 import com.samosaai.masala.connectors.mcp.McpStorage
 import com.samosaai.masala.connectors.mcp.McpStrings
 import com.samosaai.masala.connectors.mcp.McpToolNames
+import com.samosaai.masala.connectors.mcp.isCleartextWithSecret
 import com.samosaai.masala.connectors.mcp.normalizedInputSchema
 import com.samosaai.masala.connectors.mcp.parseHeaderLines
 import com.samosaai.masala.connectors.mcp.validateMcpServer
@@ -41,6 +42,8 @@ class McpTest {
     private val seen = mutableListOf<RecordedRequest>()
     private var sse = false
     private var failWith: Int? = null
+    private var redirectTo: String? = null
+    private val missing = mutableSetOf<String>()
     private val methods = mutableListOf<String>()
 
     private val toolsJson = """[
@@ -54,6 +57,9 @@ class McpTest {
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 seen += request
+                val path = request.path!!.substringBefore('?')
+                if (path in missing) return MockResponse().setResponseCode(404).setBody("nope")
+                redirectTo?.let { dest -> if (path != dest) return MockResponse().setResponseCode(307).addHeader("Location", dest) }
                 failWith?.let { return MockResponse().setResponseCode(it).setBody("nope") }
                 val body = Json.parseToJsonElement(request.body.readUtf8()).jsonObject
                 val id = body["id"]?.jsonPrimitive?.content
@@ -185,13 +191,81 @@ class McpTest {
         assertEquals("Notes", p.server.name)
     }
 
-    @Test fun cleartextWithASecretIsRefusedOffTheLocalNetwork() {
-        assertEquals(McpConfigProblem.CLEARTEXT_WITH_SECRET, validateMcpServer("http://example.com/mcp", "tok", emptyMap()))
-        assertNull(validateMcpServer("http://192.168.1.5/mcp", "tok", emptyMap()))
-        assertNull(validateMcpServer("http://10.0.2.2:8080/mcp", "tok", emptyMap()))
-        assertNull(validateMcpServer("https://example.com/mcp", "tok", emptyMap()))
+    @Test fun cleartextWithASecretWarnsInsteadOfRefusing() {
+        // Accepted everywhere now; the screen warns when a secret leaves the local network over http.
+        assertNull(validateMcpServer("http://example.com/mcp", "tok", emptyMap()))
+        assertTrue(isCleartextWithSecret("http://example.com/mcp", "tok", emptyMap()))
+        assertTrue(isCleartextWithSecret("http://example.com/mcp", "", mapOf("X-Key" to "v")))
+        assertTrue(!isCleartextWithSecret("http://192.168.1.5/mcp", "tok", emptyMap()))
+        assertTrue(!isCleartextWithSecret("http://10.0.2.2:8080/mcp", "tok", emptyMap()))
+        assertTrue(!isCleartextWithSecret("http://example.com/mcp", "", emptyMap()))
+        assertTrue(!isCleartextWithSecret("https://example.com/mcp", "tok", emptyMap()))
         assertEquals(McpConfigProblem.BAD_URL, validateMcpServer("not a url", "", emptyMap()))
         assertEquals(McpConfigProblem.BAD_HEADER, validateMcpServer("https://x.y", "", mapOf("bad name" to "v")))
+    }
+
+    @Test fun sameOriginRedirectIsFollowedAndSticks() = runBlocking {
+        redirectTo = "/mcp-final"
+        val session = McpHttpClient().session(McpEndpoint(url()))
+        assertEquals("Notes", session.initialize().name)
+        assertTrue(session.lastRequestUrl.endsWith("/mcp-final"), session.lastRequestUrl)
+        session.listTools()
+        assertTrue(seen.last().path!!.startsWith("/mcp-final"), seen.last().path!!)
+    }
+
+    @Test fun crossHostRedirectNamesTheDestination() = runBlocking {
+        redirectTo = "http://example.com/other"
+        val e = assertFailsWith<McpException> { McpHttpClient().session(McpEndpoint(url())).initialize() }
+        assertEquals(McpFailure.REDIRECT, e.kind)
+        assertTrue(e.detail.contains("http://example.com/other"), e.detail)
+    }
+
+    @Test fun redirectLoopsFailInsteadOfHanging() = runBlocking {
+        // The query survives but the path never lands: every attempt redirects again.
+        redirectTo = "/mcp?x=1"
+        val e = assertFailsWith<McpException> { McpHttpClient().session(McpEndpoint(url())).initialize() }
+        assertEquals(McpFailure.HTTP, e.kind)
+        assertEquals(6, seen.size)
+    }
+
+    @Test fun redirectTargetPolicy() {
+        val client = McpHttpClient()
+        assertEquals("http://h:1/b", client.redirectTarget("http://h:1/a", "/b", 307))
+        assertEquals("https://h:1/a", client.redirectTarget("http://h:1/a", "https://h:1/a", 307))
+        assertFailsWith<McpException> { client.redirectTarget("http://h:1/a", "http://other:1/a", 307) }
+        assertFailsWith<McpException> { client.redirectTarget("http://h:1/a", "http://h:2/a", 307) }
+        assertFailsWith<McpException> { client.redirectTarget("https://h/a", "http://h/a", 307) }
+    }
+
+    @Test fun slashSpellingIsRetriedOnceOn404() = runBlocking {
+        missing += "/mcp"
+        val session = McpHttpClient().session(McpEndpoint(url()))
+        assertEquals("Notes", session.initialize().name)
+        assertTrue(session.endpoint.url.endsWith("/mcp/"), session.endpoint.url)
+        assertTrue(seen.any { it.path == "/mcp" } && seen.any { it.path == "/mcp/" })
+    }
+
+    @Test fun failedSlashRetryRestoresTheConfiguredUrl() = runBlocking {
+        missing += "/mcp"
+        missing += "/mcp/"
+        val session = McpHttpClient().session(McpEndpoint(url()))
+        val e = assertFailsWith<McpException> { session.initialize() }
+        assertEquals(McpFailure.NOT_FOUND, e.kind)
+        assertEquals(url(), session.endpoint.url)
+    }
+
+    @Test fun slashToggledTogglesOnlyTheTrailingSlash() {
+        val client = McpHttpClient()
+        assertEquals("http://h/mcp/", client.slashToggled("http://h/mcp"))
+        assertEquals("http://h/mcp", client.slashToggled("http://h/mcp/"))
+        assertNull(client.slashToggled("http://h/"))
+        assertNull(client.slashToggled("not a url"))
+    }
+
+    @Test fun redirectFailureHasAMessage() {
+        val store = McpServerStore(Storage(), Registry()::register)
+        val message = store.failureMessage(McpException(McpFailure.REDIRECT, "http://x/y", 302), strings)
+        assertTrue(message.contains("http://x/y"), message)
     }
 
     @Test fun headerLinesParse() {

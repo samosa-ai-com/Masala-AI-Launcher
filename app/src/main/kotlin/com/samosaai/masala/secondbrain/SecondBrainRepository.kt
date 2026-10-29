@@ -1,5 +1,6 @@
 package com.samosaai.masala.secondbrain
 
+import androidx.compose.ui.geometry.Offset
 import com.samosaai.masala.data.WikiDao
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -152,8 +153,12 @@ class SecondBrainRepository(
         store.loadSnapshot().also { cached = it }
     }
 
-    /** The link graph plus a force-directed layout, computed off the main thread. */
-    suspend fun preparedGraph(): Pair<BrainGraph, List<Pair<Float, Float>>> = withContext(Dispatchers.Default) {
+    /**
+     * The graph plus its 3D layout: the flat force-directed cloud turned onto
+     * its side (spread runs front-to-back, depth across), confined to the
+     * brain shell. Computed off the main thread.
+     */
+    suspend fun preparedGraph(): PreparedGraph = withContext(Dispatchers.Default) {
         val graph = withContext(Dispatchers.IO) { store.loadSnapshot().also { cached = it } }
             .let { store.buildGraph(it) }
         val index = graph.nodes.indices.associateBy({ graph.nodes[it].id }, { it })
@@ -163,8 +168,24 @@ class SecondBrainRepository(
             if (a != null && b != null) a to b else null
         }
         val iterations = (16000 / maxOf(1, graph.nodes.size)).coerceIn(40, 160)
-        graph to store.forceLayout(graph.nodes.size, pairs, iterations)
+        val points = store.forceLayout(graph.nodes.size, pairs, iterations)
+        val depths = List(graph.nodes.size) { store.nodeZ(it) }
+        // Turn the flat layout cloud onto its side: spread runs front-to-back
+        // (z) so the starting side view shows the full cloud, depth runs across.
+        val sideways = points.indices.map { i -> Offset(depths[i], points[i].y) }
+        val sidewaysDepths = points.indices.map { i -> points[i].x }
+        val (confined, confinedZ) = store.confineToBrain(sideways, sidewaysDepths)
+        PreparedGraph(graph, confined, confinedZ)
     }
+
+    /** The vault file behind a graph node id, or null when it is gone. */
+    fun findIn(snapshot: SecondBrainSnapshot, id: String): BrainFile? =
+        snapshot.allMarkdown().firstOrNull { store.relativeId(it) == id }
+            ?: snapshot.raw.firstOrNull { store.relativeId(it) == id }
+
+    /** The snapshot narrowed to [query]; the screen debounces and runs it off-main. */
+    fun filter(snapshot: SecondBrainSnapshot, query: String): SecondBrainSnapshot =
+        store.filterSnapshot(snapshot, query)
 
     /** Vault health (unlinked, dangling, schema, unscanned; task links once tasks carry note refs). Never moves the tick. */
     suspend fun health(taskLinks: List<TaskLink> = emptyList()): BrainHealth = withContext(Dispatchers.IO) {

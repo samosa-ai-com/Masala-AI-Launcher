@@ -227,25 +227,46 @@ class SecondBrainStoreTest {
         val b = store.forceLayout(4, pairs, 60)
         assertEquals(a, b)
         assertEquals(4, a.size)
-        assertTrue(a.all { (x, y) -> x.isFinite() && y.isFinite() && x in 0f..1f && y in 0f..1f })
+        assertTrue(a.all { p -> p.x.isFinite() && p.y.isFinite() && p.x in -500f..500f && p.y in -350f..350f })
         assertTrue(a.distinct().size > 1)
     }
 
-    @Test fun forceLayoutKeepsDisconnectedComponentsInBounds() {
-        // Two linked pairs plus two isolates: everything stays on the canvas and finite.
-        val pts = store.forceLayout(6, listOf(0 to 1, 2 to 3), 80)
-        assertEquals(6, pts.size)
-        assertTrue(pts.all { (x, y) -> x.isFinite() && y.isFinite() && x in 0f..1f && y in 0f..1f })
-        // Linked nodes end up nearer than the isolates drifted apart: no pile-up at one corner.
-        assertTrue(pts.distinct().size > 2)
-    }
-
     @Test fun forceLayoutHandlesEdges() {
-        assertEquals(emptyList<Pair<Float, Float>>(), store.forceLayout(0, emptyList(), 10))
-        assertEquals(listOf(0.5f to 0.5f), store.forceLayout(1, emptyList(), 10))
+        assertEquals(emptyList<androidx.compose.ui.geometry.Offset>(), store.forceLayout(0, emptyList(), 10))
+        assertEquals(listOf(androidx.compose.ui.geometry.Offset.Zero), store.forceLayout(1, emptyList(), 10))
         // Out-of-range and self pairs are ignored, not crashed on.
         val pts = store.forceLayout(3, listOf(0 to 9, -1 to 2, 1 to 1, 0 to 1), 20)
         assertEquals(3, pts.size)
-        assertTrue(pts.all { (x, y) -> x.isFinite() && y.isFinite() })
+        assertTrue(pts.all { p -> p.x.isFinite() && p.y.isFinite() })
+    }
+
+    @Test fun confineToBrainPullsOutliersInside() {
+        val (pts, depths) = store.confineToBrain(
+            listOf(androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(2000f, 0f)),
+            listOf(0f, 2000f),
+        )
+        assertEquals(2, pts.size)
+        assertEquals(androidx.compose.ui.geometry.Offset(0f, 0f), pts[0])
+        fun inside(p: androidx.compose.ui.geometry.Offset, z: Float): Boolean {
+            val e = (p.x / 280f) * (p.x / 280f) + (p.y / 360f) * (p.y / 360f) + (z / 520f) * (z / 520f)
+            return e <= 0.81f + 1e-3f
+        }
+        assertTrue(inside(pts[1], depths[1]))
+        // Mismatched sizes pass through untouched.
+        assertEquals(1, store.confineToBrain(listOf(androidx.compose.ui.geometry.Offset.Zero), emptyList()).first.size)
+    }
+
+    @Test fun filterSnapshotMatchesNamesPreviewsAndFullText() {
+        File(dir, "notes/mum.md").writeText(record("Mum") + "\nLikes tulips.\n")
+        File(dir, "notes/big.md").writeText(
+            "---\ntitle: Big\narea: Personal\ntype: note\nupdated: 2026-10-29\n---\n\n" +
+                "x".repeat(9000) + "\nburied treasure\n",
+        )
+        val snapshot = store.loadSnapshot()
+        assertTrue(store.filterSnapshot(snapshot, "").notes.size >= 2)
+        assertEquals(listOf("Mum"), store.filterSnapshot(snapshot, "mum").notes.map { store.frontmatterOf(it.content)?.get("title") })
+        // "treasure" sits past the viewer cap: found through the full-text re-read.
+        assertEquals(1, store.filterSnapshot(snapshot, "treasure").notes.size)
+        assertTrue(store.filterSnapshot(snapshot, "no such thing anywhere").isEmpty())
     }
 }

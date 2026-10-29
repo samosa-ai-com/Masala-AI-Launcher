@@ -28,9 +28,17 @@ data class SecondBrainSnapshot(
         areas.isEmpty() && people.isEmpty() && notes.isEmpty() && raw.isEmpty()
 }
 
+/** One node on the Second Brain graph. */
 data class BrainNode(val id: String, val label: String, val kind: String)
 data class BrainEdge(val fromId: String, val toId: String)
 data class BrainGraph(val nodes: List<BrainNode>, val edges: List<BrainEdge>)
+
+/** The graph plus its 3D layout: plane positions and per-node depths for the shell. */
+data class PreparedGraph(
+    val graph: BrainGraph,
+    val layout: List<androidx.compose.ui.geometry.Offset>,
+    val layoutZ: List<Float>,
+)
 
     /** A wiki-style link that points nowhere. Self-links resolve (to their own file) and never dangle. */
 data class DanglingLink(val fromId: String, val target: String)

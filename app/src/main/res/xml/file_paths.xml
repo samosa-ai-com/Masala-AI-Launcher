@@ -5,4 +5,6 @@
     <!-- Where results go when there is no external files folder -->
     <files-path name="output_internal" path="output/" />
     <files-path name="work" path="work/" />
+    <!-- The Second Brain vault, for the Open button on binary files -->
+    <files-path name="secondbrain" path="secondbrain/" />
 </paths>

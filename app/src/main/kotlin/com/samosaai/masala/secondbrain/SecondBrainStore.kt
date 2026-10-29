@@ -1,5 +1,6 @@
 package com.samosaai.masala.secondbrain
 
+import androidx.compose.ui.geometry.Offset
 import java.io.File
 import java.time.LocalDate
 import kotlin.io.extension
@@ -673,80 +674,115 @@ class SecondBrainStore(
     }
 
     /**
-     * Deterministic force-directed layout (Fruchterman-Reingold on a cooling schedule)
-     * for the graph view: nodes start on a jittered ring, then repel, attract along
-     * edges and drift toward the centre. Pure math, no Android types, unit-tested.
+     * Force-directed layout (Fruchterman-Reingold): repulsion pushes all nodes
+     * apart, springs pull linked nodes together, gravity keeps the cloud
+     * centered. Fixed seed, so the same vault always draws the same brain.
+     * Coordinates are centered at the origin in a 1000x700 box; the viewer
+     * scales them to the canvas.
      */
     fun forceLayout(
-        count: Int,
-        pairs: List<Pair<Int, Int>>,
-        iterations: Int,
-        seed: Long = 7L,
-    ): List<Pair<Float, Float>> {
-        if (count == 0) return emptyList()
-        if (count == 1) return listOf(0.5f to 0.5f)
-        val random = java.util.Random(seed)
-        val pos = Array(count) { i ->
-            val a = (i.toDouble() / count) * 2.0 * Math.PI
-            // Deterministic ring start with a small jitter so symmetric graphs still relax.
-            val r = 0.5 + (random.nextDouble() - 0.5) * 0.01
-            floatArrayOf((0.5 + r * Math.cos(a) / 2).toFloat(), (0.5 + r * Math.sin(a) / 2).toFloat())
+        nodeCount: Int,
+        edgeIndexPairs: List<Pair<Int, Int>>,
+        iterations: Int = 160,
+    ): List<Offset> {
+        if (nodeCount == 0) return emptyList()
+        if (nodeCount == 1) return listOf(Offset.Zero)
+        val width = 1000f
+        val height = 700f
+        val random = kotlin.random.Random(42)
+        val pos = Array(nodeCount) {
+            Offset(random.nextFloat() * width - width / 2f, random.nextFloat() * height - height / 2f)
         }
-        val area = 1.0
-        val k = Math.sqrt(area / count)
-        val maxIter = iterations.coerceIn(1, 500)
-        // Undirected edges: (a, b) and (b, a) pull once, not twice.
-        val clampedPairs = pairs
-            .map { (a, b) -> minOf(a, b) to maxOf(a, b) }
-            .filter { (a, b) -> a in 0 until count && b in 0 until count && a != b }
-            .toSet().toList()
-        repeat(maxIter) { step ->
-            // Linear cooling tied to the iteration budget: full motion early, settled at the end.
-            val temperature = 0.1f * (1f - step.toFloat() / maxIter)
-            val disp = Array(count) { floatArrayOf(0f, 0f) }
-            // Repulsion between every pair.
-            for (i in 0 until count) {
-                for (j in i + 1 until count) {
-                    var dx = pos[i][0] - pos[j][0]
-                    var dy = pos[i][1] - pos[j][1]
-                    var dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
-                    if (dist < 0.001f) {
-                        dx = (random.nextFloat() - 0.5f) * 0.01f
-                        dy = (random.nextFloat() - 0.5f) * 0.01f
-                        dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat().coerceAtLeast(0.001f)
-                    }
-                    val force = (k * k / dist).toFloat().coerceAtMost(0.5f)
-                    disp[i][0] += dx / dist * force
-                    disp[i][1] += dy / dist * force
-                    disp[j][0] -= dx / dist * force
-                    disp[j][1] -= dy / dist * force
+        val area = width * height
+        val k = kotlin.math.sqrt(area / nodeCount)
+        var temperature = minOf(width, height) / 4f
+        repeat(iterations.coerceIn(1, 500)) {
+            val disp = Array(nodeCount) { Offset.Zero }
+            for (i in 0 until nodeCount) {
+                for (j in i + 1 until nodeCount) {
+                    val delta = pos[i] - pos[j]
+                    val dist = delta.getDistance().coerceAtLeast(0.01f)
+                    val force = k * k / dist
+                    val push = delta / dist * force
+                    disp[i] += push
+                    disp[j] -= push
                 }
             }
-            // Attraction along edges.
-            for ((a, b) in clampedPairs) {
-                val dx = pos[a][0] - pos[b][0]
-                val dy = pos[a][1] - pos[b][1]
-                val dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat().coerceAtLeast(0.001f)
-                val force = (dist * dist / k).toFloat().coerceAtMost(0.5f)
-                disp[a][0] -= dx / dist * force
-                disp[a][1] -= dy / dist * force
-                disp[b][0] += dx / dist * force
-                disp[b][1] += dy / dist * force
-            }
-            // Gravity toward the centre keeps disconnected nodes from drifting off.
-            // Scaled by the ideal edge length so it matters at any vault size.
-            for (i in 0 until count) {
-                disp[i][0] += (0.5f - pos[i][0]) * k.toFloat()
-                disp[i][1] += (0.5f - pos[i][1]) * k.toFloat()
-                val len = Math.sqrt((disp[i][0] * disp[i][0] + disp[i][1] * disp[i][1]).toDouble()).toFloat()
-                if (len > 0f) {
-                    val step = minOf(len, temperature)
-                    pos[i][0] = (pos[i][0] + disp[i][0] / len * step).coerceIn(0f, 1f)
-                    pos[i][1] = (pos[i][1] + disp[i][1] / len * step).coerceIn(0f, 1f)
+            edgeIndexPairs.forEach { (a, b) ->
+                if (a in 0 until nodeCount && b in 0 until nodeCount && a != b) {
+                    val delta = pos[a] - pos[b]
+                    val dist = delta.getDistance().coerceAtLeast(0.01f)
+                    val force = dist * dist / k
+                    val pull = delta / dist * force
+                    disp[a] -= pull
+                    disp[b] += pull
                 }
             }
+            for (i in 0 until nodeCount) {
+                disp[i] -= pos[i] * 0.02f
+                val len = disp[i].getDistance().coerceAtLeast(0.01f)
+                val capped = disp[i] / len * minOf(len, temperature)
+                pos[i] = Offset(
+                    (pos[i].x + capped.x).coerceIn(-width / 2f, width / 2f),
+                    (pos[i].y + capped.y).coerceIn(-height / 2f, height / 2f),
+                )
+            }
+            temperature *= 0.95f
         }
-        return pos.map { it[0] to it[1] }
+        return pos.toList()
+    }
+
+    /** Deterministic depth spread per node, inside the shell's z-radius. */
+    fun nodeZ(index: Int): Float = ((index * 53 % 100) / 100f - 0.5f) * 520f
+
+    /**
+     * Pulls every point inside the brain ellipsoid (with margin), so no neuron
+     * can sit outside the shell no matter how many files are added later.
+     * Returns the adjusted positions and depths.
+     */
+    fun confineToBrain(points: List<Offset>, depths: List<Float>): Pair<List<Offset>, List<Float>> {
+        if (points.size != depths.size) return points to depths
+        return points.zip(depths).map { (p, z) ->
+            val e = (p.x / BRAIN_RX) * (p.x / BRAIN_RX) +
+                (p.y / BRAIN_RY) * (p.y / BRAIN_RY) +
+                (z / BRAIN_RZ) * (z / BRAIN_RZ)
+            if (e <= 0.81f) {
+                p to z
+            } else {
+                val s = (0.9f / kotlin.math.sqrt(e))
+                Offset(p.x * s, p.y * s) to (z * s)
+            }
+        }.unzip()
+    }
+
+    /**
+     * The snapshot narrowed to files matching [query] (name, preview, or full
+     * text past the viewer cap for truncated files). The screen runs it off
+     * the main thread; truncated re-reads are bounded like every vault read.
+     */
+    fun filterSnapshot(snapshot: SecondBrainSnapshot, query: String): SecondBrainSnapshot {
+        val q = query.trim().lowercase()
+        if (q.isEmpty()) return snapshot
+        fun match(file: BrainFile): Boolean {
+            if (file.name.lowercase().contains(q)) return true
+            if (file.content.lowercase().contains(q)) return true
+            // Truncated previews stop at the viewer cap: search the full file
+            // before reporting no match.
+            if (!file.truncated) return false
+            val abs = file.absolutePath
+            if (abs.isBlank()) return false
+            return readUpTo(File(abs), LINK_SCAN_CAP_CHARS)?.lowercase()?.contains(q) ?: false
+        }
+        fun matchOpt(file: BrainFile?): BrainFile? = if (file != null && match(file)) file else null
+        return snapshot.copy(
+            soul = matchOpt(snapshot.soul),
+            memoryIndex = matchOpt(snapshot.memoryIndex),
+            userCard = matchOpt(snapshot.userCard),
+            areas = snapshot.areas.filter(::match),
+            people = snapshot.people.filter(::match),
+            notes = snapshot.notes.filter(::match),
+            raw = snapshot.raw.filter(::match),
+        )
     }
 
     companion object {
@@ -754,6 +790,10 @@ class SecondBrainStore(
         const val MEMORY_CAP_CHARS = 1500
         const val VIEWER_FILE_CAP_CHARS = 8000
         const val LINK_SCAN_CAP_CHARS = 200_000
+        /** Brain shell radii in graph units. Layout content is confined inside these. */
+        const val BRAIN_RX = 280f
+        const val BRAIN_RY = 360f
+        const val BRAIN_RZ = 520f
         /** Frontmatter lives at the top; this is plenty to hold it. */
         const val FRONTMATTER_SCAN_CHARS = 4096
 

@@ -81,6 +81,8 @@
 
     <application
         android:name=".MasalaApp"
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -200,6 +202,11 @@
         <!-- Personal Wiki: read, edit, delete, export (Phase 4) -->
         <activity
             android:name=".ui.secondbrain.SecondBrainActivity"
+            android:exported="false" />
+
+        <!-- The user profile (Settings → Profile), saved into the Second Brain -->
+        <activity
+            android:name=".ui.profile.ProfileActivity"
             android:exported="false" />
 
         <!-- A skill's conversation (Phase 4) -->

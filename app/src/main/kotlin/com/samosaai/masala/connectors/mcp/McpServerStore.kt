@@ -109,7 +109,8 @@ class McpServerStore(
         }
         val label = saved.serverName.ifBlank { hostOf(saved.url) }
         val capped = if (probe.tools.size > MAX_TOOLS) " " + strings(R.string.mcp_tools_capped, MAX_TOOLS) else ""
-        return true to strings(R.string.mcp_connected, label, saved.tools.size) + capped
+        val warning = cleartextWarning(url, token, headers, strings)
+        return true to strings(R.string.mcp_connected, label, saved.tools.size) + capped + warning
     }
 
     fun remove(id: String) = synchronized(lock) {
@@ -156,6 +157,7 @@ class McpServerStore(
         McpFailure.NOT_FOUND -> strings(R.string.mcp_error_not_found)
         McpFailure.OLD_TRANSPORT -> strings(R.string.mcp_error_old_transport)
         McpFailure.NOT_MCP -> strings(R.string.mcp_error_not_mcp, e.detail.take(DETAIL_CHARS))
+        McpFailure.REDIRECT -> strings(R.string.mcp_error_redirect, e.detail.take(DETAIL_CHARS))
         McpFailure.HTTP -> strings(R.string.mcp_error_http, e.httpCode, e.detail.take(DETAIL_CHARS))
         McpFailure.RPC -> strings(R.string.mcp_error_rpc, e.detail.take(DETAIL_CHARS))
         McpFailure.NETWORK -> strings(R.string.mcp_error_network, e.detail.take(DETAIL_CHARS))
@@ -163,10 +165,13 @@ class McpServerStore(
 
     private fun problemMessage(problem: McpConfigProblem, strings: McpStrings) = when (problem) {
         McpConfigProblem.BAD_URL -> strings(R.string.mcp_error_bad_url)
-        McpConfigProblem.CLEARTEXT_WITH_SECRET -> strings(R.string.mcp_error_cleartext)
         McpConfigProblem.BAD_HEADER -> strings(R.string.mcp_error_bad_header)
         McpConfigProblem.BAD_TOKEN -> strings(R.string.mcp_error_bad_token)
     }
+
+    /** The cleartext warning appended to a successful connect, or empty. */
+    private fun cleartextWarning(url: String, token: String, headers: Map<String, String>, strings: McpStrings): String =
+        if (isCleartextWithSecret(url, token, headers)) " " + strings(R.string.mcp_error_cleartext) else ""
 
     private fun sessionFor(config: McpServerConfig): McpHttpClient.Session = synchronized(lock) {
         sessions.getOrPut(config.id) { client.session(config.endpoint()) }
