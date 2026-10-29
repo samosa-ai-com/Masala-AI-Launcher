@@ -35,6 +35,7 @@ object ProTools {
     fun register(registry: ToolRegistry, context: Context, extractor: TextExtractor): FileIndex {
         val app = context.applicationContext
         val index = ProFileIndex.get(app).also { it.extractor = extractor }
+        index.refresh()
         registry.fileAccess = ProFileAccess(app, registry.fileAccess)
         val files = ToolFiles { registry.fileAccess }
 
@@ -45,7 +46,8 @@ object ProTools {
         val db = ProDatabase.get(app)
         val search = FileSearchTool(
             hits = { match, folder, limit -> db.fileIndex().hits(match, folder, limit) },
-            indexedFiles = { index.status.files },
+            // Seeing access here for the first time (the user just granted it) starts the first run.
+            indexedFiles = { index.refresh(); index.status.files },
             hasAccess = { Environment.isExternalStorageManager() },
         )
 
