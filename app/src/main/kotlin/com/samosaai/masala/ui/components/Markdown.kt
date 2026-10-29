@@ -3,6 +3,8 @@ package com.samosaai.masala.ui.components
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -38,10 +40,11 @@ import com.samosaai.masala.R
 @Composable
 fun Markdown(markdown: String, modifier: Modifier = Modifier) {
     val segments = remember(markdown) { MarkdownParser.segments(markdown) }
+    val context = LocalContext.current
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         segments.forEach { segment ->
             when (segment) {
-                is MarkdownSegment.Prose -> Material3RichText { RichMarkdown(segment.markdown) }
+                is MarkdownSegment.Prose -> Material3RichText { RichMarkdown(segment.markdown, onLinkClicked = { openLink(context, it) }) }
                 is MarkdownSegment.Code -> CodeBox(segment.code, segment.language)
             }
         }
@@ -67,6 +70,18 @@ fun CodeBox(code: String, language: String?, modifier: Modifier = Modifier) {
                 modifier = Modifier.horizontalScroll(rememberScrollState()).padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
             )
         }
+    }
+}
+
+/**
+ * Opens a link from model output. The default handler throws when no app takes the link (a relative
+ * path, an odd scheme), which would take the launcher down with it.
+ */
+private fun openLink(context: Context, url: String) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    } catch (e: Exception) {
+        Toast.makeText(context, R.string.link_cant_open, Toast.LENGTH_SHORT).show()
     }
 }
 

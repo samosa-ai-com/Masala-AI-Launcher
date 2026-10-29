@@ -50,16 +50,16 @@ object ResultFiles {
 
     private fun uri(context: Context, path: String) = FileProvider.getUriForFile(context, authority(context), File(path))
 
-    fun open(context: Context, path: String) = launch(context, Intent(Intent.ACTION_VIEW).setDataAndType(uri(context, path), mime(File(path))))
+    fun open(context: Context, path: String) = launch(context) { Intent(Intent.ACTION_VIEW).setDataAndType(uri(context, path), mime(File(path))) }
 
-    fun share(context: Context, path: String) {
-        val send = Intent(Intent.ACTION_SEND).setType(mime(File(path))).putExtra(Intent.EXTRA_STREAM, uri(context, path))
-        launch(context, Intent.createChooser(send, null))
+    fun share(context: Context, path: String) = launch(context) {
+        Intent.createChooser(Intent(Intent.ACTION_SEND).setType(mime(File(path))).putExtra(Intent.EXTRA_STREAM, uri(context, path)), null)
     }
 
-    private fun launch(context: Context, intent: Intent) {
+    // The intent is built inside the try: getUriForFile throws for a file outside the FileProvider's folders.
+    private fun launch(context: Context, intent: () -> Intent) {
         try {
-            context.startActivity(intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+            context.startActivity(intent().addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
         } catch (e: Exception) {
             // No app for the type, or a file outside the folders the FileProvider shares.
             Toast.makeText(context, R.string.result_cant_open, Toast.LENGTH_SHORT).show()

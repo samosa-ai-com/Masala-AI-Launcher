@@ -232,6 +232,7 @@
     <string name="message_copied">Copied</string>
     <string name="code_copy">Copy</string>
     <string name="code_copied">Code copied</string>
+    <string name="link_cant_open">Nothing can open that link</string>
     <string name="report_action">Report</string>
     <string name="report_title">Report this answer</string>
     <string name="report_reason_wrong">Wrong or misleading</string>
