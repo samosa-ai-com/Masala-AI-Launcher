@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Environment
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.util.Base64
 import com.samosaai.masala.core.contract.SkillInput
@@ -16,7 +18,47 @@ object SkillInputs {
     private const val MAX_PHOTO_SIDE = 1024
 
     /** Inputs this build can take; the rest are shown disabled with a reason. */
-    val supported = setOf(SkillInput.TEXT, SkillInput.PHOTO, SkillInput.VIDEO, SkillInput.DOCUMENT, SkillInput.AUDIO_FILE)
+    val supported = setOf(
+        SkillInput.TEXT, SkillInput.PHOTO, SkillInput.VIDEO, SkillInput.DOCUMENT, SkillInput.AUDIO_FILE, SkillInput.FOLDER, SkillInput.PATH,
+    )
+
+    private const val STORAGE = "/storage/emulated/0"
+    private const val EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage.documents"
+
+    /** Folder and path inputs hand tools real paths in shared storage, which needs All files access. */
+    fun needsAllFiles(input: SkillInput): Boolean = input == SkillInput.FOLDER && !Environment.isExternalStorageManager()
+
+    /**
+     * The path in shared storage for a document or tree id from the system picker
+     * (`primary:Download/Taxes` → `/storage/emulated/0/Download/Taxes`; the Downloads provider's
+     * `raw:/storage/…`). Null for anything else: SD cards, cloud providers, media ids.
+     */
+    internal fun storagePath(documentId: String): String? = when {
+        documentId.startsWith("raw:/") -> documentId.removePrefix("raw:")
+        documentId == "primary:" -> STORAGE
+        documentId.startsWith("primary:") -> "$STORAGE/" + documentId.removePrefix("primary:").trim('/')
+        else -> null
+    }
+
+    /** A picked folder as its real path, or null when it isn't on this phone's storage. */
+    fun pickedFolder(uri: Uri): Attachment? {
+        if (uri.authority != EXTERNAL_STORAGE_AUTHORITY) return null
+        val path = storagePath(DocumentsContract.getTreeDocumentId(uri)) ?: return null
+        return Attachment(SkillInput.FOLDER, path, File(path).name.ifEmpty { "Storage" })
+    }
+
+    /**
+     * A picked file for a PATH input: with All files access, a file on this phone's storage keeps its
+     * real path, so tools can write results next to it (arch §3.10); otherwise it is copied like any pick.
+     */
+    fun pickedPath(context: Context, uri: Uri, dir: File): Attachment? {
+        val real = if (Environment.isExternalStorageManager() && DocumentsContract.isDocumentUri(context, uri)) {
+            storagePath(DocumentsContract.getDocumentId(uri))?.takeIf { File(it).isFile }
+        } else {
+            null
+        }
+        return real?.let { Attachment(SkillInput.PATH, it, File(it).name) } ?: copyPicked(context, uri, SkillInput.PATH, dir)
+    }
 
     /** Copies a picked [uri] into [dir], so tools get a path inside Masala's storage. */
     fun copyPicked(context: Context, uri: Uri, kind: SkillInput, dir: File): Attachment? = try {

@@ -418,6 +418,7 @@
     <string name="input_record">Record</string>
     <string name="input_later">later</string>
     <string name="input_pick_failed">Couldn’t read that file</string>
+    <string name="input_folder_not_local">Pick a folder on this phone’s storage</string>
     <string name="result_open">Open</string>
     <string name="result_share">Share</string>
     <string name="result_save">Save</string>

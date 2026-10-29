@@ -47,6 +47,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.R
+import com.samosaai.masala.core.tool.ToolFiles
 import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.core.contract.SkillInput
 import com.samosaai.masala.data.LauncherSettings
@@ -164,6 +165,17 @@ class SkillSheetActivity : ComponentActivity() {
         val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia(), picked(SkillInput.VIDEO))
         val pickDocument = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument(), picked(SkillInput.DOCUMENT))
         val pickAudio = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument(), picked(SkillInput.AUDIO_FILE))
+        val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            SkillInputs.pickedFolder(uri)?.let(attachments::add)
+                ?: Toast.makeText(context, R.string.input_folder_not_local, Toast.LENGTH_SHORT).show()
+        }
+        val pickPath = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) scope.launch {
+                val attachment = withContext(Dispatchers.IO) { SkillInputs.pickedPath(context, uri, pickDir) }
+                if (attachment != null) attachments.add(attachment) else Toast.makeText(context, R.string.input_pick_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
         val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
             val result = saving
             saving = null
@@ -250,6 +262,9 @@ class SkillSheetActivity : ComponentActivity() {
                                         SkillInput.VIDEO -> pickVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
                                         SkillInput.DOCUMENT -> pickDocument.launch(arrayOf("*/*"))
                                         SkillInput.AUDIO_FILE -> pickAudio.launch(arrayOf("audio/*"))
+                                        // A folder only means something as a real path: ask for access first.
+                                        SkillInput.FOLDER -> if (SkillInputs.needsAllFiles(input)) grant(ToolFiles.ALL_FILES_ACCESS) else pickFolder.launch(null)
+                                        SkillInput.PATH -> pickPath.launch(arrayOf("*/*"))
                                         else -> Unit
                                     }
                                 },
