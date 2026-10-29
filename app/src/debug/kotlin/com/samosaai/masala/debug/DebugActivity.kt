@@ -54,7 +54,6 @@ import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.llm.LlmConfig
 import com.samosaai.masala.masala
-import com.samosaai.masala.permissions.rememberCapabilityPrompt
 import com.samosaai.masala.tools.Capability
 import com.samosaai.masala.tools.HealthTool
 import com.samosaai.masala.tools.ToolGate
@@ -143,9 +142,7 @@ class DebugActivity : ComponentActivity() {
                 trailingIcon = { TextButton(onClick = { prompt = "" }) { Text(stringResource(R.string.debug_clear)) } },
                 modifier = Modifier.fillMaxWidth().testTag("debug_prompt"),
             )
-            // The executor itself waits for the permission answer, so this screen only has to
-            // provide the prompt; a tool call resumes on its own once the user allows it.
-            rememberCapabilityPrompt(masala.permissionBroker)
+            // The executor waits for the permission answer itself (permissions/PermissionGate).
             fun send() {
                 saveConfig(config)
                 events.clear()

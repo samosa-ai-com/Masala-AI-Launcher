@@ -8,6 +8,7 @@ import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.core.tool.ToolSensitivity
 import kotlinx.coroutines.CancellationException
 import com.samosaai.masala.permissions.CapabilityPrompt
+import com.samosaai.masala.permissions.PermissionGate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -37,7 +38,7 @@ class MasalaToolExecutor(
      * Asks the user for a missing permission and waits for the answer, so a tool never reports
      * "not granted" while the dialog is still on screen. Null in tests and headless callers.
      */
-    private val capabilities: CapabilityPrompt? = null,
+    private val capabilities: CapabilityPrompt = PermissionGate,
 ) {
     private val askLock = Mutex()
     suspend fun execute(name: String, args: JsonObject): ToolResult {
@@ -86,10 +87,9 @@ class MasalaToolExecutor(
 
     /** Asks the UI for [marker] and reports whether the phone now holds it. One ask at a time. */
     private suspend fun askAndVerify(marker: String): Boolean {
-        val prompt = capabilities ?: return false
         return askLock.withLock {
             val answered = try {
-                prompt.request(marker)
+                capabilities.request(marker)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

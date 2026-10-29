@@ -39,7 +39,6 @@ import com.samosaai.masala.ui.drawer.Drawer
 import com.samosaai.masala.ui.drawer.RenameDialog
 import com.samosaai.masala.actions.ActionDispatcher
 import com.samosaai.masala.core.contract.MasalaAction
-import com.samosaai.masala.permissions.rememberCapabilityPrompt
 import com.samosaai.masala.ui.home.ConfirmationSheet
 import com.samosaai.masala.ui.home.HomeScreen
 import com.samosaai.masala.ui.home.RenderContext
@@ -133,8 +132,7 @@ class HomeActivity : ComponentActivity() {
                 override fun ask(prompt: String) = askMasala(prompt)
             }
         }
-        // Tools wait for the permission answer themselves; home only supplies the prompt.
-        rememberCapabilityPrompt(app.permissionBroker)
+        // Tools wait for the permission answer themselves (permissions/PermissionGate).
         fun run(action: MasalaAction) {
             scope.launch {
                 when (val outcome = app.dispatcher.dispatch(action, screen)) {

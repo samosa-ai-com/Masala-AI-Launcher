@@ -177,6 +177,14 @@
             android:label="@string/generate_title"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- Hosts one permission dialog and finishes (permissions/PermissionGate) -->
+        <activity
+            android:name=".permissions.PermissionRequestActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.Masala.Translucent" />
+
         <!-- Generated HTML mini-apps (plan Phase 3, lane D) -->
         <activity
             android:name=".miniapps.MiniAppActivity"

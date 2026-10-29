@@ -16,7 +16,7 @@ import com.samosaai.masala.launcher.LauncherModel
 import com.samosaai.masala.layout.LayoutRepository
 import com.samosaai.masala.layout.ModeStore
 import com.samosaai.masala.miniapps.MiniAppStore
-import com.samosaai.masala.permissions.PermissionBroker
+import com.samosaai.masala.permissions.PermissionGate
 import com.samosaai.masala.core.scheduled.ScheduledTaskStore
 import com.samosaai.masala.pro.ProTools
 import com.samosaai.masala.scheduled.PrefsTaskStorage
@@ -60,12 +60,8 @@ class MasalaApp : Application() {
         }
     }
 
-    /** Which resumed screen answers a permission request (home or the debug screen). */
-    val permissionBroker = PermissionBroker()
-
     /** Runs tools for one caller; [gate] confirms anything that isn't read-only. */
-    fun toolExecutor(gate: ToolGate) =
-        MasalaToolExecutor(this, tools, actionLog, gate, permissionBroker)
+    fun toolExecutor(gate: ToolGate) = MasalaToolExecutor(this, tools, actionLog, gate)
 
     val modes by lazy { ModeStore(this) }
 
@@ -89,6 +85,8 @@ class MasalaApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Tools ask for permissions from background threads; the gate needs a context for that.
+        PermissionGate.context = this
         catalog = AppCatalog(this, scope)
         icons = IconCache(this, catalog)
         actions = AppActions(this, catalog)
