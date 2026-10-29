@@ -6,6 +6,7 @@ import com.samosaai.masala.core.agent.ToolInfo
 import com.samosaai.masala.core.agent.ToolScope
 import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.core.contract.SkillInput
+import com.samosaai.masala.core.tool.Produced
 import com.samosaai.masala.core.tool.ToolDefinition
 import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.core.tool.ToolSensitivity
@@ -53,6 +54,7 @@ class SkillRunnerTest {
         val rows = mutableListOf<SkillArtifactEntity>()
         override suspend fun insert(artifact: SkillArtifactEntity): Long { rows += artifact.copy(id = rows.size + 1L); return rows.size.toLong() }
         override fun forRun(runId: Long): Flow<List<SkillArtifactEntity>> = MutableStateFlow(rows.filter { it.runId == runId })
+        override suspend fun deleteSame(runId: Long, kind: String, ref: String) { rows.removeAll { it.runId == runId && it.kind == kind && it.ref == ref } }
     }
 
     private val infos = listOf(
@@ -121,6 +123,19 @@ class SkillRunnerTest {
         assertTrue(state.events.contains(SkillRunEvent.Result("file", "menu.pdf", "/data/out/menu.pdf")))
         assertEquals(listOf("menu.pdf"), artifacts.rows.map { it.title })
         assertEquals(id, artifacts.rows.single().runId)
+    }
+
+    @Test fun aMiniAppResultIsKeptAndItsUpdateReplacesTheCard() = runBlocking {
+        val app = Produced("mini_app", "Snake", "ab12cd34")
+        val r = runner(reply("", call("1", "web_search")), reply("", call("2", "web_search")), reply("Made it")) {
+            ToolResult.Success("ok", produced = listOf(app))
+        }
+        val id = r.start("chef", user("snake"))!!
+        val state = r.finished(id)
+        assertEquals(listOf(SkillRunEvent.Result("mini_app", "Snake", "ab12cd34")), state.events.filterIsInstance<SkillRunEvent.Result>())
+        assertEquals(1, artifacts.rows.size)
+        // After a restart the card is rebuilt from storage.
+        assertEquals(listOf(SkillRunEvent.Result("mini_app", "Snake", "ab12cd34")), runner().open(id)!!.value.events.filterIsInstance<SkillRunEvent.Result>())
     }
 
     @Test fun failedModelMarksTheRunFailed() = runBlocking {
