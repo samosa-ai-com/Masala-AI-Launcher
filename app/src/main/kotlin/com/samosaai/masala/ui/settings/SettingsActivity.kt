@@ -53,6 +53,7 @@ import com.samosaai.masala.BuildConfig
 import com.samosaai.masala.R
 import com.samosaai.masala.core.apps.AppEntry
 import com.samosaai.masala.core.apps.Visibility
+import com.samosaai.masala.core.scheduled.ScheduledTask
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.data.ThemeMode
 import com.samosaai.masala.launcher.HomeRole
@@ -70,7 +71,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, TASKS }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -93,12 +94,14 @@ class SettingsActivity : ComponentActivity() {
                             onRecording = { page = Page.RECORDING },
                             onMiniApps = { page = Page.MINI_APPS },
                             onSkills = { page = Page.SKILLS },
+                            onTasks = { page = Page.TASKS },
                         )
                         Page.HIDDEN_APPS -> HiddenAppsPage(onBack = { page = Page.MAIN })
                         Page.LAYOUT -> LayoutPage(settings, onBack = { page = Page.MAIN })
                         Page.RECORDING -> RecordingPage(onBack = { page = Page.MAIN })
                         Page.MINI_APPS -> MiniAppsPage(onBack = { page = Page.MAIN })
                         Page.SKILLS -> SkillsPage(onBack = { page = Page.MAIN })
+                        Page.TASKS -> ScheduledTasksPage(onBack = { page = Page.MAIN })
                     }
                 }
             }
@@ -113,6 +116,7 @@ class SettingsActivity : ComponentActivity() {
         onRecording: () -> Unit,
         onMiniApps: () -> Unit,
         onSkills: () -> Unit,
+        onTasks: () -> Unit,
     ) {
         val scope = rememberCoroutineScope()
         val apps by masala.launcher.apps.collectAsStateWithLifecycle()
@@ -192,6 +196,12 @@ class SettingsActivity : ComponentActivity() {
                 title = stringResource(R.string.settings_skills),
                 summary = stringResource(R.string.settings_skills_summary),
                 onClick = onSkills,
+            )
+
+            SettingsNavRow(
+                title = stringResource(R.string.settings_scheduled_tasks),
+                summary = stringResource(R.string.settings_scheduled_tasks_summary),
+                onClick = onTasks,
             )
 
             SettingsSectionTitle(stringResource(R.string.settings_ask))
@@ -447,16 +457,180 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
+    /** Every scheduled task in one place, so runs can be fired, paused or deleted (plan F5). */
+    @Composable
+    private fun ScheduledTasksPage(onBack: () -> Unit) {
+        val scope = rememberCoroutineScope()
+        var tasks by remember { mutableStateOf(listOf<ScheduledTask>()) }
+        val format = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
+        suspend fun sync() {
+            tasks = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { masala.scheduledTasks.all() }
+        }
+        androidx.compose.runtime.LaunchedEffect(Unit) { sync() }
+        fun mutate(block: suspend () -> Unit) {
+            scope.launch {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    block()
+                    com.samosaai.masala.scheduled.ScheduledTaskScheduler.reschedule(this@SettingsActivity)
+                }
+                sync()
+            }
+        }
+        SettingsScaffold(stringResource(R.string.settings_scheduled_tasks), onBack = onBack) {
+            if (tasks.isEmpty()) {
+                Text(stringResource(R.string.scheduled_tasks_empty), style = MaterialTheme.typography.bodyMedium)
+            }
+            tasks.forEach { task ->
+                key(task.id) {
+                    var confirmDelete by remember(task.id) { mutableStateOf(false) }
+                    // Paused tasks still show their scheduled time; a finished one-time task has nothing to pause.
+                    val next = (task.retryAt ?: task.nextRunAt)?.let { format.format(java.util.Date(it)) }
+                    val canPause = task.repeat.kind != com.samosaai.masala.core.scheduled.RepeatKind.NONE || task.nextRunAt != null
+                    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Text(task.name, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            if (!task.enabled) {
+                                next?.let { stringResource(R.string.scheduled_task_paused_next, it) }
+                                    ?: stringResource(R.string.scheduled_task_paused)
+                            } else {
+                                next?.let { stringResource(R.string.scheduled_task_next, it) }
+                                    ?: stringResource(R.string.scheduled_task_done)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        task.history.lastOrNull()?.let { last ->
+                            Text(
+                                stringResource(R.string.scheduled_task_last, last.status.name),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = {
+                                scope.launch {
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        com.samosaai.masala.scheduled.ScheduledTaskRuns(application).runNow(task.id)
+                                    }
+                                    sync()
+                                }
+                            }) { Text(stringResource(R.string.scheduled_task_run_now)) }
+                            TextButton(
+                                enabled = canPause,
+                                onClick = {
+                                    mutate {
+                                        masala.scheduledTasks.update(task.id) {
+                                            com.samosaai.masala.core.scheduled.ScheduledTaskPlanner.toggled(
+                                                it, !it.enabled,
+                                                System.currentTimeMillis(), java.time.ZoneId.systemDefault(),
+                                            )
+                                        }
+                                    }
+                                },
+                            ) {
+                                Text(stringResource(if (task.enabled) R.string.scheduled_task_pause else R.string.scheduled_task_resume))
+                            }
+                            TextButton(onClick = { confirmDelete = true }) { Text(stringResource(R.string.scheduled_task_delete)) }
+                        }
+                    }
+                    HorizontalDivider()
+                    if (confirmDelete) {
+                        AlertDialog(
+                            onDismissRequest = { confirmDelete = false },
+                            title = { Text(stringResource(R.string.scheduled_task_delete_title)) },
+                            text = { Text(stringResource(R.string.scheduled_task_delete_message, task.name)) },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    confirmDelete = false
+                                    mutate { masala.scheduledTasks.delete(task.id) }
+                                }) { Text(stringResource(R.string.scheduled_task_delete)) }
+                            },
+                            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_back)) } },
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     /** Meeting-notes recording (plan Phase 3, Lane D): explicit Start/Stop for the mic service. */
     @Composable
     private fun RecordingPage(onBack: () -> Unit) {
         fun svc() = Intent(this@SettingsActivity, RecordingService::class.java)
-        fun countFiles() = java.io.File(filesDir, "recordings").listFiles()?.size ?: 0
+        fun listFiles() = java.io.File(filesDir, "recordings").listFiles()
+            ?.filter { it.isFile && it.name.startsWith("rec-") && it.name.endsWith(".m4a") }
+            .orEmpty().sortedByDescending { it.lastModified() }
         // Reads the service's own state, so a Stop from the notification or a return to this page
         // shows what is actually happening instead of a remembered tap.
+        val scope = rememberCoroutineScope()
         val running by RecordingService.recording.collectAsStateWithLifecycle()
-        var files by remember { mutableIntStateOf(countFiles()) }
+        var entries by remember { mutableStateOf(listOf<java.io.File>()) }
         var denied by remember { mutableStateOf(false) }
+        var playing by remember { mutableStateOf<String?>(null) }
+        val player = remember { android.media.MediaPlayer() }
+        fun releasePlayer() {
+            player.setOnPreparedListener(null)
+            player.setOnCompletionListener(null)
+            player.setOnErrorListener(null)
+            runCatching { player.stop() }
+            runCatching { player.reset() }
+        }
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            onDispose {
+                releasePlayer()
+                player.release()
+            }
+        }
+        fun refresh() {
+            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val fresh = listFiles()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    entries = fresh
+                    if (playing != null && fresh.none { it.absolutePath == playing }) playing = null
+                }
+            }
+        }
+        androidx.compose.runtime.LaunchedEffect(Unit) { refresh() }
+        val dateFormat = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
+        @Composable
+        fun sizeText(bytes: Long) = if (bytes < 1024 * 1024) {
+            stringResource(R.string.recording_size_kb, bytes / 1024)
+        } else {
+            stringResource(R.string.recording_size_mb, bytes / (1024 * 1024))
+        }
+        fun togglePlay(file: java.io.File) {
+            if (playing == file.absolutePath) {
+                releasePlayer()
+                playing = null
+                return
+            }
+            // Async prepare keeps the tap responsive; errors and the natural end both release the row.
+            // Listeners are cleared on every stop so a late callback can never start a dead player.
+            val ok = runCatching {
+                player.reset()
+                player.setDataSource(file.absolutePath)
+                player.setOnPreparedListener { runCatching { it.start() } }
+                player.setOnCompletionListener { playing = null }
+                player.setOnErrorListener { _, _, _ ->
+                    playing = null
+                    runCatching { player.reset() }
+                    player.setOnPreparedListener(null)
+                    true
+                }
+                player.prepareAsync()
+            }.isSuccess
+            if (ok) {
+                playing = file.absolutePath
+            } else {
+                releasePlayer()
+                playing = null
+                android.widget.Toast.makeText(
+                    this@SettingsActivity,
+                    getString(R.string.recording_play_failed),
+                    android.widget.Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
         val askMic = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
                 ContextCompat.startForegroundService(this@SettingsActivity, svc())
@@ -480,7 +654,7 @@ class SettingsActivity : ComponentActivity() {
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
-                    stringResource(R.string.recording_files, files),
+                    stringResource(R.string.recording_files, entries.size),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -497,9 +671,57 @@ class SettingsActivity : ComponentActivity() {
                         enabled = running,
                         onClick = {
                             stopService(svc())
-                            files = countFiles()
+                            refresh()
                         },
                     ) { Text(stringResource(R.string.recording_stop)) }
+                }
+                if (entries.isEmpty()) {
+                    Text(stringResource(R.string.recording_empty), style = MaterialTheme.typography.bodyMedium)
+                }
+                entries.forEach { file ->
+                    key(file.absolutePath) {
+                        var confirmDelete by remember(file.absolutePath) { mutableStateOf(false) }
+                        val isPlaying = playing == file.absolutePath
+                        Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Text(
+                                dateFormat.format(java.util.Date(file.lastModified())),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Text(
+                                sizeText(file.length()),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { togglePlay(file) }) {
+                                    Text(stringResource(if (isPlaying) R.string.recording_stop_play else R.string.recording_play))
+                                }
+                                TextButton(onClick = { confirmDelete = true }) { Text(stringResource(R.string.skills_delete)) }
+                            }
+                        }
+                        HorizontalDivider()
+                        if (confirmDelete) {
+                            AlertDialog(
+                                onDismissRequest = { confirmDelete = false },
+                                title = { Text(stringResource(R.string.recording_delete_title)) },
+                                text = { Text(stringResource(R.string.recording_delete_message, dateFormat.format(java.util.Date(file.lastModified())))) },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        confirmDelete = false
+                                        if (isPlaying) {
+                                            releasePlayer()
+                                            playing = null
+                                        }
+                                        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                            file.delete()
+                                            refresh()
+                                        }
+                                    }) { Text(stringResource(R.string.recording_delete)) }
+                                },
+                                dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_back)) } },
+                            )
+                        }
+                    }
                 }
             }
         }
