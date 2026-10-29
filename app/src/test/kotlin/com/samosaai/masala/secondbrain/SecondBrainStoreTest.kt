@@ -92,6 +92,17 @@ class SecondBrainStoreTest {
         assertTrue(health.invalid.any { it.fileId == "notes/empty.md" })
     }
 
+    @Test fun syncUserMergesWithoutClobbering() {
+        store.syncUser(mapOf("name" to "R", "location" to "Home"))
+        File(dir, "user.md").appendText("- nickname: Roo\n")
+        store.syncUser(mapOf("name" to "", "location" to "Home", "occupation" to "Dev", "background" to ""))
+        val text = File(dir, "user.md").readText()
+        assertTrue(text.contains("- location: Home"))
+        assertTrue(text.contains("- occupation: Dev"))
+        assertTrue(text.contains("- nickname: Roo"))
+        assertTrue(!text.contains("- name:"))
+    }
+
     @Test fun seedsCreateTheWholeTree() {
         listOf("SOUL.md", "MEMORY.md", "user.md").forEach { assertTrue(File(dir, it).exists()) }
         listOf("areas", "people", "notes", "raw").forEach { assertTrue(File(dir, it).isDirectory) }

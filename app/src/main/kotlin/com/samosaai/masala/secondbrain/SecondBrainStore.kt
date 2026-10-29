@@ -35,10 +35,15 @@ class SecondBrainStore(
         }
     }
 
-    /** Rewrites user.md from profile fields (name, location, occupation, background). */
+    /** Rewrites user.md, merging the incoming profile fields over the existing bullets. */
     fun syncUser(fields: Map<String, String>) {
         synchronized(lock) {
-            val clean = fields.mapValues { it.value.trim() }.filterValues { it.isNotEmpty() }
+            val current = userFile().takeIf { it.exists() }?.let { readBullets(it) }.orEmpty()
+            val merged = current.toMutableMap()
+            KNOWN_PROFILE_KEYS.forEach { key ->
+                val v = fields[key]?.trim().orEmpty()
+                if (v.isEmpty()) merged.remove(key) else merged[key] = v
+            }
             userFile().writeText(buildString {
                 appendLine("---")
                 appendLine("title: User")
@@ -51,10 +56,32 @@ class SecondBrainStore(
                 appendLine()
                 appendLine("Synced from settings. Do not duplicate into notes.")
                 appendLine()
-                for ((key, value) in clean) appendLine("- $key: $value")
-                if (clean.isEmpty()) appendLine("- (nothing filled in yet)")
+                if (merged.isEmpty()) {
+                    appendLine("- (nothing filled in yet)")
+                } else {
+                    for ((key, value) in merged) appendLine("- $key: $value")
+                }
             })
         }
+    }
+
+    private fun readBullets(file: File): Map<String, String> = runCatching {
+        bodyAfterFrontmatter(file.readText()).lines().mapNotNull { line ->
+            val t = line.trim()
+            if (!t.startsWith("- ")) return@mapNotNull null
+            val kv = t.removePrefix("- ").split(":", limit = 2)
+            if (kv.size != 2 || kv[0].isBlank() || kv[1].isBlank() || kv[1].trim().startsWith("(")) return@mapNotNull null
+            kv[0].trim() to kv[1].trim()
+        }.toMap()
+    }.getOrDefault(emptyMap())
+
+    private fun bodyAfterFrontmatter(content: String): String {
+        val lines = content.lines()
+        if (lines.isNotEmpty() && lines[0].trim() == "---") {
+            val end = lines.drop(1).indexOfFirst { it.trim() == "---" }
+            if (end >= 0) return lines.drop(2 + end).joinToString("\n")
+        }
+        return content
     }
 
     /**
@@ -279,6 +306,17 @@ class SecondBrainStore(
 
     /** Vault-relative id ("notes/foo.md") for display and tool arguments. */
     fun relativeId(file: BrainFile): String = relativeMemoryId(file, file.name)
+
+    /** Text previewable in the viewer: known text formats, or extensionless non-binary content. */
+    fun isTextFile(name: String, content: String): Boolean {
+        val ext = name.substringAfterLast('.', "").lowercase()
+        if (ext in TEXT_EXTENSIONS) return true
+        if ('.' in name) return false
+        return content.isNotBlank() && content.none { it == '\u0000' }
+    }
+
+    /** Whether the screen offers Edit/Delete for a vault id (detail dirs only, never roots). */
+    fun isEditable(id: String): Boolean = id.substringBefore('/') in setOf("areas", "people", "notes")
 
     /** Rewrites one detail record, keeping its frontmatter (title and date refreshed). */
     fun writeEntry(id: String, title: String, markdown: String): File? = synchronized(lock) {
@@ -650,6 +688,9 @@ class SecondBrainStore(
         )
         val RECORD_TYPES = setOf("person", "note", "meeting", "decision", "reference", "area", "contact-card")
         val STARTER_AREAS = setOf("People", "Work", "Personal", "Health")
+
+        /** Profile fields the editor writes; anything else in user.md is left alone. */
+        val KNOWN_PROFILE_KEYS = setOf("name", "location", "occupation", "background")
 
         /** Which record types live in which directory. */
         val DIR_TYPES = mapOf(

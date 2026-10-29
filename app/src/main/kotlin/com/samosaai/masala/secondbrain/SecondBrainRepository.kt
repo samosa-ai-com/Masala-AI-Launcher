@@ -147,9 +147,45 @@ class SecondBrainRepository(
         refreshSnapshot().details().joinToString("\n\n") { "# ${titleOf(it)}\n\n${bodyOf(it.content)}" }
     }
 
+    /** A fresh snapshot, for the screen and health checks. Never moves the tick. */
+    suspend fun snapshot(): SecondBrainSnapshot = withContext(Dispatchers.IO) {
+        store.loadSnapshot().also { cached = it }
+    }
+
+    /** Vault health (unlinked, dangling, schema, unscanned; task links once tasks carry note refs). Never moves the tick. */
+    suspend fun health(taskLinks: List<TaskLink> = emptyList()): BrainHealth = withContext(Dispatchers.IO) {
+        val snapshot = store.loadSnapshot().also { cached = it }
+        store.checkHealth(snapshot, taskLinks)
+    }
+
+    /** Rewrites user.md from profile fields, then refreshes. */
+    suspend fun syncUser(fields: Map<String, String>) {
+        withContext(Dispatchers.IO) { store.syncUser(fields) }
+        refresh()
+    }
+
+    /** Text previewable in the viewer. */
+    fun isText(file: BrainFile): Boolean = store.isTextFile(file.name, file.content)
+
+    /** Whether the screen offers Edit/Delete for a vault id. */
+    fun isEditable(id: String): Boolean = store.isEditable(id)
+
     /** The first body line, for list previews (frontmatter skipped). */
     fun previewOf(file: BrainFile): String =
         bodyOf(file).lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
+
+    /** Profile fields from user.md bullets (`- name: …`), for the editor. */
+    suspend fun profile(): Map<String, String> = withContext(Dispatchers.IO) {
+        val card = refreshSnapshot().userCard?.content ?: return@withContext emptyMap()
+        card.lines().mapNotNull { line ->
+            val t = line.trim()
+            if (!t.startsWith("- ")) return@mapNotNull null
+            val kv = t.removePrefix("- ").split(":", limit = 2)
+            if (kv.size != 2) return@mapNotNull null
+            val v = kv[1].trim()
+            if (kv[0].isBlank() || v.isEmpty() || v.startsWith("(")) null else kv[0].trim() to v
+        }.toMap()
+    }
 
     /** The editable body (frontmatter stripped). */
     fun bodyOf(file: BrainFile): String = bodyOf(file.content)
