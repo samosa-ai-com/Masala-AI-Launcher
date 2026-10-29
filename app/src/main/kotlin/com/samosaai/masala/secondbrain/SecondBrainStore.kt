@@ -277,6 +277,64 @@ class SecondBrainStore(
     private fun readFrontmatter(file: File): Map<String, String>? =
         readUpTo(file, FRONTMATTER_SCAN_CHARS)?.let { frontmatterOf(it) }
 
+    /** Vault-relative id ("notes/foo.md") for display and tool arguments. */
+    fun relativeId(file: BrainFile): String = relativeMemoryId(file, file.name)
+
+    /** Rewrites one detail record, keeping its frontmatter (title and date refreshed). */
+    fun writeEntry(id: String, title: String, markdown: String): File? = synchronized(lock) {
+        val file = vaultFile(id) ?: return null
+        if (!file.isFile || file.extension.lowercase() !in MARKDOWN_EXTENSIONS) return null
+        if (file.parentFile?.name !in setOf("areas", "people", "notes")) return null
+        val front = readFrontmatter(file)?.toMutableMap() ?: mutableMapOf()
+        front["title"] = title.trim()
+        front["updated"] = today()
+        if (front["area"].isNullOrBlank()) front["area"] = "Personal"
+        if (front["type"].isNullOrBlank()) front["type"] = "note"
+        file.writeText(renderRecord(front, markdown.trim()))
+        file
+    }
+
+    /** Deletes one vault file. Root files (SOUL.md, MEMORY.md, user.md) are refused. */
+    fun deleteEntry(id: String): Boolean = synchronized(lock) {
+        val file = vaultFile(id) ?: return false
+        if (!file.isFile) return false
+        if (file.parentFile == root && file.name in setOf("SOUL.md", "MEMORY.md", "user.md")) return false
+        file.delete()
+    }
+
+    /** The Second Brain prompt block: capped SOUL.md + MEMORY.md plus entry titles. */
+    fun buildPrompt(snapshot: SecondBrainSnapshot): SecondBrainPrompt {
+        // Snapshot contents are already capped for display; the prompt takes the head of those.
+        fun head(content: String?, cap: Int): Pair<String?, Boolean> {
+            val trimmed = content?.trim()
+            if (trimmed.isNullOrEmpty()) return null to false
+            return if (trimmed.length <= cap) trimmed to false else trimmed.take(cap) to true
+        }
+        val (soul, soulTruncated) = head(snapshot.soul?.content, SOUL_CAP_CHARS)
+        val (memory, memoryTruncated) = head(snapshot.memoryIndex?.content, MEMORY_CAP_CHARS)
+        val titles = (snapshot.areas + snapshot.people + snapshot.notes).map { file ->
+            frontmatterOf(file.content)?.get("title")?.takeIf { it.isNotBlank() }
+                ?: file.name.removeSuffix(".md").removeSuffix(".markdown")
+        }
+        return SecondBrainPrompt(
+            soul = soul,
+            memory = memory,
+            soulTruncated = soulTruncated,
+            memoryTruncated = memoryTruncated,
+            titles = titles,
+        )
+    }
+
+    /** Resolves a vault-relative id to a file, refusing escapes from the vault. */
+    private fun vaultFile(id: String): File? {
+        if (id.isBlank() || ".." in id) return null
+        val file = File(root, id)
+        val canonical = runCatching { file.canonicalPath }.getOrNull() ?: return null
+        val rootPath = runCatching { root.canonicalPath }.getOrNull() ?: return null
+        if (canonical != rootPath && !canonical.startsWith(rootPath.trimEnd('/') + '/')) return null
+        return File(canonical)
+    }
+
     private fun existingByTitle(title: String): File? {
         // User content only: seeded area hubs must never be overwritten by an upsert.
         for (dirKind in listOf("notes", "people")) {

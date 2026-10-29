@@ -22,12 +22,12 @@ import com.samosaai.masala.R
 import kotlinx.coroutines.launch
 
 /**
- * What the model wants to remember, with Approve and Dismiss (arch §3.5: writes go through an approval
- * chip). Shown on the reply card, in the skill sheet and in the wiki screen.
+ * What the model wants to remember, with Approve and Dismiss. Shown on the reply card,
+ * in the skill sheet and in the Second Brain screen.
  */
 @Composable
 fun ProposalCards(app: MasalaApp, modifier: Modifier = Modifier) {
-    val proposals by app.wiki.proposals.collectAsStateWithLifecycle()
+    val proposals by app.secondBrain.proposals.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         proposals.forEach { p ->
@@ -37,8 +37,8 @@ fun ProposalCards(app: MasalaApp, modifier: Modifier = Modifier) {
                     Text(p.markdown, style = MaterialTheme.typography.bodyMedium, maxLines = 4)
                     if (p.reason.isNotBlank()) Text(p.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
                     Row {
-                        TextButton(onClick = { scope.launch { app.wiki.approve(p.id) } }) { Text(stringResource(R.string.wiki_approve)) }
-                        TextButton(onClick = { app.wiki.dismiss(p.id) }) { Text(stringResource(R.string.wiki_dismiss)) }
+                        TextButton(onClick = { scope.launch { app.secondBrain.approve(p.id) } }) { Text(stringResource(R.string.wiki_approve)) }
+                        TextButton(onClick = { app.secondBrain.dismiss(p.id) }) { Text(stringResource(R.string.wiki_dismiss)) }
                     }
                 }
             }

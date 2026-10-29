@@ -20,11 +20,12 @@ import com.samosaai.masala.agent.AgentPrompt
 import com.samosaai.masala.agent.AgentTools
 import com.samosaai.masala.agent.LlmAgentModel
 import com.samosaai.masala.agent.MasalaAgent
-import com.samosaai.masala.agent.WikiTools
+import com.samosaai.masala.agent.MemoryTools
 import com.samosaai.masala.connectors.mcp.McpServerStore
 import com.samosaai.masala.connectors.mcp.PrefsMcpStorage
 import com.samosaai.masala.core.tool.ToolResult
-import com.samosaai.masala.wiki.WikiRepository
+import com.samosaai.masala.secondbrain.SecondBrainRepository
+import com.samosaai.masala.secondbrain.SecondBrainStore
 import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.core.tool.ActionResult
 import com.samosaai.masala.llm.LlmConfig
@@ -111,7 +112,7 @@ class MasalaApp : Application() {
             scope = scope(infos),
             systemPrompt = {
                 val now = java.text.SimpleDateFormat("EEEE d MMMM yyyy, HH:mm", java.util.Locale.US).format(java.util.Date())
-                AgentPrompt.build("$now (${java.util.TimeZone.getDefault().id})", skills.getAllSkills(), wiki.titles.value, instructions)
+                AgentPrompt.build("$now (${java.util.TimeZone.getDefault().id})", skills.getAllSkills(), secondBrain.promptNow(), instructions)
             },
             maxSteps = maxSteps,
         )
@@ -130,11 +131,16 @@ class MasalaApp : Application() {
     /** Skill widgets and their default schedules. */
     val skillScheduling by lazy { SkillScheduling(scheduledTasks, PrefsDeclinedSchedules(this)) }
 
-    /** The Personal Wiki; approved writes are recorded in the action log. */
-    val wiki by lazy {
-        WikiRepository(scope, database.wikiPages(), audit = { action, detail ->
-            actionLog.record(action, detail, ToolResult.Success("The user approved the page"))
-        })
+    /** The Second Brain; approved writes are recorded in the action log. */
+    val secondBrain by lazy {
+        SecondBrainRepository(
+            scope,
+            SecondBrainStore(java.io.File(filesDir, "secondbrain")),
+            database.wikiPages(),
+            audit = { action, detail ->
+                actionLog.record(action, detail, ToolResult.Success("The user approved the entry"))
+            },
+        ).also { repo -> scope.launch(Dispatchers.IO) { repo.ensure() } }
     }
 
     private val stt by lazy {
@@ -261,7 +267,7 @@ class MasalaApp : Application() {
             toolNames = { tools.tools.map { it.name }.toSet() },
         )
         AgentTools.create(this, layouts, modes, runSkill = ::openSkillSheet).forEach(tools::register)
-        WikiTools.create(wiki).forEach(tools::register)
+        MemoryTools.create(secondBrain).forEach(tools::register)
         mcp.servers
         dispatcher = ActionDispatcher(this, actions, launcher, modes, confirmationGate, tools, { skills }) { toolExecutor(confirmationGate) }
 

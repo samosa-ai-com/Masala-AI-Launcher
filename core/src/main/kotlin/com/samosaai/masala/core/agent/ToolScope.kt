@@ -18,8 +18,8 @@ class ToolScope private constructor(val names: Set<String>) {
     fun allows(name: String) = name in names
 
     companion object {
-        /** Wiki lookups are allowed in every skill run: they are how a persona knows the user. */
-        const val WIKI_READ = "wiki_read"
+        /** Memory lookups are allowed in every skill run: they are how a persona knows the user. */
+        const val MEMORY_READ = "memory_read"
 
         /** A typed or spoken command: every tool there is. */
         fun command(all: List<ToolInfo>) = ToolScope(all.mapTo(HashSet()) { it.name })
@@ -30,9 +30,9 @@ class ToolScope private constructor(val names: Set<String>) {
          */
         fun skill(skill: MasalaSkill, all: List<ToolInfo>): ToolScope {
             val basics = all.filter { it.sensitivity == ToolSensitivity.READ_ONLY && !it.readsPrivateData }.map { it.name }
-            val wiki = all.filter { it.name == WIKI_READ }.map { it.name }
+            val memory = all.filter { it.name == MEMORY_READ }.map { it.name }
             val required = skill.requiresTools.filter { name -> all.any { it.name == name } }
-            return ToolScope((basics + wiki + required).toSet())
+            return ToolScope((basics + memory + required).toSet())
         }
 
         /** A run nobody is watching: nothing that would need a confirmation. */

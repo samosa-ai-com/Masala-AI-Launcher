@@ -36,15 +36,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.R
 import com.samosaai.masala.data.LauncherSettings
-import com.samosaai.masala.data.WikiPageEntity
 import com.samosaai.masala.masala
 import com.samosaai.masala.ui.settings.SettingsScaffold
 import com.samosaai.masala.ui.theme.MasalaTheme
 import kotlinx.coroutines.launch
 
 /**
- * The Personal Wiki screen (arch §3.5): every page can be read, edited and deleted, what the model has
- * proposed waits here for approval, and all pages export as one Markdown file.
+ * The Second Brain screen: every entry can be read, edited and deleted, what the model has
+ * proposed waits here for approval, and all entries export as one Markdown file.
  */
 class WikiActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,45 +59,50 @@ class WikiActivity : ComponentActivity() {
     private fun WikiScreen() {
         val app = masala
         val scope = rememberCoroutineScope()
-        val pages by app.wiki.pages.collectAsStateWithLifecycle(emptyList())
-        // Null: the list. A page with a blank id is a new one.
-        var editing by remember { mutableStateOf<WikiPageEntity?>(null) }
+        val pages by app.secondBrain.pages.collectAsStateWithLifecycle(emptyList())
+        // Null: the list. A blank id is a new entry.
+        var editing by remember { mutableStateOf<Editing?>(null) }
         val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/markdown")) { uri ->
             if (uri != null) scope.launch {
-                val text = app.wiki.exportMarkdown()
+                val text = app.secondBrain.exportMarkdown()
                 val ok = runCatching { contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) } != null }.getOrDefault(false)
                 Toast.makeText(this@WikiActivity, if (ok) R.string.wiki_exported else R.string.settings_export_failed, Toast.LENGTH_SHORT).show()
             }
         }
 
         BackHandler(enabled = editing != null) { editing = null }
-        val page = editing
-        if (page != null) {
-            EditPage(page, onSave = { title, body ->
+        val entry = editing
+        if (entry != null) {
+            EditPage(entry, onSave = { title, body ->
                 scope.launch {
-                    app.wiki.save(page.id, title, body, page.source.takeIf { page.id.isNotBlank() } ?: "user")
+                    app.secondBrain.save(entry.id.ifBlank { null }, title, body)
                     editing = null
                 }
-            }, onDelete = { scope.launch { app.wiki.delete(page.id); editing = null } }, onBack = { editing = null })
+            }, onDelete = { scope.launch { app.secondBrain.delete(entry.id); editing = null } }, onBack = { editing = null })
             return
         }
 
         SettingsScaffold(stringResource(R.string.wiki_title), onBack = { finish() }) {
             ProposalCards(app)
             Row2 {
-                Button(onClick = { editing = WikiPageEntity("", "", "", "user", 0) }) { Text(stringResource(R.string.wiki_new)) }
-                OutlinedButton(enabled = pages.isNotEmpty(), onClick = { export.launch("masala-wiki.md") }) { Text(stringResource(R.string.wiki_export)) }
+                Button(onClick = { editing = Editing("", "", "") }) { Text(stringResource(R.string.wiki_new)) }
+                OutlinedButton(enabled = pages.isNotEmpty(), onClick = { export.launch("masala-secondbrain.md") }) { Text(stringResource(R.string.wiki_export)) }
             }
             if (pages.isEmpty()) Text(stringResource(R.string.wiki_empty), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 16.dp))
-            // The scaffold's content already scrolls, and a wiki is a handful of short pages.
+            // The scaffold's content already scrolls, and a brain is a handful of short entries.
             pages.forEach { p ->
-                Column(Modifier.fillMaxWidth().clickable { editing = p }.padding(vertical = 10.dp)) {
-                    Text(p.title, style = MaterialTheme.typography.titleMedium)
-                    Text(p.markdown.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val id = app.secondBrain.idOf(p)
+                val title = app.secondBrain.titleOf(p)
+                Column(Modifier.fillMaxWidth().clickable { editing = Editing(id, title, app.secondBrain.bodyOf(p)) }.padding(vertical = 10.dp)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    Text(app.secondBrain.previewOf(p), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
     }
+
+    /** An entry being edited: the vault-relative id, or blank for a new entry. */
+    private data class Editing(val id: String, val title: String, val body: String)
 
     @Composable
     private fun Row2(content: @Composable () -> Unit) {
@@ -106,22 +110,22 @@ class WikiActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun EditPage(page: WikiPageEntity, onSave: (String, String) -> Unit, onDelete: () -> Unit, onBack: () -> Unit) {
-        var title by rememberSaveable(page.id) { mutableStateOf(page.title) }
-        var body by rememberSaveable(page.id) { mutableStateOf(page.markdown) }
+    private fun EditPage(entry: Editing, onSave: (String, String) -> Unit, onDelete: () -> Unit, onBack: () -> Unit) {
+        var title by rememberSaveable(entry.id) { mutableStateOf(entry.title) }
+        var body by rememberSaveable(entry.id) { mutableStateOf(entry.body) }
         var confirmDelete by remember { mutableStateOf(false) }
-        SettingsScaffold(stringResource(if (page.id.isBlank()) R.string.wiki_new else R.string.wiki_edit), onBack = onBack) {
+        SettingsScaffold(stringResource(if (entry.id.isBlank()) R.string.wiki_new else R.string.wiki_edit), onBack = onBack) {
             OutlinedTextField(title, { title = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.wiki_page_title)) }, singleLine = true)
             OutlinedTextField(body, { body = it }, Modifier.fillMaxWidth().padding(top = 8.dp), label = { Text(stringResource(R.string.wiki_page_text)) }, minLines = 6)
             androidx.compose.foundation.layout.Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(enabled = title.isNotBlank() && body.isNotBlank(), onClick = { onSave(title, body) }) { Text(stringResource(R.string.wiki_save)) }
-                if (page.id.isNotBlank()) TextButton(onClick = { confirmDelete = true }) { Text(stringResource(R.string.wiki_delete)) }
+                if (entry.id.isNotBlank()) TextButton(onClick = { confirmDelete = true }) { Text(stringResource(R.string.wiki_delete)) }
             }
         }
         if (confirmDelete) {
             AlertDialog(
                 onDismissRequest = { confirmDelete = false },
-                title = { Text(stringResource(R.string.wiki_delete_title, page.title)) },
+                title = { Text(stringResource(R.string.wiki_delete_title, entry.title)) },
                 text = { Text(stringResource(R.string.wiki_delete_body)) },
                 confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete() }) { Text(stringResource(R.string.wiki_delete)) } },
                 dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) } },

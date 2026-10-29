@@ -13,7 +13,7 @@ class ToolScopeTest {
     private val all = listOf(
         ToolInfo("web_search", ToolSensitivity.READ_ONLY),
         ToolInfo("read_notifications", ToolSensitivity.READ_ONLY, readsPrivateData = true),
-        ToolInfo("wiki_read", ToolSensitivity.READ_ONLY, readsPrivateData = true),
+        ToolInfo("memory_read", ToolSensitivity.READ_ONLY, readsPrivateData = true),
         ToolInfo("set_alarm", ToolSensitivity.CHANGES_SOMETHING),
         ToolInfo("delete_file", ToolSensitivity.DESTRUCTIVE),
         ToolInfo("create_mini_app", ToolSensitivity.CHANGES_SOMETHING),
@@ -25,9 +25,9 @@ class ToolScopeTest {
         assertTrue(all.all { scope.allows(it.name) })
     }
 
-    @Test fun skillGetsBasicsWikiAndRequiredOnly() {
+    @Test fun skillGetsBasicsMemoryAndRequiredOnly() {
         val scope = ToolScope.skill(skill("create_mini_app"), all)
-        assertEquals(setOf("web_search", "wiki_read", "create_mini_app"), scope.names)
+        assertEquals(setOf("web_search", "memory_read", "create_mini_app"), scope.names)
     }
 
     @Test fun skillNeverGainsAChangingToolItDidNotRequire() {
@@ -43,7 +43,7 @@ class ToolScopeTest {
 
     @Test fun unattendedKeepsReadOnlyOnly() {
         val scope = ToolScope.unattended(ToolScope.skill(skill("set_alarm"), all), all)
-        assertEquals(setOf("web_search", "wiki_read"), scope.names)
+        assertEquals(setOf("web_search", "memory_read"), scope.names)
     }
 }
 
