@@ -31,9 +31,8 @@ object SkillScheduleParser {
             }
             "weekly" -> if (parts.size != 3) null else {
                 val wanted = parts[1].split(',').map { d -> days.indexOf(d.take(3)).takeIf { it >= 0 } ?: return null }.map { it + 1 }.distinct().sorted()
-                var date = now.toLocalDate()
                 // A week and a day always reach a listed weekday whose time is still ahead.
-                val start = generateSequence(date) { it.plusDays(1) }.take(8).map { it.atTime(at) }
+                val start = generateSequence(now.toLocalDate()) { it.plusDays(1) }.take(8).map { it.atTime(at) }
                     .first { it.dayOfWeek.value in wanted && it.isAfter(now) }
                 val names = wanted.joinToString(", ") { DayOfWeek.of(it).getDisplayName(TextStyle.FULL, Locale.ENGLISH) }
                 SkillSchedule(start.toString(), Repeat(RepeatKind.WEEKLY, weekdays = wanted), at, "every $names at $label")

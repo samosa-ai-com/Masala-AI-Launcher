@@ -147,6 +147,12 @@ class SettingsActivity : ComponentActivity() {
             SettingsToggleRow(stringResource(R.string.settings_read_replies), settings.readRepliesAloud) { on ->
                 update { it.copy(readRepliesAloud = on) }
             }
+            SettingsNavRow(stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) {
+                startActivity(Intent(this@SettingsActivity, WikiActivity::class.java))
+            }
+            SettingsNavRow(stringResource(R.string.mcp_title), stringResource(R.string.mcp_summary)) {
+                startActivity(Intent(this@SettingsActivity, McpActivity::class.java))
+            }
 
             SettingsSectionTitle(stringResource(R.string.settings_drawer))
             SettingsToggleRow(stringResource(R.string.settings_auto_launch), settings.autoLaunch) { on ->
@@ -161,13 +167,6 @@ class SettingsActivity : ComponentActivity() {
                 ),
                 onClick = onHiddenApps,
             )
-
-            SettingsNavRow(stringResource(R.string.mcp_title), stringResource(R.string.mcp_summary)) {
-                startActivity(Intent(this@SettingsActivity, McpActivity::class.java))
-            }
-            SettingsNavRow(stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) {
-                startActivity(Intent(this@SettingsActivity, WikiActivity::class.java))
-            }
 
             if (BuildConfig.DEBUG) {
                 // The debug screen lives in the debug source set, so it's started by name.
