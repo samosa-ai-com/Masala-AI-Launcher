@@ -6,7 +6,11 @@ import android.content.pm.ShortcutInfo
 import android.graphics.drawable.Drawable
 import android.util.LruCache
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -42,7 +46,8 @@ class IconCache(context: Context, private val catalog: AppCatalog) {
 
     private suspend fun load(id: String, drawable: () -> Drawable?): ImageBitmap? =
         cache.get(id) ?: withContext(Dispatchers.IO) {
-            runCatching { drawable()?.toBitmap(sizePx, sizePx)?.asImageBitmap() }.getOrNull()
+            // prepareToDraw starts the texture upload now, not on the first frame that shows the icon.
+            runCatching { drawable()?.toBitmap(sizePx, sizePx)?.also { it.prepareToDraw() }?.asImageBitmap() }.getOrNull()
         }?.also { cache.put(id, it) }
 
     companion object {
@@ -54,7 +59,9 @@ class IconCache(context: Context, private val catalog: AppCatalog) {
 
 @Composable
 fun rememberAppIcon(icons: IconCache, key: AppKey): ImageBitmap? {
-    val icon by produceState(icons.cached(key.id), key) { value = icons.app(key) }
+    // A cached icon needs no coroutine: rows scrolling into view only start one for a missing icon.
+    var icon by remember(key) { mutableStateOf(icons.cached(key.id)) }
+    if (icon == null) LaunchedEffect(key) { icon = icons.app(key) }
     return icon
 }
 

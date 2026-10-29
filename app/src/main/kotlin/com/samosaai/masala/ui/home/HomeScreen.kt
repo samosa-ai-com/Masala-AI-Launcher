@@ -6,8 +6,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.util.VelocityTracker1D
-import android.os.SystemClock
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -113,7 +113,8 @@ fun HomeScreen(
             // Live drawer tracking: net travel since the gesture started, and whether the drawer took it.
             var net = 0f
             var following = false
-            val velocity = VelocityTracker1D(isDataDifferential = true)
+            // Fed from the pointer events (their own timestamps) by the lift observer below.
+            val velocity = VelocityTracker()
 
             val connection = object : NestedScrollConnection {
                 override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
@@ -132,10 +133,8 @@ fun HomeScreen(
                     handled = false
                     net = 0f
                     following = false
-                    velocity.resetTracking()
                 }
                 net += dy
-                velocity.addDataPoint(SystemClock.uptimeMillis(), dy)
                 val drawer = latestDrawer
                 // Upward travel past the slop hands the gesture to the drawer, which then follows
                 // the finger both ways until lift.
@@ -159,7 +158,8 @@ fun HomeScreen(
                 handled = true
                 if (following) {
                     following = false
-                    latestDrawer?.onRelease(runCatching { velocity.calculateVelocity() }.getOrDefault(0f))
+                    val vy = runCatching { velocity.calculateVelocity().y }.getOrDefault(0f)
+                    latestDrawer?.onRelease(if (vy.isFinite()) vy else 0f)
                     peakUp = 0f
                     peakDown = 0f
                     return
@@ -205,10 +205,13 @@ fun HomeScreen(
                 // Main-pass waiters), but Final still sees it.
                 while (true) {
                     awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = false)
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        swipes.velocity.resetTracking()
+                        swipes.velocity.addPointerInputChange(down)
                         var up = false
                         while (!up) {
                             val event = awaitPointerEvent(PointerEventPass.Final)
+                            event.changes.firstOrNull { it.id == down.id }?.let(swipes.velocity::addPointerInputChange)
                             up = event.changes.isNotEmpty() && event.changes.all { !it.pressed }
                         }
                         swipes.onLift()

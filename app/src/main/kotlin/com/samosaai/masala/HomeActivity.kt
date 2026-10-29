@@ -17,6 +17,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -241,6 +242,8 @@ class HomeActivity : ComponentActivity() {
                 .graphicsLayer {
                     val p = drawerProgress.value
                     alpha = 1f - p
+                    // Alpha on each draw instead of a full-screen offscreen buffer every frame.
+                    compositingStrategy = CompositingStrategy.ModulateAlpha
                     scaleX = 1f - 0.04f * p
                     scaleY = 1f - 0.04f * p
                 }
@@ -288,6 +291,7 @@ class HomeActivity : ComponentActivity() {
                 .graphicsLayer {
                     val p = drawerProgress.value
                     alpha = p
+                    compositingStrategy = CompositingStrategy.ModulateAlpha
                     // Closed: moved off screen, so it neither draws nor takes touches.
                     translationY = if (p <= 0f) size.height else (1f - p) * size.height / 4f
                 }

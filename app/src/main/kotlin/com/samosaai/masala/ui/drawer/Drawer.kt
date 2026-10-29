@@ -167,14 +167,14 @@ fun Drawer(
                 val personal = if (searching) results else results.filter { it.profile == ProfileKind.PERSONAL }
                 // Search mixes profiles, so work apps are labeled there; otherwise they sit under the Work header.
                 items(personal, key = { it.key.id }) { entry ->
-                    AppItem(entry, icons, profiles, searching, onLaunch, onMenu, Modifier.animateItem())
+                    AppItem(entry, icons, profiles, searching, onLaunch, onMenu, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
                 }
 
                 val work = profiles.work
                 if (!searching && work != null) {
                     item(key = "work-header") { WorkHeader(paused = work.paused, onWorkPaused = onWorkPaused) }
                     items(results.filter { it.profile == ProfileKind.WORK }, key = { it.key.id }) { entry ->
-                        AppItem(entry, icons, profiles, labelWork = false, onLaunch, onMenu, Modifier.animateItem())
+                        AppItem(entry, icons, profiles, labelWork = false, onLaunch, onMenu, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
                     }
                 }
                 if (searching && current && results.isEmpty()) {
