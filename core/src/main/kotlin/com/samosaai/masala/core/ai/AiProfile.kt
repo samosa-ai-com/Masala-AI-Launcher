@@ -1,11 +1,15 @@
 package com.samosaai.masala.core.ai
 
+import kotlinx.serialization.Serializable
+
 /** One model endpoint: a preset, its base URL and a model id (blank = ask the server). Keys live elsewhere. */
+@Serializable
 data class Endpoint(val presetId: String, val baseUrl: String, val model: String = "") {
     val preset get() = ProviderPresets.byId(presetId)
 }
 
 /** How the mic button works (decision 6): tap to talk with auto-stop on a pause, or hold to talk. */
+@Serializable
 enum class MicMode { TAP, HOLD }
 
 /**
@@ -13,6 +17,7 @@ enum class MicMode { TAP, HOLD }
  * model, mixed freely. Voice in and out may be "on this phone" (null endpoint): Android's recognizer
  * and text-to-speech. Pure data, so `:core` tests cover validation without Android.
  */
+@Serializable
 data class AiProfile(
     val chat: Endpoint,
     /** Null: on this phone. */

@@ -85,7 +85,8 @@ class LLMClient(
             .writeTimeout(timeouts.writeSeconds, TimeUnit.SECONDS)
             .addInterceptor { chain ->
                 val builder = chain.request().newBuilder()
-                    .addHeader("Authorization", "Bearer $apiKey")
+                // Servers on the user's own network take no key; send none rather than an empty bearer.
+                if (apiKey.isNotBlank()) builder.addHeader("Authorization", "Bearer $apiKey")
                 val response = chain.proceed(builder.build())
                 if (response.code == 401) {
                     onUnauthorized?.invoke()
