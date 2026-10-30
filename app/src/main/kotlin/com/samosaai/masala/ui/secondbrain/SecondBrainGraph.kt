@@ -723,16 +723,16 @@ private fun convexHull(points: List<Offset>): List<Offset> {
         (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
     val lower = mutableListOf<Offset>()
     sorted.forEach { p ->
-        while (lower.size >= 2 && cross(lower[lower.size - 2], lower.last(), p) <= 0f) lower.removeLast()
+        while (lower.size >= 2 && cross(lower[lower.size - 2], lower.last(), p) <= 0f) lower.removeAt(lower.lastIndex)
         lower.add(p)
     }
     val upper = mutableListOf<Offset>()
     sorted.asReversed().forEach { p ->
-        while (upper.size >= 2 && cross(upper[upper.size - 2], upper.last(), p) <= 0f) upper.removeLast()
+        while (upper.size >= 2 && cross(upper[upper.size - 2], upper.last(), p) <= 0f) upper.removeAt(upper.lastIndex)
         upper.add(p)
     }
-    lower.removeLast()
-    upper.removeLast()
+    lower.removeAt(lower.lastIndex)
+    upper.removeAt(upper.lastIndex)
     return lower + upper
 }
 
