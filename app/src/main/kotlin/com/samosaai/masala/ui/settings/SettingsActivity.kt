@@ -1,5 +1,6 @@
 package com.samosaai.masala.ui.settings
 
+import androidx.lifecycle.lifecycleScope
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -72,7 +73,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, TASKS, FILES }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, TASKS, FILES, AI_MODELS, VOICE }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -97,6 +98,8 @@ class SettingsActivity : ComponentActivity() {
                             onSkills = { page = Page.SKILLS },
                             onTasks = { page = Page.TASKS },
                             onFiles = { page = Page.FILES },
+                            onAiModels = { page = Page.AI_MODELS },
+                            onVoice = { page = Page.VOICE },
                         )
                         Page.HIDDEN_APPS -> HiddenAppsPage(onBack = { page = Page.MAIN })
                         Page.LAYOUT -> LayoutPage(settings, onBack = { page = Page.MAIN })
@@ -105,6 +108,8 @@ class SettingsActivity : ComponentActivity() {
                         Page.SKILLS -> SkillsPage(onBack = { page = Page.MAIN })
                         Page.TASKS -> ScheduledTasksPage(onBack = { page = Page.MAIN })
                         Page.FILES -> masala.fileIndex?.let { FilesPage(it, onBack = { page = Page.MAIN }) }
+                        Page.AI_MODELS -> AiModelsPage(onBack = { page = Page.MAIN })
+                        Page.VOICE -> VoicePage(settings, update = { change -> lifecycleScope.launch { masala.settings.update(change) } }, onBack = { page = Page.MAIN })
                     }
                 }
             }
@@ -121,6 +126,8 @@ class SettingsActivity : ComponentActivity() {
         onSkills: () -> Unit,
         onTasks: () -> Unit,
         onFiles: () -> Unit,
+        onAiModels: () -> Unit,
+        onVoice: () -> Unit,
     ) {
         val scope = rememberCoroutineScope()
         val apps by masala.launcher.apps.collectAsStateWithLifecycle()
@@ -218,19 +225,8 @@ class SettingsActivity : ComponentActivity() {
             )
 
             SettingsSectionTitle(stringResource(R.string.settings_ask))
-            SettingsToggleRow(stringResource(R.string.settings_read_replies), settings.readRepliesAloud) { on ->
-                update { it.copy(readRepliesAloud = on) }
-            }
-            SettingsNavRow(stringResource(R.string.settings_test_voice), stringResource(R.string.settings_test_voice_summary)) {
-                scope.launch {
-                    val reason = masala.speakReply(getString(R.string.settings_test_voice_sentence))
-                    android.widget.Toast.makeText(
-                        this@SettingsActivity,
-                        reason ?: getString(R.string.settings_test_voice_ok),
-                        if (reason == null) android.widget.Toast.LENGTH_SHORT else android.widget.Toast.LENGTH_LONG,
-                    ).show()
-                }
-            }
+            SettingsNavRow(stringResource(R.string.ai_models_title), stringResource(R.string.ai_models_summary), onAiModels)
+            SettingsNavRow(stringResource(R.string.voice_title), stringResource(R.string.voice_summary), onVoice)
             SettingsNavRow(stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) {
                 startActivity(Intent(this@SettingsActivity, SecondBrainActivity::class.java))
             }
