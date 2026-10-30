@@ -84,11 +84,14 @@ class IconCache(context: Context, private val catalog: AppCatalog) {
 
     private fun render(drawable: Drawable, s: Style): Bitmap {
         val mono = if (s.style == IconStyle.TINTED && drawable is AdaptiveIconDrawable && Build.VERSION.SDK_INT >= 33) drawable.monochrome else null
-        // No mask for as-shipped: the icon untouched, or its monochrome layer on the tint tile.
+        // No mask for as-shipped: the icon untouched, or its monochrome layer on the tint tile,
+        // clipped to the same mask the tile next to it uses.
         if (s.shape == IconShape.AS_SHIPPED) {
             if (mono == null) return drawable.toBitmap(sizePx, sizePx)
             val bitmap = createBitmap(sizePx, sizePx)
-            drawMono(Canvas(bitmap), mono, sizePx, sizePx / 4, s.tint)
+            val canvas = Canvas(bitmap)
+            canvas.clipPath(IconMask.path(s.shape, sizePx.toFloat(), sizePx.toFloat()))
+            drawMono(canvas, mono, sizePx, sizePx / 4, s.tint)
             return bitmap
         }
         val size = sizePx

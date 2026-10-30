@@ -114,7 +114,9 @@ fun IconTile(
     filled: Boolean = false,
 ) {
     val tokens = MasalaTheme.tokens
-    val glyph = tint ?: tokens.accent
+    // Gold on a light tile reads at ~1.5:1, so the default glyph is the deep accent text
+    // (identical to the accent in dark); explicit tints are untouched.
+    val glyph = tint ?: tokens.accentText
     // Unfilled tiles read on both grounds: charcoal in dark, the light surface in Paper.
     val ground = if (tokens.dark) MasalaColors.Charcoal else MaterialTheme.colorScheme.surfaceVariant
     val maskShape = remember(shape) { IconMask.shape(shape) }

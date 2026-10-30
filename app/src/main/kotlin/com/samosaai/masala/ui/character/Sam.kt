@@ -9,6 +9,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -64,23 +65,24 @@ object SamArt {
 fun SamHello(modifier: Modifier = Modifier, contentDescription: String = "Sam waving hello") {
     val still = LocalMotion.current.reduced
     // Same as the mark: no infinite transition while still, so reduced motion (and the Welcome
-    // screen sitting open) doesn't keep polling Choreographer.
-    val breathe: Float
-    val wave: Float
-    val blink: Float
+    // screen sitting open) doesn't keep polling Choreographer. States are read in the draw
+    // lambda, so frames invalidate only drawing, not composition.
+    val breathe: State<Float>?
+    val wave: State<Float>?
+    val blink: State<Float>?
     if (still) {
-        breathe = 0f
-        wave = -14f
-        blink = 1f
+        breathe = null
+        wave = null
+        blink = null
     } else {
         val t = rememberInfiniteTransition(label = "sam")
-        breathe = t.animateFloat(0f, -3f, infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "breathe").value
-        wave = t.animateFloat(-14f, 18f, infiniteRepeatable(tween(450, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "wave").value
+        breathe = t.animateFloat(0f, -3f, infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "breathe")
+        wave = t.animateFloat(-14f, 18f, infiniteRepeatable(tween(450, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "wave")
         blink = t.animateFloat(
             1f, 1f,
             infiniteRepeatable(keyframes { durationMillis = 4400; 1f at 4090; 0.08f at 4224; 1f at 4400 }),
             label = "blink",
-        ).value
+        )
     }
     Canvas(modifier.semantics { this.contentDescription = contentDescription }) {
         val s = minOf(size.width / 230f, size.height / 210f)
@@ -89,7 +91,7 @@ fun SamHello(modifier: Modifier = Modifier, contentDescription: String = "Sam wa
         translate(dx + 15f * s, dy + 10f * s) {
             scale(s, pivot = Offset.Zero) {
                 drawOval(Color.Black.copy(alpha = 0.4f), Offset(48f, 179f), Size(104f, 14f))
-                translate(0f, breathe) { drawSam(wave, blink) }
+                translate(0f, breathe?.value ?: 0f) { drawSam(wave?.value ?: -14f, blink?.value ?: 1f) }
             }
         }
     }
