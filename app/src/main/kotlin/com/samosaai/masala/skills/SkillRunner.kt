@@ -42,6 +42,8 @@ import java.util.concurrent.atomic.AtomicLong
  *
  * [runData] gathers data a skill needs before the model starts (the daily brief's calendar and weather). It
  * goes in front of the run's first message as a [RunData] block: saved with the transcript, hidden in the sheet.
+ * [fallback] writes an answer by code when a first turn fails (the brief without its news): the run then
+ * ends `done` with that answer, and its error stays saved.
  *
  * The whole conversation is saved in [transcripts], one file per run: tool replies can be large, and a
  * database row past 2 MB can't be read back. The row keeps only the last answer, for the widget.
@@ -55,6 +57,7 @@ class SkillRunner(
     private val agentFor: (skill: MasalaSkill, unattended: Boolean) -> MasalaAgent,
     private val clock: () -> Long = System::currentTimeMillis,
     private val runData: suspend (MasalaSkill) -> String? = { null },
+    private val fallback: suspend (skill: MasalaSkill, error: String) -> String? = { _, _ -> null },
 ) {
     private class Active(val skill: MasalaSkill, var agent: MasalaAgent, var unattended: Boolean, val state: MutableStateFlow<SkillRunState>) {
         var job: Job? = null
@@ -135,7 +138,14 @@ class SkillRunner(
                 }
                 val sent = data?.let { message.withRunData(it) } ?: message
                 run.agent.run(sent).collect { event -> error = handle(runId, run, event) ?: error }
-                if (error != null) status = "failed"
+                val failed = error
+                val stand = if (first && failed != null) fallbackFor(run.skill, failed) else null
+                if (stand != null) {
+                    run.agent.restore(run.agent.transcript + ChatMessage("assistant", JsonPrimitive(stand)))
+                    run.state.update { it.copy(events = it.events.withoutProgress() + SkillRunEvent.Message(SkillRunEvent.Message.Role.ASSISTANT, stand) + SkillRunEvent.Done) }
+                } else if (failed != null) {
+                    status = "failed"
+                }
             } catch (e: CancellationException) {
                 status = "cancelled"
                 run.state.update { it.copy(events = it.events.settled() + SkillRunEvent.Failed("Stopped.")) }
@@ -148,6 +158,14 @@ class SkillRunner(
                 evictIdle()
             }
         }
+    }
+
+    private suspend fun fallbackFor(skill: MasalaSkill, error: String): String? = try {
+        fallback(skill, error)?.takeIf { it.isNotBlank() }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
     }
 
     /**

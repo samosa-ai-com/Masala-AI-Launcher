@@ -144,6 +144,10 @@ class MasalaApp : Application() {
             scope, database.skillRuns(), database.skillArtifacts(), TranscriptFiles(java.io.File(filesDir, "skill_runs")),
             { if (it == COMMAND_SKILL_ID) COMMAND_SKILL else skills.getSkillById(it) }, ::skillAgent,
             runData = { skill -> if (skill.id == BriefInputs.SKILL_ID) BriefInputs(this).collect().toPrompt() else null },
+            fallback = { skill, error ->
+                if (skill.id != BriefInputs.SKILL_ID) null
+                else com.samosaai.masala.core.brief.BriefFallback.render(BriefInputs(this).collect(), com.samosaai.masala.core.brief.BriefFallback.reasonFor(error))
+            },
         )
     }
 

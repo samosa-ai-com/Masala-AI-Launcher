@@ -80,14 +80,16 @@ class SkillRunnerTest {
     private fun runner(
         vararg replies: ChatMessage,
         runData: suspend (MasalaSkill) -> String? = { null },
+        fallback: suspend (MasalaSkill, String) -> String? = { _, _ -> null },
+        model: AgentModel? = null,
         tool: (String) -> ToolResult = { ToolResult.Success("ok") },
     ): SkillRunner {
         val queue = ArrayDeque(replies.toList())
         return SkillRunner(scope, runs, artifacts, transcripts, { if (it == "chef") chef else null }, { skill, unattended ->
             val toolScope = ToolScope.skill(skill, infos).let { if (unattended) ToolScope.unattended(it, infos) else it }
             scopesSeen += toolScope.names
-            MasalaAgent(AgentModel { messages, _ -> synchronized(requests) { requests += messages }; queue.removeFirst() }, { name, _ -> tool(name) }, definitions, toolScope, { "system" })
-        }, runData = runData)
+            MasalaAgent(model ?: AgentModel { messages, _ -> synchronized(requests) { requests += messages }; queue.removeFirst() }, { name, _ -> tool(name) }, definitions, toolScope, { "system" })
+        }, runData = runData, fallback = fallback)
     }
 
     @Test fun runDataGoesToTheModelOnTheFirstTurnOnly() = runBlocking {
@@ -104,6 +106,25 @@ class SkillRunnerTest {
         val users = { events: List<SkillRunEvent> -> events.filterIsInstance<SkillRunEvent.Message>().filter { it.role == SkillRunEvent.Message.Role.USER }.map { it.text } }
         assertEquals(listOf("go", "more?"), users(r.open(id)!!.value.events))
         assertEquals(listOf("go", "more?"), users(SkillRunner.eventsFrom(transcripts.read(id)!!)))
+    }
+
+    @Test fun aFailedFirstTurnEndsOnTheFallbackAnswer() = runBlocking {
+        val r = runner(model = { _, _ -> error("no route to host") }, fallback = { skill, error -> "Plain brief for ${skill.id} ($error)" })
+        val id = r.start("chef", user("go"))!!
+        val state = withTimeout(5_000) { r.open(id)!!.first { !it.running } }
+        assertEquals(SkillRunEvent.Done, state.events.last())
+        val row = runs.get(id)!!
+        assertEquals("done", row.status)
+        assertEquals("no route to host", row.error)
+        assertEquals("Plain brief for chef (no route to host)", SkillRunner.lastAnswer(row.transcriptJson))
+        assertEquals(com.samosaai.masala.core.scheduled.TaskRunStatus.DONE to "no route to host", ScheduledOutcome.of(row.status, row.error))
+    }
+
+    @Test fun withoutAFallbackAFailedRunStaysFailed() = runBlocking {
+        val r = runner(model = { _, _ -> error("down") })
+        val id = r.start("chef", user("go"))!!
+        withTimeout(5_000) { r.open(id)!!.first { !it.running } }
+        assertEquals("failed", runs.get(id)!!.status)
     }
 
     @Test fun aFailingRunDataStillRunsTheSkill() = runBlocking {
