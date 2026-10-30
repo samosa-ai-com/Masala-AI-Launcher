@@ -13,19 +13,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -65,6 +63,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -77,6 +76,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
@@ -212,6 +212,7 @@ fun Drawer(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
+    val resultsState = rememberLazyListState()
     val gridState = rememberLazyGridState()
     var handledSignal by remember { mutableIntStateOf(focusSignal) }
     LaunchedEffect(open, settled, autoKeyboard, focusSignal) {
@@ -227,11 +228,12 @@ fun Drawer(
             query = TextFieldValue()
             // Only one of the two is on screen; requests don't wait for a layout that may never come.
             listState.requestScrollToItem(0)
+            resultsState.requestScrollToItem(0)
             gridState.requestScrollToItem(0)
         }
     }
     // New results start at the top; applied in the next layout pass, without a frame of its own.
-    LaunchedEffect(results) { listState.requestScrollToItem(0) }
+    LaunchedEffect(results) { resultsState.requestScrollToItem(0) }
 
     // Switches at once; the saved setting catches up (a settings write and read-back took a beat).
     var shownLayout by remember(layout) { mutableStateOf(layout) }
@@ -274,44 +276,53 @@ fun Drawer(
                 onOpenSettings = onOpenSettings,
             )
 
-            if (searching) {
-                LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    if (shownLayout == DrawerLayout.GLOBE && globeRanked.isNotEmpty()) {
-                        item(key = "globe") {
-                            Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)) {
-                                Globe(globeRanked, icons, text, open, onLaunch = launch, onMenu = onMenu)
+            // Results and the browse view are both kept composed and the one not in use is hidden: building
+            // the results list on the first letter, and the grid again after the last, each took a frame
+            // of several times the budget.
+            Box(Modifier.fillMaxWidth().weight(1f)) {
+                Column(Modifier.fillMaxSize().hiddenWhen(searching)) {
+                    // Remembered: a new list on every letter made the hidden grid recompose with each one.
+                    val shown = remember(browse, showWork, work == null) {
+                        when {
+                            work == null -> browse.filter { it.profile == ProfileKind.PERSONAL }
+                            showWork -> browse.filter { it.profile == ProfileKind.WORK }
+                            else -> browse.filter { it.profile == ProfileKind.PERSONAL }
+                        }
+                    }
+                    AllAppsBar(
+                        count = shown.size,
+                        layout = shownLayout,
+                        onLayout = pickLayout,
+                        showWorkSwitch = work != null,
+                        showWork = showWork,
+                        onShowWork = { showWork = it },
+                    )
+                    if (showWork && work != null) WorkHeader(paused = work.paused, onWorkPaused = onWorkPaused)
+                    when (shownLayout) {
+                        DrawerLayout.GRID -> AppGrid(shown, suggested.takeIf { !showWork }.orEmpty(), icons, profiles, onLaunch, onMenu, gridState, Modifier.weight(1f))
+                        DrawerLayout.LIST -> LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f)) {
+                            items(shown, key = { it.key.id }) { entry -> AppRow(entry, icons, profiles, labelWork = false, onLaunch, onMenu) }
+                        }
+                        DrawerLayout.GLOBE -> GlobePage(shown, globeRanked, range, { range = it }, icons, open, globe, onLaunch, onMenu, profiles, Modifier.weight(1f))
+                    }
+                }
+                // Ends above the keyboard, so only the rows that can be seen are composed on each letter.
+                LazyColumn(state = resultsState, modifier = Modifier.fillMaxSize().hiddenWhen(!searching).imePadding()) {
+                    if (searching) {
+                        if (shownLayout == DrawerLayout.GLOBE && globeRanked.isNotEmpty()) {
+                            item(key = "globe") {
+                                Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)) {
+                                    Globe(globeRanked, icons, text, open, onLaunch = launch, onMenu = onMenu)
+                                }
+                            }
+                        }
+                        searchGroups(extra, text, sources, onAsk) {
+                            if (results.isNotEmpty()) item(key = "h-apps") { GroupHeader(stringResource(R.string.search_apps)) }
+                            items(results.take(12), key = { it.key.id }) { entry ->
+                                AppRow(entry, icons, profiles, labelWork = true, onLaunch, onMenu, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
                             }
                         }
                     }
-                    searchGroups(extra, text, sources, onAsk) {
-                        if (results.isNotEmpty()) item(key = "h-apps") { GroupHeader(stringResource(R.string.search_apps)) }
-                        items(results.take(12), key = { it.key.id }) { entry ->
-                            AppRow(entry, icons, profiles, labelWork = true, onLaunch, onMenu, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
-                        }
-                    }
-                    item(key = "ime") { Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.ime)) }
-                }
-            } else {
-                val shown = when {
-                    work == null -> browse.filter { it.profile == ProfileKind.PERSONAL }
-                    showWork -> browse.filter { it.profile == ProfileKind.WORK }
-                    else -> browse.filter { it.profile == ProfileKind.PERSONAL }
-                }
-                AllAppsBar(
-                    count = shown.size,
-                    layout = shownLayout,
-                    onLayout = pickLayout,
-                    showWorkSwitch = work != null,
-                    showWork = showWork,
-                    onShowWork = { showWork = it },
-                )
-                if (showWork && work != null) WorkHeader(paused = work.paused, onWorkPaused = onWorkPaused)
-                when (shownLayout) {
-                    DrawerLayout.GRID -> AppGrid(shown, suggested.takeIf { !showWork }.orEmpty(), icons, profiles, onLaunch, onMenu, gridState, Modifier.weight(1f))
-                    DrawerLayout.LIST -> LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f)) {
-                        items(shown, key = { it.key.id }) { entry -> AppRow(entry, icons, profiles, labelWork = false, onLaunch, onMenu) }
-                    }
-                    DrawerLayout.GLOBE -> GlobePage(shown, globeRanked, range, { range = it }, icons, open, globe, onLaunch, onMenu, profiles, Modifier.weight(1f))
                 }
             }
         }
@@ -612,6 +623,16 @@ private fun WorkHeader(paused: Boolean, onWorkPaused: (Boolean) -> Unit) {
         Switch(checked = !paused, onCheckedChange = null, modifier = Modifier.padding(start = 8.dp))
     }
 }
+
+/**
+ * Kept composed and measured, but not placed while [hidden]: an unplaced node isn't drawn or touched,
+ * and it doesn't take touches from what's under it the way a hidden but placed one would. Its
+ * semantics are cleared too, so screen readers and tests don't find it.
+ */
+private fun Modifier.hiddenWhen(hidden: Boolean): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    layout(placeable.width, placeable.height) { if (!hidden) placeable.place(0, 0) }
+}.then(if (hidden) Modifier.clearAndSetSemantics { } else Modifier)
 
 /**
  * While [enabled], nothing inside gets touches: they're consumed in the first pass, before any child
