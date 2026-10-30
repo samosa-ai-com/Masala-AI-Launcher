@@ -269,4 +269,83 @@ class SecondBrainStoreTest {
         assertEquals(1, store.filterSnapshot(snapshot, "treasure").notes.size)
         assertTrue(store.filterSnapshot(snapshot, "no such thing anywhere").isEmpty())
     }
+
+    // ---- S1 record rules ----
+
+    @Test fun slugsCompareTitlesAndFileNames() {
+        assertEquals("asha-sharma", store.slugify("Asha Sharma"))
+        assertEquals("asha-sharma", store.slugify("asha-sharma.md"))
+        assertEquals("asha-sharma", store.slugify("  Asha--Sharma  "))
+        assertEquals("v1-2-plan", store.slugify("v1.2 plan"))
+    }
+
+    @Test fun duplicatesMatchByFileNameOrTitle() {
+        File(dir, "people/asha-sharma.md").writeText(record("Asha Sharma", area = "People", type = "person"))
+        File(dir, "notes/physio.md").writeText(record("Asha's physio plan"))
+        val snapshot = store.loadSnapshot()
+        assertEquals(listOf("people/asha-sharma.md"), store.findPossibleDuplicates("Asha Sharma", snapshot))
+        assertEquals(listOf("people/asha-sharma.md"), store.findPossibleDuplicates("notes/asha-sharma.md", snapshot))
+        assertEquals(listOf("notes/physio.md"), store.findPossibleDuplicates("physio", snapshot))
+        assertTrue(store.findPossibleDuplicates("Ravi", snapshot).isEmpty())
+    }
+
+    @Test fun datedNotesNeedARealDate() {
+        assertTrue(store.isDatedNote("2026-10-29-standup.md"))
+        assertTrue(store.isDatedNote("notes/2026-10-29.md"))
+        assertFalse(store.isDatedNote("2026-13-40-standup.md"))
+        assertFalse(store.isDatedNote("standup-2026-10-29.md"))
+    }
+
+    @Test fun recordDirKindOnlyForMarkdownInDetailDirs() {
+        assertEquals("people", store.recordDirKind("people/asha.md"))
+        assertEquals("notes", store.recordDirKind("notes/plan.markdown"))
+        assertEquals(null, store.recordDirKind("raw/memo.md"))
+        assertEquals(null, store.recordDirKind("notes/memo.pdf"))
+        assertEquals(null, store.recordDirKind("notes/sub/plan.md"))
+        assertEquals(null, store.recordDirKind("MEMORY.md"))
+    }
+
+    @Test fun tagsKeepQuotedCommas() {
+        assertEquals(listOf("k99", "cerebral-palsy"), store.parseTags("[k99, cerebral-palsy]"))
+        assertEquals(listOf("bad,tag", "ok"), store.parseTags("[\"bad,tag\", ok]"))
+        assertEquals(listOf("solo"), store.parseTags("solo"))
+        val check = store.validateRecord("x.md", record("X", extra = "tags: [\"bad,tag\", ok]\n"))
+        assertEquals(listOf("x.md: bad tag 'bad,tag' (lowercase letters, digits and single hyphens only)."), check.errors)
+    }
+
+    @Test fun validatorCatchesStricterProblems() {
+        fun errors(text: String) = store.validateRecord("x.md", text, "notes").errors
+        assertTrue(errors("---\ntitle: X\narea: Personal\ntype: note\nupdated: 2026-02-30\n---\n\nBody.\n").single().contains("ISO date"))
+        assertTrue(errors("---\ntitle: X\narea: Personal\ntype: note\nupdated: 2026-10-29\n---\n\n").single().contains("empty body"))
+        assertTrue(errors(record("X", extra = "source:\n")).single().contains("'source' is present but blank"))
+        assertTrue(errors(record("X", extra = "title: Y\n")).single().contains("duplicate key 'title'"))
+        assertTrue(errors("---\ntitle: \"\"\narea: Personal\ntype: note\nupdated: 2026-10-29\n---\n\nBody.\n").single().contains("'title'"))
+        // A block scalar's indented lines are part of its value, not new keys.
+        assertTrue(errors(record("X", extra = "summary: |\n  line one\n  line: two\n")).isEmpty())
+    }
+
+    @Test fun ephemeralPaths() {
+        assertTrue(store.isEphemeralPath("/tmp/x.pdf"))
+        assertTrue(store.isEphemeralPath("/data/user/0/app/cache/x.pdf"))
+        assertTrue(store.isEphemeralPath("/sdcard/Download/x.tmp"))
+        assertFalse(store.isEphemeralPath("/sdcard/Documents/x.pdf"))
+    }
+
+    @Test fun staleRawIsListedNotDeleted() {
+        val old = File(dir, "raw/old.mp3").apply { writeText("a"); setLastModified(1_000L) }
+        File(dir, "raw/new.mp3").writeText("b")
+        assertEquals(listOf("raw/old.mp3"), store.listStaleRaw(nowMillis = System.currentTimeMillis()))
+        assertTrue(old.exists())
+    }
+
+    @Test fun legacyHubsGainFrontmatterOnce() {
+        val hub = File(dir, "areas/garden.md").apply { writeText("# Garden\n\nTomatoes.\n") }
+        store.ensureDefaults()
+        val once = hub.readText()
+        assertTrue(once.startsWith("---\ntitle: Garden\narea: Garden\ntype: area\n"))
+        assertTrue(once.endsWith("# Garden\n\nTomatoes.\n"))
+        store.ensureDefaults()
+        assertEquals(once, hub.readText())
+        assertTrue(store.validateRecord("garden.md", once, "areas", setOf("Garden")).valid)
+    }
 }

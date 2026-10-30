@@ -32,6 +32,7 @@ class SecondBrainStore(
             writeIfMissing(soulFile(), defaultSoul())
             writeIfMissing(memoryFile(), defaultMemoryIndex())
             ensureAreaHubs()
+            migrateLegacyHubs()
             if (!userFile().exists()) syncUser(emptyMap())
         }
     }
@@ -237,10 +238,20 @@ class SecondBrainStore(
         val end = lines.drop(1).indexOfFirst { it.trim() == "---" }
         if (end < 0) return RecordValidation(false, listOf("$fileName: frontmatter never closed with ---."))
         val front = mutableMapOf<String, String>()
-        lines.drop(1).take(end).forEach { line ->
-            if (':' !in line) return@forEach
-            val key = line.substringBefore(':').trim()
-            if (key.isNotEmpty()) front[key] = line.substringAfter(':').trim()
+        var inBlock = false
+        lines.drop(1).take(end).forEach { raw ->
+            // Indented or blank lines after `key: |` belong to that value, not to new keys.
+            if (inBlock && (raw.isBlank() || raw.startsWith(" ") || raw.startsWith("\t"))) return@forEach
+            inBlock = false
+            val line = raw.trim()
+            if (line.isEmpty() || line.startsWith("#")) return@forEach
+            // A line without a colon is free text and is skipped, as before.
+            val key = line.substringBefore(':', "").trim()
+            if (key.isEmpty()) return@forEach
+            if (key in front) errors += "$fileName: duplicate key '$key'."
+            val value = unquote(line.substringAfter(':').trim())
+            front[key] = value
+            if (value == "|" || value == ">") inBlock = true
         }
         for (key in RECORD_REQUIRED_KEYS) {
             if (front[key].isNullOrBlank()) errors += "$fileName: missing required key '$key'."
@@ -263,14 +274,19 @@ class SecondBrainStore(
             errors += "$fileName: unknown area '$area'."
         }
         val updated = front["updated"].orEmpty()
-        if (updated.isNotBlank() && !ISO_DATE_REGEX.matches(updated)) {
-            errors += "$fileName: 'updated' must be an ISO date (yyyy-MM-dd)."
+        if (updated.isNotBlank() && !(ISO_DATE_REGEX.matches(updated) && runCatching { LocalDate.parse(updated) }.isSuccess)) {
+            errors += "$fileName: 'updated' must be an ISO date (yyyy-MM-dd), got '$updated'."
         }
         front["tags"]?.takeIf { it.isNotBlank() }?.let { tags ->
-            val slugs = tags.trim().removePrefix("[").removeSuffix("]").split(Regex("[,\\s]+")).filter { it.isNotBlank() }
-            slugs.filterNot { SLUG_REGEX.matches(it) }.forEach { bad ->
+            parseTags(tags).filterNot { SLUG_REGEX.matches(it) }.forEach { bad ->
                 errors += "$fileName: bad tag '$bad' (lowercase letters, digits and single hyphens only)."
             }
+        }
+        for (key in OPTIONAL_NON_BLANK_KEYS) {
+            if (key in front && front[key].isNullOrBlank()) errors += "$fileName: '$key' is present but blank."
+        }
+        if (lines.drop(end + 2).joinToString("\n").isBlank()) {
+            errors += "$fileName: empty body. Facts live in the body, not the frontmatter."
         }
         return RecordValidation(errors.isEmpty(), errors)
     }
@@ -290,6 +306,113 @@ class SecondBrainStore(
     }
 
     data class CappedText(val text: String, val truncated: Boolean)
+
+    // ---- record rules (plan `second-brain-robust.md` S1) ----
+
+    /**
+     * Duplicate guard: "Asha Sharma", "asha-sharma.md" and "Asha-Sharma" all compare equal. A real
+     * record extension is dropped first; dots inside titles stay.
+     */
+    fun slugify(text: String): String {
+        val lower = text.trim().lowercase()
+        val base = when {
+            lower.endsWith(".markdown") -> lower.dropLast(".markdown".length)
+            lower.endsWith(".md") -> lower.dropLast(".md".length)
+            else -> lower
+        }
+        return base.map { if (it.isLetterOrDigit()) it else '-' }.joinToString("")
+            .replace(Regex("-+"), "-").trim('-')
+    }
+
+    /** Ids of records whose file name or frontmatter title has the same slug as [title]. */
+    fun findPossibleDuplicates(title: String, snapshot: SecondBrainSnapshot): List<String> {
+        val slug = slugify(title.substringAfterLast('/'))
+        if (slug.isEmpty()) return emptyList()
+        return detailFiles(snapshot).mapNotNull { (file, dirKind) ->
+            val id = relativeMemoryId(file, "$dirKind/${file.name}")
+            val titleSlug = frontmatterOf(file.content)?.get("title")?.let { slugify(unquote(it)) }
+            if (slug == slugify(file.name) || slug == titleSlug) id else null
+        }.distinct().sorted()
+    }
+
+    /** History rule: a name starting with a real ISO date describes what was true then. */
+    fun isDatedNote(fileName: String): Boolean {
+        val prefix = DATED_NAME_REGEX.find(fileName.substringAfterLast('/'))?.value ?: return false
+        return runCatching { LocalDate.parse(prefix) }.isSuccess
+    }
+
+    /** `areas`, `people` or `notes` for a vault-relative Markdown record path, else null. */
+    fun recordDirKind(path: String): String? {
+        val parts = path.trim().trimStart('/').split('/')
+        if (parts.size != 2 || parts[1].isBlank()) return null
+        if (parts[0] !in DIR_TYPES.keys) return null
+        val ext = parts[1].substringAfterLast('.', "").lowercase()
+        return if (ext == "md" || ext == "markdown") parts[0] else null
+    }
+
+    /** A `tags:` value: an inline `[a, b]` list (commas inside quotes stay) or one slug. */
+    fun parseTags(raw: String): List<String> {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty()) return emptyList()
+        if (!(trimmed.startsWith("[") && trimmed.endsWith("]"))) return listOf(unquote(trimmed)).filter { it.isNotEmpty() }
+        val out = mutableListOf<String>()
+        val cur = StringBuilder()
+        var quote: Char? = null
+        fun flush() {
+            unquote(cur.toString().trim()).takeIf { it.isNotEmpty() }?.let(out::add)
+            cur.clear()
+        }
+        for (ch in trimmed.substring(1, trimmed.length - 1)) {
+            when {
+                quote != null && ch == quote -> { cur.append(ch); quote = null }
+                quote == null && (ch == '"' || ch == '\'') -> { cur.append(ch); quote = ch }
+                quote == null && ch == ',' -> flush()
+                else -> cur.append(ch)
+            }
+        }
+        flush()
+        return out
+    }
+
+    /** Staging paths that can vanish (temp dirs, caches, `.tmp`): a raw drop from there is always copied. */
+    fun isEphemeralPath(path: String): Boolean {
+        val lower = path.lowercase().replace('\\', '/')
+        return lower == "/tmp" || lower.startsWith("/tmp/") || "/tmp/" in lower || "/cache/" in lower ||
+            "/temp/" in lower || lower.endsWith(".tmp") || lower.endsWith(".temp")
+    }
+
+    /** Raw ids older than [maxAgeDays], to propose for cleanup. Lists only; never deletes. */
+    fun listStaleRaw(maxAgeDays: Int = RAW_STALE_DAYS, nowMillis: Long = System.currentTimeMillis()): List<String> {
+        val cutoff = nowMillis - maxAgeDays * 24L * 60 * 60 * 1000
+        return dir("raw").listFiles()
+            ?.filter { it.isFile && it.lastModified() < cutoff }
+            ?.map { "raw/${it.name}" }
+            ?.sortedBy { it.lowercase() }
+            .orEmpty()
+    }
+
+    /** Hubs written before the record schema gain frontmatter in place; bodies stay as they are. */
+    private fun migrateLegacyHubs() {
+        dir("areas").listFiles()
+            ?.filter { it.isFile && it.extension.lowercase() == "md" }
+            ?.forEach { hub ->
+                runCatching {
+                    val text = hub.readText()
+                    if (text.lineSequence().firstOrNull()?.trim() == "---") return@runCatching
+                    val base = hub.nameWithoutExtension
+                    val area = STARTER_AREAS.firstOrNull { it.equals(base, ignoreCase = true) }
+                        ?: base.replaceFirstChar { it.uppercase() }
+                    hub.writeText("---\ntitle: $area\narea: $area\ntype: area\ntags: []\nupdated: ${today()}\n---\n\n$text")
+                }
+            }
+    }
+
+    /** Strips one layer of matching quotes, so `title: ""` counts as blank. */
+    private fun unquote(value: String): String {
+        if (value.length < 2) return value
+        val first = value.first()
+        return if ((first == '"' || first == '\'') && value.last() == first) value.substring(1, value.length - 1) else value
+    }
 
     // ---- internals ----
 
@@ -832,5 +955,12 @@ class SecondBrainStore(
         private val FENCE_REGEX = Regex("(?s)(```|~~~).*?(\\1|\\Z)")
         private val SLUG_REGEX = Regex("^[a-z0-9]+(?:-[a-z0-9]+)*$")
         private val ISO_DATE_REGEX = Regex("^\\d{4}-\\d{2}-\\d{2}$")
+        private val DATED_NAME_REGEX = Regex("^\\d{4}-\\d{2}-\\d{2}")
+        /** Optional keys that, when present, must carry a value. */
+        private val OPTIONAL_NON_BLANK_KEYS = listOf("source", "source_file", "next_action", "task_ref")
+        /** Raw drops older than this are proposed for cleanup. */
+        const val RAW_STALE_DAYS = 30
+        /** Raw files over this size on durable disk are linked in place, never duplicated. */
+        const val RAW_LINK_THRESHOLD_BYTES = 10L * 1024 * 1024
     }
 }
