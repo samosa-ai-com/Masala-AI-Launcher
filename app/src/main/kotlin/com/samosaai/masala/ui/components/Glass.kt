@@ -115,8 +115,10 @@ fun IconTile(
 ) {
     val tokens = MasalaTheme.tokens
     val glyph = tint ?: tokens.accent
-    val maskShape = remember(shape) { IconMask.shape(if (shape == IconShape.AS_SHIPPED) IconShape.SQUIRCLE else shape) }
-    val fill = if (filled) glyph else glyph.copy(alpha = 0.16f).compositeOver(MasalaColors.Charcoal)
+    // Unfilled tiles read on both grounds: charcoal in dark, the light surface in Paper.
+    val ground = if (tokens.dark) MasalaColors.Charcoal else MaterialTheme.colorScheme.surfaceVariant
+    val maskShape = remember(shape) { IconMask.shape(shape) }
+    val fill = if (filled) glyph else glyph.copy(alpha = 0.16f).compositeOver(ground)
     Box(
         modifier.size(size).clip(maskShape).background(fill).border(1.dp, tokens.hairline, maskShape),
         contentAlignment = Alignment.Center,

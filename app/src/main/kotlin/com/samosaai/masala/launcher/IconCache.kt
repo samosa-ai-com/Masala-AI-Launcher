@@ -83,7 +83,14 @@ class IconCache(context: Context, private val catalog: AppCatalog) {
     }
 
     private fun render(drawable: Drawable, s: Style): Bitmap {
-        if (s.shape == IconShape.AS_SHIPPED) return drawable.toBitmap(sizePx, sizePx)
+        val mono = if (s.style == IconStyle.TINTED && drawable is AdaptiveIconDrawable && Build.VERSION.SDK_INT >= 33) drawable.monochrome else null
+        // No mask for as-shipped: the icon untouched, or its monochrome layer on the tint tile.
+        if (s.shape == IconShape.AS_SHIPPED) {
+            if (mono == null) return drawable.toBitmap(sizePx, sizePx)
+            val bitmap = createBitmap(sizePx, sizePx)
+            drawMono(Canvas(bitmap), mono, sizePx, sizePx / 4, s.tint)
+            return bitmap
+        }
         val size = sizePx
         val bitmap = createBitmap(size, size)
         val canvas = Canvas(bitmap)
@@ -91,14 +98,8 @@ class IconCache(context: Context, private val catalog: AppCatalog) {
         // Adaptive layers are 108 dp with 72 dp visible: draw them half again as big, centred.
         val pad = size / 4
         if (drawable is AdaptiveIconDrawable) {
-            val mono = if (s.style == IconStyle.TINTED && Build.VERSION.SDK_INT >= 33) drawable.monochrome else null
             if (mono != null) {
-                canvas.drawColor(TINTED_TILE)
-                mono.mutate().apply {
-                    setTint(s.tint)
-                    setBounds(-pad, -pad, size + pad, size + pad)
-                    draw(canvas)
-                }
+                drawMono(canvas, mono, size, pad, s.tint)
             } else {
                 drawable.background?.apply { setBounds(-pad, -pad, size + pad, size + pad); draw(canvas) }
                 drawable.foreground?.apply { setBounds(-pad, -pad, size + pad, size + pad); draw(canvas) }
@@ -111,6 +112,16 @@ class IconCache(context: Context, private val catalog: AppCatalog) {
             drawable.draw(canvas)
         }
         return bitmap
+    }
+
+    /** The monochrome layer in [tint] on the dark tint tile, drawn oversized like the mask path. */
+    private fun drawMono(canvas: Canvas, mono: Drawable, size: Int, pad: Int, tint: Int) {
+        canvas.drawColor(TINTED_TILE)
+        mono.mutate().apply {
+            setTint(tint)
+            setBounds(-pad, -pad, size + pad, size + pad)
+            draw(canvas)
+        }
     }
 
     private fun badge(bitmap: Bitmap, user: UserHandle?): Bitmap {

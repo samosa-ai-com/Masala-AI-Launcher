@@ -87,7 +87,8 @@ class HomeActivity : ComponentActivity() {
         // Light icons on the wallpaper; HomeContent switches them while a light drawer is open.
         enableEdgeToEdge(SystemBarStyle.dark(Color.TRANSPARENT), SystemBarStyle.dark(Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
-        showWelcomeOnce()
+        // Once per creation: a rotation while Welcome is in flight must not launch it again.
+        if (savedInstanceState == null) showWelcomeOnce()
         setContent {
             val settings by masala.settings.settings.collectAsStateWithLifecycle(LauncherSettings())
             MasalaTheme(settings, systemBars = false) { HomeContent(settings) }
