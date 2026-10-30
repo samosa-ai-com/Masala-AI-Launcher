@@ -66,6 +66,13 @@ interface Tool {
      */
     val opensScreen: Boolean get() = false
 
+    /**
+     * Whether this call goes through the confirmation gate. Every tool that isn't [ToolSensitivity.READ_ONLY]
+     * asks, except where a tool narrows it per call: memory writes apply at once (with Undo) and ask only to
+     * rewrite history. Sensitivity alone still decides what unattended runs get.
+     */
+    fun needsConfirmation(args: JsonObject): Boolean = sensitivity != ToolSensitivity.READ_ONLY
+
     suspend fun execute(args: JsonObject): ToolResult
 }
 
