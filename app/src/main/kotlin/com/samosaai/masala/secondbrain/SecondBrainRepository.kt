@@ -117,6 +117,40 @@ class SecondBrainRepository(
         ok
     }
 
+    /** Gated write at a vault path ([SecondBrainStore.writeRecord]); a success is logged and refreshes the flows. */
+    suspend fun write(path: String, content: String, append: Boolean = false, allowDuplicate: Boolean = false) =
+        changed("memory_write") { store.writeRecord(path, content, append, allowDuplicate) }
+
+    /** Gated exact-text edit ([SecondBrainStore.editRecord]). */
+    suspend fun edit(path: String, oldText: String, newText: String, replaceAll: Boolean = false) =
+        changed("memory_edit") { store.editRecord(path, oldText, newText, replaceAll) }
+
+    /** Deletes a record or raw file ([SecondBrainStore.deleteRecord]). */
+    suspend fun remove(path: String) = changed("memory_delete") { store.deleteRecord(path) }
+
+    /** Puts back the file a change replaced, created or deleted. */
+    suspend fun undo(undoId: String): Boolean {
+        val target = withContext(Dispatchers.IO) { store.undoTarget(undoId) }
+        val ok = withContext(Dispatchers.IO) { store.undo(undoId) }
+        if (ok) {
+            audit("memory_undo", target.orEmpty())
+            refresh()
+        }
+        return ok
+    }
+
+    private suspend fun changed(
+        action: String,
+        block: () -> SecondBrainStore.WriteOutcome,
+    ): SecondBrainStore.WriteOutcome {
+        val outcome = withContext(Dispatchers.IO) { block() }
+        if (outcome.ok) {
+            audit(action, outcome.id)
+            refresh()
+        }
+        return outcome
+    }
+
     /** Queues an entry for approval. Returns null when it is empty or fails the schema. */
     fun propose(title: String, markdown: String, reason: String): Proposal? {
         val cleanTitle = title.trim()

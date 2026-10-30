@@ -235,4 +235,22 @@ class SecondBrainRepositoryTest {
         assertTrue(brain.titles.first { it.contains("Fixed") }.contains("Fixed"))
         assertEquals(listOf("3"), dao.rows.value.map { it.id })
     }
+
+    @Test fun writeEditUndoAreLoggedAndRefreshTheTitles() = runBlocking<Unit> {
+        fresh()
+        val card = "---\ntitle: Asha Sharma\narea: Health\ntype: person\nupdated: 2026-10-29\n---\n\nPhysio, Tuesdays.\n"
+        val written = brain.write("people/asha-sharma.md", card)
+        assertTrue(written.ok, written.errors.toString())
+        assertTrue("Asha Sharma" in brain.titles.first { "Asha Sharma" in it })
+        val edited = brain.edit("people/asha-sharma.md", "Tuesdays", "Wednesdays")
+        assertTrue(edited.ok)
+        assertTrue(brain.undo(edited.undoId!!))
+        assertTrue(File(dir, "people/asha-sharma.md").readText().contains("Tuesdays"))
+        val refused = brain.write("people/ravi.md", "no frontmatter")
+        assertTrue(!refused.ok)
+        assertEquals(
+            listOf("memory_write" to "people/asha-sharma.md", "memory_edit" to "people/asha-sharma.md", "memory_undo" to "people/asha-sharma.md"),
+            audited.filter { it.first.startsWith("memory_") && it.first != "memory_approve" },
+        )
+    }
 }
