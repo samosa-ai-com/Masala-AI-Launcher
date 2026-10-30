@@ -94,6 +94,16 @@ class SecondBrainRepository(
             .sortedByDescending { it.second }.take(limit).map { it.first }
     }
 
+    /** One vault file by path, capped; [MemoryProtocol.PATH] returns the protocol. */
+    suspend fun readPath(path: String): SecondBrainStore.CappedText? {
+        if (path.trim().equals(MemoryProtocol.PATH, ignoreCase = true)) return SecondBrainStore.CappedText(MemoryProtocol.TEXT, false)
+        return withContext(Dispatchers.IO) { store.readText(path) }
+    }
+
+    /** Matching lines across the vault, `path:line: text`. */
+    suspend fun search(query: String, limit: Int = 20): List<String> =
+        withContext(Dispatchers.IO) { store.search(query, limit) }
+
     suspend fun get(id: String): BrainFile? = withContext(Dispatchers.IO) {
         refreshSnapshot().details().firstOrNull { idOf(it) == id }
     }

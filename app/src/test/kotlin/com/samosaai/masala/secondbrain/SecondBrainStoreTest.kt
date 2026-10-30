@@ -450,4 +450,28 @@ class SecondBrainStoreTest {
         }
         assertEquals(SecondBrainStore.JOURNAL_KEEP, File(dir, ".history").listFiles { f -> f.name.endsWith(".path") }!!.size)
     }
+
+    @Test fun readTextStaysInTheVault() {
+        store.writeRecord("people/asha-sharma.md", person("Asha Sharma"))
+        assertTrue(store.readText("people/asha-sharma.md")!!.text.contains("Physio."))
+        assertTrue(store.readText("/MEMORY.md")!!.text.startsWith("# MEMORY"))
+        assertEquals(null, store.readText("../secret.md"))
+        assertEquals(null, store.readText(".history/x.path"))
+        assertEquals(null, store.readText("people/missing.md"))
+        File(dir, "raw/song.mp3").writeText("ID3")
+        assertEquals(null, store.readText("raw/song.mp3"))
+        File(dir, "notes/long.md").writeText(record("Long") + "x".repeat(SecondBrainStore.VIEWER_FILE_CAP_CHARS))
+        assertTrue(store.readText("notes/long.md")!!.truncated)
+    }
+
+    @Test fun searchFindsLinesAndNames() {
+        store.writeRecord("people/asha-sharma.md", person("Asha Sharma", "Physio on Tuesdays."))
+        File(dir, "raw/asha-voice.m4a").writeText("bytes")
+        val hits = store.search("ASHA")
+        assertTrue(hits.toString(), hits.contains("people/asha-sharma.md:2: title: Asha Sharma"))
+        assertTrue(hits.toString(), hits.contains("raw/asha-voice.m4a: (name matches)"))
+        assertEquals(listOf("people/asha-sharma.md:8: Physio on Tuesdays."), store.search("tuesdays"))
+        assertEquals(1, store.search("a", limit = 1).size)
+        assertTrue(store.search("  ").isEmpty())
+    }
 }

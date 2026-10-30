@@ -571,6 +571,40 @@ class SecondBrainStore(
         WriteOutcome(id, undoId = undoId)
     }
 
+    /** One vault text file by path for the agent, capped like the viewer; null when missing, binary or outside. */
+    fun readText(path: String, cap: Int = VIEWER_FILE_CAP_CHARS): CappedText? {
+        val id = normalizeId(path)
+        if (id.isBlank() || ".." in id.split('/') || id.startsWith(".")) return null
+        val file = vaultFile(id)?.takeIf { it.isFile } ?: return null
+        if (!isTextFile(file.name, "x")) return null
+        return readCapped(file, cap)
+    }
+
+    /**
+     * Grep for the agent: `path:line: text` for each line containing [query] (case-insensitive), plus
+     * `path: (name matches)` when only the file name matches. Root files first, then areas, people,
+     * notes and text raw files; every file read is bounded.
+     */
+    fun search(query: String, limit: Int = 20): List<String> {
+        val q = query.trim().lowercase()
+        if (q.isEmpty()) return emptyList()
+        val files = listOf(soulFile(), memoryFile(), userFile()) +
+            listOf("areas", "people", "notes", "raw").flatMap { d ->
+                dir(d).listFiles()?.filter { it.isFile }?.sortedBy { it.name.lowercase() }.orEmpty()
+            }
+        val out = mutableListOf<String>()
+        for (file in files) {
+            if (out.size >= limit) break
+            if (!file.isFile) continue
+            val id = file.toRelativeString(root).replace('\\', '/')
+            val lines = if (isTextFile(file.name, "x")) readUpTo(file, LINK_SCAN_CAP_CHARS)?.lines().orEmpty() else emptyList()
+            val hits = lines.withIndex().filter { q in it.value.lowercase() }
+            if (hits.isEmpty() && q in file.name.lowercase()) out += "$id: (name matches)"
+            hits.take(limit - out.size).forEach { (i, line) -> out += "$id:${i + 1}: ${line.trim().take(SEARCH_LINE_CHARS)}" }
+        }
+        return out
+    }
+
     /** Puts a file back as it was before the change [undoId] names. False when the entry is gone. */
     fun undo(undoId: String): Boolean = synchronized(lock) {
         if (!JOURNAL_ID_REGEX.matches(undoId)) return false
@@ -1139,6 +1173,8 @@ class SecondBrainStore(
         val ROOT_FILES = setOf("SOUL.md", "MEMORY.md", "user.md")
         /** Undo depth, the same as the layout history. */
         const val JOURNAL_KEEP = 50
+        /** Longest line a search hit shows. */
+        const val SEARCH_LINE_CHARS = 200
         private val JOURNAL_ID_REGEX = Regex("^\\d{13}-\\d{4}$")
 
         /** Root files are navigation hubs, not content: never reported as unlinked. */
