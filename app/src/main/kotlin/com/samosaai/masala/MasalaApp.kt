@@ -158,6 +158,24 @@ class MasalaApp : Application() {
     /** Models, keys and voice choices (Settings → Masala AI); every model call reads it. */
     val aiSettings by lazy { AiSettingsStore(this, KeyCipher.androidKeystore()) }
 
+    /** Fetch list and Test connection in Settings → Models & keys. */
+    val aiConnection by lazy { com.samosaai.masala.llm.AiConnection() }
+
+    /** Voices for the picker: the phone's for [language], or a provider's (from its speech models). */
+    suspend fun voicesFor(out: com.samosaai.masala.core.ai.Endpoint?, language: Language): List<String> =
+        if (out == null) {
+            tts.androidVoices(language).map { it.name }
+        } else {
+            kotlinx.coroutines.withContext(Dispatchers.IO) {
+                runCatching {
+                    com.samosaai.masala.audio.AudioApi(out.baseUrl, aiSettings.keyFor(out)).listAudioModels()
+                        .filter { it.category == com.samosaai.masala.audio.ModelCategory.TTS }
+                        .flatMap { m -> m.voices.map { it.id } }
+                        .distinct()
+                }.getOrDefault(emptyList())
+            }
+        }
+
     private val stt by lazy {
         SttEngine(this, SpeechConfig.default.baseUrl, SpeechConfig.default.apiKey)
     }
