@@ -444,4 +444,10 @@
     <string name="report_send">Report</string>
     <string name="report_thanks">Thanks, the report is saved on this phone</string>
     <string name="miniapp_report_title">Report this mini app</string>
+    <!-- UI refresh U1: first run -->
+    <string name="welcome_title">Hi, I’m Sam.</string>
+    <string name="welcome_body">I keep your home screen tidy and do things when you ask. Everything stays on this phone unless you choose a model.</string>
+    <string name="welcome_make_home">Make Masala my home screen</string>
+    <string name="welcome_look_around">Look around first</string>
+    <string name="welcome_sam_description">Sam, a golden samosa, waving hello</string>
 </resources>
