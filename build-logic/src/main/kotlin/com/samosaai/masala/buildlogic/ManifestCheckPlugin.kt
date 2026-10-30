@@ -24,7 +24,8 @@ import org.gradle.api.tasks.TaskAction
 /**
  * Applied to `:app`. For each variant, `check<Variant>ManifestPolicy` fails the build on restricted entries
  * outside `:pro` and writes `build/reports/play-readiness-<variant>.md` at the root. `checkProImports`
- * keeps `:app` to `ProTools`. Both run before `assemble<Variant>` and with `check`.
+ * keeps `:app` to `ProTools`; `checkListCalls` keeps JDK 21-only list calls out of every module's device
+ * code. All run before `assemble<Variant>` and with `check`.
  */
 class ManifestCheckPlugin : Plugin<Project> {
     override fun apply(project: Project) {
@@ -37,6 +38,18 @@ class ManifestCheckPlugin : Plugin<Project> {
             baseDir.set(project.layout.projectDirectory)
         }
         project.tasks.named("check") { dependsOn(proImports) }
+
+        // Everything that runs on a device: main, debug and androidTest sources of every module.
+        val listCalls = project.tasks.register("checkListCalls", ListCallsTask::class.java) {
+            listOf("app", "pro", "core").forEach { module ->
+                sources.from(project.rootProject.fileTree(module) {
+                    include("src/**/*.kt", "src/**/*.java")
+                    exclude("src/test/**")
+                })
+            }
+            baseDir.set(project.rootProject.layout.projectDirectory)
+        }
+        project.tasks.named("check") { dependsOn(listCalls) }
 
         val components = project.extensions.getByType(ApplicationAndroidComponentsExtension::class.java)
         components.onVariants { variant ->
@@ -56,7 +69,7 @@ class ManifestCheckPlugin : Plugin<Project> {
                 report.set(project.rootProject.layout.buildDirectory.file("reports/play-readiness-${variant.name}.md"))
             }
             project.tasks.named("check") { dependsOn(check) }
-            project.tasks.matching { it.name == "assemble$name" }.configureEach { dependsOn(check, proImports) }
+            project.tasks.matching { it.name == "assemble$name" }.configureEach { dependsOn(check, proImports, listCalls) }
         }
     }
 }
@@ -104,6 +117,25 @@ abstract class ProImportsTask : DefaultTask() {
         if (bad.isNotEmpty()) {
             throw GradleException(
                 "Only ProTools may be used from :pro (plan 0.3):\n" + bad.joinToString("\n") { "  $it" },
+            )
+        }
+    }
+}
+
+abstract class ListCallsTask : DefaultTask() {
+    @get:InputFiles @get:SkipWhenEmpty @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val sources: ConfigurableFileCollection
+
+    @get:Internal abstract val baseDir: DirectoryProperty
+
+    @TaskAction
+    fun run() {
+        val root = baseDir.get().asFile
+        val bad = newApiListCalls(sources.files.associate { it.relativeTo(root).path to it.readText() })
+        if (bad.isNotEmpty()) {
+            throw GradleException(
+                "JDK 21 list calls crash below API 35; use add / removeAt(0) / removeAt(lastIndex):\n" +
+                    bad.joinToString("\n") { "  $it" },
             )
         }
     }
