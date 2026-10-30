@@ -39,6 +39,7 @@ import com.samosaai.masala.core.apps.AppEntry
 import com.samosaai.masala.core.apps.Visibility
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.launcher.HomeRole
+import com.samosaai.masala.launcher.HomeSearchSources
 import com.samosaai.masala.ui.drawer.AppMenu
 import com.samosaai.masala.ui.drawer.AppMenuActions
 import com.samosaai.masala.ui.drawer.Drawer
@@ -401,7 +402,18 @@ class HomeActivity : ComponentActivity() {
                 }
                 .then(if (!drawerShown.value) Modifier.clearAndSetSemantics { } else Modifier),
         ) {
-            val searchSources = remember { com.samosaai.masala.launcher.HomeSearchSources(this@HomeActivity, app) }
+            val searchSources = remember { HomeSearchSources(this@HomeActivity, app) }
+            // File hits ask the model, whose reply card only renders with the drawer closed;
+            // external targets would otherwise land back on an open drawer. Dismiss first.
+            val dismissingSources = remember(searchSources) {
+                object : com.samosaai.masala.ui.drawer.SearchSources by searchSources {
+                    override fun openShortcut(shortcut: ShortcutInfo) { drawerOpen = false; searchSources.openShortcut(shortcut) }
+                    override fun openSkill(skill: com.samosaai.masala.core.contract.MasalaSkill) { drawerOpen = false; searchSources.openSkill(skill) }
+                    override fun openSetting(entry: com.samosaai.masala.ui.drawer.SettingsEntry) { drawerOpen = false; searchSources.openSetting(entry) }
+                    override fun openFile(hit: com.samosaai.masala.ui.drawer.FileHit) { drawerOpen = false; searchSources.openFile(hit) }
+                    override fun webSearch(query: String) { drawerOpen = false; searchSources.webSearch(query) }
+                }
+            }
             // Suggestions and usage access are read again each time the drawer opens.
             var suggested by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
             var usageAccess by remember { mutableStateOf(false) }
@@ -416,8 +428,9 @@ class HomeActivity : ComponentActivity() {
                 val now = System.currentTimeMillis()
                 val launches = app.usage.launches(com.samosaai.masala.core.apps.UsageRange.MONTH.since(now, zone), apps)
                 val byId = apps.associateBy { it.key.id }
+                val eligible = byId.filterValues { it.visibility == Visibility.DEFAULT }.keys
                 val t = java.time.LocalTime.now(zone)
-                val next = com.samosaai.masala.core.apps.UsageRank.suggestedNow(launches, t.hour * 60 + t.minute, zone, { byId[it]?.label ?: it })
+                val next = com.samosaai.masala.core.apps.UsageRank.suggestedNow(launches.filter { it.key in eligible }, t.hour * 60 + t.minute, zone, { byId[it]?.label ?: it })
                     .mapNotNull { byId[it] }.filter { it.visibility == Visibility.DEFAULT }
                 if (next.map { it.key } != suggested.map { it.key }) suggested = next
             }
@@ -449,7 +462,7 @@ class HomeActivity : ComponentActivity() {
                 onLayout = { l -> scope.launch { app.settings.update { it.copy(drawerLayout = l) } } },
                 suggested = suggested,
                 globe = globeSource,
-                sources = searchSources,
+                sources = dismissingSources,
                 onMenu = { menuFor = it },
                 onAsk = ::askMasala,
                 onWorkPaused = { paused ->

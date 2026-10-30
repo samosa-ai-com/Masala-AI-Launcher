@@ -29,12 +29,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -86,12 +87,10 @@ fun Globe(
 ) {
     val tokens = MasalaTheme.tokens
     val turning = open && !LocalMotion.current.reduced
-    val turn = rememberInfiniteTransition(label = "globe")
-    val phase by if (turning) {
+    val phase: State<Float>? = if (turning) {
+        val turn = rememberInfiniteTransition(label = "globe")
         turn.animateFloat(1f, -1f, infiniteRepeatable(tween(12_000, easing = LinearEasing), RepeatMode.Reverse), label = "meridians")
-    } else {
-        turn.animateFloat(1f, 1f, infiniteRepeatable(tween(1_000)), label = "still")
-    }
+    } else null
     BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(1f).semantics { isTraversalGroup = true }) {
         val unit = maxWidth / 370f
         Canvas(Modifier.matchParentSize()) {
@@ -104,7 +103,7 @@ fun Globe(
                 drawCircle(line.copy(alpha = 0.10f), 182f, c, style = Stroke(1f / k))
                 // Meridians: ellipses whose width swings through zero, so the globe seems to turn.
                 for (m in listOf(0.2f, 0.45f, 0.7f, 0.95f)) {
-                    val w = 182f * kotlin.math.sin((m + phase * 0.5f) * Math.PI.toFloat()).let { kotlin.math.abs(it) }
+                    val w = 182f * kotlin.math.sin((m + (phase?.value ?: 1f) * 0.5f) * Math.PI.toFloat()).let { kotlin.math.abs(it) }
                     drawOval(line.copy(alpha = 0.08f), Offset(185f - w, 3f), Size(2 * w, 364f), style = Stroke(1f / k))
                 }
             }
@@ -125,13 +124,13 @@ fun Globe(
                 val icon = rememberAppIcon(icons, app.entry.key)
                 Column(
                     Modifier
-                        .offset(unit * (x - r), unit * (y - r))
+                        .offset { androidx.compose.ui.unit.IntOffset((unit * (x - r)).roundToPx(), (unit * (y - r)).roundToPx()) }
                         .size(unit * d)
-                        .alpha(dim)
+                        .graphicsLayer { alpha = dim }
                         .clip(CircleShape)
                         .background(Color(0xE0242527))
                         .border(if (top) 1.5.dp else 1.dp, if (top) tokens.accent.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.10f), CircleShape)
-                        .combinedClickable(role = Role.Button, onClick = { onLaunch(app.entry) }, onLongClick = { onMenu(app.entry) })
+                        .combinedClickable(role = Role.Button, onClick = { onLaunch(app.entry) }, onLongClick = { onMenu(app.entry) }, onLongClickLabel = stringResource(R.string.menu_options))
                         .semantics { contentDescription = app.entry.label; traversalIndex = index.toFloat() },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,

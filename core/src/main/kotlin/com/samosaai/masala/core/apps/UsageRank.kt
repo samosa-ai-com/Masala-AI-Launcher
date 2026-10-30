@@ -37,8 +37,8 @@ object UsageRank {
             .toList()
 
     /**
-     * Apps opened at about this time of day on earlier days (the drawer's "Suggested now"): launches within
-     * [windowMinutes] of [minuteOfDay], most first, ties by label.
+     * Apps opened at about this time of day (the drawer's "Suggested now"): launches within
+     * [windowMinutes] of [minuteOfDay], today's launches in the window included, most first, ties by label.
      */
     fun suggestedNow(launches: List<Launch>, minuteOfDay: Int, zone: ZoneId, label: (String) -> String, windowMinutes: Int = 90, limit: Int = 5): List<String> {
         val near = launches.filter { l ->
