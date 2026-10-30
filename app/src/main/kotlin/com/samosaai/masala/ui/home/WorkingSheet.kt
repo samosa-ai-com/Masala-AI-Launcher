@@ -85,7 +85,7 @@ fun WorkingSheet(state: CommandState.Thinking, character: Character, onStop: () 
                 Text(stringResource(if (layoutRun) R.string.working_layout else R.string.working_title), style = MaterialTheme.typography.titleMedium, color = MasalaColors.Text)
                 Text(
                     "%d:%02d".format(elapsed / 60, elapsed % 60) + if (layoutRun) " · " + stringResource(R.string.working_layout_usual) else "",
-                    fontFamily = MasalaMono, fontSize = 12.5.sp, color = MasalaColors.Text.copy(alpha = 0.62f),
+                    fontFamily = MasalaMono, fontSize = 12.5.sp, color = MasalaColors.Text.copy(alpha = 0.62f), maxLines = 1,
                 )
             }
             OutlinedButton(onClick = onStop, modifier = Modifier.height(36.dp)) { Text(stringResource(R.string.working_stop), color = MasalaColors.Text) }

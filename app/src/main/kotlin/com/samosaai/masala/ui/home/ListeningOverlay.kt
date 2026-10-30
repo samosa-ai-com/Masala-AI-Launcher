@@ -81,7 +81,7 @@ fun ListeningOverlay(
     val spin by rememberInfiniteTransition(label = "glow").animateFloat(0f, if (still) 0f else 360f, infiniteRepeatable(tween(4000, easing = LinearEasing)), label = "spin")
     val bars by rememberInfiniteTransition(label = "bars").animateFloat(0f, if (still) 0f else 1f, infiniteRepeatable(tween(1000, easing = LinearEasing)), label = "bars")
 
-    Box(Modifier.fillMaxSize().background(Color(0x990A0912))) {
+    Box(Modifier.fillMaxSize().background(Color(0xCC0A0912))) {
         Canvas(Modifier.fillMaxSize()) {
             val w = 4.dp.toPx() + 6.dp.toPx() * level().coerceIn(0f, 1f)
             drawRoundRect(

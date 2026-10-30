@@ -327,8 +327,6 @@ class HomeActivity : ComponentActivity() {
             },
         ) }
 
-        ConfirmationSheet(app.confirmationGate)
-
         // Listening, work and replies (UI refresh U4); a command runs on if home is left.
         if (!drawerOpen && !drawerShown) {
             val command by app.commands.state.collectAsStateWithLifecycle()
@@ -364,6 +362,9 @@ class HomeActivity : ComponentActivity() {
                 }
             }
         }
+
+        // Above the working sheet and the reply card: a confirmation must never be hidden by them.
+        ConfirmationSheet(app.confirmationGate)
 
         if (drawerReady || drawerOpen) Box(
             Modifier
