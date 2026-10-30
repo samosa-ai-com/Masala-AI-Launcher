@@ -452,6 +452,7 @@ class SecondBrainStore(
         front["updated"] = today()
         if (front["area"].isNullOrBlank()) front["area"] = "Personal"
         if (front["type"].isNullOrBlank()) front["type"] = "note"
+        journal(id, file)
         file.writeText(renderRecord(front, markdown.trim()))
         file
     }
@@ -460,8 +461,196 @@ class SecondBrainStore(
     fun deleteEntry(id: String): Boolean = synchronized(lock) {
         val file = vaultFile(id) ?: return false
         if (!file.isFile) return false
-        if (file.parentFile == root && file.name in setOf("SOUL.md", "MEMORY.md", "user.md")) return false
+        if (file.parentFile == root && file.name in ROOT_FILES) return false
+        journal(id, file)
         file.delete()
+    }
+
+    // ---- gated writes (plan `second-brain-robust.md` S2) ----
+
+    /** What a gated write did: the vault id written, or every reason it was refused. */
+    data class WriteOutcome(
+        val id: String,
+        val errors: List<String> = emptyList(),
+        val created: Boolean = false,
+        /** Restores the file as it was before this change; null when nothing was written. */
+        val undoId: String? = null,
+    ) {
+        val ok: Boolean get() = errors.isEmpty()
+    }
+
+    /**
+     * Writes a whole record at a vault path (or appends to it). Records in areas/, people/ and notes/
+     * must pass [validateRecord]; MEMORY.md and SOUL.md stay under their startup caps; user.md and raw/
+     * are never written here. An existing dated note can only be appended to, and a new file whose
+     * name or title matches an existing record is refused unless [allowDuplicate].
+     */
+    fun writeRecord(path: String, content: String, append: Boolean = false, allowDuplicate: Boolean = false): WriteOutcome =
+        synchronized(lock) {
+            val id = normalizeId(path)
+            refuseTarget(id)?.let { return WriteOutcome(id, listOf(it)) }
+            if ('\u0000' in content) return WriteOutcome(id, listOf("$id: memory files are text; refusing binary content."))
+            val file = vaultFile(id) ?: return WriteOutcome(id, listOf("$id: not a path inside the Second Brain."))
+            val exists = file.isFile
+            if (exists && !append && isDatedNote(id)) {
+                return WriteOutcome(
+                    id,
+                    listOf(
+                        "$id is a dated note: it records what was true then and is never replaced. Write the new " +
+                            "decision as a new note with a 'Superseded by [[$id]]'-style link both ways, or append.",
+                    ),
+                )
+            }
+            val effective = if (append && exists) {
+                val old = file.readText()
+                if (old.isEmpty() || old.endsWith("\n")) old + content else old + "\n" + content
+            } else {
+                content
+            }
+            val dirKind = recordDirKind(id)
+            val snapshot = loadSnapshot()
+            if (!exists && dirKind != null && !allowDuplicate) {
+                val title = frontmatterOf(effective)?.get("title")?.let(::unquote).orEmpty()
+                val dups = (findPossibleDuplicates(id, snapshot) +
+                    title.takeIf { it.isNotBlank() }?.let { findPossibleDuplicates(it, snapshot) }.orEmpty()).distinct().sorted()
+                if (dups.isNotEmpty()) {
+                    return WriteOutcome(
+                        id,
+                        listOf(
+                            "$id: ${dups.joinToString(", ")} already covers this. Update that file instead " +
+                                "(one fact in one place), or pass allow_duplicate if it really is something else.",
+                        ),
+                    )
+                }
+            }
+            checkContent(id, dirKind, effective, snapshot).takeIf { it.isNotEmpty() }?.let { return WriteOutcome(id, it) }
+            val undoId = journal(id, file)
+            file.parentFile?.mkdirs()
+            file.writeText(effective)
+            WriteOutcome(id, created = !exists, undoId = undoId)
+        }
+
+    /** Replaces exact text in a vault file; the result must still pass the same checks as a write. */
+    fun editRecord(path: String, oldText: String, newText: String, replaceAll: Boolean = false): WriteOutcome =
+        synchronized(lock) {
+            val id = normalizeId(path)
+            refuseTarget(id)?.let { return WriteOutcome(id, listOf(it)) }
+            val file = vaultFile(id)?.takeIf { it.isFile } ?: return WriteOutcome(id, listOf("$id does not exist."))
+            if (oldText.isEmpty()) return WriteOutcome(id, listOf("$id: old_text is empty."))
+            val text = file.readText()
+            var count = 0
+            var at = text.indexOf(oldText)
+            while (at >= 0) {
+                count++
+                at = text.indexOf(oldText, at + oldText.length)
+            }
+            when {
+                count == 0 -> return WriteOutcome(id, listOf("$id: old_text was not found. Read the file and copy the text exactly."))
+                count > 1 && !replaceAll -> return WriteOutcome(
+                    id,
+                    listOf("$id: old_text appears $count times. Give more surrounding text, or pass replace_all."),
+                )
+            }
+            val updated = if (replaceAll) text.replace(oldText, newText) else text.replaceFirst(oldText, newText)
+            checkContent(id, recordDirKind(id), updated, loadSnapshot()).takeIf { it.isNotEmpty() }?.let { return WriteOutcome(id, it) }
+            val undoId = journal(id, file)
+            file.writeText(updated)
+            WriteOutcome(id, undoId = undoId)
+        }
+
+    /** Deletes a record or raw file. Root files are refused. */
+    fun deleteRecord(path: String): WriteOutcome = synchronized(lock) {
+        val id = normalizeId(path)
+        if (id in ROOT_FILES) return WriteOutcome(id, listOf("$id is a root file and is never deleted."))
+        if (recordDirKind(id) == null && !isRawId(id)) {
+            return WriteOutcome(id, listOf("$id: only files in areas/, people/, notes/ and raw/ can be deleted."))
+        }
+        val file = vaultFile(id)?.takeIf { it.isFile } ?: return WriteOutcome(id, listOf("$id does not exist."))
+        val undoId = journal(id, file)
+        if (!file.delete()) return WriteOutcome(id, listOf("$id could not be deleted."))
+        WriteOutcome(id, undoId = undoId)
+    }
+
+    /** Puts a file back as it was before the change [undoId] names. False when the entry is gone. */
+    fun undo(undoId: String): Boolean = synchronized(lock) {
+        if (!JOURNAL_ID_REGEX.matches(undoId)) return false
+        val pathFile = File(journalDir(), "$undoId.path").takeIf { it.isFile } ?: return false
+        val id = pathFile.readText().trim()
+        val file = vaultFile(id) ?: return false
+        val prev = File(journalDir(), "$undoId.prev")
+        if (prev.isFile) {
+            file.parentFile?.mkdirs()
+            prev.copyTo(file, overwrite = true)
+        } else {
+            file.delete()
+        }
+        pathFile.delete()
+        prev.delete()
+        true
+    }
+
+    /** The vault id a journal entry restores, or null. */
+    fun undoTarget(undoId: String): String? =
+        undoId.takeIf { JOURNAL_ID_REGEX.matches(it) }
+            ?.let { File(journalDir(), "$it.path") }?.takeIf { it.isFile }?.readText()?.trim()
+
+    private fun journalDir() = File(root, ".history")
+
+    private var journalSeq = 0
+
+    /** Saves [file]'s current bytes (or that it didn't exist) before a change; keeps the newest [JOURNAL_KEEP]. */
+    private fun journal(id: String, file: File): String {
+        val dir = journalDir().apply { mkdirs() }
+        val undoId = "%013d-%04d".format(System.currentTimeMillis(), journalSeq++ % 10_000)
+        File(dir, "$undoId.path").writeText(id)
+        if (file.isFile) file.copyTo(File(dir, "$undoId.prev"), overwrite = true)
+        dir.listFiles { f -> f.name.endsWith(".path") }
+            ?.map { it.name.removeSuffix(".path") }
+            ?.sortedDescending()
+            ?.drop(JOURNAL_KEEP)
+            ?.forEach { old ->
+                File(dir, "$old.path").delete()
+                File(dir, "$old.prev").delete()
+            }
+        return undoId
+    }
+
+    private fun normalizeId(path: String): String = path.trim().replace('\\', '/').trimStart('/')
+
+    private fun isRawId(id: String): Boolean = id.startsWith("raw/") && id.count { it == '/' } == 1 && id.length > 4
+
+    /** Why [id] can't be written or edited at all, or null. */
+    private fun refuseTarget(id: String): String? = when {
+        id.isBlank() || ".." in id.split('/') -> "'$id' is not a path inside the Second Brain."
+        id == "user.md" -> "user.md is synced from Settings → Profile; change the profile instead."
+        id.startsWith("raw/") -> "$id: raw files are never edited. File new drops with memory_file_raw."
+        id in ROOT_FILES -> null
+        recordDirKind(id) == null -> "$id: records live in areas/, people/ or notes/ as one .md file each (no subfolders)."
+        else -> null
+    }
+
+    /** Schema for records, caps for the two root files. */
+    private fun checkContent(id: String, dirKind: String?, content: String, snapshot: SecondBrainSnapshot): List<String> {
+        val cap = when (id) {
+            "SOUL.md" -> SOUL_CAP_CHARS
+            "MEMORY.md" -> MEMORY_CAP_CHARS
+            else -> null
+        }
+        if (cap != null) {
+            return if (content.length > cap) listOf("$id must stay under $cap characters (now ${content.length}): it is read at the start of every run.") else emptyList()
+        }
+        if (dirKind == null) return emptyList()
+        // Writing areas/<name>.md with area <name> is how a new area is created.
+        val bootstrap = if (dirKind == "areas") {
+            setOf(id.substringAfter('/').substringBeforeLast('.')) + listOfNotNull(frontmatterOf(content)?.get("title")?.let(::unquote))
+        } else {
+            emptySet()
+        }
+        val known = knownAreaNames(snapshot) + bootstrap
+        val areaOk = { area: String -> known.any { it.equals(area, ignoreCase = true) } }
+        val area = frontmatterOf(content)?.get("area")?.let(::unquote).orEmpty()
+        val result = validateRecord(id, content, dirKind, if (area.isNotBlank() && areaOk(area)) known + area else known)
+        return result.errors
     }
 
     /** The Second Brain prompt block: capped SOUL.md + MEMORY.md plus entry titles. */
@@ -945,6 +1134,12 @@ class SecondBrainStore(
             "people" to setOf("person", "contact-card"),
             "notes" to setOf("note", "meeting", "decision", "reference"),
         )
+
+        /** The three root files: never deleted; user.md is never written by a record write. */
+        val ROOT_FILES = setOf("SOUL.md", "MEMORY.md", "user.md")
+        /** Undo depth, the same as the layout history. */
+        const val JOURNAL_KEEP = 50
+        private val JOURNAL_ID_REGEX = Regex("^\\d{13}-\\d{4}$")
 
         /** Root files are navigation hubs, not content: never reported as unlinked. */
         val HEALTH_ROOT_IDS = setOf("SOUL.md", "MEMORY.md", "user.md")
