@@ -140,7 +140,14 @@ class HomeActivity : ComponentActivity() {
         val drawerMostlyOpen by remember { derivedStateOf { drawerProgress.value > 0.5f } }
         val drawerSettled by remember { derivedStateOf { drawerOpen && drawerProgress.value >= 1f } }
         val drawerSpring = remember { spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow) }
-        LaunchedEffect(drawerOpen) { drawerProgress.animateTo(if (drawerOpen) 1f else 0f, drawerSpring) }
+        LaunchedEffect(drawerOpen) {
+            // The release animation below already drives toward the same target with the fling's
+            // velocity; replaying it here with velocity 0 would cancel that momentum (the second
+            // animateTo wins). External changes (Back, tap) have no animation in flight, so they
+            // still animate from here.
+            val target = if (drawerOpen) 1f else 0f
+            if (drawerProgress.targetValue != target) drawerProgress.animateTo(target, drawerSpring)
+        }
         // Composed once home has drawn its first frame, so the first open is as quick as the rest.
         var drawerReady by remember { mutableStateOf(false) }
         LaunchedEffect(Unit) {

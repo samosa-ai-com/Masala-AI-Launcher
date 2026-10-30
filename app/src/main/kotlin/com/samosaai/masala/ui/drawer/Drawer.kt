@@ -154,7 +154,10 @@ fun Drawer(
                         onGo = {
                             // Enter while composing finishes the character instead (Olauncher §2.4).
                             if (composing) return@KeyboardActions
-                            results.firstOrNull()?.let(onLaunch) ?: text.takeIf { it.isNotBlank() }?.let(onAsk)
+                            // The async rank may still be for the previous keystroke; rank this text
+                            // synchronously instead of launching its stale top hit (~100 apps, <1 ms).
+                            val active = if (current) results else AppSearch.rank(text, prepared)
+                            active.firstOrNull()?.let(onLaunch) ?: text.takeIf { it.isNotBlank() }?.let(onAsk)
                         },
                     ),
                     modifier = Modifier.weight(1f).focusRequester(focus),

@@ -11,7 +11,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -67,8 +66,9 @@ fun rememberAppIcon(icons: IconCache, key: AppKey): ImageBitmap? {
 
 @Composable
 fun rememberShortcutIcon(icons: IconCache, info: ShortcutInfo): ImageBitmap? {
-    val icon by produceState(icons.cached(IconCache.shortcutId(info)), IconCache.shortcutId(info)) {
-        value = icons.shortcut(info)
-    }
+    // A cached icon needs no coroutine, like rememberAppIcon above.
+    val id = IconCache.shortcutId(info)
+    var icon by remember(id) { mutableStateOf(icons.cached(id)) }
+    if (icon == null) LaunchedEffect(id) { icon = icons.shortcut(info) }
     return icon
 }

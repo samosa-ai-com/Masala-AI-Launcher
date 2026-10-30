@@ -57,7 +57,10 @@ class LauncherModel(
         combine(catalog.state, catalog.shortcutsVersion, shortcutRefresh) { _, _, _ -> Unit }
             .map { actions.pinnedShortcuts() }
             // Home comes back often (each onResume refreshes); an unchanged list must not recompose it.
-            .distinctUntilChangedBy { list -> list.map { "${it.`package`}/${it.id}#${it.userHandle.hashCode()}" } }
+            // The key includes the label and last-changed timestamp, so an updated shortcut still refreshes.
+            .distinctUntilChangedBy { list ->
+                list.map { "${it.`package`}/${it.id}#${it.userHandle.hashCode()}:${it.lastChangedTimestamp}:${it.shortLabel}" }
+            }
             .flowOn(Dispatchers.IO)
             .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
