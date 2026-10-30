@@ -32,8 +32,20 @@ class SecondBrainRepository(
     /** A change the agent just made (D1: applied at once), shown with Undo until dismissed. */
     data class Remembered(val id: String, val action: String, val undoId: String)
 
+    /** Recent agent changes, oldest first. */
+    private val changes = MutableStateFlow<List<Remembered>>(emptyList())
     private val _remembered = MutableStateFlow<List<Remembered>>(emptyList())
+
+    /**
+     * One card per file, newest first: its latest change. Undo steps that file back one change, and
+     * the change before it becomes the card, so an old card can never wipe out newer edits.
+     */
     val remembered: StateFlow<List<Remembered>> = _remembered.asStateFlow()
+
+    private fun setChanges(list: List<Remembered>) {
+        changes.value = list.takeLast(MAX_CHANGES)
+        _remembered.value = changes.value.asReversed().distinctBy { it.id }.take(MAX_REMEMBERED)
+    }
 
     private val tick = MutableStateFlow(0)
 
@@ -181,7 +193,7 @@ class SecondBrainRepository(
             audit("memory_undo", target.orEmpty())
             refresh()
         }
-        dismissRemembered(undoId)
+        setChanges(changes.value.filterNot { it.undoId == undoId })
         return ok
     }
 
@@ -193,7 +205,7 @@ class SecondBrainRepository(
         if (outcome.ok) {
             audit(action, outcome.id)
             outcome.undoId?.let { undoId ->
-                _remembered.value = (_remembered.value + Remembered(outcome.id, action, undoId)).takeLast(MAX_REMEMBERED)
+                setChanges(changes.value + Remembered(outcome.id, action, undoId))
             }
             refresh()
         }
@@ -202,7 +214,8 @@ class SecondBrainRepository(
 
     /** Hides a change's card; the change itself stays. */
     fun dismissRemembered(undoId: String) {
-        _remembered.value = _remembered.value.filterNot { it.undoId == undoId }
+        val id = changes.value.firstOrNull { it.undoId == undoId }?.id ?: return
+        setChanges(changes.value.filterNot { it.id == id })
     }
 
     /** Every detail record as one Markdown document, for export (bodies only, no frontmatter). */
@@ -333,6 +346,8 @@ class SecondBrainRepository(
 
     companion object {
         const val MAX_REMEMBERED = 5
+        /** Changes kept for step-by-step undo from the cards. */
+        const val MAX_CHANGES = 20
         private val USER_CARD_NAMES = setOf("user.md", "user", "profile", "user card", "user profile")
     }
 }

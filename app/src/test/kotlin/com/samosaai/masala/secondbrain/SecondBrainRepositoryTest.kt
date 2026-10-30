@@ -96,7 +96,7 @@ class SecondBrainRepositoryTest {
         assertTrue(brain.remembered.value.isEmpty())
         repeat(8) { brain.write("notes/page-$it.md", note("Page $it")) }
         assertEquals(SecondBrainRepository.MAX_REMEMBERED, brain.remembered.value.size)
-        assertEquals("notes/page-7.md", brain.remembered.value.last().id)
+        assertEquals("notes/page-7.md", brain.remembered.value.first().id)
     }
 
     @Test fun datedNoteEditsAskFirstOtherWritesDoNot() = runBlocking<Unit> {
@@ -267,5 +267,26 @@ class SecondBrainRepositoryTest {
             listOf("memory_write" to "people/asha-sharma.md", "memory_edit" to "people/asha-sharma.md", "memory_undo" to "people/asha-sharma.md"),
             audited.filter { it.first.startsWith("memory_") && it.first != "memory_approve" },
         )
+    }
+
+    @Test fun oneCardPerFileAndUndoStepsBack() = runBlocking<Unit> {
+        fresh()
+        brain.write("notes/gym.md", note("Gym", "Mondays."))
+        brain.edit("notes/gym.md", "Mondays", "Tuesdays")
+        brain.write("notes/tea.md", note("Tea", "Green."))
+        // Newest first, one per file: the gym card is its edit, not the create.
+        assertEquals(listOf("notes/tea.md" to "memory_write", "notes/gym.md" to "memory_edit"), brain.remembered.value.map { it.id to it.action })
+        assertTrue(brain.undo(brain.remembered.value.first { it.id == "notes/gym.md" }.undoId))
+        assertTrue(File(dir, "notes/gym.md").readText().contains("Mondays."))
+        // The create is the gym card now; undoing it removes the file.
+        val create = brain.remembered.value.first { it.id == "notes/gym.md" }
+        assertEquals("memory_write", create.action)
+        assertTrue(brain.undo(create.undoId))
+        assertTrue(!File(dir, "notes/gym.md").exists())
+        assertEquals(listOf("notes/tea.md"), brain.remembered.value.map { it.id })
+        // Dismiss hides every change to that file.
+        brain.edit("notes/tea.md", "Green", "Black")
+        brain.dismissRemembered(brain.remembered.value.single().undoId)
+        assertTrue(brain.remembered.value.isEmpty())
     }
 }
