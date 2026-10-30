@@ -57,10 +57,9 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
     private val loadJob = ioScope.launch { runCatching { load() }.onFailure { Log.w(TAG, "settings load failed", it) } }
 
     init {
-        // Start from the compiled-in seed synchronously; disk and Keystore load on IO right after,
-        // so Application.onCreate never blocks on them.
+        // Start from the compiled-in seed synchronously; disk and Keystore load on IO right after
+        // (loadJob), so Application.onCreate never blocks on them.
         _profile = MutableStateFlow(seedProfile())
-        ioScope.launch { load() }
     }
 
     val profile: StateFlow<AiProfile> = _profile.asStateFlow()
@@ -94,11 +93,19 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
         context.aiStore.edit { it[Keys.profile] = json.encodeToString(AiProfile.serializer(), next) }
     }
 
-    suspend fun update(change: (AiProfile) -> AiProfile) = setProfile(change(_profile.value))
+    suspend fun update(change: (AiProfile) -> AiProfile) {
+        loadJob.join()
+        setProfile(change(_profile.value))
+    }
 
     /** Saves [key] for [presetId] (blank removes it). The plain text never touches storage. */
     suspend fun setKey(presetId: String, key: String) {
         loadJob.join()
+        saveKey(presetId, key)
+    }
+
+    /** [setKey] without the join; only the first load (via [seed]) may use this. */
+    private suspend fun saveKey(presetId: String, key: String) {
         val trimmed = key.trim()
         val snapshot = synchronized(plain) {
             if (trimmed.isEmpty()) {
@@ -140,9 +147,9 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
         val p = _profile.value
         val debug = context.getSharedPreferences("debug_llm", Context.MODE_PRIVATE)
         val llmKey = debug.getString("api_key", null) ?: LlmConfig.fromBuild.apiKey
-        if (llmKey.isNotBlank() && !hasKey(p.chat.presetId)) setKey(p.chat.presetId, llmKey)
+        if (llmKey.isNotBlank() && !hasKey(p.chat.presetId)) saveKey(p.chat.presetId, llmKey)
         val sttKey = SpeechConfig.fromBuild.apiKey
-        p.voiceIn?.let { if (sttKey.isNotBlank() && !hasKey(it.presetId)) setKey(it.presetId, sttKey) }
+        p.voiceIn?.let { if (sttKey.isNotBlank() && !hasKey(it.presetId)) saveKey(it.presetId, sttKey) }
         context.aiStore.edit {
             it[Keys.profile] = json.encodeToString(AiProfile.serializer(), p)
             it[Keys.seeded] = true
