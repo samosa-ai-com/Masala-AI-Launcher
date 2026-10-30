@@ -84,6 +84,9 @@ class MasalaApp : Application() {
     val database by lazy { MasalaDatabase.create(this) }
     val miniApps by lazy { MiniAppStore(database.miniApps()) }
     val settings by lazy { SettingsStore(this) }
+
+    /** Open-Meteo for the daily brief and the `weather` tool. */
+    val weather by lazy { com.samosaai.masala.weather.WeatherClient() }
     val actionLog by lazy { ActionLog(this) }
 
     /** Bundled personas and skills, then the ones the user imported. */

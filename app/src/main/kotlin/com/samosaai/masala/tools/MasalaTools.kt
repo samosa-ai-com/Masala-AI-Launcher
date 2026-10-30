@@ -146,6 +146,20 @@ object MasalaTools {
             FunctionTool(Defs.webFetch, READ_ONLY, usesNetwork = true) {
                 webFetch.fetch(url = it.string("url") ?: return@FunctionTool missing("url"), format = it.string("format"))
             },
+            // The saved place is where the user lives, so the answer counts as private.
+            FunctionTool(Defs.weather, READ_ONLY, readsPrivateData = true, usesNetwork = true) { args ->
+                val host = host()
+                val place = when (val name = args.string("place")?.takeIf { it.isNotBlank() }) {
+                    null -> host.settings.current().briefPlace
+                        ?: return@FunctionTool ActionResult.error("No place is set for the weather. Ask the user to pick one in Settings → Daily brief, or pass a place.")
+                    else -> host.weather.search(name).getOrElse { return@FunctionTool ActionResult.error(it.message ?: "The weather service can't be reached.") }
+                        .firstOrNull() ?: return@FunctionTool ActionResult.error("No place called '$name' was found.")
+                }
+                host.weather.today(place).fold(
+                    { ActionResult.ok(it.line()) },
+                    { ActionResult.error(it.message ?: "The weather service can't be reached.") },
+                )
+            },
             FunctionTool(Defs.getBatteryInfo, READ_ONLY) { system.getBatteryInfo() },
             FunctionTool(Defs.toggleWifi, CHANGES_SOMETHING) { system.toggleWifi(it.boolean("enabled") ?: return@FunctionTool missing("enabled")) },
 

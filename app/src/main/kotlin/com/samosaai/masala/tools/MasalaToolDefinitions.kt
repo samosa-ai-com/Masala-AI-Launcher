@@ -588,6 +588,20 @@ object MasalaToolDefinitions {
         }
     )
 
+    val weather = tool(
+        "weather",
+        "Today's weather: conditions, temperature now, the high and low in °C and the chance of rain. " +
+            "Without a place it is for the place the user set in Settings → Daily brief.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("place") {
+                    put("type", "string")
+                    put("description", "Optional city or town name, for weather somewhere else.")
+                }
+            }
+        }
+    )
+
     val getBatteryInfo = tool(
         "get_battery_info",
         "Report battery percentage and charging state.",
@@ -1057,6 +1071,7 @@ object MasalaToolDefinitions {
         setClipboard,
         webSearch,
         webFetch,
+        weather,
         getBatteryInfo,
         toggleWifi,
         nextAlarm,
