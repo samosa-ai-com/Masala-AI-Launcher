@@ -39,6 +39,7 @@ import com.samosaai.masala.llm.LlmConfig
 import com.samosaai.masala.skills.AiReports
 import com.samosaai.masala.skills.PrefsDeclinedSchedules
 import com.samosaai.masala.skills.SkillRunner
+import com.samosaai.masala.brief.BriefInputs
 import com.samosaai.masala.skills.SkillScheduling
 import com.samosaai.masala.skills.TranscriptFiles
 import com.samosaai.masala.scheduled.ScheduledSkillRunner
@@ -137,7 +138,11 @@ class MasalaApp : Application() {
 
     /** Runs skills; app-scoped, so a run goes on after its sheet closes. */
     val skillRunner by lazy {
-        SkillRunner(scope, database.skillRuns(), database.skillArtifacts(), TranscriptFiles(java.io.File(filesDir, "skill_runs")), { if (it == COMMAND_SKILL_ID) COMMAND_SKILL else skills.getSkillById(it) }, ::skillAgent)
+        SkillRunner(
+            scope, database.skillRuns(), database.skillArtifacts(), TranscriptFiles(java.io.File(filesDir, "skill_runs")),
+            { if (it == COMMAND_SKILL_ID) COMMAND_SKILL else skills.getSkillById(it) }, ::skillAgent,
+            runData = { skill -> if (skill.id == BriefInputs.SKILL_ID) BriefInputs(this).collect().toPrompt() else null },
+        )
     }
 
     val aiReports by lazy { AiReports(this) }
@@ -199,14 +204,18 @@ class MasalaApp : Application() {
         MiniAppConsole.clear(id)
     }
 
+    /** The language Masala speaks and writes spoken text in: Settings → Voice, else the phone's. */
+    fun voiceLanguage(): Language =
+        aiSettings.profile.value.voiceLanguage.takeIf { it.isNotBlank() }?.let { code -> Language.entries.firstOrNull { it.matchesCode(code) } }
+            ?: Language.entries.firstOrNull { it.matchesCode(java.util.Locale.getDefault().language) } ?: Language.ENGLISH
+
     /**
      * Reads [text] aloud with the voice chosen in Settings → Voice (the phone's, or an API voice). Null when it
      * played to the end (or the user stopped it), else the user-facing reason.
      */
     suspend fun speakReply(text: String): String? {
         val profile = aiSettings.profile.value
-        val language = profile.voiceLanguage.takeIf { it.isNotBlank() }?.let { code -> Language.entries.firstOrNull { it.matchesCode(code) } }
-            ?: Language.entries.firstOrNull { it.matchesCode(java.util.Locale.getDefault().language) } ?: Language.ENGLISH
+        val language = voiceLanguage()
         val out = profile.voiceOut
         val spoke = if (out != null) {
             tts.speak(text, AudioProvider.API, apiModel = out.model, voice = profile.voice, language = language, rate = profile.speechRate)

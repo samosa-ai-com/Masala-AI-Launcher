@@ -74,13 +74,43 @@ class SkillRunnerTest {
     private fun call(id: String, name: String) = ToolCall(id, function = FunctionCall(name, "{}"))
     private fun user(text: String) = ChatMessage("user", JsonPrimitive(text))
 
-    private fun runner(vararg replies: ChatMessage, tool: (String) -> ToolResult = { ToolResult.Success("ok") }): SkillRunner {
+    /** What the model was sent, request by request. */
+    private val requests = mutableListOf<List<ChatMessage>>()
+
+    private fun runner(
+        vararg replies: ChatMessage,
+        runData: suspend (MasalaSkill) -> String? = { null },
+        tool: (String) -> ToolResult = { ToolResult.Success("ok") },
+    ): SkillRunner {
         val queue = ArrayDeque(replies.toList())
         return SkillRunner(scope, runs, artifacts, transcripts, { if (it == "chef") chef else null }, { skill, unattended ->
             val toolScope = ToolScope.skill(skill, infos).let { if (unattended) ToolScope.unattended(it, infos) else it }
             scopesSeen += toolScope.names
-            MasalaAgent(AgentModel { _, _ -> queue.removeFirst() }, { name, _ -> tool(name) }, definitions, toolScope, { "system" })
-        })
+            MasalaAgent(AgentModel { messages, _ -> synchronized(requests) { requests += messages }; queue.removeFirst() }, { name, _ -> tool(name) }, definitions, toolScope, { "system" })
+        }, runData = runData)
+    }
+
+    @Test fun runDataGoesToTheModelOnTheFirstTurnOnly() = runBlocking {
+        val r = runner(reply("Brief"), reply("Sure"), runData = { skill -> "Date: today for ${skill.id}" })
+        val id = r.start("chef", user("go"))!!
+        r.finished(id)
+        val firstUser = requests.first().last { it.role == "user" }.textContent
+        assertTrue(firstUser.startsWith("<run-data>\nDate: today for chef\n</run-data>"), firstUser)
+        assertTrue(firstUser.endsWith("go"))
+        r.send(id, user("more?"))
+        withTimeout(5_000) { r.open(id)!!.first { !it.running && it.events.count { e -> e is SkillRunEvent.Done } == 2 } }
+        assertEquals("more?", requests.last().last { it.role == "user" }.textContent)
+        // The sheet shows only what the user typed, live and after a restore.
+        val users = { events: List<SkillRunEvent> -> events.filterIsInstance<SkillRunEvent.Message>().filter { it.role == SkillRunEvent.Message.Role.USER }.map { it.text } }
+        assertEquals(listOf("go", "more?"), users(r.open(id)!!.value.events))
+        assertEquals(listOf("go", "more?"), users(SkillRunner.eventsFrom(transcripts.read(id)!!)))
+    }
+
+    @Test fun aFailingRunDataStillRunsTheSkill() = runBlocking {
+        val r = runner(reply("Plain"), runData = { error("calendar exploded") })
+        val id = r.start("chef", user("go"))!!
+        assertEquals("done", r.finished(id).let { runs.get(id)!!.status })
+        assertEquals("go", requests.single().last { it.role == "user" }.textContent)
     }
 
     private suspend fun SkillRunner.finished(id: Long) = withTimeout(5_000) { open(id)!!.first { !it.running && it.events.any { e -> e is SkillRunEvent.Done || e is SkillRunEvent.Failed } } }

@@ -22,6 +22,17 @@ class SecondBrainStoreTest {
     private fun record(title: String, area: String = "Personal", type: String = "note", extra: String = "") =
         "---\ntitle: $title\narea: $area\ntype: $type\nupdated: 2026-10-29\n$extra---\n\nBody.\n"
 
+    @Test fun theDailyBriefTopicsNotePassesTheWriteCheck() {
+        val path = com.samosaai.masala.core.brief.BriefTopics.PATH
+        val text = com.samosaai.masala.core.brief.BriefTopics.render(listOf("Formula 1", "Android"), java.time.LocalDate.of(2026, 10, 29))
+        val created = store.writeRecord(path, text)
+        assertTrue(created.errors.joinToString(), created.ok)
+        // Saving the list again replaces it rather than counting as a duplicate.
+        val again = store.writeRecord(path, com.samosaai.masala.core.brief.BriefTopics.render(listOf("Chess"), java.time.LocalDate.of(2026, 10, 29)))
+        assertTrue(again.errors.joinToString(), again.ok)
+        assertEquals(listOf("Chess"), com.samosaai.masala.core.brief.BriefTopics.parse(store.readText(path)!!.text))
+    }
+
     @Test fun freshVaultIsClean() {
         val snapshot = store.loadSnapshot()
         assertTrue(snapshot.available)

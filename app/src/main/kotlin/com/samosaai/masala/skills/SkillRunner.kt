@@ -2,6 +2,7 @@ package com.samosaai.masala.skills
 
 import com.samosaai.masala.agent.AgentEvent
 import com.samosaai.masala.agent.MasalaAgent
+import com.samosaai.masala.core.agent.RunData
 import com.samosaai.masala.core.contract.MasalaJson
 import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.core.tool.ToolResult
@@ -25,6 +26,8 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -37,6 +40,9 @@ import java.util.concurrent.atomic.AtomicLong
  * [agentFor] builds the agent for a skill; the app passes one with the skill's [com.samosaai.masala.core.agent.ToolScope],
  * cut down to read-only tools when the run is `unattended` (scheduled runs nobody watches, arch §3.9).
  *
+ * [runData] gathers data a skill needs before the model starts (the daily brief's calendar and weather). It
+ * goes in front of the run's first message as a [RunData] block: saved with the transcript, hidden in the sheet.
+ *
  * The whole conversation is saved in [transcripts], one file per run: tool replies can be large, and a
  * database row past 2 MB can't be read back. The row keeps only the last answer, for the widget.
  */
@@ -48,6 +54,7 @@ class SkillRunner(
     private val skill: (String) -> MasalaSkill?,
     private val agentFor: (skill: MasalaSkill, unattended: Boolean) -> MasalaAgent,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val runData: suspend (MasalaSkill) -> String? = { null },
 ) {
     private class Active(val skill: MasalaSkill, var agent: MasalaAgent, var unattended: Boolean, val state: MutableStateFlow<SkillRunState>) {
         var job: Job? = null
@@ -67,7 +74,7 @@ class SkillRunner(
         )
         val run = Active(skill, agentFor(skill, unattended), unattended, MutableStateFlow(SkillRunState(id, skillId)))
         active[id] = run
-        turn(id, run, message)
+        turn(id, run, message, first = true)
         return id
     }
 
@@ -111,14 +118,23 @@ class SkillRunner(
         active[runId]?.job?.cancel()
     }
 
-    private suspend fun turn(runId: Long, run: Active, message: ChatMessage) {
+    private suspend fun turn(runId: Long, run: Active, message: ChatMessage, first: Boolean = false) {
         run.state.update { it.copy(events = it.events + SkillRunEvent.Message(SkillRunEvent.Message.Role.USER, message.textContent), running = true) }
         save(runId, run, "running", null)
         run.job = scope.launch {
             var status = "done"
             var error: String? = null
             try {
-                run.agent.run(message).collect { event -> error = handle(runId, run, event) ?: error }
+                // Gathered here, not in start(), so the sheet opens at once.
+                val data = if (!first) null else try {
+                    runData(run.skill)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    null // the model still runs, without the gathered data
+                }
+                val sent = data?.let { message.withRunData(it) } ?: message
+                run.agent.run(sent).collect { event -> error = handle(runId, run, event) ?: error }
                 if (error != null) status = "failed"
             } catch (e: CancellationException) {
                 status = "cancelled"
@@ -216,11 +232,18 @@ class SkillRunner(
 
         /** Rebuilds what the sheet shows from a saved conversation. */
         fun eventsFrom(history: List<ChatMessage>): List<SkillRunEvent> = history.mapNotNull { m ->
+            val userText = if (m.role == "user") RunData.strip(m.textContent) else ""
             when {
-                m.role == "user" && !m.textContent.startsWith("[") -> SkillRunEvent.Message(SkillRunEvent.Message.Role.USER, m.textContent)
+                m.role == "user" -> if (userText.isBlank() || userText.startsWith("[")) null else SkillRunEvent.Message(SkillRunEvent.Message.Role.USER, userText)
                 m.role == "assistant" && m.hasText -> SkillRunEvent.Message(SkillRunEvent.Message.Role.ASSISTANT, m.textContent)
                 else -> null
             }
+        }
+
+        /** [message] with a [RunData] block in front; a message with photos gets it as a first text part. */
+        internal fun ChatMessage.withRunData(data: String): ChatMessage = when (val parts = content) {
+            is JsonArray -> copy(content = JsonArray(listOf(buildJsonObject { put("type", "text"); put("text", RunData.prepend(data, "").trimEnd()) }) + parts))
+            else -> copy(content = JsonPrimitive(RunData.prepend(data, textContent)))
         }
 
         /**
