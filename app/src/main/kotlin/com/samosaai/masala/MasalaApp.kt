@@ -120,6 +120,7 @@ class MasalaApp : Application() {
         scope: (List<ToolInfo>) -> ToolScope = { ToolScope.command(it) },
         instructions: String? = null,
         maxSteps: Int = MasalaAgent.DEFAULT_MAX_STEPS,
+        fetchOnlyResults: Boolean = false,
     ): MasalaAgent {
         val executor = toolExecutor(gate)
         val infos = tools.tools.map { ToolInfo(it.name, it.sensitivity, it.readsPrivateData, it.opensScreen) }
@@ -133,6 +134,7 @@ class MasalaApp : Application() {
                 AgentPrompt.build("$now (${java.util.TimeZone.getDefault().id})", skills.getAllSkills(), secondBrain.promptNow(), instructions)
             },
             maxSteps = maxSteps,
+            fetchOnlyResults = fetchOnlyResults,
         )
     }
 
@@ -286,6 +288,8 @@ class MasalaApp : Application() {
         scope = { infos -> ToolScope.skill(skill, infos).let { if (unattended) ToolScope.unattended(it, infos) else it } },
         instructions = listOfNotNull(skill.persona?.systemPrompt, skill.instructions).joinToString("\n\n"),
         maxSteps = MasalaAgent.SKILL_MAX_STEPS,
+        // It holds private data and nobody sees what it opens, so it opens only what its searches returned.
+        fetchOnlyResults = unattended,
     )
 
     /** The `run_skill` tool: opens the skill sheet on a prompt. */
