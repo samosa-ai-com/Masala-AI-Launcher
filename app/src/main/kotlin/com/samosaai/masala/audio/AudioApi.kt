@@ -203,13 +203,14 @@ class AudioApi(
      * Text-to-speech: synthesize speech and return audio bytes.
      * @param voice must be a valid voice ID from the model's voice list.
      */
-    fun synthesize(text: String, model: String, voice: String): Result<ByteArray> = runCatching {
+    fun synthesize(text: String, model: String, voice: String, speed: Float = 1f): Result<ByteArray> = runCatching {
         val url = "${baseUrl.trimEnd('/')}/audio/speech"
         val json = buildJsonObject {
             put("model", model)
             put("input", text)
             put("voice", voice)
             put("response_format", "wav")
+            if (speed != 1f) put("speed", speed)
         }
         val requestBody = json.toString().toRequestBody("application/json".toMediaType())
         val request = Request.Builder()

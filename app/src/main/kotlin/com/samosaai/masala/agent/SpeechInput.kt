@@ -12,6 +12,12 @@ interface SpeechInput {
     fun start(onFailure: (String) -> Unit): Boolean
     suspend fun stop(): Result<String>
     fun cancel()
+
+    /** Tap to talk: listens until the speaker pauses, then returns the transcript. */
+    suspend fun listenOnce(): Result<String> = Result.failure(UnsupportedOperationException("Tap to talk isn't available"))
+
+    /** Ends [listenOnce] now; what was said so far is still transcribed. */
+    fun finish() {}
 }
 
 /**
@@ -38,6 +44,8 @@ data class SpeechStrings(
  * other one as fallback when the first can't start. A phone whose default recognizer
  * is a stub (or has none) therefore records for the server instead of failing.
  */
+private const val SILENCE_MS = 1200L
+
 class ConfiguredSpeechInput(
     private val engine: PttEngine,
     private val config: () -> SpeechConfig,
@@ -89,6 +97,23 @@ class ConfiguredSpeechInput(
         val language = if (provider.isApiBased()) settings.sttLanguage.ifBlank { language().iso639 } else ""
         return engine.stopListeningAndTranscribe(provider, model, language)
     }
+
+    override suspend fun listenOnce(): Result<String> {
+        cancel()
+        val settings = config()
+        val provider = SpeechPolicy.order(configured()).firstOrNull { it != AudioProvider.ANDROID || localAvailable() }
+            ?: return Result.failure(Exception(strings.localUnavailable))
+        active = provider
+        val model = if (provider.isApiBased()) settings.sttModel else ""
+        val lang = settings.sttLanguage.takeIf { it.isNotBlank() }?.let { code -> Language.entries.firstOrNull { it.matchesCode(code) } } ?: language()
+        return try {
+            engine.listenForUtterance(provider, model, lang, SILENCE_MS)
+        } finally {
+            active = null
+        }
+    }
+
+    override fun finish() = engine.finishUtterance()
 
     override fun cancel() {
         active = null

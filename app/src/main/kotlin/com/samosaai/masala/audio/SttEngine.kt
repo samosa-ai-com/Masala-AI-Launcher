@@ -257,10 +257,10 @@ class SttEngine(
      *   [SilenceDetector] stops the recording after [silenceTimeoutMs] of
      *   trailing silence; the resulting WAV is transcribed through the API.
      */
-    suspend fun listenForUtterance(
+    override suspend fun listenForUtterance(
         provider: AudioProvider,
         model: String,
-        language: Language = Language.ENGLISH,
+        language: Language,
         silenceTimeoutMs: Long
     ): Result<String> = when {
         provider == AudioProvider.ANDROID -> {
@@ -682,6 +682,16 @@ class SttEngine(
                 transcribeApi(file, model, language)
             }
             else -> Result.failure(Exception("STT not configured"))
+        }
+    }
+
+    /** Ends a [listenForUtterance] early: the recorder stops and what was said is still transcribed. */
+    override fun finishUtterance() {
+        vadStopRequested = true
+        mainHandler.post {
+            try {
+                currentRecognizer?.stopListening()
+            } catch (_: Exception) { }
         }
     }
 

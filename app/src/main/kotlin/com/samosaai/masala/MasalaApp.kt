@@ -2,6 +2,9 @@ package com.samosaai.masala
 
 import android.app.Application
 import android.content.Context
+import com.samosaai.masala.audio.AudioProvider
+import com.samosaai.masala.llm.KeyCipher
+import com.samosaai.masala.llm.AiSettingsStore
 import androidx.compose.ui.graphics.toArgb
 import android.content.Intent
 import com.samosaai.masala.core.files.FileIndex
@@ -152,6 +155,9 @@ class MasalaApp : Application() {
         ).also { repo -> scope.launch(Dispatchers.IO) { repo.ensure() } }
     }
 
+    /** Models, keys and voice choices (Settings → Masala AI); every model call reads it. */
+    val aiSettings by lazy { AiSettingsStore(this, KeyCipher.androidKeystore()) }
+
     private val stt by lazy {
         SttEngine(this, SpeechConfig.default.baseUrl, SpeechConfig.default.apiKey)
     }
@@ -164,11 +170,21 @@ class MasalaApp : Application() {
         MiniAppConsole.clear(id)
     }
 
-    /** Reads [text] aloud on the phone's own voice. Null when it played to the end (or the user stopped it), else the user-facing reason. */
+    /**
+     * Reads [text] aloud with the voice chosen in Settings → Voice (the phone's, or an API voice). Null when it
+     * played to the end (or the user stopped it), else the user-facing reason.
+     */
     suspend fun speakReply(text: String): String? {
-        if (tts.speak(text, language = Language.entries.firstOrNull { it.matchesCode(java.util.Locale.getDefault().language) } ?: Language.ENGLISH)) {
-            return null
+        val profile = aiSettings.profile.value
+        val language = profile.voiceLanguage.takeIf { it.isNotBlank() }?.let { code -> Language.entries.firstOrNull { it.matchesCode(code) } }
+            ?: Language.entries.firstOrNull { it.matchesCode(java.util.Locale.getDefault().language) } ?: Language.ENGLISH
+        val out = profile.voiceOut
+        val spoke = if (out != null) {
+            tts.speak(text, AudioProvider.API, apiModel = out.model, voice = profile.voice, language = language, rate = profile.speechRate)
+        } else {
+            tts.speak(text, language = language, androidVoice = profile.voice, rate = profile.speechRate)
         }
+        if (spoke) return null
         if (tts.androidInterrupted) return null
         val missing = tts.lastLanguageUnavailable
         android.util.Log.w("MasalaApp", "speakReply failed; languageUnavailable=$missing")
@@ -297,6 +313,16 @@ class MasalaApp : Application() {
         }
         // Updated apps may have new icons.
         scope.launch { catalog.state.drop(1).collect { icons.clear() } }
+        // Model calls read the AI settings; the speech engines follow them when they change.
+        LlmConfig.source = { aiSettings.chatConfig() }
+        SpeechConfig.source = { aiSettings.speechConfig() }
+        scope.launch {
+            aiSettings.profile.collect { p ->
+                val speech = aiSettings.speechConfig()
+                stt.configureApi(speech.baseUrl, speech.apiKey)
+                p.voiceOut.let { out -> tts.configureApi(out?.baseUrl.orEmpty(), out?.let(aiSettings::keyFor).orEmpty()) }
+            }
+        }
         // Icon mask, style and tint follow Appearance; the tint is the accent.
         scope.launch {
             settings.settings.collect { s ->
