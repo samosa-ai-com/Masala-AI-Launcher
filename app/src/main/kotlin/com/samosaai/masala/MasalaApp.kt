@@ -25,6 +25,7 @@ import com.samosaai.masala.agent.AgentPrompt
 import com.samosaai.masala.agent.AgentTools
 import com.samosaai.masala.agent.LlmAgentModel
 import com.samosaai.masala.agent.MasalaAgent
+import com.samosaai.masala.agent.MemoryRawTool
 import com.samosaai.masala.agent.MemoryTools
 import com.samosaai.masala.connectors.mcp.McpServerStore
 import com.samosaai.masala.connectors.mcp.PrefsMcpStorage
@@ -325,6 +326,7 @@ class MasalaApp : Application() {
         )
         AgentTools.create(this, layouts, modes, runSkill = ::openSkillSheet).forEach(tools::register)
         MemoryTools.create(secondBrain).forEach(tools::register)
+        tools.register(MemoryRawTool.create(this, secondBrain) { tools.fileAccess })
         mcp.servers
         dispatcher = ActionDispatcher(this, actions, launcher, modes, confirmationGate, tools, { skills }) { toolExecutor(confirmationGate) }
 

@@ -71,14 +71,16 @@ data class BrainHealth(
     val staleTaskLinks: List<StaleTaskLink> = emptyList(),
     val unscanned: List<String> = emptyList(),
     val missingBacklinks: List<MissingBacklink> = emptyList(),
+    /** Raw drops older than 30 days: digest, link and delete, or keep on purpose. */
+    val staleRaw: List<String> = emptyList(),
 ) {
     val isClean: Boolean
         get() = unlinked.isEmpty() && dangling.isEmpty() && invalid.isEmpty() &&
             unknownTasks.isEmpty() && mismatchedTasks.isEmpty() &&
-            staleTaskLinks.isEmpty() && unscanned.isEmpty() && missingBacklinks.isEmpty()
+            staleTaskLinks.isEmpty() && unscanned.isEmpty() && missingBacklinks.isEmpty() && staleRaw.isEmpty()
     val issueCount: Int
         get() = unlinked.size + dangling.size + invalid.size + unknownTasks.size +
-            mismatchedTasks.size + staleTaskLinks.size + unscanned.size + missingBacklinks.size
+            mismatchedTasks.size + staleTaskLinks.size + unscanned.size + missingBacklinks.size + staleRaw.size
 }
 
 data class RecordValidation(val valid: Boolean, val errors: List<String>)

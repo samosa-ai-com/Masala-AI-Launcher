@@ -211,7 +211,7 @@ class SecondBrainStore(
                 missingBacklinks.add(MissingBacklink(id, task.name))
             }
         }
-        return BrainHealth(unlinked, dangling, invalid, unknownTasks, mismatched, staleTaskLinks, unscanned, missingBacklinks)
+        return BrainHealth(unlinked, dangling, invalid, unknownTasks, mismatched, staleTaskLinks, unscanned, missingBacklinks, listStaleRaw())
     }
 
     /**
@@ -569,6 +569,47 @@ class SecondBrainStore(
         val undoId = journal(id, file)
         if (!file.delete()) return WriteOutcome(id, listOf("$id could not be deleted."))
         WriteOutcome(id, undoId = undoId)
+    }
+
+    /**
+     * Copies a raw drop into raw/ under [name] (made safe, never overwriting: `-2`, `-3` … on a clash),
+     * streaming at most [maxBytes]. Raw files are immutable afterwards; undo removes the copy.
+     */
+    fun fileRaw(name: String, maxBytes: Long = RAW_COPY_MAX_BYTES, open: () -> java.io.InputStream): WriteOutcome = synchronized(lock) {
+        val safe = name.substringAfterLast('/').replace(Regex("[^\\p{L}\\p{N}._-]+"), "-").trim('-', '.').take(120)
+        if (safe.isEmpty()) return WriteOutcome("raw/", listOf("'$name' has no usable file name."))
+        val base = safe.substringBeforeLast('.', safe)
+        val ext = safe.substringAfterLast('.', "").let { if (it.isEmpty() || it == safe) "" else ".$it" }
+        var target = File(dir("raw"), safe)
+        var n = 2
+        while (target.exists()) target = File(dir("raw"), "$base-${n++}$ext")
+        val id = "raw/${target.name}"
+        dir("raw").mkdirs()
+        val undoId = journal(id, target)
+        val copied = try {
+            open().use { input ->
+                target.outputStream().use { out ->
+                    val buf = ByteArray(64 * 1024)
+                    var total = 0L
+                    while (true) {
+                        val read = input.read(buf)
+                        if (read < 0) break
+                        total += read
+                        if (total > maxBytes) error("larger than ${maxBytes / (1024 * 1024)} MB")
+                        out.write(buf, 0, read)
+                    }
+                }
+            }
+            null
+        } catch (e: Exception) {
+            e.message ?: e.javaClass.simpleName
+        }
+        if (copied != null) {
+            target.delete()
+            undo(undoId)
+            return WriteOutcome(id, listOf("$id: not filed ($copied)."))
+        }
+        WriteOutcome(id, created = true, undoId = undoId)
     }
 
     /** One vault text file by path for the agent, capped like the viewer; null when missing, binary or outside. */
@@ -1193,5 +1234,7 @@ class SecondBrainStore(
         const val RAW_STALE_DAYS = 30
         /** Raw files over this size on durable disk are linked in place, never duplicated. */
         const val RAW_LINK_THRESHOLD_BYTES = 10L * 1024 * 1024
+        /** Largest raw drop copied into the vault. */
+        const val RAW_COPY_MAX_BYTES = 200L * 1024 * 1024
     }
 }

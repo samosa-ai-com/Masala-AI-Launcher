@@ -474,4 +474,35 @@ class SecondBrainStoreTest {
         assertEquals(1, store.search("a", limit = 1).size)
         assertTrue(store.search("  ").isEmpty())
     }
+
+    // ---- S4 raw drops ----
+
+    @Test fun rawFilingCopiesDeclashesAndUndoes() {
+        val first = store.fileRaw("Stand up/2026-10-29 memo.m4a") { "abc".byteInputStream() }
+        assertEquals("raw/2026-10-29-memo.m4a", first.id)
+        val second = store.fileRaw("2026-10-29 memo.m4a") { "def".byteInputStream() }
+        assertEquals("raw/2026-10-29-memo-2.m4a", second.id)
+        assertEquals("abc", File(dir, "raw/2026-10-29-memo.m4a").readText())
+        assertTrue(store.undo(second.undoId!!))
+        assertFalse(File(dir, "raw/2026-10-29-memo-2.m4a").exists())
+        assertFalse(store.writeRecord("raw/2026-10-29-memo.m4a", "x").ok)
+    }
+
+    @Test fun rawFilingOverTheCapLeavesNothing() {
+        val big = store.fileRaw("big.bin", maxBytes = 10) { ByteArray(64).inputStream() }
+        assertFalse(big.ok)
+        assertTrue(big.errors.single().contains("not filed"))
+        assertTrue(File(dir, "raw").listFiles()!!.isEmpty())
+        val broken = store.fileRaw("broken.pdf") { throw java.io.IOException("gone") }
+        assertFalse(broken.ok)
+        assertFalse(File(dir, "raw/broken.pdf").exists())
+        assertFalse(store.fileRaw("///") { "x".byteInputStream() }.ok)
+    }
+
+    @Test fun staleRawShowsInHealth() {
+        File(dir, "raw/old.mp3").apply { writeText("a"); setLastModified(1_000L) }
+        val health = store.checkHealth(store.loadSnapshot())
+        assertEquals(listOf("raw/old.mp3"), health.staleRaw)
+        assertFalse(health.isClean)
+    }
 }

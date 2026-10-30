@@ -137,6 +137,13 @@ class SecondBrainRepository(
     suspend fun edit(path: String, oldText: String, newText: String, replaceAll: Boolean = false) =
         changed("memory_edit") { store.editRecord(path, oldText, newText, replaceAll) }
 
+    /** Copies a raw drop into raw/ ([SecondBrainStore.fileRaw]); undo removes the copy. */
+    suspend fun fileRaw(name: String, open: () -> java.io.InputStream) =
+        changed("memory_file_raw") { store.fileRaw(name, open = open) }
+
+    /** Temp and cache paths: a raw drop from there is always copied, never linked. */
+    fun isEphemeralPath(path: String): Boolean = store.isEphemeralPath(path)
+
     /** Deletes a record or raw file ([SecondBrainStore.deleteRecord]). */
     suspend fun remove(path: String) = changed("memory_delete") { store.deleteRecord(path) }
 

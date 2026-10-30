@@ -374,6 +374,10 @@ class SecondBrainActivity : ComponentActivity() {
                         stringResource(R.string.secondbrain_health_unscanned, health.unscanned.size),
                         health.unscanned,
                     )
+                    HealthGroup(
+                        stringResource(R.string.secondbrain_health_stale_raw, health.staleRaw.size),
+                        health.staleRaw,
+                    )
                 }
             }
         }

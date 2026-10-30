@@ -351,6 +351,7 @@
     <string name="secondbrain_health_mismatched">Notes whose task points elsewhere (%1$d)</string>
     <string name="secondbrain_health_stale">Tasks pointing at missing notes (%1$d)</string>
     <string name="secondbrain_health_unscanned">Files too large to scan fully (%1$d)</string>
+    <string name="secondbrain_health_stale_raw">Raw files older than 30 days (%1$d)</string>
     <string name="secondbrain_health_more">…and %1$d more</string>
     <string name="secondbrain_expand">Show details</string>
     <string name="secondbrain_collapse">Hide</string>
