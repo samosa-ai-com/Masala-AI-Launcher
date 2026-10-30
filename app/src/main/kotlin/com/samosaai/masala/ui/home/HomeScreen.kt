@@ -6,6 +6,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,6 +56,16 @@ import com.samosaai.masala.ui.components.LauncherRow
 import com.samosaai.masala.ui.components.wallpaperText
 
 /**
+ * The drawer following the finger (plan UI refresh U0). Home feeds it upward travel in pixels while the
+ * finger is down and the release velocity (px/s, negative is upward) when it lifts; the drawer decides
+ * whether to settle open or closed.
+ */
+interface DrawerDrag {
+    fun onDrag(upPx: Float)
+    fun onRelease(velocityY: Float)
+}
+
+/**
  * The home screen (plan Phase 2): the resolved layout drawn by [LayoutRenderer], the default-home banner
  * on top, shortcuts other apps pinned below the layout, and the gestures. A vertical swipe runs the
  * user's swipe-up or swipe-down action; a long press on empty space opens settings.
@@ -71,6 +83,8 @@ fun HomeScreen(
     onLaunchShortcut: (ShortcutInfo) -> Unit,
     onUnpinShortcut: (ShortcutInfo) -> Unit,
     homePresses: Int = 0,
+    /** When set, a swipe up moves the drawer with the finger instead of [onSwipeUp] firing on lift. */
+    drawerDrag: DrawerDrag? = null,
     /** False when embedded in another screen that already handles insets (e.g. the AI preview). */
     applyWindowInsets: Boolean = true,
 ) {
@@ -88,12 +102,19 @@ fun HomeScreen(
     // otherwise a recomposition mid-swipe would restart tracking and swallow the gesture.
     val latestUp by rememberUpdatedState(onSwipeUp)
     val latestDown by rememberUpdatedState(onSwipeDown)
-    val swipes = remember(swipeThreshold) {
+    val latestDrawer by rememberUpdatedState(drawerDrag)
+    val slop = with(LocalDensity.current) { 12.dp.toPx() }
+    val swipes = remember(swipeThreshold, slop) {
         object {
             var peakUp = 0f
             var peakDown = 0f
             var tracking = false
             var handled = false
+            // Live drawer tracking: net travel since the gesture started, and whether the drawer took it.
+            var net = 0f
+            var following = false
+            // Fed from the pointer events (their own timestamps) by the lift observer below.
+            val velocity = VelocityTracker()
 
             val connection = object : NestedScrollConnection {
                 override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
@@ -110,6 +131,16 @@ fun HomeScreen(
                     peakUp = 0f
                     peakDown = 0f
                     handled = false
+                    net = 0f
+                    following = false
+                }
+                net += dy
+                val drawer = latestDrawer
+                // Upward travel past the slop hands the gesture to the drawer, which then follows
+                // the finger both ways until lift.
+                if (drawer != null && (following || (-net > slop && -net > peakDown))) {
+                    following = true
+                    drawer.onDrag((-net).coerceAtLeast(0f))
                 }
                 // Peaks, not a running total: lift jitter or a mid-gesture wiggle can shrink
                 // the current run, but a swipe that already traveled far enough still counts.
@@ -125,6 +156,14 @@ fun HomeScreen(
                     return
                 }
                 handled = true
+                if (following) {
+                    following = false
+                    val vy = runCatching { velocity.calculateVelocity().y }.getOrDefault(0f)
+                    latestDrawer?.onRelease(if (vy.isFinite()) vy else 0f)
+                    peakUp = 0f
+                    peakDown = 0f
+                    return
+                }
                 // The further excursion wins; ties and sub-threshold lifts do nothing.
                 if (-peakUp >= swipeThreshold && -peakUp >= peakDown) latestUp()
                 else if (peakDown >= swipeThreshold && peakDown > -peakUp) latestDown()
@@ -149,7 +188,11 @@ fun HomeScreen(
                         dragged = 0f
                         swipes.add(0f)
                     },
-                    onDragEnd = { swipes.onLift() },
+                    onDragEnd = {
+                        // No-op on purpose: the Final-pass observer below fires onLift() once it has
+                        // seen the up event, so the release velocity includes it. Firing here (Main
+                        // pass) would compute velocity without the up change.
+                    },
                     onDragCancel = { /* the nested path may still be live; lift decides */ },
                     onVerticalDrag = { change, dy ->
                         dragged += dy
@@ -166,10 +209,13 @@ fun HomeScreen(
                 // Main-pass waiters), but Final still sees it.
                 while (true) {
                     awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = false)
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        swipes.velocity.resetTracking()
+                        swipes.velocity.addPointerInputChange(down)
                         var up = false
                         while (!up) {
                             val event = awaitPointerEvent(PointerEventPass.Final)
+                            event.changes.firstOrNull { it.id == down.id }?.let(swipes.velocity::addPointerInputChange)
                             up = event.changes.isNotEmpty() && event.changes.all { !it.pressed }
                         }
                         swipes.onLift()

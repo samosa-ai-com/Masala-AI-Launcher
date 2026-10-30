@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,19 +72,46 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
-/** What the renderer needs from the screen around it. */
+/**
+ * What the renderer needs from the screen around it. Stable and remembered by the caller, so a minute
+ * tick or an unrelated state change doesn't recompose the whole layout: only the clock reads [clock].
+ */
+@Stable
 class RenderContext(
     val icons: IconCache,
     /** Every launchable app, to find an item's icon and the user's renames. */
     val apps: List<AppEntry>,
-    val now: LocalDateTime,
+    /** The current time, read only by the clock so the tick recomposes the clock alone. */
+    val clock: () -> LocalDateTime,
     val locked: Boolean,
     val onAction: (MasalaAction) -> Unit,
     val onAppMenu: (AppEntry) -> Unit,
     val onClockClick: () -> Unit,
     /** Where skill widgets get their skill and latest result; without it they stay placeholders. */
     val skillWidgets: SkillWidgetSource? = null,
-)
+) {
+    /** A fixed time, for previews and tests. */
+    constructor(
+        icons: IconCache,
+        apps: List<AppEntry>,
+        now: LocalDateTime,
+        locked: Boolean,
+        onAction: (MasalaAction) -> Unit,
+        onAppMenu: (AppEntry) -> Unit,
+        onClockClick: () -> Unit,
+        skillWidgets: SkillWidgetSource? = null,
+    ) : this(icons, apps, { now }, locked, onAction, onAppMenu, onClockClick, skillWidgets)
+
+    /** Apps by package and user, built once per catalog instead of scanning every app per item. */
+    private val byPackage: Map<Pair<String, Long>, List<AppEntry>> by lazy {
+        apps.groupBy { it.key.packageName to it.key.user }
+    }
+
+    fun appFor(packageName: String, user: Long, activity: String?): AppEntry? {
+        val candidates = byPackage[packageName to user] ?: return null
+        return if (activity == null) candidates.firstOrNull() else candidates.firstOrNull { it.key.activity == activity }
+    }
+}
 
 /**
  * Draws a [ResolvedLayout] (plan Phase 2): a pager of pages; on each page the sections in a column, the
@@ -159,8 +187,9 @@ private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: Render
 
 @Composable
 private fun Header(section: HeaderSection, ctx: RenderContext) {
-    val time = remember(ctx.now.hour, ctx.now.minute) { DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).format(ctx.now) }
-    val date = remember(ctx.now.toLocalDate()) { DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).format(ctx.now) }
+    val now = ctx.clock()
+    val time = remember(now.hour, now.minute) { DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).format(now) }
+    val date = remember(now.toLocalDate()) { DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).format(now) }
     Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)) {
         if (section.showClock) {
             Text(
@@ -295,7 +324,7 @@ private fun Modifier.itemClicks(item: Item, app: AppEntry?, ctx: RenderContext, 
 
 private fun appFor(item: Item, ctx: RenderContext): AppEntry? {
     val a = item.action as? MasalaAction.LaunchApp ?: return null
-    return ctx.apps.firstOrNull { it.key.packageName == a.packageName && it.key.user == a.user && (a.activity == null || it.key.activity == a.activity) }
+    return ctx.appFor(a.packageName, a.user, a.activity)
 }
 
 @Composable
@@ -303,7 +332,7 @@ private fun IconView(icon: IconRef, app: AppEntry?, ctx: RenderContext, size: In
     when (icon) {
         is IconRef.AppIcon -> {
             // The same app in another profile has its own key and badge.
-            val entry = app ?: ctx.apps.firstOrNull { it.key.packageName == icon.packageName && it.key.user == icon.user }
+            val entry = app ?: ctx.appFor(icon.packageName, icon.user, null)
             val bitmap = entry?.let { rememberAppIcon(ctx.icons, it.key) }
             if (bitmap != null) {
                 Image(bitmap, contentDescription = null, modifier = Modifier.size(size.dp))

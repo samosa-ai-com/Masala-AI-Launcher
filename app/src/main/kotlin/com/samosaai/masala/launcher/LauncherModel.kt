@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -55,6 +56,11 @@ class LauncherModel(
     val pinnedShortcuts: StateFlow<List<ShortcutInfo>> =
         combine(catalog.state, catalog.shortcutsVersion, shortcutRefresh) { _, _, _ -> Unit }
             .map { actions.pinnedShortcuts() }
+            // Home comes back often (each onResume refreshes); an unchanged list must not recompose it.
+            // The key includes the label and last-changed timestamp, so an updated shortcut still refreshes.
+            .distinctUntilChangedBy { list ->
+                list.map { "${it.`package`}/${it.id}#${it.userHandle.hashCode()}:${it.lastChangedTimestamp}:${it.shortLabel}" }
+            }
             .flowOn(Dispatchers.IO)
             .stateIn(scope, SharingStarted.Eagerly, emptyList())
 

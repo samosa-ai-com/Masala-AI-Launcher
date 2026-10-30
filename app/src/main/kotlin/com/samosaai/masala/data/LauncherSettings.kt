@@ -27,6 +27,8 @@ data class LauncherSettings(
     val swipeDown: MasalaAction = MasalaAction.ExpandNotifications,
     /** Speak every reply from the reply card (plan Phase 4 M3). */
     val readRepliesAloud: Boolean = false,
+    /** Open the keyboard as soon as the drawer opens; off, it opens when the search field is tapped. */
+    val drawerKeyboard: Boolean = false,
 ) {
     companion object {
         const val MIN_TEXT_SCALE = 0.5f
@@ -45,6 +47,7 @@ class SettingsStore(private val context: Context) {
         val swipeUp = stringPreferencesKey("swipe_up")
         val swipeDown = stringPreferencesKey("swipe_down")
         val readRepliesAloud = booleanPreferencesKey("read_replies_aloud")
+        val drawerKeyboard = booleanPreferencesKey("drawer_keyboard")
     }
 
     val settings: Flow<LauncherSettings> = context.dataStore.data.map { it.toSettings() }
@@ -59,6 +62,7 @@ class SettingsStore(private val context: Context) {
             prefs[Keys.swipeUp] = MasalaJson.strict.encodeToString(MasalaAction.serializer(), next.swipeUp)
             prefs[Keys.swipeDown] = MasalaJson.strict.encodeToString(MasalaAction.serializer(), next.swipeDown)
             prefs[Keys.readRepliesAloud] = next.readRepliesAloud
+            prefs[Keys.drawerKeyboard] = next.drawerKeyboard
         }
     }
 
@@ -70,6 +74,7 @@ class SettingsStore(private val context: Context) {
         swipeUp = this[Keys.swipeUp].toAction(MasalaAction.OpenDrawer),
         swipeDown = this[Keys.swipeDown].toAction(MasalaAction.ExpandNotifications),
         readRepliesAloud = this[Keys.readRepliesAloud] ?: false,
+        drawerKeyboard = this[Keys.drawerKeyboard] ?: false,
     )
 
     // A gesture saved by a newer version, or damaged, falls back to its default.

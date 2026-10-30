@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -48,6 +47,21 @@ import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.ui.components.LauncherRow
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.withContext
+
+/** Ranked search results and the text they were ranked for. */
+private data class Ranked<T>(val query: String, val results: List<T>)
 
 /** Pause after the last keystroke before a composing single match auto-launches. */
 private const val AUTO_LAUNCH_PAUSE_MS = 800L
@@ -56,6 +70,7 @@ private const val AUTO_LAUNCH_PAUSE_MS = 800L
  * The app drawer: a search field on top, then personal apps and a Work section with its pause
  * switch. With a query, apps marked "search only" join the results; hidden apps never show.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @Composable
 fun Drawer(
     apps: List<AppEntry>,
@@ -67,20 +82,34 @@ fun Drawer(
     onAsk: (String) -> Unit,
     onWorkPaused: (Boolean) -> Unit,
     onOpenSettings: () -> Unit,
+    /** The drawer stays composed while closed; closing clears the search and drops the keyboard. */
+    open: Boolean = true,
+    /** Focus the field (and so open the keyboard) once the drawer has settled open, not only on tap. */
+    autoKeyboard: Boolean = false,
+    /** True once the open transition has finished, so the keyboard doesn't animate in during the slide. */
+    settled: Boolean = true,
 ) {
     var query by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
     val text = query.text
     val composing = query.composition != null
 
-    val results = remember(apps, text) {
-        if (text.isBlank()) {
-            apps.filter { it.visibility == Visibility.DEFAULT }
-        } else {
-            AppSearch.rank(text, apps.filter { it.visibility != Visibility.HIDDEN }) { listOf(it.label, it.originalLabel) }
-        }
+    val browse = remember(apps) { apps.filter { it.visibility == Visibility.DEFAULT } }
+    // Labels normalized once per catalog change; ranking runs off the main thread on each keystroke.
+    val prepared = remember(apps) {
+        AppSearch.prepare(apps.filter { it.visibility != Visibility.HIDDEN }) { listOf(it.label, it.originalLabel) }
     }
-    LaunchedEffect(text, composing, results) {
-        if (!autoLaunch) return@LaunchedEffect
+    val latestPrepared by rememberUpdatedState(prepared)
+    var ranked by remember { mutableStateOf(Ranked("", emptyList<AppEntry>())) }
+    LaunchedEffect(Unit) {
+        snapshotFlow { query.text to latestPrepared }
+            .mapLatest { (q, index) -> if (q.isBlank()) Ranked(q, emptyList()) else withContext(Dispatchers.Default) { Ranked(q, AppSearch.rank(q, index)) } }
+            .collect { ranked = it }
+    }
+    // Until the ranking for the current text arrives, keep showing the last one (never a stale auto-launch).
+    val results = if (text.isBlank()) browse else ranked.results
+    val current = text.isBlank() || ranked.query == text
+    LaunchedEffect(text, composing, ranked) {
+        if (!autoLaunch || !current) return@LaunchedEffect
         AppSearch.autoLaunchTarget(text, composing, results)?.let(onLaunch) ?: run {
             // Keyboards that keep composition open while typing (Samsung autocomplete) would
             // otherwise never auto-launch: a single match that survives a short pause launches
@@ -93,15 +122,26 @@ fun Drawer(
     }
 
     val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focus.requestFocus() }
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
-    LaunchedEffect(text) { listState.scrollToItem(0) }    // A Surface, not just a background, so text and icons get the scheme's on-surface colour.
+    LaunchedEffect(open, settled, autoKeyboard) {
+        if (open && settled && autoKeyboard) focus.requestFocus()
+        if (!open) {
+            query = TextFieldValue()
+            focusManager.clearFocus(force = true)
+            keyboard?.hide()
+            listState.scrollToItem(0)
+        }
+    }
+    // New results start at the top; applied in the next layout pass, without a frame of its own.
+    LaunchedEffect(results) { listState.requestScrollToItem(0) }
+    // A Surface, not just a background, so text and icons get the scheme's on-surface colour.
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Column(
             Modifier
                 .fillMaxSize()
-                .systemBarsPadding()
-                .imePadding(),
+                .systemBarsPadding(),
         ) {
             Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
@@ -114,7 +154,10 @@ fun Drawer(
                         onGo = {
                             // Enter while composing finishes the character instead (Olauncher §2.4).
                             if (composing) return@KeyboardActions
-                            results.firstOrNull()?.let(onLaunch) ?: text.takeIf { it.isNotBlank() }?.let(onAsk)
+                            // The async rank may still be for the previous keystroke; rank this text
+                            // synchronously instead of launching its stale top hit (~100 apps, <1 ms).
+                            val active = if (current) results else AppSearch.rank(text, prepared)
+                            active.firstOrNull()?.let(onLaunch) ?: text.takeIf { it.isNotBlank() }?.let(onAsk)
                         },
                     ),
                     modifier = Modifier.weight(1f).focusRequester(focus),
@@ -126,16 +169,18 @@ fun Drawer(
                 val searching = text.isNotBlank()
                 val personal = if (searching) results else results.filter { it.profile == ProfileKind.PERSONAL }
                 // Search mixes profiles, so work apps are labeled there; otherwise they sit under the Work header.
-            items(personal, key = { it.key.id }) { entry -> AppItem(entry, icons, profiles, searching, onLaunch, onMenu) }
+                items(personal, key = { it.key.id }) { entry ->
+                    AppItem(entry, icons, profiles, searching, onLaunch, onMenu, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
+                }
 
                 val work = profiles.work
                 if (!searching && work != null) {
                     item(key = "work-header") { WorkHeader(paused = work.paused, onWorkPaused = onWorkPaused) }
                     items(results.filter { it.profile == ProfileKind.WORK }, key = { it.key.id }) { entry ->
-                        AppItem(entry, icons, profiles, labelWork = false, onLaunch, onMenu)
+                        AppItem(entry, icons, profiles, labelWork = false, onLaunch, onMenu, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
                     }
                 }
-                if (searching && results.isEmpty()) {
+                if (searching && current && results.isEmpty()) {
                     item(key = "ask") {
                         Text(
                             stringResource(R.string.drawer_no_match, text.trim()),
@@ -147,6 +192,9 @@ fun Drawer(
                         )
                     }
                 }
+                // Room for the keyboard at the end of the list, instead of re-laying out the whole
+                // column on every frame of the keyboard animation.
+                item(key = "ime") { Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.ime)) }
             }
         }
     }
@@ -160,6 +208,7 @@ private fun AppItem(
     labelWork: Boolean,
     onLaunch: (AppEntry) -> Unit,
     onMenu: (AppEntry) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val paused = entry.profile == ProfileKind.WORK && profiles.work?.paused == true
     LauncherRow(
@@ -170,6 +219,7 @@ private fun AppItem(
         longClickLabel = stringResource(R.string.menu_options),
         subtitle = stringResource(R.string.menu_work_badge).takeIf { labelWork && entry.profile == ProfileKind.WORK },
         dimmed = paused,
+        modifier = modifier,
     )
 }
 

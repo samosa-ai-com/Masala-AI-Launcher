@@ -49,6 +49,19 @@ android {
         buildConfigField("String", "MASALA_STT_MODEL", "\"${samosaConfig("MASALA_STT_MODEL", "")}\"")
     }
 
+    buildTypes {
+        // What frame times are measured on (plan UI refresh U0): R8 and resource shrinking like a
+        // release, but signed with the debug key so it installs over a debug build and keeps its data.
+        create("profile") {
+            initWith(getByName("release"))
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -89,6 +102,8 @@ dependencies {
     implementation(libs.compose.material.icons.extended)
     implementation(libs.androidx.webkit)
     implementation(libs.compose.ui.tooling.preview)
+    // Installs the start-up profiles Compose and the other AndroidX libraries ship.
+    implementation(libs.androidx.profileinstaller)
     debugImplementation(libs.compose.ui.tooling)
 
     implementation(libs.room.runtime)
