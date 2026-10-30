@@ -9,6 +9,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.samosaai.masala.ui.theme.LocalMotion
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Sam, the golden samosa (plan UI refresh §1, "Character"), drawn from the same path data as the
@@ -53,7 +55,7 @@ object SamArt {
     /** Crust scallops along the bottom edge: x, y (radius 6). */
     val SCALLOPS = listOf(42f to 168f, 56.5f to 169f, 71f to 169.5f, 85.5f to 170f, 100f to 170f, 114.5f to 170f, 129f to 169.5f, 143.5f to 169f, 158f to 168f)
 
-    private val cache = HashMap<String, Path>()
+    private val cache = ConcurrentHashMap<String, Path>()
     fun path(d: String): Path = cache.getOrPut(d) { PathParser().parsePathString(d).toPath() }
 }
 
@@ -64,14 +66,25 @@ object SamArt {
 @Composable
 fun SamHello(modifier: Modifier = Modifier, contentDescription: String = "Sam waving hello") {
     val still = LocalMotion.current.reduced
-    val t = rememberInfiniteTransition(label = "sam")
-    val breathe by t.animateFloat(0f, if (still) 0f else -3f, infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "breathe")
-    val wave by t.animateFloat(-14f, if (still) -14f else 18f, infiniteRepeatable(tween(450, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "wave")
-    val blink by t.animateFloat(
-        1f, 1f,
-        infiniteRepeatable(keyframes { durationMillis = 4400; 1f at 4090; (if (still) 1f else 0.08f) at 4224; 1f at 4400 }),
-        label = "blink",
-    )
+    // Same as the mark: no infinite transition while still, so reduced motion (and the Welcome
+    // screen sitting open) doesn't keep polling Choreographer.
+    val breathe: Float
+    val wave: Float
+    val blink: Float
+    if (still) {
+        breathe = 0f
+        wave = -14f
+        blink = 1f
+    } else {
+        val t = rememberInfiniteTransition(label = "sam")
+        breathe = t.animateFloat(0f, -3f, infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "breathe").value
+        wave = t.animateFloat(-14f, 18f, infiniteRepeatable(tween(450, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "wave").value
+        blink = t.animateFloat(
+            1f, 1f,
+            infiniteRepeatable(keyframes { durationMillis = 4400; 1f at 4090; 0.08f at 4224; 1f at 4400 }),
+            label = "blink",
+        ).value
+    }
     Canvas(modifier.semantics { this.contentDescription = contentDescription }) {
         val s = minOf(size.width / 230f, size.height / 210f)
         val dx = (size.width - 230f * s) / 2f
@@ -120,19 +133,28 @@ internal fun DrawScope.drawSam(waveDeg: Float, eyeOpen: Float) {
 @Composable
 fun Sam(state: CharacterState, modifier: Modifier = Modifier, level: () -> Float = { 0f }, contentDescription: String? = null) {
     val still = LocalMotion.current.reduced
-    val t = rememberInfiniteTransition(label = "sam")
-    val loop by t.animateFloat(0f, if (still) 0f else 1f, infiniteRepeatable(tween(2400, easing = androidx.compose.animation.core.LinearEasing)), label = "loop")
-    val blink by t.animateFloat(
-        1f, 1f,
-        infiniteRepeatable(keyframes { durationMillis = 4600; 1f at 4280; (if (still) 1f else 0.08f) at 4416; 1f at 4600 }),
-        label = "blink",
-    )
+    // No infinite transition while still: even constant animations poll Choreographer every
+    // vsync. States are read in the draw lambda, so frames invalidate only drawing.
+    val loop: State<Float>?
+    val blink: State<Float>?
+    if (still) {
+        loop = null
+        blink = null
+    } else {
+        val t = rememberInfiniteTransition(label = "sam")
+        loop = t.animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = androidx.compose.animation.core.LinearEasing)), label = "loop")
+        blink = t.animateFloat(
+            1f, 1f,
+            infiniteRepeatable(keyframes { durationMillis = 4600; 1f at 4280; 0.08f at 4416; 1f at 4600 }),
+            label = "blink",
+        )
+    }
     val face = remember(state) { SamFaces.of(state.face) }
     Canvas(modifier.then(if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier)) {
         val px = size.minDimension
         val dp = px / density
         val s = px / 200f
-        val phase = loop * 2 * Math.PI.toFloat()
+        val phase = (loop?.value ?: 0f) * 2 * Math.PI.toFloat()
         val (dy, sway) = when (state) {
             CharacterState.DONE -> -kotlin.math.abs(kotlin.math.sin(phase * 2)) * 10f to 0f
             CharacterState.THINKING, CharacterState.SEARCHING -> 0f to kotlin.math.sin(phase) * 4f
@@ -145,14 +167,14 @@ fun Sam(state: CharacterState, modifier: Modifier = Modifier, level: () -> Float
                 if (state == CharacterState.LISTENING && !still) {
                     val l = level().coerceIn(0f, 1f)
                     for (k in 0..1) {
-                        val p = (loop + k * 0.5f) % 1f
+                        val p = ((loop?.value ?: 0f) + k * 0.5f) % 1f
                         drawCircle(Color(0xFF9DB4FF).copy(alpha = (0.6f * (1 - p)) * (0.4f + 0.6f * l)), 70f + 40f * p + 20f * l, Offset(100f, 110f), style = Stroke(3f))
                     }
                 }
                 if (dp >= 48f) drawOval(Color.Black.copy(alpha = 0.35f), Offset(48f, 179f), Size(104f, 14f))
                 translate(0f, if (still) 0f else dy) {
                     rotate(face.tilt + if (still) 0f else sway, Offset(100f, 170f)) {
-                        drawFace(face, dp, blink, if (state == CharacterState.SPEAKING) (0.3f + 0.7f * level().coerceIn(0f, 1f)) * (0.6f + 0.4f * kotlin.math.abs(kotlin.math.sin(phase * 6))) else null)
+                        drawFace(face, dp, blink?.value ?: 1f, if (state == CharacterState.SPEAKING) (0.3f + 0.7f * level().coerceIn(0f, 1f)) * (0.6f + 0.4f * kotlin.math.abs(kotlin.math.sin(phase * 6))) else null)
                     }
                 }
                 if ((state == CharacterState.THINKING || state == CharacterState.SEARCHING) && dp >= 48f && !still) {

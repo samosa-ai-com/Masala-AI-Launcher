@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -40,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.samosaai.masala.ui.theme.LocalMotion
 import com.samosaai.masala.ui.theme.MasalaColors
 import com.samosaai.masala.ui.theme.SpaceGrotesk
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The Masala logo, a mortar and pestle in gold line art (brand board; the canvas trace for now,
@@ -65,7 +65,7 @@ object MasalaMark {
     val GRIND_PIVOT = Offset(290f, 236f)
 }
 
-private val parsed = HashMap<String, Path>()
+private val parsed = ConcurrentHashMap<String, Path>()
 private fun markPath(d: String): Path = parsed.getOrPut(d) { PathParser().parsePathString(d).toPath() }
 
 /** The logo as an [ImageVector], gold strokes on nothing; [stroke] is in grid units. */
@@ -98,16 +98,17 @@ fun MasalaMarkIcon(
 ) {
     val reduced = LocalMotion.current.reduced
     val animate = grinding && !reduced
-    val transition = rememberInfiniteTransition(label = "grind")
-    val angle by if (animate) {
-        transition.animateFloat(-8f, 7f, infiniteRepeatable(tween(550), RepeatMode.Reverse), label = "pestle")
+    // No infinite transition while still: even a 0-to-0 animation keeps polling Choreographer
+    // every vsync, which costs battery on a home-screen launcher.
+    val angle: Float
+    val puff: Float
+    if (animate) {
+        val transition = rememberInfiniteTransition(label = "grind")
+        angle = transition.animateFloat(-8f, 7f, infiniteRepeatable(tween(550), RepeatMode.Reverse), label = "pestle").value
+        puff = transition.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = LinearEasing)), label = "puff").value
     } else {
-        transition.animateFloat(0f, 0f, infiniteRepeatable(tween(1000)), label = "still")
-    }
-    val puff by if (animate) {
-        transition.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = LinearEasing)), label = "puff")
-    } else {
-        transition.animateFloat(0f, 0f, infiniteRepeatable(tween(1000)), label = "nopuff")
+        angle = 0f
+        puff = 0f
     }
     Canvas(
         modifier.size(size).then(if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier),
@@ -115,7 +116,7 @@ fun MasalaMarkIcon(
         val px = this.size.minDimension
         scale(px / MasalaMark.GRID, pivot = Offset.Zero) {
             if (animate) drawPuffs(puff)
-            drawMark(color, px, if (animate) angle else 0f)
+            drawMark(color, px, angle)
         }
     }
 }

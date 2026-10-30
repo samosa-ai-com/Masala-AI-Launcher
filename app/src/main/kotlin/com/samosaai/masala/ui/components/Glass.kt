@@ -120,7 +120,9 @@ fun IconTile(
     val tokens = MasalaTheme.tokens
     val glyph = tint ?: tokens.accent
     val mask = if (shape == IconShape.AS_SHIPPED) IconShape.SQUIRCLE else shape
-    val fill = if (filled) glyph else glyph.copy(alpha = 0.16f).compositeOver(MasalaColors.Charcoal)
+    // Unfilled tiles read on both grounds: charcoal in dark, the light surface in Paper.
+    val ground = if (tokens.dark) MasalaColors.Charcoal else MaterialTheme.colorScheme.surfaceVariant
+    val fill = if (filled) glyph else glyph.copy(alpha = 0.16f).compositeOver(ground)
     val hairline = tokens.hairline
     Box(
         // The mask is drawn as a filled path, not used as a clip: clipping to a path made the renderer

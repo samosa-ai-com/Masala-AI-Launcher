@@ -3,23 +3,27 @@ package com.samosaai.masala.ui.onboarding
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
@@ -137,19 +141,27 @@ class WelcomeActivity : ComponentActivity() {
     @Composable
     private fun Welcome(onDone: () -> Unit) {
         val haptics = rememberHaptics()
+        val scroll = rememberScrollState()
+        // System Back finishes the activity without a button press; count that as done too,
+        // or the welcome screen would come back on the next launch.
+        BackHandler(onBack = onDone)
         val roleRequest = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             if (!HomeRole.isDefault(this)) HomeRole.openSettings(this)
             onDone()
         }
         Box(Modifier.fillMaxSize().background(MasalaColors.Charcoal)) {
+            // Centered when everything fits, scrollable on small screens, landscape or split
+            // screen (the fixed-size column above could clip the buttons there).
             Column(
-                Modifier.fillMaxSize().systemBarsPadding().padding(start = 24.dp, end = 24.dp, top = 40.dp, bottom = 28.dp),
+                Modifier.fillMaxSize().systemBarsPadding().verticalScroll(scroll).padding(start = 24.dp, end = 24.dp, top = 40.dp, bottom = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
                 MasalaWordmark(markSize = 40.dp, grinding = true)
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    SamHello(Modifier.size(width = 290.dp, height = 265.dp), contentDescription = stringResource(R.string.welcome_sam_description))
-                }
+                SamHello(
+                    Modifier.widthIn(max = 290.dp).fillMaxWidth().aspectRatio(290f / 265f).padding(vertical = 16.dp),
+                    contentDescription = stringResource(R.string.welcome_sam_description),
+                )
                 Text(
                     stringResource(R.string.welcome_title),
                     style = TextStyle(fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold, fontSize = 34.sp, letterSpacing = (-0.03).em),
