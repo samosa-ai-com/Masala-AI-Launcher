@@ -716,7 +716,7 @@ private fun quad1(p0: Float, c: Float, p1: Float, t: Float): Float {
 }
 
 /** Monotone-chain convex hull for the shell silhouette. */
-private fun convexHull(points: List<Offset>): List<Offset> {
+internal fun convexHull(points: List<Offset>): List<Offset> {
     val sorted = points.sortedWith(compareBy({ it.x }, { it.y })).distinct()
     if (sorted.size < 3) return sorted
     fun cross(o: Offset, a: Offset, b: Offset): Float =
