@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -50,6 +52,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -218,11 +222,14 @@ fun Drawer(
             runCatching { focus.requestFocus() }
         }
         if (!open) {
-            query = TextFieldValue()
+            // Focus and keyboard go first, so the keyboard's composing text can't come back into the
+            // emptied field on the next open.
             focusManager.clearFocus(force = true)
             keyboard?.hide()
-            listState.scrollToItem(0)
-            gridState.scrollToItem(0)
+            query = TextFieldValue()
+            // Only one of the two is on screen; requests don't wait for a layout that may never come.
+            listState.requestScrollToItem(0)
+            gridState.requestScrollToItem(0)
         }
     }
     // New results start at the top; applied in the next layout pass, without a frame of its own.
@@ -242,7 +249,24 @@ fun Drawer(
     val tokens = MasalaTheme.tokens
     // A dimmed glass sheet: the wallpaper stays visible behind (home fades out under it).
     val sheet = if (tokens.dark) Color(0xD60C0A12) else MasalaColors.Paper.copy(alpha = 0.94f)
-    Box(Modifier.fillMaxSize().background(sheet)) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(sheet)
+            // The sheet is the touch target over home: taps and drags on its empty parts must not reach
+            // the home screen underneath (children still get theirs first, in the main pass).
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    do {
+                        val event = awaitPointerEvent()
+                        event.changes.forEach { it.consume() }
+                    } while (event.changes.any { it.pressed })
+                }
+            },
+    ) {
+        // No Surface under the sheet any more, so rows get their text colour from here.
+        CompositionLocalProvider(LocalContentColor provides tokens.textHigh) {
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
             Box(Modifier.align(Alignment.CenterHorizontally).padding(top = 10.dp).size(38.dp, 4.dp).clip(RoundedCornerShape(50)).background(tokens.textLow))
             SearchRow(
@@ -296,6 +320,7 @@ fun Drawer(
                     DrawerLayout.GLOBE -> GlobePage(shown, globeRanked, range, { range = it }, icons, open, globe, onLaunch, onMenu, profiles, Modifier.weight(1f))
                 }
             }
+        }
         }
     }
 }

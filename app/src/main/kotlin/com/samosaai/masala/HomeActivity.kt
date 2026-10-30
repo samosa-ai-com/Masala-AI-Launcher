@@ -327,8 +327,10 @@ class HomeActivity : ComponentActivity() {
             // Suggestions and usage access are read again each time the drawer opens.
             var suggested by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
             var usageAccess by remember { mutableStateOf(false) }
-            LaunchedEffect(drawerOpen) {
-                if (!drawerOpen) return@LaunchedEffect
+            // After the open animation has settled, and only when the suggestions actually change, so a
+            // database read never recomposes the grid mid-slide.
+            LaunchedEffect(drawerSettled) {
+                if (!drawerSettled) return@LaunchedEffect
                 searchSources.reset()
                 usageAccess = app.usage.hasUsageAccess()
                 val zone = java.time.ZoneId.systemDefault()
@@ -336,10 +338,11 @@ class HomeActivity : ComponentActivity() {
                 val launches = app.usage.launches(com.samosaai.masala.core.apps.UsageRange.MONTH.since(now, zone), apps)
                 val byId = apps.associateBy { it.key.id }
                 val t = java.time.LocalTime.now(zone)
-                suggested = com.samosaai.masala.core.apps.UsageRank.suggestedNow(launches, t.hour * 60 + t.minute, zone, { byId[it]?.label ?: it })
+                val next = com.samosaai.masala.core.apps.UsageRank.suggestedNow(launches, t.hour * 60 + t.minute, zone, { byId[it]?.label ?: it })
                     .mapNotNull { byId[it] }.filter { it.visibility == Visibility.DEFAULT }
+                if (next.map { it.key } != suggested.map { it.key }) suggested = next
             }
-            val globeSource = com.samosaai.masala.ui.drawer.GlobeSource(
+            val globeSource = remember(apps, usageAccess, settings.usageAsked) { com.samosaai.masala.ui.drawer.GlobeSource(
                 ranked = { range ->
                     val zone = java.time.ZoneId.systemDefault()
                     val launches = app.usage.launches(range.since(System.currentTimeMillis(), zone), apps)
@@ -356,7 +359,7 @@ class HomeActivity : ComponentActivity() {
                     runCatching { startActivity(Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
                 },
                 onSkip = { scope.launch { app.settings.update { it.copy(usageAsked = true) } } },
-            )
+            ) }
             Drawer(
                 apps = apps,
                 profiles = profiles,
