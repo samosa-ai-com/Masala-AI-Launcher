@@ -41,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
@@ -148,6 +149,8 @@ fun LayoutRenderer(
     resetSignal: Int = 0,
     /** Drawn above the dock on every page: home's search-or-ask pill (UI refresh U3). */
     aboveDock: @Composable () -> Unit = {},
+    /** Bumped when a new layout version is applied: sections arrive one by one (UI refresh U4). */
+    entrySignal: Int = 0,
     footer: @Composable () -> Unit = {},
 ) {
     val pages = layout.layout.pages
@@ -155,7 +158,7 @@ fun LayoutRenderer(
     LaunchedEffect(resetSignal) { if (resetSignal > 0) pager.animateScrollToPage(0) }
     Column(modifier) {
         HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
-            pages.getOrNull(index)?.let { PageContent(it, layout, ctx, aboveDock, footer = if (index == pages.lastIndex) footer else ({})) }
+            pages.getOrNull(index)?.let { PageContent(it, layout, ctx, aboveDock, entrySignal, footer = if (index == pages.lastIndex) footer else ({})) }
         }
         if (pages.size > 1) PageDots(pages.size, pager.currentPage)
     }
@@ -174,12 +177,12 @@ private fun PageDots(count: Int, current: Int) {
 }
 
 @Composable
-private fun PageContent(page: Page, layout: ResolvedLayout, ctx: RenderContext, aboveDock: @Composable () -> Unit, footer: @Composable () -> Unit) {
+private fun PageContent(page: Page, layout: ResolvedLayout, ctx: RenderContext, aboveDock: @Composable () -> Unit, entrySignal: Int, footer: @Composable () -> Unit) {
     val (docks, body) = page.sections.partition { it is DockSection }
     Column(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            body.forEach { section ->
-                item(key = section.id) { SectionContent(section, layout, ctx) }
+            body.forEachIndexed { i, section ->
+                item(key = section.id) { Box(Modifier.sectionEntry(i, entrySignal)) { SectionContent(section, layout, ctx) } }
             }
             item(key = "footer") { footer() }
         }
@@ -428,5 +431,28 @@ internal class IconBounds {
     fun set(coordinates: androidx.compose.ui.layout.LayoutCoordinates) {
         val b = coordinates.boundsInWindow()
         rect = android.graphics.Rect(b.left.toInt(), b.top.toInt(), b.right.toInt(), b.bottom.toInt())
+    }
+}
+
+/** Gap between sections arriving after an AI layout is applied (motion spec: 40–120 ms apart). */
+private const val SECTION_STAGGER_MS = 80L
+
+/**
+ * A new layout assembles in place (building board): each section fades and rises in turn after
+ * [signal] changes; with reduced motion, a plain fade.
+ */
+@Composable
+private fun Modifier.sectionEntry(index: Int, signal: Int): Modifier {
+    val reduced = com.samosaai.masala.ui.theme.LocalMotion.current.reduced
+    val shown = remember { androidx.compose.animation.core.Animatable(1f) }
+    LaunchedEffect(signal) {
+        if (signal == 0) return@LaunchedEffect
+        shown.snapTo(0f)
+        kotlinx.coroutines.delay(minOf(index * SECTION_STAGGER_MS, 600L))
+        shown.animateTo(1f, androidx.compose.animation.core.tween(com.samosaai.masala.ui.theme.Motion.SHEET_MS))
+    }
+    return graphicsLayer {
+        alpha = shown.value
+        translationY = if (reduced) 0f else (1f - shown.value) * 24.dp.toPx()
     }
 }

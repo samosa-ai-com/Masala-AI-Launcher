@@ -126,15 +126,15 @@ class FileIndexer(
     /** Every indexable file under [root] by path, up to [IndexRules.MAX_FILES]; and whether it stopped at that cap. */
     private fun walk(root: File, isStopped: () -> Boolean): Pair<Map<String, File>, Boolean> {
         val found = LinkedHashMap<String, File>()
-        val stack = ArrayDeque<Pair<File, Int>>().apply { addLast(root to 0) }
+        val stack = ArrayDeque<Pair<File, Int>>().apply { add(root to 0) }
         while (stack.isNotEmpty() && !isStopped()) {
-            val (dir, depth) = stack.removeLast()
+            val (dir, depth) = stack.removeAt(stack.lastIndex)
             val children = dir.listFiles() ?: continue
             for (child in children.sortedBy { it.name }) {
                 // Links could loop or leave storage; real files are reachable without them.
                 if (Files.isSymbolicLink(child.toPath())) continue
                 if (child.isDirectory) {
-                    if (IndexRules.walksInto(child.name, depth + 1)) stack.addLast(child to depth + 1)
+                    if (IndexRules.walksInto(child.name, depth + 1)) stack.add(child to depth + 1)
                 } else if (child.isFile && IndexRules.indexes(child.name)) {
                     if (found.size >= IndexRules.MAX_FILES) return found to true
                     found[child.absolutePath] = child

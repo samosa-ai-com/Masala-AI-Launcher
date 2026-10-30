@@ -1,5 +1,27 @@
 package com.samosaai.masala.ui.settings
 
+import com.samosaai.masala.ui.theme.MasalaColors
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.FiberManualRecord
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.Extension
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.AutoFixHigh
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.Icons
 import androidx.lifecycle.lifecycleScope
 import android.Manifest
 import android.content.Intent
@@ -42,6 +64,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,7 +96,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, TASKS, FILES, AI_MODELS, VOICE }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, ABOUT }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -102,6 +125,7 @@ class SettingsActivity : ComponentActivity() {
                             onFiles = { page = Page.FILES },
                             onAiModels = { page = Page.AI_MODELS },
                             onVoice = { page = Page.VOICE },
+                            onPage = { page = it },
                         )
                         Page.HIDDEN_APPS -> HiddenAppsPage(onBack = { page = Page.MAIN })
                         Page.LAYOUT -> LayoutPage(settings, onBack = { page = Page.MAIN })
@@ -112,12 +136,23 @@ class SettingsActivity : ComponentActivity() {
                         Page.FILES -> masala.fileIndex?.let { FilesPage(it, onBack = { page = Page.MAIN }) }
                         Page.AI_MODELS -> AiModelsPage(onBack = { page = Page.MAIN })
                         Page.VOICE -> VoicePage(settings, update = { change -> lifecycleScope.launch { masala.settings.update(change) } }, onBack = { page = Page.MAIN })
+                        Page.APPEARANCE -> AppearancePage(settings, update = { change -> lifecycleScope.launch { masala.settings.update(change) } }, onBack = { page = Page.MAIN })
+                        Page.DRAWER -> DrawerPage(settings, onHiddenApps = { page = Page.HIDDEN_APPS }, onBack = { page = Page.MAIN })
+                        Page.PRIVACY -> PrivacyPage(onBack = { page = Page.MAIN })
+                        Page.ABOUT -> AboutPage(onBack = { page = Page.MAIN })
                     }
                 }
             }
         }
     }
 
+    /** One row of the grouped settings home: searchable by its title and summary. */
+    private class Entry(val group: Int, val icon: androidx.compose.ui.graphics.vector.ImageVector, val tint: androidx.compose.ui.graphics.Color?, val title: String, val summary: String, val open: () -> Unit)
+
+    /**
+     * The settings home (plan UI refresh U5, settings board): a status card, a search field, and the
+     * pages grouped under Masala AI, Look & feel, Automation, Privacy & data, Pro and About.
+     */
     @Composable
     private fun MainPage(
         settings: LauncherSettings,
@@ -130,122 +165,100 @@ class SettingsActivity : ComponentActivity() {
         onFiles: () -> Unit,
         onAiModels: () -> Unit,
         onVoice: () -> Unit,
+        onPage: (Page) -> Unit,
     ) {
-        val scope = rememberCoroutineScope()
-        val apps by masala.launcher.apps.collectAsStateWithLifecycle()
         var isDefault by remember { mutableStateOf(HomeRole.isDefault(this)) }
         LifecycleResumeEffect(Unit) {
             isDefault = HomeRole.isDefault(this@SettingsActivity)
             onPauseOrDispose {}
         }
+        val profile by masala.aiSettings.profile.collectAsStateWithLifecycle()
+        val tokens = com.samosaai.masala.ui.theme.MasalaTheme.tokens
+        val ai = MasalaColors.Gold
+        val voice = MasalaColors.Indigo
+        val look = MasalaColors.Lilac
+        val auto = MasalaColors.Chili
+        val data = MasalaColors.Cardamom
+        val micText = stringResource(if (profile.micMode == com.samosaai.masala.core.ai.MicMode.TAP) R.string.voice_tap else R.string.voice_hold)
+        val entries = buildList {
+            add(Entry(0, Icons.Rounded.Key, ai, stringResource(R.string.ai_models_title), "${profile.chat.preset.name} · ${profile.chat.model}", onAiModels))
+            add(Entry(0, Icons.Rounded.Mic, voice, stringResource(R.string.voice_title), "${profile.voiceIn?.preset?.name ?: stringResource(R.string.voice_on_phone)} · $micText", onVoice))
+            add(Entry(0, Icons.Rounded.Person, ai, stringResource(R.string.settings_profile), stringResource(R.string.settings_profile_summary)) { startActivity(Intent(this@SettingsActivity, ProfileActivity::class.java)) })
+            add(Entry(1, Icons.Rounded.Palette, look, stringResource(R.string.appearance_title), stringResource(R.string.appearance_summary)) { onPage(Page.APPEARANCE) })
+            add(Entry(1, Icons.Rounded.GridView, data, stringResource(R.string.settings_home_layout), stringResource(R.string.settings_home_layout_summary), onLayout))
+            add(Entry(1, Icons.Rounded.Search, data, stringResource(R.string.drawer_page_title), stringResource(R.string.drawer_page_summary)) { onPage(Page.DRAWER) })
+            add(Entry(2, Icons.Rounded.AutoFixHigh, auto, stringResource(R.string.settings_skills), stringResource(R.string.settings_skills_summary), onSkills))
+            add(Entry(2, Icons.Rounded.Schedule, auto, stringResource(R.string.settings_scheduled_tasks), stringResource(R.string.settings_scheduled_tasks_summary), onTasks))
+            add(Entry(2, Icons.Rounded.Extension, auto, stringResource(R.string.mcp_title), stringResource(R.string.mcp_summary)) { startActivity(Intent(this@SettingsActivity, McpActivity::class.java)) })
+            add(Entry(2, Icons.Rounded.Apps, auto, stringResource(R.string.settings_miniapps), stringResource(R.string.settings_miniapps_summary), onMiniApps))
+            add(Entry(3, Icons.Rounded.MenuBook, data, stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) { startActivity(Intent(this@SettingsActivity, SecondBrainActivity::class.java)) })
+            add(Entry(3, Icons.Rounded.Shield, data, stringResource(R.string.privacy_title), stringResource(R.string.privacy_summary)) { onPage(Page.PRIVACY) })
+            // Only with :pro in the build: without it there is no index and no all-files access.
+            if (masala.fileIndex != null) add(Entry(4, Icons.Rounded.Folder, ai, stringResource(R.string.settings_files), stringResource(R.string.settings_files_summary), onFiles))
+            add(Entry(4, Icons.Rounded.FiberManualRecord, auto, stringResource(R.string.settings_recording), stringResource(R.string.settings_recording_summary), onRecording))
+            add(Entry(5, Icons.Rounded.Info, null, stringResource(R.string.about_title), stringResource(R.string.about_summary)) { onPage(Page.ABOUT) })
+            if (BuildConfig.DEBUG) {
+                // The debug screen lives in the debug source set, so it's started by name.
+                add(Entry(5, Icons.Rounded.BugReport, null, stringResource(R.string.settings_debug), stringResource(R.string.settings_debug_summary)) {
+                    startActivity(Intent().setClassName(this@SettingsActivity, "com.samosaai.masala.debug.DebugActivity"))
+                })
+            }
+        }
+        val groups = listOf(R.string.settings_group_ai, R.string.settings_group_look, R.string.settings_group_automation, R.string.settings_group_privacy, R.string.settings_group_pro, R.string.settings_group_about).map { stringResource(it) }
+        var query by rememberSaveable { mutableStateOf("") }
+
+        SettingsScaffold(stringResource(R.string.settings_title), onBack = ::finish, close = true) {
+            // Settings search: titles and summaries of every row.
+            OutlinedTextField(
+                query, { query = it },
+                placeholder = { Text(stringResource(R.string.settings_search)) },
+                leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                singleLine = true,
+                shape = RoundedCornerShape(50),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (query.isBlank()) {
+                // Status: home app, and the chat model in use.
+                com.samosaai.masala.ui.components.GlassSurface(
+                    fill = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    onClick = { HomeRole.openSettings(this@SettingsActivity) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        com.samosaai.masala.ui.character.MasalaCharacter(settings.character, com.samosaai.masala.ui.character.CharacterState.HELLO, Modifier.size(46.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(if (isDefault) R.string.settings_home_app_is_default else R.string.settings_home_app_not_default), style = MaterialTheme.typography.titleSmall)
+                            Text("${profile.chat.preset.name} · ${profile.chat.model}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+            val q = query.trim().lowercase()
+            val shown = entries.filter { q.isEmpty() || it.title.lowercase().contains(q) || it.summary.lowercase().contains(q) }
+            if (shown.isEmpty()) Text(stringResource(R.string.settings_search_none), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            shown.groupBy { it.group }.toSortedMap().forEach { (g, rows) ->
+                com.samosaai.masala.ui.components.SectionCard(title = groups[g]) {
+                    rows.forEach { r ->
+                        com.samosaai.masala.ui.components.SettingsRow(r.icon, r.title, summary = r.summary, tint = r.tint, onClick = r.open) {
+                            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = tokens.textLow)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Settings → Look & feel → Drawer & search: what used to sit under Drawer on the main page. */
+    @Composable
+    private fun DrawerPage(settings: LauncherSettings, onHiddenApps: () -> Unit, onBack: () -> Unit) {
+        val scope = rememberCoroutineScope()
+        val apps by masala.launcher.apps.collectAsStateWithLifecycle()
         fun update(change: (LauncherSettings) -> LauncherSettings) {
             scope.launch { masala.settings.update(change) }
         }
-
-        SettingsScaffold(stringResource(R.string.settings_title), onBack = ::finish) {
-            SettingsSectionTitle(stringResource(R.string.settings_home_app))
-            Text(
-                stringResource(if (isDefault) R.string.settings_home_app_is_default else R.string.settings_home_app_not_default),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            OutlinedButton(onClick = { HomeRole.openSettings(this@SettingsActivity) }) {
-                Text(stringResource(R.string.settings_home_app_choose))
-            }
-
-            SettingsSectionTitle(stringResource(R.string.settings_appearance))
-            Text(stringResource(R.string.settings_theme), style = MaterialTheme.typography.bodyLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ThemeMode.entries.forEach { mode ->
-                    FilterChip(
-                        selected = settings.theme == mode,
-                        onClick = { update { it.copy(theme = mode) } },
-                        label = {
-                            Text(
-                                stringResource(
-                                    when (mode) {
-                                        ThemeMode.SYSTEM -> R.string.settings_theme_system
-                                        ThemeMode.LIGHT -> R.string.settings_theme_light
-                                        ThemeMode.DARK -> R.string.settings_theme_dark
-                                    },
-                                ),
-                            )
-                        },
-                    )
-                }
-            }
-
-            // Saved when the finger lifts, so the whole screen doesn't re-layout on every step.
-            var scale by remember(settings.textScale) { mutableFloatStateOf(settings.textScale) }
-            val scaleLabel = stringResource(R.string.settings_text_scale, (scale * 100).roundToInt())
-            Text(scaleLabel, style = MaterialTheme.typography.bodyLarge)
-            Slider(
-                value = scale,
-                onValueChange = { scale = it },
-                onValueChangeFinished = { update { it.copy(textScale = scale) } },
-                valueRange = LauncherSettings.MIN_TEXT_SCALE..LauncherSettings.MAX_TEXT_SCALE,
-                steps = 5,
-                modifier = Modifier.semantics { contentDescription = scaleLabel },
-            )
-
-            SettingsNavRow(
-                title = stringResource(R.string.settings_home_layout),
-                summary = stringResource(R.string.settings_home_layout_summary),
-                onClick = onLayout,
-            )
-
-            SettingsNavRow(
-                title = stringResource(R.string.settings_miniapps),
-                summary = stringResource(R.string.settings_miniapps_summary),
-                onClick = onMiniApps,
-            )
-
-            SettingsNavRow(
-                title = stringResource(R.string.settings_recording),
-                summary = stringResource(R.string.settings_recording_summary),
-                onClick = onRecording,
-            )
-
-            // Only with :pro in the build: without it there is no index and no all-files access.
-            if (masala.fileIndex != null) {
-                SettingsNavRow(
-                    title = stringResource(R.string.settings_files),
-                    summary = stringResource(R.string.settings_files_summary),
-                    onClick = onFiles,
-                )
-            }
-
-            SettingsNavRow(
-                title = stringResource(R.string.settings_skills),
-                summary = stringResource(R.string.settings_skills_summary),
-                onClick = onSkills,
-            )
-
-            SettingsNavRow(
-                title = stringResource(R.string.settings_scheduled_tasks),
-                summary = stringResource(R.string.settings_scheduled_tasks_summary),
-                onClick = onTasks,
-            )
-
-            SettingsSectionTitle(stringResource(R.string.settings_ask))
-            SettingsNavRow(stringResource(R.string.ai_models_title), stringResource(R.string.ai_models_summary), onAiModels)
-            SettingsNavRow(stringResource(R.string.voice_title), stringResource(R.string.voice_summary), onVoice)
-            SettingsNavRow(stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) {
-                startActivity(Intent(this@SettingsActivity, SecondBrainActivity::class.java))
-            }
-            SettingsNavRow(stringResource(R.string.settings_profile), stringResource(R.string.settings_profile_summary)) {
-                startActivity(Intent(this@SettingsActivity, ProfileActivity::class.java))
-            }
-            SettingsNavRow(stringResource(R.string.mcp_title), stringResource(R.string.mcp_summary)) {
-                startActivity(Intent(this@SettingsActivity, McpActivity::class.java))
-            }
-
-            SettingsSectionTitle(stringResource(R.string.settings_drawer))
-            SettingsToggleRow(stringResource(R.string.settings_auto_launch), settings.autoLaunch) { on ->
-                update { it.copy(autoLaunch = on) }
-            }
-            SettingsToggleRow(stringResource(R.string.settings_drawer_keyboard), settings.drawerKeyboard) { on ->
-                update { it.copy(drawerKeyboard = on) }
-            }
+        SettingsScaffold(stringResource(R.string.drawer_page_title), onBack) {
+            SettingsToggleRow(stringResource(R.string.settings_auto_launch), settings.autoLaunch) { on -> update { it.copy(autoLaunch = on) } }
+            SettingsToggleRow(stringResource(R.string.settings_drawer_keyboard), settings.drawerKeyboard) { on -> update { it.copy(drawerKeyboard = on) } }
             SettingsNavRow(
                 title = stringResource(R.string.settings_hidden_apps),
                 summary = stringResource(
@@ -255,13 +268,6 @@ class SettingsActivity : ComponentActivity() {
                 ),
                 onClick = onHiddenApps,
             )
-
-            if (BuildConfig.DEBUG) {
-                // The debug screen lives in the debug source set, so it's started by name.
-                SettingsNavRow(stringResource(R.string.settings_debug), stringResource(R.string.settings_debug_summary)) {
-                    startActivity(Intent().setClassName(this@SettingsActivity, "com.samosaai.masala.debug.DebugActivity"))
-                }
-            }
         }
     }
 

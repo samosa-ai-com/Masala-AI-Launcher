@@ -192,7 +192,14 @@ fun MicButton(press: MicPress, modifier: Modifier = Modifier, size: androidx.com
  * home keeps going if the card is left.
  */
 @Composable
-fun ReplyCard(app: MasalaApp, readAloud: Boolean, modifier: Modifier = Modifier) {
+fun ReplyCard(
+    app: MasalaApp,
+    readAloud: Boolean,
+    modifier: Modifier = Modifier,
+    /** Home shows listening and work in their own overlay and sheet (UI refresh U4); the card skips them. */
+    sheets: Boolean = false,
+    character: com.samosaai.masala.data.Character? = null,
+) {
     val state by app.commands.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -206,6 +213,7 @@ fun ReplyCard(app: MasalaApp, readAloud: Boolean, modifier: Modifier = Modifier)
     // "Read replies aloud" applies to every reply; the button reads one on request.
     LaunchedEffect(reply) { if (readAloud && reply != null && app.commands.claimReadAloud(reply)) app.speakReply(reply.text) }
     if (state == CommandState.Idle) return
+    if (sheets && (state == CommandState.Listening || state is CommandState.Thinking)) return
 
     // A glass sheet over home (UI refresh U3); opened for typing, its field takes focus.
     val field = remember { FocusRequester() }
@@ -217,6 +225,15 @@ fun ReplyCard(app: MasalaApp, readAloud: Boolean, modifier: Modifier = Modifier)
         border = BorderStroke(1.dp, MasalaTheme.tokens.hairline),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Sam in the card's corner for a reply or a failure (beside the content, never on it).
+            if (character != null && (state is CommandState.Reply || state is CommandState.Error)) {
+                val speaking by app.speaking.collectAsStateWithLifecycle()
+                com.samosaai.masala.ui.character.MasalaCharacter(
+                    character,
+                    com.samosaai.masala.ui.character.characterStateFor(state, speaking, night = false),
+                    Modifier.size(40.dp),
+                )
+            }
             Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 when (val s = state) {
                     CommandState.Listening -> Text(stringResource(R.string.command_listening), style = MaterialTheme.typography.titleMedium)

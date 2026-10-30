@@ -181,3 +181,21 @@ fun forbiddenProImports(sources: Map<String, String>, allowed: Set<String> = set
             if (import != null && import !in allowed) "$path:${i + 1}: $import" else null
         }
     }
+
+private val sequencedCall = Regex("""\.(removeFirst|removeLast|addFirst|addLast|getFirst|getLast)\(""")
+
+/**
+ * Kotlin 2 compiled against JDK 21 binds `MutableList.removeLast()` and friends to the JDK 21
+ * `SequencedCollection` members, which exist on Android only from API 35: older phones crash with
+ * `NoSuchMethodError`. The source can't tell a list from a Kotlin `ArrayDeque` (where they're safe),
+ * so device code uses `add`, `add(0, x)`, `removeAt(0)` and `removeAt(lastIndex)` instead.
+ * Returns `file:line: call` for every use outside comments.
+ */
+fun newApiListCalls(sources: Map<String, String>): List<String> =
+    sources.flatMap { (path, text) ->
+        text.lines().withIndex().mapNotNull { (i, line) ->
+            val code = line.trim()
+            if (code.startsWith("//") || code.startsWith("*")) return@mapNotNull null
+            sequencedCall.find(code.substringBefore(" //"))?.let { "$path:${i + 1}: ${it.value.drop(1)})" }
+        }
+    }

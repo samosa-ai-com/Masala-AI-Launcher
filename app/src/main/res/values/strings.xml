@@ -484,4 +484,22 @@
     <string name="usage_access_body">The globe and suggestions then count apps opened from anywhere. Android asks you to switch it on for Masala in a list; nothing leaves the phone.</string>
     <string name="usage_access_allow">Allow</string>
     <string name="usage_access_skip">Not now</string>
+    <!-- UI refresh U4 -->
+    <string name="listening_chip">Listening · %1$s</string>
+    <string name="listening_on_device">on-device</string>
+    <string name="listening_sam">Masala is listening</string>
+    <string name="listening_hint">Sends when you pause · tap to stop now</string>
+    <string name="listening_cancel">Cancel</string>
+    <string name="listening_stop">Stop and send</string>
+    <string name="listening_type">Switch to typing</string>
+    <string name="working_sam">Masala is thinking</string>
+    <string name="working_title">Working on it</string>
+    <string name="working_layout">Building your screen</string>
+    <string name="working_layout_usual">usually about 20 s</string>
+    <string name="working_stop">Stop</string>
+    <string name="working_starting">Reading your request</string>
+    <string name="working_next">Working on the next step</string>
+    <string name="working_preview_note">Preview fills in as sections arrive</string>
+    <string name="layout_applied">New layout on home</string>
+    <string name="layout_undo">Undo</string>
 </resources>

@@ -17,6 +17,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -25,7 +27,6 @@ import com.samosaai.masala.ui.home.DrawerDrag
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +42,7 @@ import com.samosaai.masala.launcher.HomeRole
 import com.samosaai.masala.ui.drawer.AppMenu
 import com.samosaai.masala.ui.drawer.AppMenuActions
 import com.samosaai.masala.ui.drawer.Drawer
+import com.samosaai.masala.ui.drawer.blockTouches
 import com.samosaai.masala.ui.drawer.RenameDialog
 import com.samosaai.masala.actions.ActionDispatcher
 import com.samosaai.masala.core.contract.MasalaAction
@@ -57,6 +59,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.samosaai.masala.agent.CommandState
 import com.samosaai.masala.ui.home.SearchPill
+import com.samosaai.masala.ui.home.ListeningOverlay
+import com.samosaai.masala.ui.home.WorkingSheet
+import androidx.compose.material3.Text
 import com.samosaai.masala.ui.home.ReplyCard
 import com.samosaai.masala.ui.home.rememberMicPress
 import com.samosaai.masala.ui.home.ConfirmationSheet
@@ -149,17 +154,45 @@ class HomeActivity : ComponentActivity() {
             if (!HomeRole.isDefault(this)) HomeRole.openSettings(this)
         }
 
+        // A newly applied layout arrives section by section, with an Undo offer (UI refresh U4).
+        val history by app.layouts.historyState.collectAsStateWithLifecycle()
+        val currentVersion = history.versions.firstOrNull { it.current }?.id
+        var lastVersion by remember { mutableStateOf<Long?>(null) }
+        var entrySignal by remember { mutableStateOf(0) }
+        var undoOffer by remember { mutableStateOf(false) }
+        var undoing by remember { mutableStateOf(false) }
+        LaunchedEffect(currentVersion) {
+            val before = lastVersion
+            lastVersion = currentVersion
+            if (before == null || currentVersion == null || before == currentVersion) return@LaunchedEffect
+            entrySignal++
+            if (undoing) {
+                undoing = false
+                return@LaunchedEffect
+            }
+            undoOffer = true
+            kotlinx.coroutines.delay(6_000)
+            undoOffer = false
+        }
+
         // Always enabled, so Back never leaves home.
         BackHandler { drawerOpen = false }
 
         // One progress (0 = home, 1 = drawer) drives both layers. Both stay composed, so opening and
         // closing the drawer never rebuilds the home pager or the drawer list (plan UI refresh U0).
+        // The drawer's state is read only inside the [Isolated] layers and the effects below, never in this
+        // function's own body: a change would otherwise recompose all of home in the middle of the slide.
         val drawerProgress = remember { Animatable(0f) }
-        val drawerShown by remember { derivedStateOf { drawerProgress.value > 0f } }
-        val drawerMostlyOpen by remember { derivedStateOf { drawerProgress.value > 0.5f } }
-        val drawerSettled by remember { derivedStateOf { drawerOpen && drawerProgress.value >= 1f } }
+        val drawerShown = remember { derivedStateOf { drawerProgress.value > 0f } }
+        val drawerSettled = remember { derivedStateOf { drawerOpen && drawerProgress.value >= 1f } }
         val drawerSpring = remember { spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow) }
-        LaunchedEffect(drawerOpen) { drawerProgress.animateTo(if (drawerOpen) 1f else 0f, drawerSpring) }
+        LaunchedEffect(Unit) {
+            snapshotFlow { drawerOpen }.collectLatest { open ->
+                val target = if (open) 1f else 0f
+                // A released drag already animates there with the finger's speed; don't restart it.
+                if (!(drawerProgress.isRunning && drawerProgress.targetValue == target)) drawerProgress.animateTo(target, drawerSpring)
+            }
+        }
         // Composed once home has drawn its first frame, so the first open is as quick as the rest.
         var drawerReady by remember { mutableStateOf(false) }
         LaunchedEffect(Unit) {
@@ -235,10 +268,12 @@ class HomeActivity : ComponentActivity() {
         }
 
         val lightSurface = MaterialTheme.colorScheme.surface.luminance() > 0.5f
-        SideEffect {
-            WindowCompat.getInsetsController(window, window.decorView).apply {
-                isAppearanceLightStatusBars = drawerMostlyOpen && lightSurface
-                isAppearanceLightNavigationBars = drawerMostlyOpen && lightSurface
+        LaunchedEffect(lightSurface) {
+            snapshotFlow { drawerProgress.value > 0.5f }.collect { mostlyOpen ->
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = mostlyOpen && lightSurface
+                    isAppearanceLightNavigationBars = mostlyOpen && lightSurface
+                }
             }
         }
 
@@ -265,18 +300,19 @@ class HomeActivity : ComponentActivity() {
             )
         }
         // Faded out under the open drawer and hidden from TalkBack; the drawer above takes the touches.
-        Box(
+        Isolated { Box(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
                     val p = drawerProgress.value
                     alpha = 1f - p
-                    // Alpha on each draw instead of a full-screen offscreen buffer every frame.
-                    compositingStrategy = CompositingStrategy.ModulateAlpha
+                    compositingStrategy = drawerLayerStrategy(p)
                     scaleX = 1f - (1f - Motion.HOME_UNDER_DRAWER_SCALE) * p
                     scaleY = 1f - (1f - Motion.HOME_UNDER_DRAWER_SCALE) * p
                 }
-                .then(if (drawerOpen) Modifier.clearAndSetSemantics { } else Modifier),
+                .then(if (drawerOpen) Modifier.clearAndSetSemantics { } else Modifier)
+                // Set on release, not while the opening swipe is still moving home's own gesture.
+                .blockTouches(drawerOpen),
         ) { HomeScreen(
             layout = layout,
             render = render,
@@ -292,6 +328,7 @@ class HomeActivity : ComponentActivity() {
                 launcher.refreshShortcuts()
             },
             homePresses = homePresses,
+            entrySignal = entrySignal,
             drawerDrag = drawerDrag.takeIf { settings.swipeUp == MasalaAction.OpenDrawer },
             aboveDock = {
                 val command by app.commands.state.collectAsStateWithLifecycle()
@@ -300,28 +337,69 @@ class HomeActivity : ComponentActivity() {
                     SearchPill(onSearch = { drawerOpen = true; searchRequests++ }, mic = rememberMicPress(app))
                 }
             },
-        ) }
+        ) } }
 
-        ConfirmationSheet(app.confirmationGate)
-
-        // The reply card; it stays up until closed, and the command runs on if home is left.
-        if (!drawerOpen && !drawerShown) {
-            Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(), contentAlignment = Alignment.BottomCenter) {
-                ReplyCard(app, settings.readRepliesAloud)
+        // Listening, work and replies (UI refresh U4); a command runs on if home is left. Hidden while the
+        // drawer is shown; the reply card stays composed under it, because taking it out and putting it
+        // back cost a slow frame at the start of every open and close.
+        Isolated {
+            val hidden = drawerOpen || drawerShown.value
+            val command by app.commands.state.collectAsStateWithLifecycle()
+            val level by app.commands.micLevel.collectAsStateWithLifecycle()
+            val words by app.commands.liveWords.collectAsStateWithLifecycle()
+            when (val c = command) {
+                CommandState.Listening -> if (!hidden) ListeningOverlay(
+                    character = settings.character,
+                    level = { level },
+                    words = words,
+                    source = app.aiSettings.profile.value.voiceIn?.preset?.name ?: getString(R.string.listening_on_device),
+                    onCancel = { app.commands.dismiss() },
+                    onStop = { if (app.aiSettings.profile.value.micMode == com.samosaai.masala.core.ai.MicMode.HOLD) app.commands.stopListening() else app.commands.finishListening() },
+                    onType = { app.commands.dismiss(); app.commands.openInput() },
+                )
+                is CommandState.Thinking -> if (!hidden) Box(Modifier.fillMaxSize().navigationBarsPadding(), contentAlignment = Alignment.BottomCenter) {
+                    WorkingSheet(c, settings.character, onStop = { app.commands.dismiss() })
+                }
+                else -> Box(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = if (drawerProgress.value > 0f) 0f else 1f }
+                        .then(if (hidden) Modifier.clearAndSetSemantics { } else Modifier)
+                        .blockTouches(hidden)
+                        .statusBarsPadding().navigationBarsPadding().imePadding(),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    ReplyCard(app, settings.readRepliesAloud, sheets = true, character = settings.character)
+                }
+            }
+            if (undoOffer && !hidden) {
+                Box(Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = 150.dp), contentAlignment = Alignment.BottomCenter) {
+                    com.samosaai.masala.ui.components.GlassPill {
+                        Text(getString(R.string.layout_applied), color = com.samosaai.masala.ui.theme.MasalaColors.Text)
+                        androidx.compose.material3.TextButton(onClick = {
+                            undoOffer = false
+                            undoing = true
+                            scope.launch { app.layouts.undo() }
+                        }) { Text(getString(R.string.layout_undo), color = com.samosaai.masala.ui.theme.MasalaColors.Gold) }
+                    }
+                }
             }
         }
 
-        if (drawerReady || drawerOpen) Box(
+        // Above the working sheet and the reply card: a confirmation must never be hidden by them.
+        ConfirmationSheet(app.confirmationGate)
+
+        Isolated { if (drawerReady || drawerOpen) Box(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
                     val p = drawerProgress.value
                     alpha = p
-                    compositingStrategy = CompositingStrategy.ModulateAlpha
+                    compositingStrategy = drawerLayerStrategy(p)
                     // Closed: moved off screen, so it neither draws nor takes touches.
                     translationY = if (p <= 0f) size.height else (1f - p) * size.height / 4f
                 }
-                .then(if (!drawerShown) Modifier.clearAndSetSemantics { } else Modifier),
+                .then(if (!drawerShown.value) Modifier.clearAndSetSemantics { } else Modifier),
         ) {
             val searchSources = remember { com.samosaai.masala.launcher.HomeSearchSources(this@HomeActivity, app) }
             // Suggestions and usage access are read again each time the drawer opens.
@@ -329,8 +407,9 @@ class HomeActivity : ComponentActivity() {
             var usageAccess by remember { mutableStateOf(false) }
             // After the open animation has settled, and only when the suggestions actually change, so a
             // database read never recomposes the grid mid-slide.
-            LaunchedEffect(drawerSettled) {
-                if (!drawerSettled) return@LaunchedEffect
+            val settled = drawerSettled.value
+            LaunchedEffect(settled) {
+                if (!settled) return@LaunchedEffect
                 searchSources.reset()
                 usageAccess = app.usage.hasUsageAccess()
                 val zone = java.time.ZoneId.systemDefault()
@@ -380,9 +459,9 @@ class HomeActivity : ComponentActivity() {
                 open = drawerOpen,
                 focusSignal = searchRequests,
                 autoKeyboard = settings.drawerKeyboard,
-                settled = drawerSettled,
+                settled = drawerSettled.value,
             )
-        }
+        } }
 
         menuFor?.let { entry ->
             AppMenu(
@@ -452,3 +531,16 @@ class HomeActivity : ComponentActivity() {
 
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
 }
+
+/** Gives [content] a recomposition scope of its own: state read inside recomposes only [content]. */
+@Composable
+private fun Isolated(content: @Composable () -> Unit) = content()
+
+/**
+ * How home and the drawer are drawn at drawer progress [p]. While the drawer moves, each is drawn once
+ * into its own layer and only the layer is faded, scaled and slid: redrawing every text at a new scale
+ * each frame made the glyph cache rasterise the clock again on every frame. At rest, alpha goes onto
+ * each draw instead, so no full-screen buffer is kept.
+ */
+private fun drawerLayerStrategy(p: Float): CompositingStrategy =
+    if (p > 0f && p < 1f) CompositingStrategy.Offscreen else CompositingStrategy.ModulateAlpha
