@@ -87,6 +87,8 @@ fun HomeScreen(
     drawerDrag: DrawerDrag? = null,
     /** Above the dock: the search-or-ask pill (UI refresh U3). */
     aboveDock: @Composable () -> Unit = {},
+    /** Bumped when a new layout is applied, so its sections arrive one by one. */
+    entrySignal: Int = 0,
     /** False when embedded in another screen that already handles insets (e.g. the AI preview). */
     applyWindowInsets: Boolean = true,
 ) {
@@ -233,7 +235,7 @@ fun HomeScreen(
     ) {
         Column(Modifier.fillMaxSize()) {
             if (!isDefault) DefaultBanner(onSetDefault)
-            LayoutRenderer(layout, render, Modifier.weight(1f), resetSignal = homePresses, aboveDock = aboveDock) {
+            LayoutRenderer(layout, render, Modifier.weight(1f), resetSignal = homePresses, aboveDock = aboveDock, entrySignal = entrySignal) {
                 if (pinnedShortcuts.isNotEmpty()) {
                     Text(
                         stringResource(R.string.home_shortcuts_title),

@@ -57,6 +57,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.samosaai.masala.agent.CommandState
 import com.samosaai.masala.ui.home.SearchPill
+import com.samosaai.masala.ui.home.ListeningOverlay
+import com.samosaai.masala.ui.home.WorkingSheet
+import androidx.compose.material3.Text
 import com.samosaai.masala.ui.home.ReplyCard
 import com.samosaai.masala.ui.home.rememberMicPress
 import com.samosaai.masala.ui.home.ConfirmationSheet
@@ -147,6 +150,27 @@ class HomeActivity : ComponentActivity() {
         val roleRequest = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             // Turned down: the dialog may not come back, so offer the system screen instead.
             if (!HomeRole.isDefault(this)) HomeRole.openSettings(this)
+        }
+
+        // A newly applied layout arrives section by section, with an Undo offer (UI refresh U4).
+        val history by app.layouts.historyState.collectAsStateWithLifecycle()
+        val currentVersion = history.versions.firstOrNull { it.current }?.id
+        var lastVersion by remember { mutableStateOf<Long?>(null) }
+        var entrySignal by remember { mutableStateOf(0) }
+        var undoOffer by remember { mutableStateOf(false) }
+        var undoing by remember { mutableStateOf(false) }
+        LaunchedEffect(currentVersion) {
+            val before = lastVersion
+            lastVersion = currentVersion
+            if (before == null || currentVersion == null || before == currentVersion) return@LaunchedEffect
+            entrySignal++
+            if (undoing) {
+                undoing = false
+                return@LaunchedEffect
+            }
+            undoOffer = true
+            kotlinx.coroutines.delay(6_000)
+            undoOffer = false
         }
 
         // Always enabled, so Back never leaves home.
@@ -292,6 +316,7 @@ class HomeActivity : ComponentActivity() {
                 launcher.refreshShortcuts()
             },
             homePresses = homePresses,
+            entrySignal = entrySignal,
             drawerDrag = drawerDrag.takeIf { settings.swipeUp == MasalaAction.OpenDrawer },
             aboveDock = {
                 val command by app.commands.state.collectAsStateWithLifecycle()
@@ -304,10 +329,39 @@ class HomeActivity : ComponentActivity() {
 
         ConfirmationSheet(app.confirmationGate)
 
-        // The reply card; it stays up until closed, and the command runs on if home is left.
+        // Listening, work and replies (UI refresh U4); a command runs on if home is left.
         if (!drawerOpen && !drawerShown) {
-            Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(), contentAlignment = Alignment.BottomCenter) {
-                ReplyCard(app, settings.readRepliesAloud)
+            val command by app.commands.state.collectAsStateWithLifecycle()
+            val level by app.commands.micLevel.collectAsStateWithLifecycle()
+            val words by app.commands.liveWords.collectAsStateWithLifecycle()
+            when (val c = command) {
+                CommandState.Listening -> ListeningOverlay(
+                    character = settings.character,
+                    level = { level },
+                    words = words,
+                    source = app.aiSettings.profile.value.voiceIn?.preset?.name ?: getString(R.string.listening_on_device),
+                    onCancel = { app.commands.dismiss() },
+                    onStop = { if (app.aiSettings.profile.value.micMode == com.samosaai.masala.core.ai.MicMode.HOLD) app.commands.stopListening() else app.commands.finishListening() },
+                    onType = { app.commands.dismiss(); app.commands.openInput() },
+                )
+                is CommandState.Thinking -> Box(Modifier.fillMaxSize().navigationBarsPadding(), contentAlignment = Alignment.BottomCenter) {
+                    WorkingSheet(c, settings.character, onStop = { app.commands.dismiss() })
+                }
+                else -> Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(), contentAlignment = Alignment.BottomCenter) {
+                    ReplyCard(app, settings.readRepliesAloud, sheets = true, character = settings.character)
+                }
+            }
+            if (undoOffer) {
+                Box(Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = 150.dp), contentAlignment = Alignment.BottomCenter) {
+                    com.samosaai.masala.ui.components.GlassPill {
+                        Text(getString(R.string.layout_applied), color = com.samosaai.masala.ui.theme.MasalaColors.Text)
+                        androidx.compose.material3.TextButton(onClick = {
+                            undoOffer = false
+                            undoing = true
+                            scope.launch { app.layouts.undo() }
+                        }) { Text(getString(R.string.layout_undo), color = com.samosaai.masala.ui.theme.MasalaColors.Gold) }
+                    }
+                }
             }
         }
 

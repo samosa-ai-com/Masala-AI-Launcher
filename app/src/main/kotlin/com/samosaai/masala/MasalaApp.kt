@@ -215,6 +215,9 @@ class MasalaApp : Application() {
 
     fun stopSpeaking() = tts.stop()
 
+    /** True while a reply is being read aloud (Sam's speaking state). */
+    val speaking get() = tts.isSpeaking
+
     /** Typed and spoken commands: the fast path, persona routing, then the agent. */
     val commands by lazy {
         CommandController(
@@ -240,6 +243,7 @@ class MasalaApp : Application() {
                     localUnavailable = getString(R.string.speech_local_unavailable),
                     recordFailed = getString(R.string.speech_record_failed),
                 ),
+                live = stt,
             ),
         )
     }
