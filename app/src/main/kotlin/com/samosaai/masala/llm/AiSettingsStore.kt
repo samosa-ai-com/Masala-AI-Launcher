@@ -1,6 +1,7 @@
 package com.samosaai.masala.llm
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -22,6 +23,8 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
 private val Context.aiStore by preferencesDataStore(name = "ai_settings")
+
+private const val TAG = "AiSettingsStore"
 
 /**
  * The AI and voice choices (plan UI refresh U2): an [AiProfile] in DataStore and one API key per
@@ -49,8 +52,9 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
     /** Decrypted keys, kept in memory only. */
     private val plain = HashMap<String, String>()
 
-    /** Keys written before the first load finished; the load must not wipe them. */
-    private val dirty = mutableSetOf<String>()
+    // Writers wait for the first load: otherwise a key saved in the first milliseconds would
+    // snapshot a still-empty sealed map to disk and wipe the other providers' keys for good.
+    private val loadJob = ioScope.launch { runCatching { load() }.onFailure { Log.w(TAG, "settings load failed", it) } }
 
     init {
         // Start from the compiled-in seed synchronously; disk and Keystore load on IO right after,
@@ -61,18 +65,17 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
 
     val profile: StateFlow<AiProfile> = _profile.asStateFlow()
 
-    /** The stored profile and keys, applied over the seed once disk and Keystore answer. Keys (and
-     *  deletions) written before this finishes win over the snapshot being loaded. */
+    /** The stored profile and keys, applied over the seed once disk and Keystore answer. */
     private suspend fun load() {
         val prefs = context.aiStore.data.first()
         val stored = prefs[Keys.profile]?.let { runCatching { json.decodeFromString(AiProfile.serializer(), it) }.getOrNull() }
         val keys = prefs[Keys.keys]?.let { runCatching { json.decodeFromString(keyMap, it) }.getOrNull() }.orEmpty()
         synchronized(plain) {
-            // Drop lookups cached while sealed was still empty, then apply the snapshot around
-            // anything written since (a key set in the first milliseconds would otherwise vanish).
+            // Drop lookups cached while sealed was still empty; writers join loadJob, so nothing
+            // else mutates sealed concurrently.
             plain.clear()
-            keys.filterKeys { it !in dirty }.forEach { (id, sealedKey) -> sealed[id] = sealedKey }
-            dirty.clear()
+            sealed.clear()
+            sealed.putAll(keys)
         }
         if (stored != null) _profile.value = stored
         if (prefs[Keys.seeded] != true || stored == null) seed()
@@ -86,6 +89,7 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
     fun hasKey(presetId: String): Boolean = key(presetId).isNotBlank()
 
     suspend fun setProfile(next: AiProfile) {
+        loadJob.join()
         _profile.value = next
         context.aiStore.edit { it[Keys.profile] = json.encodeToString(AiProfile.serializer(), next) }
     }
@@ -94,9 +98,9 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
 
     /** Saves [key] for [presetId] (blank removes it). The plain text never touches storage. */
     suspend fun setKey(presetId: String, key: String) {
+        loadJob.join()
         val trimmed = key.trim()
-        synchronized(plain) {
-            dirty.add(presetId)
+        val snapshot = synchronized(plain) {
             if (trimmed.isEmpty()) {
                 plain.remove(presetId)
                 sealed.remove(presetId)
@@ -104,8 +108,8 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
                 plain[presetId] = trimmed
                 sealed[presetId] = cipher.encrypt(trimmed)
             }
+            sealed.toMap()
         }
-        val snapshot = synchronized(plain) { sealed.toMap() }
         context.aiStore.edit { it[Keys.keys] = json.encodeToString(keyMap, snapshot) }
     }
 
