@@ -281,10 +281,13 @@ fun Drawer(
             // of several times the budget.
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 Column(Modifier.fillMaxSize().hiddenWhen(searching)) {
-                    val shown = when {
-                        work == null -> browse.filter { it.profile == ProfileKind.PERSONAL }
-                        showWork -> browse.filter { it.profile == ProfileKind.WORK }
-                        else -> browse.filter { it.profile == ProfileKind.PERSONAL }
+                    // Remembered: a new list on every letter made the hidden grid recompose with each one.
+                    val shown = remember(browse, showWork, work == null) {
+                        when {
+                            work == null -> browse.filter { it.profile == ProfileKind.PERSONAL }
+                            showWork -> browse.filter { it.profile == ProfileKind.WORK }
+                            else -> browse.filter { it.profile == ProfileKind.PERSONAL }
+                        }
                     }
                     AllAppsBar(
                         count = shown.size,
