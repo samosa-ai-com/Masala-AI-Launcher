@@ -84,6 +84,9 @@ class FileIndexWorker(context: Context, params: WorkerParameters) : CoroutineWor
             .setOngoing(true)
             .setSilent(true)
             .build()
+        // The dataSync type is declared on WorkManager's SystemForegroundService in the app
+        // module's manifest (pro is never an APK on its own); standalone pro lint can't see it.
+        //noinspection SpecifyForegroundServiceType
         return ForegroundInfo(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
     }
 
