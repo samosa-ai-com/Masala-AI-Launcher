@@ -131,7 +131,7 @@ fun AiModelsPage(onBack: () -> Unit) {
     SettingsScaffold(stringResource(R.string.ai_models_title), { scope.launch { persist(); onBack() } }) {
         Text(stringResource(R.string.ai_models_intro), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Eyebrow(stringResource(R.string.ai_models_provider))
-        PresetGrid(current = preset.id) { pickedId = it; haptics.tick() }
+        PresetGrid(current = preset.id) { scope.launch { persist(); pickedId = it; haptics.tick() } }
 
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(Radii.card)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
@@ -238,7 +238,8 @@ fun AiModelsPage(onBack: () -> Unit) {
                         persist {
                             val model = it.voiceOut?.takeIf { v -> v.presetId == preset.id }?.model?.ifBlank { preset.defaultTtsModel }
                                 ?: preset.defaultTtsModel
-                            it.copy(voiceOut = if (on) Endpoint(preset.id, urlCheck.getOrThrow(), model) else null)
+                            // A phone voice picked earlier would 400 on the API; start unpicked.
+                            it.copy(voiceOut = if (on) Endpoint(preset.id, urlCheck.getOrThrow(), model) else null, voice = if (on) "" else it.voice)
                         }
                     }
                 }

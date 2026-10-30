@@ -49,6 +49,9 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
     /** Decrypted keys, kept in memory only. */
     private val plain = HashMap<String, String>()
 
+    /** Keys written before the first load finished; the load must not wipe them. */
+    private val dirty = mutableSetOf<String>()
+
     init {
         // Start from the compiled-in seed synchronously; disk and Keystore load on IO right after,
         // so Application.onCreate never blocks on them.
@@ -58,14 +61,18 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
 
     val profile: StateFlow<AiProfile> = _profile.asStateFlow()
 
-    /** The stored profile and keys, applied over the seed once disk and Keystore answer. */
+    /** The stored profile and keys, applied over the seed once disk and Keystore answer. Keys (and
+     *  deletions) written before this finishes win over the snapshot being loaded. */
     private suspend fun load() {
         val prefs = context.aiStore.data.first()
         val stored = prefs[Keys.profile]?.let { runCatching { json.decodeFromString(AiProfile.serializer(), it) }.getOrNull() }
         val keys = prefs[Keys.keys]?.let { runCatching { json.decodeFromString(keyMap, it) }.getOrNull() }.orEmpty()
         synchronized(plain) {
-            sealed.clear()
-            sealed.putAll(keys)
+            // Drop lookups cached while sealed was still empty, then apply the snapshot around
+            // anything written since (a key set in the first milliseconds would otherwise vanish).
+            plain.clear()
+            keys.filterKeys { it !in dirty }.forEach { (id, sealedKey) -> sealed[id] = sealedKey }
+            dirty.clear()
         }
         if (stored != null) _profile.value = stored
         if (prefs[Keys.seeded] != true || stored == null) seed()
@@ -89,6 +96,7 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
     suspend fun setKey(presetId: String, key: String) {
         val trimmed = key.trim()
         synchronized(plain) {
+            dirty.add(presetId)
             if (trimmed.isEmpty()) {
                 plain.remove(presetId)
                 sealed.remove(presetId)
