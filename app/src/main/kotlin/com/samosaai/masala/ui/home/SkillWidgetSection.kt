@@ -108,7 +108,7 @@ fun SkillWidgetCard(section: SkillWidgetSection, source: SkillWidgetSource, onAc
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SymbolDisc(SymbolIcons.glyph(skill.widget?.icon ?: "star"), SymbolIcons.tint(skill.widget?.tint), if (section.size == SkillWidgetSize.SMALL) 32 else 40)
+                SymbolDisc(SymbolIcons.icon(skill.widget?.icon ?: "star"), SymbolIcons.tint(skill.widget?.tint), if (section.size == SkillWidgetSize.SMALL) 32 else 40)
                 Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             }
             if (section.size != SkillWidgetSize.SMALL) {

@@ -781,6 +781,8 @@ fun BrainFileBody(app: MasalaApp, file: BrainFile, onOpenFile: (String) -> Unit,
 @Composable
 internal fun BrainBinaryRow(file: BrainFile) {
     val context = LocalContext.current
+    // Resolved in composition: reading it off LocalContext inside onClick trips lint.
+    val openFailed = stringResource(R.string.secondbrain_open_failed)
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 4.dp, bottom = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -810,7 +812,7 @@ internal fun BrainBinaryRow(file: BrainFile) {
                 if (!opened) {
                     android.widget.Toast.makeText(
                         context,
-                        context.getString(R.string.secondbrain_open_failed),
+                        openFailed,
                         android.widget.Toast.LENGTH_SHORT,
                     ).show()
                 }

@@ -29,7 +29,7 @@ object JobNotifications {
             NotificationChannel(CHANNEL, context.getString(R.string.jobs_channel), NotificationManager.IMPORTANCE_LOW),
         )
         val notification: Notification = NotificationCompat.Builder(context, CHANNEL)
-            .setSmallIcon(android.R.drawable.ic_popup_sync)
+            .setSmallIcon(R.drawable.ic_notification_masala)
             .setContentTitle(title)
             .setContentText(text)
             .setOngoing(true)

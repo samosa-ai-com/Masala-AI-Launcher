@@ -37,6 +37,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.ui.platform.LocalContext
+import com.samosaai.masala.masala
+import com.samosaai.masala.ui.components.IconTile
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -337,23 +343,19 @@ private fun IconView(icon: IconRef, app: AppEntry?, ctx: RenderContext, size: In
             if (bitmap != null) {
                 Image(bitmap, contentDescription = null, modifier = Modifier.size(size.dp))
             } else {
-                SymbolDisc("?", null, size)
+                SymbolDisc(Icons.Rounded.Apps, null, size)
             }
         }
-        is IconRef.Symbol -> SymbolDisc(SymbolIcons.glyph(icon.name), SymbolIcons.tint(icon.tint), size)
-        is IconRef.Override -> SymbolDisc("•", null, size)
+        is IconRef.Symbol -> SymbolDisc(SymbolIcons.icon(icon.name), SymbolIcons.tint(icon.tint), size)
+        is IconRef.Override -> SymbolDisc(SymbolIcons.Fallback, null, size)
     }
 }
 
+/** A symbol in the same mask as the app icons (plan UI refresh U1: vectors, not emoji on discs). */
 @Composable
-internal fun SymbolDisc(glyph: String, tint: Color?, size: Int) {
-    Box(
-        Modifier.size(size.dp).clip(CircleShape).background((tint ?: MaterialTheme.colorScheme.primary).copy(alpha = 0.85f))
-            .clearAndSetSemantics { },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(glyph, fontSize = (size * 0.45f).sp, color = Color.White)
-    }
+internal fun SymbolDisc(icon: ImageVector, tint: Color?, size: Int) {
+    val shape = LocalContext.current.masala.icons.style.shape
+    IconTile(icon, Modifier.clearAndSetSemantics { }, size = size.dp, tint = tint, shape = shape)
 }
 
 @Composable

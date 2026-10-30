@@ -1,6 +1,7 @@
 package com.samosaai.masala.debug
 
 import com.samosaai.masala.tools.MasalaToolDefinitions
+import com.samosaai.masala.tools.commandTemplate
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test

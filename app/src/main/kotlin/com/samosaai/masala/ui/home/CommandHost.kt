@@ -1,5 +1,9 @@
 package com.samosaai.masala.ui.home
 
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.ChatBubble
+import androidx.compose.material.icons.Icons
+import androidx.compose.material3.Icon
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -88,7 +92,7 @@ fun AskButton(onOpen: () -> Unit, modifier: Modifier = Modifier) {
         shape = CircleShape,
         color = MaterialTheme.colorScheme.secondaryContainer,
     ) {
-        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { Text("💬") }
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.ChatBubble, contentDescription = null) }
     }
 }
 
@@ -110,7 +114,7 @@ fun MicButton(press: MicPress, modifier: Modifier = Modifier) {
         shape = CircleShape,
         color = MaterialTheme.colorScheme.primary,
     ) {
-        Box(contentAlignment = Alignment.Center) { Text("🎤") }
+        Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Mic, contentDescription = null) }
     }
 }
 
