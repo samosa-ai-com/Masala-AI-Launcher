@@ -138,7 +138,6 @@ object LayoutChecker {
                 problems += Problem("$path.columns", "columns must be 1 to $MAX_COLUMNS")
             }
             is ListSection, is GroupSection, is DockSection -> Unit
-            else -> Unit
         }
         section.items.forEachIndexed { i, item ->
             val itemPath = "$path.items[$i]"

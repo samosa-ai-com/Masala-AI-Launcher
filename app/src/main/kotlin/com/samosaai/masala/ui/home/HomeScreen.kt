@@ -192,7 +192,11 @@ fun HomeScreen(
                         dragged = 0f
                         swipes.add(0f)
                     },
-                    onDragEnd = { swipes.onLift() },
+                    onDragEnd = {
+                        // No-op on purpose: the Final-pass observer below fires onLift() once it has
+                        // seen the up event, so the release velocity includes it. Firing here (Main
+                        // pass) would compute velocity without the up change.
+                    },
                     onDragCancel = { /* the nested path may still be live; lift decides */ },
                     onVerticalDrag = { change, dy ->
                         dragged += dy

@@ -97,9 +97,7 @@ object AppSearch {
     fun <T> rank(query: String, entries: List<T>, labels: (T) -> List<String>): List<T> =
         entries.withIndex()
             .mapNotNull { (i, entry) ->
-                labels(entry).mapNotNull { match(query, it) }
-                    .maxWithOrNull(matchOrder)
-                    ?.let { Triple(entry, it, i) }
+                bestOf(labels(entry)) { match(query, it) }?.let { Triple(entry, it, i) }
             }
             .sortedWith(compareByDescending<Triple<T, Match, Int>, Match>(matchOrder) { it.second }.thenBy { it.third })
             .map { it.first }
@@ -118,12 +116,20 @@ object AppSearch {
         if (q.isEmpty()) return emptyList()
         return prepared.entries.withIndex()
             .mapNotNull { (i, entry) ->
-                entry.second.mapNotNull { matchNormalized(q, it) }
-                    .maxWithOrNull(matchOrder)
-                    ?.let { Triple(entry.first, it, i) }
+                bestOf(entry.second) { matchNormalized(q, it) }?.let { Triple(entry.first, it, i) }
             }
             .sortedWith(compareByDescending<Triple<T, Match, Int>, Match>(matchOrder) { it.second }.thenBy { it.third })
             .map { it.first }
+    }
+
+    /** Best match over labels without allocating a list per entry per keystroke. */
+    private inline fun bestOf(labels: List<String>, match: (String) -> Match?): Match? {
+        var best: Match? = null
+        for (label in labels) {
+            val m = match(label) ?: continue
+            if (best == null || matchOrder.compare(m, best) > 0) best = m
+        }
+        return best
     }
 
     private val matchOrder: Comparator<Match> =
