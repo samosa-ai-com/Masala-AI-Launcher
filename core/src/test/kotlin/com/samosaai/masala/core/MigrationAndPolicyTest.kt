@@ -56,8 +56,8 @@ class MigrationAndPolicyTest {
         },
     ).apply {
         register(FakeTool("memory_read", readsPrivateData = true))
-        register(FakeTool("calendar_read", readsPrivateData = true))
-        register(FakeTool("weather", usesNetwork = true))
+        register(FakeTool("list_calendar_events", readsPrivateData = true))
+        register(FakeTool("weather", readsPrivateData = true, usesNetwork = true))
         register(FakeTool("websearch", usesNetwork = true))
         register(FakeTool("webfetch", usesNetwork = true))
         register(FakeTool("file_search", origin = ToolOrigin.PRO, readsPrivateData = true))
