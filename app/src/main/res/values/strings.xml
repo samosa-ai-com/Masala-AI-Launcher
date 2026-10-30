@@ -248,6 +248,7 @@
     <string name="scheduled_task_done">No runs left</string>
     <string name="scheduled_task_next">Next: %1$s</string>
     <string name="scheduled_task_last">Last: %1$s</string>
+    <string name="scheduled_task_note">Note: %1$s</string>
     <string name="scheduled_task_delete_title">Delete this task?</string>
     <string name="scheduled_task_delete_message">“%1$s” will no longer run.</string>
     <string name="recording_start">Start recording</string>

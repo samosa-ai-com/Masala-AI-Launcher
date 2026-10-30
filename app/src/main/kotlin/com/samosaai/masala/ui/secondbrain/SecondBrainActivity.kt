@@ -84,7 +84,7 @@ class SecondBrainActivity : ComponentActivity() {
 
         suspend fun reload() {
             snapshot = app.secondBrain.snapshot()
-            health = app.secondBrain.health()
+            health = app.secondBrain.health(app.taskNoteLinks.healthLinks())
         }
         // The vault snapshot follows the repository: any mutation (a proposal card,
         // or a tool run) refreshes the sections and the health without a manual step.

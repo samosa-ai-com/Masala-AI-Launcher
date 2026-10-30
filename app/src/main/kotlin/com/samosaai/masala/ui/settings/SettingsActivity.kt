@@ -522,6 +522,13 @@ class SettingsActivity : ComponentActivity() {
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        task.memoryNote?.let { note ->
+                            Text(
+                                stringResource(R.string.scheduled_task_note, note),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         task.history.lastOrNull()?.let { last ->
                             Text(
                                 stringResource(R.string.scheduled_task_last, last.status.name),
@@ -565,7 +572,10 @@ class SettingsActivity : ComponentActivity() {
                             confirmButton = {
                                 TextButton(onClick = {
                                     confirmDelete = false
-                                    mutate { masala.scheduledTasks.delete(task.id) }
+                                    mutate {
+                                        masala.taskNoteLinks.taskDeleted(task)
+                                        masala.scheduledTasks.delete(task.id)
+                                    }
                                 }) { Text(stringResource(R.string.scheduled_task_delete)) }
                             },
                             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_back)) } },

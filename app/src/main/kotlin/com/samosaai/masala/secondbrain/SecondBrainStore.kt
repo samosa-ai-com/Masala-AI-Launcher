@@ -612,6 +612,27 @@ class SecondBrainStore(
         WriteOutcome(id, created = true, undoId = undoId)
     }
 
+    /**
+     * Sets (or with null clears) a record's `task_ref`, touching only that frontmatter line. Setting it
+     * must leave a valid record; clearing always works, so a broken note can still be unlinked.
+     */
+    fun setTaskRef(path: String, taskId: String?): WriteOutcome = synchronized(lock) {
+        val id = normalizeId(path)
+        val dirKind = recordDirKind(id) ?: return WriteOutcome(id, listOf("$id: only records in areas/, people/ or notes/ link to tasks."))
+        val file = vaultFile(id)?.takeIf { it.isFile } ?: return WriteOutcome(id, listOf("$id does not exist."))
+        val lines = file.readText().lines()
+        val end = if (lines.firstOrNull()?.trim() == "---") lines.drop(1).indexOfFirst { it.trim() == "---" } + 1 else 0
+        if (end <= 0) return WriteOutcome(id, listOf("$id has no frontmatter to hold task_ref."))
+        val front = lines.subList(1, end).filterNot { it.substringBefore(':').trim() == "task_ref" }
+        val updated = (listOf(lines[0]) + front + listOfNotNull(taskId?.let { "task_ref: $it" }) + lines.drop(end)).joinToString("\n")
+        if (taskId != null) {
+            checkContent(id, dirKind, updated, loadSnapshot()).takeIf { it.isNotEmpty() }?.let { return WriteOutcome(id, it) }
+        }
+        val undoId = journal(id, file)
+        file.writeText(updated)
+        WriteOutcome(id, undoId = undoId)
+    }
+
     /** One vault text file by path for the agent, capped like the viewer; null when missing, binary or outside. */
     fun readText(path: String, cap: Int = VIEWER_FILE_CAP_CHARS): CappedText? {
         val id = normalizeId(path)

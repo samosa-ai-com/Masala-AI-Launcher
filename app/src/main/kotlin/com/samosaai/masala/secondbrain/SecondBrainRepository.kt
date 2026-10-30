@@ -123,10 +123,13 @@ class SecondBrainRepository(
         refreshSnapshot().details().firstOrNull { it.absolutePath == file.absolutePath }
     }
 
-    suspend fun delete(id: String): Boolean = withContext(Dispatchers.IO) {
-        val ok = store.deleteEntry(id)
-        if (ok) refresh()
-        ok
+    suspend fun delete(id: String): Boolean {
+        val ok = withContext(Dispatchers.IO) { store.deleteEntry(id) }
+        if (ok) {
+            refresh()
+            onNoteDeleted(id)
+        }
+        return ok
     }
 
     /** Gated write at a vault path ([SecondBrainStore.writeRecord]); a success is logged and refreshes the flows. */
@@ -146,6 +149,29 @@ class SecondBrainRepository(
 
     /** Deletes a record or raw file ([SecondBrainStore.deleteRecord]). */
     suspend fun remove(path: String) = changed("memory_delete") { store.deleteRecord(path) }
+        .also { if (it.ok) onNoteDeleted(it.id) }
+
+    /** Called with the vault id of every deleted file, so a task pointing at it can let go (S5). */
+    @Volatile
+    var onNoteDeleted: suspend (String) -> Unit = {}
+
+    /** Writes `task_ref` into a note (shown as a change with Undo). */
+    suspend fun linkTask(path: String, taskId: String) = changed("memory_link_task") { store.setTaskRef(path, taskId) }
+
+    /** Clears a note's `task_ref` because its task went away; not shown as a card. */
+    suspend fun clearTaskRef(path: String): Boolean {
+        val outcome = withContext(Dispatchers.IO) { store.setTaskRef(path, null) }
+        if (outcome.ok) {
+            audit("memory_unlink_task", outcome.id)
+            refresh()
+        }
+        return outcome.ok
+    }
+
+    /** A note's `task_ref`, or null. */
+    suspend fun taskRefOf(path: String): String? = withContext(Dispatchers.IO) {
+        store.readText(path, SecondBrainStore.FRONTMATTER_SCAN_CHARS)?.text?.let { store.frontmatterOf(it) }?.get("task_ref")?.takeIf { it.isNotBlank() }
+    }
 
     /** Puts back the file a change replaced, created or deleted. */
     suspend fun undo(undoId: String): Boolean {
@@ -223,7 +249,7 @@ class SecondBrainRepository(
     fun filter(snapshot: SecondBrainSnapshot, query: String): SecondBrainSnapshot =
         store.filterSnapshot(snapshot, query)
 
-    /** Vault health (unlinked, dangling, schema, unscanned; task links once tasks carry note refs). Never moves the tick. */
+    /** Vault health: links, schema, unscanned files, stale raw drops, and task links both ways. Never moves the tick. */
     suspend fun health(taskLinks: List<TaskLink> = emptyList()): BrainHealth = withContext(Dispatchers.IO) {
         val snapshot = store.loadSnapshot().also { cached = it }
         store.checkHealth(snapshot, taskLinks)

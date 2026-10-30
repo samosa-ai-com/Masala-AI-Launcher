@@ -10,6 +10,7 @@ import com.samosaai.masala.core.tool.ToolSensitivity.READ_ONLY
 import com.samosaai.masala.secondbrain.MemoryProtocol
 import com.samosaai.masala.secondbrain.SecondBrainRepository
 import com.samosaai.masala.secondbrain.SecondBrainStore
+import com.samosaai.masala.secondbrain.TaskNoteLinks
 import com.samosaai.masala.tools.boolean
 import com.samosaai.masala.tools.int
 import com.samosaai.masala.tools.missing
@@ -134,6 +135,23 @@ object MemoryTools {
             result(secondBrain.remove(path))
         },
     )
+
+    val link = ToolDefinition(
+        "memory_link_task",
+        "Link a scheduled task and the Second Brain note it belongs to, both ways: the task remembers the note and " +
+            "the note's task_ref names the task. Pass an empty path to unlink. Asks the user first.",
+        schema(listOf("task", "path")) {
+            prop("task", "The task's id or exact name.")
+            prop("path", "The note, e.g. notes/2026-10-29-dentist.md; empty to remove the link.")
+        },
+    )
+
+    fun linkTask(links: TaskNoteLinks): Tool = FunctionTool(link, CHANGES_SOMETHING, readsPrivateData = true) { args ->
+        val task = args.string("task")?.takeIf { it.isNotBlank() } ?: return@FunctionTool missing("task")
+        val path = args.string("path")?.trim().orEmpty()
+        val outcome = if (path.isEmpty()) links.unlink(task) else links.link(task, path)
+        if (outcome.ok) ActionResult.ok(outcome.message) else ActionResult.error(outcome.message)
+    }
 
     private fun JsonObject.path(): String? = string("path")
 

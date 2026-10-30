@@ -31,6 +31,7 @@ import com.samosaai.masala.connectors.mcp.McpServerStore
 import com.samosaai.masala.connectors.mcp.PrefsMcpStorage
 import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.secondbrain.SecondBrainRepository
+import com.samosaai.masala.secondbrain.TaskNoteLinks
 import com.samosaai.masala.secondbrain.SecondBrainStore
 import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.core.tool.ActionResult
@@ -145,16 +146,22 @@ class MasalaApp : Application() {
     val skillScheduling by lazy { SkillScheduling(scheduledTasks, PrefsDeclinedSchedules(this)) }
 
     /** The Second Brain; approved writes are recorded in the action log. */
-    val secondBrain by lazy {
+    val secondBrain: SecondBrainRepository by lazy {
         SecondBrainRepository(
             scope,
             SecondBrainStore(java.io.File(filesDir, "secondbrain")),
             database.wikiPages(),
             audit = { action, detail ->
-                actionLog.record(action, detail, ToolResult.Success("The user approved the entry"))
+                actionLog.record(action, detail, ToolResult.Success("Second Brain changed"))
             },
-        ).also { repo -> scope.launch(Dispatchers.IO) { repo.ensure() } }
+        ).also { repo ->
+            repo.onNoteDeleted = { taskNoteLinks.noteDeleted(it) }
+            scope.launch(Dispatchers.IO) { repo.ensure() }
+        }
     }
+
+    /** Scheduled tasks and Second Brain notes, linked both ways (plan `second-brain-robust.md`, S5). */
+    val taskNoteLinks: TaskNoteLinks by lazy { TaskNoteLinks(scheduledTasks, secondBrain) }
 
     /** Models, keys and voice choices (Settings → Masala AI); every model call reads it. */
     val aiSettings by lazy { AiSettingsStore(this, KeyCipher.androidKeystore()) }
@@ -327,6 +334,7 @@ class MasalaApp : Application() {
         AgentTools.create(this, layouts, modes, runSkill = ::openSkillSheet).forEach(tools::register)
         MemoryTools.create(secondBrain).forEach(tools::register)
         tools.register(MemoryRawTool.create(this, secondBrain) { tools.fileAccess })
+        tools.register(MemoryTools.linkTask(taskNoteLinks))
         mcp.servers
         dispatcher = ActionDispatcher(this, actions, launcher, modes, confirmationGate, tools, { skills }) { toolExecutor(confirmationGate) }
 
