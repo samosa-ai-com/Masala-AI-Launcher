@@ -285,6 +285,9 @@ class MasalaApp : Application() {
         private set
     lateinit var actions: AppActions
         private set
+
+    /** Launch counts for the globe drawer and "Suggested now" (UI refresh U3). */
+    val usage by lazy { com.samosaai.masala.launcher.AppUsage(this, database.appLaunches(), scope) }
     lateinit var launcher: LauncherModel
         private set
     lateinit var contextService: ContextService
@@ -300,7 +303,7 @@ class MasalaApp : Application() {
         PermissionGate.context = this
         catalog = AppCatalog(this, scope)
         icons = IconCache(this, catalog)
-        actions = AppActions(this, catalog)
+        actions = AppActions(this, catalog) { usage.record(it) }
         launcher = LauncherModel(scope, catalog, database.appOverrides(), actions)
         catalog.start()
 
