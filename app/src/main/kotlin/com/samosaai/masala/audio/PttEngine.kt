@@ -21,4 +21,17 @@ interface PttEngine {
     ): Result<String>
 
     fun cancelListening(provider: AudioProvider)
+
+    /**
+     * Tap to talk (plan UI refresh U2): listen until a pause of [silenceTimeoutMs] after speech, then
+     * transcribe. [finishUtterance] ends it early and still transcribes what was said.
+     */
+    suspend fun listenForUtterance(
+        provider: AudioProvider,
+        model: String,
+        language: Language = Language.ENGLISH,
+        silenceTimeoutMs: Long,
+    ): Result<String> = Result.failure(UnsupportedOperationException("Tap to talk isn't available"))
+
+    fun finishUtterance() {}
 }

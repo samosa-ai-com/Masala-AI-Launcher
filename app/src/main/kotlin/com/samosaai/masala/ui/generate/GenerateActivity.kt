@@ -63,15 +63,8 @@ import kotlinx.coroutines.withContext
  * touches the current layout.
  */
 class GenerateActivity : ComponentActivity() {
-    private val prefs by lazy { getSharedPreferences("debug_llm", Context.MODE_PRIVATE) }
-
-    private fun loadConfig() = LlmConfig.default.let { d ->
-        LlmConfig(
-            prefs.getString("base_url", null) ?: d.baseUrl,
-            prefs.getString("api_key", null) ?: d.apiKey,
-            prefs.getString("model", null) ?: d.model,
-        )
-    }
+    /** The chat model from Settings → Masala AI → Models & keys. */
+    private fun loadConfig() = LlmConfig.default
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()

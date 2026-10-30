@@ -1,0 +1,291 @@
+package com.samosaai.masala.ui.settings
+
+import android.content.Intent
+import android.provider.Settings
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.PanTool
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.samosaai.masala.R
+import com.samosaai.masala.core.ai.Endpoint
+import com.samosaai.masala.core.ai.KeyKind
+import com.samosaai.masala.core.ai.MicMode
+import com.samosaai.masala.core.ai.ProviderPresets
+import com.samosaai.masala.data.LauncherSettings
+import com.samosaai.masala.i18n.Language
+import com.samosaai.masala.masala
+import com.samosaai.masala.ui.components.Radii
+import com.samosaai.masala.ui.theme.MasalaMono
+import com.samosaai.masala.ui.theme.MasalaTheme
+import com.samosaai.masala.ui.theme.rememberHaptics
+import kotlinx.coroutines.launch
+import java.util.Locale
+
+/**
+ * Settings → Masala AI → Voice (plan UI refresh U2, "Voice in & out" board): how the mic button works,
+ * where voice input goes and in which language, the voice replies are read in (the phone's or a
+ * provider's), its speed, read-aloud, a test, and Masala as the assist app.
+ */
+@Composable
+fun VoicePage(settings: LauncherSettings, update: ((LauncherSettings) -> LauncherSettings) -> Unit, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val app = context.masala
+    val store = app.aiSettings
+    val profile by store.profile.collectAsState()
+    val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
+    val voiceTint = MasalaTheme.tokens.voice
+
+    SettingsScaffold(stringResource(R.string.voice_title), onBack) {
+        Eyebrow(stringResource(R.string.voice_mic_button))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MicCard(Icons.Rounded.Mic, stringResource(R.string.voice_tap), stringResource(R.string.voice_tap_summary), profile.micMode == MicMode.TAP, Modifier.weight(1f)) {
+                scope.launch { store.update { it.copy(micMode = MicMode.TAP) } }; haptics.tick()
+            }
+            MicCard(Icons.Rounded.PanTool, stringResource(R.string.voice_hold), stringResource(R.string.voice_hold_summary), profile.micMode == MicMode.HOLD, Modifier.weight(1f)) {
+                scope.launch { store.update { it.copy(micMode = MicMode.HOLD) } }; haptics.tick()
+            }
+        }
+
+        Eyebrow(stringResource(R.string.voice_input))
+        Panel {
+            OptionRow(stringResource(R.string.voice_on_phone), stringResource(R.string.voice_on_phone_summary), profile.voiceIn == null, badge = stringResource(R.string.voice_private)) {
+                scope.launch { store.update { it.copy(voiceIn = null) } }
+            }
+            // Providers that transcribe: the one in use, then any with a key or none needed and a known URL.
+            ProviderPresets.all.filter { it.capabilities.voiceIn }.forEach { p ->
+                val known = profile.endpoints.firstOrNull { it.presetId == p.id }?.baseUrl ?: p.baseUrl
+                val ready = known.isNotBlank() && (p.keyKind == KeyKind.NONE || store.hasKey(p.id))
+                val sub = when {
+                    profile.voiceIn?.presetId == p.id -> profile.voiceIn?.model?.ifBlank { stringResource(R.string.voice_first_model) } ?: ""
+                    !ready && known.isBlank() -> stringResource(R.string.voice_set_up_first)
+                    !ready -> stringResource(R.string.voice_needs_key, p.name)
+                    else -> stringResource(R.string.voice_from_models)
+                }
+                OptionRow(p.name, sub, profile.voiceIn?.presetId == p.id, enabled = ready) {
+                    scope.launch { store.update { it.copy(voiceIn = Endpoint(p.id, known)) } }
+                }
+            }
+            LanguageRow(profile.voiceLanguage) { code -> scope.launch { store.update { it.copy(voiceLanguage = code) } } }
+        }
+
+        Eyebrow(stringResource(R.string.voice_output))
+        Panel(Modifier.padding(14.dp)) {
+            val outs = ProviderPresets.all.filter { p ->
+                p.capabilities.voiceOut && (profile.endpoints.any { it.presetId == p.id } || (p.baseUrl.isNotBlank() && store.hasKey(p.id)))
+            }
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.06f)).padding(3.dp).horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Segment(stringResource(R.string.voice_phone_voice), profile.voiceOut == null) { scope.launch { store.update { it.copy(voiceOut = null, voice = "") } } }
+                outs.forEach { p ->
+                    Segment(p.name, profile.voiceOut?.presetId == p.id) {
+                        val known = profile.endpoints.firstOrNull { it.presetId == p.id }?.baseUrl ?: p.baseUrl
+                        scope.launch { store.update { it.copy(voiceOut = Endpoint(p.id, known, p.defaultTtsModel), voice = "") } }
+                    }
+                }
+            }
+            VoiceChips(profile.voiceOut, profile.voiceLanguage, profile.voice) { name -> scope.launch { store.update { it.copy(voice = name) } } }
+
+            var speed by remember(profile.speechRate) { mutableFloatStateOf(profile.speechRate) }
+            Column {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(stringResource(R.string.voice_speed), style = MaterialTheme.typography.titleSmall)
+                    Text("%.1f×".format(Locale.ROOT, speed), fontFamily = MasalaMono, color = voiceTint)
+                }
+                Slider(
+                    speed, { speed = (it * 10).toInt() / 10f },
+                    valueRange = 0.5f..2f,
+                    onValueChangeFinished = { scope.launch { store.update { it.copy(speechRate = speed) } } },
+                    colors = SliderDefaults.colors(thumbColor = MasalaTheme.tokens.textHigh, activeTrackColor = voiceTint),
+                )
+            }
+            SettingsToggleRow(stringResource(R.string.settings_read_replies), settings.readRepliesAloud) { on -> update { it.copy(readRepliesAloud = on) } }
+            val testSentence = stringResource(R.string.settings_test_voice_sentence)
+            val testVoiceOk = stringResource(R.string.settings_test_voice_ok)
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        val reason = app.speakReply(testSentence)
+                        Toast.makeText(context, reason ?: testVoiceOk, Toast.LENGTH_SHORT).show()
+                    }
+                },
+                border = BorderStroke(1.dp, voiceTint.copy(alpha = 0.4f)),
+                modifier = Modifier.fillMaxWidth().height(46.dp),
+            ) {
+                Icon(Icons.Rounded.PlayArrow, null, tint = voiceTint)
+                Text(stringResource(R.string.voice_test), color = voiceTint, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 6.dp))
+            }
+        }
+
+        Eyebrow(stringResource(R.string.voice_from_anywhere))
+        Panel {
+            com.samosaai.masala.ui.components.SettingsRow(
+                Icons.Rounded.AutoAwesome,
+                stringResource(R.string.voice_assist_title),
+                summary = stringResource(R.string.voice_assist_summary),
+                // The system's "Digital assistant app" screen; the assistant role can't be asked for in a dialog.
+                onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } },
+            ) { Text(stringResource(R.string.voice_set_up), color = MasalaTheme.tokens.accentText, fontWeight = FontWeight.SemiBold) }
+        }
+    }
+}
+
+@Composable
+private fun Panel(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val shape = RoundedCornerShape(Radii.card)
+    Column(
+        Modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh).border(1.dp, MasalaTheme.tokens.hairline, shape).then(modifier),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) { content() }
+}
+
+@Composable
+private fun MicCard(icon: ImageVector, title: String, summary: String, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val tint = MasalaTheme.tokens.voice
+    val shape = RoundedCornerShape(20.dp)
+    Column(
+        modifier.clip(shape).background(if (on) tint.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainerHigh)
+            .border(BorderStroke(1.5.dp, if (on) tint else MasalaTheme.tokens.hairline), shape)
+            .clickable(role = Role.RadioButton, onClick = onClick).semantics { selected = on }.padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(icon, null, tint = if (on) tint else MasalaTheme.tokens.textMedium, modifier = Modifier.size(22.dp))
+        Text(title, style = MaterialTheme.typography.titleSmall)
+        Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun OptionRow(title: String, sub: String, checked: Boolean, enabled: Boolean = true, badge: String? = null, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = enabled, role = Role.RadioButton, onClick = onClick).padding(horizontal = 14.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        RadioButton(checked, null, enabled = enabled, colors = RadioButtonDefaults.colors(selectedColor = MasalaTheme.tokens.voice))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = if (enabled) MaterialTheme.colorScheme.onSurface else MasalaTheme.tokens.textLow)
+            if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        badge?.let {
+            Text(
+                it, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MasalaTheme.tokens.done,
+                modifier = Modifier.clip(RoundedCornerShape(50)).background(MasalaTheme.tokens.done.copy(alpha = 0.12f)).padding(horizontal = 8.dp, vertical = 3.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LanguageRow(code: String, onPick: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val auto = stringResource(R.string.voice_language_auto)
+    val current = Language.entries.firstOrNull { it.matchesCode(code) }?.label ?: auto
+    Box {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 52.dp).clickable(role = Role.DropdownList) { open = true }.padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.voice_language), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text(current, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(open, { open = false }) {
+            DropdownMenuItem(text = { Text(auto) }, onClick = { open = false; onPick("") })
+            Language.entries.forEach { l -> DropdownMenuItem(text = { Text(l.label) }, onClick = { open = false; onPick(l.iso639) }) }
+        }
+    }
+}
+
+@Composable
+private fun Segment(label: String, on: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.height(34.dp).clip(RoundedCornerShape(50)).background(if (on) MasalaTheme.tokens.textHigh else Color.Transparent)
+            .clickable(role = Role.Tab, onClick = onClick).semantics { selected = on }.padding(horizontal = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = if (on) MaterialTheme.colorScheme.surface else MasalaTheme.tokens.textMedium)
+    }
+}
+
+/** A few voices to pick from: the phone's for the chosen language, or the provider's (from its models). */
+@Composable
+private fun VoiceChips(out: Endpoint?, languageCode: String, chosen: String, onPick: (String) -> Unit) {
+    val app = LocalContext.current.masala
+    val language = Language.entries.firstOrNull { it.matchesCode(languageCode.ifBlank { Locale.getDefault().language }) } ?: Language.ENGLISH
+    var voices by remember(out, language) { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(out, language) { voices = app.voicesFor(out, language) }
+    if (voices.isEmpty()) return
+    val tint = MasalaTheme.tokens.voice
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        voices.take(8).forEach { v ->
+            val on = v == chosen || (chosen.isBlank() && v == voices.first())
+            Box(
+                Modifier.height(36.dp).clip(RoundedCornerShape(50))
+                    .background(if (on) tint.copy(alpha = 0.12f) else Color.Transparent)
+                    .border(if (on) 1.5.dp else 1.dp, if (on) tint else Color.White.copy(alpha = 0.14f), RoundedCornerShape(50))
+                    .clickable(role = Role.RadioButton) { onPick(v) }.semantics { selected = on }.padding(horizontal = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text(if (out == null) phoneVoiceLabel(v) else v, fontSize = 12.5.sp, fontWeight = FontWeight.Medium, maxLines = 1) }
+        }
+    }
+}
+
+/** "en-AU-language" or "en-in-x-ene-local" → "English (Australia)"; engines name voices by locale first. */
+private fun phoneVoiceLabel(name: String): String {
+    val tag = name.split('-').take(2).joinToString("-")
+    val variant = name.substringAfter("-x-", "").substringBefore('-').takeIf { it.isNotBlank() }
+    val display = Locale.forLanguageTag(tag).displayName.takeIf { it.isNotBlank() && it != tag } ?: return name
+    return if (variant != null) "$display · $variant" else display
+}

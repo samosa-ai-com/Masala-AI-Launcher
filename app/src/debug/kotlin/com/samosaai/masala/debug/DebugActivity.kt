@@ -1,5 +1,8 @@
 package com.samosaai.masala.debug
 
+import androidx.lifecycle.lifecycleScope
+import com.samosaai.masala.core.ai.ProviderPresets
+import com.samosaai.masala.core.ai.Endpoint
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -76,7 +79,6 @@ import kotlinx.serialization.json.jsonPrimitive
  * confirmation gate will.
  */
 class DebugActivity : ComponentActivity() {
-    private val prefs by lazy { getSharedPreferences("debug_llm", Context.MODE_PRIVATE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -87,16 +89,17 @@ class DebugActivity : ComponentActivity() {
         }
     }
 
-    private fun loadConfig() = LlmConfig.default.let { d ->
-        LlmConfig(
-            prefs.getString("base_url", null) ?: d.baseUrl,
-            prefs.getString("api_key", null) ?: d.apiKey,
-            prefs.getString("model", null) ?: d.model,
-        )
-    }
+    /** The same store Settings → Models & keys writes, so the two never disagree (plan UI refresh U2). */
+    private fun loadConfig() = LlmConfig.default
 
-    private fun saveConfig(c: LlmConfig) =
-        prefs.edit().putString("base_url", c.baseUrl).putString("api_key", c.apiKey).putString("model", c.model).apply()
+    private fun saveConfig(c: LlmConfig) {
+        val app = masala
+        lifecycleScope.launch {
+            val preset = ProviderPresets.detect(c.baseUrl)
+            app.aiSettings.update { it.copy(chat = Endpoint(preset.id, c.baseUrl, c.model)) }
+            app.aiSettings.setKey(preset.id, c.apiKey)
+        }
+    }
 
     private companion object {
         val DIRECT_CALL = Regex("""/(\w+)\s*(\{.*\})?""", RegexOption.DOT_MATCHES_ALL)

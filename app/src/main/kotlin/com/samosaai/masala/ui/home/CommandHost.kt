@@ -60,24 +60,59 @@ import com.samosaai.masala.ui.components.rememberCapabilityGrant
 import com.samosaai.masala.ui.skills.SkillSheetActivity
 import com.samosaai.masala.ui.secondbrain.ProposalCards
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import com.samosaai.masala.core.ai.MicMode
 
-/** Push-to-talk: what a held mic button does, with the microphone permission asked on the first press. */
+/** What the mic button does when pressed and released, with the microphone permission asked on the first press. */
 class MicPress(val onPress: () -> Unit, val onRelease: () -> Unit)
 
+/** A press longer than this is hold-to-talk; shorter is a tap. */
+private const val HOLD_AFTER_MS = 300L
+
+/**
+ * The mic (plan UI refresh U2, decision 6). In tap mode a tap listens until the speaker pauses (a second
+ * tap sends early) and a press held past [HOLD_AFTER_MS] is walkie-talkie; in hold mode only holding
+ * records.
+ */
 @Composable
 fun rememberMicPress(app: MasalaApp): MicPress {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val granted = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { /* the next press listens */ }
-    return remember(app) {
+    // Keyed on the composition's scope, launcher and context: keying on the app singleton would
+    // keep the first composition's cancelled scope, dead permission launcher and destroyed
+    // Activity across rotations.
+    return remember(context, scope, granted, app) {
+        var holdStart: Job? = null
+        var holding = false
+        var permitted = false
         MicPress(
             onPress = {
-                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                permitted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                if (!permitted) {
                     granted.launch(Manifest.permission.RECORD_AUDIO)
-                } else {
-                    app.commands.startListening()
+                } else if (app.aiSettings.profile.value.micMode == MicMode.HOLD) {
+                    holding = app.commands.startListening()
+                } else if (app.commands.state.value != CommandState.Listening) {
+                    holding = false
+                    holdStart = scope.launch {
+                        delay(HOLD_AFTER_MS)
+                        holding = app.commands.startListening()
+                    }
                 }
             },
-            onRelease = { app.commands.stopListening() },
+            onRelease = {
+                if (permitted) {
+                    holdStart?.cancel()
+                    holdStart = null
+                    when {
+                        holding -> app.commands.stopListening()
+                        app.aiSettings.profile.value.micMode == MicMode.TAP -> app.commands.tapToTalk()
+                    }
+                    holding = false
+                }
+            },
         )
     }
 }
@@ -96,7 +131,7 @@ fun AskButton(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-/** The mic: records while held. */
+/** The mic: tap to talk, or hold (see [rememberMicPress]). */
 @Composable
 fun MicButton(press: MicPress, modifier: Modifier = Modifier) {
     val label = stringResource(R.string.command_mic)

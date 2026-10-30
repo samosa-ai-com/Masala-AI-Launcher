@@ -86,6 +86,27 @@ class CommandController(
         return true
     }
 
+    /**
+     * Tap to talk (decision 6): listens until the speaker pauses, then runs the transcript. A second tap
+     * while listening ends it early ([finishListening]).
+     */
+    fun tapToTalk() {
+        val input = speech ?: return
+        if (_state.value == CommandState.Listening) return finishListening()
+        job?.cancel()
+        _state.value = CommandState.Listening
+        job = scope.launch {
+            input.listenOnce()
+                .onSuccess { if (it.isBlank()) _state.value = CommandState.Error("", "Didn't catch that") else ask(it, spoken = true) }
+                .onFailure { _state.value = CommandState.Error("", it.message ?: "Didn't catch that") }
+        }
+    }
+
+    /** Ends tap-to-talk listening now; what was said still runs. */
+    fun finishListening() {
+        speech?.finish()
+    }
+
     /** Push-to-talk released: the transcript becomes a command. */
     fun stopListening() {
         val input = speech ?: return
