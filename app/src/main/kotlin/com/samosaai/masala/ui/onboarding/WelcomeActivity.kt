@@ -12,9 +12,11 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -150,53 +152,58 @@ class WelcomeActivity : ComponentActivity() {
             onDone()
         }
         Box(Modifier.fillMaxSize().background(MasalaColors.Charcoal)) {
-            // Centered when everything fits, scrollable on small screens, landscape or split
-            // screen (the fixed-size column above could clip the buttons there).
-            Column(
-                Modifier.fillMaxSize().systemBarsPadding().verticalScroll(scroll).padding(start = 24.dp, end = 24.dp, top = 40.dp, bottom = 28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                MasalaWordmark(markSize = 40.dp, grinding = true)
-                SamHello(
-                    Modifier.widthIn(max = 290.dp).fillMaxWidth().aspectRatio(290f / 265f).padding(vertical = 16.dp),
-                    contentDescription = stringResource(R.string.welcome_sam_description),
-                )
-                Text(
-                    stringResource(R.string.welcome_title),
-                    style = TextStyle(fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold, fontSize = 34.sp, letterSpacing = (-0.03).em),
-                    color = MasalaColors.Text,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.semantics { heading() },
-                )
-                Text(
-                    stringResource(R.string.welcome_body),
-                    fontSize = 15.5.sp,
-                    lineHeight = 23.sp,
-                    color = MasalaColors.Text.copy(alpha = 0.72f),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 10.dp).widthIn(max = 300.dp),
-                )
-                Spacer(Modifier.height(26.dp))
-                Button(
-                    onClick = {
-                        haptics.confirm()
-                        HomeRole.requestIntent(this@WelcomeActivity)?.let(roleRequest::launch) ?: run {
-                            HomeRole.openSettings(this@WelcomeActivity)
-                            onDone()
-                        }
-                    },
-                    shape = RoundedCornerShape(percent = 50),
-                    colors = ButtonDefaults.buttonColors(containerColor = MasalaColors.Gold, contentColor = MasalaColors.Charcoal),
-                    modifier = Modifier.fillMaxWidth().height(54.dp),
-                ) { Text(stringResource(R.string.welcome_make_home), fontSize = 16.sp, fontWeight = FontWeight.Bold) }
-                OutlinedButton(
-                    onClick = onDone,
-                    shape = RoundedCornerShape(percent = 50),
-                    border = BorderStroke(1.dp, MasalaColors.Text.copy(alpha = 0.18f)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MasalaColors.Text),
-                    modifier = Modifier.padding(top = 10.dp).fillMaxWidth().height(50.dp),
-                ) { Text(stringResource(R.string.welcome_look_around), fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+            Box(Modifier.fillMaxSize().systemBarsPadding().padding(start = 24.dp, end = 24.dp, top = 40.dp, bottom = 28.dp)) {
+                // Centered when everything fits, scrollable on small screens, landscape or split
+                // screen. The min height gives Arrangement.Center something to center in: a bare
+                // scrolling column wraps its content, which would pin everything to the top.
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    Column(
+                        Modifier.verticalScroll(scroll).defaultMinSize(minHeight = maxHeight),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        MasalaWordmark(markSize = 40.dp, grinding = true)
+                        SamHello(
+                            Modifier.widthIn(max = 290.dp).fillMaxWidth().aspectRatio(290f / 265f).padding(vertical = 16.dp),
+                            contentDescription = stringResource(R.string.welcome_sam_description),
+                        )
+                        Text(
+                            stringResource(R.string.welcome_title),
+                            style = TextStyle(fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold, fontSize = 34.sp, letterSpacing = (-0.03).em),
+                            color = MasalaColors.Text,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.semantics { heading() },
+                        )
+                        Text(
+                            stringResource(R.string.welcome_body),
+                            fontSize = 15.5.sp,
+                            lineHeight = 23.sp,
+                            color = MasalaColors.Text.copy(alpha = 0.72f),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = 10.dp).widthIn(max = 300.dp),
+                        )
+                        Spacer(Modifier.height(26.dp))
+                        Button(
+                            onClick = {
+                                haptics.confirm()
+                                HomeRole.requestIntent(this@WelcomeActivity)?.let(roleRequest::launch) ?: run {
+                                    HomeRole.openSettings(this@WelcomeActivity)
+                                    onDone()
+                                }
+                            },
+                            shape = RoundedCornerShape(percent = 50),
+                            colors = ButtonDefaults.buttonColors(containerColor = MasalaColors.Gold, contentColor = MasalaColors.Charcoal),
+                            modifier = Modifier.fillMaxWidth().height(54.dp),
+                        ) { Text(stringResource(R.string.welcome_make_home), fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                        OutlinedButton(
+                            onClick = onDone,
+                            shape = RoundedCornerShape(percent = 50),
+                            border = BorderStroke(1.dp, MasalaColors.Text.copy(alpha = 0.18f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MasalaColors.Text),
+                            modifier = Modifier.padding(top = 10.dp).fillMaxWidth().height(50.dp),
+                        ) { Text(stringResource(R.string.welcome_look_around), fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+                    }
+                }
             }
         }
     }

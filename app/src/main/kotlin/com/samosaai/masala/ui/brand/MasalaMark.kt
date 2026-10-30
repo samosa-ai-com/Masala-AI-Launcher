@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -99,24 +100,25 @@ fun MasalaMarkIcon(
     val reduced = LocalMotion.current.reduced
     val animate = grinding && !reduced
     // No infinite transition while still: even a 0-to-0 animation keeps polling Choreographer
-    // every vsync, which costs battery on a home-screen launcher.
-    val angle: Float
-    val puff: Float
+    // every vsync, which costs battery on a home-screen launcher. The states are read inside
+    // the draw lambda, so frames invalidate only the draw layer, not composition.
+    val angle: State<Float>?
+    val puff: State<Float>?
     if (animate) {
         val transition = rememberInfiniteTransition(label = "grind")
-        angle = transition.animateFloat(-8f, 7f, infiniteRepeatable(tween(550), RepeatMode.Reverse), label = "pestle").value
-        puff = transition.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = LinearEasing)), label = "puff").value
+        angle = transition.animateFloat(-8f, 7f, infiniteRepeatable(tween(550), RepeatMode.Reverse), label = "pestle")
+        puff = transition.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = LinearEasing)), label = "puff")
     } else {
-        angle = 0f
-        puff = 0f
+        angle = null
+        puff = null
     }
     Canvas(
         modifier.size(size).then(if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier),
     ) {
         val px = this.size.minDimension
         scale(px / MasalaMark.GRID, pivot = Offset.Zero) {
-            if (animate) drawPuffs(puff)
-            drawMark(color, px, angle)
+            if (animate) drawPuffs(puff?.value ?: 0f)
+            drawMark(color, px, angle?.value ?: 0f)
         }
     }
 }
