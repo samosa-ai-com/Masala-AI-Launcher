@@ -317,7 +317,7 @@
     <string name="wiki_edit">Edit entry</string>
     <string name="wiki_export">Export</string>
     <string name="wiki_exported">Second Brain exported</string>
-    <string name="wiki_empty">No memories yet. Masala suggests entries when you tell it something worth keeping, and nothing is saved until you approve.</string>
+    <string name="wiki_empty">No memories yet. Tell Masala something worth keeping and it files it here; you can undo any change.</string>
     <string name="secondbrain_intro">What Masala remembers about you. Identity first, then the map, then detail. Open a file to read the full text; detail entries can be edited.</string>
     <string name="secondbrain_loading">Loading memory…</string>
     <string name="secondbrain_unavailable">Memory is not available yet. Open a chat and send one message.</string>
@@ -377,8 +377,12 @@
     <string name="wiki_delete">Delete</string>
     <string name="wiki_delete_title">Delete “%1$s”?</string>
     <string name="wiki_delete_body">The entry is removed from this phone and can’t be brought back.</string>
-    <string name="wiki_remember">Remember “%1$s”?</string>
-    <string name="wiki_approve">Approve</string>
+    <string name="memory_remembered">Remembered: %1$s</string>
+    <string name="memory_deleted">Deleted: %1$s</string>
+    <string name="memory_filed">Filed: %1$s</string>
+    <string name="memory_undo">Undo</string>
+    <string name="memory_undone">Undone</string>
+    <string name="memory_undo_gone">That change can no longer be undone</string>
     <string name="wiki_dismiss">Dismiss</string>
     <string name="settings_ask">Ask Masala</string>
     <string name="settings_read_replies">Read replies aloud</string>

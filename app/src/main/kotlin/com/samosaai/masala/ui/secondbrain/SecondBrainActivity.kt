@@ -205,7 +205,7 @@ class SecondBrainActivity : ComponentActivity() {
                         shown = withContext(Dispatchers.Default) { app.secondBrain.filter(current, search) }
                     }
                 }
-                ProposalCards(app)
+                RememberedCards(app)
                 Row2 {
                     Button(onClick = { editing = Editing("", "", "") }) { Text(stringResource(R.string.wiki_new)) }
                     OutlinedButton(enabled = pages.isNotEmpty(), onClick = { export.launch("masala-secondbrain.md") }) {

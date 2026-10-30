@@ -65,43 +65,48 @@ class SecondBrainRepositoryTest {
 
     private suspend fun titles() = brain.titles.first { it.isNotEmpty() }
 
-    @Test fun proposalWritesNothingUntilApproved() = runBlocking<Unit> {
+    private fun note(title: String, body: String = "Body.") =
+        "---\ntitle: $title\narea: Personal\ntype: note\nupdated: 2026-10-29\n---\n\n$body\n"
+
+    private fun args(json: String) = Json.parseToJsonElement(json) as JsonObject
+
+    @Test fun agentWritesShowAsRememberedWithUndo() = runBlocking<Unit> {
         fresh()
-        val proposal = assertNotNull(brain.propose("Morning routine", "Coffee, then run.", "user said so"))
+        val written = brain.write("notes/morning-routine.md", note("Morning routine", "Coffee, then run."))
+        assertTrue(written.ok)
+        assertTrue(brain.pages.first().any { brain.titleOf(it) == "Morning routine" })
+        val card = brain.remembered.value.single()
+        assertEquals("notes/morning-routine.md", card.id)
+        assertTrue(brain.undo(card.undoId))
+        assertTrue(brain.remembered.value.isEmpty())
         assertTrue(brain.pages.first().none { brain.titleOf(it) == "Morning routine" })
-        assertEquals(listOf(proposal), brain.proposals.value)
-        val file = assertNotNull(brain.approve(proposal.id))
-        assertEquals("Morning routine", brain.titleOf(file))
-        assertTrue(brain.proposals.value.isEmpty())
-        assertEquals(listOf("memory_approve" to "Morning routine"), audited)
     }
 
-    @Test fun dismissedProposalIsNeverWritten() = runBlocking<Unit> {
+    @Test fun dismissedCardKeepsTheChange() = runBlocking<Unit> {
         fresh()
-        val p = assertNotNull(brain.propose("Gym", "Mon, Wed", ""))
-        brain.dismiss(p.id)
-        assertNull(brain.approve(p.id))
-        assertTrue(brain.pages.first().none { brain.titleOf(it) == "Gym" })
+        brain.write("notes/gym.md", note("Gym", "Mon, Wed"))
+        brain.dismissRemembered(brain.remembered.value.single().undoId)
+        assertTrue(brain.remembered.value.isEmpty())
+        assertTrue(brain.pages.first().any { brain.titleOf(it) == "Gym" })
     }
 
-    @Test fun approvingATitleThatExistsUpdatesTheFile() = runBlocking<Unit> {
+    @Test fun refusedWritesLeaveNoCardAndCardsAreCapped() = runBlocking<Unit> {
         fresh()
-        val first = assertNotNull(brain.save(null, "Gym", "Mon"))
-        val p = assertNotNull(brain.propose("gym", "Mon, Wed", ""))
-        brain.approve(p.id)
-        val gyms = brain.pages.first().filter { brain.titleOf(it).equals("Gym", ignoreCase = true) }
-        assertEquals(1, gyms.size)
-        assertEquals(brain.idOf(first), brain.idOf(gyms.single()))
-        assertTrue(gyms.single().content.contains("Mon, Wed"))
+        assertTrue(!brain.write("notes/x.md", "no frontmatter").ok)
+        assertTrue(brain.remembered.value.isEmpty())
+        repeat(8) { brain.write("notes/page-$it.md", note("Page $it")) }
+        assertEquals(SecondBrainRepository.MAX_REMEMBERED, brain.remembered.value.size)
+        assertEquals("notes/page-7.md", brain.remembered.value.last().id)
     }
 
-    @Test fun emptyAndTooManyProposalsAreLimited() {
+    @Test fun datedNoteEditsAskFirstOtherWritesDoNot() = runBlocking<Unit> {
         fresh()
-        assertNull(brain.propose("  ", "x", ""))
-        assertNull(brain.propose("t", " ", ""))
-        repeat(8) { brain.propose("page $it", "x", "") }
-        assertEquals(5, brain.proposals.value.size)
-        assertEquals("page 7", brain.proposals.value.last().title)
+        val tools = MemoryTools.create(brain).associateBy { it.name }
+        assertTrue(!tools.getValue("memory_write").needsConfirmation(args("""{"path":"notes/2026-10-29-x.md","content":"c"}""")))
+        assertTrue(!tools.getValue("memory_edit").needsConfirmation(args("""{"path":"people/asha.md","old_text":"a","new_text":"b"}""")))
+        assertTrue(tools.getValue("memory_edit").needsConfirmation(args("""{"path":"notes/2026-10-29-x.md","old_text":"a","new_text":"b"}""")))
+        assertTrue(tools.getValue("memory_delete").needsConfirmation(args("""{"path":"notes/gym.md"}""")))
+        assertTrue(!tools.getValue("memory_read").needsConfirmation(args("""{"path":"MEMORY.md"}""")))
     }
 
     @Test fun titlesFollowTheEntries() = runBlocking<Unit> {
@@ -151,21 +156,22 @@ class SecondBrainRepositoryTest {
         assertEquals(1, brain.pages.first().count { it.name.startsWith("old-note") })
     }
 
-    @Test fun agentProposesAndNothingIsWrittenUntilApprove() = runBlocking<Unit> {
+    @Test fun agentWritesThroughTheTool() = runBlocking<Unit> {
         fresh()
         val tools = MemoryTools.create(brain)
-        val call = ToolCall("1", function = FunctionCall("memory_propose", """{"title":"Coffee","markdown":"Oat flat white","reason":"user said so"}"""))
-        val replies = ArrayDeque(listOf(ChatMessage("assistant", JsonPrimitive(""), toolCalls = listOf(call)), ChatMessage("assistant", JsonPrimitive("Want me to remember that?"))))
+        val content = Json.encodeToString(JsonPrimitive.serializer(), JsonPrimitive(note("Coffee", "Oat flat white.")))
+        val call = ToolCall("1", function = FunctionCall("memory_write", """{"path":"notes/coffee.md","content":$content}"""))
+        val replies = ArrayDeque(listOf(ChatMessage("assistant", JsonPrimitive(""), toolCalls = listOf(call)), ChatMessage("assistant", JsonPrimitive("Remembered."))))
         val agent = MasalaAgent(
-            AgentModel { _, _ -> replies.removeFirst() },
+            AgentModel { _, _ -> replies.removeAt(0) },
             AgentToolRunner { name, args -> tools.first { it.name == name }.execute(args) },
             tools.map { it.definition },
-            ToolScope.command(tools.map { ToolInfo(it.name, ToolSensitivity.READ_ONLY) }),
+            ToolScope.command(tools.map { ToolInfo(it.name, it.sensitivity) }),
             { "s" },
         )
         agent.run(ChatMessage("user", JsonPrimitive("I like oat flat whites"))).first { it is AgentEvent.Done }
-        assertTrue(brain.pages.first().none { brain.titleOf(it) == "Coffee" })
-        assertEquals(listOf("Coffee"), brain.proposals.value.map { it.title })
+        assertTrue(brain.pages.first().any { brain.titleOf(it) == "Coffee" })
+        assertEquals(listOf("notes/coffee.md"), brain.remembered.value.map { it.id })
     }
 
     @Test fun memoryReadToolReturnsEntryText() = runBlocking<Unit> {
@@ -176,12 +182,20 @@ class SecondBrainRepositoryTest {
         assertTrue(result.toString().contains("Likes tulips."))
     }
 
-    @Test fun memoryProposeRejectsUnusableInput() = runBlocking<Unit> {
+    @Test fun memoryToolsExplainRefusalsAndFindByPath() = runBlocking<Unit> {
         fresh()
-        val propose = MemoryTools.create(brain).first { it.name == "memory_propose" }
-        val missing = propose.execute(Json.parseToJsonElement("""{"title":"","markdown":"x","reason":"y"}""") as JsonObject)
-        assertTrue(missing is ToolResult.Failure)
-        assertEquals(0, brain.proposals.value.size)
+        val tools = MemoryTools.create(brain).associateBy { it.name }
+        val refused = tools.getValue("memory_write").execute(args("""{"path":"people/ravi.md","content":"Ravi"}"""))
+        assertTrue(refused is ToolResult.Failure && refused.message.contains("missing frontmatter") && refused.message.contains("PROTOCOL"))
+        assertTrue(brain.remembered.value.isEmpty())
+        brain.write("notes/gym.md", note("Gym", "Mondays."))
+        val found = tools.getValue("memory_search").execute(args("""{"query":"mondays"}"""))
+        assertTrue(found.toString().contains("notes/gym.md:8: Mondays."))
+        val read = tools.getValue("memory_read").execute(args("""{"path":"notes/gym.md"}"""))
+        assertTrue(read.toString().contains("Mondays."))
+        val protocol = tools.getValue("memory_read").execute(args("""{"path":"PROTOCOL"}"""))
+        assertTrue(protocol.toString().contains("Second Brain protocol"))
+        assertTrue(tools.getValue("memory_read").execute(args("{}")) is ToolResult.Failure)
     }
 
     @Test fun promptBlockHasSoulMemoryAndRules() = runBlocking<Unit> {
@@ -200,7 +214,8 @@ class SecondBrainRepositoryTest {
         val text = AgentPrompt.build("now", emptyList(), prompt, null)
         assertTrue(text.contains("<soul_md>"))
         assertTrue(text.contains("<memory_md>"))
-        assertTrue(text.contains("memory_propose"))
+        assertTrue(text.contains("memory_write"))
+        assertTrue(!text.contains("memory_propose"))
         assertTrue(text.contains("Mum"))
     }
 
