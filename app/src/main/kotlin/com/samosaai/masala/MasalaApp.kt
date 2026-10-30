@@ -341,7 +341,9 @@ class MasalaApp : Application() {
         // Model calls read the AI settings; the speech engines follow them when they change.
         LlmConfig.source = { aiSettings.chatConfig() }
         SpeechConfig.source = { aiSettings.speechConfig() }
-        scope.launch {
+        // Off the main thread: the store's first read and key decryption use DataStore and the Keystore.
+        scope.launch(Dispatchers.Default) {
+            aiSettings.warmKeys()
             aiSettings.profile.collect { p ->
                 val speech = aiSettings.speechConfig()
                 stt.configureApi(speech.baseUrl, speech.apiKey)
@@ -349,8 +351,9 @@ class MasalaApp : Application() {
             }
         }
         // Icon mask, style and tint follow Appearance; the tint is the accent.
-        scope.launch {
+        scope.launch(Dispatchers.Default) {
             settings.settings.collect { s ->
+                if (s.accent == com.samosaai.masala.data.Accent.WALLPAPER) com.samosaai.masala.ui.theme.WallpaperAccent.refresh(this@MasalaApp)
                 val tint = com.samosaai.masala.ui.theme.accentColor(this@MasalaApp, s.accent).toArgb()
                 icons.applyStyle(IconCache.Style(s.iconShape, s.iconStyle, tint))
             }

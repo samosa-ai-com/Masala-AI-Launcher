@@ -1,6 +1,13 @@
 package com.samosaai.masala
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
+import com.samosaai.masala.data.DrawerLayout
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -17,6 +24,7 @@ import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.launcher.AppCatalog
 import com.samosaai.masala.ui.drawer.Drawer
+import com.samosaai.masala.ui.drawer.blockTouches
 import com.samosaai.masala.ui.drawer.Scrubber
 import com.samosaai.masala.ui.drawer.SearchSources
 import com.samosaai.masala.ui.drawer.SettingsEntry
@@ -81,5 +89,51 @@ class DrawerTest {
         compose.onNode(hasText("Ask Masala")).assertExists()
         // Camera doesn't match "ch".
         assertTrue(compose.onAllNodes(hasText("Camera")).fetchSemanticsNodes().isEmpty())
+    }
+
+    /** Touches on the drawer's empty space never reach home underneath (home blocks itself while it's open). */
+    @Test
+    fun emptyDrawerSpaceDoesNotReachHomeUnderneath() {
+        var homeTaps = 0
+        compose.setContent {
+            MasalaTheme(LauncherSettings()) {
+                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
+                    androidx.compose.foundation.layout.Box(
+                        androidx.compose.ui.Modifier.fillMaxSize().semantics { testTag = "home" }.blockTouches(true).clickable { homeTaps++ },
+                    )
+                    Drawer(
+                        apps = listOf(entry("Camera")), profiles = AppCatalog.Snapshot(), icons = app.icons, autoLaunch = false,
+                        onLaunch = { _, _ -> }, onMenu = {}, onAsk = {}, onWorkPaused = {}, onOpenSettings = {},
+                    )
+                }
+            }
+        }
+        // Near the bottom of the screen: no app or button there, only the sheet.
+        compose.onNodeWithTag("home").performTouchInput { click(androidx.compose.ui.geometry.Offset(centerX, bottom - 40f)) }
+        compose.waitForIdle()
+        assertEquals(0, homeTaps)
+    }
+
+    /** A tap whose finger moves a few pixels still switches the layout (the sheet must not swallow it). */
+    @Test
+    fun aWobblyTapOnALayoutButtonStillSwitches() {
+        val picked = mutableListOf<DrawerLayout>()
+        compose.setContent {
+            MasalaTheme(LauncherSettings()) {
+                Drawer(
+                    apps = listOf(entry("Camera")), profiles = AppCatalog.Snapshot(), icons = app.icons, autoLaunch = false,
+                    onLaunch = { _, _ -> }, onMenu = {}, onAsk = {}, onWorkPaused = {}, onOpenSettings = {},
+                    onLayout = { picked += it },
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Globe layout").performTouchInput {
+            down(center)
+            moveBy(androidx.compose.ui.geometry.Offset(3f, 2f))
+            moveBy(androidx.compose.ui.geometry.Offset(-2f, 1f))
+            up()
+        }
+        compose.waitForIdle()
+        assertEquals(listOf(DrawerLayout.GLOBE), picked)
     }
 }

@@ -6,8 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -235,11 +233,15 @@ fun Drawer(
     // New results start at the top; applied in the next layout pass, without a frame of its own.
     LaunchedEffect(results) { listState.requestScrollToItem(0) }
 
+    // Switches at once; the saved setting catches up (a settings write and read-back took a beat).
+    var shownLayout by remember(layout) { mutableStateOf(layout) }
+    val pickLayout: (DrawerLayout) -> Unit = { l -> shownLayout = l; onLayout(l) }
+
     // The globe's ranking lives here so typing in Globe layout can dim it above the search results.
     var range by rememberSaveable { mutableStateOf(UsageRange.WEEK) }
     var globeRanked by remember { mutableStateOf<List<GlobeApp>>(emptyList()) }
-    LaunchedEffect(range, apps, open, layout) {
-        if (!open || globe == null || layout != DrawerLayout.GLOBE) return@LaunchedEffect
+    LaunchedEffect(range, apps, open, shownLayout) {
+        if (!open || globe == null || shownLayout != DrawerLayout.GLOBE) return@LaunchedEffect
         val r = globe.ranked(range)
         globeRanked = withContext(Dispatchers.Default) { globeApps(r) }
     }
@@ -252,18 +254,10 @@ fun Drawer(
     Box(
         Modifier
             .fillMaxSize()
-            .background(sheet)
-            // The sheet is the touch target over home: taps and drags on its empty parts must not reach
-            // the home screen underneath (children still get theirs first, in the main pass).
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
-                    do {
-                        val event = awaitPointerEvent()
-                        event.changes.forEach { it.consume() }
-                    } while (event.changes.any { it.pressed })
-                }
-            },
+            // No pointer handler here: any listener on this root (even one that consumes nothing) made
+            // the buttons and rows inside drop taps whose finger moved a little. Home keeps itself out
+            // of reach instead ([blockTouches] in HomeActivity).
+            .background(sheet),
     ) {
         // No Surface under the sheet any more, so rows get their text colour from here.
         CompositionLocalProvider(LocalContentColor provides tokens.textHigh) {
@@ -282,7 +276,7 @@ fun Drawer(
 
             if (searching) {
                 LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    if (layout == DrawerLayout.GLOBE && globeRanked.isNotEmpty()) {
+                    if (shownLayout == DrawerLayout.GLOBE && globeRanked.isNotEmpty()) {
                         item(key = "globe") {
                             Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)) {
                                 Globe(globeRanked, icons, text, open, onLaunch = launch, onMenu = onMenu)
@@ -305,14 +299,14 @@ fun Drawer(
                 }
                 AllAppsBar(
                     count = shown.size,
-                    layout = layout,
-                    onLayout = onLayout,
+                    layout = shownLayout,
+                    onLayout = pickLayout,
                     showWorkSwitch = work != null,
                     showWork = showWork,
                     onShowWork = { showWork = it },
                 )
                 if (showWork && work != null) WorkHeader(paused = work.paused, onWorkPaused = onWorkPaused)
-                when (layout) {
+                when (shownLayout) {
                     DrawerLayout.GRID -> AppGrid(shown, suggested.takeIf { !showWork }.orEmpty(), icons, profiles, onLaunch, onMenu, gridState, Modifier.weight(1f))
                     DrawerLayout.LIST -> LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f)) {
                         items(shown, key = { it.key.id }) { entry -> AppRow(entry, icons, profiles, labelWork = false, onLaunch, onMenu) }
@@ -616,5 +610,15 @@ private fun WorkHeader(paused: Boolean, onWorkPaused: (Boolean) -> Unit) {
         }
         Text(stringResource(R.string.drawer_work_toggle), style = MaterialTheme.typography.bodySmall)
         Switch(checked = !paused, onCheckedChange = null, modifier = Modifier.padding(start = 8.dp))
+    }
+}
+
+/**
+ * While [enabled], nothing inside gets touches: they're consumed in the first pass, before any child
+ * sees them. Home uses it under the open drawer, so taps on the drawer's empty parts can't reach it.
+ */
+fun Modifier.blockTouches(enabled: Boolean): Modifier = if (!enabled) this else pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial).changes.forEach { it.consume() }
     }
 }

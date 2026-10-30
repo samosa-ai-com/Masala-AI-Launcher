@@ -41,6 +41,7 @@ import com.samosaai.masala.launcher.HomeRole
 import com.samosaai.masala.ui.drawer.AppMenu
 import com.samosaai.masala.ui.drawer.AppMenuActions
 import com.samosaai.masala.ui.drawer.Drawer
+import com.samosaai.masala.ui.drawer.blockTouches
 import com.samosaai.masala.ui.drawer.RenameDialog
 import com.samosaai.masala.actions.ActionDispatcher
 import com.samosaai.masala.core.contract.MasalaAction
@@ -300,7 +301,9 @@ class HomeActivity : ComponentActivity() {
                     scaleX = 1f - (1f - Motion.HOME_UNDER_DRAWER_SCALE) * p
                     scaleY = 1f - (1f - Motion.HOME_UNDER_DRAWER_SCALE) * p
                 }
-                .then(if (drawerOpen) Modifier.clearAndSetSemantics { } else Modifier),
+                .then(if (drawerOpen) Modifier.clearAndSetSemantics { } else Modifier)
+                // Set on release, not while the opening swipe is still moving home's own gesture.
+                .blockTouches(drawerOpen),
         ) { HomeScreen(
             layout = layout,
             render = render,

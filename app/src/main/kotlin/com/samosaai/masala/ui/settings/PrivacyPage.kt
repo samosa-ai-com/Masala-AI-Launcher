@@ -14,7 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -44,7 +44,12 @@ fun PrivacyPage(onBack: () -> Unit) {
     val servers by app.mcp.servers.collectAsState()
     val onPhone = stringResource(R.string.privacy_on_phone)
     fun where(e: Endpoint?) = e?.let { "${it.preset.name} · ${hostOf(it.baseUrl)}" } ?: onPhone
-    val log = remember { app.actionLog.tail(200).filter { line -> line.split('\t').getOrNull(1) in NETWORK_TOOLS || line.split('\t').getOrNull(1)?.startsWith("mcp_") == true }.takeLast(12).reversed() }
+    // The log file can be half a megabyte: read it in the background.
+    val log by produceState(emptyList<String>()) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            app.actionLog.tail(200).filter { line -> line.split('\t').getOrNull(1) in NETWORK_TOOLS || line.split('\t').getOrNull(1)?.startsWith("mcp_") == true }.takeLast(12).reversed()
+        }
+    }
 
     SettingsScaffold(stringResource(R.string.privacy_title), onBack) {
         Text(stringResource(R.string.privacy_intro), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
