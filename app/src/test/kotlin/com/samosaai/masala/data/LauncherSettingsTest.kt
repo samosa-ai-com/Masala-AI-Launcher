@@ -27,6 +27,7 @@ class LauncherSettingsTest {
             character = Character.ORB,
             drawerLayout = DrawerLayout.GLOBE,
             welcomeDone = true,
+            usageAsked = true,
         )
         val prefs = mutablePreferencesOf()
         prefs.write(changed)

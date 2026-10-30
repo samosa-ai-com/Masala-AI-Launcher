@@ -44,6 +44,12 @@ data class MasalaTokens(
     val alert: Color,
     val lilac: Color,
     val glassFill: Color,
+    /**
+     * Glass straight on the wallpaper (home cards, dock, search pill): stronger than [glassFill] so text
+     * reads on any picture — 8.4:1 for full text and 5.9:1 for [onWallpaperMedium] even over white.
+     */
+    val wallpaperGlass: Color,
+    val onWallpaperMedium: Color,
     val hairline: Color,
     val textHigh: Color,
     val textMedium: Color,
@@ -61,6 +67,8 @@ data class MasalaTokens(
             alert = MasalaColors.Chili,
             lilac = MasalaColors.Lilac,
             glassFill = MasalaColors.GlassInk.copy(alpha = MasalaColors.GLASS_ALPHA),
+            wallpaperGlass = MasalaColors.GlassInk.copy(alpha = 0.78f),
+            onWallpaperMedium = MasalaColors.Text.copy(alpha = 0.78f),
             hairline = MasalaColors.Hairline,
             textHigh = MasalaColors.Text,
             textMedium = MasalaColors.Text.copy(alpha = 0.62f),
@@ -78,6 +86,9 @@ data class MasalaTokens(
             alert = MasalaColors.ChiliDeep,
             lilac = MasalaColors.LilacDeep,
             glassFill = Color.White.copy(alpha = 0.72f),
+            // Home sits on the wallpaper in both schemes, so its glass stays dark (charcoal cards on Paper too).
+            wallpaperGlass = MasalaColors.GlassInk.copy(alpha = 0.78f),
+            onWallpaperMedium = MasalaColors.Text.copy(alpha = 0.78f),
             hairline = Color(0x1A000000),
             textHigh = MasalaColors.Charcoal,
             textMedium = MasalaColors.Charcoal.copy(alpha = 0.68f),

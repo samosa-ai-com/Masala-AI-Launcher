@@ -56,8 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.samosaai.masala.agent.CommandState
-import com.samosaai.masala.ui.home.AskButton
-import com.samosaai.masala.ui.home.MicButton
+import com.samosaai.masala.ui.home.SearchPill
 import com.samosaai.masala.ui.home.ReplyCard
 import com.samosaai.masala.ui.home.rememberMicPress
 import com.samosaai.masala.ui.home.ConfirmationSheet
@@ -82,6 +81,8 @@ class HomeActivity : ComponentActivity() {
     private var drawerOpen by mutableStateOf(false)
     private var isDefault by mutableStateOf(true)
     private var homePresses by mutableStateOf(0)
+    /** Bumped by the search pill: the drawer opens with its search field focused. */
+    private var searchRequests by mutableStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Light icons on the wallpaper; HomeContent switches them while a light drawer is open.
@@ -186,8 +187,8 @@ class HomeActivity : ComponentActivity() {
             }
         }
 
-        fun launch(entry: AppEntry) {
-            if (!app.actions.launch(entry.key)) toast(getString(R.string.drawer_launch_failed, entry.label))
+        fun launch(entry: AppEntry, bounds: android.graphics.Rect? = null) {
+            if (!app.actions.launch(entry.key, bounds, window.decorView)) toast(getString(R.string.drawer_launch_failed, entry.label))
             drawerOpen = false
         }
 
@@ -241,7 +242,10 @@ class HomeActivity : ComponentActivity() {
             }
         }
 
-        val render = remember(apps, settings.homeLocked) {
+        val activeModes by app.modes.active.collectAsStateWithLifecycle()
+        val patches by app.modes.patches.collectAsStateWithLifecycle()
+        val modeName = patches.filter { it.id in activeModes }.joinToString(" · ") { it.name }.ifBlank { null }
+        val render = remember(apps, settings.homeLocked, modeName) {
             RenderContext(
                 icons = app.icons,
                 apps = apps,
@@ -251,6 +255,13 @@ class HomeActivity : ComponentActivity() {
                 onAppMenu = { menuFor = it },
                 onClockClick = { run(MasalaAction.RunTool("show_alarms")) },
                 skillWidgets = skillWidgets,
+                modeName = modeName,
+                onModeChip = ::openSettings,
+                onLaunchFrom = { action, bounds ->
+                    val a = action as? MasalaAction.LaunchApp
+                    val entry = a?.let { render0 -> apps.firstOrNull { it.key.packageName == render0.packageName && it.key.user == render0.user && (render0.activity == null || it.key.activity == render0.activity) } }
+                    if (entry != null) launch(entry, bounds) else run(action)
+                },
             )
         }
         // Faded out under the open drawer and hidden from TalkBack; the drawer above takes the touches.
@@ -282,24 +293,21 @@ class HomeActivity : ComponentActivity() {
             },
             homePresses = homePresses,
             drawerDrag = drawerDrag.takeIf { settings.swipeUp == MasalaAction.OpenDrawer },
+            aboveDock = {
+                val command by app.commands.state.collectAsStateWithLifecycle()
+                // The pill makes way for the reply card while a command is shown.
+                if (command == CommandState.Idle) {
+                    SearchPill(onSearch = { drawerOpen = true; searchRequests++ }, mic = rememberMicPress(app))
+                }
+            },
         ) }
 
         ConfirmationSheet(app.confirmationGate)
 
-        // The reply card and the mic; the card stays up until closed, and the command runs on if home is left.
+        // The reply card; it stays up until closed, and the command runs on if home is left.
         if (!drawerOpen && !drawerShown) {
-            val command by app.commands.state.collectAsStateWithLifecycle()
-            val mic = rememberMicPress(app)
             Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(), contentAlignment = Alignment.BottomCenter) {
                 ReplyCard(app, settings.readRepliesAloud)
-            }
-            if (command == CommandState.Idle) {
-                Box(Modifier.fillMaxSize().navigationBarsPadding().padding(end = 16.dp, bottom = 120.dp), contentAlignment = Alignment.BottomEnd) {
-                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        AskButton(onOpen = { app.commands.openInput() })
-                        MicButton(mic)
-                    }
-                }
             }
         }
 
@@ -315,12 +323,51 @@ class HomeActivity : ComponentActivity() {
                 }
                 .then(if (!drawerShown) Modifier.clearAndSetSemantics { } else Modifier),
         ) {
+            val searchSources = remember { com.samosaai.masala.launcher.HomeSearchSources(this@HomeActivity, app) }
+            // Suggestions and usage access are read again each time the drawer opens.
+            var suggested by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
+            var usageAccess by remember { mutableStateOf(false) }
+            LaunchedEffect(drawerOpen) {
+                if (!drawerOpen) return@LaunchedEffect
+                searchSources.reset()
+                usageAccess = app.usage.hasUsageAccess()
+                val zone = java.time.ZoneId.systemDefault()
+                val now = System.currentTimeMillis()
+                val launches = app.usage.launches(com.samosaai.masala.core.apps.UsageRange.MONTH.since(now, zone), apps)
+                val byId = apps.associateBy { it.key.id }
+                val t = java.time.LocalTime.now(zone)
+                suggested = com.samosaai.masala.core.apps.UsageRank.suggestedNow(launches, t.hour * 60 + t.minute, zone, { byId[it]?.label ?: it })
+                    .mapNotNull { byId[it] }.filter { it.visibility == Visibility.DEFAULT }
+            }
+            val globeSource = com.samosaai.masala.ui.drawer.GlobeSource(
+                ranked = { range ->
+                    val zone = java.time.ZoneId.systemDefault()
+                    val launches = app.usage.launches(range.since(System.currentTimeMillis(), zone), apps)
+                    val visible = apps.filter { it.visibility == Visibility.DEFAULT }
+                    val byId = visible.associateBy { it.key.id }
+                    com.samosaai.masala.core.apps.UsageRank.top(
+                        com.samosaai.masala.core.apps.UsageRank.counts(launches, Long.MIN_VALUE), byId.keys, { byId[it]?.label ?: it },
+                    ).mapNotNull { r -> byId[r.key]?.let { it to r.count } }
+                },
+                usageAccess = usageAccess,
+                asked = settings.usageAsked,
+                onAllow = {
+                    scope.launch { app.settings.update { it.copy(usageAsked = true) } }
+                    runCatching { startActivity(Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+                },
+                onSkip = { scope.launch { app.settings.update { it.copy(usageAsked = true) } } },
+            )
             Drawer(
                 apps = apps,
                 profiles = profiles,
                 icons = app.icons,
                 autoLaunch = settings.autoLaunch,
                 onLaunch = ::launch,
+                layout = settings.drawerLayout,
+                onLayout = { l -> scope.launch { app.settings.update { it.copy(drawerLayout = l) } } },
+                suggested = suggested,
+                globe = globeSource,
+                sources = searchSources,
                 onMenu = { menuFor = it },
                 onAsk = ::askMasala,
                 onWorkPaused = { paused ->
@@ -328,6 +375,7 @@ class HomeActivity : ComponentActivity() {
                 },
                 onOpenSettings = ::openSettings,
                 open = drawerOpen,
+                focusSignal = searchRequests,
                 autoKeyboard = settings.drawerKeyboard,
                 settled = drawerSettled,
             )
@@ -341,7 +389,7 @@ class HomeActivity : ComponentActivity() {
                 canUninstall = app.catalog.canUninstall(entry.key),
                 onDismiss = { menuFor = null },
                 menu = object : AppMenuActions {
-                    override fun launch(entry: AppEntry) = done { launch(entry) }
+                    override fun launch(entry: AppEntry) = done { launch(entry, null) }
                     override fun launchShortcut(shortcut: ShortcutInfo) = done { launchShortcut(shortcut) }
                     override fun pinShortcut(shortcut: ShortcutInfo) = done {
                         app.actions.pin(shortcut)

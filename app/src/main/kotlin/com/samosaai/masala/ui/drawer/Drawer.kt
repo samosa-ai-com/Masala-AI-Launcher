@@ -1,63 +1,110 @@
 package com.samosaai.masala.ui.drawer
 
+import android.graphics.Rect
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.automirrored.rounded.ViewList
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.samosaai.masala.R
 import com.samosaai.masala.core.apps.AppEntry
 import com.samosaai.masala.core.apps.AppSearch
 import com.samosaai.masala.core.apps.ProfileKind
+import com.samosaai.masala.core.apps.UsageRange
 import com.samosaai.masala.core.apps.Visibility
+import com.samosaai.masala.data.DrawerLayout
 import com.samosaai.masala.launcher.AppCatalog
 import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.ui.components.LauncherRow
-import kotlinx.coroutines.delay
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import com.samosaai.masala.ui.theme.MasalaColors
+import com.samosaai.masala.ui.theme.MasalaTheme
+import com.samosaai.masala.ui.theme.rememberHaptics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Ranked search results and the text they were ranked for. */
@@ -66,9 +113,24 @@ private data class Ranked<T>(val query: String, val results: List<T>)
 /** Pause after the last keystroke before a composing single match auto-launches. */
 private const val AUTO_LAUNCH_PAUSE_MS = 800L
 
+/** Where the globe gets its counts and whether to ask for Usage access (decision 11). */
+class GlobeSource(
+    val ranked: suspend (UsageRange) -> List<Pair<AppEntry, Int>>,
+    val usageAccess: Boolean,
+    val asked: Boolean,
+    val onAllow: () -> Unit,
+    val onSkip: () -> Unit,
+)
+
+/** The A–Z section an app files under; anything not a letter goes under #. */
+internal fun sectionOf(label: String): Char =
+    AppSearch.normalize(label).firstOrNull()?.uppercaseChar()?.takeIf { it in 'A'..'Z' } ?: '#'
+
 /**
- * The app drawer: a search field on top, then personal apps and a Work section with its pause
- * switch. With a query, apps marked "search only" join the results; hidden apps never show.
+ * The app drawer (plan UI refresh U3, drawer boards): a dimmed glass sheet over the wallpaper with a
+ * search field, then Grid (suggested now, A–Z sections, scrubber), Globe (sized by use) or List. With a
+ * query, search covers apps, app shortcuts, skills, settings and indexed files, with Ask Masala first
+ * when nothing matches well. Apps marked "search only" appear only in search; hidden apps never show.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @Composable
@@ -77,7 +139,7 @@ fun Drawer(
     profiles: AppCatalog.Snapshot,
     icons: IconCache,
     autoLaunch: Boolean,
-    onLaunch: (AppEntry) -> Unit,
+    onLaunch: (AppEntry, Rect?) -> Unit,
     onMenu: (AppEntry) -> Unit,
     onAsk: (String) -> Unit,
     onWorkPaused: (Boolean) -> Unit,
@@ -88,10 +150,19 @@ fun Drawer(
     autoKeyboard: Boolean = false,
     /** True once the open transition has finished, so the keyboard doesn't animate in during the slide. */
     settled: Boolean = true,
+    /** Bumped by home's search pill: focus the field once the drawer settles. */
+    focusSignal: Int = 0,
+    layout: DrawerLayout = DrawerLayout.GRID,
+    onLayout: (DrawerLayout) -> Unit = {},
+    /** "Suggested now": apps opened around this time on earlier days. */
+    suggested: List<AppEntry> = emptyList(),
+    globe: GlobeSource? = null,
+    sources: SearchSources = SearchSources.None,
 ) {
     var query by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
     val text = query.text
     val composing = query.composition != null
+    val launch: (AppEntry) -> Unit = { onLaunch(it, null) }
 
     val browse = remember(apps) { apps.filter { it.visibility == Visibility.DEFAULT } }
     // Labels normalized once per catalog change; ranking runs off the main thread on each keystroke.
@@ -105,118 +176,397 @@ fun Drawer(
             .mapLatest { (q, index) -> if (q.isBlank()) Ranked(q, emptyList()) else withContext(Dispatchers.Default) { Ranked(q, AppSearch.rank(q, index)) } }
             .collect { ranked = it }
     }
+    val searching = text.isNotBlank()
     // Until the ranking for the current text arrives, keep showing the last one (never a stale auto-launch).
-    val results = if (text.isBlank()) browse else ranked.results
-    val current = text.isBlank() || ranked.query == text
+    val results = if (searching) ranked.results else browse
+    val current = !searching || ranked.query == text
     LaunchedEffect(text, composing, ranked) {
         if (!autoLaunch || !current) return@LaunchedEffect
-        AppSearch.autoLaunchTarget(text, composing, results)?.let(onLaunch) ?: run {
+        AppSearch.autoLaunchTarget(text, composing, results)?.let(launch) ?: run {
             // Keyboards that keep composition open while typing (Samsung autocomplete) would
             // otherwise never auto-launch: a single match that survives a short pause launches
             // too, so the keyboard never has to close first.
             if (composing && AppSearch.autoLaunchTarget(text, false, results) != null) {
                 delay(AUTO_LAUNCH_PAUSE_MS)
-                AppSearch.autoLaunchTarget(text, false, results)?.let(onLaunch)
+                AppSearch.autoLaunchTarget(text, false, results)?.let(launch)
             }
         }
+    }
+
+    // The other search sources, debounced a little so a fast typist doesn't query files per letter.
+    var extra by remember { mutableStateOf(SearchGroups.build("", emptyList())) }
+    LaunchedEffect(text, results) {
+        if (!searching) return@LaunchedEffect
+        val skills = sources.skills(text)
+        val settingsHits = sources.settings(text)
+        extra = SearchGroups.build(text, results, skills = skills, settings = settingsHits, ask = { suggestionsFor(it) })
+        delay(250)
+        val shortcuts = sources.shortcuts(text)
+        val files = sources.files(text)
+        extra = SearchGroups.build(text, results, shortcuts, skills, settingsHits, files) { suggestionsFor(it) }
     }
 
     val focus = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
-    LaunchedEffect(open, settled, autoKeyboard) {
-        if (open && settled && autoKeyboard) focus.requestFocus()
+    val gridState = rememberLazyGridState()
+    var handledSignal by remember { mutableIntStateOf(focusSignal) }
+    LaunchedEffect(open, settled, autoKeyboard, focusSignal) {
+        if (open && settled && (autoKeyboard || focusSignal != handledSignal)) {
+            handledSignal = focusSignal
+            runCatching { focus.requestFocus() }
+        }
         if (!open) {
             query = TextFieldValue()
             focusManager.clearFocus(force = true)
             keyboard?.hide()
             listState.scrollToItem(0)
+            gridState.scrollToItem(0)
         }
     }
     // New results start at the top; applied in the next layout pass, without a frame of its own.
     LaunchedEffect(results) { listState.requestScrollToItem(0) }
-    // A Surface, not just a background, so text and icons get the scheme's on-surface colour.
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .systemBarsPadding(),
-        ) {
-            Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    placeholder = { Text(stringResource(R.string.drawer_search_hint)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-                    keyboardActions = KeyboardActions(
-                        onGo = {
-                            // Enter while composing finishes the character instead (Olauncher §2.4).
-                            if (composing) return@KeyboardActions
-                            results.firstOrNull()?.let(onLaunch) ?: text.takeIf { it.isNotBlank() }?.let(onAsk)
-                        },
-                    ),
-                    modifier = Modifier.weight(1f).focusRequester(focus),
+
+    // The globe's ranking lives here so typing in Globe layout can dim it above the search results.
+    var range by rememberSaveable { mutableStateOf(UsageRange.WEEK) }
+    var globeRanked by remember { mutableStateOf<List<GlobeApp>>(emptyList()) }
+    LaunchedEffect(range, apps, open, layout) {
+        if (!open || globe == null || layout != DrawerLayout.GLOBE) return@LaunchedEffect
+        val r = globe.ranked(range)
+        globeRanked = withContext(Dispatchers.Default) { globeApps(r) }
+    }
+
+    var showWork by rememberSaveable { mutableStateOf(false) }
+    val work = profiles.work
+    val tokens = MasalaTheme.tokens
+    // A dimmed glass sheet: the wallpaper stays visible behind (home fades out under it).
+    val sheet = if (tokens.dark) Color(0xD60C0A12) else MasalaColors.Paper.copy(alpha = 0.94f)
+    Box(Modifier.fillMaxSize().background(sheet)) {
+        Column(Modifier.fillMaxSize().systemBarsPadding()) {
+            Box(Modifier.align(Alignment.CenterHorizontally).padding(top = 10.dp).size(38.dp, 4.dp).clip(RoundedCornerShape(50)).background(tokens.textLow))
+            SearchRow(
+                query = query,
+                onQuery = { query = it },
+                focus = focus,
+                onGo = {
+                    // Enter while composing finishes the character instead (Olauncher §2.4).
+                    if (!composing) results.firstOrNull()?.let(launch) ?: text.takeIf { it.isNotBlank() }?.let { onAsk(it.trim()) }
+                },
+                onOpenSettings = onOpenSettings,
+            )
+
+            if (searching) {
+                LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    if (layout == DrawerLayout.GLOBE && globeRanked.isNotEmpty()) {
+                        item(key = "globe") {
+                            Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)) {
+                                Globe(globeRanked, icons, text, open, onLaunch = launch, onMenu = onMenu)
+                            }
+                        }
+                    }
+                    searchGroups(extra, text, sources, onAsk) {
+                        if (results.isNotEmpty()) item(key = "h-apps") { GroupHeader(stringResource(R.string.search_apps)) }
+                        items(results.take(12), key = { it.key.id }) { entry ->
+                            AppRow(entry, icons, profiles, labelWork = true, onLaunch, onMenu, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
+                        }
+                    }
+                    item(key = "ime") { Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.ime)) }
+                }
+            } else {
+                val shown = when {
+                    work == null -> browse.filter { it.profile == ProfileKind.PERSONAL }
+                    showWork -> browse.filter { it.profile == ProfileKind.WORK }
+                    else -> browse.filter { it.profile == ProfileKind.PERSONAL }
+                }
+                AllAppsBar(
+                    count = shown.size,
+                    layout = layout,
+                    onLayout = onLayout,
+                    showWorkSwitch = work != null,
+                    showWork = showWork,
+                    onShowWork = { showWork = it },
                 )
-                TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.drawer_settings)) }
-            }
-
-            LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f)) {
-                val searching = text.isNotBlank()
-                val personal = if (searching) results else results.filter { it.profile == ProfileKind.PERSONAL }
-                // Search mixes profiles, so work apps are labeled there; otherwise they sit under the Work header.
-                items(personal, key = { it.key.id }) { entry ->
-                    AppItem(entry, icons, profiles, searching, onLaunch, onMenu, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
-                }
-
-                val work = profiles.work
-                if (!searching && work != null) {
-                    item(key = "work-header") { WorkHeader(paused = work.paused, onWorkPaused = onWorkPaused) }
-                    items(results.filter { it.profile == ProfileKind.WORK }, key = { it.key.id }) { entry ->
-                        AppItem(entry, icons, profiles, labelWork = false, onLaunch, onMenu, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
+                if (showWork && work != null) WorkHeader(paused = work.paused, onWorkPaused = onWorkPaused)
+                when (layout) {
+                    DrawerLayout.GRID -> AppGrid(shown, suggested.takeIf { !showWork }.orEmpty(), icons, profiles, onLaunch, onMenu, gridState, Modifier.weight(1f))
+                    DrawerLayout.LIST -> LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        items(shown, key = { it.key.id }) { entry -> AppRow(entry, icons, profiles, labelWork = false, onLaunch, onMenu) }
                     }
+                    DrawerLayout.GLOBE -> GlobePage(shown, globeRanked, range, { range = it }, icons, open, globe, onLaunch, onMenu, profiles, Modifier.weight(1f))
                 }
-                if (searching && current && results.isEmpty()) {
-                    item(key = "ask") {
-                        Text(
-                            stringResource(R.string.drawer_no_match, text.trim()),
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(role = Role.Button) { onAsk(text.trim()) }
-                                .padding(horizontal = 20.dp, vertical = 16.dp),
-                        )
-                    }
-                }
-                // Room for the keyboard at the end of the list, instead of re-laying out the whole
-                // column on every frame of the keyboard animation.
-                item(key = "ime") { Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.ime)) }
             }
         }
     }
 }
 
+/** Two suggested questions for the Ask card; plain on purpose (the model reads the rest). */
+private fun suggestionsFor(q: String): List<String> = listOf("What do my files say about $q?", "Remind me about $q")
+
 @Composable
-private fun AppItem(
+private fun SearchRow(query: TextFieldValue, onQuery: (TextFieldValue) -> Unit, focus: FocusRequester, onGo: () -> Unit, onOpenSettings: () -> Unit) {
+    val tokens = MasalaTheme.tokens
+    val pill = RoundedCornerShape(50)
+    val hint = stringResource(R.string.drawer_search_hint)
+    Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            Modifier.weight(1f).height(50.dp).clip(pill).background(Color.White.copy(alpha = if (tokens.dark) 0.08f else 0.6f))
+                .border(1.dp, tokens.hairline, pill).padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(Icons.Rounded.Search, null, tint = tokens.textMedium, modifier = Modifier.size(19.dp))
+            Box(Modifier.weight(1f)) {
+                if (query.text.isEmpty()) Text(hint, style = MaterialTheme.typography.bodyMedium, color = tokens.textMedium)
+                BasicTextField(
+                    value = query,
+                    onValueChange = onQuery,
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = tokens.textHigh),
+                    cursorBrush = SolidColor(tokens.accent),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                    keyboardActions = KeyboardActions(onGo = { onGo() }),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focus).semantics { contentDescription = hint },
+                )
+            }
+        }
+        IconButton(
+            onClick = onOpenSettings,
+            modifier = Modifier.size(50.dp).clip(CircleShape).background(Color.White.copy(alpha = if (tokens.dark) 0.08f else 0.6f)).border(1.dp, tokens.hairline, CircleShape),
+        ) { Icon(Icons.Rounded.Settings, stringResource(R.string.drawer_settings), tint = tokens.textHigh) }
+    }
+}
+
+@Composable
+private fun AllAppsBar(count: Int, layout: DrawerLayout, onLayout: (DrawerLayout) -> Unit, showWorkSwitch: Boolean, showWork: Boolean, onShowWork: (Boolean) -> Unit) {
+    val tokens = MasalaTheme.tokens
+    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 14.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(stringResource(R.string.drawer_all_apps, count), style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp), color = tokens.textMedium, modifier = Modifier.weight(1f))
+        if (showWorkSwitch) {
+            Segmented(listOf(stringResource(R.string.drawer_personal), stringResource(R.string.drawer_work_header)), if (showWork) 1 else 0) { onShowWork(it == 1) }
+            Spacer(Modifier.width(8.dp))
+        }
+        LayoutButton(Icons.Rounded.Apps, stringResource(R.string.drawer_layout_grid), layout == DrawerLayout.GRID) { onLayout(DrawerLayout.GRID) }
+        LayoutButton(Icons.Rounded.Public, stringResource(R.string.drawer_layout_globe), layout == DrawerLayout.GLOBE) { onLayout(DrawerLayout.GLOBE) }
+        LayoutButton(Icons.AutoMirrored.Rounded.ViewList, stringResource(R.string.drawer_layout_list), layout == DrawerLayout.LIST) { onLayout(DrawerLayout.LIST) }
+    }
+}
+
+@Composable
+private fun LayoutButton(icon: ImageVector, label: String, on: Boolean, onClick: () -> Unit) {
+    val tokens = MasalaTheme.tokens
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.size(44.dp).padding(2.dp).clip(CircleShape).background(if (on) tokens.textHigh else Color.Transparent).semantics { selected = on },
+    ) { Icon(icon, label, tint = if (on) MaterialTheme.colorScheme.surface else tokens.textMedium, modifier = Modifier.size(20.dp)) }
+}
+
+@Composable
+internal fun Segmented(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+    val tokens = MasalaTheme.tokens
+    Row(Modifier.clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.07f)).padding(3.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        labels.forEachIndexed { i, l ->
+            val on = i == selected
+            Box(
+                Modifier.heightIn(min = 30.dp).clip(RoundedCornerShape(50)).background(if (on) tokens.textHigh else Color.Transparent)
+                    .clickable(role = Role.Tab) { onSelect(i) }.semantics { this.selected = on }.padding(horizontal = 14.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text(l, fontSize = 12.5.sp, color = if (on) MaterialTheme.colorScheme.surface else tokens.textMedium, style = MaterialTheme.typography.labelMedium) }
+        }
+    }
+}
+
+/**
+ * The grid (drawer board): "Suggested now", then apps in A–Z sections, four across, with a scrubber on
+ * the right that ticks under the finger and shows the letter in a bubble.
+ */
+@Composable
+private fun AppGrid(
+    apps: List<AppEntry>,
+    suggested: List<AppEntry>,
+    icons: IconCache,
+    profiles: AppCatalog.Snapshot,
+    onLaunch: (AppEntry, Rect?) -> Unit,
+    onMenu: (AppEntry) -> Unit,
+    state: androidx.compose.foundation.lazy.grid.LazyGridState,
+    modifier: Modifier,
+) {
+    val sections = remember(apps) { apps.groupBy { sectionOf(it.label) }.toSortedMap(compareBy { if (it == '#') '[' else it }) }
+    // Grid index of each section header, for the scrubber.
+    val headerIndex = remember(sections, suggested) {
+        var i = if (suggested.isNotEmpty()) 2 else 0
+        sections.mapValues { (_, list) -> i.also { i += 1 + list.size } }
+    }
+    val scope = rememberCoroutineScope()
+    var scrubbing by remember { mutableStateOf<Char?>(null) }
+    Box(modifier.fillMaxWidth()) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(4),
+            state = state,
+            modifier = Modifier.fillMaxSize().padding(start = 12.dp, end = 30.dp),
+        ) {
+            if (suggested.isNotEmpty()) {
+                item(key = "sug-h", span = { GridItemSpan(maxLineSpan) }) { GroupHeader(stringResource(R.string.drawer_suggested_now)) }
+                item(key = "sug", span = { GridItemSpan(maxLineSpan) }) { SuggestedRow(suggested, icons, onLaunch, onMenu) }
+            }
+            sections.forEach { (letter, list) ->
+                item(key = "h-$letter", span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        letter.toString(), style = MaterialTheme.typography.labelMedium, color = MasalaTheme.tokens.textLow,
+                        modifier = Modifier.padding(start = 8.dp, top = 12.dp, bottom = 6.dp).semantics { heading() },
+                    )
+                }
+                items(list.size, key = { list[it].key.id }) { i -> AppCell(list[i], icons, profiles, onLaunch, onMenu) }
+            }
+            item(key = "end", span = { GridItemSpan(maxLineSpan) }) { Spacer(Modifier.height(24.dp)) }
+        }
+        Scrubber(
+            letters = sections.keys.toList(),
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 6.dp),
+            onLetter = { c ->
+                scrubbing = c
+                headerIndex[c]?.let { scope.launch { state.scrollToItem(it) } }
+            },
+            onEnd = { scrubbing = null },
+        )
+        scrubbing?.let { c ->
+            Box(
+                Modifier.align(Alignment.TopEnd).padding(top = 52.dp, end = 38.dp).size(54.dp)
+                    .clip(RoundedCornerShape(topStart = 27.dp, topEnd = 27.dp, bottomStart = 27.dp, bottomEnd = 6.dp))
+                    .background(MasalaTheme.tokens.accent),
+                contentAlignment = Alignment.Center,
+            ) { Text(c.toString(), fontSize = 26.sp, color = MasalaTheme.tokens.onAccent, style = MaterialTheme.typography.headlineSmall) }
+        }
+    }
+}
+
+/** A–Z down the right edge; drag or tap to jump, with a haptic tick on each new letter. */
+@Composable
+internal fun Scrubber(letters: List<Char>, modifier: Modifier = Modifier, onLetter: (Char) -> Unit, onEnd: () -> Unit) {
+    if (letters.isEmpty()) return
+    val haptics = rememberHaptics()
+    val tokens = MasalaTheme.tokens
+    var heightPx by remember { mutableIntStateOf(1) }
+    var last by remember { mutableStateOf<Char?>(null) }
+    val latestLetters by rememberUpdatedState(letters)
+    fun pick(y: Float) {
+        val l = latestLetters
+        val c = l[(y / heightPx * l.size).toInt().coerceIn(0, l.lastIndex)]
+        if (c != last) {
+            last = c
+            haptics.tick()
+            onLetter(c)
+        }
+    }
+    val label = stringResource(R.string.drawer_scrubber)
+    Column(
+        modifier
+            .width(22.dp)
+            .onGloballyPositioned { heightPx = it.size.height.coerceAtLeast(1) }
+            .semantics { contentDescription = label }
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragStart = { pick(it.y) },
+                    onDragEnd = { last = null; onEnd() },
+                    onDragCancel = { last = null; onEnd() },
+                ) { change, _ -> pick(change.position.y) }
+            }
+            .pointerInput(Unit) { detectTapGestures(onPress = { pick(it.y); tryAwaitRelease(); last = null; onEnd() }) },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        letters.forEach { c ->
+            Text(c.toString(), fontSize = 10.sp, lineHeight = 16.sp, textAlign = TextAlign.Center, color = if (c == last) tokens.accentText else tokens.textLow)
+        }
+    }
+}
+
+@Composable
+private fun SuggestedRow(apps: List<AppEntry>, icons: IconCache, onLaunch: (AppEntry, Rect?) -> Unit, onMenu: (AppEntry) -> Unit) {
+    val shape = RoundedCornerShape(24.dp)
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 4.dp).clip(shape).background(Color.White.copy(alpha = 0.05f)).border(1.dp, MasalaTheme.tokens.hairline, shape).padding(vertical = 12.dp, horizontal = 4.dp),
+    ) {
+        apps.take(5).forEach { Box(Modifier.weight(1f)) { AppCell(it, icons, null, onLaunch, onMenu, iconSize = 52) } }
+        repeat(5 - apps.take(5).size) { Spacer(Modifier.weight(1f)) }
+    }
+}
+
+@Composable
+private fun AppCell(entry: AppEntry, icons: IconCache, profiles: AppCatalog.Snapshot?, onLaunch: (AppEntry, Rect?) -> Unit, onMenu: (AppEntry) -> Unit, iconSize: Int = 56) {
+    val paused = entry.profile == ProfileKind.WORK && profiles?.work?.paused == true
+    var bounds by remember { mutableStateOf<Rect?>(null) }
+    val menuLabel = stringResource(R.string.menu_options)
+    Column(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            .onGloballyPositioned { c -> c.boundsInWindow().let { bounds = Rect(it.left.toInt(), it.top.toInt(), it.right.toInt(), it.bottom.toInt()) } }
+            .combinedClickable(role = Role.Button, onClick = { onLaunch(entry, bounds) }, onLongClick = { onMenu(entry) }, onLongClickLabel = menuLabel)
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        val icon = rememberAppIcon(icons, entry.key)
+        Box(Modifier.size(iconSize.dp)) { if (icon != null) Image(icon, null, Modifier.size(iconSize.dp)) }
+        Text(
+            entry.label, style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.5.sp), maxLines = 1, overflow = TextOverflow.Ellipsis,
+            color = if (paused) MasalaTheme.tokens.textLow else MasalaTheme.tokens.textHigh, modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
+        )
+    }
+}
+
+@Composable
+private fun GlobePage(
+    apps: List<AppEntry>,
+    ranked: List<GlobeApp>,
+    range: UsageRange,
+    onRange: (UsageRange) -> Unit,
+    icons: IconCache,
+    open: Boolean,
+    source: GlobeSource?,
+    onLaunch: (AppEntry, Rect?) -> Unit,
+    onMenu: (AppEntry) -> Unit,
+    profiles: AppCatalog.Snapshot,
+    modifier: Modifier,
+) {
+    val onGlobe = remember(ranked) { ranked.map { it.entry.key.id }.toSet() }
+    val rest = apps.filter { it.key.id !in onGlobe }
+    LazyColumn(modifier.fillMaxWidth()) {
+        if (source != null && !source.usageAccess) item(key = "usage") { UsageAccessCard(source.asked, source.onAllow, source.onSkip) }
+        item(key = "globe") {
+            Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)) {
+                if (ranked.isEmpty()) {
+                    Text(stringResource(R.string.globe_empty), style = MaterialTheme.typography.bodyMedium, color = MasalaTheme.tokens.textMedium, modifier = Modifier.padding(24.dp))
+                } else {
+                    Globe(ranked, icons, "", open, onLaunch = { onLaunch(it, null) }, onMenu = onMenu)
+                }
+            }
+        }
+        item(key = "range") { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { RangeSwitch(range, onRange) } }
+        item(key = "caption") { GlobeCaption() }
+        item(key = "more") { GroupHeader(stringResource(R.string.globe_more_apps, rest.size), stringResource(R.string.globe_more_note)) }
+        items(rest, key = { it.key.id }) { entry -> AppRow(entry, icons, profiles, labelWork = false, onLaunch, onMenu) }
+    }
+}
+
+@Composable
+private fun AppRow(
     entry: AppEntry,
     icons: IconCache,
     profiles: AppCatalog.Snapshot,
     labelWork: Boolean,
-    onLaunch: (AppEntry) -> Unit,
+    onLaunch: (AppEntry, Rect?) -> Unit,
     onMenu: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val paused = entry.profile == ProfileKind.WORK && profiles.work?.paused == true
+    var bounds by remember { mutableStateOf<Rect?>(null) }
     LauncherRow(
         label = entry.label,
         icon = rememberAppIcon(icons, entry.key),
-        onClick = { onLaunch(entry) },
+        onClick = { onLaunch(entry, bounds) },
         onLongClick = { onMenu(entry) },
         longClickLabel = stringResource(R.string.menu_options),
         subtitle = stringResource(R.string.menu_work_badge).takeIf { labelWork && entry.profile == ProfileKind.WORK },
         dimmed = paused,
-        modifier = modifier,
+        modifier = modifier.onGloballyPositioned { c -> c.boundsInWindow().let { bounds = Rect(it.left.toInt(), it.top.toInt(), it.right.toInt(), it.bottom.toInt()) } },
     )
 }
 
@@ -234,7 +584,7 @@ private fun WorkHeader(paused: Boolean, onWorkPaused: (Boolean) -> Unit) {
             Text(
                 stringResource(R.string.drawer_work_header),
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
+                color = MasalaTheme.tokens.accentText,
                 modifier = Modifier.semantics { heading() },
             )
             if (paused) Text(stringResource(R.string.drawer_work_paused), style = MaterialTheme.typography.bodySmall)

@@ -3,6 +3,12 @@ package com.samosaai.masala.ui.home
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import com.samosaai.masala.ui.theme.OnWallpaper
+import com.samosaai.masala.ui.theme.MasalaTheme
+import androidx.compose.material.icons.rounded.WbTwilight
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +41,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -95,6 +103,11 @@ class RenderContext(
     val onClockClick: () -> Unit,
     /** Where skill widgets get their skill and latest result; without it they stay placeholders. */
     val skillWidgets: SkillWidgetSource? = null,
+    /** The active mode's name for the chip above the clock (UI refresh U3); none hides the chip. */
+    val modeName: String? = null,
+    val onModeChip: (() -> Unit)? = null,
+    /** Opens an app from the bounds of its icon on screen, so it grows out of it. */
+    val onLaunchFrom: ((MasalaAction, android.graphics.Rect) -> Unit)? = null,
 ) {
     /** A fixed time, for previews and tests. */
     constructor(
@@ -133,6 +146,8 @@ fun LayoutRenderer(
     modifier: Modifier = Modifier,
     /** Bumped when Home is pressed while home shows: back to the first page. */
     resetSignal: Int = 0,
+    /** Drawn above the dock on every page: home's search-or-ask pill (UI refresh U3). */
+    aboveDock: @Composable () -> Unit = {},
     footer: @Composable () -> Unit = {},
 ) {
     val pages = layout.layout.pages
@@ -140,7 +155,7 @@ fun LayoutRenderer(
     LaunchedEffect(resetSignal) { if (resetSignal > 0) pager.animateScrollToPage(0) }
     Column(modifier) {
         HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
-            pages.getOrNull(index)?.let { PageContent(it, layout, ctx, footer = if (index == pages.lastIndex) footer else ({})) }
+            pages.getOrNull(index)?.let { PageContent(it, layout, ctx, aboveDock, footer = if (index == pages.lastIndex) footer else ({})) }
         }
         if (pages.size > 1) PageDots(pages.size, pager.currentPage)
     }
@@ -159,7 +174,7 @@ private fun PageDots(count: Int, current: Int) {
 }
 
 @Composable
-private fun PageContent(page: Page, layout: ResolvedLayout, ctx: RenderContext, footer: @Composable () -> Unit) {
+private fun PageContent(page: Page, layout: ResolvedLayout, ctx: RenderContext, aboveDock: @Composable () -> Unit, footer: @Composable () -> Unit) {
     val (docks, body) = page.sections.partition { it is DockSection }
     Column(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -168,6 +183,7 @@ private fun PageContent(page: Page, layout: ResolvedLayout, ctx: RenderContext, 
             }
             item(key = "footer") { footer() }
         }
+        aboveDock()
         docks.forEach { SectionContent(it, layout, ctx) }
     }
 }
@@ -196,7 +212,8 @@ private fun Header(section: HeaderSection, ctx: RenderContext) {
     val now = ctx.clock()
     val time = remember(now.hour, now.minute) { DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).format(now) }
     val date = remember(now.toLocalDate()) { DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).format(now) }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
+        ctx.modeName?.let { ModeChip(it, ctx.onModeChip) }
         if (section.showClock) {
             Text(
                 time,
@@ -207,7 +224,25 @@ private fun Header(section: HeaderSection, ctx: RenderContext) {
                     .semantics { contentDescription = time },
             )
         }
-        if (section.showDate) Text(date, style = wallpaperText(MaterialTheme.typography.titleMedium))
+        if (section.showDate) Text(date, style = wallpaperText(MaterialTheme.typography.bodyMedium), modifier = Modifier.padding(top = 6.dp))
+    }
+}
+
+/** "Evening · auto": the mode that's shaping home, as a glass chip (home boards). */
+@Composable
+private fun ModeChip(name: String, onClick: (() -> Unit)?) {
+    val tokens = MasalaTheme.tokens
+    val shape = RoundedCornerShape(50)
+    Row(
+        Modifier.padding(bottom = 18.dp).heightIn(min = 34.dp).clip(shape).background(tokens.wallpaperGlass)
+            .border(1.dp, Color.White.copy(alpha = 0.12f), shape)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .padding(start = 10.dp, end = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(Icons.Rounded.WbTwilight, null, tint = tokens.accent, modifier = Modifier.size(18.dp))
+        Text(name, style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp), color = OnWallpaper)
     }
 }
 
@@ -242,8 +277,10 @@ private fun ItemGrid(title: String?, items: List<Item>, columns: Int, ctx: Rende
 
 @Composable
 private fun Dock(section: DockSection, ctx: RenderContext) {
+    val shape = RoundedCornerShape(30.dp)
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).heightIn(min = 78.dp).clip(shape)
+            .background(MasalaTheme.tokens.wallpaperGlass).border(1.dp, Color.White.copy(alpha = 0.09f), shape).padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -278,11 +315,13 @@ private fun Group(section: GroupSection, ctx: RenderContext) {
 private fun ItemCell(item: Item, ctx: RenderContext, showLabel: Boolean = true) {
     val app = appFor(item, ctx)
     val label = app?.takeIf { it.renamed }?.label ?: item.label
+    val bounds = remember { IconBounds() }
     Column(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .itemClicks(item, app, ctx, label)
+            .onGloballyPositioned { bounds.set(it) }
+            .itemClicks(item, app, ctx, label, bounds)
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -304,8 +343,9 @@ private fun ItemCell(item: Item, ctx: RenderContext, showLabel: Boolean = true) 
 private fun ItemRow(item: Item, ctx: RenderContext) {
     val app = appFor(item, ctx)
     val label = app?.takeIf { it.renamed }?.label ?: item.label
+    val bounds = remember { IconBounds() }
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 56.dp).itemClicks(item, app, ctx, label).padding(horizontal = 24.dp, vertical = 4.dp),
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).onGloballyPositioned { bounds.set(it) }.itemClicks(item, app, ctx, label, bounds).padding(horizontal = 24.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconView(item.icon, app, ctx, size = 40)
@@ -316,12 +356,15 @@ private fun ItemRow(item: Item, ctx: RenderContext) {
 /** Tap runs the action; a long press on a pinned app opens its menu unless the home layout is locked. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Modifier.itemClicks(item: Item, app: AppEntry?, ctx: RenderContext, label: String): Modifier {
+private fun Modifier.itemClicks(item: Item, app: AppEntry?, ctx: RenderContext, label: String, bounds: IconBounds? = null): Modifier {
     val menuLabel = stringResource(R.string.menu_options)
     val canMenu = app != null && !ctx.locked
     return this
         .combinedClickable(
-            onClick = { ctx.onAction(item.action) },
+            onClick = {
+                val from = bounds?.rect
+                if (from != null && item.action is MasalaAction.LaunchApp && ctx.onLaunchFrom != null) ctx.onLaunchFrom.invoke(item.action, from) else ctx.onAction(item.action)
+            },
             onLongClick = if (canMenu) ({ ctx.onAppMenu(app!!) }) else null,
             onLongClickLabel = if (canMenu) menuLabel else null,
         )
@@ -360,15 +403,30 @@ internal fun SymbolDisc(icon: ImageVector, tint: Color?, size: Int) {
 
 @Composable
 internal fun Placeholder(title: String, note: String, rows: Int?) {
-    Card(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = ((rows ?: 2) * 48).dp),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(4.dp))
-            Text(note, style = MaterialTheme.typography.bodyMedium)
-        }
+    WallpaperCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = ((rows ?: 2) * 48).dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium, color = OnWallpaper)
+        Spacer(Modifier.height(4.dp))
+        Text(note, style = MaterialTheme.typography.bodyMedium, color = MasalaTheme.tokens.onWallpaperMedium)
+    }
+}
+
+/** A glass card straight on the wallpaper (home boards): 26 dp corners, stronger glass, white hairline. */
+@Composable
+internal fun WallpaperCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val shape = RoundedCornerShape(26.dp)
+    Column(
+        modifier.clip(shape).background(MasalaTheme.tokens.wallpaperGlass).border(1.dp, Color.White.copy(alpha = 0.10f), shape).padding(18.dp),
+        content = content,
+    )
+}
+
+/** Where an item sits in the window, so an app opened from it grows out of its icon. Not state: no recomposition. */
+internal class IconBounds {
+    var rect: android.graphics.Rect? = null
+        private set
+
+    fun set(coordinates: androidx.compose.ui.layout.LayoutCoordinates) {
+        val b = coordinates.boundsInWindow()
+        rect = android.graphics.Rect(b.left.toInt(), b.top.toInt(), b.right.toInt(), b.bottom.toInt())
     }
 }

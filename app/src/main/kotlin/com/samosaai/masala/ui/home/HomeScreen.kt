@@ -85,6 +85,8 @@ fun HomeScreen(
     homePresses: Int = 0,
     /** When set, a swipe up moves the drawer with the finger instead of [onSwipeUp] firing on lift. */
     drawerDrag: DrawerDrag? = null,
+    /** Above the dock: the search-or-ask pill (UI refresh U3). */
+    aboveDock: @Composable () -> Unit = {},
     /** False when embedded in another screen that already handles insets (e.g. the AI preview). */
     applyWindowInsets: Boolean = true,
 ) {
@@ -231,7 +233,7 @@ fun HomeScreen(
     ) {
         Column(Modifier.fillMaxSize()) {
             if (!isDefault) DefaultBanner(onSetDefault)
-            LayoutRenderer(layout, render, Modifier.weight(1f), resetSignal = homePresses) {
+            LayoutRenderer(layout, render, Modifier.weight(1f), resetSignal = homePresses, aboveDock = aboveDock) {
                 if (pinnedShortcuts.isNotEmpty()) {
                     Text(
                         stringResource(R.string.home_shortcuts_title),

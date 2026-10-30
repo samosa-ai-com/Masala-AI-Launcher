@@ -86,8 +86,10 @@ class SettingsActivity : ComponentActivity() {
             val settings by masala.settings.settings.collectAsStateWithLifecycle(LauncherSettings())
             MasalaTheme(settings) {
                 Surface {
-                    var page by rememberSaveable { mutableStateOf(Page.MAIN) }
-                    BackHandler(enabled = page != Page.MAIN) { page = Page.MAIN }
+                    // Search can open a page directly (UI refresh U3); Back then leaves settings.
+                    val start = remember { intent.getStringExtra(EXTRA_PAGE)?.let { n -> Page.entries.firstOrNull { it.name == n } } }
+                    var page by rememberSaveable { mutableStateOf(start ?: Page.MAIN) }
+                    BackHandler(enabled = page != Page.MAIN) { if (start != null && page == start) finish() else page = Page.MAIN }
                     when (page) {
                         Page.MAIN -> MainPage(
                             settings,
@@ -773,5 +775,10 @@ class SettingsActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    companion object {
+        /** A [Page] name to open directly. */
+        const val EXTRA_PAGE = "page"
     }
 }
