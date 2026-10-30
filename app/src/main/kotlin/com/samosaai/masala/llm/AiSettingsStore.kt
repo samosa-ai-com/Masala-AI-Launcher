@@ -9,11 +9,14 @@ import com.samosaai.masala.audio.SpeechConfig
 import com.samosaai.masala.core.ai.AiProfile
 import com.samosaai.masala.core.ai.Endpoint
 import com.samosaai.masala.core.ai.ProviderPresets
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -37,22 +40,36 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val keyMap = MapSerializer(String.serializer(), String.serializer())
 
+    // The store outlives any screen, so its own scope is fine.
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private val _profile: MutableStateFlow<AiProfile>
-    private val sealed: MutableMap<String, String>
+    private val sealed = mutableMapOf<String, String>()
 
     /** Decrypted keys, kept in memory only. */
     private val plain = HashMap<String, String>()
 
     init {
-        // One small file, read once at start-up so the synchronous LlmConfig.default works right away.
-        val prefs = runBlocking { context.aiStore.data.first() }
-        val stored = prefs[Keys.profile]?.let { runCatching { json.decodeFromString(AiProfile.serializer(), it) }.getOrNull() }
-        sealed = prefs[Keys.keys]?.let { runCatching { json.decodeFromString(keyMap, it) }.getOrNull() }?.toMutableMap() ?: mutableMapOf()
-        _profile = MutableStateFlow(stored ?: seedProfile())
-        if (prefs[Keys.seeded] != true || stored == null) runBlocking { seed() }
+        // Start from the compiled-in seed synchronously; disk and Keystore load on IO right after,
+        // so Application.onCreate never blocks on them.
+        _profile = MutableStateFlow(seedProfile())
+        ioScope.launch { load() }
     }
 
     val profile: StateFlow<AiProfile> = _profile.asStateFlow()
+
+    /** The stored profile and keys, applied over the seed once disk and Keystore answer. */
+    private suspend fun load() {
+        val prefs = context.aiStore.data.first()
+        val stored = prefs[Keys.profile]?.let { runCatching { json.decodeFromString(AiProfile.serializer(), it) }.getOrNull() }
+        val keys = prefs[Keys.keys]?.let { runCatching { json.decodeFromString(keyMap, it) }.getOrNull() }.orEmpty()
+        synchronized(plain) {
+            sealed.clear()
+            sealed.putAll(keys)
+        }
+        if (stored != null) _profile.value = stored
+        if (prefs[Keys.seeded] != true || stored == null) seed()
+    }
 
     /** The key saved for [presetId], or blank. */
     fun key(presetId: String): String = synchronized(plain) {
