@@ -34,7 +34,10 @@
     <string name="ai_key_refused">The key was refused</string>
     <string name="ai_found_chat">%1$d chat</string>
     <string name="ai_found_stt">%1$d transcription</string>
-    <string name="ai_found_tts">%1$d voice</string>
+    <plurals name="ai_found_tts">
+        <item quantity="one">%1$d voice</item>
+        <item quantity="other">%1$d voices</item>
+    </plurals>
     <string name="ai_found_nothing">no models listed</string>
     <string name="ai_url_empty">Enter the server’s address</string>
     <string name="ai_url_not_http">Start with http:// or https://</string>
@@ -43,6 +46,7 @@
     <string name="ai_note_openai">Chat, transcription and voices from one key.</string>
     <string name="ai_note_meta">Meta’s model API.</string>
     <string name="ai_note_chat_only">OpenAI-compatible endpoint. Chat only.</string>
+    <string name="ai_note_anthropic">Anthropic’s own API is not OpenAI-shaped. Use an OpenAI-to-Anthropic proxy.</string>
     <string name="ai_note_groq">Fast chat and fast transcription.</string>
     <string name="ai_note_openrouter">Many models behind one key.</string>
     <string name="ai_note_mistral">Chat; Test finds anything else it offers.</string>

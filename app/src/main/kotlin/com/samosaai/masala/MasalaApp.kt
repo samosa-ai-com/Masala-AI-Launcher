@@ -161,7 +161,8 @@ class MasalaApp : Application() {
     /** Fetch list and Test connection in Settings → Models & keys. */
     val aiConnection by lazy { com.samosaai.masala.llm.AiConnection() }
 
-    /** Voices for the picker: the phone's for [language], or a provider's (from its speech models). */
+    /** Voices for the picker: the phone's for [language], or a provider's (from its speech models,
+     *  else the preset's fallback list for servers that publish none, like OpenAI). */
     suspend fun voicesFor(out: com.samosaai.masala.core.ai.Endpoint?, language: Language): List<String> =
         if (out == null) {
             tts.androidVoices(language).map { it.name }
@@ -173,6 +174,7 @@ class MasalaApp : Application() {
                         .flatMap { m -> m.voices.map { it.id } }
                         .distinct()
                 }.getOrDefault(emptyList())
+                    .ifEmpty { com.samosaai.masala.core.ai.ProviderPresets.byId(out.presetId).fallbackVoices }
             }
         }
 
@@ -198,7 +200,15 @@ class MasalaApp : Application() {
             ?: Language.entries.firstOrNull { it.matchesCode(java.util.Locale.getDefault().language) } ?: Language.ENGLISH
         val out = profile.voiceOut
         val spoke = if (out != null) {
-            tts.speak(text, AudioProvider.API, apiModel = out.model, voice = profile.voice, language = language, rate = profile.speechRate)
+            // A blank model or voice would make speakApi return false (or 400 on OpenAI): the
+            // preset's defaults fill in before the call, so an untouched toggle still speaks.
+            val preset = com.samosaai.masala.core.ai.ProviderPresets.byId(out.presetId)
+            tts.speak(
+                text, AudioProvider.API,
+                apiModel = out.model.ifBlank { preset.defaultTtsModel },
+                voice = profile.voice.ifBlank { preset.fallbackVoices.firstOrNull().orEmpty() },
+                language = language, rate = profile.speechRate,
+            )
         } else {
             tts.speak(text, language = language, androidVoice = profile.voice, rate = profile.speechRate)
         }

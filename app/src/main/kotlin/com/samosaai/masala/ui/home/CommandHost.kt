@@ -80,7 +80,10 @@ fun rememberMicPress(app: MasalaApp): MicPress {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val granted = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { /* the next press listens */ }
-    return remember(app) {
+    // Keyed on the composition's scope, launcher and context: keying on the app singleton would
+    // keep the first composition's cancelled scope, dead permission launcher and destroyed
+    // Activity across rotations.
+    return remember(context, scope, granted, app) {
         var holdStart: Job? = null
         var holding = false
         var permitted = false

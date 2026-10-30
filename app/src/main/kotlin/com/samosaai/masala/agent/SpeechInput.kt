@@ -44,7 +44,8 @@ data class SpeechStrings(
  * other one as fallback when the first can't start. A phone whose default recognizer
  * is a stub (or has none) therefore records for the server instead of failing.
  */
-private const val SILENCE_MS = 1200L
+/** A pause that ends tap-to-talk; long enough for a mid-sentence breath, short enough to feel live. */
+private const val SILENCE_MS = 1500L
 
 class ConfiguredSpeechInput(
     private val engine: PttEngine,
@@ -57,6 +58,11 @@ class ConfiguredSpeechInput(
 
     private fun language() = Language.entries.firstOrNull { it.matchesCode(Locale.getDefault().language) } ?: Language.ENGLISH
 
+    /** The STT language from settings, or the phone's when unset or unknown. */
+    private fun configuredLanguage(settings: SpeechConfig): Language =
+        settings.sttLanguage.takeIf { it.isNotBlank() }?.let { code -> Language.entries.firstOrNull { it.matchesCode(code) } }
+            ?: language()
+
     private fun configured(): AudioProvider =
         if (config().baseUrl.isNotBlank()) AudioProvider.API else AudioProvider.ANDROID
 
@@ -64,15 +70,16 @@ class ConfiguredSpeechInput(
         // A press while a previous session is still around must not leak its recorder.
         cancel()
         val reasons = mutableListOf<String>()
+        val lang = configuredLanguage(config())
         for (provider in SpeechPolicy.order(configured())) {
             if (provider == AudioProvider.ANDROID && !localAvailable()) {
                 reasons += strings.localUnavailable
                 continue
             }
             val started = if (provider == AudioProvider.ANDROID) {
-                engine.startListening(provider, language(), onFailure)
+                engine.startListening(provider, lang, onFailure)
             } else {
-                engine.startListening(provider, language())
+                engine.startListening(provider, lang)
             }
             if (started) {
                 active = provider
@@ -105,7 +112,7 @@ class ConfiguredSpeechInput(
             ?: return Result.failure(Exception(strings.localUnavailable))
         active = provider
         val model = if (provider.isApiBased()) settings.sttModel else ""
-        val lang = settings.sttLanguage.takeIf { it.isNotBlank() }?.let { code -> Language.entries.firstOrNull { it.matchesCode(code) } } ?: language()
+        val lang = configuredLanguage(settings)
         return try {
             engine.listenForUtterance(provider, model, lang, SILENCE_MS)
         } finally {

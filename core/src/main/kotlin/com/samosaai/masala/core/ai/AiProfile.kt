@@ -64,7 +64,7 @@ object AiValidation {
     fun problems(profile: AiProfile, hasKey: (presetId: String) -> Boolean): List<String> = buildList {
         for ((role, e) in listOf("chat" to profile.chat, "voice in" to profile.voiceIn, "voice out" to profile.voiceOut)) {
             if (e == null) continue
-            normalizeBaseUrl(e.baseUrl).onFailure { add("$role: ${(it as InvalidUrl).problem}") }
+            normalizeBaseUrl(e.baseUrl).onFailure { add("$role: ${(it as? InvalidUrl)?.problem ?: UrlProblem.EMPTY}") }
             if (e.preset.keyKind == KeyKind.KEY && !hasKey(e.presetId)) add("$role: no API key for ${e.preset.name}")
         }
         if (profile.chat.model.isBlank()) add("chat: no model")
