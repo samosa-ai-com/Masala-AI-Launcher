@@ -98,6 +98,11 @@ data class ScheduledTask(
     val retriesUsed: Int = 0,
     /** When the current occurrence first found another run in progress. */
     val busySince: Long? = null,
+    /**
+     * The Second Brain note this task belongs to (vault path, e.g. `notes/2026-10-29-dentist.md`). The note
+     * names the task back in its `task_ref`; both sides are set and cleared together.
+     */
+    val memoryNote: String? = null,
     /** Newest last, capped at [MAX_HISTORY]. */
     val history: List<TaskRun> = emptyList()
 ) {
