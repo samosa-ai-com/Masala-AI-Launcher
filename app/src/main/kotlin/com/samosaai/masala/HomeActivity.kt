@@ -68,7 +68,11 @@ import com.samosaai.masala.skills.SkillScheduling
 import com.samosaai.masala.ui.home.SkillWidgetSource
 import com.samosaai.masala.ui.settings.SettingsActivity
 import com.samosaai.masala.ui.theme.MasalaTheme
+import com.samosaai.masala.ui.theme.Motion
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import androidx.lifecycle.lifecycleScope
+import com.samosaai.masala.ui.onboarding.WelcomeActivity
 
 /**
  * The home screen. `singleTask` with the HOME category; drawn edge to edge over the wallpaper. Back
@@ -83,9 +87,23 @@ class HomeActivity : ComponentActivity() {
         // Light icons on the wallpaper; HomeContent switches them while a light drawer is open.
         enableEdgeToEdge(SystemBarStyle.dark(Color.TRANSPARENT), SystemBarStyle.dark(Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
+        showWelcomeOnce()
         setContent {
             val settings by masala.settings.settings.collectAsStateWithLifecycle(LauncherSettings())
             MasalaTheme(settings, systemBars = false) { HomeContent(settings) }
+        }
+    }
+
+    /** First run only; a phone that already has Masala as home skips it (and it's marked done). */
+    private fun showWelcomeOnce() {
+        lifecycleScope.launch {
+            val app = masala
+            if (app.settings.settings.first().welcomeDone) return@launch
+            if (HomeRole.isDefault(this@HomeActivity)) {
+                app.settings.update { it.copy(welcomeDone = true) }
+            } else {
+                startActivity(Intent(this@HomeActivity, WelcomeActivity::class.java))
+            }
         }
     }
 
@@ -251,8 +269,8 @@ class HomeActivity : ComponentActivity() {
                     alpha = 1f - p
                     // Alpha on each draw instead of a full-screen offscreen buffer every frame.
                     compositingStrategy = CompositingStrategy.ModulateAlpha
-                    scaleX = 1f - 0.04f * p
-                    scaleY = 1f - 0.04f * p
+                    scaleX = 1f - (1f - Motion.HOME_UNDER_DRAWER_SCALE) * p
+                    scaleY = 1f - (1f - Motion.HOME_UNDER_DRAWER_SCALE) * p
                 }
                 .then(if (drawerOpen) Modifier.clearAndSetSemantics { } else Modifier),
         ) { HomeScreen(

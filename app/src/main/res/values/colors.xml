@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#006C53</color>
+    <!-- Charcoal, the logo's ground. -->
+    <color name="ic_launcher_background">#242527</color>
+    <color name="masala_gold">#EBCB80</color>
 </resources>

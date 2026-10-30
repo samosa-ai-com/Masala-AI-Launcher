@@ -190,7 +190,7 @@ class SkillSheetActivity : ComponentActivity() {
 
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SymbolDisc(SymbolIcons.glyph(skill.widget?.icon ?: "star"), SymbolIcons.tint(skill.widget?.tint), 40)
+                SymbolDisc(SymbolIcons.icon(skill.widget?.icon ?: "star"), SymbolIcons.tint(skill.widget?.tint), 40)
                 Column(Modifier.weight(1f)) {
                     Text(skill.title.ifBlank { skill.id }, style = MaterialTheme.typography.titleLarge)
                     skill.persona?.disclaimer?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }

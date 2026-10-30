@@ -2,6 +2,7 @@ package com.samosaai.masala
 
 import android.app.Application
 import android.content.Context
+import androidx.compose.ui.graphics.toArgb
 import android.content.Intent
 import com.samosaai.masala.core.files.FileIndex
 import com.samosaai.masala.core.tool.ToolFiles
@@ -296,6 +297,13 @@ class MasalaApp : Application() {
         }
         // Updated apps may have new icons.
         scope.launch { catalog.state.drop(1).collect { icons.clear() } }
+        // Icon mask, style and tint follow Appearance; the tint is the accent.
+        scope.launch {
+            settings.settings.collect { s ->
+                val tint = com.samosaai.masala.ui.theme.accentColor(this@MasalaApp, s.accent).toArgb()
+                icons.applyStyle(IconCache.Style(s.iconShape, s.iconStyle, tint))
+            }
+        }
     }
 }
 

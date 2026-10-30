@@ -1,0 +1,112 @@
+package com.samosaai.masala.ui.character
+
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.samosaai.masala.ui.theme.LocalMotion
+
+/**
+ * Sam, the golden samosa (plan UI refresh §1, "Character"), drawn from the same path data as the
+ * design samples on a 200 × 200 grid: a rounded-triangle body with a darker facet and a highlight, nine
+ * crust scallops, a coriander leaf, big eyes, cheeks and a small mouth, arms only when a pose needs them.
+ */
+object SamArt {
+    val Gold = Color(0xFFEBCB80)
+    val Facet = Color(0xFFDDB868)
+    val Crust = Color(0xFFC99A45)
+    val Highlight = Color(0xFFF6E3B4)
+    val Leaf = Color(0xFF6CC08B)
+    val Ink = Color(0xFF242527)
+    val Cheek = Color(0xFFFF8A6B)
+
+    const val BODY = "M88 30 Q100 10 112 30 L172 146 Q182 168 158 170 L42 170 Q18 168 28 146 Z"
+    const val FACET = "M112 30 L172 146 Q182 168 158 170 L136 170 Q150 120 112 30Z"
+    const val SHINE = "M84 46 Q70 72 50 110"
+    const val LEAF = "M100 24 Q88 6 103 2 Q113 14 100 24Z"
+    const val ARM_LEFT = "M36 132 Q22 140 20 154"
+    const val ARM_WAVE = "M164 128 Q186 118 190 96"
+    const val MOUTH_OPEN = "M86 127 Q100 146 114 127Z"
+
+    /** Crust scallops along the bottom edge: x, y (radius 6). */
+    val SCALLOPS = listOf(42f to 168f, 56.5f to 169f, 71f to 169.5f, 85.5f to 170f, 100f to 170f, 114.5f to 170f, 129f to 169.5f, 143.5f to 169f, 158f to 168f)
+
+    private val cache = HashMap<String, Path>()
+    fun path(d: String): Path = cache.getOrPut(d) { PathParser().parsePathString(d).toPath() }
+}
+
+/**
+ * Sam saying hello: breathing, blinking and waving (first-run board). Reduced motion keeps him still.
+ * The design's view box is (-15, -10, 230, 210), so the waving arm and the shadow fit.
+ */
+@Composable
+fun SamHello(modifier: Modifier = Modifier, contentDescription: String = "Sam waving hello") {
+    val still = LocalMotion.current.reduced
+    val t = rememberInfiniteTransition(label = "sam")
+    val breathe by t.animateFloat(0f, if (still) 0f else -3f, infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "breathe")
+    val wave by t.animateFloat(-14f, if (still) -14f else 18f, infiniteRepeatable(tween(450, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "wave")
+    val blink by t.animateFloat(
+        1f, 1f,
+        infiniteRepeatable(keyframes { durationMillis = 4400; 1f at 4090; (if (still) 1f else 0.08f) at 4224; 1f at 4400 }),
+        label = "blink",
+    )
+    Canvas(modifier.semantics { this.contentDescription = contentDescription }) {
+        val s = minOf(size.width / 230f, size.height / 210f)
+        val dx = (size.width - 230f * s) / 2f
+        val dy = (size.height - 210f * s) / 2f
+        translate(dx + 15f * s, dy + 10f * s) {
+            scale(s, pivot = Offset.Zero) {
+                drawOval(Color.Black.copy(alpha = 0.4f), Offset(48f, 179f), Size(104f, 14f))
+                translate(0f, breathe) { drawSam(wave, blink) }
+            }
+        }
+    }
+}
+
+/** One frame of Sam with the waving arm at [waveDeg] and the eyes open by [eyeOpen] (0..1). */
+internal fun DrawScope.drawSam(waveDeg: Float, eyeOpen: Float) {
+    val crustStroke = Stroke(12f, cap = StrokeCap.Round)
+    val armStroke = Stroke(8f, cap = StrokeCap.Round)
+    drawPath(SamArt.path(SamArt.ARM_LEFT), SamArt.Crust, style = crustStroke)
+    drawPath(SamArt.path(SamArt.ARM_LEFT), SamArt.Gold, style = armStroke)
+    rotate(waveDeg, Offset(164f, 128f)) {
+        drawPath(SamArt.path(SamArt.ARM_WAVE), SamArt.Crust, style = crustStroke)
+        drawPath(SamArt.path(SamArt.ARM_WAVE), SamArt.Gold, style = armStroke)
+    }
+    drawPath(SamArt.path(SamArt.LEAF), SamArt.Leaf)
+    drawPath(SamArt.path(SamArt.BODY), SamArt.Gold)
+    drawPath(SamArt.path(SamArt.FACET), SamArt.Facet)
+    drawPath(SamArt.path(SamArt.SHINE), SamArt.Highlight, style = Stroke(6f, cap = StrokeCap.Round))
+    SamArt.SCALLOPS.forEach { (x, y) -> drawCircle(SamArt.Crust, 6f, Offset(x, y)) }
+    withTransform({ scale(1f, eyeOpen, Offset(100f, 104f)) }) {
+        for (x in listOf(80f, 120f)) {
+            drawOval(Color.White, Offset(x - 13f, 88f), Size(26f, 32f))
+            drawCircle(SamArt.Ink, 7f, Offset(x + 2f, 107f))
+            drawCircle(Color.White, 2.5f, Offset(x + 5f, 103f))
+        }
+    }
+    for (x in listOf(64f, 136f)) drawOval(SamArt.Cheek.copy(alpha = 0.6f), Offset(x - 7f, 120.5f), Size(14f, 9f))
+    drawPath(SamArt.path(SamArt.MOUTH_OPEN), SamArt.Ink)
+    drawPath(SamArt.path(SamArt.MOUTH_OPEN), SamArt.Ink, style = Stroke(3f))
+}

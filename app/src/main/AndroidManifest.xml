@@ -204,6 +204,12 @@
             android:name=".ui.secondbrain.SecondBrainActivity"
             android:exported="false" />
 
+        <!-- First run: Sam says hello, then make Masala the home app (UI refresh U1) -->
+        <activity
+            android:name=".ui.onboarding.WelcomeActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Masala" />
+
         <!-- The user profile (Settings → Profile), saved into the Second Brain -->
         <activity
             android:name=".ui.profile.ProfileActivity"
