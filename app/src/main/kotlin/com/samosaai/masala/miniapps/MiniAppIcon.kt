@@ -48,9 +48,16 @@ object MiniAppIcon {
 
     private val BLOCKED = listOf("<script", "<foreignobject", "<image", "href=\"http", "href='http", "url(http")
 
+    /** An XML declaration, doctype or comment before the `<svg>` tag, as models often write. */
+    private val PROLOG = Regex("""^(\s*(<\?xml[^>]*\?>|<!DOCTYPE[^>]*>|<!--.*?-->))*\s*""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+
+    /** What the agent is told when its icon was refused, so it can try again. */
+    const val REFUSED_NOTE = "The icon was refused (not a built-in name, or an SVG over 8 KB, not starting with <svg, " +
+        "or with scripts, images or links); the app keeps its previous icon or shows its title's letter."
+
     /**
-     * What gets stored: `symbol:<name>` for a built-in, the SVG as-is, or null when [raw] is
-     * blank, too long, not an SVG, or reaches for anything remote.
+     * What gets stored: `symbol:<name>` for a built-in, the SVG (from its `<svg` tag on), or null when
+     * [raw] is blank, too long, not an SVG, or reaches for anything remote.
      */
     fun sanitize(raw: String?): String? {
         if (raw.isNullOrBlank()) return null
@@ -59,11 +66,15 @@ object MiniAppIcon {
             val name = trimmed.removePrefix("symbol:")
             return if (KnownSymbols.names.contains(name)) "symbol:$name" else null
         }
-        if (trimmed.length > MAX_ICON_CHARS) return null
-        if (!trimmed.startsWith("<svg")) return null
-        if (BLOCKED.any { it in trimmed.lowercase() }) return null
-        return trimmed
+        val svg = trimmed.replaceFirst(PROLOG, "")
+        if (svg.length > MAX_ICON_CHARS) return null
+        if (!svg.startsWith("<svg")) return null
+        if (BLOCKED.any { it in svg.lowercase() }) return null
+        return svg
     }
+
+    /** A line for the tool result when the agent sent an icon that [sanitize] refused; empty otherwise. */
+    fun refusedNote(raw: String?): String = if (!raw.isNullOrBlank() && sanitize(raw) == null) "\n" + REFUSED_NOTE else ""
 }
 
 /**
@@ -88,6 +99,10 @@ fun MiniAppIconView(icon: String?, title: String, size: Dp) {
         value = withContext(Dispatchers.Default) {
             runCatching {
                 val doc = SVG.getFromString(svg)
+                // Without a viewBox, resizing only crops; take one from its own size so it scales.
+                if (doc.documentViewBox == null && doc.documentWidth > 0f && doc.documentHeight > 0f) {
+                    doc.setDocumentViewBox(0f, 0f, doc.documentWidth, doc.documentHeight)
+                }
                 doc.documentWidth = px.toFloat()
                 doc.documentHeight = px.toFloat()
                 Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888).also {

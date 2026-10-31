@@ -333,7 +333,8 @@ class SettingsActivity : ComponentActivity() {
             Button(onClick = { askInChat(getString(R.string.miniapp_create_prefill)) }) { Text(stringResource(R.string.miniapp_create)) }
             var filter by rememberSaveable { mutableStateOf("") }
             // The search sits below Create (Batch A added the button on top), and only for long lists.
-            if (apps.size > 5) ListSearchField(filter, { filter = it }, stringResource(R.string.miniapps_filter))
+            // Also while a filter is set, so it can't be left hiding rows with no field to clear it.
+            if (apps.size > 5 || filter.isNotEmpty()) ListSearchField(filter, { filter = it }, stringResource(R.string.miniapps_filter))
             val shown = remember(apps, filter) {
                 val q = filter.trim().lowercase()
                 if (q.isEmpty()) apps else apps.filter { it.title.lowercase().contains(q) }
@@ -532,7 +533,7 @@ class SettingsActivity : ComponentActivity() {
         SettingsScaffold(stringResource(R.string.settings_scheduled_tasks), onBack = onBack) {
             Button(onClick = { askInChat(getString(R.string.scheduled_task_create_prefill)) }) { Text(stringResource(R.string.scheduled_task_create)) }
             var filter by rememberSaveable { mutableStateOf("") }
-            if (tasks.size > 5) ListSearchField(filter, { filter = it }, stringResource(R.string.scheduled_tasks_filter))
+            if (tasks.size > 5 || filter.isNotEmpty()) ListSearchField(filter, { filter = it }, stringResource(R.string.scheduled_tasks_filter))
             val shown = remember(tasks, filter) {
                 val q = filter.trim().lowercase()
                 if (q.isEmpty()) tasks else tasks.filter {

@@ -45,8 +45,8 @@ class MiniAppStore(private val dao: MiniAppDao) {
     suspend fun update(id: String, html: String, icon: String? = null): Boolean = withContext(Dispatchers.IO) {
         if (html.length > MAX_HTML_CHARS) return@withContext false
         val row = dao.get(id) ?: return@withContext false
-        // A missing icon leaves the stored one alone; a present one replaces it after sanitize.
-        dao.upsert(row.copy(html = html, icon = if (icon == null) row.icon else MiniAppIcon.sanitize(icon), updatedAt = System.currentTimeMillis()))
+        // A missing or refused icon leaves the stored one alone; an accepted one replaces it.
+        dao.upsert(row.copy(html = html, icon = MiniAppIcon.sanitize(icon) ?: row.icon, updatedAt = System.currentTimeMillis()))
         true
     }
 

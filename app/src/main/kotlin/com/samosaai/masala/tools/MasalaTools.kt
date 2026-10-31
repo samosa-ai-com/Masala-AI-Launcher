@@ -5,6 +5,7 @@ import com.samosaai.masala.core.tool.ActionResult
 import com.samosaai.masala.core.tool.Produced
 import com.samosaai.masala.core.tool.ToolFiles
 import com.samosaai.masala.miniapps.MiniAppConsole
+import com.samosaai.masala.miniapps.MiniAppIcon
 import com.samosaai.masala.miniapps.MiniAppProbe
 import com.samosaai.masala.miniapps.openMiniApp
 import com.samosaai.masala.miniapps.MiniAppStore
@@ -244,7 +245,7 @@ object MasalaTools {
                 val created = if (problems.isEmpty()) "Mini app '$id' created and pinned to home."
                 else "Mini app '$id' created, but it couldn't be pinned: ${problems.first()}"
                 ActionResult.ok(
-                    created + "\n" + loadReport(probe.errors(html)),
+                    created + "\n" + loadReport(probe.errors(html)) + MiniAppIcon.refusedNote(it.string("icon")),
                     listOf(Produced("mini_app", miniApps.get(id)?.title ?: title, id)),
                 )
             },
@@ -260,7 +261,7 @@ object MasalaTools {
                 MiniAppConsole.clear(id)
                 val produced = listOfNotNull(miniApps.get(id)?.let { row -> Produced("mini_app", row.title, id) })
                 val earlier = if (seen.isEmpty()) "" else "\nWhile the user had the previous version open it logged:\n" + seen.joinToString("\n")
-                ActionResult.ok("Mini app '$id' updated.\n" + loadReport(probe.errors(html)) + earlier, produced)
+                ActionResult.ok("Mini app '$id' updated.\n" + loadReport(probe.errors(html)) + earlier + MiniAppIcon.refusedNote(it.string("icon")), produced)
             },
             FunctionTool(Defs.listMiniApps, READ_ONLY) {
                 val rows = miniApps.list()

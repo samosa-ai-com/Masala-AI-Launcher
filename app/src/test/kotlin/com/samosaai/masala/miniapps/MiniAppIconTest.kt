@@ -67,4 +67,27 @@ class MiniAppIconTest {
         val svg = """<svg viewBox="0 0 24 24"><defs><linearGradient id="g"></linearGradient></defs><rect fill="url(#g)"/><a href="#g"/></svg>"""
         assertEquals(svg, MiniAppIcon.sanitize(svg))
     }
+
+    @Test
+    fun `an xml declaration, doctype and comments before the svg are dropped`() {
+        val svg = """<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>"""
+        assertEquals(svg, MiniAppIcon.sanitize("""<?xml version="1.0" encoding="UTF-8"?>
+            |<!-- timer icon -->
+            |$svg""".trimMargin()))
+        assertEquals(svg, MiniAppIcon.sanitize("""<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "x.dtd"> $svg"""))
+    }
+
+    @Test
+    fun `a prolog doesn't let other markup or remote links through`() {
+        assertNull(MiniAppIcon.sanitize("""<?xml version="1.0"?><html><svg/></html>"""))
+        assertNull(MiniAppIcon.sanitize("""<?xml version="1.0"?><svg><use href="http://x.test/a.svg#i"/></svg>"""))
+    }
+
+    @Test
+    fun `the agent hears about a refused icon only`() {
+        assertEquals("", MiniAppIcon.refusedNote(null))
+        assertEquals("", MiniAppIcon.refusedNote(" "))
+        assertEquals("", MiniAppIcon.refusedNote("timer"))
+        assertEquals("\n" + MiniAppIcon.REFUSED_NOTE, MiniAppIcon.refusedNote("calculate"))
+    }
 }
