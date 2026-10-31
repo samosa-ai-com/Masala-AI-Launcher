@@ -27,10 +27,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.samosaai.masala.R
+import com.samosaai.masala.MasalaApp
 import com.samosaai.masala.core.scheduled.RepeatKind
 import com.samosaai.masala.core.scheduled.ScheduledTask
 import com.samosaai.masala.core.scheduled.ScheduledTaskPlanner
 import com.samosaai.masala.masala
+import com.samosaai.masala.ui.skills.SkillSheetActivity
 import com.samosaai.masala.scheduled.ScheduledTaskRuns
 import com.samosaai.masala.scheduled.ScheduledTaskScheduler
 import kotlinx.coroutines.launch
@@ -47,6 +49,10 @@ fun ScheduledTasksPage(onBack: () -> Unit, onAskInChat: (String) -> Unit) {
         tasks = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { app.scheduledTasks.all() }
     }
     androidx.compose.runtime.LaunchedEffect(Unit) { sync() }
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        val job = scope.launch { sync() }
+        onPauseOrDispose { job.cancel() }
+    }
     fun mutate(block: suspend () -> Unit) {
         scope.launch {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -144,11 +150,33 @@ fun ScheduledTasksPage(onBack: () -> Unit, onAskInChat: (String) -> Unit) {
                     }
                     if (showHistory) {
                         task.history.takeLast(3).reversed().forEach { run ->
-                            Text(
-                                stringResource(R.string.scheduled_task_history_entry, format.format(java.util.Date(run.at)), run.status.name),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            val entry = stringResource(R.string.scheduled_task_history_entry, format.format(java.util.Date(run.at)), run.status.name)
+                            val link = run.skillRunId
+                            if (link == null) {
+                                Text(
+                                    entry,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            } else {
+                                Text(
+                                    entry,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.clickable(
+                                        role = Role.Button,
+                                        onClickLabel = stringResource(R.string.scheduled_task_open_run),
+                                    ) {
+                                        context.startActivity(
+                                            SkillSheetActivity.intent(
+                                                context,
+                                                task.skillId ?: MasalaApp.COMMAND_SKILL_ID,
+                                                runId = link,
+                                            )
+                                        )
+                                    },
+                                )
+                            }
                         }
                     }
                 }

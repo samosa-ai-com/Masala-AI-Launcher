@@ -47,6 +47,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.R
+import com.samosaai.masala.MasalaApp
 import com.samosaai.masala.core.tool.ToolFiles
 import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.core.contract.SkillInput
@@ -79,7 +80,11 @@ class SkillSheetActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val skillId = intent.getStringExtra(EXTRA_SKILL_ID)
-        val skill = skillId?.let { masala.skills.getSkillById(it) }
+        val skill = skillId?.let {
+            masala.skills.getSkillById(it)
+                // Free-text tasks run under the command skill, which lives outside the registry.
+                ?: if (it == MasalaApp.COMMAND_SKILL_ID) MasalaApp.COMMAND_SKILL else null
+        }
         if (skill == null) {
             Toast.makeText(this, R.string.skill_missing, Toast.LENGTH_SHORT).show()
             finish()
