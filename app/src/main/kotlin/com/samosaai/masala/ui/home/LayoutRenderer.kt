@@ -52,6 +52,8 @@ import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.delay
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -178,9 +180,38 @@ fun LayoutRenderer(
     val pager = rememberPagerState { pages.size.coerceAtLeast(1) }
     LaunchedEffect(resetSignal) { if (resetSignal > 0) pager.animateScrollToPage(0) }
     var origin by remember { mutableStateOf(Offset.Zero) }
-    Box(modifier.onGloballyPositioned { origin = it.positionInRoot() }) {
+    var width by remember { mutableStateOf(0) }
+    val drag = ctx.drag
+    val dragging = drag?.dragging != null
+    if (drag != null) {
+        LaunchedEffect(drag, pages) { snapshotFlow { pager.currentPage }.collect { drag.page = pages.getOrNull(it)?.id } }
+        val edge = with(LocalDensity.current) { EDGE_FLIP_ZONE.toPx() }
+        LaunchedEffect(drag, dragging, pages.size) {
+            if (!dragging) return@LaunchedEffect
+            var held = 0L
+            while (true) {
+                delay(EDGE_TICK_MS)
+                // Boxes move after a flip while the finger doesn't: look again each tick.
+                drag.moveTo(drag.pointer)
+                val x = drag.pointer.x - origin.x
+                val step = when {
+                    x < edge -> -1
+                    x > width - edge -> 1
+                    else -> 0
+                }
+                val target = pager.currentPage + step
+                held = if (step != 0 && target in pages.indices) held + EDGE_TICK_MS else 0L
+                if (held >= EDGE_HOLD_MS) {
+                    held = 0L
+                    pager.animateScrollToPage(target)
+                }
+            }
+        }
+    }
+    Box(modifier.onGloballyPositioned { origin = it.positionInRoot(); width = it.size.width }) {
         Column(Modifier.fillMaxSize()) {
-            HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
+            // While dragging, every page stays composed so the dragged cell's gesture survives a flip.
+            HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth(), beyondViewportPageCount = if (dragging) pages.size else 0) { index ->
                 pages.getOrNull(index)?.let { PageContent(it, layout, ctx, aboveDock, entrySignal, footer = if (index == pages.lastIndex) footer else ({})) }
             }
             if (pages.size > 1) PageDots(pages.size, pager.currentPage)
@@ -413,7 +444,11 @@ private fun Modifier.dropItem(item: Item, sectionId: String?, ctx: RenderContext
     return this
         .onGloballyPositioned {
             bounds.set(it)
-            if (drag != null && sectionId != null) drag.itemBoxes[item.id] = sectionId to it.boundsInRoot().toBox2()
+            if (drag != null && sectionId != null) {
+                // Off screen (a page kept for the drag) the clipped box is empty: not a target.
+                val box = it.boundsInRoot()
+                if (box.isEmpty) drag.itemBoxes.remove(item.id) else drag.itemBoxes[item.id] = sectionId to box.toBox2()
+            }
         }
         .graphicsLayer { alpha = if (drag?.dragging?.id == item.id) 0.3f else 1f }
 }
@@ -423,7 +458,10 @@ private fun Modifier.dropItem(item: Item, sectionId: String?, ctx: RenderContext
 private fun Modifier.dropSection(sectionId: String, ctx: RenderContext): Modifier {
     val drag = ctx.drag ?: return this
     DisposableEffect(drag, sectionId) { onDispose { drag.sectionBoxes.remove(sectionId) } }
-    return onGloballyPositioned { drag.sectionBoxes[sectionId] = it.boundsInRoot().toBox2() }
+    return onGloballyPositioned {
+        val box = it.boundsInRoot()
+        if (box.isEmpty) drag.sectionBoxes.remove(sectionId) else drag.sectionBoxes[sectionId] = box.toBox2()
+    }
 }
 
 private fun androidx.compose.ui.geometry.Rect.toBox2() = Box2(left, top, right, bottom)
@@ -453,18 +491,24 @@ private fun Modifier.itemClicks(item: Item, app: AppEntry?, ctx: RenderContext, 
             long.consume()
             fun rootOf(p: Offset) = bounds?.coordinates?.takeIf { it.isAttached }?.localToRoot(p) ?: p
             var moved = false
-            while (true) {
-                val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
-                if (!change.pressed) {
+            try {
+                while (true) {
+                    val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                    if (!change.pressed) {
+                        change.consume()
+                        break
+                    }
+                    if (!moved && (change.position - long.position).getDistance() > viewConfiguration.touchSlop) {
+                        moved = true
+                        drag.start(item, rootOf(change.position))
+                    }
+                    if (moved) drag.moveTo(rootOf(change.position))
                     change.consume()
-                    break
                 }
-                if (!moved && (change.position - long.position).getDistance() > viewConfiguration.touchSlop) {
-                    moved = true
-                    drag.start(item, rootOf(change.position))
-                }
-                if (moved) drag.moveTo(rootOf(change.position))
-                change.consume()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // The cell can leave mid-drag (its page or section goes away): never leave the copy lifted.
+                if (moved && drag.dragging?.id == item.id) drag.cancel()
+                throw e
             }
             if (moved) drag.drop()?.let { ctx.onDrop?.invoke(item, it) } else menu?.invoke()
         }
@@ -551,6 +595,11 @@ internal class IconBounds {
         rect = android.graphics.Rect(b.left.toInt(), b.top.toInt(), b.right.toInt(), b.bottom.toInt())
     }
 }
+
+/** Holding a dragged item this close to a side for [EDGE_HOLD_MS] flips to the next page that way. */
+private val EDGE_FLIP_ZONE = 24.dp
+private const val EDGE_HOLD_MS = 600L
+private const val EDGE_TICK_MS = 100L
 
 /** Gap between sections arriving after an AI layout is applied (motion spec: 40–120 ms apart). */
 private const val SECTION_STAGGER_MS = 80L

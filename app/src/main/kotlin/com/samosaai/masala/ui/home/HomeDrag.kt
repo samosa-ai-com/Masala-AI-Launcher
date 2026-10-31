@@ -17,6 +17,9 @@ sealed interface DropTarget {
      */
     data class Slot(val sectionId: String, val index: Int, val before: String? = null) : DropTarget
     data class Onto(val itemId: String) : DropTarget
+
+    /** Anywhere off the item sections of a page other than the one the drag began on. */
+    data class Page(val pageId: String) : DropTarget
 }
 
 /** A plain rectangle in root pixels, so hit-testing is testable without Compose. */
@@ -79,9 +82,14 @@ class HomeDragState(
     val itemBoxes = mutableStateMapOf<String, Pair<String, Box2>>()
     val sectionBoxes = mutableStateMapOf<String, Box2>()
 
+    /** The page on screen, set by the renderer; a drop off the sections of another page moves the item there. */
+    var page: String? = null
+    private var startPage: String? = null
+
     fun start(item: Item, at: Offset) {
         val box = itemBoxes[item.id]?.second
         grab = if (box != null) at - Offset(box.left, box.top) else Offset.Zero
+        startPage = page
         dragging = item
         moveTo(at)
     }
@@ -91,10 +99,13 @@ class HomeDragState(
         pointer = at
         val items = itemBoxes.entries.groupBy({ it.value.first }, { it.key to it.value.second })
         hover = DropTargets.resolve(at.x, at.y, sectionBoxes.toMap(), items, item.id, onto)
+            ?: page?.takeIf { it != startPage }?.let { DropTarget.Page(it) }
     }
 
     /** Ends the drag; returns where it landed, or null to cancel. */
-    fun drop(): DropTarget? = hover.also {
+    fun drop(): DropTarget? = hover.also { cancel() }
+
+    fun cancel() {
         dragging = null
         hover = null
     }

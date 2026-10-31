@@ -376,6 +376,9 @@ class HomeActivity : ComponentActivity() {
                             is DropTarget.Slot -> app.layouts.edit(getString(R.string.layout_label_moved, item.label)) {
                                 LayoutEdits.moveBefore(it, item.id, target.sectionId, target.before)
                             }
+                            is DropTarget.Page -> app.layouts.edit(getString(R.string.layout_label_moved, item.label)) {
+                                LayoutEdits.moveToPage(it, item.id, target.pageId)
+                            }
                             is DropTarget.Onto -> emptyList() // Folders come later.
                         }
                         problems.firstOrNull()?.let { toast(it.message) }
