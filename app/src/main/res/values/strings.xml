@@ -186,8 +186,9 @@
     <string name="settings_miniapps_summary">Apps the model built — open, pin or delete</string>
     <string name="miniapps_empty">No mini apps yet. Ask the model to build one, then it appears here and on home.</string>
     <string name="miniapp_gone">That mini app is gone</string>
-    <string name="miniapp_network">Allow network access</string>
-    <string name="miniapp_network_summary">Off unless you turn it on for this app.</string>
+    <string name="miniapp_network">Let this app use the internet</string>
+    <string name="miniapp_network_summary">Off by default. On lets the app load things from the web. The app stays on this phone and is never shared or hosted.</string>
+    <string name="miniapp_network_badge">Uses the internet</string>
     <string name="miniapp_share">Share</string>
     <string name="miniapp_pin">Pin to home</string>
     <string name="miniapp_pinned">Pinned — see it on home</string>

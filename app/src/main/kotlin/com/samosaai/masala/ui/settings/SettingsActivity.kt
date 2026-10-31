@@ -332,6 +332,11 @@ class SettingsActivity : ComponentActivity() {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (row.networkAllowed) Text(
+                        stringResource(R.string.miniapp_network_badge),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { startActivity(Intent(this@SettingsActivity, MiniAppActivity::class.java).putExtra(MiniAppActivity.EXTRA_APP_ID, row.id)) }) {
                             Text(stringResource(R.string.miniapp_open))
