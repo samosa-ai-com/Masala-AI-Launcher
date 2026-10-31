@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.samosaai.masala.R
 import com.samosaai.masala.MasalaApp
@@ -32,6 +33,7 @@ import com.samosaai.masala.core.scheduled.RepeatKind
 import com.samosaai.masala.core.scheduled.ScheduledTask
 import com.samosaai.masala.core.scheduled.ScheduledTaskPlanner
 import com.samosaai.masala.masala
+import com.samosaai.masala.skills.SkillRunner
 import com.samosaai.masala.ui.skills.SkillSheetActivity
 import com.samosaai.masala.scheduled.ScheduledTaskRuns
 import com.samosaai.masala.scheduled.ScheduledTaskScheduler
@@ -44,9 +46,19 @@ fun ScheduledTasksPage(onBack: () -> Unit, onAskInChat: (String) -> Unit) {
     val app = context.masala
     val scope = rememberCoroutineScope()
     var tasks by remember { mutableStateOf(listOf<ScheduledTask>()) }
+    var answers by remember { mutableStateOf(mapOf<String, String>()) }
     val format = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
     suspend fun sync() {
-        tasks = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { app.scheduledTasks.all() }
+        val fresh = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { app.scheduledTasks.all() }
+        tasks = fresh
+        answers = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            fresh.mapNotNull { t ->
+                val link = t.history.lastOrNull()?.skillRunId ?: return@mapNotNull null
+                val answer = app.database.skillRuns().get(link)
+                    ?.let { SkillRunner.lastAnswer(it.transcriptJson) }
+                if (answer.isNullOrBlank()) null else t.id to answer
+            }.toMap()
+        }
     }
     androidx.compose.runtime.LaunchedEffect(Unit) { sync() }
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
@@ -119,6 +131,14 @@ fun ScheduledTasksPage(onBack: () -> Unit, onAskInChat: (String) -> Unit) {
                             stringResource(R.string.scheduled_task_last, last.status.name),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    answers[task.id]?.let { answer ->
+                        Text(
+                            answer,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
