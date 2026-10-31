@@ -1,6 +1,9 @@
 package com.samosaai.masala.ui.drawer
 
 import android.graphics.Rect
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -52,6 +55,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,6 +72,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
@@ -99,6 +104,7 @@ import com.samosaai.masala.launcher.AppCatalog
 import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.ui.components.LauncherRow
+import com.samosaai.masala.ui.theme.LocalMotion
 import com.samosaai.masala.ui.theme.MasalaColors
 import com.samosaai.masala.ui.theme.MasalaTheme
 import com.samosaai.masala.ui.theme.rememberHaptics
@@ -108,6 +114,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.exp
 
 /** Ranked search results and the text they were ranked for. */
 private data class Ranked<T>(val query: String, val results: List<T>)
@@ -441,6 +448,7 @@ private fun AppGrid(
     }
     val scope = rememberCoroutineScope()
     var scrubbing by remember { mutableStateOf<Char?>(null) }
+    val reduced = LocalMotion.current.reduced
     Box(modifier.fillMaxWidth()) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(4),
@@ -471,7 +479,9 @@ private fun AppGrid(
             },
             onEnd = { scrubbing = null },
         )
-        scrubbing?.let { c ->
+        // With motion on, the letter under the thumb grows on the arc itself, so the bubble stays out of
+        // the way. Reduced motion has no arc, so it keeps the bubble.
+        if (reduced) scrubbing?.let { c ->
             Box(
                 Modifier.align(Alignment.TopEnd).padding(top = 52.dp, end = 38.dp).size(54.dp)
                     .clip(RoundedCornerShape(topStart = 27.dp, topEnd = 27.dp, bottomStart = 27.dp, bottomEnd = 6.dp))
@@ -491,6 +501,16 @@ internal fun Scrubber(letters: List<Char>, modifier: Modifier = Modifier, onLett
     var heightPx by remember { mutableIntStateOf(1) }
     var last by remember { mutableStateOf<Char?>(null) }
     val latestLetters by rememberUpdatedState(letters)
+    // 0 while the rail is idle, 1 while a finger is on it. Read only inside graphicsLayer below, so
+    // the letters animate in the draw phase and a drag never recomposes the rail.
+    val active = remember { Animatable(0f) }
+    var dragY by remember { mutableFloatStateOf(0f) }
+    val scope = rememberCoroutineScope()
+    val reduced = LocalMotion.current.reduced
+    // The gesture block is keyed on Unit, so it must read the current setting, not the one it was
+    // created with: toggling motion in Settings while the drawer is composed would keep the old value.
+    val reducedNow by rememberUpdatedState(reduced)
+    val settle = remember { spring<Float>(stiffness = Spring.StiffnessMediumLow) }
     fun pick(y: Float) {
         val l = latestLetters
         val c = l[(y / heightPx * l.size).toInt().coerceIn(0, l.lastIndex)]
@@ -513,23 +533,43 @@ internal fun Scrubber(letters: List<Char>, modifier: Modifier = Modifier, onLett
                     // drop the bubble at drag start.
                     awaitEachGesture {
                         val down = awaitFirstDown()
+                        dragY = down.position.y
+                        if (!reducedNow) scope.launch { active.animateTo(1f, settle) }
                         pick(down.position.y)
                         while (true) {
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull() ?: break
                             if (!change.pressed) break
+                            dragY = change.position.y
                             pick(change.position.y)
                             change.consume()
                         }
                         last = null
                         onEnd()
+                        if (!reducedNow) scope.launch { active.animateTo(0f, settle) }
                     }
                 },
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceEvenly,
         ) {
-            letters.forEach { c ->
-                Text(c.toString(), fontSize = 10.sp, lineHeight = 16.sp, textAlign = TextAlign.Center, color = if (c == last) tokens.accentText else tokens.textLow)
+            letters.forEachIndexed { i, c ->
+                Text(
+                    c.toString(), fontSize = 10.sp, lineHeight = 16.sp, textAlign = TextAlign.Center,
+                    color = if (c == last) tokens.accentText else tokens.textLow,
+                    // A bell around the finger's letter swings it left and grows it; the rail keeps its
+                    // 22 dp touch strip and draws outside it (graphicsLayer does not clip).
+                    modifier = Modifier.graphicsLayer {
+                        val a = active.value
+                        val pitch = heightPx.toFloat() / letters.size
+                        val centre = (i + 0.5f) * pitch
+                        val d = (centre - dragY) / pitch
+                        val bell = exp(-(d * d) / 8f)
+                        translationX = -bell * 56.dp.toPx() * a
+                        scaleX = 1f + bell * 1.2f * a
+                        scaleY = scaleX
+                        alpha = 1f - (1f - bell) * 0.5f * a
+                    },
+                )
             }
         }
         Spacer(Modifier.height(24.dp))
