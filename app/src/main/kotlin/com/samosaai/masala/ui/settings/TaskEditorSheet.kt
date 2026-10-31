@@ -28,7 +28,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimeInput
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -274,7 +274,7 @@ fun TaskEditorSheet(
             dismissButton = {
                 TextButton(onClick = { showTime = false }) { Text(stringResource(R.string.action_cancel)) }
             },
-            text = { TimePicker(state) },
+            text = { TimeInput(state) },
         )
     }
 }
