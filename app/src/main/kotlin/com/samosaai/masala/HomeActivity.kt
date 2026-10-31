@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -188,11 +189,17 @@ class HomeActivity : ComponentActivity() {
         val drawerShown = remember { derivedStateOf { drawerProgress.value > 0f } }
         val drawerSettled = remember { derivedStateOf { drawerOpen && drawerProgress.value >= 1f } }
         val drawerSpring = remember { spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow) }
+        // The release's fling velocity, consumed by the animation below. The release only records
+        // it and flips the state; the effect below is the single place that animates, so a
+        // cancelled animation can never strand the state behind the progress.
+        var releaseVelocity by remember { mutableFloatStateOf(0f) }
         LaunchedEffect(Unit) {
             snapshotFlow { drawerOpen }.collectLatest { open ->
                 val target = if (open) 1f else 0f
                 // A released drag already animates there with the finger's speed; don't restart it.
-                if (!(drawerProgress.isRunning && drawerProgress.targetValue == target)) drawerProgress.animateTo(target, drawerSpring)
+                val v = releaseVelocity
+                releaseVelocity = 0f
+                if (!(drawerProgress.isRunning && drawerProgress.targetValue == target)) drawerProgress.animateTo(target, drawerSpring, initialVelocity = v)
             }
         }
         // Composed once home has drawn its first frame, so the first open is as quick as the rest.
@@ -214,12 +221,18 @@ class HomeActivity : ComponentActivity() {
 
                 override fun onRelease(velocityY: Float) {
                     val open = velocityY < -FLING_VELOCITY || (velocityY < FLING_VELOCITY && drawerProgress.value > 0.35f)
-                    // The state flips only after the animation lands: the release owns the
-                    // fling's velocity, and the LaunchedEffect above must not replay it with 0
-                    // (its isRunning check can lose the race with this launch). External
-                    // changes (Back, tap, launch) still animate from the effect.
-                    scope.launch {
-                        drawerProgress.animateTo(if (open) 1f else 0f, drawerSpring, initialVelocity = -velocityY / distance)
+                    // Record the fling and flip at once; the effect above owns the animation, so
+                    // even if it is immediately superseded the state always matches the latest
+                    // release and a later Back/Home always has a transition to run.
+                    releaseVelocity = -velocityY / distance
+                    if (drawerOpen == open) {
+                        // No state change, so the effect above won't run: settle directly. Without
+                        // this a partial drag that releases below the threshold freezes mid-slide
+                        // with no later event able to move it.
+                        scope.launch {
+                            drawerProgress.animateTo(if (open) 1f else 0f, drawerSpring, initialVelocity = -velocityY / distance)
+                        }
+                    } else {
                         drawerOpen = open
                     }
                 }

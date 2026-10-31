@@ -155,8 +155,13 @@ fun HomeScreen(
                 if (!tracking) return
                 tracking = false
                 if (handled) {
+                    // A lift with no fresh tracking (e.g. after a missed one): drop the stale
+                    // peaks so the next gesture starts clean instead of inheriting them.
+                    handled = false
                     peakUp = 0f
                     peakDown = 0f
+                    net = 0f
+                    following = false
                     return
                 }
                 handled = true
@@ -164,15 +169,16 @@ fun HomeScreen(
                     following = false
                     val vy = runCatching { velocity.calculateVelocity().y }.getOrDefault(0f)
                     latestDrawer?.onRelease(if (vy.isFinite()) vy else 0f)
-                    peakUp = 0f
-                    peakDown = 0f
-                    return
+                } else {
+                    // The further excursion wins; ties and sub-threshold lifts do nothing.
+                    if (-peakUp >= swipeThreshold && -peakUp >= peakDown) latestUp()
+                    else if (peakDown >= swipeThreshold && peakDown > -peakUp) latestDown()
                 }
-                // The further excursion wins; ties and sub-threshold lifts do nothing.
-                if (-peakUp >= swipeThreshold && -peakUp >= peakDown) latestUp()
-                else if (peakDown >= swipeThreshold && peakDown > -peakUp) latestDown()
                 peakUp = 0f
                 peakDown = 0f
+                net = 0f
+                following = false
+                handled = false
             }
         }
     }
