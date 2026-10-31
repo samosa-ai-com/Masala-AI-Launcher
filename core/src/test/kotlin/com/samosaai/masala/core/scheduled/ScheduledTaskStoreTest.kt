@@ -54,6 +54,14 @@ class ScheduledTaskStoreTest {
     }
 
     @Test
+    fun `tasks stored before the run link load without one and keep a new one`() {
+        memory.text = """[{"id":"1","name":"Old","prompt":"p","startLocal":"2026-10-19T08:00","history":[{"at":1,"status":"DONE"}]}]"""
+        assertNull(store.get("1")!!.history.single().skillRunId)
+        store.update("1") { it.withRun(TaskRun(at = 2, status = TaskRunStatus.DONE, skillRunId = 9)) }
+        assertEquals(9, ScheduledTaskStore(memory).get("1")!!.history.last().skillRunId)
+    }
+
+    @Test
     fun `unreadable storage reads as no tasks`() {
         memory.text = "{not json"
         assertEquals(emptyList(), store.all())

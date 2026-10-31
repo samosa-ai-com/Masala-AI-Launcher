@@ -40,8 +40,9 @@ class JobRunner(context: Context, params: WorkerParameters) : CoroutineWorker(co
         // Android may refuse to start a foreground service from the background; the run still goes ahead.
         runCatching { setForeground(info(name, "")) }.onFailure { Log.w(TAG, "No foreground service: ${it.message}") }
 
+        var skillRowId: Long? = null
         suspend fun record(status: TaskRunStatus, detail: String?) {
-            if (taskId != null) withContext(NonCancellable) { ScheduledTaskRuns(app).recordOutcome(taskId, runId, status, detail) }
+            if (taskId != null) withContext(NonCancellable) { ScheduledTaskRuns(app).recordOutcome(taskId, runId, status, detail, skillRunId = skillRowId) }
         }
 
         val id = app.skillRunner.start(skillId, ChatMessage("user", JsonPrimitive(prompt)), unattended = true)
@@ -49,6 +50,7 @@ class JobRunner(context: Context, params: WorkerParameters) : CoroutineWorker(co
             record(TaskRunStatus.FAILED, "The skill '$skillId' is not installed.")
             return Result.failure()
         }
+        skillRowId = id
         val state = app.skillRunner.open(id)!!
         try {
             coroutineScope {

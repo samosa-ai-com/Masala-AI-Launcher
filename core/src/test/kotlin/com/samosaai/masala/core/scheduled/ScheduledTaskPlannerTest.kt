@@ -251,6 +251,17 @@ class ScheduledTaskPlannerTest {
     }
 
     @Test
+    fun `a finished run keeps its skill run link`() {
+        val now = at("2026-10-19T08:00")
+        val started = ScheduledTaskPlanner.started(daily(), now, zone)
+        val failed = ScheduledTaskPlanner.finished(started, TaskRunStatus.FAILED, "chat", null, now + minute, skillRunId = 7)
+        assertEquals(7, failed.lastRun!!.skillRunId)
+        assertEquals("chat", failed.lastRun!!.runId)
+        val plain = ScheduledTaskPlanner.finished(started, TaskRunStatus.FAILED, "chat", null, now + minute)
+        assertNull(plain.lastRun!!.skillRunId)
+    }
+
+    @Test
     fun `history keeps the newest runs only`() {
         var task = daily()
         repeat(

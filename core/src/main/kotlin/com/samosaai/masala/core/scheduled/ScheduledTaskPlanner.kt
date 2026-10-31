@@ -168,9 +168,10 @@ object ScheduledTaskPlanner {
         status: TaskRunStatus,
         runId: String?,
         detail: String?,
-        now: Long
+        now: Long,
+        skillRunId: Long? = null
     ): ScheduledTask {
-        val recorded = task.withRun(TaskRun(at = now, status = status, runId = runId, detail = detail))
+        val recorded = task.withRun(TaskRun(at = now, status = status, runId = runId, detail = detail, skillRunId = skillRunId))
         val retryAt = now + task.retryDelayMinutes.coerceAtLeast(1) * MINUTE_MS
         val beforeNext = task.nextRunAt?.let { retryAt < it } ?: true
         return if (status == TaskRunStatus.FAILED && task.retriesUsed < task.maxRetries && beforeNext) {

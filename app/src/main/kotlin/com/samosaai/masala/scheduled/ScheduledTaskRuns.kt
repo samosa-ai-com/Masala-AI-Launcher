@@ -84,10 +84,11 @@ class ScheduledTaskRuns(private val app: Application) {
         runId: String,
         status: TaskRunStatus,
         detail: String?,
-        now: Long = System.currentTimeMillis()
+        now: Long = System.currentTimeMillis(),
+        skillRunId: Long? = null
     ) {
         lock.withLock {
-            store.update(taskId) { ScheduledTaskPlanner.finished(it, status, runId, detail, now) }
+            store.update(taskId) { ScheduledTaskPlanner.finished(it, status, runId, detail, now, skillRunId) }
         }
         ScheduledTaskScheduler.reschedule(app)
     }
