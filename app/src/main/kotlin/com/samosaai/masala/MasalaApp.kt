@@ -95,6 +95,12 @@ class MasalaApp : Application() {
 
     val scheduledTasks by lazy { ScheduledTaskStore(PrefsTaskStorage(this)) }
 
+    /** Conversations, stored as one JSON file each; the chat surface reads and writes them. */
+    val chats by lazy { com.samosaai.masala.chat.ChatSessions(java.io.File(filesDir, com.samosaai.masala.chat.ChatSessions.DIR)) }
+
+    /** The conversation turns are being added to; created on the first turn of a new chat. */
+    val activeChatId = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
     /** Starts a scheduled task's run as a foreground job (plan Phase 4 M6). */
     @Volatile var taskRunner: TaskRunner? = null
 
@@ -323,7 +329,18 @@ class MasalaApp : Application() {
                 recordError = getString(R.string.stt_error_record),
                 generic = getString(R.string.stt_error_generic),
             ),
-        )
+        ).also { controller ->
+            controller.onTurn = ::recordTurn
+            scope.launch { chats.load() }
+        }
+    }
+
+    /** Appends a turn to the active conversation, starting one when there is none. */
+    internal fun recordTurn(turn: com.samosaai.masala.chat.ChatTurn) {
+        scope.launch {
+            val id = activeChatId.value ?: chats.create().id.also { activeChatId.value = it }
+            chats.append(id, turn)
+        }
     }
 
     companion object {

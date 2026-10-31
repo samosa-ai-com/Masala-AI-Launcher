@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.ChatBubble
@@ -137,14 +138,16 @@ fun rememberMicPress(app: MasalaApp): MicPress {
  * place of the two floating buttons. Tapping the pill opens search; the mic talks.
  */
 @Composable
-fun SearchPill(onSearch: () -> Unit, mic: MicPress, modifier: Modifier = Modifier) {
+fun SearchPill(onSearch: () -> Unit, mic: MicPress, onOpenChat: () -> Unit = {}, modifier: Modifier = Modifier) {
     val tokens = MasalaTheme.tokens
     val shape = RoundedCornerShape(50)
     val label = stringResource(R.string.home_search_or_ask)
     Row(
         modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).height(58.dp).clip(shape)
             .background(tokens.wallpaperGlass).border(1.dp, Color.White.copy(alpha = 0.12f), shape)
-            .clickable(role = Role.Button, onClickLabel = label, onClick = onSearch)
+            // Tap searches; long-press opens the conversation (history included), so the
+            // chat is reachable while nothing is running.
+            .combinedClickable(role = Role.Button, onClickLabel = label, onClick = onSearch, onLongClick = onOpenChat, onLongClickLabel = stringResource(R.string.chat_history))
             .padding(start = 18.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),

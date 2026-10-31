@@ -526,4 +526,14 @@
     <string name="working_preview_note">Preview fills in as sections arrive</string>
     <string name="layout_applied">New layout on home</string>
     <string name="layout_undo">Undo</string>
+    <!-- Conversation surface (plan chat-live-sessions) -->
+    <string name="chat_new">New chat</string>
+    <string name="chat_close">Close chat</string>
+    <string name="chat_history">Chat history</string>
+    <string name="chat_empty">Hold the mic to talk, or tap it and speak. Everything you say stays here.</string>
+    <string name="chat_working">Working on it…</string>
+    <string name="chat_drag_for_thread">Drag down to see the conversation</string>
+    <string name="chat_sessions_title">Chats</string>
+    <string name="chat_delete">Delete</string>
+    <string name="chat_no_sessions">No conversations yet. Ask Masala something to start one.</string>
 </resources>

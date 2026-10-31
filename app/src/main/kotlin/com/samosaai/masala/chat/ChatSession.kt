@@ -1,0 +1,45 @@
+package com.samosaai.masala.chat
+
+import kotlinx.serialization.Serializable
+
+/** Who said it. Errors are stored so a failed turn is visible when the session is reopened. */
+@Serializable
+enum class TurnRole { USER, MASALA, ERROR }
+
+/**
+ * One thing on the conversation screen. [steps] are the tool steps a reply took, kept
+ * beside the text so a reopened session shows the same trace; [at] is when it landed.
+ */
+@Serializable
+data class ChatTurn(
+    val role: TurnRole,
+    val text: String,
+    val steps: List<String> = emptyList(),
+    val at: Long = 0L,
+)
+
+/**
+ * One conversation: everything said in it, in order. [title] is taken from the first
+ * user turn (editable later), and [updatedAt] sorts the session list.
+ */
+@Serializable
+data class ChatSession(
+    val id: String,
+    val title: String = "",
+    val createdAt: Long = 0L,
+    val updatedAt: Long = 0L,
+    val turns: List<ChatTurn> = emptyList(),
+) {
+    /** The last line of the conversation, for the session list. */
+    val preview: String
+        get() = turns.lastOrNull { it.text.isNotBlank() }?.text?.replace('\n', ' ')?.take(80).orEmpty()
+}
+
+/** What the session list needs, without loading every turn. */
+data class ChatSummary(
+    val id: String,
+    val title: String,
+    val updatedAt: Long,
+    val preview: String,
+    val turns: Int,
+)
