@@ -207,6 +207,8 @@ internal fun hostMiniApp(
     onConsole: (String) -> Unit,
 ) {
     val origin = originOf(appId)
+    // Hosts already reported as blocked; requests are intercepted off the main thread.
+    val blockedHosts = java.util.Collections.synchronizedSet(mutableSetOf<String>())
     applyMiniAppSettings(wv, networkAllowed)
     var document = html
     if (!networkAllowed) {
@@ -235,6 +237,8 @@ internal fun hostMiniApp(
             // Nothing else is served from the app: no asset directory, no files.
             // With network off, every other request is refused outright.
             if (!networkAllowed) {
+                val host = request.url.host.orEmpty().ifEmpty { request.url.toString().take(80) }
+                if (blockedHosts.add(host)) onConsole("WARNING: blocked a request to $host: internet is off for this app")
                 return WebResourceResponse("text/plain", "utf-8", 403, "Blocked", emptyMap(), null)
             }
             return null
@@ -351,6 +355,14 @@ class MiniAppActivity : ComponentActivity() {
                 TopAppBar(
                     title = { Text(title.ifEmpty { stringResource(R.string.miniapp_title) }, maxLines = 1) },
                     navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.action_back)) } },
+                    actions = {
+                        if (networkAllowed) Text(
+                            stringResource(R.string.miniapp_network_badge),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(end = 16.dp),
+                        )
+                    },
                 )
             },
         ) { padding ->

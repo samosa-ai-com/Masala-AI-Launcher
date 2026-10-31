@@ -265,8 +265,18 @@ object MasalaTools {
             FunctionTool(Defs.listMiniApps, READ_ONLY) {
                 val rows = miniApps.list()
                 if (rows.isEmpty()) ActionResult.ok("No mini apps yet.")
-                else rows.joinToString("\n") { "${it.id}: ${it.title} (updated ${it.updatedAt})" }
-                    .let { ActionResult.ok(it) }
+                else rows.joinToString("\n") {
+                    "${it.id}: ${it.title} (updated ${java.time.Instant.ofEpochMilli(it.updatedAt)}, internet ${if (it.networkAllowed) "on" else "off"})"
+                }.let { ActionResult.ok(it) }
+            },
+            FunctionTool(Defs.readMiniApp, READ_ONLY) {
+                val id = it.string("id") ?: return@FunctionTool missing("id")
+                val row = miniApps.get(id) ?: return@FunctionTool ActionResult.error("No mini app '$id'.")
+                // Capped so one large app can't push the whole run out of the history window.
+                val html = if (row.html.length <= READ_MINI_APP_MAX_CHARS) row.html
+                else row.html.take(READ_MINI_APP_MAX_CHARS) +
+                    "\n--- cut at $READ_MINI_APP_MAX_CHARS of ${row.html.length} characters: ask the user before rewriting it whole ---"
+                ActionResult.ok("Title: ${row.title}\nInternet: ${if (row.networkAllowed) "on" else "off"}\n---\n$html")
             },
             FunctionTool(Defs.openMiniAppTool, READ_ONLY, opensScreen = true) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")
@@ -297,3 +307,6 @@ object MasalaTools {
         else -> "It logged console errors while loading; fix them with update_mini_app:\n" + errors.joinToString("\n")
     }
 }
+
+/** What `read_mini_app` returns of an app's HTML at most; stored apps may hold up to [MiniAppStore.MAX_HTML_CHARS]. */
+private const val READ_MINI_APP_MAX_CHARS = 16_000

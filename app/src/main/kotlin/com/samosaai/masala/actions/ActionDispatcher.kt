@@ -98,6 +98,7 @@ class ActionDispatcher(
         is MasalaAction.SetMode -> setMode(action)
         is MasalaAction.RunTool -> tool(action.name, action.args)
         is MasalaAction.OpenMiniApp -> openMiniApp(action)
+        is MasalaAction.OpenFolder -> Outcome.Failed("Folders open on the home screen")
         is MasalaAction.RunSkill ->
             if (skills().getSkillById(action.skillId) == null) Outcome.Failed("There is no skill '${action.skillId}'")
             else start(SkillSheetActivity.intent(context, action.skillId, action.prompt))

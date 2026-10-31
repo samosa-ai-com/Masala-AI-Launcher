@@ -11,6 +11,7 @@ import com.samosaai.masala.core.contract.MasalaAction
 import com.samosaai.masala.core.contract.MasalaJson
 import com.samosaai.masala.core.contract.Page
 import com.samosaai.masala.core.layout.LayoutChecker
+import com.samosaai.masala.core.layout.LayoutEdits
 import com.samosaai.masala.core.layout.LayoutHistory
 import com.samosaai.masala.core.layout.ResolveCache
 import com.samosaai.masala.core.layout.ResolvedLayout
@@ -170,6 +171,23 @@ class LayoutRepository(
         problems
     }
 
+    /**
+     * Applies [change] to the current base layout and saves the result under [label] if it passes the
+     * checker. Returns the problems (empty when saved); a null change saves nothing. Reads the history
+     * directly, not [base], which follows it a moment later. Must not call [apply]: [lock] isn't reentrant.
+     */
+    suspend fun edit(label: String, change: (LayoutDoc) -> LayoutDoc?): List<LayoutChecker.Problem> = lock.withLock {
+        val current = history.current?.layout ?: return@withLock emptyList()
+        val next = change(current) ?: return@withLock emptyList()
+        if (next == current) return@withLock emptyList()
+        val problems = LayoutChecker.check(next, environment())
+        if (problems.isEmpty()) {
+            push(label, next)
+            publish()
+        }
+        problems
+    }
+
     suspend fun undo(): Boolean = lock.withLock { history.undo()?.also { savePointer(); publish() } != null }
 
     suspend fun redo(): Boolean = lock.withLock { history.redo()?.also { savePointer(); publish() } != null }
@@ -234,7 +252,7 @@ class LayoutRepository(
     /** Takes every home item that opens mini-app [id] off home, so deleting the app leaves no dead pin. */
     suspend fun unpinMiniApp(id: String): List<LayoutChecker.Problem> {
         val doc = history.current?.layout ?: return emptyList()
-        val label = doc.pages.flatMap { it.sections }.filterIsInstance<ItemSection>().flatMap { it.items }
+        val label = LayoutEdits.itemsWithFolders(doc.pages.flatMap { it.sections }.filterIsInstance<ItemSection>())
             .firstOrNull { (it.action as? MasalaAction.OpenMiniApp)?.id == id }?.label ?: return emptyList()
         return apply("Unpin $label", withoutMiniApp(doc, id))
     }
@@ -267,17 +285,13 @@ class LayoutRepository(
 
     suspend fun unpin(entry: AppEntry): List<LayoutChecker.Problem> {
         val doc = history.current?.layout ?: return emptyList()
-        val pages = doc.pages.map { page ->
-            page.copy(
-                sections = page.sections.map { s ->
-                    if (s is ItemSection && s !is DockSection) s.withItems(s.items.filterNot { matches(it.action, entry) }) else s
-                },
-            )
-        }
-        return apply("Unpin ${entry.label}", doc.copy(pages = pages))
+        // Out of folders too, or an app in one could be neither unpinned nor shown as pinned.
+        return apply("Unpin ${entry.label}", LayoutEdits.removeWhere(doc, { it !is DockSection }) { matches(it.action, entry) })
     }
 
-    private fun favorites(doc: LayoutDoc) = doc.pages.flatMap { it.sections }.filterIsInstance<ItemSection>().filter { it !is DockSection }.flatMap { it.items }
+    /** Items outside the dock, folder children included. */
+    private fun favorites(doc: LayoutDoc) =
+        LayoutEdits.itemsWithFolders(doc.pages.flatMap { it.sections }.filterIsInstance<ItemSection>().filter { it !is DockSection })
 
     private fun matches(action: MasalaAction, entry: AppEntry) =
         action is MasalaAction.LaunchApp && action.packageName == entry.key.packageName && action.user == entry.key.user &&
@@ -314,15 +328,8 @@ class LayoutRepository(
         private const val TAG = "LayoutRepository"
         private const val KEY_CURRENT = "current"
 
-        /** [doc] without the items that open mini-app [id], in any section, the dock included. */
-        fun withoutMiniApp(doc: LayoutDoc, id: String): LayoutDoc = doc.copy(
-            pages = doc.pages.map { page ->
-                page.copy(
-                    sections = page.sections.map { s ->
-                        if (s is ItemSection) s.withItems(s.items.filterNot { (it.action as? MasalaAction.OpenMiniApp)?.id == id }) else s
-                    },
-                )
-            },
-        )
+        /** [doc] without the items that open mini-app [id], in any section, the dock and folders included. */
+        fun withoutMiniApp(doc: LayoutDoc, id: String): LayoutDoc =
+            LayoutEdits.removeWhere(doc) { (it.action as? MasalaAction.OpenMiniApp)?.id == id }
     }
 }

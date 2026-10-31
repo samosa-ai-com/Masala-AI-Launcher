@@ -54,6 +54,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,6 +65,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -114,7 +116,9 @@ class SettingsActivity : ComponentActivity() {
                     val start = remember { intent.getStringExtra(EXTRA_PAGE)?.let { n -> Page.entries.firstOrNull { it.name == n } } }
                     var page by rememberSaveable { mutableStateOf(start ?: Page.MAIN) }
                     BackHandler(enabled = page != Page.MAIN) { if (start != null && page == start) finish() else page = Page.MAIN }
-                    when (page) {
+                    // Each page keeps its scroll position (and other saved state) while another page is shown.
+                    val pageStates = rememberSaveableStateHolder()
+                    pageStates.SaveableStateProvider(page.name) { when (page) {
                         Page.MAIN -> MainPage(
                             settings,
                             onHiddenApps = { page = Page.HIDDEN_APPS },
@@ -142,7 +146,7 @@ class SettingsActivity : ComponentActivity() {
                         Page.PRIVACY -> PrivacyPage(onBack = { page = Page.MAIN })
                         Page.ABOUT -> AboutPage(onBack = { page = Page.MAIN })
                         Page.BRIEF -> BriefPage(settings, update = { change -> lifecycleScope.launch { masala.settings.update(change) } }, onBack = { page = Page.MAIN })
-                    }
+                    } }
                 }
             }
         }
@@ -310,6 +314,14 @@ class SettingsActivity : ComponentActivity() {
         )
     }
 
+    /** Home's input card, already holding [prefill], for the user to finish in their own words. */
+    private fun askInChat(prefill: String) {
+        masala.commands.openInput(prefill)
+        startActivity(Intent(this, com.samosaai.masala.HomeActivity::class.java).putExtra(com.samosaai.masala.HomeActivity.EXTRA_SHOW_INPUT, true)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+        finish()
+    }
+
     /** Every stored mini-app, so a created app is never invisible (plan: Lane D follow-ups). */
     @Composable
     private fun MiniAppsPage(onBack: () -> Unit) {
@@ -317,6 +329,7 @@ class SettingsActivity : ComponentActivity() {
         val apps by remember { masala.miniApps.all }.collectAsStateWithLifecycle(emptyList())
         val format = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
         SettingsScaffold(stringResource(R.string.settings_miniapps), onBack = onBack) {
+            Button(onClick = { askInChat(getString(R.string.miniapp_create_prefill)) }) { Text(stringResource(R.string.miniapp_create)) }
             if (apps.isEmpty()) {
                 Text(stringResource(R.string.miniapps_empty), style = MaterialTheme.typography.bodyMedium)
             }
@@ -327,6 +340,11 @@ class SettingsActivity : ComponentActivity() {
                     Text(
                         format.format(java.util.Date(row.updatedAt)),
                         style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (row.networkAllowed) Text(
+                        stringResource(R.string.miniapp_network_badge),
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -502,6 +520,7 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         SettingsScaffold(stringResource(R.string.settings_scheduled_tasks), onBack = onBack) {
+            Button(onClick = { askInChat(getString(R.string.scheduled_task_create_prefill)) }) { Text(stringResource(R.string.scheduled_task_create)) }
             if (tasks.isEmpty()) {
                 Text(stringResource(R.string.scheduled_tasks_empty), style = MaterialTheme.typography.bodyMedium)
             }

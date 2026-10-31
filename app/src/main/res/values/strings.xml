@@ -98,6 +98,24 @@
     <string name="scheduled_task_no_runner">Scheduled runs need the agent, which isn’t in this build yet.</string>
 
     <!-- Layout renderer and confirmation -->
+    <string name="layout_label_moved">Moved %1$s</string>
+    <string name="layout_label_new_folder">New folder</string>
+    <string name="layout_label_added_to_folder">Added %1$s to a folder</string>
+    <string name="layout_label_renamed_folder">Renamed folder</string>
+    <string name="layout_label_ungrouped_folder">Ungrouped folder</string>
+    <string name="layout_label_moved_out_of_folder">Moved %1$s out of a folder</string>
+    <string name="folder_default_name">Folder</string>
+    <string name="folder_full">This folder is full</string>
+    <string name="folder_cant_group">This item can’t go in a folder</string>
+    <string name="folder_rename_title">Rename folder</string>
+    <string name="folder_rename">Rename</string>
+    <string name="folder_ungroup">Ungroup</string>
+    <string name="folder_move_out">Move out of folder</string>
+    <string name="folder_app_options">App options</string>
+    <plurals name="folder_description">
+        <item quantity="one">%1$s, folder, %2$d app</item>
+        <item quantity="other">%1$s, folder, %2$d apps</item>
+    </plurals>
     <string name="home_widget_placeholder">Widgets arrive in a later build</string>
     <string name="home_stack_placeholder">A stack of %1$d widgets arrives in a later build</string>
     <string name="home_skill_widget_placeholder">Skill widgets arrive in a later build</string>
@@ -186,8 +204,13 @@
     <string name="settings_miniapps_summary">Apps the model built — open, pin or delete</string>
     <string name="miniapps_empty">No mini apps yet. Ask the model to build one, then it appears here and on home.</string>
     <string name="miniapp_gone">That mini app is gone</string>
-    <string name="miniapp_network">Allow network access</string>
-    <string name="miniapp_network_summary">Off unless you turn it on for this app.</string>
+    <string name="miniapp_network">Let this app use the internet</string>
+    <string name="miniapp_network_summary">Off by default. On lets the app load things from the web. The app stays on this phone and is never shared or hosted.</string>
+    <string name="miniapp_network_badge">Uses the internet</string>
+    <string name="miniapp_create">Create a mini app</string>
+    <string name="miniapp_create_prefill">"Build me a mini app that "</string>
+    <string name="scheduled_task_create">Create with Masala</string>
+    <string name="scheduled_task_create_prefill">"Every day at 8:00, "</string>
     <string name="miniapp_share">Share</string>
     <string name="miniapp_pin">Pin to home</string>
     <string name="miniapp_pinned">Pinned — see it on home</string>
@@ -499,7 +522,7 @@
     <string name="globe_month">30 days</string>
     <string name="globe_caption">Sized and placed by how often you open them</string>
     <string name="globe_more_apps">More apps · %1$d</string>
-    <string name="globe_more_note">Rarely opened, A–Z</string>
+    <string name="globe_more_note">Most used first, then A–Z</string>
     <string name="globe_empty">Open a few apps and they’ll gather here, the ones you use most in the middle.</string>
     <string name="globe_own_counts">Using Masala’s own counts: apps opened from outside Masala aren’t counted.</string>
     <string name="usage_access_title">Let Masala see which apps you use</string>

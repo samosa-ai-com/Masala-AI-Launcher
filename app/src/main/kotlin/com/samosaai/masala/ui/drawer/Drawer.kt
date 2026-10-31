@@ -114,6 +114,7 @@ private data class Ranked<T>(val query: String, val results: List<T>)
 
 /** Pause after the last keystroke before a composing single match auto-launches. */
 private const val AUTO_LAUNCH_PAUSE_MS = 800L
+private const val GLOBE_MAX = 30
 
 /** Where the globe gets its counts and whether to ask for Usage access (decision 11). */
 class GlobeSource(
@@ -242,10 +243,12 @@ fun Drawer(
     // The globe's ranking lives here so typing in Globe layout can dim it above the search results.
     var range by rememberSaveable { mutableStateOf(UsageRange.WEEK) }
     var globeRanked by remember { mutableStateOf<List<GlobeApp>>(emptyList()) }
+    var usageOrder by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     LaunchedEffect(range, apps, open, shownLayout) {
         if (!open || globe == null || shownLayout != DrawerLayout.GLOBE) return@LaunchedEffect
         val r = globe.ranked(range)
-        globeRanked = withContext(Dispatchers.Default) { globeApps(r) }
+        usageOrder = r.mapIndexed { i, (e, _) -> e.key.id to i }.toMap()
+        globeRanked = withContext(Dispatchers.Default) { globeApps(r.take(GLOBE_MAX)) }
     }
 
     var showWork by rememberSaveable { mutableStateOf(false) }
@@ -312,7 +315,7 @@ fun Drawer(
                         DrawerLayout.LIST -> LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f)) {
                             items(shown, key = { it.key.id }) { entry -> AppRow(entry, icons, profiles, labelWork = false, onLaunch, onMenu) }
                         }
-                        DrawerLayout.GLOBE -> GlobePage(shown, globeRanked, range, { range = it }, icons, open, globe, onLaunch, onMenu, profiles, Modifier.weight(1f))
+                        DrawerLayout.GLOBE -> GlobePage(shown, globeRanked, usageOrder, range, { range = it }, icons, open, globe, onLaunch, onMenu, profiles, Modifier.weight(1f))
                     }
                 }
                 // Ends above the keyboard, so only the rows that can be seen are composed on each letter.
@@ -461,7 +464,7 @@ private fun AppGrid(
         }
         Scrubber(
             letters = sections.keys.toList(),
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 6.dp),
+            modifier = Modifier.align(Alignment.TopEnd).fillMaxHeight().padding(end = 6.dp),
             onLetter = { c ->
                 scrubbing = c
                 headerIndex[c]?.let { scope.launch { state.scrollToItem(it) } }
@@ -498,33 +501,38 @@ internal fun Scrubber(letters: List<Char>, modifier: Modifier = Modifier, onLett
         }
     }
     val label = stringResource(R.string.drawer_scrubber)
-    Column(
-        modifier
-            .width(22.dp)
-            .onGloballyPositioned { heightPx = it.size.height.coerceAtLeast(1) }
-            .semantics { contentDescription = label }
-            .pointerInput(Unit) {
-                // One gesture block: stacked tap+drag detectors cancel each other and
-                // drop the bubble at drag start.
-                awaitEachGesture {
-                    val down = awaitFirstDown()
-                    pick(down.position.y)
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull() ?: break
-                        if (!change.pressed) break
-                        pick(change.position.y)
-                        change.consume()
+    Column(modifier.width(22.dp)) {
+        // "A" starts about 30% down, within thumb reach; the letters spread to near the bottom.
+        Spacer(Modifier.weight(0.3f))
+        Column(
+            Modifier.weight(0.7f).fillMaxWidth()
+                .onGloballyPositioned { heightPx = it.size.height.coerceAtLeast(1) }
+                .semantics { contentDescription = label }
+                .pointerInput(Unit) {
+                    // One gesture block: stacked tap+drag detectors cancel each other and
+                    // drop the bubble at drag start.
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        pick(down.position.y)
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            if (!change.pressed) break
+                            pick(change.position.y)
+                            change.consume()
+                        }
+                        last = null
+                        onEnd()
                     }
-                    last = null
-                    onEnd()
-                }
-            },
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        letters.forEach { c ->
-            Text(c.toString(), fontSize = 10.sp, lineHeight = 16.sp, textAlign = TextAlign.Center, color = if (c == last) tokens.accentText else tokens.textLow)
+                },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            letters.forEach { c ->
+                Text(c.toString(), fontSize = 10.sp, lineHeight = 16.sp, textAlign = TextAlign.Center, color = if (c == last) tokens.accentText else tokens.textLow)
+            }
         }
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -564,6 +572,7 @@ private fun AppCell(entry: AppEntry, icons: IconCache, profiles: AppCatalog.Snap
 private fun GlobePage(
     apps: List<AppEntry>,
     ranked: List<GlobeApp>,
+    usageOrder: Map<String, Int>,
     range: UsageRange,
     onRange: (UsageRange) -> Unit,
     icons: IconCache,
@@ -575,7 +584,10 @@ private fun GlobePage(
     modifier: Modifier,
 ) {
     val onGlobe = remember(ranked) { ranked.map { it.entry.key.id }.toSet() }
-    val rest = apps.filter { it.key.id !in onGlobe }
+    // Most used first; never-opened apps keep the catalog's A–Z order (the sort is stable).
+    val rest = remember(apps, onGlobe, usageOrder) {
+        apps.filter { it.key.id !in onGlobe }.sortedBy { usageOrder[it.key.id] ?: Int.MAX_VALUE }
+    }
     LazyColumn(modifier.fillMaxWidth()) {
         if (source != null && !source.usageAccess) item(key = "usage") { UsageAccessCard(source.asked, source.onAllow, source.onSkip) }
         item(key = "globe") {

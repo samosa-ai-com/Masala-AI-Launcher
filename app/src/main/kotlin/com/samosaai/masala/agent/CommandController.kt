@@ -99,9 +99,14 @@ class CommandController(
         return true
     }
 
+    /** Text the input card starts with, taken once (the Create buttons in Settings). */
+    private var draft = ""
+    fun takeDraft(): String = draft.also { draft = "" }
+
     /** Shows the card with its input field and nothing else. */
-    fun openInput() {
+    fun openInput(prefill: String = "") {
         job?.cancel()
+        draft = prefill
         _state.value = CommandState.Input
     }
 

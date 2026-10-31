@@ -17,7 +17,7 @@ object LayoutMigrations {
 
     /** `steps[n]` turns version n JSON into version n + 1. */
     private val steps: Map<Int, (JsonObject) -> JsonObject> = mapOf(
-        // 1 to { json -> ... },
+        1 to { json -> json }, // 2 adds folders (open_folder); nothing to rewrite
     )
 
     fun migrate(json: JsonObject): JsonObject {
