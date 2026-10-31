@@ -38,7 +38,7 @@ import kotlinx.coroutines.flow.Flow
         WatchEntity::class,
         AppLaunchEntity::class,
     ],
-    version = 2,
+    version = 3,
 )
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
@@ -58,8 +58,15 @@ abstract class MasalaDatabase : RoomDatabase() {
             }
         }
 
+        /** UI feedback round 2, Batch C: the agent-chosen icon behind mini-app rows, top bar and home. */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE mini_apps ADD COLUMN icon TEXT")
+            }
+        }
+
         fun create(context: Context): MasalaDatabase =
-            Room.databaseBuilder(context, MasalaDatabase::class.java, "masala.db").addMigrations(MIGRATION_1_2).build()
+            Room.databaseBuilder(context, MasalaDatabase::class.java, "masala.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
     }
 }
 
@@ -283,6 +290,8 @@ data class MiniAppEntity(
     val html: String,
     /** Off unless the user turns it on for this app. */
     val networkAllowed: Boolean = false,
+    /** The agent-chosen icon: `symbol:<name>` or one small inline SVG; null draws the title's letter. */
+    val icon: String? = null,
     val createdAt: Long,
     val updatedAt: Long,
 )
