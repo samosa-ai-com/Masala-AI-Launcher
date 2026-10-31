@@ -24,6 +24,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.asComposePath
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.compositeOver
@@ -117,12 +121,23 @@ fun IconTile(
     // Gold on a light tile reads at ~1.5:1, so the default glyph is the deep accent text
     // (identical to the accent in dark); explicit tints are untouched.
     val glyph = tint ?: tokens.accentText
+    val mask = if (shape == IconShape.AS_SHIPPED) IconShape.SQUIRCLE else shape
     // Unfilled tiles read on both grounds: charcoal in dark, the light surface in Paper.
     val ground = if (tokens.dark) MasalaColors.Charcoal else MaterialTheme.colorScheme.surfaceVariant
-    val maskShape = remember(shape) { IconMask.shape(shape) }
     val fill = if (filled) glyph else glyph.copy(alpha = 0.16f).compositeOver(ground)
+    val hairline = tokens.hairline
     Box(
-        modifier.size(size).clip(maskShape).background(fill).border(1.dp, tokens.hairline, maskShape),
+        // The mask is drawn as a filled path, not used as a clip: clipping to a path made the renderer
+        // rasterise a fresh mask for every tile on every frame.
+        modifier.size(size).drawWithCache {
+            val stroke = 1.dp.toPx()
+            val body = IconMask.path(mask, this.size.width, this.size.height).asComposePath()
+            val edge = IconMask.path(mask, this.size.width - stroke, this.size.height - stroke).asComposePath()
+            onDrawBehind {
+                drawPath(body, fill)
+                translate(stroke / 2, stroke / 2) { drawPath(edge, hairline, style = Stroke(stroke)) }
+            }
+        },
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = null, tint = if (filled) MasalaTheme.tokens.onAccent else glyph, modifier = Modifier.size(size * 0.5f))

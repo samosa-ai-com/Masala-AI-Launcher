@@ -36,6 +36,10 @@ class CommandController(
     val state: StateFlow<CommandState> = _state.asStateFlow()
 
     private var job: Job? = null
+
+    /** The mic level and live words while listening, for the listening overlay (UI refresh U4). */
+    val micLevel: StateFlow<Float> get() = speech?.level ?: kotlinx.coroutines.flow.MutableStateFlow(0f)
+    val liveWords: StateFlow<String> get() = speech?.partial ?: kotlinx.coroutines.flow.MutableStateFlow("")
     private var history: List<ChatMessage> = emptyList()
     private var readAloud: CommandState.Reply? = null
 

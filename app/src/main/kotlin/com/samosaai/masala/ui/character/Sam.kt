@@ -10,6 +10,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -122,4 +123,110 @@ internal fun DrawScope.drawSam(waveDeg: Float, eyeOpen: Float) {
     for (x in listOf(64f, 136f)) drawOval(SamArt.Cheek.copy(alpha = 0.6f), Offset(x - 7f, 120.5f), Size(14f, 9f))
     drawPath(SamArt.path(SamArt.MOUTH_OPEN), SamArt.Ink)
     drawPath(SamArt.path(SamArt.MOUTH_OPEN), SamArt.Ink, style = Stroke(3f))
+}
+
+/**
+ * Sam in [state] (states board), at any size: full detail from 96 dp; no crust or cheeks below 48 dp;
+ * at 24 dp and under a triangle with two eyes. [level] (0..1) drives the listening rings and the
+ * speaking mouth. Reduced motion keeps him still (no hops, sway or rings).
+ */
+@Composable
+fun Sam(state: CharacterState, modifier: Modifier = Modifier, level: () -> Float = { 0f }, contentDescription: String? = null) {
+    val still = LocalMotion.current.reduced
+    // No infinite transition while still: even constant animations poll Choreographer every
+    // vsync. States are read in the draw lambda, so frames invalidate only drawing.
+    val loop: State<Float>?
+    val blink: State<Float>?
+    if (still) {
+        loop = null
+        blink = null
+    } else {
+        val t = rememberInfiniteTransition(label = "sam")
+        loop = t.animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = androidx.compose.animation.core.LinearEasing)), label = "loop")
+        blink = t.animateFloat(
+            1f, 1f,
+            infiniteRepeatable(keyframes { durationMillis = 4600; 1f at 4280; 0.08f at 4416; 1f at 4600 }),
+            label = "blink",
+        )
+    }
+    val face = remember(state) { SamFaces.of(state.face) }
+    Canvas(modifier.then(if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier)) {
+        val px = size.minDimension
+        val dp = px / density
+        val s = px / 200f
+        val phase = (loop?.value ?: 0f) * 2 * Math.PI.toFloat()
+        val (dy, sway) = when (state) {
+            CharacterState.DONE -> -kotlin.math.abs(kotlin.math.sin(phase * 2)) * 10f to 0f
+            CharacterState.THINKING, CharacterState.SEARCHING -> 0f to kotlin.math.sin(phase) * 4f
+            CharacterState.LISTENING -> 0f to kotlin.math.sin(phase) * 3f
+            CharacterState.SLEEPING -> kotlin.math.sin(phase) * 1.5f to 0f
+            else -> kotlin.math.sin(phase) * 2.5f to 0f
+        }
+        translate((size.width - px) / 2f, (size.height - px) / 2f) {
+            scale(s, pivot = Offset.Zero) {
+                if (state == CharacterState.LISTENING && !still) {
+                    val l = level().coerceIn(0f, 1f)
+                    for (k in 0..1) {
+                        val p = ((loop?.value ?: 0f) + k * 0.5f) % 1f
+                        drawCircle(Color(0xFF9DB4FF).copy(alpha = (0.6f * (1 - p)) * (0.4f + 0.6f * l)), 70f + 40f * p + 20f * l, Offset(100f, 110f), style = Stroke(3f))
+                    }
+                }
+                if (dp >= 48f) drawOval(Color.Black.copy(alpha = 0.35f), Offset(48f, 179f), Size(104f, 14f))
+                translate(0f, if (still) 0f else dy) {
+                    rotate(face.tilt + if (still) 0f else sway, Offset(100f, 170f)) {
+                        drawFace(face, dp, blink?.value ?: 1f, if (state == CharacterState.SPEAKING) (0.3f + 0.7f * level().coerceIn(0f, 1f)) * (0.6f + 0.4f * kotlin.math.abs(kotlin.math.sin(phase * 6))) else null)
+                    }
+                }
+                if ((state == CharacterState.THINKING || state == CharacterState.SEARCHING) && dp >= 48f && !still) {
+                    // Spices orbiting the leaf (working board).
+                    val dots = listOf(Color(0xFFFF8A6B) to 6f, Color(0xFF7FDBA8) to 5f, Color(0xFF9DB4FF) to 4f)
+                    dots.forEachIndexed { i, (c, r) ->
+                        val a = phase + i * 2.1f
+                        drawCircle(c, r, Offset(100f + 26f * kotlin.math.cos(a), 14f + 12f * kotlin.math.sin(a)))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Body, crust, leaf and [face]; [mouthOpen] (0..1) replaces the mouth while speaking. */
+private fun DrawScope.drawFace(face: SamFace, dp: Float, blink: Float, mouthOpen: Float?) {
+    if (dp <= 24f) {
+        drawPath(SamArt.path(SamArt.BODY), face.bodyFill)
+        drawCircle(SamArt.Ink, 18f, Offset(78f, 108f))
+        drawCircle(SamArt.Ink, 18f, Offset(122f, 108f))
+        return
+    }
+    val detailed = dp >= 48f
+    drawPath(SamArt.path(face.leaf), face.leafFill)
+    drawPath(SamArt.path(SamArt.BODY), face.bodyFill)
+    if (detailed) {
+        drawPath(SamArt.path(SamArt.FACET), face.shadeFill)
+        drawPath(SamArt.path(SamArt.SHINE), SamArt.Highlight.copy(alpha = face.cheek.coerceIn(0f, 1f)), style = Stroke(6f, cap = StrokeCap.Round))
+        SamArt.SCALLOPS.forEach { (x, y) -> drawCircle(SamArt.Crust, 6f, Offset(x, y)) }
+    }
+    withTransform({ scale(1f, blink, Offset(100f, 104f)) }) {
+        if (face.whites.isNotBlank()) {
+            drawPath(SamArt.path(face.whites), Color.White)
+            drawPath(SamArt.path(face.whites), SamArt.Ink.copy(alpha = 0.25f), style = Stroke(1.5f))
+        }
+        if (face.pupils.isNotBlank()) drawPath(SamArt.path(face.pupils), SamArt.Ink)
+        if (face.shine.isNotBlank()) drawPath(SamArt.path(face.shine), Color.White)
+    }
+    val line = Stroke(if (detailed) 4.5f else 6f, cap = StrokeCap.Round)
+    if (face.lids.isNotBlank()) drawPath(SamArt.path(face.lids), SamArt.Ink, style = line)
+    if (face.brows.isNotBlank()) drawPath(SamArt.path(face.brows), SamArt.Ink, style = Stroke(4f, cap = StrokeCap.Round))
+    if (detailed) drawPath(SamArt.path(SamFaces.CHEEKS), SamArt.Cheek.copy(alpha = face.cheek))
+    if (mouthOpen != null) {
+        drawOval(SamArt.Ink, Offset(92f, 128f), Size(16f, 4f + 12f * mouthOpen))
+    } else {
+        val mouth = SamArt.path(face.mouth)
+        if (face.mouthFilled) drawPath(mouth, SamArt.Ink)
+        drawPath(mouth, SamArt.Ink, style = Stroke(4f, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+    }
+    if (detailed && face.extra.isNotBlank()) {
+        face.extraFill?.let { drawPath(SamArt.path(face.extra), it) }
+        face.extraStroke?.let { drawPath(SamArt.path(face.extra), it, style = Stroke(3.5f, cap = StrokeCap.Round)) }
+    }
 }

@@ -81,6 +81,22 @@ class SttEngine(
     /** Latest partial result from the current recognizer segment (not yet finalized). */
     private var currentPartialResult = ""
 
+    private val _level = kotlinx.coroutines.flow.MutableStateFlow(0f)
+
+    /** The mic level while listening, 0..1 (UI refresh U4: Sam's rings and the level bars follow it). */
+    val level: kotlinx.coroutines.flow.StateFlow<Float> = _level
+
+    private val _partial = kotlinx.coroutines.flow.MutableStateFlow("")
+
+    /** Words heard so far in this session (on-device recognizer only; API transcription has none). */
+    val partial: kotlinx.coroutines.flow.StateFlow<String> = _partial
+
+    /** A new listening session starts from silence and no words. */
+    fun resetLive() {
+        _level.value = 0f
+        _partial.value = ""
+    }
+
     /** Language for the current/next Android recognizer session. */
     private var currentLanguage = Language.ENGLISH
 
@@ -329,7 +345,9 @@ class SttEngine(
                 }
                 pcm.write(byteBuf, 0, count * 2)
                 val now = System.currentTimeMillis()
-                val decision = detector.update(SilenceDetector.rmsDb(shortBuf, count), now)
+                val db = SilenceDetector.rmsDb(shortBuf, count)
+                _level.value = ((db + 60f) / 50f).coerceIn(0f, 1f)
+                val decision = detector.update(db, now)
                 if (decision != SilenceDetector.Decision.CONTINUE ||
                     now - startMs > MAX_VAD_RECORDING_MS
                 ) {
@@ -352,6 +370,7 @@ class SttEngine(
             }
             recorder.release()
             vadStopRequested = false
+            _level.value = 0f
         }
         return result
     }
@@ -414,7 +433,7 @@ class SttEngine(
                     MasalaLog.d(TAG) { "onReadyForSpeech" }
                 }
                 override fun onBeginningOfSpeech() { MasalaLog.d(TAG) { "onBeginningOfSpeech" } }
-                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onRmsChanged(rmsdB: Float) { _level.value = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f) }
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEndOfSpeech() { MasalaLog.d(TAG) { "onEndOfSpeech" } }
                 override fun onError(error: Int) {
@@ -461,6 +480,7 @@ class SttEngine(
                     val text = matches?.firstOrNull() ?: ""
                     if (text.isNotBlank()) {
                         currentPartialResult = text
+                        _partial.value = text
                     }
                 }
                 override fun onEvent(eventType: Int, params: Bundle?) { MasalaLog.d(TAG) { "onEvent: $eventType" } }
@@ -592,7 +612,7 @@ class SttEngine(
                 recognizer.setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) {}
                     override fun onBeginningOfSpeech() {}
-                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onRmsChanged(rmsdB: Float) { _level.value = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f) }
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() {}
                     override fun onError(error: Int) {

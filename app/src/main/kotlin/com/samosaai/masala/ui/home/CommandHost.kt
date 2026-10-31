@@ -1,5 +1,17 @@
 package com.samosaai.masala.ui.home
 
+import com.samosaai.masala.ui.theme.MasalaTheme
+import com.samosaai.masala.ui.components.Radii
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.Icons
@@ -117,6 +129,29 @@ fun rememberMicPress(app: MasalaApp): MicPress {
     }
 }
 
+/**
+ * "Search or ask Masala" with the mic (UI refresh U3, home boards): one glass pill above the dock in
+ * place of the two floating buttons. Tapping the pill opens search; the mic talks.
+ */
+@Composable
+fun SearchPill(onSearch: () -> Unit, mic: MicPress, modifier: Modifier = Modifier) {
+    val tokens = MasalaTheme.tokens
+    val shape = RoundedCornerShape(50)
+    val label = stringResource(R.string.home_search_or_ask)
+    Row(
+        modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).height(58.dp).clip(shape)
+            .background(tokens.wallpaperGlass).border(1.dp, Color.White.copy(alpha = 0.12f), shape)
+            .clickable(role = Role.Button, onClickLabel = label, onClick = onSearch)
+            .padding(start = 18.dp, end = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(Icons.Rounded.Search, null, tint = tokens.onWallpaperMedium, modifier = Modifier.size(20.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = tokens.onWallpaperMedium, modifier = Modifier.weight(1f))
+        MicButton(mic, size = 46.dp)
+    }
+}
+
 /** Opens the reply card for typing, without running anything yet. */
 @Composable
 fun AskButton(onOpen: () -> Unit, modifier: Modifier = Modifier) {
@@ -133,11 +168,11 @@ fun AskButton(onOpen: () -> Unit, modifier: Modifier = Modifier) {
 
 /** The mic: tap to talk, or hold (see [rememberMicPress]). */
 @Composable
-fun MicButton(press: MicPress, modifier: Modifier = Modifier) {
+fun MicButton(press: MicPress, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 48.dp) {
     val label = stringResource(R.string.command_mic)
     Surface(
         modifier
-            .size(48.dp)
+            .size(size)
             .semantics { contentDescription = label; role = Role.Button }
             .pointerInput(press) {
                 detectTapGestures(onPress = {
@@ -160,7 +195,14 @@ fun MicButton(press: MicPress, modifier: Modifier = Modifier) {
  * home keeps going if the card is left.
  */
 @Composable
-fun ReplyCard(app: MasalaApp, readAloud: Boolean, modifier: Modifier = Modifier) {
+fun ReplyCard(
+    app: MasalaApp,
+    readAloud: Boolean,
+    modifier: Modifier = Modifier,
+    /** Home shows listening and work in their own overlay and sheet (UI refresh U4); the card skips them. */
+    sheets: Boolean = false,
+    character: com.samosaai.masala.data.Character? = null,
+) {
     val state by app.commands.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -174,13 +216,27 @@ fun ReplyCard(app: MasalaApp, readAloud: Boolean, modifier: Modifier = Modifier)
     // "Read replies aloud" applies to every reply; the button reads one on request.
     LaunchedEffect(reply) { if (readAloud && reply != null && app.commands.claimReadAloud(reply)) app.speakReply(reply.text) }
     if (state == CommandState.Idle) return
+    if (sheets && (state == CommandState.Listening || state is CommandState.Thinking)) return
 
+    // A glass sheet over home (UI refresh U3); opened for typing, its field takes focus.
+    val field = remember { FocusRequester() }
+    LaunchedEffect(state) { if (state == CommandState.Input) runCatching { field.requestFocus() } }
     Card(
-        modifier.fillMaxWidth().padding(16.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
+        modifier.fillMaxWidth().padding(12.dp),
+        shape = RoundedCornerShape(Radii.sheet),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f), contentColor = MaterialTheme.colorScheme.onSurface),
+        border = BorderStroke(1.dp, MasalaTheme.tokens.hairline),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Sam in the card's corner for a reply or a failure (beside the content, never on it).
+            if (character != null && (state is CommandState.Reply || state is CommandState.Error)) {
+                val speaking by app.speaking.collectAsStateWithLifecycle()
+                com.samosaai.masala.ui.character.MasalaCharacter(
+                    character,
+                    com.samosaai.masala.ui.character.characterStateFor(state, speaking, night = false),
+                    Modifier.size(40.dp),
+                )
+            }
             Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 when (val s = state) {
                     CommandState.Listening -> Text(stringResource(R.string.command_listening), style = MaterialTheme.typography.titleMedium)
@@ -212,7 +268,7 @@ fun ReplyCard(app: MasalaApp, readAloud: Boolean, modifier: Modifier = Modifier)
                 OutlinedTextField(
                     text,
                     { text = it },
-                    Modifier.weight(1f),
+                    Modifier.weight(1f).focusRequester(field),
                     placeholder = { Text(stringResource(R.string.command_hint)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),

@@ -18,7 +18,16 @@ interface SpeechInput {
 
     /** Ends [listenOnce] now; what was said so far is still transcribed. */
     fun finish() {}
+
+    /** Mic level 0..1 while listening (UI refresh U4). */
+    val level: kotlinx.coroutines.flow.StateFlow<Float> get() = NO_LEVEL
+
+    /** Words heard so far, where the recognizer reports them. */
+    val partial: kotlinx.coroutines.flow.StateFlow<String> get() = NO_WORDS
 }
+
+private val NO_LEVEL = kotlinx.coroutines.flow.MutableStateFlow(0f)
+private val NO_WORDS = kotlinx.coroutines.flow.MutableStateFlow("")
 
 /**
  * Which provider push-to-talk tries, in order. The configured cloud STT goes first when
@@ -52,7 +61,11 @@ class ConfiguredSpeechInput(
     private val config: () -> SpeechConfig,
     private val localAvailable: () -> Boolean,
     private val strings: SpeechStrings,
+    private val live: com.samosaai.masala.audio.SttEngine? = null,
 ) : SpeechInput {
+    override val level get() = live?.level ?: super.level
+    override val partial get() = live?.partial ?: super.partial
+
     @Volatile
     private var active: AudioProvider? = null
 
@@ -67,6 +80,7 @@ class ConfiguredSpeechInput(
         if (config().baseUrl.isNotBlank()) AudioProvider.API else AudioProvider.ANDROID
 
     override fun start(onFailure: (String) -> Unit): Boolean {
+        live?.resetLive()
         // A press while a previous session is still around must not leak its recorder.
         cancel()
         val reasons = mutableListOf<String>()
@@ -107,6 +121,7 @@ class ConfiguredSpeechInput(
 
     override suspend fun listenOnce(): Result<String> {
         cancel()
+        live?.resetLive()
         val settings = config()
         val provider = SpeechPolicy.order(configured()).firstOrNull { it != AudioProvider.ANDROID || localAvailable() }
             ?: return Result.failure(Exception(strings.localUnavailable))

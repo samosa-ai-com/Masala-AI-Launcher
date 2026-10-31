@@ -225,6 +225,9 @@ class MasalaApp : Application() {
 
     fun stopSpeaking() = tts.stop()
 
+    /** True while a reply is being read aloud (Sam's speaking state). */
+    val speaking get() = tts.isSpeaking
+
     /** Typed and spoken commands: the fast path, persona routing, then the agent. */
     val commands by lazy {
         CommandController(
@@ -250,6 +253,7 @@ class MasalaApp : Application() {
                     localUnavailable = getString(R.string.speech_local_unavailable),
                     recordFailed = getString(R.string.speech_record_failed),
                 ),
+                live = stt,
             ),
         )
     }
@@ -295,6 +299,9 @@ class MasalaApp : Application() {
         private set
     lateinit var actions: AppActions
         private set
+
+    /** Launch counts for the globe drawer and "Suggested now" (UI refresh U3). */
+    val usage by lazy { com.samosaai.masala.launcher.AppUsage(this, database.appLaunches(), scope) }
     lateinit var launcher: LauncherModel
         private set
     lateinit var contextService: ContextService
@@ -310,7 +317,7 @@ class MasalaApp : Application() {
         PermissionGate.context = this
         catalog = AppCatalog(this, scope)
         icons = IconCache(this, catalog)
-        actions = AppActions(this, catalog)
+        actions = AppActions(this, catalog) { usage.record(it) }
         launcher = LauncherModel(scope, catalog, database.appOverrides(), actions)
         catalog.start()
 
@@ -344,7 +351,9 @@ class MasalaApp : Application() {
         // Model calls read the AI settings; the speech engines follow them when they change.
         LlmConfig.source = { aiSettings.chatConfig() }
         SpeechConfig.source = { aiSettings.speechConfig() }
-        scope.launch {
+        // Off the main thread: the store's first read and key decryption use DataStore and the Keystore.
+        scope.launch(Dispatchers.Default) {
+            aiSettings.warmKeys()
             aiSettings.profile.collect { p ->
                 val speech = aiSettings.speechConfig()
                 stt.configureApi(speech.baseUrl, speech.apiKey)
@@ -352,8 +361,9 @@ class MasalaApp : Application() {
             }
         }
         // Icon mask, style and tint follow Appearance; the tint is the accent.
-        scope.launch {
+        scope.launch(Dispatchers.Default) {
             settings.settings.collect { s ->
+                if (s.accent == com.samosaai.masala.data.Accent.WALLPAPER) com.samosaai.masala.ui.theme.WallpaperAccent.refresh(this@MasalaApp)
                 val tint = com.samosaai.masala.ui.theme.accentColor(this@MasalaApp, s.accent).toArgb()
                 icons.applyStyle(IconCache.Style(s.iconShape, s.iconStyle, tint))
             }

@@ -716,23 +716,23 @@ private fun quad1(p0: Float, c: Float, p1: Float, t: Float): Float {
 }
 
 /** Monotone-chain convex hull for the shell silhouette. */
-private fun convexHull(points: List<Offset>): List<Offset> {
+internal fun convexHull(points: List<Offset>): List<Offset> {
     val sorted = points.sortedWith(compareBy({ it.x }, { it.y })).distinct()
     if (sorted.size < 3) return sorted
     fun cross(o: Offset, a: Offset, b: Offset): Float =
         (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
     val lower = mutableListOf<Offset>()
     sorted.forEach { p ->
-        while (lower.size >= 2 && cross(lower[lower.size - 2], lower.last(), p) <= 0f) lower.removeLast()
+        while (lower.size >= 2 && cross(lower[lower.size - 2], lower.last(), p) <= 0f) lower.removeAt(lower.lastIndex)
         lower.add(p)
     }
     val upper = mutableListOf<Offset>()
     sorted.asReversed().forEach { p ->
-        while (upper.size >= 2 && cross(upper[upper.size - 2], upper.last(), p) <= 0f) upper.removeLast()
+        while (upper.size >= 2 && cross(upper[upper.size - 2], upper.last(), p) <= 0f) upper.removeAt(upper.lastIndex)
         upper.add(p)
     }
-    lower.removeLast()
-    upper.removeLast()
+    lower.removeAt(lower.lastIndex)
+    upper.removeAt(upper.lastIndex)
     return lower + upper
 }
 

@@ -85,6 +85,10 @@ fun HomeScreen(
     homePresses: Int = 0,
     /** When set, a swipe up moves the drawer with the finger instead of [onSwipeUp] firing on lift. */
     drawerDrag: DrawerDrag? = null,
+    /** Above the dock: the search-or-ask pill (UI refresh U3). */
+    aboveDock: @Composable () -> Unit = {},
+    /** Bumped when a new layout is applied, so its sections arrive one by one. */
+    entrySignal: Int = 0,
     /** False when embedded in another screen that already handles insets (e.g. the AI preview). */
     applyWindowInsets: Boolean = true,
 ) {
@@ -151,8 +155,13 @@ fun HomeScreen(
                 if (!tracking) return
                 tracking = false
                 if (handled) {
+                    // A lift with no fresh tracking (e.g. after a missed one): drop the stale
+                    // peaks so the next gesture starts clean instead of inheriting them.
+                    handled = false
                     peakUp = 0f
                     peakDown = 0f
+                    net = 0f
+                    following = false
                     return
                 }
                 handled = true
@@ -160,15 +169,16 @@ fun HomeScreen(
                     following = false
                     val vy = runCatching { velocity.calculateVelocity().y }.getOrDefault(0f)
                     latestDrawer?.onRelease(if (vy.isFinite()) vy else 0f)
-                    peakUp = 0f
-                    peakDown = 0f
-                    return
+                } else {
+                    // The further excursion wins; ties and sub-threshold lifts do nothing.
+                    if (-peakUp >= swipeThreshold && -peakUp >= peakDown) latestUp()
+                    else if (peakDown >= swipeThreshold && peakDown > -peakUp) latestDown()
                 }
-                // The further excursion wins; ties and sub-threshold lifts do nothing.
-                if (-peakUp >= swipeThreshold && -peakUp >= peakDown) latestUp()
-                else if (peakDown >= swipeThreshold && peakDown > -peakUp) latestDown()
                 peakUp = 0f
                 peakDown = 0f
+                net = 0f
+                following = false
+                handled = false
             }
         }
     }
@@ -216,7 +226,12 @@ fun HomeScreen(
                         while (!up) {
                             val event = awaitPointerEvent(PointerEventPass.Final)
                             event.changes.firstOrNull { it.id == down.id }?.let(swipes.velocity::addPointerInputChange)
-                            up = event.changes.isNotEmpty() && event.changes.all { !it.pressed }
+                            // A lifted pointer can vanish from later events instead of arriving
+                            // pressed=false: if our pointer is gone, the gesture is over. Without
+                            // this the observer can wait forever and every later lift is lost,
+                            // leaving the drawer frozen mid-slide.
+                            up = event.changes.isEmpty() || event.changes.none { it.id == down.id } ||
+                                (event.changes.isNotEmpty() && event.changes.all { !it.pressed })
                         }
                         swipes.onLift()
                     }
@@ -235,7 +250,7 @@ fun HomeScreen(
     ) {
         Column(Modifier.fillMaxSize()) {
             if (!isDefault) DefaultBanner(onSetDefault)
-            LayoutRenderer(layout, render, Modifier.weight(1f), resetSignal = homePresses) {
+            LayoutRenderer(layout, render, Modifier.weight(1f), resetSignal = homePresses, aboveDock = aboveDock, entrySignal = entrySignal) {
                 if (pinnedShortcuts.isNotEmpty()) {
                     Text(
                         stringResource(R.string.home_shortcuts_title),

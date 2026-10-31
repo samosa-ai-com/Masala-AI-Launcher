@@ -268,8 +268,8 @@ object MiniAppConsole {
     fun record(appId: String, line: String) {
         synchronized(lock) {
             val q = logs.getOrPut(appId) { ArrayDeque() }
-            q.addLast(line.take(500))
-            while (q.size > 20) q.removeFirst()
+            q.add(line.take(500))
+            while (q.size > 20) q.removeAt(0)
             state.value = logs.mapValues { it.value.toList() }
         }
         Log.d("MiniApp", "$appId console: $line")

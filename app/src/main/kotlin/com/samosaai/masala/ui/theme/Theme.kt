@@ -14,6 +14,8 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
@@ -44,6 +46,12 @@ data class MasalaTokens(
     val alert: Color,
     val lilac: Color,
     val glassFill: Color,
+    /**
+     * Glass straight on the wallpaper (home cards, dock, search pill): stronger than [glassFill] so text
+     * reads on any picture — 8.4:1 for full text and 5.9:1 for [onWallpaperMedium] even over white.
+     */
+    val wallpaperGlass: Color,
+    val onWallpaperMedium: Color,
     val hairline: Color,
     val textHigh: Color,
     val textMedium: Color,
@@ -61,6 +69,8 @@ data class MasalaTokens(
             alert = MasalaColors.Chili,
             lilac = MasalaColors.Lilac,
             glassFill = MasalaColors.GlassInk.copy(alpha = MasalaColors.GLASS_ALPHA),
+            wallpaperGlass = MasalaColors.GlassInk.copy(alpha = 0.78f),
+            onWallpaperMedium = MasalaColors.Text.copy(alpha = 0.78f),
             hairline = MasalaColors.Hairline,
             textHigh = MasalaColors.Text,
             textMedium = MasalaColors.Text.copy(alpha = 0.62f),
@@ -78,6 +88,9 @@ data class MasalaTokens(
             alert = MasalaColors.ChiliDeep,
             lilac = MasalaColors.LilacDeep,
             glassFill = Color.White.copy(alpha = 0.72f),
+            // Home sits on the wallpaper in both schemes, so its glass stays dark (charcoal cards on Paper too).
+            wallpaperGlass = MasalaColors.GlassInk.copy(alpha = 0.78f),
+            onWallpaperMedium = MasalaColors.Text.copy(alpha = 0.78f),
             hairline = Color(0x1A000000),
             textHigh = MasalaColors.Charcoal,
             textMedium = MasalaColors.Charcoal.copy(alpha = 0.68f),
@@ -165,23 +178,36 @@ private fun lightScheme(t: MasalaTokens): ColorScheme = lightColorScheme(
     inversePrimary = MasalaColors.Gold,
 )
 
-/** The accent colour for [accent]; [Accent.WALLPAPER] reads the wallpaper's colours (no permission). */
+/**
+ * The accent colour for [accent]. [Accent.WALLPAPER] uses the wallpaper's colours, read off the main
+ * thread ([WallpaperAccent.refresh]); until they're known it's gold.
+ */
 fun accentColor(context: Context, accent: Accent): Color = when (accent) {
     Accent.GOLD -> MasalaColors.Gold
     Accent.INDIGO -> MasalaColors.Indigo
     Accent.CARDAMOM -> MasalaColors.Cardamom
     Accent.CHILI -> MasalaColors.Chili
     Accent.LILAC -> MasalaColors.Lilac
-    Accent.WALLPAPER -> wallpaperAccent(context) ?: MasalaColors.Gold
+    Accent.WALLPAPER -> WallpaperAccent.color.value ?: MasalaColors.Gold
 }
 
-private fun wallpaperAccent(context: Context): Color? = runCatching {
-    val colors = WallpaperManager.getInstance(context).getWallpaperColors(WallpaperManager.FLAG_SYSTEM) ?: return null
-    val argb = (colors.secondaryColor ?: colors.primaryColor).toArgb()
-    // Lifted so it reads on charcoal like the gold does.
-    val c = Color(argb)
-    if (c.luminance() < 0.35f) Color.White.copy(alpha = 0.45f).compositeOver(c) else c
-}.getOrNull()
+/**
+ * The wallpaper's accent, cached. `getWallpaperColors` is a call into the system that can take a
+ * noticeable time, so it never runs while a screen is drawn.
+ */
+object WallpaperAccent {
+    val color = kotlinx.coroutines.flow.MutableStateFlow<Color?>(null)
+
+    /** Call from a background thread (app start, and when the wallpaper accent is chosen). */
+    fun refresh(context: Context) {
+        color.value = runCatching {
+            val colors = WallpaperManager.getInstance(context).getWallpaperColors(WallpaperManager.FLAG_SYSTEM) ?: return
+            // Lifted so it reads on charcoal like the gold does.
+            val c = Color((colors.secondaryColor ?: colors.primaryColor).toArgb())
+            if (c.luminance() < 0.35f) Color.White.copy(alpha = 0.45f).compositeOver(c) else c
+        }.getOrNull()
+    }
+}
 
 /** Whether [settings] ask for the dark scheme. */
 @Composable
@@ -202,7 +228,8 @@ fun MasalaTheme(settings: LauncherSettings, systemBars: Boolean = true, content:
     val dark = isDark(settings)
     if (systemBars) SystemBars(lightBackground = !dark)
     val context = LocalContext.current
-    val accent = remember(settings.accent) { accentColor(context, settings.accent) }
+    val wallpaper by WallpaperAccent.color.collectAsState()
+    val accent = remember(settings.accent, wallpaper) { accentColor(context, settings.accent) }
     val tokens = remember(dark, accent) { if (dark) MasalaTokens.dark(accent) else MasalaTokens.light(accent) }
     val scheme = remember(tokens) { if (dark) darkScheme(tokens) else lightScheme(tokens) }
     val typography = remember(settings.font) { masalaTypography(settings.font) }

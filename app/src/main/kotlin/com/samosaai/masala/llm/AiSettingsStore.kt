@@ -87,6 +87,11 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
 
     fun hasKey(presetId: String): Boolean = key(presetId).isNotBlank()
 
+    /** Decrypts every saved key now (call off the main thread), so screens never wait on the Keystore. */
+    fun warmKeys() {
+        synchronized(plain) { sealed.keys.toList() }.forEach(::key)
+    }
+
     suspend fun setProfile(next: AiProfile) {
         loadJob.join()
         _profile.value = next

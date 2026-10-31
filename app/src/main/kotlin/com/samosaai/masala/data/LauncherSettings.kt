@@ -61,6 +61,8 @@ data class LauncherSettings(
     val drawerLayout: DrawerLayout = DrawerLayout.GRID,
     /** The first-run welcome was finished or skipped. */
     val welcomeDone: Boolean = false,
+    /** Usage access was offered once (first run, or the first time the globe opens), granted or not. */
+    val usageAsked: Boolean = false,
 ) {
     companion object {
         const val MIN_TEXT_SCALE = 0.5f
@@ -96,6 +98,7 @@ private object Keys {
     val character = stringPreferencesKey("character")
     val drawerLayout = stringPreferencesKey("drawer_layout")
     val welcomeDone = booleanPreferencesKey("welcome_done")
+    val usageAsked = booleanPreferencesKey("usage_asked")
 }
 
 internal fun MutablePreferences.write(next: LauncherSettings) {
@@ -116,6 +119,7 @@ internal fun MutablePreferences.write(next: LauncherSettings) {
     this[Keys.character] = next.character.name
     this[Keys.drawerLayout] = next.drawerLayout.name
     this[Keys.welcomeDone] = next.welcomeDone
+    this[Keys.usageAsked] = next.usageAsked
 }
 
 internal fun Preferences.toSettings(): LauncherSettings {
@@ -138,6 +142,7 @@ internal fun Preferences.toSettings(): LauncherSettings {
         character = enumOr(this[Keys.character], defaults.character),
         drawerLayout = enumOr(this[Keys.drawerLayout], defaults.drawerLayout),
         welcomeDone = this[Keys.welcomeDone] ?: defaults.welcomeDone,
+        usageAsked = this[Keys.usageAsked] ?: defaults.usageAsked,
     )
 }
 

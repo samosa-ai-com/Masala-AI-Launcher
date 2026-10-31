@@ -3,6 +3,8 @@ package com.samosaai.masala.data
 import android.content.Context
 import androidx.room.Dao
 import androidx.room.Database
+import androidx.sqlite.db.SupportSQLiteDatabase
+import androidx.room.migration.Migration
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -34,8 +36,9 @@ import kotlinx.coroutines.flow.Flow
         SkillArtifactEntity::class,
         MiniAppEntity::class,
         WatchEntity::class,
+        AppLaunchEntity::class,
     ],
-    version = 1,
+    version = 2,
 )
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
@@ -44,11 +47,43 @@ abstract class MasalaDatabase : RoomDatabase() {
     abstract fun skillRuns(): SkillRunDao
     abstract fun skillArtifacts(): SkillArtifactDao
     abstract fun wikiPages(): WikiDao
+    abstract fun appLaunches(): AppLaunchDao
 
     companion object {
+        /** UI refresh U3: the launch log behind the globe drawer and "Suggested now". */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `app_launches` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `appKey` TEXT NOT NULL, `at` INTEGER NOT NULL)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_app_launches_at` ON `app_launches` (`at`)")
+            }
+        }
+
         fun create(context: Context): MasalaDatabase =
-            Room.databaseBuilder(context, MasalaDatabase::class.java, "masala.db").build()
+            Room.databaseBuilder(context, MasalaDatabase::class.java, "masala.db").addMigrations(MIGRATION_1_2).build()
     }
+}
+
+/**
+ * One app launch from home, the drawer, search or the agent (UI refresh U3), for the globe drawer and
+ * "Suggested now". Kept 30 days. With Usage access, the system's own counts are used instead.
+ */
+@Entity(tableName = "app_launches", indices = [Index("at")])
+data class AppLaunchEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val appKey: String,
+    val at: Long,
+)
+
+@Dao
+interface AppLaunchDao {
+    @Insert
+    suspend fun insert(launch: AppLaunchEntity)
+
+    @Query("SELECT * FROM app_launches WHERE at >= :since")
+    suspend fun since(since: Long): List<AppLaunchEntity>
+
+    @Query("DELETE FROM app_launches WHERE at < :before")
+    suspend fun prune(before: Long): Int
 }
 
 /** A saved home layout (Phase 2): the `LayoutDoc` JSON, labeled for undo and the version list. */
