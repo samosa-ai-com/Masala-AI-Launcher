@@ -58,7 +58,10 @@
     <string name="voice_summary">Mic button, voice input and the voice replies use</string>
     <string name="voice_mic_button">The mic button</string>
     <string name="voice_gestures">Hold to talk, or tap for hands-free</string>
-    <string name="voice_gestures_summary">Hold the mic and let go to send, or tap it and speak — it sends after a pause. No setting to change.</string>
+    <string name="voice_hands_free">Hands-free sending</string>
+    <string name="voice_hands_free_summary">A tap starts listening and it sends itself after a pause. Off: hold the mic and let go to send.</string>
+    <string name="voice_hands_free_unavailable">This phone’s own recognizer decides when a sentence ends, so it is hold-to-talk only. Pick a server voice input to use hands-free.</string>
+    <string name="voice_gestures_summary">Hold the mic and let go to send, or tap it and speak — it sends after a pause.</string>
     <string name="voice_tap">Tap to talk</string>
     <string name="voice_tap_summary">Sends when you pause. Tap again to stop.</string>
     <string name="voice_hold">Hold to talk</string>

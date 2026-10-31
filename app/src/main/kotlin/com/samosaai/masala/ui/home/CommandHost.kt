@@ -108,11 +108,16 @@ fun rememberMicPress(app: MasalaApp): MicPress {
                 if (!permitted) {
                     granted.launch(Manifest.permission.RECORD_AUDIO)
                 } else if (app.commands.state.value != CommandState.Listening) {
-                    // Walkie-talkie arms only while the finger stays down; a shorter press
-                    // never starts it and becomes hands-free on release instead.
-                    holding = false
-                    holdStart = scope.launch {
-                        delay(HOLD_AFTER_MS)
+                    if (app.commands.handsFreeAvailable()) {
+                        // Walkie-talkie arms only while the finger stays down; a shorter press
+                        // never starts it and becomes hands-free on release instead.
+                        holding = false
+                        holdStart = scope.launch {
+                            delay(HOLD_AFTER_MS)
+                            holding = app.commands.startListening()
+                        }
+                    } else {
+                        // No hands-free here: the press itself starts, the release sends.
                         holding = app.commands.startListening()
                     }
                 }

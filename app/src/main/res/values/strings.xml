@@ -538,6 +538,7 @@
     <string name="chat_sessions_title">Chats</string>
     <string name="chat_delete">Delete</string>
     <string name="chat_send_ready">Tap Send when you are done</string>
+    <string name="chat_release_to_send">Release to send</string>
     <string name="chat_sending_in">Sending in %1$d s</string>
     <string name="chat_send_now">Send now</string>
     <string name="chat_search">Search chats</string>

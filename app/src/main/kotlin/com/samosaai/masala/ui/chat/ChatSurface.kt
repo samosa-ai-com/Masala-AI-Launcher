@@ -86,6 +86,7 @@ fun ChatSurface(
     onExpanded: (Boolean) -> Unit,
     mic: MicPress,
     autoSendIn: Int?,
+    walkie: Boolean = false,
     onSend: () -> Unit,
     onStop: () -> Unit,
     onClose: () -> Unit,
@@ -147,7 +148,7 @@ fun ChatSurface(
                         else -> Thread(turns, liveWords, listening, thinking, state, character, level, onStop)
                     }
                 }
-                Controls(listening, autoSendIn, mic, onSend, onClose)
+                Controls(listening, autoSendIn, walkie, mic, onSend, onClose)
             }
         }
     }
@@ -382,7 +383,7 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1) {
  * behaviour is predictable rather than a surprise.
  */
 @Composable
-private fun Controls(listening: Boolean, autoSendIn: Int?, mic: MicPress, onSend: () -> Unit, onClose: () -> Unit) {
+private fun Controls(listening: Boolean, autoSendIn: Int?, walkie: Boolean, mic: MicPress, onSend: () -> Unit, onClose: () -> Unit) {
     val tokens = MasalaTheme.tokens
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         if (listening) {
@@ -393,8 +394,11 @@ private fun Controls(listening: Boolean, autoSendIn: Int?, mic: MicPress, onSend
             ) {
                 val countdown = autoSendIn
                 Text(
-                    if (countdown == null) stringResource(R.string.chat_send_ready)
-                    else stringResource(R.string.chat_sending_in, countdown),
+                    when {
+                        walkie -> stringResource(R.string.chat_release_to_send)
+                        countdown == null -> stringResource(R.string.chat_send_ready)
+                        else -> stringResource(R.string.chat_sending_in, countdown)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = if (countdown == null) tokens.textLow else tokens.accentText,
                 )

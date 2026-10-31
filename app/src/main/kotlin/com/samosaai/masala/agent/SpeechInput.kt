@@ -4,7 +4,6 @@ import com.samosaai.masala.audio.AudioProvider
 import com.samosaai.masala.audio.PttEngine
 import com.samosaai.masala.audio.SpeechConfig
 import com.samosaai.masala.i18n.Language
-import kotlinx.coroutines.isActive
 import java.util.Locale
 
 /** Push-to-talk: [start] while the button is held, [stop] on release returns the transcript. */
@@ -14,8 +13,11 @@ interface SpeechInput {
     suspend fun stop(): Result<String>
     fun cancel()
 
-    /** Tap to talk: listens until the speaker pauses, then returns the transcript. */
-    suspend fun listenOnce(): Result<String> = Result.failure(UnsupportedOperationException("Tap to talk isn't available"))
+    /**
+     * Hands-free: listens until the speaker pauses, then returns the transcript. Only the
+     * providers that can do this (an endpoint we time ourselves) are asked to.
+     */
+    suspend fun listenOnce(): Result<String> = Result.failure(UnsupportedOperationException("Hands-free isn't available"))
 
     /** Ends [listenOnce] now; what was said so far is still transcribed. */
     fun finish() {}
@@ -44,6 +46,15 @@ internal object SpeechPolicy {
         configured.isApiBased() -> listOf(configured, AudioProvider.ANDROID)
         else -> listOf(AudioProvider.ANDROID)
     }
+
+    /**
+     * Whether a tap can start a hands-free take that ends by itself. The server path is
+     * timed by our own voice detector, so it can. The on-device recognizer ends a take on
+     * its own schedule (and reopens the microphone between segments), so a hands-free take
+     * there either cuts the speaker off or flickers the mic on and off; it is hold-to-talk
+     * only, which is also how it is set by default.
+     */
+    fun handsFreeWorks(provider: AudioProvider): Boolean = provider.isApiBased()
 }
 
 /** User-facing reasons [ConfiguredSpeechInput] can report; loaded from resources by the caller. */
@@ -90,79 +101,29 @@ fun friendlySttMessage(raw: String?, s: SpeechStrings): String {
 }
 
 /**
- * [SpeechInput] that follows the app's STT configuration: cloud transcription when
- * [SpeechConfig] names an endpoint, otherwise the on-device recognizer — with the
- * other one as fallback when the first can't start. A phone whose default recognizer
- * is a stub (or has none) therefore records for the server instead of failing.
- */
-/**
  * Silence that ends a hands-free turn: 2.5 s, so a breath or a slow sentence does not
  * cut the user off mid-thought. Hold-to-talk never depends on it (release sends).
  */
 private const val SILENCE_MS = 2500L
 
 /**
- * How far above the room's quiet level a window must sit to count as speech. Levels are
- * 0..1 over 50 dB, so 0.2 is about 10 dB — the same margin the voice detector uses.
- */
-private const val LEVEL_MARGIN = 0.2f
-
-/**
- * When an on-device take is over. The recognizer cannot be asked to wait longer for a
- * pause, and its partial results are rate-limited (one every few seconds on some phones),
- * so this watches the microphone instead: words or a clear step above the room's quiet
- * level are speech, and [silenceMs] of neither ends the take.
+ * [SpeechInput] that follows the app's STT configuration: cloud transcription when
+ * [SpeechConfig] names an endpoint, otherwise the on-device recognizer — with the
+ * other one as fallback when the first can't start. A phone whose default recognizer
+ * is a stub (or has none) therefore records for the server instead of failing.
  *
- * Pure so it can be pinned by tests without a recognizer.
+ * Hands-free (a tap that ends by itself) runs only where it can be timed reliably: the
+ * server path, through our own voice detector. Everywhere else the mic is hold-to-talk,
+ * which is what the on-device recognizer can do well.
  */
-internal class OnDeviceSilenceClock(
-    private val silenceMs: Long = SILENCE_MS,
-    private val noSpeechMs: Long = NO_SPEECH_MS,
-    private val maxMs: Long = MAX_LISTEN_MS,
-    private val margin: Float = LEVEL_MARGIN,
-) {
-    private var startedAt = 0L
-    private var lastActivityAt = 0L
-    private var floor = 1f
-    private var heard = -1L
-
-    /** True once speech has been heard. */
-    var spoke = false
-        private set
-
-    /** Feeds one sample; true when the take should end. */
-    fun update(now: Long, level: Float, heardCount: Long): Boolean {
-        if (startedAt == 0L) startedAt = now
-        val l = level.coerceIn(0f, 1f)
-        if (!spoke) floor = minOf(floor, l)
-        val louder = l >= floor + margin
-        val words = heard >= 0 && heardCount != heard
-        heard = heardCount
-        if (louder || words) {
-            spoke = true
-            lastActivityAt = now
-        }
-        return when {
-            spoke && now - lastActivityAt >= silenceMs -> true
-            !spoke && now - startedAt >= noSpeechMs -> true
-            now - startedAt >= maxMs -> true
-            else -> false
-        }
-    }
-}
-
-/** How long an on-device take waits for the first words before giving up. */
-private const val NO_SPEECH_MS = 15_000L
-
-/** A ceiling on one on-device take, so a stuck recognizer cannot hold the turn forever. */
-private const val MAX_LISTEN_MS = 60_000L
-
 class ConfiguredSpeechInput(
     private val engine: PttEngine,
     private val config: () -> SpeechConfig,
     private val localAvailable: () -> Boolean,
     private val strings: SpeechStrings,
     private val live: com.samosaai.masala.audio.SttEngine? = null,
+    /** The user's choice for hands-free; defaults to the provider's ability. */
+    private val handsFreeEnabled: () -> Boolean = { true },
 ) : SpeechInput {
     override val level get() = live?.level ?: super.level
     override val partial get() = live?.partial ?: super.partial
@@ -170,6 +131,10 @@ class ConfiguredSpeechInput(
 
     @Volatile
     private var active: AudioProvider? = null
+
+    /** This session started hands-free (and will end by itself) rather than from a hold. */
+    @Volatile
+    private var handsFree = false
 
     private fun language() = Language.entries.firstOrNull { it.matchesCode(Locale.getDefault().language) } ?: Language.ENGLISH
 
@@ -180,6 +145,9 @@ class ConfiguredSpeechInput(
 
     private fun configured(): AudioProvider =
         if (config().baseUrl.isNotBlank()) AudioProvider.API else AudioProvider.ANDROID
+
+    /** Whether a tap may start a take that ends itself with this configuration. */
+    fun handsFreeAvailable(): Boolean = handsFreeEnabled() && SpeechPolicy.handsFreeWorks(configured())
 
     override fun start(onFailure: (String) -> Unit): Boolean {
         live?.resetLive()
@@ -199,6 +167,7 @@ class ConfiguredSpeechInput(
             }
             if (started) {
                 active = provider
+                handsFree = false
                 return true
             }
             reasons += if (provider == AudioProvider.ANDROID) {
@@ -215,6 +184,7 @@ class ConfiguredSpeechInput(
     override suspend fun stop(): Result<String> {
         val provider = active ?: return Result.failure(Exception("Wasn't listening"))
         active = null
+        handsFree = false
         val settings = config()
         val model = if (provider.isApiBased()) settings.sttModel else ""
         val language = if (provider.isApiBased()) settings.sttLanguage.ifBlank { language().iso639 } else ""
@@ -225,7 +195,9 @@ class ConfiguredSpeechInput(
         cancel()
         live?.resetLive()
         val settings = config()
+        // Only the providers we can time ourselves; on-device stays hold-to-talk.
         val order = SpeechPolicy.order(configured())
+            .filter { SpeechPolicy.handsFreeWorks(it) }
             .filter { it != AudioProvider.ANDROID || localAvailable() }
         if (order.isEmpty()) return Result.failure(Exception(strings.localUnavailable))
         val lang = configuredLanguage(settings)
@@ -233,17 +205,15 @@ class ConfiguredSpeechInput(
         // The first technical failure, kept: once the user has spoken, a fallback provider
         // only hears the room, and reporting its silence would hide the real error.
         var firstFailure: Result<String>? = null
-        // Like push-to-talk's start(): the cloud goes first, the on-device recognizer is the
-        // last resort. Silence is final (another provider would only repeat the wait); only a
-        // technical failure moves on to the next provider.
         for (provider in order) {
             active = provider
+            handsFree = true
             val model = if (provider.isApiBased()) settings.sttModel else ""
             val result = try {
-                if (provider == AudioProvider.ANDROID && live != null) listenAndroidUntilPause(lang)
-                else engine.listenForUtterance(provider, model, lang, SILENCE_MS)
+                engine.listenForUtterance(provider, model, lang, SILENCE_MS)
             } finally {
                 active = null
+                handsFree = false
             }
             if (result.isSuccess) return result
             if (com.samosaai.masala.audio.SttEngine.isBenignSttError(result.exceptionOrNull())) {
@@ -257,50 +227,11 @@ class ConfiguredSpeechInput(
         return firstFailure ?: last!!
     }
 
-    /**
-     * On-device recognition ends a take when *it* decides the sentence is over — usually
-     * after about a second of pause — so a speaking breath cuts the message in half. There
-     * is no way to ask it for a longer pause, so this runs it continuously (it keeps
-     * restarting through pauses and accumulates the text) and ends the take on our own
-     * silence timer, which is what the server path already does.
-     */
-    private suspend fun listenAndroidUntilPause(language: Language): Result<String> {
-        val stt = live ?: return Result.failure(Exception(strings.localUnavailable))
-        if (!engine.startListening(AudioProvider.ANDROID, language)) {
-            return Result.failure(Exception(stt.androidFailure ?: strings.localUnavailable))
-        }
-        val clock = OnDeviceSilenceClock()
-        var spoke: Boolean
-        val text: String
-        try {
-            while (true) {
-                kotlinx.coroutines.delay(100)
-                // A failure the recognizer reports on its own (no on-device model, language
-                // missing) ends the turn now instead of waiting out the no-speech window.
-                stt.androidFailure?.let {
-                    engine.cancelListening(AudioProvider.ANDROID)
-                    return Result.failure(Exception(it))
-                }
-                if (clock.update(System.currentTimeMillis(), stt.level.value, stt.heard.value)) break
-            }
-            spoke = clock.spoke
-        } finally {
-            // Cancelled from outside still stops the recognizer: otherwise continuous
-            // listening would keep running with nobody watching.
-            if (!kotlinx.coroutines.currentCoroutineContext().isActive) engine.cancelListening(AudioProvider.ANDROID)
-        }
-        text = engine.stopListeningAndTranscribe(AudioProvider.ANDROID, "", "").getOrDefault("")
-        return if (text.isBlank()) {
-            Result.failure(Exception(if (spoke) "Didn't catch that" else "No speech detected"))
-        } else {
-            Result.success(text)
-        }
-    }
-
     override fun finish() = engine.finishUtterance()
 
     override fun cancel() {
         active = null
+        handsFree = false
         engine.cancelListening(AudioProvider.ANDROID)
         engine.cancelListening(AudioProvider.API)
     }

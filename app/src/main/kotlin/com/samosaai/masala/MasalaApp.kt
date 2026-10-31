@@ -295,6 +295,11 @@ class MasalaApp : Application() {
     val speaking get() = tts.isSpeaking
 
     /** Typed and spoken commands: the fast path, persona routing, then the agent. */
+    private var speechInputRef: ConfiguredSpeechInput? = null
+
+    private fun speechInput(): ConfiguredSpeechInput =
+        speechInputRef ?: error("speech input read before commands was built")
+
     val commands by lazy {
         CommandController(
             scope = scope,
@@ -320,7 +325,8 @@ class MasalaApp : Application() {
                     recordFailed = getString(R.string.speech_record_failed),
                 ),
                 live = stt,
-            ),
+                handsFreeEnabled = { aiSettings.profile.value.handsFree ?: (aiSettings.profile.value.voiceIn != null) },
+            ).also { speechInputRef = it },
             speechStrings = SpeechStrings(
                 localUnavailable = getString(R.string.speech_local_unavailable),
                 recordFailed = getString(R.string.speech_record_failed),
@@ -334,6 +340,7 @@ class MasalaApp : Application() {
             ),
             summarize = { transcript -> summarizeHistory(transcript) },
         ).also { controller ->
+            controller.handsFreeAvailable = { speechInput().handsFreeAvailable() }
             controller.onTurn = ::recordTurn
             scope.launch { chats.load() }
         }

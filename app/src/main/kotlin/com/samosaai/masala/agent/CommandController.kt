@@ -78,6 +78,12 @@ class CommandController(
     val micLevel: StateFlow<Float> get() = speech?.level ?: kotlinx.coroutines.flow.MutableStateFlow(0f)
     val liveWords: StateFlow<String> get() = speech?.partial ?: kotlinx.coroutines.flow.MutableStateFlow("")
 
+    /**
+     * Whether a tap may start a take that ends by itself here. False makes the mic
+     * hold-to-talk only, which is what the on-device recognizer needs.
+     */
+    var handsFreeAvailable: () -> Boolean = { true }
+
     /** Seconds until the take ends by itself, when the provider works that way. */
     val autoSendIn: StateFlow<Int?> get() = speech?.autoSendIn ?: kotlinx.coroutines.flow.MutableStateFlow(null)
     private var history: List<ChatMessage> = emptyList()

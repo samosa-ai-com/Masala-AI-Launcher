@@ -41,6 +41,12 @@ data class AiProfile(
      * fail fast instead of spending them.
      */
     val maxRepeatedToolCalls: Int = 4,
+    /**
+     * Hands-free sending: a tap starts a take that ends itself on a pause. Null follows the
+     * provider — on for a server endpoint we time ourselves, off for the phone's recognizer,
+     * which decides its own end and flickers the mic between segments.
+     */
+    val handsFree: Boolean? = null,
 ) {
     /** Every endpoint the profile uses, for "what leaves the phone" and key lookups. */
     val endpoints: List<Endpoint> get() = listOfNotNull(chat, voiceIn, voiceOut)

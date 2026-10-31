@@ -168,17 +168,19 @@ class SpeechPolicyTest {
     }
 
     @Test
-    fun tapCloudFailureFallsBackToLocal() = runBlocking<Unit> {
+    fun tapCloudFailureIsReportedInsteadOfRelistening() = runBlocking<Unit> {
+        // The user already spoke during the server take; asking the phone's recognizer to
+        // listen again would only hear the room and hide the real error.
         val engine = FakeEngine(
             utteranceResults = mapOf(
                 AudioProvider.API to Result.failure(Exception("HTTP 500 boom")),
-                AudioProvider.ANDROID to Result.success("open youtube"),
+                AudioProvider.ANDROID to Result.success("never asked"),
             )
         )
         val text = input(engine).listenOnce()
-        assertTrue(text.isSuccess)
-        assertEquals("open youtube", text.getOrNull())
-        assertEquals(listOf(AudioProvider.API, AudioProvider.ANDROID), engine.utterances)
+        assertTrue(text.isFailure)
+        assertEquals("HTTP 500 boom", text.exceptionOrNull()?.message)
+        assertEquals(listOf(AudioProvider.API), engine.utterances)
     }
 
     @Test
@@ -218,51 +220,25 @@ class SpeechPolicyTest {
     }
 
     @Test
-    fun `on-device take survives the recognizer's slow partials`() {
-        // This recognizer reports words once every ~5 s. The clock must follow the mic, or
-        // the take ends mid-sentence between two reports.
-        val clock = OnDeviceSilenceClock()
-        var now = 1_000L
-        // Room floor, then the user speaks: loud for 6 s while words arrive only once.
-        repeat(10) { clock.update(now, 0.10f, 0); now += 100 }
-        var ended = false
-        repeat(60) {
-            ended = clock.update(now, 0.55f, if (it == 0) 1 else 1)
-            now += 100
-        }
-        assertFalse("speaking must not end the take", ended)
+    fun `hands-free only where it can be timed`() {
+        // The server path is timed by our own detector; the phone's recognizer decides its
+        // own end, so a hands-free take there cut people off (and flickered the mic).
+        assertTrue(SpeechPolicy.handsFreeWorks(AudioProvider.API))
+        assertTrue(SpeechPolicy.handsFreeWorks(AudioProvider.SAMOSA_AI))
+        assertFalse(SpeechPolicy.handsFreeWorks(AudioProvider.ANDROID))
     }
 
     @Test
-    fun `on-device take ends after the pause, not before`() {
-        val clock = OnDeviceSilenceClock()
-        var now = 1_000L
-        repeat(5) { clock.update(now, 0.10f, 0); now += 100 }
-        // Speak for a second.
-        repeat(10) { clock.update(now, 0.60f, 0); now += 100 }
-        // Then go quiet: it must hold for the whole 2.5 s pause, then end. The clock counts
-        // from the last activity, which is the final loud sample, one tick before this.
-        val quietFrom = now - 100
-        var endedAt = -1L
-        repeat(40) {
-            if (endedAt < 0 && clock.update(now, 0.10f, 0)) endedAt = now
-            now += 100
-        }
-        assertTrue("the take must end once the pause passes", endedAt >= 0)
-        assertTrue("it must not end before the pause", endedAt - quietFrom >= 2_500L)
-    }
-
-    @Test
-    fun `a quiet room gives up without pretending anyone spoke`() {
-        val clock = OnDeviceSilenceClock()
-        var now = 1_000L
-        var ended = false
-        repeat(160) {
-            if (clock.update(now, 0.10f, 0)) ended = true
-            now += 100
-        }
-        assertTrue(ended)
-        assertFalse(clock.spoke)
+    fun `a hands-free tap never reaches the on-device recognizer`() = runBlocking<Unit> {
+        val engine = FakeEngine(
+            utteranceResults = mapOf(
+                AudioProvider.ANDROID to Result.success("should not be asked"),
+            )
+        )
+        // On-device only: nothing can be timed, so the tap fails instead of half-listening.
+        val result = input(engine, baseUrl = "").listenOnce()
+        assertTrue(result.isFailure)
+        assertTrue(engine.utterances.isEmpty())
     }
 
     @Test
