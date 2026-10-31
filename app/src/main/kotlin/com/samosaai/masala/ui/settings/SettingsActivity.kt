@@ -64,6 +64,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -114,7 +115,9 @@ class SettingsActivity : ComponentActivity() {
                     val start = remember { intent.getStringExtra(EXTRA_PAGE)?.let { n -> Page.entries.firstOrNull { it.name == n } } }
                     var page by rememberSaveable { mutableStateOf(start ?: Page.MAIN) }
                     BackHandler(enabled = page != Page.MAIN) { if (start != null && page == start) finish() else page = Page.MAIN }
-                    when (page) {
+                    // Each page keeps its scroll position (and other saved state) while another page is shown.
+                    val pageStates = rememberSaveableStateHolder()
+                    pageStates.SaveableStateProvider(page.name) { when (page) {
                         Page.MAIN -> MainPage(
                             settings,
                             onHiddenApps = { page = Page.HIDDEN_APPS },
@@ -142,7 +145,7 @@ class SettingsActivity : ComponentActivity() {
                         Page.PRIVACY -> PrivacyPage(onBack = { page = Page.MAIN })
                         Page.ABOUT -> AboutPage(onBack = { page = Page.MAIN })
                         Page.BRIEF -> BriefPage(settings, update = { change -> lifecycleScope.launch { masala.settings.update(change) } }, onBack = { page = Page.MAIN })
-                    }
+                    } }
                 }
             }
         }
