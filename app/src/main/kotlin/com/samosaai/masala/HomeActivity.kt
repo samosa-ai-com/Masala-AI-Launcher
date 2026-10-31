@@ -69,8 +69,12 @@ import com.samosaai.masala.ui.home.HomeScreen
 import com.samosaai.masala.ui.home.RenderContext
 import com.samosaai.masala.ui.home.DropTarget
 import com.samosaai.masala.ui.home.HomeDragState
+import com.samosaai.masala.ui.home.FolderMenu
 import com.samosaai.masala.ui.home.FolderRenameDialog
+import com.samosaai.masala.ui.home.FolderSheet
 import com.samosaai.masala.core.contract.ItemSection
+import com.samosaai.masala.core.contract.LayoutDoc
+import androidx.compose.runtime.SideEffect
 import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.layout.LayoutChecker
 import java.util.UUID
@@ -188,6 +192,9 @@ class HomeActivity : ComponentActivity() {
         var menuFor by remember { mutableStateOf<AppEntry?>(null) }
         var renaming by remember { mutableStateOf<AppEntry?>(null) }
         var renamingFolder by remember { mutableStateOf<String?>(null) }
+        // The folder, and whether it is in the saved layout (not added by a mode).
+        var openFolder by remember { mutableStateOf<Pair<Item, Boolean>?>(null) }
+        var folderMenu by remember { mutableStateOf<Item?>(null) }
 
         val roleRequest = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             // Turned down: the dialog may not come back, so offer the system screen instead.
@@ -375,6 +382,8 @@ class HomeActivity : ComponentActivity() {
                 },
                 drag = drag,
                 movable = movable,
+                onOpenFolder = { openFolder = it to (it.id in movable) },
+                onFolderMenu = { folderMenu = it },
                 onDrop = { item, target ->
                     scope.launch {
                         val problems = when (target) {
@@ -684,6 +693,44 @@ class HomeActivity : ComponentActivity() {
             )
         }
 
+        // Looked up again in the saved layout, so an open folder shows each change as it lands. A folder a
+        // mode added isn't in it; one that left it (ungrouped, one item left) closes.
+        openFolder?.let { (opened, saved) ->
+            val folder = if (saved) itemIn(baseLayout, opened.id) else opened
+            if (folder == null) {
+                SideEffect { openFolder = null }
+                return@let
+            }
+            FolderSheet(
+                folder = folder,
+                ctx = render,
+                onDismiss = { openFolder = null },
+                onRename = { renamingFolder = folder.id },
+                onMoveOut = { child ->
+                    scope.launch {
+                        app.layouts.edit(getString(R.string.layout_label_moved_out_of_folder, child.label)) {
+                            LayoutEdits.moveOutOfFolder(it, folder.id, child.id)
+                        }.firstOrNull()?.let { toast(it.message) }
+                    }
+                },
+            )
+        }
+
+        folderMenu?.let { folder ->
+            FolderMenu(
+                folder = folder,
+                onRename = { folderMenu = null; renamingFolder = folder.id },
+                onUngroup = {
+                    folderMenu = null
+                    scope.launch {
+                        app.layouts.edit(getString(R.string.layout_label_ungrouped_folder)) { LayoutEdits.dissolveFolder(it, folder.id) }
+                            .firstOrNull()?.let { toast(it.message) }
+                    }
+                },
+                onDismiss = { folderMenu = null },
+            )
+        }
+
         renamingFolder?.let { folderId ->
             FolderRenameDialog(
                 label = baseItem(folderId)?.label ?: getString(R.string.folder_default_name),
@@ -731,7 +778,9 @@ class HomeActivity : ComponentActivity() {
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
 
     /** A top-level item of the saved (base) layout, not one a mode added. */
-    private fun baseItem(id: String): Item? = masala.layouts.base.value?.pages.orEmpty()
+    private fun baseItem(id: String): Item? = itemIn(masala.layouts.base.value, id)
+
+    private fun itemIn(doc: LayoutDoc?, id: String): Item? = doc?.pages.orEmpty()
         .flatMap { it.sections }.filterIsInstance<ItemSection>().flatMap { it.items }.firstOrNull { it.id == id }
 }
 

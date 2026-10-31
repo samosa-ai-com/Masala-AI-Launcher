@@ -69,6 +69,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.samosaai.masala.masala
 import com.samosaai.masala.ui.components.IconTile
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -131,6 +132,10 @@ class RenderContext(
     val movable: Set<String> = emptySet(),
     /** The menu for an item that isn't an app; apps use [onAppMenu]. */
     val onItemMenu: ((Item) -> Unit)? = null,
+    /** Tapping a folder (an `open_folder` item) shows its items; folders are never dispatched. */
+    val onOpenFolder: ((Item) -> Unit)? = null,
+    /** A folder's own menu (rename, ungroup). */
+    val onFolderMenu: ((Item) -> Unit)? = null,
     val onDrop: ((Item, DropTarget) -> Unit)? = null,
 ) {
     /** A fixed time, for previews and tests. */
@@ -391,23 +396,32 @@ private fun Group(section: GroupSection, ctx: RenderContext) {
 }
 
 @Composable
-private fun ItemCell(item: Item, ctx: RenderContext, sectionId: String?, showLabel: Boolean = true, interactive: Boolean = true) {
+internal fun ItemCell(
+    item: Item,
+    ctx: RenderContext,
+    sectionId: String?,
+    showLabel: Boolean = true,
+    interactive: Boolean = true,
+    /** Off on a sheet, where the label takes the surface's colour instead of white with a shadow. */
+    onWallpaper: Boolean = true,
+) {
     val app = appFor(item, ctx)
     val label = app?.takeIf { it.renamed }?.label ?: item.label
+    val spoken = spokenLabel(item, label)
     val bounds = remember { IconBounds() }
     Column(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .then(if (interactive) Modifier.dropItem(item, sectionId, ctx, bounds).itemClicks(item, app, ctx, label, bounds) else Modifier)
+            .then(if (interactive) Modifier.dropItem(item, sectionId, ctx, bounds).itemClicks(item, app, ctx, spoken, bounds) else Modifier)
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        IconView(item.icon, app, ctx, size = 48)
+        ItemIcon(item, app, ctx, size = 48)
         if (showLabel) {
             Text(
                 label,
-                style = wallpaperText(MaterialTheme.typography.labelMedium),
+                style = MaterialTheme.typography.labelMedium.let { if (onWallpaper) wallpaperText(it) else it },
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
@@ -423,10 +437,11 @@ private fun ItemRow(item: Item, ctx: RenderContext, sectionId: String) {
     val label = app?.takeIf { it.renamed }?.label ?: item.label
     val bounds = remember { IconBounds() }
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 56.dp).dropItem(item, sectionId, ctx, bounds).itemClicks(item, app, ctx, label, bounds).padding(horizontal = 24.dp, vertical = 4.dp),
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).dropItem(item, sectionId, ctx, bounds).itemClicks(item, app, ctx, spokenLabel(item, label), bounds)
+            .padding(horizontal = 24.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconView(item.icon, app, ctx, size = 40)
+        ItemIcon(item, app, ctx, size = 40)
         Text(label, style = wallpaperText(MaterialTheme.typography.titleMedium), modifier = Modifier.padding(start = 16.dp))
     }
 }
@@ -480,6 +495,7 @@ private fun Modifier.itemClicks(item: Item, app: AppEntry?, ctx: RenderContext, 
     val drag = ctx.drag?.takeIf { item.id in ctx.movable && !ctx.locked }
     val menu: (() -> Unit)? = when {
         ctx.locked -> null
+        item.action is MasalaAction.OpenFolder -> ctx.onFolderMenu?.let { onMenu -> { onMenu(item) } }
         app != null -> ({ ctx.onAppMenu(app) })
         else -> ctx.onItemMenu?.let { onMenu -> { onMenu(item) } }
     }
@@ -518,10 +534,11 @@ private fun Modifier.itemClicks(item: Item, app: AppEntry?, ctx: RenderContext, 
         .combinedClickable(
             onClick = {
                 val from = bounds?.rect
-                if (from != null && item.action is MasalaAction.LaunchApp && ctx.onLaunchFrom != null) ctx.onLaunchFrom.invoke(item.action, from) else ctx.onAction(item.action)
+                if (item.action is MasalaAction.OpenFolder) ctx.onOpenFolder?.invoke(item)
+                else if (from != null && item.action is MasalaAction.LaunchApp && ctx.onLaunchFrom != null) ctx.onLaunchFrom.invoke(item.action, from) else ctx.onAction(item.action)
             },
-            onLongClick = if (drag == null && app != null && !ctx.locked) ({ ctx.onAppMenu(app) }) else null,
-            onLongClickLabel = if (drag == null && app != null && !ctx.locked) menuLabel else null,
+            onLongClick = if (drag == null) menu else null,
+            onLongClickLabel = if (drag == null && menu != null) menuLabel else null,
         )
         .semantics {
             contentDescription = label
@@ -531,13 +548,27 @@ private fun Modifier.itemClicks(item: Item, app: AppEntry?, ctx: RenderContext, 
         }
 }
 
-private fun appFor(item: Item, ctx: RenderContext): AppEntry? {
+internal fun appFor(item: Item, ctx: RenderContext): AppEntry? {
     val a = item.action as? MasalaAction.LaunchApp ?: return null
     return ctx.appFor(a.packageName, a.user, a.activity)
 }
 
+/** A folder's 2×2 preview, or the item's own icon. */
 @Composable
-private fun IconView(icon: IconRef, app: AppEntry?, ctx: RenderContext, size: Int) {
+private fun ItemIcon(item: Item, app: AppEntry?, ctx: RenderContext, size: Int) {
+    val folder = item.action as? MasalaAction.OpenFolder
+    if (folder != null) FolderIcon(folder.items, ctx, size) else IconView(item.icon, app, ctx, size)
+}
+
+/** What TalkBack reads: a folder says it is one and how many apps it holds. */
+@Composable
+private fun spokenLabel(item: Item, label: String): String {
+    val folder = item.action as? MasalaAction.OpenFolder ?: return label
+    return pluralStringResource(R.plurals.folder_description, folder.items.size, label, folder.items.size)
+}
+
+@Composable
+internal fun IconView(icon: IconRef, app: AppEntry?, ctx: RenderContext, size: Int) {
     when (icon) {
         is IconRef.AppIcon -> {
             // The same app in another profile has its own key and badge.
