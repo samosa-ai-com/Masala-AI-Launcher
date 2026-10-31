@@ -220,7 +220,12 @@ fun HomeScreen(
                         while (!up) {
                             val event = awaitPointerEvent(PointerEventPass.Final)
                             event.changes.firstOrNull { it.id == down.id }?.let(swipes.velocity::addPointerInputChange)
-                            up = event.changes.isNotEmpty() && event.changes.all { !it.pressed }
+                            // A lifted pointer can vanish from later events instead of arriving
+                            // pressed=false: if our pointer is gone, the gesture is over. Without
+                            // this the observer can wait forever and every later lift is lost,
+                            // leaving the drawer frozen mid-slide.
+                            up = event.changes.isEmpty() || event.changes.none { it.id == down.id } ||
+                                (event.changes.isNotEmpty() && event.changes.all { !it.pressed })
                         }
                         swipes.onLift()
                     }
