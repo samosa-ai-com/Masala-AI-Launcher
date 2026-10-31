@@ -1,6 +1,9 @@
 package com.samosaai.masala.ui.drawer
 
 import android.graphics.Rect
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -52,6 +55,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,11 +67,16 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
@@ -99,6 +108,7 @@ import com.samosaai.masala.launcher.AppCatalog
 import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.ui.components.LauncherRow
+import com.samosaai.masala.ui.theme.LocalMotion
 import com.samosaai.masala.ui.theme.MasalaColors
 import com.samosaai.masala.ui.theme.MasalaTheme
 import com.samosaai.masala.ui.theme.rememberHaptics
@@ -108,12 +118,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.exp
 
 /** Ranked search results and the text they were ranked for. */
 private data class Ranked<T>(val query: String, val results: List<T>)
 
 /** Pause after the last keystroke before a composing single match auto-launches. */
 private const val AUTO_LAUNCH_PAUSE_MS = 800L
+
+/** How far the letter under the thumb swings left from the rail. */
+private val ARC_SWING = 36.dp
+
+/** Radius of the disc behind the curve; its centre sits between the rail and the swung-out letter. */
+private val ARC_DISC_RADIUS = 56.dp
 private const val GLOBE_MAX = 30
 
 /** Where the globe gets its counts and whether to ask for Usage access (decision 11). */
@@ -312,9 +329,7 @@ fun Drawer(
                     if (showWork && work != null) WorkHeader(paused = work.paused, onWorkPaused = onWorkPaused)
                     when (shownLayout) {
                         DrawerLayout.GRID -> AppGrid(shown, suggested.takeIf { !showWork }.orEmpty(), icons, profiles, onLaunch, onMenu, gridState, Modifier.weight(1f))
-                        DrawerLayout.LIST -> LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f)) {
-                            items(shown, key = { it.key.id }) { entry -> AppRow(entry, icons, profiles, labelWork = false, onLaunch, onMenu) }
-                        }
+                        DrawerLayout.LIST -> AppListWithRail(shown, icons, profiles, onLaunch, onMenu, listState, Modifier.weight(1f))
                         DrawerLayout.GLOBE -> GlobePage(shown, globeRanked, usageOrder, range, { range = it }, icons, open, globe, onLaunch, onMenu, profiles, Modifier.weight(1f))
                     }
                 }
@@ -441,6 +456,7 @@ private fun AppGrid(
     }
     val scope = rememberCoroutineScope()
     var scrubbing by remember { mutableStateOf<Char?>(null) }
+    val reduced = LocalMotion.current.reduced
     Box(modifier.fillMaxWidth()) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(4),
@@ -471,7 +487,61 @@ private fun AppGrid(
             },
             onEnd = { scrubbing = null },
         )
-        scrubbing?.let { c ->
+        // With motion on, the letter under the thumb grows on the arc itself, so the bubble stays out of
+        // the way. Reduced motion has no arc, so it keeps the bubble.
+        if (reduced) scrubbing?.let { c ->
+            Box(
+                Modifier.align(Alignment.TopEnd).padding(top = 52.dp, end = 38.dp).size(54.dp)
+                    .clip(RoundedCornerShape(topStart = 27.dp, topEnd = 27.dp, bottomStart = 27.dp, bottomEnd = 6.dp))
+                    .background(MasalaTheme.tokens.accent),
+                contentAlignment = Alignment.Center,
+            ) { Text(c.toString(), fontSize = 26.sp, color = MasalaTheme.tokens.onAccent, style = MaterialTheme.typography.headlineSmall) }
+        }
+    }
+}
+
+/** The A–Z list with the same right-edge scrubber as [AppGrid]. */
+@Composable
+private fun AppListWithRail(
+    apps: List<AppEntry>,
+    icons: IconCache,
+    profiles: AppCatalog.Snapshot,
+    onLaunch: (AppEntry, Rect?) -> Unit,
+    onMenu: (AppEntry) -> Unit,
+    state: androidx.compose.foundation.lazy.LazyListState,
+    modifier: Modifier,
+) {
+    val sections = remember(apps) { apps.groupBy { sectionOf(it.label) }.toSortedMap(compareBy { if (it == '#') '[' else it }) }
+    val headerIndex = remember(sections) {
+        var i = 0
+        sections.mapValues { (_, list) -> i.also { i += 1 + list.size } }
+    }
+    val scope = rememberCoroutineScope()
+    var scrubbing by remember { mutableStateOf<Char?>(null) }
+    val reduced = LocalMotion.current.reduced
+    Box(modifier.fillMaxWidth()) {
+        LazyColumn(state = state, modifier = Modifier.fillMaxSize().padding(end = 30.dp)) {
+            sections.forEach { (letter, list) ->
+                item(key = "h-$letter") {
+                    Text(
+                        letter.toString(), style = MaterialTheme.typography.labelMedium, color = MasalaTheme.tokens.textLow,
+                        modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 6.dp).semantics { heading() },
+                    )
+                }
+                items(list, key = { it.key.id }) { entry -> AppRow(entry, icons, profiles, labelWork = false, onLaunch, onMenu) }
+            }
+            item(key = "end") { Spacer(Modifier.height(24.dp)) }
+        }
+        Scrubber(
+            letters = sections.keys.toList(),
+            modifier = Modifier.align(Alignment.TopEnd).fillMaxHeight().padding(end = 6.dp),
+            onLetter = { c ->
+                scrubbing = c
+                headerIndex[c]?.let { scope.launch { state.scrollToItem(it) } }
+            },
+            onEnd = { scrubbing = null },
+        )
+        if (reduced) scrubbing?.let { c ->
             Box(
                 Modifier.align(Alignment.TopEnd).padding(top = 52.dp, end = 38.dp).size(54.dp)
                     .clip(RoundedCornerShape(topStart = 27.dp, topEnd = 27.dp, bottomStart = 27.dp, bottomEnd = 6.dp))
@@ -491,6 +561,16 @@ internal fun Scrubber(letters: List<Char>, modifier: Modifier = Modifier, onLett
     var heightPx by remember { mutableIntStateOf(1) }
     var last by remember { mutableStateOf<Char?>(null) }
     val latestLetters by rememberUpdatedState(letters)
+    // 0 while the rail is idle, 1 while a finger is on it. Read only inside graphicsLayer below, so
+    // the letters animate in the draw phase and a drag never recomposes the rail.
+    val active = remember { Animatable(0f) }
+    var dragY by remember { mutableFloatStateOf(0f) }
+    val scope = rememberCoroutineScope()
+    val reduced = LocalMotion.current.reduced
+    // The gesture block is keyed on Unit, so it must read the current setting, not the one it was
+    // created with: toggling motion in Settings while the drawer is composed would keep the old value.
+    val reducedNow by rememberUpdatedState(reduced)
+    val settle = remember { spring<Float>(stiffness = Spring.StiffnessMediumLow) }
     fun pick(y: Float) {
         val l = latestLetters
         val c = l[(y / heightPx * l.size).toInt().coerceIn(0, l.lastIndex)]
@@ -501,35 +581,77 @@ internal fun Scrubber(letters: List<Char>, modifier: Modifier = Modifier, onLett
         }
     }
     val label = stringResource(R.string.drawer_scrubber)
+    val panel = MaterialTheme.colorScheme.surfaceContainerHigh
     Column(modifier.width(22.dp)) {
         // "A" starts about 30% down, within thumb reach; the letters spread to near the bottom.
         Spacer(Modifier.weight(0.3f))
         Column(
             Modifier.weight(0.7f).fillMaxWidth()
                 .onGloballyPositioned { heightPx = it.size.height.coerceAtLeast(1) }
+                // A disc behind the curve, following the finger, so the letters never sit on the app
+                // icons under them; solid in the middle, fading at the rim. Drawn outside the 22 dp
+                // strip, like the letters.
+                .drawBehind {
+                    val a = active.value
+                    if (a <= 0f) return@drawBehind
+                    val radius = ARC_DISC_RADIUS.toPx()
+                    val centre = Offset(size.width / 2 - ARC_SWING.toPx() * 0.6f, dragY)
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            0f to panel.copy(alpha = 0.97f * a),
+                            0.7f to panel.copy(alpha = 0.94f * a),
+                            1f to panel.copy(alpha = 0f),
+                            center = centre,
+                            radius = radius,
+                        ),
+                        radius = radius,
+                        center = centre,
+                    )
+                }
                 .semantics { contentDescription = label }
                 .pointerInput(Unit) {
                     // One gesture block: stacked tap+drag detectors cancel each other and
                     // drop the bubble at drag start.
                     awaitEachGesture {
                         val down = awaitFirstDown()
+                        dragY = down.position.y
+                        if (!reducedNow) scope.launch { active.animateTo(1f, settle) }
                         pick(down.position.y)
                         while (true) {
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull() ?: break
                             if (!change.pressed) break
+                            dragY = change.position.y
                             pick(change.position.y)
                             change.consume()
                         }
                         last = null
                         onEnd()
+                        if (!reducedNow) scope.launch { active.animateTo(0f, settle) }
                     }
                 },
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceEvenly,
         ) {
-            letters.forEach { c ->
-                Text(c.toString(), fontSize = 10.sp, lineHeight = 16.sp, textAlign = TextAlign.Center, color = if (c == last) tokens.accentText else tokens.textLow)
+            letters.forEachIndexed { i, c ->
+                Text(
+                    c.toString(), fontSize = 10.sp, lineHeight = 16.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold,
+                    color = if (c == last) tokens.accentText else tokens.textLow,
+                    // A narrow bell around the finger's letter swings it left and grows it, its neighbours
+                    // less, the rest hardly at all; the rail keeps its 22 dp touch strip and draws outside
+                    // it (graphicsLayer does not clip).
+                    modifier = Modifier.graphicsLayer {
+                        val a = active.value
+                        val pitch = heightPx.toFloat() / letters.size
+                        val centre = (i + 0.5f) * pitch
+                        val d = (centre - dragY) / pitch
+                        val bell = exp(-(d * d) / 2.5f)
+                        translationX = -bell * ARC_SWING.toPx() * a
+                        scaleX = 1f + bell * 1.1f * a
+                        scaleY = scaleX
+                        alpha = 1f - (1f - bell) * 0.65f * a
+                    },
+                )
             }
         }
         Spacer(Modifier.height(24.dp))
