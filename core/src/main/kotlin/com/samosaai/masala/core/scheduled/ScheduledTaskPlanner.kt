@@ -32,6 +32,25 @@ object ScheduledTaskPlanner {
         data class Missed(val task: ScheduledTask) : Decision()
     }
 
+    /**
+     * Why [task] can't be saved as it is; empty when its schedule works from [now].
+     * The editor shows the first problem and disables Save while any remain.
+     */
+    fun problems(task: ScheduledTask, now: Long, zone: ZoneId): List<String> = buildList {
+        if (task.name.isBlank()) add("Give the task a name")
+        if (task.prompt.isBlank() && task.skillId == null) add("Say what to run, or pick a skill")
+        if (task.repeat.interval < 1) add("Repeat every at least 1")
+        if (task.repeat.kind == RepeatKind.WEEKLY && task.repeat.weekdays.isEmpty()) {
+            add("Pick at least one weekday")
+        }
+        if (task.repeat.kind == RepeatKind.NONE &&
+            task.start.atZone(zone).toInstant().toEpochMilli() < now
+        ) {
+            add("The start is in the past")
+        }
+        if (armed(task, now, zone).nextRunAt == null) add("Nothing left to run: the schedule has no next time")
+    }
+
     /** A new or edited [task], with its next time worked out from [now]. */
     fun armed(task: ScheduledTask, now: Long, zone: ZoneId): ScheduledTask =
         task.copy(

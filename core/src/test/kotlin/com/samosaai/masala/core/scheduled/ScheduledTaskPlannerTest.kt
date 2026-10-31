@@ -259,4 +259,61 @@ class ScheduledTaskPlannerTest {
         assertEquals(ScheduledTask.MAX_HISTORY, task.history.size)
         assertEquals((ScheduledTask.MAX_HISTORY + 4).toLong(), task.history.last().at)
     }
+
+    private fun valid(now: Long = at("2026-10-19T07:00")) = ScheduledTask(
+        id = "t",
+        name = "n",
+        prompt = "p",
+        startLocal = "2026-10-19T08:00",
+        repeat = Repeat(RepeatKind.DAILY)
+    ).let { it to now }
+
+    @Test
+    fun `a task without a name can't be saved`() {
+        val (task, now) = valid()
+        assertTrue(ScheduledTaskPlanner.problems(task, now, zone).isEmpty())
+        val problems = ScheduledTaskPlanner.problems(task.copy(name = "  "), now, zone)
+        assertEquals(1, problems.size)
+    }
+
+    @Test
+    fun `a task with nothing to run can't be saved`() {
+        val (task, now) = valid()
+        assertTrue(ScheduledTaskPlanner.problems(task.copy(prompt = "  "), now, zone).isNotEmpty())
+        assertTrue(ScheduledTaskPlanner.problems(task.copy(prompt = "  ", skillId = "s"), now, zone).isEmpty())
+    }
+
+    @Test
+    fun `a task repeating every zero can't be saved`() {
+        val (task, now) = valid()
+        val problems = ScheduledTaskPlanner.problems(task.copy(repeat = Repeat(RepeatKind.DAILY, interval = 0)), now, zone)
+        assertEquals(1, problems.size)
+    }
+
+    @Test
+    fun `a weekly task with no weekdays can't be saved`() {
+        val (task, now) = valid()
+        val problems = ScheduledTaskPlanner.problems(task.copy(repeat = Repeat(RepeatKind.WEEKLY)), now, zone)
+        assertTrue(problems.isNotEmpty())
+        val withDays = task.copy(repeat = Repeat(RepeatKind.WEEKLY, weekdays = listOf(1)))
+        assertTrue(ScheduledTaskPlanner.problems(withDays, now, zone).isEmpty())
+    }
+
+    @Test
+    fun `a one-time task starting in the past can't be saved`() {
+        val (task, now) = valid()
+        val past = task.copy(repeat = Repeat(), startLocal = "2026-10-19T06:00")
+        assertTrue(ScheduledTaskPlanner.problems(past, now, zone).isNotEmpty())
+        val future = task.copy(repeat = Repeat(), startLocal = "2026-10-19T08:00")
+        assertTrue(ScheduledTaskPlanner.problems(future, now, zone).isEmpty())
+    }
+
+    @Test
+    fun `a task with no next run can't be saved`() {
+        val (task, now) = valid()
+        val past = task.copy(repeat = Repeat(), startLocal = "2026-10-19T06:00")
+        assertNull(ScheduledTaskPlanner.armed(past, now, zone).nextRunAt)
+        assertTrue(ScheduledTaskPlanner.problems(past, now, zone).isNotEmpty())
+        assertTrue(ScheduledTaskPlanner.problems(task, now, zone).isEmpty())
+    }
 }
