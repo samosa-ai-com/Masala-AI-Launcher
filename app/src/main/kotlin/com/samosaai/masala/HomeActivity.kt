@@ -221,18 +221,18 @@ class HomeActivity : ComponentActivity() {
 
                 override fun onRelease(velocityY: Float) {
                     val open = velocityY < -FLING_VELOCITY || (velocityY < FLING_VELOCITY && drawerProgress.value > 0.35f)
-                    // Record the fling and flip at once; the effect above owns the animation, so
-                    // even if it is immediately superseded the state always matches the latest
-                    // release and a later Back/Home always has a transition to run.
-                    releaseVelocity = -velocityY / distance
                     if (drawerOpen == open) {
-                        // No state change, so the effect above won't run: settle directly. Without
+                        // No state change, so the effect below won't run: settle directly. Without
                         // this a partial drag that releases below the threshold freezes mid-slide
                         // with no later event able to move it.
                         scope.launch {
                             drawerProgress.animateTo(if (open) 1f else 0f, drawerSpring, initialVelocity = -velocityY / distance)
                         }
                     } else {
+                        // Record the fling for the effect to consume; it owns the animation, so the
+                        // two can never fight over the same frame. (Only here, so a sub-threshold
+                        // release can't leak a stale velocity into a later tap-to-open.)
+                        releaseVelocity = -velocityY / distance
                         drawerOpen = open
                     }
                 }
