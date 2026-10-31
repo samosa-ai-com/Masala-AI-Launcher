@@ -87,6 +87,7 @@ import com.samosaai.masala.launcher.HomeRole
 import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.masala
 import com.samosaai.masala.miniapps.MiniAppActivity
+import com.samosaai.masala.miniapps.MiniAppIconView
 import com.samosaai.masala.ui.skills.SkillSheetActivity
 import com.samosaai.masala.ui.components.LauncherRow
 import com.samosaai.masala.ui.drawer.visibilityLabel
@@ -345,17 +346,22 @@ class SettingsActivity : ComponentActivity() {
             shown.forEach { row ->
                 var confirmDelete by remember(row.id) { mutableStateOf(false) }
                 Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Text(row.title, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        format.format(java.util.Date(row.updatedAt)),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (row.networkAllowed) Text(
-                        stringResource(R.string.miniapp_network_badge),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        MiniAppIconView(row.icon, row.title, 40.dp)
+                        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                            Text(row.title, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                format.format(java.util.Date(row.updatedAt)),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (row.networkAllowed) Text(
+                                stringResource(R.string.miniapp_network_badge),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { startActivity(Intent(this@SettingsActivity, MiniAppActivity::class.java).putExtra(MiniAppActivity.EXTRA_APP_ID, row.id)) }) {
                             Text(stringResource(R.string.miniapp_open))

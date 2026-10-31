@@ -329,6 +329,7 @@ class MiniAppActivity : ComponentActivity() {
         val app = context.masala
         val scope = rememberCoroutineScope()
         var title by remember { mutableStateOf("") }
+        var icon by remember { mutableStateOf<String?>(null) }
         var html by remember { mutableStateOf<String?>(null) }
         var networkAllowed by remember { mutableStateOf(false) }
         var gone by remember { mutableStateOf(false) }
@@ -341,6 +342,7 @@ class MiniAppActivity : ComponentActivity() {
                 gone = true
             } else {
                 title = row.title
+                icon = row.icon
                 html = row.html
                 networkAllowed = row.networkAllowed
             }
@@ -353,7 +355,16 @@ class MiniAppActivity : ComponentActivity() {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(title.ifEmpty { stringResource(R.string.miniapp_title) }, maxLines = 1) },
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            MiniAppIconView(icon, title, 24.dp)
+                            Text(
+                                title.ifEmpty { stringResource(R.string.miniapp_title) },
+                                maxLines = 1,
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                    },
                     navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.action_back)) } },
                     actions = {
                         if (networkAllowed) Text(
