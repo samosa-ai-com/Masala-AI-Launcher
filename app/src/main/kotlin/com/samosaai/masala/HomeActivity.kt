@@ -358,7 +358,7 @@ class HomeActivity : ComponentActivity() {
                 val command by app.commands.state.collectAsStateWithLifecycle()
                 // The pill makes way for the reply card while a command is shown.
                 if (command == CommandState.Idle) {
-                    SearchPill(onSearch = { drawerOpen = true; searchRequests++ }, mic = rememberMicPress(app))
+                    SearchPill(onSearch = { drawerOpen = true; searchRequests++ }, mic = rememberMicPress(app), mode = app.aiSettings.profile.value.micMode)
                 }
             },
         ) } }
@@ -380,6 +380,7 @@ class HomeActivity : ComponentActivity() {
                     onCancel = { app.commands.dismiss() },
                     onStop = { if (app.aiSettings.profile.value.micMode == com.samosaai.masala.core.ai.MicMode.HOLD) app.commands.stopListening() else app.commands.finishListening() },
                     onType = { app.commands.dismiss(); app.commands.openInput() },
+                    hold = app.aiSettings.profile.value.micMode == com.samosaai.masala.core.ai.MicMode.HOLD,
                 )
                 is CommandState.Thinking -> if (!hidden) Box(Modifier.fillMaxSize().navigationBarsPadding(), contentAlignment = Alignment.BottomCenter) {
                     WorkingSheet(c, settings.character, onStop = { app.commands.dismiss() })

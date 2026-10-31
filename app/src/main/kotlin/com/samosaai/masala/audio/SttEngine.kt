@@ -64,6 +64,12 @@ class SttEngine(
     @Volatile
     private var vadStopRequested = false
 
+    /**
+     * Why the last [recordPcmWithVad] returned null without the user staying quiet (recorder
+     * wouldn't start, reads failed): reported instead of "no speech". Cleared on read.
+     */
+    private var vadRecordError: Exception? = null
+
     // Audio muting state
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
     private var isMutedForRestart = false
@@ -294,7 +300,9 @@ class SttEngine(
         provider.isApiBased() -> withContext(Dispatchers.IO) {
             val wav = recordPcmWithVad(silenceTimeoutMs)
             if (wav == null) {
-                Result.failure(Exception("No speech detected"))
+                val cause = vadRecordError
+                vadRecordError = null
+                Result.failure(cause ?: Exception("No speech detected"))
             } else {
                 transcribeApi(wav, model, language.iso639, contentType = "audio/wav")
             }
@@ -323,9 +331,12 @@ class SttEngine(
             AudioFormat.ENCODING_PCM_16BIT,
             maxOf(minBuffer, windowShorts * 2)
         )
-        if (recorder.state != AudioRecord.STATE_INITIALIZED) return null
+        if (recorder.state != AudioRecord.STATE_INITIALIZED) return null.also {
+            vadRecordError = Exception("Recording failed to start")
+        }
 
         vadStopRequested = false
+        vadRecordError = null
         val detector = SilenceDetector(silenceTimeoutMs)
         val shortBuf = ShortArray(windowShorts)
         val byteBuf = ByteArray(windowShorts * 2)
@@ -361,6 +372,7 @@ class SttEngine(
             // A permissions/security failure, OOM, or recorder error must not
             // look like "no speech" without a trace — log it for debugging.
             Log.w(TAG, "VAD recording failed; treating as no speech", e)
+            vadRecordError = Exception("Recording failed: ${e.message ?: e.javaClass.simpleName}")
             result = null
         } finally {
             try {
@@ -553,6 +565,16 @@ class SttEngine(
             if (gateResult != null) {
                 unmuteBeep()
                 listenGate = null
+                // The session is over: drop the recognizer so the next tap doesn't meet a
+                // stale one and fail with RECOGNIZER_BUSY.
+                mainHandler.post {
+                    try {
+                        currentRecognizer?.cancel()
+                        currentRecognizer?.destroy()
+                    } catch (_: Exception) {
+                    }
+                    currentRecognizer = null
+                }
                 return gateResult
             }
             // Timed out — force cleanup

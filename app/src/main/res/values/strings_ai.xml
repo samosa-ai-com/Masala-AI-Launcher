@@ -75,6 +75,13 @@
     <string name="voice_phone_voice">Phone voice</string>
     <string name="voice_speed">Speed</string>
     <string name="voice_test">Test voice</string>
+    <string name="stt_test">Test microphone</string>
+    <string name="stt_test_summary">Speak to check the microphone and transcription</string>
+    <string name="stt_test_listening">Listening… speak now</string>
+    <string name="stt_test_stop">Stop</string>
+    <string name="stt_test_cancel">Cancel</string>
+    <string name="stt_test_peak">Mic peak %1$d%%</string>
+    <string name="stt_test_heard">Heard: %1$s</string>
     <string name="voice_from_anywhere">From anywhere</string>
     <string name="voice_assist_title">Masala as the assist app</string>
     <string name="voice_assist_summary">Hold Home or Power to talk from any app</string>

@@ -45,7 +45,44 @@ internal object SpeechPolicy {
 data class SpeechStrings(
     val localUnavailable: String,
     val recordFailed: String,
+    /** Shown when the user stayed quiet. */
+    val noSpeech: String = "No speech detected",
+    /** Shown when speech was heard but nothing usable came back. */
+    val didntCatch: String = "Didn't catch that",
+    /** Shown when the recognizer is busy (usually a stuck session just ended; retry). */
+    val busy: String = "The speech recognizer is busy. Try again.",
+    /** Shown for transcription-server HTTP failures and network errors. */
+    val server: String = "Couldn't reach the transcription server. Check your connection and try again.",
+    /** Shown for authentication/authorization rejections. */
+    val auth: String = "Transcription was rejected. Check your voice setup in Settings → Voice.",
+    /** Shown when recording itself couldn't start. */
+    val recordError: String = "Couldn't record from the microphone. Check the microphone permission.",
+    /** Shown for anything else. */
+    val generic: String = "Something went wrong with speech input. Try again.",
 )
+
+/**
+ * Maps a raw STT failure to what the user should read. Engine messages stay machine-stable
+ * (the voice-call loop classifies on them); only display goes through here.
+ */
+fun friendlySttMessage(raw: String?, s: SpeechStrings): String {
+    val m = raw?.trim().orEmpty()
+    if (m.isEmpty() || m == "No speech detected") return s.noSpeech
+    if (m.startsWith("Speech recognition failed:")) {
+        val code = m.removePrefix("Speech recognition failed:").trim().toIntOrNull()
+        // 6 = speech timeout, 7 = no match: heard nothing usable; 8 = recognizer busy.
+        return when (code) {
+            6, 7 -> s.noSpeech
+            8 -> s.busy
+            else -> s.generic
+        }
+    }
+    if (m.contains("HTTP 401") || m.contains("HTTP 403") || m.contains("Unauthor", ignoreCase = true)) return s.auth
+    if (m.contains("HTTP") || m.contains("host", ignoreCase = true) || m.contains("timeout", ignoreCase = true) || m.contains("network", ignoreCase = true)) return s.server
+    if (m.contains("No transcription model") || m.contains("not configured", ignoreCase = true)) return s.server
+    if (m.contains("ecord", ignoreCase = true) || m.contains("permission", ignoreCase = true)) return s.recordError
+    return s.generic
+}
 
 /**
  * [SpeechInput] that follows the app's STT configuration: cloud transcription when
@@ -123,16 +160,27 @@ class ConfiguredSpeechInput(
         cancel()
         live?.resetLive()
         val settings = config()
-        val provider = SpeechPolicy.order(configured()).firstOrNull { it != AudioProvider.ANDROID || localAvailable() }
-            ?: return Result.failure(Exception(strings.localUnavailable))
-        active = provider
-        val model = if (provider.isApiBased()) settings.sttModel else ""
+        val order = SpeechPolicy.order(configured())
+            .filter { it != AudioProvider.ANDROID || localAvailable() }
+        if (order.isEmpty()) return Result.failure(Exception(strings.localUnavailable))
         val lang = configuredLanguage(settings)
-        return try {
-            engine.listenForUtterance(provider, model, lang, SILENCE_MS)
-        } finally {
-            active = null
+        var last: Result<String>? = null
+        // Like push-to-talk's start(): the cloud goes first, the on-device recognizer is the
+        // last resort. Silence is final (another provider would only repeat the wait); only a
+        // technical failure moves on to the next provider.
+        for (provider in order) {
+            active = provider
+            val model = if (provider.isApiBased()) settings.sttModel else ""
+            val result = try {
+                engine.listenForUtterance(provider, model, lang, SILENCE_MS)
+            } finally {
+                active = null
+            }
+            if (result.isSuccess) return result
+            if (com.samosaai.masala.audio.SttEngine.isBenignSttError(result.exceptionOrNull())) return result
+            last = result
         }
+        return last!!
     }
 
     override fun finish() = engine.finishUtterance()

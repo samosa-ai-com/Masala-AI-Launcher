@@ -26,7 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Keyboard
-import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -61,6 +61,11 @@ import com.samosaai.masala.ui.theme.MasalaColors
  * Listening (plan UI refresh U4, listening board): a glow around the screen edge that follows the
  * display's own rounded corners, Sam listening with rings that follow the mic, the words heard so far,
  * level bars, and Cancel / Stop and send / type instead. Reduced motion keeps the glow still.
+ *
+ * Tap and hold look different on purpose: tap spins the edge glow and ripples the bars (the
+ * recognizer endpoints on its own), while hold breathes the glow with the mic level and fills
+ * the bars straight from it (release sends). The centre button is always a square Stop —
+ * never the mic that started listening.
  */
 @Composable
 fun ListeningOverlay(
@@ -71,6 +76,7 @@ fun ListeningOverlay(
     onCancel: () -> Unit,
     onStop: () -> Unit,
     onType: () -> Unit,
+    hold: Boolean = false,
 ) {
     val view = LocalView.current
     // The display's corner radius (Android 12+), so the glow hugs the glass; a phone-ish default otherwise.
@@ -78,12 +84,14 @@ fun ListeningOverlay(
         if (Build.VERSION.SDK_INT >= 31) view.rootWindowInsets?.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)?.radius?.toFloat() else null
     } ?: (36f * view.resources.displayMetrics.density)
     val still = LocalMotion.current.reduced
-    val spin by rememberInfiniteTransition(label = "glow").animateFloat(0f, if (still) 0f else 360f, infiniteRepeatable(tween(4000, easing = LinearEasing)), label = "spin")
+    // Tap: the glow sweeps round the edge. Hold: it stays put and breathes with the mic instead.
+    val spin by rememberInfiniteTransition(label = "glow").animateFloat(0f, if (still || hold) 0f else 360f, infiniteRepeatable(tween(4000, easing = LinearEasing)), label = "spin")
     val bars by rememberInfiniteTransition(label = "bars").animateFloat(0f, if (still) 0f else 1f, infiniteRepeatable(tween(1000, easing = LinearEasing)), label = "bars")
 
     Box(Modifier.fillMaxSize().background(Color(0xCC0A0912))) {
         Canvas(Modifier.fillMaxSize()) {
-            val w = 4.dp.toPx() + 6.dp.toPx() * level().coerceIn(0f, 1f)
+            val l = level().coerceIn(0f, 1f)
+            val w = 4.dp.toPx() + 6.dp.toPx() * l
             drawRoundRect(
                 brush = Brush.sweepGradient(
                     listOf(Color(0xFF5B7CFF), MasalaColors.Indigo, MasalaColors.Gold, Color(0xFF5B7CFF)).let { c ->
@@ -93,6 +101,8 @@ fun ListeningOverlay(
                     },
                     center,
                 ),
+                // Hold breathes with the mic; tap keeps a steady glow while it spins.
+                alpha = if (hold) 0.45f + 0.55f * l else 1f,
                 topLeft = Offset(w / 2, w / 2),
                 size = androidx.compose.ui.geometry.Size(size.width - w, size.height - w),
                 cornerRadius = CornerRadius(cornerPx, cornerPx),
@@ -109,7 +119,7 @@ fun ListeningOverlay(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(MasalaColors.Indigo))
-                Text(stringResource(R.string.listening_chip, source), fontSize = 12.5.sp, color = Color(0xFFC3D1FF), style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(if (hold) R.string.listening_chip_hold else R.string.listening_chip, source), fontSize = 12.5.sp, color = Color(0xFFC3D1FF), style = MaterialTheme.typography.labelMedium)
             }
             Spacer(Modifier.weight(1f))
             MasalaCharacter(character, CharacterState.LISTENING, Modifier.size(150.dp), level, description = stringResource(R.string.listening_sam))
@@ -120,21 +130,23 @@ fun ListeningOverlay(
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(top = 26.dp).semantics { liveRegion = LiveRegionMode.Polite },
             )
-            // Level bars: heights follow the mic, each bar a little out of step with its neighbours.
+            // Level bars: tap ripples them while the recognizer runs; hold fills them
+            // straight from the mic, so the finger can see its own loudness.
             Row(Modifier.padding(top = 26.dp).height(44.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 val l = level().coerceIn(0f, 1f)
                 repeat(14) { i ->
-                    val wave = 0.5f + 0.5f * kotlin.math.sin((bars + i * 0.13f) * 2 * Math.PI.toFloat())
+                    val wave = if (hold || still) 1f else 0.5f + 0.5f * kotlin.math.sin((bars + i * 0.13f) * 2 * Math.PI.toFloat())
                     val h = 8f + 36f * (0.25f + 0.75f * l) * (if (still) 0.6f else wave)
-                    Box(Modifier.width(5.dp).height(h.dp).clip(RoundedCornerShape(3.dp)).background(MasalaColors.Indigo))
+                    Box(Modifier.width(5.dp).height(h.dp).clip(RoundedCornerShape(3.dp)).background(if (hold) MasalaColors.Gold else MasalaColors.Indigo))
                 }
             }
             Spacer(Modifier.weight(1f))
-            Text(stringResource(R.string.listening_hint), fontSize = 13.sp, color = MasalaColors.Text.copy(alpha = 0.72f), textAlign = TextAlign.Center)
+            Text(stringResource(if (hold) R.string.listening_hint_hold else R.string.listening_hint), fontSize = 13.sp, color = MasalaColors.Text.copy(alpha = 0.72f), textAlign = TextAlign.Center)
             Row(Modifier.padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(28.dp)) {
                 RoundButton(Icons.Rounded.Close, stringResource(R.string.listening_cancel), onCancel)
-                IconButton(onClick = onStop, modifier = Modifier.size(78.dp).clip(CircleShape).background(MasalaColors.Indigo)) {
-                    Icon(Icons.Rounded.Mic, stringResource(R.string.listening_stop), tint = Color(0xFF0D1430), modifier = Modifier.size(30.dp))
+                // A square Stop, never the mic that started listening.
+                IconButton(onClick = onStop, modifier = Modifier.size(78.dp).clip(CircleShape).background(MasalaColors.Gold)) {
+                    Icon(Icons.Rounded.Stop, stringResource(R.string.listening_stop), tint = Color(0xFF0D1430), modifier = Modifier.size(30.dp))
                 }
                 RoundButton(Icons.Rounded.Keyboard, stringResource(R.string.listening_type), onType)
             }

@@ -134,7 +134,7 @@ fun rememberMicPress(app: MasalaApp): MicPress {
  * place of the two floating buttons. Tapping the pill opens search; the mic talks.
  */
 @Composable
-fun SearchPill(onSearch: () -> Unit, mic: MicPress, modifier: Modifier = Modifier) {
+fun SearchPill(onSearch: () -> Unit, mic: MicPress, mode: com.samosaai.masala.core.ai.MicMode = com.samosaai.masala.core.ai.MicMode.TAP, modifier: Modifier = Modifier) {
     val tokens = MasalaTheme.tokens
     val shape = RoundedCornerShape(50)
     val label = stringResource(R.string.home_search_or_ask)
@@ -148,7 +148,7 @@ fun SearchPill(onSearch: () -> Unit, mic: MicPress, modifier: Modifier = Modifie
     ) {
         Icon(Icons.Rounded.Search, null, tint = tokens.onWallpaperMedium, modifier = Modifier.size(20.dp))
         Text(label, style = MaterialTheme.typography.bodyMedium, color = tokens.onWallpaperMedium, modifier = Modifier.weight(1f))
-        MicButton(mic, size = 46.dp)
+        MicButton(mic, mode, size = 46.dp)
     }
 }
 
@@ -166,10 +166,10 @@ fun AskButton(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-/** The mic: tap to talk, or hold (see [rememberMicPress]). */
+/** The mic: tap to talk, or hold (see [rememberMicPress]). The label always names the current mode. */
 @Composable
-fun MicButton(press: MicPress, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 48.dp) {
-    val label = stringResource(R.string.command_mic)
+fun MicButton(press: MicPress, mode: com.samosaai.masala.core.ai.MicMode = com.samosaai.masala.core.ai.MicMode.TAP, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 48.dp) {
+    val label = stringResource(if (mode == com.samosaai.masala.core.ai.MicMode.TAP) R.string.voice_tap else R.string.voice_hold)
     Surface(
         modifier
             .size(size)
@@ -277,7 +277,7 @@ fun ReplyCard(
                 if (text.isNotBlank()) {
                     TextButton(onClick = { app.commands.ask(text); text = "" }) { Text(stringResource(R.string.skill_send)) }
                 } else {
-                    MicButton(press)
+                    MicButton(press, app.aiSettings.profile.value.micMode)
                 }
             }
             Row {

@@ -396,6 +396,13 @@
     <string name="read_aloud_no_engine">The speech engine didn’t start</string>
     <string name="speech_local_unavailable">No speech recognition on this phone</string>
     <string name="speech_record_failed">Recording for transcription didn’t start</string>
+    <string name="stt_no_speech">No speech detected</string>
+    <string name="stt_didnt_catch">Didn’t catch that</string>
+    <string name="stt_error_generic">Something went wrong with speech input. Try again.</string>
+    <string name="stt_error_busy">The speech recognizer is busy. Wait a moment and try again.</string>
+    <string name="stt_error_server">Couldn’t reach the transcription server. Check your connection and try again.</string>
+    <string name="stt_error_auth">Transcription was rejected. Check your voice setup in Settings → Voice.</string>
+    <string name="stt_error_record">Couldn’t record from the microphone. Check the microphone permission.</string>
     <string name="command_hint">Ask or tell Masala</string>
     <string name="command_open_chat">Open chat</string>
     <string name="command_mic">Hold to talk</string>
@@ -504,6 +511,8 @@
     <string name="listening_on_device">on-device</string>
     <string name="listening_sam">Masala is listening</string>
     <string name="listening_hint">Sends when you pause · tap to stop now</string>
+    <string name="listening_hint_hold">Keep holding · release to send, or tap stop</string>
+    <string name="listening_chip_hold">Holding · %1$s</string>
     <string name="listening_cancel">Cancel</string>
     <string name="listening_stop">Stop and send</string>
     <string name="listening_type">Switch to typing</string>

@@ -37,9 +37,11 @@ class SpeechPolicyTest {
     private class FakeEngine(
         var startResults: Map<AudioProvider, Boolean> = mapOf(),
         var stopText: String = "hello",
+        var utteranceResults: Map<AudioProvider, Result<String>> = mapOf(),
     ) : PttEngine {
         val started = mutableListOf<AudioProvider>()
         val cancelled = mutableListOf<AudioProvider>()
+        val utterances = mutableListOf<AudioProvider>()
         var stopped: AudioProvider? = null
         var stoppedModel = ""
         var stoppedLanguage = ""
@@ -67,6 +69,16 @@ class SpeechPolicyTest {
 
         override fun cancelListening(provider: AudioProvider) {
             cancelled += provider
+        }
+
+        override suspend fun listenForUtterance(
+            provider: AudioProvider,
+            model: String,
+            language: com.samosaai.masala.i18n.Language,
+            silenceTimeoutMs: Long,
+        ): Result<String> {
+            utterances += provider
+            return utteranceResults[provider] ?: Result.failure(UnsupportedOperationException("no stub"))
         }
     }
 
@@ -142,5 +154,54 @@ class SpeechPolicyTest {
         speech.cancel()
         val stop = runBlocking { speech.stop() }
         assertTrue(stop.isFailure)
+    }
+
+    @Test
+    fun tapCloudSuccessUsesCloudOnly() = runBlocking<Unit> {
+        val engine = FakeEngine(utteranceResults = mapOf(AudioProvider.API to Result.success("open youtube")))
+        val text = input(engine).listenOnce()
+        assertTrue(text.isSuccess)
+        assertEquals("open youtube", text.getOrNull())
+        assertEquals(listOf(AudioProvider.API), engine.utterances)
+    }
+
+    @Test
+    fun tapCloudFailureFallsBackToLocal() = runBlocking<Unit> {
+        val engine = FakeEngine(
+            utteranceResults = mapOf(
+                AudioProvider.API to Result.failure(Exception("HTTP 500 boom")),
+                AudioProvider.ANDROID to Result.success("open youtube"),
+            )
+        )
+        val text = input(engine).listenOnce()
+        assertTrue(text.isSuccess)
+        assertEquals("open youtube", text.getOrNull())
+        assertEquals(listOf(AudioProvider.API, AudioProvider.ANDROID), engine.utterances)
+    }
+
+    @Test
+    fun tapSilenceDoesNotRepeatTheWaitOnLocal() = runBlocking<Unit> {
+        val engine = FakeEngine(
+            utteranceResults = mapOf(
+                AudioProvider.API to Result.failure(Exception("No speech detected")),
+                AudioProvider.ANDROID to Result.success("should not be asked"),
+            )
+        )
+        val text = input(engine).listenOnce()
+        assertTrue(text.isFailure)
+        assertEquals(listOf(AudioProvider.API), engine.utterances)
+    }
+
+    @Test
+    fun friendlyMessagesNameTheFix() {
+        val s = SpeechStrings("no-local", "no-record")
+        assertEquals(s.noSpeech, friendlySttMessage(null, s))
+        assertEquals(s.noSpeech, friendlySttMessage("No speech detected", s))
+        assertEquals(s.noSpeech, friendlySttMessage("Speech recognition failed: 7", s))
+        assertEquals(s.busy, friendlySttMessage("Speech recognition failed: 8", s))
+        assertEquals(s.auth, friendlySttMessage("HTTP 401 body", s))
+        assertEquals(s.server, friendlySttMessage("HTTP 500 boom", s))
+        assertEquals(s.recordError, friendlySttMessage("Recording failed to start", s))
+        assertEquals(s.generic, friendlySttMessage("something exotic", s))
     }
 }

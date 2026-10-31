@@ -205,6 +205,9 @@ class MasalaApp : Application() {
     }
     private val tts by lazy { TtsEngine(this) }
 
+    /** The speech-to-text engine, for the Voice settings test (same engine the mic uses). */
+    internal fun sttEngine(): SttEngine = stt
+
     /** Deletes a mini app with its home pins and console log; every Delete (screen, settings, tool) goes through here. */
     suspend fun deleteMiniApp(id: String) {
         miniApps.delete(id)
@@ -308,6 +311,17 @@ class MasalaApp : Application() {
                     recordFailed = getString(R.string.speech_record_failed),
                 ),
                 live = stt,
+            ),
+            speechStrings = SpeechStrings(
+                localUnavailable = getString(R.string.speech_local_unavailable),
+                recordFailed = getString(R.string.speech_record_failed),
+                noSpeech = getString(R.string.stt_no_speech),
+                didntCatch = getString(R.string.stt_didnt_catch),
+                busy = getString(R.string.stt_error_busy),
+                server = getString(R.string.stt_error_server),
+                auth = getString(R.string.stt_error_auth),
+                recordError = getString(R.string.stt_error_record),
+                generic = getString(R.string.stt_error_generic),
             ),
         )
     }

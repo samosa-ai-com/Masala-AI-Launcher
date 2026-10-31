@@ -31,6 +31,7 @@ class CommandController(
     private val skills: () -> List<MasalaSkill>,
     private val newAgent: () -> MasalaAgent,
     private val speech: SpeechInput? = null,
+    private val speechStrings: SpeechStrings = SpeechStrings("", ""),
 ) {
     private val _state = MutableStateFlow<CommandState>(CommandState.Idle)
     val state: StateFlow<CommandState> = _state.asStateFlow()
@@ -101,8 +102,8 @@ class CommandController(
         _state.value = CommandState.Listening
         job = scope.launch {
             input.listenOnce()
-                .onSuccess { if (it.isBlank()) _state.value = CommandState.Error("", "Didn't catch that") else ask(it, spoken = true) }
-                .onFailure { _state.value = CommandState.Error("", it.message ?: "Didn't catch that") }
+                .onSuccess { if (it.isBlank()) _state.value = CommandState.Error("", speechStrings.didntCatch) else ask(it, spoken = true) }
+                .onFailure { _state.value = CommandState.Error("", friendlySttMessage(it.message, speechStrings)) }
         }
     }
 
@@ -119,7 +120,7 @@ class CommandController(
         job = scope.launch {
             input.stop()
                 .onSuccess { ask(it, spoken = true) }
-                .onFailure { _state.value = CommandState.Error("", it.message ?: "Didn't catch that") }
+                .onFailure { _state.value = CommandState.Error("", friendlySttMessage(it.message, speechStrings)) }
         }
     }
 
