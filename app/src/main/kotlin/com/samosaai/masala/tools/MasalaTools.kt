@@ -272,7 +272,11 @@ object MasalaTools {
             FunctionTool(Defs.readMiniApp, READ_ONLY) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")
                 val row = miniApps.get(id) ?: return@FunctionTool ActionResult.error("No mini app '$id'.")
-                ActionResult.ok("Title: ${row.title}\nInternet: ${if (row.networkAllowed) "on" else "off"}\n---\n${row.html}")
+                // Capped so one large app can't push the whole run out of the history window.
+                val html = if (row.html.length <= READ_MINI_APP_MAX_CHARS) row.html
+                else row.html.take(READ_MINI_APP_MAX_CHARS) +
+                    "\n--- cut at $READ_MINI_APP_MAX_CHARS of ${row.html.length} characters: ask the user before rewriting it whole ---"
+                ActionResult.ok("Title: ${row.title}\nInternet: ${if (row.networkAllowed) "on" else "off"}\n---\n$html")
             },
             FunctionTool(Defs.openMiniAppTool, READ_ONLY, opensScreen = true) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")
@@ -303,3 +307,6 @@ object MasalaTools {
         else -> "It logged console errors while loading; fix them with update_mini_app:\n" + errors.joinToString("\n")
     }
 }
+
+/** What `read_mini_app` returns of an app's HTML at most; stored apps may hold up to [MiniAppStore.MAX_HTML_CHARS]. */
+private const val READ_MINI_APP_MAX_CHARS = 16_000

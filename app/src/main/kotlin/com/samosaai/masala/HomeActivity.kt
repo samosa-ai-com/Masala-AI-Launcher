@@ -399,7 +399,7 @@ class HomeActivity : ComponentActivity() {
                                 val folder = onto?.action as? MasalaAction.OpenFolder
                                 when {
                                     // A mode added it: it isn't in the saved layout, so nothing can be combined with it.
-                                    onto == null -> emptyList<LayoutChecker.Problem>().also { toast(getString(R.string.folder_cant_group)) }
+                                    onto == null -> { toast(getString(R.string.folder_cant_group)); emptyList() }
                                     folder == null -> {
                                         val folderId = generateSequence { "folder-" + UUID.randomUUID().toString().take(8) }
                                             .first { baseItem(it) == null }
@@ -407,7 +407,11 @@ class HomeActivity : ComponentActivity() {
                                         app.layouts.edit(getString(R.string.layout_label_new_folder)) {
                                             LayoutEdits.makeFolder(it, item.id, target.itemId, folderId, getString(R.string.folder_default_name))
                                                 .also { next -> made = next != null }
-                                        }.also { problems -> if (made && problems.isEmpty()) renamingFolder = folderId }
+                                        }.also { problems ->
+                                            // Not made: the target became a folder (or left) since the drop was read.
+                                            if (!made) toast(getString(R.string.folder_cant_group))
+                                            else if (problems.isEmpty()) renamingFolder = folderId
+                                        }
                                     }
                                     else -> {
                                         // Checked again inside the edit, so a folder filled by a drop just before still says so.

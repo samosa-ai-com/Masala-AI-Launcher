@@ -314,7 +314,6 @@ class SettingsActivity : ComponentActivity() {
         )
     }
 
-    /** Every stored mini-app, so a created app is never invisible (plan: Lane D follow-ups). */
     /** Home's input card, already holding [prefill], for the user to finish in their own words. */
     private fun askInChat(prefill: String) {
         masala.commands.openInput(prefill)
@@ -323,6 +322,7 @@ class SettingsActivity : ComponentActivity() {
         finish()
     }
 
+    /** Every stored mini-app, so a created app is never invisible (plan: Lane D follow-ups). */
     @Composable
     private fun MiniAppsPage(onBack: () -> Unit) {
         val scope = rememberCoroutineScope()

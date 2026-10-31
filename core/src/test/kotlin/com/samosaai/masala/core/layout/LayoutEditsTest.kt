@@ -263,4 +263,11 @@ class LayoutEditsTest {
     fun `moveBefore itself is a no-op`() {
         assertEquals(doc, LayoutEdits.moveBefore(doc, "b", "grid", "b"))
     }
+
+    @Test
+    fun `moveOutOfFolder of the only child removes the folder`() {
+        val one = Item("f", "Folder", IconRef.Symbol("folder"), MasalaAction.OpenFolder(listOf(item("c"))))
+        val single = LayoutDoc(pages = listOf(Page("home", sections = listOf(GridSection("grid", items = listOf(item("a"), one, item("b")))))))
+        assertEquals(listOf("a", "c", "b"), ids(assertNotNull(LayoutEdits.moveOutOfFolder(single, "f", "c")), "grid"))
+    }
 }

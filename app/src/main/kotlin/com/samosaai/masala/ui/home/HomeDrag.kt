@@ -76,8 +76,6 @@ class HomeDragState(
         private set
     var pointer: Offset by mutableStateOf(Offset.Zero)
         private set
-    var hover: DropTarget? by mutableStateOf(null)
-        private set
 
     /** Item id → (owning section id, box). */
     val itemBoxes = mutableStateMapOf<String, Pair<String, Box2>>()
@@ -88,6 +86,8 @@ class HomeDragState(
     private var startPage: String? = null
 
     fun start(item: Item, at: Offset) {
+        // A second finger's long press mustn't take over a drag in progress.
+        if (dragging != null) return
         val box = itemBoxes[item.id]?.second
         grab = if (box != null) at - Offset(box.left, box.top) else Offset.Zero
         startPage = page
@@ -96,18 +96,21 @@ class HomeDragState(
     }
 
     fun moveTo(at: Offset) {
-        val item = dragging ?: return
-        pointer = at
+        if (dragging != null) pointer = at
+    }
+
+    /** Where a drop at the pointer lands now; resolved only at release, not on every move. */
+    fun target(): DropTarget? {
+        val item = dragging ?: return null
         val items = itemBoxes.entries.groupBy({ it.value.first }, { it.key to it.value.second })
-        hover = DropTargets.resolve(at.x, at.y, sectionBoxes.toMap(), items, item.id, onto && item.action !is MasalaAction.OpenFolder)
+        return DropTargets.resolve(pointer.x, pointer.y, sectionBoxes.toMap(), items, item.id, onto && item.action !is MasalaAction.OpenFolder)
             ?: page?.takeIf { it != startPage }?.let { DropTarget.Page(it) }
     }
 
     /** Ends the drag; returns where it landed, or null to cancel. */
-    fun drop(): DropTarget? = hover.also { cancel() }
+    fun drop(): DropTarget? = target().also { cancel() }
 
     fun cancel() {
         dragging = null
-        hover = null
     }
 }

@@ -196,8 +196,6 @@ fun LayoutRenderer(
             var held = 0L
             while (true) {
                 delay(EDGE_TICK_MS)
-                // Boxes move after a flip while the finger doesn't: look again each tick.
-                drag.moveTo(drag.pointer)
                 val x = drag.pointer.x - origin.x
                 val step = when {
                     x < edge -> -1

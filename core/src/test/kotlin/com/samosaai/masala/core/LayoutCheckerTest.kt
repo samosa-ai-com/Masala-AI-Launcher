@@ -199,4 +199,11 @@ class LayoutCheckerTest {
         val long = folder("f", listOf(item("a"))).copy(label = "x".repeat(LayoutChecker.MAX_FOLDER_LABEL + 1))
         assertEquals(listOf("$.pages[0].sections[0].items[0].label"), folderProblems(long).map { it.path })
     }
+
+    @Test
+    fun `a folder in a widget button is a problem`() {
+        val button = WidgetComponent.Button("Open", MasalaAction.OpenFolder(listOf(item("a"))))
+        val l = layout(com.samosaai.masala.core.contract.WidgetSection("ws", WidgetSpec("w", components = listOf(button))))
+        assertEquals(listOf("$.pages[0].sections[0].widget.components[0].action"), paths(l))
+    }
 }

@@ -50,6 +50,7 @@ import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.MasalaAction
 import com.samosaai.masala.core.layout.LayoutChecker
 import com.samosaai.masala.ui.theme.MasalaTheme
+import kotlin.math.roundToInt
 
 /** A folder on home: a glass rounded square with its first four items' icons in a 2×2 grid. */
 @Composable
@@ -63,7 +64,7 @@ internal fun FolderIcon(items: List<Item>, ctx: RenderContext, size: Int) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             items.take(4).chunked(2).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    row.forEach { child -> IconView(child.icon, appFor(child, ctx), ctx, (size * 0.4f).toInt()) }
+                    row.forEach { child -> IconView(child.icon, appFor(child, ctx), ctx, (size * 0.4f).roundToInt()) }
                 }
             }
         }

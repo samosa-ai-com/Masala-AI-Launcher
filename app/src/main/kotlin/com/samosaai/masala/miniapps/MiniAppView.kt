@@ -237,7 +237,7 @@ internal fun hostMiniApp(
             // Nothing else is served from the app: no asset directory, no files.
             // With network off, every other request is refused outright.
             if (!networkAllowed) {
-                val host = request.url.host.orEmpty()
+                val host = request.url.host.orEmpty().ifEmpty { request.url.toString().take(80) }
                 if (blockedHosts.add(host)) onConsole("WARNING: blocked a request to $host: internet is off for this app")
                 return WebResourceResponse("text/plain", "utf-8", 403, "Blocked", emptyMap(), null)
             }

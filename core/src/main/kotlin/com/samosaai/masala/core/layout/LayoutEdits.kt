@@ -66,12 +66,21 @@ object LayoutEdits {
         return replace(remove(doc, itemId), folderId) { listOf(it.withChildren(children + item)) }
     }
 
-    /** Takes [itemId] out of [folderId] to just after it. A folder left with one child becomes that child. */
+    /**
+     * Takes [itemId] out of [folderId] to just after it. A folder left with one child becomes that child;
+     * one left with none (an imported one-item folder) is gone.
+     */
     fun moveOutOfFolder(doc: LayoutDoc, folderId: String, itemId: String): LayoutDoc? {
         val children = find(doc, folderId)?.item?.children ?: return null
         val child = children.firstOrNull { it.id == itemId } ?: return null
         val left = children.filterNot { it.id == itemId }
-        return replace(doc, folderId) { folder -> listOf(left.singleOrNull() ?: folder.withChildren(left), child) }
+        return replace(doc, folderId) { folder ->
+            when (left.size) {
+                0 -> listOf(child)
+                1 -> listOf(left.single(), child)
+                else -> listOf(folder.withChildren(left), child)
+            }
+        }
     }
 
     /** Null if [folderId] isn't a folder or [label] is blank. Long names are cut to [LayoutChecker.MAX_FOLDER_LABEL]. */
