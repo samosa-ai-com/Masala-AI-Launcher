@@ -80,6 +80,23 @@ class LayoutEditsTest {
     }
 
     @Test
+    fun `moveBefore lands before the named item`() {
+        assertEquals(listOf("b", "c", "a", "d"), ids(assertNotNull(LayoutEdits.moveBefore(doc, "a", "grid", "d")), "grid"))
+        assertEquals(listOf("a", "d", "b", "c"), ids(assertNotNull(LayoutEdits.moveBefore(doc, "d", "grid", "b")), "grid"))
+    }
+
+    @Test
+    fun `moveBefore with no or an unknown item goes to the end`() {
+        assertEquals(listOf("b", "c", "d", "a"), ids(assertNotNull(LayoutEdits.moveBefore(doc, "a", "grid", null)), "grid"))
+        assertEquals(listOf("x", "y", "a"), ids(assertNotNull(LayoutEdits.moveBefore(doc, "a", "dock", "mode-added")), "dock"))
+    }
+
+    @Test
+    fun `moveBefore into a header is null`() {
+        assertNull(LayoutEdits.moveBefore(doc, "a", "header", null))
+    }
+
+    @Test
     fun `moveToPage appends to the first non-dock item section`() {
         val out = assertNotNull(LayoutEdits.moveToPage(doc, "x", "two"))
         assertEquals(listOf("p", "x"), ids(out, "grid2"))

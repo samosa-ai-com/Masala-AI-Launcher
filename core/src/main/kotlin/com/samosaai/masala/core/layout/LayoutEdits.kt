@@ -24,6 +24,16 @@ object LayoutEdits {
         return insert(remove(doc, itemId), from.item, to.sectionId, index)
     }
 
+    /**
+     * Moves [itemId] into section [sectionId] just before [beforeId], or to its end when [beforeId] is
+     * null or not in that section. What home drops use: the visible order can skip hidden items.
+     */
+    fun moveBefore(doc: LayoutDoc, itemId: String, sectionId: String, beforeId: String?): LayoutDoc? {
+        val section = doc.pages.flatMap { it.sections }.firstOrNull { it.id == sectionId } as? ItemSection ?: return null
+        val index = section.items.indexOfFirst { it.id == beforeId }.takeIf { it >= 0 } ?: section.items.size
+        return move(doc, itemId, Slot(sectionId, index))
+    }
+
     /** Moves [itemId] to the end of page [pageId]'s first non-dock [ItemSection]. Null if there is none. */
     fun moveToPage(doc: LayoutDoc, itemId: String, pageId: String): LayoutDoc? {
         val page = doc.pages.firstOrNull { it.id == pageId } ?: return null
