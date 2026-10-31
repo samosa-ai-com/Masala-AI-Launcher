@@ -67,6 +67,8 @@ fun BriefPage(settings: LauncherSettings, update: ((LauncherSettings) -> Launche
     val app = context.masala
     val scope = rememberCoroutineScope()
     fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+    val hereLabel = stringResource(R.string.brief_place_here)
+    val noFixMessage = stringResource(R.string.brief_place_no_fix)
 
     var task by remember { mutableStateOf<ScheduledTask?>(null) }
     var topics by remember { mutableStateOf(emptyList<String>()) }
@@ -99,8 +101,8 @@ fun BriefPage(settings: LauncherSettings, update: ((LauncherSettings) -> Launche
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (!granted) return@rememberLauncherForActivityResult
         scope.launch {
-            val place = WeatherClient.currentPlace(context, context.getString(R.string.brief_place_here))
-            if (place == null) toast(context.getString(R.string.brief_place_no_fix)) else update { it.copy(briefPlace = place) }
+            val place = WeatherClient.currentPlace(context, hereLabel)
+            if (place == null) toast(noFixMessage) else update { it.copy(briefPlace = place) }
         }
     }
 
