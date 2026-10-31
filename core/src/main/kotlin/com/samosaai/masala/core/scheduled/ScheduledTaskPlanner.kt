@@ -85,7 +85,31 @@ object ScheduledTaskPlanner {
      * schedule changed, [toggled] when only on/off did, and otherwise left with
      * its times as they are.
      */
-    fun edited(existing: ScheduledTask?, edited: ScheduledTask, now: Long, zone: ZoneId): ScheduledTask = when {
+    fun edited(existing: ScheduledTask?, edited: ScheduledTask, now: Long, zone: ZoneId): ScheduledTask = editedNow(existing, edited, now, zone)
+
+    /**
+     * The editor's [draft] saved over [current], the task as stored at save time. Only the fields the
+     * editor shows come from the draft: the editor works from a copy read when it opened, and a run
+     * that finished meanwhile must keep its history, next time and retry state.
+     */
+    fun savedEdit(current: ScheduledTask, draft: ScheduledTask, now: Long, zone: ZoneId): ScheduledTask =
+        edited(
+            current,
+            current.copy(
+                name = draft.name,
+                prompt = draft.prompt,
+                skillId = draft.skillId,
+                startLocal = draft.startLocal,
+                repeat = draft.repeat,
+                enabled = draft.enabled,
+                maxRetries = draft.maxRetries,
+                retryDelayMinutes = draft.retryDelayMinutes,
+            ),
+            now,
+            zone,
+        )
+
+    private fun editedNow(existing: ScheduledTask?, edited: ScheduledTask, now: Long, zone: ZoneId): ScheduledTask = when {
         existing == null || edited.startLocal != existing.startLocal || edited.repeat != existing.repeat ->
             armed(edited, now, zone)
         edited.enabled != existing.enabled ->

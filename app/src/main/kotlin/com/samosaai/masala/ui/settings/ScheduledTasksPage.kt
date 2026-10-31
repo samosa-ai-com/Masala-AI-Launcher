@@ -248,16 +248,12 @@ fun ScheduledTasksPage(onBack: () -> Unit, onAskInChat: (String) -> Unit) {
                     existing = editTarget,
                     skills = skills,
                     onSave = { draft ->
-                        val target = editTarget
+                        val isNew = editTarget == null
                         createOpen = false
                         editTarget = null
+                        // Saved onto the task as stored now, not the copy the sheet opened with.
                         mutate {
-                            app.scheduledTasks.put(
-                                ScheduledTaskPlanner.edited(
-                                    target, draft,
-                                    System.currentTimeMillis(), java.time.ZoneId.systemDefault(),
-                                )
-                            )
+                            ScheduledTaskRuns(context.applicationContext as android.app.Application).saveEdit(draft, isNew)
                         }
                     },
                     onDismiss = { createOpen = false; editTarget = null },

@@ -69,13 +69,28 @@ class ScheduledTaskRuns(private val app: Application) {
     /**
      * Runs task [id] now, for "Run now". The task's schedule is left as it is, unless this was its
      * scheduled time.
-     */    suspend fun runNow(id: String, now: Long = System.currentTimeMillis()): ScheduledStart {
+     */
+    suspend fun runNow(id: String, now: Long = System.currentTimeMillis()): ScheduledStart {
         val result = lock.withLock {
             val task = store.get(id) ?: return@withLock ScheduledStart.Failed(app.getString(R.string.scheduled_task_gone))
             start(task, now, ZoneId.systemDefault(), userInitiated = true)
         }
         ScheduledTaskScheduler.reschedule(app)
         return result
+    }
+
+    /**
+     * Saves the editor's [draft]: a new task as it is, an existing one onto what is stored now, under the
+     * same lock as firing and recording, so neither a run's result nor a firing is overwritten. An edit
+     * to a task deleted meanwhile saves nothing.
+     */
+    suspend fun saveEdit(draft: ScheduledTask, isNew: Boolean, now: Long = System.currentTimeMillis()) {
+        lock.withLock {
+            val zone = ZoneId.systemDefault()
+            if (isNew) store.put(ScheduledTaskPlanner.edited(null, draft, now, zone))
+            else store.update(draft.id) { ScheduledTaskPlanner.savedEdit(it, draft, now, zone) }
+        }
+        ScheduledTaskScheduler.reschedule(app)
     }
 
     /** Ids of tasks with a run currently going, for the Stop button. */

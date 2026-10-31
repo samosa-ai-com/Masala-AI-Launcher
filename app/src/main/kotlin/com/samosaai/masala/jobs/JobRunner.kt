@@ -76,12 +76,16 @@ class JobRunner(context: Context, params: WorkerParameters) : CoroutineWorker(co
         val answer = withContext(Dispatchers.IO) {
             app.database.skillRuns().get(id)?.let { SkillRunner.lastAnswer(it.transcriptJson) }
         }
-        TaskDoneNotification.post(
-            app, name.ifBlank { skillId }, skillId, id, status,
-            if (status == TaskRunStatus.DONE) answer else detail,
-        )
-        if (skillId == com.samosaai.masala.brief.BriefInputs.SKILL_ID && status == TaskRunStatus.DONE && app.settings.current().briefNotify) {
-            app.database.skillRuns().get(id)?.let { com.samosaai.masala.skills.SkillRunner.lastAnswer(it.transcriptJson) }?.let { com.samosaai.masala.brief.BriefNotification.post(app, it) }
+        // A finished brief has a notification of its own; the "run finished" one would repeat it.
+        val briefNotified = skillId == com.samosaai.masala.brief.BriefInputs.SKILL_ID && status == TaskRunStatus.DONE &&
+            app.settings.current().briefNotify && answer != null
+        if (briefNotified) {
+            com.samosaai.masala.brief.BriefNotification.post(app, answer!!)
+        } else {
+            TaskDoneNotification.post(
+                app, name.ifBlank { skillId }, skillId, id, status,
+                if (status == TaskRunStatus.DONE) answer else detail,
+            )
         }
         return Result.success()
     }

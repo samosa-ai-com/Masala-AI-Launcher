@@ -327,4 +327,31 @@ class ScheduledTaskPlannerTest {
         assertTrue(ScheduledTaskPlanner.problems(past, now, zone).isNotEmpty())
         assertTrue(ScheduledTaskPlanner.problems(task, now, zone).isEmpty())
     }
+
+    @Test
+    fun `an edit from an older copy keeps a run that finished meanwhile`() {
+        // The editor opens at 07:59 on the 08:00 daily task; it runs at 08:00; the rename is saved at 08:02.
+        val opened = daily()
+        val ran = ScheduledTaskPlanner.finished(
+            ScheduledTaskPlanner.started(opened, at("2026-10-19T08:00"), zone),
+            TaskRunStatus.DONE, "run-1", null, at("2026-10-19T08:01"), skillRunId = 7L,
+        )
+        val saved = ScheduledTaskPlanner.savedEdit(ran, opened.copy(name = "renamed"), at("2026-10-19T08:02"), zone)
+        assertEquals("renamed", saved.name)
+        assertEquals(ran.history, saved.history)
+        assertEquals(at("2026-10-20T08:00"), saved.nextRunAt)
+        // Not due again today: no second run of the 08:00 occurrence.
+        assertEquals(ScheduledTaskPlanner.Decision.Wait, ScheduledTaskPlanner.decide(saved, at("2026-10-19T08:03"), zone))
+    }
+
+    @Test
+    fun `an edit that changes the schedule re-arms from the stored task`() {
+        val ran = ScheduledTaskPlanner.finished(
+            ScheduledTaskPlanner.started(daily(), at("2026-10-19T08:00"), zone),
+            TaskRunStatus.DONE, "run-1", null, at("2026-10-19T08:01"),
+        )
+        val saved = ScheduledTaskPlanner.savedEdit(ran, daily().copy(startLocal = "2026-10-19T09:00"), at("2026-10-19T08:02"), zone)
+        assertEquals(at("2026-10-19T09:00"), saved.nextRunAt)
+        assertEquals(ran.history, saved.history)
+    }
 }

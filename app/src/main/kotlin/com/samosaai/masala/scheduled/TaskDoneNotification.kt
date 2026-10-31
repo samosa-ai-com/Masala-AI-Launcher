@@ -17,6 +17,8 @@ import com.samosaai.masala.ui.skills.SkillSheetActivity
  * Settings). Tapping it opens the run's transcript; it clears on tap.
  */
 object TaskDoneNotification {
+    private const val TAG = "task-done"
+
     fun post(
         context: Context,
         name: String,
@@ -49,7 +51,8 @@ object TaskDoneNotification {
             .setContentIntent(open)
             .setAutoCancel(true)
             .build()
-        // One notification per run; the row id is unique per run.
-        manager.notify(skillRunId.hashCode(), notification)
+        // One notification per run; the row id is unique per run, and the tag keeps it clear of other
+        // notifications' fixed ids (a running job's, the brief's).
+        manager.notify(TAG, skillRunId.hashCode(), notification)
     }
 }
