@@ -330,10 +330,19 @@ class SettingsActivity : ComponentActivity() {
         val format = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
         SettingsScaffold(stringResource(R.string.settings_miniapps), onBack = onBack) {
             Button(onClick = { askInChat(getString(R.string.miniapp_create_prefill)) }) { Text(stringResource(R.string.miniapp_create)) }
+            var filter by rememberSaveable { mutableStateOf("") }
+            // The search sits below Create (Batch A added the button on top), and only for long lists.
+            if (apps.size > 5) ListSearchField(filter, { filter = it }, stringResource(R.string.miniapps_filter))
+            val shown = remember(apps, filter) {
+                val q = filter.trim().lowercase()
+                if (q.isEmpty()) apps else apps.filter { it.title.lowercase().contains(q) }
+            }
             if (apps.isEmpty()) {
                 Text(stringResource(R.string.miniapps_empty), style = MaterialTheme.typography.bodyMedium)
+            } else if (shown.isEmpty()) {
+                Text(stringResource(R.string.miniapps_empty_no_match), style = MaterialTheme.typography.bodyMedium)
             }
-            apps.forEach { row ->
+            shown.forEach { row ->
                 var confirmDelete by remember(row.id) { mutableStateOf(false) }
                 Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Text(row.title, style = MaterialTheme.typography.titleMedium)
@@ -398,12 +407,7 @@ class SettingsActivity : ComponentActivity() {
             if (q.isEmpty()) masala.skills.getAllSkills() else masala.skills.searchSkills(q)
         }
         SettingsScaffold(stringResource(R.string.settings_skills), onBack = onBack) {
-            OutlinedTextField(
-                filter, { filter = it },
-                label = { Text(stringResource(R.string.skills_filter)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            ListSearchField(filter, { filter = it }, stringResource(R.string.skills_filter))
             if (skills.isEmpty()) {
                 Text(stringResource(R.string.skills_empty), style = MaterialTheme.typography.bodyMedium)
             }
@@ -521,10 +525,20 @@ class SettingsActivity : ComponentActivity() {
         }
         SettingsScaffold(stringResource(R.string.settings_scheduled_tasks), onBack = onBack) {
             Button(onClick = { askInChat(getString(R.string.scheduled_task_create_prefill)) }) { Text(stringResource(R.string.scheduled_task_create)) }
+            var filter by rememberSaveable { mutableStateOf("") }
+            if (tasks.size > 5) ListSearchField(filter, { filter = it }, stringResource(R.string.scheduled_tasks_filter))
+            val shown = remember(tasks, filter) {
+                val q = filter.trim().lowercase()
+                if (q.isEmpty()) tasks else tasks.filter {
+                    it.name.lowercase().contains(q) || it.prompt.lowercase().contains(q)
+                }
+            }
             if (tasks.isEmpty()) {
                 Text(stringResource(R.string.scheduled_tasks_empty), style = MaterialTheme.typography.bodyMedium)
+            } else if (shown.isEmpty()) {
+                Text(stringResource(R.string.scheduled_tasks_empty_no_match), style = MaterialTheme.typography.bodyMedium)
             }
-            tasks.forEach { task ->
+            shown.forEach { task ->
                 key(task.id) {
                     var confirmDelete by remember(task.id) { mutableStateOf(false) }
                     // Paused tasks still show their scheduled time; a finished one-time task has nothing to pause.

@@ -23,6 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -102,6 +103,17 @@ fun SettingsNavRow(title: String, summary: String, onClick: () -> Unit) {
         }
         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
     }
+}
+
+/** One search field for every settings list (skills, mini apps, scheduled tasks). */
+@Composable
+fun ListSearchField(value: String, onValue: (String) -> Unit, hint: String) {
+    OutlinedTextField(
+        value, onValue,
+        label = { Text(hint) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 /** A label and a switch. The whole row toggles, so the touch target is the full width. */

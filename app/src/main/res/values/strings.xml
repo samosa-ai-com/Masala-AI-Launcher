@@ -209,6 +209,8 @@
     <string name="miniapp_network_badge">Uses the internet</string>
     <string name="miniapp_create">Create a mini app</string>
     <string name="miniapp_create_prefill">"Build me a mini app that "</string>
+    <string name="miniapps_filter">Filter mini apps</string>
+    <string name="miniapps_empty_no_match">No mini apps match.</string>
     <string name="scheduled_task_create">Create with Masala</string>
     <string name="scheduled_task_create_prefill">"Every day at 8:00, "</string>
     <string name="miniapp_share">Share</string>
@@ -262,6 +264,8 @@
     <string name="settings_scheduled_tasks">Scheduled tasks</string>
     <string name="settings_scheduled_tasks_summary">One-time and repeating runs</string>
     <string name="scheduled_tasks_empty">No scheduled tasks yet. Skills with schedules and debug commands create them.</string>
+    <string name="scheduled_tasks_filter">Filter scheduled tasks</string>
+    <string name="scheduled_tasks_empty_no_match">No scheduled tasks match.</string>
     <string name="scheduled_task_run_now">Run now</string>
     <string name="scheduled_task_pause">Pause</string>
     <string name="scheduled_task_resume">Resume</string>
