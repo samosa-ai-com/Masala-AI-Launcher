@@ -214,9 +214,13 @@ class HomeActivity : ComponentActivity() {
 
                 override fun onRelease(velocityY: Float) {
                     val open = velocityY < -FLING_VELOCITY || (velocityY < FLING_VELOCITY && drawerProgress.value > 0.35f)
-                    drawerOpen = open
+                    // The state flips only after the animation lands: the release owns the
+                    // fling's velocity, and the LaunchedEffect above must not replay it with 0
+                    // (its isRunning check can lose the race with this launch). External
+                    // changes (Back, tap, launch) still animate from the effect.
                     scope.launch {
                         drawerProgress.animateTo(if (open) 1f else 0f, drawerSpring, initialVelocity = -velocityY / distance)
+                        drawerOpen = open
                     }
                 }
             }

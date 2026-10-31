@@ -74,6 +74,9 @@ class WelcomeActivity : ComponentActivity() {
         setContent {
             val settings by masala.settings.settings.collectAsStateWithLifecycle(LauncherSettings())
             MasalaTheme(settings.copy(theme = com.samosaai.masala.data.ThemeMode.DARK), systemBars = false) {
+                // At this level so it covers both steps: Welcome() uncomposes on step 1, which would
+                // otherwise leave system Back to finish without marking welcome done.
+                BackHandler(onBack = ::done)
                 var step by rememberSaveable { mutableIntStateOf(0) }
                 when {
                     step == 0 -> Welcome(onDone = { if (masala.usage.hasUsageAccess()) done() else step = 1 })
@@ -145,9 +148,6 @@ class WelcomeActivity : ComponentActivity() {
     private fun Welcome(onDone: () -> Unit) {
         val haptics = rememberHaptics()
         val scroll = rememberScrollState()
-        // System Back finishes the activity without a button press; count that as done too,
-        // or the welcome screen would come back on the next launch.
-        BackHandler(onBack = onDone)
         val roleRequest = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             if (!HomeRole.isDefault(this)) HomeRole.openSettings(this)
             onDone()
