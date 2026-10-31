@@ -158,4 +158,45 @@ class LayoutCheckerTest {
         assertNull(parsed.layout)
         assertTrue("newer" in parsed.problems.single().message)
     }
+
+    private fun folder(id: String, children: List<Item>) = item(id, MasalaAction.OpenFolder(children))
+
+    private fun folderProblems(vararg items: Item) =
+        LayoutChecker.check(layout(GridSection("g", items = items.toList())), env)
+
+    @Test
+    fun `a valid folder has no problems`() {
+        assertEquals(emptyList(), folderProblems(folder("f", listOf(item("a"), item("b")))))
+    }
+
+    @Test
+    fun `a folder holds at most 16 items`() {
+        val problems = folderProblems(folder("f", (1..17).map { item("c$it") }))
+        assertEquals(listOf("$.pages[0].sections[0].items[0].action.items"), problems.map { it.path })
+    }
+
+    @Test
+    fun `folders can't contain folders`() {
+        val problems = folderProblems(folder("f", listOf(item("a"), folder("inner", listOf(item("b"))))))
+        assertEquals(listOf("$.pages[0].sections[0].items[0].action.items[1].action"), problems.map { it.path })
+    }
+
+    @Test
+    fun `items in a folder can't have rules`() {
+        val ruled = item("a", rules = listOf(Rule(Condition.Charging(), Effect.Show)))
+        val problems = folderProblems(folder("f", listOf(ruled)))
+        assertEquals(listOf("$.pages[0].sections[0].items[0].action.items[0].rules"), problems.map { it.path })
+    }
+
+    @Test
+    fun `a folder child's id must not repeat a section item's id`() {
+        val problems = folderProblems(item("a"), folder("f", listOf(item("a"))))
+        assertEquals(listOf("$.pages[0].sections[0].items[1].action.items[0].id"), problems.map { it.path })
+    }
+
+    @Test
+    fun `a folder name over the limit is a problem`() {
+        val long = folder("f", listOf(item("a"))).copy(label = "x".repeat(LayoutChecker.MAX_FOLDER_LABEL + 1))
+        assertEquals(listOf("$.pages[0].sections[0].items[0].label"), folderProblems(long).map { it.path })
+    }
 }

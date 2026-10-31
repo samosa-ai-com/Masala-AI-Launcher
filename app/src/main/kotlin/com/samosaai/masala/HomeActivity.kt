@@ -67,6 +67,18 @@ import com.samosaai.masala.ui.home.rememberMicPress
 import com.samosaai.masala.ui.home.ConfirmationSheet
 import com.samosaai.masala.ui.home.HomeScreen
 import com.samosaai.masala.ui.home.RenderContext
+import com.samosaai.masala.ui.home.DropTarget
+import com.samosaai.masala.ui.home.HomeDragState
+import com.samosaai.masala.ui.home.FolderMenu
+import com.samosaai.masala.ui.home.FolderRenameDialog
+import com.samosaai.masala.ui.home.FolderSheet
+import com.samosaai.masala.core.contract.ItemSection
+import com.samosaai.masala.core.contract.LayoutDoc
+import androidx.compose.runtime.SideEffect
+import com.samosaai.masala.core.contract.Item
+import com.samosaai.masala.core.layout.LayoutChecker
+import java.util.UUID
+import com.samosaai.masala.core.layout.LayoutEdits
 import com.samosaai.masala.scheduled.ScheduledTaskScheduler
 import com.samosaai.masala.skills.SkillScheduling
 import com.samosaai.masala.ui.home.SkillWidgetSource
@@ -179,6 +191,10 @@ class HomeActivity : ComponentActivity() {
         val scope = rememberCoroutineScope()
         var menuFor by remember { mutableStateOf<AppEntry?>(null) }
         var renaming by remember { mutableStateOf<AppEntry?>(null) }
+        var renamingFolder by remember { mutableStateOf<String?>(null) }
+        // The folder, and whether it is in the saved layout (not added by a mode).
+        var openFolder by remember { mutableStateOf<Pair<Item, Boolean>?>(null) }
+        var folderMenu by remember { mutableStateOf<Item?>(null) }
 
         val roleRequest = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             // Turned down: the dialog may not come back, so offer the system screen instead.
@@ -342,7 +358,12 @@ class HomeActivity : ComponentActivity() {
         val activeModes by app.modes.active.collectAsStateWithLifecycle()
         val patches by app.modes.patches.collectAsStateWithLifecycle()
         val modeName = patches.filter { it.id in activeModes }.joinToString(" · ") { it.name }.ifBlank { null }
-        val render = remember(apps, settings.homeLocked, modeName) {
+        val baseLayout by app.layouts.base.collectAsStateWithLifecycle()
+        val movable = remember(baseLayout) {
+            baseLayout?.pages.orEmpty().flatMap { it.sections }.filterIsInstance<ItemSection>().flatMap { s -> s.items.map { it.id } }.toSet()
+        }
+        val drag = remember { HomeDragState() }
+        val render = remember(apps, settings.homeLocked, modeName, movable) {
             RenderContext(
                 icons = app.icons,
                 apps = apps,
@@ -358,6 +379,48 @@ class HomeActivity : ComponentActivity() {
                     val a = action as? MasalaAction.LaunchApp
                     val entry = a?.let { render0 -> apps.firstOrNull { it.key.packageName == render0.packageName && it.key.user == render0.user && (render0.activity == null || it.key.activity == render0.activity) } }
                     if (entry != null) launch(entry, bounds) else run(action)
+                },
+                drag = drag,
+                movable = movable,
+                onOpenFolder = { openFolder = it to (it.id in movable) },
+                onFolderMenu = { if (it.id in movable) folderMenu = it },
+                onDrop = { item, target ->
+                    scope.launch {
+                        val problems = when (target) {
+                            // `before` may be a mode-added item, not in the saved layout: then it lands at the section's end.
+                            is DropTarget.Slot -> app.layouts.edit(getString(R.string.layout_label_moved, item.label)) {
+                                LayoutEdits.moveBefore(it, item.id, target.sectionId, target.before)
+                            }
+                            is DropTarget.Page -> app.layouts.edit(getString(R.string.layout_label_moved, item.label)) {
+                                LayoutEdits.moveToPage(it, item.id, target.pageId)
+                            }
+                            is DropTarget.Onto -> {
+                                val onto = baseItem(target.itemId)
+                                val folder = onto?.action as? MasalaAction.OpenFolder
+                                when {
+                                    // A mode added it: it isn't in the saved layout, so nothing can be combined with it.
+                                    onto == null -> emptyList<LayoutChecker.Problem>().also { toast(getString(R.string.folder_cant_group)) }
+                                    folder == null -> {
+                                        val folderId = generateSequence { "folder-" + UUID.randomUUID().toString().take(8) }
+                                            .first { baseItem(it) == null }
+                                        var made = false
+                                        app.layouts.edit(getString(R.string.layout_label_new_folder)) {
+                                            LayoutEdits.makeFolder(it, item.id, target.itemId, folderId, getString(R.string.folder_default_name))
+                                                .also { next -> made = next != null }
+                                        }.also { problems -> if (made && problems.isEmpty()) renamingFolder = folderId }
+                                    }
+                                    else -> {
+                                        // Checked again inside the edit, so a folder filled by a drop just before still says so.
+                                        var full = folder.items.size >= LayoutChecker.MAX_FOLDER_ITEMS
+                                        if (full) emptyList() else app.layouts.edit(getString(R.string.layout_label_added_to_folder, item.label)) {
+                                            LayoutEdits.addToFolder(it, item.id, target.itemId).also { next -> full = next == null }
+                                        }.also { if (full) toast(getString(R.string.folder_full)) }
+                                    }
+                                }
+                            }
+                        }
+                        problems.firstOrNull()?.let { toast(it.message) }
+                    }
                 },
             )
         }
@@ -636,6 +699,59 @@ class HomeActivity : ComponentActivity() {
             )
         }
 
+        // Looked up again in the saved layout, so an open folder shows each change as it lands. A folder a
+        // mode added isn't in it; one that left it (ungrouped, one item left) closes.
+        openFolder?.let { (opened, saved) ->
+            val folder = if (saved) itemIn(baseLayout, opened.id) else opened
+            if (folder?.action !is MasalaAction.OpenFolder) {
+                SideEffect { openFolder = null }
+                return@let
+            }
+            FolderSheet(
+                folder = folder,
+                ctx = render,
+                editable = saved,
+                onDismiss = { openFolder = null },
+                onRename = { renamingFolder = folder.id },
+                onMoveOut = { child ->
+                    scope.launch {
+                        app.layouts.edit(getString(R.string.layout_label_moved_out_of_folder, child.label)) {
+                            LayoutEdits.moveOutOfFolder(it, folder.id, child.id)
+                        }.firstOrNull()?.let { toast(it.message) }
+                    }
+                },
+            )
+        }
+
+        folderMenu?.let { folder ->
+            FolderMenu(
+                folder = folder,
+                onRename = { folderMenu = null; renamingFolder = folder.id },
+                onUngroup = {
+                    folderMenu = null
+                    scope.launch {
+                        app.layouts.edit(getString(R.string.layout_label_ungrouped_folder)) { LayoutEdits.dissolveFolder(it, folder.id) }
+                            .firstOrNull()?.let { toast(it.message) }
+                    }
+                },
+                onDismiss = { folderMenu = null },
+            )
+        }
+
+        renamingFolder?.let { folderId ->
+            FolderRenameDialog(
+                label = baseItem(folderId)?.label ?: getString(R.string.folder_default_name),
+                onRename = { label ->
+                    renamingFolder = null
+                    scope.launch {
+                        app.layouts.edit(getString(R.string.layout_label_renamed_folder)) { LayoutEdits.renameFolder(it, folderId, label) }
+                            .firstOrNull()?.let { toast(it.message) }
+                    }
+                },
+                onDismiss = { renamingFolder = null },
+            )
+        }
+
         renaming?.let { entry ->
             RenameDialog(
                 entry = entry,
@@ -667,6 +783,12 @@ class HomeActivity : ComponentActivity() {
     }
 
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+
+    /** A top-level item of the saved (base) layout, not one a mode added. */
+    private fun baseItem(id: String): Item? = itemIn(masala.layouts.base.value, id)
+
+    private fun itemIn(doc: LayoutDoc?, id: String): Item? = doc?.pages.orEmpty()
+        .flatMap { it.sections }.filterIsInstance<ItemSection>().flatMap { it.items }.firstOrNull { it.id == id }
 }
 
 /** Gives [content] a recomposition scope of its own: state read inside recomposes only [content]. */

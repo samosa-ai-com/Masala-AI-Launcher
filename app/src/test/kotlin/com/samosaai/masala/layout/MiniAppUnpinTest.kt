@@ -33,6 +33,14 @@ class MiniAppUnpinTest {
         assertEquals(doc.pages[0].sections[0], cleaned.pages[0].sections[0])
     }
 
+    @Test fun removesTheAppFromInsideAFolder() {
+        val folder = Item("f", "Games", IconRef.Symbol("folder"), MasalaAction.OpenFolder(listOf(miniApp("snake"), miniApp("tetris"), app)))
+        val doc = LayoutDoc(pages = listOf(Page("p", sections = listOf(GridSection("favorites", items = listOf(folder))))))
+        val cleaned = LayoutRepository.withoutMiniApp(doc, "snake")
+        val left = ((cleaned.pages[0].sections[0] as GridSection).items.single().action as MasalaAction.OpenFolder).items.map { it.id }
+        assertEquals(listOf("miniapp-tetris", "app"), left)
+    }
+
     @Test fun aLayoutWithoutTheAppIsUnchanged() {
         val doc = LayoutDoc(pages = listOf(Page("p", sections = listOf(GridSection("favorites", items = listOf(app))))))
         assertEquals(doc, LayoutRepository.withoutMiniApp(doc, "snake"))
