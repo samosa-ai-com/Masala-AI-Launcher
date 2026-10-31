@@ -168,17 +168,19 @@ class SpeechPolicyTest {
     }
 
     @Test
-    fun tapCloudFailureFallsBackToLocal() = runBlocking<Unit> {
+    fun tapCloudFailureIsReportedInsteadOfRelistening() = runBlocking<Unit> {
+        // The user already spoke during the server take; asking the phone's recognizer to
+        // listen again would only hear the room and hide the real error.
         val engine = FakeEngine(
             utteranceResults = mapOf(
                 AudioProvider.API to Result.failure(Exception("HTTP 500 boom")),
-                AudioProvider.ANDROID to Result.success("open youtube"),
+                AudioProvider.ANDROID to Result.success("never asked"),
             )
         )
         val text = input(engine).listenOnce()
-        assertTrue(text.isSuccess)
-        assertEquals("open youtube", text.getOrNull())
-        assertEquals(listOf(AudioProvider.API, AudioProvider.ANDROID), engine.utterances)
+        assertTrue(text.isFailure)
+        assertEquals("HTTP 500 boom", text.exceptionOrNull()?.message)
+        assertEquals(listOf(AudioProvider.API), engine.utterances)
     }
 
     @Test
@@ -215,6 +217,28 @@ class SpeechPolicyTest {
         val result = input(engine).listenOnce()
         assertTrue(result.isFailure)
         assertEquals("HTTP 401 rejected", result.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun `hands-free only where it can be timed`() {
+        // The server path is timed by our own detector; the phone's recognizer decides its
+        // own end, so a hands-free take there cut people off (and flickered the mic).
+        assertTrue(SpeechPolicy.handsFreeWorks(AudioProvider.API))
+        assertTrue(SpeechPolicy.handsFreeWorks(AudioProvider.SAMOSA_AI))
+        assertFalse(SpeechPolicy.handsFreeWorks(AudioProvider.ANDROID))
+    }
+
+    @Test
+    fun `a hands-free tap never reaches the on-device recognizer`() = runBlocking<Unit> {
+        val engine = FakeEngine(
+            utteranceResults = mapOf(
+                AudioProvider.ANDROID to Result.success("should not be asked"),
+            )
+        )
+        // On-device only: nothing can be timed, so the tap fails instead of half-listening.
+        val result = input(engine, baseUrl = "").listenOnce()
+        assertTrue(result.isFailure)
+        assertTrue(engine.utterances.isEmpty())
     }
 
     @Test

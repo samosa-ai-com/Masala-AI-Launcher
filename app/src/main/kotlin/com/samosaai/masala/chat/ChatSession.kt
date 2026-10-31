@@ -2,9 +2,12 @@ package com.samosaai.masala.chat
 
 import kotlinx.serialization.Serializable
 
-/** Who said it. Errors are stored so a failed turn is visible when the session is reopened. */
+/**
+ * Who said it. Errors are stored so a failed turn is visible when the session is reopened;
+ * [SYSTEM] marks a note the app wrote, such as a history summary.
+ */
 @Serializable
-enum class TurnRole { USER, MASALA, ERROR }
+enum class TurnRole { USER, MASALA, ERROR, SYSTEM }
 
 /**
  * One thing on the conversation screen. [steps] are the tool steps a reply took, kept
@@ -35,11 +38,15 @@ data class ChatSession(
         get() = turns.lastOrNull { it.text.isNotBlank() }?.text?.replace('\n', ' ')?.take(80).orEmpty()
 }
 
-/** What the session list needs, without loading every turn. */
+/**
+ * What the session list needs, without loading every turn. [search] is the title plus the
+ * conversation's text (bounded), so the list can be filtered without touching the disk.
+ */
 data class ChatSummary(
     val id: String,
     val title: String,
     val updatedAt: Long,
     val preview: String,
     val turns: Int,
+    val search: String = "",
 )

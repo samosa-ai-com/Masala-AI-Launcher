@@ -36,6 +36,8 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -106,6 +108,26 @@ fun VoicePage(settings: LauncherSettings, update: ((LauncherSettings) -> Launche
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+            val canBeHandsFree = profile.voiceIn != null
+            val handsFree = (profile.handsFree ?: true) && canBeHandsFree
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 52.dp)
+                    .clickable(enabled = canBeHandsFree, role = Role.Switch) {
+                        scope.launch { store.update { it.copy(handsFree = !handsFree) } }
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.voice_hands_free), style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        stringResource(if (canBeHandsFree) R.string.voice_hands_free_summary else R.string.voice_hands_free_unavailable),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = handsFree, onCheckedChange = null, enabled = canBeHandsFree)
             }
         }
 

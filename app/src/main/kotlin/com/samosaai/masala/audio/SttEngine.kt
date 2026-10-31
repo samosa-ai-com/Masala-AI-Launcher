@@ -101,6 +101,24 @@ class SttEngine(
     /** Words heard so far in this session (on-device recognizer only; API transcription has none). */
     val partial: kotlinx.coroutines.flow.StateFlow<String> = _partial
 
+    private val _autoSendIn = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
+
+    /**
+     * Seconds until the detector ends the take on its own, or null when it has not accepted
+     * speech (or the provider does not use this detector). The UI shows this instead of
+     * guessing from the level, so the countdown matches what will actually happen.
+     */
+    val autoSendIn: kotlinx.coroutines.flow.StateFlow<Int?> = _autoSendIn
+
+    private val _heard = kotlinx.coroutines.flow.MutableStateFlow(0L)
+
+    /**
+     * Bumped every time new words arrive from the recognizer. Its only job is letting a
+     * caller tell "still speaking" from "gone quiet" without guessing at partial text,
+     * which the recognizer keeps around after a pause.
+     */
+    val heard: kotlinx.coroutines.flow.StateFlow<Long> = _heard
+
     /** What the voice-activity detector currently sees; the settings test card shows it. */
     data class VadSnapshot(val floorDb: Float, val thresholdDb: Float, val peakDb: Float, val speechHeard: Boolean)
 
@@ -360,6 +378,7 @@ class SttEngine(
         vadUserStopped = false
         vadRecordError = null
         _vadState.value = null
+        _autoSendIn.value = null
         val detector = SilenceDetector(silenceTimeoutMs)
         val shortBuf = ShortArray(windowShorts)
         val byteBuf = ByteArray(windowShorts * 2)
@@ -367,6 +386,7 @@ class SttEngine(
         val startMs = System.currentTimeMillis()
         var result: File? = null
         var peakDb = -50f
+        var lastLoudAt = 0L
         // Any non-zero sample at all. rmsDb clamps at the floor, so a genuinely
         // quiet room is indistinguishable from a broken stream by level alone.
         var sawSignal = false
@@ -393,6 +413,11 @@ class SttEngine(
                 peakDb = maxOf(peakDb, db)
                 val decision = detector.update(db, now)
                 _vadState.value = VadSnapshot(detector.floorDb, detector.thresholdDb, peakDb, detector.speechDetected)
+                // The detector's own clock: silence since the last window above its threshold.
+                if (db > detector.thresholdDb) lastLoudAt = now
+                _autoSendIn.value = if (detector.speechDetected && lastLoudAt > 0) {
+                    ((silenceTimeoutMs - (now - lastLoudAt)).coerceAtLeast(0) / 1000).toInt()
+                } else null
                 if (decision != SilenceDetector.Decision.CONTINUE ||
                     now - startMs > MAX_VAD_RECORDING_MS
                 ) {
@@ -426,6 +451,7 @@ class SttEngine(
             recorder.release()
             vadStopRequested = false
             vadUserStopped = false
+            _autoSendIn.value = null
             _level.value = 0f
         }
         return result
@@ -521,6 +547,7 @@ class SttEngine(
                     if (text.isNotBlank()) {
                         if (continuousTranscript.isNotEmpty()) continuousTranscript.append(" ")
                         continuousTranscript.append(text)
+                        _heard.value = _heard.value + 1
                     }
                     currentPartialResult = "" // Final result supersedes partial
                     if (isContinuousListening) {
@@ -537,6 +564,7 @@ class SttEngine(
                     if (text.isNotBlank()) {
                         currentPartialResult = text
                         _partial.value = text
+                        _heard.value = _heard.value + 1
                     }
                 }
                 override fun onEvent(eventType: Int, params: Bundle?) { MasalaLog.d(TAG) { "onEvent: $eventType" } }
@@ -678,7 +706,9 @@ class SttEngine(
                 recognizer.setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) {}
                     override fun onBeginningOfSpeech() {}
-                    override fun onRmsChanged(rmsdB: Float) { _level.value = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f) }
+                    override fun onRmsChanged(rmsdB: Float) {
+                        _level.value = smoothed(previous = _level.value, raw = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f))
+                    }
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() {}
                     override fun onError(error: Int) {
@@ -709,6 +739,8 @@ class SttEngine(
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE, tag)
                     // Best-effort end-of-speech hint; the platform may ignore it.
                     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, silenceTimeoutMs)
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, silenceTimeoutMs)
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, silenceTimeoutMs)
                 }
                 recognizer.startListening(intent)
             } catch (_: Exception) {
@@ -823,6 +855,12 @@ class SttEngine(
      * muting music, notifications or the ringer would let a tap on the mic swallow a
      * song or an incoming call.
      */
+    /**
+     * A level that moves like a voice rather than flickering: the recognizer's raw value
+     * jumps several steps per second, which made the bars saturate and oscillate.
+     */
+    private fun smoothed(previous: Float, raw: Float): Float = (previous + (raw - previous) * 0.35f).coerceIn(0f, 1f)
+
     private fun muteBeep() {
         if (!isMutedForRestart) {
             try {

@@ -32,6 +32,11 @@ class CommandController(
     private val newAgent: () -> MasalaAgent,
     private val speech: SpeechInput? = null,
     private val speechStrings: SpeechStrings = SpeechStrings("", ""),
+    /**
+     * Turns a long conversation into a short summary the model can keep in its context
+     * once the history outgrows the budget; null means compaction is off.
+     */
+    private val summarize: (suspend (String) -> String?)? = null,
 ) {
     private val _state = MutableStateFlow<CommandState>(CommandState.Idle)
     /**
@@ -72,6 +77,15 @@ class CommandController(
     /** The mic level and live words while listening, for the listening overlay (UI refresh U4). */
     val micLevel: StateFlow<Float> get() = speech?.level ?: kotlinx.coroutines.flow.MutableStateFlow(0f)
     val liveWords: StateFlow<String> get() = speech?.partial ?: kotlinx.coroutines.flow.MutableStateFlow("")
+
+    /**
+     * Whether a tap may start a take that ends by itself here. False makes the mic
+     * hold-to-talk only, which is what the on-device recognizer needs.
+     */
+    var handsFreeAvailable: () -> Boolean = { true }
+
+    /** Seconds until the take ends by itself, when the provider works that way. */
+    val autoSendIn: StateFlow<Int?> get() = speech?.autoSendIn ?: kotlinx.coroutines.flow.MutableStateFlow(null)
     private var history: List<ChatMessage> = emptyList()
     private var readAloud: CommandState.Reply? = null
 
@@ -104,9 +118,14 @@ class CommandController(
         if (raw.isEmpty()) return openInput()
         job?.cancel()
         val prompt = if (spoken) NameCorrector(names()).correct(raw) else raw
-        onTurn?.invoke(com.samosaai.masala.chat.ChatTurn(com.samosaai.masala.chat.TurnRole.USER, prompt))
         _state.value = CommandState.Thinking(prompt)
-        job = scope.launch { handle(prompt, spoken) }
+        job = scope.launch {
+            // Compact first: the summary must appear above the turn that triggered it, not
+            // below it, and the new prompt must not be part of what gets summarised.
+            compactIfNeeded()
+            onTurn?.invoke(com.samosaai.masala.chat.ChatTurn(com.samosaai.masala.chat.TurnRole.USER, prompt))
+            handle(prompt, spoken)
+        }
     }
 
     /** Push-to-talk pressed. Returns false if listening can't start. */
@@ -158,14 +177,55 @@ class CommandController(
         job?.cancel()
         _walkieTalkie.value = false
         speech?.cancel()
-        history = turns
-            .filter { it.role != com.samosaai.masala.chat.TurnRole.ERROR && it.text.isNotBlank() }
-            .map { com.samosaai.masala.llm.ChatMessage(if (it.role == com.samosaai.masala.chat.TurnRole.USER) "user" else "assistant", JsonPrimitive(it.text)) }
+        // A summary written earlier stands in for everything before it, so reopening a very
+        // long chat does not hand the model its whole transcript.
+        val summaryIndex = turns.indexOfLast { it.role == com.samosaai.masala.chat.TurnRole.SYSTEM }
+        val summary = turns.getOrNull(summaryIndex)?.text
+        // Only what came after the summary: everything before it is already condensed, and
+        // replaying it would put the transcript right back over the budget.
+        val spoken = turns.drop(summaryIndex + 1)
+            .filter {
+                it.text.isNotBlank() &&
+                    it.role != com.samosaai.masala.chat.TurnRole.ERROR &&
+                    it.role != com.samosaai.masala.chat.TurnRole.SYSTEM
+            }
+            .map {
+                com.samosaai.masala.llm.ChatMessage(
+                    if (it.role == com.samosaai.masala.chat.TurnRole.USER) "user" else "assistant",
+                    JsonPrimitive(it.text),
+                )
+            }
+        history = listOfNotNull(summary?.let { com.samosaai.masala.llm.ChatMessage("assistant", JsonPrimitive(it)) }) + spoken
         _state.value = CommandState.Idle
+    }
+
+    /**
+     * Keeps the model's context bounded without losing the thread: once the history is long,
+     * it becomes one summary plus the recent turns. The visible transcript is untouched, and
+     * the summary is written into it as a system note so the change is never silent.
+     */
+    private suspend fun compactIfNeeded() {
+        val chars = history.sumOf { it.textContent.length }
+        if (chars < COMPACT_AT_CHARS) return
+        val readable = history.joinToString("\n\n") { "[${it.role}] ${it.textContent}" }
+        val summary = summarize?.invoke(readable)?.trim()?.takeIf { it.isNotBlank() }
+        if (summary != null) {
+            history = listOf(com.samosaai.masala.llm.ChatMessage("assistant", JsonPrimitive(summary)))
+            onTurn?.invoke(com.samosaai.masala.chat.ChatTurn(com.samosaai.masala.chat.TurnRole.SYSTEM, summary))
+        } else {
+            // No summariser, or it failed: keep what fits rather than sending everything.
+            history = com.samosaai.masala.agent.AgentHistory.trim(history, MasalaAgent.DEFAULT_MAX_HISTORY_CHARS)
+        }
     }
 
     /** Ends tap-to-talk listening now; what was said still runs. */
     fun finishListening() {
+        // Sending is not instantaneous: the take still has to be transcribed. Say so at
+        // once instead of leaving "Listening…" on screen until the text lands.
+        if (_state.value == CommandState.Listening) {
+            _walkieTalkie.value = false
+            _state.value = CommandState.Thinking("", listOf("Transcribing"))
+        }
         speech?.finish()
     }
 
@@ -219,6 +279,11 @@ class CommandController(
         } finally {
             history = agent.history
         }
+    }
+
+    private companion object {
+        /** Roughly 7.5k tokens: compact before the agent's own 40k-char trim would kick in. */
+        const val COMPACT_AT_CHARS = 30_000
     }
 
     private fun stateFor(prompt: String, outcome: ActionDispatcher.Outcome, spoken: Boolean, done: String? = null): CommandState = when (outcome) {
