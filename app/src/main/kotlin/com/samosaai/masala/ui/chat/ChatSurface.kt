@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +34,8 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -94,6 +97,7 @@ fun ChatSurface(
     onClose: () -> Unit,
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
+    onDeleteTurn: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val tokens = MasalaTheme.tokens
@@ -148,7 +152,7 @@ fun ChatSurface(
                             },
                         )
                         turns.isEmpty() && !listening && !thinking -> EmptyThread(level, character)
-                        else -> Thread(turns, liveWords, listening, thinking, state, character, level, onStop)
+                        else -> Thread(turns, liveWords, listening, thinking, state, character, level, onStop, onDeleteTurn)
                     }
                 }
                 Controls(listening, autoSendIn, walkie, mic, level, onSend, onClose)
@@ -306,6 +310,7 @@ private fun Thread(
     character: Character,
     level: () -> Float,
     onStop: () -> Unit,
+    onDeleteTurn: (Int) -> Unit,
 ) {
     val list = rememberLazyListState()
     LaunchedEffect(turns.size, liveWords, thinking, (state as? CommandState.Thinking)?.steps?.size) {
@@ -317,7 +322,7 @@ private fun Thread(
         modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        itemsIndexed(turns) { index, turn -> Bubble(turn, key = index) }
+        itemsIndexed(turns) { index, turn -> Bubble(turn, key = index, onDelete = { onDeleteTurn(index) }) }
         if (listening) {
             item("live") {
                 Bubble(
@@ -336,16 +341,28 @@ private fun Thread(
 }
 
 @Composable
-private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1) {
+private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1, onDelete: (() -> Unit)? = null) {
+    var menu by remember { mutableStateOf(false) }
+    // Live turns are transient; only stored turns can be deleted.
+    val longPress = if (onDelete != null && !live) {
+        Modifier.combinedClickable(onClick = {}, onLongClick = { menu = true })
+    } else {
+        Modifier
+    }
+    fun dismissDelete() {
+        menu = false
+        onDelete?.invoke()
+    }
     val user = turn.role == TurnRole.USER
     if (turn.role == TurnRole.SYSTEM) {
         // A history summary: the app wrote it, so it reads as a note, not as a reply.
-        Column(
-            Modifier.fillMaxWidth().padding(vertical = 6.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color.White.copy(alpha = 0.04f))
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        ) {
+        Box(Modifier.fillMaxWidth()) {
+            Column(
+                longPress.fillMaxWidth().padding(vertical = 6.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White.copy(alpha = 0.04f))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
             Text(
                 stringResource(R.string.chat_summary_note),
                 style = MaterialTheme.typography.labelSmall,
@@ -357,6 +374,8 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1) {
                 color = MasalaTheme.tokens.textMedium,
                 modifier = Modifier.padding(top = 4.dp),
             )
+            }
+            TurnMenu(menu, onDismiss = { menu = false }, onDelete = ::dismissDelete)
         }
         return
     }
@@ -367,8 +386,10 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1) {
         bottomEnd = if (user) 6.dp else 18.dp,
     )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (user) Arrangement.End else Arrangement.Start) {
+        Box(Modifier.fillMaxWidth(0.92f)) {
+            TurnMenu(menu, onDismiss = { menu = false }, onDelete = ::dismissDelete)
         Column(
-            Modifier.fillMaxWidth(0.92f).clip(shape)
+            longPress.fillMaxWidth().clip(shape)
                 .background(
                     when {
                         user -> MasalaTheme.tokens.accent.copy(alpha = if (live) 0.22f else 0.92f)
@@ -399,6 +420,15 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1) {
                 }
             }
         }
+        }
+    }
+}
+
+/** Long-press menu on one stored turn: deleting it also drops it from the agent's history. */
+@Composable
+private fun TurnMenu(expanded: Boolean, onDismiss: () -> Unit, onDelete: () -> Unit) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(text = { Text(stringResource(R.string.chat_delete_turn)) }, onClick = onDelete)
     }
 }
 

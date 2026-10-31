@@ -537,6 +537,17 @@ class HomeActivity : ComponentActivity() {
                         app.commands.restoreSession(emptyList())
                         expanded = false
                     },
+                    onDeleteTurn = { index ->
+                        val id = activeId ?: return@ChatSurface
+                        app.scope.launch {
+                            // The agent's history drops the turn too, the way deleting
+                            // a whole chat clears it.
+                            app.chats.deleteTurn(id, index)?.let {
+                                turns = it.turns
+                                app.commands.restoreSession(it.turns)
+                            }
+                        }
+                    },
                 )
             }
             if (showHistory && !hidden) SessionListSheet(

@@ -597,6 +597,7 @@
     <string name="chat_drag_for_thread">Drag up to see the conversation</string>
     <string name="chat_sessions_title">Chats</string>
     <string name="chat_delete">Delete</string>
+    <string name="chat_delete_turn">Delete message</string>
     <string name="chat_send_ready">Tap Send when you are done</string>
     <string name="chat_release_to_send">Release to send</string>
     <string name="chat_sending_in">Sending in %1$d s</string>

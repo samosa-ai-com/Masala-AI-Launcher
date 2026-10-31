@@ -126,4 +126,32 @@ class ChatSessionsTest {
         val s = store()
         assertTrue(s.load().isEmpty())
     }
+
+    @Test
+    fun `deleting one turn keeps the rest in order`() = runBlocking<Unit> {
+        val s = store()
+        val chat = s.create()
+        s.append(chat.id, user("one"))
+        s.append(chat.id, masala("two"))
+        s.append(chat.id, user("three"))
+
+        val next = s.deleteTurn(chat.id, 1)
+        assertNotNull(next)
+        assertEquals(listOf("one", "three"), next!!.turns.map { it.text })
+
+        val reopened = s.get(chat.id)
+        assertNotNull(reopened)
+        assertEquals(listOf("one", "three"), reopened!!.turns.map { it.text })
+    }
+
+    @Test
+    fun `deleting an unknown turn changes nothing`() = runBlocking<Unit> {
+        val s = store()
+        val chat = s.create()
+        s.append(chat.id, user("one"))
+
+        assertNull(s.deleteTurn(chat.id, 5))
+        assertNull(s.deleteTurn("missing", 0))
+        assertEquals(1, s.get(chat.id)!!.turns.size)
+    }
 }
