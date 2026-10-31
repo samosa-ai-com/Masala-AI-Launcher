@@ -121,7 +121,9 @@ internal class SilenceDetector(
     companion object {
         private const val NO_SPEECH_TIMEOUT_DEFAULT_MS = 15_000L
         private const val SPEECH_MARGIN_DB = 10f
+        /** Floor of [rmsDb]; a stream of zeros reads exactly this. */
         private const val ABSOLUTE_FLOOR_DB = -50f
+
         private const val INITIAL_NOISE_FLOOR_DB = -60f
 
         /** Consecutive above-threshold windows required before accepting speech. */

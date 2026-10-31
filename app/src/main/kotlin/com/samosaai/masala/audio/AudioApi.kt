@@ -43,6 +43,11 @@ class AudioApi(
         isLenient = true
     }
 
+    /** HTTP status of the last failed model request (0 when it succeeded), for honest messages. */
+    @Volatile
+    var lastErrorCode: Int = 0
+        private set
+
     init {
         val logging = HttpLoggingInterceptor().apply {
             // The request URL (the configured provider endpoint) is not user
@@ -76,6 +81,7 @@ class AudioApi(
     /** Fetch available models from the API and categorize them by the `task` field. */
     @Suppress("CyclomaticComplexMethod")
     fun listAudioModels(): List<AudioModel> {
+        lastErrorCode = 0
         return try {
             val url = "${baseUrl.trimEnd('/')}/models"
             try { Log.d("AudioApi", "Fetching models from: $url") } catch (_: Throwable) {}
@@ -83,8 +89,10 @@ class AudioApi(
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     try { Log.w("AudioApi", "Models request failed: HTTP ${response.code}") } catch (_: Throwable) {}
+                    lastErrorCode = response.code
                     return@use emptyList()
                 }
+                lastErrorCode = 0
                 val body = response.body?.string() ?: return@use emptyList()
                 try {
                     Log.d("AudioApi", "Models response (first 200 chars): ${body.take(200)}")

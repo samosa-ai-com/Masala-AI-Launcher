@@ -83,6 +83,7 @@
     <string name="stt_test_peak">Mic peak %1$d%%</string>
     <string name="stt_test_vad">Detector floor %1$d · speaks above %2$d · peak %3$d dB</string>
     <string name="stt_test_heard">Heard: %1$s</string>
+    <string name="stt_test_fell_back">The configured server failed, so the phone recognizer did it instead.</string>
     <string name="voice_from_anywhere">From anywhere</string>
     <string name="voice_assist_title">Masala as the assist app</string>
     <string name="voice_assist_summary">Hold Home or Power to talk from any app</string>

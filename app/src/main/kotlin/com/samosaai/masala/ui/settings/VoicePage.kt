@@ -317,6 +317,8 @@ private fun SttTestCard() {
     var heard by remember { mutableStateOf<String?>(null) }
     var peak by remember { mutableFloatStateOf(0f) }
     var activeProvider by remember { mutableStateOf<AudioProvider?>(null) }
+    var usedOnDevice by remember { mutableStateOf(false) }
+    var detail by remember { mutableStateOf<String?>(null) }
     var userCancelled by remember { mutableStateOf(false) }
     val level by engine.level.collectAsState()
     val partial by engine.partial.collectAsState()
@@ -344,30 +346,64 @@ private fun SttTestCard() {
         userCancelled = false
         outcome = null
         heard = null
+        detail = null
+        usedOnDevice = false
         peak = 0f
         scope.launch {
             try {
                 val cfg = app.aiSettings.speechConfig()
                 val code = cfg.sttLanguage.ifBlank { Locale.getDefault().language }
                 val lang = Language.entries.firstOrNull { it.matchesCode(code) } ?: Language.ENGLISH
-                val provider = SpeechPolicy.order(if (cfg.baseUrl.isNotBlank()) AudioProvider.API else AudioProvider.ANDROID)
-                    .firstOrNull { it != AudioProvider.ANDROID || engine.isLocalRecognitionAvailable() }
-                if (provider == null) {
+                // Same order and fallback the mic button uses, so the test reports what
+                // a real tap would do, not a rosier single-provider attempt.
+                val order = SpeechPolicy.order(if (cfg.baseUrl.isNotBlank()) AudioProvider.API else AudioProvider.ANDROID)
+                    .filter { it != AudioProvider.ANDROID || engine.isLocalRecognitionAvailable() }
+                if (order.isEmpty()) {
                     if (!userCancelled) outcome = strings.localUnavailable
                     return@launch
                 }
-                activeProvider = provider
-                val model = if (provider.isApiBased()) cfg.sttModel else ""
-                val result = withTimeoutOrNull(45_000L) { engine.listenForUtterance(provider, model, lang, 2_500L) }
-                if (userCancelled) return@launch
-                if (result == null) {
-                    outcome = strings.server
-                    return@launch
+                var lastResult: Result<String>? = null
+                var lastFailure: String? = null
+                // Why a configured server failed, kept apart from lastFailure: a fallback
+                // that then hears nothing must still be able to name the server problem.
+                var serverFailure: String? = null
+                for (provider in order) {
+                    activeProvider = provider
+                    val model = if (provider.isApiBased()) cfg.sttModel else ""
+                    val result = withTimeoutOrNull(45_000L) { engine.listenForUtterance(provider, model, lang, 2_500L) }
+                    if (userCancelled) return@launch
+                    if (result == null) {
+                        lastFailure = strings.server
+                        if (provider.isApiBased()) serverFailure = strings.server
+                        continue
+                    }
+                    if (result.isSuccess) {
+                        lastResult = result
+                        // Only a stand-in when a configured server actually failed first.
+                        usedOnDevice = provider == AudioProvider.ANDROID && serverFailure != null
+                        break
+                    }
+                    lastFailure = result.exceptionOrNull()?.message
+                    if (provider.isApiBased()) serverFailure = lastFailure
+                    // Silence is final: another provider would only repeat the wait.
+                    if (com.samosaai.masala.audio.SttEngine.isBenignSttError(result.exceptionOrNull())) {
+                        lastResult = result
+                        break
+                    }
                 }
-                result.onSuccess {
+                lastResult?.onSuccess {
                     if (it.isBlank()) outcome = strings.didntCatch else heard = it
-                }.onFailure {
+                }?.onFailure {
                     outcome = friendlySttMessage(it.message, strings)
+                }
+                // A configured server that failed first is the likelier cause than
+                // silence, so say it under the outcome — once, never as a repeat.
+                serverFailure?.let { f ->
+                    val extra = friendlySttMessage(f, strings)
+                    if (extra != outcome) detail = extra
+                }
+                if (!userCancelled && lastResult == null) {
+                    outcome = friendlySttMessage(lastFailure, strings)
                 }
             } catch (e: Exception) {
                 if (!userCancelled) outcome = friendlySttMessage(e.message, strings)
@@ -425,12 +461,22 @@ private fun SttTestCard() {
         }
         heard?.let {
             Text(stringResource(R.string.stt_test_heard, it), style = MaterialTheme.typography.bodyMedium)
+            if (usedOnDevice) {
+                Text(
+                    stringResource(R.string.stt_test_fell_back),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             OutlinedButton(onClick = { start { grant.launch(Manifest.permission.RECORD_AUDIO) } }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.stt_test))
             }
         }
         outcome?.let {
             Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+            detail?.let { d ->
+                Text(d, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             OutlinedButton(onClick = { start { grant.launch(Manifest.permission.RECORD_AUDIO) } }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.stt_test))
             }

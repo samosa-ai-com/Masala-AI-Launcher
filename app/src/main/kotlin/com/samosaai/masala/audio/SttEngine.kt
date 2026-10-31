@@ -263,7 +263,15 @@ class SttEngine(
         val effectiveModel = model.ifBlank {
             if (apiSttModels.isEmpty()) refreshApiModels()
             apiSttModels.firstOrNull()?.id
-                ?: return@withContext Result.failure(Exception("No transcription model on the configured endpoint"))
+                ?: return@withContext Result.failure(
+                    Exception(
+                        if (api.lastErrorCode == 401 || api.lastErrorCode == 403) {
+                            "HTTP ${api.lastErrorCode} listing speech models: the API key was rejected"
+                        } else {
+                            "No transcription model on the configured endpoint"
+                        }
+                    )
+                )
         }
         try {
             api.transcribe(
@@ -335,8 +343,10 @@ class SttEngine(
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT
         )
+        // MIC, not VOICE_RECOGNITION: the recognition source applies the vendor's
+        // capture processing and on some devices reads back pure zeros.
         val recorder = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_RECOGNITION,
+            MediaRecorder.AudioSource.MIC,
             sampleRate,
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT,
@@ -357,6 +367,9 @@ class SttEngine(
         val startMs = System.currentTimeMillis()
         var result: File? = null
         var peakDb = -50f
+        // Any non-zero sample at all. rmsDb clamps at the floor, so a genuinely
+        // quiet room is indistinguishable from a broken stream by level alone.
+        var sawSignal = false
         try {
             recorder.startRecording()
             while (!vadStopRequested) {
@@ -365,6 +378,7 @@ class SttEngine(
                 if (count == 0) continue
                 for (i in 0 until count) {
                     val sample = shortBuf[i].toInt()
+                    if (sample != 0) sawSignal = true
                     byteBuf[i * 2] = (sample and 0xFF).toByte()
                     byteBuf[i * 2 + 1] = ((sample shr 8) and 0xFF).toByte()
                 }
@@ -385,7 +399,12 @@ class SttEngine(
             // the hands-free auto-stop, it never vetoes the user's finger. Pure
             // silence still returns null, so an untouched mic doesn't upload
             // 15 s of nothing.
-            if (shouldKeepRecording(detector.speechDetected, vadUserStopped, pcm.size())) {
+            if (!sawSignal && pcm.size() > 0) {
+                // Not one non-zero sample: the capture path itself is broken (the
+                // stream opened and read back only zeros). Say so, rather than
+                // blaming the user for not speaking.
+                vadRecordError = Exception("Recording captured no audio (microphone returned silence)")
+            } else if (shouldKeepRecording(detector.speechDetected, vadUserStopped, pcm.size())) {
                 result = writeWav(context.cacheDir, pcm.toByteArray(), sampleRate)
             }
         } catch (e: Exception) {
@@ -833,6 +852,7 @@ class SttEngine(
 
         /** Synthetic error code: listening was cancelled by pause/end, not by the recognizer. */
         const val ERROR_CANCELLED = -100
+
 
         /** Hard cap on a single hands-free VAD recording (90 s). */
         private const val MAX_VAD_RECORDING_MS = 90_000L
