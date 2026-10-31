@@ -11,7 +11,7 @@ data class LayoutDoc(
 ) {
     companion object {
         /** Bump with a migration in [com.samosaai.masala.core.migration.LayoutMigrations]. */
-        const val CURRENT_SCHEMA_VERSION = 1
+        const val CURRENT_SCHEMA_VERSION = 2
     }
 }
 

@@ -84,6 +84,11 @@ sealed interface MasalaAction {
     @Serializable
     @SerialName("run_tool")
     data class RunTool(val name: String, val args: JsonObject = JsonObject(emptyMap())) : MasalaAction
+
+    /** A folder on home: tapping it shows [items]. Opened by the home screen, never dispatched. */
+    @Serializable
+    @SerialName("open_folder")
+    data class OpenFolder(val items: List<Item>) : MasalaAction
 }
 
 /**
@@ -108,5 +113,6 @@ fun MasalaAction.sensitivity(toolSensitivity: (String) -> ToolSensitivity?): Too
     is MasalaAction.Search,
     is MasalaAction.AskMasala,
     is MasalaAction.RunSkill,
-    is MasalaAction.OpenMiniApp -> ToolSensitivity.READ_ONLY
+    is MasalaAction.OpenMiniApp,
+    is MasalaAction.OpenFolder -> ToolSensitivity.READ_ONLY
 }

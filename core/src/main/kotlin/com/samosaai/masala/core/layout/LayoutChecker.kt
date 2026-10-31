@@ -62,6 +62,7 @@ object LayoutChecker {
     const val MAX_COLUMNS = 6
     const val MAX_WIDGETS_IN_STACK = 8
     const val MAX_ROWS = 8
+    const val MAX_FOLDER_ITEMS = 16
 
     /**
      * Reads layout JSON the strict way, migrating older schema versions first. A document that doesn't
@@ -142,15 +143,42 @@ object LayoutChecker {
         section.items.forEachIndexed { i, item ->
             val itemPath = "$path.items[$i]"
             id(item.id, itemPath)
-            checkItem(item, itemPath, env, problems)
+            checkItem(item, itemPath, env, id, problems)
         }
     }
 
-    private fun checkItem(item: Item, path: String, env: Environment, problems: MutableList<Problem>) {
+    private fun checkItem(item: Item, path: String, env: Environment, id: (String, String) -> Unit, problems: MutableList<Problem>) {
         if (item.label.isBlank()) problems += Problem("$path.label", "label is empty")
         checkIcon(item.icon, "$path.icon", env, problems)
-        checkAction(item.action, "$path.action", env, problems)
+        checkAction(item.action, "$path.action", env, problems, id)
         checkRules(item.rules, "$path.rules", null, problems)
+    }
+
+    /** One level only: a folder's children are plain items with no rules. */
+    private fun checkFolder(
+        folder: MasalaAction.OpenFolder,
+        path: String,
+        env: Environment,
+        id: ((String, String) -> Unit)?,
+        problems: MutableList<Problem>,
+    ) {
+        if (id == null) {
+            problems += Problem(path, "Folders can only be home items")
+            return
+        }
+        if (folder.items.size !in 1..MAX_FOLDER_ITEMS) {
+            problems += Problem("$path.items", "A folder holds 1 to $MAX_FOLDER_ITEMS items")
+        }
+        folder.items.forEachIndexed { i, child ->
+            val childPath = "$path.items[$i]"
+            id(child.id, childPath)
+            if (child.action is MasalaAction.OpenFolder) {
+                problems += Problem("$childPath.action", "Folders can't contain folders")
+            } else {
+                checkItem(child, childPath, env, id, problems)
+            }
+            if (child.rules.isNotEmpty()) problems += Problem("$childPath.rules", "Items in a folder can't have rules")
+        }
     }
 
     private fun checkIcon(icon: IconRef, path: String, env: Environment, problems: MutableList<Problem>) {
@@ -165,8 +193,16 @@ object LayoutChecker {
         }
     }
 
-    fun checkAction(action: MasalaAction, path: String, env: Environment, problems: MutableList<Problem>) {
+    /** [id] registers folder children's ids; without it (a widget button) a folder is a problem. */
+    fun checkAction(
+        action: MasalaAction,
+        path: String,
+        env: Environment,
+        problems: MutableList<Problem>,
+        id: ((String, String) -> Unit)? = null,
+    ) {
         when (action) {
+            is MasalaAction.OpenFolder -> checkFolder(action, path, env, id, problems)
             is MasalaAction.LaunchApp -> if (!env.installed(action.packageName, action.user)) {
                 problems += Problem("$path.packageName", "${action.packageName} is not installed for user ${action.user}")
             }
