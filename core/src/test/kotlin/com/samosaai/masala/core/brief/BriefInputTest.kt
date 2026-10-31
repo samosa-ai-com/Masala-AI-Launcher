@@ -111,6 +111,12 @@ class BriefTopicsTest {
 
 class BriefLinksTest {
     @Test
+    fun `recent links skip briefs without any`() {
+        val answers = listOf("News isn't available right now.", "Offline too", "- A ([S](https://a.example/1))", "- B https://b.example/2", "- C https://c.example/3")
+        assertEquals(listOf("https://a.example/1", "https://b.example/2"), BriefLinks.recent(answers))
+    }
+
+    @Test
     fun `links come out of Markdown and bare text once each`() {
         val md = "- F1 news ([Source](https://f1.example/a?x=1)). See https://b.example/x, and https://f1.example/a?x=1"
         assertEquals(listOf("https://f1.example/a?x=1", "https://b.example/x"), BriefLinks.extract(md))

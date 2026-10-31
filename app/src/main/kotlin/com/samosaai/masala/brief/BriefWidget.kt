@@ -41,7 +41,20 @@ object BriefWidget {
         }
     }
 
+    /**
+     * Each line that starts with a bold label ("**Weather**: …") begins its own paragraph. Models often
+     * put the labels on single lines, which Markdown would join into one paragraph.
+     */
+    fun paragraphs(markdown: String): String {
+        val out = mutableListOf<String>()
+        for (line in markdown.trim().lines()) {
+            if (line.trimStart().startsWith("**") && out.isNotEmpty() && out.last().isNotBlank()) out += ""
+            out += line
+        }
+        return out.joinToString("\n")
+    }
+
     /** What a medium widget shows: the first block (the brief's Today section). */
     fun preview(markdown: String): String =
-        markdown.trim().split(Regex("\\n\\s*\\n")).firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+        paragraphs(markdown).split(Regex("\\n\\s*\\n")).firstOrNull { it.isNotBlank() }?.trim().orEmpty()
 }

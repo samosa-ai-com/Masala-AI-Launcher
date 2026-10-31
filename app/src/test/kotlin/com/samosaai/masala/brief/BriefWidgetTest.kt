@@ -53,4 +53,11 @@ class BriefWidgetTest {
         assertEquals("**Today**\n- 09:30 Standup", BriefWidget.preview("\n**Today**\n- 09:30 Standup\n\n**Weather**\nRain\n"))
         assertEquals("", BriefWidget.preview("   "))
     }
+
+    @Test
+    fun `labels on single lines become paragraphs, so the preview is the first section`() {
+        val md = "**Today**: Nothing on the calendar.\n**Weather**: Rain.\n**Worth knowing**:\n- **Big** news"
+        assertEquals("**Today**: Nothing on the calendar.\n\n**Weather**: Rain.\n\n**Worth knowing**:\n\n- **Big** news".replace("\n\n- ", "\n- "), BriefWidget.paragraphs(md))
+        assertEquals("**Today**: Nothing on the calendar.", BriefWidget.preview(md))
+    }
 }

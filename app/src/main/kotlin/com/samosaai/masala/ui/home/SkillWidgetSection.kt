@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -25,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
@@ -203,7 +205,14 @@ private fun ScheduledResult(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Markdown(if (size == SkillWidgetSize.LARGE) markdown else BriefWidget.preview(markdown))
+            // Capped, so the buttons stay on screen; Open shows the whole result.
+            Markdown(
+                if (size == SkillWidgetSize.LARGE) BriefWidget.paragraphs(markdown) else BriefWidget.preview(markdown),
+                // Measured at full height and clipped: a capped measure makes the paragraphs overlap.
+                Modifier.heightIn(max = if (size == SkillWidgetSize.LARGE) 200.dp else 96.dp).clipToBounds()
+                    .wrapContentHeight(Alignment.Top, unbounded = true),
+                linkColor = MaterialTheme.colorScheme.primary,
+            )
         }
     }
     nextRun?.let { Text(stringResource(R.string.skill_widget_next_run, formatNextRun(it)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }

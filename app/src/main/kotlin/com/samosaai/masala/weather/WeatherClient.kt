@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -45,11 +46,14 @@ class WeatherClient(private val clock: () -> Long = System::currentTimeMillis) {
         get(OpenMeteo.searchUrl(name, Locale.getDefault().language)).map(OpenMeteo::parsePlaces)
 
     private suspend fun get(url: String): Result<String> = withContext(Dispatchers.IO) {
-        runCatching {
+        try {
             client.newCall(Request.Builder().url(url).build()).execute().use { response ->
-                if (!response.isSuccessful) error("The weather service answered HTTP ${response.code}.")
-                response.body?.string() ?: error("The weather service sent an empty answer.")
+                if (!response.isSuccessful) Result.failure(IOException("the weather service answered HTTP ${response.code}"))
+                else response.body?.string()?.let { Result.success(it) } ?: Result.failure(IOException("the weather service sent an empty answer"))
             }
+        } catch (_: IOException) {
+            // No connection, no DNS, a timeout: the exception's own text means nothing to the user.
+            Result.failure(IOException("no connection to the weather service"))
         }
     }
 

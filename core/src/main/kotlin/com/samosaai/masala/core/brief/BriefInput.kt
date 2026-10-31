@@ -153,4 +153,11 @@ object BriefLinks {
     private val URL = Regex("https?://[^\\s)\\]>\"']+")
 
     fun extract(markdown: String): List<String> = URL.findAll(markdown).map { it.value.trimEnd('.', ',', ';') }.distinct().toList()
+
+    /**
+     * The links of the newest [briefs] answers that have any, newest first. Briefs without links (a
+     * fallback written while offline) are skipped, so they don't hide the stories covered before.
+     */
+    fun recent(answersNewestFirst: List<String>, briefs: Int = 2): List<String> =
+        answersNewestFirst.map(::extract).filter { it.isNotEmpty() }.take(briefs).flatten().distinct()
 }

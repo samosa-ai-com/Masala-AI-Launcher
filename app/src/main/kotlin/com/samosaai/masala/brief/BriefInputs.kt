@@ -79,11 +79,11 @@ class BriefInputs(private val app: MasalaApp) {
         app.secondBrain.readPath(BriefTopics.PATH)?.text?.let(BriefTopics::parse).orEmpty()
 
     private suspend fun recentLinks(): List<String> = withContext(Dispatchers.IO) {
-        app.database.skillRuns().runsFor(SKILL_ID).first()
-            .filter { it.status == "done" }
-            .take(2)
-            .flatMap { run -> SkillRunner.lastAnswer(run.transcriptJson)?.let(BriefLinks::extract).orEmpty() }
-            .distinct()
+        BriefLinks.recent(
+            app.database.skillRuns().runsFor(SKILL_ID).first()
+                .filter { it.status == "done" }
+                .mapNotNull { run -> SkillRunner.lastAnswer(run.transcriptJson) },
+        )
     }
 
     companion object {
