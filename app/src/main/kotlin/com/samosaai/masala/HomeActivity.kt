@@ -170,6 +170,7 @@ class HomeActivity : ComponentActivity() {
             LaunchedEffect(commandState) {
                 if (commandState != CommandState.Idle) chatOpen = true
                 if (commandState == CommandState.Listening) expanded = false
+                if (commandState is CommandState.Thinking) expanded = true
             }
         val pinnedShortcuts by launcher.pinnedShortcuts.collectAsStateWithLifecycle()
         val profiles by launcher.profiles.collectAsStateWithLifecycle()
@@ -439,6 +440,7 @@ class HomeActivity : ComponentActivity() {
                     onExpanded = { expanded = it },
                     mic = rememberMicPress(app),
                     onSend = { app.commands.sendNow() },
+                    onStop = { app.commands.dismiss() },
                     onClose = {
                         app.commands.dismiss()
                         chatOpen = false

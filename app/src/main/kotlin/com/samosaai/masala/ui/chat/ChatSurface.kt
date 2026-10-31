@@ -64,6 +64,7 @@ import com.samosaai.masala.ui.character.CharacterState
 import com.samosaai.masala.ui.character.MasalaCharacter
 import com.samosaai.masala.ui.home.MicPress
 import com.samosaai.masala.ui.home.MicButton
+import com.samosaai.masala.ui.theme.MasalaColors
 import com.samosaai.masala.ui.theme.MasalaTheme
 
 /**
@@ -83,6 +84,7 @@ fun ChatSurface(
     onExpanded: (Boolean) -> Unit,
     mic: MicPress,
     onSend: () -> Unit,
+    onStop: () -> Unit,
     onClose: () -> Unit,
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
@@ -138,7 +140,7 @@ fun ChatSurface(
                             },
                         )
                         turns.isEmpty() && !listening && !thinking -> EmptyThread(level, character)
-                        else -> Thread(turns, liveWords, listening, thinking, state, character, level)
+                        else -> Thread(turns, liveWords, listening, thinking, state, character, level, onStop)
                     }
                 }
                 Controls(listening, mic, onSend, onClose)
@@ -270,9 +272,10 @@ private fun Thread(
     state: CommandState,
     character: Character,
     level: () -> Float,
+    onStop: () -> Unit,
 ) {
     val list = rememberLazyListState()
-    LaunchedEffect(turns.size, liveWords, thinking) {
+    LaunchedEffect(turns.size, liveWords, thinking, (state as? CommandState.Thinking)?.steps?.size) {
         val last = list.layoutInfo.totalItemsCount - 1
         if (last >= 0) list.animateScrollToItem(last)
     }
@@ -292,15 +295,7 @@ private fun Thread(
         }
         if (thinking) {
             item("working") {
-                Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = MasalaTheme.tokens.accent)
-                    Text(
-                        stringResource(R.string.chat_working),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MasalaTheme.tokens.textMedium,
-                        modifier = Modifier.padding(start = 10.dp),
-                    )
-                }
+                StepTimeline(steps = (state as? CommandState.Thinking)?.steps.orEmpty(), onStop = onStop)
             }
         }
         item("tail") { Spacer(Modifier.height(6.dp)) }
@@ -335,12 +330,18 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1) {
                 fontSize = 14.sp,
             )
             if (turn.steps.isNotEmpty()) {
-                Text(
-                    turn.steps.joinToString(" · "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MasalaTheme.tokens.textLow,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
+                Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    turn.steps.forEach { step ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Box(Modifier.size(5.dp).clip(CircleShape).background(MasalaColors.Cardamom.copy(alpha = 0.85f)))
+                            Text(
+                                step,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MasalaTheme.tokens.textLow,
+                            )
+                        }
+                    }
+                }
             }
         }
     }
