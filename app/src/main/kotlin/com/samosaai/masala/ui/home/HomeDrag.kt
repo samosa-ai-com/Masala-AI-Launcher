@@ -40,8 +40,9 @@ object DropTargets {
     /** Fraction cut from each side of an item's box; what is left is the "onto" area (centre 60%). */
     private const val ONTO_INSET = 0.2f
 
-    fun resolve(x: Float, y: Float, sections: Map<String, Box2>, items: Map<String, List<Pair<String, Box2>>>, dragged: String): DropTarget? {
-        for (list in items.values) for ((id, box) in list) {
+    /** Without [onto] (no folders yet), a drop on an item's centre is a slot like its edge. */
+    fun resolve(x: Float, y: Float, sections: Map<String, Box2>, items: Map<String, List<Pair<String, Box2>>>, dragged: String, onto: Boolean = true): DropTarget? {
+        if (onto) for (list in items.values) for ((id, box) in list) {
             if (id != dragged && box.inset(ONTO_INSET).contains(x, y)) return DropTarget.Onto(id)
         }
         val sectionId = sections.entries.firstOrNull { it.value.contains(x, y) }?.key ?: return null
@@ -59,7 +60,10 @@ object DropTargets {
  * their boxes in [itemBoxes] and [sectionBoxes] (root pixels) and remove them when they leave.
  */
 @Stable
-class HomeDragState {
+class HomeDragState(
+    /** Whether a drop onto an item is its own target (folders); off until folders exist. */
+    private val onto: Boolean = false,
+) {
     var dragging: Item? by mutableStateOf(null)
         private set
 
@@ -86,7 +90,7 @@ class HomeDragState {
         val item = dragging ?: return
         pointer = at
         val items = itemBoxes.entries.groupBy({ it.value.first }, { it.key to it.value.second })
-        hover = DropTargets.resolve(at.x, at.y, sectionBoxes.toMap(), items, item.id)
+        hover = DropTargets.resolve(at.x, at.y, sectionBoxes.toMap(), items, item.id, onto)
     }
 
     /** Ends the drag; returns where it landed, or null to cancel. */

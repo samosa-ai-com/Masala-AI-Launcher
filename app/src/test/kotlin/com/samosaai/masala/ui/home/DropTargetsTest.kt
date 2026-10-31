@@ -22,6 +22,11 @@ class DropTargetsTest {
     }
 
     @Test
+    fun `without onto the centre of an item is a slot`() {
+        assertEquals(DropTarget.Slot("grid", 5, "g5"), DropTargets.resolve(150f, 150f, sections, items, "other", onto = false))
+    }
+
+    @Test
     fun `the edge of an item is a slot`() {
         assertEquals(DropTarget.Slot("grid", 1, "g1"), resolve(105f, 50f))
     }

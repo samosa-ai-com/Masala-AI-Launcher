@@ -42,8 +42,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.unit.round
+import com.samosaai.masala.ui.theme.rememberHaptics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -109,6 +123,13 @@ class RenderContext(
     val onModeChip: (() -> Unit)? = null,
     /** Opens an app from the bounds of its icon on screen, so it grows out of it. */
     val onLaunchFrom: ((MasalaAction, android.graphics.Rect) -> Unit)? = null,
+    /** Long-press-then-drag to move items; none keeps the plain long-press menu. */
+    val drag: HomeDragState? = null,
+    /** Ids of the items in the base layout: only these can be dragged (not mode-added ones). */
+    val movable: Set<String> = emptySet(),
+    /** The menu for an item that isn't an app; apps use [onAppMenu]. */
+    val onItemMenu: ((Item) -> Unit)? = null,
+    val onDrop: ((Item, DropTarget) -> Unit)? = null,
 ) {
     /** A fixed time, for previews and tests. */
     constructor(
@@ -156,12 +177,36 @@ fun LayoutRenderer(
     val pages = layout.layout.pages
     val pager = rememberPagerState { pages.size.coerceAtLeast(1) }
     LaunchedEffect(resetSignal) { if (resetSignal > 0) pager.animateScrollToPage(0) }
-    Column(modifier) {
-        HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
-            pages.getOrNull(index)?.let { PageContent(it, layout, ctx, aboveDock, entrySignal, footer = if (index == pages.lastIndex) footer else ({})) }
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    Box(modifier.onGloballyPositioned { origin = it.positionInRoot() }) {
+        Column(Modifier.fillMaxSize()) {
+            HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
+                pages.getOrNull(index)?.let { PageContent(it, layout, ctx, aboveDock, entrySignal, footer = if (index == pages.lastIndex) footer else ({})) }
+            }
+            if (pages.size > 1) PageDots(pages.size, pager.currentPage)
         }
-        if (pages.size > 1) PageDots(pages.size, pager.currentPage)
+        ctx.drag?.let { drag -> drag.dragging?.let { LiftedItem(it, drag, origin, ctx) } }
     }
+}
+
+/** The dragged item under the finger, a little larger and raised. */
+@Composable
+private fun LiftedItem(item: Item, drag: HomeDragState, origin: Offset, ctx: RenderContext) {
+    val width = 80.dp
+    val widthPx = with(LocalDensity.current) { width.toPx() }
+    Box(
+        Modifier
+            .offset {
+                val grab = Offset(drag.grab.x.coerceAtMost(widthPx / 2), drag.grab.y)
+                (drag.pointer - grab - origin).round()
+            }
+            .width(width)
+            .graphicsLayer {
+                scaleX = 1.12f
+                scaleY = 1.12f
+                shadowElevation = 16.dp.toPx()
+            },
+    ) { ItemCell(item, ctx, sectionId = null, interactive = false) }
 }
 
 @Composable
@@ -195,9 +240,9 @@ private fun PageContent(page: Page, layout: ResolvedLayout, ctx: RenderContext, 
 private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: RenderContext) {
     when (section) {
         is HeaderSection -> Header(section, ctx)
-        is GridSection -> ItemGrid(section.title, section.items, section.columns, ctx)
+        is GridSection -> ItemGrid(section.id, section.title, section.items, section.columns, ctx)
         is DockSection -> Dock(section, ctx)
-        is ListSection -> ItemList(section.title, section.items, ctx)
+        is ListSection -> ItemList(section.id, section.title, section.items, ctx)
         is GroupSection -> Group(section, ctx)
         is WidgetSection -> Placeholder(section.widget.title ?: section.widget.id, stringResource(R.string.home_widget_placeholder), layout.widgetRows[section.widget.id])
         is StackSection -> section.widgets.firstOrNull()?.let {
@@ -260,16 +305,16 @@ private fun columnsFor(wanted: Int, maxWidthDp: Float): Int {
 }
 
 @Composable
-private fun ItemGrid(title: String?, items: List<Item>, columns: Int, ctx: RenderContext) {
+private fun ItemGrid(sectionId: String, title: String?, items: List<Item>, columns: Int, ctx: RenderContext) {
     if (items.isEmpty() && title == null) return
-    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+    Column(Modifier.fillMaxWidth().dropSection(sectionId, ctx).padding(horizontal = 12.dp)) {
         title?.let { Text(it, style = wallpaperText(MaterialTheme.typography.titleSmall), modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) }
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val cols = columnsFor(columns, maxWidth.value)
             Column {
                 items.chunked(cols).forEach { row ->
                     Row(Modifier.fillMaxWidth()) {
-                        row.forEach { item -> Box(Modifier.weight(1f)) { ItemCell(item, ctx) } }
+                        row.forEach { item -> Box(Modifier.weight(1f)) { ItemCell(item, ctx, sectionId) } }
                         repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
@@ -282,20 +327,20 @@ private fun ItemGrid(title: String?, items: List<Item>, columns: Int, ctx: Rende
 private fun Dock(section: DockSection, ctx: RenderContext) {
     val shape = RoundedCornerShape(30.dp)
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).heightIn(min = 78.dp).clip(shape)
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).heightIn(min = 78.dp).dropSection(section.id, ctx).clip(shape)
             .background(MasalaTheme.tokens.wallpaperGlass).border(1.dp, Color.White.copy(alpha = 0.09f), shape).padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        section.items.forEach { item -> Box(Modifier.weight(1f)) { ItemCell(item, ctx, showLabel = false) } }
+        section.items.forEach { item -> Box(Modifier.weight(1f)) { ItemCell(item, ctx, section.id, showLabel = false) } }
     }
 }
 
 @Composable
-private fun ItemList(title: String?, items: List<Item>, ctx: RenderContext) {
-    Column(Modifier.fillMaxWidth()) {
+private fun ItemList(sectionId: String, title: String?, items: List<Item>, ctx: RenderContext) {
+    Column(Modifier.fillMaxWidth().dropSection(sectionId, ctx)) {
         title?.let { Text(it, style = wallpaperText(MaterialTheme.typography.titleSmall), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) }
-        items.forEach { item -> ItemRow(item, ctx) }
+        items.forEach { item -> ItemRow(item, ctx, sectionId) }
     }
 }
 
@@ -310,12 +355,12 @@ private fun Group(section: GroupSection, ctx: RenderContext) {
             Text(section.label, style = wallpaperText(MaterialTheme.typography.titleMedium), modifier = Modifier.weight(1f))
             Text(if (open) "▾" else "▸", style = wallpaperText(MaterialTheme.typography.titleMedium))
         }
-        if (open) ItemGrid(null, section.items, 4, ctx)
+        if (open) ItemGrid(section.id, null, section.items, 4, ctx)
     }
 }
 
 @Composable
-private fun ItemCell(item: Item, ctx: RenderContext, showLabel: Boolean = true) {
+private fun ItemCell(item: Item, ctx: RenderContext, sectionId: String?, showLabel: Boolean = true, interactive: Boolean = true) {
     val app = appFor(item, ctx)
     val label = app?.takeIf { it.renamed }?.label ?: item.label
     val bounds = remember { IconBounds() }
@@ -323,8 +368,7 @@ private fun ItemCell(item: Item, ctx: RenderContext, showLabel: Boolean = true) 
         Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .onGloballyPositioned { bounds.set(it) }
-            .itemClicks(item, app, ctx, label, bounds)
+            .then(if (interactive) Modifier.dropItem(item, sectionId, ctx, bounds).itemClicks(item, app, ctx, label, bounds) else Modifier)
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -343,12 +387,12 @@ private fun ItemCell(item: Item, ctx: RenderContext, showLabel: Boolean = true) 
 }
 
 @Composable
-private fun ItemRow(item: Item, ctx: RenderContext) {
+private fun ItemRow(item: Item, ctx: RenderContext, sectionId: String) {
     val app = appFor(item, ctx)
     val label = app?.takeIf { it.renamed }?.label ?: item.label
     val bounds = remember { IconBounds() }
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 56.dp).onGloballyPositioned { bounds.set(it) }.itemClicks(item, app, ctx, label, bounds).padding(horizontal = 24.dp, vertical = 4.dp),
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).dropItem(item, sectionId, ctx, bounds).itemClicks(item, app, ctx, label, bounds).padding(horizontal = 24.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconView(item.icon, app, ctx, size = 40)
@@ -356,22 +400,91 @@ private fun ItemRow(item: Item, ctx: RenderContext) {
     }
 }
 
-/** Tap runs the action; a long press on a pinned app opens its menu unless the home layout is locked. */
+/**
+ * Records where the item sits (for opening apps from it and for drops), and fades it while it is the one
+ * being dragged. Its drop box goes when it leaves, so pages scrolled away leave no stale boxes.
+ */
+@Composable
+private fun Modifier.dropItem(item: Item, sectionId: String?, ctx: RenderContext, bounds: IconBounds): Modifier {
+    val drag = ctx.drag
+    if (drag != null && sectionId != null) {
+        DisposableEffect(drag, item.id) { onDispose { drag.itemBoxes.remove(item.id) } }
+    }
+    return this
+        .onGloballyPositioned {
+            bounds.set(it)
+            if (drag != null && sectionId != null) drag.itemBoxes[item.id] = sectionId to it.boundsInRoot().toBox2()
+        }
+        .graphicsLayer { alpha = if (drag?.dragging?.id == item.id) 0.3f else 1f }
+}
+
+/** Registers an item section's box as a drop area while it is on screen. */
+@Composable
+private fun Modifier.dropSection(sectionId: String, ctx: RenderContext): Modifier {
+    val drag = ctx.drag ?: return this
+    DisposableEffect(drag, sectionId) { onDispose { drag.sectionBoxes.remove(sectionId) } }
+    return onGloballyPositioned { drag.sectionBoxes[sectionId] = it.boundsInRoot().toBox2() }
+}
+
+private fun androidx.compose.ui.geometry.Rect.toBox2() = Box2(left, top, right, bottom)
+
+/**
+ * Tap runs the action. A long press opens the item's menu unless the home layout is locked; on an item
+ * of the base layout, moving past touch slop after the long press drags it instead (no menu then).
+ * After the long press every move and the lift are consumed early, so neither the tap nor the pager,
+ * the page's list or home's swipes see them.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun Modifier.itemClicks(item: Item, app: AppEntry?, ctx: RenderContext, label: String, bounds: IconBounds? = null): Modifier {
     val menuLabel = stringResource(R.string.menu_options)
-    val canMenu = app != null && !ctx.locked
+    val haptics = rememberHaptics()
+    val drag = ctx.drag?.takeIf { item.id in ctx.movable && !ctx.locked }
+    val menu: (() -> Unit)? = when {
+        ctx.locked -> null
+        app != null -> ({ ctx.onAppMenu(app) })
+        else -> ctx.onItemMenu?.let { onMenu -> { onMenu(item) } }
+    }
+    val dragging = if (drag == null) Modifier else Modifier.pointerInput(item.id, drag) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            val long = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
+            haptics.heavy()
+            long.consume()
+            fun rootOf(p: Offset) = bounds?.coordinates?.takeIf { it.isAttached }?.localToRoot(p) ?: p
+            var moved = false
+            while (true) {
+                val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                if (!change.pressed) {
+                    change.consume()
+                    break
+                }
+                if (!moved && (change.position - long.position).getDistance() > viewConfiguration.touchSlop) {
+                    moved = true
+                    drag.start(item, rootOf(change.position))
+                }
+                if (moved) drag.moveTo(rootOf(change.position))
+                change.consume()
+            }
+            if (moved) drag.drop()?.let { ctx.onDrop?.invoke(item, it) } else menu?.invoke()
+        }
+    }
     return this
+        .then(dragging)
         .combinedClickable(
             onClick = {
                 val from = bounds?.rect
                 if (from != null && item.action is MasalaAction.LaunchApp && ctx.onLaunchFrom != null) ctx.onLaunchFrom.invoke(item.action, from) else ctx.onAction(item.action)
             },
-            onLongClick = if (canMenu && app != null) ({ ctx.onAppMenu(app) }) else null,
-            onLongClickLabel = if (canMenu) menuLabel else null,
+            onLongClick = if (drag == null && app != null && !ctx.locked) ({ ctx.onAppMenu(app) }) else null,
+            onLongClickLabel = if (drag == null && app != null && !ctx.locked) menuLabel else null,
         )
-        .semantics { contentDescription = label; role = Role.Button }
+        .semantics {
+            contentDescription = label
+            role = Role.Button
+            // The drag gesture replaces the long click, so TalkBack still needs a way to the menu.
+            if (drag != null && menu != null) onLongClick(menuLabel) { menu(); true }
+        }
 }
 
 private fun appFor(item: Item, ctx: RenderContext): AppEntry? {
@@ -428,7 +541,12 @@ internal class IconBounds {
     var rect: android.graphics.Rect? = null
         private set
 
+    /** The item's layout, to turn a touch on it into root coordinates while dragging. */
+    var coordinates: androidx.compose.ui.layout.LayoutCoordinates? = null
+        private set
+
     fun set(coordinates: androidx.compose.ui.layout.LayoutCoordinates) {
+        this.coordinates = coordinates
         val b = coordinates.boundsInWindow()
         rect = android.graphics.Rect(b.left.toInt(), b.top.toInt(), b.right.toInt(), b.bottom.toInt())
     }

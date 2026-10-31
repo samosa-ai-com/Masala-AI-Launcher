@@ -67,6 +67,10 @@ import com.samosaai.masala.ui.home.rememberMicPress
 import com.samosaai.masala.ui.home.ConfirmationSheet
 import com.samosaai.masala.ui.home.HomeScreen
 import com.samosaai.masala.ui.home.RenderContext
+import com.samosaai.masala.ui.home.DropTarget
+import com.samosaai.masala.ui.home.HomeDragState
+import com.samosaai.masala.core.contract.ItemSection
+import com.samosaai.masala.core.layout.LayoutEdits
 import com.samosaai.masala.scheduled.ScheduledTaskScheduler
 import com.samosaai.masala.skills.SkillScheduling
 import com.samosaai.masala.ui.home.SkillWidgetSource
@@ -342,7 +346,12 @@ class HomeActivity : ComponentActivity() {
         val activeModes by app.modes.active.collectAsStateWithLifecycle()
         val patches by app.modes.patches.collectAsStateWithLifecycle()
         val modeName = patches.filter { it.id in activeModes }.joinToString(" · ") { it.name }.ifBlank { null }
-        val render = remember(apps, settings.homeLocked, modeName) {
+        val baseLayout by app.layouts.base.collectAsStateWithLifecycle()
+        val movable = remember(baseLayout) {
+            baseLayout?.pages.orEmpty().flatMap { it.sections }.filterIsInstance<ItemSection>().flatMap { s -> s.items.map { it.id } }.toSet()
+        }
+        val drag = remember { HomeDragState() }
+        val render = remember(apps, settings.homeLocked, modeName, movable) {
             RenderContext(
                 icons = app.icons,
                 apps = apps,
@@ -358,6 +367,19 @@ class HomeActivity : ComponentActivity() {
                     val a = action as? MasalaAction.LaunchApp
                     val entry = a?.let { render0 -> apps.firstOrNull { it.key.packageName == render0.packageName && it.key.user == render0.user && (render0.activity == null || it.key.activity == render0.activity) } }
                     if (entry != null) launch(entry, bounds) else run(action)
+                },
+                drag = drag,
+                movable = movable,
+                onDrop = { item, target ->
+                    scope.launch {
+                        val problems = when (target) {
+                            is DropTarget.Slot -> app.layouts.edit(getString(R.string.layout_label_moved, item.label)) {
+                                LayoutEdits.moveBefore(it, item.id, target.sectionId, target.before)
+                            }
+                            is DropTarget.Onto -> emptyList() // Folders come later.
+                        }
+                        problems.firstOrNull()?.let { toast(it.message) }
+                    }
                 },
             )
         }
