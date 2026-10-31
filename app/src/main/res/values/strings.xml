@@ -305,7 +305,9 @@
     <string name="scheduled_task_next_run">Next run: %1$s</string>
     <string name="scheduled_task_history">History</string>
     <string name="scheduled_task_history_entry">%1$s · %2$s</string>
-    <string name="scheduled_task_open_run">Open run</string>
+    <string name="scheduled_task_open">Open</string>
+    <string name="scheduled_task_show_more">Show more</string>
+    <string name="scheduled_task_show_less">Show less</string>
     <string name="recording_start">Start recording</string>
     <string name="recording_stop">Stop</string>
     <string name="recording_active">Recording meeting notes</string>

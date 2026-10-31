@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -47,6 +48,7 @@ fun ScheduledTasksPage(onBack: () -> Unit, onAskInChat: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     var tasks by remember { mutableStateOf(listOf<ScheduledTask>()) }
     var answers by remember { mutableStateOf(mapOf<String, String>()) }
+    var expandedAnswers by remember { mutableStateOf(setOf<String>()) }
     var running by remember { mutableStateOf(setOf<String>()) }
     val format = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
     suspend fun sync() {
@@ -137,12 +139,18 @@ fun ScheduledTasksPage(onBack: () -> Unit, onAskInChat: (String) -> Unit) {
                         )
                     }
                     answers[task.id]?.let { answer ->
+                        val expanded = task.id in expandedAnswers
                         Text(
                             answer,
                             style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 3,
+                            maxLines = if (expanded) Int.MAX_VALUE else 3,
                             overflow = TextOverflow.Ellipsis,
                         )
+                        TextButton(onClick = {
+                            expandedAnswers = if (expanded) expandedAnswers - task.id else expandedAnswers + task.id
+                        }) {
+                            Text(stringResource(if (expanded) R.string.scheduled_task_show_less else R.string.scheduled_task_show_more))
+                        }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (task.id in running) {
@@ -193,14 +201,14 @@ fun ScheduledTasksPage(onBack: () -> Unit, onAskInChat: (String) -> Unit) {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             } else {
-                                Text(
-                                    entry,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.clickable(
-                                        role = Role.Button,
-                                        onClickLabel = stringResource(R.string.scheduled_task_open_run),
-                                    ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        entry,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    TextButton(onClick = {
                                         context.startActivity(
                                             SkillSheetActivity.intent(
                                                 context,
@@ -208,8 +216,8 @@ fun ScheduledTasksPage(onBack: () -> Unit, onAskInChat: (String) -> Unit) {
                                                 runId = link,
                                             )
                                         )
-                                    },
-                                )
+                                    }) { Text(stringResource(R.string.scheduled_task_open)) }
+                                }
                             }
                         }
                     }
