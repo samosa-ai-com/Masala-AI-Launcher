@@ -464,7 +464,7 @@ private fun AppGrid(
         }
         Scrubber(
             letters = sections.keys.toList(),
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 6.dp),
+            modifier = Modifier.align(Alignment.TopEnd).fillMaxHeight().padding(end = 6.dp),
             onLetter = { c ->
                 scrubbing = c
                 headerIndex[c]?.let { scope.launch { state.scrollToItem(it) } }
@@ -501,33 +501,38 @@ internal fun Scrubber(letters: List<Char>, modifier: Modifier = Modifier, onLett
         }
     }
     val label = stringResource(R.string.drawer_scrubber)
-    Column(
-        modifier
-            .width(22.dp)
-            .onGloballyPositioned { heightPx = it.size.height.coerceAtLeast(1) }
-            .semantics { contentDescription = label }
-            .pointerInput(Unit) {
-                // One gesture block: stacked tap+drag detectors cancel each other and
-                // drop the bubble at drag start.
-                awaitEachGesture {
-                    val down = awaitFirstDown()
-                    pick(down.position.y)
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull() ?: break
-                        if (!change.pressed) break
-                        pick(change.position.y)
-                        change.consume()
+    Column(modifier.width(22.dp)) {
+        // "A" starts about 30% down, within thumb reach; the letters spread to near the bottom.
+        Spacer(Modifier.weight(0.3f))
+        Column(
+            Modifier.weight(0.7f).fillMaxWidth()
+                .onGloballyPositioned { heightPx = it.size.height.coerceAtLeast(1) }
+                .semantics { contentDescription = label }
+                .pointerInput(Unit) {
+                    // One gesture block: stacked tap+drag detectors cancel each other and
+                    // drop the bubble at drag start.
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        pick(down.position.y)
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            if (!change.pressed) break
+                            pick(change.position.y)
+                            change.consume()
+                        }
+                        last = null
+                        onEnd()
                     }
-                    last = null
-                    onEnd()
-                }
-            },
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        letters.forEach { c ->
-            Text(c.toString(), fontSize = 10.sp, lineHeight = 16.sp, textAlign = TextAlign.Center, color = if (c == last) tokens.accentText else tokens.textLow)
+                },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            letters.forEach { c ->
+                Text(c.toString(), fontSize = 10.sp, lineHeight = 16.sp, textAlign = TextAlign.Center, color = if (c == last) tokens.accentText else tokens.textLow)
+            }
         }
+        Spacer(Modifier.height(24.dp))
     }
 }
 
