@@ -123,6 +123,7 @@ dependencies {
     implementation(libs.media3.common)
     implementation(libs.health.connect)
     implementation(libs.pdfbox.android)
+    implementation(libs.androidsvg)
 
     testImplementation(kotlin("test-junit"))
     testImplementation(libs.okhttp.mockwebserver)

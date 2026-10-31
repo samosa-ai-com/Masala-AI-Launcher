@@ -18,6 +18,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,9 +28,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -47,10 +54,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -322,6 +334,12 @@ class MiniAppActivity : ComponentActivity() {
         }
     }
 
+    override fun onDestroy() {
+        // A full-size app hid them; whatever shows next gets them back.
+        WindowCompat.getInsetsController(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
+        super.onDestroy()
+    }
+
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
     @Composable
     private fun MiniAppScreen(appId: String, onBack: () -> Unit) {
@@ -329,31 +347,60 @@ class MiniAppActivity : ComponentActivity() {
         val app = context.masala
         val scope = rememberCoroutineScope()
         var title by remember { mutableStateOf("") }
+        var icon by remember { mutableStateOf<String?>(null) }
         var html by remember { mutableStateOf<String?>(null) }
         var networkAllowed by remember { mutableStateOf(false) }
         var gone by remember { mutableStateOf(false) }
         var confirmDelete by remember { mutableStateOf(false) }
         var reporting by remember { mutableStateOf(false) }
         var webView by remember { mutableStateOf<WebView?>(null) }
+        // Full size hides Masala's chrome and the system bars; kept per app on this phone.
+        val fullPrefs = remember { getSharedPreferences("mini_apps", MODE_PRIVATE) }
+        var full by remember { mutableStateOf(fullPrefs.getBoolean("full_$appId", false)) }
+        fun setFull(on: Boolean) {
+            full = on
+            fullPrefs.edit().putBoolean("full_$appId", on).apply()
+        }
         LaunchedEffect(appId) {
             val row = withContext(Dispatchers.IO) { app.miniApps.get(appId) }
             if (row == null) {
                 gone = true
             } else {
                 title = row.title
+                icon = row.icon
                 html = row.html
                 networkAllowed = row.networkAllowed
             }
         }
-        // In-app history first, like any browser; the top bar's Back always leaves.
-        BackHandler(enabled = webView?.canGoBack() == true) { webView?.goBack() }
+        // Back leaves full size first, then goes through the web history like any browser.
+        BackHandler(enabled = full || webView?.canGoBack() == true) {
+            if (full) setFull(false) else webView?.goBack()
+        }
+        LaunchedEffect(full) {
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            if (full) {
+                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+            } else {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
 
         // Own scaffold, not SettingsScaffold: the app needs the full remaining height, and a
         // weighted child inside a scrolling column can't be measured.
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text(title.ifEmpty { stringResource(R.string.miniapp_title) }, maxLines = 1) },
+                if (!full) TopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            MiniAppIconView(icon, title, 24.dp)
+                            Text(
+                                title.ifEmpty { stringResource(R.string.miniapp_title) },
+                                maxLines = 1,
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                    },
                     navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.action_back)) } },
                     actions = {
                         if (networkAllowed) Text(
@@ -376,7 +423,7 @@ class MiniAppActivity : ComponentActivity() {
                     }
                     else -> {
                         val doc = html!!
-                        Row(
+                        if (!full) Row(
                             Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
@@ -401,12 +448,21 @@ class MiniAppActivity : ComponentActivity() {
                         }
                         Box(Modifier.weight(1f).fillMaxWidth()) {
                             MiniAppView(appId, doc, networkAllowed, Modifier.fillMaxSize()) { webView = it }
+                            // Full size keeps one way out over the app: Back, or this button.
+                            if (full) IconButton(
+                                onClick = { setFull(false) },
+                                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(36.dp)
+                                    .clip(CircleShape).background(ComposeColor.Black.copy(alpha = 0.5f)),
+                            ) {
+                                Icon(Icons.Rounded.Close, stringResource(R.string.action_back), tint = ComposeColor.White)
+                            }
                         }
                         // Wraps on a narrow screen instead of squeezing the labels.
-                        FlowRow(
+                        if (!full) FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                         ) {
+                            TextButton(onClick = { setFull(true) }) { Text(stringResource(R.string.miniapp_full_size)) }
                             TextButton(onClick = {
                                 scope.launch {
                                     val file = withContext(Dispatchers.IO) {

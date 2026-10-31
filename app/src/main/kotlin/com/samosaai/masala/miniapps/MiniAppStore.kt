@@ -24,7 +24,7 @@ class MiniAppStore(private val dao: MiniAppDao) {
     }
 
     /** Stores new HTML under a random id; returns the id, or null when the HTML is too large. */
-    suspend fun create(title: String, html: String): String? = withContext(Dispatchers.IO) {
+    suspend fun create(title: String, html: String, icon: String? = null): String? = withContext(Dispatchers.IO) {
         if (html.length > MAX_HTML_CHARS) return@withContext null
         val now = System.currentTimeMillis()
         val id = UUID.randomUUID().toString().take(8)
@@ -33,6 +33,7 @@ class MiniAppStore(private val dao: MiniAppDao) {
                 id = id,
                 title = title.trim().ifEmpty { "Mini app" }.take(MAX_TITLE_CHARS),
                 html = html,
+                icon = MiniAppIcon.sanitize(icon),
                 createdAt = now,
                 updatedAt = now,
             )
@@ -41,10 +42,11 @@ class MiniAppStore(private val dao: MiniAppDao) {
     }
 
     /** Replaces the HTML, keeping the title and settings. False when unknown or too large. */
-    suspend fun update(id: String, html: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun update(id: String, html: String, icon: String? = null): Boolean = withContext(Dispatchers.IO) {
         if (html.length > MAX_HTML_CHARS) return@withContext false
         val row = dao.get(id) ?: return@withContext false
-        dao.upsert(row.copy(html = html, updatedAt = System.currentTimeMillis()))
+        // A missing or refused icon leaves the stored one alone; an accepted one replaces it.
+        dao.upsert(row.copy(html = html, icon = MiniAppIcon.sanitize(icon) ?: row.icon, updatedAt = System.currentTimeMillis()))
         true
     }
 

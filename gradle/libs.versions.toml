@@ -30,6 +30,7 @@ androidxTestExt = "1.3.0"
 espresso = "3.7.0"
 webkit = "1.12.0"
 profileinstaller = "1.4.1"
+androidsvg = "1.4"
 
 [libraries]
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
@@ -74,6 +75,7 @@ androidx-test-espresso-core = { module = "androidx.test.espresso:espresso-core",
 compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
 compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 pdfbox-android = { module = "com.tom-roush:pdfbox-android", version.ref = "pdfbox" }
+androidsvg = { module = "com.caverock:androidsvg-aar", version.ref = "androidsvg" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

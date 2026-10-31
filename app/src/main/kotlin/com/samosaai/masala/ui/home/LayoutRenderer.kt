@@ -96,6 +96,7 @@ import com.samosaai.masala.core.contract.Section
 import com.samosaai.masala.core.contract.SkillWidgetSection
 import com.samosaai.masala.core.contract.StackSection
 import com.samosaai.masala.core.contract.WidgetSection
+import com.samosaai.masala.miniapps.MiniAppIconView
 import com.samosaai.masala.core.layout.ResolvedLayout
 import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.rememberAppIcon
@@ -132,6 +133,8 @@ class RenderContext(
     val movable: Set<String> = emptySet(),
     /** The menu for an item that isn't an app; apps use [onAppMenu]. */
     val onItemMenu: ((Item) -> Unit)? = null,
+    /** A mini app's stored icon by id; null draws the pinned item's own icon. */
+    val miniAppIcon: (String) -> String? = { null },
     /** Tapping a folder (an `open_folder` item) shows its items; folders are never dispatched. */
     val onOpenFolder: ((Item) -> Unit)? = null,
     /** A folder's own menu (rename, ungroup). */
@@ -551,11 +554,21 @@ internal fun appFor(item: Item, ctx: RenderContext): AppEntry? {
     return ctx.appFor(a.packageName, a.user, a.activity)
 }
 
-/** A folder's 2×2 preview, or the item's own icon. */
+/** A folder's 2×2 preview, a mini app's stored icon, or the item's own icon. */
 @Composable
-private fun ItemIcon(item: Item, app: AppEntry?, ctx: RenderContext, size: Int) {
+internal fun ItemIcon(item: Item, app: AppEntry?, ctx: RenderContext, size: Int) {
     val folder = item.action as? MasalaAction.OpenFolder
-    if (folder != null) FolderIcon(folder.items, ctx, size) else IconView(item.icon, app, ctx, size)
+    if (folder != null) {
+        FolderIcon(folder.items, ctx, size)
+        return
+    }
+    val miniApp = item.action as? MasalaAction.OpenMiniApp
+    val stored = miniApp?.let { ctx.miniAppIcon(it.id) }
+    if (miniApp != null && stored != null) {
+        MiniAppIconView(stored, item.label, size.dp)
+        return
+    }
+    IconView(item.icon, app, ctx, size)
 }
 
 /** What TalkBack reads: a folder says it is one and how many apps it holds. */

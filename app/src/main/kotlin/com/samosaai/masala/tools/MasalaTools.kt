@@ -5,6 +5,7 @@ import com.samosaai.masala.core.tool.ActionResult
 import com.samosaai.masala.core.tool.Produced
 import com.samosaai.masala.core.tool.ToolFiles
 import com.samosaai.masala.miniapps.MiniAppConsole
+import com.samosaai.masala.miniapps.MiniAppIcon
 import com.samosaai.masala.miniapps.MiniAppProbe
 import com.samosaai.masala.miniapps.openMiniApp
 import com.samosaai.masala.miniapps.MiniAppStore
@@ -235,7 +236,7 @@ object MasalaTools {
             FunctionTool(Defs.createMiniApp, CHANGES_SOMETHING) {
                 val title = it.string("title") ?: "Mini app"
                 val html = it.string("html") ?: return@FunctionTool missing("html")
-                val id = miniApps.create(title = title, html = html) ?: return@FunctionTool ActionResult.error(
+                val id = miniApps.create(title = title, html = html, icon = it.string("icon")) ?: return@FunctionTool ActionResult.error(
                     "That HTML is too large (max ${MiniAppStore.MAX_HTML_CHARS} characters). Make it smaller."
                 )
                 // Pinning here is what makes "it created the app" true for the user: a stored app
@@ -244,14 +245,14 @@ object MasalaTools {
                 val created = if (problems.isEmpty()) "Mini app '$id' created and pinned to home."
                 else "Mini app '$id' created, but it couldn't be pinned: ${problems.first()}"
                 ActionResult.ok(
-                    created + "\n" + loadReport(probe.errors(html)),
+                    created + "\n" + loadReport(probe.errors(html)) + MiniAppIcon.refusedNote(it.string("icon")),
                     listOf(Produced("mini_app", miniApps.get(id)?.title ?: title, id)),
                 )
             },
             FunctionTool(Defs.updateMiniApp, CHANGES_SOMETHING) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")
                 val html = it.string("html") ?: return@FunctionTool missing("html")
-                val ok = miniApps.update(id, html = html)
+                val ok = miniApps.update(id, html = html, icon = it.string("icon"))
                 if (!ok) return@FunctionTool ActionResult.error(
                     "No mini app '$id', or its HTML is over ${MiniAppStore.MAX_HTML_CHARS} characters."
                 )
@@ -260,13 +261,13 @@ object MasalaTools {
                 MiniAppConsole.clear(id)
                 val produced = listOfNotNull(miniApps.get(id)?.let { row -> Produced("mini_app", row.title, id) })
                 val earlier = if (seen.isEmpty()) "" else "\nWhile the user had the previous version open it logged:\n" + seen.joinToString("\n")
-                ActionResult.ok("Mini app '$id' updated.\n" + loadReport(probe.errors(html)) + earlier, produced)
+                ActionResult.ok("Mini app '$id' updated.\n" + loadReport(probe.errors(html)) + earlier + MiniAppIcon.refusedNote(it.string("icon")), produced)
             },
             FunctionTool(Defs.listMiniApps, READ_ONLY) {
                 val rows = miniApps.list()
                 if (rows.isEmpty()) ActionResult.ok("No mini apps yet.")
                 else rows.joinToString("\n") {
-                    "${it.id}: ${it.title} (updated ${java.time.Instant.ofEpochMilli(it.updatedAt)}, internet ${if (it.networkAllowed) "on" else "off"})"
+                    "${it.id}: ${it.title} (updated ${java.time.Instant.ofEpochMilli(it.updatedAt)}, internet ${if (it.networkAllowed) "on" else "off"}, icon ${if (it.icon != null) "yes" else "no"})"
                 }.let { ActionResult.ok(it) }
             },
             FunctionTool(Defs.readMiniApp, READ_ONLY) {
