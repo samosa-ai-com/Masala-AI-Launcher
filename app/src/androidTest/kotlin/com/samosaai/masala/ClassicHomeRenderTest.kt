@@ -81,7 +81,7 @@ class ClassicHomeRenderTest {
                         modeName = "Evening", onModeChip = { modeTaps++ },
                     ),
                     aboveDock = {
-                        com.samosaai.masala.ui.home.SearchPill(onSearch = { searched++ }, mic = com.samosaai.masala.ui.home.MicPress({}, {}))
+                        com.samosaai.masala.ui.home.SearchPill(onSearch = { searched++ }, mic = {})
                     },
                 )
             }

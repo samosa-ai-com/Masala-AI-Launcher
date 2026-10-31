@@ -24,7 +24,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,7 +58,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -78,68 +76,27 @@ import com.samosaai.masala.ui.components.rememberCapabilityGrant
 import com.samosaai.masala.ui.skills.SkillSheetActivity
 import com.samosaai.masala.ui.secondbrain.RememberedCards
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-
-/** What the mic button does when pressed and released, with the microphone permission asked on the first press. */
-class MicPress(val onPress: () -> Unit, val onRelease: () -> Unit)
-
-/** A press longer than this is hold-to-talk; shorter is a tap. */
-private const val HOLD_AFTER_MS = 300L
 
 /**
- * The mic: hold to talk (release sends), or tap for hands-free. One rule everywhere, no
- * setting: a press past [HOLD_AFTER_MS] is walkie-talkie and sends the moment you let go;
- * a shorter press starts hands-free listening, which sends after a pause, or when the
- * overlay's send button (or another tap) is used.
+ * What a tap on the mic does, with the microphone permission asked on the first tap:
+ * opens Sam listening; Send (or cancel) ends the take. There is no hold: a tap is
+ * `onClick`, which completes before any state change unmounts the button, so the
+ * release can never be swallowed mid-take.
  */
 @Composable
-fun rememberMicPress(app: MasalaApp): MicPress {
+fun rememberMicTap(app: MasalaApp): () -> Unit {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val granted = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { /* the next press listens */ }
-    // Keyed on the composition's scope, launcher and context: keying on the app singleton would
-    // keep the first composition's cancelled scope, dead permission launcher and destroyed
-    // Activity across rotations.
-    return remember(context, scope, granted, app) {
-        var holdStart: Job? = null
-        var holding = false
-        var permitted = false
-        MicPress(
-            onPress = {
-                permitted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-                if (!permitted) {
-                    granted.launch(Manifest.permission.RECORD_AUDIO)
-                } else if (app.commands.state.value != CommandState.Listening) {
-                    if (app.commands.handsFreeAvailable()) {
-                        // Walkie-talkie arms only while the finger stays down; a shorter press
-                        // never starts it and becomes hands-free on release instead.
-                        holding = false
-                        holdStart = scope.launch {
-                            delay(HOLD_AFTER_MS)
-                            holding = app.commands.startListening()
-                        }
-                    } else {
-                        // No hands-free here: the press itself starts, the release sends.
-                        holding = app.commands.startListening()
-                    }
-                }
-            },
-            onRelease = {
-                if (permitted) {
-                    holdStart?.cancel()
-                    holdStart = null
-                    if (holding) {
-                        // Held: the speaker decides when they are done.
-                        app.commands.stopListening()
-                        holding = false
-                    } else {
-                        // Tapped (or already listening): hands-free start, or send now.
-                        app.commands.tapToTalk()
-                    }
-                }
-            },
-        )
+    val granted = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { /* the next tap listens */ }
+    // Keyed on the context, launcher and app: keying on the app singleton would keep the
+    // first composition's dead permission launcher and destroyed Activity across rotations.
+    return remember(context, granted, app) {
+        {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                if (app.commands.state.value != CommandState.Listening) app.commands.startListening()
+            } else {
+                granted.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
     }
 }
 
@@ -148,7 +105,7 @@ fun rememberMicPress(app: MasalaApp): MicPress {
  * place of the two floating buttons. Tapping the pill opens search; the mic talks.
  */
 @Composable
-fun SearchPill(onSearch: () -> Unit, mic: MicPress, onOpenChat: () -> Unit = {}, modifier: Modifier = Modifier, level: () -> Float = { 0f }) {
+fun SearchPill(onSearch: () -> Unit, mic: () -> Unit, onOpenChat: () -> Unit = {}, modifier: Modifier = Modifier, level: () -> Float = { 0f }) {
     val tokens = MasalaTheme.tokens
     val shape = RoundedCornerShape(50)
     val label = stringResource(R.string.home_search_or_ask)
@@ -192,13 +149,13 @@ fun AskButton(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-/** The mic: tap to talk, or hold (see [rememberMicPress]). The label always names the current mode. */
+/** The mic: one tap opens Sam listening; Send ends the take. */
 @Composable
-fun MicButton(press: MicPress, level: () -> Float = { 0f }, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 48.dp) {
-    // One label for both gestures: there is no mode to name any more.
-    val label = stringResource(R.string.voice_gestures)
+fun MicButton(onTap: () -> Unit, level: () -> Float = { 0f }, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 48.dp) {
+    val label = stringResource(R.string.voice_tap)
     val ring = MasalaTheme.tokens.accent
     Surface(
+        onClick = onTap,
         modifier
             .size(size)
             .drawBehind {
@@ -212,20 +169,7 @@ fun MicButton(press: MicPress, level: () -> Float = { 0f }, modifier: Modifier =
                     )
                 }
             }
-            .semantics { contentDescription = label; role = Role.Button }
-            .pointerInput(press) {
-                detectTapGestures(onPress = {
-                    press.onPress()
-                    // Always runs, even if this button leaves the composition mid-press
-                    // (starting a take swaps it for the listening controls): otherwise
-                    // the release is swallowed and the take sticks with no way to end it.
-                    try {
-                        tryAwaitRelease()
-                    } finally {
-                        press.onRelease()
-                    }
-                })
-            },
+            .semantics { contentDescription = label; role = Role.Button },
         shape = CircleShape,
         color = MaterialTheme.colorScheme.primary,
     ) {
@@ -251,7 +195,7 @@ fun ReplyCard(
     val state by app.commands.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val press = rememberMicPress(app)
+    val micTap = rememberMicTap(app)
     val micLvl by app.commands.micLevel.collectAsStateWithLifecycle()
     var text by remember { mutableStateOf(TextFieldValue("")) }
     val retryPrompt = stringResource(R.string.capability_retry_prompt)
@@ -262,9 +206,7 @@ fun ReplyCard(
     // "Read replies aloud" applies to every reply; the button reads one on request.
     LaunchedEffect(reply) { if (readAloud && reply != null && app.commands.claimReadAloud(reply)) app.speakReply(reply.text) }
     if (state == CommandState.Idle) return
-    // The card stays composed (but draws nothing) while listening: the mic that
-    // started the take must survive until the finger lifts. The overlay covers it.
-    if (sheets && state is CommandState.Thinking) return
+    if (sheets && (state == CommandState.Listening || state is CommandState.Thinking)) return
 
     // A glass sheet over home (UI refresh U3); opened for typing, its field takes focus.
     val field = remember { FocusRequester() }
@@ -330,7 +272,7 @@ fun ReplyCard(
                 if (text.text.isNotBlank()) {
                     TextButton(onClick = { app.commands.ask(text.text); text = TextFieldValue("") }) { Text(stringResource(R.string.skill_send)) }
                 } else {
-                    MicButton(press, level = { micLvl })
+                    MicButton(micTap, level = { micLvl })
                 }
             }
             Row {
