@@ -9,9 +9,12 @@ import com.samosaai.masala.MasalaApp
 import com.samosaai.masala.core.scheduled.TaskRunStatus
 import com.samosaai.masala.llm.ChatMessage
 import com.samosaai.masala.scheduled.ScheduledTaskRuns
+import com.samosaai.masala.scheduled.TaskDoneNotification
 import com.samosaai.masala.skills.ScheduledOutcome
 import com.samosaai.masala.skills.SkillRunEvent
+import com.samosaai.masala.skills.SkillRunner
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
@@ -70,6 +73,13 @@ class JobRunner(context: Context, params: WorkerParameters) : CoroutineWorker(co
         }
         val (status, detail) = app.skillRunner.outcome(id)?.let { ScheduledOutcome.of(it.first, it.second) } ?: (TaskRunStatus.FAILED to "The run was lost.")
         record(status, detail)
+        val answer = withContext(Dispatchers.IO) {
+            app.database.skillRuns().get(id)?.let { SkillRunner.lastAnswer(it.transcriptJson) }
+        }
+        TaskDoneNotification.post(
+            app, name.ifBlank { skillId }, skillId, id, status,
+            if (status == TaskRunStatus.DONE) answer else detail,
+        )
         if (skillId == com.samosaai.masala.brief.BriefInputs.SKILL_ID && status == TaskRunStatus.DONE && app.settings.current().briefNotify) {
             app.database.skillRuns().get(id)?.let { com.samosaai.masala.skills.SkillRunner.lastAnswer(it.transcriptJson) }?.let { com.samosaai.masala.brief.BriefNotification.post(app, it) }
         }

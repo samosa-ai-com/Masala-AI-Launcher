@@ -269,6 +269,9 @@
     <string name="scheduled_tasks_empty_no_match">No scheduled tasks match.</string>
     <string name="scheduled_task_run_now">Run now</string>
     <string name="scheduled_task_stop">Stop</string>
+    <string name="scheduled_task_run_done">Done</string>
+    <string name="scheduled_task_run_failed">Failed</string>
+    <string name="scheduled_task_run_stopped">Stopped</string>
     <string name="scheduled_task_pause">Pause</string>
     <string name="scheduled_task_resume">Resume</string>
     <string name="scheduled_task_paused">Paused</string>
