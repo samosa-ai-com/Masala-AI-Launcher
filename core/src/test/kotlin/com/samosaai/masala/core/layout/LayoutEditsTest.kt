@@ -210,4 +210,44 @@ class LayoutEditsTest {
         assertNull(LayoutEdits.dissolveFolder(withFolder, "a"))
         assertNull(LayoutEdits.dissolveFolder(withFolder, "nope"))
     }
+
+    private fun folderOf(id: String, vararg children: String) =
+        Item(id, "Folder $id", IconRef.Symbol("folder"), MasalaAction.OpenFolder(items(*children)))
+
+    private fun withSectionItems(sectionId: String, list: List<Item>) = doc.copy(
+        pages = doc.pages.map { page ->
+            page.copy(sections = page.sections.map { if (it.id == sectionId && it is ItemSection) it.withItems(list) else it })
+        },
+    )
+
+    @Test
+    fun `itemsWithFolders lists each folder then its children`() {
+        val d = withSectionItems("grid", listOf(item("a"), folderOf("f", "b", "c")))
+        val sections = d.pages.flatMap { it.sections }.filterIsInstance<ItemSection>().filter { it.id == "grid" }
+        assertEquals(listOf("a", "f", "b", "c"), LayoutEdits.itemsWithFolders(sections).map { it.id })
+    }
+
+    @Test
+    fun `removeWhere takes matches out of folders and keeps the folder while two are left`() {
+        val d = withSectionItems("grid", listOf(item("a"), folderOf("f", "b", "c", "d")))
+        val out = LayoutEdits.removeWhere(d) { it.id == "c" }
+        val folder = (out.pages[0].sections[1] as ItemSection).items[1]
+        assertEquals(listOf("a", "f"), ids(out, "grid"))
+        assertEquals(listOf("b", "d"), (folder.action as MasalaAction.OpenFolder).items.map { it.id })
+    }
+
+    @Test
+    fun `removeWhere turns a folder left with one child into that child, and drops an empty one`() {
+        val d = withSectionItems("grid", listOf(folderOf("f", "b", "c"), folderOf("g", "x")))
+        assertEquals(listOf("c", "g"), ids(LayoutEdits.removeWhere(d) { it.id == "b" }, "grid"))
+        assertEquals(listOf("f"), ids(LayoutEdits.removeWhere(d) { it.id == "x" }, "grid"))
+    }
+
+    @Test
+    fun `removeWhere leaves sections it isn't given, and an unmatched layout equal`() {
+        val out = LayoutEdits.removeWhere(doc, { it !is DockSection }) { it.id == "x" || it.id == "a" }
+        assertEquals(listOf("b", "c", "d"), ids(out, "grid"))
+        assertEquals(listOf("x", "y"), ids(out, "dock"))
+        assertEquals(doc, LayoutEdits.removeWhere(doc) { false })
+    }
 }

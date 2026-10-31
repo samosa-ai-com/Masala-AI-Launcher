@@ -86,6 +86,30 @@ object LayoutEdits {
         return replace(doc, folderId) { children }
     }
 
+    /** The items of [sections], each folder followed by its children: what is on home, wherever it sits. */
+    fun itemsWithFolders(sections: List<ItemSection>): List<Item> =
+        sections.flatMap { it.items }.flatMap { listOf(it) + it.children.orEmpty() }
+
+    /**
+     * [doc] without the items [match] picks, in the sections [where] accepts, folder children included. A
+     * folder left with one child becomes that child; one left empty goes.
+     */
+    fun removeWhere(doc: LayoutDoc, where: (ItemSection) -> Boolean = { true }, match: (Item) -> Boolean): LayoutDoc =
+        mapSections(doc) { section ->
+            if (!where(section)) return@mapSections section
+            section.withItems(
+                section.items.filterNot(match).flatMap { item ->
+                    val children = item.children ?: return@flatMap listOf(item)
+                    val left = children.filterNot(match)
+                    when {
+                        left.size == children.size -> listOf(item)
+                        left.size <= 1 -> left
+                        else -> listOf(item.withChildren(left))
+                    }
+                },
+            )
+        }
+
     private val Item.children get() = (action as? MasalaAction.OpenFolder)?.items
     private val Item.isFolder get() = action is MasalaAction.OpenFolder
     private fun Item.withChildren(items: List<Item>) = copy(action = MasalaAction.OpenFolder(items))
