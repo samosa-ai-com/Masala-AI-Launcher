@@ -6,6 +6,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.clickable
@@ -147,7 +148,7 @@ fun rememberMicPress(app: MasalaApp): MicPress {
  * place of the two floating buttons. Tapping the pill opens search; the mic talks.
  */
 @Composable
-fun SearchPill(onSearch: () -> Unit, mic: MicPress, onOpenChat: () -> Unit = {}, modifier: Modifier = Modifier) {
+fun SearchPill(onSearch: () -> Unit, mic: MicPress, onOpenChat: () -> Unit = {}, modifier: Modifier = Modifier, level: () -> Float = { 0f }) {
     val tokens = MasalaTheme.tokens
     val shape = RoundedCornerShape(50)
     val label = stringResource(R.string.home_search_or_ask)
@@ -173,7 +174,7 @@ fun SearchPill(onSearch: () -> Unit, mic: MicPress, onOpenChat: () -> Unit = {},
                 modifier = Modifier.size(22.dp),
             )
         }
-        MicButton(mic, size = 46.dp)
+        MicButton(mic, level = level, size = 46.dp)
     }
 }
 
@@ -193,12 +194,24 @@ fun AskButton(onOpen: () -> Unit, modifier: Modifier = Modifier) {
 
 /** The mic: tap to talk, or hold (see [rememberMicPress]). The label always names the current mode. */
 @Composable
-fun MicButton(press: MicPress, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 48.dp) {
+fun MicButton(press: MicPress, level: () -> Float = { 0f }, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 48.dp) {
     // One label for both gestures: there is no mode to name any more.
     val label = stringResource(R.string.voice_gestures)
+    val ring = MasalaTheme.tokens.accent
     Surface(
         modifier
             .size(size)
+            .drawBehind {
+                // Draw-phase read only: the mic level redraws the ring without recomposing.
+                val l = level().coerceIn(0f, 1f)
+                if (l > 0.01f) {
+                    drawCircle(
+                        color = ring.copy(alpha = 0.25f + 0.55f * l),
+                        radius = size.toPx() / 2f * (1f + 0.28f * l),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = (2f + 2f * l).dp.toPx()),
+                    )
+                }
+            }
             .semantics { contentDescription = label; role = Role.Button }
             .pointerInput(press) {
                 detectTapGestures(onPress = {
@@ -233,6 +246,7 @@ fun ReplyCard(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val press = rememberMicPress(app)
+    val micLvl by app.commands.micLevel.collectAsStateWithLifecycle()
     var text by remember { mutableStateOf(TextFieldValue("")) }
     val retryPrompt = stringResource(R.string.capability_retry_prompt)
     // A dialog that was allowed carries on by itself; a settings screen needs Try again.
@@ -308,7 +322,7 @@ fun ReplyCard(
                 if (text.text.isNotBlank()) {
                     TextButton(onClick = { app.commands.ask(text.text); text = TextFieldValue("") }) { Text(stringResource(R.string.skill_send)) }
                 } else {
-                    MicButton(press)
+                    MicButton(press, level = { micLvl })
                 }
             }
             Row {

@@ -148,7 +148,7 @@ fun ChatSurface(
                         else -> Thread(turns, liveWords, listening, thinking, state, character, level, onStop)
                     }
                 }
-                Controls(listening, autoSendIn, walkie, mic, onSend, onClose)
+                Controls(listening, autoSendIn, walkie, mic, level, onSend, onClose)
             }
         }
     }
@@ -383,7 +383,7 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1) {
  * behaviour is predictable rather than a surprise.
  */
 @Composable
-private fun Controls(listening: Boolean, autoSendIn: Int?, walkie: Boolean, mic: MicPress, onSend: () -> Unit, onClose: () -> Unit) {
+private fun Controls(listening: Boolean, autoSendIn: Int?, walkie: Boolean, mic: MicPress, level: () -> Float, onSend: () -> Unit, onClose: () -> Unit) {
     val tokens = MasalaTheme.tokens
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         if (listening) {
@@ -414,13 +414,13 @@ private fun Controls(listening: Boolean, autoSendIn: Int?, walkie: Boolean, mic:
                     Icon(Icons.Rounded.Close, stringResource(R.string.listening_cancel), tint = tokens.textHigh)
                 }
                 Spacer(Modifier.width(20.dp))
-                MicButton(mic, size = 68.dp)
+                MicButton(mic, level = level, size = 68.dp)
                 Spacer(Modifier.width(20.dp))
                 IconButton(onClick = onSend, modifier = Modifier.size(52.dp).clip(CircleShape).background(tokens.accent)) {
                     Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
                 }
             } else {
-                MicButton(mic, size = 68.dp)
+                MicButton(mic, level = level, size = 68.dp)
             }
         }
     }

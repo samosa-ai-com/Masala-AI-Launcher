@@ -467,11 +467,13 @@ class HomeActivity : ComponentActivity() {
             drawerDrag = drawerDrag.takeIf { settings.swipeUp == MasalaAction.OpenDrawer },
             aboveDock = {
                 val command by app.commands.state.collectAsStateWithLifecycle()
+                val pillLevel by app.commands.micLevel.collectAsStateWithLifecycle()
                 // The pill makes way for the reply card while a command is shown.
                 if (command == CommandState.Idle) {
                     SearchPill(
                         onSearch = { drawerOpen = true; searchRequests++ },
                         mic = rememberMicPress(app),
+                        level = { pillLevel },
                         onOpenChat = {
                             chatOpen = true
                             expanded = true
