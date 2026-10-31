@@ -63,7 +63,7 @@ import com.samosaai.masala.agent.CommandState
 import com.samosaai.masala.ui.home.SearchPill
 import androidx.compose.material3.Text
 import com.samosaai.masala.ui.home.ReplyCard
-import com.samosaai.masala.ui.home.rememberMicPress
+import com.samosaai.masala.ui.home.rememberMicTap
 import com.samosaai.masala.ui.home.ConfirmationSheet
 import com.samosaai.masala.ui.home.HomeScreen
 import com.samosaai.masala.ui.home.RenderContext
@@ -171,8 +171,6 @@ class HomeActivity : ComponentActivity() {
             var expanded by rememberSaveable { mutableStateOf(false) }
             var chatOpen by rememberSaveable { mutableStateOf(false) }
             var showHistory by remember { mutableStateOf(false) }
-            val autoSendIn by app.commands.autoSendIn.collectAsStateWithLifecycle()
-            val walkieTalkie by app.commands.walkieTalkie.collectAsStateWithLifecycle()
             LaunchedEffect(activeId, sessions) {
                 val id = activeId ?: return@LaunchedEffect
                 val session = app.chats.get(id) ?: return@LaunchedEffect
@@ -468,13 +466,11 @@ class HomeActivity : ComponentActivity() {
             aboveDock = {
                 val command by app.commands.state.collectAsStateWithLifecycle()
                 val pillLevel by app.commands.micLevel.collectAsStateWithLifecycle()
-                // The pill makes way for the reply card while a command is shown, but it
-                // stays composed (hidden under the overlay) while listening: the mic that
-                // started the take must survive until the finger lifts.
-                if (command == CommandState.Idle || command == CommandState.Listening) {
+                // The pill makes way for the reply card while a command is shown.
+                if (command == CommandState.Idle) {
                     SearchPill(
                         onSearch = { drawerOpen = true; searchRequests++ },
-                        mic = rememberMicPress(app),
+                        mic = rememberMicTap(app),
                         level = { pillLevel },
                         onOpenChat = {
                             chatOpen = true
@@ -503,15 +499,12 @@ class HomeActivity : ComponentActivity() {
             val command by app.commands.state.collectAsStateWithLifecycle()
             val level by app.commands.micLevel.collectAsStateWithLifecycle()
             val words by app.commands.liveWords.collectAsStateWithLifecycle()
-            if (hidden) Unit else {
-                // The input card stays composed (but draws nothing visible under the
-                // overlay) while listening: the mic that started the take must survive
-                // until the finger lifts, or the release is swallowed and the take sticks.
-                if (command == CommandState.Input || command == CommandState.Listening) Box(
+            if (hidden) Unit else when (val c = command) {
+                CommandState.Input -> Box(
                     Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(),
                     contentAlignment = Alignment.BottomCenter,
                 ) { ReplyCard(app, settings.readRepliesAloud, sheets = true, character = settings.character) }
-                if (command != CommandState.Input && chatOpen) ChatSurface(
+                else -> if (chatOpen) ChatSurface(
                     session = turns.takeIf { it.isNotEmpty() }?.let {
                         com.samosaai.masala.chat.ChatSession(id = activeId.orEmpty(), title = sessionTitle, turns = it)
                     },
@@ -521,9 +514,7 @@ class HomeActivity : ComponentActivity() {
                     character = settings.character,
                     expanded = expanded,
                     onExpanded = { expanded = it },
-                    mic = rememberMicPress(app),
-                    autoSendIn = autoSendIn,
-                    walkie = walkieTalkie,
+                    mic = rememberMicTap(app),
                     serverProvider = app.commands.usesServerStt(),
                     onSend = { app.commands.sendNow() },
                     onStop = { app.commands.dismiss() },

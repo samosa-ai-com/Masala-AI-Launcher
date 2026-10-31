@@ -72,7 +72,6 @@ import com.samosaai.masala.chat.TurnRole
 import com.samosaai.masala.data.Character
 import com.samosaai.masala.ui.character.CharacterState
 import com.samosaai.masala.ui.character.MasalaCharacter
-import com.samosaai.masala.ui.home.MicPress
 import com.samosaai.masala.ui.home.MicButton
 import com.samosaai.masala.ui.theme.MasalaColors
 import com.samosaai.masala.ui.theme.MasalaTheme
@@ -92,9 +91,7 @@ fun ChatSurface(
     character: Character,
     expanded: Boolean,
     onExpanded: (Boolean) -> Unit,
-    mic: MicPress,
-    autoSendIn: Int?,
-    walkie: Boolean = false,
+    mic: () -> Unit,
     serverProvider: Boolean = false,
     onSend: () -> Unit,
     onStop: () -> Unit,
@@ -159,7 +156,7 @@ fun ChatSurface(
                         else -> Thread(turns, liveWords, listening, thinking, state, character, level, onStop, onDeleteTurn, onCollapse = { onExpanded(false) })
                     }
                 }
-                Controls(listening, autoSendIn, walkie, mic, level, onSend, onClose)
+                Controls(listening, mic, level, onSend, onClose)
             }
         }
     }
@@ -464,52 +461,29 @@ private fun TurnMenu(expanded: Boolean, onDismiss: () -> Unit, onDelete: () -> U
 }
 
 /**
- * Mic, and while listening the send/cancel pair. Sending is explicit: the arrow stops the
- * take now. The countdown above it says how long the automatic stop has left, so the
- * behaviour is predictable rather than a surprise.
+ * Mic to open Sam, and while listening the cancel/send pair. Sending is explicit: the
+ * arrow ends the take now. There is no mic button while listening — tapping it is how
+ * a take starts, so showing one there could only end the take by accident.
  */
 @Composable
-private fun Controls(listening: Boolean, autoSendIn: Int?, walkie: Boolean, mic: MicPress, level: () -> Float, onSend: () -> Unit, onClose: () -> Unit) {
+private fun Controls(listening: Boolean, mic: () -> Unit, level: () -> Float, onSend: () -> Unit, onClose: () -> Unit) {
     val tokens = MasalaTheme.tokens
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
-        if (listening) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                val countdown = autoSendIn
-                Text(
-                    when {
-                        walkie -> stringResource(R.string.chat_release_to_send)
-                        countdown == null -> stringResource(R.string.chat_send_ready)
-                        else -> stringResource(R.string.chat_sending_in, countdown)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (countdown == null) tokens.textLow else tokens.accentText,
-                )
-            }
-        }
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
-            // One mic node in both states: the button that starts a hold must still be
-            // composed when the finger lifts, or the release is swallowed and the take
-            // sticks. Only the flanking buttons come and go.
             if (listening) {
                 IconButton(onClick = onClose, modifier = Modifier.size(52.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.06f))) {
                     Icon(Icons.Rounded.Close, stringResource(R.string.listening_cancel), tint = tokens.textHigh)
                 }
                 Spacer(Modifier.width(20.dp))
-            }
-            MicButton(mic, level = level, size = 68.dp)
-            if (listening) {
-                Spacer(Modifier.width(20.dp))
-                IconButton(onClick = onSend, modifier = Modifier.size(52.dp).clip(CircleShape).background(tokens.accent)) {
+                IconButton(onClick = onSend, modifier = Modifier.size(68.dp).clip(CircleShape).background(tokens.accent)) {
                     Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
                 }
+            } else {
+                MicButton(mic, level = level, size = 68.dp)
             }
         }
     }
