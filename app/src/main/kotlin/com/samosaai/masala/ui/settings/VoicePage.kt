@@ -394,8 +394,9 @@ private fun SttTestCard() {
             }
         }
         if (testing) {
+            val liveText = partial.takeIf { it.isNotBlank() }?.let { " — “$it”" } ?: ""
             Text(
-                (stringResource(R.string.stt_test_listening) + partial.takeIf { it.isNotBlank() }?.let { " — “$it”" }).orEmpty(),
+                stringResource(R.string.stt_test_listening) + liveText,
                 style = MaterialTheme.typography.bodyMedium,
             )
             Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.10f))) {
