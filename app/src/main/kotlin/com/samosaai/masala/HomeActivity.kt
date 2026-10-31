@@ -247,6 +247,11 @@ class HomeActivity : ComponentActivity() {
                     scope.launch(kotlinx.coroutines.Dispatchers.IO) { ScheduledTaskScheduler.reschedule(app) }
                 }
                 override fun declineSchedule(skillId: String) = app.skillScheduling.decline(skillId)
+                override suspend fun speak(text: String) = app.speakReply(text)
+                override fun stopSpeaking() = app.stopSpeaking()
+                override fun speaking() = app.speaking
+                override suspend fun runNow(skillId: String) = app.runSkillTaskNow(skillId)
+                override suspend fun claimAutoRead(run: com.samosaai.masala.data.SkillRunEntity) = app.claimAutoRead(run)
             }
         }
         val screen = remember {

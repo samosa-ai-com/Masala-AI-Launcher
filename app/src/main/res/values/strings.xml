@@ -415,6 +415,13 @@
     <string name="skill_step_failed">%1$s didn’t work</string>
     <string name="skill_widget_working">Working on it…</string>
     <string name="skill_widget_open">Open</string>
+    <string name="skill_widget_read_aloud">Read aloud</string>
+    <string name="skill_widget_stop_reading">Stop</string>
+    <string name="skill_widget_run_now">Run now</string>
+    <string name="skill_widget_ran_today">Today</string>
+    <string name="skill_widget_ran_yesterday">Yesterday</string>
+    <string name="skill_widget_no_task">This skill has no schedule yet. Add the widget\'s schedule first.</string>
+    <string name="skill_widget_busy">Another scheduled run is going; this one waits its turn.</string>
     <string name="skill_widget_hint">Ask %1$s</string>
     <string name="input_text">Text</string>
     <string name="input_photo">Photo</string>

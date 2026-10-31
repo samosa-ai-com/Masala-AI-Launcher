@@ -1,0 +1,56 @@
+package com.samosaai.masala.brief
+
+import java.time.LocalDate
+import java.time.ZoneId
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class BriefWidgetTest {
+    private val zone = ZoneId.of("Asia/Kolkata")
+    private val day = LocalDate.of(2026, 10, 31)
+    private fun at(h: Int, m: Int = 0, d: LocalDate = day) = d.atTime(h, m).atZone(zone).toInstant().toEpochMilli()
+
+    private fun due(
+        runId: Long = 7,
+        status: String = "done",
+        finishedAt: Long? = at(7, 31),
+        now: Long = at(8, 5),
+        readAloud: Boolean = true,
+        quiet: Boolean = false,
+        lastRead: Long = 6,
+    ) = BriefWidget.autoReadDue(runId, status, finishedAt, now, zone, readAloud, quiet, lastRead)
+
+    @Test
+    fun `a fresh brief is read once on the first look before noon`() {
+        assertTrue(due())
+        assertFalse(due(lastRead = 7), "already read")
+        assertFalse(due(now = at(12, 0)), "afternoon")
+        assertFalse(due(finishedAt = at(7, 31, day.minusDays(1))), "yesterday's")
+    }
+
+    @Test
+    fun `nothing is read when the user would not want it`() {
+        assertFalse(due(readAloud = false))
+        assertFalse(due(quiet = true))
+        assertFalse(due(status = "failed"))
+        assertFalse(due(status = "running", finishedAt = null))
+    }
+
+    @Test
+    fun `the run label says how old a result is`() {
+        val today = BriefWidget.runLabel(at(7, 31), "Today", "Yesterday", zone, day)
+        assertTrue(today.startsWith("Today "), today)
+        assertTrue(BriefWidget.runLabel(at(7, 31, day.minusDays(1)), "Today", "Yesterday", zone, day).startsWith("Yesterday "))
+        val old = BriefWidget.runLabel(at(7, 31, day.minusDays(3)), "Today", "Yesterday", zone, day)
+        assertFalse(old.startsWith("Today") || old.startsWith("Yesterday"), old)
+        assertTrue("28" in old, old)
+    }
+
+    @Test
+    fun `a medium widget previews the first section`() {
+        assertEquals("**Today**\n- 09:30 Standup", BriefWidget.preview("\n**Today**\n- 09:30 Standup\n\n**Weather**\nRain\n"))
+        assertEquals("", BriefWidget.preview("   "))
+    }
+}

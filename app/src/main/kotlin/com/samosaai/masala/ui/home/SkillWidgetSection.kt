@@ -45,6 +45,18 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import com.samosaai.masala.brief.BriefWidget
+import com.samosaai.masala.core.brief.BriefSpeech
+import com.samosaai.masala.core.contract.SkillOutput
+import com.samosaai.masala.ui.components.Markdown
 
 /** What the skill widget needs: the skill, and its newest run for the result line. */
 interface SkillWidgetSource {
@@ -58,6 +70,17 @@ interface SkillWidgetSource {
     fun scheduleOffer(skillId: String): SkillScheduling.Offer? = null
     fun acceptSchedule(offer: SkillScheduling.Offer) = Unit
     fun declineSchedule(skillId: String) = Unit
+
+    /** Reads [text] aloud; null when it played or was stopped, else why it couldn't. */
+    suspend fun speak(text: String): String? = null
+    fun stopSpeaking() = Unit
+    fun speaking(): StateFlow<Boolean> = MutableStateFlow(false)
+
+    /** Runs the skill's scheduled task now; null when it started, else why not. */
+    suspend fun runNow(skillId: String): String? = null
+
+    /** True once per run when it should be read aloud without a tap (plan `phase5-daily-brief.md` D5). */
+    suspend fun claimAutoRead(run: SkillRunEntity): Boolean = false
 }
 
 /**
@@ -113,7 +136,9 @@ fun SkillWidgetCard(section: SkillWidgetSection, source: SkillWidgetSource, onAc
                 SymbolDisc(SymbolIcons.icon(skill.widget?.icon ?: "star"), SymbolIcons.tint(skill.widget?.tint), if (section.size == SkillWidgetSize.SMALL) 32 else 40)
                 Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             }
-            if (section.size != SkillWidgetSize.SMALL) {
+            if (section.size != SkillWidgetSize.SMALL && skill.schedule != null && skill.widget?.output == SkillOutput.MARKDOWN) {
+                ScheduledResult(skill, section.size, latest, line, nextRun, source, open)
+            } else if (section.size != SkillWidgetSize.SMALL) {
                 val text = when {
                     latest?.status == "running" -> stringResource(R.string.skill_widget_working)
                     else -> line
@@ -134,6 +159,64 @@ fun SkillWidgetCard(section: SkillWidgetSection, source: SkillWidgetSource, onAc
                 }
             }
         }
+    }
+}
+
+/**
+ * A scheduled skill's result (the daily brief): when it ran, the Markdown (the first section at medium
+ * size), and Read aloud, Run now and Open. A fresh result may be read aloud once without a tap.
+ */
+@Composable
+private fun ScheduledResult(
+    skill: MasalaSkill,
+    size: SkillWidgetSize,
+    latest: SkillRunEntity?,
+    answer: String?,
+    nextRun: Long?,
+    source: SkillWidgetSource,
+    open: () -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val speaking by remember(source) { source.speaking() }.collectAsStateWithLifecycle()
+    val done = latest?.takeIf { it.status == "done" }
+    val markdown = done?.let { answer }?.trim()
+    fun say(text: String) = scope.launch {
+        source.speak(BriefSpeech.toSpeech(text))?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show() }
+    }
+    // The first look at home after a fresh result, not only the moment it arrives.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(done?.id, markdown) {
+        val run = done ?: return@LaunchedEffect
+        val text = markdown?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            if (source.claimAutoRead(run)) say(text)
+        }
+    }
+    when {
+        latest?.status == "running" -> Text(stringResource(R.string.skill_widget_working), style = MaterialTheme.typography.bodyMedium)
+        latest?.status == "failed" -> latest.error?.let { Text(it.trim(), style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis) }
+        markdown != null -> {
+            val at = done.finishedAt ?: done.startedAt
+            Text(
+                BriefWidget.runLabel(at, stringResource(R.string.skill_widget_ran_today), stringResource(R.string.skill_widget_ran_yesterday)),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Markdown(if (size == SkillWidgetSize.LARGE) markdown else BriefWidget.preview(markdown))
+        }
+    }
+    nextRun?.let { Text(stringResource(R.string.skill_widget_next_run, formatNextRun(it)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (markdown != null) {
+            TextButton(onClick = { if (speaking) source.stopSpeaking() else say(markdown) }) {
+                Text(stringResource(if (speaking) R.string.skill_widget_stop_reading else R.string.skill_widget_read_aloud))
+            }
+        }
+        TextButton(enabled = latest?.status != "running", onClick = {
+            scope.launch { source.runNow(skill.id)?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show() } }
+        }) { Text(stringResource(R.string.skill_widget_run_now)) }
+        Button(onClick = open) { Text(stringResource(R.string.skill_widget_open)) }
     }
 }
 

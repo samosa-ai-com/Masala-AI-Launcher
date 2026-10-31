@@ -241,6 +241,35 @@ class MasalaApp : Application() {
 
     fun stopSpeaking() = tts.stop()
 
+    /** The widget's Run now: starts [skillId]'s scheduled task; null when it started, else why not. */
+    suspend fun runSkillTaskNow(skillId: String): String? {
+        val task = kotlinx.coroutines.withContext(Dispatchers.IO) { scheduledTasks.all().firstOrNull { it.skillId == skillId } }
+            ?: return getString(R.string.skill_widget_no_task)
+        return when (val start = com.samosaai.masala.scheduled.ScheduledTaskRuns(this).runNow(task.id)) {
+            is com.samosaai.masala.scheduled.ScheduledStart.Started -> null
+            com.samosaai.masala.scheduled.ScheduledStart.Busy -> getString(R.string.skill_widget_busy)
+            is com.samosaai.masala.scheduled.ScheduledStart.Failed -> start.detail
+        }
+    }
+
+    /**
+     * Whether [run] is read aloud now without a tap (plan `phase5-daily-brief.md` D5): once per run, and
+     * only when read-aloud is on and the phone isn't silenced or in Do Not Disturb.
+     */
+    suspend fun claimAutoRead(run: com.samosaai.masala.data.SkillRunEntity): Boolean {
+        val prefs = getSharedPreferences("auto_read", MODE_PRIVATE)
+        val audio = getSystemService(android.media.AudioManager::class.java)
+        val notifications = getSystemService(android.app.NotificationManager::class.java)
+        val quiet = audio?.ringerMode != android.media.AudioManager.RINGER_MODE_NORMAL ||
+            notifications?.currentInterruptionFilter.let { it != null && it != android.app.NotificationManager.INTERRUPTION_FILTER_ALL }
+        val due = com.samosaai.masala.brief.BriefWidget.autoReadDue(
+            run.id, run.status, run.finishedAt, System.currentTimeMillis(), java.time.ZoneId.systemDefault(),
+            settings.current().readRepliesAloud, quiet, prefs.getLong(run.skillId, -1),
+        )
+        if (due) prefs.edit().putLong(run.skillId, run.id).apply()
+        return due
+    }
+
     /** True while a reply is being read aloud (Sam's speaking state). */
     val speaking get() = tts.isSpeaking
 
