@@ -1,6 +1,8 @@
 package com.samosaai.masala.ui.chat
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -200,7 +202,14 @@ private fun Header(
 private fun Orb(level: () -> Float, character: Character, listening: Boolean, caption: String) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Box(contentAlignment = Alignment.Center) {
-            val l = level().coerceIn(0f, 1f)
+            // The engine reports one level per 200 ms audio window; animating between them
+            // turns the steps into a continuous breath instead of a jump every window.
+            val raw = level().coerceIn(0f, 1f)
+            val l by animateFloatAsState(
+                raw,
+                animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+                label = "orb-level",
+            )
             val accent = MasalaTheme.tokens.accent
             androidx.compose.foundation.Canvas(Modifier.size(200.dp)) {
                 val base = size.minDimension / 2f
@@ -216,7 +225,7 @@ private fun Orb(level: () -> Float, character: Character, listening: Boolean, ca
             MasalaCharacter(
                 character,
                 if (listening) CharacterState.LISTENING else CharacterState.HELLO,
-                Modifier.size(120.dp), level,
+                Modifier.size(120.dp), { l },
                 description = if (listening) stringResource(R.string.listening_sam) else null,
             )
         }

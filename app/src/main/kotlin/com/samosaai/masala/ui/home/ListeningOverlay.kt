@@ -2,7 +2,9 @@ package com.samosaai.masala.ui.home
 
 import android.os.Build
 import android.view.RoundedCorner
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -89,8 +91,12 @@ fun ListeningOverlay(
     val bars by rememberInfiniteTransition(label = "bars").animateFloat(0f, if (still) 0f else 1f, infiniteRepeatable(tween(1000, easing = LinearEasing)), label = "bars")
 
     Box(Modifier.fillMaxSize().background(Color(0xCC0A0912))) {
+        // Smoothed: the level arrives one value per 200 ms audio window, and the edge
+        // should breathe between them rather than step.
+        val glowRaw = level().coerceIn(0f, 1f)
+        val glow by animateFloatAsState(glowRaw, tween(260, easing = FastOutSlowInEasing), label = "glow-level")
         Canvas(Modifier.fillMaxSize()) {
-            val l = level().coerceIn(0f, 1f)
+            val l = glow
             val w = 4.dp.toPx() + 6.dp.toPx() * l
             drawRoundRect(
                 brush = Brush.sweepGradient(
