@@ -81,6 +81,7 @@
     <string name="stt_test_stop">Stop</string>
     <string name="stt_test_cancel">Cancel</string>
     <string name="stt_test_peak">Mic peak %1$d%%</string>
+    <string name="stt_test_vad">Detector floor %1$d · speaks above %2$d · peak %3$d dB</string>
     <string name="stt_test_heard">Heard: %1$s</string>
     <string name="voice_from_anywhere">From anywhere</string>
     <string name="voice_assist_title">Masala as the assist app</string>

@@ -320,6 +320,7 @@ private fun SttTestCard() {
     var userCancelled by remember { mutableStateOf(false) }
     val level by engine.level.collectAsState()
     val partial by engine.partial.collectAsState()
+    val vad by engine.vadState.collectAsState()
     LaunchedEffect(testing, level) { if (testing && level > peak) peak = level }
     val strings = SpeechStrings(
         localUnavailable = stringResource(R.string.speech_local_unavailable),
@@ -403,6 +404,12 @@ private fun SttTestCard() {
                 Box(Modifier.fillMaxWidth(level.coerceIn(0f, 1f)).height(8.dp).clip(RoundedCornerShape(4.dp)).background(voiceTint))
             }
             Text(stringResource(R.string.stt_test_peak, (peak.coerceIn(0f, 1f) * 100).toInt()), fontFamily = MasalaMono, style = MaterialTheme.typography.bodySmall, color = voiceTint)
+            vad?.let {
+                Text(
+                    stringResource(R.string.stt_test_vad, it.floorDb.toInt(), it.thresholdDb.toInt(), it.peakDb.toInt()),
+                    fontFamily = MasalaMono, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { engine.finishUtterance() }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.stt_test_stop)) }
                 OutlinedButton(

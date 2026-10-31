@@ -161,4 +161,34 @@ class SilenceDetectorTest {
         assertTrue(full > -10f)
         assertTrue(truncated > -10f)
     }
+
+    @Test
+    fun `short command starting at once is accepted without waiting for priming`() {
+        val detector = SilenceDetector(silenceTimeoutMs = 3_000L)
+        // "Open YouTube" (~1.2 s) spoken the moment the mic opens: the 12-window
+        // priming alone outlasts the whole utterance, so acceptance must not wait
+        // for it. Varying levels mark it as speech, not ambient.
+        var now = start
+        detector.update(windowRmsDb = -62f, nowMs = now); now += 200
+        detector.update(windowRmsDb = -30f, nowMs = now); now += 200
+        detector.update(windowRmsDb = -24f, nowMs = now); now += 200
+        detector.update(windowRmsDb = -32f, nowMs = now); now += 200
+        assertTrue(
+            "speech from the first windows must be accepted at the streak, not after priming",
+            detector.speechDetected,
+        )
+    }
+
+    @Test
+    fun `speech from the first window in a loud room is accepted`() {
+        val detector = SilenceDetector(silenceTimeoutMs = 3_000L)
+        // Loud room (-38 dBFS) with the user speaking over it from the start:
+        // steady ambient alone must never accept, but varying speech must.
+        var now = start
+        repeat(3) { detector.update(windowRmsDb = -38f, nowMs = now); now += 200 }
+        detector.update(windowRmsDb = -22f, nowMs = now); now += 200
+        detector.update(windowRmsDb = -26f, nowMs = now); now += 200
+        detector.update(windowRmsDb = -22f, nowMs = now); now += 200
+        assertTrue(detector.speechDetected)
+    }
 }

@@ -97,6 +97,12 @@ class SttEngine(
     /** Words heard so far in this session (on-device recognizer only; API transcription has none). */
     val partial: kotlinx.coroutines.flow.StateFlow<String> = _partial
 
+    /** What the voice-activity detector currently sees; the settings test card shows it. */
+    data class VadSnapshot(val floorDb: Float, val thresholdDb: Float, val peakDb: Float, val speechHeard: Boolean)
+
+    private val _vadState = kotlinx.coroutines.flow.MutableStateFlow<VadSnapshot?>(null)
+    val vadState: kotlinx.coroutines.flow.StateFlow<VadSnapshot?> = _vadState
+
     /** A new listening session starts from silence and no words. */
     fun resetLive() {
         _level.value = 0f
@@ -337,12 +343,14 @@ class SttEngine(
 
         vadStopRequested = false
         vadRecordError = null
+        _vadState.value = null
         val detector = SilenceDetector(silenceTimeoutMs)
         val shortBuf = ShortArray(windowShorts)
         val byteBuf = ByteArray(windowShorts * 2)
         val pcm = ByteArrayOutputStream()
         val startMs = System.currentTimeMillis()
         var result: File? = null
+        var peakDb = -50f
         try {
             recorder.startRecording()
             while (!vadStopRequested) {
@@ -358,7 +366,9 @@ class SttEngine(
                 val now = System.currentTimeMillis()
                 val db = SilenceDetector.rmsDb(shortBuf, count)
                 _level.value = ((db + 60f) / 50f).coerceIn(0f, 1f)
+                peakDb = maxOf(peakDb, db)
                 val decision = detector.update(db, now)
+                _vadState.value = VadSnapshot(detector.floorDb, detector.thresholdDb, peakDb, detector.speechDetected)
                 if (decision != SilenceDetector.Decision.CONTINUE ||
                     now - startMs > MAX_VAD_RECORDING_MS
                 ) {
