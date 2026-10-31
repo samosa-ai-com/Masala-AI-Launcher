@@ -560,6 +560,7 @@ class HomeActivity : ComponentActivity() {
                     val byId = visible.associateBy { it.key.id }
                     com.samosaai.masala.core.apps.UsageRank.top(
                         com.samosaai.masala.core.apps.UsageRank.counts(launches, Long.MIN_VALUE), byId.keys, { byId[it]?.label ?: it },
+                        limit = Int.MAX_VALUE,
                     ).mapNotNull { r -> byId[r.key]?.let { it to r.count } }
                 },
                 usageAccess = usageAccess,

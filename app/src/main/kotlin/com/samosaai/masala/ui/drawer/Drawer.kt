@@ -114,6 +114,7 @@ private data class Ranked<T>(val query: String, val results: List<T>)
 
 /** Pause after the last keystroke before a composing single match auto-launches. */
 private const val AUTO_LAUNCH_PAUSE_MS = 800L
+private const val GLOBE_MAX = 30
 
 /** Where the globe gets its counts and whether to ask for Usage access (decision 11). */
 class GlobeSource(
@@ -242,10 +243,12 @@ fun Drawer(
     // The globe's ranking lives here so typing in Globe layout can dim it above the search results.
     var range by rememberSaveable { mutableStateOf(UsageRange.WEEK) }
     var globeRanked by remember { mutableStateOf<List<GlobeApp>>(emptyList()) }
+    var usageOrder by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     LaunchedEffect(range, apps, open, shownLayout) {
         if (!open || globe == null || shownLayout != DrawerLayout.GLOBE) return@LaunchedEffect
         val r = globe.ranked(range)
-        globeRanked = withContext(Dispatchers.Default) { globeApps(r) }
+        usageOrder = r.mapIndexed { i, (e, _) -> e.key.id to i }.toMap()
+        globeRanked = withContext(Dispatchers.Default) { globeApps(r.take(GLOBE_MAX)) }
     }
 
     var showWork by rememberSaveable { mutableStateOf(false) }
@@ -312,7 +315,7 @@ fun Drawer(
                         DrawerLayout.LIST -> LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f)) {
                             items(shown, key = { it.key.id }) { entry -> AppRow(entry, icons, profiles, labelWork = false, onLaunch, onMenu) }
                         }
-                        DrawerLayout.GLOBE -> GlobePage(shown, globeRanked, range, { range = it }, icons, open, globe, onLaunch, onMenu, profiles, Modifier.weight(1f))
+                        DrawerLayout.GLOBE -> GlobePage(shown, globeRanked, usageOrder, range, { range = it }, icons, open, globe, onLaunch, onMenu, profiles, Modifier.weight(1f))
                     }
                 }
                 // Ends above the keyboard, so only the rows that can be seen are composed on each letter.
@@ -564,6 +567,7 @@ private fun AppCell(entry: AppEntry, icons: IconCache, profiles: AppCatalog.Snap
 private fun GlobePage(
     apps: List<AppEntry>,
     ranked: List<GlobeApp>,
+    usageOrder: Map<String, Int>,
     range: UsageRange,
     onRange: (UsageRange) -> Unit,
     icons: IconCache,
@@ -575,7 +579,10 @@ private fun GlobePage(
     modifier: Modifier,
 ) {
     val onGlobe = remember(ranked) { ranked.map { it.entry.key.id }.toSet() }
-    val rest = apps.filter { it.key.id !in onGlobe }
+    // Most used first; never-opened apps keep the catalog's A–Z order (the sort is stable).
+    val rest = remember(apps, onGlobe, usageOrder) {
+        apps.filter { it.key.id !in onGlobe }.sortedBy { usageOrder[it.key.id] ?: Int.MAX_VALUE }
+    }
     LazyColumn(modifier.fillMaxWidth()) {
         if (source != null && !source.usageAccess) item(key = "usage") { UsageAccessCard(source.asked, source.onAllow, source.onSkip) }
         item(key = "globe") {

@@ -500,7 +500,7 @@
     <string name="globe_month">30 days</string>
     <string name="globe_caption">Sized and placed by how often you open them</string>
     <string name="globe_more_apps">More apps · %1$d</string>
-    <string name="globe_more_note">Rarely opened, A–Z</string>
+    <string name="globe_more_note">Most used first, then A–Z</string>
     <string name="globe_empty">Open a few apps and they’ll gather here, the ones you use most in the middle.</string>
     <string name="globe_own_counts">Using Masala’s own counts: apps opened from outside Masala aren’t counted.</string>
     <string name="usage_access_title">Let Masala see which apps you use</string>
