@@ -23,6 +23,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CommandControllerTest {
@@ -186,6 +187,29 @@ class CommandControllerTest {
         c.stopListening()
         c.settled()
         assertEquals(listOf<MasalaAction>(MasalaAction.StartTimer(60)), ran)
+    }
+
+    @Test fun aHeldSessionSendsOnStopAndATappedOneSendsOnFinish() = runBlocking<Unit> {
+        var finished = 0
+        val speech = object : SpeechInput {
+            override fun start(onFailure: (String) -> Unit) = true
+            override suspend fun stop() = Result.failure<String>(Exception("held"))
+            override fun cancel() = Unit
+            override fun finish() { finished++ }
+            override suspend fun listenOnce() = Result.failure<String>(Exception("tapped"))
+        }
+        val c = controller(speech)
+        // Walkie-talkie: sendNow ends the held session (stop), not the hands-free one.
+        assertTrue(c.startListening())
+        assertTrue(c.walkieTalkie.value)
+        c.sendNow()
+        assertEquals(0, finished)
+        c.settled()
+        // Hands-free: sendNow ends the utterance early instead.
+        c.tapToTalk()
+        assertFalse(c.walkieTalkie.value)
+        c.sendNow()
+        assertEquals(1, finished)
     }
 
     @Test fun listeningWithoutAMicrophoneIsAnError() = runBlocking<Unit> {

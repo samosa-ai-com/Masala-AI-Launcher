@@ -510,8 +510,8 @@
     <string name="listening_chip">Listening · %1$s</string>
     <string name="listening_on_device">on-device</string>
     <string name="listening_sam">Masala is listening</string>
-    <string name="listening_hint">Sends when you pause · tap to stop now</string>
-    <string name="listening_hint_hold">Keep holding · release to send, or tap stop</string>
+    <string name="listening_hint">Sends after about 2 seconds of silence · tap ■ to send now</string>
+    <string name="listening_hint_hold">Release to send · tap ■ to send now</string>
     <string name="listening_chip_hold">Holding · %1$s</string>
     <string name="listening_cancel">Cancel</string>
     <string name="listening_stop">Stop and send</string>

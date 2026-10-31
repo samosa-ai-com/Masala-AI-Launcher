@@ -90,8 +90,11 @@ fun friendlySttMessage(raw: String?, s: SpeechStrings): String {
  * other one as fallback when the first can't start. A phone whose default recognizer
  * is a stub (or has none) therefore records for the server instead of failing.
  */
-/** A pause that ends tap-to-talk; long enough for a mid-sentence breath, short enough to feel live. */
-private const val SILENCE_MS = 1500L
+/**
+ * Silence that ends a hands-free turn: 2.5 s, so a breath or a slow sentence does not
+ * cut the user off mid-thought. Hold-to-talk never depends on it (release sends).
+ */
+private const val SILENCE_MS = 2500L
 
 class ConfiguredSpeechInput(
     private val engine: PttEngine,

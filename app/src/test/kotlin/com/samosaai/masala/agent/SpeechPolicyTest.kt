@@ -42,6 +42,7 @@ class SpeechPolicyTest {
         val started = mutableListOf<AudioProvider>()
         val cancelled = mutableListOf<AudioProvider>()
         val utterances = mutableListOf<AudioProvider>()
+        var lastSilenceMs = 0L
         var stopped: AudioProvider? = null
         var stoppedModel = ""
         var stoppedLanguage = ""
@@ -78,6 +79,7 @@ class SpeechPolicyTest {
             silenceTimeoutMs: Long,
         ): Result<String> {
             utterances += provider
+            lastSilenceMs = silenceTimeoutMs
             return utteranceResults[provider] ?: Result.failure(UnsupportedOperationException("no stub"))
         }
     }
@@ -190,6 +192,14 @@ class SpeechPolicyTest {
         val text = input(engine).listenOnce()
         assertTrue(text.isFailure)
         assertEquals(listOf(AudioProvider.API), engine.utterances)
+    }
+
+    @Test
+    fun tapWaitsLongEnoughForASlowSentence() = runBlocking<Unit> {
+        val engine = FakeEngine(utteranceResults = mapOf(AudioProvider.API to Result.success("hi")))
+        input(engine).listenOnce()
+        // 2.5 s: a breath mid-sentence must not end the take (it was 1.5 s).
+        assertEquals(2500L, engine.lastSilenceMs)
     }
 
     @Test

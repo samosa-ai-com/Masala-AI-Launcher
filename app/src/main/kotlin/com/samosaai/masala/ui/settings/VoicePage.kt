@@ -26,7 +26,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.PanTool
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -68,7 +67,6 @@ import com.samosaai.masala.agent.friendlySttMessage
 import com.samosaai.masala.audio.AudioProvider
 import com.samosaai.masala.core.ai.Endpoint
 import com.samosaai.masala.core.ai.KeyKind
-import com.samosaai.masala.core.ai.MicMode
 import com.samosaai.masala.core.ai.ProviderPresets
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.i18n.Language
@@ -76,7 +74,6 @@ import com.samosaai.masala.masala
 import com.samosaai.masala.ui.components.Radii
 import com.samosaai.masala.ui.theme.MasalaMono
 import com.samosaai.masala.ui.theme.MasalaTheme
-import com.samosaai.masala.ui.theme.rememberHaptics
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
@@ -93,17 +90,22 @@ fun VoicePage(settings: LauncherSettings, update: ((LauncherSettings) -> Launche
     val store = app.aiSettings
     val profile by store.profile.collectAsState()
     val scope = rememberCoroutineScope()
-    val haptics = rememberHaptics()
     val voiceTint = MasalaTheme.tokens.voice
 
     SettingsScaffold(stringResource(R.string.voice_title), onBack) {
         Eyebrow(stringResource(R.string.voice_mic_button))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MicCard(Icons.Rounded.Mic, stringResource(R.string.voice_tap), stringResource(R.string.voice_tap_summary), profile.micMode == MicMode.TAP, Modifier.weight(1f)) {
-                scope.launch { store.update { it.copy(micMode = MicMode.TAP) } }; haptics.tick()
-            }
-            MicCard(Icons.Rounded.PanTool, stringResource(R.string.voice_hold), stringResource(R.string.voice_hold_summary), profile.micMode == MicMode.HOLD, Modifier.weight(1f)) {
-                scope.launch { store.update { it.copy(micMode = MicMode.HOLD) } }; haptics.tick()
+        // One gesture language, no mode to pick: holding and tapping both always work.
+        Panel(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(Icons.Rounded.Mic, null, tint = voiceTint, modifier = Modifier.size(22.dp))
+                Column {
+                    Text(stringResource(R.string.voice_gestures), style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        stringResource(R.string.voice_gestures_summary),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
 
@@ -200,21 +202,6 @@ private fun Panel(modifier: Modifier = Modifier, content: @Composable () -> Unit
         Modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh).border(1.dp, MasalaTheme.tokens.hairline, shape).then(modifier),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) { content() }
-}
-
-@Composable
-private fun MicCard(icon: ImageVector, title: String, summary: String, on: Boolean, modifier: Modifier, onClick: () -> Unit) {    val tint = MasalaTheme.tokens.voice
-    val shape = RoundedCornerShape(20.dp)
-    Column(
-        modifier.clip(shape).background(if (on) tint.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainerHigh)
-            .border(BorderStroke(1.5.dp, if (on) tint else MasalaTheme.tokens.hairline), shape)
-            .clickable(role = Role.RadioButton, onClick = onClick).semantics { selected = on }.padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Icon(icon, null, tint = if (on) tint else MasalaTheme.tokens.textMedium, modifier = Modifier.size(22.dp))
-        Text(title, style = MaterialTheme.typography.titleSmall)
-        Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
 }
 
 @Composable

@@ -358,7 +358,7 @@ class HomeActivity : ComponentActivity() {
                 val command by app.commands.state.collectAsStateWithLifecycle()
                 // The pill makes way for the reply card while a command is shown.
                 if (command == CommandState.Idle) {
-                    SearchPill(onSearch = { drawerOpen = true; searchRequests++ }, mic = rememberMicPress(app), mode = app.aiSettings.profile.value.micMode)
+                    SearchPill(onSearch = { drawerOpen = true; searchRequests++ }, mic = rememberMicPress(app))
                 }
             },
         ) } }
@@ -371,6 +371,7 @@ class HomeActivity : ComponentActivity() {
             val command by app.commands.state.collectAsStateWithLifecycle()
             val level by app.commands.micLevel.collectAsStateWithLifecycle()
             val words by app.commands.liveWords.collectAsStateWithLifecycle()
+            val walkieTalkie by app.commands.walkieTalkie.collectAsStateWithLifecycle()
             when (val c = command) {
                 CommandState.Listening -> if (!hidden) ListeningOverlay(
                     character = settings.character,
@@ -378,9 +379,9 @@ class HomeActivity : ComponentActivity() {
                     words = words,
                     source = app.aiSettings.profile.value.voiceIn?.preset?.name ?: getString(R.string.listening_on_device),
                     onCancel = { app.commands.dismiss() },
-                    onStop = { if (app.aiSettings.profile.value.micMode == com.samosaai.masala.core.ai.MicMode.HOLD) app.commands.stopListening() else app.commands.finishListening() },
+                    onStop = { app.commands.sendNow() },
                     onType = { app.commands.dismiss(); app.commands.openInput() },
-                    hold = app.aiSettings.profile.value.micMode == com.samosaai.masala.core.ai.MicMode.HOLD,
+                    hold = walkieTalkie,
                 )
                 is CommandState.Thinking -> if (!hidden) Box(Modifier.fillMaxSize().navigationBarsPadding(), contentAlignment = Alignment.BottomCenter) {
                     WorkingSheet(c, settings.character, onStop = { app.commands.dismiss() })

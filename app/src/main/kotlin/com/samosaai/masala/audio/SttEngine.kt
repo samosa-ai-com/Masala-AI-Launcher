@@ -814,13 +814,15 @@ class SttEngine(
         }
     }
 
+    /**
+     * Silences the recognizer's own start/stop tones. Only the system stream is muted:
+     * muting music, notifications or the ringer would let a tap on the mic swallow a
+     * song or an incoming call.
+     */
     private fun muteBeep() {
         if (!isMutedForRestart) {
             try {
-                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, 0)
                 audioManager.adjustStreamVolume(AudioManager.STREAM_SYSTEM, AudioManager.ADJUST_MUTE, 0)
-                audioManager.adjustStreamVolume(AudioManager.STREAM_NOTIFICATION, AudioManager.ADJUST_MUTE, 0)
-                audioManager.adjustStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_MUTE, 0)
             } catch (_: Exception) {}
             isMutedForRestart = true
         }
@@ -829,10 +831,7 @@ class SttEngine(
     private fun unmuteBeep() {
         if (isMutedForRestart) {
             try {
-                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0)
                 audioManager.adjustStreamVolume(AudioManager.STREAM_SYSTEM, AudioManager.ADJUST_UNMUTE, 0)
-                audioManager.adjustStreamVolume(AudioManager.STREAM_NOTIFICATION, AudioManager.ADJUST_UNMUTE, 0)
-                audioManager.adjustStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_UNMUTE, 0)
             } catch (_: Exception) {}
             isMutedForRestart = false
         }

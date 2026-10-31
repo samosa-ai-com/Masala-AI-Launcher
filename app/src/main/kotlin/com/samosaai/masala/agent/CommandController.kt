@@ -38,6 +38,10 @@ class CommandController(
 
     private var job: Job? = null
 
+    /** True while a hold-to-talk session runs: the release sends, not a detected pause. */
+    private val _walkieTalkie = MutableStateFlow(false)
+    val walkieTalkie: kotlinx.coroutines.flow.StateFlow<Boolean> = _walkieTalkie.asStateFlow()
+
     /** The mic level and live words while listening, for the listening overlay (UI refresh U4). */
     val micLevel: StateFlow<Float> get() = speech?.level ?: kotlinx.coroutines.flow.MutableStateFlow(0f)
     val liveWords: StateFlow<String> get() = speech?.partial ?: kotlinx.coroutines.flow.MutableStateFlow("")
@@ -62,6 +66,7 @@ class CommandController(
 
     fun dismiss() {
         job?.cancel()
+        _walkieTalkie.value = false
         speech?.cancel()
         _state.value = CommandState.Idle
     }
@@ -87,6 +92,7 @@ class CommandController(
             _state.value = CommandState.Error("", reason ?: "Speech recognition isn't available")
             return false
         }
+        _walkieTalkie.value = true
         _state.value = CommandState.Listening
         return true
     }
@@ -99,12 +105,21 @@ class CommandController(
         val input = speech ?: return
         if (_state.value == CommandState.Listening) return finishListening()
         job?.cancel()
+        _walkieTalkie.value = false
         _state.value = CommandState.Listening
         job = scope.launch {
             input.listenOnce()
                 .onSuccess { if (it.isBlank()) _state.value = CommandState.Error("", speechStrings.didntCatch) else ask(it, spoken = true) }
                 .onFailure { _state.value = CommandState.Error("", friendlySttMessage(it.message, speechStrings)) }
         }
+    }
+
+    /**
+     * The listening overlay's send button, whatever started the session: a held session
+     * stops and transcribes, a hands-free one ends its utterance early.
+     */
+    fun sendNow() {
+        if (_walkieTalkie.value) stopListening() else finishListening()
     }
 
     /** Ends tap-to-talk listening now; what was said still runs. */
@@ -116,6 +131,7 @@ class CommandController(
     fun stopListening() {
         val input = speech ?: return
         if (_state.value != CommandState.Listening) return
+        _walkieTalkie.value = false
         _state.value = CommandState.Thinking("")
         job = scope.launch {
             input.stop()

@@ -101,8 +101,10 @@ fun ListeningOverlay(
                     },
                     center,
                 ),
-                // Hold breathes with the mic; tap keeps a steady glow while it spins.
-                alpha = if (hold) 0.45f + 0.55f * l else 1f,
+                // Both gestures follow the mic, so the glow itself proves it hears you:
+                // holding breathes fully with the level, hands-free pulses more gently
+                // over a steady base while it spins.
+                alpha = if (hold) 0.35f + 0.65f * l else 0.72f + 0.28f * l,
                 topLeft = Offset(w / 2, w / 2),
                 size = androidx.compose.ui.geometry.Size(size.width - w, size.height - w),
                 cornerRadius = CornerRadius(cornerPx, cornerPx),
