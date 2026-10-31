@@ -47,10 +47,13 @@ fun ScheduledTasksPage(onBack: () -> Unit, onAskInChat: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     var tasks by remember { mutableStateOf(listOf<ScheduledTask>()) }
     var answers by remember { mutableStateOf(mapOf<String, String>()) }
+    var running by remember { mutableStateOf(setOf<String>()) }
     val format = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
     suspend fun sync() {
+        val runs = ScheduledTaskRuns(context.applicationContext as android.app.Application)
         val fresh = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { app.scheduledTasks.all() }
         tasks = fresh
+        running = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runs.runningTaskIds() }
         answers = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             fresh.mapNotNull { t ->
                 val link = t.history.lastOrNull()?.skillRunId ?: return@mapNotNull null
@@ -142,14 +145,25 @@ fun ScheduledTasksPage(onBack: () -> Unit, onAskInChat: (String) -> Unit) {
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = {
-                            scope.launch {
-                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                    ScheduledTaskRuns(context.applicationContext as android.app.Application).runNow(task.id)
+                        if (task.id in running) {
+                            TextButton(onClick = {
+                                scope.launch {
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        ScheduledTaskRuns(context.applicationContext as android.app.Application).stop(task.id)
+                                    }
+                                    sync()
                                 }
-                                sync()
-                            }
-                        }) { Text(stringResource(R.string.scheduled_task_run_now)) }
+                            }) { Text(stringResource(R.string.scheduled_task_stop)) }
+                        } else {
+                            TextButton(onClick = {
+                                scope.launch {
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        ScheduledTaskRuns(context.applicationContext as android.app.Application).runNow(task.id)
+                                    }
+                                    sync()
+                                }
+                            }) { Text(stringResource(R.string.scheduled_task_run_now)) }
+                        }
                         TextButton(
                             enabled = canPause,
                             onClick = {

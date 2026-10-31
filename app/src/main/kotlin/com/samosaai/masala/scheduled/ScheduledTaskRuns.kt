@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import androidx.work.WorkManager
 import com.samosaai.masala.R
 import com.samosaai.masala.core.scheduled.ScheduledTask
 import com.samosaai.masala.core.scheduled.ScheduledTaskPlanner
@@ -68,14 +69,35 @@ class ScheduledTaskRuns(private val app: Application) {
     /**
      * Runs task [id] now, for "Run now". The task's schedule is left as it is, unless this was its
      * scheduled time.
-     */
-    suspend fun runNow(id: String, now: Long = System.currentTimeMillis()): ScheduledStart {
+     */    suspend fun runNow(id: String, now: Long = System.currentTimeMillis()): ScheduledStart {
         val result = lock.withLock {
             val task = store.get(id) ?: return@withLock ScheduledStart.Failed(app.getString(R.string.scheduled_task_gone))
             start(task, now, ZoneId.systemDefault(), userInitiated = true)
         }
         ScheduledTaskScheduler.reschedule(app)
         return result
+    }
+
+    /** Ids of tasks with a run currently going, for the Stop button. */
+    suspend fun runningTaskIds(): Set<String> = withContext(Dispatchers.IO) {
+        val work = WorkManager.getInstance(app)
+        work.getWorkInfosForUniqueWork(ScheduledSkillRunner.UNIQUE).get()
+            .filterNot { it.state.isFinished }
+            .flatMap { info -> info.tags.filter { it.startsWith(ScheduledSkillRunner.TASK_TAG) } }
+            .map { it.removePrefix(ScheduledSkillRunner.TASK_TAG) }
+            .toSet()
+    }
+
+    /**
+     * Stops the in-flight run of [taskId]; true when one was going. The worker records
+     * STOPPED itself as it is cancelled.
+     */
+    suspend fun stop(taskId: String): Boolean = withContext(Dispatchers.IO) {
+        val work = WorkManager.getInstance(app)
+        val going = work.getWorkInfosForUniqueWork(ScheduledSkillRunner.UNIQUE).get()
+            .any { !it.state.isFinished && it.tags.contains(ScheduledSkillRunner.TASK_TAG + taskId) }
+        if (going) work.cancelUniqueWork(ScheduledSkillRunner.UNIQUE)
+        going
     }
 
     /** The run [runId] of task [taskId] ended with [status]; [detail] is its error, if any. */
