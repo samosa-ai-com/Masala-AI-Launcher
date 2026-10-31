@@ -528,6 +528,7 @@
     <string name="layout_undo">Undo</string>
     <!-- Conversation surface (plan chat-live-sessions) -->
     <string name="chat_new">New chat</string>
+    <string name="chat_tap_mic">Tap the mic and speak, or hold it. Drag up for the conversation.</string>
     <string name="chat_close">Close chat</string>
     <string name="chat_history">Chat history</string>
     <string name="chat_empty">Hold the mic to talk, or tap it and speak. Everything you say stays here.</string>

@@ -165,8 +165,12 @@ class HomeActivity : ComponentActivity() {
                 turns = session.turns
                 sessionTitle = session.title
             }
-            // Talking or a finished turn brings the surface up by itself.
-            LaunchedEffect(commandState) { if (commandState != CommandState.Idle) chatOpen = true }
+            // Talking or a finished turn brings the surface up by itself; starting to talk
+            // always shows the orb, so the big animation is what a press produces.
+            LaunchedEffect(commandState) {
+                if (commandState != CommandState.Idle) chatOpen = true
+                if (commandState == CommandState.Listening) expanded = false
+            }
         val pinnedShortcuts by launcher.pinnedShortcuts.collectAsStateWithLifecycle()
         val profiles by launcher.profiles.collectAsStateWithLifecycle()
         val scope = rememberCoroutineScope()
@@ -199,8 +203,16 @@ class HomeActivity : ComponentActivity() {
             undoOffer = false
         }
 
-        // Always enabled, so Back never leaves home.
-        BackHandler { drawerOpen = false }
+        // Always enabled, so Back never leaves home. It closes whatever is on top first:
+        // the history sheet, then the expanded thread, then the chat itself.
+        BackHandler {
+            when {
+                showHistory -> showHistory = false
+                chatOpen && expanded -> expanded = false
+                chatOpen -> { app.commands.dismiss(); chatOpen = false }
+                else -> drawerOpen = false
+            }
+        }
 
         // One progress (0 = home, 1 = drawer) drives both layers. Both stay composed, so opening and
         // closing the drawer never rebuilds the home pager or the drawer list (plan UI refresh U0).

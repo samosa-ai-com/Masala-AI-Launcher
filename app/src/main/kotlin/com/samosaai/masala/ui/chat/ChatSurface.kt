@@ -3,6 +3,7 @@ package com.samosaai.masala.ui.chat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -24,7 +25,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
@@ -96,12 +96,18 @@ fun ChatSurface(
     LaunchedEffect(lastTurn) {
         if (!listening && lastTurn != null) onExpanded(true)
     }
-    val threadHeight by animateFloatAsState(if (expanded) 0.94f else 0.52f, spring(stiffness = 380f), label = "sheet")
+    val threadHeight by animateFloatAsState(if (expanded) 0.88f else 0.52f, spring(stiffness = 380f), label = "sheet")
 
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         // Dims home so the conversation reads over any wallpaper, then the panel itself
         // is opaque: nothing of the launcher shows through a bubble.
-        Box(Modifier.fillMaxSize().background(Color(0x8A000000)))
+        Box(
+            Modifier.fillMaxSize().background(Color(0x8A000000))
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                ) { onClose() },
+        )
         Box(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp).fillMaxSize(threadHeight).navigationBarsPadding()
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
@@ -119,7 +125,16 @@ fun ChatSurface(
                 )
                 Box(Modifier.weight(1f)) {
                     when {
-                        listening && !expanded -> Orb(level, character, liveWords)
+                        // Collapsed is the live orb, whether or not a conversation exists:
+                        // that is the state's whole point, and what the swipe returns to.
+                        !expanded -> Orb(
+                            level = level,
+                            character = character,
+                            listening = listening,
+                            caption = liveWords.ifBlank {
+                                (turns.lastOrNull { it.role == TurnRole.MASALA }?.text ?: "").take(140)
+                            },
+                        )
                         turns.isEmpty() && !listening && !thinking -> EmptyThread(level, character)
                         else -> Thread(turns, liveWords, listening, thinking, state, character, level)
                     }
@@ -149,7 +164,11 @@ private fun Header(
                     // drag area, so the launcher's own swipes keep their meaning elsewhere.
                     detectVerticalDragGestures(
                         onDragEnd = {
-                            if (drag > 40f) onToggle() else if (drag < -40f) onToggle()
+                            when {
+                                drag > 40f && !expanded -> onClose()
+                                drag > 40f -> onToggle()
+                                drag < -40f -> onToggle()
+                            }
                             drag = 0f
                         },
                     ) { _, dy -> drag += dy }
@@ -161,7 +180,7 @@ private fun Header(
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.chat_close), tint = MasalaTheme.tokens.textMedium)
+                Icon(Icons.Rounded.Close, stringResource(R.string.chat_close), tint = MasalaTheme.tokens.textHigh)
             }
             Text(
                 title,
@@ -178,7 +197,7 @@ private fun Header(
 
 /** Talking: Sam and rings that follow the mic, with the words heard so far. */
 @Composable
-private fun Orb(level: () -> Float, character: Character, liveWords: String) {
+private fun Orb(level: () -> Float, character: Character, listening: Boolean, caption: String) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Box(contentAlignment = Alignment.Center) {
             val l = level().coerceIn(0f, 1f)
@@ -194,13 +213,19 @@ private fun Orb(level: () -> Float, character: Character, liveWords: String) {
                     )
                 }
             }
-            MasalaCharacter(character, CharacterState.LISTENING, Modifier.size(120.dp), level, description = stringResource(R.string.listening_sam))
+            MasalaCharacter(
+                character,
+                if (listening) CharacterState.LISTENING else CharacterState.HELLO,
+                Modifier.size(120.dp), level,
+                description = if (listening) stringResource(R.string.listening_sam) else null,
+            )
         }
         Text(
-            liveWords.ifBlank { stringResource(R.string.command_listening) },
+            caption.ifBlank { if (listening) stringResource(R.string.command_listening) else stringResource(R.string.chat_tap_mic) },
             style = MaterialTheme.typography.titleMedium,
-            color = if (liveWords.isBlank()) MasalaTheme.tokens.textMedium else MasalaTheme.tokens.textHigh,
+            color = if (caption.isBlank()) MasalaTheme.tokens.textMedium else MasalaTheme.tokens.textHigh,
             textAlign = TextAlign.Center,
+            maxLines = 3,
             modifier = Modifier.padding(top = 12.dp, start = 24.dp, end = 24.dp),
         )
         Text(
