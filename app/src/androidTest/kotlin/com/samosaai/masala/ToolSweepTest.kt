@@ -169,7 +169,7 @@ class ToolSweepTest {
         })
         val id = Regex("'([0-9a-f]{8})'").find((created as? ToolResult.Success)?.output.orEmpty())?.groupValues?.get(1)
         if (id == null) {
-            listOf("update_mini_app", "open_mini_app", "pin_mini_app", "delete_mini_app").forEach {
+            listOf("update_mini_app", "read_mini_app", "open_mini_app", "pin_mini_app", "delete_mini_app").forEach {
                 record(it, "FAIL", "no id from create_mini_app: ${(created as? ToolResult.Failure)?.message}")
             }
         } else {
@@ -177,6 +177,10 @@ class ToolSweepTest {
                 put("id", id)
                 put("html", "<!doctype html><html><body><h1>sweep v2</h1></body></html>")
             })
+            val read = run(executor, "read_mini_app", args { put("id", id) })
+            if (read is ToolResult.Success && "<h1>sweep v2</h1>" !in read.output) {
+                record("read_mini_app", "FAIL", "the HTML is not in the result")
+            }
             run(executor, "open_mini_app", args { put("id", id) })
             run(executor, "pin_mini_app", args { put("id", id) })
             run(executor, "delete_mini_app", args { put("id", id) })

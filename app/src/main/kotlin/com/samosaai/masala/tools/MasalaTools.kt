@@ -265,8 +265,14 @@ object MasalaTools {
             FunctionTool(Defs.listMiniApps, READ_ONLY) {
                 val rows = miniApps.list()
                 if (rows.isEmpty()) ActionResult.ok("No mini apps yet.")
-                else rows.joinToString("\n") { "${it.id}: ${it.title} (updated ${it.updatedAt})" }
-                    .let { ActionResult.ok(it) }
+                else rows.joinToString("\n") {
+                    "${it.id}: ${it.title} (updated ${java.time.Instant.ofEpochMilli(it.updatedAt)}, internet ${if (it.networkAllowed) "on" else "off"})"
+                }.let { ActionResult.ok(it) }
+            },
+            FunctionTool(Defs.readMiniApp, READ_ONLY) {
+                val id = it.string("id") ?: return@FunctionTool missing("id")
+                val row = miniApps.get(id) ?: return@FunctionTool ActionResult.error("No mini app '$id'.")
+                ActionResult.ok("Title: ${row.title}\nInternet: ${if (row.networkAllowed) "on" else "off"}\n---\n${row.html}")
             },
             FunctionTool(Defs.openMiniAppTool, READ_ONLY, opensScreen = true) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")

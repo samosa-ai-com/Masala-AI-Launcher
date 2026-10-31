@@ -159,8 +159,24 @@ object MasalaToolDefinitions {
 
     val listMiniApps = tool(
         "list_mini_apps",
-        "List the HTML mini-apps stored on this phone, with their ids, titles and last update.",
+        "List the HTML mini-apps stored on this phone: id, title, last update, and whether it may use " +
+            "the internet. To change one: read_mini_app, then update_mini_app.",
         schema { putJsonObject("properties") {} }
+    )
+
+    val readMiniApp = tool(
+        "read_mini_app",
+        "Read a stored mini-app's full HTML, title and settings, to change it with update_mini_app. " +
+            "The user may name an app by its title: call list_mini_apps first to find the id.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Mini-app id from list_mini_apps.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        }
     )
 
     val openMiniAppTool = tool(
@@ -1092,6 +1108,7 @@ object MasalaToolDefinitions {
         createMiniApp,
         updateMiniApp,
         listMiniApps,
+        readMiniApp,
         openMiniAppTool,
         pinMiniAppTool,
         deleteMiniAppTool,

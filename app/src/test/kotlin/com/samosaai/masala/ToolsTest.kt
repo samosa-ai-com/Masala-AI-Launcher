@@ -113,7 +113,7 @@ class ToolsTest {
         val names = MasalaToolDefinitions.all.map { it.name }.toSet()
         for (expected in listOf(
             "open_url", "create_calendar_event", "search_contacts",
-            "list_mini_apps", "open_mini_app", "pin_mini_app", "delete_mini_app",
+            "list_mini_apps", "read_mini_app", "open_mini_app", "pin_mini_app", "delete_mini_app",
         )) {
             assertTrue(expected in names, "missing tool $expected")
         }
