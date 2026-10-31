@@ -180,6 +180,18 @@ class SilenceDetectorTest {
     }
 
     @Test
+    fun `a single transient in a loud room is not speech`() {
+        val detector = SilenceDetector(silenceTimeoutMs = 3_000L)
+        // Loud ambient (-45 dBFS) is above the fixed -50 floor, and one clink at -38 is
+        // 7 dB of variation: neither alone may accept the turn.
+        var now = start
+        repeat(4) { detector.update(windowRmsDb = -45f, nowMs = now); now += 200 }
+        detector.update(windowRmsDb = -38f, nowMs = now); now += 200
+        detector.update(windowRmsDb = -45f, nowMs = now); now += 200
+        assertFalse("a transient over loud ambient must not start a take", detector.speechDetected)
+    }
+
+    @Test
     fun `speech from the first window in a loud room is accepted`() {
         val detector = SilenceDetector(silenceTimeoutMs = 3_000L)
         // Loud room (-38 dBFS) with the user speaking over it from the start:

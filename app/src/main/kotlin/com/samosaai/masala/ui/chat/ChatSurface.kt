@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -113,7 +114,7 @@ fun ChatSurface(
                 ) { onClose() },
         )
         Box(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp).fillMaxSize(threadHeight).navigationBarsPadding()
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp).fillMaxHeight(threadHeight)
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                 .background(Color(0xFF15171E))
                 .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
@@ -126,6 +127,7 @@ fun ChatSurface(
                     onHistory = onHistory,
                     onNewChat = onNewChat,
                     onToggle = { onExpanded(!expanded) },
+                    onExpanded = onExpanded,
                 )
                 Box(Modifier.weight(1f)) {
                     when {
@@ -158,6 +160,7 @@ private fun Header(
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
     onToggle: () -> Unit,
+    onExpanded: (Boolean) -> Unit,
 ) {
     var drag by remember { mutableFloatStateOf(0f) }
     Column(Modifier.fillMaxWidth()) {
@@ -169,9 +172,11 @@ private fun Header(
                     detectVerticalDragGestures(
                         onDragEnd = {
                             when {
+                                // Down from the orb closes; down from the thread collapses;
+                                // up from the orb opens. Up when already open does nothing.
                                 drag > 40f && !expanded -> onClose()
-                                drag > 40f -> onToggle()
-                                drag < -40f -> onToggle()
+                                drag > 40f && expanded -> onExpanded(false)
+                                drag < -40f && !expanded -> onExpanded(true)
                             }
                             drag = 0f
                         },
@@ -352,7 +357,7 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1) {
 private fun Controls(listening: Boolean, mic: MicPress, onSend: () -> Unit, onClose: () -> Unit) {
     val tokens = MasalaTheme.tokens
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {

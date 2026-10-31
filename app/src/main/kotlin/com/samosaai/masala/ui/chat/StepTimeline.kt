@@ -35,7 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -61,12 +60,12 @@ fun StepTimeline(
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
     var elapsed by remember { mutableLongStateOf(0L) }
     LaunchedEffect(Unit) {
-        val start = System.currentTimeMillis()
+        // Monotonic: a network time update must not jump the stopwatch.
+        val start = android.os.SystemClock.elapsedRealtime()
         while (true) {
-            elapsed = (System.currentTimeMillis() - start) / 1000
+            elapsed = (android.os.SystemClock.elapsedRealtime() - start) / 1000
             delay(1_000)
         }
     }

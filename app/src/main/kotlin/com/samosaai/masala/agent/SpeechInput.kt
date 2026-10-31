@@ -168,6 +168,9 @@ class ConfiguredSpeechInput(
         if (order.isEmpty()) return Result.failure(Exception(strings.localUnavailable))
         val lang = configuredLanguage(settings)
         var last: Result<String>? = null
+        // The first technical failure, kept: once the user has spoken, a fallback provider
+        // only hears the room, and reporting its silence would hide the real error.
+        var firstFailure: Result<String>? = null
         // Like push-to-talk's start(): the cloud goes first, the on-device recognizer is the
         // last resort. Silence is final (another provider would only repeat the wait); only a
         // technical failure moves on to the next provider.
@@ -180,10 +183,15 @@ class ConfiguredSpeechInput(
                 active = null
             }
             if (result.isSuccess) return result
-            if (com.samosaai.masala.audio.SttEngine.isBenignSttError(result.exceptionOrNull())) return result
+            if (com.samosaai.masala.audio.SttEngine.isBenignSttError(result.exceptionOrNull())) {
+                // The fallback heard nothing because the speaking already happened: the
+                // server's failure is the answer, not "no speech detected".
+                return firstFailure ?: result
+            }
+            if (firstFailure == null) firstFailure = result
             last = result
         }
-        return last!!
+        return firstFailure ?: last!!
     }
 
     override fun finish() = engine.finishUtterance()

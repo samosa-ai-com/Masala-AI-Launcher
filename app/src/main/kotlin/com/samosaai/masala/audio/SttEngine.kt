@@ -374,7 +374,11 @@ class SttEngine(
             recorder.startRecording()
             while (!vadStopRequested) {
                 val count = recorder.read(shortBuf, 0, shortBuf.size)
-                if (count < 0) break
+                if (count < 0) {
+                    // A hardware/HAL read failure is not silence: say which it was.
+                    vadRecordError = Exception("Audio capture failed (error code $count)")
+                    break
+                }
                 if (count == 0) continue
                 for (i in 0 until count) {
                     val sample = shortBuf[i].toInt()

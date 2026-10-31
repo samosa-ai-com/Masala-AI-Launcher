@@ -111,7 +111,16 @@ class ChatSessions(
 
     private fun write(session: ChatSession) {
         dir.mkdirs()
-        runCatching { fileFor(session.id).writeText(json.encodeToString(ChatSession.serializer(), session)) }
+        // Temp file + rename: a process killed mid-write must never leave a truncated chat.
+        runCatching {
+            val target = fileFor(session.id)
+            val temp = File(dir, "${session.id}.json.tmp")
+            temp.writeText(json.encodeToString(ChatSession.serializer(), session))
+            if (!temp.renameTo(target)) {
+                target.writeText(temp.readText())
+                temp.delete()
+            }
+        }
     }
 
     private fun fileFor(id: String) = File(dir, "$id.json")

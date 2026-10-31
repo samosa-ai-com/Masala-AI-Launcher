@@ -53,6 +53,8 @@ fun SessionListSheet(
     val format = androidx.compose.runtime.remember {
         DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
     }
+    // Deleting is one tap away from opening, so it asks first.
+    val confirming = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     Box(modifier.fillMaxSize().background(Color(0xB3000000)).clickable(onClick = onDismiss), contentAlignment = Alignment.BottomCenter) {
         Column(
             Modifier.fillMaxWidth().heightIn(min = 240.dp, max = 560.dp)
@@ -103,7 +105,7 @@ fun SessionListSheet(
                                     fontSize = 12.sp,
                                 )
                             }
-                            IconButton(onClick = { onDelete(s.id) }, modifier = Modifier.size(40.dp)) {
+                            IconButton(onClick = { confirming.value = s.id }, modifier = Modifier.size(40.dp)) {
                                 Icon(Icons.Rounded.DeleteOutline, stringResource(R.string.chat_delete), tint = MasalaTheme.tokens.textLow)
                             }
                         }
@@ -111,5 +113,23 @@ fun SessionListSheet(
                 }
             }
         }
+    }
+    confirming.value?.let { id ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirming.value = null },
+            title = { Text(stringResource(R.string.chat_delete_title)) },
+            text = { Text(stringResource(R.string.chat_delete_message)) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    confirming.value = null
+                    onDelete(id)
+                }) { Text(stringResource(R.string.chat_delete)) }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { confirming.value = null }) {
+                    Text(stringResource(R.string.action_back))
+                }
+            },
+        )
     }
 }

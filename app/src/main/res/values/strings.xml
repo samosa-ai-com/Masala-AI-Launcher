@@ -533,8 +533,10 @@
     <string name="chat_history">Chat history</string>
     <string name="chat_empty">Hold the mic to talk, or tap it and speak. Everything you say stays here.</string>
     <string name="chat_working">Working on it…</string>
-    <string name="chat_drag_for_thread">Drag down to see the conversation</string>
+    <string name="chat_drag_for_thread">Drag up to see the conversation</string>
     <string name="chat_sessions_title">Chats</string>
     <string name="chat_delete">Delete</string>
+    <string name="chat_delete_title">Delete this chat?</string>
+    <string name="chat_delete_message">Its messages are removed from this phone. This can’t be undone.</string>
     <string name="chat_no_sessions">No conversations yet. Ask Masala something to start one.</string>
 </resources>

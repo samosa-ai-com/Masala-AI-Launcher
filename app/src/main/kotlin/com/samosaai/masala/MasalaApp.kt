@@ -77,6 +77,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 
 /** Holds the launcher's long-lived parts. Home and settings both read them through [masala]. */
 class MasalaApp : Application() {
@@ -335,11 +336,20 @@ class MasalaApp : Application() {
         }
     }
 
-    /** Appends a turn to the active conversation, starting one when there is none. */
+    /**
+     * Appends a turn to the active conversation, starting one when there is none. Turns are
+     * serialized: a fast command can produce the user turn and its reply before the first
+     * append has left the main thread, and two unguarded launches would each create their
+     * own session, splitting one exchange across two chats.
+     */
+    private val turnLock = kotlinx.coroutines.sync.Mutex()
+
     internal fun recordTurn(turn: com.samosaai.masala.chat.ChatTurn) {
         scope.launch {
-            val id = activeChatId.value ?: chats.create().id.also { activeChatId.value = it }
-            chats.append(id, turn)
+            turnLock.withLock {
+                val id = activeChatId.value ?: chats.create().id.also { activeChatId.value = it }
+                chats.append(id, turn)
+            }
         }
     }
 

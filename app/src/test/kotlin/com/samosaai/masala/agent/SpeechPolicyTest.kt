@@ -203,6 +203,21 @@ class SpeechPolicyTest {
     }
 
     @Test
+    fun `a server failure is reported, not the fallback's silence`() = runBlocking<Unit> {
+        // The user spoke during the server take; the fallback only hears the room. The
+        // reason the user sees must be the server error, not "no speech detected".
+        val engine = FakeEngine(
+            utteranceResults = mapOf(
+                AudioProvider.API to Result.failure(Exception("HTTP 401 rejected")),
+                AudioProvider.ANDROID to Result.failure(Exception("No speech detected")),
+            )
+        )
+        val result = input(engine).listenOnce()
+        assertTrue(result.isFailure)
+        assertEquals("HTTP 401 rejected", result.exceptionOrNull()?.message)
+    }
+
+    @Test
     fun friendlyMessagesNameTheFix() {
         val s = SpeechStrings("no-local", "no-record")
         assertEquals(s.noSpeech, friendlySttMessage(null, s))

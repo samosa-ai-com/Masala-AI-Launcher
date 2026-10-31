@@ -61,8 +61,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.samosaai.masala.agent.CommandState
 import com.samosaai.masala.ui.home.SearchPill
-import com.samosaai.masala.ui.home.ListeningOverlay
-import com.samosaai.masala.ui.home.WorkingSheet
 import androidx.compose.material3.Text
 import com.samosaai.masala.ui.home.ReplyCard
 import com.samosaai.masala.ui.home.rememberMicPress
@@ -209,6 +207,8 @@ class HomeActivity : ComponentActivity() {
         BackHandler {
             when {
                 showHistory -> showHistory = false
+                // The drawer is on top of the chat, so it goes first.
+                drawerOpen -> drawerOpen = false
                 chatOpen && expanded -> expanded = false
                 chatOpen -> { app.commands.dismiss(); chatOpen = false }
                 else -> drawerOpen = false
@@ -451,7 +451,9 @@ class HomeActivity : ComponentActivity() {
                         app.activeChatId.value = null
                         turns = emptyList()
                         sessionTitle = ""
-                        app.commands.dismiss()
+                        // Empty history too: otherwise the agent answers in the new chat
+                        // with the old conversation's context.
+                        app.commands.restoreSession(emptyList())
                         expanded = false
                     },
                 )
@@ -477,6 +479,8 @@ class HomeActivity : ComponentActivity() {
                             app.activeChatId.value = null
                             turns = emptyList()
                             sessionTitle = ""
+                            // Its context goes with it.
+                            app.commands.restoreSession(emptyList())
                         }
                     }
                 },

@@ -50,6 +50,19 @@ internal class SilenceDetector(
     val floorDb: Float
         get() = noiseFloorEstimate
 
+    /**
+     * The bar a window must clear to start counting toward speech. Once the floor is primed
+     * it is [thresholdDb]; before that it is the margin above the quietest window heard so
+     * far, so loud room noise (above the fixed floor) is not counted as speech from window
+     * one and a single transient can't accept the turn.
+     */
+    private val acceptingThresholdDb: Float
+        get() {
+            if (recentCount >= FLOOR_WINDOW) return thresholdDb
+            val quietest = (0 until recentCount).minOfOrNull { recentRms[it] } ?: INITIAL_NOISE_FLOOR_DB
+            return maxOf(absoluteFloorDb, quietest + speechMarginDb)
+        }
+
     fun update(windowRmsDb: Float, nowMs: Long): Decision {
         if (startMs < 0) startMs = nowMs
         // Only pre-speech windows inform the floor, so the estimate keeps
@@ -60,7 +73,7 @@ internal class SilenceDetector(
             if (recentCount < FLOOR_WINDOW) recentCount++
         }
 
-        if (windowRmsDb > thresholdDb) {
+        if (windowRmsDb > acceptingThresholdDb) {
             aboveThresholdStreak++
             // Either the floor has learned the room (primed), or the signal is
             // visibly varying (speech over ambient): steady sound alone — even
