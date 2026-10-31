@@ -218,6 +218,54 @@ class SpeechPolicyTest {
     }
 
     @Test
+    fun `on-device take survives the recognizer's slow partials`() {
+        // This recognizer reports words once every ~5 s. The clock must follow the mic, or
+        // the take ends mid-sentence between two reports.
+        val clock = OnDeviceSilenceClock()
+        var now = 1_000L
+        // Room floor, then the user speaks: loud for 6 s while words arrive only once.
+        repeat(10) { clock.update(now, 0.10f, 0); now += 100 }
+        var ended = false
+        repeat(60) {
+            ended = clock.update(now, 0.55f, if (it == 0) 1 else 1)
+            now += 100
+        }
+        assertFalse("speaking must not end the take", ended)
+    }
+
+    @Test
+    fun `on-device take ends after the pause, not before`() {
+        val clock = OnDeviceSilenceClock()
+        var now = 1_000L
+        repeat(5) { clock.update(now, 0.10f, 0); now += 100 }
+        // Speak for a second.
+        repeat(10) { clock.update(now, 0.60f, 0); now += 100 }
+        // Then go quiet: it must hold for the whole 2.5 s pause, then end. The clock counts
+        // from the last activity, which is the final loud sample, one tick before this.
+        val quietFrom = now - 100
+        var endedAt = -1L
+        repeat(40) {
+            if (endedAt < 0 && clock.update(now, 0.10f, 0)) endedAt = now
+            now += 100
+        }
+        assertTrue("the take must end once the pause passes", endedAt >= 0)
+        assertTrue("it must not end before the pause", endedAt - quietFrom >= 2_500L)
+    }
+
+    @Test
+    fun `a quiet room gives up without pretending anyone spoke`() {
+        val clock = OnDeviceSilenceClock()
+        var now = 1_000L
+        var ended = false
+        repeat(160) {
+            if (clock.update(now, 0.10f, 0)) ended = true
+            now += 100
+        }
+        assertTrue(ended)
+        assertFalse(clock.spoke)
+    }
+
+    @Test
     fun friendlyMessagesNameTheFix() {
         val s = SpeechStrings("no-local", "no-record")
         assertEquals(s.noSpeech, friendlySttMessage(null, s))

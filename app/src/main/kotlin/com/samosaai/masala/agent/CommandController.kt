@@ -77,6 +77,9 @@ class CommandController(
     /** The mic level and live words while listening, for the listening overlay (UI refresh U4). */
     val micLevel: StateFlow<Float> get() = speech?.level ?: kotlinx.coroutines.flow.MutableStateFlow(0f)
     val liveWords: StateFlow<String> get() = speech?.partial ?: kotlinx.coroutines.flow.MutableStateFlow("")
+
+    /** Seconds until the take ends by itself, when the provider works that way. */
+    val autoSendIn: StateFlow<Int?> get() = speech?.autoSendIn ?: kotlinx.coroutines.flow.MutableStateFlow(null)
     private var history: List<ChatMessage> = emptyList()
     private var readAloud: CommandState.Reply? = null
 

@@ -56,7 +56,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
 import com.samosaai.masala.R
 import com.samosaai.masala.agent.CommandState
 import com.samosaai.masala.chat.ChatSession
@@ -86,6 +85,7 @@ fun ChatSurface(
     expanded: Boolean,
     onExpanded: (Boolean) -> Unit,
     mic: MicPress,
+    autoSendIn: Int?,
     onSend: () -> Unit,
     onStop: () -> Unit,
     onClose: () -> Unit,
@@ -147,7 +147,7 @@ fun ChatSurface(
                         else -> Thread(turns, liveWords, listening, thinking, state, character, level, onStop)
                     }
                 }
-                Controls(listening, level, mic, onSend, onClose)
+                Controls(listening, autoSendIn, mic, onSend, onClose)
             }
         }
     }
@@ -382,7 +382,7 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1) {
  * behaviour is predictable rather than a surprise.
  */
 @Composable
-private fun Controls(listening: Boolean, level: () -> Float, mic: MicPress, onSend: () -> Unit, onClose: () -> Unit) {
+private fun Controls(listening: Boolean, autoSendIn: Int?, mic: MicPress, onSend: () -> Unit, onClose: () -> Unit) {
     val tokens = MasalaTheme.tokens
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         if (listening) {
@@ -391,7 +391,7 @@ private fun Controls(listening: Boolean, level: () -> Float, mic: MicPress, onSe
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
             ) {
-                val countdown = rememberAutoSendCountdown(active = listening, level = level)
+                val countdown = autoSendIn
                 Text(
                     if (countdown == null) stringResource(R.string.chat_send_ready)
                     else stringResource(R.string.chat_sending_in, countdown),
@@ -420,41 +420,4 @@ private fun Controls(listening: Boolean, level: () -> Float, mic: MicPress, onSe
             }
         }
     }
-}
-
-/** Mirrors the engine's hands-free pause; if one changes, the other must. */
-private const val AUTO_SEND_MS = 2500L
-
-/** A level above this is speech, below it silence: the same idea the detector uses. */
-private const val SPEECH_LEVEL = 0.18f
-
-/**
- * Seconds until the automatic send, or null while the user is still speaking. The mic level
- * is the clock: the take ends after [AUTO_SEND_MS] of silence, so counting that down makes
- * the behaviour legible instead of surprising.
- */
-@Composable
-private fun rememberAutoSendCountdown(active: Boolean, level: () -> Float): Int? {
-    var remaining by remember { mutableStateOf<Int?>(null) }
-    LaunchedEffect(active) {
-        if (!active) {
-            remaining = null
-            return@LaunchedEffect
-        }
-        var quietMs = 0L
-        var spoke = false
-        while (true) {
-            delay(100)
-            if (level() > SPEECH_LEVEL) {
-                spoke = true
-                quietMs = 0
-                remaining = null
-            } else if (spoke) {
-                quietMs += 100
-                val left = AUTO_SEND_MS - quietMs
-                remaining = if (left > 0) ((left + 999) / 1000).toInt() else 0
-            }
-        }
-    }
-    return remaining
 }

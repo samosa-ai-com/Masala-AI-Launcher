@@ -4,6 +4,7 @@ import com.samosaai.masala.audio.AudioProvider
 import com.samosaai.masala.audio.PttEngine
 import com.samosaai.masala.audio.SpeechConfig
 import com.samosaai.masala.i18n.Language
+import kotlinx.coroutines.isActive
 import java.util.Locale
 
 /** Push-to-talk: [start] while the button is held, [stop] on release returns the transcript. */
@@ -24,10 +25,14 @@ interface SpeechInput {
 
     /** Words heard so far, where the recognizer reports them. */
     val partial: kotlinx.coroutines.flow.StateFlow<String> get() = NO_WORDS
+
+    /** Seconds until the take ends by itself, where the provider works that way; else null. */
+    val autoSendIn: kotlinx.coroutines.flow.StateFlow<Int?> get() = NO_COUNTDOWN
 }
 
 private val NO_LEVEL = kotlinx.coroutines.flow.MutableStateFlow(0f)
 private val NO_WORDS = kotlinx.coroutines.flow.MutableStateFlow("")
+private val NO_COUNTDOWN = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
 
 /**
  * Which provider push-to-talk tries, in order. The configured cloud STT goes first when
@@ -96,6 +101,62 @@ fun friendlySttMessage(raw: String?, s: SpeechStrings): String {
  */
 private const val SILENCE_MS = 2500L
 
+/**
+ * How far above the room's quiet level a window must sit to count as speech. Levels are
+ * 0..1 over 50 dB, so 0.2 is about 10 dB — the same margin the voice detector uses.
+ */
+private const val LEVEL_MARGIN = 0.2f
+
+/**
+ * When an on-device take is over. The recognizer cannot be asked to wait longer for a
+ * pause, and its partial results are rate-limited (one every few seconds on some phones),
+ * so this watches the microphone instead: words or a clear step above the room's quiet
+ * level are speech, and [silenceMs] of neither ends the take.
+ *
+ * Pure so it can be pinned by tests without a recognizer.
+ */
+internal class OnDeviceSilenceClock(
+    private val silenceMs: Long = SILENCE_MS,
+    private val noSpeechMs: Long = NO_SPEECH_MS,
+    private val maxMs: Long = MAX_LISTEN_MS,
+    private val margin: Float = LEVEL_MARGIN,
+) {
+    private var startedAt = 0L
+    private var lastActivityAt = 0L
+    private var floor = 1f
+    private var heard = -1L
+
+    /** True once speech has been heard. */
+    var spoke = false
+        private set
+
+    /** Feeds one sample; true when the take should end. */
+    fun update(now: Long, level: Float, heardCount: Long): Boolean {
+        if (startedAt == 0L) startedAt = now
+        val l = level.coerceIn(0f, 1f)
+        if (!spoke) floor = minOf(floor, l)
+        val louder = l >= floor + margin
+        val words = heard >= 0 && heardCount != heard
+        heard = heardCount
+        if (louder || words) {
+            spoke = true
+            lastActivityAt = now
+        }
+        return when {
+            spoke && now - lastActivityAt >= silenceMs -> true
+            !spoke && now - startedAt >= noSpeechMs -> true
+            now - startedAt >= maxMs -> true
+            else -> false
+        }
+    }
+}
+
+/** How long an on-device take waits for the first words before giving up. */
+private const val NO_SPEECH_MS = 15_000L
+
+/** A ceiling on one on-device take, so a stuck recognizer cannot hold the turn forever. */
+private const val MAX_LISTEN_MS = 60_000L
+
 class ConfiguredSpeechInput(
     private val engine: PttEngine,
     private val config: () -> SpeechConfig,
@@ -105,6 +166,7 @@ class ConfiguredSpeechInput(
 ) : SpeechInput {
     override val level get() = live?.level ?: super.level
     override val partial get() = live?.partial ?: super.partial
+    override val autoSendIn get() = live?.autoSendIn ?: super.autoSendIn
 
     @Volatile
     private var active: AudioProvider? = null
@@ -178,7 +240,8 @@ class ConfiguredSpeechInput(
             active = provider
             val model = if (provider.isApiBased()) settings.sttModel else ""
             val result = try {
-                engine.listenForUtterance(provider, model, lang, SILENCE_MS)
+                if (provider == AudioProvider.ANDROID && live != null) listenAndroidUntilPause(lang)
+                else engine.listenForUtterance(provider, model, lang, SILENCE_MS)
             } finally {
                 active = null
             }
@@ -192,6 +255,46 @@ class ConfiguredSpeechInput(
             last = result
         }
         return firstFailure ?: last!!
+    }
+
+    /**
+     * On-device recognition ends a take when *it* decides the sentence is over — usually
+     * after about a second of pause — so a speaking breath cuts the message in half. There
+     * is no way to ask it for a longer pause, so this runs it continuously (it keeps
+     * restarting through pauses and accumulates the text) and ends the take on our own
+     * silence timer, which is what the server path already does.
+     */
+    private suspend fun listenAndroidUntilPause(language: Language): Result<String> {
+        val stt = live ?: return Result.failure(Exception(strings.localUnavailable))
+        if (!engine.startListening(AudioProvider.ANDROID, language)) {
+            return Result.failure(Exception(stt.androidFailure ?: strings.localUnavailable))
+        }
+        val clock = OnDeviceSilenceClock()
+        var spoke: Boolean
+        val text: String
+        try {
+            while (true) {
+                kotlinx.coroutines.delay(100)
+                // A failure the recognizer reports on its own (no on-device model, language
+                // missing) ends the turn now instead of waiting out the no-speech window.
+                stt.androidFailure?.let {
+                    engine.cancelListening(AudioProvider.ANDROID)
+                    return Result.failure(Exception(it))
+                }
+                if (clock.update(System.currentTimeMillis(), stt.level.value, stt.heard.value)) break
+            }
+            spoke = clock.spoke
+        } finally {
+            // Cancelled from outside still stops the recognizer: otherwise continuous
+            // listening would keep running with nobody watching.
+            if (!kotlinx.coroutines.currentCoroutineContext().isActive) engine.cancelListening(AudioProvider.ANDROID)
+        }
+        text = engine.stopListeningAndTranscribe(AudioProvider.ANDROID, "", "").getOrDefault("")
+        return if (text.isBlank()) {
+            Result.failure(Exception(if (spoke) "Didn't catch that" else "No speech detected"))
+        } else {
+            Result.success(text)
+        }
     }
 
     override fun finish() = engine.finishUtterance()

@@ -157,6 +157,7 @@ class HomeActivity : ComponentActivity() {
             var expanded by rememberSaveable { mutableStateOf(false) }
             var chatOpen by rememberSaveable { mutableStateOf(false) }
             var showHistory by remember { mutableStateOf(false) }
+            val autoSendIn by app.commands.autoSendIn.collectAsStateWithLifecycle()
             LaunchedEffect(activeId, sessions) {
                 val id = activeId ?: return@LaunchedEffect
                 val session = app.chats.get(id) ?: return@LaunchedEffect
@@ -439,6 +440,7 @@ class HomeActivity : ComponentActivity() {
                     expanded = expanded,
                     onExpanded = { expanded = it },
                     mic = rememberMicPress(app),
+                    autoSendIn = autoSendIn,
                     onSend = { app.commands.sendNow() },
                     onStop = { app.commands.dismiss() },
                     onClose = {
