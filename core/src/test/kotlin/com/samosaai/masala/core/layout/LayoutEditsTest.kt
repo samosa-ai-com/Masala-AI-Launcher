@@ -250,4 +250,17 @@ class LayoutEditsTest {
         assertEquals(listOf("x", "y"), ids(out, "dock"))
         assertEquals(doc, LayoutEdits.removeWhere(doc) { false })
     }
+
+    @Test
+    fun `folder names are trimmed and cut to the limit`() {
+        val long = "x".repeat(LayoutChecker.MAX_FOLDER_LABEL + 40)
+        assertEquals(LayoutChecker.MAX_FOLDER_LABEL, folderOf(assertNotNull(LayoutEdits.renameFolder(withFolder, "f", long)), "f").label.length)
+        assertEquals("Games", folderOf(assertNotNull(LayoutEdits.renameFolder(withFolder, "f", "  Games ")), "f").label)
+        assertEquals(LayoutChecker.MAX_FOLDER_LABEL, folderOf(assertNotNull(LayoutEdits.makeFolder(doc, "a", "c", "g", long)), "g").label.length)
+    }
+
+    @Test
+    fun `moveBefore itself is a no-op`() {
+        assertEquals(doc, LayoutEdits.moveBefore(doc, "b", "grid", "b"))
+    }
 }

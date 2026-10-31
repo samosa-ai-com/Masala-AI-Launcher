@@ -106,6 +106,7 @@
     <string name="layout_label_moved_out_of_folder">Moved %1$s out of a folder</string>
     <string name="folder_default_name">Folder</string>
     <string name="folder_full">This folder is full</string>
+    <string name="folder_cant_group">This item can’t go in a folder</string>
     <string name="folder_rename_title">Rename folder</string>
     <string name="folder_rename">Rename</string>
     <string name="folder_ungroup">Ungroup</string>

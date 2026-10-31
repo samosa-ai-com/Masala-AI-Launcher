@@ -54,7 +54,7 @@ object LayoutEdits {
         val dragged = find(doc, draggedId)?.item ?: return null
         val target = find(doc, targetId)?.item ?: return null
         if (dragged.isFolder || target.isFolder) return null
-        val folder = Item(folderId, label, IconRef.Symbol("folder"), MasalaAction.OpenFolder(listOf(target, dragged)))
+        val folder = Item(folderId, folderLabel(label), IconRef.Symbol("folder"), MasalaAction.OpenFolder(listOf(target, dragged)))
         return replace(remove(doc, draggedId), targetId) { listOf(folder) }
     }
 
@@ -70,15 +70,17 @@ object LayoutEdits {
     fun moveOutOfFolder(doc: LayoutDoc, folderId: String, itemId: String): LayoutDoc? {
         val children = find(doc, folderId)?.item?.children ?: return null
         val child = children.firstOrNull { it.id == itemId } ?: return null
-        val left = children - child
+        val left = children.filterNot { it.id == itemId }
         return replace(doc, folderId) { folder -> listOf(left.singleOrNull() ?: folder.withChildren(left), child) }
     }
 
-    /** Null if [folderId] isn't a folder or [label] is blank. */
+    /** Null if [folderId] isn't a folder or [label] is blank. Long names are cut to [LayoutChecker.MAX_FOLDER_LABEL]. */
     fun renameFolder(doc: LayoutDoc, folderId: String, label: String): LayoutDoc? {
         if (label.isBlank() || find(doc, folderId)?.item?.isFolder != true) return null
-        return replace(doc, folderId) { listOf(it.copy(label = label.trim())) }
+        return replace(doc, folderId) { listOf(it.copy(label = folderLabel(label))) }
     }
+
+    private fun folderLabel(label: String) = label.trim().take(LayoutChecker.MAX_FOLDER_LABEL)
 
     /** Puts the folder's children in its place, in order. Null if [folderId] isn't a folder. */
     fun dissolveFolder(doc: LayoutDoc, folderId: String): LayoutDoc? {

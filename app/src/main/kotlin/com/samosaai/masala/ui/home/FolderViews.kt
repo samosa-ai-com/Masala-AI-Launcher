@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import com.samosaai.masala.R
 import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.MasalaAction
+import com.samosaai.masala.core.layout.LayoutChecker
 import com.samosaai.masala.ui.theme.MasalaTheme
 
 /** A folder on home: a glass rounded square with its first four items' icons in a 2×2 grid. */
@@ -76,15 +77,23 @@ internal fun FolderIcon(items: List<Item>, ctx: RenderContext, size: Int) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FolderSheet(folder: Item, ctx: RenderContext, onDismiss: () -> Unit, onRename: () -> Unit, onMoveOut: (Item) -> Unit) {
+fun FolderSheet(
+    folder: Item,
+    ctx: RenderContext,
+    /** False for a folder a mode added: it isn't in the saved layout, so it can't be renamed or emptied. */
+    editable: Boolean,
+    onDismiss: () -> Unit,
+    onRename: () -> Unit,
+    onMoveOut: (Item) -> Unit,
+) {
     val children = (folder.action as? MasalaAction.OpenFolder)?.items.orEmpty()
     var menuFor by remember { mutableStateOf<Item?>(null) }
-    val inner = remember(ctx, children) {
+    val inner = remember(ctx, folder) {
         RenderContext(
             icons = ctx.icons,
             apps = ctx.apps,
             clock = ctx.clock,
-            locked = ctx.locked,
+            locked = ctx.locked || !editable,
             onAction = { onDismiss(); ctx.onAction(it) },
             onAppMenu = { app -> menuFor = children.firstOrNull { appFor(it, ctx) == app } },
             onClockClick = ctx.onClockClick,
@@ -99,7 +108,7 @@ fun FolderSheet(folder: Item, ctx: RenderContext, onDismiss: () -> Unit, onRenam
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (ctx.locked) Modifier else Modifier.clickable(role = Role.Button, onClickLabel = stringResource(R.string.folder_rename), onClick = onRename))
+                    .then(if (ctx.locked || !editable) Modifier else Modifier.clickable(role = Role.Button, onClickLabel = stringResource(R.string.folder_rename), onClick = onRename))
                     .padding(vertical = 12.dp),
             )
             children.chunked(FOLDER_COLUMNS).forEach { row ->
@@ -168,7 +177,7 @@ fun FolderRenameDialog(label: String, onRename: (String) -> Unit, onDismiss: () 
         text = {
             OutlinedTextField(
                 value = field,
-                onValueChange = { field = it },
+                onValueChange = { if (it.text.length <= LayoutChecker.MAX_FOLDER_LABEL) field = it },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { if (text.isNotEmpty()) onRename(text) }),

@@ -193,4 +193,10 @@ class LayoutCheckerTest {
         val problems = folderProblems(item("a"), folder("f", listOf(item("a"))))
         assertEquals(listOf("$.pages[0].sections[0].items[1].action.items[0].id"), problems.map { it.path })
     }
+
+    @Test
+    fun `a folder name over the limit is a problem`() {
+        val long = folder("f", listOf(item("a"))).copy(label = "x".repeat(LayoutChecker.MAX_FOLDER_LABEL + 1))
+        assertEquals(listOf("$.pages[0].sections[0].items[0].label"), folderProblems(long).map { it.path })
+    }
 }

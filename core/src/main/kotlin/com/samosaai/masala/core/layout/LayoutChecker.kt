@@ -63,6 +63,7 @@ object LayoutChecker {
     const val MAX_WIDGETS_IN_STACK = 8
     const val MAX_ROWS = 8
     const val MAX_FOLDER_ITEMS = 16
+    const val MAX_FOLDER_LABEL = 60
 
     /**
      * Reads layout JSON the strict way, migrating older schema versions first. A document that doesn't
@@ -149,6 +150,9 @@ object LayoutChecker {
 
     private fun checkItem(item: Item, path: String, env: Environment, id: (String, String) -> Unit, problems: MutableList<Problem>) {
         if (item.label.isBlank()) problems += Problem("$path.label", "label is empty")
+        if (item.action is MasalaAction.OpenFolder && item.label.length > MAX_FOLDER_LABEL) {
+            problems += Problem("$path.label", "A folder name has at most $MAX_FOLDER_LABEL characters")
+        }
         checkIcon(item.icon, "$path.icon", env, problems)
         checkAction(item.action, "$path.action", env, problems, id)
         checkRules(item.rules, "$path.rules", null, problems)

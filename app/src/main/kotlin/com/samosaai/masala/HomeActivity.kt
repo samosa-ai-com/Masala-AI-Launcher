@@ -383,10 +383,11 @@ class HomeActivity : ComponentActivity() {
                 drag = drag,
                 movable = movable,
                 onOpenFolder = { openFolder = it to (it.id in movable) },
-                onFolderMenu = { folderMenu = it },
+                onFolderMenu = { if (it.id in movable) folderMenu = it },
                 onDrop = { item, target ->
                     scope.launch {
                         val problems = when (target) {
+                            // `before` may be a mode-added item, not in the saved layout: then it lands at the section's end.
                             is DropTarget.Slot -> app.layouts.edit(getString(R.string.layout_label_moved, item.label)) {
                                 LayoutEdits.moveBefore(it, item.id, target.sectionId, target.before)
                             }
@@ -394,21 +395,26 @@ class HomeActivity : ComponentActivity() {
                                 LayoutEdits.moveToPage(it, item.id, target.pageId)
                             }
                             is DropTarget.Onto -> {
-                                val folder = baseItem(target.itemId)?.action as? MasalaAction.OpenFolder
+                                val onto = baseItem(target.itemId)
+                                val folder = onto?.action as? MasalaAction.OpenFolder
                                 when {
+                                    // A mode added it: it isn't in the saved layout, so nothing can be combined with it.
+                                    onto == null -> emptyList<LayoutChecker.Problem>().also { toast(getString(R.string.folder_cant_group)) }
                                     folder == null -> {
-                                        val folderId = "folder-" + UUID.randomUUID().toString().take(8)
+                                        val folderId = generateSequence { "folder-" + UUID.randomUUID().toString().take(8) }
+                                            .first { baseItem(it) == null }
                                         var made = false
                                         app.layouts.edit(getString(R.string.layout_label_new_folder)) {
                                             LayoutEdits.makeFolder(it, item.id, target.itemId, folderId, getString(R.string.folder_default_name))
                                                 .also { next -> made = next != null }
-                                        }.also { if (made && it.isEmpty()) renamingFolder = folderId }
+                                        }.also { problems -> if (made && problems.isEmpty()) renamingFolder = folderId }
                                     }
-                                    folder.items.size >= LayoutChecker.MAX_FOLDER_ITEMS -> emptyList<LayoutChecker.Problem>().also {
-                                        toast(getString(R.string.folder_full))
-                                    }
-                                    else -> app.layouts.edit(getString(R.string.layout_label_added_to_folder, item.label)) {
-                                        LayoutEdits.addToFolder(it, item.id, target.itemId)
+                                    else -> {
+                                        // Checked again inside the edit, so a folder filled by a drop just before still says so.
+                                        var full = folder.items.size >= LayoutChecker.MAX_FOLDER_ITEMS
+                                        if (full) emptyList() else app.layouts.edit(getString(R.string.layout_label_added_to_folder, item.label)) {
+                                            LayoutEdits.addToFolder(it, item.id, target.itemId).also { next -> full = next == null }
+                                        }.also { if (full) toast(getString(R.string.folder_full)) }
                                     }
                                 }
                             }
@@ -697,13 +703,14 @@ class HomeActivity : ComponentActivity() {
         // mode added isn't in it; one that left it (ungrouped, one item left) closes.
         openFolder?.let { (opened, saved) ->
             val folder = if (saved) itemIn(baseLayout, opened.id) else opened
-            if (folder == null) {
+            if (folder?.action !is MasalaAction.OpenFolder) {
                 SideEffect { openFolder = null }
                 return@let
             }
             FolderSheet(
                 folder = folder,
                 ctx = render,
+                editable = saved,
                 onDismiss = { openFolder = null },
                 onRename = { renamingFolder = folder.id },
                 onMoveOut = { child ->
