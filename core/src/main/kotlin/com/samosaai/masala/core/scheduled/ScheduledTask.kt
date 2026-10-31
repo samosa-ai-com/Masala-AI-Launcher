@@ -58,7 +58,9 @@ data class TaskRun(
     /** The run this firing started (a `skill_runs` row, Phase 4), when it started one. */
     val runId: String? = null,
     /** The error shown at the end of a failed run, or why it did not start. */
-    val detail: String? = null
+    val detail: String? = null,
+    /** The `skill_runs` row holding the transcript, for opening the run back up. */
+    val skillRunId: Long? = null
 )
 
 /**

@@ -9,9 +9,12 @@ import com.samosaai.masala.MasalaApp
 import com.samosaai.masala.core.scheduled.TaskRunStatus
 import com.samosaai.masala.llm.ChatMessage
 import com.samosaai.masala.scheduled.ScheduledTaskRuns
+import com.samosaai.masala.scheduled.TaskDoneNotification
 import com.samosaai.masala.skills.ScheduledOutcome
 import com.samosaai.masala.skills.SkillRunEvent
+import com.samosaai.masala.skills.SkillRunner
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
@@ -40,8 +43,9 @@ class JobRunner(context: Context, params: WorkerParameters) : CoroutineWorker(co
         // Android may refuse to start a foreground service from the background; the run still goes ahead.
         runCatching { setForeground(info(name, "")) }.onFailure { Log.w(TAG, "No foreground service: ${it.message}") }
 
+        var skillRowId: Long? = null
         suspend fun record(status: TaskRunStatus, detail: String?) {
-            if (taskId != null) withContext(NonCancellable) { ScheduledTaskRuns(app).recordOutcome(taskId, runId, status, detail) }
+            if (taskId != null) withContext(NonCancellable) { ScheduledTaskRuns(app).recordOutcome(taskId, runId, status, detail, skillRunId = skillRowId) }
         }
 
         val id = app.skillRunner.start(skillId, ChatMessage("user", JsonPrimitive(prompt)), unattended = true)
@@ -49,6 +53,7 @@ class JobRunner(context: Context, params: WorkerParameters) : CoroutineWorker(co
             record(TaskRunStatus.FAILED, "The skill '$skillId' is not installed.")
             return Result.failure()
         }
+        skillRowId = id
         val state = app.skillRunner.open(id)!!
         try {
             coroutineScope {
@@ -68,8 +73,19 @@ class JobRunner(context: Context, params: WorkerParameters) : CoroutineWorker(co
         }
         val (status, detail) = app.skillRunner.outcome(id)?.let { ScheduledOutcome.of(it.first, it.second) } ?: (TaskRunStatus.FAILED to "The run was lost.")
         record(status, detail)
-        if (skillId == com.samosaai.masala.brief.BriefInputs.SKILL_ID && status == TaskRunStatus.DONE && app.settings.current().briefNotify) {
-            app.database.skillRuns().get(id)?.let { com.samosaai.masala.skills.SkillRunner.lastAnswer(it.transcriptJson) }?.let { com.samosaai.masala.brief.BriefNotification.post(app, it) }
+        val answer = withContext(Dispatchers.IO) {
+            app.database.skillRuns().get(id)?.let { SkillRunner.lastAnswer(it.transcriptJson) }
+        }
+        // A finished brief has a notification of its own; the "run finished" one would repeat it.
+        val briefNotified = skillId == com.samosaai.masala.brief.BriefInputs.SKILL_ID && status == TaskRunStatus.DONE &&
+            app.settings.current().briefNotify && answer != null
+        if (briefNotified) {
+            com.samosaai.masala.brief.BriefNotification.post(app, answer!!)
+        } else {
+            TaskDoneNotification.post(
+                app, name.ifBlank { skillId }, skillId, id, status,
+                if (status == TaskRunStatus.DONE) answer else detail,
+            )
         }
         return Result.success()
     }

@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import androidx.work.WorkManager
 import com.samosaai.masala.R
 import com.samosaai.masala.core.scheduled.ScheduledTask
 import com.samosaai.masala.core.scheduled.ScheduledTaskPlanner
@@ -78,16 +79,53 @@ class ScheduledTaskRuns(private val app: Application) {
         return result
     }
 
+    /**
+     * Saves the editor's [draft]: a new task as it is, an existing one onto what is stored now, under the
+     * same lock as firing and recording, so neither a run's result nor a firing is overwritten. An edit
+     * to a task deleted meanwhile saves nothing.
+     */
+    suspend fun saveEdit(draft: ScheduledTask, isNew: Boolean, now: Long = System.currentTimeMillis()) {
+        lock.withLock {
+            val zone = ZoneId.systemDefault()
+            if (isNew) store.put(ScheduledTaskPlanner.edited(null, draft, now, zone))
+            else store.update(draft.id) { ScheduledTaskPlanner.savedEdit(it, draft, now, zone) }
+        }
+        ScheduledTaskScheduler.reschedule(app)
+    }
+
+    /** Ids of tasks with a run currently going, for the Stop button. */
+    suspend fun runningTaskIds(): Set<String> = withContext(Dispatchers.IO) {
+        val work = WorkManager.getInstance(app)
+        work.getWorkInfosForUniqueWork(ScheduledSkillRunner.UNIQUE).get()
+            .filterNot { it.state.isFinished }
+            .flatMap { info -> info.tags.filter { it.startsWith(ScheduledSkillRunner.TASK_TAG) } }
+            .map { it.removePrefix(ScheduledSkillRunner.TASK_TAG) }
+            .toSet()
+    }
+
+    /**
+     * Stops the in-flight run of [taskId]; true when one was going. The worker records
+     * STOPPED itself as it is cancelled.
+     */
+    suspend fun stop(taskId: String): Boolean = withContext(Dispatchers.IO) {
+        val work = WorkManager.getInstance(app)
+        val going = work.getWorkInfosForUniqueWork(ScheduledSkillRunner.UNIQUE).get()
+            .any { !it.state.isFinished && it.tags.contains(ScheduledSkillRunner.TASK_TAG + taskId) }
+        if (going) work.cancelUniqueWork(ScheduledSkillRunner.UNIQUE)
+        going
+    }
+
     /** The run [runId] of task [taskId] ended with [status]; [detail] is its error, if any. */
     suspend fun recordOutcome(
         taskId: String,
         runId: String,
         status: TaskRunStatus,
         detail: String?,
-        now: Long = System.currentTimeMillis()
+        now: Long = System.currentTimeMillis(),
+        skillRunId: Long? = null
     ) {
         lock.withLock {
-            store.update(taskId) { ScheduledTaskPlanner.finished(it, status, runId, detail, now) }
+            store.update(taskId) { ScheduledTaskPlanner.finished(it, status, runId, detail, now, skillRunId) }
         }
         ScheduledTaskScheduler.reschedule(app)
     }

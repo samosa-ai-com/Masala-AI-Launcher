@@ -32,6 +32,25 @@ object ScheduledTaskPlanner {
         data class Missed(val task: ScheduledTask) : Decision()
     }
 
+    /**
+     * Why [task] can't be saved as it is; empty when its schedule works from [now].
+     * The editor shows the first problem and disables Save while any remain.
+     */
+    fun problems(task: ScheduledTask, now: Long, zone: ZoneId): List<String> = buildList {
+        if (task.name.isBlank()) add("Give the task a name")
+        if (task.prompt.isBlank() && task.skillId == null) add("Say what to run, or pick a skill")
+        if (task.repeat.interval < 1) add("Repeat every at least 1")
+        if (task.repeat.kind == RepeatKind.WEEKLY && task.repeat.weekdays.isEmpty()) {
+            add("Pick at least one weekday")
+        }
+        if (task.repeat.kind == RepeatKind.NONE &&
+            task.start.atZone(zone).toInstant().toEpochMilli() < now
+        ) {
+            add("The start is in the past")
+        }
+        if (armed(task, now, zone).nextRunAt == null) add("Nothing left to run: the schedule has no next time")
+    }
+
     /** A new or edited [task], with its next time worked out from [now]. */
     fun armed(task: ScheduledTask, now: Long, zone: ZoneId): ScheduledTask =
         task.copy(
@@ -66,7 +85,31 @@ object ScheduledTaskPlanner {
      * schedule changed, [toggled] when only on/off did, and otherwise left with
      * its times as they are.
      */
-    fun edited(existing: ScheduledTask?, edited: ScheduledTask, now: Long, zone: ZoneId): ScheduledTask = when {
+    fun edited(existing: ScheduledTask?, edited: ScheduledTask, now: Long, zone: ZoneId): ScheduledTask = editedNow(existing, edited, now, zone)
+
+    /**
+     * The editor's [draft] saved over [current], the task as stored at save time. Only the fields the
+     * editor shows come from the draft: the editor works from a copy read when it opened, and a run
+     * that finished meanwhile must keep its history, next time and retry state.
+     */
+    fun savedEdit(current: ScheduledTask, draft: ScheduledTask, now: Long, zone: ZoneId): ScheduledTask =
+        edited(
+            current,
+            current.copy(
+                name = draft.name,
+                prompt = draft.prompt,
+                skillId = draft.skillId,
+                startLocal = draft.startLocal,
+                repeat = draft.repeat,
+                enabled = draft.enabled,
+                maxRetries = draft.maxRetries,
+                retryDelayMinutes = draft.retryDelayMinutes,
+            ),
+            now,
+            zone,
+        )
+
+    private fun editedNow(existing: ScheduledTask?, edited: ScheduledTask, now: Long, zone: ZoneId): ScheduledTask = when {
         existing == null || edited.startLocal != existing.startLocal || edited.repeat != existing.repeat ->
             armed(edited, now, zone)
         edited.enabled != existing.enabled ->
@@ -149,9 +192,10 @@ object ScheduledTaskPlanner {
         status: TaskRunStatus,
         runId: String?,
         detail: String?,
-        now: Long
+        now: Long,
+        skillRunId: Long? = null
     ): ScheduledTask {
-        val recorded = task.withRun(TaskRun(at = now, status = status, runId = runId, detail = detail))
+        val recorded = task.withRun(TaskRun(at = now, status = status, runId = runId, detail = detail, skillRunId = skillRunId))
         val retryAt = now + task.retryDelayMinutes.coerceAtLeast(1) * MINUTE_MS
         val beforeNext = task.nextRunAt?.let { retryAt < it } ?: true
         return if (status == TaskRunStatus.FAILED && task.retriesUsed < task.maxRetries && beforeNext) {

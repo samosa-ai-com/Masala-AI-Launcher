@@ -31,6 +31,7 @@ class ScheduledSkillRunner(private val context: Context) : TaskRunner {
         }
         val runId = UUID.randomUUID().toString()
         val request = OneTimeWorkRequestBuilder<JobRunner>()
+            .addTag(TASK_TAG + task.id)
             .setInputData(
                 Data.Builder()
                     .putString(JobRunner.KEY_TASK_ID, task.id)
@@ -46,7 +47,10 @@ class ScheduledSkillRunner(private val context: Context) : TaskRunner {
         return ScheduledStart.Started(runId)
     }
 
-    private companion object {
+    companion object {
         const val UNIQUE = "scheduled-run"
+
+        /** Tag prefix matching a run to its task, for the Stop button. */
+        const val TASK_TAG = "scheduled-task-"
     }
 }

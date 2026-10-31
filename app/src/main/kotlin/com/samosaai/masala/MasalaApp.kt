@@ -386,7 +386,7 @@ class MasalaApp : Application() {
     companion object {
         /** A scheduled task with no skill runs a plain command under this id. */
         const val COMMAND_SKILL_ID = "command"
-        private val COMMAND_SKILL = MasalaSkill(id = COMMAND_SKILL_ID, title = "Command", instructions = "")
+        val COMMAND_SKILL = MasalaSkill(id = COMMAND_SKILL_ID, title = "Command", instructions = "")
     }
 
     private object NoScreen : ActionDispatcher.Screen {
