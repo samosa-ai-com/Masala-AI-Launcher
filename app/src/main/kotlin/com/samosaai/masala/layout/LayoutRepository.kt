@@ -170,6 +170,23 @@ class LayoutRepository(
         problems
     }
 
+    /**
+     * Applies [change] to the current base layout and saves the result under [label] if it passes the
+     * checker. Returns the problems (empty when saved); a null change saves nothing. Reads the history
+     * directly, not [base], which follows it a moment later. Must not call [apply]: [lock] isn't reentrant.
+     */
+    suspend fun edit(label: String, change: (LayoutDoc) -> LayoutDoc?): List<LayoutChecker.Problem> = lock.withLock {
+        val current = history.current?.layout ?: return@withLock emptyList()
+        val next = change(current) ?: return@withLock emptyList()
+        if (next == current) return@withLock emptyList()
+        val problems = LayoutChecker.check(next, environment())
+        if (problems.isEmpty()) {
+            push(label, next)
+            publish()
+        }
+        problems
+    }
+
     suspend fun undo(): Boolean = lock.withLock { history.undo()?.also { savePointer(); publish() } != null }
 
     suspend fun redo(): Boolean = lock.withLock { history.redo()?.also { savePointer(); publish() } != null }
