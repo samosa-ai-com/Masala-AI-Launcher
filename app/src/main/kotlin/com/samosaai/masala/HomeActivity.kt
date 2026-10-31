@@ -61,8 +61,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.samosaai.masala.agent.CommandState
 import com.samosaai.masala.ui.home.SearchPill
-import com.samosaai.masala.ui.home.ListeningOverlay
-import com.samosaai.masala.ui.home.WorkingSheet
 import androidx.compose.material3.Text
 import com.samosaai.masala.ui.home.ReplyCard
 import com.samosaai.masala.ui.home.rememberMicPress
@@ -72,6 +70,9 @@ import com.samosaai.masala.ui.home.RenderContext
 import com.samosaai.masala.scheduled.ScheduledTaskScheduler
 import com.samosaai.masala.skills.SkillScheduling
 import com.samosaai.masala.ui.home.SkillWidgetSource
+import com.samosaai.masala.ui.chat.ChatSurface
+import com.samosaai.masala.ui.chat.SessionListSheet
+import androidx.compose.runtime.saveable.rememberSaveable
 import com.samosaai.masala.ui.settings.SettingsActivity
 import com.samosaai.masala.ui.theme.MasalaTheme
 import com.samosaai.masala.ui.theme.Motion
@@ -146,6 +147,29 @@ class HomeActivity : ComponentActivity() {
         val apps by launcher.apps.collectAsStateWithLifecycle()
         val layout by app.layouts.resolved.collectAsStateWithLifecycle()
         val snapshot by app.contextService.snapshot.collectAsStateWithLifecycle()
+            // Chat state lives here, above both the pill (which opens it on a long-press)
+            // and the surface itself.
+            val sessions by app.chats.summaries.collectAsStateWithLifecycle()
+            val activeId by app.activeChatId.collectAsStateWithLifecycle()
+            val commandState by app.commands.state.collectAsStateWithLifecycle()
+            var turns by remember { mutableStateOf<List<com.samosaai.masala.chat.ChatTurn>>(emptyList()) }
+            var sessionTitle by remember { mutableStateOf("") }
+            var expanded by rememberSaveable { mutableStateOf(false) }
+            var chatOpen by rememberSaveable { mutableStateOf(false) }
+            var showHistory by remember { mutableStateOf(false) }
+            LaunchedEffect(activeId, sessions) {
+                val id = activeId ?: return@LaunchedEffect
+                val session = app.chats.get(id) ?: return@LaunchedEffect
+                turns = session.turns
+                sessionTitle = session.title
+            }
+            // Talking or a finished turn brings the surface up by itself; starting to talk
+            // always shows the orb, so the big animation is what a press produces.
+            LaunchedEffect(commandState) {
+                if (commandState != CommandState.Idle) chatOpen = true
+                if (commandState == CommandState.Listening) expanded = false
+                if (commandState is CommandState.Thinking) expanded = true
+            }
         val pinnedShortcuts by launcher.pinnedShortcuts.collectAsStateWithLifecycle()
         val profiles by launcher.profiles.collectAsStateWithLifecycle()
         val scope = rememberCoroutineScope()
@@ -178,8 +202,18 @@ class HomeActivity : ComponentActivity() {
             undoOffer = false
         }
 
-        // Always enabled, so Back never leaves home.
-        BackHandler { drawerOpen = false }
+        // Always enabled, so Back never leaves home. It closes whatever is on top first:
+        // the history sheet, then the expanded thread, then the chat itself.
+        BackHandler {
+            when {
+                showHistory -> showHistory = false
+                // The drawer is on top of the chat, so it goes first.
+                drawerOpen -> drawerOpen = false
+                chatOpen && expanded -> expanded = false
+                chatOpen -> { app.commands.dismiss(); chatOpen = false }
+                else -> drawerOpen = false
+            }
+        }
 
         // One progress (0 = home, 1 = drawer) drives both layers. Both stay composed, so opening and
         // closing the drawer never rebuilds the home pager or the drawer list (plan UI refresh U0).
@@ -337,6 +371,7 @@ class HomeActivity : ComponentActivity() {
                 .then(if (drawerOpen) Modifier.clearAndSetSemantics { } else Modifier)
                 // Set on release, not while the opening swipe is still moving home's own gesture.
                 .blockTouches(drawerOpen),
+
         ) { HomeScreen(
             layout = layout,
             render = render,
@@ -358,7 +393,24 @@ class HomeActivity : ComponentActivity() {
                 val command by app.commands.state.collectAsStateWithLifecycle()
                 // The pill makes way for the reply card while a command is shown.
                 if (command == CommandState.Idle) {
-                    SearchPill(onSearch = { drawerOpen = true; searchRequests++ }, mic = rememberMicPress(app))
+                    SearchPill(
+                        onSearch = { drawerOpen = true; searchRequests++ },
+                        mic = rememberMicPress(app),
+                        onOpenChat = {
+                            chatOpen = true
+                            expanded = true
+                            app.chats.latest()?.let { latest ->
+                                app.activeChatId.value = latest.id
+                                app.scope.launch {
+                                    app.chats.get(latest.id)?.let { session ->
+                                        turns = session.turns
+                                        sessionTitle = session.title
+                                        app.commands.restoreSession(session.turns)
+                                    }
+                                }
+                            }
+                        },
+                    )
                 }
             },
         ) } }
@@ -371,31 +423,69 @@ class HomeActivity : ComponentActivity() {
             val command by app.commands.state.collectAsStateWithLifecycle()
             val level by app.commands.micLevel.collectAsStateWithLifecycle()
             val words by app.commands.liveWords.collectAsStateWithLifecycle()
-            when (val c = command) {
-                CommandState.Listening -> if (!hidden) ListeningOverlay(
-                    character = settings.character,
-                    level = { level },
-                    words = words,
-                    source = app.aiSettings.profile.value.voiceIn?.preset?.name ?: getString(R.string.listening_on_device),
-                    onCancel = { app.commands.dismiss() },
-                    onStop = { if (app.aiSettings.profile.value.micMode == com.samosaai.masala.core.ai.MicMode.HOLD) app.commands.stopListening() else app.commands.finishListening() },
-                    onType = { app.commands.dismiss(); app.commands.openInput() },
-                )
-                is CommandState.Thinking -> if (!hidden) Box(Modifier.fillMaxSize().navigationBarsPadding(), contentAlignment = Alignment.BottomCenter) {
-                    WorkingSheet(c, settings.character, onStop = { app.commands.dismiss() })
-                }
-                else -> Box(
-                    Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { alpha = if (drawerProgress.value > 0f) 0f else 1f }
-                        .then(if (hidden) Modifier.clearAndSetSemantics { } else Modifier)
-                        .blockTouches(hidden)
-                        .statusBarsPadding().navigationBarsPadding().imePadding(),
+            if (hidden) Unit else when (val c = command) {
+                CommandState.Input -> Box(
+                    Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(),
                     contentAlignment = Alignment.BottomCenter,
-                ) {
-                    ReplyCard(app, settings.readRepliesAloud, sheets = true, character = settings.character)
-                }
+                ) { ReplyCard(app, settings.readRepliesAloud, sheets = true, character = settings.character) }
+                else -> if (chatOpen) ChatSurface(
+                    session = turns.takeIf { it.isNotEmpty() }?.let {
+                        com.samosaai.masala.chat.ChatSession(id = activeId.orEmpty(), title = sessionTitle, turns = it)
+                    },
+                    liveWords = words,
+                    level = { level },
+                    state = c,
+                    character = settings.character,
+                    expanded = expanded,
+                    onExpanded = { expanded = it },
+                    mic = rememberMicPress(app),
+                    onSend = { app.commands.sendNow() },
+                    onStop = { app.commands.dismiss() },
+                    onClose = {
+                        app.commands.dismiss()
+                        chatOpen = false
+                        expanded = false
+                    },
+                    onHistory = { showHistory = true },
+                    onNewChat = {
+                        app.activeChatId.value = null
+                        turns = emptyList()
+                        sessionTitle = ""
+                        // Empty history too: otherwise the agent answers in the new chat
+                        // with the old conversation's context.
+                        app.commands.restoreSession(emptyList())
+                        expanded = false
+                    },
+                )
             }
+            if (showHistory && !hidden) SessionListSheet(
+                sessions = sessions,
+                onOpen = { id ->
+                    showHistory = false
+                    app.activeChatId.value = id
+                    app.scope.launch {
+                        val session = app.chats.get(id) ?: return@launch
+                        turns = session.turns
+                        sessionTitle = session.title
+                        app.commands.restoreSession(session.turns)
+                        chatOpen = true
+                        expanded = true
+                    }
+                },
+                onDelete = { id ->
+                    app.scope.launch {
+                        app.chats.delete(id)
+                        if (activeId == id) {
+                            app.activeChatId.value = null
+                            turns = emptyList()
+                            sessionTitle = ""
+                            // Its context goes with it.
+                            app.commands.restoreSession(emptyList())
+                        }
+                    }
+                },
+                onDismiss = { showHistory = false },
+            )
             if (undoOffer && !hidden) {
                 Box(Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = 150.dp), contentAlignment = Alignment.BottomCenter) {
                     com.samosaai.masala.ui.components.GlassPill {

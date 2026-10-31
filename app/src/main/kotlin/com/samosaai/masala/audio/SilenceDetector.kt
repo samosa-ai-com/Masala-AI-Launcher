@@ -4,15 +4,21 @@ package com.samosaai.masala.audio
  * A noise-floor-adaptive voice-activity detector used by the hands-free
  * wake-word call flow.
  *
- * It is fed one RMS (dBFS) value per audio window. The noise floor is a
- * low-percentile estimate over a rolling window of recent RMS values, so it
- * can both fall and rise: in a loud room the floor climbs toward the ambient
- * level instead of permanently classifying ambient as speech. The rolling
- * window only records windows heard before speech is accepted, so sustained
- * speech can never drag the floor up mid-utterance. Speech is any window
- * above `noiseFloor + margin` (never below an absolute floor). A window must
- * stay above the threshold for [ACCEPT_STREAK] consecutive windows before it
- * counts as speech, so a one-window transient (door slam, cough) is ignored.
+ * It is fed one RMS (dBFS) value per audio window. The noise floor is the
+ * minimum over a rolling window of recent RMS values: the minimum (unlike a
+ * percentile) needs every window loud to be dragged up, so speech starting the
+ * moment the mic opens can't contaminate it the way a percentile can — only a
+ * pause-free 2.4 s shout would. The rolling window only records windows heard
+ * before speech is accepted, so sustained speech can never drag the floor up
+ * mid-utterance. Speech is any window above `noiseFloor + margin` (never below
+ * an absolute floor). A window must stay above the threshold for
+ * [ACCEPT_STREAK] consecutive windows before it counts as speech, so a
+ * one-window transient (door slam, cough) is ignored.
+ *
+ * Acceptance doesn't wait for the floor window to prime: a short command
+ * ("open YouTube", ~1.2 s) spoken at once would be over before 12 windows
+ * elapse. Early on, varying levels mark speech — steady ambient, however loud,
+ * never accepts until the floor has learned it.
  *
  * Once speech has been accepted, the detector reports [Decision.STOP] after
  * [silenceTimeoutMs] of trailing silence — the clock only starts after genuine
@@ -40,6 +46,23 @@ internal class SilenceDetector(
     val thresholdDb: Float
         get() = maxOf(absoluteFloorDb, noiseFloorEstimate + speechMarginDb)
 
+    /** The current noise-floor estimate, for diagnostics (the test card shows it). */
+    val floorDb: Float
+        get() = noiseFloorEstimate
+
+    /**
+     * The bar a window must clear to start counting toward speech. Once the floor is primed
+     * it is [thresholdDb]; before that it is the margin above the quietest window heard so
+     * far, so loud room noise (above the fixed floor) is not counted as speech from window
+     * one and a single transient can't accept the turn.
+     */
+    private val acceptingThresholdDb: Float
+        get() {
+            if (recentCount >= FLOOR_WINDOW) return thresholdDb
+            val quietest = (0 until recentCount).minOfOrNull { recentRms[it] } ?: INITIAL_NOISE_FLOOR_DB
+            return maxOf(absoluteFloorDb, quietest + speechMarginDb)
+        }
+
     fun update(windowRmsDb: Float, nowMs: Long): Decision {
         if (startMs < 0) startMs = nowMs
         // Only pre-speech windows inform the floor, so the estimate keeps
@@ -50,13 +73,13 @@ internal class SilenceDetector(
             if (recentCount < FLOOR_WINDOW) recentCount++
         }
 
-        if (windowRmsDb > thresholdDb) {
+        if (windowRmsDb > acceptingThresholdDb) {
             aboveThresholdStreak++
-            // Only accept speech once the floor window is primed — otherwise a
-            // loud first window would be accepted against the initial floor
-            // before the ambient level has been learned.
-            if (!speechDetected && recentCount >= FLOOR_WINDOW &&
-                aboveThresholdStreak >= ACCEPT_STREAK
+            // Either the floor has learned the room (primed), or the signal is
+            // visibly varying (speech over ambient): steady sound alone — even
+            // loud — never accepts before the floor knows it.
+            if (!speechDetected && aboveThresholdStreak >= ACCEPT_STREAK &&
+                (recentCount >= FLOOR_WINDOW || levelRangeDb >= VARIATION_DB)
             ) {
                 speechDetected = true
             }
@@ -74,17 +97,36 @@ internal class SilenceDetector(
     }
 
     /**
-     * Low-percentile of the recent RMS windows, in dBFS. Using a percentile
-     * rather than the running minimum makes the floor robust to a single quiet
-     * outlier, and letting it rise tracks louder rooms without treating the
-     * ambient level as speech.
+     * Spread of the levels heard so far, in dBFS. Speech jumps 15–30 dB over
+     * ambient within a few windows; steady room noise moves 1–3 dB. Only the
+     * filled prefix counts — the rest of the ring is zero-initialized, not audio.
+     */
+    private val levelRangeDb: Float
+        get() {
+            val n = minOf(recentCount, FLOOR_WINDOW)
+            if (n < 2) return 0f
+            var lo = Float.MAX_VALUE
+            var hi = -Float.MAX_VALUE
+            for (i in 0 until n) {
+                lo = minOf(lo, recentRms[i])
+                hi = maxOf(hi, recentRms[i])
+            }
+            return hi - lo
+        }
+
+    /**
+     * Minimum of the recent RMS windows, in dBFS. The minimum (unlike a low
+     * percentile) needs every window loud to rise, so a few speech windows
+     * during priming can't drag it up; one quiet dip is enough to hold it down.
+     * Letting it rise still tracks louder rooms without treating the ambient
+     * level as speech.
      */
     private val noiseFloorEstimate: Float
         get() {
             if (recentCount < FLOOR_WINDOW) return INITIAL_NOISE_FLOOR_DB
-            val sorted = recentRms.copyOf(FLOOR_WINDOW).apply { sort() }
-            val idx = (sorted.size * FLOOR_QUANTILE).toInt()
-            return maxOf(sorted[idx.coerceIn(0, sorted.lastIndex)], absoluteFloorDb)
+            var floor = Float.MAX_VALUE
+            for (i in 0 until FLOOR_WINDOW) floor = minOf(floor, recentRms[i])
+            return maxOf(floor, absoluteFloorDb)
         }
 
     enum class Decision { CONTINUE, STOP, STOP_NO_SPEECH }
@@ -92,17 +134,22 @@ internal class SilenceDetector(
     companion object {
         private const val NO_SPEECH_TIMEOUT_DEFAULT_MS = 15_000L
         private const val SPEECH_MARGIN_DB = 10f
+        /** Floor of [rmsDb]; a stream of zeros reads exactly this. */
         private const val ABSOLUTE_FLOOR_DB = -50f
+
         private const val INITIAL_NOISE_FLOOR_DB = -60f
 
         /** Consecutive above-threshold windows required before accepting speech. */
         private const val ACCEPT_STREAK = 3
 
-        /** Number of recent RMS windows the floor percentile is computed over. */
+        /** Number of recent RMS windows the floor minimum is computed over. */
         private const val FLOOR_WINDOW = 12
 
-        /** Fraction of recent windows that are background noise (low percentile). */
-        private const val FLOOR_QUANTILE = 0.25f
+        /**
+         * Level spread that marks speech before the floor is primed. Steady rooms
+         * move 1–3 dB; speech onsets jump 15–30 dB. 6 dB sits well between.
+         */
+        private const val VARIATION_DB = 6f
 
         /** RMS of [count] 16-bit PCM samples in dBFS (clamped to [ABSOLUTE_FLOOR_DB]). */
         fun rmsDb(samples: ShortArray, count: Int): Float {

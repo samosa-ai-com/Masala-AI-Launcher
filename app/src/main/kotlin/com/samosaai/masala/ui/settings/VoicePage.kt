@@ -1,8 +1,12 @@
 package com.samosaai.masala.ui.settings
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,7 +26,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.PanTool
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -56,10 +59,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.samosaai.masala.R
+import com.samosaai.masala.agent.SpeechPolicy
+import com.samosaai.masala.agent.SpeechStrings
+import com.samosaai.masala.agent.friendlySttMessage
+import com.samosaai.masala.audio.AudioProvider
 import com.samosaai.masala.core.ai.Endpoint
 import com.samosaai.masala.core.ai.KeyKind
-import com.samosaai.masala.core.ai.MicMode
 import com.samosaai.masala.core.ai.ProviderPresets
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.i18n.Language
@@ -67,8 +74,8 @@ import com.samosaai.masala.masala
 import com.samosaai.masala.ui.components.Radii
 import com.samosaai.masala.ui.theme.MasalaMono
 import com.samosaai.masala.ui.theme.MasalaTheme
-import com.samosaai.masala.ui.theme.rememberHaptics
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 
 /**
@@ -83,17 +90,22 @@ fun VoicePage(settings: LauncherSettings, update: ((LauncherSettings) -> Launche
     val store = app.aiSettings
     val profile by store.profile.collectAsState()
     val scope = rememberCoroutineScope()
-    val haptics = rememberHaptics()
     val voiceTint = MasalaTheme.tokens.voice
 
     SettingsScaffold(stringResource(R.string.voice_title), onBack) {
         Eyebrow(stringResource(R.string.voice_mic_button))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MicCard(Icons.Rounded.Mic, stringResource(R.string.voice_tap), stringResource(R.string.voice_tap_summary), profile.micMode == MicMode.TAP, Modifier.weight(1f)) {
-                scope.launch { store.update { it.copy(micMode = MicMode.TAP) } }; haptics.tick()
-            }
-            MicCard(Icons.Rounded.PanTool, stringResource(R.string.voice_hold), stringResource(R.string.voice_hold_summary), profile.micMode == MicMode.HOLD, Modifier.weight(1f)) {
-                scope.launch { store.update { it.copy(micMode = MicMode.HOLD) } }; haptics.tick()
+        // One gesture language, no mode to pick: holding and tapping both always work.
+        Panel(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(Icons.Rounded.Mic, null, tint = voiceTint, modifier = Modifier.size(22.dp))
+                Column {
+                    Text(stringResource(R.string.voice_gestures), style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        stringResource(R.string.voice_gestures_summary),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
 
@@ -117,6 +129,7 @@ fun VoicePage(settings: LauncherSettings, update: ((LauncherSettings) -> Launche
                 }
             }
             LanguageRow(profile.voiceLanguage) { code -> scope.launch { store.update { it.copy(voiceLanguage = code) } } }
+            SttTestCard()
         }
 
         Eyebrow(stringResource(R.string.voice_output))
@@ -189,22 +202,6 @@ private fun Panel(modifier: Modifier = Modifier, content: @Composable () -> Unit
         Modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh).border(1.dp, MasalaTheme.tokens.hairline, shape).then(modifier),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) { content() }
-}
-
-@Composable
-private fun MicCard(icon: ImageVector, title: String, summary: String, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val tint = MasalaTheme.tokens.voice
-    val shape = RoundedCornerShape(20.dp)
-    Column(
-        modifier.clip(shape).background(if (on) tint.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainerHigh)
-            .border(BorderStroke(1.5.dp, if (on) tint else MasalaTheme.tokens.hairline), shape)
-            .clickable(role = Role.RadioButton, onClick = onClick).semantics { selected = on }.padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Icon(icon, null, tint = if (on) tint else MasalaTheme.tokens.textMedium, modifier = Modifier.size(22.dp))
-        Text(title, style = MaterialTheme.typography.titleSmall)
-        Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
 }
 
 @Composable
@@ -288,4 +285,188 @@ private fun phoneVoiceLabel(name: String): String {
     val variant = name.substringAfter("-x-", "").substringBefore('-').takeIf { it.isNotBlank() }
     val display = Locale.forLanguageTag(tag).displayName.takeIf { it.isNotBlank() && it != tag } ?: return name
     return if (variant != null) "$display · $variant" else display
+}
+
+/**
+ * Settings → Voice → microphone test: runs the same utterance path the mic button uses and
+ * reports the live mic level, the peak, and the transcript or the mapped failure — so a dead
+ * mic, a deaf detector, and a bad server each show up as themselves.
+ */
+@Composable
+private fun SttTestCard() {
+    val context = LocalContext.current
+    val app = context.masala
+    val engine = remember { app.sttEngine() }
+    val scope = rememberCoroutineScope()
+    val voiceTint = MasalaTheme.tokens.voice
+    var testing by remember { mutableStateOf(false) }
+    var outcome by remember { mutableStateOf<String?>(null) }
+    var heard by remember { mutableStateOf<String?>(null) }
+    var peak by remember { mutableFloatStateOf(0f) }
+    var activeProvider by remember { mutableStateOf<AudioProvider?>(null) }
+    var usedOnDevice by remember { mutableStateOf(false) }
+    var detail by remember { mutableStateOf<String?>(null) }
+    var userCancelled by remember { mutableStateOf(false) }
+    val level by engine.level.collectAsState()
+    val partial by engine.partial.collectAsState()
+    val vad by engine.vadState.collectAsState()
+    LaunchedEffect(testing, level) { if (testing && level > peak) peak = level }
+    val strings = SpeechStrings(
+        localUnavailable = stringResource(R.string.speech_local_unavailable),
+        recordFailed = stringResource(R.string.speech_record_failed),
+        noSpeech = stringResource(R.string.stt_no_speech),
+        didntCatch = stringResource(R.string.stt_didnt_catch),
+        busy = stringResource(R.string.stt_error_busy),
+        server = stringResource(R.string.stt_error_server),
+        auth = stringResource(R.string.stt_error_auth),
+        recordError = stringResource(R.string.stt_error_record),
+        generic = stringResource(R.string.stt_error_generic),
+    )
+
+    fun start(requestGrant: () -> Unit) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestGrant()
+            return
+        }
+        if (testing) return
+        testing = true
+        userCancelled = false
+        outcome = null
+        heard = null
+        detail = null
+        usedOnDevice = false
+        peak = 0f
+        scope.launch {
+            try {
+                val cfg = app.aiSettings.speechConfig()
+                val code = cfg.sttLanguage.ifBlank { Locale.getDefault().language }
+                val lang = Language.entries.firstOrNull { it.matchesCode(code) } ?: Language.ENGLISH
+                // Same order and fallback the mic button uses, so the test reports what
+                // a real tap would do, not a rosier single-provider attempt.
+                val order = SpeechPolicy.order(if (cfg.baseUrl.isNotBlank()) AudioProvider.API else AudioProvider.ANDROID)
+                    .filter { it != AudioProvider.ANDROID || engine.isLocalRecognitionAvailable() }
+                if (order.isEmpty()) {
+                    if (!userCancelled) outcome = strings.localUnavailable
+                    return@launch
+                }
+                var lastResult: Result<String>? = null
+                var lastFailure: String? = null
+                // Why a configured server failed, kept apart from lastFailure: a fallback
+                // that then hears nothing must still be able to name the server problem.
+                var serverFailure: String? = null
+                for (provider in order) {
+                    activeProvider = provider
+                    val model = if (provider.isApiBased()) cfg.sttModel else ""
+                    val result = withTimeoutOrNull(45_000L) { engine.listenForUtterance(provider, model, lang, 2_500L) }
+                    if (userCancelled) return@launch
+                    if (result == null) {
+                        lastFailure = strings.server
+                        if (provider.isApiBased()) serverFailure = strings.server
+                        continue
+                    }
+                    if (result.isSuccess) {
+                        lastResult = result
+                        // Only a stand-in when a configured server actually failed first.
+                        usedOnDevice = provider == AudioProvider.ANDROID && serverFailure != null
+                        break
+                    }
+                    lastFailure = result.exceptionOrNull()?.message
+                    if (provider.isApiBased()) serverFailure = lastFailure
+                    // Silence is final: another provider would only repeat the wait.
+                    if (com.samosaai.masala.audio.SttEngine.isBenignSttError(result.exceptionOrNull())) {
+                        lastResult = result
+                        break
+                    }
+                }
+                lastResult?.onSuccess {
+                    if (it.isBlank()) outcome = strings.didntCatch else heard = it
+                }?.onFailure {
+                    outcome = friendlySttMessage(it.message, strings)
+                }
+                // A configured server that failed first is the likelier cause than
+                // silence, so say it under the outcome — once, never as a repeat.
+                serverFailure?.let { f ->
+                    val extra = friendlySttMessage(f, strings)
+                    if (extra != outcome) detail = extra
+                }
+                if (!userCancelled && lastResult == null) {
+                    outcome = friendlySttMessage(lastFailure, strings)
+                }
+            } catch (e: Exception) {
+                if (!userCancelled) outcome = friendlySttMessage(e.message, strings)
+            } finally {
+                activeProvider = null
+                testing = false
+            }
+        }
+    }
+
+    val grant = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) start({}) else outcome = strings.recordError
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.stt_test_summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (!testing && heard == null && outcome == null) {
+            OutlinedButton(
+                onClick = { start { grant.launch(Manifest.permission.RECORD_AUDIO) } },
+                border = BorderStroke(1.dp, voiceTint.copy(alpha = 0.4f)),
+                modifier = Modifier.fillMaxWidth().height(46.dp),
+            ) {
+                Icon(Icons.Rounded.Mic, null, tint = voiceTint)
+                Text(stringResource(R.string.stt_test), color = voiceTint, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 6.dp))
+            }
+        }
+        if (testing) {
+            val liveText = partial.takeIf { it.isNotBlank() }?.let { " — “$it”" } ?: ""
+            Text(
+                stringResource(R.string.stt_test_listening) + liveText,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.10f))) {
+                Box(Modifier.fillMaxWidth(level.coerceIn(0f, 1f)).height(8.dp).clip(RoundedCornerShape(4.dp)).background(voiceTint))
+            }
+            Text(stringResource(R.string.stt_test_peak, (peak.coerceIn(0f, 1f) * 100).toInt()), fontFamily = MasalaMono, style = MaterialTheme.typography.bodySmall, color = voiceTint)
+            vad?.let {
+                Text(
+                    stringResource(R.string.stt_test_vad, it.floorDb.toInt(), it.thresholdDb.toInt(), it.peakDb.toInt()),
+                    fontFamily = MasalaMono, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { engine.finishUtterance() }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.stt_test_stop)) }
+                OutlinedButton(
+                    onClick = {
+                        userCancelled = true
+                        activeProvider?.let { engine.cancelListening(it) }
+                        testing = false
+                        outcome = null
+                    },
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(R.string.stt_test_cancel)) }
+            }
+        }
+        heard?.let {
+            Text(stringResource(R.string.stt_test_heard, it), style = MaterialTheme.typography.bodyMedium)
+            if (usedOnDevice) {
+                Text(
+                    stringResource(R.string.stt_test_fell_back),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            OutlinedButton(onClick = { start { grant.launch(Manifest.permission.RECORD_AUDIO) } }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.stt_test))
+            }
+        }
+        outcome?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+            detail?.let { d ->
+                Text(d, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            OutlinedButton(onClick = { start { grant.launch(Manifest.permission.RECORD_AUDIO) } }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.stt_test))
+            }
+        }
+    }
 }

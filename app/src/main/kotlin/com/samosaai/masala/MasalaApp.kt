@@ -77,6 +77,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 
 /** Holds the launcher's long-lived parts. Home and settings both read them through [masala]. */
 class MasalaApp : Application() {
@@ -94,6 +95,12 @@ class MasalaApp : Application() {
     val skills by lazy { SkillRegistry(this) }
 
     val scheduledTasks by lazy { ScheduledTaskStore(PrefsTaskStorage(this)) }
+
+    /** Conversations, stored as one JSON file each; the chat surface reads and writes them. */
+    val chats by lazy { com.samosaai.masala.chat.ChatSessions(java.io.File(filesDir, com.samosaai.masala.chat.ChatSessions.DIR)) }
+
+    /** The conversation turns are being added to; created on the first turn of a new chat. */
+    val activeChatId = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 
     /** Starts a scheduled task's run as a foreground job (plan Phase 4 M6). */
     @Volatile var taskRunner: TaskRunner? = null
@@ -205,6 +212,9 @@ class MasalaApp : Application() {
     }
     private val tts by lazy { TtsEngine(this) }
 
+    /** The speech-to-text engine, for the Voice settings test (same engine the mic uses). */
+    internal fun sttEngine(): SttEngine = stt
+
     /** Deletes a mini app with its home pins and console log; every Delete (screen, settings, tool) goes through here. */
     suspend fun deleteMiniApp(id: String) {
         miniApps.delete(id)
@@ -309,7 +319,38 @@ class MasalaApp : Application() {
                 ),
                 live = stt,
             ),
-        )
+            speechStrings = SpeechStrings(
+                localUnavailable = getString(R.string.speech_local_unavailable),
+                recordFailed = getString(R.string.speech_record_failed),
+                noSpeech = getString(R.string.stt_no_speech),
+                didntCatch = getString(R.string.stt_didnt_catch),
+                busy = getString(R.string.stt_error_busy),
+                server = getString(R.string.stt_error_server),
+                auth = getString(R.string.stt_error_auth),
+                recordError = getString(R.string.stt_error_record),
+                generic = getString(R.string.stt_error_generic),
+            ),
+        ).also { controller ->
+            controller.onTurn = ::recordTurn
+            scope.launch { chats.load() }
+        }
+    }
+
+    /**
+     * Appends a turn to the active conversation, starting one when there is none. Turns are
+     * serialized: a fast command can produce the user turn and its reply before the first
+     * append has left the main thread, and two unguarded launches would each create their
+     * own session, splitting one exchange across two chats.
+     */
+    private val turnLock = kotlinx.coroutines.sync.Mutex()
+
+    internal fun recordTurn(turn: com.samosaai.masala.chat.ChatTurn) {
+        scope.launch {
+            turnLock.withLock {
+                val id = activeChatId.value ?: chats.create().id.also { activeChatId.value = it }
+                chats.append(id, turn)
+            }
+        }
     }
 
     companion object {

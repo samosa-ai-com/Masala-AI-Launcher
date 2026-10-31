@@ -57,6 +57,8 @@
     <string name="voice_title">Voice</string>
     <string name="voice_summary">Mic button, voice input and the voice replies use</string>
     <string name="voice_mic_button">The mic button</string>
+    <string name="voice_gestures">Hold to talk, or tap for hands-free</string>
+    <string name="voice_gestures_summary">Hold the mic and let go to send, or tap it and speak — it sends after a pause. No setting to change.</string>
     <string name="voice_tap">Tap to talk</string>
     <string name="voice_tap_summary">Sends when you pause. Tap again to stop.</string>
     <string name="voice_hold">Hold to talk</string>
@@ -75,6 +77,15 @@
     <string name="voice_phone_voice">Phone voice</string>
     <string name="voice_speed">Speed</string>
     <string name="voice_test">Test voice</string>
+    <string name="stt_test">Test microphone</string>
+    <string name="stt_test_summary">Speak to check the microphone and transcription</string>
+    <string name="stt_test_listening">Listening… speak now</string>
+    <string name="stt_test_stop">Stop</string>
+    <string name="stt_test_cancel">Cancel</string>
+    <string name="stt_test_peak">Mic peak %1$d%%</string>
+    <string name="stt_test_vad">Detector floor %1$d · speaks above %2$d · peak %3$d dB</string>
+    <string name="stt_test_heard">Heard: %1$s</string>
+    <string name="stt_test_fell_back">The configured server failed, so the phone recognizer did it instead.</string>
     <string name="voice_from_anywhere">From anywhere</string>
     <string name="voice_assist_title">Masala as the assist app</string>
     <string name="voice_assist_summary">Hold Home or Power to talk from any app</string>

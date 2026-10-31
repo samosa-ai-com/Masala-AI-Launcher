@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.ChatBubble
@@ -74,7 +75,6 @@ import com.samosaai.masala.ui.secondbrain.RememberedCards
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import com.samosaai.masala.core.ai.MicMode
 
 /** What the mic button does when pressed and released, with the microphone permission asked on the first press. */
 class MicPress(val onPress: () -> Unit, val onRelease: () -> Unit)
@@ -83,9 +83,10 @@ class MicPress(val onPress: () -> Unit, val onRelease: () -> Unit)
 private const val HOLD_AFTER_MS = 300L
 
 /**
- * The mic (plan UI refresh U2, decision 6). In tap mode a tap listens until the speaker pauses (a second
- * tap sends early) and a press held past [HOLD_AFTER_MS] is walkie-talkie; in hold mode only holding
- * records.
+ * The mic: hold to talk (release sends), or tap for hands-free. One rule everywhere, no
+ * setting: a press past [HOLD_AFTER_MS] is walkie-talkie and sends the moment you let go;
+ * a shorter press starts hands-free listening, which sends after a pause, or when the
+ * overlay's send button (or another tap) is used.
  */
 @Composable
 fun rememberMicPress(app: MasalaApp): MicPress {
@@ -104,9 +105,9 @@ fun rememberMicPress(app: MasalaApp): MicPress {
                 permitted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
                 if (!permitted) {
                     granted.launch(Manifest.permission.RECORD_AUDIO)
-                } else if (app.aiSettings.profile.value.micMode == MicMode.HOLD) {
-                    holding = app.commands.startListening()
                 } else if (app.commands.state.value != CommandState.Listening) {
+                    // Walkie-talkie arms only while the finger stays down; a shorter press
+                    // never starts it and becomes hands-free on release instead.
                     holding = false
                     holdStart = scope.launch {
                         delay(HOLD_AFTER_MS)
@@ -118,11 +119,14 @@ fun rememberMicPress(app: MasalaApp): MicPress {
                 if (permitted) {
                     holdStart?.cancel()
                     holdStart = null
-                    when {
-                        holding -> app.commands.stopListening()
-                        app.aiSettings.profile.value.micMode == MicMode.TAP -> app.commands.tapToTalk()
+                    if (holding) {
+                        // Held: the speaker decides when they are done.
+                        app.commands.stopListening()
+                        holding = false
+                    } else {
+                        // Tapped (or already listening): hands-free start, or send now.
+                        app.commands.tapToTalk()
                     }
-                    holding = false
                 }
             },
         )
@@ -134,14 +138,16 @@ fun rememberMicPress(app: MasalaApp): MicPress {
  * place of the two floating buttons. Tapping the pill opens search; the mic talks.
  */
 @Composable
-fun SearchPill(onSearch: () -> Unit, mic: MicPress, modifier: Modifier = Modifier) {
+fun SearchPill(onSearch: () -> Unit, mic: MicPress, onOpenChat: () -> Unit = {}, modifier: Modifier = Modifier) {
     val tokens = MasalaTheme.tokens
     val shape = RoundedCornerShape(50)
     val label = stringResource(R.string.home_search_or_ask)
     Row(
         modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).height(58.dp).clip(shape)
             .background(tokens.wallpaperGlass).border(1.dp, Color.White.copy(alpha = 0.12f), shape)
-            .clickable(role = Role.Button, onClickLabel = label, onClick = onSearch)
+            // Tap searches; long-press opens the conversation (history included), so the
+            // chat is reachable while nothing is running.
+            .combinedClickable(role = Role.Button, onClickLabel = label, onClick = onSearch, onLongClick = onOpenChat, onLongClickLabel = stringResource(R.string.chat_history))
             .padding(start = 18.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -166,10 +172,11 @@ fun AskButton(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-/** The mic: tap to talk, or hold (see [rememberMicPress]). */
+/** The mic: tap to talk, or hold (see [rememberMicPress]). The label always names the current mode. */
 @Composable
 fun MicButton(press: MicPress, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 48.dp) {
-    val label = stringResource(R.string.command_mic)
+    // One label for both gestures: there is no mode to name any more.
+    val label = stringResource(R.string.voice_gestures)
     Surface(
         modifier
             .size(size)

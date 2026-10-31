@@ -45,7 +45,44 @@ internal object SpeechPolicy {
 data class SpeechStrings(
     val localUnavailable: String,
     val recordFailed: String,
+    /** Shown when the user stayed quiet. */
+    val noSpeech: String = "No speech detected",
+    /** Shown when speech was heard but nothing usable came back. */
+    val didntCatch: String = "Didn't catch that",
+    /** Shown when the recognizer is busy (usually a stuck session just ended; retry). */
+    val busy: String = "The speech recognizer is busy. Try again.",
+    /** Shown for transcription-server HTTP failures and network errors. */
+    val server: String = "Couldn't reach the transcription server. Check your connection and try again.",
+    /** Shown for authentication/authorization rejections. */
+    val auth: String = "Transcription was rejected. Check your voice setup in Settings → Voice.",
+    /** Shown when recording itself couldn't start. */
+    val recordError: String = "Couldn't record from the microphone. Check the microphone permission.",
+    /** Shown for anything else. */
+    val generic: String = "Something went wrong with speech input. Try again.",
 )
+
+/**
+ * Maps a raw STT failure to what the user should read. Engine messages stay machine-stable
+ * (the voice-call loop classifies on them); only display goes through here.
+ */
+fun friendlySttMessage(raw: String?, s: SpeechStrings): String {
+    val m = raw?.trim().orEmpty()
+    if (m.isEmpty() || m == "No speech detected") return s.noSpeech
+    if (m.startsWith("Speech recognition failed:")) {
+        val code = m.removePrefix("Speech recognition failed:").trim().toIntOrNull()
+        // 6 = speech timeout, 7 = no match: heard nothing usable; 8 = recognizer busy.
+        return when (code) {
+            6, 7 -> s.noSpeech
+            8 -> s.busy
+            else -> s.generic
+        }
+    }
+    if (m.contains("HTTP 401") || m.contains("HTTP 403") || m.contains("Unauthor", ignoreCase = true)) return s.auth
+    if (m.contains("HTTP") || m.contains("host", ignoreCase = true) || m.contains("timeout", ignoreCase = true) || m.contains("network", ignoreCase = true)) return s.server
+    if (m.contains("No transcription model") || m.contains("not configured", ignoreCase = true)) return s.server
+    if (m.contains("ecord", ignoreCase = true) || m.contains("permission", ignoreCase = true)) return s.recordError
+    return s.generic
+}
 
 /**
  * [SpeechInput] that follows the app's STT configuration: cloud transcription when
@@ -53,8 +90,11 @@ data class SpeechStrings(
  * other one as fallback when the first can't start. A phone whose default recognizer
  * is a stub (or has none) therefore records for the server instead of failing.
  */
-/** A pause that ends tap-to-talk; long enough for a mid-sentence breath, short enough to feel live. */
-private const val SILENCE_MS = 1500L
+/**
+ * Silence that ends a hands-free turn: 2.5 s, so a breath or a slow sentence does not
+ * cut the user off mid-thought. Hold-to-talk never depends on it (release sends).
+ */
+private const val SILENCE_MS = 2500L
 
 class ConfiguredSpeechInput(
     private val engine: PttEngine,
@@ -123,16 +163,35 @@ class ConfiguredSpeechInput(
         cancel()
         live?.resetLive()
         val settings = config()
-        val provider = SpeechPolicy.order(configured()).firstOrNull { it != AudioProvider.ANDROID || localAvailable() }
-            ?: return Result.failure(Exception(strings.localUnavailable))
-        active = provider
-        val model = if (provider.isApiBased()) settings.sttModel else ""
+        val order = SpeechPolicy.order(configured())
+            .filter { it != AudioProvider.ANDROID || localAvailable() }
+        if (order.isEmpty()) return Result.failure(Exception(strings.localUnavailable))
         val lang = configuredLanguage(settings)
-        return try {
-            engine.listenForUtterance(provider, model, lang, SILENCE_MS)
-        } finally {
-            active = null
+        var last: Result<String>? = null
+        // The first technical failure, kept: once the user has spoken, a fallback provider
+        // only hears the room, and reporting its silence would hide the real error.
+        var firstFailure: Result<String>? = null
+        // Like push-to-talk's start(): the cloud goes first, the on-device recognizer is the
+        // last resort. Silence is final (another provider would only repeat the wait); only a
+        // technical failure moves on to the next provider.
+        for (provider in order) {
+            active = provider
+            val model = if (provider.isApiBased()) settings.sttModel else ""
+            val result = try {
+                engine.listenForUtterance(provider, model, lang, SILENCE_MS)
+            } finally {
+                active = null
+            }
+            if (result.isSuccess) return result
+            if (com.samosaai.masala.audio.SttEngine.isBenignSttError(result.exceptionOrNull())) {
+                // The fallback heard nothing because the speaking already happened: the
+                // server's failure is the answer, not "no speech detected".
+                return firstFailure ?: result
+            }
+            if (firstFailure == null) firstFailure = result
+            last = result
         }
+        return firstFailure ?: last!!
     }
 
     override fun finish() = engine.finishUtterance()

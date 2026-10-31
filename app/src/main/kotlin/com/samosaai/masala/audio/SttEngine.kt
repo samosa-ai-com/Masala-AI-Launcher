@@ -64,6 +64,16 @@ class SttEngine(
     @Volatile
     private var vadStopRequested = false
 
+    /** Set by [finishUtterance] (tap Stop): transcribe what's there even if the VAD never fired. */
+    @Volatile
+    private var vadUserStopped = false
+
+    /**
+     * Why the last [recordPcmWithVad] returned null without the user staying quiet (recorder
+     * wouldn't start, reads failed): reported instead of "no speech". Cleared on read.
+     */
+    private var vadRecordError: Exception? = null
+
     // Audio muting state
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
     private var isMutedForRestart = false
@@ -90,6 +100,12 @@ class SttEngine(
 
     /** Words heard so far in this session (on-device recognizer only; API transcription has none). */
     val partial: kotlinx.coroutines.flow.StateFlow<String> = _partial
+
+    /** What the voice-activity detector currently sees; the settings test card shows it. */
+    data class VadSnapshot(val floorDb: Float, val thresholdDb: Float, val peakDb: Float, val speechHeard: Boolean)
+
+    private val _vadState = kotlinx.coroutines.flow.MutableStateFlow<VadSnapshot?>(null)
+    val vadState: kotlinx.coroutines.flow.StateFlow<VadSnapshot?> = _vadState
 
     /** A new listening session starts from silence and no words. */
     fun resetLive() {
@@ -247,7 +263,15 @@ class SttEngine(
         val effectiveModel = model.ifBlank {
             if (apiSttModels.isEmpty()) refreshApiModels()
             apiSttModels.firstOrNull()?.id
-                ?: return@withContext Result.failure(Exception("No transcription model on the configured endpoint"))
+                ?: return@withContext Result.failure(
+                    Exception(
+                        if (api.lastErrorCode == 401 || api.lastErrorCode == 403) {
+                            "HTTP ${api.lastErrorCode} listing speech models: the API key was rejected"
+                        } else {
+                            "No transcription model on the configured endpoint"
+                        }
+                    )
+                )
         }
         try {
             api.transcribe(
@@ -293,8 +317,11 @@ class SttEngine(
         }
         provider.isApiBased() -> withContext(Dispatchers.IO) {
             val wav = recordPcmWithVad(silenceTimeoutMs)
+            vadUserStopped = false
             if (wav == null) {
-                Result.failure(Exception("No speech detected"))
+                val cause = vadRecordError
+                vadRecordError = null
+                Result.failure(cause ?: Exception("No speech detected"))
             } else {
                 transcribeApi(wav, model, language.iso639, contentType = "audio/wav")
             }
@@ -316,30 +343,46 @@ class SttEngine(
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT
         )
+        // MIC, not VOICE_RECOGNITION: the recognition source applies the vendor's
+        // capture processing and on some devices reads back pure zeros.
         val recorder = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_RECOGNITION,
+            MediaRecorder.AudioSource.MIC,
             sampleRate,
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT,
             maxOf(minBuffer, windowShorts * 2)
         )
-        if (recorder.state != AudioRecord.STATE_INITIALIZED) return null
+        if (recorder.state != AudioRecord.STATE_INITIALIZED) return null.also {
+            vadRecordError = Exception("Recording failed to start")
+        }
 
         vadStopRequested = false
+        vadUserStopped = false
+        vadRecordError = null
+        _vadState.value = null
         val detector = SilenceDetector(silenceTimeoutMs)
         val shortBuf = ShortArray(windowShorts)
         val byteBuf = ByteArray(windowShorts * 2)
         val pcm = ByteArrayOutputStream()
         val startMs = System.currentTimeMillis()
         var result: File? = null
+        var peakDb = -50f
+        // Any non-zero sample at all. rmsDb clamps at the floor, so a genuinely
+        // quiet room is indistinguishable from a broken stream by level alone.
+        var sawSignal = false
         try {
             recorder.startRecording()
             while (!vadStopRequested) {
                 val count = recorder.read(shortBuf, 0, shortBuf.size)
-                if (count < 0) break
+                if (count < 0) {
+                    // A hardware/HAL read failure is not silence: say which it was.
+                    vadRecordError = Exception("Audio capture failed (error code $count)")
+                    break
+                }
                 if (count == 0) continue
                 for (i in 0 until count) {
                     val sample = shortBuf[i].toInt()
+                    if (sample != 0) sawSignal = true
                     byteBuf[i * 2] = (sample and 0xFF).toByte()
                     byteBuf[i * 2 + 1] = ((sample shr 8) and 0xFF).toByte()
                 }
@@ -347,20 +390,32 @@ class SttEngine(
                 val now = System.currentTimeMillis()
                 val db = SilenceDetector.rmsDb(shortBuf, count)
                 _level.value = ((db + 60f) / 50f).coerceIn(0f, 1f)
+                peakDb = maxOf(peakDb, db)
                 val decision = detector.update(db, now)
+                _vadState.value = VadSnapshot(detector.floorDb, detector.thresholdDb, peakDb, detector.speechDetected)
                 if (decision != SilenceDetector.Decision.CONTINUE ||
                     now - startMs > MAX_VAD_RECORDING_MS
                 ) {
                     break
                 }
             }
-            if (detector.speechDetected && pcm.size() > 0) {
+            // An explicit Stop sends whatever was captured: the VAD only controls
+            // the hands-free auto-stop, it never vetoes the user's finger. Pure
+            // silence still returns null, so an untouched mic doesn't upload
+            // 15 s of nothing.
+            if (!sawSignal && pcm.size() > 0) {
+                // Not one non-zero sample: the capture path itself is broken (the
+                // stream opened and read back only zeros). Say so, rather than
+                // blaming the user for not speaking.
+                vadRecordError = Exception("Recording captured no audio (microphone returned silence)")
+            } else if (shouldKeepRecording(detector.speechDetected, vadUserStopped, pcm.size())) {
                 result = writeWav(context.cacheDir, pcm.toByteArray(), sampleRate)
             }
         } catch (e: Exception) {
             // A permissions/security failure, OOM, or recorder error must not
             // look like "no speech" without a trace — log it for debugging.
             Log.w(TAG, "VAD recording failed; treating as no speech", e)
+            vadRecordError = Exception("Recording failed: ${e.message ?: e.javaClass.simpleName}")
             result = null
         } finally {
             try {
@@ -370,6 +425,7 @@ class SttEngine(
             }
             recorder.release()
             vadStopRequested = false
+            vadUserStopped = false
             _level.value = 0f
         }
         return result
@@ -553,6 +609,16 @@ class SttEngine(
             if (gateResult != null) {
                 unmuteBeep()
                 listenGate = null
+                // The session is over: drop the recognizer so the next tap doesn't meet a
+                // stale one and fail with RECOGNIZER_BUSY.
+                mainHandler.post {
+                    try {
+                        currentRecognizer?.cancel()
+                        currentRecognizer?.destroy()
+                    } catch (_: Exception) {
+                    }
+                    currentRecognizer = null
+                }
                 return gateResult
             }
             // Timed out — force cleanup
@@ -707,6 +773,7 @@ class SttEngine(
 
     /** Ends a [listenForUtterance] early: the recorder stops and what was said is still transcribed. */
     override fun finishUtterance() {
+        vadUserStopped = true
         vadStopRequested = true
         mainHandler.post {
             try {
@@ -751,13 +818,15 @@ class SttEngine(
         }
     }
 
+    /**
+     * Silences the recognizer's own start/stop tones. Only the system stream is muted:
+     * muting music, notifications or the ringer would let a tap on the mic swallow a
+     * song or an incoming call.
+     */
     private fun muteBeep() {
         if (!isMutedForRestart) {
             try {
-                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, 0)
                 audioManager.adjustStreamVolume(AudioManager.STREAM_SYSTEM, AudioManager.ADJUST_MUTE, 0)
-                audioManager.adjustStreamVolume(AudioManager.STREAM_NOTIFICATION, AudioManager.ADJUST_MUTE, 0)
-                audioManager.adjustStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_MUTE, 0)
             } catch (_: Exception) {}
             isMutedForRestart = true
         }
@@ -766,10 +835,7 @@ class SttEngine(
     private fun unmuteBeep() {
         if (isMutedForRestart) {
             try {
-                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0)
                 audioManager.adjustStreamVolume(AudioManager.STREAM_SYSTEM, AudioManager.ADJUST_UNMUTE, 0)
-                audioManager.adjustStreamVolume(AudioManager.STREAM_NOTIFICATION, AudioManager.ADJUST_UNMUTE, 0)
-                audioManager.adjustStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_UNMUTE, 0)
             } catch (_: Exception) {}
             isMutedForRestart = false
         }
@@ -778,8 +844,18 @@ class SttEngine(
     companion object {
         private const val TAG = "SttEngine"
 
+        /**
+         * Whether a VAD recording is worth transcribing: the detector accepted speech,
+         * or the user pressed Stop with audio actually in the buffer. Pure silence
+         * (nothing captured, or stop tapped instantly) stays null so it never uploads
+         * or transcribes.
+         */
+        internal fun shouldKeepRecording(speechDetected: Boolean, userStopped: Boolean, pcmBytes: Int): Boolean =
+            pcmBytes > 0 && (speechDetected || userStopped)
+
         /** Synthetic error code: listening was cancelled by pause/end, not by the recognizer. */
         const val ERROR_CANCELLED = -100
+
 
         /** Hard cap on a single hands-free VAD recording (90 s). */
         private const val MAX_VAD_RECORDING_MS = 90_000L

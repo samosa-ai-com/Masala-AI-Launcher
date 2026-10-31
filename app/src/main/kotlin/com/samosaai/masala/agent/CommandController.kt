@@ -31,11 +31,43 @@ class CommandController(
     private val skills: () -> List<MasalaSkill>,
     private val newAgent: () -> MasalaAgent,
     private val speech: SpeechInput? = null,
+    private val speechStrings: SpeechStrings = SpeechStrings("", ""),
 ) {
     private val _state = MutableStateFlow<CommandState>(CommandState.Idle)
+    /**
+     * Sets the state and, for a finished turn, hands it to [onTurn] so it lands in the
+     * conversation. Live states (listening, thinking) are not turns.
+     */
+    private fun publish(state: CommandState) {
+        // The same finished state can be set twice (a synchronous start failure calls the
+        // async handler and then the caller does): record its turn once.
+        if (_state.value === state) return
+        _state.value = state
+        val turn = when (state) {
+            is CommandState.Reply -> com.samosaai.masala.chat.ChatTurn(
+                com.samosaai.masala.chat.TurnRole.MASALA, state.text, state.steps,
+            )
+            is CommandState.Error -> com.samosaai.masala.chat.ChatTurn(
+                com.samosaai.masala.chat.TurnRole.ERROR, state.message,
+            )
+            else -> null
+        }
+        turn?.let { onTurn?.invoke(it) }
+    }
+
     val state: StateFlow<CommandState> = _state.asStateFlow()
 
     private var job: Job? = null
+
+    /**
+     * Every finished turn is handed here so the conversation can be stored and shown;
+     * null until the app wires its chat store.
+     */
+    var onTurn: ((com.samosaai.masala.chat.ChatTurn) -> Unit)? = null
+
+    /** True while a hold-to-talk session runs: the release sends, not a detected pause. */
+    private val _walkieTalkie = MutableStateFlow(false)
+    val walkieTalkie: kotlinx.coroutines.flow.StateFlow<Boolean> = _walkieTalkie.asStateFlow()
 
     /** The mic level and live words while listening, for the listening overlay (UI refresh U4). */
     val micLevel: StateFlow<Float> get() = speech?.level ?: kotlinx.coroutines.flow.MutableStateFlow(0f)
@@ -61,6 +93,7 @@ class CommandController(
 
     fun dismiss() {
         job?.cancel()
+        _walkieTalkie.value = false
         speech?.cancel()
         _state.value = CommandState.Idle
     }
@@ -71,6 +104,7 @@ class CommandController(
         if (raw.isEmpty()) return openInput()
         job?.cancel()
         val prompt = if (spoken) NameCorrector(names()).correct(raw) else raw
+        onTurn?.invoke(com.samosaai.masala.chat.ChatTurn(com.samosaai.masala.chat.TurnRole.USER, prompt))
         _state.value = CommandState.Thinking(prompt)
         job = scope.launch { handle(prompt, spoken) }
     }
@@ -81,11 +115,12 @@ class CommandController(
         job?.cancel()
         // The specific reason first; async errors during listening update the card too.
         var reason: String? = null
-        val async: (String) -> Unit = { reason = it; _state.value = CommandState.Error("", it) }
+        val async: (String) -> Unit = { reason = it; publish(CommandState.Error("", it)) }
         if (!input.start(async)) {
-            _state.value = CommandState.Error("", reason ?: "Speech recognition isn't available")
+            publish(CommandState.Error("", reason ?: "Speech recognition isn't available"))
             return false
         }
+        _walkieTalkie.value = true
         _state.value = CommandState.Listening
         return true
     }
@@ -98,12 +133,35 @@ class CommandController(
         val input = speech ?: return
         if (_state.value == CommandState.Listening) return finishListening()
         job?.cancel()
+        _walkieTalkie.value = false
         _state.value = CommandState.Listening
         job = scope.launch {
             input.listenOnce()
-                .onSuccess { if (it.isBlank()) _state.value = CommandState.Error("", "Didn't catch that") else ask(it, spoken = true) }
-                .onFailure { _state.value = CommandState.Error("", it.message ?: "Didn't catch that") }
+                .onSuccess { if (it.isBlank()) publish(CommandState.Error("", speechStrings.didntCatch)) else ask(it, spoken = true) }
+                .onFailure { publish(CommandState.Error("", friendlySttMessage(it.message, speechStrings))) }
         }
+    }
+
+    /**
+     * The listening overlay's send button, whatever started the session: a held session
+     * stops and transcribes, a hands-free one ends its utterance early.
+     */
+    fun sendNow() {
+        if (_walkieTalkie.value) stopListening() else finishListening()
+    }
+
+    /**
+     * Continues a stored conversation: its turns become the agent's context, so
+     * "go back to that chat and keep talking" answers with what came before.
+     */
+    fun restoreSession(turns: List<com.samosaai.masala.chat.ChatTurn>) {
+        job?.cancel()
+        _walkieTalkie.value = false
+        speech?.cancel()
+        history = turns
+            .filter { it.role != com.samosaai.masala.chat.TurnRole.ERROR && it.text.isNotBlank() }
+            .map { com.samosaai.masala.llm.ChatMessage(if (it.role == com.samosaai.masala.chat.TurnRole.USER) "user" else "assistant", JsonPrimitive(it.text)) }
+        _state.value = CommandState.Idle
     }
 
     /** Ends tap-to-talk listening now; what was said still runs. */
@@ -115,28 +173,29 @@ class CommandController(
     fun stopListening() {
         val input = speech ?: return
         if (_state.value != CommandState.Listening) return
+        _walkieTalkie.value = false
         _state.value = CommandState.Thinking("")
         job = scope.launch {
             input.stop()
                 .onSuccess { ask(it, spoken = true) }
-                .onFailure { _state.value = CommandState.Error("", it.message ?: "Didn't catch that") }
+                .onFailure { publish(CommandState.Error("", friendlySttMessage(it.message, speechStrings))) }
         }
     }
 
     private suspend fun handle(prompt: String, spoken: Boolean) {
         CommandFastPath.match(prompt, resolveApp)?.let { action ->
-            _state.value = stateFor(prompt, run(action), spoken)
+            publish(stateFor(prompt, run(action), spoken))
             return
         }
         // No model call from home: the skill's own run builds the app, with its few tools.
         SkillRouter.handoff(prompt, skills())?.let { skill ->
-            _state.value = stateFor(prompt, run(MasalaAction.RunSkill(skill.id, prompt)), spoken, "Opened ${skill.title.ifBlank { skill.id }}.")
+            publish(stateFor(prompt, run(MasalaAction.RunSkill(skill.id, prompt)), spoken, "Opened ${skill.title.ifBlank { skill.id }}."))
             return
         }
         val chip = SkillRouter.route(prompt, skills())?.let { SkillChip(it.id, it.title.ifBlank { it.id }) }
         // Asking for advice goes straight to the persona; asking the phone to act runs, with the persona offered beside it.
         if (chip != null && !SkillRouter.isCommand(prompt)) {
-            _state.value = CommandState.Reply(prompt, "${chip.title} can help with that.", skill = chip, spoken = spoken)
+            publish(CommandState.Reply(prompt, "${chip.title} can help with that.", skill = chip, spoken = spoken))
             return
         }
         val agent = newAgent().also { it.restore(history) }
@@ -148,10 +207,10 @@ class CommandController(
                         steps += event.name
                         _state.value = CommandState.Thinking(prompt, steps.toList())
                     }
-                    is AgentEvent.Done -> _state.value = CommandState.Reply(prompt, event.text.ifBlank { "Done." }, steps.toList(), chip, spoken)
-                    is AgentEvent.Failed -> _state.value = CommandState.Error(prompt, event.message)
-                    is AgentEvent.NeedsCapability -> _state.value = CommandState.Error(prompt, event.reason, event.capability)
-                    AgentEvent.StepLimit -> _state.value = CommandState.Error(prompt, "That took too many steps. Try asking in smaller pieces.")
+                    is AgentEvent.Done -> publish(CommandState.Reply(prompt, event.text.ifBlank { "Done." }, steps.toList(), chip, spoken))
+                    is AgentEvent.Failed -> publish(CommandState.Error(prompt, event.message))
+                    is AgentEvent.NeedsCapability -> publish(CommandState.Error(prompt, event.reason, event.capability))
+                    AgentEvent.StepLimit -> publish(CommandState.Error(prompt, "That took too many steps. Try asking in smaller pieces."))
                     else -> Unit
                 }
             }
