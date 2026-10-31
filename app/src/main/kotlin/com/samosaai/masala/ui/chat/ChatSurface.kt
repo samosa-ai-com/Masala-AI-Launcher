@@ -54,6 +54,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -152,7 +156,7 @@ fun ChatSurface(
                             },
                         )
                         turns.isEmpty() && !listening && !thinking -> EmptyThread(level, character)
-                        else -> Thread(turns, liveWords, listening, thinking, state, character, level, onStop, onDeleteTurn)
+                        else -> Thread(turns, liveWords, listening, thinking, state, character, level, onStop, onDeleteTurn, onCollapse = { onExpanded(false) })
                     }
                 }
                 Controls(listening, autoSendIn, walkie, mic, level, onSend, onClose)
@@ -311,15 +315,38 @@ private fun Thread(
     level: () -> Float,
     onStop: () -> Unit,
     onDeleteTurn: (Int) -> Unit,
+    onCollapse: () -> Unit,
 ) {
     val list = rememberLazyListState()
     LaunchedEffect(turns.size, liveWords, thinking, (state as? CommandState.Thinking)?.steps?.size) {
         val last = list.layoutInfo.totalItemsCount - 1
         if (last >= 0) list.animateScrollToItem(last)
     }
+    // The handle's rule, on the list itself: a downward pull past the top,
+    // beyond 120 dp, returns to the orb. Down is the handle's collapse
+    // direction (drag > 40 from the thread collapses); up from the thread
+    // does nothing there, so upward overscroll only resets the count.
+    val collapsePx = with(LocalDensity.current) { 120.dp.toPx() }
+    var overscroll by remember { mutableFloatStateOf(0f) }
+    val nested = remember(onCollapse, collapsePx) {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (available.y > 0f) {
+                    overscroll += available.y
+                    if (overscroll > collapsePx) {
+                        overscroll = 0f
+                        onCollapse()
+                    }
+                } else if (available.y < 0f) {
+                    overscroll = 0f
+                }
+                return Offset.Zero
+            }
+        }
+    }
     LazyColumn(
         state = list,
-        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp).nestedScroll(nested),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         itemsIndexed(turns) { index, turn -> Bubble(turn, key = index, onDelete = { onDeleteTurn(index) }) }
