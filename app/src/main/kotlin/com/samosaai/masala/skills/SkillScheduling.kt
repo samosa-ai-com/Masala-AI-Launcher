@@ -68,6 +68,20 @@ class SkillScheduling(private val store: ScheduledTaskStore, private val decline
     fun taskFor(skillId: String): ScheduledTask? = store.all().firstOrNull { it.skillId == skillId }
 
     /**
+     * Turns [skill]'s schedule on or off, keeping its time. Turning on a skill with no task yet creates
+     * one at its default schedule. Null when there's nothing to turn off. The caller re-arms the alarm.
+     */
+    fun setEnabled(skill: MasalaSkill, on: Boolean, now: LocalDateTime, nowMillis: Long, zone: ZoneId): ScheduledTask? {
+        val existing = taskFor(skill.id)
+        if (existing == null) {
+            if (!on) return null
+            val schedule = skill.schedule?.default?.let { SkillScheduleParser.parse(it, now) } ?: return null
+            return accept(Offer(skill, schedule), nowMillis, zone)
+        }
+        return ScheduledTaskPlanner.toggled(existing, on, nowMillis, zone).also(store::put)
+    }
+
+    /**
      * Sets [skill] to run every day at [at] (the daily brief's settings page): edits its task and turns it
      * on, or creates the task when the widget's offer was never accepted. The caller re-arms the alarm.
      */

@@ -22,6 +22,13 @@ class SecondBrainStoreTest {
     private fun record(title: String, area: String = "Personal", type: String = "note", extra: String = "") =
         "---\ntitle: $title\narea: $area\ntype: $type\nupdated: 2026-10-29\n$extra---\n\nBody.\n"
 
+    @Test fun linksOutOfTheVaultAreNotRead() {
+        val outside = Files.createTempFile("secret", ".md").toFile().apply { writeText("---\ntitle: Secret\n---\nkey"); deleteOnExit() }
+        val notes = File(dir, "notes")
+        Files.createSymbolicLink(File(notes, "leak.md").toPath(), outside.toPath())
+        assertFalse(store.loadSnapshot().notes.any { it.name == "leak.md" })
+    }
+
     @Test fun theDailyBriefTopicsNotePassesTheWriteCheck() {
         val path = com.samosaai.masala.core.brief.BriefTopics.PATH
         val text = com.samosaai.masala.core.brief.BriefTopics.render(listOf("Formula 1", "Android"), java.time.LocalDate.of(2026, 10, 29))
@@ -508,6 +515,14 @@ class SecondBrainStoreTest {
         assertFalse(broken.ok)
         assertFalse(File(dir, "raw/broken.pdf").exists())
         assertFalse(store.fileRaw("///") { "x".byteInputStream() }.ok)
+    }
+
+    @Test fun aKnownOversizedRawIsRefusedWithoutOpeningIt() {
+        var opened = false
+        val big = store.fileRaw("big.bin", maxBytes = 10, size = 64) { opened = true; ByteArray(64).inputStream() }
+        assertFalse(big.ok)
+        assertTrue(big.errors.single().contains("not filed"))
+        assertFalse(opened)
     }
 
     @Test fun staleRawShowsInHealth() {

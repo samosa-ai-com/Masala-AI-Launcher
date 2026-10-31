@@ -108,9 +108,15 @@ class MasalaAgent(
         }
     }
 
+    /**
+     * Whether `webfetch` may open the URL in [args]: it must be in a search result of this conversation.
+     * The whole [transcript], since [messages] drops exchanges older than [KEPT_EXCHANGES].
+     */
     private fun fetchAllowed(args: JsonObject): Boolean {
         val url = (args["url"] as? JsonPrimitive)?.content ?: return false
-        return FetchAllowance.allows(url, messages.filter { it.role == "tool" }.map { it.textContent })
+        val all = transcript
+        val searchCalls = all.flatMap { it.toolCalls.orEmpty() }.filter { it.function.name in FetchAllowance.SOURCES }.mapTo(HashSet()) { it.id }
+        return FetchAllowance.allows(url, all.filter { it.role == "tool" && it.toolCallId in searchCalls }.map { it.textContent })
     }
 
     private fun toolMessage(callId: String, result: ToolResult) =

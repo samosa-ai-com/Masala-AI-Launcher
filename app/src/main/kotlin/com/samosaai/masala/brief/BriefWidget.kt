@@ -1,5 +1,7 @@
 package com.samosaai.masala.brief
 
+import android.app.NotificationManager
+import android.media.AudioManager
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -28,6 +30,21 @@ object BriefWidget {
         if (!readAloud || quiet || status != "done" || finishedAt == null || runId == lastReadRunId) return false
         val nowAt = Instant.ofEpochMilli(now).atZone(zone)
         return Instant.ofEpochMilli(finishedAt).atZone(zone).toLocalDate() == nowAt.toLocalDate() && nowAt.toLocalTime() < LocalTime.NOON
+    }
+
+    /**
+     * Whether the phone is silenced: ringer on silent or vibrate, or Do Not Disturb filtering sound
+     * (priority only, alarms only, or total silence). An unknown filter ([NotificationManager.INTERRUPTION_FILTER_UNKNOWN],
+     * or no reading at all) is not quiet, so a phone that can't report it doesn't lose auto read-aloud.
+     */
+    fun isQuiet(ringerMode: Int?, interruptionFilter: Int?): Boolean {
+        val ringerSilenced = ringerMode != null && ringerMode != AudioManager.RINGER_MODE_NORMAL
+        val doNotDisturb = interruptionFilter in setOf(
+            NotificationManager.INTERRUPTION_FILTER_PRIORITY,
+            NotificationManager.INTERRUPTION_FILTER_ALARMS,
+            NotificationManager.INTERRUPTION_FILTER_NONE,
+        )
+        return ringerSilenced || doNotDisturb
     }
 
     /** "Today 07:31", "Yesterday 07:31", or "Thu 29 Oct" for older runs, so an old brief isn't taken for today's. */

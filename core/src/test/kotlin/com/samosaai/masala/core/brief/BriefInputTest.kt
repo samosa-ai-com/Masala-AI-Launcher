@@ -159,6 +159,21 @@ class BriefCalendarTest {
     }
 
     @Test
+    fun `all-day events keep their date west of UTC too`() {
+        val la = java.time.ZoneId.of("America/Los_Angeles")
+        // Seen from Los Angeles, today's all-day event starts at 17:00 yesterday, local time.
+        val rows = listOf(
+            CalendarRow("Halloween", utcMidnight(day), utcMidnight(day.plusDays(1)), true, null),
+            CalendarRow("Yesterday's", utcMidnight(day.minusDays(1)), utcMidnight(day), true, null),
+            CalendarRow("Tomorrow's", utcMidnight(day.plusDays(1)), utcMidnight(day.plusDays(2)), true, null),
+            CalendarRow("Late call", day.atTime(23, 30).atZone(la).toInstant().toEpochMilli(), day.plusDays(1).atTime(0, 15).atZone(la).toInstant().toEpochMilli(), false, null),
+        )
+        val events = BriefCalendar.today(rows, day, la)
+        assertEquals(listOf("Halloween", "Late call"), events.map { it.title })
+        assertEquals("23:30 Late call", events[1].line())
+    }
+
+    @Test
     fun `the query range covers a day either side`() {
         val range = BriefCalendar.queryRange(day, zone)
         assertEquals(at(0, 0, day.minusDays(1)), range.first)

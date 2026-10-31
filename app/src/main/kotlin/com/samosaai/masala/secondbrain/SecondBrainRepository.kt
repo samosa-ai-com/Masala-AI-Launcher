@@ -153,8 +153,8 @@ class SecondBrainRepository(
         changed("memory_edit") { store.editRecord(path, oldText, newText, replaceAll) }
 
     /** Copies a raw drop into raw/ ([SecondBrainStore.fileRaw]); undo removes the copy. */
-    suspend fun fileRaw(name: String, open: () -> java.io.InputStream) =
-        changed("memory_file_raw") { store.fileRaw(name, open = open) }
+    suspend fun fileRaw(name: String, size: Long? = null, open: () -> java.io.InputStream) =
+        changed("memory_file_raw") { store.fileRaw(name, size = size, open = open) }
 
     /** Temp and cache paths: a raw drop from there is always copied, never linked. */
     fun isEphemeralPath(path: String): Boolean = store.isEphemeralPath(path)
@@ -193,6 +193,8 @@ class SecondBrainRepository(
             audit("memory_undo", target.orEmpty())
             refresh()
         }
+        // Cleared either way: a change whose journal entry is gone (trimmed past 50, or undone twice) can
+        // never be undone, so its card would only fail again.
         setChanges(changes.value.filterNot { it.undoId == undoId })
         return ok
     }

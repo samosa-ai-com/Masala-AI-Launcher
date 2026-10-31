@@ -43,10 +43,9 @@ object MemoryRawTool {
                     put("type", "string")
                     put("description", "The file: a path (/sdcard/…, file://…) or a content:// URI from a picker or share.")
                 }
-                putJsonObject("mode") {
+            putJsonObject("mode") {
                     put("type", "string")
-                    putJsonArray("enum") { add("copy"); add("link") }
-                    put("description", "copy (default) puts a copy in raw/; link records a big file where it is.")
+                    put("description", "copy (default) puts a copy in raw/; link leaves a big file where it is and hands back its path, which you must then record in the owning note.")
                 }
                 putJsonObject("name") {
                     put("type", "string")
@@ -81,7 +80,7 @@ object MemoryRawTool {
             if (source.startsWith("content://")) {
                 if (link) return@FunctionTool ActionResult.error("A picked file can't be linked in place; file it with mode copy.")
                 val (shown, open) = uris.open(source) ?: return@FunctionTool ActionResult.error("The picked file can't be read.")
-                return@FunctionTool filed(secondBrain.fileRaw(name ?: shown, open))
+                return@FunctionTool filed(secondBrain.fileRaw(name ?: shown, open = open))
             }
             val access = fileAccess()
             val file = try {
@@ -95,8 +94,8 @@ object MemoryRawTool {
             val canLink = access.scope == FileScope.SHARED_STORAGE && big && !ephemeral
             when {
                 link && canLink -> ActionResult.ok(
-                    "Linked in place, nothing copied: ${file.path}. Record this path in the owning note " +
-                        "(source_file: ${file.path}, and in its Sources section).",
+                    "Linked in place, nothing filed: ${file.path}. Nothing in the vault tracks it yet, so write the owning note " +
+                        "now (source_file: ${file.path}, and in its Sources section) or it stays invisible to health and cleanup.",
                 )
                 link -> ActionResult.error(
                     when {
@@ -108,7 +107,7 @@ object MemoryRawTool {
                 canLink -> ActionResult.error(
                     "${file.name} is over 10 MB and stays where it is: link it in place with mode link instead of copying.",
                 )
-                else -> filed(secondBrain.fileRaw(name ?: file.name) { file.inputStream() })
+                else -> filed(secondBrain.fileRaw(name ?: file.name, size = file.length()) { file.inputStream() })
             }
         }
 

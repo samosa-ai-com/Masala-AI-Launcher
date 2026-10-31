@@ -98,4 +98,18 @@ class SkillSchedulingTest {
         assertEquals(LocalDateTime.parse("2026-10-28T11:00").atZone(zone).toInstant().toEpochMilli(), moved.nextRunAt)
         assertEquals(1, store.all().size)
     }
+
+    @Test fun setEnabledTurnsTheScheduleOffAndBackOnKeepingItsTime() {
+        assertNull(scheduling.setEnabled(brief, false, now, nowMillis, zone), "nothing to turn off")
+        val created = scheduling.setEnabled(brief, true, now, nowMillis, zone)!!
+        assertEquals("2026-10-29T07:30", created.startLocal)
+        val off = scheduling.setEnabled(brief, false, now, nowMillis, zone)!!
+        assertEquals(false, off.enabled)
+        assertNull(scheduling.nextRunAt(brief.id))
+        val on = scheduling.setEnabled(brief, true, now, nowMillis, zone)!!
+        assertTrue(on.enabled)
+        assertEquals("2026-10-29T07:30", on.startLocal)
+        assertNotNull(scheduling.nextRunAt(brief.id))
+        assertEquals(1, store.all().size)
+    }
 }

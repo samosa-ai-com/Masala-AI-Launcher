@@ -258,10 +258,9 @@ class MasalaApp : Application() {
      */
     suspend fun claimAutoRead(run: com.samosaai.masala.data.SkillRunEntity): Boolean {
         val prefs = getSharedPreferences("auto_read", MODE_PRIVATE)
-        val audio = getSystemService(android.media.AudioManager::class.java)
-        val notifications = getSystemService(android.app.NotificationManager::class.java)
-        val quiet = audio?.ringerMode != android.media.AudioManager.RINGER_MODE_NORMAL ||
-            notifications?.currentInterruptionFilter.let { it != null && it != android.app.NotificationManager.INTERRUPTION_FILTER_ALL }
+        val ringerMode = getSystemService(android.media.AudioManager::class.java)?.ringerMode
+        val interruptionFilter = getSystemService(android.app.NotificationManager::class.java)?.currentInterruptionFilter
+        val quiet = com.samosaai.masala.brief.BriefWidget.isQuiet(ringerMode, interruptionFilter)
         val due = com.samosaai.masala.brief.BriefWidget.autoReadDue(
             run.id, run.status, run.finishedAt, System.currentTimeMillis(), java.time.ZoneId.systemDefault(),
             settings.current().readRepliesAloud, quiet, prefs.getLong(run.skillId, -1),

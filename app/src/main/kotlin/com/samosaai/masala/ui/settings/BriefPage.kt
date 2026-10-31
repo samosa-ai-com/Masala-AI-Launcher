@@ -83,6 +83,14 @@ fun BriefPage(settings: LauncherSettings, update: ((LauncherSettings) -> Launche
         }
     }
 
+    fun setOn(on: Boolean) = scope.launch {
+        val skill = app.skills.getSkillById(BriefInputs.SKILL_ID) ?: return@launch
+        withContext(Dispatchers.IO) {
+            app.skillScheduling.setEnabled(skill, on, SkillScheduling.now(), System.currentTimeMillis(), ZoneId.systemDefault())
+                ?.also { task = it; ScheduledTaskScheduler.reschedule(app) }
+        }
+    }
+
     fun saveTopics(next: List<String>) = scope.launch {
         val outcome = app.secondBrain.write(BriefTopics.PATH, BriefTopics.render(next, LocalDate.now()))
         if (outcome.ok) topics = next.distinctBy { it.lowercase() } else toast(outcome.errors.joinToString(" "))
@@ -110,6 +118,9 @@ fun BriefPage(settings: LauncherSettings, update: ((LauncherSettings) -> Launche
                     TimePickerDialog(context, { _, h, m -> setTime(LocalTime.of(h, m)) }, start.hour, start.minute, true).show()
                 },
             )
+            Row(Modifier.padding(horizontal = 16.dp)) {
+                SettingsToggleRow(stringResource(R.string.brief_on), task?.enabled == true) { on -> setOn(on) }
+            }
             Row(Modifier.padding(horizontal = 16.dp)) {
                 SettingsToggleRow(stringResource(R.string.brief_notify), settings.briefNotify) { on -> update { it.copy(briefNotify = on) } }
             }

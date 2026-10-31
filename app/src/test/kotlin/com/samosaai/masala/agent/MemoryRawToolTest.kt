@@ -62,6 +62,7 @@ class MemoryRawToolTest {
         val linked = run(FileScope.SHARED_STORAGE, """{"source":"${film.path}","mode":"link"}""")
         assertIs<ToolResult.Success>(linked)
         assertTrue(linked.output.contains(film.path))
+        assertTrue(linked.output.contains("Nothing in the vault tracks it yet"))
         assertTrue(File(vault, "raw").listFiles()!!.isEmpty())
         val copyRefused = run(FileScope.SHARED_STORAGE, """{"source":"${film.path}"}""")
         assertTrue(copyRefused is ToolResult.Failure && copyRefused.message.contains("mode link"))

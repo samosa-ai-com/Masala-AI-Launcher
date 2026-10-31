@@ -575,7 +575,9 @@ class SecondBrainStore(
      * Copies a raw drop into raw/ under [name] (made safe, never overwriting: `-2`, `-3` … on a clash),
      * streaming at most [maxBytes]. Raw files are immutable afterwards; undo removes the copy.
      */
-    fun fileRaw(name: String, maxBytes: Long = RAW_COPY_MAX_BYTES, open: () -> java.io.InputStream): WriteOutcome = synchronized(lock) {
+    fun fileRaw(name: String, maxBytes: Long = RAW_COPY_MAX_BYTES, size: Long? = null, open: () -> java.io.InputStream): WriteOutcome = synchronized(lock) {
+        // A known size is refused before anything is copied; an unknown one is checked while copying.
+        if (size != null && size > maxBytes) return WriteOutcome("raw/", listOf("'$name': not filed (larger than ${maxBytes / (1024 * 1024)} MB)."))
         val safe = name.substringAfterLast('/').replace(Regex("[^\\p{L}\\p{N}._-]+"), "-").trim('-', '.').take(120)
         if (safe.isEmpty()) return WriteOutcome("raw/", listOf("'$name' has no usable file name."))
         val base = safe.substringBeforeLast('.', safe)
@@ -845,8 +847,11 @@ class SecondBrainStore(
     private fun listBrainFiles(dir: File): List<BrainFile> {
         return try {
             if (!dir.exists() || !dir.isDirectory) return emptyList()
+            val home = dir.canonicalFile
             dir.listFiles()
                 ?.filter { it.isFile && it.name.substringAfterLast('.', "").lowercase() in MARKDOWN_EXTENSIONS }
+                // Like vaultFile: a link pointing out of the vault is never read into the prompt or graph.
+                ?.filter { runCatching { it.canonicalFile.parentFile == home }.getOrDefault(false) }
                 ?.sortedBy { it.name.lowercase() }
                 ?.mapNotNull { loadBrainFile(it) }
                 .orEmpty()

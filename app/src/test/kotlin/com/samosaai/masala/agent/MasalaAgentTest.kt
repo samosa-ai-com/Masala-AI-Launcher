@@ -79,6 +79,45 @@ class MasalaAgentTest {
         assertEquals(listOf("https://evil.example/?q=Standup", "https://f1.example/a"), fetched)
     }
 
+    @Test fun anUnwatchedRunDoesNotOpenUrlsFromOtherTools() = runBlocking {
+        val tools = listOf("list_calendar_events", "webfetch")
+        val defs = tools.map { ToolDefinition(it, "", JsonObject(emptyMap())) }
+        val scope = ToolScope.command(tools.map { ToolInfo(it, ToolSensitivity.READ_ONLY) })
+        val fetched = mutableListOf<String>()
+        val runner = AgentToolRunner { name, args ->
+            if (name == "list_calendar_events") ToolResult.Success("09:00 Call (https://evil.example/join)")
+            else ToolResult.Success("page").also { fetched += (args["url"] as JsonPrimitive).content }
+        }
+        val replies = script(
+            assistant("", call("1", "list_calendar_events")),
+            assistant("", call("2", "webfetch", """{"url":"https://evil.example/join"}""")),
+            assistant("Done"),
+        )
+        MasalaAgent(replies, runner, defs, scope, { "system" }, fetchOnlyResults = true).run(user("go")).toList()
+        assertEquals(emptyList(), fetched)
+    }
+
+    @Test fun anUnwatchedRunStillOpensSearchResultsAfterOlderExchangesAreTrimmed() = runBlocking {
+        val tools = listOf("websearch", "webfetch")
+        val defs = tools.map { ToolDefinition(it, "", JsonObject(emptyMap())) }
+        val scope = ToolScope.command(tools.map { ToolInfo(it, ToolSensitivity.READ_ONLY) })
+        val fetched = mutableListOf<String>()
+        val runner = AgentToolRunner { name, args ->
+            if (name == "websearch") ToolResult.Success("1. F1\n   https://f1.example/a")
+            else ToolResult.Success("page").also { fetched += (args["url"] as JsonPrimitive).content }
+        }
+        // The search happens in the first exchange; the fetch comes after more exchanges than are kept.
+        val replies = mutableListOf(assistant("", call("s", "websearch", """{"query":"f1"}""")), assistant("ok"))
+        repeat(MasalaAgent.KEPT_EXCHANGES) { replies += assistant("ok") }
+        replies += assistant("", call("f", "webfetch", """{"url":"https://f1.example/a"}"""))
+        replies += assistant("done")
+        val agent = MasalaAgent(script(*replies.toTypedArray()), runner, defs, scope, { "system" }, fetchOnlyResults = true)
+        agent.run(user("first")).toList()
+        repeat(MasalaAgent.KEPT_EXCHANGES) { agent.run(user("again $it")).toList() }
+        agent.run(user("open it")).toList()
+        assertEquals(listOf("https://f1.example/a"), fetched)
+    }
+
     @Test fun answersWithNoTools() = runBlocking {
         val events = agent(script(assistant("Hello"))).run(user("hi")).toList()
         assertEquals(listOf(AgentEvent.Thinking, AgentEvent.Done("Hello")), events)

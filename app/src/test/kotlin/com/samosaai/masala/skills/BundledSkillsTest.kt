@@ -38,6 +38,12 @@ class BundledSkillsTest {
     }
 
     @Test
+    fun `the daily brief's contract example in core matches the shipped skill`() {
+        // :core keeps a copy for its contract tests; the two must not drift.
+        assertEquals(File("src/main/assets/skills/daily_brief.json").readText(), File("../core/src/main/resources/masala/skills/daily_brief.json").readText())
+    }
+
+    @Test
     fun `the daily brief runs on a schedule and shows Markdown`() {
         val brief = skills.single { it.id == "daily_brief" }
         assertEquals("daily 07:30", brief.schedule?.default)

@@ -78,8 +78,9 @@ class WeatherClient(private val clock: () -> Long = System::currentTimeMillis) {
             val lat = Math.round(fix.latitude * 100) / 100.0
             val lon = Math.round(fix.longitude * 100) / 100.0
             @Suppress("DEPRECATION")
-            val name = runCatching { Geocoder(context).getFromLocation(lat, lon, 1)?.firstOrNull()?.locality }.getOrNull()
-            Place(name ?: fallbackName, lat, lon)
+            val address = runCatching { Geocoder(context).getFromLocation(lat, lon, 1)?.firstOrNull() }.getOrNull()
+            // With the country, like a typed place: "Bengaluru, India".
+            Place(address?.locality ?: fallbackName, lat, lon, address?.countryName)
         }
     }
 }

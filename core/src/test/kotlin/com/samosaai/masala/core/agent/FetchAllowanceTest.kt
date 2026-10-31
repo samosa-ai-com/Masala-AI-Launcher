@@ -19,7 +19,14 @@ class FetchAllowanceTest {
     fun `a url from a search result may be opened, written a little differently`() {
         assertTrue(FetchAllowance.allows("https://www.f1.example/news/mexico-gp?utm_source=ddg&id=7", listOf(search)))
         assertTrue(FetchAllowance.allows("https://F1.example/news/mexico-gp/?id=7#top", listOf(search)))
+        // Seen over http, opened over https: an upgrade is fine.
         assertTrue(FetchAllowance.allows("https://motorsport.example/2026/calendar", listOf(search)))
+    }
+
+    @Test
+    fun `a page seen over https is never opened over plain http`() {
+        assertFalse(FetchAllowance.allows("http://www.f1.example/news/mexico-gp?id=7", listOf(search)))
+        assertTrue(FetchAllowance.allows("http://motorsport.example/2026/calendar", listOf(search)))
     }
 
     @Test

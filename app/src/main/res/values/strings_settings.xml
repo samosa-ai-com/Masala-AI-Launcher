@@ -67,6 +67,7 @@
     <string name="brief_intro">A morning card with today\'s calendar, the weather and news on your topics. It runs on its own, with read-only tools.</string>
     <string name="brief_when">When</string>
     <string name="brief_time">Time</string>
+    <string name="brief_on">Run every day</string>
     <string name="brief_time_every_day">Every day at %1$s</string>
     <string name="brief_time_off">Off. Tap to pick a time.</string>
     <string name="brief_notify">Notify me when it\'s ready</string>

@@ -60,4 +60,18 @@ class BriefWidgetTest {
         assertEquals("**Today**: Nothing on the calendar.\n\n**Weather**: Rain.\n\n**Worth knowing**:\n\n- **Big** news".replace("\n\n- ", "\n- "), BriefWidget.paragraphs(md))
         assertEquals("**Today**: Nothing on the calendar.", BriefWidget.preview(md))
     }
+
+    @Test
+    fun `only a real silencing counts as quiet`() {
+        val normal = android.media.AudioManager.RINGER_MODE_NORMAL
+        val all = android.app.NotificationManager.INTERRUPTION_FILTER_ALL
+        assertFalse(BriefWidget.isQuiet(normal, all))
+        assertFalse(BriefWidget.isQuiet(normal, android.app.NotificationManager.INTERRUPTION_FILTER_UNKNOWN), "unknown filter")
+        assertFalse(BriefWidget.isQuiet(null, null), "nothing could be read")
+        assertTrue(BriefWidget.isQuiet(android.media.AudioManager.RINGER_MODE_SILENT, all))
+        assertTrue(BriefWidget.isQuiet(android.media.AudioManager.RINGER_MODE_VIBRATE, all))
+        assertTrue(BriefWidget.isQuiet(normal, android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY))
+        assertTrue(BriefWidget.isQuiet(normal, android.app.NotificationManager.INTERRUPTION_FILTER_ALARMS))
+        assertTrue(BriefWidget.isQuiet(normal, android.app.NotificationManager.INTERRUPTION_FILTER_NONE))
+    }
 }
