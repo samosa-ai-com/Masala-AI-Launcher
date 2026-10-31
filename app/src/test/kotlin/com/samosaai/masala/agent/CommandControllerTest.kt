@@ -193,27 +193,22 @@ class CommandControllerTest {
         assertEquals(listOf<MasalaAction>(MasalaAction.StartTimer(60)), ran)
     }
 
-    @Test fun aHeldSessionSendsOnStopAndATappedOneSendsOnFinish() = runBlocking<Unit> {
-        var finished = 0
+    @Test fun sendNowStopsTheTake() = runBlocking<Unit> {
+        var stopped = 0
         val speech = object : SpeechInput {
             override fun start(onFailure: (String) -> Unit) = true
-            override suspend fun stop() = Result.failure<String>(Exception("held"))
+            override suspend fun stop(): Result<String> {
+                stopped++
+                return Result.failure(Exception("stopped"))
+            }
             override fun cancel() = Unit
-            override fun finish() { finished++ }
-            override suspend fun listenOnce() = Result.failure<String>(Exception("tapped"))
         }
         val c = controller(speech)
-        // Walkie-talkie: sendNow ends the held session (stop), not the hands-free one.
+        // A tap opens Sam; Send ends the take. Nothing ends it by itself.
         assertTrue(c.startListening())
-        assertTrue(c.walkieTalkie.value)
         c.sendNow()
-        assertEquals(0, finished)
         c.settled()
-        // Hands-free: sendNow ends the utterance early instead.
-        c.tapToTalk()
-        assertFalse(c.walkieTalkie.value)
-        c.sendNow()
-        assertEquals(1, finished)
+        assertEquals(1, stopped)
     }
 
     @Test fun aLongConversationIsSummarisedBeforeTheRun() = runBlocking<Unit> {

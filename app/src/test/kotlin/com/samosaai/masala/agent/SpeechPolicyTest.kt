@@ -220,22 +220,14 @@ class SpeechPolicyTest {
     }
 
     @Test
-    fun `hands-free only where it can be timed`() {
-        // The server path is timed by our own detector; the phone's recognizer decides its
-        // own end, so a hands-free take there cut people off (and flickered the mic).
-        assertTrue(SpeechPolicy.handsFreeWorks(AudioProvider.API))
-        assertTrue(SpeechPolicy.handsFreeWorks(AudioProvider.SAMOSA_AI))
-        assertFalse(SpeechPolicy.handsFreeWorks(AudioProvider.ANDROID))
-    }
-
-    @Test
-    fun `a hands-free tap never reaches the on-device recognizer`() = runBlocking<Unit> {
+    fun `listenOnce never reaches the on-device recognizer`() = runBlocking<Unit> {
         val engine = FakeEngine(
             utteranceResults = mapOf(
                 AudioProvider.ANDROID to Result.success("should not be asked"),
             )
         )
-        // On-device only: nothing can be timed, so the tap fails instead of half-listening.
+        // On-device only: nothing can be timed, so the test card fails instead of half-listening.
+        // (The mic itself never ends a take: only Send does.)
         val result = input(engine, baseUrl = "").listenOnce()
         assertTrue(result.isFailure)
         assertTrue(engine.utterances.isEmpty())

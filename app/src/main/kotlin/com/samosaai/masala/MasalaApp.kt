@@ -325,7 +325,6 @@ class MasalaApp : Application() {
                     recordFailed = getString(R.string.speech_record_failed),
                 ),
                 live = stt,
-                handsFreeEnabled = { aiSettings.profile.value.handsFree ?: (aiSettings.profile.value.voiceIn != null) },
             ).also { speechInputRef = it },
             speechStrings = SpeechStrings(
                 localUnavailable = getString(R.string.speech_local_unavailable),
@@ -340,7 +339,6 @@ class MasalaApp : Application() {
             ),
             summarize = { transcript -> summarizeHistory(transcript) },
         ).also { controller ->
-            controller.handsFreeAvailable = { speechInput().handsFreeAvailable() }
             controller.usesServerStt = { speechInput().usesServerStt() }
             controller.onTurn = ::recordTurn
             scope.launch { chats.load() }
