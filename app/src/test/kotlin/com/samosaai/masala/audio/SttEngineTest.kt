@@ -53,4 +53,24 @@ class SttEngineTest {
     fun `an error without a message is not benign`() {
         assertFalse(SttEngine.isBenignSttError(Exception()))
     }
+
+    @Test
+    fun `detector speech with audio is kept`() {
+        assertTrue(SttEngine.shouldKeepRecording(speechDetected = true, userStopped = false, pcmBytes = 6400))
+    }
+
+    @Test
+    fun `user stop with audio is kept even when the detector never fired`() {
+        assertTrue(SttEngine.shouldKeepRecording(speechDetected = false, userStopped = true, pcmBytes = 6400))
+    }
+
+    @Test
+    fun `pure silence is dropped even on user stop`() {
+        assertFalse(SttEngine.shouldKeepRecording(speechDetected = false, userStopped = true, pcmBytes = 0))
+    }
+
+    @Test
+    fun `unaccepted audio without a stop is dropped`() {
+        assertFalse(SttEngine.shouldKeepRecording(speechDetected = false, userStopped = false, pcmBytes = 6400))
+    }
 }

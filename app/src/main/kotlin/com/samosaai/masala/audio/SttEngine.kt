@@ -64,6 +64,10 @@ class SttEngine(
     @Volatile
     private var vadStopRequested = false
 
+    /** Set by [finishUtterance] (tap Stop): transcribe what's there even if the VAD never fired. */
+    @Volatile
+    private var vadUserStopped = false
+
     /**
      * Why the last [recordPcmWithVad] returned null without the user staying quiet (recorder
      * wouldn't start, reads failed): reported instead of "no speech". Cleared on read.
@@ -305,6 +309,7 @@ class SttEngine(
         }
         provider.isApiBased() -> withContext(Dispatchers.IO) {
             val wav = recordPcmWithVad(silenceTimeoutMs)
+            vadUserStopped = false
             if (wav == null) {
                 val cause = vadRecordError
                 vadRecordError = null
@@ -342,6 +347,7 @@ class SttEngine(
         }
 
         vadStopRequested = false
+        vadUserStopped = false
         vadRecordError = null
         _vadState.value = null
         val detector = SilenceDetector(silenceTimeoutMs)
@@ -375,7 +381,11 @@ class SttEngine(
                     break
                 }
             }
-            if (detector.speechDetected && pcm.size() > 0) {
+            // An explicit Stop sends whatever was captured: the VAD only controls
+            // the hands-free auto-stop, it never vetoes the user's finger. Pure
+            // silence still returns null, so an untouched mic doesn't upload
+            // 15 s of nothing.
+            if (shouldKeepRecording(detector.speechDetected, vadUserStopped, pcm.size())) {
                 result = writeWav(context.cacheDir, pcm.toByteArray(), sampleRate)
             }
         } catch (e: Exception) {
@@ -392,6 +402,7 @@ class SttEngine(
             }
             recorder.release()
             vadStopRequested = false
+            vadUserStopped = false
             _level.value = 0f
         }
         return result
@@ -739,6 +750,7 @@ class SttEngine(
 
     /** Ends a [listenForUtterance] early: the recorder stops and what was said is still transcribed. */
     override fun finishUtterance() {
+        vadUserStopped = true
         vadStopRequested = true
         mainHandler.post {
             try {
@@ -809,6 +821,15 @@ class SttEngine(
 
     companion object {
         private const val TAG = "SttEngine"
+
+        /**
+         * Whether a VAD recording is worth transcribing: the detector accepted speech,
+         * or the user pressed Stop with audio actually in the buffer. Pure silence
+         * (nothing captured, or stop tapped instantly) stays null so it never uploads
+         * or transcribes.
+         */
+        internal fun shouldKeepRecording(speechDetected: Boolean, userStopped: Boolean, pcmBytes: Int): Boolean =
+            pcmBytes > 0 && (speechDetected || userStopped)
 
         /** Synthetic error code: listening was cancelled by pause/end, not by the recognizer. */
         const val ERROR_CANCELLED = -100
