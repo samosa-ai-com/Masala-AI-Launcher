@@ -138,7 +138,7 @@ class SettingsActivity : ComponentActivity() {
                         Page.RECORDING -> RecordingPage(onBack = { page = Page.MAIN })
                         Page.MINI_APPS -> MiniAppsPage(onBack = { page = Page.MAIN })
                         Page.SKILLS -> SkillsPage(onBack = { page = Page.MAIN })
-                        Page.TASKS -> ScheduledTasksPage(onBack = { page = Page.MAIN })
+                        Page.TASKS -> ScheduledTasksPage(onBack = { page = Page.MAIN }, onAskInChat = { askInChat(it) })
                         Page.FILES -> masala.fileIndex?.let { FilesPage(it, onBack = { page = Page.MAIN }) }
                         Page.AI_MODELS -> AiModelsPage(onBack = { page = Page.MAIN })
                         Page.VOICE -> VoicePage(settings, update = { change -> lifecycleScope.launch { masala.settings.update(change) } }, onBack = { page = Page.MAIN })
@@ -507,123 +507,6 @@ class SettingsActivity : ComponentActivity() {
                     },
                     dismissButton = { TextButton(onClick = { confirmImport = false }) { Text(stringResource(R.string.action_back)) } },
                 )
-            }
-        }
-    }
-
-    /** Every scheduled task in one place, so runs can be fired, paused or deleted (plan F5). */
-    @Composable
-    private fun ScheduledTasksPage(onBack: () -> Unit) {
-        val scope = rememberCoroutineScope()
-        var tasks by remember { mutableStateOf(listOf<ScheduledTask>()) }
-        val format = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
-        suspend fun sync() {
-            tasks = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { masala.scheduledTasks.all() }
-        }
-        androidx.compose.runtime.LaunchedEffect(Unit) { sync() }
-        fun mutate(block: suspend () -> Unit) {
-            scope.launch {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    block()
-                    com.samosaai.masala.scheduled.ScheduledTaskScheduler.reschedule(this@SettingsActivity)
-                }
-                sync()
-            }
-        }
-        SettingsScaffold(stringResource(R.string.settings_scheduled_tasks), onBack = onBack) {
-            Button(onClick = { askInChat(getString(R.string.scheduled_task_create_prefill)) }) { Text(stringResource(R.string.scheduled_task_create)) }
-            var filter by rememberSaveable { mutableStateOf("") }
-            if (tasks.size > 5 || filter.isNotEmpty()) ListSearchField(filter, { filter = it }, stringResource(R.string.scheduled_tasks_filter))
-            val shown = remember(tasks, filter) {
-                val q = filter.trim().lowercase()
-                if (q.isEmpty()) tasks else tasks.filter {
-                    it.name.lowercase().contains(q) || it.prompt.lowercase().contains(q)
-                }
-            }
-            if (tasks.isEmpty()) {
-                Text(stringResource(R.string.scheduled_tasks_empty), style = MaterialTheme.typography.bodyMedium)
-            } else if (shown.isEmpty()) {
-                Text(stringResource(R.string.scheduled_tasks_empty_no_match), style = MaterialTheme.typography.bodyMedium)
-            }
-            shown.forEach { task ->
-                key(task.id) {
-                    var confirmDelete by remember(task.id) { mutableStateOf(false) }
-                    // Paused tasks still show their scheduled time; a finished one-time task has nothing to pause.
-                    val next = (task.retryAt ?: task.nextRunAt)?.let { format.format(java.util.Date(it)) }
-                    val canPause = task.repeat.kind != com.samosaai.masala.core.scheduled.RepeatKind.NONE || task.nextRunAt != null
-                    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Text(task.name, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            if (!task.enabled) {
-                                next?.let { stringResource(R.string.scheduled_task_paused_next, it) }
-                                    ?: stringResource(R.string.scheduled_task_paused)
-                            } else {
-                                next?.let { stringResource(R.string.scheduled_task_next, it) }
-                                    ?: stringResource(R.string.scheduled_task_done)
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        task.memoryNote?.let { note ->
-                            Text(
-                                stringResource(R.string.scheduled_task_note, note),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        task.history.lastOrNull()?.let { last ->
-                            Text(
-                                stringResource(R.string.scheduled_task_last, last.status.name),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(onClick = {
-                                scope.launch {
-                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                        com.samosaai.masala.scheduled.ScheduledTaskRuns(application).runNow(task.id)
-                                    }
-                                    sync()
-                                }
-                            }) { Text(stringResource(R.string.scheduled_task_run_now)) }
-                            TextButton(
-                                enabled = canPause,
-                                onClick = {
-                                    mutate {
-                                        masala.scheduledTasks.update(task.id) {
-                                            com.samosaai.masala.core.scheduled.ScheduledTaskPlanner.toggled(
-                                                it, !it.enabled,
-                                                System.currentTimeMillis(), java.time.ZoneId.systemDefault(),
-                                            )
-                                        }
-                                    }
-                                },
-                            ) {
-                                Text(stringResource(if (task.enabled) R.string.scheduled_task_pause else R.string.scheduled_task_resume))
-                            }
-                            TextButton(onClick = { confirmDelete = true }) { Text(stringResource(R.string.scheduled_task_delete)) }
-                        }
-                    }
-                    HorizontalDivider()
-                    if (confirmDelete) {
-                        AlertDialog(
-                            onDismissRequest = { confirmDelete = false },
-                            title = { Text(stringResource(R.string.scheduled_task_delete_title)) },
-                            text = { Text(stringResource(R.string.scheduled_task_delete_message, task.name)) },
-                            confirmButton = {
-                                TextButton(onClick = {
-                                    confirmDelete = false
-                                    mutate {
-                                        masala.taskNoteLinks.taskDeleted(task)
-                                        masala.scheduledTasks.delete(task.id)
-                                    }
-                                }) { Text(stringResource(R.string.scheduled_task_delete)) }
-                            },
-                            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_back)) } },
-                        )
-                    }
-                }
             }
         }
     }
