@@ -84,7 +84,7 @@ class SecondBrainActivity : ComponentActivity() {
 
         suspend fun reload() {
             snapshot = app.secondBrain.snapshot()
-            health = app.secondBrain.health()
+            health = app.secondBrain.health(app.taskNoteLinks.healthLinks())
         }
         // The vault snapshot follows the repository: any mutation (a proposal card,
         // or a tool run) refreshes the sections and the health without a manual step.
@@ -205,7 +205,7 @@ class SecondBrainActivity : ComponentActivity() {
                         shown = withContext(Dispatchers.Default) { app.secondBrain.filter(current, search) }
                     }
                 }
-                ProposalCards(app)
+                RememberedCards(app)
                 Row2 {
                     Button(onClick = { editing = Editing("", "", "") }) { Text(stringResource(R.string.wiki_new)) }
                     OutlinedButton(enabled = pages.isNotEmpty(), onClick = { export.launch("masala-secondbrain.md") }) {
@@ -373,6 +373,10 @@ class SecondBrainActivity : ComponentActivity() {
                     HealthGroup(
                         stringResource(R.string.secondbrain_health_unscanned, health.unscanned.size),
                         health.unscanned,
+                    )
+                    HealthGroup(
+                        stringResource(R.string.secondbrain_health_stale_raw, health.staleRaw.size),
+                        health.staleRaw,
                     )
                 }
             }

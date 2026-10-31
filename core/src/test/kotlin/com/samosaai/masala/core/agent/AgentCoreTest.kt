@@ -52,6 +52,19 @@ class ToolScopeTest {
         assertFalse(scope.allows("open_app"))
         assertTrue(scope.allows("web_search"))
     }
+
+    @Test fun memorySearchIsAllowedEverywhereAndWritesOnlyWhenAsked() {
+        val withMemory = all + listOf(
+            ToolInfo("memory_search", ToolSensitivity.READ_ONLY, readsPrivateData = true),
+            ToolInfo("memory_write", ToolSensitivity.CHANGES_SOMETHING, readsPrivateData = true),
+        )
+        assertTrue(ToolScope.skill(skill(), withMemory).allows("memory_search"))
+        assertFalse(ToolScope.skill(skill(), withMemory).allows("memory_write"))
+        val writer = ToolScope.skill(skill("memory_write"), withMemory)
+        assertTrue(writer.allows("memory_write"))
+        assertFalse(ToolScope.unattended(writer, withMemory).allows("memory_write"))
+        assertTrue(ToolScope.unattended(writer, withMemory).allows("memory_search"))
+    }
 }
 
 class CommandFastPathTest {

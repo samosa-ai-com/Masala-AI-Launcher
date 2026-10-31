@@ -9,6 +9,7 @@ import com.samosaai.masala.core.scheduled.SkillSchedule
 import com.samosaai.masala.core.scheduled.SkillScheduleParser
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
 
 /** Skills whose default schedule the user said no to, so the widget doesn't ask again. */
@@ -62,6 +63,35 @@ class SkillScheduling(private val store: ScheduledTaskStore, private val decline
     }
 
     fun decline(skillId: String) = declined.add(skillId)
+
+    /** The skill's task, if it has one (on or off). */
+    fun taskFor(skillId: String): ScheduledTask? = store.all().firstOrNull { it.skillId == skillId }
+
+    /**
+     * Turns [skill]'s schedule on or off, keeping its time. Turning on a skill with no task yet creates
+     * one at its default schedule. Null when there's nothing to turn off. The caller re-arms the alarm.
+     */
+    fun setEnabled(skill: MasalaSkill, on: Boolean, now: LocalDateTime, nowMillis: Long, zone: ZoneId): ScheduledTask? {
+        val existing = taskFor(skill.id)
+        if (existing == null) {
+            if (!on) return null
+            val schedule = skill.schedule?.default?.let { SkillScheduleParser.parse(it, now) } ?: return null
+            return accept(Offer(skill, schedule), nowMillis, zone)
+        }
+        return ScheduledTaskPlanner.toggled(existing, on, nowMillis, zone).also(store::put)
+    }
+
+    /**
+     * Sets [skill] to run every day at [at] (the daily brief's settings page): edits its task and turns it
+     * on, or creates the task when the widget's offer was never accepted. The caller re-arms the alarm.
+     */
+    fun setDaily(skill: MasalaSkill, at: LocalTime, now: LocalDateTime, nowMillis: Long, zone: ZoneId): ScheduledTask {
+        val schedule = SkillScheduleParser.parse("daily %02d:%02d".format(at.hour, at.minute), now)!!
+        val existing = taskFor(skill.id) ?: return accept(Offer(skill, schedule), nowMillis, zone)
+        val task = ScheduledTaskPlanner.edited(existing, existing.copy(startLocal = schedule.startLocal, repeat = schedule.repeat, enabled = true), nowMillis, zone)
+        store.put(task)
+        return task
+    }
 
     companion object {
         fun now(zone: ZoneId = ZoneId.systemDefault()): LocalDateTime = LocalDateTime.ofInstant(Instant.now(), zone)

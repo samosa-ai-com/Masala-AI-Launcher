@@ -13,7 +13,12 @@ class FunctionTool(
     override val usesNetwork: Boolean = false,
     override val origin: ToolOrigin = ToolOrigin.CORE,
     override val opensScreen: Boolean = false,
+    /** Narrows [Tool.needsConfirmation] per call; null keeps the sensitivity rule. */
+    private val confirmWhen: ((JsonObject) -> Boolean)? = null,
     private val run: suspend (JsonObject) -> ActionResult,
 ) : Tool {
+    override fun needsConfirmation(args: JsonObject): Boolean =
+        confirmWhen?.invoke(args) ?: super.needsConfirmation(args)
+
     override suspend fun execute(args: JsonObject): ToolResult = run(args).toToolResult()
 }

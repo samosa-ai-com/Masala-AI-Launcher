@@ -70,7 +70,7 @@ import com.samosaai.masala.agent.SkillChip
 import com.samosaai.masala.ui.components.Markdown
 import com.samosaai.masala.ui.components.rememberCapabilityGrant
 import com.samosaai.masala.ui.skills.SkillSheetActivity
-import com.samosaai.masala.ui.secondbrain.ProposalCards
+import com.samosaai.masala.ui.secondbrain.RememberedCards
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -250,7 +250,7 @@ fun ReplyCard(
                         Steps(s.steps)
                         Markdown(s.text)
                         s.skill?.let { chip -> SkillChipButton(chip) { openSkill(context, app, chip, s.prompt) } }
-                        ProposalCards(app)
+                        RememberedCards(app)
                     }
                     is CommandState.Error -> {
                         Text(s.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)

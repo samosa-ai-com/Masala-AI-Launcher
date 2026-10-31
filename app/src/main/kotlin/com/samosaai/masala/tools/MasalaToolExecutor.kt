@@ -5,7 +5,6 @@ import android.util.Log
 import com.samosaai.masala.core.tool.Tool
 import com.samosaai.masala.core.tool.ToolRegistry
 import com.samosaai.masala.core.tool.ToolResult
-import com.samosaai.masala.core.tool.ToolSensitivity
 import kotlinx.coroutines.CancellationException
 import com.samosaai.masala.permissions.CapabilityPrompt
 import com.samosaai.masala.permissions.PermissionGate
@@ -26,7 +25,8 @@ fun interface ToolGate {
 
 /**
  * The single place tools run, from the private prototype's ToolExecutor: unknown tools are refused, a missing special
- * access is reported instead of running, the gate is asked for anything that changes something, and
+ * access is reported instead of running, the gate is asked for anything that changes something (unless the
+ * tool narrows that per call, see [Tool.needsConfirmation]), and
  * every call goes into the [ActionLog].
  */
 class MasalaToolExecutor(
@@ -62,7 +62,7 @@ class MasalaToolExecutor(
                 )
             }
         }
-        if (tool.sensitivity != ToolSensitivity.READ_ONLY) {
+        if (tool.needsConfirmation(args)) {
             gate.check(tool, args)?.let { return it }
         }
         // A tool can discover missing permissions only while running, and one call may need

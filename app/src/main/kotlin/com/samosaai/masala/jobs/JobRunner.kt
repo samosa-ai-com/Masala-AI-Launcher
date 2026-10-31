@@ -68,6 +68,9 @@ class JobRunner(context: Context, params: WorkerParameters) : CoroutineWorker(co
         }
         val (status, detail) = app.skillRunner.outcome(id)?.let { ScheduledOutcome.of(it.first, it.second) } ?: (TaskRunStatus.FAILED to "The run was lost.")
         record(status, detail)
+        if (skillId == com.samosaai.masala.brief.BriefInputs.SKILL_ID && status == TaskRunStatus.DONE && app.settings.current().briefNotify) {
+            app.database.skillRuns().get(id)?.let { com.samosaai.masala.skills.SkillRunner.lastAnswer(it.transcriptJson) }?.let { com.samosaai.masala.brief.BriefNotification.post(app, it) }
+        }
         return Result.success()
     }
 

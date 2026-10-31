@@ -10,7 +10,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.samosaai.masala.core.contract.MasalaAction
 import com.samosaai.masala.core.contract.MasalaJson
+import com.samosaai.masala.core.weather.Place
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /** Masala Glass (dark) is the default; Paper is the light scheme (plan UI refresh, decision 4). */
@@ -63,6 +65,10 @@ data class LauncherSettings(
     val welcomeDone: Boolean = false,
     /** Usage access was offered once (first run, or the first time the globe opens), granted or not. */
     val usageAsked: Boolean = false,
+    /** Where the daily brief's weather is for; null until the user picks a place or their location. */
+    val briefPlace: Place? = null,
+    /** Post a quiet notification when the daily brief is ready. */
+    val briefNotify: Boolean = false,
 ) {
     companion object {
         const val MIN_TEXT_SCALE = 0.5f
@@ -74,6 +80,9 @@ private val Context.dataStore by preferencesDataStore(name = "settings")
 
 class SettingsStore(private val context: Context) {
     val settings: Flow<LauncherSettings> = context.dataStore.data.map { it.toSettings() }
+
+    /** The settings as they are now, for code that runs once (a tool call, a background run). */
+    suspend fun current(): LauncherSettings = settings.first()
 
     suspend fun update(change: (LauncherSettings) -> LauncherSettings) {
         context.dataStore.edit { prefs -> prefs.write(change(prefs.toSettings())) }
@@ -99,6 +108,8 @@ private object Keys {
     val drawerLayout = stringPreferencesKey("drawer_layout")
     val welcomeDone = booleanPreferencesKey("welcome_done")
     val usageAsked = booleanPreferencesKey("usage_asked")
+    val briefPlace = stringPreferencesKey("brief_place")
+    val briefNotify = booleanPreferencesKey("brief_notify")
 }
 
 internal fun MutablePreferences.write(next: LauncherSettings) {
@@ -120,6 +131,8 @@ internal fun MutablePreferences.write(next: LauncherSettings) {
     this[Keys.drawerLayout] = next.drawerLayout.name
     this[Keys.welcomeDone] = next.welcomeDone
     this[Keys.usageAsked] = next.usageAsked
+    if (next.briefPlace != null) this[Keys.briefPlace] = MasalaJson.strict.encodeToString(Place.serializer(), next.briefPlace) else remove(Keys.briefPlace)
+    this[Keys.briefNotify] = next.briefNotify
 }
 
 internal fun Preferences.toSettings(): LauncherSettings {
@@ -143,6 +156,8 @@ internal fun Preferences.toSettings(): LauncherSettings {
         drawerLayout = enumOr(this[Keys.drawerLayout], defaults.drawerLayout),
         welcomeDone = this[Keys.welcomeDone] ?: defaults.welcomeDone,
         usageAsked = this[Keys.usageAsked] ?: defaults.usageAsked,
+        briefPlace = this[Keys.briefPlace]?.let { runCatching { MasalaJson.lenient.decodeFromString(Place.serializer(), it) }.getOrNull() },
+        briefNotify = this[Keys.briefNotify] ?: defaults.briefNotify,
     )
 }
 

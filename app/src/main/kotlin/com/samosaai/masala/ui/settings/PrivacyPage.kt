@@ -9,6 +9,7 @@ import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,7 +31,7 @@ import com.samosaai.masala.ui.theme.MasalaMono
 internal fun hostOf(url: String): String = url.substringAfter("://").substringBefore('/').ifBlank { url }
 
 /** Tools that reach the network, whose recent runs the log shows. */
-private val NETWORK_TOOLS = setOf("web_search", "web_fetch", "open_url", "transcribe_file")
+private val NETWORK_TOOLS = setOf("websearch", "webfetch", "weather", "open_url", "transcribe_file")
 
 /**
  * Settings → Privacy & data → What leaves the phone (plan UI refresh U5): for each feature, where its
@@ -58,6 +59,7 @@ fun PrivacyPage(onBack: () -> Unit) {
             SettingsRow(Icons.Rounded.Mic, stringResource(R.string.privacy_voice_in), summary = where(profile.voiceIn))
             SettingsRow(Icons.Rounded.VolumeUp, stringResource(R.string.privacy_voice_out), summary = where(profile.voiceOut))
             SettingsRow(Icons.Rounded.Language, stringResource(R.string.privacy_web), summary = stringResource(R.string.privacy_web_what))
+            SettingsRow(Icons.Rounded.WbSunny, stringResource(R.string.brief_title), summary = stringResource(R.string.privacy_brief_what))
             SettingsRow(
                 Icons.Rounded.Extension, stringResource(R.string.privacy_mcp),
                 summary = servers.filter { it.enabled }.joinToString { "${it.name} · ${hostOf(it.url)}" }.ifBlank { stringResource(R.string.privacy_none) },

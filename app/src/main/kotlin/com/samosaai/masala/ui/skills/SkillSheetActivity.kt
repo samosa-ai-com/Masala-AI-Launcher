@@ -61,7 +61,7 @@ import com.samosaai.masala.ui.home.ConfirmationSheet
 import com.samosaai.masala.ui.home.SymbolDisc
 import com.samosaai.masala.ui.home.SymbolIcons
 import com.samosaai.masala.ui.theme.MasalaTheme
-import com.samosaai.masala.ui.secondbrain.ProposalCards
+import com.samosaai.masala.ui.secondbrain.RememberedCards
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -245,7 +245,7 @@ class SkillSheetActivity : ComponentActivity() {
                 }
             }
 
-            ProposalCards(app, Modifier.padding(horizontal = 16.dp))
+            RememberedCards(app, Modifier.padding(horizontal = 16.dp))
 
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val inputs = skill.widget?.inputs.orEmpty().filter { it != SkillInput.TEXT }

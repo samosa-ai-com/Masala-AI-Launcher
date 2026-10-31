@@ -14,12 +14,11 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withContext
-import java.util.UUID
 
 /**
  * The Second Brain repository (plan `docs/plans/second-brain-port.md`, P2): file-backed
  * memory over [SecondBrainStore], replacing the wiki table. Pages are detail records
- * (areas/people/notes); the model proposes, the user approves, approval writes a file.
+ * (areas/people/notes). The agent writes through the gated store API; every change can be undone.
  *
  * Flows re-read on every mutation ([refresh]); the agent prompt reads the cached
  * snapshot so prompt building never touches disk.
@@ -30,11 +29,23 @@ class SecondBrainRepository(
     private val legacy: WikiDao? = null,
     private val audit: (action: String, detail: String) -> Unit = { _, _ -> },
 ) {
-    /** A page the model wants to add. Nothing is written until the user approves it. */
-    data class Proposal(val id: String, val title: String, val markdown: String, val reason: String)
+    /** A change the agent just made (D1: applied at once), shown with Undo until dismissed. */
+    data class Remembered(val id: String, val action: String, val undoId: String)
 
-    private val _proposals = MutableStateFlow<List<Proposal>>(emptyList())
-    val proposals: StateFlow<List<Proposal>> = _proposals.asStateFlow()
+    /** Recent agent changes, oldest first. */
+    private val changes = MutableStateFlow<List<Remembered>>(emptyList())
+    private val _remembered = MutableStateFlow<List<Remembered>>(emptyList())
+
+    /**
+     * One card per file, newest first: its latest change. Undo steps that file back one change, and
+     * the change before it becomes the card, so an old card can never wipe out newer edits.
+     */
+    val remembered: StateFlow<List<Remembered>> = _remembered.asStateFlow()
+
+    private fun setChanges(list: List<Remembered>) {
+        changes.value = list.takeLast(MAX_CHANGES)
+        _remembered.value = changes.value.asReversed().distinctBy { it.id }.take(MAX_REMEMBERED)
+    }
 
     private val tick = MutableStateFlow(0)
 
@@ -94,6 +105,19 @@ class SecondBrainRepository(
             .sortedByDescending { it.second }.take(limit).map { it.first }
     }
 
+    /** One vault file by path, capped; [MemoryProtocol.PATH] returns the protocol. */
+    suspend fun readPath(path: String): SecondBrainStore.CappedText? {
+        if (path.trim().equals(MemoryProtocol.PATH, ignoreCase = true)) return SecondBrainStore.CappedText(MemoryProtocol.TEXT, false)
+        return withContext(Dispatchers.IO) { store.readText(path) }
+    }
+
+    /** Whether [path] names a dated note (history rule: changing one asks first). */
+    fun isDatedNote(path: String): Boolean = store.recordDirKind(path.trim().trimStart('/')) != null && store.isDatedNote(path)
+
+    /** Matching lines across the vault, `path:line: text`. */
+    suspend fun search(query: String, limit: Int = 20): List<String> =
+        withContext(Dispatchers.IO) { store.search(query, limit) }
+
     suspend fun get(id: String): BrainFile? = withContext(Dispatchers.IO) {
         refreshSnapshot().details().firstOrNull { idOf(it) == id }
     }
@@ -111,40 +135,89 @@ class SecondBrainRepository(
         refreshSnapshot().details().firstOrNull { it.absolutePath == file.absolutePath }
     }
 
-    suspend fun delete(id: String): Boolean = withContext(Dispatchers.IO) {
-        val ok = store.deleteEntry(id)
-        if (ok) refresh()
-        ok
-    }
-
-    /** Queues an entry for approval. Returns null when it is empty or fails the schema. */
-    fun propose(title: String, markdown: String, reason: String): Proposal? {
-        val cleanTitle = title.trim()
-        val body = markdown.trim()
-        if (cleanTitle.isEmpty() || body.isBlank()) return null
-        val check = store.validateRecord("$cleanTitle.md", recordText(cleanTitle, body))
-        if (!check.valid) return null
-        val proposal = Proposal(UUID.randomUUID().toString(), cleanTitle, body, reason.trim())
-        _proposals.value = (_proposals.value.filterNot {
-            it.title.equals(cleanTitle, ignoreCase = true)
-        } + proposal).takeLast(MAX_PENDING)
-        return proposal
-    }
-
-    /** Writes an approved proposal (same-title update) and records it in the action log. */
-    suspend fun approve(id: String): BrainFile? {
-        val proposal = _proposals.value.firstOrNull { it.id == id } ?: return null
-        val file = withContext(Dispatchers.IO) { store.upsertByTitle(proposal.title, proposal.markdown) }
-        _proposals.value = _proposals.value.filterNot { it.id == id }
-        audit("memory_approve", proposal.title)
-        refresh()
-        return withContext(Dispatchers.IO) {
-            refreshSnapshot().details().firstOrNull { it.absolutePath == file.absolutePath }
+    suspend fun delete(id: String): Boolean {
+        val ok = withContext(Dispatchers.IO) { store.deleteEntry(id) }
+        if (ok) {
+            refresh()
+            onNoteDeleted(id)
         }
+        return ok
     }
 
-    fun dismiss(id: String) {
-        _proposals.value = _proposals.value.filterNot { it.id == id }
+    /** Gated write at a vault path ([SecondBrainStore.writeRecord]); a success is logged and refreshes the flows. */
+    suspend fun write(path: String, content: String, append: Boolean = false, allowDuplicate: Boolean = false) =
+        changed("memory_write") { store.writeRecord(path, content, append, allowDuplicate) }
+
+    /** Gated exact-text edit ([SecondBrainStore.editRecord]). */
+    suspend fun edit(path: String, oldText: String, newText: String, replaceAll: Boolean = false) =
+        changed("memory_edit") { store.editRecord(path, oldText, newText, replaceAll) }
+
+    /** Copies a raw drop into raw/ ([SecondBrainStore.fileRaw]); undo removes the copy. */
+    suspend fun fileRaw(name: String, size: Long? = null, open: () -> java.io.InputStream) =
+        changed("memory_file_raw") { store.fileRaw(name, size = size, open = open) }
+
+    /** Temp and cache paths: a raw drop from there is always copied, never linked. */
+    fun isEphemeralPath(path: String): Boolean = store.isEphemeralPath(path)
+
+    /** Deletes a record or raw file ([SecondBrainStore.deleteRecord]). */
+    suspend fun remove(path: String) = changed("memory_delete") { store.deleteRecord(path) }
+        .also { if (it.ok) onNoteDeleted(it.id) }
+
+    /** Called with the vault id of every deleted file, so a task pointing at it can let go (S5). */
+    @Volatile
+    var onNoteDeleted: suspend (String) -> Unit = {}
+
+    /** Writes `task_ref` into a note (shown as a change with Undo). */
+    suspend fun linkTask(path: String, taskId: String) = changed("memory_link_task") { store.setTaskRef(path, taskId) }
+
+    /** Clears a note's `task_ref` because its task went away; not shown as a card. */
+    suspend fun clearTaskRef(path: String): Boolean {
+        val outcome = withContext(Dispatchers.IO) { store.setTaskRef(path, null) }
+        if (outcome.ok) {
+            audit("memory_unlink_task", outcome.id)
+            refresh()
+        }
+        return outcome.ok
+    }
+
+    /** A note's `task_ref`, or null. */
+    suspend fun taskRefOf(path: String): String? = withContext(Dispatchers.IO) {
+        store.readText(path, SecondBrainStore.FRONTMATTER_SCAN_CHARS)?.text?.let { store.frontmatterOf(it) }?.get("task_ref")?.takeIf { it.isNotBlank() }
+    }
+
+    /** Puts back the file a change replaced, created or deleted. */
+    suspend fun undo(undoId: String): Boolean {
+        val target = withContext(Dispatchers.IO) { store.undoTarget(undoId) }
+        val ok = withContext(Dispatchers.IO) { store.undo(undoId) }
+        if (ok) {
+            audit("memory_undo", target.orEmpty())
+            refresh()
+        }
+        // Cleared either way: a change whose journal entry is gone (trimmed past 50, or undone twice) can
+        // never be undone, so its card would only fail again.
+        setChanges(changes.value.filterNot { it.undoId == undoId })
+        return ok
+    }
+
+    private suspend fun changed(
+        action: String,
+        block: () -> SecondBrainStore.WriteOutcome,
+    ): SecondBrainStore.WriteOutcome {
+        val outcome = withContext(Dispatchers.IO) { block() }
+        if (outcome.ok) {
+            audit(action, outcome.id)
+            outcome.undoId?.let { undoId ->
+                setChanges(changes.value + Remembered(outcome.id, action, undoId))
+            }
+            refresh()
+        }
+        return outcome
+    }
+
+    /** Hides a change's card; the change itself stays. */
+    fun dismissRemembered(undoId: String) {
+        val id = changes.value.firstOrNull { it.undoId == undoId }?.id ?: return
+        setChanges(changes.value.filterNot { it.id == id })
     }
 
     /** Every detail record as one Markdown document, for export (bodies only, no frontmatter). */
@@ -191,7 +264,7 @@ class SecondBrainRepository(
     fun filter(snapshot: SecondBrainSnapshot, query: String): SecondBrainSnapshot =
         store.filterSnapshot(snapshot, query)
 
-    /** Vault health (unlinked, dangling, schema, unscanned; task links once tasks carry note refs). Never moves the tick. */
+    /** Vault health: links, schema, unscanned files, stale raw drops, and task links both ways. Never moves the tick. */
     suspend fun health(taskLinks: List<TaskLink> = emptyList()): BrainHealth = withContext(Dispatchers.IO) {
         val snapshot = store.loadSnapshot().also { cached = it }
         store.checkHealth(snapshot, taskLinks)
@@ -256,17 +329,6 @@ class SecondBrainRepository(
 
     private fun SecondBrainSnapshot.titles(): List<String> = details().map { titleOf(it) }
 
-    private fun recordText(title: String, body: String): String = buildString {
-        appendLine("---")
-        appendLine("title: $title")
-        appendLine("area: Personal")
-        appendLine("type: note")
-        appendLine("updated: 2000-01-01")
-        appendLine("---")
-        appendLine()
-        append(body)
-    }
-
     private suspend fun migrateLegacy() {
         val dao = legacy ?: return
         try {
@@ -285,7 +347,9 @@ class SecondBrainRepository(
     }
 
     companion object {
-        const val MAX_PENDING = 5
+        const val MAX_REMEMBERED = 5
+        /** Changes kept for step-by-step undo from the cards. */
+        const val MAX_CHANGES = 20
         private val USER_CARD_NAMES = setOf("user.md", "user", "profile", "user card", "user profile")
     }
 }

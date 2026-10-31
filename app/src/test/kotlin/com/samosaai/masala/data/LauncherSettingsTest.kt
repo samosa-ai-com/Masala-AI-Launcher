@@ -28,6 +28,8 @@ class LauncherSettingsTest {
             drawerLayout = DrawerLayout.GLOBE,
             welcomeDone = true,
             usageAsked = true,
+            briefPlace = com.samosaai.masala.core.weather.Place("Bengaluru", 12.97, 77.59, "India"),
+            briefNotify = true,
         )
         val prefs = mutablePreferencesOf()
         prefs.write(changed)
@@ -61,5 +63,13 @@ class LauncherSettingsTest {
         val prefs = mutablePreferencesOf()
         prefs.write(LauncherSettings(textScale = 9f))
         assertEquals(LauncherSettings.MAX_TEXT_SCALE, prefs.toSettings().textScale)
+    }
+
+    @Test
+    fun `clearing the brief's place removes it`() {
+        val prefs = mutablePreferencesOf()
+        prefs.write(LauncherSettings(briefPlace = com.samosaai.masala.core.weather.Place("Pune", 18.5, 73.8)))
+        prefs.write(LauncherSettings(briefPlace = null))
+        assertEquals(null, prefs.toSettings().briefPlace)
     }
 }

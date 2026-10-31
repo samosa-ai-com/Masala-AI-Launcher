@@ -36,15 +36,27 @@ import com.halilibo.richtext.markdown.Markdown as RichMarkdown
 import com.halilibo.richtext.ui.material3.Material3RichText
 import com.samosaai.masala.R
 
-/** Chat Markdown: rendered by compose-richtext, with code blocks drawn here (scroll sideways, copy button). */
+/**
+ * Chat Markdown: rendered by compose-richtext, with code blocks drawn here (scroll sideways, copy button).
+ * [linkColor] replaces the library's default link blue, which is hard to read on glass.
+ */
 @Composable
-fun Markdown(markdown: String, modifier: Modifier = Modifier) {
+fun Markdown(markdown: String, modifier: Modifier = Modifier, linkColor: androidx.compose.ui.graphics.Color? = null) {
     val segments = remember(markdown) { MarkdownParser.segments(markdown) }
     val context = LocalContext.current
+    val style = remember(linkColor) {
+        linkColor?.let {
+            com.halilibo.richtext.ui.RichTextStyle(
+                stringStyle = com.halilibo.richtext.ui.string.RichTextStringStyle(
+                    linkStyle = SpanStyle(color = it, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline),
+                ),
+            )
+        }
+    }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         segments.forEach { segment ->
             when (segment) {
-                is MarkdownSegment.Prose -> Material3RichText { RichMarkdown(segment.markdown, onLinkClicked = { openLink(context, it) }) }
+                is MarkdownSegment.Prose -> Material3RichText(style = style) { RichMarkdown(segment.markdown, onLinkClicked = { openLink(context, it) }) }
                 is MarkdownSegment.Code -> CodeBox(segment.code, segment.language)
             }
         }

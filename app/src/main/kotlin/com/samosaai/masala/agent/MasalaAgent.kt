@@ -1,5 +1,6 @@
 package com.samosaai.masala.agent
 
+import com.samosaai.masala.core.agent.FetchAllowance
 import com.samosaai.masala.core.agent.ToolScope
 import com.samosaai.masala.core.tool.ToolDefinition
 import com.samosaai.masala.core.tool.ToolResult
@@ -23,6 +24,9 @@ fun interface AgentToolRunner {
  * result goes back, until the model answers, [maxSteps] model turns pass, or a tool needs a
  * capability. One instance is one conversation; [history] carries follow-ups.
  *
+ * With [fetchOnlyResults] (runs nobody watches), `webfetch` opens only addresses an earlier tool result
+ * in this conversation named ([FetchAllowance]).
+ *
  * Not safe to run twice at once.
  */
 class MasalaAgent(
@@ -33,6 +37,7 @@ class MasalaAgent(
     private val systemPrompt: () -> String,
     private val maxSteps: Int = DEFAULT_MAX_STEPS,
     private val maxHistoryChars: Int = DEFAULT_MAX_HISTORY_CHARS,
+    private val fetchOnlyResults: Boolean = false,
 ) {
     private var messages: List<ChatMessage> = emptyList()
 
@@ -74,8 +79,13 @@ class MasalaAgent(
                 for (call in calls) {
                     val name = call.function.name
                     val args = runCatching { Json.parseToJsonElement(call.function.arguments) as JsonObject }.getOrDefault(JsonObject(emptyMap()))
-                    if (!scope.allows(name)) {
-                        val refusal = ToolResult.Failure("Tool '$name' is not available here. Only the listed tools can be used.")
+                    val refused = when {
+                        !scope.allows(name) -> "Tool '$name' is not available here. Only the listed tools can be used."
+                        fetchOnlyResults && name == FetchAllowance.TOOL && !fetchAllowed(args) -> FetchAllowance.REFUSAL
+                        else -> null
+                    }
+                    if (refused != null) {
+                        val refusal = ToolResult.Failure(refused)
                         messages = messages + toolMessage(call.id, refusal)
                         emit(AgentEvent.ToolDone(name, refusal))
                         continue
@@ -96,6 +106,17 @@ class MasalaAgent(
             messages = AgentHistory.repairOrphanedToolCalls(messages)
             throw e
         }
+    }
+
+    /**
+     * Whether `webfetch` may open the URL in [args]: it must be in a search result of this conversation.
+     * The whole [transcript], since [messages] drops exchanges older than [KEPT_EXCHANGES].
+     */
+    private fun fetchAllowed(args: JsonObject): Boolean {
+        val url = (args["url"] as? JsonPrimitive)?.content ?: return false
+        val all = transcript
+        val searchCalls = all.flatMap { it.toolCalls.orEmpty() }.filter { it.function.name in FetchAllowance.SOURCES }.mapTo(HashSet()) { it.id }
+        return FetchAllowance.allows(url, all.filter { it.role == "tool" && it.toolCallId in searchCalls }.map { it.textContent })
     }
 
     private fun toolMessage(callId: String, result: ToolResult) =

@@ -25,11 +25,13 @@ import com.samosaai.masala.agent.AgentPrompt
 import com.samosaai.masala.agent.AgentTools
 import com.samosaai.masala.agent.LlmAgentModel
 import com.samosaai.masala.agent.MasalaAgent
+import com.samosaai.masala.agent.MemoryRawTool
 import com.samosaai.masala.agent.MemoryTools
 import com.samosaai.masala.connectors.mcp.McpServerStore
 import com.samosaai.masala.connectors.mcp.PrefsMcpStorage
 import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.secondbrain.SecondBrainRepository
+import com.samosaai.masala.secondbrain.TaskNoteLinks
 import com.samosaai.masala.secondbrain.SecondBrainStore
 import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.core.tool.ActionResult
@@ -37,6 +39,7 @@ import com.samosaai.masala.llm.LlmConfig
 import com.samosaai.masala.skills.AiReports
 import com.samosaai.masala.skills.PrefsDeclinedSchedules
 import com.samosaai.masala.skills.SkillRunner
+import com.samosaai.masala.brief.BriefInputs
 import com.samosaai.masala.skills.SkillScheduling
 import com.samosaai.masala.skills.TranscriptFiles
 import com.samosaai.masala.scheduled.ScheduledSkillRunner
@@ -82,6 +85,9 @@ class MasalaApp : Application() {
     val database by lazy { MasalaDatabase.create(this) }
     val miniApps by lazy { MiniAppStore(database.miniApps()) }
     val settings by lazy { SettingsStore(this) }
+
+    /** Open-Meteo for the daily brief and the `weather` tool. */
+    val weather by lazy { com.samosaai.masala.weather.WeatherClient() }
     val actionLog by lazy { ActionLog(this) }
 
     /** Bundled personas and skills, then the ones the user imported. */
@@ -114,6 +120,7 @@ class MasalaApp : Application() {
         scope: (List<ToolInfo>) -> ToolScope = { ToolScope.command(it) },
         instructions: String? = null,
         maxSteps: Int = MasalaAgent.DEFAULT_MAX_STEPS,
+        fetchOnlyResults: Boolean = false,
     ): MasalaAgent {
         val executor = toolExecutor(gate)
         val infos = tools.tools.map { ToolInfo(it.name, it.sensitivity, it.readsPrivateData, it.opensScreen) }
@@ -127,12 +134,21 @@ class MasalaApp : Application() {
                 AgentPrompt.build("$now (${java.util.TimeZone.getDefault().id})", skills.getAllSkills(), secondBrain.promptNow(), instructions)
             },
             maxSteps = maxSteps,
+            fetchOnlyResults = fetchOnlyResults,
         )
     }
 
     /** Runs skills; app-scoped, so a run goes on after its sheet closes. */
     val skillRunner by lazy {
-        SkillRunner(scope, database.skillRuns(), database.skillArtifacts(), TranscriptFiles(java.io.File(filesDir, "skill_runs")), { if (it == COMMAND_SKILL_ID) COMMAND_SKILL else skills.getSkillById(it) }, ::skillAgent)
+        SkillRunner(
+            scope, database.skillRuns(), database.skillArtifacts(), TranscriptFiles(java.io.File(filesDir, "skill_runs")),
+            { if (it == COMMAND_SKILL_ID) COMMAND_SKILL else skills.getSkillById(it) }, ::skillAgent,
+            runData = { skill -> if (skill.id == BriefInputs.SKILL_ID) BriefInputs(this).collect().toPrompt() else null },
+            fallback = { skill, error ->
+                if (skill.id != BriefInputs.SKILL_ID) null
+                else com.samosaai.masala.core.brief.BriefFallback.render(BriefInputs(this).collect(), com.samosaai.masala.core.brief.BriefFallback.reasonFor(error))
+            },
+        )
     }
 
     val aiReports by lazy { AiReports(this) }
@@ -144,16 +160,22 @@ class MasalaApp : Application() {
     val skillScheduling by lazy { SkillScheduling(scheduledTasks, PrefsDeclinedSchedules(this)) }
 
     /** The Second Brain; approved writes are recorded in the action log. */
-    val secondBrain by lazy {
+    val secondBrain: SecondBrainRepository by lazy {
         SecondBrainRepository(
             scope,
             SecondBrainStore(java.io.File(filesDir, "secondbrain")),
             database.wikiPages(),
             audit = { action, detail ->
-                actionLog.record(action, detail, ToolResult.Success("The user approved the entry"))
+                actionLog.record(action, detail, ToolResult.Success("Second Brain changed"))
             },
-        ).also { repo -> scope.launch(Dispatchers.IO) { repo.ensure() } }
+        ).also { repo ->
+            repo.onNoteDeleted = { taskNoteLinks.noteDeleted(it) }
+            scope.launch(Dispatchers.IO) { repo.ensure() }
+        }
     }
+
+    /** Scheduled tasks and Second Brain notes, linked both ways (plan `second-brain-robust.md`, S5). */
+    val taskNoteLinks: TaskNoteLinks by lazy { TaskNoteLinks(scheduledTasks, secondBrain) }
 
     /** Models, keys and voice choices (Settings → Masala AI); every model call reads it. */
     val aiSettings by lazy { AiSettingsStore(this, KeyCipher.androidKeystore()) }
@@ -190,14 +212,18 @@ class MasalaApp : Application() {
         MiniAppConsole.clear(id)
     }
 
+    /** The language Masala speaks and writes spoken text in: Settings → Voice, else the phone's. */
+    fun voiceLanguage(): Language =
+        aiSettings.profile.value.voiceLanguage.takeIf { it.isNotBlank() }?.let { code -> Language.entries.firstOrNull { it.matchesCode(code) } }
+            ?: Language.entries.firstOrNull { it.matchesCode(java.util.Locale.getDefault().language) } ?: Language.ENGLISH
+
     /**
      * Reads [text] aloud with the voice chosen in Settings → Voice (the phone's, or an API voice). Null when it
      * played to the end (or the user stopped it), else the user-facing reason.
      */
     suspend fun speakReply(text: String): String? {
         val profile = aiSettings.profile.value
-        val language = profile.voiceLanguage.takeIf { it.isNotBlank() }?.let { code -> Language.entries.firstOrNull { it.matchesCode(code) } }
-            ?: Language.entries.firstOrNull { it.matchesCode(java.util.Locale.getDefault().language) } ?: Language.ENGLISH
+        val language = voiceLanguage()
         val out = profile.voiceOut
         val spoke = if (out != null) {
             // A blank model or voice would make speakApi return false (or 400 on OpenAI): the
@@ -224,6 +250,34 @@ class MasalaApp : Application() {
     }
 
     fun stopSpeaking() = tts.stop()
+
+    /** The widget's Run now: starts [skillId]'s scheduled task; null when it started, else why not. */
+    suspend fun runSkillTaskNow(skillId: String): String? {
+        val task = kotlinx.coroutines.withContext(Dispatchers.IO) { scheduledTasks.all().firstOrNull { it.skillId == skillId } }
+            ?: return getString(R.string.skill_widget_no_task)
+        return when (val start = com.samosaai.masala.scheduled.ScheduledTaskRuns(this).runNow(task.id)) {
+            is com.samosaai.masala.scheduled.ScheduledStart.Started -> null
+            com.samosaai.masala.scheduled.ScheduledStart.Busy -> getString(R.string.skill_widget_busy)
+            is com.samosaai.masala.scheduled.ScheduledStart.Failed -> start.detail
+        }
+    }
+
+    /**
+     * Whether [run] is read aloud now without a tap (plan `phase5-daily-brief.md` D5): once per run, and
+     * only when read-aloud is on and the phone isn't silenced or in Do Not Disturb.
+     */
+    suspend fun claimAutoRead(run: com.samosaai.masala.data.SkillRunEntity): Boolean {
+        val prefs = getSharedPreferences("auto_read", MODE_PRIVATE)
+        val ringerMode = getSystemService(android.media.AudioManager::class.java)?.ringerMode
+        val interruptionFilter = getSystemService(android.app.NotificationManager::class.java)?.currentInterruptionFilter
+        val quiet = com.samosaai.masala.brief.BriefWidget.isQuiet(ringerMode, interruptionFilter)
+        val due = com.samosaai.masala.brief.BriefWidget.autoReadDue(
+            run.id, run.status, run.finishedAt, System.currentTimeMillis(), java.time.ZoneId.systemDefault(),
+            settings.current().readRepliesAloud, quiet, prefs.getLong(run.skillId, -1),
+        )
+        if (due) prefs.edit().putLong(run.skillId, run.id).apply()
+        return due
+    }
 
     /** True while a reply is being read aloud (Sam's speaking state). */
     val speaking get() = tts.isSpeaking
@@ -276,6 +330,8 @@ class MasalaApp : Application() {
         scope = { infos -> ToolScope.skill(skill, infos).let { if (unattended) ToolScope.unattended(it, infos) else it } },
         instructions = listOfNotNull(skill.persona?.systemPrompt, skill.instructions).joinToString("\n\n"),
         maxSteps = MasalaAgent.SKILL_MAX_STEPS,
+        // It holds private data and nobody sees what it opens, so it opens only what its searches returned.
+        fetchOnlyResults = unattended,
     )
 
     /** The `run_skill` tool: opens the skill sheet on a prompt. */
@@ -335,6 +391,8 @@ class MasalaApp : Application() {
         )
         AgentTools.create(this, layouts, modes, runSkill = ::openSkillSheet).forEach(tools::register)
         MemoryTools.create(secondBrain).forEach(tools::register)
+        tools.register(MemoryRawTool.create(this, secondBrain) { tools.fileAccess })
+        tools.register(MemoryTools.linkTask(taskNoteLinks))
         mcp.servers
         dispatcher = ActionDispatcher(this, actions, launcher, modes, confirmationGate, tools, { skills }) { toolExecutor(confirmationGate) }
 

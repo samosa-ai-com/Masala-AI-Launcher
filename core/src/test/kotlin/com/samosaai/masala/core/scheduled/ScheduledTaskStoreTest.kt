@@ -46,6 +46,14 @@ class ScheduledTaskStoreTest {
     }
 
     @Test
+    fun `tasks stored before the note link load without one and keep a new one`() {
+        memory.text = """[{"id":"1","name":"Old","prompt":"p","startLocal":"2026-10-19T08:00"}]"""
+        assertNull(store.get("1")!!.memoryNote)
+        store.update("1") { it.copy(memoryNote = "notes/dentist.md") }
+        assertEquals("notes/dentist.md", ScheduledTaskStore(memory).get("1")!!.memoryNote)
+    }
+
+    @Test
     fun `unreadable storage reads as no tasks`() {
         memory.text = "{not json"
         assertEquals(emptyList(), store.all())
