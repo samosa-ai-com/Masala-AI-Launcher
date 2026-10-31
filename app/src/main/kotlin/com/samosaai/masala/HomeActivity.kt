@@ -69,7 +69,11 @@ import com.samosaai.masala.ui.home.HomeScreen
 import com.samosaai.masala.ui.home.RenderContext
 import com.samosaai.masala.ui.home.DropTarget
 import com.samosaai.masala.ui.home.HomeDragState
+import com.samosaai.masala.ui.home.FolderRenameDialog
 import com.samosaai.masala.core.contract.ItemSection
+import com.samosaai.masala.core.contract.Item
+import com.samosaai.masala.core.layout.LayoutChecker
+import java.util.UUID
 import com.samosaai.masala.core.layout.LayoutEdits
 import com.samosaai.masala.scheduled.ScheduledTaskScheduler
 import com.samosaai.masala.skills.SkillScheduling
@@ -183,6 +187,7 @@ class HomeActivity : ComponentActivity() {
         val scope = rememberCoroutineScope()
         var menuFor by remember { mutableStateOf<AppEntry?>(null) }
         var renaming by remember { mutableStateOf<AppEntry?>(null) }
+        var renamingFolder by remember { mutableStateOf<String?>(null) }
 
         val roleRequest = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             // Turned down: the dialog may not come back, so offer the system screen instead.
@@ -379,7 +384,25 @@ class HomeActivity : ComponentActivity() {
                             is DropTarget.Page -> app.layouts.edit(getString(R.string.layout_label_moved, item.label)) {
                                 LayoutEdits.moveToPage(it, item.id, target.pageId)
                             }
-                            is DropTarget.Onto -> emptyList() // Folders come later.
+                            is DropTarget.Onto -> {
+                                val folder = baseItem(target.itemId)?.action as? MasalaAction.OpenFolder
+                                when {
+                                    folder == null -> {
+                                        val folderId = "folder-" + UUID.randomUUID().toString().take(8)
+                                        var made = false
+                                        app.layouts.edit(getString(R.string.layout_label_new_folder)) {
+                                            LayoutEdits.makeFolder(it, item.id, target.itemId, folderId, getString(R.string.folder_default_name))
+                                                .also { next -> made = next != null }
+                                        }.also { if (made && it.isEmpty()) renamingFolder = folderId }
+                                    }
+                                    folder.items.size >= LayoutChecker.MAX_FOLDER_ITEMS -> emptyList<LayoutChecker.Problem>().also {
+                                        toast(getString(R.string.folder_full))
+                                    }
+                                    else -> app.layouts.edit(getString(R.string.layout_label_added_to_folder, item.label)) {
+                                        LayoutEdits.addToFolder(it, item.id, target.itemId)
+                                    }
+                                }
+                            }
                         }
                         problems.firstOrNull()?.let { toast(it.message) }
                     }
@@ -661,6 +684,20 @@ class HomeActivity : ComponentActivity() {
             )
         }
 
+        renamingFolder?.let { folderId ->
+            FolderRenameDialog(
+                label = baseItem(folderId)?.label ?: getString(R.string.folder_default_name),
+                onRename = { label ->
+                    renamingFolder = null
+                    scope.launch {
+                        app.layouts.edit(getString(R.string.layout_label_renamed_folder)) { LayoutEdits.renameFolder(it, folderId, label) }
+                            .firstOrNull()?.let { toast(it.message) }
+                    }
+                },
+                onDismiss = { renamingFolder = null },
+            )
+        }
+
         renaming?.let { entry ->
             RenameDialog(
                 entry = entry,
@@ -692,6 +729,10 @@ class HomeActivity : ComponentActivity() {
     }
 
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+
+    /** A top-level item of the saved (base) layout, not one a mode added. */
+    private fun baseItem(id: String): Item? = masala.layouts.base.value?.pages.orEmpty()
+        .flatMap { it.sections }.filterIsInstance<ItemSection>().flatMap { it.items }.firstOrNull { it.id == id }
 }
 
 /** Gives [content] a recomposition scope of its own: state read inside recomposes only [content]. */

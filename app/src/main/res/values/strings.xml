@@ -99,6 +99,14 @@
 
     <!-- Layout renderer and confirmation -->
     <string name="layout_label_moved">Moved %1$s</string>
+    <string name="layout_label_new_folder">New folder</string>
+    <string name="layout_label_added_to_folder">Added %1$s to a folder</string>
+    <string name="layout_label_renamed_folder">Renamed folder</string>
+    <string name="layout_label_ungrouped_folder">Ungrouped folder</string>
+    <string name="layout_label_moved_out_of_folder">Moved %1$s out of a folder</string>
+    <string name="folder_default_name">Folder</string>
+    <string name="folder_full">This folder is full</string>
+    <string name="folder_rename_title">Rename folder</string>
     <string name="home_widget_placeholder">Widgets arrive in a later build</string>
     <string name="home_stack_placeholder">A stack of %1$d widgets arrives in a later build</string>
     <string name="home_skill_widget_placeholder">Skill widgets arrive in a later build</string>

@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import com.samosaai.masala.core.contract.Item
+import com.samosaai.masala.core.contract.MasalaAction
 import kotlin.math.abs
 
 /** Where a drop lands. */
@@ -64,8 +65,8 @@ object DropTargets {
  */
 @Stable
 class HomeDragState(
-    /** Whether a drop onto an item is its own target (folders); off until folders exist. */
-    private val onto: Boolean = false,
+    /** Whether a drop onto an item is its own target (folders). A dragged folder never drops onto one. */
+    private val onto: Boolean = true,
 ) {
     var dragging: Item? by mutableStateOf(null)
         private set
@@ -98,7 +99,7 @@ class HomeDragState(
         val item = dragging ?: return
         pointer = at
         val items = itemBoxes.entries.groupBy({ it.value.first }, { it.key to it.value.second })
-        hover = DropTargets.resolve(at.x, at.y, sectionBoxes.toMap(), items, item.id, onto)
+        hover = DropTargets.resolve(at.x, at.y, sectionBoxes.toMap(), items, item.id, onto && item.action !is MasalaAction.OpenFolder)
             ?: page?.takeIf { it != startPage }?.let { DropTarget.Page(it) }
     }
 
