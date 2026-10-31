@@ -59,6 +59,8 @@ import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.ui.theme.LocalMotion
 import com.samosaai.masala.ui.theme.MasalaTheme
+import kotlin.math.PI
+import kotlin.math.sin
 
 /** One app on the globe: its entry, how often it was opened, and its circle in design units. */
 data class GlobeApp(val entry: AppEntry, val count: Int, val circle: GlobeLayout.Circle)
@@ -126,7 +128,19 @@ fun Globe(
                     Modifier
                         .offset { androidx.compose.ui.unit.IntOffset((unit * (x - r)).roundToPx(), (unit * (y - r)).roundToPx()) }
                         .size(unit * d)
-                        .graphicsLayer { alpha = dim }
+                        // Read phase.value inside the layer lambda only, so the circles breathe with the
+                        // globe in the draw phase and never recompose per frame.
+                        .graphicsLayer {
+                            if (phase != null) {
+                                val w = sin((phase.value + index * 0.37f) * PI.toFloat())
+                                scaleX = 1f + 0.05f * w
+                                scaleY = scaleX
+                                translationY = 2.dp.toPx() * w
+                                alpha = dim * (0.92f + 0.08f * w)
+                            } else {
+                                alpha = dim
+                            }
+                        }
                         .clip(CircleShape)
                         .background(Color(0xE0242527))
                         .border(if (top) 1.5.dp else 1.dp, if (top) tokens.accent.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.10f), CircleShape)
