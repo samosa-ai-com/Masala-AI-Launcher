@@ -30,6 +30,17 @@ data class AiProfile(
     /** An API voice name, or an Android voice name for the phone's voice; blank = the default. */
     val voice: String = "",
     val speechRate: Float = 1f,
+    /**
+     * How many model rounds one request may take before it gives up. Each round is a model
+     * reply, usually with a tool call and its result; a multi-step job needs many.
+     */
+    val maxToolRounds: Int = 100,
+    /**
+     * How many times in a row the same tool may be called with the same arguments before
+     * the run is stopped: with a hundred rounds available, an agent stuck in a loop must
+     * fail fast instead of spending them.
+     */
+    val maxRepeatedToolCalls: Int = 4,
 ) {
     /** Every endpoint the profile uses, for "what leaves the phone" and key lookups. */
     val endpoints: List<Endpoint> get() = listOfNotNull(chat, voiceIn, voiceOut)
@@ -37,6 +48,10 @@ data class AiProfile(
     companion object {
         const val MIN_RATE = 0.5f
         const val MAX_RATE = 2f
+        const val MIN_ROUNDS = 1
+        const val MAX_ROUNDS = 500
+        const val MIN_REPEATS = 1
+        const val MAX_REPEATS = 50
     }
 }
 

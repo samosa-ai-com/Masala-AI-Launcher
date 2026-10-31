@@ -31,7 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,6 +56,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import com.samosaai.masala.R
 import com.samosaai.masala.agent.CommandState
 import com.samosaai.masala.chat.ChatSession
@@ -145,7 +147,7 @@ fun ChatSurface(
                         else -> Thread(turns, liveWords, listening, thinking, state, character, level, onStop)
                     }
                 }
-                Controls(listening, mic, onSend, onClose)
+                Controls(listening, level, mic, onSend, onClose)
             }
         }
     }
@@ -310,6 +312,28 @@ private fun Thread(
 @Composable
 private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1) {
     val user = turn.role == TurnRole.USER
+    if (turn.role == TurnRole.SYSTEM) {
+        // A history summary: the app wrote it, so it reads as a note, not as a reply.
+        Column(
+            Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.White.copy(alpha = 0.04f))
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Text(
+                stringResource(R.string.chat_summary_note),
+                style = MaterialTheme.typography.labelSmall,
+                color = MasalaTheme.tokens.textLow,
+            )
+            Text(
+                turn.text,
+                style = MaterialTheme.typography.bodySmall,
+                color = MasalaTheme.tokens.textMedium,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        return
+    }
     val error = turn.role == TurnRole.ERROR
     val shape = RoundedCornerShape(
         topStart = 18.dp, topEnd = 18.dp,
@@ -352,27 +376,85 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1) {
     }
 }
 
-/** Mic, and while listening the send/cancel pair (send = stop now, cancel = discard). */
+/**
+ * Mic, and while listening the send/cancel pair. Sending is explicit: the arrow stops the
+ * take now. The countdown above it says how long the automatic stop has left, so the
+ * behaviour is predictable rather than a surprise.
+ */
 @Composable
-private fun Controls(listening: Boolean, mic: MicPress, onSend: () -> Unit, onClose: () -> Unit) {
+private fun Controls(listening: Boolean, level: () -> Float, mic: MicPress, onSend: () -> Unit, onClose: () -> Unit) {
     val tokens = MasalaTheme.tokens
-    Row(
-        Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
+    Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         if (listening) {
-            IconButton(onClick = onClose, modifier = Modifier.size(52.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.06f))) {
-                Icon(Icons.Rounded.Close, stringResource(R.string.listening_cancel), tint = tokens.textHigh)
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                val countdown = rememberAutoSendCountdown(active = listening, level = level)
+                Text(
+                    if (countdown == null) stringResource(R.string.chat_send_ready)
+                    else stringResource(R.string.chat_sending_in, countdown),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (countdown == null) tokens.textLow else tokens.accentText,
+                )
             }
-            Spacer(Modifier.width(20.dp))
-            MicButton(mic, size = 68.dp)
-            Spacer(Modifier.width(20.dp))
-            IconButton(onClick = onSend, modifier = Modifier.size(52.dp).clip(CircleShape).background(tokens.accent)) {
-                Icon(Icons.Rounded.Stop, stringResource(R.string.listening_stop), tint = tokens.onAccent)
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            if (listening) {
+                IconButton(onClick = onClose, modifier = Modifier.size(52.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.06f))) {
+                    Icon(Icons.Rounded.Close, stringResource(R.string.listening_cancel), tint = tokens.textHigh)
+                }
+                Spacer(Modifier.width(20.dp))
+                MicButton(mic, size = 68.dp)
+                Spacer(Modifier.width(20.dp))
+                IconButton(onClick = onSend, modifier = Modifier.size(52.dp).clip(CircleShape).background(tokens.accent)) {
+                    Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
+                }
+            } else {
+                MicButton(mic, size = 68.dp)
             }
-        } else {
-            MicButton(mic, size = 68.dp)
         }
     }
+}
+
+/** Mirrors the engine's hands-free pause; if one changes, the other must. */
+private const val AUTO_SEND_MS = 2500L
+
+/** A level above this is speech, below it silence: the same idea the detector uses. */
+private const val SPEECH_LEVEL = 0.18f
+
+/**
+ * Seconds until the automatic send, or null while the user is still speaking. The mic level
+ * is the clock: the take ends after [AUTO_SEND_MS] of silence, so counting that down makes
+ * the behaviour legible instead of surprising.
+ */
+@Composable
+private fun rememberAutoSendCountdown(active: Boolean, level: () -> Float): Int? {
+    var remaining by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(active) {
+        if (!active) {
+            remaining = null
+            return@LaunchedEffect
+        }
+        var quietMs = 0L
+        var spoke = false
+        while (true) {
+            delay(100)
+            if (level() > SPEECH_LEVEL) {
+                spoke = true
+                quietMs = 0
+                remaining = null
+            } else if (spoke) {
+                quietMs += 100
+                val left = AUTO_SEND_MS - quietMs
+                remaining = if (left > 0) ((left + 999) / 1000).toInt() else 0
+            }
+        }
+    }
+    return remaining
 }

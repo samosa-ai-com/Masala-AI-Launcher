@@ -262,7 +262,52 @@ fun AiModelsPage(onBack: () -> Unit) {
 
             outcome?.let { TestResult(it) }
         }
+
+        // Loop limits: how far one request may go, and when a repeating tool stops it.
+        Eyebrow(stringResource(R.string.ai_limits))
+        AgentLimits(profile) { change -> scope.launch { persist(change) } }
         LaunchedEffect(pickedId) { outcome = null }
+    }
+}
+
+/**
+ * Two numbers that decide how far a single request can go: the model rounds it may take,
+ * and how many identical tool calls in a row mean it is stuck. Both apply to spoken
+ * commands and skill runs.
+ */
+@Composable
+private fun AgentLimits(profile: com.samosaai.masala.core.ai.AiProfile, onChange: ((com.samosaai.masala.core.ai.AiProfile) -> com.samosaai.masala.core.ai.AiProfile) -> Unit) {
+    var rounds by remember(profile.maxToolRounds) { mutableStateOf(profile.maxToolRounds.toString()) }
+    var repeats by remember(profile.maxRepeatedToolCalls) { mutableStateOf(profile.maxRepeatedToolCalls.toString()) }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        OutlinedTextField(
+            rounds, { rounds = it.filter(Char::isDigit).take(3) },
+            label = { Text(stringResource(R.string.ai_max_rounds)) },
+            supportingText = { Text(stringResource(R.string.ai_max_rounds_note)) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            repeats, { repeats = it.filter(Char::isDigit).take(2) },
+            label = { Text(stringResource(R.string.ai_max_repeats)) },
+            supportingText = { Text(stringResource(R.string.ai_max_repeats_note)) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        TextButton(
+            enabled = rounds.toIntOrNull() != null && repeats.toIntOrNull() != null,
+            onClick = {
+                val r = (rounds.toIntOrNull() ?: profile.maxToolRounds)
+                    .coerceIn(com.samosaai.masala.core.ai.AiProfile.MIN_ROUNDS, com.samosaai.masala.core.ai.AiProfile.MAX_ROUNDS)
+                val p = (repeats.toIntOrNull() ?: profile.maxRepeatedToolCalls)
+                    .coerceIn(com.samosaai.masala.core.ai.AiProfile.MIN_REPEATS, com.samosaai.masala.core.ai.AiProfile.MAX_REPEATS)
+                rounds = r.toString()
+                repeats = p.toString()
+                onChange { it.copy(maxToolRounds = r, maxRepeatedToolCalls = p) }
+            },
+        ) { Text(stringResource(R.string.ai_save_limits)) }
     }
 }
 

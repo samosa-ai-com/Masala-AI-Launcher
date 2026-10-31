@@ -97,6 +97,29 @@ class ChatSessionsTest {
     }
 
     @Test
+    fun `renaming persists and survives a reload`() = runBlocking<Unit> {
+        val s = store()
+        val chat = s.create()
+        s.append(chat.id, user("two plus two"))
+        s.rename(chat.id, "Arithmetic")
+        assertEquals("Arithmetic", s.summaries.value.single().title)
+        val reopened = store()
+        reopened.load()
+        assertEquals("Arithmetic", reopened.summaries.value.single().title)
+    }
+
+    @Test
+    fun `the summary line stays searchable`() = runBlocking<Unit> {
+        val s = store()
+        val chat = s.create()
+        s.append(chat.id, user("build me a timer app"))
+        s.append(chat.id, masala("Created the Timer mini app."))
+        val summary = s.summaries.value.single()
+        assertTrue(summary.search.contains("timer", ignoreCase = true))
+        assertTrue(summary.search.contains("Created", ignoreCase = true))
+    }
+
+    @Test
     fun `a corrupt file is ignored rather than crashing`() = runBlocking<Unit> {
         tmp.root.mkdirs()
         java.io.File(tmp.root, "broken.json").writeText("{not json")

@@ -13,10 +13,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -154,6 +156,16 @@ fun SearchPill(onSearch: () -> Unit, mic: MicPress, onOpenChat: () -> Unit = {},
     ) {
         Icon(Icons.Rounded.Search, null, tint = tokens.onWallpaperMedium, modifier = Modifier.size(20.dp))
         Text(label, style = MaterialTheme.typography.bodyMedium, color = tokens.onWallpaperMedium, modifier = Modifier.weight(1f))
+        // The conversation is reachable without the microphone: typing, reading history,
+        // or continuing an earlier chat.
+        IconButton(onClick = onOpenChat, modifier = Modifier.size(46.dp)) {
+            Icon(
+                Icons.Rounded.ChatBubbleOutline,
+                stringResource(R.string.chat_open),
+                tint = tokens.onWallpaperMedium,
+                modifier = Modifier.size(22.dp),
+            )
+        }
         MicButton(mic, size = 46.dp)
     }
 }

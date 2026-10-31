@@ -90,4 +90,10 @@
     <string name="voice_assist_title">Masala as the assist app</string>
     <string name="voice_assist_summary">Hold Home or Power to talk from any app</string>
     <string name="voice_set_up">Set up</string>
+    <string name="ai_limits">LOOP LIMITS</string>
+    <string name="ai_max_rounds">Max rounds per request</string>
+    <string name="ai_max_rounds_note">How many model turns one request may take. Multi-step jobs need many; 100 is a good default.</string>
+    <string name="ai_max_repeats">Max identical tool calls in a row</string>
+    <string name="ai_max_repeats_note">A run that repeats the same tool with the same input this many times is stuck; it stops there.</string>
+    <string name="ai_save_limits">Save limits</string>
 </resources>

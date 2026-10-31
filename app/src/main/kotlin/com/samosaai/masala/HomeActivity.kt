@@ -472,6 +472,7 @@ class HomeActivity : ComponentActivity() {
                         expanded = true
                     }
                 },
+                onRename = { id, title -> app.scope.launch { app.chats.rename(id, title) } },
                 onDelete = { id ->
                     app.scope.launch {
                         app.chats.delete(id)

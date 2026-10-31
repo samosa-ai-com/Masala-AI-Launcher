@@ -37,6 +37,7 @@ class MasalaAgent(
     private val systemPrompt: () -> String,
     private val maxSteps: Int = DEFAULT_MAX_STEPS,
     private val maxHistoryChars: Int = DEFAULT_MAX_HISTORY_CHARS,
+    private val maxRepeatedToolCalls: Int = DEFAULT_MAX_REPEATED_TOOL_CALLS,
     private val fetchOnlyResults: Boolean = false,
 ) {
     private var messages: List<ChatMessage> = emptyList()
@@ -61,6 +62,10 @@ class MasalaAgent(
         dropped = dropped + messages.subList(0, messages.size - kept.size)
         messages = kept + user
         val visible = definitions.filter { scope.allows(it.name) }.map { it.toLlm() }
+        // The last tool call and how many times in a row it has repeated, so a loop stops
+        // early instead of burning the round budget.
+        var lastCall = ""
+        var repeats = 0
         try {
             repeat(maxSteps) {
                 emit(AgentEvent.Thinking)
@@ -89,6 +94,13 @@ class MasalaAgent(
                         messages = messages + toolMessage(call.id, refusal)
                         emit(AgentEvent.ToolDone(name, refusal))
                         continue
+                    }
+                    val signature = "$name${call.function.arguments}"
+                    repeats = if (signature == lastCall) repeats + 1 else 1
+                    lastCall = signature
+                    if (repeats > maxRepeatedToolCalls) {
+                        messages = AgentHistory.repairOrphanedToolCalls(messages)
+                        return@flow emit(AgentEvent.Failed("Stopped: $name was called with the same arguments $repeats times in a row."))
                     }
                     emit(AgentEvent.ToolCall(name, args))
                     val result = tools.run(name, args)
@@ -123,8 +135,14 @@ class MasalaAgent(
         ChatMessage("tool", JsonPrimitive(result.asText()), toolCallId = callId)
 
     companion object {
-        const val DEFAULT_MAX_STEPS = 6
-        const val SKILL_MAX_STEPS = 12
+        /** A request that needs many steps (search, read, edit, verify) must not stop early. */
+        const val DEFAULT_MAX_STEPS = 100
+
+        /**
+         * The same tool with the same arguments this many times in a row means a loop: stop
+         * rather than spend the whole round budget on it.
+         */
+        const val DEFAULT_MAX_REPEATED_TOOL_CALLS = 4
         const val DEFAULT_MAX_HISTORY_CHARS = 40_000
         const val KEPT_EXCHANGES = 5
 

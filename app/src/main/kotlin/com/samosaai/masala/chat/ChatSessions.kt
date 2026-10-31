@@ -83,6 +83,21 @@ class ChatSessions(
         next
     } }
 
+    /** Retitles a conversation; a blank title falls back to the first user words. */
+    suspend fun rename(id: String, title: String): ChatSession? = lock.withLock { withContext(Dispatchers.IO) {
+        val session = loaded[id] ?: read(id) ?: return@withContext null
+        val next = session.copy(
+            title = title.trim().take(60).ifBlank {
+                session.turns.firstOrNull { it.role == TurnRole.USER }?.text?.trim()?.take(48).orEmpty()
+            },
+            updatedAt = clock(),
+        )
+        loaded[id] = next
+        write(next)
+        publish()
+        next
+    } }
+
     /** Removes a conversation and its file. */
     suspend fun delete(id: String) = lock.withLock { withContext(Dispatchers.IO) {
         loaded.remove(id)
@@ -131,6 +146,8 @@ class ChatSessions(
         updatedAt = updatedAt,
         preview = preview,
         turns = turns.size,
+        // Bounded: enough to match a phrase the user remembers, cheap to keep in memory.
+        search = (title + "\n" + turns.joinToString("\n") { it.text }).take(4_000),
     )
 
     companion object {

@@ -41,7 +41,10 @@ class CommandControllerTest {
 
     private fun reply(text: String) = ChatMessage("assistant", JsonPrimitive(text))
 
-    private fun controller(speech: SpeechInput? = null) = CommandController(
+    private fun controller(
+        speech: SpeechInput? = null,
+        summarize: (suspend (String) -> String?)? = null,
+    ) = CommandController(
         scope = scope,
         resolveApp = { if (it == "spotify") spotify else null },
         names = { listOf("Spotify") },
@@ -58,6 +61,7 @@ class CommandControllerTest {
             )
         },
         speech = speech,
+        summarize = summarize,
     )
 
     private suspend fun CommandController.settled() = withTimeout(5_000) { state.first { it is CommandState.Reply || it is CommandState.Error } }
@@ -210,6 +214,30 @@ class CommandControllerTest {
         assertFalse(c.walkieTalkie.value)
         c.sendNow()
         assertEquals(1, finished)
+    }
+
+    @Test fun aLongConversationIsSummarisedBeforeTheRun() = runBlocking<Unit> {
+        val recorded = mutableListOf<com.samosaai.masala.chat.ChatTurn>()
+        var asked = 0
+        val c = controller(summarize = { asked++; "SUMMARY: user asked for a timer app" })
+        c.onTurn = { recorded += it }
+        // Well past the 30k-character compaction threshold.
+        c.restoreSession(
+            List(60) { i ->
+                com.samosaai.masala.chat.ChatTurn(
+                    if (i % 2 == 0) com.samosaai.masala.chat.TurnRole.USER else com.samosaai.masala.chat.TurnRole.MASALA,
+                    "message $i " + "x".repeat(600),
+                )
+            },
+        )
+        c.ask("what did we decide?")
+        c.settled()
+        assertEquals(1, asked)
+        // The model sees the summary, not the transcript.
+        val sent = requests.last().joinToString("\n") { it.textContent }
+        assertTrue(sent.contains("SUMMARY: user asked for a timer app"))
+        // And the transcript says so, as a system note the UI can show.
+        assertTrue(recorded.any { it.role == com.samosaai.masala.chat.TurnRole.SYSTEM })
     }
 
     @Test fun listeningWithoutAMicrophoneIsAnError() = runBlocking<Unit> {

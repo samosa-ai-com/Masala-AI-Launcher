@@ -126,7 +126,8 @@ class MasalaApp : Application() {
         gate: ToolGate = confirmationGate,
         scope: (List<ToolInfo>) -> ToolScope = { ToolScope.command(it) },
         instructions: String? = null,
-        maxSteps: Int = MasalaAgent.DEFAULT_MAX_STEPS,
+        maxSteps: Int = aiSettings.profile.value.maxToolRounds,
+        maxRepeatedToolCalls: Int = aiSettings.profile.value.maxRepeatedToolCalls,
         fetchOnlyResults: Boolean = false,
     ): MasalaAgent {
         val executor = toolExecutor(gate)
@@ -141,6 +142,7 @@ class MasalaApp : Application() {
                 AgentPrompt.build("$now (${java.util.TimeZone.getDefault().id})", skills.getAllSkills(), secondBrain.promptNow(), instructions)
             },
             maxSteps = maxSteps,
+            maxRepeatedToolCalls = maxRepeatedToolCalls,
             fetchOnlyResults = fetchOnlyResults,
         )
     }
@@ -330,6 +332,7 @@ class MasalaApp : Application() {
                 recordError = getString(R.string.stt_error_record),
                 generic = getString(R.string.stt_error_generic),
             ),
+            summarize = { transcript -> summarizeHistory(transcript) },
         ).also { controller ->
             controller.onTurn = ::recordTurn
             scope.launch { chats.load() }
@@ -353,6 +356,26 @@ class MasalaApp : Application() {
         }
     }
 
+    /**
+     * Condenses a long conversation so the model keeps the thread without the transcript:
+     * what was asked, what was decided or built (names, ids, paths), preferences, open ends.
+     */
+    private suspend fun summarizeHistory(transcript: String): String? = runCatching {
+        val model = LlmAgentModel(LlmConfig.default.client(this))
+        val prompt = listOf(
+            com.samosaai.masala.llm.ChatMessage(
+                "system",
+                kotlinx.serialization.json.JsonPrimitive(
+                    "Summarise this conversation so it can be continued. Keep: what the user wanted, " +
+                        "decisions and preferences, anything created or changed (app names, ids, file paths, code), " +
+                        "and what is still open. Be compact and factual; no greetings, no advice.",
+                ),
+            ),
+            com.samosaai.masala.llm.ChatMessage("user", kotlinx.serialization.json.JsonPrimitive(transcript.take(60_000))),
+        )
+        model.next(prompt, emptyList()).textContent.takeIf { it.isNotBlank() }
+    }.getOrNull()
+
     companion object {
         /** A scheduled task with no skill runs a plain command under this id. */
         const val COMMAND_SKILL_ID = "command"
@@ -370,7 +393,8 @@ class MasalaApp : Application() {
         // A run nobody watches can't ask, so it only gets tools that never need a confirmation.
         scope = { infos -> ToolScope.skill(skill, infos).let { if (unattended) ToolScope.unattended(it, infos) else it } },
         instructions = listOfNotNull(skill.persona?.systemPrompt, skill.instructions).joinToString("\n\n"),
-        maxSteps = MasalaAgent.SKILL_MAX_STEPS,
+        maxSteps = aiSettings.profile.value.maxToolRounds,
+        maxRepeatedToolCalls = aiSettings.profile.value.maxRepeatedToolCalls,
         // It holds private data and nobody sees what it opens, so it opens only what its searches returned.
         fetchOnlyResults = unattended,
     )
