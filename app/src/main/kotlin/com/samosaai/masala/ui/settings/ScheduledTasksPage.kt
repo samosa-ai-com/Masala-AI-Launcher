@@ -1,5 +1,6 @@
 package com.samosaai.masala.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,6 +10,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -22,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.samosaai.masala.R
 import com.samosaai.masala.core.scheduled.RepeatKind
@@ -55,7 +58,13 @@ fun ScheduledTasksPage(onBack: () -> Unit, onAskInChat: (String) -> Unit) {
     }
     SettingsScaffold(stringResource(R.string.settings_scheduled_tasks), onBack = onBack) {
         val createPrefill = stringResource(R.string.scheduled_task_create_prefill)
-        Button(onClick = { onAskInChat(createPrefill) }) { Text(stringResource(R.string.scheduled_task_create)) }
+        var createOpen by remember { mutableStateOf(false) }
+        var editTarget by remember { mutableStateOf<ScheduledTask?>(null) }
+        val skills = remember { app.skills.getAllSkills() }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { onAskInChat(createPrefill) }) { Text(stringResource(R.string.scheduled_task_create)) }
+            OutlinedButton(onClick = { createOpen = true }) { Text(stringResource(R.string.scheduled_task_new)) }
+        }
         var filter by rememberSaveable { mutableStateOf("") }
         if (tasks.size > 5 || filter.isNotEmpty()) ListSearchField(filter, { filter = it }, stringResource(R.string.scheduled_tasks_filter))
         val shown = remember(tasks, filter) {
@@ -72,10 +81,14 @@ fun ScheduledTasksPage(onBack: () -> Unit, onAskInChat: (String) -> Unit) {
         shown.forEach { task ->
             key(task.id) {
                 var confirmDelete by remember(task.id) { mutableStateOf(false) }
+                var showHistory by remember(task.id) { mutableStateOf(false) }
                 // Paused tasks still show their scheduled time; a finished one-time task has nothing to pause.
                 val next = (task.retryAt ?: task.nextRunAt)?.let { format.format(java.util.Date(it)) }
                 val canPause = task.repeat.kind != RepeatKind.NONE || task.nextRunAt != null
-                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Column(
+                    Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        .clickable(role = Role.Button, onClickLabel = stringResource(R.string.scheduled_task_edit)) { editTarget = task }
+                ) {
                     Text(task.name, style = MaterialTheme.typography.titleMedium)
                     Text(
                         if (!task.enabled) {
@@ -127,6 +140,16 @@ fun ScheduledTasksPage(onBack: () -> Unit, onAskInChat: (String) -> Unit) {
                             Text(stringResource(if (task.enabled) R.string.scheduled_task_pause else R.string.scheduled_task_resume))
                         }
                         TextButton(onClick = { confirmDelete = true }) { Text(stringResource(R.string.scheduled_task_delete)) }
+                        if (task.history.isNotEmpty()) TextButton(onClick = { showHistory = !showHistory }) { Text(stringResource(R.string.scheduled_task_history)) }
+                    }
+                    if (showHistory) {
+                        task.history.takeLast(3).reversed().forEach { run ->
+                            Text(
+                                stringResource(R.string.scheduled_task_history_entry, format.format(java.util.Date(run.at)), run.status.name),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
                 HorizontalDivider()
@@ -147,6 +170,28 @@ fun ScheduledTasksPage(onBack: () -> Unit, onAskInChat: (String) -> Unit) {
                         dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_back)) } },
                     )
                 }
+            }
+        }
+        if (createOpen || editTarget != null) {
+            key(if (createOpen) "new" else editTarget?.id) {
+                TaskEditorSheet(
+                    existing = editTarget,
+                    skills = skills,
+                    onSave = { draft ->
+                        val target = editTarget
+                        createOpen = false
+                        editTarget = null
+                        mutate {
+                            app.scheduledTasks.put(
+                                ScheduledTaskPlanner.edited(
+                                    target, draft,
+                                    System.currentTimeMillis(), java.time.ZoneId.systemDefault(),
+                                )
+                            )
+                        }
+                    },
+                    onDismiss = { createOpen = false; editTarget = null },
+                )
             }
         }
     }
