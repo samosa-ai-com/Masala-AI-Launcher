@@ -64,7 +64,7 @@ internal fun FolderIcon(items: List<Item>, ctx: RenderContext, size: Int) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             items.take(4).chunked(2).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    row.forEach { child -> IconView(child.icon, appFor(child, ctx), ctx, (size * 0.4f).roundToInt()) }
+                    row.forEach { child -> ItemIcon(child, appFor(child, ctx), ctx, (size * 0.4f).roundToInt()) }
                 }
             }
         }
@@ -100,6 +100,7 @@ fun FolderSheet(
             onClockClick = ctx.onClockClick,
             onLaunchFrom = ctx.onLaunchFrom?.let { launch -> { action, from -> onDismiss(); launch(action, from) } },
             onItemMenu = { menuFor = it },
+            miniAppIcon = ctx.miniAppIcon,
         )
     }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainer) {

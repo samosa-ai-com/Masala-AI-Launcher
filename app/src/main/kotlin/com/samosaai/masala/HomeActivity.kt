@@ -362,8 +362,12 @@ class HomeActivity : ComponentActivity() {
         val movable = remember(baseLayout) {
             baseLayout?.pages.orEmpty().flatMap { it.sections }.filterIsInstance<ItemSection>().flatMap { s -> s.items.map { it.id } }.toSet()
         }
+        // Mini-app icons for home (Batch C): id to stored icon, so pins, folder previews and the
+        // folder sheet draw what the agent chose.
+        val miniAppRows by remember { app.miniApps.all }.collectAsStateWithLifecycle(emptyList())
+        val miniAppIcons = remember(miniAppRows) { miniAppRows.associate { it.id to it.icon } }
         val drag = remember { HomeDragState() }
-        val render = remember(apps, settings.homeLocked, modeName, movable) {
+        val render = remember(apps, settings.homeLocked, modeName, movable, miniAppIcons) {
             RenderContext(
                 icons = app.icons,
                 apps = apps,
@@ -382,6 +386,7 @@ class HomeActivity : ComponentActivity() {
                 },
                 drag = drag,
                 movable = movable,
+                miniAppIcon = { miniAppIcons[it] },
                 onOpenFolder = { openFolder = it to (it.id in movable) },
                 onFolderMenu = { if (it.id in movable) folderMenu = it },
                 onDrop = { item, target ->
