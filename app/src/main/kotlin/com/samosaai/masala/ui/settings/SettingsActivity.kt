@@ -54,6 +54,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -314,12 +315,21 @@ class SettingsActivity : ComponentActivity() {
     }
 
     /** Every stored mini-app, so a created app is never invisible (plan: Lane D follow-ups). */
+    /** Home's input card, already holding [prefill], for the user to finish in their own words. */
+    private fun askInChat(prefill: String) {
+        masala.commands.openInput(prefill)
+        startActivity(Intent(this, com.samosaai.masala.HomeActivity::class.java).putExtra(com.samosaai.masala.HomeActivity.EXTRA_SHOW_INPUT, true)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+        finish()
+    }
+
     @Composable
     private fun MiniAppsPage(onBack: () -> Unit) {
         val scope = rememberCoroutineScope()
         val apps by remember { masala.miniApps.all }.collectAsStateWithLifecycle(emptyList())
         val format = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
         SettingsScaffold(stringResource(R.string.settings_miniapps), onBack = onBack) {
+            Button(onClick = { askInChat(getString(R.string.miniapp_create_prefill)) }) { Text(stringResource(R.string.miniapp_create)) }
             if (apps.isEmpty()) {
                 Text(stringResource(R.string.miniapps_empty), style = MaterialTheme.typography.bodyMedium)
             }
@@ -510,6 +520,7 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         SettingsScaffold(stringResource(R.string.settings_scheduled_tasks), onBack = onBack) {
+            Button(onClick = { askInChat(getString(R.string.scheduled_task_create_prefill)) }) { Text(stringResource(R.string.scheduled_task_create)) }
             if (tasks.isEmpty()) {
                 Text(stringResource(R.string.scheduled_tasks_empty), style = MaterialTheme.typography.bodyMedium)
             }

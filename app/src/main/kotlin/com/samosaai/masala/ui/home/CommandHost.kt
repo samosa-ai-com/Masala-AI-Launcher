@@ -39,7 +39,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AssistChip
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -231,7 +233,7 @@ fun ReplyCard(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val press = rememberMicPress(app)
-    var text by remember { mutableStateOf("") }
+    var text by remember { mutableStateOf(TextFieldValue("")) }
     val retryPrompt = stringResource(R.string.capability_retry_prompt)
     // A dialog that was allowed carries on by itself; a settings screen needs Try again.
     val grant = rememberCapabilityGrant { granted -> if (granted) app.commands.ask(retryPrompt) }
@@ -244,7 +246,12 @@ fun ReplyCard(
 
     // A glass sheet over home (UI refresh U3); opened for typing, its field takes focus.
     val field = remember { FocusRequester() }
-    LaunchedEffect(state) { if (state == CommandState.Input) runCatching { field.requestFocus() } }
+    LaunchedEffect(state) {
+        if (state == CommandState.Input) {
+            app.commands.takeDraft().takeIf { it.isNotEmpty() }?.let { text = TextFieldValue(it, TextRange(it.length)) }
+            runCatching { field.requestFocus() }
+        }
+    }
     Card(
         modifier.fillMaxWidth().padding(12.dp),
         shape = RoundedCornerShape(Radii.sheet),
@@ -296,10 +303,10 @@ fun ReplyCard(
                     placeholder = { Text(stringResource(R.string.command_hint)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { if (text.isNotBlank()) { app.commands.ask(text); text = "" } }),
+                    keyboardActions = KeyboardActions(onSend = { if (text.text.isNotBlank()) { app.commands.ask(text.text); text = TextFieldValue("") } }),
                 )
-                if (text.isNotBlank()) {
-                    TextButton(onClick = { app.commands.ask(text); text = "" }) { Text(stringResource(R.string.skill_send)) }
+                if (text.text.isNotBlank()) {
+                    TextButton(onClick = { app.commands.ask(text.text); text = TextFieldValue("") }) { Text(stringResource(R.string.skill_send)) }
                 } else {
                     MicButton(press)
                 }

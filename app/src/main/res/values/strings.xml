@@ -189,6 +189,10 @@
     <string name="miniapp_network">Let this app use the internet</string>
     <string name="miniapp_network_summary">Off by default. On lets the app load things from the web. The app stays on this phone and is never shared or hosted.</string>
     <string name="miniapp_network_badge">Uses the internet</string>
+    <string name="miniapp_create">Create a mini app</string>
+    <string name="miniapp_create_prefill">"Build me a mini app that "</string>
+    <string name="scheduled_task_create">Create with Masala</string>
+    <string name="scheduled_task_create_prefill">"Every day at 8:00, "</string>
     <string name="miniapp_share">Share</string>
     <string name="miniapp_pin">Pin to home</string>
     <string name="miniapp_pinned">Pinned — see it on home</string>

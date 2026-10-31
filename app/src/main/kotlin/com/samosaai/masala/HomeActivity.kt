@@ -138,6 +138,8 @@ class HomeActivity : ComponentActivity() {
             drawerOpen = false
             homePresses++
         }
+        // The input card is hidden while the drawer is open.
+        if (intent.getBooleanExtra(EXTRA_SHOW_INPUT, false)) drawerOpen = false
     }
 
     @Composable
@@ -656,9 +658,12 @@ class HomeActivity : ComponentActivity() {
         startActivity(Intent(this, SettingsActivity::class.java))
     }
 
-    private companion object {
+    companion object {
         /** Release speed (px/s) that settles the drawer in the fling's direction whatever its position. */
-        const val FLING_VELOCITY = 1200f
+        private const val FLING_VELOCITY = 1200f
+
+        /** Started to show the input card (Settings' Create buttons): the drawer closes so the card shows. */
+        const val EXTRA_SHOW_INPUT = "com.samosaai.masala.SHOW_INPUT"
     }
 
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
