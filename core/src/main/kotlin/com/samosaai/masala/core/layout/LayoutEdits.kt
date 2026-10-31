@@ -1,9 +1,11 @@
 package com.samosaai.masala.core.layout
 
 import com.samosaai.masala.core.contract.DockSection
+import com.samosaai.masala.core.contract.IconRef
 import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.ItemSection
 import com.samosaai.masala.core.contract.LayoutDoc
+import com.samosaai.masala.core.contract.MasalaAction
 
 /** User edits to a base layout by item id (home drag and drop). Each returns null when it can't apply. */
 object LayoutEdits {
@@ -41,6 +43,57 @@ object LayoutEdits {
         val from = find(doc, itemId) ?: return null
         val size = section.items.size - if (from.sectionId == section.id) 1 else 0
         return insert(remove(doc, itemId), from.item, section.id, size)
+    }
+
+    /**
+     * Drops [draggedId] onto [targetId]: the target is replaced in place by a new folder [folderId] holding
+     * the target then the dragged item. Null if either is missing, they are the same, or either is a folder.
+     */
+    fun makeFolder(doc: LayoutDoc, draggedId: String, targetId: String, folderId: String, label: String): LayoutDoc? {
+        if (draggedId == targetId) return null
+        val dragged = find(doc, draggedId)?.item ?: return null
+        val target = find(doc, targetId)?.item ?: return null
+        if (dragged.isFolder || target.isFolder) return null
+        val folder = Item(folderId, label, IconRef.Symbol("folder"), MasalaAction.OpenFolder(listOf(target, dragged)))
+        return replace(remove(doc, draggedId), targetId) { listOf(folder) }
+    }
+
+    /** Appends [itemId] to folder [folderId]. Null if the item is a folder, the target isn't one, or it is full. */
+    fun addToFolder(doc: LayoutDoc, itemId: String, folderId: String): LayoutDoc? {
+        val item = find(doc, itemId)?.item ?: return null
+        val children = find(doc, folderId)?.item?.children ?: return null
+        if (item.isFolder || children.size >= LayoutChecker.MAX_FOLDER_ITEMS) return null
+        return replace(remove(doc, itemId), folderId) { listOf(it.withChildren(children + item)) }
+    }
+
+    /** Takes [itemId] out of [folderId] to just after it. A folder left with one child becomes that child. */
+    fun moveOutOfFolder(doc: LayoutDoc, folderId: String, itemId: String): LayoutDoc? {
+        val children = find(doc, folderId)?.item?.children ?: return null
+        val child = children.firstOrNull { it.id == itemId } ?: return null
+        val left = children - child
+        return replace(doc, folderId) { folder -> listOf(left.singleOrNull() ?: folder.withChildren(left), child) }
+    }
+
+    /** Null if [folderId] isn't a folder or [label] is blank. */
+    fun renameFolder(doc: LayoutDoc, folderId: String, label: String): LayoutDoc? {
+        if (label.isBlank() || find(doc, folderId)?.item?.isFolder != true) return null
+        return replace(doc, folderId) { listOf(it.copy(label = label.trim())) }
+    }
+
+    /** Puts the folder's children in its place, in order. Null if [folderId] isn't a folder. */
+    fun dissolveFolder(doc: LayoutDoc, folderId: String): LayoutDoc? {
+        val children = find(doc, folderId)?.item?.children ?: return null
+        return replace(doc, folderId) { children }
+    }
+
+    private val Item.children get() = (action as? MasalaAction.OpenFolder)?.items
+    private val Item.isFolder get() = action is MasalaAction.OpenFolder
+    private fun Item.withChildren(items: List<Item>) = copy(action = MasalaAction.OpenFolder(items))
+
+    /** Replaces the top-level item [itemId] with what [with] returns for it. */
+    private fun replace(doc: LayoutDoc, itemId: String, with: (Item) -> List<Item>) = mapSections(doc) { section ->
+        if (section.items.none { it.id == itemId }) section
+        else section.withItems(section.items.flatMap { if (it.id == itemId) with(it) else listOf(it) })
     }
 
     private data class Found(val item: Item, val sectionId: String, val index: Int)
