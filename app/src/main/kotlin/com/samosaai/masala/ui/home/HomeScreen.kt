@@ -155,8 +155,13 @@ fun HomeScreen(
                 if (!tracking) return
                 tracking = false
                 if (handled) {
+                    // A lift with no fresh tracking (e.g. after a missed one): drop the stale
+                    // peaks so the next gesture starts clean instead of inheriting them.
+                    handled = false
                     peakUp = 0f
                     peakDown = 0f
+                    net = 0f
+                    following = false
                     return
                 }
                 handled = true
@@ -164,15 +169,16 @@ fun HomeScreen(
                     following = false
                     val vy = runCatching { velocity.calculateVelocity().y }.getOrDefault(0f)
                     latestDrawer?.onRelease(if (vy.isFinite()) vy else 0f)
-                    peakUp = 0f
-                    peakDown = 0f
-                    return
+                } else {
+                    // The further excursion wins; ties and sub-threshold lifts do nothing.
+                    if (-peakUp >= swipeThreshold && -peakUp >= peakDown) latestUp()
+                    else if (peakDown >= swipeThreshold && peakDown > -peakUp) latestDown()
                 }
-                // The further excursion wins; ties and sub-threshold lifts do nothing.
-                if (-peakUp >= swipeThreshold && -peakUp >= peakDown) latestUp()
-                else if (peakDown >= swipeThreshold && peakDown > -peakUp) latestDown()
                 peakUp = 0f
                 peakDown = 0f
+                net = 0f
+                following = false
+                handled = false
             }
         }
     }
@@ -192,7 +198,11 @@ fun HomeScreen(
                         dragged = 0f
                         swipes.add(0f)
                     },
-                    onDragEnd = { swipes.onLift() },
+                    onDragEnd = {
+                        // No-op on purpose: the Final-pass observer below fires onLift() once it has
+                        // seen the up event, so the release velocity includes it. Firing here (Main
+                        // pass) would compute velocity without the up change.
+                    },
                     onDragCancel = { /* the nested path may still be live; lift decides */ },
                     onVerticalDrag = { change, dy ->
                         dragged += dy
@@ -216,7 +226,12 @@ fun HomeScreen(
                         while (!up) {
                             val event = awaitPointerEvent(PointerEventPass.Final)
                             event.changes.firstOrNull { it.id == down.id }?.let(swipes.velocity::addPointerInputChange)
-                            up = event.changes.isNotEmpty() && event.changes.all { !it.pressed }
+                            // A lifted pointer can vanish from later events instead of arriving
+                            // pressed=false: if our pointer is gone, the gesture is over. Without
+                            // this the observer can wait forever and every later lift is lost,
+                            // leaving the drawer frozen mid-slide.
+                            up = event.changes.isEmpty() || event.changes.none { it.id == down.id } ||
+                                (event.changes.isNotEmpty() && event.changes.all { !it.pressed })
                         }
                         swipes.onLift()
                     }

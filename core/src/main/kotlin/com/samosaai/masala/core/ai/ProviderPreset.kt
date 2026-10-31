@@ -21,18 +21,26 @@ data class ProviderPreset(
     val keyKind: KeyKind,
     val capabilities: Capabilities,
     val defaultChatModel: String = "",
+    /** TTS model used when this preset is picked for voice out (blank = ask the server). */
+    val defaultTtsModel: String = "",
+    /** Voice ids offered when the server's /models lists no voices (e.g. OpenAI). */
+    val fallbackVoices: List<String> = emptyList(),
     /** Set for providers on the local network: the port on the user's computer. */
     val lanPort: Int? = null,
 ) {
     val onLan get() = lanPort != null
 
     /** The base URL for a computer at [host] (LAN presets), else the fixed one. */
-    fun baseUrlFor(host: String): String =
-        if (lanPort == null) baseUrl else "http://${host.trim().removePrefix("http://").trimEnd('/')}:$lanPort/v1/"
+    fun baseUrlFor(host: String): String {
+        if (lanPort == null) return baseUrl
+        // Accept a pasted URL or host:port too, not just a bare address.
+        val clean = host.trim().substringAfter("://").substringBefore(':').substringBefore('/').trim().trimEnd('/')
+        return "http://$clean:$lanPort/v1/"
+    }
 }
 
 object ProviderPresets {
-    val OpenAI = ProviderPreset("openai", "OpenAI", "OA", "https://api.openai.com/v1/", KeyKind.KEY, Capabilities(chat = true, voiceIn = true, voiceOut = true))
+    val OpenAI = ProviderPreset("openai", "OpenAI", "OA", "https://api.openai.com/v1/", KeyKind.KEY, Capabilities(chat = true, voiceIn = true, voiceOut = true), defaultTtsModel = "tts-1", fallbackVoices = listOf("alloy", "echo", "fable", "onyx", "nova", "shimmer"))
     val Meta = ProviderPreset("meta", "Meta", "Me", "https://api.meta.ai/v1/", KeyKind.KEY, Capabilities(chat = true, voiceIn = true, voiceOut = false), defaultChatModel = "muse-spark-1.3")
     val Anthropic = ProviderPreset("anthropic", "Anthropic", "An", "https://api.anthropic.com/v1/", KeyKind.KEY, Capabilities(chat = true, voiceIn = false, voiceOut = false))
     val Gemini = ProviderPreset("gemini", "Gemini", "Ge", "https://generativelanguage.googleapis.com/v1beta/openai/", KeyKind.KEY, Capabilities(chat = true, voiceIn = false, voiceOut = false))

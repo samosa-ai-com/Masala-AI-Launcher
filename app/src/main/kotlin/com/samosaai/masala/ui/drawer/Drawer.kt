@@ -6,8 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -198,7 +198,7 @@ fun Drawer(
     // The other search sources, debounced a little so a fast typist doesn't query files per letter.
     var extra by remember { mutableStateOf(SearchGroups.build("", emptyList())) }
     LaunchedEffect(text, results) {
-        if (!searching) return@LaunchedEffect
+        if (!searching) { extra = SearchGroups.build("", emptyList()); return@LaunchedEffect }
         val skills = sources.skills(text)
         val settingsHits = sources.settings(text)
         extra = SearchGroups.build(text, results, skills = skills, settings = settingsHits, ask = { suggestionsFor(it) })
@@ -271,7 +271,16 @@ fun Drawer(
                 focus = focus,
                 onGo = {
                     // Enter while composing finishes the character instead (Olauncher §2.4).
-                    if (!composing) results.firstOrNull()?.let(launch) ?: text.takeIf { it.isNotBlank() }?.let { onAsk(it.trim()) }
+                    if (!composing) {
+                        if (extra.askFirst && text.isNotBlank()) onAsk(text.trim())
+                        else {
+                            // Async ranking may lag the text; rank once on submit so Enter
+                            // never launches the previous query's hit.
+                            val fresh = if (current) results else AppSearch.rank(text, latestPrepared)
+                            fresh.firstOrNull()?.let(launch)
+                                ?: text.takeIf { it.isNotBlank() }?.let { onAsk(it.trim()) }
+                        }
+                    }
                 },
                 onOpenSettings = onOpenSettings,
             )
@@ -495,13 +504,22 @@ internal fun Scrubber(letters: List<Char>, modifier: Modifier = Modifier, onLett
             .onGloballyPositioned { heightPx = it.size.height.coerceAtLeast(1) }
             .semantics { contentDescription = label }
             .pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onDragStart = { pick(it.y) },
-                    onDragEnd = { last = null; onEnd() },
-                    onDragCancel = { last = null; onEnd() },
-                ) { change, _ -> pick(change.position.y) }
-            }
-            .pointerInput(Unit) { detectTapGestures(onPress = { pick(it.y); tryAwaitRelease(); last = null; onEnd() }) },
+                // One gesture block: stacked tap+drag detectors cancel each other and
+                // drop the bubble at drag start.
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    pick(down.position.y)
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull() ?: break
+                        if (!change.pressed) break
+                        pick(change.position.y)
+                        change.consume()
+                    }
+                    last = null
+                    onEnd()
+                }
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         letters.forEach { c ->

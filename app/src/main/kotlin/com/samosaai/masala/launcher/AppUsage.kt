@@ -7,6 +7,7 @@ import android.content.Context
 import android.os.Process
 import com.samosaai.masala.core.apps.AppEntry
 import com.samosaai.masala.core.apps.AppKey
+import com.samosaai.masala.core.apps.ProfileKind
 import com.samosaai.masala.core.apps.UsageRank
 import com.samosaai.masala.data.AppLaunchDao
 import com.samosaai.masala.data.AppLaunchEntity
@@ -42,14 +43,13 @@ class AppUsage(private val context: Context, private val dao: AppLaunchDao, priv
      * the foreground from another), mapped onto [apps] by package for the personal profile; else the log.
      */
     suspend fun launches(since: Long, apps: List<AppEntry>): List<UsageRank.Launch> = withContext(Dispatchers.IO) {
-        if (hasUsageAccess()) systemLaunches(since, apps)?.let { return@withContext it }
+        if (hasUsageAccess()) systemLaunches(since, apps)?.takeIf { it.isNotEmpty() }?.let { return@withContext it }
         dao.since(since).map { UsageRank.Launch(it.appKey, it.at) }
     }
 
     private fun systemLaunches(since: Long, apps: List<AppEntry>): List<UsageRank.Launch>? = runCatching {
         val usm = context.getSystemService(UsageStatsManager::class.java) ?: return null
-        val me = Process.myUserHandle().hashCode().toLong()
-        val byPackage = apps.filter { it.key.user == me }.groupBy { it.key.packageName }.mapValues { it.value.first().key.id }
+        val byPackage = apps.filter { it.profile == ProfileKind.PERSONAL }.groupBy { it.key.packageName }.mapValues { it.value.first().key.id }
         val events = usm.queryEvents(since, System.currentTimeMillis())
         val out = ArrayList<UsageRank.Launch>()
         val e = UsageEvents.Event()

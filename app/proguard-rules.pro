@@ -13,9 +13,10 @@
 }
 -keep,includedescriptorclasses class com.samosaai.masala.**$$serializer { *; }
 
-# Retrofit service interfaces are proxied by reflection.
--keep,allowobfuscation interface com.samosaai.masala.**.*Api
--keep,allowobfuscation interface com.samosaai.masala.llm.ApiService
+# Retrofit service interfaces are proxied by reflection: keep the members too, so R8
+# keeps the HTTP annotations and return types (a bare interface keep only keeps the declaration).
+-keep,allowobfuscation interface com.samosaai.masala.**.*Api { *; }
+-keep,allowobfuscation interface com.samosaai.masala.llm.ApiService { *; }
 
 # pdfbox-android: optional JPEG 2000 and crypto providers are not bundled.
 -dontwarn com.gemalto.jp2.**

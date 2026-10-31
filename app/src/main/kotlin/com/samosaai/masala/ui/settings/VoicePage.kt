@@ -132,7 +132,7 @@ fun VoicePage(settings: LauncherSettings, update: ((LauncherSettings) -> Launche
                 outs.forEach { p ->
                     Segment(p.name, profile.voiceOut?.presetId == p.id) {
                         val known = profile.endpoints.firstOrNull { it.presetId == p.id }?.baseUrl ?: p.baseUrl
-                        scope.launch { store.update { it.copy(voiceOut = Endpoint(p.id, known), voice = "") } }
+                        scope.launch { store.update { it.copy(voiceOut = Endpoint(p.id, known, p.defaultTtsModel), voice = "") } }
                     }
                 }
             }
@@ -152,11 +152,13 @@ fun VoicePage(settings: LauncherSettings, update: ((LauncherSettings) -> Launche
                 )
             }
             SettingsToggleRow(stringResource(R.string.settings_read_replies), settings.readRepliesAloud) { on -> update { it.copy(readRepliesAloud = on) } }
+            val testSentence = stringResource(R.string.settings_test_voice_sentence)
+            val testVoiceOk = stringResource(R.string.settings_test_voice_ok)
             OutlinedButton(
                 onClick = {
                     scope.launch {
-                        val reason = app.speakReply(context.getString(R.string.settings_test_voice_sentence))
-                        Toast.makeText(context, reason ?: context.getString(R.string.settings_test_voice_ok), Toast.LENGTH_SHORT).show()
+                        val reason = app.speakReply(testSentence)
+                        Toast.makeText(context, reason ?: testVoiceOk, Toast.LENGTH_SHORT).show()
                     }
                 },
                 border = BorderStroke(1.dp, voiceTint.copy(alpha = 0.4f)),

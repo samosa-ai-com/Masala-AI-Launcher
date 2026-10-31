@@ -37,10 +37,18 @@ class KeyCipher(private val secretKey: () -> SecretKey) {
         private const val IV_BYTES = 12
         private const val ALIAS = "masala_ai_keys"
 
-        /** The Keystore-backed cipher; the key is made on first use. */
+        @Volatile
+        private var cached: SecretKey? = null
+
+        /** The Keystore-backed cipher; the key is made once and then reused. */
         fun androidKeystore(): KeyCipher = KeyCipher {
+            cached ?: synchronized(this) { cached ?: loadOrCreate().also { cached = it } }
+        }
+
+        private fun loadOrCreate(): SecretKey {
             val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-            (store.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry)?.secretKey ?: KeyGenerator
+            (store.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
+            return KeyGenerator
                 .getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
                 .apply {
                     init(

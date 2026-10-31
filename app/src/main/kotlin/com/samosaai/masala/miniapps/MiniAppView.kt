@@ -418,13 +418,18 @@ class MiniAppActivity : ComponentActivity() {
                                     )
                                 }
                             }) { Text(stringResource(R.string.miniapp_share)) }
+                            // Resolved in composition: reading resources off LocalContext inside the
+                            // launch below trips lint (LocalContextGetResourceValueCall).
+                            val pinTitle = stringResource(R.string.miniapp_title)
+                            val pinnedText = stringResource(R.string.miniapp_pinned)
+                            val pinFailedText = stringResource(R.string.miniapp_pin_failed)
                             TextButton(onClick = {
                                 scope.launch {
                                     val problems = app.layouts.pinMiniApp(
-                                        appId, title.ifEmpty { context.getString(R.string.miniapp_title) }
+                                        appId, title.ifEmpty { pinTitle }
                                     )
-                                    val text = if (problems.isEmpty()) R.string.miniapp_pinned
-                                    else R.string.miniapp_pin_failed
+                                    val text = if (problems.isEmpty()) pinnedText
+                                    else pinFailedText
                                     android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             }) { Text(stringResource(R.string.miniapp_pin)) }

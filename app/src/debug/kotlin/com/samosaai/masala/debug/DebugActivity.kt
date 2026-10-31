@@ -52,7 +52,6 @@ import androidx.compose.ui.unit.sp
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.R
-import com.samosaai.masala.core.tool.ToolDefinition
 import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.llm.LlmConfig
@@ -60,6 +59,7 @@ import com.samosaai.masala.masala
 import com.samosaai.masala.tools.Capability
 import com.samosaai.masala.tools.HealthTool
 import com.samosaai.masala.tools.ToolGate
+import com.samosaai.masala.tools.commandTemplate
 import com.samosaai.masala.ui.theme.MasalaTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
@@ -69,7 +69,6 @@ import com.samosaai.masala.llm.ChatMessage
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -370,25 +369,3 @@ internal fun capped(text: String, limit: Int): String {
 
 private const val PREVIEW_CHARS = 1_200
 private const val MAX_BODY_CHARS = 8_000
-
-/**
- * A ready-to-edit argument object for the `/tool` prompt: one entry per required parameter, with a
- * placeholder of the right JSON type, so tapping "Use" always produces a call that parses.
- */
-internal fun commandTemplate(definition: ToolDefinition): String {
-    val properties = definition.parameters["properties"]?.jsonObject.orEmpty()
-    val required = definition.parameters["required"]?.jsonArray
-        ?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
-    val args = required.joinToString(",") { key ->
-        val type = properties[key]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull ?: "string"
-        val value = when (type) {
-            "integer", "number" -> "0"
-            "boolean" -> "false"
-            "array" -> "[]"
-            "object" -> "{}"
-            else -> "\"\""
-        }
-        "\"$key\":$value"
-    }
-    return "{$args}"
-}

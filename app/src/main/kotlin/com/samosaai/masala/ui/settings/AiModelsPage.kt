@@ -1,5 +1,6 @@
 package com.samosaai.masala.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -46,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -105,10 +107,11 @@ fun AiModelsPage(onBack: () -> Unit) {
     val urlCheck = AiValidation.normalizeBaseUrl(effectiveUrl)
     val clipboard = LocalClipboardManager.current
 
-    /** Writes the key and refreshes every role this preset is used for. */
+    /** Writes the key and refreshes every role this preset is used for. The key is saved even when
+     *  the URL doesn't validate yet, so backing out never loses a pasted key. */
     suspend fun persist(roles: (AiProfile) -> AiProfile = { it }) {
-        val base = urlCheck.getOrNull() ?: return
         if (preset.keyKind == KeyKind.KEY) store.setKey(preset.id, key)
+        val base = urlCheck.getOrNull() ?: return
         store.update { p ->
             fun Endpoint.refreshed(m: String = model) = if (presetId == preset.id) copy(baseUrl = base, model = m) else this
             roles(
@@ -121,10 +124,14 @@ fun AiModelsPage(onBack: () -> Unit) {
         }
     }
 
-    SettingsScaffold(stringResource(R.string.ai_models_title), onBack) {
+    // Typed input must survive every exit, not just Test/Toggle: the activity-level BackHandler
+    // would otherwise pop this page without flushing.
+    BackHandler { scope.launch { persist(); onBack() } }
+
+    SettingsScaffold(stringResource(R.string.ai_models_title), { scope.launch { persist(); onBack() } }) {
         Text(stringResource(R.string.ai_models_intro), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Eyebrow(stringResource(R.string.ai_models_provider))
-        PresetGrid(current = preset.id) { pickedId = it; haptics.tick() }
+        PresetGrid(current = preset.id) { scope.launch { persist(); pickedId = it; haptics.tick() } }
 
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(Radii.card)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
@@ -156,7 +163,7 @@ fun AiModelsPage(onBack: () -> Unit) {
                     label = { Text(stringResource(R.string.ai_base_url)) },
                     textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = MasalaMono),
                     isError = urlCheck.isFailure && url.isNotBlank(),
-                    supportingText = urlCheck.exceptionOrNull()?.let { e -> { Text(urlProblem((e as AiValidation.InvalidUrl).problem.name)) } },
+                    supportingText = urlCheck.exceptionOrNull()?.let { e -> { Text(urlProblem((e as? AiValidation.InvalidUrl)?.problem?.name ?: "EMPTY")) } },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     modifier = Modifier.fillMaxWidth(),
@@ -227,7 +234,14 @@ fun AiModelsPage(onBack: () -> Unit) {
                     scope.launch { persist { it.copy(voiceIn = if (on) Endpoint(preset.id, urlCheck.getOrThrow()) else null) } }
                 }
                 UseRow(stringResource(R.string.ai_use_voice_out), profile.voiceOut?.presetId == preset.id, preset.capabilities.voiceOut) { on ->
-                    scope.launch { persist { it.copy(voiceOut = if (on) Endpoint(preset.id, urlCheck.getOrThrow()) else null) } }
+                    scope.launch {
+                        persist {
+                            val model = it.voiceOut?.takeIf { v -> v.presetId == preset.id }?.model?.ifBlank { preset.defaultTtsModel }
+                                ?: preset.defaultTtsModel
+                            // A phone voice picked earlier would 400 on the API; start unpicked.
+                            it.copy(voiceOut = if (on) Endpoint(preset.id, urlCheck.getOrThrow(), model) else null, voice = if (on) "" else it.voice)
+                        }
+                    }
                 }
             }
 
@@ -301,7 +315,8 @@ private fun presetNote(p: ProviderPreset): String = stringResource(
     when (p.id) {
         "openai" -> R.string.ai_note_openai
         "meta" -> R.string.ai_note_meta
-        "anthropic", "gemini" -> R.string.ai_note_chat_only
+        "anthropic" -> R.string.ai_note_anthropic
+        "gemini" -> R.string.ai_note_chat_only
         "groq" -> R.string.ai_note_groq
         "openrouter" -> R.string.ai_note_openrouter
         "mistral" -> R.string.ai_note_mistral
@@ -355,7 +370,7 @@ private fun TestResult(outcome: AiConnection.Outcome) {
             val parts = listOfNotNull(
                 stringResource(R.string.ai_found_chat, f.chat.size).takeIf { f.chat.isNotEmpty() },
                 stringResource(R.string.ai_found_stt, f.transcription.size).takeIf { f.transcription.isNotEmpty() },
-                stringResource(R.string.ai_found_tts, f.voices.size).takeIf { f.voices.isNotEmpty() },
+                pluralStringResource(R.plurals.ai_found_tts, f.voices.size, f.voices.size).takeIf { f.voices.isNotEmpty() },
             ).ifEmpty { listOf(stringResource(R.string.ai_found_nothing)) }
             Triple(true, stringResource(R.string.ai_connected), parts.joinToString(", ") + " · ${f.millis} ms")
         }

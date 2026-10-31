@@ -21,7 +21,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -84,7 +83,17 @@ class IconCache(context: Context, private val catalog: AppCatalog) {
     }
 
     private fun render(drawable: Drawable, s: Style): Bitmap {
-        if (s.shape == IconShape.AS_SHIPPED) return drawable.toBitmap(sizePx, sizePx)
+        val mono = if (s.style == IconStyle.TINTED && drawable is AdaptiveIconDrawable && Build.VERSION.SDK_INT >= 33) drawable.monochrome else null
+        // No mask for as-shipped: the icon untouched, or its monochrome layer on the tint tile,
+        // clipped to the same mask the tile next to it uses.
+        if (s.shape == IconShape.AS_SHIPPED) {
+            if (mono == null) return drawable.toBitmap(sizePx, sizePx)
+            val bitmap = createBitmap(sizePx, sizePx)
+            val canvas = Canvas(bitmap)
+            canvas.clipPath(IconMask.path(s.shape, sizePx.toFloat(), sizePx.toFloat()))
+            drawMono(canvas, mono, sizePx, sizePx / 4, s.tint)
+            return bitmap
+        }
         val size = sizePx
         val bitmap = createBitmap(size, size)
         val canvas = Canvas(bitmap)
@@ -92,14 +101,8 @@ class IconCache(context: Context, private val catalog: AppCatalog) {
         // Adaptive layers are 108 dp with 72 dp visible: draw them half again as big, centred.
         val pad = size / 4
         if (drawable is AdaptiveIconDrawable) {
-            val mono = if (s.style == IconStyle.TINTED && Build.VERSION.SDK_INT >= 33) drawable.monochrome else null
             if (mono != null) {
-                canvas.drawColor(TINTED_TILE)
-                mono.mutate().apply {
-                    setTint(s.tint)
-                    setBounds(-pad, -pad, size + pad, size + pad)
-                    draw(canvas)
-                }
+                drawMono(canvas, mono, size, pad, s.tint)
             } else {
                 drawable.background?.apply { setBounds(-pad, -pad, size + pad, size + pad); draw(canvas) }
                 drawable.foreground?.apply { setBounds(-pad, -pad, size + pad, size + pad); draw(canvas) }
@@ -112,6 +115,16 @@ class IconCache(context: Context, private val catalog: AppCatalog) {
             drawable.draw(canvas)
         }
         return bitmap
+    }
+
+    /** The monochrome layer in [tint] on the dark tint tile, drawn oversized like the mask path. */
+    private fun drawMono(canvas: Canvas, mono: Drawable, size: Int, pad: Int, tint: Int) {
+        canvas.drawColor(TINTED_TILE)
+        mono.mutate().apply {
+            setTint(tint)
+            setBounds(-pad, -pad, size + pad, size + pad)
+            draw(canvas)
+        }
     }
 
     private fun badge(bitmap: Bitmap, user: UserHandle?): Bitmap {
@@ -139,8 +152,10 @@ fun rememberAppIcon(icons: IconCache, key: AppKey): ImageBitmap? {
 
 @Composable
 fun rememberShortcutIcon(icons: IconCache, info: ShortcutInfo): ImageBitmap? {
-    val icon by produceState(icons.cached(IconCache.shortcutId(info)), IconCache.shortcutId(info), icons.style) {
-        value = icons.shortcut(info)
-    }
+    // A cached icon needs no coroutine, like rememberAppIcon above.
+    val id = IconCache.shortcutId(info)
+    val style = icons.style
+    var icon by remember(id, style) { mutableStateOf(icons.cached(id)) }
+    if (icon == null) LaunchedEffect(id, style) { icon = icons.shortcut(info) }
     return icon
 }

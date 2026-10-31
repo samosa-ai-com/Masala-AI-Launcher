@@ -368,7 +368,7 @@ private fun Modifier.itemClicks(item: Item, app: AppEntry?, ctx: RenderContext, 
                 val from = bounds?.rect
                 if (from != null && item.action is MasalaAction.LaunchApp && ctx.onLaunchFrom != null) ctx.onLaunchFrom.invoke(item.action, from) else ctx.onAction(item.action)
             },
-            onLongClick = if (canMenu) ({ ctx.onAppMenu(app!!) }) else null,
+            onLongClick = if (canMenu && app != null) ({ ctx.onAppMenu(app) }) else null,
             onLongClickLabel = if (canMenu) menuLabel else null,
         )
         .semantics { contentDescription = label; role = Role.Button }

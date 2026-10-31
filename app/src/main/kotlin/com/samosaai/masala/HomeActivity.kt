@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -39,6 +40,7 @@ import com.samosaai.masala.core.apps.AppEntry
 import com.samosaai.masala.core.apps.Visibility
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.launcher.HomeRole
+import com.samosaai.masala.launcher.HomeSearchSources
 import com.samosaai.masala.ui.drawer.AppMenu
 import com.samosaai.masala.ui.drawer.AppMenuActions
 import com.samosaai.masala.ui.drawer.Drawer
@@ -93,7 +95,8 @@ class HomeActivity : ComponentActivity() {
         // Light icons on the wallpaper; HomeContent switches them while a light drawer is open.
         enableEdgeToEdge(SystemBarStyle.dark(Color.TRANSPARENT), SystemBarStyle.dark(Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
-        showWelcomeOnce()
+        // Once per creation: a rotation while Welcome is in flight must not launch it again.
+        if (savedInstanceState == null) showWelcomeOnce()
         setContent {
             val settings by masala.settings.settings.collectAsStateWithLifecycle(LauncherSettings())
             MasalaTheme(settings, systemBars = false) { HomeContent(settings) }
@@ -186,11 +189,17 @@ class HomeActivity : ComponentActivity() {
         val drawerShown = remember { derivedStateOf { drawerProgress.value > 0f } }
         val drawerSettled = remember { derivedStateOf { drawerOpen && drawerProgress.value >= 1f } }
         val drawerSpring = remember { spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow) }
+        // The release's fling velocity, consumed by the animation below. The release only records
+        // it and flips the state; the effect below is the single place that animates, so a
+        // cancelled animation can never strand the state behind the progress.
+        var releaseVelocity by remember { mutableFloatStateOf(0f) }
         LaunchedEffect(Unit) {
             snapshotFlow { drawerOpen }.collectLatest { open ->
                 val target = if (open) 1f else 0f
                 // A released drag already animates there with the finger's speed; don't restart it.
-                if (!(drawerProgress.isRunning && drawerProgress.targetValue == target)) drawerProgress.animateTo(target, drawerSpring)
+                val v = releaseVelocity
+                releaseVelocity = 0f
+                if (!(drawerProgress.isRunning && drawerProgress.targetValue == target)) drawerProgress.animateTo(target, drawerSpring, initialVelocity = v)
             }
         }
         // Composed once home has drawn its first frame, so the first open is as quick as the rest.
@@ -212,9 +221,19 @@ class HomeActivity : ComponentActivity() {
 
                 override fun onRelease(velocityY: Float) {
                     val open = velocityY < -FLING_VELOCITY || (velocityY < FLING_VELOCITY && drawerProgress.value > 0.35f)
-                    drawerOpen = open
-                    scope.launch {
-                        drawerProgress.animateTo(if (open) 1f else 0f, drawerSpring, initialVelocity = -velocityY / distance)
+                    if (drawerOpen == open) {
+                        // No state change, so the effect below won't run: settle directly. Without
+                        // this a partial drag that releases below the threshold freezes mid-slide
+                        // with no later event able to move it.
+                        scope.launch {
+                            drawerProgress.animateTo(if (open) 1f else 0f, drawerSpring, initialVelocity = -velocityY / distance)
+                        }
+                    } else {
+                        // Record the fling for the effect to consume; it owns the animation, so the
+                        // two can never fight over the same frame. (Only here, so a sub-threshold
+                        // release can't leak a stale velocity into a later tap-to-open.)
+                        releaseVelocity = -velocityY / distance
+                        drawerOpen = open
                     }
                 }
             }
@@ -406,7 +425,18 @@ class HomeActivity : ComponentActivity() {
                 }
                 .then(if (!drawerShown.value) Modifier.clearAndSetSemantics { } else Modifier),
         ) {
-            val searchSources = remember { com.samosaai.masala.launcher.HomeSearchSources(this@HomeActivity, app) }
+            val searchSources = remember { HomeSearchSources(this@HomeActivity, app) }
+            // File hits ask the model, whose reply card only renders with the drawer closed;
+            // external targets would otherwise land back on an open drawer. Dismiss first.
+            val dismissingSources = remember(searchSources) {
+                object : com.samosaai.masala.ui.drawer.SearchSources by searchSources {
+                    override fun openShortcut(shortcut: ShortcutInfo) { drawerOpen = false; searchSources.openShortcut(shortcut) }
+                    override fun openSkill(skill: com.samosaai.masala.core.contract.MasalaSkill) { drawerOpen = false; searchSources.openSkill(skill) }
+                    override fun openSetting(entry: com.samosaai.masala.ui.drawer.SettingsEntry) { drawerOpen = false; searchSources.openSetting(entry) }
+                    override fun openFile(hit: com.samosaai.masala.ui.drawer.FileHit) { drawerOpen = false; searchSources.openFile(hit) }
+                    override fun webSearch(query: String) { drawerOpen = false; searchSources.webSearch(query) }
+                }
+            }
             // Suggestions and usage access are read again each time the drawer opens.
             var suggested by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
             var usageAccess by remember { mutableStateOf(false) }
@@ -421,8 +451,9 @@ class HomeActivity : ComponentActivity() {
                 val now = System.currentTimeMillis()
                 val launches = app.usage.launches(com.samosaai.masala.core.apps.UsageRange.MONTH.since(now, zone), apps)
                 val byId = apps.associateBy { it.key.id }
+                val eligible = byId.filterValues { it.visibility == Visibility.DEFAULT }.keys
                 val t = java.time.LocalTime.now(zone)
-                val next = com.samosaai.masala.core.apps.UsageRank.suggestedNow(launches, t.hour * 60 + t.minute, zone, { byId[it]?.label ?: it })
+                val next = com.samosaai.masala.core.apps.UsageRank.suggestedNow(launches.filter { it.key in eligible }, t.hour * 60 + t.minute, zone, { byId[it]?.label ?: it })
                     .mapNotNull { byId[it] }.filter { it.visibility == Visibility.DEFAULT }
                 if (next.map { it.key } != suggested.map { it.key }) suggested = next
             }
@@ -454,7 +485,7 @@ class HomeActivity : ComponentActivity() {
                 onLayout = { l -> scope.launch { app.settings.update { it.copy(drawerLayout = l) } } },
                 suggested = suggested,
                 globe = globeSource,
-                sources = searchSources,
+                sources = dismissingSources,
                 onMenu = { menuFor = it },
                 onAsk = ::askMasala,
                 onWorkPaused = { paused ->
