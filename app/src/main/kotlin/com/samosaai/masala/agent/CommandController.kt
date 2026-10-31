@@ -228,11 +228,13 @@ class CommandController(
 
     /** Ends tap-to-talk listening now; what was said still runs. */
     fun finishListening() {
-        // Sending is not instantaneous: the take still has to be transcribed. Say so at
-        // once instead of leaving "Listening…" on screen until the text lands.
+        // Sending is not instantaneous: the take still has to be transcribed. Show the
+        // working row at once instead of leaving "Listening…" on screen until the text
+        // lands. Steps stay empty until something actually finishes: the timeline ticks
+        // only done steps, so a pending transcribe must not appear ticked.
         if (_state.value == CommandState.Listening) {
             _walkieTalkie.value = false
-            _state.value = CommandState.Thinking("", listOf("Transcribing"))
+            _state.value = CommandState.Thinking("", emptyList())
         }
         speech?.finish()
     }

@@ -232,7 +232,9 @@ private fun Orb(level: () -> Float, character: Character, listening: Boolean, ca
                 label = "orb-level",
             )
             val accent = MasalaTheme.tokens.accent
-            androidx.compose.foundation.Canvas(Modifier.size(200.dp)) {
+            // Sized to fit the collapsed sheet: canvas, character, caption and hint share
+            // about 200 dp here, and a taller orb overflows center-first into the mic row.
+            androidx.compose.foundation.Canvas(Modifier.size(150.dp)) {
                 val base = size.minDimension / 2f
                 repeat(3) { i ->
                     val grow = 0.55f + 0.45f * l + i * 0.14f
@@ -246,7 +248,7 @@ private fun Orb(level: () -> Float, character: Character, listening: Boolean, ca
             MasalaCharacter(
                 character,
                 if (listening) CharacterState.LISTENING else CharacterState.HELLO,
-                Modifier.size(120.dp), { l },
+                Modifier.size(96.dp), { l },
                 description = if (listening) stringResource(R.string.listening_sam) else null,
             )
         }
@@ -276,16 +278,18 @@ private fun Orb(level: () -> Float, character: Character, listening: Boolean, ca
                 style = MaterialTheme.typography.titleMedium,
                 color = if (caption.isBlank()) MasalaTheme.tokens.textMedium else MasalaTheme.tokens.textHigh,
                 textAlign = TextAlign.Center,
-                maxLines = 3,
+                maxLines = 2,
                 modifier = Modifier.padding(top = 12.dp, start = 24.dp, end = 24.dp),
             )
         }
-        Text(
-            stringResource(R.string.chat_drag_for_thread),
-            style = MaterialTheme.typography.bodySmall,
-            color = MasalaTheme.tokens.textLow,
-            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
-        )
+        if (!listening) {
+            Text(
+                stringResource(R.string.chat_drag_for_thread),
+                style = MaterialTheme.typography.bodySmall,
+                color = MasalaTheme.tokens.textLow,
+                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+            )
+        }
     }
 }
 
