@@ -130,6 +130,14 @@ object MasalaToolDefinitions {
                     put("type", "string")
                     put("description", "Complete HTML document, inline style and script only.")
                 }
+                putJsonObject("icon") {
+                    put("type", "string")
+                    put(
+                        "description",
+                        "Optional icon: a built-in name (e.g. timer, music_note, checklist) or one small " +
+                            "inline SVG (<= 8 KB, viewBox, no scripts, no links).",
+                    )
+                }
             }
             putJsonArray("required") { add("html") }
         }
@@ -149,6 +157,14 @@ object MasalaToolDefinitions {
                     put("type", "string")
                     put("description", "Complete replacement HTML document.")
                 }
+                putJsonObject("icon") {
+                    put("type", "string")
+                    put(
+                        "description",
+                        "Optional icon: a built-in name (e.g. timer, music_note, checklist) or one small " +
+                            "inline SVG (<= 8 KB, viewBox, no scripts, no links). Missing leaves the stored one alone.",
+                    )
+                }
             }
             putJsonArray("required") {
                 add("id")
@@ -159,8 +175,8 @@ object MasalaToolDefinitions {
 
     val listMiniApps = tool(
         "list_mini_apps",
-        "List the HTML mini-apps stored on this phone: id, title, last update, and whether it may use " +
-            "the internet. To change one: read_mini_app, then update_mini_app.",
+        "List the HTML mini-apps stored on this phone: id, title, last update, whether it may use " +
+            "the internet, and whether it has an icon. To change one: read_mini_app, then update_mini_app.",
         schema { putJsonObject("properties") {} }
     )
 
