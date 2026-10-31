@@ -67,6 +67,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -121,6 +125,12 @@ private data class Ranked<T>(val query: String, val results: List<T>)
 
 /** Pause after the last keystroke before a composing single match auto-launches. */
 private const val AUTO_LAUNCH_PAUSE_MS = 800L
+
+/** How far the letter under the thumb swings left from the rail. */
+private val ARC_SWING = 36.dp
+
+/** Radius of the disc behind the curve; its centre sits between the rail and the swung-out letter. */
+private val ARC_DISC_RADIUS = 56.dp
 private const val GLOBE_MAX = 30
 
 /** Where the globe gets its counts and whether to ask for Usage access (decision 11). */
@@ -571,12 +581,33 @@ internal fun Scrubber(letters: List<Char>, modifier: Modifier = Modifier, onLett
         }
     }
     val label = stringResource(R.string.drawer_scrubber)
+    val panel = MaterialTheme.colorScheme.surfaceContainerHigh
     Column(modifier.width(22.dp)) {
         // "A" starts about 30% down, within thumb reach; the letters spread to near the bottom.
         Spacer(Modifier.weight(0.3f))
         Column(
             Modifier.weight(0.7f).fillMaxWidth()
                 .onGloballyPositioned { heightPx = it.size.height.coerceAtLeast(1) }
+                // A disc behind the curve, following the finger, so the letters never sit on the app
+                // icons under them; solid in the middle, fading at the rim. Drawn outside the 22 dp
+                // strip, like the letters.
+                .drawBehind {
+                    val a = active.value
+                    if (a <= 0f) return@drawBehind
+                    val radius = ARC_DISC_RADIUS.toPx()
+                    val centre = Offset(size.width / 2 - ARC_SWING.toPx() * 0.6f, dragY)
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            0f to panel.copy(alpha = 0.97f * a),
+                            0.7f to panel.copy(alpha = 0.94f * a),
+                            1f to panel.copy(alpha = 0f),
+                            center = centre,
+                            radius = radius,
+                        ),
+                        radius = radius,
+                        center = centre,
+                    )
+                }
                 .semantics { contentDescription = label }
                 .pointerInput(Unit) {
                     // One gesture block: stacked tap+drag detectors cancel each other and
@@ -604,20 +635,21 @@ internal fun Scrubber(letters: List<Char>, modifier: Modifier = Modifier, onLett
         ) {
             letters.forEachIndexed { i, c ->
                 Text(
-                    c.toString(), fontSize = 10.sp, lineHeight = 16.sp, textAlign = TextAlign.Center,
+                    c.toString(), fontSize = 10.sp, lineHeight = 16.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold,
                     color = if (c == last) tokens.accentText else tokens.textLow,
-                    // A bell around the finger's letter swings it left and grows it; the rail keeps its
-                    // 22 dp touch strip and draws outside it (graphicsLayer does not clip).
+                    // A narrow bell around the finger's letter swings it left and grows it, its neighbours
+                    // less, the rest hardly at all; the rail keeps its 22 dp touch strip and draws outside
+                    // it (graphicsLayer does not clip).
                     modifier = Modifier.graphicsLayer {
                         val a = active.value
                         val pitch = heightPx.toFloat() / letters.size
                         val centre = (i + 0.5f) * pitch
                         val d = (centre - dragY) / pitch
-                        val bell = exp(-(d * d) / 8f)
-                        translationX = -bell * 56.dp.toPx() * a
-                        scaleX = 1f + bell * 1.2f * a
+                        val bell = exp(-(d * d) / 2.5f)
+                        translationX = -bell * ARC_SWING.toPx() * a
+                        scaleX = 1f + bell * 1.1f * a
                         scaleY = scaleX
-                        alpha = 1f - (1f - bell) * 0.5f * a
+                        alpha = 1f - (1f - bell) * 0.65f * a
                     },
                 )
             }
