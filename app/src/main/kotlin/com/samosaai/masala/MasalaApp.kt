@@ -341,6 +341,7 @@ class MasalaApp : Application() {
             summarize = { transcript -> summarizeHistory(transcript) },
         ).also { controller ->
             controller.handsFreeAvailable = { speechInput().handsFreeAvailable() }
+            controller.usesServerStt = { speechInput().usesServerStt() }
             controller.onTurn = ::recordTurn
             scope.launch { chats.load() }
         }

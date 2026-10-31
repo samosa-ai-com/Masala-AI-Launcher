@@ -149,6 +149,9 @@ class ConfiguredSpeechInput(
     /** Whether a tap may start a take that ends itself with this configuration. */
     fun handsFreeAvailable(): Boolean = handsFreeEnabled() && SpeechPolicy.handsFreeWorks(configured())
 
+    /** True when push-to-talk records for a transcription endpoint (which sends no partials). */
+    fun usesServerStt(): Boolean = configured().isApiBased()
+
     override fun start(onFailure: (String) -> Unit): Boolean {
         live?.resetLive()
         // A press while a previous session is still around must not leak its recorder.

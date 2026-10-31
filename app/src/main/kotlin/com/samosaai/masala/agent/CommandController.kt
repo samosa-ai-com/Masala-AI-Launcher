@@ -84,6 +84,9 @@ class CommandController(
      */
     var handsFreeAvailable: () -> Boolean = { true }
 
+    /** True while push-to-talk records for a transcription endpoint (which sends no partials). */
+    var usesServerStt: () -> Boolean = { false }
+
     /** Seconds until the take ends by itself, when the provider works that way. */
     val autoSendIn: StateFlow<Int?> get() = speech?.autoSendIn ?: kotlinx.coroutines.flow.MutableStateFlow(null)
     private var history: List<ChatMessage> = emptyList()

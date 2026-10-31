@@ -519,6 +519,7 @@ class HomeActivity : ComponentActivity() {
                     mic = rememberMicPress(app),
                     autoSendIn = autoSendIn,
                     walkie = walkieTalkie,
+                    serverProvider = app.commands.usesServerStt(),
                     onSend = { app.commands.sendNow() },
                     onStop = { app.commands.dismiss() },
                     onClose = {

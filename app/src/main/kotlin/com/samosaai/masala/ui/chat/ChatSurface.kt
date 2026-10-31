@@ -49,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -87,6 +88,7 @@ fun ChatSurface(
     mic: MicPress,
     autoSendIn: Int?,
     walkie: Boolean = false,
+    serverProvider: Boolean = false,
     onSend: () -> Unit,
     onStop: () -> Unit,
     onClose: () -> Unit,
@@ -140,6 +142,7 @@ fun ChatSurface(
                             level = level,
                             character = character,
                             listening = listening,
+                            showShimmer = listening && serverProvider && liveWords.isBlank(),
                             caption = liveWords.ifBlank {
                                 (turns.lastOrNull { it.role == TurnRole.MASALA }?.text ?: "").take(140)
                             },
@@ -209,7 +212,7 @@ private fun Header(
 
 /** Talking: Sam and rings that follow the mic, with the words heard so far. */
 @Composable
-private fun Orb(level: () -> Float, character: Character, listening: Boolean, caption: String) {
+private fun Orb(level: () -> Float, character: Character, listening: Boolean, caption: String, showShimmer: Boolean = false) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Box(contentAlignment = Alignment.Center) {
             // The engine reports one level per 200 ms audio window; animating between them
@@ -239,14 +242,36 @@ private fun Orb(level: () -> Float, character: Character, listening: Boolean, ca
                 description = if (listening) stringResource(R.string.listening_sam) else null,
             )
         }
-        Text(
-            caption.ifBlank { if (listening) stringResource(R.string.command_listening) else stringResource(R.string.chat_tap_mic) },
-            style = MaterialTheme.typography.titleMedium,
-            color = if (caption.isBlank()) MasalaTheme.tokens.textMedium else MasalaTheme.tokens.textHigh,
-            textAlign = TextAlign.Center,
-            maxLines = 3,
-            modifier = Modifier.padding(top = 12.dp, start = 24.dp, end = 24.dp),
-        )
+        if (showShimmer) {
+            // The server sends no partials, so the orb would sit on a dead line until
+            // the transcript lands. Pulse it instead; the animated value is read only
+            // inside the draw lambda, so the pulse redraws without recomposing.
+            var on by remember { mutableStateOf(true) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    kotlinx.coroutines.delay(1100)
+                    on = !on
+                }
+            }
+            val glow by animateFloatAsState(if (on) 1f else 0.35f, tween(1100, easing = FastOutSlowInEasing), label = "listening-alpha")
+            Text(
+                stringResource(R.string.command_listening),
+                style = MaterialTheme.typography.titleMedium,
+                color = MasalaTheme.tokens.textMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier.graphicsLayer { alpha = glow }.padding(top = 12.dp, start = 24.dp, end = 24.dp),
+            )
+        } else {
+            Text(
+                caption.ifBlank { if (listening) stringResource(R.string.command_listening) else stringResource(R.string.chat_tap_mic) },
+                style = MaterialTheme.typography.titleMedium,
+                color = if (caption.isBlank()) MasalaTheme.tokens.textMedium else MasalaTheme.tokens.textHigh,
+                textAlign = TextAlign.Center,
+                maxLines = 3,
+                modifier = Modifier.padding(top = 12.dp, start = 24.dp, end = 24.dp),
+            )
+        }
         Text(
             stringResource(R.string.chat_drag_for_thread),
             style = MaterialTheme.typography.bodySmall,
