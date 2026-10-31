@@ -14,6 +14,7 @@ import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.GridView
@@ -96,7 +97,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, ABOUT }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, ABOUT, BRIEF }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -140,6 +141,7 @@ class SettingsActivity : ComponentActivity() {
                         Page.DRAWER -> DrawerPage(settings, onHiddenApps = { page = Page.HIDDEN_APPS }, onBack = { page = Page.MAIN })
                         Page.PRIVACY -> PrivacyPage(onBack = { page = Page.MAIN })
                         Page.ABOUT -> AboutPage(onBack = { page = Page.MAIN })
+                        Page.BRIEF -> BriefPage(settings, update = { change -> lifecycleScope.launch { masala.settings.update(change) } }, onBack = { page = Page.MAIN })
                     }
                 }
             }
@@ -189,6 +191,7 @@ class SettingsActivity : ComponentActivity() {
             add(Entry(1, Icons.Rounded.Search, data, stringResource(R.string.drawer_page_title), stringResource(R.string.drawer_page_summary)) { onPage(Page.DRAWER) })
             add(Entry(2, Icons.Rounded.AutoFixHigh, auto, stringResource(R.string.settings_skills), stringResource(R.string.settings_skills_summary), onSkills))
             add(Entry(2, Icons.Rounded.Schedule, auto, stringResource(R.string.settings_scheduled_tasks), stringResource(R.string.settings_scheduled_tasks_summary), onTasks))
+            add(Entry(2, Icons.Rounded.WbSunny, auto, stringResource(R.string.brief_title), stringResource(R.string.brief_summary)) { onPage(Page.BRIEF) })
             add(Entry(2, Icons.Rounded.Extension, auto, stringResource(R.string.mcp_title), stringResource(R.string.mcp_summary)) { startActivity(Intent(this@SettingsActivity, McpActivity::class.java)) })
             add(Entry(2, Icons.Rounded.Apps, auto, stringResource(R.string.settings_miniapps), stringResource(R.string.settings_miniapps_summary), onMiniApps))
             add(Entry(3, Icons.Rounded.MenuBook, data, stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) { startActivity(Intent(this@SettingsActivity, SecondBrainActivity::class.java)) })

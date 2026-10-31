@@ -418,6 +418,8 @@
     <string name="skill_widget_read_aloud">Read aloud</string>
     <string name="skill_widget_stop_reading">Stop</string>
     <string name="skill_widget_run_now">Run now</string>
+    <string name="brief_channel">Daily brief</string>
+    <string name="brief_ready">Your daily brief is ready</string>
     <string name="skill_widget_ran_today">Today</string>
     <string name="skill_widget_ran_yesterday">Yesterday</string>
     <string name="skill_widget_no_task">This skill has no schedule yet. Add the widget\'s schedule first.</string>

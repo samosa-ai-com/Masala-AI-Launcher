@@ -92,6 +92,7 @@ class HomeSearchSources(private val context: Context, private val app: MasalaApp
             SettingsEntry(context.getString(R.string.settings_home_layout), listOf("home", "layout", "undo", "gesture", "lock"), "LAYOUT"),
             SettingsEntry(context.getString(R.string.settings_files), listOf("files", "index", "storage"), "FILES"),
             SettingsEntry(context.getString(R.string.settings_skills), listOf("skills", "persona"), "SKILLS"),
+            SettingsEntry(context.getString(R.string.brief_title), listOf("brief", "morning", "weather", "topics", "news"), "BRIEF"),
         )
     }
 

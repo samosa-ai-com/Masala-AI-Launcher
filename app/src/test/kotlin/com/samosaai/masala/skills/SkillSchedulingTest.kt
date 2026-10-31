@@ -84,4 +84,18 @@ class SkillSchedulingTest {
         assertTrue(formatNextRun(sevenThirty, zone, today).none { it.isLetter() && it !in "AMP" }, "today has no weekday")
         assertTrue(formatNextRun(tomorrow, zone, today).startsWith("Thu"))
     }
+
+    @Test fun setDailyCreatesOrMovesTheTaskAndTurnsItOn() {
+        val created = scheduling.setDaily(brief, java.time.LocalTime.of(6, 45), now, nowMillis, zone)
+        assertEquals("2026-10-29T06:45", created.startLocal)
+        assertEquals(RepeatKind.DAILY, created.repeat.kind)
+        assertNotNull(created.nextRunAt)
+        store.put(created.copy(enabled = false))
+        val moved = scheduling.setDaily(brief, java.time.LocalTime.of(11, 0), now, nowMillis, zone)
+        assertEquals(created.id, moved.id)
+        assertEquals("2026-10-28T11:00", moved.startLocal)
+        assertTrue(moved.enabled)
+        assertEquals(LocalDateTime.parse("2026-10-28T11:00").atZone(zone).toInstant().toEpochMilli(), moved.nextRunAt)
+        assertEquals(1, store.all().size)
+    }
 }
