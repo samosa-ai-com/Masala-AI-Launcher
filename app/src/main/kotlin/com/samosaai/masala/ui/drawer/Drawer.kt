@@ -319,9 +319,7 @@ fun Drawer(
                     if (showWork && work != null) WorkHeader(paused = work.paused, onWorkPaused = onWorkPaused)
                     when (shownLayout) {
                         DrawerLayout.GRID -> AppGrid(shown, suggested.takeIf { !showWork }.orEmpty(), icons, profiles, onLaunch, onMenu, gridState, Modifier.weight(1f))
-                        DrawerLayout.LIST -> LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(1f)) {
-                            items(shown, key = { it.key.id }) { entry -> AppRow(entry, icons, profiles, labelWork = false, onLaunch, onMenu) }
-                        }
+                        DrawerLayout.LIST -> AppListWithRail(shown, icons, profiles, onLaunch, onMenu, listState, Modifier.weight(1f))
                         DrawerLayout.GLOBE -> GlobePage(shown, globeRanked, usageOrder, range, { range = it }, icons, open, globe, onLaunch, onMenu, profiles, Modifier.weight(1f))
                     }
                 }
@@ -481,6 +479,58 @@ private fun AppGrid(
         )
         // With motion on, the letter under the thumb grows on the arc itself, so the bubble stays out of
         // the way. Reduced motion has no arc, so it keeps the bubble.
+        if (reduced) scrubbing?.let { c ->
+            Box(
+                Modifier.align(Alignment.TopEnd).padding(top = 52.dp, end = 38.dp).size(54.dp)
+                    .clip(RoundedCornerShape(topStart = 27.dp, topEnd = 27.dp, bottomStart = 27.dp, bottomEnd = 6.dp))
+                    .background(MasalaTheme.tokens.accent),
+                contentAlignment = Alignment.Center,
+            ) { Text(c.toString(), fontSize = 26.sp, color = MasalaTheme.tokens.onAccent, style = MaterialTheme.typography.headlineSmall) }
+        }
+    }
+}
+
+/** The A–Z list with the same right-edge scrubber as [AppGrid]. */
+@Composable
+private fun AppListWithRail(
+    apps: List<AppEntry>,
+    icons: IconCache,
+    profiles: AppCatalog.Snapshot,
+    onLaunch: (AppEntry, Rect?) -> Unit,
+    onMenu: (AppEntry) -> Unit,
+    state: androidx.compose.foundation.lazy.LazyListState,
+    modifier: Modifier,
+) {
+    val sections = remember(apps) { apps.groupBy { sectionOf(it.label) }.toSortedMap(compareBy { if (it == '#') '[' else it }) }
+    val headerIndex = remember(sections) {
+        var i = 0
+        sections.mapValues { (_, list) -> i.also { i += 1 + list.size } }
+    }
+    val scope = rememberCoroutineScope()
+    var scrubbing by remember { mutableStateOf<Char?>(null) }
+    val reduced = LocalMotion.current.reduced
+    Box(modifier.fillMaxWidth()) {
+        LazyColumn(state = state, modifier = Modifier.fillMaxSize().padding(end = 30.dp)) {
+            sections.forEach { (letter, list) ->
+                item(key = "h-$letter") {
+                    Text(
+                        letter.toString(), style = MaterialTheme.typography.labelMedium, color = MasalaTheme.tokens.textLow,
+                        modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 6.dp).semantics { heading() },
+                    )
+                }
+                items(list, key = { it.key.id }) { entry -> AppRow(entry, icons, profiles, labelWork = false, onLaunch, onMenu) }
+            }
+            item(key = "end") { Spacer(Modifier.height(24.dp)) }
+        }
+        Scrubber(
+            letters = sections.keys.toList(),
+            modifier = Modifier.align(Alignment.TopEnd).fillMaxHeight().padding(end = 6.dp),
+            onLetter = { c ->
+                scrubbing = c
+                headerIndex[c]?.let { scope.launch { state.scrollToItem(it) } }
+            },
+            onEnd = { scrubbing = null },
+        )
         if (reduced) scrubbing?.let { c ->
             Box(
                 Modifier.align(Alignment.TopEnd).padding(top = 52.dp, end = 38.dp).size(54.dp)
