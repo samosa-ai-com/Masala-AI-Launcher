@@ -216,8 +216,14 @@ fun MicButton(press: MicPress, level: () -> Float = { 0f }, modifier: Modifier =
             .pointerInput(press) {
                 detectTapGestures(onPress = {
                     press.onPress()
-                    tryAwaitRelease()
-                    press.onRelease()
+                    // Always runs, even if this button leaves the composition mid-press
+                    // (starting a take swaps it for the listening controls): otherwise
+                    // the release is swallowed and the take sticks with no way to end it.
+                    try {
+                        tryAwaitRelease()
+                    } finally {
+                        press.onRelease()
+                    }
                 })
             },
         shape = CircleShape,
@@ -256,7 +262,9 @@ fun ReplyCard(
     // "Read replies aloud" applies to every reply; the button reads one on request.
     LaunchedEffect(reply) { if (readAloud && reply != null && app.commands.claimReadAloud(reply)) app.speakReply(reply.text) }
     if (state == CommandState.Idle) return
-    if (sheets && (state == CommandState.Listening || state is CommandState.Thinking)) return
+    // The card stays composed (but draws nothing) while listening: the mic that
+    // started the take must survive until the finger lifts. The overlay covers it.
+    if (sheets && state is CommandState.Thinking) return
 
     // A glass sheet over home (UI refresh U3); opened for typing, its field takes focus.
     val field = remember { FocusRequester() }

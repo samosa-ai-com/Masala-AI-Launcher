@@ -495,18 +495,21 @@ private fun Controls(listening: Boolean, autoSendIn: Int?, walkie: Boolean, mic:
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
+            // One mic node in both states: the button that starts a hold must still be
+            // composed when the finger lifts, or the release is swallowed and the take
+            // sticks. Only the flanking buttons come and go.
             if (listening) {
                 IconButton(onClick = onClose, modifier = Modifier.size(52.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.06f))) {
                     Icon(Icons.Rounded.Close, stringResource(R.string.listening_cancel), tint = tokens.textHigh)
                 }
                 Spacer(Modifier.width(20.dp))
-                MicButton(mic, level = level, size = 68.dp)
+            }
+            MicButton(mic, level = level, size = 68.dp)
+            if (listening) {
                 Spacer(Modifier.width(20.dp))
                 IconButton(onClick = onSend, modifier = Modifier.size(52.dp).clip(CircleShape).background(tokens.accent)) {
                     Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
                 }
-            } else {
-                MicButton(mic, level = level, size = 68.dp)
             }
         }
     }

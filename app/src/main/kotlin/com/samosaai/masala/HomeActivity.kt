@@ -468,8 +468,10 @@ class HomeActivity : ComponentActivity() {
             aboveDock = {
                 val command by app.commands.state.collectAsStateWithLifecycle()
                 val pillLevel by app.commands.micLevel.collectAsStateWithLifecycle()
-                // The pill makes way for the reply card while a command is shown.
-                if (command == CommandState.Idle) {
+                // The pill makes way for the reply card while a command is shown, but it
+                // stays composed (hidden under the overlay) while listening: the mic that
+                // started the take must survive until the finger lifts.
+                if (command == CommandState.Idle || command == CommandState.Listening) {
                     SearchPill(
                         onSearch = { drawerOpen = true; searchRequests++ },
                         mic = rememberMicPress(app),
@@ -501,18 +503,21 @@ class HomeActivity : ComponentActivity() {
             val command by app.commands.state.collectAsStateWithLifecycle()
             val level by app.commands.micLevel.collectAsStateWithLifecycle()
             val words by app.commands.liveWords.collectAsStateWithLifecycle()
-            if (hidden) Unit else when (val c = command) {
-                CommandState.Input -> Box(
+            if (hidden) Unit else {
+                // The input card stays composed (but draws nothing visible under the
+                // overlay) while listening: the mic that started the take must survive
+                // until the finger lifts, or the release is swallowed and the take sticks.
+                if (command == CommandState.Input || command == CommandState.Listening) Box(
                     Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(),
                     contentAlignment = Alignment.BottomCenter,
                 ) { ReplyCard(app, settings.readRepliesAloud, sheets = true, character = settings.character) }
-                else -> if (chatOpen) ChatSurface(
+                if (command != CommandState.Input && chatOpen) ChatSurface(
                     session = turns.takeIf { it.isNotEmpty() }?.let {
                         com.samosaai.masala.chat.ChatSession(id = activeId.orEmpty(), title = sessionTitle, turns = it)
                     },
                     liveWords = words,
                     level = { level },
-                    state = c,
+                    state = command,
                     character = settings.character,
                     expanded = expanded,
                     onExpanded = { expanded = it },
