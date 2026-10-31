@@ -214,6 +214,7 @@
     <string name="scheduled_task_create">Create with Masala</string>
     <string name="scheduled_task_create_prefill">"Every day at 8:00, "</string>
     <string name="miniapp_share">Share</string>
+    <string name="miniapp_full_size">Full size</string>
     <string name="miniapp_pin">Pin to home</string>
     <string name="miniapp_pinned">Pinned — see it on home</string>
     <string name="miniapp_pin_failed">Couldn’t pin it to home</string>
