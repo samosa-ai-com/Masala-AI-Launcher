@@ -321,13 +321,24 @@ class SttEngine(
                 val bytes = ByteArray(windowShorts * 2)
                 var zeroRunMs = 0L
                 val startMs = System.currentTimeMillis()
+                /**
+                 * Ends the take from inside the capture thread: stops the mic indicator
+                 * with the take (not on the next Send or tap) and reports it. A later
+                 * stop releasing the same recorder again is caught and ignored.
+                 */
+                fun endTakeAlone(end: PttEngine.TakeAutoEnd) {
+                    holdStopRequested = true
+                    runCatching { recorder.stop() }
+                    runCatching { recorder.release() }
+                    postTakeAutoEnd(end)
+                }
                 try {
                     while (!holdStopRequested && gen == holdGen) {
                         val count = recorder.read(shorts, 0, shorts.size)
                         if (gen != holdGen) break
                         if (count < 0) {
                             holdError = Exception("Audio capture failed (error code $count)")
-                            postTakeAutoEnd(PttEngine.TakeAutoEnd.Failed(holdError?.message ?: "Recording failed"))
+                            endTakeAlone(PttEngine.TakeAutoEnd.Failed(holdError?.message ?: "Recording failed"))
                             break
                         }
                         if (count == 0) continue
@@ -349,8 +360,7 @@ class SttEngine(
                             // window: fail in 1.5 s, not after a full take.
                             if (zeroRunFailsFast(zeroRunMs)) {
                                 holdError = Exception(CAPTURE_SILENCE_MESSAGE)
-                                holdStopRequested = true
-                                postTakeAutoEnd(PttEngine.TakeAutoEnd.Failed(CAPTURE_SILENCE_MESSAGE))
+                                endTakeAlone(PttEngine.TakeAutoEnd.Failed(CAPTURE_SILENCE_MESSAGE))
                                 break
                             }
                         }
@@ -358,14 +368,13 @@ class SttEngine(
                         if (System.currentTimeMillis() - startMs > MAX_VAD_RECORDING_MS) {
                             // Safety cap, and it is loud about itself: what was heard
                             // is kept for Send, and the take ends now on its own.
-                            holdStopRequested = true
-                            postTakeAutoEnd(PttEngine.TakeAutoEnd.CapReached)
+                            endTakeAlone(PttEngine.TakeAutoEnd.CapReached)
                             break
                         }
                     }
                 } catch (e: Exception) {
                     holdError = Exception("Recording failed: ${e.message ?: e.javaClass.simpleName}")
-                    postTakeAutoEnd(PttEngine.TakeAutoEnd.Failed(holdError?.message ?: "Recording failed"))
+                    endTakeAlone(PttEngine.TakeAutoEnd.Failed(holdError?.message ?: "Recording failed"))
                 } finally {
                     _level.value = 0f
                 }

@@ -42,6 +42,9 @@ class SpeechPolicyTest {
         val started = mutableListOf<AudioProvider>()
         val cancelled = mutableListOf<AudioProvider>()
         val utterances = mutableListOf<AudioProvider>()
+        val events = mutableListOf<String>()
+        var takeAutoEndListener: ((PttEngine.TakeAutoEnd) -> Unit)? = null
+            private set
         var lastSilenceMs = 0L
         var stopped: AudioProvider? = null
         var stoppedModel = ""
@@ -54,7 +57,13 @@ class SpeechPolicyTest {
             onAndroidFailure: ((String) -> Unit)?,
         ): Boolean {
             started += provider
+            events += "start"
             return startResults[provider] ?: true
+        }
+
+        override fun setTakeAutoEndListener(listener: ((PttEngine.TakeAutoEnd) -> Unit)?) {
+            takeAutoEndListener = listener
+            events += "listener"
         }
 
         override suspend fun stopListeningAndTranscribe(
@@ -217,6 +226,15 @@ class SpeechPolicyTest {
         val result = input(engine).listenOnce()
         assertTrue(result.isFailure)
         assertEquals("HTTP 401 rejected", result.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun `the take-end listener is attached before recording starts`() {
+        val engine = FakeEngine()
+        input(engine).start {}
+        // A failure on the very first read must already have somewhere to go:
+        // the attach lands before the first start call (cancel noise aside).
+        assertEquals(listOf("listener", "start"), engine.events.takeLast(2))
     }
 
     @Test

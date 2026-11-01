@@ -142,6 +142,9 @@ class ConfiguredSpeechInput(
         // A press while a previous session is still around must not leak its recorder.
         cancel()
         failure = onFailure
+        // Attached before recording starts: a failure on the very first read must
+        // already have somewhere to go. Cleared again on every exit below.
+        engine.setTakeAutoEndListener(::onEngineTakeEnd)
         val reasons = mutableListOf<String>()
         val lang = configuredLanguage(config())
         for (provider in SpeechPolicy.order(configured())) {
@@ -156,7 +159,6 @@ class ConfiguredSpeechInput(
             }
             if (started) {
                 active = provider
-                if (provider.isApiBased()) engine.setTakeAutoEndListener(::onEngineTakeEnd)
                 return true
             }
             reasons += if (provider == AudioProvider.ANDROID) {
@@ -166,6 +168,7 @@ class ConfiguredSpeechInput(
             }
         }
         active = null
+        engine.setTakeAutoEndListener(null)
         onFailure(reasons.joinToString("; "))
         return false
     }
