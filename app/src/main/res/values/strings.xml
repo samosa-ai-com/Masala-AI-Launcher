@@ -291,6 +291,17 @@
     <string name="widgets_delete_message">“%1$s” will be removed from the library and taken off home. This can’t be undone.</string>
     <string name="widgets_deleted">Deleted</string>
     <string name="widgets_preview_note">Preview — add it to home to use its buttons</string>
+    <string name="widgets_remove_from_home">Remove from home</string>
+    <string name="widgets_resize">Resize (%1$d–%2$d rows)</string>
+    <string name="widgets_rows">%1$d rows</string>
+    <string name="widgets_edit_in_manager">Edit in manager</string>
+    <string name="widgets_removed">Removed from home</string>
+    <string name="widgets_resized">Resized</string>
+    <string name="widgets_add">Add</string>
+    <string name="widgets_add_sheet_title">Add widget</string>
+    <string name="widgets_describe_short">Describe…</string>
+    <string name="widgets_manage">Manage</string>
+    <string name="widgets_settings">Settings</string>
     <string name="settings_recording">Recording</string>
     <string name="settings_recording_summary">Meeting notes: 15-minute chunks in app storage</string>
     <string name="settings_files">Files &amp; search</string>

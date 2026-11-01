@@ -81,6 +81,8 @@ fun HomeScreen(
     onSwipeUp: () -> Unit,
     onSwipeDown: () -> Unit,
     onOpenSettings: () -> Unit,
+    /** Empty-space long-press: the Add widget sheet (settings stays one tap inside it). */
+    onAddWidget: () -> Unit = onOpenSettings,
     onLaunchShortcut: (ShortcutInfo) -> Unit,
     onUnpinShortcut: (ShortcutInfo) -> Unit,
     homePresses: Int = 0,
@@ -262,7 +264,7 @@ fun HomeScreen(
                     }
                 }
             }
-            .pointerInput(Unit) { detectTapGestures(onLongPress = { onOpenSettings() }) }
+            .pointerInput(Unit) { detectTapGestures(onLongPress = { onAddWidget() }) }
             // TalkBack can't swipe or long-press empty space, so each is offered as an action.
             .semantics {
                 customActions = listOf(

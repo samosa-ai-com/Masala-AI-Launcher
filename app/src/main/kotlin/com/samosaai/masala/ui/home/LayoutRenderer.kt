@@ -135,6 +135,8 @@ class RenderContext(
     val skillWidgets: SkillWidgetSource? = null,
     /** Where generated widgets get their snapshot, stored values and actions; none keeps the placeholder. */
     val widgets: com.samosaai.masala.ui.home.widgets.WidgetSource? = null,
+    /** Long-press on a home widget opens its menu (remove, resize, edit in manager). */
+    val onWidgetMenu: ((com.samosaai.masala.core.contract.WidgetSpec, String) -> Unit)? = null,
     /** The active mode's name for the chip above the clock (UI refresh U3); none hides the chip. */
     val modeName: String? = null,
     val onModeChip: (() -> Unit)? = null,
@@ -378,12 +380,20 @@ private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: Render
         // A resolved layout always carries the widget inline (refs are filled in from the library).
         is WidgetSection -> section.widget?.let {
             ctx.widgets?.let { source ->
-                com.samosaai.masala.ui.home.widgets.WidgetCard(it, layout.widgetRows[it.id], source)
+                val menu = ctx.onWidgetMenu
+                com.samosaai.masala.ui.home.widgets.WidgetCard(
+                    it, layout.widgetRows[it.id],
+                    if (menu == null) source else source.copy(onLongPress = { menu(it, section.id) }),
+                )
             } ?: Placeholder(it.title ?: it.id, stringResource(R.string.home_widget_placeholder), layout.widgetRows[it.id])
         }
         is StackSection -> section.widgets.firstOrNull()?.let {
             ctx.widgets?.let { source ->
-                com.samosaai.masala.ui.home.widgets.StackCard(section.widgets, layout.widgetRows, source)
+                val menu = ctx.onWidgetMenu
+                com.samosaai.masala.ui.home.widgets.StackCard(
+                    section.widgets, layout.widgetRows,
+                    if (menu == null) source else source.copy(onLongPress = { menu(it, section.id) }),
+                )
             } ?: Placeholder(it.title ?: it.id, stringResource(R.string.home_stack_placeholder, section.widgets.size), layout.widgetRows[it.id])
         }
         is SkillWidgetSection -> ctx.skillWidgets?.let { SkillWidgetCard(section, it, ctx.onAction) }

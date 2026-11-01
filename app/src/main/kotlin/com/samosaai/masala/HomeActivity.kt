@@ -214,6 +214,8 @@ class HomeActivity : ComponentActivity() {
         var choosingIcon by remember { mutableStateOf<AppEntry?>(null) }
         // Tiles that aren't installed apps get their own menu, so nothing on home is menu-less.
         var itemMenuFor by remember { mutableStateOf<Item?>(null) }
+        var widgetMenuFor by remember { mutableStateOf<com.samosaai.masala.core.contract.WidgetSpec?>(null) }
+        var addWidgetSheet by remember { mutableStateOf(false) }
         var renamingItem by remember { mutableStateOf<Item?>(null) }
         var choosingIconForApp by remember { mutableStateOf<com.samosaai.masala.data.MiniAppEntity?>(null) }
         var deletingMiniApp by remember { mutableStateOf<com.samosaai.masala.data.MiniAppEntity?>(null) }
@@ -481,6 +483,7 @@ class HomeActivity : ComponentActivity() {
                 onOpenFolder = { openFolder = it to (it.id in movable) },
                 onFolderMenu = { if (it.id in movable) folderMenu = it },
                 onItemMenu = { itemMenuFor = it },
+                onWidgetMenu = { spec, _ -> widgetMenuFor = spec },
                 onDrop = { item, target ->
                     scope.launch {
                         // What the user saw, which is the base document merged with the active modes: the
@@ -564,6 +567,7 @@ class HomeActivity : ComponentActivity() {
             onSwipeUp = { run(settings.swipeUp) },
             onSwipeDown = { run(settings.swipeDown) },
             onOpenSettings = ::openSettings,
+            onAddWidget = { addWidgetSheet = true },
             onLaunchShortcut = ::launchShortcut,
             onUnpinShortcut = {
                 app.actions.unpin(it)
@@ -937,9 +941,45 @@ class HomeActivity : ComponentActivity() {
             )
         }
 
+        widgetMenuFor?.let { spec ->
+            fun done(action: () -> Unit) {
+                widgetMenuFor = null
+                action()
+            }
+            com.samosaai.masala.ui.home.widgets.WidgetMenuDialog(
+                spec = spec,
+                onRemove = { done { scope.launch {
+                    app.layouts.removeWidgetRefs("Remove from home: ${spec.title ?: spec.id}", spec.id)
+                        .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_removed))
+                } } },
+                onResize = { rows -> done { scope.launch {
+                    val coerced = rows.coerceIn(spec.size.min, spec.size.max)
+                    app.layouts.resizeWidget("Resize ${spec.title ?: spec.id}", spec.id, coerced)
+                        .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_resized))
+                } } },
+                onEdit = { done { startActivity(Intent(this@HomeActivity, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_PAGE, "WIDGETS")) } },
+                onDismiss = { widgetMenuFor = null },
+            )
+        }
+
+        if (addWidgetSheet) {
+            com.samosaai.masala.ui.home.widgets.AddWidgetSheet(
+                library = app.widgetLibrary,
+                onAdd = { id -> scope.launch {
+                    val title = app.widgetLibrary.current()[id]?.title ?: id
+                    app.layouts.placeWidget("Add to home: $title", id)
+                        .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_added))
+                    addWidgetSheet = false
+                } },
+                onDescribe = { addWidgetSheet = false; askMasala(getString(R.string.widgets_describe_prefill)) },
+                onManage = { addWidgetSheet = false; startActivity(Intent(this@HomeActivity, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_PAGE, "WIDGETS")) },
+                onSettings = { addWidgetSheet = false; openSettings() },
+                onDismiss = { addWidgetSheet = false },
+            )
+        }
+
         renamingItem?.let { item ->
-            com.samosaai.masala.ui.home.ItemRenameDialog(
-                label = item.label,
+            com.samosaai.masala.ui.home.ItemRenameDialog(                label = item.label,
                 onRename = { label ->
                     renamingItem = null
                     val miniId = (item.action as? MasalaAction.OpenMiniApp)?.id

@@ -1,7 +1,9 @@
 package com.samosaai.masala.ui.home.widgets
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -61,6 +63,7 @@ data class WidgetSource(
 )
 
 /** One generated widget on home: a glass card with its components top to bottom. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WidgetCard(spec: WidgetSpec, rows: Int?, source: WidgetSource, modifier: Modifier = Modifier) {
     val snapshot = source.snapshot()
@@ -68,7 +71,11 @@ fun WidgetCard(spec: WidgetSpec, rows: Int?, source: WidgetSource, modifier: Mod
     // New values (a counter tap, a checklist tick) recompose this card alone.
     LaunchedEffect(spec.id) { source.store.load(listOf(spec.id)) }
     val storage = states[spec.id].orEmpty()
-    WallpaperCard(modifier.fillMaxWidth().heightIn(min = ((rows ?: spec.size.default) * 48).dp)) {
+    val longPress = source.onLongPress
+    WallpaperCard(
+        modifier.fillMaxWidth().heightIn(min = ((rows ?: spec.size.default) * 48).dp)
+            .then(if (longPress != null) Modifier.combinedClickable(onClick = {}, onLongClick = longPress) else Modifier),
+    ) {
         spec.title?.let {
             Text(it, style = MaterialTheme.typography.titleMedium, color = OnWallpaper, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(4.dp))
