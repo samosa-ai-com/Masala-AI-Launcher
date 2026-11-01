@@ -238,6 +238,132 @@ object MasalaToolDefinitions {
         }
     )
 
+    // Generated home widgets (plan docs/plans/widget-maker.md §7.2).
+    val listWidgets = tool(
+        "list_widgets",
+        "List the widget library: id, title, where each widget sits on home. " +
+            "To change one: read_widget, then update_widget. To use a template as a start, read it too.",
+        schema { putJsonObject("properties") {} },
+    )
+
+    val readWidget = tool(
+        "read_widget",
+        "Read one library widget's full spec JSON, to change it with update_widget. " +
+            "The user may name a widget by its title: call list_widgets first to find the id.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Widget id from list_widgets.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
+    val widgetSchema = tool(
+        "widget_schema",
+        "How a widget spec is shaped: components, bindings, sources and limits. " +
+            "Read this before writing a spec by hand; create_widget from a sentence skips it.",
+        schema { putJsonObject("properties") {} },
+    )
+
+    val createWidget = tool(
+        "create_widget",
+        "Make a home-screen widget: either the full spec JSON, or one sentence and the maker " +
+            "writes the spec (checked, one repair turn). The answer names the widget id and any " +
+            "problems; a spec with problems is never saved. Nothing goes on home until place_widget, " +
+            "which always asks the user first.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("spec") {
+                    put("type", "string")
+                    put("description", "Complete WidgetSpec JSON. One of spec or sentence.")
+                }
+                putJsonObject("sentence") {
+                    put("type", "string")
+                    put("description", "What the widget should be, e.g. 'a water counter with a goal of 8'. One of spec or sentence.")
+                }
+            }
+        },
+    )
+
+    val updateWidget = tool(
+        "update_widget",
+        "Change a library widget: either the complete replacement spec JSON (same id), or a " +
+            "sentence and the maker revises it (checked, one repair turn). The look applies at " +
+            "once with Undo. Never moves it on home: place_widget does that.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Widget id from list_widgets.")
+                }
+                putJsonObject("spec") {
+                    put("type", "string")
+                    put("description", "Complete replacement WidgetSpec JSON with the same id. One of spec or sentence.")
+                }
+                putJsonObject("sentence") {
+                    put("type", "string")
+                    put("description", "What to change, e.g. 'make the goal 10'. One of spec or sentence.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
+    val placeWidget = tool(
+        "place_widget",
+        "Put a library widget on home. Always asks the user first, naming the widget. " +
+            "The same widget may sit on two pages.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Widget id from list_widgets or create_widget.")
+                }
+                putJsonObject("page") {
+                    put("type", "string")
+                    put("description", "Page id for the widget. Missing puts it on the first page.")
+                }
+                putJsonObject("rows") {
+                    put("type", "integer")
+                    put("description", "Height override in rows, inside the widget's own size range. Missing keeps its default.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
+    val removeWidget = tool(
+        "remove_widget",
+        "Take a widget off home wherever it sits, keeping it in the library. " +
+            "Deleting it from the library instead is delete_widget.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Widget id from list_widgets.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
+    val deleteWidget = tool(
+        "delete_widget",
+        "Delete a widget from the library and take it off home everywhere. Lost for good.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Widget id from list_widgets.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
     val createCalendarEvent = tool(
         "create_calendar_event",
         "Add an event to the phone's calendar. The answer names the event id for later edits.",
