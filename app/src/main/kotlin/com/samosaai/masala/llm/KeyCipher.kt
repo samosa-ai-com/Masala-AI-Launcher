@@ -37,22 +37,26 @@ class KeyCipher(private val secretKey: () -> SecretKey) {
         private const val IV_BYTES = 12
         private const val ALIAS = "masala_ai_keys"
 
-        @Volatile
-        private var cached: SecretKey? = null
+        private val cachedByAlias = HashMap<String, SecretKey>()
 
         /** The Keystore-backed cipher; the key is made once and then reused. */
-        fun androidKeystore(): KeyCipher = KeyCipher {
-            cached ?: synchronized(this) { cached ?: loadOrCreate().also { cached = it } }
+        fun androidKeystore(): KeyCipher = androidKeystore(ALIAS)
+
+        /** Same, under another alias so stream passwords never share the AI keys' key. */
+        fun androidKeystore(alias: String): KeyCipher = KeyCipher {
+            synchronized(this) { cachedByAlias.getOrPut(alias) { loadOrCreate(alias) } }
         }
 
-        private fun loadOrCreate(): SecretKey {
+        private fun loadOrCreate(): SecretKey = loadOrCreate(ALIAS)
+
+        private fun loadOrCreate(alias: String): SecretKey {
             val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-            (store.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
+            (store.getEntry(alias, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
             return KeyGenerator
                 .getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
                 .apply {
                     init(
-                        KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+                        KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                             .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                             .setKeySize(256)

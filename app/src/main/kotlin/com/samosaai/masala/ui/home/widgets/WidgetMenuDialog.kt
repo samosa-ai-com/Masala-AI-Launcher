@@ -1,0 +1,81 @@
+package com.samosaai.masala.ui.home.widgets
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.samosaai.masala.R
+import com.samosaai.masala.core.contract.WidgetSpec
+
+/**
+ * A generated widget's menu on home (plan `docs/plans/widget-maker.md` W2): remove it from home
+ * (every placement, one undoable version), resize within its own range, or edit it in the manager.
+ */
+@Composable
+fun WidgetMenuDialog(
+    spec: WidgetSpec,
+    onRemove: () -> Unit,
+    onResize: (Int) -> Unit,
+    onEdit: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var resizing by rememberSaveable(spec.id) { mutableStateOf(false) }
+    var rows by rememberSaveable(spec.id) { mutableIntStateOf(spec.size.default) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(spec.title ?: spec.id) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (!resizing) {
+                    MenuRow(stringResource(R.string.widgets_remove_from_home), onRemove)
+                    MenuRow(stringResource(R.string.widgets_resize, spec.size.min, spec.size.max)) {
+                        rows = spec.size.default
+                        resizing = true
+                    }
+                    MenuRow(stringResource(R.string.widgets_edit_in_manager), onEdit)
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        TextButton(enabled = rows > spec.size.min, onClick = { rows-- }) { Text("−") }
+                        Text(
+                            stringResource(R.string.widgets_rows, rows),
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(enabled = rows < spec.size.max, onClick = { rows++ }) { Text("+") }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (resizing) {
+                TextButton(onClick = { onResize(rows) }) { Text(stringResource(R.string.widgets_save)) }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { if (resizing) resizing = false else onDismiss() }) {
+                Text(stringResource(if (resizing) R.string.action_back else R.string.action_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun MenuRow(label: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Text(label, modifier = Modifier.fillMaxWidth())
+    }
+}

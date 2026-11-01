@@ -1,0 +1,13 @@
+{
+  "id": "countdown",
+  "name": "Countdown timer",
+  "description": "A one-tap countdown, for tea or a short break.",
+  "widget": {
+    "id": "tea-timer",
+    "title": "Tea",
+    "components": [
+      { "type": "timer", "key": "tea", "label": "Tea", "seconds": 240 }
+    ],
+    "size": { "min": 1, "default": 1, "max": 2 }
+  }
+}

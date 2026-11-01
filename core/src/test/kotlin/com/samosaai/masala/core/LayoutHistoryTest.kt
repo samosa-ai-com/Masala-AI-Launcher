@@ -6,6 +6,7 @@ import com.samosaai.masala.core.layout.LayoutHistory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -98,5 +99,18 @@ class LayoutHistoryTest {
         assertNull(h.delete(h.current!!.id))
         assertEquals(1, h.versions.size)
         assertNull(h.delete(999))
+    }
+
+    @Test
+    fun `repairCurrent replaces the layout in place, redo intact`() {
+        val h = LayoutHistory()
+        h.push("one", doc("one"), 1); h.push("two", doc("two"), 2)
+        h.undo()
+        val fixed = assertNotNull(h.repairCurrent(doc("one-fixed")))
+        assertEquals("one-fixed", fixed.layout.pages.single().id)
+        assertEquals(2, h.versions.size)
+        assertTrue(h.canRedo)
+        assertEquals("two", h.redo()?.label)
+        assertNull(h.repairCurrent(h.current!!.layout))
     }
 }

@@ -2,6 +2,8 @@ package com.samosaai.masala.ui.settings
 
 import com.samosaai.masala.ui.theme.MasalaColors
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
@@ -17,6 +19,7 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.WbSunny
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.GridView
@@ -40,6 +43,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.samosaai.masala.audio.RecordingService
 import com.samosaai.masala.core.layout.LayoutChecker
+import com.samosaai.masala.core.layout.LayoutEdits
+import com.samosaai.masala.ui.home.widgets.WidgetCard
+import com.samosaai.masala.ui.home.widgets.WidgetSource
 import com.samosaai.masala.layout.LayoutTransfer
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
@@ -105,7 +111,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, PERSONAS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, ABOUT, BRIEF }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, PERSONAS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, ABOUT, BRIEF, WIDGETS }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -138,6 +144,7 @@ class SettingsActivity : ComponentActivity() {
                             onLayout = { page = Page.LAYOUT },
                             onRecording = { page = Page.RECORDING },
                             onMiniApps = { page = Page.MINI_APPS },
+                            onWidgets = { page = Page.WIDGETS },
                             onSkills = { page = Page.SKILLS },
                             onTasks = { page = Page.TASKS },
                             onFiles = { page = Page.FILES },
@@ -169,6 +176,7 @@ class SettingsActivity : ComponentActivity() {
                         Page.PRIVACY -> PrivacyPage(onBack = { page = Page.MAIN })
                         Page.ABOUT -> AboutPage(onBack = { page = Page.MAIN })
                         Page.BRIEF -> BriefPage(settings, update = { change -> lifecycleScope.launch { masala.settings.update(change) } }, onBack = { page = Page.MAIN })
+                        Page.WIDGETS -> WidgetsPage(onBack = { page = Page.MAIN })
                     } }
                 }
             }
@@ -189,6 +197,7 @@ class SettingsActivity : ComponentActivity() {
         onLayout: () -> Unit,
         onRecording: () -> Unit,
         onMiniApps: () -> Unit,
+        onWidgets: () -> Unit,
         onSkills: () -> Unit,
         onTasks: () -> Unit,
         onFiles: () -> Unit,
@@ -223,6 +232,7 @@ class SettingsActivity : ComponentActivity() {
             add(Entry(2, Icons.Rounded.WbSunny, auto, stringResource(R.string.brief_title), stringResource(R.string.brief_summary)) { onPage(Page.BRIEF) })
             add(Entry(2, Icons.Rounded.Extension, auto, stringResource(R.string.mcp_title), stringResource(R.string.mcp_summary)) { startActivity(Intent(this@SettingsActivity, McpActivity::class.java)) })
             add(Entry(2, Icons.Rounded.Apps, auto, stringResource(R.string.settings_miniapps), stringResource(R.string.settings_miniapps_summary), onMiniApps))
+            add(Entry(1, Icons.Rounded.Widgets, look, stringResource(R.string.settings_widgets), stringResource(R.string.settings_widgets_summary), onWidgets))
             add(Entry(3, Icons.Rounded.MenuBook, data, stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) { startActivity(Intent(this@SettingsActivity, SecondBrainActivity::class.java)) })
             add(Entry(3, Icons.Rounded.Shield, data, stringResource(R.string.privacy_title), stringResource(R.string.privacy_summary)) { onPage(Page.PRIVACY) })
             add(
@@ -431,6 +441,432 @@ class SettingsActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /** The widget library in one place: preview, add to home, duplicate, delete (plan W2). */
+    @Composable
+    private fun WidgetsPage(onBack: () -> Unit) {
+        val scope = rememberCoroutineScope()
+        val entries by remember { masala.widgetLibrary.watch() }.collectAsStateWithLifecycle(emptyList())
+        val snapshot by masala.contextService.snapshot.collectAsStateWithLifecycle()
+        val base by masala.layouts.base.collectAsStateWithLifecycle()
+        fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()
+        val source = remember(snapshot) {
+            WidgetSource(snapshot = { snapshot }, store = masala.widgetStates, onAction = { toast(getString(R.string.widgets_preview_note)) }, streams = masala.streamSources, http = masala.httpValues, approved = { masala.httpApproval.approved(it) })
+        }
+        // Template blurbs by widget id, so the Templates tab can say what each one does.
+        val templatesByWidgetId = remember {
+            runCatching { com.samosaai.masala.core.widgets.WidgetTemplates.all().associateBy { it.widget.id } }.getOrDefault(emptyMap())
+        }
+        SettingsScaffold(stringResource(R.string.settings_widgets), onBack = onBack) {
+            Button(onClick = { askInChat(getString(R.string.widgets_describe_prefill)) }) { Text(stringResource(R.string.widgets_describe)) }
+            var versionsId by remember { mutableStateOf<String?>(null) }
+            versionsId?.let { id ->
+                val title = entries.firstOrNull { it.spec.id == id }?.spec?.title ?: id
+                WidgetVersionsDialog(id, title, onClose = { versionsId = null })
+            }
+            var tab by rememberSaveable { mutableStateOf(0) }
+            val tabs = listOf(stringResource(R.string.widgets_mine), stringResource(R.string.widgets_templates), stringResource(R.string.widgets_cameras), stringResource(R.string.widgets_html))
+            androidx.compose.material3.ScrollableTabRow(selectedTabIndex = tab, edgePadding = 0.dp) {
+                tabs.forEachIndexed { i, title ->
+                    androidx.compose.material3.Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title, maxLines = 1, softWrap = false) })
+                }
+            }
+            if (tab == 2) {
+                CamerasTab()
+                return@SettingsScaffold
+            }
+            if (tab == 3) {
+                HtmlTab()
+                return@SettingsScaffold
+            }
+            val mine = tab == 0
+            var filter by rememberSaveable { mutableStateOf("") }
+            val rows = remember(entries, mine, filter) {
+                val q = filter.trim().lowercase()
+                entries.filter { (it.createdBy != "template") == mine }
+                    .filter { q.isEmpty() || it.spec.id.lowercase().contains(q) || (it.spec.title?.lowercase()?.contains(q) == true) }
+            }
+            if (entries.any { (it.createdBy != "template") == mine } && (rows.size > 5 || filter.isNotEmpty())) {
+                ListSearchField(filter, { filter = it }, stringResource(R.string.widgets_filter))
+            }
+            if (rows.isEmpty()) {
+                Text(
+                    stringResource(if (filter.isNotBlank()) R.string.widgets_empty_no_match else R.string.widgets_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                return@SettingsScaffold
+            }
+            rows.forEach { (spec, _) ->
+                var confirmDelete by remember(spec.id) { mutableStateOf(false) }
+                var approval by remember(spec.id) { mutableStateOf<List<com.samosaai.masala.widgets.HttpApproval.Fetch>?>(null) }
+                approval?.let { fetches ->
+                    com.samosaai.masala.ui.home.widgets.HttpApprovalDialog(
+                        fetches = fetches,
+                        onApprove = {
+                            approval = null
+                            scope.launch {
+                                masala.httpApproval.approve(spec.id, fetches.map { it.host })
+                                val placed = masala.layouts.placeWidget("Add to home: ${spec.title ?: spec.id}", spec.id)
+                                toast(
+                                    if (placed.problems.isEmpty()) getString(R.string.widgets_added_on, masala.layouts.pageLabel(placed.pageId ?: spec.id))
+                                    else getString(R.string.widgets_add_failed),
+                                )
+                            }
+                        },
+                        onDismiss = { approval = null },
+                    )
+                }
+                val placements = remember(base, spec.id) { base?.let { LayoutEdits.widgetPlacements(it, spec.id) }.orEmpty() }
+                var allowedNow by remember(spec.id) { mutableStateOf(false) }
+                var fetchApproval by remember(spec.id) { mutableStateOf<List<com.samosaai.masala.widgets.HttpApproval.Fetch>?>(null) }
+                fetchApproval?.let { fetches ->
+                    com.samosaai.masala.ui.home.widgets.HttpApprovalDialog(
+                        fetches = fetches,
+                        onApprove = {
+                            fetchApproval = null
+                            scope.launch {
+                                masala.httpApproval.approve(spec.id, fetches.map { it.host })
+                                allowedNow = true
+                                toast(getString(R.string.widgets_fetch_approved))
+                            }
+                        },
+                        onDismiss = { fetchApproval = null },
+                    )
+                }
+                val pendingFetch = remember(base, spec, allowedNow) {
+                    if (allowedNow || placements.isEmpty()) emptyList()
+                    else com.samosaai.masala.widgets.HttpApproval.needingApproval(spec, masala.httpApproval.approved(spec.id))
+                }
+                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    WidgetCard(spec, rows = null, source = source)
+                    if (!mine) {
+                        templatesByWidgetId[spec.id]?.description?.let { blurb ->
+                            Text(
+                                blurb,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
+                    }
+                    Text(
+                        if (placements.isEmpty()) stringResource(R.string.widgets_not_on_home)
+                        else stringResource(R.string.widgets_on_home) + " · ${placements.size}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    ) {
+                        if (pendingFetch.isNotEmpty()) {
+                            TextButton(onClick = { fetchApproval = pendingFetch }) { Text(stringResource(R.string.widgets_allow_fetching)) }
+                        }
+                        if (placements.isEmpty()) {
+                            TextButton(onClick = {
+                                scope.launch {
+                                    val pending = com.samosaai.masala.widgets.HttpApproval.needingApproval(spec, masala.httpApproval.approved(spec.id))
+                                    if (pending.isEmpty()) {
+                                        val placed = masala.layouts.placeWidget("Add to home: ${spec.title ?: spec.id}", spec.id)
+                                        toast(
+                                            if (placed.problems.isEmpty()) getString(R.string.widgets_added_on, masala.layouts.pageLabel(placed.pageId ?: spec.id))
+                                            else getString(R.string.widgets_add_failed),
+                                        )
+                                    } else {
+                                        approval = pending
+                                    }
+                                }
+                            }) { Text(stringResource(R.string.widgets_add_to_home)) }
+                        }
+                        if (mine) {
+                            TextButton(onClick = {
+                                askInChat(getString(R.string.widgets_edit_prefill, spec.title ?: spec.id))
+                            }) { Text(stringResource(R.string.widgets_edit)) }
+                            TextButton(onClick = { versionsId = spec.id }) { Text(stringResource(R.string.widgets_versions)) }
+                            TextButton(onClick = {
+                                scope.launch {
+                                    val known = masala.widgetLibrary.current().keys
+                                    var copyId = "${spec.id}-copy"
+                                    var n = 2
+                                    while (copyId in known) copyId = "${spec.id}-copy-$n".also { n++ }
+                                    masala.widgetLibrary.save(
+                                        spec.copy(id = copyId, title = (spec.title ?: spec.id) + " (copy)"),
+                                        createdBy = "user",
+                                    )
+                                }
+                            }) { Text(stringResource(R.string.widgets_duplicate)) }
+                            TextButton(onClick = { confirmDelete = true }) {
+                                Text(stringResource(R.string.settings_version_delete))
+                            }
+                        } else {
+                            // Templates stay pristine: personalizing goes through the Widget Maker in chat,
+                            // which saves a new widget and leaves the template untouched.
+                            TextButton(onClick = {
+                                val template = templatesByWidgetId[spec.id]
+                                askInChat(getString(R.string.widgets_customize_prefill, template?.name ?: spec.title ?: spec.id))
+                            }) { Text(stringResource(R.string.widgets_customize)) }
+                        }
+                    }
+                }
+                HorizontalDivider()
+                if (mine && confirmDelete) {
+                    AlertDialog(
+                        onDismissRequest = { confirmDelete = false },
+                        title = { Text(stringResource(R.string.widgets_delete_title)) },
+                        text = { Text(stringResource(R.string.widgets_delete_message, spec.title ?: spec.id)) },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                confirmDelete = false
+                                scope.launch {
+                                    // Strip refs before deleting the library: the other order
+                                    // leaves refs to a missing widget that reject later edits.
+                                    val problems = masala.layouts.removeWidgetRefs("Remove from home: ${spec.title ?: spec.id}", spec.id)
+                                    if (problems.isEmpty()) {
+                                        masala.widgetLibrary.delete(spec.id)
+                                        masala.httpValues.clearWidget(spec.id)
+                                        masala.httpApproval.clearWidget(spec.id)
+                                    } else {
+                                        toast(problems.first().message)
+                                    }
+                                }
+                            }) { Text(stringResource(R.string.settings_version_delete)) }
+                        },
+                        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_back)) } },
+                    )
+                }
+            }
+        }
+    }
+
+    /** Stream sources (plan §4.2): the registry behind video and snapshot widgets. */
+    @Composable
+    private fun CamerasTab() {
+        val scope = rememberCoroutineScope()
+        val sources by remember { masala.streamSources.sources }.collectAsStateWithLifecycle()
+        fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()
+        var adding by rememberSaveable { mutableStateOf(false) }
+        var testing by remember { mutableStateOf<String?>(null) }
+        var testLines by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+        if (sources.isEmpty() && !adding) {
+            Text(stringResource(R.string.widgets_sources_empty), style = MaterialTheme.typography.bodyMedium)
+        }
+        sources.forEach { source ->
+            Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(source.name, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "${source.kind.name.lowercase()} · ${source.url}" + if (source.hasCredentials) " · ${stringResource(R.string.widgets_source_login)}" else "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                        )
+                        testLines[source.id]?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    var mobile by remember(source.id) { mutableStateOf(masala.streamSources.isMeteredAllowed(source.id)) }
+                    FilterChip(mobile, {
+                        mobile = !mobile
+                        masala.streamSources.setMeteredAllowed(source.id, mobile)
+                    }, { Text(stringResource(R.string.widgets_source_mobile)) })
+                    TextButton(
+                        enabled = testing == null,
+                        onClick = {
+                            testing = source.id
+                            scope.launch {
+                                val streamUrl = masala.streamSources.urlWithCredentials(source.id)
+                                val result = if (streamUrl == null) {
+                                    com.samosaai.masala.widgets.StreamTest.Result(false, getString(R.string.widgets_source_login_gone))
+                                } else {
+                                    com.samosaai.masala.widgets.StreamTest.test(
+                                        this@SettingsActivity, source.kind, streamUrl,
+                                        masala.streamSources.snapshotUrlWithCredentials(source.id),
+                                    )
+                                }
+                                testLines = testLines + (source.id to (if (result.ok) result.detail else getString(R.string.widgets_source_test_failed, result.detail)))
+                                testing = null
+                            }
+                        },
+                    ) { Text(if (testing == source.id) stringResource(R.string.widgets_source_testing) else stringResource(R.string.widgets_source_test)) }
+                    TextButton(onClick = {
+                        scope.launch {
+                            masala.streamSources.remove(source.id)
+                            toast(getString(R.string.widgets_source_removed))
+                        }
+                    }) { Text(stringResource(R.string.settings_version_delete)) }
+                }
+            }
+            HorizontalDivider()
+        }
+        if (adding) {
+            SourceForm(
+                onSave = { adding = false },
+                onCancel = { adding = false },
+            )
+        } else {
+            Button(onClick = { adding = true }) { Text(stringResource(R.string.widgets_source_add)) }
+        }
+    }
+
+    @Composable
+    private fun SourceForm(onSave: () -> Unit, onCancel: () -> Unit) {
+        val scope = rememberCoroutineScope()
+        fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()
+        var name by rememberSaveable { mutableStateOf("") }
+        var kind by rememberSaveable { mutableStateOf(com.samosaai.masala.widgets.StreamKind.RTSP) }
+        var url by rememberSaveable { mutableStateOf("") }
+        var snapshotUrl by rememberSaveable { mutableStateOf("") }
+        var username by rememberSaveable { mutableStateOf("") }
+        var password by rememberSaveable { mutableStateOf("") }
+        var transport by rememberSaveable { mutableStateOf("tcp") }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(stringResource(R.string.widgets_source_name)) })
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                com.samosaai.masala.widgets.StreamKind.entries.forEach { entry ->
+                    FilterChip(entry == kind, { kind = entry }, { Text(entry.name.lowercase()) })
+                }
+            }
+            OutlinedTextField(url, { url = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(stringResource(R.string.widgets_source_url)) })
+            OutlinedTextField(snapshotUrl, { snapshotUrl = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(stringResource(R.string.widgets_source_snapshot_url)) })
+            OutlinedTextField(username, { username = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(stringResource(R.string.widgets_source_username)) })
+            OutlinedTextField(
+                password, { password = it }, Modifier.fillMaxWidth(), singleLine = true,
+                placeholder = { Text(stringResource(R.string.widgets_source_password)) },
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+            )
+            if (kind == com.samosaai.masala.widgets.StreamKind.RTSP) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf("tcp", "udp").forEach { option ->
+                        FilterChip(option == transport, { transport = option }, { Text(option) })
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {
+                    scope.launch {
+                        val (id, message) = masala.streamSources.add(
+                            name, kind, url, snapshotUrl.ifBlank { null },
+                            username.ifBlank { null }, password.ifEmpty { null },
+                            transport.takeIf { kind == com.samosaai.masala.widgets.StreamKind.RTSP },
+                        )
+                        if (id == null) toast(message ?: getString(R.string.widgets_add_failed))
+                        else onSave()
+                    }
+                }) { Text(stringResource(R.string.widgets_save)) }
+                TextButton(onClick = onCancel) { Text(stringResource(R.string.action_back)) }
+            }
+        }
+    }
+
+    /**
+     * Edits one library widget: title plus the raw spec JSON, checker problems inline, and the last
+     * versions to restore. The id never changes, so storage, taps and home refs carry over.
+     */
+    @Composable
+    private fun HtmlTab() {
+        val scope = rememberCoroutineScope()
+        val apps by remember { masala.miniApps.all }.collectAsStateWithLifecycle(emptyList())
+        val base by masala.layouts.base.collectAsStateWithLifecycle()
+        fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()
+        if (apps.isEmpty()) {
+            Text(stringResource(R.string.widgets_html_empty), style = MaterialTheme.typography.bodyMedium)
+            return
+        }
+        apps.forEach { row ->
+            val placements = remember(base, row.id) { base?.let { com.samosaai.masala.core.layout.LayoutEdits.htmlPlacements(it, row.id) }.orEmpty() }
+            Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    com.samosaai.masala.miniapps.MiniAppIconView(row.icon, row.title, 40.dp)
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text(row.title, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            if (placements.isEmpty()) stringResource(R.string.widgets_not_on_home)
+                            else stringResource(R.string.widgets_on_home) + " · ${placements.size}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (placements.isEmpty()) {
+                        TextButton(onClick = {
+                            scope.launch {
+                                val placed = masala.layouts.placeHtml("Add to home: ${row.title}", row.id)
+                                toast(
+                                    if (placed.problems.isEmpty()) getString(R.string.widgets_added_on, masala.layouts.pageLabel(placed.pageId ?: row.id))
+                                    else getString(R.string.widgets_add_failed),
+                                )
+                            }
+                        }) { Text(stringResource(R.string.widgets_add_to_home)) }
+                    }
+                    TextButton(onClick = {
+                        scope.launch {
+                            masala.layouts.removeHtmlApp("Remove from home: ${row.title}", row.id)
+                        }
+                    }) {
+                        Text(stringResource(R.string.widgets_remove_from_home))
+                    }
+                }
+            }
+            HorizontalDivider()
+        }
+    }
+
+    /**
+     * Earlier saves of one library widget, without JSON: restoring puts one back as the newest
+     * version. The id never changes, so storage, taps and home refs carry over.
+     */
+    @Composable
+    private fun WidgetVersionsDialog(specId: String, specTitle: String, onClose: () -> Unit) {
+        val scope = rememberCoroutineScope()
+        fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()
+        var versions by remember(specId) { mutableStateOf<List<com.samosaai.masala.core.contract.WidgetSpec>?>(null) }
+        androidx.compose.runtime.LaunchedEffect(specId) { versions = masala.widgetLibrary.history(specId) }
+        AlertDialog(
+            onDismissRequest = onClose,
+            title = { Text(stringResource(R.string.widgets_versions) + " · $specTitle") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val older = versions
+                    if (older == null) {
+                        Text("…", style = MaterialTheme.typography.bodyMedium)
+                    } else if (older.size <= 1) {
+                        Text(
+                            stringResource(R.string.widgets_versions_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    } else {
+                        Text(
+                            stringResource(R.string.widgets_versions) + " (${older.size})",
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        older.drop(1).forEachIndexed { i, old ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    stringResource(R.string.widgets_versions) + " ${older.size - i - 1}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                TextButton(onClick = {
+                                    scope.launch {
+                                        masala.widgetLibrary.save(old)
+                                        toast(getString(R.string.widgets_added))
+                                        onClose()
+                                    }
+                                }) { Text(stringResource(R.string.widgets_restore)) }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.action_back)) } },
+        )
     }
 
     /** Every installed skill in one place, so a chat is one tap away (plan F4). */

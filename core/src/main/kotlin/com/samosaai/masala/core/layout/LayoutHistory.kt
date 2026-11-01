@@ -40,6 +40,19 @@ class LayoutHistory(
         return Change(version, removed)
     }
 
+    /**
+     * Replaces the current version's layout in place (repair only: an undo that restored a deleted
+     * widget's placement): no new version, redo intact. Returns the fixed version, or null when
+     * nothing changed.
+     */
+    fun repairCurrent(layout: LayoutDoc): Version? {
+        val cur = current ?: return null
+        if (cur.layout == layout) return null
+        val fixed = cur.copy(layout = layout)
+        list[index] = fixed
+        return fixed
+    }
+
     /** Steps back; returns the version now in use, or null at the oldest. */
     fun undo(): Version? = if (canUndo) list[--index] else null
 

@@ -5,6 +5,9 @@ import com.samosaai.masala.core.apps.AppKey
 import com.samosaai.masala.core.apps.ProfileKind
 import com.samosaai.masala.core.apps.Visibility
 import com.samosaai.masala.core.contract.MasalaAction
+import com.samosaai.masala.core.contract.LayoutDoc
+import com.samosaai.masala.core.contract.WidgetRef
+import com.samosaai.masala.core.contract.WidgetSection
 import com.samosaai.masala.core.layout.LayoutChecker
 import com.samosaai.masala.llm.ChatMessage
 import com.samosaai.masala.llm.ResponseFormat
@@ -175,16 +178,39 @@ class LayoutGeneratorTest {
     }
 
     @Test
-    fun `generated widget section is rejected`() = runBlocking<Unit> {
+    fun `a widget ref section passes against the library`() = runBlocking<Unit> {
         val withWidget = """
-            {"schemaVersion":1,"pages":[{"id":"home","title":"Home","sections":[
-            {"type":"widget","id":"w","widget":{"id":"w1","components":[{"type":"text","text":"Hi"}]}}
+            {"schemaVersion":3,"pages":[{"id":"home","title":"Home","sections":[
+            {"type":"widget","id":"w","ref":{"widgetId":"water"}}
             ]}]}
         """.trimIndent()
-        val caller = FakeCaller(ArrayDeque(listOf(Result.success(withWidget), Result.success(withWidget))))
-        val result = LayoutGenerator(caller).generate(request())
+        val water = com.samosaai.masala.core.contract.WidgetSpec("water", components = listOf(com.samosaai.masala.core.contract.WidgetComponent.Text("Hi")))
+        val caller = FakeCaller(ArrayDeque(listOf(Result.success(withWidget))))
+        val result = LayoutGenerator(caller).generate(request().copy(library = mapOf("water" to water)))
+        val generated = assertIs<GenerateResult.Generated>(result)
+        assertEquals(1, generated.layout.pages.single().sections.size)
+    }
+
+    @Test
+    fun `a revise that drops every widget is rejected`() = runBlocking<Unit> {
+        val revise = LayoutDoc(
+            pages = listOf(
+                com.samosaai.masala.core.contract.Page(
+                    "home",
+                    sections = listOf(WidgetSection("w", ref = com.samosaai.masala.core.contract.WidgetRef("water"))),
+                ),
+            ),
+        )
+        val dropped = """
+            {"schemaVersion":3,"pages":[{"id":"home","title":"Home","sections":[
+            {"type":"header","id":"h"}
+            ]}]}
+        """.trimIndent()
+        val water = com.samosaai.masala.core.contract.WidgetSpec("water", components = listOf(com.samosaai.masala.core.contract.WidgetComponent.Text("Hi")))
+        val caller = FakeCaller(ArrayDeque(listOf(Result.success(dropped), Result.success(dropped))))
+        val result = LayoutGenerator(caller).generate(request().copy(revise = revise, library = mapOf("water" to water)))
         val rejected = assertIs<GenerateResult.Rejected>(result)
-        assertTrue(rejected.problems.any { it.message.contains("later build") }, rejected.problems.toString())
+        assertTrue(rejected.problems.any { it.message.contains("dropped every widget") }, rejected.problems.toString())
     }
 
     @Test

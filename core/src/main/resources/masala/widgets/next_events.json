@@ -1,0 +1,16 @@
+{
+  "id": "next_events",
+  "name": "Next events",
+  "description": "The next three calendar events; tap one to ask about it.",
+  "widget": {
+    "id": "next-events",
+    "title": "Coming up",
+    "components": [
+      { "type": "list", "binding": { "source": "next_event" }, "maxRows": 3 }
+    ],
+    "size": { "min": 1, "default": 2, "max": 3 },
+    "rules": [
+      { "condition": { "type": "minutes_to_next_event", "maxMinutes": 15 }, "effect": { "type": "size", "rows": 3 } }
+    ]
+  }
+}

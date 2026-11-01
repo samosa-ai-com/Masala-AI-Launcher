@@ -11,7 +11,7 @@ data class LayoutDoc(
 ) {
     companion object {
         /** Bump with a migration in [com.samosaai.masala.core.migration.LayoutMigrations]. */
-        const val CURRENT_SCHEMA_VERSION = 2
+        const val CURRENT_SCHEMA_VERSION = 3
     }
 }
 
@@ -90,28 +90,56 @@ data class DockSection(
     override fun withItems(items: List<Item>) = copy(items = items)
 }
 
+/**
+ * One generated widget. Schema 3 points at the widget library with [ref]; an inline [widget] is still
+ * read for one schema so older exports import (exactly one of the two is set, the checker says so).
+ * A resolved layout ([com.samosaai.masala.core.layout.LayoutResolver]) always carries [widget], with
+ * [ref] kept so the home screen knows which library widget it is drawing.
+ */
 @Serializable
 @SerialName("widget")
 data class WidgetSection(
     override val id: String,
-    val widget: WidgetSpec,
+    val widget: WidgetSpec? = null,
+    val ref: WidgetRef? = null,
     override val rules: List<Rule> = emptyList(),
-) : Section
+) : Section {
+    /** The library or inline widget id; empty only for a section the checker rejects. */
+    val widgetId: String get() = ref?.widgetId ?: widget?.id.orEmpty()
+}
 
-/** Widgets shown one at a time, ordered by rule priority, then tap weight (arch §3.3). */
+/**
+ * Widgets shown one at a time, ordered by rule priority, then tap weight (arch §3.3). Schema 3 uses
+ * [refs]; inline [widgets] are still read for one schema. A resolved stack carries [widgets] in
+ * display order, with [refs] (when the stack had them) in the same order.
+ */
 @Serializable
 @SerialName("stack")
 data class StackSection(
     override val id: String,
-    val widgets: List<WidgetSpec>,
+    val widgets: List<WidgetSpec> = emptyList(),
+    val refs: List<WidgetRef> = emptyList(),
+    override val rules: List<Rule> = emptyList(),
+) : Section {
+    val widgetIds: List<String> get() = if (refs.isNotEmpty()) refs.map { it.widgetId } else widgets.map { it.id }
+}
+
+/** A generated HTML mini-app drawn at widget size (plan `docs/plans/widget-maker.md` §3.3). */
+@Serializable
+@SerialName("html")
+data class HtmlSection(
+    override val id: String,
+    /** The mini app to draw; sandboxed exactly like on its own screen, no phone data. */
+    val appId: String,
+    /** Height in rows. */
+    val rows: Int = 2,
     override val rules: List<Rule> = emptyList(),
 ) : Section
 
 /** A Pro or hub skill's widget (arch §3.9). Not drawn by the generated-widget renderer. */
 @Serializable
 @SerialName("skill_widget")
-data class SkillWidgetSection(
-    override val id: String,
+data class SkillWidgetSection(    override val id: String,
     val skillId: String,
     val size: SkillWidgetSize = SkillWidgetSize.MEDIUM,
     override val rules: List<Rule> = emptyList(),

@@ -91,6 +91,19 @@ class MasalaApp : Application() {
 
     val database by lazy { MasalaDatabase.create(this) }
     val miniApps by lazy { MiniAppStore(database.miniApps()) }
+    /** Fetched web values (plan widget-maker §5): display strings and ages for web_value. */
+    val httpValues by lazy { com.samosaai.masala.widgets.HttpValueStore(scope, database.httpValues()) { httpApproval.approved(it) } }
+    /** Hosts the user approved per widget for web fetching. */
+    val httpApproval by lazy { com.samosaai.masala.widgets.HttpApprovalStore(this) }
+    /** The 2-player pool for live video widgets (plan widget-maker §4.3, D3 fixed). */
+    val videoPool by lazy { com.samosaai.masala.widgets.media.PlayerPool(this) }
+    val streamSources by lazy {
+        com.samosaai.masala.widgets.StreamSourceStore(database.streamSources(), com.samosaai.masala.llm.KeyCipher.androidKeystore("masala_stream_secrets"))
+            .also { it.attachPrefs(this) }
+    }
+    /** Every generated widget's own values (counters, ticks); shared by home and the manager. */
+    val widgetStates by lazy { com.samosaai.masala.widgets.WidgetStateStore(scope, database.widgetStates()) }
+    val widgetLibrary by lazy { com.samosaai.masala.widgets.WidgetLibrary(database.widgets(), database.widgetVersions()) }
     val settings by lazy { SettingsStore(this) }
 
     /** Open-Meteo for the daily brief and the `weather` tool. */
@@ -125,6 +138,7 @@ class MasalaApp : Application() {
     val tools by lazy {
         MasalaToolRegistry(AppStorageFileAccess(this)).also { registry ->
             MasalaTools.create(this, ToolFiles { registry.fileAccess }, miniApps).forEach(registry::register)
+            com.samosaai.masala.widgets.WidgetTools.create(this).forEach(registry::register)
             fileIndex = ProTools.register(registry, this, DocumentText(this))
         }
     }
@@ -251,6 +265,7 @@ class MasalaApp : Application() {
     suspend fun deleteMiniApp(id: String) {
         miniApps.delete(id)
         layouts.unpinMiniApp(id)
+        layouts.removeHtmlApp("Remove HTML widget", id)
         MiniAppConsole.clear(id)
     }
 
@@ -572,6 +587,8 @@ class MasalaApp : Application() {
         super.onCreate()
         // Tools ask for permissions from background threads; the gate needs a context for that.
         PermissionGate.context = this
+        scope.launch { httpValues.load() }
+        com.samosaai.masala.widgets.WidgetHttpWorker.ensure(this)
         catalog = AppCatalog(this, scope)
         icons = IconCache(this, catalog)
         actions = AppActions(this, catalog) { usage.record(it) }
@@ -589,6 +606,9 @@ class MasalaApp : Application() {
             contextService = contextService,
             skills = { skills },
             toolNames = { tools.tools.map { it.name }.toSet() },
+            widgets = widgetLibrary,
+            streams = streamSources,
+            miniApps = miniApps,
         )
         AgentTools.create(
             this, layouts, modes,
@@ -601,7 +621,18 @@ class MasalaApp : Application() {
         tools.register(MemoryRawTool.create(this, secondBrain) { tools.fileAccess })
         tools.register(MemoryTools.linkTask(taskNoteLinks))
         mcp.servers
-        dispatcher = ActionDispatcher(this, actions, launcher, modes, confirmationGate, tools, { skills }) { toolExecutor(confirmationGate) }
+        dispatcher = ActionDispatcher(this, actions, launcher, modes, confirmationGate, tools, { skills }, { toolExecutor(confirmationGate) }) { widgetId ->
+            // A refresh tap only refetches hosts the user already approved at placement; anything
+            // else keeps the last value, and the tap reports it instead of asking again.
+            val spec = widgetLibrary.current()[widgetId] ?: return@ActionDispatcher false
+            val approved = httpApproval.approved(widgetId)
+            val bindings = com.samosaai.masala.widgets.HttpApproval.fetchesOf(spec)
+                .filter { it.host in approved }.map { it.http }.distinct()
+            if (bindings.isEmpty()) return@ActionDispatcher false
+            var fresh = false
+            bindings.forEach { fresh = httpValues.refresh(widgetId, it) || fresh }
+            fresh
+        }
 
         taskRunner = ScheduledSkillRunner(this)
 

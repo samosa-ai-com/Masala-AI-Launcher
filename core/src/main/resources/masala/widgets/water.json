@@ -1,0 +1,13 @@
+{
+  "id": "water",
+  "name": "Water counter",
+  "description": "Count glasses of water against a daily goal.",
+  "widget": {
+    "id": "water",
+    "title": "Water",
+    "components": [
+      { "type": "counter", "key": "glasses", "label": "Glasses", "goal": 8, "style": { "tint": "blue", "emphasis": "large" } }
+    ],
+    "size": { "min": 1, "default": 1, "max": 2 }
+  }
+}

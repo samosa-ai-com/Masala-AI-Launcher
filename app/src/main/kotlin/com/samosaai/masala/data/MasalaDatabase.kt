@@ -37,8 +37,12 @@ import kotlinx.coroutines.flow.Flow
         MiniAppEntity::class,
         WatchEntity::class,
         AppLaunchEntity::class,
+        WidgetEntity::class,
+        WidgetVersionEntity::class,
+        StreamSourceEntity::class,
+        WidgetHttpValueEntity::class,
     ],
-    version = 5,
+    version = 8,
 )
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
@@ -46,6 +50,12 @@ abstract class MasalaDatabase : RoomDatabase() {
     abstract fun miniApps(): MiniAppDao
     abstract fun skillRuns(): SkillRunDao
     abstract fun skillArtifacts(): SkillArtifactDao
+    abstract fun widgetStates(): WidgetStateDao
+    abstract fun usageWeights(): UsageWeightDao
+    abstract fun widgets(): WidgetDao
+    abstract fun widgetVersions(): WidgetVersionDao
+    abstract fun streamSources(): StreamSourceDao
+    abstract fun httpValues(): WidgetHttpValueDao
     abstract fun wikiPages(): WikiDao
     abstract fun appLaunches(): AppLaunchDao
 
@@ -79,9 +89,31 @@ abstract class MasalaDatabase : RoomDatabase() {
             }
         }
 
+        /** Widget library (plan `docs/plans/widget-maker.md` §6.1): specs plus the last versions of each. */
+        val MIGRATION_5_6 = object : Migration(5, 6) {            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `widgets` (`id` TEXT NOT NULL, `specJson` TEXT NOT NULL, `tier` TEXT NOT NULL, `title` TEXT, `createdBy` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `widget_versions` (`widgetId` TEXT NOT NULL, `version` INTEGER NOT NULL, `specJson` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`widgetId`, `version`))")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_widget_versions_widgetId_version` ON `widget_versions` (`widgetId`, `version`)")
+            }
+        }
+
+        /** Stream sources (plan `docs/plans/widget-maker.md` §4.2): registry without secrets. */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `stream_sources` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `kind` TEXT NOT NULL, `url` TEXT NOT NULL, `snapshotUrl` TEXT, `secret` TEXT, `transport` TEXT, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))")
+            }
+        }
+
+        /** Fetched web values (plan `docs/plans/widget-maker.md` §5): display strings and ages. */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `widget_http_values` (`key` TEXT NOT NULL, `widgetId` TEXT NOT NULL, `value` TEXT NOT NULL, `fetchedAt` INTEGER NOT NULL, PRIMARY KEY(`key`))")
+            }
+        }
+
         fun create(context: Context): MasalaDatabase =
             Room.databaseBuilder(context, MasalaDatabase::class.java, "masala.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8).build()
     }
 }
 
@@ -228,6 +260,15 @@ data class WidgetStateEntity(
     val updatedAt: Long,
 )
 
+@Dao
+interface WidgetStateDao {
+    @Query("SELECT * FROM widget_state WHERE widgetId = :widgetId")
+    suspend fun get(widgetId: String): WidgetStateEntity?
+
+    @Upsert
+    suspend fun upsert(entity: WidgetStateEntity)
+}
+
 /** Tap weights for stack ordering and usage ranking (Phase 6): `weight += α(1 − weight)`. */
 @Entity(tableName = "usage_weights")
 data class UsageWeightEntity(
@@ -235,6 +276,127 @@ data class UsageWeightEntity(
     val weight: Double,
     val updatedAt: Long,
 )
+
+@Dao
+interface UsageWeightDao {
+    @Query("SELECT * FROM usage_weights")
+    suspend fun all(): List<UsageWeightEntity>
+
+    @Upsert
+    suspend fun upsert(entity: UsageWeightEntity)
+}
+
+/** One widget in the library (plan `docs/plans/widget-maker.md` §6.1): the spec as JSON plus who made it. */
+@Entity(tableName = "widgets")
+data class WidgetEntity(
+    @PrimaryKey val id: String,
+    val specJson: String,
+    /** "spec" for native widgets, "html" for the W6 escape hatch. */
+    val tier: String = "spec",
+    val title: String?,
+    /** "user", "agent" or "template". */
+    val createdBy: String,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
+/** The last versions of one library widget, for Undo in the manager. */
+@Entity(tableName = "widget_versions", primaryKeys = ["widgetId", "version"], indices = [Index("widgetId", "version")])
+data class WidgetVersionEntity(
+    val widgetId: String,
+    val version: Long,
+    val specJson: String,
+    val createdAt: Long,
+)
+
+@Dao
+interface WidgetDao {
+    @Query("SELECT * FROM widgets ORDER BY updatedAt DESC")
+    suspend fun all(): List<WidgetEntity>
+
+    @Query("SELECT * FROM widgets ORDER BY updatedAt DESC")
+    fun watch(): Flow<List<WidgetEntity>>
+
+    @Query("SELECT * FROM widgets WHERE id = :id")
+    suspend fun get(id: String): WidgetEntity?
+
+    @Upsert
+    suspend fun upsert(entity: WidgetEntity)
+
+    @Query("DELETE FROM widgets WHERE id = :id")
+    suspend fun delete(id: String)
+}
+
+@Dao
+interface WidgetVersionDao {
+    @Query("SELECT * FROM widget_versions WHERE widgetId = :widgetId ORDER BY version DESC")
+    suspend fun versions(widgetId: String): List<WidgetVersionEntity>
+
+    @Insert
+    suspend fun insert(version: WidgetVersionEntity)
+
+    @Query("DELETE FROM widget_versions WHERE widgetId = :widgetId AND version NOT IN (SELECT version FROM widget_versions WHERE widgetId = :widgetId ORDER BY version DESC LIMIT 20)")
+    suspend fun prune(widgetId: String)
+
+    @Query("DELETE FROM widget_versions WHERE widgetId = :widgetId")
+    suspend fun deleteForWidget(widgetId: String)
+}
+
+/** One camera or stream a widget may show (plan `docs/plans/widget-maker.md` §4.2). */
+@Entity(tableName = "stream_sources")
+data class StreamSourceEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    /** rtsp, hls, dash, mjpeg, snapshot or progressive. */
+    val kind: String,
+    /** Never carries userinfo; credentials live in [secret], sealed by the Keystore. */
+    val url: String,
+    val snapshotUrl: String?,
+    /** `base64(iv ‖ ciphertext+tag)` of `username + "\n" + password`, or null. */
+    val secret: String?,
+    val transport: String?,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
+@Dao
+interface StreamSourceDao {
+    @Query("SELECT * FROM stream_sources ORDER BY name COLLATE NOCASE")
+    suspend fun all(): List<StreamSourceEntity>
+
+    @Query("SELECT * FROM stream_sources ORDER BY name COLLATE NOCASE")
+    fun watch(): Flow<List<StreamSourceEntity>>
+
+    @Query("SELECT * FROM stream_sources WHERE id = :id")
+    suspend fun get(id: String): StreamSourceEntity?
+
+    @Upsert
+    suspend fun upsert(entity: StreamSourceEntity)
+
+    @Query("DELETE FROM stream_sources WHERE id = :id")
+    suspend fun delete(id: String)
+}
+
+/** One fetched web value (plan `docs/plans/widget-maker.md` §5): the display string and its age. */
+@Entity(tableName = "widget_http_values")
+data class WidgetHttpValueEntity(
+    @PrimaryKey val key: String,
+    val widgetId: String,
+    val value: String,
+    val fetchedAt: Long,
+)
+
+@Dao
+interface WidgetHttpValueDao {
+    @Query("SELECT * FROM widget_http_values")
+    suspend fun all(): List<WidgetHttpValueEntity>
+
+    @Upsert
+    suspend fun upsert(entity: WidgetHttpValueEntity)
+
+    @Query("DELETE FROM widget_http_values WHERE widgetId = :widgetId")
+    suspend fun deleteForWidget(widgetId: String)
+}
 
 /** One run of a skill (arch §3.9, Phase 4). */
 @Entity(tableName = "skill_runs", indices = [Index("skillId")])

@@ -63,6 +63,20 @@ class ConfirmationGateTest {
     }
 
     @Test
+    fun `a tool-provided summary replaces the generic one`() = runBlocking<Unit> {
+        val gate = gate()
+        val args = JsonObject(mapOf("id" to JsonPrimitive("price")))
+        val tool = com.samosaai.masala.core.tool.FunctionTool(
+            ToolDefinition("place_widget", "", JsonObject(emptyMap())),
+            ToolSensitivity.CHANGES_SOMETHING,
+            confirmSummary = { "Put \"price\" on home (fetches api.example.com every 15s)" },
+        ) { com.samosaai.masala.core.tool.ActionResult.ok("") }
+        answerWhenAsked(gate, true)
+        assertNull(gate.check(tool, args))
+        assertEquals("Put \"price\" on home (fetches api.example.com every 15s)", log.last().second)
+    }
+
+    @Test
     fun `questions are asked one at a time`() = runBlocking<Unit> {
         val gate = gate()
         val first = async { gate.confirm("first") }
@@ -100,6 +114,26 @@ class ConfirmationGateTest {
         assertEquals(
             "Add a new app to your home screen",
             ConfirmationGate.summarize("create_mini_app", JsonObject(mapOf("html" to JsonPrimitive(html)))),
+        )
+    }
+
+    @Test
+    fun `widget placement is confirmed in words, not as spec JSON`() {
+        assertEquals(
+            "Put \"water\" on home",
+            ConfirmationGate.summarize("place_widget", JsonObject(mapOf("id" to JsonPrimitive("water")))),
+        )
+        assertEquals(
+            "Take \"water\" off home",
+            ConfirmationGate.summarize("remove_widget", JsonObject(mapOf("id" to JsonPrimitive("water")))),
+        )
+        assertEquals(
+            "Delete the \"water\" widget everywhere",
+            ConfirmationGate.summarize("delete_widget", JsonObject(mapOf("id" to JsonPrimitive("water")))),
+        )
+        assertEquals(
+            "Add the \"Garage\" camera",
+            ConfirmationGate.summarize("add_stream_source", JsonObject(mapOf("name" to JsonPrimitive("Garage")))),
         )
     }
 

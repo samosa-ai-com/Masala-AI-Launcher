@@ -133,6 +133,10 @@ class RenderContext(
     val onClockClick: () -> Unit,
     /** Where skill widgets get their skill and latest result; without it they stay placeholders. */
     val skillWidgets: SkillWidgetSource? = null,
+    /** Where generated widgets get their snapshot, stored values and actions; none keeps the placeholder. */
+    val widgets: com.samosaai.masala.ui.home.widgets.WidgetSource? = null,
+    /** Long-press on a home widget opens its menu (remove, resize, edit in manager). */
+    val onWidgetMenu: ((com.samosaai.masala.core.contract.WidgetSpec, String) -> Unit)? = null,
     /** The active mode's name for the chip above the clock (UI refresh U3); none hides the chip. */
     val modeName: String? = null,
     val onModeChip: (() -> Unit)? = null,
@@ -146,6 +150,8 @@ class RenderContext(
     val onItemMenu: ((Item) -> Unit)? = null,
     /** A mini app's stored icon by id; null draws the pinned item's own icon. */
     val miniAppIcon: (String) -> String? = { null },
+    /** A mini app's document for HTML widgets; none keeps the placeholder. */
+    val htmlWidget: (String) -> com.samosaai.masala.data.MiniAppEntity? = { null },
     /** Tapping a folder (an `open_folder` item) shows its items; folders are never dispatched. */
     val onOpenFolder: ((Item) -> Unit)? = null,
     /** A folder's own menu (rename, ungroup). */
@@ -373,12 +379,35 @@ private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: Render
         is DockSection -> Dock(section, ctx)
         is ListSection -> ItemList(section.id, section.title, section.items, ctx)
         is GroupSection -> Group(section, ctx)
-        is WidgetSection -> Placeholder(section.widget.title ?: section.widget.id, stringResource(R.string.home_widget_placeholder), layout.widgetRows[section.widget.id])
+        // A resolved layout always carries the widget inline (refs are filled in from the library).
+        is WidgetSection -> section.widget?.let {
+            ctx.widgets?.let { source ->
+                val menu = ctx.onWidgetMenu
+                com.samosaai.masala.ui.home.widgets.WidgetCard(
+                    it, layout.widgetRows[section.id],
+                    if (menu == null) source else source.copy(onLongPress = { menu(it, section.id) }),
+                )
+            } ?: Placeholder(it.title ?: it.id, stringResource(R.string.home_widget_placeholder), layout.widgetRows[section.id])
+        }
         is StackSection -> section.widgets.firstOrNull()?.let {
-            Placeholder(it.title ?: it.id, stringResource(R.string.home_stack_placeholder, section.widgets.size), layout.widgetRows[it.id])
+            ctx.widgets?.let { source ->
+                val menu = ctx.onWidgetMenu
+                com.samosaai.masala.ui.home.widgets.StackCard(
+                    section.widgets, layout.widgetRows[section.id],
+                    if (menu == null) source else source.copy(onLongPress = { menu(it, section.id) }),
+                )
+            } ?: Placeholder(it.title ?: it.id, stringResource(R.string.home_stack_placeholder, section.widgets.size), layout.widgetRows[section.id])
         }
         is SkillWidgetSection -> ctx.skillWidgets?.let { SkillWidgetCard(section, it, ctx.onAction) }
             ?: Placeholder(section.skillId, stringResource(R.string.home_skill_widget_placeholder), null)
+        // An HTML widget draws its mini app at widget size, sandboxed like its own screen.
+        is com.samosaai.masala.core.contract.HtmlSection -> ctx.htmlWidget(section.appId)?.let { row ->
+            androidx.compose.foundation.layout.Box(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = ((section.rows) * 48).dp),
+            ) {
+                com.samosaai.masala.miniapps.MiniAppView(row.id, row.html, row.networkAllowed, Modifier.fillMaxWidth())
+            }
+        } ?: Placeholder(section.appId, stringResource(R.string.home_widget_placeholder), section.rows)
     }
 }
 
@@ -435,9 +464,9 @@ private fun columnsFor(wanted: Int, maxWidthDp: Float): Int {
 
 @Composable
 private fun ItemGrid(sectionId: String, title: String?, items: List<Item>, columns: Int, ctx: RenderContext) {
-    if (items.isEmpty() && title == null) return
+    if (items.isEmpty() && title.isNullOrBlank()) return
     Column(Modifier.fillMaxWidth().dropSection(sectionId, ctx).padding(horizontal = 12.dp)) {
-        title?.let { Text(it, style = wallpaperText(MaterialTheme.typography.titleSmall), modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) }
+        if (!title.isNullOrBlank()) Text(title, style = wallpaperText(MaterialTheme.typography.titleSmall), modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val cols = columnsFor(columns, maxWidth.value)
             Column {
@@ -468,7 +497,7 @@ private fun Dock(section: DockSection, ctx: RenderContext) {
 @Composable
 private fun ItemList(sectionId: String, title: String?, items: List<Item>, ctx: RenderContext) {
     Column(Modifier.fillMaxWidth().dropSection(sectionId, ctx)) {
-        title?.let { Text(it, style = wallpaperText(MaterialTheme.typography.titleSmall), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) }
+        if (!title.isNullOrBlank()) Text(title, style = wallpaperText(MaterialTheme.typography.titleSmall), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         items.forEach { item -> ItemRow(item, ctx, sectionId) }
     }
 }

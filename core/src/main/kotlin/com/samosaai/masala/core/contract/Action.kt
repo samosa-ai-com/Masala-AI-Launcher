@@ -77,6 +77,14 @@ sealed interface MasalaAction {
     @SerialName("run_skill")
     data class RunSkill(val skillId: String, val prompt: String? = null) : MasalaAction
 
+    /**
+     * Reloads the widget's own web values in place. The phone fills in a blank [widgetId] with the
+     * widget holding the button; only hosts the user already approved are fetched, so it never asks.
+     */
+    @Serializable
+    @SerialName("refresh_widget")
+    data class RefreshWidget(val widgetId: String = "") : MasalaAction
+
     @Serializable
     @SerialName("open_mini_app")
     data class OpenMiniApp(val id: String) : MasalaAction
@@ -113,6 +121,7 @@ fun MasalaAction.sensitivity(toolSensitivity: (String) -> ToolSensitivity?): Too
     is MasalaAction.Search,
     is MasalaAction.AskMasala,
     is MasalaAction.RunSkill,
+    is MasalaAction.RefreshWidget,
     is MasalaAction.OpenMiniApp,
     is MasalaAction.OpenFolder -> ToolSensitivity.READ_ONLY
 }

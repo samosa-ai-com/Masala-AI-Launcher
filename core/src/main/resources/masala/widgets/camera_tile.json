@@ -1,0 +1,14 @@
+{
+  "id": "camera_tile",
+  "name": "Camera tile",
+  "description": "One live camera, muted; tap for full screen. Replace the source with one of yours.",
+  "widget": {
+    "id": "camera",
+    "title": "Front door",
+    "components": [
+      { "type": "video", "stream": { "sourceId": "front-door" } },
+      { "type": "text", "binding": { "source": "stream_status", "key": "front-door" }, "style": { "align": "end" } }
+    ],
+    "size": { "min": 2, "default": 3, "max": 5 }
+  }
+}

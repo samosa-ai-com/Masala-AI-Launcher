@@ -15,6 +15,8 @@ class FunctionTool(
     override val opensScreen: Boolean = false,
     /** Narrows [Tool.needsConfirmation] per call; null keeps the sensitivity rule. */
     private val confirmWhen: ((JsonObject) -> Boolean)? = null,
+    /** Overrides the confirmation sheet text for this call; null keeps the default summary. */
+    val confirmSummary: ((JsonObject) -> String)? = null,
     private val run: suspend (JsonObject) -> ActionResult,
 ) : Tool {
     override fun needsConfirmation(args: JsonObject): Boolean =

@@ -1,11 +1,13 @@
 package com.samosaai.masala.layout
 
+import com.samosaai.masala.core.contract.HtmlSection
 import com.samosaai.masala.core.contract.ItemSection
 import com.samosaai.masala.core.contract.LayoutDoc
 import com.samosaai.masala.core.contract.MasalaJson
 import com.samosaai.masala.core.contract.MasalaAction
 import com.samosaai.masala.core.contract.StackSection
 import com.samosaai.masala.core.contract.WidgetSection
+import com.samosaai.masala.core.contract.WidgetSpec
 import com.samosaai.masala.core.layout.LayoutChecker
 import com.samosaai.masala.llm.ChatMessage
 import com.samosaai.masala.llm.ResponseFormat
@@ -46,6 +48,8 @@ class LayoutGenerator(
          * prompt and the model returns the complete revised layout. Null generates from scratch.
          */
         val revise: LayoutDoc? = null,
+        /** The widget library, so refs in a revise check against what is installed. */
+        val library: Map<String, WidgetSpec> = emptyMap(),
     )
 
     suspend fun generate(request: Request): GenerateResult {
@@ -149,21 +153,23 @@ class LayoutGenerator(
         )
     }
 
-    private fun checkerEnv(request: Request): LayoutChecker.Environment = checkerEnv(request.context)
+    private fun checkerEnv(request: Request): LayoutChecker.Environment = checkerEnv(request.context).copy(
+        widgets = request.library.ifEmpty { null },
+        // HTML widgets point at the user's mini apps, listed in the prompt.
+        miniAppIds = request.context.miniApps.map { it.id }.toSet(),
+    )
 
     /**
-     * Meaning checks the schema can't say: no generated-widget sections (Phase 6), no override
-     * icons (later), and no empty item sections — the model emits those when it is vague, so they
-     * trigger the repair turn instead of shipping a hollow home screen.
+     * Meaning checks the schema can't say: no override icons (later), and no empty item
+     * sections — the model emits those when it is vague, so they trigger the repair turn instead
+     * of shipping a hollow home screen. A revise that drops every widget fails too: widget,
+     * stack and html sections ride through unchanged unless the user asked about them.
      */
     internal fun meaningProblems(layout: LayoutDoc, request: Request): List<LayoutChecker.Problem> {
         val out = mutableListOf<LayoutChecker.Problem>()
         layout.pages.forEachIndexed { p, page ->
             page.sections.forEachIndexed { s, section ->
                 val path = "$.pages[$p].sections[$s]"
-                if (section is WidgetSection || section is StackSection) {
-                    out += LayoutChecker.Problem(path, "Generated widgets arrive in a later build; use grid or list sections")
-                }
                 if (section is ItemSection && section.items.isEmpty()) {
                     out += LayoutChecker.Problem("$path.items", "Empty section: add items or drop the section")
                 }
@@ -174,6 +180,12 @@ class LayoutGenerator(
                         }
                     }
                 }
+            }
+        }
+        if (request.revise != null) {
+            fun hasWidgets(doc: LayoutDoc) = doc.pages.flatMap { it.sections }.any { it is WidgetSection || it is StackSection || it is HtmlSection }
+            if (hasWidgets(request.revise) && !hasWidgets(layout)) {
+                out += LayoutChecker.Problem("$", "The revision dropped every widget: carry widget, stack and html sections through unchanged unless the user asked to remove them")
             }
         }
         return out
@@ -242,6 +254,7 @@ class LayoutGenerator(
         internal val SYSTEM_PROMPT = """
             You design an Android home-screen layout. Reply with ONLY the layout object, no prose.
             Rules: every page, section and item needs a unique id. Use only the installed apps listed below (copy package, activity and user exactly). Use only the listed symbol names. Every grid, list, dock or group section needs at least one item. Put a clock header first. Never invent packages, icons or skills. A photo may be attached: sketches and screenshots define the layout structure, scenes set the theme. The text request overrides the photo where they conflict.
+            Widget, stack and HTML sections show the user's library widgets and mini apps: copy them through unchanged unless the request is about them. A widget section holds a ref with a widgetId from the library list, a stack a list of such refs, an HTML section a mini-app id from the mini-app list — copy every id exactly, never invent one. Skill widgets (skill_widget) are installed skills from the skill list, for expert consultations and job cards; never use one for a library widget.
         """.trimIndent()
 
         internal fun isSchemaRejection(e: Exception): Boolean {

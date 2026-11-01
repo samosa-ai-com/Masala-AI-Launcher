@@ -238,6 +238,191 @@ object MasalaToolDefinitions {
         }
     )
 
+    // Generated home widgets (plan docs/plans/widget-maker.md §7.2).
+    val listWidgets = tool(
+        "list_widgets",
+        "List the widget library: id, title, where each widget sits on home. " +
+            "To change one: read_widget, then update_widget. To use a template as a start, read it too.",
+        schema { putJsonObject("properties") {} },
+    )
+
+    val readWidget = tool(
+        "read_widget",
+        "Read one library widget's full spec JSON, to change it with update_widget. " +
+            "The user may name a widget by its title: call list_widgets first to find the id.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Widget id from list_widgets.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
+    val widgetSchema = tool(
+        "widget_schema",
+        "How a widget spec is shaped: components, bindings, sources and limits. " +
+            "Read this before writing a spec by hand; create_widget from a sentence skips it.",
+        schema { putJsonObject("properties") {} },
+    )
+
+    val createWidget = tool(
+        "create_widget",
+        "Make a home-screen widget: either the full spec JSON, or one sentence and the maker " +
+            "writes the spec (checked, one repair turn). The answer names the widget id and any " +
+            "problems; a spec with problems is never saved. Nothing goes on home until place_widget, " +
+            "which always asks the user first.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("spec") {
+                    put("type", "string")
+                    put("description", "Complete WidgetSpec JSON. One of spec or sentence.")
+                }
+                putJsonObject("sentence") {
+                    put("type", "string")
+                    put("description", "What the widget should be, e.g. 'a water counter with a goal of 8'. One of spec or sentence.")
+                }
+            }
+        },
+    )
+
+    val updateWidget = tool(
+        "update_widget",
+        "Change a library widget: either the complete replacement spec JSON (same id), or a " +
+            "sentence and the maker revises it (checked, one repair turn). The look applies at " +
+            "once with Undo. Never moves it on home: place_widget does that.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Widget id from list_widgets.")
+                }
+                putJsonObject("spec") {
+                    put("type", "string")
+                    put("description", "Complete replacement WidgetSpec JSON with the same id. One of spec or sentence.")
+                }
+                putJsonObject("sentence") {
+                    put("type", "string")
+                    put("description", "What to change, e.g. 'make the goal 10'. One of spec or sentence.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
+    val placeWidget = tool(
+        "place_widget",
+        "Put a library widget on home. Always asks the user first, naming the widget. " +
+            "The same widget may sit on two pages.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Widget id from list_widgets or create_widget.")
+                }
+                putJsonObject("page") {
+                    put("type", "string")
+                    put("description", "Page id for the widget. Missing puts it on the first page.")
+                }
+                putJsonObject("rows") {
+                    put("type", "integer")
+                    put("description", "Height override in rows, inside the widget's own size range. Missing keeps its default.")
+                }
+                putJsonObject("approved") {
+                    put("type", "boolean")
+                    put("description", "Set true after the user agreed to the widget's web fetching (the error names the hosts). Missing asks first.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
+    val removeWidget = tool(
+        "remove_widget",
+        "Take a widget off home wherever it sits, keeping it in the library. " +
+            "Deleting it from the library instead is delete_widget.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Widget id from list_widgets.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
+    val deleteWidget = tool(
+        "delete_widget",
+        "Delete a widget from the library and take it off home everywhere. Lost for good.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Widget id from list_widgets.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
+    // Stream sources for live media widgets (plan docs/plans/widget-maker.md §7.2).
+    val listStreamSources = tool(
+        "list_stream_sources",
+        "The cameras and streams the phone knows: name, kind and whether it plays. " +
+            "A widget shows one by its source id; the URLs and their secrets never leave the phone.",
+        schema { putJsonObject("properties") {} },
+    )
+
+    val addStreamSource = tool(
+        "add_stream_source",
+        "Add a camera or stream by name and URL (rtsp, hls, dash, progressive mp4, mjpeg or " +
+            "snapshot jpeg). Never put a username or password in the URL or in chat: when one is " +
+            "needed the user types it into a sheet on screen. The answer names the source id for " +
+            "video and snapshot components.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("name") {
+                    put("type", "string")
+                    put("description", "Name shown in Settings, e.g. Front door.")
+                }
+                putJsonObject("url") {
+                    put("type", "string")
+                    put("description", "Stream or snapshot URL, without any username or password.")
+                }
+                putJsonObject("kind") {
+                    put("type", "string")
+                    put("description", "rtsp, hls, dash, progressive, mjpeg or snapshot. Guessed from the URL when missing.")
+                }
+                putJsonObject("username") {
+                    put("type", "string")
+                    put("description", "Camera login. The password is asked on screen, never in chat.")
+                }
+            }
+            putJsonArray("required") {
+                add("name")
+                add("url")
+            }
+        },
+    )
+
+    val testStream = tool(
+        "test_stream",
+        "Connect to a stream source for up to 8 seconds and report the codec, the resolution and " +
+            "the latency, or the error. Run it before placing a video or snapshot widget.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Source id from list_stream_sources.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
     val createCalendarEvent = tool(
         "create_calendar_event",
         "Add an event to the phone's calendar. The answer names the event id for later edits.",
@@ -1447,5 +1632,16 @@ object MasalaToolDefinitions {
         openMiniAppTool,
         pinMiniAppTool,
         deleteMiniAppTool,
+        listWidgets,
+        readWidget,
+        widgetSchema,
+        createWidget,
+        updateWidget,
+        placeWidget,
+        removeWidget,
+        deleteWidget,
+        listStreamSources,
+        addStreamSource,
+        testStream,
     )
 }

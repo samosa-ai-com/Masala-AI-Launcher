@@ -17,6 +17,8 @@ import com.samosaai.masala.core.layout.LayoutHistory
 import com.samosaai.masala.core.layout.ResolveCache
 import com.samosaai.masala.core.layout.ResolvedLayout
 import com.samosaai.masala.core.migration.LayoutMigrations
+import com.samosaai.masala.core.migration.WidgetLift
+import com.samosaai.masala.widgets.WidgetLibrary
 import com.samosaai.masala.context.ContextService
 import com.samosaai.masala.data.LayoutVersionDao
 import com.samosaai.masala.data.LayoutVersionEntity
@@ -58,6 +60,9 @@ class LayoutRepository(
     private val contextService: ContextService,
     private val skills: () -> SkillRegistry,
     private val toolNames: () -> Set<String>,
+    private val widgets: WidgetLibrary,
+    private val streams: com.samosaai.masala.widgets.StreamSourceStore,
+    private val miniApps: com.samosaai.masala.miniapps.MiniAppStore,
 ) {
     enum class Source { CACHE, MINIMAL }
 
@@ -65,6 +70,12 @@ class LayoutRepository(
     private data class Cached(val layout: LayoutDoc, val widgetRows: Map<String, Int>)
 
     private data class Base(val version: Long, val layout: LayoutDoc)
+
+    private data class Inputs(
+        val base: Base,
+        val patches: List<com.samosaai.masala.core.contract.ModePatch>,
+        val snapshot: com.samosaai.masala.core.contract.ContextSnapshot,
+    )
 
     private val cacheFile = File(context.filesDir, "resolved_layout.json")
     private val pointer = context.getSharedPreferences("layout", Context.MODE_PRIVATE)
@@ -102,7 +113,11 @@ class LayoutRepository(
         scope.launch { load() }
         scope.launch {
             combine(_base.filterNotNull(), modes.patches, modes.active, contextService.snapshot) { base, patches, active, snapshot ->
-                resolveCache.resolve(base.version, base.layout, patches.filter { it.id in active }, snapshot)
+                Inputs(base, patches.filter { it.id in active }, snapshot)
+            }.let { inputs ->
+                combine(inputs, widgets.widgets, widgets.version) { i, lib, libVersion ->
+                    resolveCache.resolve(i.base.version, i.base.layout, i.patches, i.snapshot, libVersion, lib)
+                }
             }.flowOn(Dispatchers.Default).collect { r ->
                 _resolved.value = r
                 writeCache(r)
@@ -118,6 +133,9 @@ class LayoutRepository(
                 LayoutHistory.Version(row.id, row.label, LayoutMigrations.decode(MasalaJson.strict.parseToJsonElement(row.json)), row.createdAt)
             }.onFailure { Log.w(TAG, "Skipping unreadable layout version ${row.id}", it) }.getOrNull()
         }
+        // Templates seed only when nothing was ever saved: an emptied library stays empty.
+        widgets.load(seedIfEmpty = saved.isEmpty())
+        streams.load()
         history = LayoutHistory(saved, pointer.getLong(KEY_CURRENT, -1).takeIf { it >= 0 })
         if (history.current == null) {
             // Fresh install, or nothing readable: Classic, once the app list is known.
@@ -125,7 +143,41 @@ class LayoutRepository(
             val classic = ClassicLayoutBuilder.build(context, launcher.apps.value, launcher.pinnedApps.value)
             lock.withLock { push("Classic", classic) }
         }
+        liftInlineWidgets()
+        // Heal layouts bricked by the old delete order (library deleted before refs stripped):
+        // an undo or a crash could leave refs to missing widgets that reject every later edit.
+        history.current?.let { repairDanglingRefs(it) }
         publish()
+    }
+
+    /**
+     * Schema 3 once: every inline widget still saved in the layout moves into the library and the
+     * layout keeps a ref, as one undoable version (plan `docs/plans/widget-maker.md` §6.1). Mode
+     * patches lift too — later loads find no inline widgets anywhere and do nothing. The push
+     * happens whenever the layout still differs (even with nothing new to save), so a crash
+     * between the library save and the push resumes into the same refs instead of stranding
+     * the layout inline for good.
+     */
+    private suspend fun liftInlineWidgets() {
+        val current = history.current ?: return
+        val patches = modes.patches.value
+        val baseInline = WidgetLift.hasInline(current.layout)
+        val patchInline = patches.any(WidgetLift::hasInline)
+        if (!baseInline && !patchInline) return
+        var known = widgets.current()
+        val liftedBase = if (baseInline) WidgetLift.lift(current.layout, known) else null
+        liftedBase?.let { known = known + it.widgets.associateBy { w -> w.id } }
+        val liftedPatches = patches.mapNotNull { patch ->
+            if (!WidgetLift.hasInline(patch)) null
+            else patch to WidgetLift.lift(patch, known).also { known += it.widgets.associateBy { w -> w.id } }
+        }
+        val all = liftedBase?.widgets.orEmpty() + liftedPatches.flatMap { (_, lifted) -> lifted.widgets }
+        if (all.isNotEmpty()) widgets.saveAll(all)
+        liftedPatches.forEach { (patch, lifted) ->
+            if (lifted.value != patch) modes.put(lifted.value)
+        }
+        val lifted = liftedBase?.value
+        if (lifted != null && lifted != current.layout) lock.withLock { push("Widgets to library", lifted) }
     }
 
     private suspend fun push(label: String, layout: LayoutDoc) {
@@ -164,9 +216,10 @@ class LayoutRepository(
      * [label]. Returns the problems when it doesn't; nothing is changed then.
      */
     suspend fun apply(label: String, layout: LayoutDoc): List<LayoutChecker.Problem> = lock.withLock {
-        val problems = LayoutChecker.check(layout, environment())
+        val pruned = LayoutEdits.pruneEmptyPages(layout, modePageIds()) ?: layout
+        val problems = LayoutChecker.check(pruned, environment())
         if (problems.isEmpty()) {
-            push(label, layout)
+            push(label, pruned)
             publish()
         }
         problems
@@ -179,7 +232,8 @@ class LayoutRepository(
      */
     suspend fun edit(label: String, change: (LayoutDoc) -> LayoutDoc?): List<LayoutChecker.Problem> = lock.withLock {
         val current = history.current?.layout ?: return@withLock emptyList()
-        val next = change(current) ?: return@withLock emptyList()
+        val changed = change(current) ?: return@withLock emptyList()
+        val next = LayoutEdits.pruneEmptyPages(changed, modePageIds()) ?: changed
         if (next == current) return@withLock emptyList()
         val problems = LayoutChecker.check(next, environment())
         if (problems.isEmpty()) {
@@ -197,9 +251,87 @@ class LayoutRepository(
     suspend fun renameItems(label: String, match: (Item) -> Boolean): List<LayoutChecker.Problem> =
         edit(label) { LayoutEdits.renameWhere(it, label, match) }
 
-    suspend fun undo(): Boolean = lock.withLock { history.undo()?.also { savePointer(); publish() } != null }
+    /** Page ids mode patches add sections to: pruning never drops these. */
+    private fun modePageIds(): Set<String> = modes.patches.value.flatMap { patch -> patch.addSections.map { it.pageId } }.toSet()
 
-    suspend fun redo(): Boolean = lock.withLock { history.redo()?.also { savePointer(); publish() } != null }
+    /** Where one library widget sits on home, for the Widgets manager. */
+    fun widgetPlacements(widgetId: String): List<LayoutEdits.WidgetPlacement> =
+        base.value?.let { LayoutEdits.widgetPlacements(it, widgetId) }.orEmpty()
+
+    /**
+     * Puts a library widget on home: the requested page when it has room, else the first page
+     * that does, else a new home screen. Always asks (arch §3.3), so the caller gates it.
+     * One widget sits on home once: placing again reports where it already is.
+     * Returns the check problems plus where it landed (or already sits), for the "on Home 2" message.
+     */
+    suspend fun placeWidget(
+        label: String,
+        widgetId: String,
+        rowsOverride: Int? = null,
+        pageId: String? = null,
+    ): PlaceResult {
+        widgetPlacements(widgetId).lastOrNull()?.let { return PlaceResult(emptyList(), it.pageId, alreadyPlaced = true) }
+        val specs = widgets.current()
+        val problems = edit(label) { LayoutEdits.placeWidget(it, widgetId, rowsOverride, pageId, specs)?.doc }
+        if (problems.isNotEmpty()) return PlaceResult(problems, null)
+        val at = widgetPlacements(widgetId).lastOrNull()?.pageId
+        return PlaceResult(emptyList(), at)
+    }
+
+    data class PlaceResult(val problems: List<LayoutChecker.Problem>, val pageId: String?, val alreadyPlaced: Boolean = false)
+
+    /** Takes one library widget off home wherever it sits, in one undoable step. */
+    suspend fun removeWidgetRefs(label: String, widgetId: String): List<LayoutChecker.Problem> {
+        val problems = edit(label) { LayoutEdits.removeWidgetRefs(it, widgetId) }
+        if (problems.isNotEmpty()) return problems
+        // Mode patches hold refs too; the layout checker never sees them, so strip them here.
+        modes.patches.value.forEach { patch ->
+            WidgetLift.stripRefs(patch, widgetId)?.let { modes.put(it) }
+        }
+        return emptyList()
+    }
+
+    /** Sets the per-placement height override on every ref of [widgetId]. */
+    suspend fun resizeWidget(label: String, widgetId: String, rows: Int): List<LayoutChecker.Problem> =
+        edit(label) { LayoutEdits.resizeWidget(it, widgetId, rows) }
+
+    /** Where one mini app sits on home at widget size, for the Widgets manager. */
+    fun htmlPlacements(appId: String): List<LayoutEdits.WidgetPlacement> =
+        base.value?.let { LayoutEdits.htmlPlacements(it, appId) }.orEmpty()
+
+    /** Shows a mini app on home at widget size, with the same one-screenful overflow as widgets. */
+    suspend fun placeHtml(label: String, appId: String, rows: Int = 2, pageId: String? = null): PlaceResult {
+        htmlPlacements(appId).lastOrNull()?.let { return PlaceResult(emptyList(), it.pageId, alreadyPlaced = true) }
+        val specs = widgets.current()
+        val problems = edit(label) { LayoutEdits.placeHtml(it, appId, rows, pageId, specs)?.doc }
+        if (problems.isNotEmpty()) return PlaceResult(problems, null)
+        val at = htmlPlacements(appId).lastOrNull()?.pageId
+        return PlaceResult(emptyList(), at)
+    }
+
+    /** The display name of a page ("Home 2", or the id when it has no title). */
+    fun pageLabel(pageId: String): String =
+        base.value?.pages?.firstOrNull { it.id == pageId }?.title ?: pageId
+
+    /** Takes a mini app off home wherever it sits at widget size, in one undoable step. */
+    suspend fun removeHtmlApp(label: String, appId: String): List<LayoutChecker.Problem> =
+        edit(label) { LayoutEdits.removeHtmlApp(it, appId) }
+
+    suspend fun undo(): Boolean = lock.withLock {
+        val version = history.undo() ?: return false
+        savePointer()
+        repairDanglingRefs(version)
+        publish()
+        true
+    }
+
+    suspend fun redo(): Boolean = lock.withLock {
+        val version = history.redo() ?: return false
+        savePointer()
+        repairDanglingRefs(version)
+        publish()
+        true
+    }
 
     /** The saved document for one version, for the Refine flow. Null when unreadable. */
     suspend fun layoutFor(versionId: Long): LayoutDoc? = withContext(Dispatchers.IO) {
@@ -209,7 +341,25 @@ class LayoutRepository(
         }.getOrNull()
     }
 
-    suspend fun select(versionId: Long): Boolean = lock.withLock { history.select(versionId)?.also { savePointer(); publish() } != null }
+    suspend fun select(versionId: Long): Boolean = lock.withLock {
+        val version = history.select(versionId) ?: return false
+        savePointer()
+        repairDanglingRefs(version)
+        publish()
+        true
+    }
+
+    /**
+     * An undo/redo/select can restore a placement whose widget is gone (delete isn't undone):
+     * strip those refs in place so the next edit doesn't fail as "Unknown widget". No new
+     * version, redo intact.
+     */
+    private suspend fun repairDanglingRefs(version: LayoutHistory.Version) {
+        val cleaned = LayoutEdits.stripUnknownWidgets(version.layout, widgets.current().keys) ?: return
+        val fixed = history.repairCurrent(cleaned) ?: return
+        android.util.Log.w(TAG, "Stripped refs to missing widgets after history navigation")
+        withContext(Dispatchers.IO) { dao.upsert(fixed.toEntity()) }
+    }
 
     /** Renames one saved version. Blank labels are rejected; false when unknown. */
     suspend fun renameVersion(versionId: Long, label: String): Boolean = lock.withLock {
@@ -307,13 +457,16 @@ class LayoutRepository(
             (action.activity == null || action.activity == entry.key.activity)
 
     /** What the checker knows about this phone. */
-    fun environment(): LayoutChecker.Environment {
+    suspend fun environment(): LayoutChecker.Environment {
         val installed = catalog.state.value.apps.groupBy({ it.key.packageName }, { it.key.user }).mapValues { it.value.toSet() }
         return LayoutChecker.Environment(
             installedApps = installed,
             skillIds = skills().getAllSkills().map { it.id }.toSet(),
             toolNames = toolNames(),
             modeIds = modes.patches.value.map { it.id }.toSet(),
+            widgets = widgets.current(),
+            streamSourceIds = streams.current().keys,
+            miniAppIds = miniApps.list().map { it.id }.toSet(),
         )
     }
 

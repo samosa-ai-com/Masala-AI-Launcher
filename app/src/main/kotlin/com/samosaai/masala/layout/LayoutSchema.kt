@@ -18,8 +18,9 @@ import kotlinx.serialization.json.putJsonObject
  *
  * The shape mirrors what [com.samosaai.masala.core.layout.LayoutChecker.parse] decodes
  * (same `"type"` discriminators, same field names), so a valid reply parses with no translation
- * step. Only what Phase 3 supports is included: header, grid, list, group, dock and skill-widget
- * sections (no generated-widget sections until Phase 6), app and symbol icons (no overrides), and
+ * step. Included: header, grid, list, group, dock, skill-widget and generated-widget sections
+ * (widget and stack sections hold library refs only, html sections mini-app ids — the prompt
+ * lists both, the checker enforces them), app and symbol icons (no overrides), and
  * eight safe actions (no shortcuts, dialing, messaging, modes or raw tools).
  *
  * Strict-mode notes (model check, `docs/internal/model-check.md`): every object lists all of its
@@ -63,6 +64,9 @@ object LayoutSchema {
                         addJsonObject { merge(group(symbolNames)) }
                         addJsonObject { merge(dock(symbolNames)) }
                         addJsonObject { merge(skillWidget()) }
+                        addJsonObject { merge(widgetSection()) }
+                        addJsonObject { merge(stackSection()) }
+                        addJsonObject { merge(htmlSection()) }
                     }
                 }
             }
@@ -124,8 +128,63 @@ object LayoutSchema {
             put("additionalProperties", false)
         }
 
-    private fun skillWidget(): JsonObject = buildJsonObject {
+    /**
+     * A library widget on home: a ref into the widget library, never an inline spec. The model
+     * copies refs through from the revise document or picks ids from the library list; the
+     * checker rejects unknown ids.
+     */
+    private fun widgetSection(): JsonObject = buildJsonObject {
         put("type", "object")
+        putJsonObject("properties") {
+            put("type", const("widget"))
+            put("id", string())
+            putJsonObject("ref") {
+                put("type", "object")
+                putJsonObject("properties") {
+                    put("widgetId", string())
+                }
+                putJsonArray("required") { add("widgetId") }
+                put("additionalProperties", false)
+            }
+        }
+        putJsonArray("required") { add("type"); add("id"); add("ref") }
+        put("additionalProperties", false)
+    }
+
+    private fun stackSection(): JsonObject = buildJsonObject {
+        put("type", "object")
+        putJsonObject("properties") {
+            put("type", const("stack"))
+            put("id", string())
+            putJsonObject("refs") {
+                put("type", "array")
+                putJsonObject("items") {
+                    put("type", "object")
+                    putJsonObject("properties") {
+                        put("widgetId", string())
+                    }
+                    putJsonArray("required") { add("widgetId") }
+                    put("additionalProperties", false)
+                }
+            }
+        }
+        putJsonArray("required") { add("type"); add("id"); add("refs") }
+        put("additionalProperties", false)
+    }
+
+    private fun htmlSection(): JsonObject = buildJsonObject {
+        put("type", "object")
+        putJsonObject("properties") {
+            put("type", const("html"))
+            put("id", string())
+            put("appId", string())
+            put("rows", int())
+        }
+        putJsonArray("required") { add("type"); add("id"); add("appId"); add("rows") }
+        put("additionalProperties", false)
+    }
+
+    private fun skillWidget(): JsonObject = buildJsonObject {        put("type", "object")
         putJsonObject("properties") {
             put("type", const("skill_widget"))
             put("id", string())

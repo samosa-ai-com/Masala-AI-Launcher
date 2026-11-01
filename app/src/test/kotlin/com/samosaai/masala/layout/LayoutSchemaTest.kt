@@ -25,8 +25,7 @@ class LayoutSchemaTest {
     fun `sections and actions are unions, root is an object`() {
         val schema = LayoutSchema.schema(setOf("call"))
         val sectionTypes = sectionVariants(schema)
-        assertTrue(sectionTypes.containsAll(listOf("header", "grid", "list", "dock", "group", "skill_widget")))
-        assertTrue(!sectionTypes.contains("widget") && !sectionTypes.contains("stack"))
+        assertTrue(sectionTypes.containsAll(listOf("header", "grid", "list", "dock", "group", "skill_widget", "widget", "stack", "html")))
     }
 
     @Test

@@ -6,6 +6,7 @@ import com.samosaai.masala.core.contract.Effect
 import com.samosaai.masala.core.contract.GridSection
 import com.samosaai.masala.core.contract.GroupSection
 import com.samosaai.masala.core.contract.HeaderSection
+import com.samosaai.masala.core.contract.HtmlSection
 import com.samosaai.masala.core.contract.IconRef
 import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.ItemSection
@@ -17,10 +18,11 @@ import com.samosaai.masala.core.contract.Rule
 import com.samosaai.masala.core.contract.SizeRange
 import com.samosaai.masala.core.contract.SkillWidgetSection
 import com.samosaai.masala.core.contract.StackSection
-import com.samosaai.masala.core.contract.WidgetComponent
 import com.samosaai.masala.core.contract.WidgetSection
+import com.samosaai.masala.core.contract.WidgetRef
 import com.samosaai.masala.core.contract.WidgetSpec
 import com.samosaai.masala.core.migration.LayoutMigrations
+import com.samosaai.masala.core.widgets.WidgetChecker
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -45,6 +47,12 @@ object LayoutChecker {
         val toolNames: Set<String>? = null,
         /** Mode IDs `set_mode` may use; null skips the check. */
         val modeIds: Set<String>? = null,
+        /** The widget library, for refs (schema 3); null skips the check. */
+        val widgets: Map<String, WidgetSpec>? = null,
+        /** Stream source IDs `video`/`snapshot` may use; null skips the check. */
+        val streamSourceIds: Set<String>? = null,
+        /** Mini-app IDs `html` sections may show; null skips the check. */
+        val miniAppIds: Set<String>? = null,
     ) {
         fun installed(packageName: String, user: Long) = user in installedApps[packageName].orEmpty()
     }
@@ -61,6 +69,11 @@ object LayoutChecker {
     const val MAX_DOCK_ITEMS = 6
     const val MAX_COLUMNS = 6
     const val MAX_WIDGETS_IN_STACK = 8
+    const val MAX_HTML_PER_PAGE = 2
+    /** Declared widget rows on one page (refs, overrides, inline defaults, HTML rows). */
+    const val MAX_WIDGET_ROWS_PER_PAGE = 8
+    /** Rendered rows on one page, for placement routing (header, grids, drawn widgets, HTML). */
+    const val MAX_PAGE_ROWS = 12
     const val MAX_ROWS = 8
     const val MAX_FOLDER_ITEMS = 16
     const val MAX_FOLDER_LABEL = 60
@@ -103,6 +116,17 @@ object LayoutChecker {
             if (page.sections.size > MAX_SECTIONS_PER_PAGE) {
                 problems += Problem("$pagePath.sections", "At most $MAX_SECTIONS_PER_PAGE sections on a page")
             }
+            // An HTML widget is a live WebView: at most two per page, so home keeps its frame time.
+            if (page.sections.filterIsInstance<HtmlSection>().size > MAX_HTML_PER_PAGE) {
+                problems += Problem("$pagePath.sections", "At most $MAX_HTML_PER_PAGE HTML widgets on a page")
+            }
+            // A page holds at most eight declared widget rows: the author's height intent stays
+            // coherent. Items are never counted, so existing grids keep editing. Rendered fit is
+            // the placer's job (estimates, overflow), since cards draw taller than their rows.
+            val sizes = env.widgets?.mapValues { it.value.size.default }.orEmpty()
+            if (LayoutEdits.declaredWidgetRows(page.sections, sizes) > MAX_WIDGET_ROWS_PER_PAGE) {
+                problems += Problem("$pagePath.sections", "At most $MAX_WIDGET_ROWS_PER_PAGE widget rows on a page")
+            }
             page.sections.forEachIndexed { s, section ->
                 val path = "$pagePath.sections[$s]"
                 id(section.id, path)
@@ -110,16 +134,17 @@ object LayoutChecker {
                 when (section) {
                     is HeaderSection -> Unit
                     is ItemSection -> checkItemSection(section, path, env, ::id, problems)
-                    is WidgetSection -> checkWidget(section.widget, "$path.widget", env, ::id, problems)
-                    is StackSection -> {
-                        if (section.widgets.isEmpty()) problems += Problem("$path.widgets", "A stack needs a widget")
-                        if (section.widgets.size > MAX_WIDGETS_IN_STACK) {
-                            problems += Problem("$path.widgets", "At most $MAX_WIDGETS_IN_STACK widgets in a stack")
-                        }
-                        section.widgets.forEachIndexed { w, widget -> checkWidget(widget, "$path.widgets[$w]", env, ::id, problems) }
+                    is WidgetSection -> when {
+                        section.widget != null && section.ref != null ->
+                            problems += Problem(path, "A widget section has 'ref' or 'widget', not both")
+                        section.ref != null -> checkRef(section.ref, "$path.ref", env, problems)
+                        section.widget != null -> checkWidget(section.widget, "$path.widget", env, ::id, problems)
+                        else -> problems += Problem("$path.ref", "A widget section needs 'ref'")
                     }
+                    is StackSection -> checkStack(section, path, env, ::id, problems)
                     is SkillWidgetSection ->
                         if (section.skillId !in env.skillIds) problems += Problem("$path.skillId", "Unknown skill '${section.skillId}'")
+                    is HtmlSection -> checkHtml(section, path, env, problems)
                 }
             }
         }
@@ -185,7 +210,7 @@ object LayoutChecker {
         }
     }
 
-    private fun checkIcon(icon: IconRef, path: String, env: Environment, problems: MutableList<Problem>) {
+    internal fun checkIcon(icon: IconRef, path: String, env: Environment, problems: MutableList<Problem>) {
         when (icon) {
             is IconRef.AppIcon ->
                 if (!env.installed(icon.packageName, icon.user)) {
@@ -243,12 +268,14 @@ object LayoutChecker {
             is MasalaAction.RunTool -> if (env.toolNames != null && action.name !in env.toolNames) {
                 problems += Problem("$path.name", "Unknown tool '${action.name}'")
             }
-            // An empty ask_masala prompt opens the ask box with nothing typed.
+            // An empty ask_masala prompt opens the ask box with nothing typed. A blank refresh_widget
+            // id means the widget holding the button; the renderer fills it in before dispatching.
             MasalaAction.OpenDrawer, MasalaAction.ExpandNotifications, is MasalaAction.Search,
-            is MasalaAction.OpenMiniApp, is MasalaAction.AskMasala -> Unit
+            is MasalaAction.OpenMiniApp, is MasalaAction.AskMasala, is MasalaAction.RefreshWidget -> Unit
         }
     }
 
+    /** An inline widget (schema 2 and older): its id is unique in the layout like any other. */
     private fun checkWidget(
         widget: WidgetSpec,
         path: String,
@@ -257,28 +284,68 @@ object LayoutChecker {
         problems: MutableList<Problem>,
     ) {
         id(widget.id, path)
-        checkSize(widget.size, "$path.size", problems)
-        checkRules(widget.rules, "$path.rules", widget.size, problems)
-        if (widget.components.isEmpty()) problems += Problem("$path.components", "A widget needs a component")
-        widget.components.forEachIndexed { c, component ->
-            val cPath = "$path.components[$c]"
-            when (component) {
-                is WidgetComponent.Button -> checkAction(component.action, "$cPath.action", env, problems)
-                is WidgetComponent.Image -> checkIcon(component.icon, "$cPath.icon", env, problems)
-                is WidgetComponent.Timer -> if (component.seconds <= 0) problems += Problem("$cPath.seconds", "seconds must be above 0")
-                is WidgetComponent.Counter -> if (component.step <= 0) problems += Problem("$cPath.step", "step must be above 0")
-                else -> Unit
+        WidgetChecker.checkInto(widget, path, env, problems)
+    }
+
+    /** A library widget. The same widget may sit in several places, so its id isn't registered. */
+    private fun checkRef(ref: WidgetRef, path: String, env: Environment, problems: MutableList<Problem>) {
+        if (ref.widgetId.isBlank()) {
+            problems += Problem("$path.widgetId", "widgetId is empty")
+            return
+        }
+        val spec = env.widgets?.get(ref.widgetId)
+        if (env.widgets != null && spec == null) problems += Problem("$path.widgetId", "Unknown widget '${ref.widgetId}'")
+        val rows = ref.rowsOverride ?: return
+        val range = spec?.size ?: SizeRange(1, 1, MAX_ROWS)
+        if (rows !in range.min..range.max) {
+            problems += Problem("$path.rowsOverride", "$rows is outside the widget's size range ${range.min}..${range.max}")
+        }
+    }
+
+    /** A generated HTML widget: a known mini app at widget size, same sandbox as its screen. */
+    private fun checkHtml(section: HtmlSection, path: String, env: Environment, problems: MutableList<Problem>) {
+        if (section.appId.isBlank()) {
+            problems += Problem("$path.appId", "An HTML widget needs an app")
+            return
+        }
+        if (env.miniAppIds != null && section.appId !in env.miniAppIds) {
+            problems += Problem("$path.appId", "Unknown mini app '${section.appId}'")
+        }
+        if (section.rows !in 1..MAX_ROWS) problems += Problem("$path.rows", "rows is 1..$MAX_ROWS")
+    }
+
+    private fun checkStack(
+        section: StackSection,
+        path: String,
+        env: Environment,
+        id: (String, String) -> Unit,
+        problems: MutableList<Problem>,
+    ) {
+        if (section.widgets.isNotEmpty() && section.refs.isNotEmpty()) {
+            problems += Problem(path, "A stack has 'refs' or 'widgets', not both")
+            return
+        }
+        val count = section.widgets.size + section.refs.size
+        val field = if (section.widgets.isNotEmpty()) "widgets" else "refs"
+        if (count == 0) problems += Problem("$path.refs", "A stack needs a widget")
+        if (count > MAX_WIDGETS_IN_STACK) problems += Problem("$path.$field", "At most $MAX_WIDGETS_IN_STACK widgets in a stack")
+        section.widgets.forEachIndexed { w, widget -> checkWidget(widget, "$path.widgets[$w]", env, id, problems) }
+        val seen = HashMap<String, Int>()
+        section.refs.forEachIndexed { r, ref ->
+            checkRef(ref, "$path.refs[$r]", env, problems)
+            seen.putIfAbsent(ref.widgetId, r)?.let {
+                problems += Problem("$path.refs[$r].widgetId", "'${ref.widgetId}' is already in this stack at refs[$it]")
             }
         }
     }
 
-    private fun checkSize(size: SizeRange, path: String, problems: MutableList<Problem>) {
+    internal fun checkSize(size: SizeRange, path: String, problems: MutableList<Problem>) {
         if (size.min < 1 || size.max > MAX_ROWS || size.min > size.default || size.default > size.max) {
             problems += Problem(path, "Sizes need 1 <= min <= default <= max <= $MAX_ROWS")
         }
     }
 
-    private fun checkRules(rules: List<Rule>, path: String, range: SizeRange?, problems: MutableList<Problem>) {
+    internal fun checkRules(rules: List<Rule>, path: String, range: SizeRange?, problems: MutableList<Problem>) {
         rules.forEachIndexed { r, rule ->
             val rulePath = "$path[$r]"
             checkCondition(rule.condition, "$rulePath.condition", problems)
@@ -318,7 +385,7 @@ object LayoutChecker {
     }
 
     private val PHONE_NUMBER = Regex("""^\+?[0-9 ()\-.*#]{3,32}$""")
-    private const val MAX_TIMER_SECONDS = 24 * 60 * 60
+    private const val MAX_TIMER_SECONDS = WidgetChecker.MAX_TIMER_SECONDS
 
     /** kotlinx puts `at path: $.pages[0]...` at the end of the first line of a decoding error. */
     private fun pathOf(message: String?): String =

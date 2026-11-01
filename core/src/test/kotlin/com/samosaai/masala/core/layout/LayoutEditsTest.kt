@@ -1,19 +1,30 @@
 package com.samosaai.masala.core.layout
 
+import com.samosaai.masala.core.contract.Binding
+import com.samosaai.masala.core.contract.BindingSource
 import com.samosaai.masala.core.contract.DockSection
 import com.samosaai.masala.core.contract.GridSection
 import com.samosaai.masala.core.contract.HeaderSection
+import com.samosaai.masala.core.contract.HtmlSection
+import com.samosaai.masala.core.contract.HttpBinding
 import com.samosaai.masala.core.contract.IconRef
 import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.ItemSection
 import com.samosaai.masala.core.contract.LayoutDoc
 import com.samosaai.masala.core.contract.MasalaAction
 import com.samosaai.masala.core.contract.Page
+import com.samosaai.masala.core.contract.SizeRange
+import com.samosaai.masala.core.contract.StackSection
+import com.samosaai.masala.core.contract.WidgetComponent
+import com.samosaai.masala.core.contract.WidgetRef
+import com.samosaai.masala.core.contract.WidgetSection
+import com.samosaai.masala.core.contract.WidgetSpec
 import com.samosaai.masala.core.layout.LayoutEdits.Slot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class LayoutEditsTest {
     private fun item(id: String) = Item(id, "Label $id", IconRef.Symbol("apps"), MasalaAction.OpenDrawer)
@@ -291,5 +302,272 @@ class LayoutEditsTest {
         val one = Item("f", "Folder", IconRef.Symbol("folder"), MasalaAction.OpenFolder(listOf(item("c"))))
         val single = LayoutDoc(pages = listOf(Page("home", sections = listOf(GridSection("grid", items = listOf(item("a"), one, item("b")))))))
         assertEquals(listOf("a", "c", "b"), ids(assertNotNull(LayoutEdits.moveOutOfFolder(single, "f", "c")), "grid"))
+    }
+
+    @Test
+    fun `widget placements cover refs, stacks and inline specs`() {
+        val doc = widgetDoc()
+        assertEquals(
+            listOf(LayoutEdits.WidgetPlacement("home", "w1"), LayoutEdits.WidgetPlacement("home", "s1")),
+            LayoutEdits.widgetPlacements(doc, "water"),
+        )
+        assertEquals(listOf(LayoutEdits.WidgetPlacement("home", "s1"), LayoutEdits.WidgetPlacement("two", "s2")), LayoutEdits.widgetPlacements(doc, "steps"))
+        assertEquals(emptyList(), LayoutEdits.widgetPlacements(doc, "missing"))
+    }
+
+    private val waterSpec = WidgetSpec("water", "Water", listOf(WidgetComponent.Counter("n", "N")), SizeRange(1, 1, 2))
+    private val stepsSpec = WidgetSpec("steps", null, listOf(WidgetComponent.Text(binding = Binding(BindingSource.BATTERY))), SizeRange(1, 1, 1))
+    private val lib = mapOf("water" to waterSpec, "steps" to stepsSpec)
+
+    @Test
+    fun `placeWidget appends a ref section with a free id`() {
+        val once = assertNotNull(LayoutEdits.placeWidget(widgetDoc(), "habits", specs = lib))
+        val section = once.doc.pages.first().sections.last() as WidgetSection
+        assertEquals(WidgetRef("habits"), section.ref)
+        assertEquals("home", once.pageId)
+        val twice = assertNotNull(LayoutEdits.placeWidget(once.doc, "habits", specs = lib))
+        val ids = twice.doc.pages.first().sections.map { it.id }
+        assertEquals(ids.size, ids.toSet().size)
+        assertNull(LayoutEdits.placeWidget(widgetDoc(), ""))
+        assertNull(LayoutEdits.placeWidget(widgetDoc(), "habits", pageId = "missing"))
+        val other = assertNotNull(LayoutEdits.placeWidget(widgetDoc(), "habits", rowsOverride = 3, pageId = "two", specs = lib))
+        assertEquals("two", other.pageId)
+        assertEquals(listOf("s2", "widget-habits"), other.doc.pages.last().sections.map { it.id })
+        assertEquals(3, (other.doc.pages.last().sections.last() as WidgetSection).ref?.rowsOverride)
+    }
+
+    @Test
+    fun `placing past the page budget overflows to room, then a new page`() {        val big = WidgetSpec("big", "Big", listOf(WidgetComponent.Counter("n", "N")), SizeRange(1, 1, 2))
+        val specs = mapOf("big" to big)
+        // Home starts with a 4-item grid with a title: 3 rendered rows.
+        var doc = LayoutDoc(pages = listOf(Page("home", sections = listOf(GridSection("g", title = "Apps", columns = 4, items = items("a", "b", "c", "d"))))))
+        val first = assertNotNull(LayoutEdits.placeWidget(doc, "big", specs = specs))
+        // Grid 3 + widget 3 = 6: fits.
+        assertEquals("home", first.pageId)
+        doc = first.doc
+        val second = assertNotNull(LayoutEdits.placeWidget(doc, "big", specs = specs))
+        // 6 + 3 = 9: fits.
+        assertEquals("home", second.pageId)
+        doc = second.doc
+        val third = assertNotNull(LayoutEdits.placeWidget(doc, "big", specs = specs))
+        // 9 + 3 = 12: exactly a screenful, still fits.
+        assertEquals("home", third.pageId)
+        doc = third.doc
+        val fourth = assertNotNull(LayoutEdits.placeWidget(doc, "big", specs = specs))
+        // 12 + 3 > 12: a new home screen opens.
+        assertEquals(2, fourth.doc.pages.size)
+        assertEquals("home-2", fourth.pageId)
+        assertEquals("Home 2", fourth.doc.pages.last().title)
+    }
+
+    @Test
+    fun `widgetRowsUsed counts headers, grids and widgets at drawn size`() {
+        // w1: water at drawn 3; s1: tallest of water 3 and steps override 1 is 3.
+        assertEquals(6, LayoutEdits.widgetRowsUsed(widgetDoc(), "home", lib))
+        assertEquals(1, LayoutEdits.widgetRowsUsed(widgetDoc(), "two", lib))
+        assertEquals(0, LayoutEdits.widgetRowsUsed(widgetDoc(), "missing", lib))
+        val grid = LayoutDoc(pages = listOf(Page("home", sections = listOf(HeaderSection("h"), GridSection("g", title = "T", columns = 4, items = items("a", "b", "c", "d", "e"))))))
+        // Header 3 (clock + date) + grid title 1 + ceil(5/4)*2 rows.
+        assertEquals(3 + 1 + 4, LayoutEdits.widgetRowsUsed(grid, "home"))
+    }
+
+    @Test
+    fun `stripUnknownWidgets drops refs to deleted widgets`() {
+        val doc = LayoutDoc(
+            pages = listOf(
+                Page(
+                    "home",
+                    sections = listOf(
+                        WidgetSection("w1", ref = WidgetRef("gone")),
+                        WidgetSection("w2", ref = WidgetRef("here")),
+                        StackSection("s", refs = listOf(WidgetRef("gone"), WidgetRef("here"))),
+                        StackSection("s2", refs = listOf(WidgetRef("gone"))),
+                    ),
+                ),
+            ),
+        )
+        val cleaned = assertNotNull(LayoutEdits.stripUnknownWidgets(doc, setOf("here")))
+        val sections = cleaned.pages.single().sections
+        assertEquals(listOf("w2", "s"), sections.map { it.id })
+        assertEquals(listOf(WidgetRef("here")), (sections.single { it.id == "s" } as StackSection).refs)
+        assertNull(LayoutEdits.stripUnknownWidgets(cleaned, setOf("here")))
+    }
+
+    @Test
+    fun `removeWidgetRefs drops sections and strips stacks`() {        val doc = widgetDoc()
+        val out = assertNotNull(LayoutEdits.removeWidgetRefs(doc, "water"))
+        assertEquals(emptyList(), LayoutEdits.widgetPlacements(out, "water"))
+        // The water section is gone; s1 keeps its steps ref, s2 is untouched.
+        val stacks = out.pages.flatMap { it.sections }.filterIsInstance<StackSection>()
+        assertEquals(listOf("s1", "s2"), stacks.map { it.id })
+        assertEquals(listOf(WidgetRef("steps", rowsOverride = 1)), stacks.first().refs)
+        assertNull(LayoutEdits.removeWidgetRefs(doc, "missing"))
+    }
+
+    @Test
+    fun `resizeWidget sets the override on every matching ref`() {
+        val out = assertNotNull(LayoutEdits.resizeWidget(widgetDoc(), "water", 3))
+        val refs = out.pages.flatMap { it.sections }.flatMap {
+            when (it) {
+                is WidgetSection -> listOfNotNull(it.ref)
+                is StackSection -> it.refs
+                else -> emptyList()
+            }
+        }.filter { it.widgetId == "water" }
+        assertEquals(2, refs.size)
+        assertEquals(listOf(3, 3), refs.map { it.rowsOverride })
+        assertNull(LayoutEdits.resizeWidget(widgetDoc(), "missing", 3))
+    }
+
+    private fun widgetDoc() = LayoutDoc(
+        pages = listOf(
+            Page(
+                "home",
+                sections = listOf(
+                    WidgetSection("w1", ref = WidgetRef("water")),
+                    StackSection("s1", refs = listOf(WidgetRef("water"), WidgetRef("steps", rowsOverride = 1))),
+                ),
+            ),
+            Page("two", sections = listOf(StackSection("s2", refs = listOf(WidgetRef("steps"))))),
+        ),
+    )
+
+    @Test
+    fun `placeHtml appends a sized section with a free id`() {
+        val once = assertNotNull(LayoutEdits.placeHtml(widgetDoc(), "dice"))
+        val section = once.doc.pages.first().sections.last() as HtmlSection
+        assertEquals("dice", section.appId)
+        assertEquals(2, section.rows)
+        assertEquals("home", once.pageId)
+        val twice = assertNotNull(LayoutEdits.placeHtml(once.doc, "dice", rows = 3))
+        // Home holds 6, so rows 3 still fits at 9.
+        assertEquals("home", twice.pageId)
+        assertEquals(3, (twice.doc.pages.first().sections.last() as HtmlSection).rows)
+        assertEquals(twice.doc.pages.flatMap { it.sections }.map { it.id }.size, twice.doc.pages.flatMap { it.sections }.map { it.id }.toSet().size)
+        assertNull(LayoutEdits.placeHtml(widgetDoc(), ""))
+        assertNull(LayoutEdits.placeHtml(widgetDoc(), "dice", pageId = "missing"))
+    }
+
+    @Test
+    fun `pruneEmptyPages drops show-nothing pages but keeps one and referenced ones`() {
+        val live = Page("home", sections = listOf(WidgetSection("w", ref = WidgetRef("water"))))
+        val headerOnly = Page("empty", sections = listOf(HeaderSection("h")))
+        val blankGrid = Page("blank", sections = listOf(GridSection("g", items = emptyList())))
+        val dockOnly = Page("dockpage", sections = listOf(DockSection("d", items = items("x"))))
+        val doc = LayoutDoc(pages = listOf(live, headerOnly, blankGrid, dockOnly))
+        val pruned = assertNotNull(LayoutEdits.pruneEmptyPages(doc))
+        assertEquals(listOf("home", "dockpage"), pruned.pages.map { it.id })
+        // A referenced empty page survives for its mode.
+        val kept = assertNotNull(LayoutEdits.pruneEmptyPages(doc, referenced = setOf("empty")))
+        assertEquals(listOf("home", "empty", "dockpage"), kept.pages.map { it.id })
+        // The last page never goes, even empty.
+        assertNull(LayoutEdits.pruneEmptyPages(LayoutDoc(pages = listOf(headerOnly))))
+        assertNull(LayoutEdits.pruneEmptyPages(LayoutDoc(pages = listOf(live))))
+    }
+
+    @Test
+    fun `removeHtmlApp drops only matching sections`() {        val doc = assertNotNull(LayoutEdits.placeHtml(widgetDoc(), "dice")).doc
+        assertEquals(listOf(LayoutEdits.WidgetPlacement("home", "html-dice")), LayoutEdits.htmlPlacements(doc, "dice"))
+        val out = assertNotNull(LayoutEdits.removeHtmlApp(doc, "dice"))
+        assertEquals(emptyList(), LayoutEdits.htmlPlacements(out, "dice"))
+        assertEquals(doc.pages.first().sections.size - 1, out.pages.first().sections.size)
+        assertNull(LayoutEdits.removeHtmlApp(doc, "missing"))
+    }
+
+    @Test
+    fun `the reported overflowing screen sends new widgets to a new page`() {        // The Redmi screen from the bug report: clock + date, an Essentials grid, the gauge,
+        // habits and price widgets from the bundled templates.
+        val lib = com.samosaai.masala.core.widgets.WidgetTemplates.all().associate { it.widget.id to it.widget }
+        val doc = LayoutDoc(
+            pages = listOf(
+                Page(
+                    "home",
+                    sections = listOf(
+                        HeaderSection("h", showClock = true, showDate = true),
+                        GridSection("g", title = "Essentials", columns = 4, items = items("a", "b", "c")),
+                        WidgetSection("w1", ref = WidgetRef("battery-steps")),
+                        WidgetSection("w2", ref = WidgetRef("habits")),
+                        WidgetSection("w3", ref = WidgetRef("price")),
+                    ),
+                ),
+            ),
+        )
+        // Sanity: that screen really does overflow a 12-row page.
+        assertTrue(LayoutEdits.widgetRowsUsed(doc, "home", lib) > LayoutChecker.MAX_PAGE_ROWS)
+        val placed = assertNotNull(LayoutEdits.placeWidget(doc, "water", specs = lib))
+        assertEquals("home-2", placed.pageId)
+        assertEquals("Home 2", placed.doc.pages.last().title)
+    }
+
+    @Test
+    fun `a small widget joins a nearly full home screen instead of opening a new one`() {
+        // The follow-up report: header + blank-title grid + price, then tea (timer only).
+        // Estimated 3 + 2 + 2 = 7, plus tea 3 = 10: fits, no new page.
+        val tea = WidgetSpec("tea", null, listOf(WidgetComponent.Timer("tea", "Tea", 60)), SizeRange(1, 1, 2))
+        val price = WidgetSpec("price", "Price", listOf(WidgetComponent.WebValue("Now", HttpBinding("https://example.com", "$"))), SizeRange(1, 1, 2))
+        val specs = mapOf("tea" to tea, "price" to price)
+        val doc = LayoutDoc(
+            pages = listOf(
+                Page(
+                    "home",
+                    sections = listOf(
+                        HeaderSection("h", showClock = true, showDate = true),
+                        GridSection("g", title = "", columns = 3, items = items("a", "b", "c")),
+                        WidgetSection("w", ref = WidgetRef("price")),
+                    ),
+                ),
+            ),
+        )
+        assertEquals(7, LayoutEdits.widgetRowsUsed(doc, "home", specs))
+        val placed = assertNotNull(LayoutEdits.placeWidget(doc, "tea", specs = specs))
+        assertEquals("home", placed.pageId)
+        assertEquals(1, placed.doc.pages.size)
+    }
+
+    @Test
+    fun `a text card joins the first page with room instead of opening a third`() {
+        // The NiftyBEES report: home holds a price card (7 rows), page two holds two text cards
+        // (4 rows each), and a joke card (4 rows) must land on home (7 + 4 = 11), not a new page.
+        val card = { id: String, title: String, big: String, small: String ->
+            WidgetSpec(
+                id, title,
+                listOf(
+                    WidgetComponent.Text(big, style = com.samosaai.masala.core.contract.WidgetStyle(emphasis = com.samosaai.masala.core.contract.Emphasis.LARGE)),
+                    WidgetComponent.Text(small),
+                    WidgetComponent.Button("Check", MasalaAction.OpenDrawer),
+                ),
+                SizeRange(1, 1, 2),
+            )
+        }
+        val price = WidgetSpec("price", "Price", listOf(WidgetComponent.WebValue("Now", HttpBinding("https://example.com", "$"))), SizeRange(1, 1, 2))
+        val nifty = card("nifty", "Nifty", "NiftyBEES • NSE", "Live price coming soon - tap Check for latest")
+        val joke = card("joke", "Joke", "Morning Joke", "Why don't scientists trust atoms? Because they make up everything!")
+        assertEquals(4, LayoutEdits.estimateWidgetRows(nifty))
+        assertEquals(4, LayoutEdits.estimateWidgetRows(joke))
+        val specs = mapOf("price" to price, "nifty" to nifty, "nifty-live" to nifty.copy(id = "nifty-live"), "joke" to joke)
+        val doc = LayoutDoc(
+            pages = listOf(
+                Page(
+                    "home",
+                    sections = listOf(
+                        HeaderSection("h", showClock = true, showDate = true),
+                        GridSection("g", title = "", columns = 3, items = items("a", "b", "c")),
+                        WidgetSection("w", ref = WidgetRef("price")),
+                    ),
+                ),
+                Page(
+                    "page-2",
+                    sections = listOf(
+                        WidgetSection("w1", ref = WidgetRef("nifty")),
+                        WidgetSection("w2", ref = WidgetRef("nifty-live")),
+                    ),
+                ),
+            ),
+        )
+        assertEquals(7, LayoutEdits.widgetRowsUsed(doc, "home", specs))
+        assertEquals(8, LayoutEdits.widgetRowsUsed(doc, "page-2", specs))
+        val placed = assertNotNull(LayoutEdits.placeWidget(doc, "joke", specs = specs))
+        assertEquals("home", placed.pageId)
+        assertEquals(2, placed.doc.pages.size)
     }
 }
