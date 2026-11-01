@@ -153,6 +153,10 @@ fun ChatSurface(
         )
         Box(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp).fillMaxHeight(threadHeight)
+                // Everything rides above the keyboard: the thread and the type field move up
+                // together, so no message is ever stuck behind it. (The activity uses
+                // adjustNothing, so without this the window never makes room.)
+                .imePadding()
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                 .background(Color(0xFF15171E))
                 .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
@@ -664,7 +668,7 @@ private fun Controls(
     onClose: () -> Unit,
 ) {
     val tokens = MasalaTheme.tokens
-    Column(Modifier.fillMaxWidth().navigationBarsPadding().imePadding()) {
+    Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
