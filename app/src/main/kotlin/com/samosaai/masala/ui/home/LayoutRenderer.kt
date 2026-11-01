@@ -604,8 +604,10 @@ private fun Modifier.itemClicks(item: Item, app: AppEntry?, ctx: RenderContext, 
             var opened = false
             // Keep holding a still finger and the menu opens by itself, without waiting for the lift;
             // moving instead starts the drag and cancels this.
+            // Counted from the touch down, so the menu lands at [MENU_HOLD_MS] whether the long press
+            // fired late or early; the press itself already used part of it.
             val openMenu = scope.launch {
-                delay(MENU_AFTER_LONG_PRESS_MS)
+                delay((down.uptimeMillis + MENU_HOLD_MS - long.uptimeMillis).coerceAtLeast(0L))
                 if (!moved) {
                     opened = true
                     menu?.invoke()
@@ -769,8 +771,8 @@ internal class IconBounds {
     }
 }
 
-/** How long a finger stays still after the long press before an item's menu opens by itself. */
-private const val MENU_AFTER_LONG_PRESS_MS = 1_000L
+/** Total touch time, long press included, after which a still finger opens an item's menu. */
+private const val MENU_HOLD_MS = 1_000L
 
 /** Holding a dragged item this close to a side for [EDGE_HOLD_MS] flips to the next page that way. */
 private val EDGE_FLIP_ZONE = 24.dp
