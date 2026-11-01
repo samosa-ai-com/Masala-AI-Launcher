@@ -621,7 +621,18 @@ class MasalaApp : Application() {
         tools.register(MemoryRawTool.create(this, secondBrain) { tools.fileAccess })
         tools.register(MemoryTools.linkTask(taskNoteLinks))
         mcp.servers
-        dispatcher = ActionDispatcher(this, actions, launcher, modes, confirmationGate, tools, { skills }) { toolExecutor(confirmationGate) }
+        dispatcher = ActionDispatcher(this, actions, launcher, modes, confirmationGate, tools, { skills }, { toolExecutor(confirmationGate) }) { widgetId ->
+            // A refresh tap only refetches hosts the user already approved at placement; anything
+            // else keeps the last value, and the tap reports it instead of asking again.
+            val spec = widgetLibrary.current()[widgetId] ?: return@ActionDispatcher false
+            val approved = httpApproval.approved(widgetId)
+            val bindings = com.samosaai.masala.widgets.HttpApproval.fetchesOf(spec)
+                .filter { it.host in approved }.map { it.http }.distinct()
+            if (bindings.isEmpty()) return@ActionDispatcher false
+            var fresh = false
+            bindings.forEach { fresh = httpValues.refresh(widgetId, it) || fresh }
+            fresh
+        }
 
         taskRunner = ScheduledSkillRunner(this)
 

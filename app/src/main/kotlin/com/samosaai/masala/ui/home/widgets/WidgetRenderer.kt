@@ -105,6 +105,15 @@ private fun Component(
     source: WidgetSource,
     depth: Int,
 ) {
+    // A refresh button with no id means this widget; the renderer fills it before dispatching.
+    fun fire(action: com.samosaai.masala.core.contract.MasalaAction) =
+        source.onAction(
+            if (action is com.samosaai.masala.core.contract.MasalaAction.RefreshWidget && action.widgetId.isBlank()) {
+                action.copy(widgetId = widgetId)
+            } else {
+                action
+            },
+        )
     when (component) {
         is WidgetComponent.Text -> {
             val text = component.text ?: component.binding?.let { WidgetValues.textOf(it, storage, snapshot) } ?: return
@@ -168,7 +177,7 @@ private fun Component(
         }
         is WidgetComponent.Chart -> ChartBars(component, storage, snapshot)
         is WidgetComponent.Button -> {
-            Button(onClick = { source.onAction(component.action) }, modifier = Modifier.fillMaxWidth()) { Text(component.label) }
+            Button(onClick = { fire(component.action) }, modifier = Modifier.fillMaxWidth()) { Text(component.label) }
         }
         is WidgetComponent.Image -> {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
@@ -189,7 +198,7 @@ private fun Component(
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.fillMaxWidth()
-                                .then(component.rowAction?.let { action -> Modifier.clickable(role = Role.Button) { source.onAction(action) } } ?: Modifier),
+                                .then(component.rowAction?.let { action -> Modifier.clickable(role = Role.Button) { fire(action) } } ?: Modifier),
                         )
                     }
                 }

@@ -81,5 +81,7 @@ class ContractsTest {
         assertEquals(ToolSensitivity.DESTRUCTIVE, MasalaAction.RunTool("unknown").sensitivity(tools::get))
         assertEquals(ToolSensitivity.CHANGES_SOMETHING, MasalaAction.SetAlarm(7, 0).sensitivity(tools::get))
         assertEquals(ToolSensitivity.READ_ONLY, MasalaAction.Dial("123").sensitivity(tools::get))
+        // A refresh tap only refetches approved hosts, like the background worker does.
+        assertEquals(ToolSensitivity.READ_ONLY, MasalaAction.RefreshWidget("water").sensitivity(tools::get))
     }
 }

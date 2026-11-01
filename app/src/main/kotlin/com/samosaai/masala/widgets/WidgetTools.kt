@@ -242,7 +242,7 @@ Components (each has "type"):
 - timer {key, label, seconds}: counts down from Start; the key holds its deadline
 - progress {label, binding, max}: a bar; style like text
 - chart {binding, kind bar|line, days}: comma-separated values in storage, oldest first, at most 31
-- button {label, action}: action is ask_masala {prompt}, run_skill {skillId}, or start_timer {seconds}
+- button {label, action}: action is ask_masala {prompt}, run_skill {skillId}, start_timer {seconds}, or refresh_widget (reloads this widget's web values in place; no id needed)
 - image {icon {type symbol, name}}: a built-in symbol name like star, timer, checklist
 - list {binding, maxRows}: rows from a binding, at most 8
 - gauge {label, binding, max}: a ring; style like text

@@ -90,7 +90,7 @@ class WidgetGenerator(
         append("At most 12 components; rows and columns hold leaves only and nest at most 2 deep; ")
         append("one storage key per component (a counter, checklist, timer or list line owns its key); ")
         append("styling stays bounded: a palette tint, normal or large emphasis, start/center/end. ")
-        append("Buttons only ask_masala, run_skill (an installed id, exactly as listed) or start_timer. ")
+        append("Buttons only ask_masala, run_skill (an installed id, exactly as listed), start_timer, or refresh_widget (reloads this widget's web values in place; no id needed). ")
         append("A web_value reads one JSON value over http (its host is approved at placement); video and snapshot need a source id from list_stream_sources. ")
         append("Ids are short slugs; titles are short. Counters start at 0, checklists unticked.\n")
         if (request.skillIds.isNotEmpty()) {

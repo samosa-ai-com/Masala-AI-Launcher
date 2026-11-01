@@ -76,6 +76,20 @@ class WidgetToolsTest {
     }
 
     @Test
+    fun refreshUnknownWidgetFails() {
+        // The refresh tap is wired through the dispatcher: an unknown widget reports instead of
+        // asking or crashing (no network, no gate — refresh only refetches approved hosts).
+        val screen = object : com.samosaai.masala.actions.ActionDispatcher.Screen {
+            override fun openDrawer(query: String?) = Unit
+            override fun ask(prompt: String) = Unit
+        }
+        val outcome = runBlocking {
+            app.dispatcher.dispatch(com.samosaai.masala.core.contract.MasalaAction.RefreshWidget("missing"), screen)
+        }
+        assertTrue(outcome is com.samosaai.masala.actions.ActionDispatcher.Outcome.Failed)
+    }
+
+    @Test
     fun listAndReadAndSchema() {
         val listed = success("list_widgets", args())
         assertTrue(listed.output.isNotBlank())

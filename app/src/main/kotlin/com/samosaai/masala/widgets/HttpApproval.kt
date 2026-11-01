@@ -12,7 +12,7 @@ import com.samosaai.masala.core.contract.WidgetSpec
  */
 object HttpApproval {
     /** One fetch a widget would do: who, where, how often, and whether it runs in background. */
-    data class Fetch(val widgetId: String, val host: String, val every: Int, val background: Boolean)
+    data class Fetch(val widgetId: String, val host: String, val every: Int, val background: Boolean, val http: HttpBinding)
 
     /** Every `http` a spec would fetch, walking rows and columns too. */
     fun fetchesOf(spec: WidgetSpec): List<Fetch> {
@@ -32,7 +32,7 @@ object HttpApproval {
         }
         spec.components.forEach(::walk)
         return https.mapNotNull { http ->
-            hostOf(http.url)?.let { Fetch(spec.id, it, http.every, http.background) }
+            hostOf(http.url)?.let { Fetch(spec.id, it, http.every, http.background, http) }
         }
     }
 

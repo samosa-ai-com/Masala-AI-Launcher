@@ -268,9 +268,10 @@ object LayoutChecker {
             is MasalaAction.RunTool -> if (env.toolNames != null && action.name !in env.toolNames) {
                 problems += Problem("$path.name", "Unknown tool '${action.name}'")
             }
-            // An empty ask_masala prompt opens the ask box with nothing typed.
+            // An empty ask_masala prompt opens the ask box with nothing typed. A blank refresh_widget
+            // id means the widget holding the button; the renderer fills it in before dispatching.
             MasalaAction.OpenDrawer, MasalaAction.ExpandNotifications, is MasalaAction.Search,
-            is MasalaAction.OpenMiniApp, is MasalaAction.AskMasala -> Unit
+            is MasalaAction.OpenMiniApp, is MasalaAction.AskMasala, is MasalaAction.RefreshWidget -> Unit
         }
     }
 

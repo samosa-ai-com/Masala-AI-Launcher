@@ -73,6 +73,23 @@ class WidgetCheckerTest {
     }
 
     @Test
+    fun `a refresh button passes with or without naming its widget`() {
+        val blank = WidgetSpec(
+            "w",
+            components = listOf(
+                WidgetComponent.Button("Refresh", com.samosaai.masala.core.contract.MasalaAction.RefreshWidget()),
+            ),
+        )
+        assertEquals(emptyList(), WidgetChecker.check(blank, env))
+        val named = blank.copy(
+            components = listOf(
+                WidgetComponent.Button("Refresh", com.samosaai.masala.core.contract.MasalaAction.RefreshWidget("w")),
+            ),
+        )
+        assertEquals(emptyList(), WidgetChecker.check(named, env))
+    }
+
+    @Test
     fun `url rules`() {
         assertNull(WidgetChecker.urlProblem("https://api.example.com/v1/price?symbol=BTC"))
         assertNull(WidgetChecker.urlProblem("http://192.168.1.20:8080/status.json"))

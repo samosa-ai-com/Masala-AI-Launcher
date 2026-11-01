@@ -36,6 +36,11 @@ class ActionDispatcher(
     private val registry: ToolRegistry,
     private val skills: () -> SkillRegistry,
     private val executor: () -> MasalaToolExecutor,
+    /**
+     * Reloads one widget's approved web values in place; null where widgets don't live (tests and
+     * headless callers). False means unknown, unapproved or unreachable — the tap reports it.
+     */
+    private val refreshWidget: (suspend (widgetId: String) -> Boolean)? = null,
 ) {
     /** What the screen has to do for actions that are about the screen. */
     interface Screen {
@@ -102,6 +107,12 @@ class ActionDispatcher(
         is MasalaAction.RunSkill ->
             if (skills().getSkillById(action.skillId) == null) Outcome.Failed("There is no skill '${action.skillId}'")
             else start(SkillSheetActivity.intent(context, action.skillId, action.prompt))
+        is MasalaAction.RefreshWidget -> {
+            val refresh = refreshWidget ?: return Outcome.Failed("Nothing to refresh here")
+            if (action.widgetId.isBlank()) Outcome.Failed("That button doesn't name a widget")
+            else if (refresh(action.widgetId)) Outcome.Done()
+            else Outcome.Failed("Couldn't refresh that widget yet")
+        }
     }
 
     private suspend fun setMode(action: MasalaAction.SetMode): Outcome {
