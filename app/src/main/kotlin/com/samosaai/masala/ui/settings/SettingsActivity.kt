@@ -100,7 +100,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, ABOUT, BRIEF }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, PERSONAS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, ABOUT, BRIEF }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -131,13 +131,15 @@ class SettingsActivity : ComponentActivity() {
                             onFiles = { page = Page.FILES },
                             onAiModels = { page = Page.AI_MODELS },
                             onVoice = { page = Page.VOICE },
+                            onPersonas = { page = Page.PERSONAS },
                             onPage = { page = it },
                         )
                         Page.HIDDEN_APPS -> HiddenAppsPage(onBack = { page = Page.MAIN })
                         Page.LAYOUT -> LayoutPage(settings, onBack = { page = Page.MAIN })
                         Page.RECORDING -> RecordingPage(onBack = { page = Page.MAIN })
                         Page.MINI_APPS -> MiniAppsPage(onBack = { page = Page.MAIN })
-                        Page.SKILLS -> SkillsPage(onBack = { page = Page.MAIN })
+                        Page.SKILLS -> SkillsPage(onBack = { page = Page.MAIN }, onEditPersonas = { page = Page.PERSONAS })
+                        Page.PERSONAS -> PersonasPage(onBack = { page = Page.MAIN })
                         Page.TASKS -> ScheduledTasksPage(onBack = { page = Page.MAIN }, onAskInChat = { askInChat(it) })
                         Page.FILES -> masala.fileIndex?.let { FilesPage(it, onBack = { page = Page.MAIN }) }
                         Page.AI_MODELS -> AiModelsPage(onBack = { page = Page.MAIN })
@@ -172,6 +174,7 @@ class SettingsActivity : ComponentActivity() {
         onFiles: () -> Unit,
         onAiModels: () -> Unit,
         onVoice: () -> Unit,
+        onPersonas: () -> Unit,
         onPage: (Page) -> Unit,
     ) {
         var isDefault by remember { mutableStateOf(HomeRole.isDefault(this)) }
@@ -194,6 +197,7 @@ class SettingsActivity : ComponentActivity() {
             add(Entry(1, Icons.Rounded.GridView, data, stringResource(R.string.settings_home_layout), stringResource(R.string.settings_home_layout_summary), onLayout))
             add(Entry(1, Icons.Rounded.Search, data, stringResource(R.string.drawer_page_title), stringResource(R.string.drawer_page_summary)) { onPage(Page.DRAWER) })
             add(Entry(2, Icons.Rounded.AutoFixHigh, auto, stringResource(R.string.settings_skills), stringResource(R.string.settings_skills_summary), onSkills))
+            add(Entry(2, Icons.Rounded.Person, auto, stringResource(R.string.personas_title), stringResource(R.string.personas_summary), onPersonas))
             add(Entry(2, Icons.Rounded.Schedule, auto, stringResource(R.string.settings_scheduled_tasks), stringResource(R.string.settings_scheduled_tasks_summary), onTasks))
             add(Entry(2, Icons.Rounded.WbSunny, auto, stringResource(R.string.brief_title), stringResource(R.string.brief_summary)) { onPage(Page.BRIEF) })
             add(Entry(2, Icons.Rounded.Extension, auto, stringResource(R.string.mcp_title), stringResource(R.string.mcp_summary)) { startActivity(Intent(this@SettingsActivity, McpActivity::class.java)) })
@@ -403,7 +407,7 @@ class SettingsActivity : ComponentActivity() {
 
     /** Every installed skill in one place, so a chat is one tap away (plan F4). */
     @Composable
-    private fun SkillsPage(onBack: () -> Unit) {
+    private fun SkillsPage(onBack: () -> Unit, onEditPersonas: () -> Unit) {
         val scope = rememberCoroutineScope()
         var filter by rememberSaveable { mutableStateOf("") }
         var url by rememberSaveable { mutableStateOf("") }
@@ -435,9 +439,14 @@ class SettingsActivity : ComponentActivity() {
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = {
-                            startActivity(SkillSheetActivity.intent(this@SettingsActivity, skill.id, null))
-                        }) { Text(stringResource(R.string.skills_open)) }
+                        // An expert has no chat of its own; its row leads to what can be changed.
+                        if (skill.persona != null) {
+                            TextButton(onClick = onEditPersonas) { Text(stringResource(R.string.skills_edit)) }
+                        } else {
+                            TextButton(onClick = {
+                                startActivity(SkillSheetActivity.intent(this@SettingsActivity, skill.id, null))
+                            }) { Text(stringResource(R.string.skills_open)) }
+                        }
                         if (communityIds.contains(skill.id)) {
                             var confirmDelete by remember(skill.id) { mutableStateOf(false) }
                             TextButton(onClick = { confirmDelete = true }) { Text(stringResource(R.string.skills_delete)) }
