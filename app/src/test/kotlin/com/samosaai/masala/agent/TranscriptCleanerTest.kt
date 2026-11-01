@@ -40,6 +40,22 @@ class TranscriptCleanerTest {
         assertEquals(raw, LlmTranscriptCleaner.acceptCleaned(raw, null))
     }
 
+    @Test fun autoLanguageKeepsWhateverWasSpoken() = runBlocking {
+        var sent: List<ChatMessage> = emptyList()
+        LlmTranscriptCleaner({ sent = it; "Kya haal hai?" }, { null }, 1_000).clean("kya haal hai")
+        val system = sent.first().textContent
+        // No language is named, so a phone set to English can't turn Hindi into English.
+        assertTrue(Language.entries.none { system.contains(it.label) })
+        assertTrue(system.contains("same language as the text"))
+    }
+
+    @Test fun aShortAnswerInsteadOfACorrectionIsRejected() {
+        val raw = "what time is it"
+        assertEquals(raw, LlmTranscriptCleaner.acceptCleaned(raw, "I don't have access to the time."))
+        // A real correction keeps the words, apostrophes and capitals aside.
+        assertEquals("What's the time?", LlmTranscriptCleaner.acceptCleaned("whats the time", "What's the time?"))
+    }
+
     @Test fun echoedTagsAndQuotesAreStripped() {
         assertEquals("What's the weather?", LlmTranscriptCleaner.acceptCleaned("whats the weather", "<dictation>\n\"What's the weather?\"\n</dictation>"))
     }

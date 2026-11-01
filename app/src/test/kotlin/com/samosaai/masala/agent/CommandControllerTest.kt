@@ -219,6 +219,21 @@ class CommandControllerTest {
         assertEquals("What's the weather like today?", requests.last().last().textContent)
     }
 
+    @Test fun aFastPathCommandSkipsTheCleaner() = runBlocking<Unit> {
+        val speech = object : SpeechInput {
+            override fun start(onFailure: (String) -> Unit) = true
+            override suspend fun stop() = Result.success("open spotify")
+            override fun cancel() = Unit
+        }
+        var cleaned = false
+        val c = controller(speech, cleaner = { cleaned = true; it })
+        assertTrue(c.startListening())
+        c.stopListening()
+        c.settled()
+        assertTrue(!cleaned)
+        assertEquals(listOf<MasalaAction>(spotify), ran)
+    }
+
     @Test fun engineFailureEndsTheTakeWithItsMessage() = runBlocking<Unit> {
         var listener: ((PttEngine.TakeAutoEnd) -> Unit)? = null
         val speech = object : SpeechInput {

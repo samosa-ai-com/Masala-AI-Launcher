@@ -291,11 +291,10 @@ fun Drawer(
     val latestCloseRelease by rememberUpdatedState(onCloseRelease)
     val latestCloseFinger by rememberUpdatedState(onCloseFingerActive)
     var closeTravel by remember { mutableFloatStateOf(0f) }
+    // Net travel both ways: dragging back up reopens, so changing your mind mid-pull works.
     val closeState = rememberDraggableState { dy ->
-        if (dy > 0f) {
-            closeTravel += dy
-            latestCloseDrag?.invoke(closeTravel)
-        }
+        closeTravel = (closeTravel + dy).coerceAtLeast(0f)
+        latestCloseDrag?.invoke(closeTravel)
     }
     val closeDraggable = if (onCloseDrag != null && onCloseRelease != null) {
         Modifier.draggable(

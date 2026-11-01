@@ -22,7 +22,6 @@ import com.samosaai.masala.agent.CommandController
 import com.samosaai.masala.agent.ConsultService
 import com.samosaai.masala.agent.ConfiguredSpeechInput
 import com.samosaai.masala.agent.LlmTranscriptCleaner
-import com.samosaai.masala.agent.speechLanguage
 import com.samosaai.masala.agent.SpeechStrings
 import com.samosaai.masala.audio.SpeechConfig
 import com.samosaai.masala.agent.AgentPrompt
@@ -325,6 +324,15 @@ class MasalaApp : Application() {
     /** True while a reply is being read aloud (Sam's speaking state). */
     val speaking get() = tts.isSpeaking
 
+    // The transcript cleaner's client, rebuilt only when the model settings change.
+    private var cleanerClient: Pair<LlmConfig, com.samosaai.masala.llm.LLMClient>? = null
+
+    private fun cleanerClient(): com.samosaai.masala.llm.LLMClient = synchronized(this) {
+        val config = LlmConfig.default
+        cleanerClient?.takeIf { it.first == config }?.second
+            ?: config.client(this).also { cleanerClient = config to it }
+    }
+
     /** Typed and spoken commands: the fast path, persona routing, then the agent. */
     val commands by lazy {
         CommandController(
@@ -368,10 +376,14 @@ class MasalaApp : Application() {
             // Every transcript, on-device or server, is tidied by the model before it is sent.
             cleaner = LlmTranscriptCleaner(
                 complete = { messages ->
-                    LlmConfig.default.client(this).chat(messages, temperature = 0f)
+                    cleanerClient().chat(messages, temperature = 0f)
                         .choices.firstOrNull()?.message?.textContent.orEmpty()
                 },
-                language = { speechLanguage(SpeechConfig.default) },
+                // Auto (no language set) stays null: the phone's language would translate.
+                language = {
+                    SpeechConfig.default.sttLanguage.takeIf { it.isNotBlank() }
+                        ?.let { code -> Language.entries.firstOrNull { it.matchesCode(code) } }
+                },
             ),
         ).also { controller ->
             controller.onTurn = ::recordTurn

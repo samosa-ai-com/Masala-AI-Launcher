@@ -216,7 +216,11 @@ class CommandController(
         job = scope.launch {
             input.stop()
                 .onSuccess { heard ->
-                    val text = if (heard.isBlank()) heard else cleaner?.clean(heard) ?: heard
+                    // A command the fast path already matches as heard ("open camera") skips
+                    // the cleanup call: it would only add the model's round trip.
+                    val quick = heard.isBlank() ||
+                        CommandFastPath.match(NameCorrector(names()).correct(heard.trim()), resolveApp) != null
+                    val text = if (quick) heard else cleaner?.clean(heard) ?: heard
                     ask(text, spoken = true)
                 }
                 .onFailure { publish(CommandState.Error("", friendlySttMessage(it.message, speechStrings))) }

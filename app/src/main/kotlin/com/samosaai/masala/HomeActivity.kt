@@ -286,9 +286,12 @@ class HomeActivity : ComponentActivity() {
         // this non-zero, so the watchdog below compares timestamps instead of waiting for a
         // reset that only a received lift can make.
         var lastDrawerDragAt by remember { mutableLongStateOf(0L) }
-        // True while any finger is down anywhere on home (set by the gesture observer, cleared on
-        // lift or when tracking ends). Keeps the watchdog from settling under a held finger.
-        var drawerFingerDown by remember { mutableStateOf(false) }
+        // A finger is down on home (its gesture observer) or on the drawer's pull-to-close header.
+        // One flag per writer, so one surface lifting can't clear the other's held finger. Keeps
+        // the watchdog from settling under a held finger.
+        var homeFingerDown by remember { mutableStateOf(false) }
+        var headerFingerDown by remember { mutableStateOf(false) }
+        val drawerFingerDown by remember { derivedStateOf { homeFingerDown || headerFingerDown } }
         LaunchedEffect(Unit) {
             snapshotFlow { drawerOpen }.collectLatest { open ->
                 val target = if (open) 1f else 0f
@@ -563,7 +566,7 @@ class HomeActivity : ComponentActivity() {
             homePresses = homePresses,
             entrySignal = entrySignal,
             drawerDrag = drawerDrag.takeIf { settings.swipeUp == MasalaAction.OpenDrawer },
-            onFingerActive = { drawerFingerDown = it },
+            onFingerActive = { homeFingerDown = it },
             aboveDock = {
                 val command by app.commands.state.collectAsStateWithLifecycle()
                 val pillLevel by app.commands.micLevel.collectAsStateWithLifecycle()
@@ -822,7 +825,7 @@ class HomeActivity : ComponentActivity() {
                     scope.launch { drawerProgress.snapTo((1f - downPx / dragDistance).coerceIn(0f, 1f)) }
                 },
                 onCloseRelease = ::settleDrawerRelease,
-                onCloseFingerActive = { drawerFingerDown = it },
+                onCloseFingerActive = { headerFingerDown = it },
             )
         } }
 

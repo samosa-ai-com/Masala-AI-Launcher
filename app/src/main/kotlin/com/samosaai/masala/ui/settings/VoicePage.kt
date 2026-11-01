@@ -307,6 +307,8 @@ private fun SttTestCard() {
     var outcome by remember { mutableStateOf<String?>(null) }
     var heard by remember { mutableStateOf<String?>(null) }
     var peak by remember { mutableFloatStateOf(0f) }
+    var transcription by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    val timedOut = stringResource(R.string.stt_test_timeout)
     val level by engine.level.collectAsState()
     LaunchedEffect(testing, level) { if (testing && level > peak) peak = level }
     val strings = SpeechStrings(
@@ -328,11 +330,18 @@ private fun SttTestCard() {
         if (!testing) return
         testing = false
         transcribing = true
-        scope.launch {
+        transcription = scope.launch {
             try {
-                input.stop()
-                    .onSuccess { if (it.isBlank()) outcome = strings.didntCatch else heard = it }
-                    .onFailure { outcome = friendlySttMessage(it.message, strings) }
+                // Bounded, so a server that never answers can't leave the card spinning.
+                val result = kotlinx.coroutines.withTimeoutOrNull(TRANSCRIBE_TIMEOUT_MS) { input.stop() }
+                if (result == null) {
+                    input.cancel()
+                    outcome = timedOut
+                } else {
+                    result
+                        .onSuccess { if (it.isBlank()) outcome = strings.didntCatch else heard = it }
+                        .onFailure { outcome = friendlySttMessage(it.message, strings) }
+                }
             } finally {
                 transcribing = false
             }
@@ -394,9 +403,16 @@ private fun SttTestCard() {
             }
         }
         if (transcribing) {
-            Row(Modifier.heightIn(min = 46.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 46.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 CircularProgressIndicator(Modifier.size(18.dp), color = voiceTint, strokeWidth = 2.dp)
-                Text(stringResource(R.string.command_transcribing), style = MaterialTheme.typography.bodyMedium, color = voiceTint)
+                Text(stringResource(R.string.command_transcribing), style = MaterialTheme.typography.bodyMedium, color = voiceTint, modifier = Modifier.weight(1f))
+                OutlinedButton(
+                    onClick = {
+                        transcription?.cancel()
+                        input.cancel()
+                        outcome = null
+                    },
+                ) { Text(stringResource(R.string.stt_test_cancel)) }
             }
         }
         heard?.let {
@@ -413,3 +429,6 @@ private fun SttTestCard() {
         }
     }
 }
+
+/** Longer than on-device transcription's own 120 s cap, so only a stuck take hits it. */
+private const val TRANSCRIBE_TIMEOUT_MS = 150_000L

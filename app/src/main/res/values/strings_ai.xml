@@ -80,6 +80,7 @@
     <string name="stt_test_listening">Listening… tap Stop when you’re done</string>
     <string name="stt_test_stop">Stop</string>
     <string name="stt_test_cancel">Cancel</string>
+    <string name="stt_test_timeout">Transcribing took too long. Try again.</string>
     <string name="stt_test_peak">Mic peak %1$d%%</string>
     <string name="stt_test_heard">Heard: %1$s</string>
     <string name="voice_from_anywhere">From anywhere</string>
