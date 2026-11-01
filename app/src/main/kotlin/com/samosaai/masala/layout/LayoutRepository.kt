@@ -203,9 +203,10 @@ class LayoutRepository(
      * [label]. Returns the problems when it doesn't; nothing is changed then.
      */
     suspend fun apply(label: String, layout: LayoutDoc): List<LayoutChecker.Problem> = lock.withLock {
-        val problems = LayoutChecker.check(layout, environment())
+        val pruned = LayoutEdits.pruneEmptyPages(layout, modePageIds()) ?: layout
+        val problems = LayoutChecker.check(pruned, environment())
         if (problems.isEmpty()) {
-            push(label, layout)
+            push(label, pruned)
             publish()
         }
         problems
@@ -218,7 +219,8 @@ class LayoutRepository(
      */
     suspend fun edit(label: String, change: (LayoutDoc) -> LayoutDoc?): List<LayoutChecker.Problem> = lock.withLock {
         val current = history.current?.layout ?: return@withLock emptyList()
-        val next = change(current) ?: return@withLock emptyList()
+        val changed = change(current) ?: return@withLock emptyList()
+        val next = LayoutEdits.pruneEmptyPages(changed, modePageIds()) ?: changed
         if (next == current) return@withLock emptyList()
         val problems = LayoutChecker.check(next, environment())
         if (problems.isEmpty()) {
@@ -235,6 +237,9 @@ class LayoutRepository(
     /** Renames every item [match] selects, so a mini app's pin and its app share one name. */
     suspend fun renameItems(label: String, match: (Item) -> Boolean): List<LayoutChecker.Problem> =
         edit(label) { LayoutEdits.renameWhere(it, label, match) }
+
+    /** Page ids mode patches add sections to: pruning never drops these. */
+    private fun modePageIds(): Set<String> = modes.patches.value.flatMap { patch -> patch.addSections.map { it.pageId } }.toSet()
 
     /** Where one library widget sits on home, for the Widgets manager. */
     fun widgetPlacements(widgetId: String): List<LayoutEdits.WidgetPlacement> =

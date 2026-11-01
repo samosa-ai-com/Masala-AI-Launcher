@@ -422,8 +422,24 @@ class LayoutEditsTest {
     }
 
     @Test
-    fun `removeHtmlApp drops only matching sections`() {
-        val doc = assertNotNull(LayoutEdits.placeHtml(widgetDoc(), "dice")).doc
+    fun `pruneEmptyPages drops show-nothing pages but keeps one and referenced ones`() {
+        val live = Page("home", sections = listOf(WidgetSection("w", ref = WidgetRef("water"))))
+        val headerOnly = Page("empty", sections = listOf(HeaderSection("h")))
+        val blankGrid = Page("blank", sections = listOf(GridSection("g", items = emptyList())))
+        val dockOnly = Page("dockpage", sections = listOf(DockSection("d", items = items("x"))))
+        val doc = LayoutDoc(pages = listOf(live, headerOnly, blankGrid, dockOnly))
+        val pruned = assertNotNull(LayoutEdits.pruneEmptyPages(doc))
+        assertEquals(listOf("home", "dockpage"), pruned.pages.map { it.id })
+        // A referenced empty page survives for its mode.
+        val kept = assertNotNull(LayoutEdits.pruneEmptyPages(doc, referenced = setOf("empty")))
+        assertEquals(listOf("home", "empty", "dockpage"), kept.pages.map { it.id })
+        // The last page never goes, even empty.
+        assertNull(LayoutEdits.pruneEmptyPages(LayoutDoc(pages = listOf(headerOnly))))
+        assertNull(LayoutEdits.pruneEmptyPages(LayoutDoc(pages = listOf(live))))
+    }
+
+    @Test
+    fun `removeHtmlApp drops only matching sections`() {        val doc = assertNotNull(LayoutEdits.placeHtml(widgetDoc(), "dice")).doc
         assertEquals(listOf(LayoutEdits.WidgetPlacement("home", "html-dice")), LayoutEdits.htmlPlacements(doc, "dice"))
         val out = assertNotNull(LayoutEdits.removeHtmlApp(doc, "dice"))
         assertEquals(emptyList(), LayoutEdits.htmlPlacements(out, "dice"))

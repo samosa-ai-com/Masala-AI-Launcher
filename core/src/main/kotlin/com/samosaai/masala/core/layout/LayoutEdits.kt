@@ -490,4 +490,23 @@ object LayoutEdits {
         )
         return if (changed) next else null
     }
+
+    /**
+     * Drops pages left with nothing to show (no items, widgets, HTML or skill widgets — a header
+     * or an empty grid alone doesn't keep one), so removing the last thing off a screen removes
+     * the screen. Never drops the last page, and never a page a mode patch adds to ([referenced]).
+     */
+    fun pruneEmptyPages(doc: LayoutDoc, referenced: Set<String> = emptySet()): LayoutDoc? {
+        if (doc.pages.size <= 1) return null
+        fun shows(section: Section): Boolean = when (section) {
+            is ItemSection -> section.items.isNotEmpty()
+            is WidgetSection -> section.widget != null || section.ref != null
+            is StackSection -> section.widgets.isNotEmpty() || section.refs.isNotEmpty()
+            is HtmlSection, is SkillWidgetSection, is DockSection -> true
+            else -> false
+        }
+        val kept = doc.pages.filter { page -> page.id in referenced || page.sections.any(::shows) }
+        if (kept.size == doc.pages.size || kept.isEmpty()) return null
+        return doc.copy(pages = kept)
+    }
 }
