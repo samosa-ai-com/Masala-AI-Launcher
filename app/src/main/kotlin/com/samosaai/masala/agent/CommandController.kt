@@ -1,6 +1,7 @@
 package com.samosaai.masala.agent
 
 import com.samosaai.masala.actions.ActionDispatcher
+import com.samosaai.masala.audio.PttEngine
 import com.samosaai.masala.core.agent.CommandFastPath
 import com.samosaai.masala.core.agent.NameCorrector
 import com.samosaai.masala.core.agent.SkillRouter
@@ -70,22 +71,13 @@ class CommandController(
      */
     var onTurn: ((com.samosaai.masala.chat.ChatTurn) -> Unit)? = null
 
-    /** True while a hold-to-talk session runs: the release sends, not a detected pause. */
-    private val _walkieTalkie = MutableStateFlow(false)
-    val walkieTalkie: kotlinx.coroutines.flow.StateFlow<Boolean> = _walkieTalkie.asStateFlow()
-
     /** The mic level and live words while listening, for the listening overlay (UI refresh U4). */
     val micLevel: StateFlow<Float> get() = speech?.level ?: kotlinx.coroutines.flow.MutableStateFlow(0f)
     val liveWords: StateFlow<String> get() = speech?.partial ?: kotlinx.coroutines.flow.MutableStateFlow("")
 
-    /**
-     * Whether a tap may start a take that ends by itself here. False makes the mic
-     * hold-to-talk only, which is what the on-device recognizer needs.
-     */
-    var handsFreeAvailable: () -> Boolean = { true }
+    /** True while listening records for a transcription endpoint (which sends no partials). */
+    var usesServerStt: () -> Boolean = { false }
 
-    /** Seconds until the take ends by itself, when the provider works that way. */
-    val autoSendIn: StateFlow<Int?> get() = speech?.autoSendIn ?: kotlinx.coroutines.flow.MutableStateFlow(null)
     private var history: List<ChatMessage> = emptyList()
     private var readAloud: CommandState.Reply? = null
 
@@ -112,7 +104,6 @@ class CommandController(
 
     fun dismiss() {
         job?.cancel()
-        _walkieTalkie.value = false
         speech?.cancel()
         _state.value = CommandState.Idle
     }
@@ -133,7 +124,7 @@ class CommandController(
         }
     }
 
-    /** Push-to-talk pressed. Returns false if listening can't start. */
+    /** Tap on the mic. Returns false if listening can't start. */
     fun startListening(): Boolean {
         val input = speech ?: return false
         job?.cancel()
@@ -144,35 +135,23 @@ class CommandController(
             publish(CommandState.Error("", reason ?: "Speech recognition isn't available"))
             return false
         }
-        _walkieTalkie.value = true
+        // A take that ends by itself must still leave Listening: a dead capture shows
+        // its error at once, the 90 s cap sends what was heard.
+        input.setTakeAutoEndListener { end ->
+            when (end) {
+                is PttEngine.TakeAutoEnd.Failed -> async(end.message)
+                PttEngine.TakeAutoEnd.CapReached -> stopListening()
+            }
+        }
         _state.value = CommandState.Listening
         return true
     }
 
     /**
-     * Tap to talk (decision 6): listens until the speaker pauses, then runs the transcript. A second tap
-     * while listening ends it early ([finishListening]).
+     * The listening overlay's send button: ends the take now and transcribes it.
+     * Listening never ends by itself — there is no hold and no auto-send.
      */
-    fun tapToTalk() {
-        val input = speech ?: return
-        if (_state.value == CommandState.Listening) return finishListening()
-        job?.cancel()
-        _walkieTalkie.value = false
-        _state.value = CommandState.Listening
-        job = scope.launch {
-            input.listenOnce()
-                .onSuccess { if (it.isBlank()) publish(CommandState.Error("", speechStrings.didntCatch)) else ask(it, spoken = true) }
-                .onFailure { publish(CommandState.Error("", friendlySttMessage(it.message, speechStrings))) }
-        }
-    }
-
-    /**
-     * The listening overlay's send button, whatever started the session: a held session
-     * stops and transcribes, a hands-free one ends its utterance early.
-     */
-    fun sendNow() {
-        if (_walkieTalkie.value) stopListening() else finishListening()
-    }
+    fun sendNow() = stopListening()
 
     /**
      * Continues a stored conversation: its turns become the agent's context, so
@@ -180,7 +159,6 @@ class CommandController(
      */
     fun restoreSession(turns: List<com.samosaai.masala.chat.ChatTurn>) {
         job?.cancel()
-        _walkieTalkie.value = false
         speech?.cancel()
         // A summary written earlier stands in for everything before it, so reopening a very
         // long chat does not hand the model its whole transcript.
@@ -223,22 +201,13 @@ class CommandController(
         }
     }
 
-    /** Ends tap-to-talk listening now; what was said still runs. */
-    fun finishListening() {
-        // Sending is not instantaneous: the take still has to be transcribed. Say so at
-        // once instead of leaving "Listening…" on screen until the text lands.
-        if (_state.value == CommandState.Listening) {
-            _walkieTalkie.value = false
-            _state.value = CommandState.Thinking("", listOf("Transcribing"))
-        }
-        speech?.finish()
-    }
-
-    /** Push-to-talk released: the transcript becomes a command. */
+    /** Send ends the take now; what was said still runs. */
     fun stopListening() {
         val input = speech ?: return
         if (_state.value != CommandState.Listening) return
-        _walkieTalkie.value = false
+        // Sending is not instantaneous: the take still has to be transcribed. Show the
+        // working row at once instead of leaving "Listening…" on screen until the text
+        // lands.
         _state.value = CommandState.Thinking("")
         job = scope.launch {
             input.stop()

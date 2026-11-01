@@ -6,7 +6,7 @@ import com.samosaai.masala.audio.SpeechConfig
 import com.samosaai.masala.i18n.Language
 import java.util.Locale
 
-/** Push-to-talk: [start] while the button is held, [stop] on release returns the transcript. */
+/** Push-to-talk: [start] opens Sam listening, [stop] on Send returns the transcript. */
 interface SpeechInput {
     /** False if listening couldn't start; [onFailure] says why when it fails later. */
     fun start(onFailure: (String) -> Unit): Boolean
@@ -14,27 +14,24 @@ interface SpeechInput {
     fun cancel()
 
     /**
-     * Hands-free: listens until the speaker pauses, then returns the transcript. Only the
-     * providers that can do this (an endpoint we time ourselves) are asked to.
+     * Listens until the speaker pauses, then returns the transcript. Only the
+     * providers the detector can time itself are asked to. The mic no longer uses
+     * this (a tap ends only on Send); the Settings test card does.
      */
     suspend fun listenOnce(): Result<String> = Result.failure(UnsupportedOperationException("Hands-free isn't available"))
 
-    /** Ends [listenOnce] now; what was said so far is still transcribed. */
-    fun finish() {}
+    /** Reports a take that ended by itself; the test card path never needs it. */
+    fun setTakeAutoEndListener(listener: ((com.samosaai.masala.audio.PttEngine.TakeAutoEnd) -> Unit)?) {}
 
     /** Mic level 0..1 while listening (UI refresh U4). */
     val level: kotlinx.coroutines.flow.StateFlow<Float> get() = NO_LEVEL
 
     /** Words heard so far, where the recognizer reports them. */
     val partial: kotlinx.coroutines.flow.StateFlow<String> get() = NO_WORDS
-
-    /** Seconds until the take ends by itself, where the provider works that way; else null. */
-    val autoSendIn: kotlinx.coroutines.flow.StateFlow<Int?> get() = NO_COUNTDOWN
 }
 
 private val NO_LEVEL = kotlinx.coroutines.flow.MutableStateFlow(0f)
 private val NO_WORDS = kotlinx.coroutines.flow.MutableStateFlow("")
-private val NO_COUNTDOWN = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
 
 /**
  * Which provider push-to-talk tries, in order. The configured cloud STT goes first when
@@ -46,15 +43,6 @@ internal object SpeechPolicy {
         configured.isApiBased() -> listOf(configured, AudioProvider.ANDROID)
         else -> listOf(AudioProvider.ANDROID)
     }
-
-    /**
-     * Whether a tap can start a hands-free take that ends by itself. The server path is
-     * timed by our own voice detector, so it can. The on-device recognizer ends a take on
-     * its own schedule (and reopens the microphone between segments), so a hands-free take
-     * there either cuts the speaker off or flickers the mic on and off; it is hold-to-talk
-     * only, which is also how it is set by default.
-     */
-    fun handsFreeWorks(provider: AudioProvider): Boolean = provider.isApiBased()
 }
 
 /** User-facing reasons [ConfiguredSpeechInput] can report; loaded from resources by the caller. */
@@ -101,8 +89,8 @@ fun friendlySttMessage(raw: String?, s: SpeechStrings): String {
 }
 
 /**
- * Silence that ends a hands-free turn: 2.5 s, so a breath or a slow sentence does not
- * cut the user off mid-thought. Hold-to-talk never depends on it (release sends).
+ * Silence that ends the test-card turn: 2.5 s, so a breath or a slow sentence does not
+ * cut the user off mid-thought.
  */
 private const val SILENCE_MS = 2500L
 
@@ -112,9 +100,8 @@ private const val SILENCE_MS = 2500L
  * other one as fallback when the first can't start. A phone whose default recognizer
  * is a stub (or has none) therefore records for the server instead of failing.
  *
- * Hands-free (a tap that ends by itself) runs only where it can be timed reliably: the
- * server path, through our own voice detector. Everywhere else the mic is hold-to-talk,
- * which is what the on-device recognizer can do well.
+ * A tap starts an open-ended take; only Send (or cancel) ends it. `listenOnce` stays
+ * for the Settings test card, which is the only place that still ends a take by itself.
  */
 class ConfiguredSpeechInput(
     private val engine: PttEngine,
@@ -122,19 +109,12 @@ class ConfiguredSpeechInput(
     private val localAvailable: () -> Boolean,
     private val strings: SpeechStrings,
     private val live: com.samosaai.masala.audio.SttEngine? = null,
-    /** The user's choice for hands-free; defaults to the provider's ability. */
-    private val handsFreeEnabled: () -> Boolean = { true },
 ) : SpeechInput {
     override val level get() = live?.level ?: super.level
     override val partial get() = live?.partial ?: super.partial
-    override val autoSendIn get() = live?.autoSendIn ?: super.autoSendIn
 
     @Volatile
     private var active: AudioProvider? = null
-
-    /** This session started hands-free (and will end by itself) rather than from a hold. */
-    @Volatile
-    private var handsFree = false
 
     private fun language() = Language.entries.firstOrNull { it.matchesCode(Locale.getDefault().language) } ?: Language.ENGLISH
 
@@ -146,13 +126,25 @@ class ConfiguredSpeechInput(
     private fun configured(): AudioProvider =
         if (config().baseUrl.isNotBlank()) AudioProvider.API else AudioProvider.ANDROID
 
-    /** Whether a tap may start a take that ends itself with this configuration. */
-    fun handsFreeAvailable(): Boolean = handsFreeEnabled() && SpeechPolicy.handsFreeWorks(configured())
+    /** True when push-to-talk records for a transcription endpoint (which sends no partials). */
+    fun usesServerStt(): Boolean = configured().isApiBased()
+
+    /** The engine ended the take by itself; [onEngineTakeEnd] routes it. */
+    private var failure: ((String) -> Unit)? = null
+    private var autoEnd: ((PttEngine.TakeAutoEnd) -> Unit)? = null
+
+    override fun setTakeAutoEndListener(listener: ((PttEngine.TakeAutoEnd) -> Unit)?) {
+        autoEnd = listener
+    }
 
     override fun start(onFailure: (String) -> Unit): Boolean {
         live?.resetLive()
         // A press while a previous session is still around must not leak its recorder.
         cancel()
+        failure = onFailure
+        // Attached before recording starts: a failure on the very first read must
+        // already have somewhere to go. Cleared again on every exit below.
+        engine.setTakeAutoEndListener(::onEngineTakeEnd)
         val reasons = mutableListOf<String>()
         val lang = configuredLanguage(config())
         for (provider in SpeechPolicy.order(configured())) {
@@ -167,7 +159,6 @@ class ConfiguredSpeechInput(
             }
             if (started) {
                 active = provider
-                handsFree = false
                 return true
             }
             reasons += if (provider == AudioProvider.ANDROID) {
@@ -177,6 +168,7 @@ class ConfiguredSpeechInput(
             }
         }
         active = null
+        engine.setTakeAutoEndListener(null)
         onFailure(reasons.joinToString("; "))
         return false
     }
@@ -184,7 +176,9 @@ class ConfiguredSpeechInput(
     override suspend fun stop(): Result<String> {
         val provider = active ?: return Result.failure(Exception("Wasn't listening"))
         active = null
-        handsFree = false
+        failure = null
+        autoEnd = null
+        engine.setTakeAutoEndListener(null)
         val settings = config()
         val model = if (provider.isApiBased()) settings.sttModel else ""
         val language = if (provider.isApiBased()) settings.sttLanguage.ifBlank { language().iso639 } else ""
@@ -195,9 +189,10 @@ class ConfiguredSpeechInput(
         cancel()
         live?.resetLive()
         val settings = config()
-        // Only the providers we can time ourselves; on-device stays hold-to-talk.
+        // Only the providers the detector can time itself; the Settings test card is
+        // the only caller that still ends a take by itself.
         val order = SpeechPolicy.order(configured())
-            .filter { SpeechPolicy.handsFreeWorks(it) }
+            .filter { it.isApiBased() }
             .filter { it != AudioProvider.ANDROID || localAvailable() }
         if (order.isEmpty()) return Result.failure(Exception(strings.localUnavailable))
         val lang = configuredLanguage(settings)
@@ -207,13 +202,11 @@ class ConfiguredSpeechInput(
         var firstFailure: Result<String>? = null
         for (provider in order) {
             active = provider
-            handsFree = true
             val model = if (provider.isApiBased()) settings.sttModel else ""
             val result = try {
                 engine.listenForUtterance(provider, model, lang, SILENCE_MS)
             } finally {
                 active = null
-                handsFree = false
             }
             if (result.isSuccess) return result
             if (com.samosaai.masala.audio.SttEngine.isBenignSttError(result.exceptionOrNull())) {
@@ -227,11 +220,27 @@ class ConfiguredSpeechInput(
         return firstFailure ?: last!!
     }
 
-    override fun finish() = engine.finishUtterance()
+    /**
+     * The engine ended the take by itself: a failure reports at once so the UI never
+     * sits on "Listening…" for a dead take; the cap forwards for Send-with-what-we-have.
+     * One-shot: the first event wins and clears the rest.
+     */
+    private fun onEngineTakeEnd(end: PttEngine.TakeAutoEnd) {
+        engine.setTakeAutoEndListener(null)
+        when (end) {
+            is PttEngine.TakeAutoEnd.Failed -> {
+                autoEnd = null
+                failure?.invoke(end.message)
+            }
+            PttEngine.TakeAutoEnd.CapReached -> autoEnd?.invoke(end).also { autoEnd = null }
+        }
+    }
 
     override fun cancel() {
         active = null
-        handsFree = false
+        failure = null
+        autoEnd = null
+        engine.setTakeAutoEndListener(null)
         engine.cancelListening(AudioProvider.ANDROID)
         engine.cancelListening(AudioProvider.API)
     }

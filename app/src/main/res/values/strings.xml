@@ -567,16 +567,8 @@
     <string name="usage_access_allow">Allow</string>
     <string name="usage_access_skip">Not now</string>
     <!-- UI refresh U4 -->
-    <string name="listening_chip">Listening · %1$s</string>
-    <string name="listening_on_device">on-device</string>
     <string name="listening_sam">Masala is listening</string>
-    <string name="listening_hint">Sends after about 2 seconds of silence · tap ■ to send now</string>
-    <string name="listening_hint_hold">Release to send · tap ■ to send now</string>
-    <string name="listening_chip_hold">Holding · %1$s</string>
     <string name="listening_cancel">Cancel</string>
-    <string name="listening_stop">Stop and send</string>
-    <string name="listening_type">Switch to typing</string>
-    <string name="working_sam">Masala is thinking</string>
     <string name="working_title">Working on it</string>
     <string name="working_layout">Building your screen</string>
     <string name="working_layout_usual">usually about 20 s</string>
@@ -589,17 +581,15 @@
     <!-- Conversation surface (plan chat-live-sessions) -->
     <string name="chat_new">New chat</string>
     <string name="chat_open">Open chat</string>
-    <string name="chat_tap_mic">Tap the mic and speak, or hold it. Drag up for the conversation.</string>
+    <string name="chat_tap_mic">Tap the mic and speak, then tap Send. Drag up for the conversation.</string>
     <string name="chat_close">Close chat</string>
     <string name="chat_history">Chat history</string>
-    <string name="chat_empty">Hold the mic to talk, or tap it and speak. Everything you say stays here.</string>
+    <string name="chat_empty">Tap the mic and speak, then tap Send. Everything you say stays here.</string>
     <string name="chat_working">Working on it…</string>
     <string name="chat_drag_for_thread">Drag up to see the conversation</string>
     <string name="chat_sessions_title">Chats</string>
     <string name="chat_delete">Delete</string>
-    <string name="chat_send_ready">Tap Send when you are done</string>
-    <string name="chat_release_to_send">Release to send</string>
-    <string name="chat_sending_in">Sending in %1$d s</string>
+    <string name="chat_delete_turn">Delete message</string>
     <string name="chat_send_now">Send now</string>
     <string name="chat_search">Search chats</string>
     <string name="chat_summary_note">Earlier messages were summarised</string>

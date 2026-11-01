@@ -188,7 +188,7 @@ class SettingsActivity : ComponentActivity() {
         val data = MasalaColors.Cardamom
         val entries = buildList {
             add(Entry(0, Icons.Rounded.Key, ai, stringResource(R.string.ai_models_title), "${profile.chat.preset.name} · ${profile.chat.model}", onAiModels))
-            add(Entry(0, Icons.Rounded.Mic, voice, stringResource(R.string.voice_title), "${profile.voiceIn?.preset?.name ?: stringResource(R.string.voice_on_phone)} · ${stringResource(R.string.voice_gestures)}", onVoice))
+            add(Entry(0, Icons.Rounded.Mic, voice, stringResource(R.string.voice_title), "${profile.voiceIn?.preset?.name ?: stringResource(R.string.voice_on_phone)} · ${stringResource(R.string.voice_tap)}", onVoice))
             add(Entry(0, Icons.Rounded.Person, ai, stringResource(R.string.settings_profile), stringResource(R.string.settings_profile_summary)) { startActivity(Intent(this@SettingsActivity, ProfileActivity::class.java)) })
             add(Entry(1, Icons.Rounded.Palette, look, stringResource(R.string.appearance_title), stringResource(R.string.appearance_summary)) { onPage(Page.APPEARANCE) })
             add(Entry(1, Icons.Rounded.GridView, data, stringResource(R.string.settings_home_layout), stringResource(R.string.settings_home_layout_summary), onLayout))

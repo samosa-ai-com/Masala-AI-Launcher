@@ -73,4 +73,12 @@ class SttEngineTest {
     fun `unaccepted audio without a stop is dropped`() {
         assertFalse(SttEngine.shouldKeepRecording(speechDetected = false, userStopped = false, pcmBytes = 6400))
     }
+
+    @Test
+    fun `leading zeros fail fast only from 1_5 s`() {
+        assertFalse(SttEngine.zeroRunFailsFast(0))
+        assertFalse(SttEngine.zeroRunFailsFast(1_400))
+        assertTrue(SttEngine.zeroRunFailsFast(1_500))
+        assertTrue(SttEngine.zeroRunFailsFast(1_600))
+    }
 }

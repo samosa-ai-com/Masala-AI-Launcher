@@ -105,6 +105,23 @@ class ChatSessions(
         publish()
     } }
 
+    /**
+     * Removes the turn at [index] from [id] and writes the result. Unknown ids
+     * and out-of-range indices return null without writing.
+     */
+    suspend fun deleteTurn(id: String, index: Int): ChatSession? = lock.withLock { withContext(Dispatchers.IO) {
+        val session = loaded[id] ?: read(id) ?: return@withContext null
+        if (index !in session.turns.indices) return@withContext null
+        val next = session.copy(
+            turns = session.turns.toMutableList().also { it.removeAt(index) },
+            updatedAt = clock(),
+        )
+        loaded[id] = next
+        write(next)
+        publish()
+        next
+    } }
+
     private fun publish() {
         _summaries.value = loaded.values.sortedByDescending { it.updatedAt }.map { it.summary() }
     }

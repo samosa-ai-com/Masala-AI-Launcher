@@ -36,8 +36,6 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -96,38 +94,18 @@ fun VoicePage(settings: LauncherSettings, update: ((LauncherSettings) -> Launche
 
     SettingsScaffold(stringResource(R.string.voice_title), onBack) {
         Eyebrow(stringResource(R.string.voice_mic_button))
-        // One gesture language, no mode to pick: holding and tapping both always work.
+        // One rule: tap the mic to listen, Send to end the take. No hold, no auto-send.
         Panel(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(Icons.Rounded.Mic, null, tint = voiceTint, modifier = Modifier.size(22.dp))
                 Column {
-                    Text(stringResource(R.string.voice_gestures), style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.voice_tap), style = MaterialTheme.typography.titleSmall)
                     Text(
-                        stringResource(R.string.voice_gestures_summary),
+                        stringResource(R.string.voice_tap_summary),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            }
-            val canBeHandsFree = profile.voiceIn != null
-            val handsFree = (profile.handsFree ?: true) && canBeHandsFree
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 52.dp)
-                    .clickable(enabled = canBeHandsFree, role = Role.Switch) {
-                        scope.launch { store.update { it.copy(handsFree = !handsFree) } }
-                    },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.voice_hands_free), style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        stringResource(if (canBeHandsFree) R.string.voice_hands_free_summary else R.string.voice_hands_free_unavailable),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(checked = handsFree, onCheckedChange = null, enabled = canBeHandsFree)
             }
         }
 

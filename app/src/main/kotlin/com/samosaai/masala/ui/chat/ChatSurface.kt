@@ -1,11 +1,16 @@
 package com.samosaai.masala.ui.chat
 
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +38,8 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,7 +56,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -64,7 +76,6 @@ import com.samosaai.masala.chat.TurnRole
 import com.samosaai.masala.data.Character
 import com.samosaai.masala.ui.character.CharacterState
 import com.samosaai.masala.ui.character.MasalaCharacter
-import com.samosaai.masala.ui.home.MicPress
 import com.samosaai.masala.ui.home.MicButton
 import com.samosaai.masala.ui.theme.MasalaColors
 import com.samosaai.masala.ui.theme.MasalaTheme
@@ -84,14 +95,14 @@ fun ChatSurface(
     character: Character,
     expanded: Boolean,
     onExpanded: (Boolean) -> Unit,
-    mic: MicPress,
-    autoSendIn: Int?,
-    walkie: Boolean = false,
+    mic: () -> Unit,
+    serverProvider: Boolean = false,
     onSend: () -> Unit,
     onStop: () -> Unit,
     onClose: () -> Unit,
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
+    onDeleteTurn: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val tokens = MasalaTheme.tokens
@@ -140,15 +151,16 @@ fun ChatSurface(
                             level = level,
                             character = character,
                             listening = listening,
+                            showShimmer = listening && serverProvider && liveWords.isBlank(),
                             caption = liveWords.ifBlank {
                                 (turns.lastOrNull { it.role == TurnRole.MASALA }?.text ?: "").take(140)
                             },
                         )
                         turns.isEmpty() && !listening && !thinking -> EmptyThread(level, character)
-                        else -> Thread(turns, liveWords, listening, thinking, state, character, level, onStop)
+                        else -> Thread(turns, liveWords, listening, thinking, state, character, level, onStop, onDeleteTurn, onCollapse = { onExpanded(false) })
                     }
                 }
-                Controls(listening, autoSendIn, walkie, mic, onSend, onClose)
+                Controls(listening, mic, level, onSend, onClose)
             }
         }
     }
@@ -209,7 +221,7 @@ private fun Header(
 
 /** Talking: Sam and rings that follow the mic, with the words heard so far. */
 @Composable
-private fun Orb(level: () -> Float, character: Character, listening: Boolean, caption: String) {
+private fun Orb(level: () -> Float, character: Character, listening: Boolean, caption: String, showShimmer: Boolean = false) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Box(contentAlignment = Alignment.Center) {
             // The engine reports one level per 200 ms audio window; animating between them
@@ -221,7 +233,9 @@ private fun Orb(level: () -> Float, character: Character, listening: Boolean, ca
                 label = "orb-level",
             )
             val accent = MasalaTheme.tokens.accent
-            androidx.compose.foundation.Canvas(Modifier.size(200.dp)) {
+            // Sized to fit the collapsed sheet: canvas, character, caption and hint share
+            // about 200 dp here, and a taller orb overflows center-first into the mic row.
+            androidx.compose.foundation.Canvas(Modifier.size(150.dp)) {
                 val base = size.minDimension / 2f
                 repeat(3) { i ->
                     val grow = 0.55f + 0.45f * l + i * 0.14f
@@ -235,24 +249,42 @@ private fun Orb(level: () -> Float, character: Character, listening: Boolean, ca
             MasalaCharacter(
                 character,
                 if (listening) CharacterState.LISTENING else CharacterState.HELLO,
-                Modifier.size(120.dp), { l },
+                Modifier.size(96.dp), { l },
                 description = if (listening) stringResource(R.string.listening_sam) else null,
             )
         }
-        Text(
-            caption.ifBlank { if (listening) stringResource(R.string.command_listening) else stringResource(R.string.chat_tap_mic) },
-            style = MaterialTheme.typography.titleMedium,
-            color = if (caption.isBlank()) MasalaTheme.tokens.textMedium else MasalaTheme.tokens.textHigh,
-            textAlign = TextAlign.Center,
-            maxLines = 3,
-            modifier = Modifier.padding(top = 12.dp, start = 24.dp, end = 24.dp),
-        )
-        Text(
-            stringResource(R.string.chat_drag_for_thread),
-            style = MaterialTheme.typography.bodySmall,
-            color = MasalaTheme.tokens.textLow,
-            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
-        )
+        if (showShimmer) {
+            // The server sends no partials, so the orb would sit on a dead line until
+            // the transcript lands. Pulse it instead; the animated value is read only
+            // inside the draw lambda, so the pulse redraws without recomposing.
+            val glow by rememberInfiniteTransition(label = "listening-shimmer")
+                .animateFloat(0.35f, 1f, infiniteRepeatable(tween(1100), RepeatMode.Reverse), label = "listening-alpha")
+            Text(
+                stringResource(R.string.command_listening),
+                style = MaterialTheme.typography.titleMedium,
+                color = MasalaTheme.tokens.textMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier.graphicsLayer { alpha = glow }.padding(top = 12.dp, start = 24.dp, end = 24.dp),
+            )
+        } else {
+            Text(
+                caption.ifBlank { if (listening) stringResource(R.string.command_listening) else stringResource(R.string.chat_tap_mic) },
+                style = MaterialTheme.typography.titleMedium,
+                color = if (caption.isBlank()) MasalaTheme.tokens.textMedium else MasalaTheme.tokens.textHigh,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                modifier = Modifier.padding(top = 12.dp, start = 24.dp, end = 24.dp),
+            )
+        }
+        if (!listening) {
+            Text(
+                stringResource(R.string.chat_drag_for_thread),
+                style = MaterialTheme.typography.bodySmall,
+                color = MasalaTheme.tokens.textLow,
+                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+            )
+        }
     }
 }
 
@@ -281,18 +313,52 @@ private fun Thread(
     character: Character,
     level: () -> Float,
     onStop: () -> Unit,
+    onDeleteTurn: (Int) -> Unit,
+    onCollapse: () -> Unit,
 ) {
     val list = rememberLazyListState()
     LaunchedEffect(turns.size, liveWords, thinking, (state as? CommandState.Thinking)?.steps?.size) {
         val last = list.layoutInfo.totalItemsCount - 1
         if (last >= 0) list.animateScrollToItem(last)
     }
+    // The handle's rule, on the list itself: a downward pull past the top,
+    // beyond 120 dp, returns to the orb. Down is the handle's collapse
+    // direction (drag > 40 from the thread collapses); up from the thread
+    // does nothing there, so upward overscroll only resets the count.
+    // A fling is its own gesture, not a pull: it resets instead of adding up.
+    val collapsePx = with(LocalDensity.current) { 120.dp.toPx() }
+    var overscroll by remember { mutableFloatStateOf(0f) }
+    val nested = remember(onCollapse, collapsePx) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source != NestedScrollSource.Fling && available.y < 0f) overscroll = 0f
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.Fling) {
+                    overscroll = 0f
+                    return Offset.Zero
+                }
+                if (available.y > 0f) {
+                    overscroll += available.y
+                    if (overscroll > collapsePx) {
+                        overscroll = 0f
+                        onCollapse()
+                    }
+                } else if (available.y < 0f) {
+                    overscroll = 0f
+                }
+                return Offset.Zero
+            }
+        }
+    }
     LazyColumn(
         state = list,
-        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp).nestedScroll(nested),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        itemsIndexed(turns) { index, turn -> Bubble(turn, key = index) }
+        itemsIndexed(turns) { index, turn -> Bubble(turn, key = index, onDelete = { onDeleteTurn(index) }) }
         if (listening) {
             item("live") {
                 Bubble(
@@ -311,16 +377,28 @@ private fun Thread(
 }
 
 @Composable
-private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1) {
+private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1, onDelete: (() -> Unit)? = null) {
+    var menu by remember { mutableStateOf(false) }
+    // Live turns are transient; only stored turns can be deleted.
+    val longPress = if (onDelete != null && !live) {
+        Modifier.combinedClickable(onClick = {}, onLongClick = { menu = true })
+    } else {
+        Modifier
+    }
+    fun dismissDelete() {
+        menu = false
+        onDelete?.invoke()
+    }
     val user = turn.role == TurnRole.USER
     if (turn.role == TurnRole.SYSTEM) {
         // A history summary: the app wrote it, so it reads as a note, not as a reply.
-        Column(
-            Modifier.fillMaxWidth().padding(vertical = 6.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color.White.copy(alpha = 0.04f))
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        ) {
+        Box(Modifier.fillMaxWidth()) {
+            Column(
+                longPress.fillMaxWidth().padding(vertical = 6.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White.copy(alpha = 0.04f))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
             Text(
                 stringResource(R.string.chat_summary_note),
                 style = MaterialTheme.typography.labelSmall,
@@ -332,6 +410,8 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1) {
                 color = MasalaTheme.tokens.textMedium,
                 modifier = Modifier.padding(top = 4.dp),
             )
+            }
+            TurnMenu(menu, onDismiss = { menu = false }, onDelete = ::dismissDelete)
         }
         return
     }
@@ -342,8 +422,10 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1) {
         bottomEnd = if (user) 6.dp else 18.dp,
     )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (user) Arrangement.End else Arrangement.Start) {
+        Box(Modifier.fillMaxWidth(0.92f)) {
+            TurnMenu(menu, onDismiss = { menu = false }, onDelete = ::dismissDelete)
         Column(
-            Modifier.fillMaxWidth(0.92f).clip(shape)
+            longPress.fillMaxWidth().clip(shape)
                 .background(
                     when {
                         user -> MasalaTheme.tokens.accent.copy(alpha = if (live) 0.22f else 0.92f)
@@ -374,36 +456,27 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1) {
                 }
             }
         }
+        }
+    }
+}
+
+/** Long-press menu on one stored turn: deleting it also drops it from the agent's history. */
+@Composable
+private fun TurnMenu(expanded: Boolean, onDismiss: () -> Unit, onDelete: () -> Unit) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(text = { Text(stringResource(R.string.chat_delete_turn)) }, onClick = onDelete)
     }
 }
 
 /**
- * Mic, and while listening the send/cancel pair. Sending is explicit: the arrow stops the
- * take now. The countdown above it says how long the automatic stop has left, so the
- * behaviour is predictable rather than a surprise.
+ * Mic to open Sam, and while listening the cancel/send pair. Sending is explicit: the
+ * arrow ends the take now. There is no mic button while listening — tapping it is how
+ * a take starts, so showing one there could only end the take by accident.
  */
 @Composable
-private fun Controls(listening: Boolean, autoSendIn: Int?, walkie: Boolean, mic: MicPress, onSend: () -> Unit, onClose: () -> Unit) {
+private fun Controls(listening: Boolean, mic: () -> Unit, level: () -> Float, onSend: () -> Unit, onClose: () -> Unit) {
     val tokens = MasalaTheme.tokens
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
-        if (listening) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                val countdown = autoSendIn
-                Text(
-                    when {
-                        walkie -> stringResource(R.string.chat_release_to_send)
-                        countdown == null -> stringResource(R.string.chat_send_ready)
-                        else -> stringResource(R.string.chat_sending_in, countdown)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (countdown == null) tokens.textLow else tokens.accentText,
-                )
-            }
-        }
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -414,13 +487,11 @@ private fun Controls(listening: Boolean, autoSendIn: Int?, walkie: Boolean, mic:
                     Icon(Icons.Rounded.Close, stringResource(R.string.listening_cancel), tint = tokens.textHigh)
                 }
                 Spacer(Modifier.width(20.dp))
-                MicButton(mic, size = 68.dp)
-                Spacer(Modifier.width(20.dp))
-                IconButton(onClick = onSend, modifier = Modifier.size(52.dp).clip(CircleShape).background(tokens.accent)) {
+                IconButton(onClick = onSend, modifier = Modifier.size(68.dp).clip(CircleShape).background(tokens.accent)) {
                     Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
                 }
             } else {
-                MicButton(mic, size = 68.dp)
+                MicButton(mic, level = level, size = 68.dp)
             }
         }
     }

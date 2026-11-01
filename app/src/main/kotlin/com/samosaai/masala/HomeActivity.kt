@@ -63,7 +63,7 @@ import com.samosaai.masala.agent.CommandState
 import com.samosaai.masala.ui.home.SearchPill
 import androidx.compose.material3.Text
 import com.samosaai.masala.ui.home.ReplyCard
-import com.samosaai.masala.ui.home.rememberMicPress
+import com.samosaai.masala.ui.home.rememberMicTap
 import com.samosaai.masala.ui.home.ConfirmationSheet
 import com.samosaai.masala.ui.home.HomeScreen
 import com.samosaai.masala.ui.home.RenderContext
@@ -171,8 +171,6 @@ class HomeActivity : ComponentActivity() {
             var expanded by rememberSaveable { mutableStateOf(false) }
             var chatOpen by rememberSaveable { mutableStateOf(false) }
             var showHistory by remember { mutableStateOf(false) }
-            val autoSendIn by app.commands.autoSendIn.collectAsStateWithLifecycle()
-            val walkieTalkie by app.commands.walkieTalkie.collectAsStateWithLifecycle()
             LaunchedEffect(activeId, sessions) {
                 val id = activeId ?: return@LaunchedEffect
                 val session = app.chats.get(id) ?: return@LaunchedEffect
@@ -467,11 +465,13 @@ class HomeActivity : ComponentActivity() {
             drawerDrag = drawerDrag.takeIf { settings.swipeUp == MasalaAction.OpenDrawer },
             aboveDock = {
                 val command by app.commands.state.collectAsStateWithLifecycle()
+                val pillLevel by app.commands.micLevel.collectAsStateWithLifecycle()
                 // The pill makes way for the reply card while a command is shown.
                 if (command == CommandState.Idle) {
                     SearchPill(
                         onSearch = { drawerOpen = true; searchRequests++ },
-                        mic = rememberMicPress(app),
+                        mic = rememberMicTap(app),
+                        level = { pillLevel },
                         onOpenChat = {
                             chatOpen = true
                             expanded = true
@@ -510,13 +510,12 @@ class HomeActivity : ComponentActivity() {
                     },
                     liveWords = words,
                     level = { level },
-                    state = c,
+                    state = command,
                     character = settings.character,
                     expanded = expanded,
                     onExpanded = { expanded = it },
-                    mic = rememberMicPress(app),
-                    autoSendIn = autoSendIn,
-                    walkie = walkieTalkie,
+                    mic = rememberMicTap(app),
+                    serverProvider = app.commands.usesServerStt(),
                     onSend = { app.commands.sendNow() },
                     onStop = { app.commands.dismiss() },
                     onClose = {
@@ -533,6 +532,22 @@ class HomeActivity : ComponentActivity() {
                         // with the old conversation's context.
                         app.commands.restoreSession(emptyList())
                         expanded = false
+                    },
+                    onDeleteTurn = { index ->
+                        val id = activeId ?: return@ChatSurface
+                        app.scope.launch {
+                            app.chats.deleteTurn(id, index)?.let {
+                                turns = it.turns
+                                // A live take or run keeps its context: restoring now
+                                // would cancel it and drop the pending answer. The turn
+                                // is gone from the store either way.
+                                if (app.commands.state.value != CommandState.Listening &&
+                                    app.commands.state.value !is CommandState.Thinking
+                                ) {
+                                    app.commands.restoreSession(it.turns)
+                                }
+                            }
+                        }
                     },
                 )
             }
