@@ -104,6 +104,26 @@ class ConfirmationGateTest {
     }
 
     @Test
+    fun `widget placement is confirmed in words, not as spec JSON`() {
+        assertEquals(
+            "Put \"water\" on home",
+            ConfirmationGate.summarize("place_widget", JsonObject(mapOf("id" to JsonPrimitive("water")))),
+        )
+        assertEquals(
+            "Take \"water\" off home",
+            ConfirmationGate.summarize("remove_widget", JsonObject(mapOf("id" to JsonPrimitive("water")))),
+        )
+        assertEquals(
+            "Delete the \"water\" widget everywhere",
+            ConfirmationGate.summarize("delete_widget", JsonObject(mapOf("id" to JsonPrimitive("water")))),
+        )
+        assertEquals(
+            "Add the \"Garage\" camera",
+            ConfirmationGate.summarize("add_stream_source", JsonObject(mapOf("name" to JsonPrimitive("Garage")))),
+        )
+    }
+
+    @Test
     fun `a long argument is still cut in the summary so the sheet stays usable`() {
         val layout = "{\"pages\":" + "x".repeat(20_000) + "}"
         val summary = ConfirmationGate.summarize("edit_layout", JsonObject(mapOf("label" to JsonPrimitive("Tidy"), "layout_json" to JsonPrimitive(layout))))

@@ -12,6 +12,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -59,6 +60,19 @@ class WidgetToolsTest {
 
         success("delete_widget", args("id" to id))
         assertTrue(id, !app.widgetLibrary.current().containsKey(id))
+    }
+
+    @Test
+    fun widgetGateFootprint() {
+        // Plan W3: the gate shows on placement, not on library writes. Making or revising a widget
+        // only lands in the versioned library (the chat shows a preview card); home placement,
+        // removal, deletion and new stream sources still ask.
+        assertFalse(tools.getValue("create_widget").needsConfirmation(args("sentence" to "a water counter")))
+        assertFalse(tools.getValue("update_widget").needsConfirmation(args("id" to "water")))
+        assertTrue(tools.getValue("place_widget").needsConfirmation(args("id" to "water")))
+        assertTrue(tools.getValue("remove_widget").needsConfirmation(args("id" to "water")))
+        assertTrue(tools.getValue("delete_widget").needsConfirmation(args("id" to "water")))
+        assertTrue(tools.getValue("add_stream_source").needsConfirmation(args("name" to "Garage", "url" to "rtsp://x")))
     }
 
     @Test

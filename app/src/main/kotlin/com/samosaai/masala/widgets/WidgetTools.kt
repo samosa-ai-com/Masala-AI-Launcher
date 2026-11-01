@@ -24,7 +24,10 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * The Widget Maker's tools (plan `docs/plans/widget-maker.md` §7.2), registered in `MasalaApp`
- * next to the private prototype's. Read-only ones run unattended; the rest go through the confirmation gate.
+ * next to the private prototype's. Library writes run unattended — a made or revised widget only lands in the
+ * versioned library, and the chat shows it as a preview card. The gate asks on what the user can
+ * see or lose: home placement, removal, deletion, and new stream sources (plan W3 exit: the gate
+ * shows on placement).
  * Every made or changed widget returns `Produced("widget", …)`, which the chat draws as a live
  * preview card with Add to home / Open in manager.
  */
@@ -101,7 +104,7 @@ object WidgetTools {
                 ActionResult.ok(MasalaJson.strict.encodeToString(WidgetSpec.serializer(), spec))
             },
             FunctionTool(Defs.widgetSchema, READ_ONLY) { ActionResult.ok(SCHEMA_TEXT) },
-            FunctionTool(Defs.createWidget, CHANGES_SOMETHING) {
+            FunctionTool(Defs.createWidget, CHANGES_SOMETHING, confirmWhen = { false }) {
                 val (spec, error) = specFromArgs(it)
                 if (spec == null) return@FunctionTool ActionResult.error(error!!)
                 val id = freeId(spec.id, spec.title)
@@ -112,7 +115,7 @@ object WidgetTools {
                     listOf(Produced("widget", final.title ?: id, id)),
                 )
             },
-            FunctionTool(Defs.updateWidget, CHANGES_SOMETHING) {
+            FunctionTool(Defs.updateWidget, CHANGES_SOMETHING, confirmWhen = { false }) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")
                 val current = host().widgetLibrary.current()[id]
                     ?: return@FunctionTool ActionResult.error("No widget '$id'. Call list_widgets to see the library.")
