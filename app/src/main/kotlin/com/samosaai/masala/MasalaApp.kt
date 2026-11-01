@@ -128,6 +128,7 @@ class MasalaApp : Application() {
     val tools by lazy {
         MasalaToolRegistry(AppStorageFileAccess(this)).also { registry ->
             MasalaTools.create(this, ToolFiles { registry.fileAccess }, miniApps).forEach(registry::register)
+            com.samosaai.masala.widgets.WidgetTools.create(this).forEach(registry::register)
             fileIndex = ProTools.register(registry, this, DocumentText(this))
         }
     }

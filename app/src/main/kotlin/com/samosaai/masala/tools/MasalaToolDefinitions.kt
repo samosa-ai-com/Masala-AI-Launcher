@@ -1573,5 +1573,13 @@ object MasalaToolDefinitions {
         openMiniAppTool,
         pinMiniAppTool,
         deleteMiniAppTool,
+        listWidgets,
+        readWidget,
+        widgetSchema,
+        createWidget,
+        updateWidget,
+        placeWidget,
+        removeWidget,
+        deleteWidget,
     )
 }

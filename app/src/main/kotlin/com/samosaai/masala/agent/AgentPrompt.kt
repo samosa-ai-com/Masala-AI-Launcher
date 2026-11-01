@@ -46,6 +46,7 @@ object AgentPrompt {
         append("expert: it knows the rules for small apps and saves it. Then say where it is — it is put on the home screen. ")
         append("A small change to an app you already know can go straight to update_mini_app. Open an app when the user ")
         append("asked you to open it, or when they clearly want to use it now; if they only hinted at it, offer. ")
+        append("To make or change a home-screen widget, consult the widget_maker expert: it knows the spec rules and saves it. ")
         append("Never open a screen just because a word matched.\n")
         val listed = skills
             .filter { it.title.isNotBlank() || it.description.isNotBlank() }
