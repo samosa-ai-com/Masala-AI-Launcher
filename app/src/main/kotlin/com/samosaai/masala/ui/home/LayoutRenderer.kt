@@ -55,9 +55,12 @@ import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -582,6 +585,7 @@ internal fun androidx.compose.ui.geometry.Rect.toBox2() = Box2(left, top, right,
 private fun Modifier.itemClicks(item: Item, app: AppEntry?, ctx: RenderContext, label: String, bounds: IconBounds? = null): Modifier {
     val menuLabel = stringResource(R.string.menu_options)
     val haptics = rememberHaptics()
+    val scope = rememberCoroutineScope()
     val drag = ctx.drag?.takeIf { item.id in ctx.movable && !ctx.locked }
     val menu: (() -> Unit)? = when {
         ctx.locked -> null
@@ -597,6 +601,16 @@ private fun Modifier.itemClicks(item: Item, app: AppEntry?, ctx: RenderContext, 
             long.consume()
             fun rootOf(p: Offset) = bounds?.coordinates?.takeIf { it.isAttached }?.localToRoot(p) ?: p
             var moved = false
+            var opened = false
+            // Keep holding a still finger and the menu opens by itself, without waiting for the lift;
+            // moving instead starts the drag and cancels this.
+            val openMenu = scope.launch {
+                delay(MENU_AFTER_LONG_PRESS_MS)
+                if (!moved) {
+                    opened = true
+                    menu?.invoke()
+                }
+            }
             try {
                 while (true) {
                     val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
@@ -604,8 +618,10 @@ private fun Modifier.itemClicks(item: Item, app: AppEntry?, ctx: RenderContext, 
                         change.consume()
                         break
                     }
-                    if (!moved && (change.position - long.position).getDistance() > viewConfiguration.touchSlop) {
+                    // After the menu is up the gesture is over: no drag should start under it.
+                    if (!moved && !opened && (change.position - long.position).getDistance() > viewConfiguration.touchSlop) {
                         moved = true
+                        openMenu.cancel()
                         drag.start(item, rootOf(change.position))
                     }
                     if (moved) drag.moveTo(rootOf(change.position))
@@ -615,8 +631,14 @@ private fun Modifier.itemClicks(item: Item, app: AppEntry?, ctx: RenderContext, 
                 // The cell can leave mid-drag (its page or section goes away): never leave the copy lifted.
                 if (moved && drag.dragging?.id == item.id) drag.cancel()
                 throw e
+            } finally {
+                openMenu.cancel()
             }
-            if (moved) drag.drop()?.let { haptics.confirm(); ctx.onDrop?.invoke(item, it) } else menu?.invoke()
+            when {
+                moved -> drag.drop()?.let { haptics.confirm(); ctx.onDrop?.invoke(item, it) }
+                // A quick lift still opens it; a hold has already done so.
+                !opened -> menu?.invoke()
+            }
         }
     }
     return this
@@ -746,6 +768,9 @@ internal class IconBounds {
         rect = android.graphics.Rect(b.left.toInt(), b.top.toInt(), b.right.toInt(), b.bottom.toInt())
     }
 }
+
+/** How long a finger stays still after the long press before an item's menu opens by itself. */
+private const val MENU_AFTER_LONG_PRESS_MS = 1_000L
 
 /** Holding a dragged item this close to a side for [EDGE_HOLD_MS] flips to the next page that way. */
 private val EDGE_FLIP_ZONE = 24.dp
