@@ -462,9 +462,9 @@ class SettingsActivity : ComponentActivity() {
             editSpec?.let { WidgetEditDialog(it, onClose = { editSpec = null }) }
             var tab by rememberSaveable { mutableStateOf(0) }
             val tabs = listOf(stringResource(R.string.widgets_mine), stringResource(R.string.widgets_templates), stringResource(R.string.widgets_cameras), stringResource(R.string.widgets_html))
-            androidx.compose.material3.TabRow(selectedTabIndex = tab) {
+            androidx.compose.material3.ScrollableTabRow(selectedTabIndex = tab, edgePadding = 0.dp) {
                 tabs.forEachIndexed { i, title ->
-                    androidx.compose.material3.Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title) })
+                    androidx.compose.material3.Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title, maxLines = 1, softWrap = false) })
                 }
             }
             if (tab == 2) {
