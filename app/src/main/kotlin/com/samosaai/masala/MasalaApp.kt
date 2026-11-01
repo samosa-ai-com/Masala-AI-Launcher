@@ -96,8 +96,18 @@ class MasalaApp : Application() {
 
     val scheduledTasks by lazy { ScheduledTaskStore(PrefsTaskStorage(this)) }
 
+    /** The experts consulted inside each chat; hidden from the list and deleted with the chat. */
+    val consults by lazy {
+        com.samosaai.masala.chat.ConsultSessions(java.io.File(filesDir, com.samosaai.masala.chat.ConsultSessions.DIR))
+    }
+
     /** Conversations, stored as one JSON file each; the chat surface reads and writes them. */
-    val chats by lazy { com.samosaai.masala.chat.ChatSessions(java.io.File(filesDir, com.samosaai.masala.chat.ChatSessions.DIR)) }
+    val chats by lazy {
+        com.samosaai.masala.chat.ChatSessions(
+            java.io.File(filesDir, com.samosaai.masala.chat.ChatSessions.DIR),
+            onDeleted = { id -> scope.launch { consults.deleteChat(id) } },
+        )
+    }
 
     /** The conversation turns are being added to; created on the first turn of a new chat. */
     val activeChatId = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)

@@ -21,6 +21,8 @@ class ChatSessions(
     private val dir: File,
     private val clock: () -> Long = { System.currentTimeMillis() },
     private val newId: () -> String = { UUID.randomUUID().toString() },
+    /** Told when a conversation is removed, so what belongs to it (its consults) goes too. */
+    private val onDeleted: (String) -> Unit = {},
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -98,10 +100,11 @@ class ChatSessions(
         next
     } }
 
-    /** Removes a conversation and its file. */
+    /** Removes a conversation, its file and what belongs to it. */
     suspend fun delete(id: String) = lock.withLock { withContext(Dispatchers.IO) {
         loaded.remove(id)
         fileFor(id).delete()
+        onDeleted(id)
         publish()
     } }
 
@@ -133,6 +136,7 @@ class ChatSessions(
         extra.forEach {
             loaded.remove(it.id)
             fileFor(it.id).delete()
+            onDeleted(it.id)
         }
     }
 
