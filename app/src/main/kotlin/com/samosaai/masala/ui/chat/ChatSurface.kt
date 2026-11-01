@@ -1,7 +1,11 @@
 package com.samosaai.masala.ui.chat
 
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -253,14 +257,8 @@ private fun Orb(level: () -> Float, character: Character, listening: Boolean, ca
             // The server sends no partials, so the orb would sit on a dead line until
             // the transcript lands. Pulse it instead; the animated value is read only
             // inside the draw lambda, so the pulse redraws without recomposing.
-            var on by remember { mutableStateOf(true) }
-            LaunchedEffect(Unit) {
-                while (true) {
-                    kotlinx.coroutines.delay(1100)
-                    on = !on
-                }
-            }
-            val glow by animateFloatAsState(if (on) 1f else 0.35f, tween(1100, easing = FastOutSlowInEasing), label = "listening-alpha")
+            val glow by rememberInfiniteTransition(label = "listening-shimmer")
+                .animateFloat(0.35f, 1f, infiniteRepeatable(tween(1100), RepeatMode.Reverse), label = "listening-alpha")
             Text(
                 stringResource(R.string.command_listening),
                 style = MaterialTheme.typography.titleMedium,
@@ -327,11 +325,21 @@ private fun Thread(
     // beyond 120 dp, returns to the orb. Down is the handle's collapse
     // direction (drag > 40 from the thread collapses); up from the thread
     // does nothing there, so upward overscroll only resets the count.
+    // A fling is its own gesture, not a pull: it resets instead of adding up.
     val collapsePx = with(LocalDensity.current) { 120.dp.toPx() }
     var overscroll by remember { mutableFloatStateOf(0f) }
     val nested = remember(onCollapse, collapsePx) {
         object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source != NestedScrollSource.Fling && available.y < 0f) overscroll = 0f
+                return Offset.Zero
+            }
+
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.Fling) {
+                    overscroll = 0f
+                    return Offset.Zero
+                }
                 if (available.y > 0f) {
                     overscroll += available.y
                     if (overscroll > collapsePx) {

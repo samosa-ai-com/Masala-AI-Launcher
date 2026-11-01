@@ -195,12 +195,18 @@ object AndroidSpeechInfo {
      * The online Google recognizer when installed. The platform default on
      * this phone is the on-device service, which ends each utterance on its
      * own schedule and reopens the mic between segments; an explicit online
-     * service keeps listening through pauses.
+     * service keeps listening through pauses. The class name picks the pick:
+     * list order alone would depend on which of the app's recognizers the
+     * package manager happens to return first.
      */
-    private fun defaultOnlineRecognizer(context: Context): ComponentName? =
-        recognizers(context)
-            .firstOrNull { it.id.startsWith("com.google.android.googlequicksearchbox/") }
-            ?.let { ComponentName.unflattenFromString(it.id) }
+    private fun defaultOnlineRecognizer(context: Context): ComponentName? {
+        val google = recognizers(context)
+            .filter { it.id.startsWith("com.google.android.googlequicksearchbox/") }
+        return (
+            google.firstOrNull { it.id.substringAfter('/').contains("GoogleRecognitionService") }
+                ?: google.firstOrNull()
+            )?.let { ComponentName.unflattenFromString(it.id) }
+    }
 
     /**
      * Whether the recognizer [createRecognizer] would pick has [language], or
