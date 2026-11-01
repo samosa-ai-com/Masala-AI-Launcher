@@ -670,22 +670,6 @@ class HomeActivity : ComponentActivity() {
                         chatOpen = true
                         expanded = true
                     },
-                    onDeleteTurn = { index ->
-                        val id = activeId ?: return@ChatSurface
-                        app.scope.launch {
-                            app.chats.deleteTurn(id, index)?.let {
-                                turns = it.turns
-                                // A live take or run keeps its context: restoring now
-                                // would cancel it and drop the pending answer. The turn
-                                // is gone from the store either way.
-                                if (app.commands.state.value != CommandState.Listening &&
-                                    app.commands.state.value !is CommandState.Thinking
-                                ) {
-                                    app.commands.restoreSession(it.turns)
-                                }
-                            }
-                        }
-                    },
                     onRevertTurn = { index ->
                         val id = activeId ?: return@ChatSurface
                         // The prompt being redone, before the store drops it.

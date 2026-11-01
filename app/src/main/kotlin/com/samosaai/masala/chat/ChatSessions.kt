@@ -109,23 +109,6 @@ class ChatSessions(
     } }
 
     /**
-     * Removes the turn at [index] from [id] and writes the result. Unknown ids
-     * and out-of-range indices return null without writing.
-     */
-    suspend fun deleteTurn(id: String, index: Int): ChatSession? = lock.withLock { withContext(Dispatchers.IO) {
-        val session = loaded[id] ?: read(id) ?: return@withContext null
-        if (index !in session.turns.indices) return@withContext null
-        val next = session.copy(
-            turns = session.turns.toMutableList().also { it.removeAt(index) },
-            updatedAt = clock(),
-        )
-        loaded[id] = next
-        write(next)
-        publish()
-        next
-    } }
-
-    /**
      * Reverts the conversation to the user message at [index]: drops that
      * message and everything after it, so its text can be edited and resent.
      * Unknown ids and out-of-range indices return null without writing.

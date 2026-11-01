@@ -117,7 +117,6 @@ fun ChatSurface(
     onClose: () -> Unit,
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
-    onDeleteTurn: (Int) -> Unit = {},
     onRevertTurn: (Int) -> Unit = {},
     /** Text dropped back into the type field by a revert, so it can be edited and resent. */
     prefill: String = "",
@@ -191,7 +190,7 @@ fun ChatSurface(
                         )
                         turns.isEmpty() && !listening && !thinking -> EmptyThread(level, character, experts, onAskExpert)
                         else -> Thread(
-                            turns, listening, thinking, state, character, level, onStop, onDeleteTurn,
+                            turns, listening, thinking, state, character, level, onStop,
                             onRevertTurn,
                             onCollapse = { onExpanded(false) },
                             onGrant = grant,
@@ -388,7 +387,6 @@ private fun Thread(
     character: Character,
     level: () -> Float,
     onStop: () -> Unit,
-    onDeleteTurn: (Int) -> Unit,
     onRevertTurn: (Int) -> Unit,
     onCollapse: () -> Unit,
     onGrant: (String) -> Unit,
@@ -445,18 +443,12 @@ private fun Thread(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         itemsIndexed(turns) { index, turn ->
-            // Only the user's own messages carry a menu: there is nothing to
-            // redo from a reply, and reverting means re-sending the prompt.
-            val mine = turn.role == TurnRole.USER
+            // Only the user's own messages carry a menu: reverting means
+            // re-sending the prompt, and there is nothing to redo from a reply.
             Bubble(
                 turn,
                 key = index,
-                onDelete = if (mine) {
-                    { onDeleteTurn(index) }
-                } else {
-                    null
-                },
-                onRevert = if (mine) {
+                onRevert = if (turn.role == TurnRole.USER) {
                     { onRevertTurn(index) }
                 } else {
                     null
@@ -556,19 +548,14 @@ private fun Bubble(
     turn: ChatTurn,
     live: Boolean = false,
     key: Int = -1,
-    onDelete: (() -> Unit)? = null,
     onRevert: (() -> Unit)? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
-    // Live turns are transient; only stored turns can be deleted or reverted to.
-    val longPress = if ((onDelete != null || onRevert != null) && !live) {
+    // Live turns are transient; only stored user turns can be reverted to.
+    val longPress = if (onRevert != null && !live) {
         Modifier.combinedClickable(onClick = {}, onLongClick = { menu = true })
     } else {
         Modifier
-    }
-    fun dismissDelete() {
-        menu = false
-        onDelete?.invoke()
     }
     fun dismissRevert() {
         menu = false
@@ -577,7 +564,7 @@ private fun Bubble(
     val user = turn.role == TurnRole.USER
     if (turn.role == TurnRole.SYSTEM) {
         // A history summary: the app wrote it, so it reads as a note, not as a reply.
-        // No menu: only the user's own messages can be deleted or reverted to.
+        // No menu: only the user's own messages can be reverted to.
         Box(Modifier.fillMaxWidth()) {
             Column(
                 Modifier.fillMaxWidth().padding(vertical = 6.dp)
@@ -608,7 +595,9 @@ private fun Bubble(
     )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (user) Arrangement.End else Arrangement.Start) {
         Box(Modifier.fillMaxWidth(0.92f)) {
-            TurnMenu(menu, onDismiss = { menu = false }, onDelete = ::dismissDelete, onRevert = onRevert?.let { { dismissRevert() } })
+            if (onRevert != null) {
+                TurnMenu(menu, onDismiss = { menu = false }, onRevert = ::dismissRevert)
+            }
         Column(
             longPress.fillMaxWidth().clip(shape)
                 .background(
@@ -680,14 +669,11 @@ private fun Bubble(
     }
 }
 
-/** Long-press menu on one of the user's turns: deleting or reverting also updates the agent's history. */
+/** Long-press menu on one of the user's turns: reverting also updates the agent's history. */
 @Composable
-private fun TurnMenu(expanded: Boolean, onDismiss: () -> Unit, onDelete: () -> Unit, onRevert: (() -> Unit)? = null) {
+private fun TurnMenu(expanded: Boolean, onDismiss: () -> Unit, onRevert: () -> Unit) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        if (onRevert != null) {
-            DropdownMenuItem(text = { Text(stringResource(R.string.chat_revert_to_here)) }, onClick = onRevert)
-        }
-        DropdownMenuItem(text = { Text(stringResource(R.string.chat_delete_turn)) }, onClick = onDelete)
+        DropdownMenuItem(text = { Text(stringResource(R.string.chat_revert_to_here)) }, onClick = onRevert)
     }
 }
 
