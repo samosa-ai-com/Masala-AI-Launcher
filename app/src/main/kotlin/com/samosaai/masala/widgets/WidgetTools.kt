@@ -151,6 +151,41 @@ object WidgetTools {
                 host().layouts.removeWidgetRefs("Delete widget $id", id)
                 ActionResult.ok("Widget '$id' is deleted from the library and off home everywhere.")
             },
+            FunctionTool(Defs.listStreamSources, READ_ONLY) {
+                val rows = host().streamSources.sources.value
+                if (rows.isEmpty()) {
+                    return@FunctionTool ActionResult.ok("No stream sources yet. Add one from Settings → Widgets → Cameras & streams, or with add_stream_source.")
+                }
+                ActionResult.ok(rows.sortedBy { it.name }.joinToString("\n") {
+                    "${it.id}: ${it.name} (${it.kind.name.lowercase()}${if (it.hasCredentials) ", with login" else ""})"
+                })
+            },
+            FunctionTool(Defs.addStreamSource, CHANGES_SOMETHING) {
+                val name = it.string("name") ?: return@FunctionTool missing("name")
+                val url = it.string("url") ?: return@FunctionTool missing("url")
+                if (it.string("password") != null) {
+                    return@FunctionTool ActionResult.error("Never put a password in chat. Call again without it; the user types it into a sheet on screen.")
+                }
+                val kind = it.string("kind")?.let(StreamKind::parse) ?: guessKind(url)
+                    ?: return@FunctionTool ActionResult.error("Couldn't tell the kind from that URL. Pass kind: rtsp, hls, dash, progressive, mjpeg or snapshot.")
+                val username = it.string("username")?.trim().orEmpty()
+                val password = if (username.isEmpty()) null else when (val answer = host().questionGate.ask("Password for '$username' on '$name'?", listOf("No password needed", "I'll add it in Settings instead"))) {
+                    is com.samosaai.masala.actions.QuestionGate.Answer.Custom -> answer.text
+                    else -> null
+                }
+                val (id, message) = host().streamSources.add(name, kind, url, null, username.ifEmpty { null }, password, if (kind == StreamKind.RTSP) "tcp" else null)
+                if (id == null) return@FunctionTool ActionResult.error(message ?: "Couldn't save the source.")
+                ActionResult.ok("Stream source '$id' added ($name, ${kind.name.lowercase()}). Run test_stream to check it before placing a widget.")
+            },
+            FunctionTool(Defs.testStream, READ_ONLY) {
+                val id = it.string("id") ?: return@FunctionTool missing("id")
+                val source = host().streamSources.current()[id]
+                    ?: return@FunctionTool ActionResult.error("No stream source '$id'. Call list_stream_sources to see them.")
+                val streamUrl = host().streamSources.urlWithCredentials(id)
+                    ?: return@FunctionTool ActionResult.error("The login for '$id' no longer opens. Re-add it from Settings → Widgets → Cameras & streams.")
+                val result = StreamTest.test(app as Context, source.kind, streamUrl, host().streamSources.snapshotUrlWithCredentials(id))
+                if (result.ok) ActionResult.ok("${source.name}: ${result.detail}") else ActionResult.error("${source.name}: ${result.detail}")
+            },
         )
     }
 
@@ -165,6 +200,19 @@ object WidgetTools {
     }
 
     private fun missing(param: String) = ActionResult.error("Missing or invalid required parameter '$param'.")
+
+    internal fun guessKind(url: String): StreamKind? {
+        val lower = url.trim().lowercase()
+        return when {
+            lower.startsWith("rtsp") -> StreamKind.RTSP
+            ".m3u8" in lower -> StreamKind.HLS
+            ".mpd" in lower -> StreamKind.DASH
+            ".mp4" in lower || ".webm" in lower -> StreamKind.PROGRESSIVE
+            "mjpeg" in lower || "mjpg" in lower || "multipart" in lower -> StreamKind.MJPEG
+            ".jpg" in lower || ".jpeg" in lower || "snapshot" in lower -> StreamKind.SNAPSHOT
+            else -> null
+        }
+    }
 
     private fun JsonObject.string(key: String): String? =
         this[key]?.jsonPrimitive?.takeIf { it.isString || it.content.isNotEmpty() }?.content

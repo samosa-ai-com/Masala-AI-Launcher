@@ -468,7 +468,7 @@ class SettingsActivity : ComponentActivity() {
                 }
             }
             if (tab == 2) {
-                Text(stringResource(R.string.widgets_cameras_note), style = MaterialTheme.typography.bodyMedium)
+                CamerasTab()
                 return@SettingsScaffold
             }
             val mine = tab == 0
@@ -551,7 +551,128 @@ class SettingsActivity : ComponentActivity() {
      * Edits one library widget: title plus the raw spec JSON, checker problems inline, and the last
      * versions to restore. The id never changes, so storage, taps and home refs carry over.
      */
+    /** Stream sources (plan §4.2): the registry behind video and snapshot widgets. */
     @Composable
+    private fun CamerasTab() {
+        val scope = rememberCoroutineScope()
+        val sources by remember { masala.streamSources.sources }.collectAsStateWithLifecycle()
+        fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()
+        var adding by rememberSaveable { mutableStateOf(false) }
+        var testing by remember { mutableStateOf<String?>(null) }
+        var testLines by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+        if (sources.isEmpty() && !adding) {
+            Text(stringResource(R.string.widgets_sources_empty), style = MaterialTheme.typography.bodyMedium)
+        }
+        sources.forEach { source ->
+            Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(source.name, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "${source.kind.name.lowercase()} · ${source.url}" + if (source.hasCredentials) " · ${stringResource(R.string.widgets_source_login)}" else "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                        )
+                        testLines[source.id]?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        enabled = testing == null,
+                        onClick = {
+                            testing = source.id
+                            scope.launch {
+                                val streamUrl = masala.streamSources.urlWithCredentials(source.id)
+                                val result = if (streamUrl == null) {
+                                    com.samosaai.masala.widgets.StreamTest.Result(false, getString(R.string.widgets_source_login_gone))
+                                } else {
+                                    com.samosaai.masala.widgets.StreamTest.test(
+                                        this@SettingsActivity, source.kind, streamUrl,
+                                        masala.streamSources.snapshotUrlWithCredentials(source.id),
+                                    )
+                                }
+                                testLines = testLines + (source.id to (if (result.ok) result.detail else getString(R.string.widgets_source_test_failed, result.detail)))
+                                testing = null
+                            }
+                        },
+                    ) { Text(if (testing == source.id) stringResource(R.string.widgets_source_testing) else stringResource(R.string.widgets_source_test)) }
+                    TextButton(onClick = {
+                        scope.launch {
+                            masala.streamSources.remove(source.id)
+                            toast(getString(R.string.widgets_source_removed))
+                        }
+                    }) { Text(stringResource(R.string.settings_version_delete)) }
+                }
+            }
+            HorizontalDivider()
+        }
+        if (adding) {
+            SourceForm(
+                onSave = { adding = false },
+                onCancel = { adding = false },
+            )
+        } else {
+            Button(onClick = { adding = true }) { Text(stringResource(R.string.widgets_source_add)) }
+        }
+    }
+
+    @Composable
+    private fun SourceForm(onSave: () -> Unit, onCancel: () -> Unit) {
+        val scope = rememberCoroutineScope()
+        fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()
+        var name by rememberSaveable { mutableStateOf("") }
+        var kind by rememberSaveable { mutableStateOf(com.samosaai.masala.widgets.StreamKind.RTSP) }
+        var url by rememberSaveable { mutableStateOf("") }
+        var snapshotUrl by rememberSaveable { mutableStateOf("") }
+        var username by rememberSaveable { mutableStateOf("") }
+        var password by rememberSaveable { mutableStateOf("") }
+        var transport by rememberSaveable { mutableStateOf("tcp") }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(stringResource(R.string.widgets_source_name)) })
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                com.samosaai.masala.widgets.StreamKind.entries.forEach { entry ->
+                    FilterChip(entry == kind, { kind = entry }, { Text(entry.name.lowercase()) })
+                }
+            }
+            OutlinedTextField(url, { url = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(stringResource(R.string.widgets_source_url)) })
+            OutlinedTextField(snapshotUrl, { snapshotUrl = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(stringResource(R.string.widgets_source_snapshot_url)) })
+            OutlinedTextField(username, { username = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(stringResource(R.string.widgets_source_username)) })
+            OutlinedTextField(
+                password, { password = it }, Modifier.fillMaxWidth(), singleLine = true,
+                placeholder = { Text(stringResource(R.string.widgets_source_password)) },
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+            )
+            if (kind == com.samosaai.masala.widgets.StreamKind.RTSP) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf("tcp", "udp").forEach { option ->
+                        FilterChip(option == transport, { transport = option }, { Text(option) })
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {
+                    scope.launch {
+                        val (id, message) = masala.streamSources.add(
+                            name, kind, url, snapshotUrl.ifBlank { null },
+                            username.ifBlank { null }, password.ifEmpty { null },
+                            transport.takeIf { kind == com.samosaai.masala.widgets.StreamKind.RTSP },
+                        )
+                        if (id == null) toast(message ?: getString(R.string.widgets_add_failed))
+                        else onSave()
+                    }
+                }) { Text(stringResource(R.string.widgets_save)) }
+                TextButton(onClick = onCancel) { Text(stringResource(R.string.action_back)) }
+            }
+        }
+    }
+
+    /**
+     * Edits one library widget: title plus the raw spec JSON, checker problems inline, and the last
+     * versions to restore. The id never changes, so storage, taps and home refs carry over.
+     */    @Composable
     private fun WidgetEditDialog(spec: com.samosaai.masala.core.contract.WidgetSpec, onClose: () -> Unit) {
         val scope = rememberCoroutineScope()
         fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()

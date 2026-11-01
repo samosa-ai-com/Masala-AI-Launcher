@@ -364,6 +364,61 @@ object MasalaToolDefinitions {
         },
     )
 
+    // Stream sources for live media widgets (plan docs/plans/widget-maker.md §7.2).
+    val listStreamSources = tool(
+        "list_stream_sources",
+        "The cameras and streams the phone knows: name, kind and whether it plays. " +
+            "A widget shows one by its source id; the URLs and their secrets never leave the phone.",
+        schema { putJsonObject("properties") {} },
+    )
+
+    val addStreamSource = tool(
+        "add_stream_source",
+        "Add a camera or stream by name and URL (rtsp, hls, dash, progressive mp4, mjpeg or " +
+            "snapshot jpeg). Never put a username or password in the URL or in chat: when one is " +
+            "needed the user types it into a sheet on screen. The answer names the source id for " +
+            "video and snapshot components.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("name") {
+                    put("type", "string")
+                    put("description", "Name shown in Settings, e.g. Front door.")
+                }
+                putJsonObject("url") {
+                    put("type", "string")
+                    put("description", "Stream or snapshot URL, without any username or password.")
+                }
+                putJsonObject("kind") {
+                    put("type", "string")
+                    put("description", "rtsp, hls, dash, progressive, mjpeg or snapshot. Guessed from the URL when missing.")
+                }
+                putJsonObject("username") {
+                    put("type", "string")
+                    put("description", "Camera login. The password is asked on screen, never in chat.")
+                }
+            }
+            putJsonArray("required") {
+                add("name")
+                add("url")
+            }
+        },
+    )
+
+    val testStream = tool(
+        "test_stream",
+        "Connect to a stream source for up to 8 seconds and report the codec, the resolution and " +
+            "the latency, or the error. Run it before placing a video or snapshot widget.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Source id from list_stream_sources.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
     val createCalendarEvent = tool(
         "create_calendar_event",
         "Add an event to the phone's calendar. The answer names the event id for later edits.",
@@ -1581,5 +1636,8 @@ object MasalaToolDefinitions {
         placeWidget,
         removeWidget,
         deleteWidget,
+        listStreamSources,
+        addStreamSource,
+        testStream,
     )
 }
