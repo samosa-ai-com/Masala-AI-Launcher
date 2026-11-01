@@ -280,5 +280,12 @@
             android:exported="false"
             android:label="@string/settings_title"
             android:theme="@style/Theme.Masala.Home" />
+
+        <!-- A camera or stream full-screen, from a video widget tap (plan widget-maker W4) -->
+        <activity
+            android:name=".widgets.media.StreamViewerActivity"
+            android:exported="false"
+            android:label="@string/widgets_cameras"
+            android:theme="@style/Theme.Masala.Home" />
     </application>
 </manifest>

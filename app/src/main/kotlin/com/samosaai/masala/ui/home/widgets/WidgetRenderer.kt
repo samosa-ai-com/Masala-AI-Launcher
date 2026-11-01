@@ -65,6 +65,8 @@ data class WidgetSource(
     val onLongPress: (() -> Unit)? = null,
     /** Stream sources for video/snapshot; media without it keeps the W4 note. */
     val streams: StreamSourceStore? = null,
+    /** The player pool and fullscreen tap for live video; without it video stays a note. */
+    val media: com.samosaai.masala.widgets.media.MediaHost? = null,
 )
 
 /** One generated widget on home: a glass card with its components top to bottom. */
@@ -212,13 +214,16 @@ private fun Component(
                 component.children.forEach { child -> Component(child, widgetId, storage, snapshot, source, depth + 1) }
             }
         }
-        // Live media (W4): MJPEG and snapshots draw; player kinds follow with the player pool.
+        // Live media (W4): MJPEG and snapshots draw; player kinds need the pool.
         is WidgetComponent.Video -> {
             val src = source.streams?.current()?.get(component.stream.sourceId)
+            val media = source.media
             when {
                 src == null -> MediaNote(stringResource(R.string.widgets_video_no_source))
-                src.kind == com.samosaai.masala.widgets.StreamKind.MJPEG ->
-                    com.samosaai.masala.widgets.media.MjpegImage(src.id, source.streams!!)
+                src.kind == com.samosaai.masala.widgets.StreamKind.MJPEG && source.streams != null ->
+                    com.samosaai.masala.widgets.media.MjpegImage(src.id, source.streams)
+                media != null && source.streams != null ->
+                    com.samosaai.masala.widgets.media.LiveVideo(src.id, source.streams, media)
                 else -> MediaNote(stringResource(R.string.widgets_video_player_next))
             }
         }

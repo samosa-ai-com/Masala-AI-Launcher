@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.samosaai.masala.ui.home.DrawerDrag
+import com.samosaai.masala.widgets.media.openStreamViewer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -140,11 +141,13 @@ class HomeActivity : ComponentActivity() {
 
     override fun onPause() {
         masala.contextService.setHomeVisible(false)
+        masala.videoPool.backgrounded = true
         super.onPause()
     }
 
     override fun onResume() {
         super.onResume()
+        masala.videoPool.backgrounded = false
         // Rules are evaluated again on resume and then on the minute tick (plan Phase 2).
         masala.contextService.setHomeVisible(true)
         isDefault = HomeRole.isDefault(this)
@@ -454,8 +457,15 @@ class HomeActivity : ComponentActivity() {
         val drag = remember { HomeDragState() }
         // Generated widgets (W1): one store for their stored values, shared by every card on home.
         val widgetStore = remember { app.widgetStates }
-        val widgetSource = remember(snapshot) {
-            com.samosaai.masala.ui.home.widgets.WidgetSource(snapshot = { snapshot }, store = widgetStore, onAction = ::run, streams = app.streamSources)
+        val mediaHost = remember {
+            com.samosaai.masala.widgets.media.MediaHost(
+                pool = app.videoPool,
+                homeVisible = { drawerProgress.value < 1f },
+                onFullscreen = { id -> this@HomeActivity.openStreamViewer(id) },
+            )
+        }
+        val widgetSource = remember(snapshot, mediaHost) {
+            com.samosaai.masala.ui.home.widgets.WidgetSource(snapshot = { snapshot }, store = widgetStore, onAction = ::run, streams = app.streamSources, media = mediaHost)
         }
         // The context below is remembered on purpose; drops read the live layout through these.
         val latestLayout = rememberUpdatedState(layout)

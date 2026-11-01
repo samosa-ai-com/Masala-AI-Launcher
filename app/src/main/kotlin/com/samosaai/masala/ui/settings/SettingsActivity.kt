@@ -580,6 +580,11 @@ class SettingsActivity : ComponentActivity() {
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    var mobile by remember(source.id) { mutableStateOf(masala.streamSources.isMeteredAllowed(source.id)) }
+                    FilterChip(mobile, {
+                        mobile = !mobile
+                        masala.streamSources.setMeteredAllowed(source.id, mobile)
+                    }, { Text(stringResource(R.string.widgets_source_mobile)) })
                     TextButton(
                         enabled = testing == null,
                         onClick = {

@@ -3,6 +3,7 @@ package com.samosaai.masala.widgets
 import com.samosaai.masala.data.StreamSourceDao
 import com.samosaai.masala.data.StreamSourceEntity
 import com.samosaai.masala.llm.KeyCipher
+import com.samosaai.masala.widgets.media.isLanUrl
 import javax.crypto.KeyGenerator
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,5 +74,21 @@ class StreamSourceStoreTest {
     @Test
     fun unknownSourceHasNoUrl() {
         assertNull(store.urlWithCredentials("missing"))
+    }
+
+    @Test
+    fun lanHosts() {
+        assertTrue(isLanUrl("rtsp://192.168.1.10/x"))
+        assertTrue(isLanUrl("http://10.0.0.5:8080/m.jpeg"))
+        assertTrue(isLanUrl("http://172.16.4.1/x"))
+        assertTrue(isLanUrl("http://172.31.255.1/x"))
+        assertTrue(isLanUrl("http://localhost:8090/x"))
+        assertTrue(isLanUrl("http://127.0.0.1/x"))
+        assertTrue(isLanUrl("http://printer.local/x"))
+        assertTrue(!isLanUrl("rtsp://203.0.113.10/x"))
+        assertTrue(!isLanUrl("https://example.com/x"))
+        assertTrue(!isLanUrl("http://172.15.0.1/x"))
+        assertTrue(!isLanUrl("http://172.32.0.1/x"))
+        assertTrue(!isLanUrl("not a url"))
     }
 }

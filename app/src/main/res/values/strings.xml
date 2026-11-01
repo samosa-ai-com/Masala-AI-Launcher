@@ -279,6 +279,7 @@
     <string name="widgets_source_test_failed">Not playing: %1$s</string>
     <string name="widgets_source_removed">Removed</string>
     <string name="widgets_source_add">Add a camera or stream</string>
+    <string name="widgets_source_mobile">Mobile data</string>
     <string name="widgets_source_name">Name, e.g. Front door</string>
     <string name="widgets_source_url">Stream or snapshot URL, no username or password</string>
     <string name="widgets_source_snapshot_url">Snapshot URL (optional, still images)</string>
@@ -321,6 +322,11 @@
     <string name="widgets_retry">Retry</string>
     <string name="widgets_video_no_source">Video · add its source in Settings → Widgets → Cameras</string>
     <string name="widgets_video_player_next">Video · live playback lands with the player next</string>
+    <string name="widgets_video_live">Live</string>
+    <string name="widgets_video_metered">Mobile data — snapshot until you allow live video</string>
+    <string name="widgets_video_pool_full">Two videos already play — this one waits</string>
+    <string name="widgets_video_failed">The stream stopped</string>
+    <string name="widgets_video_paused">Paused — tap to resume</string>
     <string name="result_widget_gone">That widget is gone from the library</string>
     <string name="settings_recording">Recording</string>
     <string name="settings_recording_summary">Meeting notes: 15-minute chunks in app storage</string>

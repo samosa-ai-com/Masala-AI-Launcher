@@ -91,8 +91,11 @@ class MasalaApp : Application() {
 
     val database by lazy { MasalaDatabase.create(this) }
     val miniApps by lazy { MiniAppStore(database.miniApps()) }
+    /** The 2-player pool for live video widgets (plan widget-maker §4.3, D3 fixed). */
+    val videoPool by lazy { com.samosaai.masala.widgets.media.PlayerPool(this) }
     val streamSources by lazy {
         com.samosaai.masala.widgets.StreamSourceStore(database.streamSources(), com.samosaai.masala.llm.KeyCipher.androidKeystore("masala_stream_secrets"))
+            .also { it.attachPrefs(this) }
     }
     /** Every generated widget's own values (counters, ticks); shared by home and the manager. */
     val widgetStates by lazy { com.samosaai.masala.widgets.WidgetStateStore(scope, database.widgetStates()) }

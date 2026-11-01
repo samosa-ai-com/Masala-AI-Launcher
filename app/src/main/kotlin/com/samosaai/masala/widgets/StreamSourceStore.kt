@@ -39,6 +39,12 @@ class StreamSourceStore(
     private val dao: StreamSourceDao,
     private val cipher: KeyCipher,
 ) {
+    private var prefs: android.content.SharedPreferences? = null
+
+    /** The store reads the metered override from here once the app context exists. */
+    fun attachPrefs(context: android.content.Context) {
+        prefs = context.getSharedPreferences("stream_sources", android.content.Context.MODE_PRIVATE)
+    }
     private val _sources = MutableStateFlow<List<StreamSource>>(emptyList())
     val sources: StateFlow<List<StreamSource>> = _sources.asStateFlow()
 
@@ -104,6 +110,16 @@ class StreamSourceStore(
         load()
     }
 
+    /** Mobile-data playback for one source (plan §4.3): off unless the source is on the LAN. */
+    fun isMeteredAllowed(id: String): Boolean =
+        prefs?.getStringSet(KEY_METERED, emptySet()).orEmpty().contains(id)
+
+    fun setMeteredAllowed(id: String, allowed: Boolean) {
+        val set = prefs?.getStringSet(KEY_METERED, emptySet()).orEmpty().toMutableSet()
+        if (allowed) set += id else set -= id
+        prefs?.edit()?.putStringSet(KEY_METERED, set)?.apply()
+    }
+
     /**
      * The URL with credentials injected, for the player, the snapshot poller and `test_stream`
      * only. Null when the source is unknown or its secret no longer opens.
@@ -138,6 +154,7 @@ class StreamSourceStore(
 
     companion object {
         private const val TAG = "StreamSourceStore"
+        private const val KEY_METERED = "metered_allowed"
         private val ALLOWED_SCHEMES = setOf("rtsp", "rtsps", "http", "https")
         private val SECRET_QUERY_KEYS = setOf("password", "passwd", "pwd", "token", "auth", "secret", "key")
 
