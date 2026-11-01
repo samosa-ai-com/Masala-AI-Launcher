@@ -54,10 +54,17 @@ fun Markdown(markdown: String, modifier: Modifier = Modifier, linkColor: android
         }
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        segments.forEach { segment ->
+        segments.flatMap { segment ->
+            if (segment is MarkdownSegment.Prose) MarkdownParser.splitTables(segment.markdown) else listOf(segment)
+        }.forEach { segment ->
             when (segment) {
                 is MarkdownSegment.Prose -> Material3RichText(style = style) { RichMarkdown(segment.markdown, onLinkClicked = { openLink(context, it) }) }
                 is MarkdownSegment.Code -> CodeBox(segment.code, segment.language)
+                is MarkdownSegment.Table -> MarkdownTable(
+                    headers = segment.headers,
+                    aligns = segment.aligns,
+                    rows = segment.rows,
+                )
             }
         }
     }

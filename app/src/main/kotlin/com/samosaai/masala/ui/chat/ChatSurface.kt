@@ -78,6 +78,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import com.samosaai.masala.R
+import com.samosaai.masala.ui.components.Markdown
 import com.samosaai.masala.agent.CommandState
 import com.samosaai.masala.chat.ChatResult
 import com.samosaai.masala.chat.ChatSession
@@ -604,12 +605,19 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1, onDelet
                     }
                 }
             }
-            Text(
-                turn.text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (user && !live) MasalaTheme.tokens.onAccent else MasalaTheme.tokens.textHigh,
-                fontSize = 14.sp,
-            )
+            // The model answers in Markdown — tables, lists, code — and the bubble is where it
+            // lands, so render it, not the raw pipes and hashes. The user's own words stay plain
+            // text on the accent tile.
+            if (user) {
+                Text(
+                    turn.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (!live) MasalaTheme.tokens.onAccent else MasalaTheme.tokens.textHigh,
+                    fontSize = 14.sp,
+                )
+            } else {
+                Markdown(turn.text)
+            }
             turn.results.forEach { result -> ResultCard(result) }
             if (turn.steps.isNotEmpty()) {
                 Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
