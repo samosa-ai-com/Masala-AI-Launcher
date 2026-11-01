@@ -14,6 +14,9 @@ data class PromptSkill(val id: String, val title: String)
 /** A stored mini-app the model may place on home. */
 data class PromptMiniApp(val id: String, val title: String)
 
+/** A library widget the model may reference (refs only, never inline specs). */
+data class PromptWidget(val id: String, val title: String)
+
 /**
  * Everything the layout prompt is grounded in (plan Phase 3, lane C): installed apps, the current
  * layout, today's calendar, the icon catalog, installed skills and wiki topics. Plain data in, one
@@ -29,6 +32,8 @@ data class PromptContextInput(
     val skills: List<PromptSkill> = emptyList(),
     /** Stored mini-apps (id: title), so layouts can place "open_mini_app" items. */
     val miniApps: List<PromptMiniApp> = emptyList(),
+    /** Library widgets (id: title), so layouts can keep widget/stack refs on revise. */
+    val widgets: List<PromptWidget> = emptyList(),
     /** Page titles the Second Brain holds; shown as "(Second Brain empty)" when there are none. */
     val wikiTopics: List<String> = emptyList(),
     val symbols: Set<String> = KnownSymbols.promptable,
@@ -63,6 +68,8 @@ object PromptContext {
         out.append(if (input.skills.isEmpty()) "(none)" else input.skills.joinToString("\n") { "${it.id}: ${it.title}" })
         out.append("\n\nMini apps (id: title):\n")
         out.append(if (input.miniApps.isEmpty()) "(none)" else input.miniApps.joinToString("\n") { "${it.id}: ${it.title}" })
+        out.append("\n\nLibrary widgets (id: title, for widget/stack refs):\n")
+        out.append(if (input.widgets.isEmpty()) "(none)" else input.widgets.joinToString("\n") { "${it.id}: ${it.title}" })
         out.append("\n\nSecond Brain topics:\n")
         out.append(if (input.wikiTopics.isEmpty()) "(Second Brain empty)" else input.wikiTopics.joinToString(", "))
         out.append("\n\nIcons allowed (symbol names):\n")
@@ -101,6 +108,8 @@ object PromptContext {
             input.skills.sumOf { it.id.length + it.title.length + 3 }.coerceAtLeast("(none)".length)
         n += "\n\nMini apps (id: title):\n".length +
             input.miniApps.sumOf { it.id.length + it.title.length + 3 }.coerceAtLeast("(none)".length)
+        n += "\n\nLibrary widgets (id: title, for widget/stack refs):\n".length +
+            input.widgets.sumOf { it.id.length + it.title.length + 3 }.coerceAtLeast("(none)".length)
         n += "\n\nSecond Brain topics:\n".length + wikiSummary.length
         n += "\n\nIcons allowed (symbol names):\n".length + input.symbols.sumOf { it.length + 2 }
         return n
