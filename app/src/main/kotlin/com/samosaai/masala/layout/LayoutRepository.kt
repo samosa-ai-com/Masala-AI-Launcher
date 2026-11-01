@@ -17,6 +17,8 @@ import com.samosaai.masala.core.layout.LayoutHistory
 import com.samosaai.masala.core.layout.ResolveCache
 import com.samosaai.masala.core.layout.ResolvedLayout
 import com.samosaai.masala.core.migration.LayoutMigrations
+import com.samosaai.masala.core.migration.WidgetLift
+import com.samosaai.masala.widgets.WidgetLibrary
 import com.samosaai.masala.context.ContextService
 import com.samosaai.masala.data.LayoutVersionDao
 import com.samosaai.masala.data.LayoutVersionEntity
@@ -58,6 +60,7 @@ class LayoutRepository(
     private val contextService: ContextService,
     private val skills: () -> SkillRegistry,
     private val toolNames: () -> Set<String>,
+    private val widgets: WidgetLibrary,
 ) {
     enum class Source { CACHE, MINIMAL }
 
@@ -65,6 +68,12 @@ class LayoutRepository(
     private data class Cached(val layout: LayoutDoc, val widgetRows: Map<String, Int>)
 
     private data class Base(val version: Long, val layout: LayoutDoc)
+
+    private data class Inputs(
+        val base: Base,
+        val patches: List<com.samosaai.masala.core.contract.ModePatch>,
+        val snapshot: com.samosaai.masala.core.contract.ContextSnapshot,
+    )
 
     private val cacheFile = File(context.filesDir, "resolved_layout.json")
     private val pointer = context.getSharedPreferences("layout", Context.MODE_PRIVATE)
@@ -102,7 +111,11 @@ class LayoutRepository(
         scope.launch { load() }
         scope.launch {
             combine(_base.filterNotNull(), modes.patches, modes.active, contextService.snapshot) { base, patches, active, snapshot ->
-                resolveCache.resolve(base.version, base.layout, patches.filter { it.id in active }, snapshot)
+                Inputs(base, patches.filter { it.id in active }, snapshot)
+            }.let { inputs ->
+                combine(inputs, widgets.widgets, widgets.version) { i, lib, libVersion ->
+                    resolveCache.resolve(i.base.version, i.base.layout, i.patches, i.snapshot, libVersion, lib)
+                }
             }.flowOn(Dispatchers.Default).collect { r ->
                 _resolved.value = r
                 writeCache(r)
@@ -113,6 +126,7 @@ class LayoutRepository(
     // ---- loading ----
 
     private suspend fun load() {
+        widgets.load()
         val saved = dao.all().mapNotNull { row ->
             runCatching {
                 LayoutHistory.Version(row.id, row.label, LayoutMigrations.decode(MasalaJson.strict.parseToJsonElement(row.json)), row.createdAt)
@@ -125,7 +139,29 @@ class LayoutRepository(
             val classic = ClassicLayoutBuilder.build(context, launcher.apps.value, launcher.pinnedApps.value)
             lock.withLock { push("Classic", classic) }
         }
+        liftInlineWidgets()
         publish()
+    }
+
+    /**
+     * Schema 3 once: every inline widget still saved in the layout moves into the library and the
+     * layout keeps a ref, as one undoable version (plan `docs/plans/widget-maker.md` §6.1). Later
+     * loads find no inline widgets and do nothing.
+     */
+    private suspend fun liftInlineWidgets() {
+        val current = history.current ?: return
+        if (!WidgetLift.hasInline(current.layout)) return
+        val lifted = WidgetLift.lift(current.layout, widgets.current())
+        if (lifted.widgets.isEmpty()) return
+        widgets.saveAll(lifted.widgets)
+        modes.patches.value.forEach { patch ->
+            val modeLifted = WidgetLift.lift(patch, widgets.current())
+            if (modeLifted.widgets.isNotEmpty()) {
+                widgets.saveAll(modeLifted.widgets)
+                modes.put(modeLifted.value)
+            }
+        }
+        lock.withLock { push("Widgets to library", lifted.value) }
     }
 
     private suspend fun push(label: String, layout: LayoutDoc) {

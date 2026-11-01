@@ -37,8 +37,10 @@ import kotlinx.coroutines.flow.Flow
         MiniAppEntity::class,
         WatchEntity::class,
         AppLaunchEntity::class,
+        WidgetEntity::class,
+        WidgetVersionEntity::class,
     ],
-    version = 5,
+    version = 6,
 )
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
@@ -48,6 +50,8 @@ abstract class MasalaDatabase : RoomDatabase() {
     abstract fun skillArtifacts(): SkillArtifactDao
     abstract fun widgetStates(): WidgetStateDao
     abstract fun usageWeights(): UsageWeightDao
+    abstract fun widgets(): WidgetDao
+    abstract fun widgetVersions(): WidgetVersionDao
     abstract fun wikiPages(): WikiDao
     abstract fun appLaunches(): AppLaunchDao
 
@@ -81,9 +85,18 @@ abstract class MasalaDatabase : RoomDatabase() {
             }
         }
 
+        /** Widget library (plan `docs/plans/widget-maker.md` §6.1): specs plus the last versions of each. */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `widgets` (`id` TEXT NOT NULL, `specJson` TEXT NOT NULL, `tier` TEXT NOT NULL, `title` TEXT, `createdBy` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `widget_versions` (`widgetId` TEXT NOT NULL, `version` INTEGER NOT NULL, `specJson` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`widgetId`, `version`))")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_widget_versions_widgetId_version` ON `widget_versions` (`widgetId`, `version`)")
+            }
+        }
+
         fun create(context: Context): MasalaDatabase =
             Room.databaseBuilder(context, MasalaDatabase::class.java, "masala.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
     }
 }
 
@@ -254,6 +267,62 @@ interface UsageWeightDao {
 
     @Upsert
     suspend fun upsert(entity: UsageWeightEntity)
+}
+
+/** One widget in the library (plan `docs/plans/widget-maker.md` §6.1): the spec as JSON plus who made it. */
+@Entity(tableName = "widgets")
+data class WidgetEntity(
+    @PrimaryKey val id: String,
+    val specJson: String,
+    /** "spec" for native widgets, "html" for the W6 escape hatch. */
+    val tier: String = "spec",
+    val title: String?,
+    /** "user", "agent" or "template". */
+    val createdBy: String,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
+/** The last versions of one library widget, for Undo in the manager. */
+@Entity(tableName = "widget_versions", primaryKeys = ["widgetId", "version"], indices = [Index("widgetId", "version")])
+data class WidgetVersionEntity(
+    val widgetId: String,
+    val version: Long,
+    val specJson: String,
+    val createdAt: Long,
+)
+
+@Dao
+interface WidgetDao {
+    @Query("SELECT * FROM widgets ORDER BY updatedAt DESC")
+    suspend fun all(): List<WidgetEntity>
+
+    @Query("SELECT * FROM widgets ORDER BY updatedAt DESC")
+    fun watch(): Flow<List<WidgetEntity>>
+
+    @Query("SELECT * FROM widgets WHERE id = :id")
+    suspend fun get(id: String): WidgetEntity?
+
+    @Upsert
+    suspend fun upsert(entity: WidgetEntity)
+
+    @Query("DELETE FROM widgets WHERE id = :id")
+    suspend fun delete(id: String)
+}
+
+@Dao
+interface WidgetVersionDao {
+    @Query("SELECT * FROM widget_versions WHERE widgetId = :widgetId ORDER BY version DESC")
+    suspend fun versions(widgetId: String): List<WidgetVersionEntity>
+
+    @Insert
+    suspend fun insert(version: WidgetVersionEntity)
+
+    @Query("DELETE FROM widget_versions WHERE widgetId = :widgetId AND version NOT IN (SELECT version FROM widget_versions WHERE widgetId = :widgetId ORDER BY version DESC LIMIT 20)")
+    suspend fun prune(widgetId: String)
+
+    @Query("DELETE FROM widget_versions WHERE widgetId = :widgetId")
+    suspend fun deleteForWidget(widgetId: String)
 }
 
 /** One run of a skill (arch §3.9, Phase 4). */

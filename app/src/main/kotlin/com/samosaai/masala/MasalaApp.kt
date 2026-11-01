@@ -91,6 +91,7 @@ class MasalaApp : Application() {
 
     val database by lazy { MasalaDatabase.create(this) }
     val miniApps by lazy { MiniAppStore(database.miniApps()) }
+    val widgetLibrary by lazy { com.samosaai.masala.widgets.WidgetLibrary(database.widgets(), database.widgetVersions()) }
     val settings by lazy { SettingsStore(this) }
 
     /** Open-Meteo for the daily brief and the `weather` tool. */
@@ -589,6 +590,7 @@ class MasalaApp : Application() {
             contextService = contextService,
             skills = { skills },
             toolNames = { tools.tools.map { it.name }.toSet() },
+            widgets = widgetLibrary,
         )
         AgentTools.create(
             this, layouts, modes,
