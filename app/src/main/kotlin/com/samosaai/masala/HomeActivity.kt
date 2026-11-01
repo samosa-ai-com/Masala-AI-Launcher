@@ -94,6 +94,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import com.samosaai.masala.ui.settings.SettingsActivity
 import com.samosaai.masala.ui.theme.MasalaTheme
 import com.samosaai.masala.ui.theme.Motion
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import androidx.lifecycle.lifecycleScope
@@ -300,12 +301,24 @@ class HomeActivity : ComponentActivity() {
                 // The drawer is fully open after this much travel.
                 val distance = (windowHeight * 0.4f).coerceAtLeast(1f)
 
+                // The in-flight drag update. Drag and settle write the same Animatable, and a
+                // snapTo cancels a running animateTo, so a drag update launched before the finger
+                // lifts must never run after the release: it would cancel the settle animation
+                // and park progress mid-slide (a translucent drawer over home, with nothing left
+                // to move it). Keeping the job lets each move supersede the last and lets the
+                // release cancel any update that hasn't run yet.
+                private var dragJob: Job? = null
+
                 override fun onDrag(upPx: Float) {
                     drawerReady = true
-                    scope.launch { drawerProgress.snapTo((upPx / distance).coerceIn(0f, 1f)) }
+                    dragJob?.cancel()
+                    dragJob = scope.launch { drawerProgress.snapTo((upPx / distance).coerceIn(0f, 1f)) }
                 }
 
                 override fun onRelease(velocityY: Float) {
+                    // No drag update may land after this point; the settle below owns progress.
+                    dragJob?.cancel()
+                    dragJob = null
                     val open = velocityY < -FLING_VELOCITY || (velocityY < FLING_VELOCITY && drawerProgress.value > 0.35f)
                     if (drawerOpen == open) {
                         // No state change, so the effect below won't run: settle directly. Without
