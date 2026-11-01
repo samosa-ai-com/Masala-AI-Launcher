@@ -105,14 +105,12 @@ import com.samosaai.masala.ui.theme.MasalaTheme
 @Composable
 fun ChatSurface(
     session: ChatSession?,
-    liveWords: String,
     level: () -> Float,
     state: CommandState,
     character: Character,
     expanded: Boolean,
     onExpanded: (Boolean) -> Unit,
     mic: () -> Unit,
-    serverProvider: Boolean = false,
     onSend: () -> Unit,
     onStop: () -> Unit,
     onAsk: (String) -> Unit = {},
@@ -181,14 +179,14 @@ fun ChatSurface(
                             level = level,
                             character = character,
                             listening = listening,
-                            showShimmer = listening && serverProvider && liveWords.isBlank(),
-                            caption = liveWords.ifBlank {
-                                (turns.lastOrNull { it.role == TurnRole.MASALA }?.text ?: "").take(140)
-                            },
+                            // Words are not streamed while talking: the pulse stands in until
+                            // the final transcript is sent.
+                            showShimmer = listening,
+                            caption = (turns.lastOrNull { it.role == TurnRole.MASALA }?.text ?: "").take(140),
                         )
                         turns.isEmpty() && !listening && !thinking -> EmptyThread(level, character, experts, onAskExpert)
                         else -> Thread(
-                            turns, liveWords, listening, thinking, state, character, level, onStop, onDeleteTurn,
+                            turns, listening, thinking, state, character, level, onStop, onDeleteTurn,
                             onCollapse = { onExpanded(false) },
                             onGrant = grant,
                             onRetry = onRetry,
@@ -275,7 +273,7 @@ private fun Header(
     }
 }
 
-/** Talking: Sam and rings that follow the mic, with the words heard so far. */
+/** Talking: Sam and rings that follow the mic, with the last answer when idle. */
 @Composable
 private fun Orb(level: () -> Float, character: Character, listening: Boolean, caption: String, showShimmer: Boolean = false) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -310,9 +308,9 @@ private fun Orb(level: () -> Float, character: Character, listening: Boolean, ca
             )
         }
         if (showShimmer) {
-            // The server sends no partials, so the orb would sit on a dead line until
-            // the transcript lands. Pulse it instead; the animated value is read only
-            // inside the draw lambda, so the pulse redraws without recomposing.
+            // No words show while talking, so the orb would sit on a dead line until the
+            // transcript lands. Pulse it instead; the animated value is read only inside
+            // the draw lambda, so the pulse redraws without recomposing.
             val glow by rememberInfiniteTransition(label = "listening-shimmer")
                 .animateFloat(0.35f, 1f, infiniteRepeatable(tween(1100), RepeatMode.Reverse), label = "listening-alpha")
             Text(
@@ -378,7 +376,6 @@ private fun EmptyThread(
 @Composable
 private fun Thread(
     turns: List<ChatTurn>,
-    liveWords: String,
     listening: Boolean,
     thinking: Boolean,
     state: CommandState,
@@ -391,7 +388,9 @@ private fun Thread(
     onRetry: () -> Unit,
 ) {
     val list = rememberLazyListState()
-    LaunchedEffect(turns.size, liveWords, thinking, (state as? CommandState.Thinking)?.steps?.size) {
+    // A blank-prompt Thinking is the gap between Send and the final transcript.
+    val transcribing = (state as? CommandState.Thinking)?.prompt?.isEmpty() == true
+    LaunchedEffect(turns.size, transcribing, thinking, (state as? CommandState.Thinking)?.steps?.size) {
         // A finished answer scrolls to its start, so the expert badge that credits it is visible;
         // while working, the steps at the bottom are what matters.
         val target = when {
@@ -439,10 +438,13 @@ private fun Thread(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         itemsIndexed(turns) { index, turn -> Bubble(turn, key = index, onDelete = { onDeleteTurn(index) }) }
-        if (listening) {
+        if (listening || transcribing) {
             item("live") {
                 Bubble(
-                    ChatTurn(TurnRole.USER, liveWords.ifBlank { stringResource(R.string.command_listening) }),
+                    ChatTurn(
+                        TurnRole.USER,
+                        stringResource(if (listening) R.string.command_listening else R.string.command_transcribing),
+                    ),
                     live = true,
                 )
             }

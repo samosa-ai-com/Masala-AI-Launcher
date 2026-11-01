@@ -23,15 +23,14 @@ interface SpeechInput {
     /** Reports a take that ended by itself; the test card path never needs it. */
     fun setTakeAutoEndListener(listener: ((com.samosaai.masala.audio.PttEngine.TakeAutoEnd) -> Unit)?) {}
 
-    /** Mic level 0..1 while listening (UI refresh U4). */
+    /**
+     * Mic level 0..1 while listening (UI refresh U4). Words are never streamed out while
+     * listening: only the final transcript from [stop] reaches the chat.
+     */
     val level: kotlinx.coroutines.flow.StateFlow<Float> get() = NO_LEVEL
-
-    /** Words heard so far, where the recognizer reports them. */
-    val partial: kotlinx.coroutines.flow.StateFlow<String> get() = NO_WORDS
 }
 
 private val NO_LEVEL = kotlinx.coroutines.flow.MutableStateFlow(0f)
-private val NO_WORDS = kotlinx.coroutines.flow.MutableStateFlow("")
 
 /**
  * Which provider push-to-talk tries, in order. The configured cloud STT goes first when
@@ -88,6 +87,13 @@ fun friendlySttMessage(raw: String?, s: SpeechStrings): String {
     return s.generic
 }
 
+private fun phoneLanguage() = Language.entries.firstOrNull { it.matchesCode(Locale.getDefault().language) } ?: Language.ENGLISH
+
+/** The STT language from settings, or the phone's when unset or unknown. */
+fun speechLanguage(settings: SpeechConfig): Language =
+    settings.sttLanguage.takeIf { it.isNotBlank() }?.let { code -> Language.entries.firstOrNull { it.matchesCode(code) } }
+        ?: phoneLanguage()
+
 /**
  * Silence that ends the test-card turn: 2.5 s, so a breath or a slow sentence does not
  * cut the user off mid-thought.
@@ -111,23 +117,16 @@ class ConfiguredSpeechInput(
     private val live: com.samosaai.masala.audio.SttEngine? = null,
 ) : SpeechInput {
     override val level get() = live?.level ?: super.level
-    override val partial get() = live?.partial ?: super.partial
 
     @Volatile
     private var active: AudioProvider? = null
 
-    private fun language() = Language.entries.firstOrNull { it.matchesCode(Locale.getDefault().language) } ?: Language.ENGLISH
+    private fun language() = phoneLanguage()
 
-    /** The STT language from settings, or the phone's when unset or unknown. */
-    private fun configuredLanguage(settings: SpeechConfig): Language =
-        settings.sttLanguage.takeIf { it.isNotBlank() }?.let { code -> Language.entries.firstOrNull { it.matchesCode(code) } }
-            ?: language()
+    private fun configuredLanguage(settings: SpeechConfig): Language = speechLanguage(settings)
 
     private fun configured(): AudioProvider =
         if (config().baseUrl.isNotBlank()) AudioProvider.API else AudioProvider.ANDROID
-
-    /** True when push-to-talk records for a transcription endpoint (which sends no partials). */
-    fun usesServerStt(): Boolean = configured().isApiBased()
 
     /** The engine ended the take by itself; [onEngineTakeEnd] routes it. */
     private var failure: ((String) -> Unit)? = null

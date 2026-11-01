@@ -550,7 +550,6 @@ class HomeActivity : ComponentActivity() {
             val hidden = drawerOpen || drawerShown.value
             val command by app.commands.state.collectAsStateWithLifecycle()
             val level by app.commands.micLevel.collectAsStateWithLifecycle()
-            val words by app.commands.liveWords.collectAsStateWithLifecycle()
             if (hidden) Unit else when (val c = command) {
                 CommandState.Input -> Box(
                     Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(),
@@ -560,14 +559,12 @@ class HomeActivity : ComponentActivity() {
                     session = turns.takeIf { it.isNotEmpty() }?.let {
                         com.samosaai.masala.chat.ChatSession(id = activeId.orEmpty(), title = sessionTitle, turns = it)
                     },
-                    liveWords = words,
                     level = { level },
                     state = command,
                     character = settings.character,
                     expanded = expanded,
                     onExpanded = { expanded = it },
                     mic = rememberMicTap(app),
-                    serverProvider = app.commands.usesServerStt(),
                     onSend = { app.commands.sendNow() },
                     onStop = { app.commands.dismiss() },
                     onAsk = { app.commands.ask(it) },

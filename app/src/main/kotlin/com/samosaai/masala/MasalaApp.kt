@@ -21,6 +21,8 @@ import com.samosaai.masala.audio.SttEngine
 import com.samosaai.masala.agent.CommandController
 import com.samosaai.masala.agent.ConsultService
 import com.samosaai.masala.agent.ConfiguredSpeechInput
+import com.samosaai.masala.agent.LlmTranscriptCleaner
+import com.samosaai.masala.agent.speechLanguage
 import com.samosaai.masala.agent.SpeechStrings
 import com.samosaai.masala.audio.SpeechConfig
 import com.samosaai.masala.agent.AgentPrompt
@@ -324,11 +326,6 @@ class MasalaApp : Application() {
     val speaking get() = tts.isSpeaking
 
     /** Typed and spoken commands: the fast path, persona routing, then the agent. */
-    private var speechInputRef: ConfiguredSpeechInput? = null
-
-    private fun speechInput(): ConfiguredSpeechInput =
-        speechInputRef ?: error("speech input read before commands was built")
-
     val commands by lazy {
         CommandController(
             scope = scope,
@@ -354,7 +351,7 @@ class MasalaApp : Application() {
                     recordFailed = getString(R.string.speech_record_failed),
                 ),
                 live = stt,
-            ).also { speechInputRef = it },
+            ),
             speechStrings = SpeechStrings(
                 localUnavailable = getString(R.string.speech_local_unavailable),
                 recordFailed = getString(R.string.speech_record_failed),
@@ -368,8 +365,15 @@ class MasalaApp : Application() {
             ),
             summarize = { transcript -> summarizeHistory(transcript) },
             onTurnStart = { consultCalls.set(0) },
+            // Every transcript, on-device or server, is tidied by the model before it is sent.
+            cleaner = LlmTranscriptCleaner(
+                complete = { messages ->
+                    LlmConfig.default.client(this).chat(messages, temperature = 0f)
+                        .choices.firstOrNull()?.message?.textContent.orEmpty()
+                },
+                language = { speechLanguage(SpeechConfig.default) },
+            ),
         ).also { controller ->
-            controller.usesServerStt = { speechInput().usesServerStt() }
             controller.onTurn = ::recordTurn
             scope.launch {
                 chats.load()

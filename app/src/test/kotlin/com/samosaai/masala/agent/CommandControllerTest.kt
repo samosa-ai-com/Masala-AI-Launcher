@@ -41,6 +41,7 @@ class CommandControllerTest {
     private fun controller(
         speech: SpeechInput? = null,
         summarize: (suspend (String) -> String?)? = null,
+        cleaner: TranscriptCleaner? = null,
     ) = CommandController(
         scope = scope,
         resolveApp = { if (it == "spotify") spotify else null },
@@ -59,6 +60,7 @@ class CommandControllerTest {
         },
         speech = speech,
         summarize = summarize,
+        cleaner = cleaner,
     )
 
     // A ceiling for a hang, not a stopwatch: the turn runs on Dispatchers.Default, which also feeds
@@ -195,6 +197,26 @@ class CommandControllerTest {
         c.stopListening()
         c.settled()
         assertEquals(listOf<MasalaAction>(MasalaAction.StartTimer(60)), ran)
+    }
+
+    @Test fun theSpokenTranscriptIsCleanedBeforeItIsSent() = runBlocking<Unit> {
+        val speech = object : SpeechInput {
+            override fun start(onFailure: (String) -> Unit) = true
+            override suspend fun stop() = Result.success("whats the weather like today")
+            override fun cancel() = Unit
+        }
+        val cleaned = mutableListOf<String>()
+        val recorded = mutableListOf<com.samosaai.masala.chat.ChatTurn>()
+        replies += reply("Sunny.")
+        val c = controller(speech, cleaner = { cleaned += it; "What's the weather like today?" })
+        c.onTurn = { recorded += it }
+        assertTrue(c.startListening())
+        c.stopListening()
+        assertIs<CommandState.Reply>(c.settled())
+        assertEquals(listOf("whats the weather like today"), cleaned)
+        val user = recorded.first { it.role == com.samosaai.masala.chat.TurnRole.USER }
+        assertEquals("What's the weather like today?", user.text)
+        assertEquals("What's the weather like today?", requests.last().last().textContent)
     }
 
     @Test fun engineFailureEndsTheTakeWithItsMessage() = runBlocking<Unit> {
