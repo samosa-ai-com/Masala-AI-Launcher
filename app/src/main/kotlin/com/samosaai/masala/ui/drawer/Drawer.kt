@@ -119,7 +119,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.exp
+import kotlin.math.sqrt
 
 /** Ranked search results and the text they were ranked for. */
 private data class Ranked<T>(val query: String, val results: List<T>)
@@ -127,11 +127,14 @@ private data class Ranked<T>(val query: String, val results: List<T>)
 /** Pause after the last keystroke before a composing single match auto-launches. */
 private const val AUTO_LAUNCH_PAUSE_MS = 800L
 
-/** How far the letter under the thumb swings left from the rail. */
-private val ARC_SWING = 100.dp
+/** Radius of the semicircle the letters swing out on while sliding. */
+private val ARC_RADIUS = 90.dp
 
-/** Radius of the disc behind the curve; its centre sits between the rail and the swung-out letter. */
-private val ARC_DISC_RADIUS = 56.dp
+/** How much the finger's letter grows at the deepest point of the arc. */
+private const val LETTER_GROW = 1.1f
+
+/** Extra room around the swung letters inside the disc behind them. */
+private val ARC_DISC_PAD = 24.dp
 private const val GLOBE_MAX = 30
 
 /** Where the globe gets its counts and whether to ask for Usage access (decision 11). */
@@ -595,8 +598,10 @@ internal fun Scrubber(letters: List<Char>, modifier: Modifier = Modifier, onLett
                 .drawBehind {
                     val a = active.value
                     if (a <= 0f) return@drawBehind
-                    val radius = ARC_DISC_RADIUS.toPx()
-                    val centre = Offset(size.width / 2 - ARC_SWING.toPx() * 0.6f, dragY)
+                    val radius = (ARC_RADIUS + ARC_DISC_PAD).toPx()
+                    // Concentric with the letters' arc and centred on the finger, so the swung
+                    // letters always sit inside it; solid in the middle, fading at the rim.
+                    val centre = Offset(size.width / 2, dragY)
                     drawCircle(
                         brush = Brush.radialGradient(
                             0f to panel.copy(alpha = 0.97f * a),
@@ -638,19 +643,20 @@ internal fun Scrubber(letters: List<Char>, modifier: Modifier = Modifier, onLett
                 Text(
                     c.toString(), fontSize = 10.sp, lineHeight = 16.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold,
                     color = if (c == last) tokens.accentText else tokens.textLow,
-                    // A narrow bell around the finger's letter swings it left and grows it, its neighbours
-                    // less, the rest hardly at all; the rail keeps its 22 dp touch strip and draws outside
-                    // it (graphicsLayer does not clip).
+                    // The letters swing out on a semicircle centred on the finger: on the circle
+                    // while within the radius, back on the rail outside it. The rail keeps its
+                    // 22 dp touch strip and draws outside it (graphicsLayer does not clip).
                     modifier = Modifier.graphicsLayer {
                         val a = active.value
+                        val radiusPx = ARC_RADIUS.toPx()
                         val pitch = heightPx.toFloat() / letters.size
                         val centre = (i + 0.5f) * pitch
-                        val d = (centre - dragY) / pitch
-                        val bell = exp(-(d * d) / 2.5f)
-                        translationX = -bell * ARC_SWING.toPx() * a
-                        scaleX = 1f + bell * 1.1f * a
+                        val dy = (centre - dragY) / radiusPx
+                        val t = sqrt((1f - dy * dy).coerceAtLeast(0f))
+                        translationX = -t * radiusPx * a
+                        scaleX = 1f + t * LETTER_GROW * a
                         scaleY = scaleX
-                        alpha = 1f - (1f - bell) * 0.65f * a
+                        alpha = 1f - (1f - t) * 0.65f * a
                     },
                 )
             }
