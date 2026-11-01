@@ -58,6 +58,12 @@ class MiniAppStore(private val dao: MiniAppDao) {
         true
     }
 
+    /** A chosen icon, or null to fall back to the title's letter. */
+    suspend fun setIcon(id: String, icon: String?): Unit = withContext(Dispatchers.IO) {
+        val row = dao.get(id) ?: return@withContext
+        dao.upsert(row.copy(icon = MiniAppIcon.sanitize(icon), updatedAt = System.currentTimeMillis()))
+    }
+
     suspend fun delete(id: String): Unit = withContext(Dispatchers.IO) { dao.delete(id) }
 
     suspend fun setNetworkAllowed(id: String, allowed: Boolean): Unit = withContext(Dispatchers.IO) {

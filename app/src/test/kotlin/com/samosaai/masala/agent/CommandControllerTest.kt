@@ -61,7 +61,9 @@ class CommandControllerTest {
         summarize = summarize,
     )
 
-    private suspend fun CommandController.settled() = withTimeout(5_000) { state.first { it is CommandState.Reply || it is CommandState.Error } }
+    // A ceiling for a hang, not a stopwatch: the turn runs on Dispatchers.Default, which also feeds
+    // lint and the second test JVM, so a loaded machine can take seconds to publish a reply.
+    private suspend fun CommandController.settled() = withTimeout(15_000) { state.first { it is CommandState.Reply || it is CommandState.Error } }
 
     @Test fun aGameRequestIsAnsweredInTheChat() = runBlocking<Unit> {
         replies += reply("I made Snake and put it on your home screen.")
@@ -131,7 +133,7 @@ class CommandControllerTest {
         c.ask("first question")
         c.settled()
         c.ask("and then?")
-        withTimeout(5_000) { c.state.first { it is CommandState.Reply && it.text == "two" } }
+        withTimeout(15_000) { c.state.first { it is CommandState.Reply && it.text == "two" } }
         assertTrue(requests[1].any { it.textContent == "first question" })
         assertTrue(requests[1].any { it.textContent == "one" })
     }

@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.caverock.androidsvg.SVG
-import com.samosaai.masala.core.layout.KnownSymbols
+import com.samosaai.masala.core.layout.IconSpec
 import com.samosaai.masala.data.IconShape
 import com.samosaai.masala.launcher.IconMask
 import com.samosaai.masala.masala
@@ -44,53 +44,34 @@ import kotlin.math.roundToInt
  */
 object MiniAppIcon {
     /** What `create_mini_app`/`update_mini_app` accept as `icon`; anything longer is refused. */
-    const val MAX_ICON_CHARS = 8_192
-
-    private val BLOCKED = listOf("<script", "<foreignobject", "<image", "href=\"http", "href='http", "url(http")
-
-    /** An XML declaration, doctype or comment before the `<svg>` tag, as models often write. */
-    private val PROLOG = Regex("""^(\s*(<\?xml[^>]*\?>|<!DOCTYPE[^>]*>|<!--.*?-->))*\s*""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+    const val MAX_ICON_CHARS = IconSpec.MAX_CHARS
 
     /** What the agent is told when its icon was refused, so it can try again. */
     const val REFUSED_NOTE = "The icon was refused (not a built-in name, or an SVG over 8 KB, not starting with <svg, " +
         "or with scripts, images or links); the app keeps its previous icon or shows its title's letter."
 
-    /**
-     * What gets stored: `symbol:<name>` for a built-in, the SVG (from its `<svg` tag on), or null when
-     * [raw] is blank, too long, not an SVG, or reaches for anything remote.
-     */
-    fun sanitize(raw: String?): String? {
-        if (raw.isNullOrBlank()) return null
-        val trimmed = raw.trim()
-        if (!trimmed.startsWith("<")) {
-            val name = trimmed.removePrefix("symbol:")
-            return if (KnownSymbols.names.contains(name)) "symbol:$name" else null
-        }
-        val svg = trimmed.replaceFirst(PROLOG, "")
-        if (svg.length > MAX_ICON_CHARS) return null
-        if (!svg.startsWith("<svg")) return null
-        if (BLOCKED.any { it in svg.lowercase() }) return null
-        return svg
-    }
+    /** What gets stored; the rules live in [IconSpec], shared with an app's chosen icon. */
+    fun sanitize(raw: String?): String? = IconSpec.sanitize(raw)
 
     /** A line for the tool result when the agent sent an icon that [sanitize] refused; empty otherwise. */
     fun refusedNote(raw: String?): String = if (!raw.isNullOrBlank() && sanitize(raw) == null) "\n" + REFUSED_NOTE else ""
 }
 
 /**
- * A mini app's icon: a built-in symbol, a small SVG rendered off the main thread, or the title's
- * first letter when there is no icon or the SVG doesn't render.
+ * Any chosen icon — a mini app's, or an app's override: a built-in symbol, a small SVG rendered off
+ * the main thread, or [fallbackLabel]'s first letter when there is none or the SVG doesn't render.
  */
 @Composable
-fun MiniAppIconView(icon: String?, title: String, size: Dp) {
-    val symbol = icon?.takeIf { it.startsWith("symbol:") }?.removePrefix("symbol:")
+fun SpecIcon(spec: String?, fallbackLabel: String, size: Dp) {
+    val label = fallbackLabel
+    val symbol = spec?.takeIf { it.startsWith("symbol:") }?.removePrefix("symbol:")
     if (symbol != null) {
         SymbolDisc(SymbolIcons.icon(symbol), tint = null, size = size.value.roundToInt())
         return
     }
-    val svg = icon
+    val svg = spec
     if (svg == null) {
-        LetterTile(title, size)
+        LetterTile(label, size)
         return
     }
     val px = with(LocalDensity.current) { size.toPx() }.roundToInt().coerceAtLeast(1)
@@ -113,15 +94,23 @@ fun MiniAppIconView(icon: String?, title: String, size: Dp) {
     }
     val image = remember(bitmap) { bitmap?.asImageBitmap() }
     if (image != null) {
-        Image(image, contentDescription = null, modifier = Modifier.size(size))
+        // Clipped to the same mask as the app icons beside it, so a pasted SVG sits in a tile rather
+        // than floating as a loose shape.
+        val setting = LocalContext.current.masala.icons.style.shape
+        val mask = remember(setting) { IconMask.shape(if (setting == IconShape.AS_SHIPPED) IconShape.SQUIRCLE else setting) }
+        Image(image, contentDescription = null, modifier = Modifier.size(size).clip(mask))
     } else {
-        LetterTile(title, size)
+        LetterTile(label, size)
     }
 }
 
+/** A mini app's icon: the same [SpecIcon], named for the place it came from. */
+@Composable
+fun MiniAppIconView(icon: String?, title: String, size: Dp) = SpecIcon(icon, title, size)
+
 /** The title's first letter in the same mask as the symbol tiles around it. Decorative. */
 @Composable
-private fun LetterTile(title: String, size: Dp) {
+private fun LetterTile(label: String, size: Dp) {
     val setting = LocalContext.current.masala.icons.style.shape
     val mask = remember(setting) {
         IconMask.shape(if (setting == IconShape.AS_SHIPPED) IconShape.SQUIRCLE else setting)
@@ -131,7 +120,7 @@ private fun LetterTile(title: String, size: Dp) {
     // Same tile ground as a symbol tile: a wash of the accent over the theme's dark or light base.
     val ground = if (tokens.dark) MasalaColors.Charcoal else MaterialTheme.colorScheme.surfaceVariant
     val fill = remember(glyph, ground) { glyph.copy(alpha = 0.16f).compositeOver(ground) }
-    val letter = title.trim().firstOrNull()?.uppercase() ?: "?"
+    val letter = label.trim().firstOrNull()?.uppercase() ?: "?"
     Box(
         Modifier.size(size).clip(mask).background(fill).border(1.dp, tokens.hairline, mask),
         contentAlignment = Alignment.Center,

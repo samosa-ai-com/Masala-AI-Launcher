@@ -21,8 +21,8 @@ class MiniAppIconTest {
 
     @Test
     fun `an unknown built-in name has no icon`() {
-        assertNull(MiniAppIcon.sanitize("calculate"))
-        assertNull(MiniAppIcon.sanitize("symbol:calculate"))
+        assertNull(MiniAppIcon.sanitize("rocket"))
+        assertNull(MiniAppIcon.sanitize("symbol:rocket"))
         assertNull(MiniAppIcon.sanitize("symbol:"))
     }
 
@@ -88,6 +88,6 @@ class MiniAppIconTest {
         assertEquals("", MiniAppIcon.refusedNote(null))
         assertEquals("", MiniAppIcon.refusedNote(" "))
         assertEquals("", MiniAppIcon.refusedNote("timer"))
-        assertEquals("\n" + MiniAppIcon.REFUSED_NOTE, MiniAppIcon.refusedNote("calculate"))
+        assertEquals("\n" + MiniAppIcon.REFUSED_NOTE, MiniAppIcon.refusedNote("rocket"))
     }
 }

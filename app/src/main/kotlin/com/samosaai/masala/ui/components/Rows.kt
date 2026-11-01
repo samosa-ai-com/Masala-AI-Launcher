@@ -47,6 +47,8 @@ fun LauncherRow(
     dimmed: Boolean = false,
     textStyle: TextStyle = MaterialTheme.typography.titleMedium,
     iconSize: Int = 40,
+    /** Draws the icon instead of [icon]: a chosen icon isn't a bitmap. */
+    iconContent: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
@@ -65,7 +67,7 @@ fun LauncherRow(
     ) {
         Box(Modifier.size(iconSize.dp)) {
             // Decorative: the label next to it names the app.
-            if (icon != null) Image(icon, contentDescription = null, modifier = Modifier.size(iconSize.dp))
+            if (iconContent != null) iconContent() else if (icon != null) Image(icon, contentDescription = null, modifier = Modifier.size(iconSize.dp))
         }
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {

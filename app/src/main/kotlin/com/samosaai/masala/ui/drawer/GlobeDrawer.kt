@@ -55,6 +55,7 @@ import com.samosaai.masala.R
 import com.samosaai.masala.core.apps.AppEntry
 import com.samosaai.masala.core.apps.GlobeLayout
 import com.samosaai.masala.core.apps.UsageRange
+import com.samosaai.masala.launcher.AppIconTile
 import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.ui.theme.LocalMotion
@@ -123,7 +124,7 @@ fun Globe(
                 val d = r * 2
                 val labelled = d >= 62f
                 val top = index == 0
-                val icon = rememberAppIcon(icons, app.entry.key)
+
                 Column(
                     Modifier
                         .offset { androidx.compose.ui.unit.IntOffset((unit * (x - r)).roundToPx(), (unit * (y - r)).roundToPx()) }
@@ -150,7 +151,7 @@ fun Globe(
                     verticalArrangement = Arrangement.Center,
                 ) {
                     val iconSize = (d * if (labelled) 0.40f else 0.56f).coerceIn(14f, 40f)
-                    if (icon != null) Image(icon, null, Modifier.size(unit * iconSize))
+                    AppIconTile(icons, app.entry.key, app.entry.label, unit * iconSize)
                     if (labelled) {
                         Text(app.entry.label, fontSize = 10.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MasalaTheme.tokens.textHigh, modifier = Modifier.padding(horizontal = 6.dp))
                     }

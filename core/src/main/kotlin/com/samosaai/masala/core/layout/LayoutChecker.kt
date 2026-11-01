@@ -329,11 +329,24 @@ object LayoutChecker {
 
 /** Material Symbol names a layout may use; the app maps each to a drawable (a test keeps the two in step). */
 object KnownSymbols {
-    val names: Set<String> = setOf(
+    /**
+     * The set a layout may name, and the every-version list: the schema offers only [promptable], so a
+     * model can't wander into the long tail, while a layout imported from a newer build still draws.
+     */
+    val promptable: Set<String> = setOf(
         "alarm", "apps", "battery_full", "bedtime", "book", "calendar_today", "call", "camera", "chat", "checklist",
         "cloud", "directions_car", "email", "event", "fitness_center", "flag", "folder", "headphones", "home", "info",
         "language", "location_on", "mic", "music_note", "notifications", "photo", "play_arrow", "priority_high",
         "queue_music", "restaurant", "school", "search", "settings", "shopping_cart", "sports_esports", "star", "timer", "tune",
         "wb_sunny", "widgets", "work",
     )
+
+    /** Everything the app can draw, offered by the icon picker and accepted by validation. */
+    val all: Set<String> = promptable + setOf(
+        "calculate", "contacts", "flight", "map", "movie", "newspaper", "palette", "pets", "public", "radio",
+        "sports_soccer", "task_alt", "translate", "videogame_asset", "wallet", "wifi",
+    )
+
+    /** The historical name for the whole catalog. */
+    val names: Set<String> get() = all
 }

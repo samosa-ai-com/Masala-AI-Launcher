@@ -5,6 +5,7 @@ import com.samosaai.masala.core.apps.AppCatalogMerge
 import com.samosaai.masala.core.apps.AppEntry
 import com.samosaai.masala.core.apps.AppKey
 import com.samosaai.masala.core.apps.Visibility
+import com.samosaai.masala.core.layout.IconSpec
 import com.samosaai.masala.data.AppOverrideDao
 import com.samosaai.masala.data.AppOverrideEntity
 import kotlinx.coroutines.CoroutineScope
@@ -73,6 +74,9 @@ class LauncherModel(
         edit(key) { it.copy(label = label?.trim()?.takeIf(String::isNotEmpty)) }
 
     suspend fun setVisibility(key: AppKey, visibility: Visibility) = edit(key) { it.copy(visibility = visibility) }
+
+    /** A chosen icon, or null to go back to the app's own. Refused specs are stored as "no icon". */
+    suspend fun setIcon(key: AppKey, icon: String?) = edit(key) { it.copy(icon = IconSpec.sanitize(icon)) }
 
     suspend fun setPinned(key: AppKey, pinned: Boolean) =
         edit(key) { it.copy(pinnedAt = if (pinned) it.pinnedAt ?: System.currentTimeMillis() else null) }

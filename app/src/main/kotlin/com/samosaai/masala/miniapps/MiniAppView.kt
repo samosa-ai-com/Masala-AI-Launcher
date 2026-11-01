@@ -40,7 +40,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -349,7 +348,6 @@ class MiniAppActivity : ComponentActivity() {
         var title by remember { mutableStateOf("") }
         var icon by remember { mutableStateOf<String?>(null) }
         var html by remember { mutableStateOf<String?>(null) }
-        var networkAllowed by remember { mutableStateOf(false) }
         var gone by remember { mutableStateOf(false) }
         var confirmDelete by remember { mutableStateOf(false) }
         var reporting by remember { mutableStateOf(false) }
@@ -369,7 +367,6 @@ class MiniAppActivity : ComponentActivity() {
                 title = row.title
                 icon = row.icon
                 html = row.html
-                networkAllowed = row.networkAllowed
             }
         }
         // Back leaves full size first, then goes through the web history like any browser.
@@ -402,14 +399,6 @@ class MiniAppActivity : ComponentActivity() {
                         }
                     },
                     navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.action_back)) } },
-                    actions = {
-                        if (networkAllowed) Text(
-                            stringResource(R.string.miniapp_network_badge),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(end = 16.dp),
-                        )
-                    },
                 )
             },
         ) { padding ->
@@ -423,31 +412,8 @@ class MiniAppActivity : ComponentActivity() {
                     }
                     else -> {
                         val doc = html!!
-                        if (!full) Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(stringResource(R.string.miniapp_network), style = MaterialTheme.typography.bodyMedium)
-                                Text(
-                                    stringResource(R.string.miniapp_network_summary),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Switch(
-                                checked = networkAllowed,
-                                onCheckedChange = { on ->
-                                    scope.launch {
-                                        app.miniApps.setNetworkAllowed(appId, on)
-                                        networkAllowed = on
-                                    }
-                                },
-                            )
-                        }
                         Box(Modifier.weight(1f).fillMaxWidth()) {
-                            MiniAppView(appId, doc, networkAllowed, Modifier.fillMaxSize()) { webView = it }
+                            MiniAppView(appId, doc, true, Modifier.fillMaxSize()) { webView = it }
                             // Full size keeps one way out over the app: Back, or this button.
                             if (full) IconButton(
                                 onClick = { setFull(false) },

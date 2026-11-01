@@ -42,7 +42,11 @@ import com.samosaai.masala.R
  */
 @Composable
 fun Markdown(markdown: String, modifier: Modifier = Modifier, linkColor: androidx.compose.ui.graphics.Color? = null) {
-    val segments = remember(markdown) { MarkdownParser.segments(markdown) }
+    val segments = remember(markdown) {
+        MarkdownParser.segments(markdown).flatMap { segment ->
+            if (segment is MarkdownSegment.Prose) MarkdownParser.splitTables(segment.markdown) else listOf(segment)
+        }
+    }
     val context = LocalContext.current
     val style = remember(linkColor) {
         linkColor?.let {
@@ -58,6 +62,11 @@ fun Markdown(markdown: String, modifier: Modifier = Modifier, linkColor: android
             when (segment) {
                 is MarkdownSegment.Prose -> Material3RichText(style = style) { RichMarkdown(segment.markdown, onLinkClicked = { openLink(context, it) }) }
                 is MarkdownSegment.Code -> CodeBox(segment.code, segment.language)
+                is MarkdownSegment.Table -> MarkdownTable(
+                    headers = segment.headers,
+                    aligns = segment.aligns,
+                    rows = segment.rows,
+                )
             }
         }
     }

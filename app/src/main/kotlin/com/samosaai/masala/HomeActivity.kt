@@ -34,12 +34,14 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.luminance
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.core.apps.AppEntry
+import com.samosaai.masala.core.apps.AppKey
 import com.samosaai.masala.core.apps.Visibility
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.launcher.HomeRole
@@ -204,6 +206,16 @@ class HomeActivity : ComponentActivity() {
         val scope = rememberCoroutineScope()
         var menuFor by remember { mutableStateOf<AppEntry?>(null) }
         var renaming by remember { mutableStateOf<AppEntry?>(null) }
+        // The app whose icon is being chosen; the sheet writes through LauncherModel, so it sticks.
+        var choosingIcon by remember { mutableStateOf<AppEntry?>(null) }
+        // Tiles that aren't installed apps get their own menu, so nothing on home is menu-less.
+        var itemMenuFor by remember { mutableStateOf<Item?>(null) }
+        var renamingItem by remember { mutableStateOf<Item?>(null) }
+        var choosingIconForApp by remember { mutableStateOf<com.samosaai.masala.data.MiniAppEntity?>(null) }
+        var deletingMiniApp by remember { mutableStateOf<com.samosaai.masala.data.MiniAppEntity?>(null) }
+        // A hidden app's items come off home too; the pill puts both back. The flag records whether
+        // the app had any tile to take off: without one there is no layout edit to undo.
+        var hiddenUndo by remember { mutableStateOf<Pair<AppEntry, Boolean>?>(null) }
         var renamingFolder by remember { mutableStateOf<String?>(null) }
         // The folder, and whether it is in the saved layout (not added by a mode).
         var openFolder by remember { mutableStateOf<Pair<Item, Boolean>?>(null) }
@@ -233,6 +245,12 @@ class HomeActivity : ComponentActivity() {
             undoOffer = true
             kotlinx.coroutines.delay(6_000)
             undoOffer = false
+        }
+        LaunchedEffect(hiddenUndo) {
+            if (hiddenUndo != null) {
+                kotlinx.coroutines.delay(6_000)
+                hiddenUndo = null
+            }
         }
 
         // Always enabled, so Back never leaves home. It closes whatever is on top first:
@@ -380,6 +398,8 @@ class HomeActivity : ComponentActivity() {
         val miniAppRows by remember { app.miniApps.all }.collectAsStateWithLifecycle(emptyList())
         val miniAppIcons = remember(miniAppRows) { miniAppRows.associate { it.id to it.icon } }
         val drag = remember { HomeDragState() }
+        // The context below is remembered on purpose; drops read the live layout through these.
+        val latestLayout = rememberUpdatedState(layout)
         val render = remember(apps, settings.homeLocked, modeName, movable, miniAppIcons) {
             RenderContext(
                 icons = app.icons,
@@ -402,22 +422,38 @@ class HomeActivity : ComponentActivity() {
                 miniAppIcon = { miniAppIcons[it] },
                 onOpenFolder = { openFolder = it to (it.id in movable) },
                 onFolderMenu = { if (it.id in movable) folderMenu = it },
+                onItemMenu = { itemMenuFor = it },
                 onDrop = { item, target ->
                     scope.launch {
-                        val problems = when (target) {
-                            // `before` may be a mode-added item, not in the saved layout: then it lands at the section's end.
-                            is DropTarget.Slot -> app.layouts.edit(getString(R.string.layout_label_moved, item.label)) {
-                                LayoutEdits.moveBefore(it, item.id, target.sectionId, target.before)
+                        // What the user saw, which is the base document merged with the active modes: the
+                        // slot they dropped on is expressed in that order, not the saved one.
+                        val resolved = latestLayout.value.layout
+                        fun visibleIn(sectionId: String): List<String> = resolved.pages.asSequence()
+                            .flatMap { it.sections.asSequence() }
+                            .filterIsInstance<ItemSection>()
+                            .firstOrNull { it.id == sectionId }?.items?.map { it.id }?.filter { it != item.id }.orEmpty()
+                        suspend fun slotEdit(sectionId: String, before: String?): List<LayoutChecker.Problem> {
+                            // A section only a mode has can't be written to: say so instead of doing nothing.
+                            if (baseSection(sectionId) == null) { toast(getString(R.string.layout_section_from_mode)); return emptyList() }
+                            return app.layouts.edit(getString(R.string.layout_label_moved, item.label)) { doc ->
+                                val visible = visibleIn(sectionId)
+                                val at = before?.let { visible.indexOf(it) }?.takeIf { it >= 0 } ?: visible.size
+                                LayoutEdits.moveBeforeVisible(doc, item.id, sectionId, visible, at)
                             }
+                        }
+                        val problems = when (target) {
+                            is DropTarget.Slot -> slotEdit(target.sectionId, target.before)
                             is DropTarget.Page -> app.layouts.edit(getString(R.string.layout_label_moved, item.label)) {
                                 LayoutEdits.moveToPage(it, item.id, target.pageId)
                             }
+                            // The sheet takes the item out itself; home never sees this one.
+                            DropTarget.OutOfFolder -> emptyList()
                             is DropTarget.Onto -> {
                                 val onto = baseItem(target.itemId)
                                 val folder = onto?.action as? MasalaAction.OpenFolder
                                 when {
-                                    // A mode added it: it isn't in the saved layout, so nothing can be combined with it.
-                                    onto == null -> { toast(getString(R.string.folder_cant_group)); emptyList() }
+                                    // A mode added it: it can't hold a folder, but it is still a neighbour to land beside.
+                                    onto == null -> drag.itemBoxes[target.itemId]?.first?.let { slotEdit(it, target.itemId) } ?: emptyList()
                                     folder == null -> {
                                         val folderId = generateSequence { "folder-" + UUID.randomUUID().toString().take(8) }
                                             .first { baseItem(it) == null }
@@ -533,6 +569,7 @@ class HomeActivity : ComponentActivity() {
                     serverProvider = app.commands.usesServerStt(),
                     onSend = { app.commands.sendNow() },
                     onStop = { app.commands.dismiss() },
+                    onAsk = { app.commands.ask(it) },
                     onClose = {
                         app.commands.dismiss()
                         chatOpen = false
@@ -605,15 +642,41 @@ class HomeActivity : ComponentActivity() {
                 },
                 onDismiss = { showHistory = false },
             )
-            if (undoOffer && !hidden) {
+            if ((undoOffer || hiddenUndo != null) && !hidden) {
                 Box(Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = 150.dp), contentAlignment = Alignment.BottomCenter) {
-                    com.samosaai.masala.ui.components.GlassPill {
-                        Text(getString(R.string.layout_applied), color = com.samosaai.masala.ui.theme.MasalaColors.Text)
-                        androidx.compose.material3.TextButton(onClick = {
-                            undoOffer = false
-                            undoing = true
-                            scope.launch { app.layouts.undo() }
-                        }) { Text(getString(R.string.layout_undo), color = com.samosaai.masala.ui.theme.MasalaColors.Gold) }
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (undoOffer) {
+                            com.samosaai.masala.ui.components.GlassPill {
+                                Text(getString(R.string.layout_applied), color = com.samosaai.masala.ui.theme.MasalaColors.Text)
+                                androidx.compose.material3.TextButton(onClick = {
+                                    undoOffer = false
+                                    undoing = true
+                                    scope.launch { app.layouts.undo() }
+                                }) { Text(getString(R.string.layout_undo), color = com.samosaai.masala.ui.theme.MasalaColors.Gold) }
+                            }
+                        }
+                        hiddenUndo?.let { (entry, hadHome) ->
+                            com.samosaai.masala.ui.components.GlassPill {
+                                Text(getString(R.string.menu_hidden_pill, entry.label), color = com.samosaai.masala.ui.theme.MasalaColors.Text)
+                                // Where it went, and how to get it back later: one tap to the list.
+                                androidx.compose.material3.TextButton(onClick = {
+                                    hiddenUndo = null
+                                    startActivity(
+                                        Intent(this@HomeActivity, SettingsActivity::class.java)
+                                            .putExtra(SettingsActivity.EXTRA_PAGE, "HIDDEN_APPS"),
+                                    )
+                                }) { Text(getString(R.string.menu_hidden_manage), color = com.samosaai.masala.ui.theme.MasalaColors.Gold) }
+                                androidx.compose.material3.TextButton(onClick = {
+                                    hiddenUndo = null
+                                    scope.launch {
+                                        // No tile came off, so there is no layout edit to take back:
+                                        // undoing here would revert an unrelated earlier change.
+                                        if (hadHome) app.layouts.undo()
+                                        launcher.setVisibility(entry.key, Visibility.DEFAULT)
+                                    }
+                                }) { Text(getString(R.string.layout_undo), color = com.samosaai.masala.ui.theme.MasalaColors.Gold) }
+                            }
+                        }
                     }
                 }
             }
@@ -734,8 +797,23 @@ class HomeActivity : ComponentActivity() {
                         }
                     }
                     override fun rename(entry: AppEntry) = done { renaming = entry }
+                    override fun changeIcon(entry: AppEntry) = done { choosingIcon = entry }
                     override fun setVisibility(entry: AppEntry, visibility: Visibility) = done {
-                        scope.launch { launcher.setVisibility(entry.key, visibility) }
+                        scope.launch {
+                            // Hiding that leaves the tile on home reads as broken: take the app off
+                            // home in the same step, and let the pill put both back.
+                            val hadHome = hasHomeItems(entry.key)
+                            if (visibility == Visibility.HIDDEN) {
+                                if (hadHome) {
+                                    app.layouts.removeItems(getString(R.string.layout_label_hidden, entry.label)) { item ->
+                                        (item.action as? MasalaAction.LaunchApp)
+                                            ?.let { it.packageName == entry.key.packageName && it.user == entry.key.user } == true
+                                    }
+                                }
+                            }
+                            launcher.setVisibility(entry.key, visibility)
+                            if (visibility == Visibility.HIDDEN) hiddenUndo = entry to hadHome
+                        }
                     }
                     override fun appInfo(entry: AppEntry) = done { app.actions.appInfo(entry.key) }
                     override fun uninstall(entry: AppEntry) = done { app.actions.uninstall(entry.key) }
@@ -744,6 +822,104 @@ class HomeActivity : ComponentActivity() {
                         menuFor = null
                         action()
                     }
+                },
+            )
+        }
+
+        choosingIcon?.let { entry ->
+            com.samosaai.masala.ui.drawer.IconPickerSheet(
+                label = entry.label,
+                current = entry.icon,
+                preview = { com.samosaai.masala.launcher.AppIconTile(app.icons, entry.key, entry.label, 48.dp) },
+                onPick = { spec ->
+                    choosingIcon = null
+                    scope.launch { launcher.setIcon(entry.key, spec) }
+                },
+                onDismiss = { choosingIcon = null },
+            )
+        }
+
+        itemMenuFor?.let { item ->
+            val miniApp = (item.action as? MasalaAction.OpenMiniApp)?.let { action -> miniAppRows.firstOrNull { it.id == action.id } }
+            fun done(action: () -> Unit) {
+                itemMenuFor = null
+                action()
+            }
+            com.samosaai.masala.ui.home.ItemMenu(
+                item = item,
+                miniApp = miniApp,
+                preview = {
+                    if (miniApp != null) com.samosaai.masala.miniapps.MiniAppIconView(miniApp.icon, miniApp.title, 48.dp)
+                    else {
+                        val entry = (item.action as? MasalaAction.LaunchApp)?.let { render.appFor(it.packageName, it.user, it.activity) }
+                        com.samosaai.masala.ui.home.ItemIcon(item, entry, render, 48)
+                    }
+                },
+                onDismiss = { itemMenuFor = null },
+                menu = object : com.samosaai.masala.ui.home.ItemMenuActions {
+                    override fun open(item: Item) = done { run(item.action) }
+                    override fun rename(item: Item) = done { renamingItem = item }
+                    override fun changeIcon(item: Item) = done { miniApp?.let { choosingIconForApp = it } }
+                    override fun removeFromHome(item: Item) = done {
+                        scope.launch {
+                            app.layouts.removeItems(getString(R.string.layout_label_removed, item.label)) { it.id == item.id }
+                                .firstOrNull()?.let { toast(it.message) }
+                        }
+                    }
+                    override fun editWithMasala(app: com.samosaai.masala.data.MiniAppEntity) = done {
+                        askMasala(getString(R.string.miniapp_edit_prefill, app.title, app.id))
+                    }
+                    override fun deleteApp(app: com.samosaai.masala.data.MiniAppEntity) = done { deletingMiniApp = app }
+                },
+            )
+        }
+
+        renamingItem?.let { item ->
+            com.samosaai.masala.ui.home.ItemRenameDialog(
+                label = item.label,
+                onRename = { label ->
+                    renamingItem = null
+                    val miniId = (item.action as? MasalaAction.OpenMiniApp)?.id
+                    scope.launch {
+                        miniId?.let { masala.miniApps.rename(it, label) }
+                        app.layouts.renameItems(label) { target ->
+                            target.id == item.id || (miniId != null && (target.action as? MasalaAction.OpenMiniApp)?.id == miniId)
+                        }.firstOrNull()?.let { toast(it.message) }
+                    }
+                },
+                onDismiss = { renamingItem = null },
+            )
+        }
+
+        choosingIconForApp?.let { row ->
+            com.samosaai.masala.ui.drawer.IconPickerSheet(
+                label = row.title,
+                current = row.icon,
+                preview = { com.samosaai.masala.miniapps.MiniAppIconView(row.icon, row.title, 48.dp) },
+                onPick = { spec ->
+                    choosingIconForApp = null
+                    scope.launch { masala.miniApps.setIcon(row.id, spec) }
+                },
+                onDismiss = { choosingIconForApp = null },
+            )
+        }
+
+        deletingMiniApp?.let { row ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { deletingMiniApp = null },
+                title = { Text(getString(R.string.miniapp_delete_title)) },
+                text = { Text(getString(R.string.miniapp_delete_message, row.title)) },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        deletingMiniApp = null
+                        scope.launch {
+                            masala.miniApps.delete(row.id)
+                            app.layouts.unpinMiniApp(row.id).firstOrNull()?.let { toast(it.message) }
+                        }
+                    }) { Text(getString(R.string.menu_delete_app), color = MaterialTheme.colorScheme.error) }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { deletingMiniApp = null }) { Text(getString(R.string.action_cancel)) }
                 },
             )
         }
@@ -835,6 +1011,19 @@ class HomeActivity : ComponentActivity() {
 
     /** A top-level item of the saved (base) layout, not one a mode added. */
     private fun baseItem(id: String): Item? = itemIn(masala.layouts.base.value, id)
+
+    /** Whether the app has any tile on home, top-level or inside a folder. */
+    private fun hasHomeItems(key: AppKey): Boolean {
+        fun matches(item: Item) = (item.action as? MasalaAction.LaunchApp)
+            ?.let { it.packageName == key.packageName && it.user == key.user } == true
+        return masala.layouts.base.value?.pages.orEmpty()
+            .flatMap { it.sections }.filterIsInstance<ItemSection>()
+            .flatMap { it.items }
+            .any { matches(it) || (it.action as? MasalaAction.OpenFolder)?.items.orEmpty().any(::matches) } == true
+    }
+
+    private fun baseSection(id: String): ItemSection? = masala.layouts.base.value?.pages.orEmpty()
+        .flatMap { it.sections }.firstOrNull { it.id == id } as? ItemSection
 
     private fun itemIn(doc: LayoutDoc?, id: String): Item? = doc?.pages.orEmpty()
         .flatMap { it.sections }.filterIsInstance<ItemSection>().flatMap { it.items }.firstOrNull { it.id == id }

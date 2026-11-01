@@ -24,6 +24,8 @@ data class LayoutBundle(
         val key: String,
         val label: String? = null,
         val visibility: Visibility = Visibility.DEFAULT,
+        /** A chosen icon (`IconSpec`); absent in bundles written before icons existed. */
+        val icon: String? = null,
     )
 
     fun encode(): String = MasalaJson.strict.encodeToString(serializer(), this)

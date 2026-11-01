@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -78,6 +79,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import com.samosaai.masala.R
+import com.samosaai.masala.ui.components.Markdown
 import com.samosaai.masala.agent.CommandState
 import com.samosaai.masala.chat.ChatResult
 import com.samosaai.masala.chat.ChatSession
@@ -113,6 +115,7 @@ fun ChatSurface(
     serverProvider: Boolean = false,
     onSend: () -> Unit,
     onStop: () -> Unit,
+    onAsk: (String) -> Unit = {},
     onClose: () -> Unit,
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
@@ -150,6 +153,10 @@ fun ChatSurface(
         )
         Box(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp).fillMaxHeight(threadHeight)
+                // Everything rides above the keyboard: the thread and the type field move up
+                // together, so no message is ever stuck behind it. (The activity uses
+                // adjustNothing, so without this the window never makes room.)
+                .imePadding()
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                 .background(Color(0xFF15171E))
                 .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
@@ -188,7 +195,7 @@ fun ChatSurface(
                         )
                     }
                 }
-                Controls(listening, mic, level, onSend, onClose)
+                Controls(listening, mic, level, onSend, onAsk, onClose)
             }
         }
     }
@@ -603,12 +610,19 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1, onDelet
                     }
                 }
             }
-            Text(
-                turn.text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (user && !live) MasalaTheme.tokens.onAccent else MasalaTheme.tokens.textHigh,
-                fontSize = 14.sp,
-            )
+            // The model answers in Markdown — tables, lists, code — and the bubble is where it
+            // lands, so render it, not the raw pipes and hashes. The user's own words stay plain
+            // text on the accent tile.
+            if (user) {
+                Text(
+                    turn.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (!live) MasalaTheme.tokens.onAccent else MasalaTheme.tokens.textHigh,
+                    fontSize = 14.sp,
+                )
+            } else {
+                Markdown(turn.text)
+            }
             turn.results.forEach { result -> ResultCard(result) }
             if (turn.steps.isNotEmpty()) {
                 Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -641,9 +655,18 @@ private fun TurnMenu(expanded: Boolean, onDismiss: () -> Unit, onDelete: () -> U
  * Mic to open Sam, and while listening the cancel/send pair. Sending is explicit: the
  * arrow ends the take now. There is no mic button while listening — tapping it is how
  * a take starts, so showing one there could only end the take by accident.
+ * Otherwise a multi-line type field sits beside the mic, so a failed microphone never
+ * strands the conversation; the send arrow appears once there is text.
  */
 @Composable
-private fun Controls(listening: Boolean, mic: () -> Unit, level: () -> Float, onSend: () -> Unit, onClose: () -> Unit) {
+private fun Controls(
+    listening: Boolean,
+    mic: () -> Unit,
+    level: () -> Float,
+    onSend: () -> Unit,
+    onAsk: (String) -> Unit = {},
+    onClose: () -> Unit,
+) {
     val tokens = MasalaTheme.tokens
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         Row(
@@ -660,7 +683,27 @@ private fun Controls(listening: Boolean, mic: () -> Unit, level: () -> Float, on
                     Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
                 }
             } else {
-                MicButton(mic, level = level, size = 68.dp)
+                var text by remember { mutableStateOf("") }
+                androidx.compose.material3.OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text(stringResource(R.string.command_hint)) },
+                    minLines = 1,
+                    maxLines = 5,
+                    shape = RoundedCornerShape(24.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                if (text.isBlank()) {
+                    MicButton(mic, level = level, size = 52.dp)
+                } else {
+                    IconButton(
+                        onClick = { onAsk(text.trim()); text = "" },
+                        modifier = Modifier.size(52.dp).clip(CircleShape).background(tokens.accent),
+                    ) {
+                        Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
+                    }
+                }
             }
         }
     }

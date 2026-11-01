@@ -586,6 +586,11 @@ class MasalaApp : Application() {
                 p.voiceOut.let { out -> tts.configureApi(out?.baseUrl.orEmpty(), out?.let(aiSettings::keyFor).orEmpty()) }
             }
         }
+        // A chosen icon lives on the app's override row; the cache keeps the current set so every
+        // tile (home, drawer, the app menu) draws it without being told.
+        scope.launch(Dispatchers.Default) {
+            launcher.apps.collect { apps -> icons.applyOverrides(apps.mapNotNull { app -> app.icon?.let { app.key.id to it } }.toMap()) }
+        }
         // Icon mask, style and tint follow Appearance; the tint is the accent.
         scope.launch(Dispatchers.Default) {
             settings.settings.collect { s ->

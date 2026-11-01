@@ -6,7 +6,6 @@ import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.MasalaAction
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 class HomeDragStateTest {
     private fun item(id: String, action: MasalaAction = MasalaAction.OpenDrawer) = Item(id, id, IconRef.Symbol("apps"), action)
@@ -37,13 +36,43 @@ class HomeDragStateTest {
     }
 
     @Test
-    fun `off the sections of another page is a page drop, of the starting page a cancel`() {
+    fun `off the sections falls back to the nearest one on the starting page`() {
         val drag = state()
         drag.start(item("x"), Offset(10f, 10f))
         drag.moveTo(Offset(500f, 500f))
-        assertNull(drag.target())
+        assertEquals(DropTarget.Slot("grid", 2), drag.target())
+    }
+
+    @Test
+    fun `off the sections of another page is a page drop`() {
+        val drag = state()
+        drag.start(item("x"), Offset(10f, 10f))
+        drag.moveTo(Offset(500f, 500f))
         drag.page = "two"
         assertEquals(DropTarget.Page("two"), drag.drop())
+    }
+
+    @Test
+    fun `the target follows the pointer while the drag is still down`() {
+        val drag = state()
+        drag.start(item("x"), Offset(10f, 10f))
+        drag.moveTo(Offset(50f, 50f))
+        assertEquals(DropTarget.Onto("a"), drag.target())
+        drag.moveTo(Offset(150f, 50f))
+        assertEquals(DropTarget.Onto("f"), drag.target())
+        drag.moveTo(Offset(190f, 90f))
+        assertEquals(DropTarget.Slot("grid", 2), drag.target())
+    }
+
+    @Test
+    fun `outside the container is out of the folder`() {
+        val drag = state()
+        drag.container = Box2(0f, 0f, 200f, 100f)
+        drag.start(item("x"), Offset(50f, 50f))
+        drag.moveTo(Offset(60f, 60f))
+        assertEquals(DropTarget.Onto("a"), drag.target())
+        drag.moveTo(Offset(60f, 400f))
+        assertEquals(DropTarget.OutOfFolder, drag.target())
     }
 
     @Test

@@ -5,6 +5,7 @@ import android.util.Log
 import com.samosaai.masala.core.apps.AppEntry
 import com.samosaai.masala.core.contract.DockSection
 import com.samosaai.masala.core.contract.GridSection
+import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.ItemSection
 import com.samosaai.masala.core.contract.LayoutDoc
 import com.samosaai.masala.core.contract.MasalaAction
@@ -187,6 +188,14 @@ class LayoutRepository(
         }
         problems
     }
+
+    /** Takes every home item [match] selects off the layout, wherever it sits, in one undoable step. */
+    suspend fun removeItems(label: String, match: (Item) -> Boolean): List<LayoutChecker.Problem> =
+        edit(label) { LayoutEdits.removeWhere(it, match = match) }
+
+    /** Renames every item [match] selects, so a mini app's pin and its app share one name. */
+    suspend fun renameItems(label: String, match: (Item) -> Boolean): List<LayoutChecker.Problem> =
+        edit(label) { LayoutEdits.renameWhere(it, label, match) }
 
     suspend fun undo(): Boolean = lock.withLock { history.undo()?.also { savePointer(); publish() } != null }
 

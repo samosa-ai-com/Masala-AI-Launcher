@@ -31,7 +31,7 @@ data class PromptContextInput(
     val miniApps: List<PromptMiniApp> = emptyList(),
     /** Page titles the Second Brain holds; shown as "(Second Brain empty)" when there are none. */
     val wikiTopics: List<String> = emptyList(),
-    val symbols: Set<String> = KnownSymbols.names,
+    val symbols: Set<String> = KnownSymbols.promptable,
 )
 
 object PromptContext {
