@@ -39,10 +39,6 @@
     <string name="menu_open_action">Open</string>
     <string name="menu_edit_with_masala">Edit with Masala</string>
     <string name="menu_miniapp_subtitle">Mini app</string>
-    <string name="menu_internet_on">Internet on</string>
-    <string name="menu_internet_off">Internet off</string>
-    <string name="menu_internet_on_hint">This app can load things from the internet.</string>
-    <string name="menu_internet_off_hint">This app works offline. Turn the internet on if it needs a page or a feed.</string>
     <string name="menu_delete_app">Delete app</string>
     <string name="menu_home_hint">Long-press again for the menu; hold and move to drag it somewhere else.</string>
     <string name="menu_hidden_pill">“%1$s” hidden</string>

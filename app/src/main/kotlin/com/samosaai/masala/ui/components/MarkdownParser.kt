@@ -122,11 +122,14 @@ object MarkdownParser {
         return column
     }
 
+    /** A delimiter cell: dashes with optional edge colons. */
+    private val DELIMITER_CELL = Regex(":?-{1,}:?")
+
     /** A delimiter row: pipes of dashes with optional edge colons. */
     private fun isDelimiterRow(line: String): Boolean {
         val cells = splitRow(line)
         if (cells.isEmpty()) return false
-        return cells.all { it.matches(Regex(":?-{1,}:?")) }
+        return cells.all { it.matches(DELIMITER_CELL) }
     }
 
     /**

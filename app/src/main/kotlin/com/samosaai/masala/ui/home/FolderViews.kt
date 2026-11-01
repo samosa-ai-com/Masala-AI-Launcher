@@ -109,8 +109,9 @@ fun FolderSheet(
             onLaunchFrom = ctx.onLaunchFrom?.let { launch -> { action, from -> onDismiss(); launch(action, from) } },
             onItemMenu = { menuFor = it },
             miniAppIcon = ctx.miniAppIcon,
-            drag = drag,
-            movable = childIds,
+            // A folder a mode added isn't in the saved layout, so its children stay put: no drag.
+            drag = drag.takeIf { editable },
+            movable = if (editable) childIds else emptySet(),
             onDrop = { child, target -> if (target is DropTarget.OutOfFolder) { drag.cancel(); onMoveOut(child) } },
         )
     }

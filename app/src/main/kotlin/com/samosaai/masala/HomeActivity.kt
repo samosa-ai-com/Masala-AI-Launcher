@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.core.apps.AppEntry
+import com.samosaai.masala.core.apps.AppKey
 import com.samosaai.masala.core.apps.Visibility
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.launcher.HomeRole
@@ -212,8 +213,9 @@ class HomeActivity : ComponentActivity() {
         var renamingItem by remember { mutableStateOf<Item?>(null) }
         var choosingIconForApp by remember { mutableStateOf<com.samosaai.masala.data.MiniAppEntity?>(null) }
         var deletingMiniApp by remember { mutableStateOf<com.samosaai.masala.data.MiniAppEntity?>(null) }
-        // A hidden app's items come off home too; the pill puts both back.
-        var hiddenUndo by remember { mutableStateOf<AppEntry?>(null) }
+        // A hidden app's items come off home too; the pill puts both back. The flag records whether
+        // the app had any tile to take off: without one there is no layout edit to undo.
+        var hiddenUndo by remember { mutableStateOf<Pair<AppEntry, Boolean>?>(null) }
         var renamingFolder by remember { mutableStateOf<String?>(null) }
         // The folder, and whether it is in the saved layout (not added by a mode).
         var openFolder by remember { mutableStateOf<Pair<Item, Boolean>?>(null) }
@@ -653,7 +655,7 @@ class HomeActivity : ComponentActivity() {
                                 }) { Text(getString(R.string.layout_undo), color = com.samosaai.masala.ui.theme.MasalaColors.Gold) }
                             }
                         }
-                        hiddenUndo?.let { entry ->
+                        hiddenUndo?.let { (entry, hadHome) ->
                             com.samosaai.masala.ui.components.GlassPill {
                                 Text(getString(R.string.menu_hidden_pill, entry.label), color = com.samosaai.masala.ui.theme.MasalaColors.Text)
                                 // Where it went, and how to get it back later: one tap to the list.
@@ -667,7 +669,9 @@ class HomeActivity : ComponentActivity() {
                                 androidx.compose.material3.TextButton(onClick = {
                                     hiddenUndo = null
                                     scope.launch {
-                                        app.layouts.undo()
+                                        // No tile came off, so there is no layout edit to take back:
+                                        // undoing here would revert an unrelated earlier change.
+                                        if (hadHome) app.layouts.undo()
                                         launcher.setVisibility(entry.key, Visibility.DEFAULT)
                                     }
                                 }) { Text(getString(R.string.layout_undo), color = com.samosaai.masala.ui.theme.MasalaColors.Gold) }
@@ -798,14 +802,17 @@ class HomeActivity : ComponentActivity() {
                         scope.launch {
                             // Hiding that leaves the tile on home reads as broken: take the app off
                             // home in the same step, and let the pill put both back.
+                            val hadHome = hasHomeItems(entry.key)
                             if (visibility == Visibility.HIDDEN) {
-                                app.layouts.removeItems(getString(R.string.layout_label_hidden, entry.label)) { item ->
-                                    (item.action as? MasalaAction.LaunchApp)
-                                        ?.let { it.packageName == entry.key.packageName && it.user == entry.key.user } == true
+                                if (hadHome) {
+                                    app.layouts.removeItems(getString(R.string.layout_label_hidden, entry.label)) { item ->
+                                        (item.action as? MasalaAction.LaunchApp)
+                                            ?.let { it.packageName == entry.key.packageName && it.user == entry.key.user } == true
+                                    }
                                 }
                             }
                             launcher.setVisibility(entry.key, visibility)
-                            if (visibility == Visibility.HIDDEN) hiddenUndo = entry
+                            if (visibility == Visibility.HIDDEN) hiddenUndo = entry to hadHome
                         }
                     }
                     override fun appInfo(entry: AppEntry) = done { app.actions.appInfo(entry.key) }
@@ -1004,6 +1011,16 @@ class HomeActivity : ComponentActivity() {
 
     /** A top-level item of the saved (base) layout, not one a mode added. */
     private fun baseItem(id: String): Item? = itemIn(masala.layouts.base.value, id)
+
+    /** Whether the app has any tile on home, top-level or inside a folder. */
+    private fun hasHomeItems(key: AppKey): Boolean {
+        fun matches(item: Item) = (item.action as? MasalaAction.LaunchApp)
+            ?.let { it.packageName == key.packageName && it.user == key.user } == true
+        return masala.layouts.base.value?.pages.orEmpty()
+            .flatMap { it.sections }.filterIsInstance<ItemSection>()
+            .flatMap { it.items }
+            .any { matches(it) || (it.action as? MasalaAction.OpenFolder)?.items.orEmpty().any(::matches) } == true
+    }
 
     private fun baseSection(id: String): ItemSection? = masala.layouts.base.value?.pages.orEmpty()
         .flatMap { it.sections }.firstOrNull { it.id == id } as? ItemSection

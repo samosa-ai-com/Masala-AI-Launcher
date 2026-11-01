@@ -166,7 +166,7 @@ fun ItemRenameDialog(label: String, onRename: (String) -> Unit, onDismiss: () ->
         text = {
             OutlinedTextField(
                 value = field,
-                onValueChange = { field = it.copy(text = it.text.take(80)) },
+                onValueChange = { field = it.copy(text = it.text.take(com.samosaai.masala.core.layout.LayoutChecker.MAX_FOLDER_LABEL)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { if (text.isNotEmpty()) onRename(text) }),

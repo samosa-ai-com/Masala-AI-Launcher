@@ -870,7 +870,7 @@ class SettingsActivity : ComponentActivity() {
         var first by remember { mutableStateOf("") }
         var second by remember { mutableStateOf("") }
         val digits = { s: String -> s.filter(Char::isDigit).take(HiddenPin.MAX_LENGTH) }
-        val valid = HiddenPin.isValid(first) && (mode == PinMode.CHANGE || first == second)
+        val valid = HiddenPin.isValid(first) && first == second
         AlertDialog(
             onDismissRequest = onDismiss,
             title = { Text(stringResource(if (mode == PinMode.SET) R.string.hidden_pin_set_title else R.string.hidden_pin_change_title)) },

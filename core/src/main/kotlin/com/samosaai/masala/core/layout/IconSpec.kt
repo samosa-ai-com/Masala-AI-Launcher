@@ -34,7 +34,7 @@ object IconSpec {
             return if (name in KnownSymbols.all) "$SYMBOL_PREFIX$name" else null
         }
         val svg = trimmed.replaceFirst(PROLOG, "")
-        if (svg.length > MAX_CHARS || !svg.startsWith("<svg")) return null
+        if (svg.length > MAX_CHARS || !svg.startsWith("<svg", ignoreCase = true)) return null
         if (BLOCKED.any { it in svg.lowercase() }) return null
         return svg
     }

@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -663,7 +664,7 @@ private fun Controls(
     onClose: () -> Unit,
 ) {
     val tokens = MasalaTheme.tokens
-    Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
+    Column(Modifier.fillMaxWidth().navigationBarsPadding().imePadding()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,

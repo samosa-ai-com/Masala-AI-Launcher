@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -164,6 +165,8 @@ fun AppMenu(
                 ActionTile(Icons.Rounded.Palette, stringResource(R.string.menu_change_icon), Modifier.weight(1f)) { menu.changeIcon(entry) }
                 ActionTile(Icons.Rounded.VisibilityOff, stringResource(R.string.menu_hide), Modifier.weight(1f)) { menu.setVisibility(entry, Visibility.HIDDEN) }
                 if (canUninstall) ActionTile(Icons.Rounded.Delete, stringResource(R.string.menu_uninstall), Modifier.weight(1f), danger = true) { menu.uninstall(entry) }
+                // Without uninstall the last row holds two tiles: a blank keeps them at a third each.
+                else Spacer(Modifier.weight(1f))
             }
 
             Text(stringResource(R.string.menu_visibility), style = MaterialTheme.typography.labelLarge)
