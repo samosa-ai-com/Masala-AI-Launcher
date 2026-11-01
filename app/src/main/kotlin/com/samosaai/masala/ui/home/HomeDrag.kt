@@ -21,6 +21,9 @@ sealed interface DropTarget {
 
     /** Anywhere off the item sections of a page other than the one the drag began on. */
     data class Page(val pageId: String) : DropTarget
+
+    /** Dropped outside the folder sheet that started the drag: take the item back out to home. */
+    data object OutOfFolder : DropTarget
 }
 
 /** A plain rectangle in root pixels, so hit-testing is testable without Compose. */
@@ -44,18 +47,58 @@ object DropTargets {
     /** Fraction cut from each side of an item's box; what is left is the "onto" area (centre 60%). */
     private const val ONTO_INSET = 0.2f
 
-    /** Without [onto] (no folders yet), a drop on an item's centre is a slot like its edge. */
-    fun resolve(x: Float, y: Float, sections: Map<String, Box2>, items: Map<String, List<Pair<String, Box2>>>, dragged: String, onto: Boolean = true): DropTarget? {
+    /**
+     * Without [onto] (no folders yet), a drop on an item's centre is a slot like its edge. With
+     * [forgiving], a drop that misses every section lands in the nearest one: generated layouts leave
+     * gaps between sections, and a drag that crosses one shouldn't vanish.
+     */
+    fun resolve(
+        x: Float,
+        y: Float,
+        sections: Map<String, Box2>,
+        items: Map<String, List<Pair<String, Box2>>>,
+        dragged: String,
+        onto: Boolean = true,
+        forgiving: Boolean = true,
+    ): DropTarget? {
         if (onto) for (list in items.values) for ((id, box) in list) {
             if (id != dragged && box.inset(ONTO_INSET).contains(x, y)) return DropTarget.Onto(id)
         }
-        val sectionId = sections.entries.firstOrNull { it.value.contains(x, y) }?.key ?: return null
+        val sectionId = sections.entries.firstOrNull { it.value.contains(x, y) }?.key
+            ?: (if (forgiving) nearest(x, y, sections) else null)
+            ?: return null
         val others = items[sectionId].orEmpty().filter { it.first != dragged }
         val index = others.count { (_, box) ->
             box.centerY < y - box.height / 2 || (abs(box.centerY - y) <= box.height / 2 && box.centerX < x)
         }
         val ordered = others.sortedWith(compareBy({ it.second.top }, { it.second.left }))
         return DropTarget.Slot(sectionId, index, ordered.getOrNull(index)?.first)
+    }
+
+    /** The section whose box is closest to the point, by square distance to its edges. */
+    private fun nearest(x: Float, y: Float, sections: Map<String, Box2>): String? = sections.minByOrNull { (_, box) ->
+        val dx = maxOf(box.left - x, x - box.right, 0f)
+        val dy = maxOf(box.top - y, y - box.bottom, 0f)
+        dx * dx + dy * dy
+    }?.key
+}
+
+/**
+ * Auto-scroll while dragging (pure): how far to move a scroll area this frame, from where the pointer
+ * is inside it. Zero outside the bands, so a drag over a dock or a gap scrolls nothing.
+ */
+object DragScroll {
+    /** Signed pixels for this frame: negative scrolls towards the start, positive towards the end. */
+    fun delta(pointerY: Float, top: Float, bottom: Float, band: Float, maxPerFrame: Float): Float {
+        val height = bottom - top
+        if (height <= 0f || band <= 0f || pointerY < top || pointerY > bottom) return 0f
+        val b = band.coerceAtMost(height / 2f)
+        val depth = when {
+            pointerY < top + b -> -(top + b - pointerY) / b
+            pointerY > bottom - b -> (pointerY - (bottom - b)) / b
+            else -> 0f
+        }
+        return depth.coerceIn(-1f, 1f) * maxPerFrame
     }
 }
 
@@ -85,6 +128,12 @@ class HomeDragState(
     var page: String? = null
     private var startPage: String? = null
 
+    /**
+     * A drag inside a surface that is not home (the folder sheet): set to that surface's box. A drop
+     * outside it means "take it out of here" instead of a slot.
+     */
+    var container: Box2? = null
+
     fun start(item: Item, at: Offset) {
         // A second finger's long press mustn't take over a drag in progress.
         if (dragging != null) return
@@ -99,9 +148,14 @@ class HomeDragState(
         if (dragging != null) pointer = at
     }
 
-    /** Where a drop at the pointer lands now; resolved only at release, not on every move. */
+    /** Where a drop at the pointer lands now: read it on every move to draw the indicator. */
     fun target(): DropTarget? {
         val item = dragging ?: return null
+        container?.let { if (!it.contains(pointer.x, pointer.y)) return DropTarget.OutOfFolder }
+        // Off the content of another page is a page move, not the nearest slot of the one underneath:
+        // the fallback below is for gaps on the page the drag started on.
+        val onSection = sectionBoxes.values.any { it.contains(pointer.x, pointer.y) }
+        if (!onSection) page?.takeIf { it != startPage }?.let { return DropTarget.Page(it) }
         val items = itemBoxes.entries.groupBy({ it.value.first }, { it.key to it.value.second })
         return DropTargets.resolve(pointer.x, pointer.y, sectionBoxes.toMap(), items, item.id, onto && item.action !is MasalaAction.OpenFolder)
             ?: page?.takeIf { it != startPage }?.let { DropTarget.Page(it) }

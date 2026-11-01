@@ -97,6 +97,28 @@ class LayoutEditsTest {
     }
 
     @Test
+    fun `moveBeforeVisible skips a mode-added neighbour and lands on the next saved one`() {
+        // The screen shows b, a mode's chip, then c; dropping before the chip must mean before c.
+        val moved = assertNotNull(LayoutEdits.moveBeforeVisible(doc, "d", "grid", listOf("b", "mode_chip", "c"), 1))
+        assertEquals(listOf("a", "b", "d", "c"), ids(moved, "grid"))
+    }
+
+    @Test
+    fun `moveBeforeVisible ends when nothing saved follows`() {
+        val moved = assertNotNull(LayoutEdits.moveBeforeVisible(doc, "a", "grid", listOf("b", "c", "d", "mode_chip"), 3))
+        assertEquals(listOf("b", "c", "d", "a"), ids(moved, "grid"))
+        // A hidden item in the visible list isn't in the document, so it can't be the insertion point.
+        val skipped = assertNotNull(LayoutEdits.moveBeforeVisible(doc, "a", "grid", listOf("b", "hidden"), 1))
+        assertEquals(listOf("b", "c", "d", "a"), ids(skipped, "grid"))
+    }
+
+    @Test
+    fun `moveBeforeVisible needs the item and the section in the document`() {
+        assertNull(LayoutEdits.moveBeforeVisible(doc, "a", "mode_section", emptyList(), 0))
+        assertNull(LayoutEdits.moveBeforeVisible(doc, "ghost", "grid", listOf("b"), 0))
+    }
+
+    @Test
     fun `moveToPage appends to the first non-dock item section`() {
         val out = assertNotNull(LayoutEdits.moveToPage(doc, "x", "two"))
         assertEquals(listOf("p", "x"), ids(out, "grid2"))

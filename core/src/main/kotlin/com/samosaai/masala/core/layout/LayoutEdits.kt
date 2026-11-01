@@ -27,6 +27,19 @@ object LayoutEdits {
     }
 
     /**
+     * Moves [itemId] into [sectionId] just before the first item the document still has at or after
+     * [visibleIndex] in [visible], ending when nothing does. [visible] is the on-screen order of the
+     * section without the dragged item: it skips hidden items and holds items a mode added, which the
+     * saved document cannot address. Null when either the item or the section isn't in [doc].
+     */
+    fun moveBeforeVisible(doc: LayoutDoc, itemId: String, sectionId: String, visible: List<String>, visibleIndex: Int): LayoutDoc? {
+        val section = doc.pages.flatMap { it.sections }.firstOrNull { it.id == sectionId } as? ItemSection ?: return null
+        val saved = section.items.mapTo(HashSet()) { it.id }
+        val before = visible.drop(visibleIndex.coerceIn(0, visible.size)).firstOrNull { it in saved }
+        return moveBefore(doc, itemId, sectionId, before)
+    }
+
+    /**
      * Moves [itemId] into section [sectionId] just before [beforeId], or to its end when [beforeId] is
      * null or not in that section. What home drops use: the visible order can skip hidden items.
      */

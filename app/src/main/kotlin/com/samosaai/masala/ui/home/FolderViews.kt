@@ -36,7 +36,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
@@ -89,7 +93,11 @@ fun FolderSheet(
 ) {
     val children = (folder.action as? MasalaAction.OpenFolder)?.items.orEmpty()
     var menuFor by remember { mutableStateOf<Item?>(null) }
-    val inner = remember(ctx, folder) {
+    // Long press then move drags a child out; a long press that lifts without moving still opens its menu.
+    val drag = remember(folder.id, editable) { HomeDragState(onto = false) }
+    val childIds = remember(children) { children.map { it.id }.toSet() }
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    val inner = remember(ctx, folder, drag, childIds) {
         RenderContext(
             icons = ctx.icons,
             apps = ctx.apps,
@@ -101,40 +109,63 @@ fun FolderSheet(
             onLaunchFrom = ctx.onLaunchFrom?.let { launch -> { action, from -> onDismiss(); launch(action, from) } },
             onItemMenu = { menuFor = it },
             miniAppIcon = ctx.miniAppIcon,
+            drag = drag,
+            movable = childIds,
+            onDrop = { child, target -> if (target is DropTarget.OutOfFolder) { drag.cancel(); onMoveOut(child) } },
         )
     }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainer) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
-            Text(
-                folder.label,
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(if (ctx.locked || !editable) Modifier else Modifier.clickable(role = Role.Button, onClickLabel = stringResource(R.string.folder_rename), onClick = onRename))
-                    .padding(vertical = 12.dp),
-            )
-            children.chunked(FOLDER_COLUMNS).forEach { row ->
-                Row(Modifier.fillMaxWidth()) {
-                    row.forEach { child ->
-                        Box(Modifier.weight(1f)) {
-                            ItemCell(child, inner, sectionId = null, onWallpaper = false)
-                            DropdownMenu(expanded = menuFor?.id == child.id, onDismissRequest = { menuFor = null }) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.folder_move_out)) },
-                                    onClick = { menuFor = null; onMoveOut(child) },
-                                )
-                                appFor(child, ctx)?.let { app ->
+        // The sheet's own card is the drag's world: leaving it is how a child gets out of the folder.
+        Box(
+            Modifier.fillMaxWidth().onGloballyPositioned {
+                val box = it.boundsInRoot().toBox2()
+                drag.container = box
+                drag.sectionBoxes[FOLDER_SECTION] = box
+                origin = it.positionInRoot()
+            },
+        ) {
+            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+                Text(
+                    folder.label,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(if (ctx.locked || !editable) Modifier else Modifier.clickable(role = Role.Button, onClickLabel = stringResource(R.string.folder_rename), onClick = onRename))
+                        .padding(vertical = 12.dp),
+                )
+                if (drag.dragging != null) {
+                    val outside = drag.container?.contains(drag.pointer.x, drag.pointer.y) == false
+                    Text(
+                        stringResource(if (outside) R.string.folder_release_to_home else R.string.folder_drag_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (outside) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+                children.chunked(FOLDER_COLUMNS).forEach { row ->
+                    Row(Modifier.fillMaxWidth()) {
+                        row.forEach { child ->
+                            Box(Modifier.weight(1f)) {
+                                ItemCell(child, inner, sectionId = FOLDER_SECTION, onWallpaper = false)
+                                DropdownMenu(expanded = menuFor?.id == child.id, onDismissRequest = { menuFor = null }) {
                                     DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.folder_app_options)) },
-                                        onClick = { menuFor = null; onDismiss(); ctx.onAppMenu(app) },
+                                        text = { Text(stringResource(R.string.folder_move_out)) },
+                                        onClick = { menuFor = null; onMoveOut(child) },
                                     )
+                                    appFor(child, ctx)?.let { app ->
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.folder_app_options)) },
+                                            onClick = { menuFor = null; onDismiss(); ctx.onAppMenu(app) },
+                                        )
+                                    }
                                 }
                             }
                         }
+                        repeat(FOLDER_COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
                     }
-                    repeat(FOLDER_COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
+            drag.dragging?.let { LiftedItem(it, drag, origin, inner) }
         }
     }
 }
@@ -162,6 +193,9 @@ fun FolderMenu(folder: Item, onRename: () -> Unit, onUngroup: () -> Unit, onDism
 }
 
 private const val FOLDER_COLUMNS = 4
+
+/** The drag section a sheet's children register into; it never reaches a layout edit. */
+private const val FOLDER_SECTION = "folder-sheet"
 
 /** Names a folder; Save is off while the name is blank. */
 @Composable

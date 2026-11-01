@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.luminance
@@ -380,6 +381,8 @@ class HomeActivity : ComponentActivity() {
         val miniAppRows by remember { app.miniApps.all }.collectAsStateWithLifecycle(emptyList())
         val miniAppIcons = remember(miniAppRows) { miniAppRows.associate { it.id to it.icon } }
         val drag = remember { HomeDragState() }
+        // The context below is remembered on purpose; drops read the live layout through these.
+        val latestLayout = rememberUpdatedState(layout)
         val render = remember(apps, settings.homeLocked, modeName, movable, miniAppIcons) {
             RenderContext(
                 icons = app.icons,
@@ -404,20 +407,35 @@ class HomeActivity : ComponentActivity() {
                 onFolderMenu = { if (it.id in movable) folderMenu = it },
                 onDrop = { item, target ->
                     scope.launch {
-                        val problems = when (target) {
-                            // `before` may be a mode-added item, not in the saved layout: then it lands at the section's end.
-                            is DropTarget.Slot -> app.layouts.edit(getString(R.string.layout_label_moved, item.label)) {
-                                LayoutEdits.moveBefore(it, item.id, target.sectionId, target.before)
+                        // What the user saw, which is the base document merged with the active modes: the
+                        // slot they dropped on is expressed in that order, not the saved one.
+                        val resolved = latestLayout.value.layout
+                        fun visibleIn(sectionId: String): List<String> = resolved.pages.asSequence()
+                            .flatMap { it.sections.asSequence() }
+                            .filterIsInstance<ItemSection>()
+                            .firstOrNull { it.id == sectionId }?.items?.map { it.id }?.filter { it != item.id }.orEmpty()
+                        suspend fun slotEdit(sectionId: String, before: String?): List<LayoutChecker.Problem> {
+                            // A section only a mode has can't be written to: say so instead of doing nothing.
+                            if (baseSection(sectionId) == null) { toast(getString(R.string.layout_section_from_mode)); return emptyList() }
+                            return app.layouts.edit(getString(R.string.layout_label_moved, item.label)) { doc ->
+                                val visible = visibleIn(sectionId)
+                                val at = before?.let { visible.indexOf(it) }?.takeIf { it >= 0 } ?: visible.size
+                                LayoutEdits.moveBeforeVisible(doc, item.id, sectionId, visible, at)
                             }
+                        }
+                        val problems = when (target) {
+                            is DropTarget.Slot -> slotEdit(target.sectionId, target.before)
                             is DropTarget.Page -> app.layouts.edit(getString(R.string.layout_label_moved, item.label)) {
                                 LayoutEdits.moveToPage(it, item.id, target.pageId)
                             }
+                            // The sheet takes the item out itself; home never sees this one.
+                            DropTarget.OutOfFolder -> emptyList()
                             is DropTarget.Onto -> {
                                 val onto = baseItem(target.itemId)
                                 val folder = onto?.action as? MasalaAction.OpenFolder
                                 when {
-                                    // A mode added it: it isn't in the saved layout, so nothing can be combined with it.
-                                    onto == null -> { toast(getString(R.string.folder_cant_group)); emptyList() }
+                                    // A mode added it: it can't hold a folder, but it is still a neighbour to land beside.
+                                    onto == null -> drag.itemBoxes[target.itemId]?.first?.let { slotEdit(it, target.itemId) } ?: emptyList()
                                     folder == null -> {
                                         val folderId = generateSequence { "folder-" + UUID.randomUUID().toString().take(8) }
                                             .first { baseItem(it) == null }
@@ -835,6 +853,9 @@ class HomeActivity : ComponentActivity() {
 
     /** A top-level item of the saved (base) layout, not one a mode added. */
     private fun baseItem(id: String): Item? = itemIn(masala.layouts.base.value, id)
+
+    private fun baseSection(id: String): ItemSection? = masala.layouts.base.value?.pages.orEmpty()
+        .flatMap { it.sections }.firstOrNull { it.id == id } as? ItemSection
 
     private fun itemIn(doc: LayoutDoc?, id: String): Item? = doc?.pages.orEmpty()
         .flatMap { it.sections }.filterIsInstance<ItemSection>().flatMap { it.items }.firstOrNull { it.id == id }

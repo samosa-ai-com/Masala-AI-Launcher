@@ -1,5 +1,6 @@
 package com.samosaai.masala.ui.home
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -24,6 +25,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -53,8 +56,12 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.delay
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.onLongClick
@@ -214,6 +221,15 @@ fun LayoutRenderer(
             }
         }
     }
+    // A generated layout, an undo or a mode turning on can replace the document under a drag: cancel
+    // it rather than write an edit against a version the item may no longer be in.
+    LaunchedEffect(drag, layout.layout, drag?.dragging?.id) {
+        val id = drag?.dragging?.id ?: return@LaunchedEffect
+        val present = layout.layout.pages.any { page ->
+            page.sections.filterIsInstance<ItemSection>().any { section -> section.items.any { it.id == id } }
+        }
+        if (!present) drag.cancel()
+    }
     Box(modifier.onGloballyPositioned { origin = it.positionInRoot(); width = it.size.width }) {
         Column(Modifier.fillMaxSize()) {
             // While dragging, every page stays composed so the dragged cell's gesture survives a flip.
@@ -222,13 +238,16 @@ fun LayoutRenderer(
             }
             if (pages.size > 1) PageDots(pages.size, pager.currentPage)
         }
-        ctx.drag?.let { drag -> drag.dragging?.let { LiftedItem(it, drag, origin, ctx) } }
+        drag?.dragging?.let { item ->
+            DropIndicator(drag.target(), drag, origin)
+            LiftedItem(item, drag, origin, ctx)
+        }
     }
 }
 
 /** The dragged item under the finger, a little larger and raised. */
 @Composable
-private fun LiftedItem(item: Item, drag: HomeDragState, origin: Offset, ctx: RenderContext) {
+internal fun LiftedItem(item: Item, drag: HomeDragState, origin: Offset, ctx: RenderContext) {
     val width = 80.dp
     val widthPx = with(LocalDensity.current) { width.toPx() }
     Box(
@@ -246,6 +265,54 @@ private fun LiftedItem(item: Item, drag: HomeDragState, origin: Offset, ctx: Ren
     ) { ItemCell(item, ctx, sectionId = null, interactive = false) }
 }
 
+/**
+ * What a drop would do, drawn from the boxes the drag state already holds: a bar where the item would
+ * land, a ring round an item it would become a folder with, and a strip on the edge that is about to
+ * turn the page. [origin] is this renderer's position in root pixels, the space the boxes are in.
+ */
+@Composable
+private fun DropIndicator(target: DropTarget?, drag: HomeDragState, origin: Offset) {
+    if (target == null) return
+    val accent = MasalaTheme.tokens.accent
+    Canvas(Modifier.fillMaxSize()) {
+        val line = 3.dp.toPx()
+        when (target) {
+            is DropTarget.Slot -> {
+                val neighbours = drag.itemBoxes.entries
+                    .filter { it.value.first == target.sectionId && it.key != drag.dragging?.id }
+                    .sortedWith(compareBy({ it.value.second.top }, { it.value.second.left }))
+                val marked = target.before?.let { id -> neighbours.firstOrNull { it.key == id } }
+                val box = (marked ?: neighbours.lastOrNull())?.value?.second
+                    ?: drag.sectionBoxes[target.sectionId]
+                    ?: return@Canvas
+                if (box.right - box.left > box.height * 2) {
+                    // A full-width row: the bar sits between rows rather than beside one.
+                    val y = (if (marked == null) box.bottom else box.top) - origin.y - line / 2
+                    drawRoundRect(accent, Offset(box.left - origin.x + 16.dp.toPx(), y), Size(box.right - box.left - 32.dp.toPx(), line))
+                } else {
+                    val x = (if (marked == null) box.right else box.left) - origin.x - line / 2
+                    drawRoundRect(accent, Offset(x, box.top - origin.y + 6.dp.toPx()), Size(line, (box.height - 12.dp.toPx()).coerceAtLeast(line)))
+                }
+            }
+            is DropTarget.Onto -> drag.itemBoxes[target.itemId]?.second?.let { box ->
+                drawRoundRect(
+                    accent,
+                    Offset(box.left - origin.x, box.top - origin.y),
+                    Size(box.right - box.left, box.height),
+                    CornerRadius(18.dp.toPx()),
+                    style = Stroke(line),
+                )
+            }
+            // The side the pointer is held against, waiting for the flip.
+            is DropTarget.Page -> {
+                val left = drag.pointer.x - origin.x < size.width / 2
+                drawRoundRect(accent, Offset(if (left) 0f else size.width - line, 0f), Size(line, size.height))
+            }
+            DropTarget.OutOfFolder -> Unit
+        }
+    }
+}
+
 @Composable
 private fun PageDots(count: Int, current: Int) {
     Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), horizontalArrangement = Arrangement.Center) {
@@ -261,8 +328,29 @@ private fun PageDots(count: Int, current: Int) {
 @Composable
 private fun PageContent(page: Page, layout: ResolvedLayout, ctx: RenderContext, aboveDock: @Composable () -> Unit, entrySignal: Int, footer: @Composable () -> Unit) {
     val (docks, body) = page.sections.partition { it is DockSection }
+    val listState = rememberLazyListState()
+    var viewport by remember { mutableStateOf(Box2(0f, 0f, 0f, 0f)) }
+    val drag = ctx.drag
+    val dragging = drag?.dragging != null && drag.page == page.id
+    val bandPx = with(LocalDensity.current) { DRAG_SCROLL_BAND.toPx() }
+    val stepPx = with(LocalDensity.current) { DRAG_SCROLL_STEP.toPx() }
+    // A drag held near the top or bottom of the list scrolls it, so an item can reach a section that
+    // started off screen. Per frame, unlike the page flip: a slide should not jump.
+    LaunchedEffect(drag, page.id, dragging) {
+        if (drag == null || !dragging) return@LaunchedEffect
+        while (true) {
+            withFrameNanos { }
+            val delta = DragScroll.delta(drag.pointer.y, viewport.top, viewport.bottom, bandPx, stepPx)
+            val allowed = if (delta < 0f) listState.canScrollBackward else listState.canScrollForward
+            if (delta != 0f && allowed) listState.scrollBy(delta)
+        }
+    }
     Column(Modifier.fillMaxSize()) {
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(
+            Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { viewport = it.boundsInRoot().toBox2() },
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             body.forEachIndexed { i, section ->
                 item(key = section.id) { Box(Modifier.sectionEntry(i, entrySignal)) { SectionContent(section, layout, ctx) } }
             }
@@ -480,7 +568,7 @@ private fun Modifier.dropSection(sectionId: String, ctx: RenderContext): Modifie
     }
 }
 
-private fun androidx.compose.ui.geometry.Rect.toBox2() = Box2(left, top, right, bottom)
+internal fun androidx.compose.ui.geometry.Rect.toBox2() = Box2(left, top, right, bottom)
 
 /**
  * Tap runs the action. A long press opens the item's menu unless the home layout is locked; on an item
@@ -527,7 +615,7 @@ private fun Modifier.itemClicks(item: Item, app: AppEntry?, ctx: RenderContext, 
                 if (moved && drag.dragging?.id == item.id) drag.cancel()
                 throw e
             }
-            if (moved) drag.drop()?.let { ctx.onDrop?.invoke(item, it) } else menu?.invoke()
+            if (moved) drag.drop()?.let { haptics.confirm(); ctx.onDrop?.invoke(item, it) } else menu?.invoke()
         }
     }
     return this
@@ -640,6 +728,9 @@ internal class IconBounds {
 
 /** Holding a dragged item this close to a side for [EDGE_HOLD_MS] flips to the next page that way. */
 private val EDGE_FLIP_ZONE = 24.dp
+/** How close to the list's top or bottom a drag scrolls it, and how far per frame at the deepest. */
+private val DRAG_SCROLL_BAND = 72.dp
+private val DRAG_SCROLL_STEP = 18.dp
 private const val EDGE_HOLD_MS = 600L
 private const val EDGE_TICK_MS = 100L
 
