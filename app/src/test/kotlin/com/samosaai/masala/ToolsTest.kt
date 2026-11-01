@@ -10,6 +10,7 @@ import com.samosaai.masala.core.tool.Tool
 import com.samosaai.masala.core.tool.ToolDefinition
 import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.core.tool.ToolSensitivity
+import com.samosaai.masala.agent.AgentTools
 import com.samosaai.masala.llm.ChatMessage
 import com.samosaai.masala.llm.ChatRequest
 import com.samosaai.masala.llm.ResponseFormat
@@ -106,6 +107,16 @@ class ToolsTest {
         for (def in MasalaToolDefinitions.all) {
             assertEquals(emptyList(), leftOut.filter { it in def.description }, def.name)
         }
+    }
+
+    @Test
+    fun `consult_expert asks for an expert and a question`() {
+        val def = AgentTools.consultExpert
+        assertEquals("consult_expert", def.name)
+        val required = def.parameters["required"]!!.jsonArray.map { it.jsonPrimitive.content }
+        assertEquals(listOf("skill_id", "question"), required)
+        // The id is how a follow-up reaches the same expert, so it must be offered.
+        assertTrue(def.parameters.toString().contains("consult_id"))
     }
 
     @Test

@@ -42,6 +42,7 @@ object SkillImportValidator {
     const val MAX_STARTERS = 12
     const val MAX_STARTER_LENGTH = 200
     const val MAX_DISCLAIMER_LENGTH = 512
+    const val MAX_WHEN_TO_USE_LENGTH = 240
     const val MAX_WIDGET_INPUTS = 8
 
     fun validate(skill: MasalaSkill) {
@@ -123,6 +124,12 @@ object SkillImportValidator {
                 if (containsControlChars(starter)) {
                     throw SkillValidationException("persona.starters contains control characters")
                 }
+            }
+            if (persona.whenToUse.length > MAX_WHEN_TO_USE_LENGTH) {
+                throw SkillValidationException("persona.whenToUse exceeds $MAX_WHEN_TO_USE_LENGTH characters")
+            }
+            if (containsControlChars(persona.whenToUse)) {
+                throw SkillValidationException("persona.whenToUse contains control characters")
             }
             persona.disclaimer?.let { disclaimer ->
                 if (disclaimer.length > MAX_DISCLAIMER_LENGTH) {

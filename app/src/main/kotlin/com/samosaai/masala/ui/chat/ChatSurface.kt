@@ -1,5 +1,6 @@
 package com.samosaai.masala.ui.chat
 
+import android.content.Intent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -13,6 +14,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,7 +39,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -44,6 +49,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,6 +59,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -71,12 +78,14 @@ import androidx.compose.ui.unit.sp
 import com.samosaai.masala.R
 import com.samosaai.masala.agent.CommandState
 import com.samosaai.masala.chat.ChatSession
+import com.samosaai.masala.chat.ExpertCredit
 import com.samosaai.masala.chat.ChatTurn
 import com.samosaai.masala.chat.TurnRole
 import com.samosaai.masala.data.Character
 import com.samosaai.masala.ui.character.CharacterState
 import com.samosaai.masala.ui.character.MasalaCharacter
 import com.samosaai.masala.ui.home.MicButton
+import com.samosaai.masala.ui.settings.SettingsActivity
 import com.samosaai.masala.ui.theme.MasalaColors
 import com.samosaai.masala.ui.theme.MasalaTheme
 
@@ -103,9 +112,16 @@ fun ChatSurface(
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
     onDeleteTurn: (Int) -> Unit = {},
+    /** The installed experts, offered in an empty thread and from the header. */
+    experts: List<ExpertCredit> = emptyList(),
+    onAskExpert: (ExpertCredit) -> Unit = {},
+    /** Asked after a missing access was granted, so the step can run again. */
+    onRetry: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val tokens = MasalaTheme.tokens
+    // A step that lacked access still gets its answer; this is how the user fixes it afterwards.
+    val grant = com.samosaai.masala.ui.components.rememberCapabilityGrant { granted -> if (granted) onRetry() }
     val listening = state == CommandState.Listening
     val thinking = state is CommandState.Thinking
     val turns = session?.turns.orEmpty()
@@ -142,6 +158,8 @@ fun ChatSurface(
                     onNewChat = onNewChat,
                     onToggle = { onExpanded(!expanded) },
                     onExpanded = onExpanded,
+                    experts = experts,
+                    onAskExpert = onAskExpert,
                 )
                 Box(Modifier.weight(1f)) {
                     when {
@@ -156,8 +174,13 @@ fun ChatSurface(
                                 (turns.lastOrNull { it.role == TurnRole.MASALA }?.text ?: "").take(140)
                             },
                         )
-                        turns.isEmpty() && !listening && !thinking -> EmptyThread(level, character)
-                        else -> Thread(turns, liveWords, listening, thinking, state, character, level, onStop, onDeleteTurn, onCollapse = { onExpanded(false) })
+                        turns.isEmpty() && !listening && !thinking -> EmptyThread(level, character, experts, onAskExpert)
+                        else -> Thread(
+                            turns, liveWords, listening, thinking, state, character, level, onStop, onDeleteTurn,
+                            onCollapse = { onExpanded(false) },
+                            onGrant = grant,
+                            onRetry = onRetry,
+                        )
                     }
                 }
                 Controls(listening, mic, level, onSend, onClose)
@@ -176,6 +199,8 @@ private fun Header(
     onNewChat: () -> Unit,
     onToggle: () -> Unit,
     onExpanded: (Boolean) -> Unit,
+    experts: List<ExpertCredit> = emptyList(),
+    onAskExpert: (ExpertCredit) -> Unit = {},
 ) {
     var drag by remember { mutableFloatStateOf(0f) }
     Column(Modifier.fillMaxWidth()) {
@@ -213,6 +238,25 @@ private fun Header(
                 maxLines = 1,
                 modifier = Modifier.weight(1f),
             )
+            if (experts.isNotEmpty()) {
+                var asking by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { asking = true }) {
+                        Icon(Icons.Rounded.Person, stringResource(R.string.chat_ask_someone), tint = MasalaTheme.tokens.textMedium)
+                    }
+                    DropdownMenu(expanded = asking, onDismissRequest = { asking = false }) {
+                        experts.forEach { expert ->
+                            DropdownMenuItem(
+                                text = { Text(expert.title) },
+                                onClick = {
+                                    asking = false
+                                    onAskExpert(expert)
+                                },
+                            )
+                        }
+                    }
+                }
+            }
             IconButton(onClick = onNewChat) { Icon(Icons.Rounded.Add, stringResource(R.string.chat_new), tint = MasalaTheme.tokens.textMedium) }
             IconButton(onClick = onHistory) { Icon(Icons.Rounded.History, stringResource(R.string.chat_history), tint = MasalaTheme.tokens.textMedium) }
         }
@@ -289,7 +333,12 @@ private fun Orb(level: () -> Float, character: Character, listening: Boolean, ca
 }
 
 @Composable
-private fun EmptyThread(level: () -> Float, character: Character) {
+private fun EmptyThread(
+    level: () -> Float,
+    character: Character,
+    experts: List<ExpertCredit>,
+    onAskExpert: (ExpertCredit) -> Unit,
+) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         MasalaCharacter(character, CharacterState.HELLO, Modifier.size(110.dp), level, description = null)
         Text(
@@ -299,6 +348,17 @@ private fun EmptyThread(level: () -> Float, character: Character) {
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 14.dp, start = 32.dp, end = 32.dp),
         )
+        if (experts.isNotEmpty()) {
+            // What Masala can do, shown rather than explained: tapping one starts the request.
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            ) {
+                experts.forEach { expert ->
+                    AssistChip(onClick = { onAskExpert(expert) }, label = { Text(expert.title) })
+                }
+            }
+        }
     }
 }
 
@@ -315,11 +375,19 @@ private fun Thread(
     onStop: () -> Unit,
     onDeleteTurn: (Int) -> Unit,
     onCollapse: () -> Unit,
+    onGrant: (String) -> Unit,
+    onRetry: () -> Unit,
 ) {
     val list = rememberLazyListState()
     LaunchedEffect(turns.size, liveWords, thinking, (state as? CommandState.Thinking)?.steps?.size) {
-        val last = list.layoutInfo.totalItemsCount - 1
-        if (last >= 0) list.animateScrollToItem(last)
+        // A finished answer scrolls to its start, so the expert badge that credits it is visible;
+        // while working, the steps at the bottom are what matters.
+        val target = when {
+            thinking || listening -> list.layoutInfo.totalItemsCount - 1
+            turns.isNotEmpty() -> turns.lastIndex
+            else -> -1
+        }
+        if (target >= 0) list.animateScrollToItem(target)
     }
     // The handle's rule, on the list itself: a downward pull past the top,
     // beyond 120 dp, returns to the orb. Down is the handle's collapse
@@ -372,9 +440,32 @@ private fun Thread(
                 StepTimeline(steps = (state as? CommandState.Thinking)?.steps.orEmpty(), onStop = onStop)
             }
         }
+        val answered = state as? CommandState.Reply
+        if (answered != null && answered.capabilities.isNotEmpty()) {
+            item("access") { AccessRow(answered.capabilities.first(), onGrant, onRetry) }
+        }
         item("tail") { Spacer(Modifier.height(6.dp)) }
     }
 }
+
+/** The answer came without a step that needed access; offer the grant, then the retry. */
+@Composable
+private fun AccessRow(capability: String, onGrant: (String) -> Unit, onRetry: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp)) {
+        Text(
+            stringResource(R.string.chat_needs_access),
+            style = MaterialTheme.typography.bodySmall,
+            color = MasalaTheme.tokens.textMedium,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TextButton(onClick = { onGrant(capability) }) { Text(stringResource(R.string.command_grant)) }
+            TextButton(onClick = onRetry) { Text(stringResource(R.string.command_try_again)) }
+        }
+    }
+}
+
+/** Beyond this the badges would wrap under the text; the steps above still name every expert. */
+private const val MAX_EXPERT_BADGES = 3
 
 @Composable
 private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1, onDelete: (() -> Unit)? = null) {
@@ -435,6 +526,33 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1, onDelet
                 )
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
+            if (turn.experts.isNotEmpty() && !user) {
+                // Who answered: the expert's name above the text, so scrolling back stays clear.
+                Row(
+                    Modifier.padding(bottom = 7.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    val context = LocalContext.current
+                    turn.experts.take(MAX_EXPERT_BADGES).forEach { expert ->
+                        Text(
+                            expert.title,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MasalaColors.Gold,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(MasalaColors.Gold.copy(alpha = 0.14f))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                // Who answered, and where its instructions can be changed.
+                                .clickable {
+                                    context.startActivity(
+                                        Intent(context, SettingsActivity::class.java)
+                                            .putExtra(SettingsActivity.EXTRA_PAGE, "PERSONAS"),
+                                    )
+                                },
+                        )
+                    }
+                }
+            }
             Text(
                 turn.text,
                 style = MaterialTheme.typography.bodyMedium,

@@ -38,6 +38,8 @@ class CommandController(
      * once the history outgrows the budget; null means compaction is off.
      */
     private val summarize: (suspend (String) -> String?)? = null,
+    /** Called when a turn starts, so per-turn budgets (expert consults) reset with it. */
+    private val onTurnStart: (() -> Unit)? = null,
 ) {
     private val _state = MutableStateFlow<CommandState>(CommandState.Idle)
     /**
@@ -51,7 +53,7 @@ class CommandController(
         _state.value = state
         val turn = when (state) {
             is CommandState.Reply -> com.samosaai.masala.chat.ChatTurn(
-                com.samosaai.masala.chat.TurnRole.MASALA, state.text, state.steps,
+                com.samosaai.masala.chat.TurnRole.MASALA, state.text, state.steps, experts = state.experts,
             )
             is CommandState.Error -> com.samosaai.masala.chat.ChatTurn(
                 com.samosaai.masala.chat.TurnRole.ERROR, state.message,
@@ -217,6 +219,7 @@ class CommandController(
     }
 
     private suspend fun handle(prompt: String, spoken: Boolean) {
+        onTurnStart?.invoke()
         CommandFastPath.match(prompt, resolveApp)?.let { action ->
             publish(stateFor(prompt, run(action), spoken))
             return
@@ -226,24 +229,39 @@ class CommandController(
             publish(stateFor(prompt, run(MasalaAction.RunSkill(skill.id, prompt)), spoken, "Opened ${skill.title.ifBlank { skill.id }}."))
             return
         }
-        val chip = SkillRouter.route(prompt, skills())?.let { SkillChip(it.id, it.title.ifBlank { it.id }) }
-        // Asking for advice goes straight to the persona; asking the phone to act runs, with the persona offered beside it.
-        if (chip != null && !SkillRouter.isCommand(prompt)) {
-            publish(CommandState.Reply(prompt, "${chip.title} can help with that.", skill = chip, spoken = spoken))
-            return
-        }
+        // Advice in an expert's area goes to the agent too: it consults the expert itself, in place.
         val agent = newAgent().also { it.restore(history) }
         val steps = mutableListOf<String>()
+        // Who answered, in order of first use; the badge on the reply and the stored turn.
+        val consulted = linkedMapOf<String, com.samosaai.masala.chat.ExpertCredit>()
+        // Access a step asked for and did not have: the answer still comes, plus a Grant row.
+        val missingAccess = linkedSetOf<String>()
         try {
             agent.run(ChatMessage("user", JsonPrimitive(prompt))).collect { event ->
                 when (event) {
                     is AgentEvent.ToolCall -> {
-                        steps += event.name
+                        val expert = consultCredit(event.name, event.args, skills())
+                        if (expert == null) {
+                            steps += event.name
+                        } else {
+                            consulted[expert.id] = expert
+                            steps += "Consulting ${expert.title}"
+                        }
                         _state.value = CommandState.Thinking(prompt, steps.toList())
                     }
-                    is AgentEvent.Done -> publish(CommandState.Reply(prompt, event.text.ifBlank { "Done." }, steps.toList(), chip, spoken))
+                    is AgentEvent.Done -> publish(
+                        CommandState.Reply(
+                            prompt,
+                            event.text.ifBlank { "Done." },
+                            steps.toList(),
+                            spoken = spoken,
+                            experts = consulted.values.toList(),
+                            capabilities = missingAccess.toList(),
+                        ),
+                    )
                     is AgentEvent.Failed -> publish(CommandState.Error(prompt, event.message))
-                    is AgentEvent.NeedsCapability -> publish(CommandState.Error(prompt, event.reason, event.capability))
+                    // Recorded, not fatal: the model keeps going and finishes around the gap.
+                    is AgentEvent.NeedsCapability -> missingAccess += event.capability
                     AgentEvent.StepLimit -> publish(CommandState.Error(prompt, "That took too many steps. Try asking in smaller pieces."))
                     else -> Unit
                 }
@@ -266,4 +284,19 @@ class CommandController(
         is ActionDispatcher.Outcome.Failed -> CommandState.Error(prompt, outcome.message)
         is ActionDispatcher.Outcome.NeedsCapability -> CommandState.Error(prompt, outcome.reason, outcome.marker)
     }
+}
+
+/**
+ * The expert a tool call consulted, or null when the call isn't one. The title comes from the
+ * installed skill, so the thread names it the way the user knows it.
+ */
+internal fun consultCredit(
+    name: String,
+    args: kotlinx.serialization.json.JsonObject,
+    skills: List<MasalaSkill>,
+): com.samosaai.masala.chat.ExpertCredit? {
+    if (name != "consult_expert") return null
+    val id = (args["skill_id"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.takeIf { it.isNotBlank() } ?: return null
+    val title = skills.firstOrNull { it.id == id }?.title?.ifBlank { id } ?: id
+    return com.samosaai.masala.chat.ExpertCredit(id, title)
 }

@@ -252,6 +252,21 @@
     <string name="skills_empty">No skills match.</string>
     <string name="skills_community">Community skill</string>
     <string name="skills_open">Open chat</string>
+    <string name="skills_edit">Edit</string>
+    <string name="personas_title">Personas</string>
+    <string name="personas_summary">The experts Masala can consult</string>
+    <string name="personas_empty">No personas are installed.</string>
+    <string name="personas_edited">Edited</string>
+    <string name="personas_edit_title">Edit %1$s</string>
+    <string name="personas_when_label">When should Masala call this expert?</string>
+    <string name="personas_when_hint">Masala reads this to decide whether a question belongs to this expert.</string>
+    <string name="personas_prompt_label">What it is told to be</string>
+    <string name="personas_reset">Reset to default</string>
+    <string name="personas_limit_tools">Limit which tools it can use</string>
+    <string name="personas_tools_hint">Only the checked tools are offered to this expert.</string>
+    <string name="personas_save">Save</string>
+    <string name="chat_ask_someone">Ask someone</string>
+    <string name="search_ask_expert">Ask the %1$s: </string>
     <string name="skills_delete">Delete</string>
     <string name="skills_import_url">Skill URL to import</string>
     <string name="skills_import">Import</string>
@@ -331,6 +346,7 @@
 
     <!-- Phase 4 -->
     <string name="command_grant">Grant</string>
+    <string name="chat_needs_access">One step needed access this phone hasn’t granted yet.</string>
     <string name="command_try_again">Try again</string>
     <string name="capability_retry_prompt">I’ve granted it. Please try again.</string>
     <string name="jobs_channel">Background jobs</string>
@@ -470,7 +486,6 @@
     <string name="command_thinking">Thinking…</string>
     <string name="command_read_aloud">Read aloud</string>
     <string name="command_close">Close</string>
-    <string name="command_continue_in">Continue in %1$s</string>
     <string name="skill_missing">That skill isn’t available</string>
     <string name="skill_new_chat">New chat</string>
     <string name="skill_input_hint">Message</string>

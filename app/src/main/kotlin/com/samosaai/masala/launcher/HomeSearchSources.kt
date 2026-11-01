@@ -68,6 +68,11 @@ class HomeSearchSources(private val context: Context, private val app: MasalaApp
     }
 
     override fun openSkill(skill: MasalaSkill) {
+        if (skill.persona != null) {
+            // Experts are consulted inside the chat: there is no screen of their own to open.
+            app.commands.openInput(context.getString(R.string.search_ask_expert, skill.title.ifBlank { skill.id }))
+            return
+        }
         context.startActivity(SkillSheetActivity.intent(context, skill.id, "").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 

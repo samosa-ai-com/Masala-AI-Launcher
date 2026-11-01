@@ -169,13 +169,21 @@ class MasalaAgentTest {
         assertEquals(AgentEvent.StepLimit, events.last())
     }
 
-    @Test fun needsCapabilityStopsTheRun() = runBlocking {
-        val model = script(assistant("", call("1", "get_time"), call("2", "dial")), assistant("never"))
+    @Test fun aMissingCapabilityIsAStepAndTheRunStillAnswers() = runBlocking {
+        val model = script(
+            assistant("", call("1", "get_time"), call("2", "dial")),
+            assistant("I couldn't call: phone access isn't granted."),
+        )
         val a = agent(model) { _, _ -> ToolResult.NeedsCapability("special:usage_access", "Needs usage access") }
         val events = a.run(user("x")).toList()
-        assertEquals(AgentEvent.NeedsCapability("special:usage_access", "Needs usage access"), events.last())
-        // Both calls have a result, so the next request is valid.
-        assertEquals(listOf("1", "2"), a.history.filter { it.role == "tool" }.map { it.toolCallId })
+        // The host is told, so it can offer the grant...
+        assertTrue(events.any { it is AgentEvent.NeedsCapability })
+        // ...and the model still gets to answer instead of the turn dying.
+        assertEquals("I couldn't call: phone access isn't granted.", (events.last() as AgentEvent.Done).text)
+        // Every call has a result, and the model is told not to retry the blocked one.
+        val toolMessages = a.history.filter { it.role == "tool" }
+        assertEquals(listOf("1", "2"), toolMessages.map { it.toolCallId })
+        assertTrue(toolMessages.all { it.textContent.contains("Do not call it again") })
     }
 
     @Test fun failedToolIsReportedToTheModel() = runBlocking {

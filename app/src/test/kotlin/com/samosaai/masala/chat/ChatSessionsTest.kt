@@ -16,7 +16,8 @@ class ChatSessionsTest {
     val tmp = TemporaryFolder()
 
     private var now = 1_000L
-    private fun store() = ChatSessions(tmp.root, clock = { now++ }, newId = { "id-${now}" })
+    private fun store(onDeleted: (String) -> Unit = {}) =
+        ChatSessions(tmp.root, clock = { now++ }, newId = { "id-${now}" }, onDeleted = onDeleted)
 
     private fun user(text: String) = ChatTurn(TurnRole.USER, text)
     private fun masala(text: String) = ChatTurn(TurnRole.MASALA, text)
@@ -35,6 +36,22 @@ class ChatSessionsTest {
         assertEquals(2, restored!!.turns.size)
         assertEquals("Opening YouTube", restored.turns[1].text)
         assertEquals(TurnRole.MASALA, restored.turns[1].role)
+    }
+
+    @Test
+    fun `a turn keeps its experts through a reload`() = runBlocking<Unit> {
+        val s = store()
+        val chat = s.create()
+        s.append(
+            chat.id,
+            ChatTurn(TurnRole.MASALA, "the doctor said so", experts = listOf(ExpertCredit("doctor", "Doctor"))),
+        )
+        val restored = store()
+        restored.load()
+        assertEquals(
+            listOf(ExpertCredit("doctor", "Doctor")),
+            restored.get(chat.id)?.turns?.single()?.experts,
+        )
     }
 
     @Test
@@ -72,6 +89,31 @@ class ChatSessionsTest {
         assertTrue(s.summaries.value.isEmpty())
         assertNull(s.get(chat.id))
         assertTrue(tmp.root.listFiles().orEmpty().none { it.name == "${chat.id}.json" })
+    }
+
+    @Test
+    fun `deleting a session reports it, so its consults can go`() = runBlocking<Unit> {
+        val dropped = mutableListOf<String>()
+        val s = store { dropped += it }
+        val chat = s.create()
+        s.append(chat.id, user("hello"))
+        s.delete(chat.id)
+        assertEquals(listOf(chat.id), dropped)
+    }
+
+    @Test
+    fun `pruning reports every dropped session`() = runBlocking<Unit> {
+        val dropped = mutableListOf<String>()
+        val s = store { dropped += it }
+        val ids = mutableListOf<String>()
+        repeat(ChatSessions.MAX_SESSIONS + 3) { i ->
+            val c = s.create()
+            ids += c.id
+            s.append(c.id, user("chat $i"))
+        }
+        // The three oldest are pruned, and each is reported once.
+        assertEquals(ids.take(3).toSet(), dropped.toSet())
+        assertEquals(3, dropped.size)
     }
 
     @Test

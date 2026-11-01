@@ -533,6 +533,16 @@ class HomeActivity : ComponentActivity() {
                         app.commands.restoreSession(emptyList())
                         expanded = false
                     },
+                    experts = app.skills.getPersonas().map {
+                        com.samosaai.masala.chat.ExpertCredit(it.id, it.title.ifBlank { it.id })
+                    },
+                    onRetry = { app.commands.ask(getString(R.string.capability_retry_prompt)) },
+                    onAskExpert = { expert ->
+                        // Seeded, not sent: the user finishes the sentence, the agent does the rest.
+                        app.commands.openInput(getString(R.string.search_ask_expert, expert.title))
+                        chatOpen = true
+                        expanded = true
+                    },
                     onDeleteTurn = { index ->
                         val id = activeId ?: return@ChatSurface
                         app.scope.launch {

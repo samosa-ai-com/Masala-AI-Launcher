@@ -41,6 +41,24 @@ class ToolScopeTest {
         assertFalse(ToolScope.skill(skill("nope"), all).allows("nope"))
     }
 
+    @Test fun consultSeesTheCommandToolsExceptWhatIsExcluded() {
+        val withScreen = all + ToolInfo("open_app", ToolSensitivity.READ_ONLY, opensScreen = true)
+        val scope = ToolScope.consult(withScreen, setOf("delete_file", "create_mini_app"))
+        // Everything the main agent can do, minus the two switched off and the one that opens a screen.
+        assertEquals(
+            all.map { it.name }.toSet() - setOf("delete_file", "create_mini_app"),
+            scope.names,
+        )
+        assertTrue(scope.allows("set_alarm"))
+        assertFalse(scope.allows("delete_file"))
+        assertFalse(scope.allows("open_app"))
+    }
+
+    @Test fun consultIgnoresAnExclusionThatIsNotATool() {
+        assertFalse(ToolScope.consult(all, setOf("made_up")).allows("made_up"))
+        assertEquals(all.map { it.name }.toSet(), ToolScope.consult(all, emptySet()).names)
+    }
+
     @Test fun unattendedKeepsReadOnlyOnly() {
         val scope = ToolScope.unattended(ToolScope.skill(skill("set_alarm"), all), all)
         assertEquals(setOf("web_search", "memory_read"), scope.names)

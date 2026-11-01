@@ -18,6 +18,7 @@ import com.samosaai.masala.core.apps.AppSearch
 import com.samosaai.masala.audio.TtsEngine
 import com.samosaai.masala.audio.SttEngine
 import com.samosaai.masala.agent.CommandController
+import com.samosaai.masala.agent.ConsultService
 import com.samosaai.masala.agent.ConfiguredSpeechInput
 import com.samosaai.masala.agent.SpeechStrings
 import com.samosaai.masala.audio.SpeechConfig
@@ -96,8 +97,18 @@ class MasalaApp : Application() {
 
     val scheduledTasks by lazy { ScheduledTaskStore(PrefsTaskStorage(this)) }
 
+    /** The experts consulted inside each chat; hidden from the list and deleted with the chat. */
+    val consults by lazy {
+        com.samosaai.masala.chat.ConsultSessions(java.io.File(filesDir, com.samosaai.masala.chat.ConsultSessions.DIR))
+    }
+
     /** Conversations, stored as one JSON file each; the chat surface reads and writes them. */
-    val chats by lazy { com.samosaai.masala.chat.ChatSessions(java.io.File(filesDir, com.samosaai.masala.chat.ChatSessions.DIR)) }
+    val chats by lazy {
+        com.samosaai.masala.chat.ChatSessions(
+            java.io.File(filesDir, com.samosaai.masala.chat.ChatSessions.DIR),
+            onDeleted = { id -> consults.deleteChat(id) },
+        )
+    }
 
     /** The conversation turns are being added to; created on the first turn of a new chat. */
     val activeChatId = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
@@ -129,6 +140,8 @@ class MasalaApp : Application() {
         maxSteps: Int = aiSettings.profile.value.maxToolRounds,
         maxRepeatedToolCalls: Int = aiSettings.profile.value.maxRepeatedToolCalls,
         fetchOnlyResults: Boolean = false,
+        /** Skills listed in the prompt. An expert's run lists none: it cannot start or consult them. */
+        listSkills: Boolean = true,
     ): MasalaAgent {
         val executor = toolExecutor(gate)
         val infos = tools.tools.map { ToolInfo(it.name, it.sensitivity, it.readsPrivateData, it.opensScreen) }
@@ -139,7 +152,12 @@ class MasalaApp : Application() {
             scope = scope(infos),
             systemPrompt = {
                 val now = java.text.SimpleDateFormat("EEEE d MMMM yyyy, HH:mm", java.util.Locale.US).format(java.util.Date())
-                AgentPrompt.build("$now (${java.util.TimeZone.getDefault().id})", skills.getAllSkills(), secondBrain.promptNow(), instructions)
+                AgentPrompt.build(
+                    "$now (${java.util.TimeZone.getDefault().id})",
+                    if (listSkills) effectiveSkills() else emptyList(),
+                    secondBrain.promptNow(),
+                    instructions,
+                )
             },
             maxSteps = maxSteps,
             maxRepeatedToolCalls = maxRepeatedToolCalls,
@@ -338,10 +356,15 @@ class MasalaApp : Application() {
                 generic = getString(R.string.stt_error_generic),
             ),
             summarize = { transcript -> summarizeHistory(transcript) },
+            onTurnStart = { consultCalls.set(0) },
         ).also { controller ->
             controller.usesServerStt = { speechInput().usesServerStt() }
             controller.onTurn = ::recordTurn
-            scope.launch { chats.load() }
+            scope.launch {
+                chats.load()
+                // Consults whose chat is gone: the app was killed between the two deletes.
+                consults.pruneOrphans(chats.summaries.value.mapTo(HashSet()) { it.id })
+            }
         }
     }
 
@@ -386,6 +409,15 @@ class MasalaApp : Application() {
         /** A scheduled task with no skill runs a plain command under this id. */
         const val COMMAND_SKILL_ID = "command"
         val COMMAND_SKILL = MasalaSkill(id = COMMAND_SKILL_ID, title = "Command", instructions = "")
+
+        /** An expert gets a short run: it answers, it doesn't build things. */
+        const val MAX_CONSULT_STEPS = 15
+
+        /** Consults one turn may make, so one question can't spend the chat's whole allowance. */
+        const val MAX_CONSULT_CALLS_PER_TURN = 6
+
+        /** An expert can't consult, or open a skill sheet, from inside its own answer. */
+        val CONSULT_EXCLUDED = setOf("consult_expert", "run_skill")
     }
 
     private object NoScreen : ActionDispatcher.Screen {
@@ -405,9 +437,69 @@ class MasalaApp : Application() {
         fetchOnlyResults = unattended,
     )
 
-    /** The `run_skill` tool: opens the skill sheet on a prompt. */
+    /** What the user changed about an expert: its prompt, when it is called, and its tools. */
+    val personas by lazy { com.samosaai.masala.skills.PersonaStore(java.io.File(filesDir, "personas")) }
+
+    /**
+     * The installed skills with the user's persona edits applied. Everything that describes or runs
+     * an expert reads this, so nothing about a persona is fixed in the prompt.
+     */
+    private fun effectiveSkills(): List<MasalaSkill> = skills.getAllSkills().map { skill ->
+        val persona = skill.persona ?: return@map skill
+        skill.copy(
+            persona = persona.copy(
+                systemPrompt = personas.promptFor(skill.id) ?: persona.systemPrompt,
+                whenToUse = personas.whenToUseFor(skill.id) ?: persona.whenToUse,
+            ),
+        )
+    }
+
+    /** The agent for one expert consult: its persona's own instructions, its tools, a bounded run. */
+    private fun consultAgent(skill: MasalaSkill) = agent(
+        model = LlmAgentModel(LlmConfig.default.client(this)),
+        // The main agent's tools, minus a consult inside a consult, a skill sheet, and anything
+        // that would take the phone's screen away from the chat — plus the user's own switches.
+        scope = { infos -> ToolScope.consult(infos, CONSULT_EXCLUDED + personas.toolsFor(skill.id)) },
+        // [skill] already carries the user's prompt and "when to use" edits.
+        instructions = listOfNotNull(skill.persona?.systemPrompt, skill.instructions).joinToString("\n\n"),
+        maxSteps = MAX_CONSULT_STEPS,
+        listSkills = false,
+    )
+
+    private val consultService by lazy {
+        ConsultService(
+            sessions = consults,
+            skill = { id -> effectiveSkills().firstOrNull { it.id == id } },
+            agentFor = ::consultAgent,
+        )
+    }
+
+    /** Consult calls spent in the current chat turn; reset when the turn starts. */
+    private val consultCalls = java.util.concurrent.atomic.AtomicInteger()
+
+    /** The `consult_expert` tool: one exchange with a persona, inside the chat that asked. */
+    private suspend fun consultExpert(skillId: String, question: String, consultId: String?): ActionResult {
+        val chatId = activeChatId.value
+            ?: return ActionResult.error("Experts can only be consulted inside a chat.")
+        if (consultCalls.incrementAndGet() > MAX_CONSULT_CALLS_PER_TURN) {
+            return ActionResult.error(
+                "That is enough experts for this turn ($MAX_CONSULT_CALLS_PER_TURN). Answer from what you have.",
+            )
+        }
+        return when (val outcome = consultService.consult(chatId, skillId, question, consultId)) {
+            is ConsultService.Outcome.Answered -> ActionResult.ok(outcome.text)
+            is ConsultService.Outcome.Refused -> ActionResult.error(outcome.reason)
+        }
+    }
+
+    /** The `run_skill` tool: opens the skill sheet on a prompt. Experts are consulted, not opened. */
     private fun openSkillSheet(skillId: String, prompt: String?): ActionResult {
-        if (skills.getSkillById(skillId) == null) return ActionResult.error("There is no skill '$skillId'.")
+        val skill = skills.getSkillById(skillId) ?: return ActionResult.error("There is no skill '$skillId'.")
+        if (skill.persona != null) {
+            return ActionResult.error(
+                "'${skill.title.ifBlank { skill.id }}' is an expert. Ask it with consult_expert instead.",
+            )
+        }
         startActivity(SkillSheetActivity.intent(this, skillId, prompt).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         return ActionResult.ok("Opened the $skillId skill for the user.")
     }
@@ -460,7 +552,7 @@ class MasalaApp : Application() {
             skills = { skills },
             toolNames = { tools.tools.map { it.name }.toSet() },
         )
-        AgentTools.create(this, layouts, modes, runSkill = ::openSkillSheet).forEach(tools::register)
+        AgentTools.create(this, layouts, modes, runSkill = ::openSkillSheet, consult = ::consultExpert).forEach(tools::register)
         MemoryTools.create(secondBrain).forEach(tools::register)
         tools.register(MemoryRawTool.create(this, secondBrain) { tools.fileAccess })
         tools.register(MemoryTools.linkTask(taskNoteLinks))

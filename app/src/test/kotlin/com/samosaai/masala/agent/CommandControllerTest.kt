@@ -83,12 +83,14 @@ class CommandControllerTest {
         assertEquals(0, agentsBuilt)
     }
 
-    @Test fun personaRequestOffersAChipWithoutCallingTheModel() = runBlocking<Unit> {
+    @Test fun aPersonaRequestRunsTheAgentInsteadOfOfferingAChip() = runBlocking<Unit> {
+        replies += reply("The chef suggests an omelette.")
         val c = controller()
         c.ask("what can I cook with eggs")
         val reply = assertIs<CommandState.Reply>(c.settled())
-        assertEquals(SkillChip("chef", "Chef"), reply.skill)
-        assertEquals(0, agentsBuilt)
+        // Advice is answered in the chat: no hand-off chip, and the agent is the one that answers.
+        assertEquals("The chef suggests an omelette.", reply.text)
+        assertEquals(1, agentsBuilt)
     }
 
     @Test fun aCommandWithAPersonaKeywordStillRuns() = runBlocking<Unit> {
@@ -98,8 +100,6 @@ class CommandControllerTest {
         val reply = assertIs<CommandState.Reply>(c.settled())
         assertEquals("Added to your calendar", reply.text)
         assertEquals(1, agentsBuilt)
-        // The persona is still offered next to the answer.
-        assertEquals(SkillChip("chef", "Chef"), reply.skill)
     }
 
     @Test fun eachReplyIsReadAloudOnce() = runBlocking<Unit> {
@@ -145,9 +145,10 @@ class CommandControllerTest {
         assertEquals("offline", assertIs<CommandState.Error>(c.settled()).message)
     }
 
-    @Test fun aToolThatNeedsAPermissionOffersToGrantIt() = runBlocking<Unit> {
+    @Test fun aToolThatNeedsAPermissionStillYieldsAnAnswerAndAnOfferToGrantIt() = runBlocking<Unit> {
         val calls = ArrayDeque(listOf(
             ChatMessage("assistant", JsonPrimitive(""), toolCalls = listOf(com.samosaai.masala.llm.ToolCall("1", function = com.samosaai.masala.llm.FunctionCall("x", "{}")))),
+            reply("I can't see your calendar without calendar access."),
         ))
         val c = CommandController(scope, { null }, { emptyList() }, { ActionDispatcher.Outcome.Done() }, { emptyList() }, {
             MasalaAgent(
@@ -159,9 +160,10 @@ class CommandControllerTest {
             )
         })
         c.ask("what is on my calendar")
-        val error = assertIs<CommandState.Error>(c.settled())
-        assertEquals("android.permission.READ_CALENDAR", error.capability)
-        assertEquals("Calendar access is needed", error.message)
+        val answer = assertIs<CommandState.Reply>(c.settled())
+        assertEquals("I can't see your calendar without calendar access.", answer.text)
+        // The answer arrives, and the missing access is carried so the card can offer Grant.
+        assertEquals(listOf("android.permission.READ_CALENDAR"), answer.capabilities)
     }
 
     @Test fun spokenCommandsGetNamesCorrected() = runBlocking<Unit> {
@@ -316,5 +318,65 @@ class CommandControllerTest {
         assertEquals(CommandState.Input, c.state.value)
         c.dismiss()
         assertEquals(CommandState.Idle, c.state.value)
+    }
+
+    @Test fun aConsultCallNamesTheExpertAndCreditsIt() = runBlocking<Unit> {
+        val args = kotlinx.serialization.json.buildJsonObject {
+            put("skill_id", JsonPrimitive("chef"))
+            put("question", JsonPrimitive("dinner"))
+        }
+        assertEquals(com.samosaai.masala.chat.ExpertCredit("chef", "Chef"), consultCredit("consult_expert", args, listOf(chef)))
+        // An id with no installed skill still names something rather than blank.
+        assertEquals(
+            com.samosaai.masala.chat.ExpertCredit("gone", "gone"),
+            consultCredit("consult_expert", kotlinx.serialization.json.buildJsonObject { put("skill_id", JsonPrimitive("gone")) }, listOf(chef)),
+        )
+        assertEquals(null, consultCredit("get_time", args, listOf(chef)))
+    }
+
+    @Test fun theReplyCarriesTheExpertItConsulted() = runBlocking<Unit> {
+        val scripts = ArrayDeque(
+            listOf(
+                ChatMessage(
+                    "assistant",
+                    JsonPrimitive(""),
+                    toolCalls = listOf(
+                        com.samosaai.masala.llm.ToolCall(
+                            "1",
+                            function = com.samosaai.masala.llm.FunctionCall(
+                                "consult_expert",
+                                """{"skill_id":"chef","question":"dinner"}""",
+                            ),
+                        ),
+                    ),
+                ),
+                reply("The chef suggests risotto."),
+            ),
+        )
+        val c = CommandController(
+            scope = scope,
+            resolveApp = { null },
+            names = { emptyList() },
+            run = { ActionDispatcher.Outcome.Done() },
+            skills = { listOf(chef) },
+            newAgent = {
+                MasalaAgent(
+                    AgentModel { _, _ -> scripts.removeFirst() },
+                    { _, _ -> ToolResult.Success("Chef: risotto.") },
+                    listOf(ToolDefinition("consult_expert", "", JsonObject(emptyMap()))),
+                    ToolScope.command(listOf(ToolInfo("consult_expert", ToolSensitivity.READ_ONLY, readsPrivateData = true))),
+                    { "system" },
+                )
+            },
+        )
+        val stored = mutableListOf<com.samosaai.masala.chat.ChatTurn>()
+        c.onTurn = { stored += it }
+        c.ask("risotto idea")
+        val settled = assertIs<CommandState.Reply>(c.settled())
+        assertEquals("The chef suggests risotto.", settled.text)
+        // What lands in the session keeps the credit, so the badge survives a reload.
+        assertEquals(listOf(com.samosaai.masala.chat.ExpertCredit("chef", "Chef")), stored.last().experts)
+        assertEquals(listOf(com.samosaai.masala.chat.ExpertCredit("chef", "Chef")), settled.experts)
+        assertTrue(settled.steps.contains("Consulting Chef"))
     }
 }

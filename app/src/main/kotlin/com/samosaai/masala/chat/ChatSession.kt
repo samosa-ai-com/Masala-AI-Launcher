@@ -9,9 +9,14 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class TurnRole { USER, MASALA, ERROR, SYSTEM }
 
+/** An expert a reply consulted, named so the thread can credit it after a reload. */
+@Serializable
+data class ExpertCredit(val id: String, val title: String)
+
 /**
  * One thing on the conversation screen. [steps] are the tool steps a reply took, kept
- * beside the text so a reopened session shows the same trace; [at] is when it landed.
+ * beside the text so a reopened session shows the same trace; [experts] are the personas
+ * whose answers shaped it; [at] is when it landed.
  */
 @Serializable
 data class ChatTurn(
@@ -19,6 +24,7 @@ data class ChatTurn(
     val text: String,
     val steps: List<String> = emptyList(),
     val at: Long = 0L,
+    val experts: List<ExpertCredit> = emptyList(),
 )
 
 /**

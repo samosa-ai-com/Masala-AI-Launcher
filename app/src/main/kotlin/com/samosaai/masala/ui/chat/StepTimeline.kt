@@ -88,7 +88,8 @@ fun StepTimeline(
                     Box(Modifier.width(2.dp).height(14.dp).background(MasalaColors.Cardamom.copy(alpha = 0.4f)))
                 }
                 Text(
-                    stringResource(R.string.skill_step_done, step),
+                    // A consult reads as itself ("Consulting Doctor"); other steps say "Ran …".
+                    if (step.startsWith("Consulting ")) step else stringResource(R.string.skill_step_done, step),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MasalaTheme.tokens.textHigh,
                     modifier = Modifier.padding(bottom = 10.dp),

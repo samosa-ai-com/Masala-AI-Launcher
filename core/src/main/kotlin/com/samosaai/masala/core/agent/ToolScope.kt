@@ -38,6 +38,15 @@ class ToolScope private constructor(val names: Set<String>) {
             return ToolScope((basics + memory + required).toSet())
         }
 
+        /**
+         * A consulted expert: the main agent's tools, minus the ones that open a screen (an expert
+         * answering inside a chat must not take over the phone) and minus anything the user switched
+         * off for it. Recursion is the caller's exclusion, since only it knows the consult tool's
+         * name. Names that don't exist in [all] are ignored, so a stale override can't invent a tool.
+         */
+        fun consult(all: List<ToolInfo>, excluded: Set<String>): ToolScope =
+            ToolScope(all.filter { !it.opensScreen }.mapTo(HashSet()) { it.name }.apply { removeAll(excluded) })
+
         /** A run nobody is watching: nothing that would need a confirmation or bring up a screen. */
         fun unattended(scope: ToolScope, all: List<ToolInfo>): ToolScope {
             val safe = all.filter { it.sensitivity == ToolSensitivity.READ_ONLY && !it.opensScreen }.mapTo(HashSet()) { it.name }
