@@ -362,8 +362,8 @@ class LayoutEditsTest {
         assertEquals(2, LayoutEdits.widgetRowsUsed(widgetDoc(), "two", lib))
         assertEquals(0, LayoutEdits.widgetRowsUsed(widgetDoc(), "missing", lib))
         val grid = LayoutDoc(pages = listOf(Page("home", sections = listOf(HeaderSection("h"), GridSection("g", title = "T", columns = 4, items = items("a", "b", "c", "d", "e"))))))
-        // Header 4 (clock + date) + grid title 1 + ceil(5/4)*2 rows.
-        assertEquals(4 + 1 + 4, LayoutEdits.widgetRowsUsed(grid, "home"))
+        // Header 3 (clock + date) + grid title 1 + ceil(5/4)*2 rows.
+        assertEquals(3 + 1 + 4, LayoutEdits.widgetRowsUsed(grid, "home"))
     }
 
     @Test

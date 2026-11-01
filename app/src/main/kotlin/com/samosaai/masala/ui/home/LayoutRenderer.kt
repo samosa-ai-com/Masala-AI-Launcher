@@ -464,9 +464,9 @@ private fun columnsFor(wanted: Int, maxWidthDp: Float): Int {
 
 @Composable
 private fun ItemGrid(sectionId: String, title: String?, items: List<Item>, columns: Int, ctx: RenderContext) {
-    if (items.isEmpty() && title == null) return
+    if (items.isEmpty() && title.isNullOrBlank()) return
     Column(Modifier.fillMaxWidth().dropSection(sectionId, ctx).padding(horizontal = 12.dp)) {
-        title?.let { Text(it, style = wallpaperText(MaterialTheme.typography.titleSmall), modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) }
+        if (!title.isNullOrBlank()) Text(title, style = wallpaperText(MaterialTheme.typography.titleSmall), modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val cols = columnsFor(columns, maxWidth.value)
             Column {
@@ -497,7 +497,7 @@ private fun Dock(section: DockSection, ctx: RenderContext) {
 @Composable
 private fun ItemList(sectionId: String, title: String?, items: List<Item>, ctx: RenderContext) {
     Column(Modifier.fillMaxWidth().dropSection(sectionId, ctx)) {
-        title?.let { Text(it, style = wallpaperText(MaterialTheme.typography.titleSmall), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) }
+        if (!title.isNullOrBlank()) Text(title, style = wallpaperText(MaterialTheme.typography.titleSmall), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         items.forEach { item -> ItemRow(item, ctx, sectionId) }
     }
 }

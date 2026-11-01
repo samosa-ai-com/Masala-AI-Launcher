@@ -243,9 +243,9 @@ object LayoutEdits {
             }
             is HtmlSection -> section.rows
             is SkillWidgetSection -> 4
-            is HeaderSection -> (if (section.showClock) 3 else 0) + (if (section.showDate) 1 else 0)
-            is GridSection -> (if (section.title != null) 1 else 0) + ((section.items.size + section.columns - 1) / section.columns) * 2
-            is ListSection -> (if (section.title != null) 1 else 0) + section.items.size
+            is HeaderSection -> (if (section.showClock) 2 else 0) + (if (section.showDate) 1 else 0)
+            is GridSection -> (if (!section.title.isNullOrBlank()) 1 else 0) + ((section.items.size + section.columns - 1) / section.columns) * 2
+            is ListSection -> (if (!section.title.isNullOrBlank()) 1 else 0) + section.items.size
             is GroupSection -> 1
             is DockSection -> 0
         }
@@ -270,7 +270,7 @@ object LayoutEdits {
             is WidgetComponent.Text -> 1
             is WidgetComponent.Counter -> 2
             is WidgetComponent.Checklist -> component.items.size + 1
-            is WidgetComponent.Timer -> 1
+            is WidgetComponent.Timer -> 2
             is WidgetComponent.Progress -> 2
             is WidgetComponent.Chart -> 2
             is WidgetComponent.Button -> 1
