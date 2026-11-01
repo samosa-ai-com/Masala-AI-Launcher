@@ -102,7 +102,9 @@ class ConsultService(
                             // Not fatal: the expert finishes around it, and the gap is reported.
                             is AgentEvent.NeedsCapability -> missingAccess = event.capability
                             is AgentEvent.Results -> event.items.forEach { item ->
-                                if (produced.none { it.ref == item.ref }) produced += item
+                                // A rebuild of the same app updates its entry instead of being dropped.
+                                produced.removeAll { it.ref == item.ref }
+                                produced += item
                             }
                             else -> Unit
                         }

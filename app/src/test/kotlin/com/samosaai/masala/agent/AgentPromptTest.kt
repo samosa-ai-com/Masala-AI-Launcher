@@ -70,7 +70,8 @@ class AgentPromptTest {
         val prompt = AgentPrompt.build("Monday", listOf(doctor))
         assertTrue(prompt.contains("open_mini_app"))
         assertTrue(prompt.contains("There is no separate builder to open"))
-        assertTrue(prompt.contains("build it with create_mini_app"))
+        assertTrue(prompt.contains("consult the software_engineer")
+            || prompt.contains("consult the software_engineer expert"))
         assertTrue(prompt.contains("Never open a screen just because a word matched"))
     }
 

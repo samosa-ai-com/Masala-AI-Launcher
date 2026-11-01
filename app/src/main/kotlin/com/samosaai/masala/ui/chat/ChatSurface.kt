@@ -459,7 +459,8 @@ private fun ResultCard(result: ChatResult) {
     val context = LocalContext.current
     val app = context.masala
     val scope = rememberCoroutineScope()
-    var pinned by remember(result.ref) { mutableStateOf(false) }
+    // Created apps are pinned by the tool, so the card must not offer it again.
+    var pinned by remember(result.ref) { mutableStateOf(app.layouts.isMiniAppPinned(result.ref)) }
     val miniApp = result.kind == "mini_app"
     Column(
         Modifier.fillMaxWidth().padding(top = 8.dp)
@@ -473,23 +474,24 @@ private fun ResultCard(result: ChatResult) {
             color = MasalaTheme.tokens.textHigh,
             maxLines = 1,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            // Only a mini app or an installed app has an address we can open from here.
-            val canOpen = miniApp || result.kind == "installed_app"
-            if (canOpen) {
+        // Only a mini app or an installed app has an address we can open from here; a produced
+        // file still gets its title, without a row of buttons that would do nothing.
+        val canOpen = miniApp || result.kind == "installed_app"
+        if (canOpen) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = {
                     if (miniApp) context.openMiniApp(result.ref)
                     else runCatching { context.packageManager.getLaunchIntentForPackage(result.ref)?.let(context::startActivity) }
                 }) { Text(stringResource(R.string.miniapp_open)) }
-            }
-            if (miniApp) {
-                TextButton(onClick = {
-                    scope.launch {
-                        app.layouts.pinMiniApp(result.ref, result.title)
-                        pinned = true
+                if (miniApp) {
+                    TextButton(onClick = {
+                        scope.launch {
+                            app.layouts.pinMiniApp(result.ref, result.title)
+                            pinned = true
+                        }
+                    }) {
+                        Text(stringResource(if (pinned) R.string.miniapp_pinned else R.string.miniapp_pin))
                     }
-                }) {
-                    Text(stringResource(if (pinned) R.string.miniapp_pinned else R.string.miniapp_pin))
                 }
             }
         }

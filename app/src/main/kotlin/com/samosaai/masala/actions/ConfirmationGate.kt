@@ -90,8 +90,11 @@ class ConfirmationGate(
          */
         internal fun summarize(name: String, args: JsonObject): String {
             // Making an app is confirmed in the user's words, not as a wall of HTML.
-            (args["title"] as? JsonPrimitive)?.takeIf { it.isString && name == "create_mini_app" }?.let {
-                return "Add \"${it.content.take(60)}\" to your home screen as an app"
+            if (name == "create_mini_app") {
+                val title = (args["title"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                    ?.trim()?.take(60)?.takeIf { it.isNotEmpty() }
+                return if (title != null) "Add \"$title\" to your home screen as an app"
+                else "Add a new app to your home screen"
             }
             if (name == "update_mini_app") return "Change that app"
             val shown = JsonObject(args.mapValues { (_, value) ->

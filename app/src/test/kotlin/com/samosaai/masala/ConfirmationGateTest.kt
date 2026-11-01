@@ -96,6 +96,11 @@ class ConfirmationGateTest {
         assertEquals("Add \"Snake\" to your home screen as an app", summary)
         // Changing one is a short sentence too.
         assertEquals("Change that app", ConfirmationGate.summarize("update_mini_app", JsonObject(mapOf("id" to JsonPrimitive("a1")))))
+        // A model that omits the title still gets a sentence, never the HTML.
+        assertEquals(
+            "Add a new app to your home screen",
+            ConfirmationGate.summarize("create_mini_app", JsonObject(mapOf("html" to JsonPrimitive(html)))),
+        )
     }
 
     @Test

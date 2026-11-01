@@ -186,23 +186,18 @@ class HomeActivity : ComponentActivity() {
                 if (commandState != CommandState.Idle) chatOpen = true
                 if (commandState == CommandState.Listening) expanded = false
                 if (commandState is CommandState.Thinking) expanded = true
-            }
-            // A newly made app opens once, then the card is how it is opened again. The count is
-            // seeded from what is already on screen, so a reload or a reopened chat never reopens it.
-            var seenTurns by remember { mutableIntStateOf(turns.size) }
-            LaunchedEffect(turns.size) {
-                if (turns.size <= seenTurns) {
-                    seenTurns = turns.size
-                    return@LaunchedEffect
+                // A newly made app opens once. This hangs off the live reply, not off the stored
+                // turns, so a reload, a cold start or opening another chat never reopens one.
+                val reply = commandState as? CommandState.Reply
+                val made = reply?.results?.firstOrNull { it.kind == "mini_app" }
+                if (made != null) {
+                    chatOpen = false
+                    expanded = false
+                    // Home's search pill only draws while the command is idle; leaving it on the
+                    // reply would hand the user back a home screen with no way to start a chat.
+                    app.commands.dismiss()
+                    runCatching { openMiniApp(made.ref) }
                 }
-                seenTurns = turns.size
-                val made = turns.lastOrNull()?.results?.firstOrNull { it.kind == "mini_app" } ?: return@LaunchedEffect
-                chatOpen = false
-                expanded = false
-                // Home's search pill only draws while the command is idle; leaving it on the
-                // reply would hand the user back a home screen with no way to start a chat.
-                app.commands.dismiss()
-                runCatching { openMiniApp(made.ref) }
             }
         val pinnedShortcuts by launcher.pinnedShortcuts.collectAsStateWithLifecycle()
         val profiles by launcher.profiles.collectAsStateWithLifecycle()
