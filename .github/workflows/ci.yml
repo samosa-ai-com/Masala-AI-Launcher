@@ -7,6 +7,11 @@ on:
   push:
     branches: [main]
   pull_request:
+    # A docs-only change can't break the build, and every run costs minutes.
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "HANDOFF.md"
   workflow_dispatch:
 
 concurrency:
