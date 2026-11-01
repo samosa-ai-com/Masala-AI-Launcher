@@ -6,11 +6,11 @@ import com.samosaai.masala.chat.ConsultTurn
 import com.samosaai.masala.chat.TurnRole
 import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.llm.ChatMessage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonPrimitive
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * One exchange with a consulted expert. The expert owns its turn — its persona prompt is the only
@@ -31,9 +31,11 @@ class ConsultService(
         data class Refused(val reason: String) : Outcome
     }
 
-    /** One consult at a time: a second question while the expert is answering is refused, not queued. */
-    private val busy = mutableSetOf<String>()
-    private val busyLock = Mutex()
+    /**
+     * One consult at a time. A concurrent map rather than a mutex: a cancelled turn must still be
+     * able to clear its entry, and a cancelled coroutine cannot take a suspending lock.
+     */
+    private val busy = ConcurrentHashMap.newKeySet<String>()
 
     suspend fun consult(chatId: String, skillId: String, question: String, consultId: String?): Outcome {
         val asked = question.trim()
@@ -49,63 +51,71 @@ class ConsultService(
                 val found = sessions.get(chatId, consultId)
                     ?: return Outcome.Refused("There is no consult '$consultId' in this chat.")
                 if (found.skillId != skillId) {
-                    return Outcome.Refused("Consult $consultId belongs to '${found.title}', not '$title'. Use its own id, or leave consult_id out for a new consult.")
+                    return Outcome.Refused("Consult $consultId belongs to '${found.title}', not '$title'. Use its own id, or leave consult_id out for a fresh consult.")
                 }
-                if (found.exchanges >= ConsultSessions.MAX_EXCHANGES) return full(found)
+                if (found.questions >= ConsultSessions.MAX_EXCHANGES) {
+                    return Outcome.Refused(
+                        "That consult has asked its ${ConsultSessions.MAX_EXCHANGES} questions. " +
+                            "Leave consult_id out to start a fresh consult with $title, or use what you have.",
+                    )
+                }
                 found
             }
-            else -> {
-                val open = sessions.newest(chatId, skillId)
-                if (open != null && open.exchanges >= ConsultSessions.MAX_EXCHANGES) return full(open)
-                open ?: sessions.create(chatId, skillId, title)
-                    ?: return Outcome.Refused(
-                        "This chat has already consulted ${ConsultSessions.MAX_PER_CHAT} experts. " +
-                            "Answer from what you know, or ask the user to start a new chat for another.",
-                    )
-            }
+            else -> sessions.newest(chatId, skillId)?.takeIf { it.questions < ConsultSessions.MAX_EXCHANGES }
+                ?: sessions.create(chatId, skillId, title)
+                ?: return Outcome.Refused(
+                    "This chat has already consulted ${ConsultSessions.MAX_PER_CHAT} experts. " +
+                        "Answer from what you know, or ask the user to start a new chat for another.",
+                )
         }
 
         val key = "${session.chatId}/${session.id}"
-        busyLock.withLock {
-            if (!busy.add(key)) return Outcome.Refused("$title is still answering the previous question.")
-        }
+        if (!busy.add(key)) return Outcome.Refused("$title is still answering the previous question.")
         try {
-            val history = session.turns
-            val afterQuestion = sessions.append(chatId, session.id, ConsultTurn(TurnRole.USER, asked))
-                ?: return full(session)
-
             val agent = agentFor(expert)
-            agent.restore(history.map { turn ->
-                ChatMessage(
-                    if (turn.role == TurnRole.USER) "user" else "assistant",
-                    JsonPrimitive(turn.text),
+            // Only answered exchanges are replayed: a failure is not something the expert said.
+            agent.restore(session.pairs().flatMap { (q, a) ->
+                listOf(
+                    ChatMessage("user", JsonPrimitive(q)),
+                    ChatMessage("assistant", JsonPrimitive(a)),
                 )
             })
 
             var answer: String? = null
             var failure: String? = null
-            val finished = withTimeoutOrNull(timeoutMs) {
-                agent.run(ChatMessage("user", JsonPrimitive(asked))).collect { event ->
-                    when (event) {
-                        is AgentEvent.Done -> answer = event.text.ifBlank { null }
-                        is AgentEvent.Failed -> failure = event.message
-                        AgentEvent.StepLimit -> failure = "It took too many steps."
-                        else -> Unit
+            try {
+                val finished = withTimeoutOrNull(timeoutMs) {
+                    agent.run(ChatMessage("user", JsonPrimitive(asked))).collect { event ->
+                        when (event) {
+                            is AgentEvent.Done -> answer = event.text.ifBlank { null }
+                            is AgentEvent.Failed -> failure = event.message
+                            AgentEvent.StepLimit -> failure = "It took too many steps."
+                            is AgentEvent.NeedsCapability -> failure = "It needs ${event.capability}: ${event.reason}"
+                            else -> Unit
+                        }
                     }
+                    true
                 }
-                true
+                if (finished == null) failure = "It didn't answer in time."
+            } catch (e: CancellationException) {
+                // Nothing was written yet, so a cancelled turn leaves no dangling question behind.
+                throw e
+            } catch (e: Exception) {
+                failure = e.message ?: e::class.java.simpleName
             }
-            if (finished == null) failure = "It didn't answer in time."
 
             val text = answer
-            if (text == null) {
-                val reason = failure ?: "It didn't answer."
-                // The question was asked, so the record keeps it and the failure honestly.
-                sessions.append(chatId, session.id, ConsultTurn(TurnRole.ERROR, reason))
-                return Outcome.Refused("$title couldn't answer: $reason")
+            val reason = failure ?: "It didn't answer."
+            // One write: the question and its outcome land together or not at all.
+            val turns = if (text != null) {
+                listOf(ConsultTurn(TurnRole.USER, asked), ConsultTurn(TurnRole.MASALA, text))
+            } else {
+                listOf(ConsultTurn(TurnRole.USER, asked), ConsultTurn(TurnRole.ERROR, reason))
             }
+            val saved = sessions.append(chatId, session.id, turns)
+                ?: return Outcome.Refused("$title answered, but the consult couldn't be saved. Don't retry; answer from what you know.")
 
-            val saved = sessions.append(chatId, session.id, ConsultTurn(TurnRole.MASALA, text)) ?: afterQuestion
+            if (text == null) return Outcome.Refused("$title couldn't answer: $reason")
             return Outcome.Answered(
                 session = saved,
                 exchange = saved.exchanges,
@@ -113,14 +123,9 @@ class ConsultService(
                 text = render(saved, text, title),
             )
         } finally {
-            busyLock.withLock { busy.remove(key) }
+            busy.remove(key)
         }
     }
-
-    private suspend fun full(session: ConsultSession): Outcome.Refused = Outcome.Refused(
-        "${session.title} has answered ${ConsultSessions.MAX_EXCHANGES} times in this chat. " +
-            "Use what you have, or ask the user to start a new chat.",
-    )
 
     /**
      * What the main agent reads: where the answer came from, the answer, and the ids it needs to
@@ -129,8 +134,6 @@ class ConsultService(
     private suspend fun render(session: ConsultSession, answer: String, title: String): String {
         val earlier = session.pairs().dropLast(1)
         val recap = if (earlier.isEmpty()) "" else buildString {
-            appendLine()
-            appendLine()
             appendLine("Earlier in this consult:")
             earlier.forEach { (q, a) -> appendLine("- Q: ${oneLine(q)} → A: ${oneLine(a)}") }
         }
@@ -147,9 +150,13 @@ class ConsultService(
             append(ConsultSessions.MAX_EXCHANGES)
             appendLine("]")
             appendLine(answer.trim())
-            append(recap.trimEnd())
+            if (recap.isNotBlank()) {
+                appendLine()
+                append(recap.trimEnd())
+                appendLine()
+            }
             if (others.isNotBlank()) {
-                if (recap.isNotBlank()) appendLine() else appendLine().appendLine()
+                appendLine()
                 append("Consults in this chat: ")
                 append(others)
             }

@@ -21,8 +21,8 @@ class ChatSessions(
     private val dir: File,
     private val clock: () -> Long = { System.currentTimeMillis() },
     private val newId: () -> String = { UUID.randomUUID().toString() },
-    /** Told when a conversation is removed, so what belongs to it (its consults) goes too. */
-    private val onDeleted: (String) -> Unit = {},
+    /** Told when a conversation is removed, so what belongs to it (its consults) goes too. Awaited, so a kill can't leave it behind. */
+    private val onDeleted: suspend (String) -> Unit = {},
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -130,7 +130,7 @@ class ChatSessions(
     }
 
     /** Keeps the newest [MAX_SESSIONS]; the rest and their files go. */
-    private fun prune() {
+    private suspend fun prune() {
         // Copy first: dropping entries while iterating a live view throws.
         val extra = loaded.values.sortedByDescending { it.updatedAt }.drop(MAX_SESSIONS).toList()
         extra.forEach {

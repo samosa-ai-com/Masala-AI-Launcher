@@ -38,6 +38,8 @@ class CommandController(
      * once the history outgrows the budget; null means compaction is off.
      */
     private val summarize: (suspend (String) -> String?)? = null,
+    /** Called when a turn starts, so per-turn budgets (expert consults) reset with it. */
+    private val onTurnStart: (() -> Unit)? = null,
 ) {
     private val _state = MutableStateFlow<CommandState>(CommandState.Idle)
     /**
@@ -217,6 +219,7 @@ class CommandController(
     }
 
     private suspend fun handle(prompt: String, spoken: Boolean) {
+        onTurnStart?.invoke()
         CommandFastPath.match(prompt, resolveApp)?.let { action ->
             publish(stateFor(prompt, run(action), spoken))
             return

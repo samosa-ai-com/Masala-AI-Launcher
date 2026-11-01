@@ -142,6 +142,24 @@ class ConsultServiceTest {
     }
 
     @Test
+    fun aFullConsultIsReplacedWhenNoIdIsGiven() = runBlocking<Unit> {
+        val replies = (1..11).map { "answer $it" }.toTypedArray()
+        val (service, _) = service(*replies)
+        var consulted = service.consult("chat-1", "doctor", "q0", null) as ConsultService.Outcome.Answered
+        repeat(9) { n ->
+            consulted = service.consult("chat-1", "doctor", "q${n + 1}", consulted.session.id) as ConsultService.Outcome.Answered
+        }
+        assertEquals(10, consulted.exchange)
+        // No id: the full consult is left alone and a fresh one starts in the next slot.
+        val fresh = service.consult("chat-1", "doctor", "new question", null) as ConsultService.Outcome.Answered
+        assertEquals("chat-1-c2", fresh.session.id)
+        assertEquals(1, fresh.exchange)
+        // With the full id it is refused rather than silently continuing past the cap.
+        val refused = service.consult("chat-1", "doctor", "one more", consulted.session.id)
+        assertTrue(refused is ConsultService.Outcome.Refused)
+    }
+
+    @Test
     fun tenExpertsIsTheChatsLimit() = runBlocking<Unit> {
         val (service, _) = service(*Array(10) { "answer" })
         repeat(10) { n ->

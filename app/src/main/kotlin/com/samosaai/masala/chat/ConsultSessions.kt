@@ -73,24 +73,35 @@ class ConsultSessions(
                 title = title,
                 createdAt = now,
                 updatedAt = now,
-            ).also { write(it) }
+            ).takeIf { write(it) }
         } }
 
     /**
-     * Adds [turn] to a consult. Null when the consult is gone, belongs to another chat, or the
-     * consult already has [MAX_EXCHANGES] questions and this is another one.
+     * Adds [turns] (a question and its answer, or a question and its failure) in one write, so a
+     * recorded question is never left without an outcome. Null when the consult is gone, belongs to
+     * another chat, [MAX_EXCHANGES] questions have been asked, or the write failed.
      */
-    suspend fun append(chatId: String, consultId: String, turn: ConsultTurn): ConsultSession? =
+    suspend fun append(chatId: String, consultId: String, turns: List<ConsultTurn>): ConsultSession? =
         lock.withLock { withContext(Dispatchers.IO) {
             val session = read(chatId, consultId) ?: return@withContext null
-            if (turn.role == TurnRole.USER && session.exchanges >= MAX_EXCHANGES) return@withContext null
+            val asking = turns.count { it.role == TurnRole.USER }
+            if (session.questions + asking > MAX_EXCHANGES) return@withContext null
             val next = session.copy(
-                turns = session.turns + turn.copy(at = turn.at.takeIf { it > 0 } ?: clock()),
+                turns = session.turns + turns.map { it.copy(at = it.at.takeIf { at -> at > 0 } ?: clock()) },
                 updatedAt = clock(),
             )
-            write(next)
-            next
+            next.takeIf { write(it) }
         } }
+
+    /**
+     * Removes consult folders whose chat is gone: the app was killed between deleting a chat and
+     * deleting its experts. Called once at start, after the chats are loaded.
+     */
+    suspend fun pruneOrphans(knownChatIds: Set<String>) = lock.withLock { withContext(Dispatchers.IO) {
+        root.listFiles { f -> f.isDirectory }.orEmpty().forEach { dir ->
+            if (dir.name !in knownChatIds) dir.deleteRecursively()
+        }
+    } }
 
     /** Removes every consult of [chatId]; the chat itself is being deleted. */
     suspend fun deleteChat(chatId: String) = lock.withLock { withContext(Dispatchers.IO) {
@@ -105,20 +116,20 @@ class ConsultSessions(
         else json.decodeFromString(ConsultSession.serializer(), file.readText()).takeIf { it.chatId == chatId }
     }.getOrNull()
 
-    private fun write(session: ConsultSession) {
+    /** True when the record reached disk; false on a full disk, so the caller doesn't claim it did. */
+    private fun write(session: ConsultSession): Boolean = runCatching {
         val dir = folder(session.chatId)
         dir.mkdirs()
         // Temp file + rename: a process killed mid-write must never leave a truncated consult.
-        runCatching {
-            val target = fileFor(session.chatId, session.id)
-            val temp = File(dir, "${session.id}.json.tmp")
-            temp.writeText(json.encodeToString(ConsultSession.serializer(), session))
-            if (!temp.renameTo(target)) {
-                target.writeText(temp.readText())
-                temp.delete()
-            }
+        val target = fileFor(session.chatId, session.id)
+        val temp = File(dir, "${session.id}.json.tmp")
+        temp.writeText(json.encodeToString(ConsultSession.serializer(), session))
+        if (!temp.renameTo(target)) {
+            target.writeText(temp.readText())
+            temp.delete()
         }
-    }
+        true
+    }.getOrDefault(false)
 
     private fun folder(chatId: String) = File(root, chatId)
 

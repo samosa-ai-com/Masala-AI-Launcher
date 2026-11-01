@@ -42,11 +42,16 @@ class ToolScopeTest {
     }
 
     @Test fun consultSeesTheCommandToolsExceptWhatIsExcluded() {
-        val scope = ToolScope.consult(all, setOf("delete_file", "create_mini_app"))
-        // Everything the main agent can do, minus the two switched off.
-        assertEquals(all.map { it.name }.toSet() - setOf("delete_file", "create_mini_app"), scope.names)
+        val withScreen = all + ToolInfo("open_app", ToolSensitivity.READ_ONLY, opensScreen = true)
+        val scope = ToolScope.consult(withScreen, setOf("delete_file", "create_mini_app"))
+        // Everything the main agent can do, minus the two switched off and the one that opens a screen.
+        assertEquals(
+            all.map { it.name }.toSet() - setOf("delete_file", "create_mini_app"),
+            scope.names,
+        )
         assertTrue(scope.allows("set_alarm"))
         assertFalse(scope.allows("delete_file"))
+        assertFalse(scope.allows("open_app"))
     }
 
     @Test fun consultIgnoresAnExclusionThatIsNotATool() {

@@ -3,8 +3,10 @@ package com.samosaai.masala.chat
 import kotlinx.serialization.Serializable
 
 /**
- * One line of a consultation, in the expert's own record. The expert sees these turns when it is
- * consulted again in the same chat; the user only ever sees the credited answer in the thread.
+ * One line of a consultation, in the expert's own record. The expert sees its answered exchanges
+ * when it is consulted again in the same chat; the user only sees the credited answer in the thread.
+ * [TurnRole.ERROR] records a question that never got an answer, so the record stays honest without
+ * pretending the expert said it.
  */
 @Serializable
 data class ConsultTurn(
@@ -28,10 +30,16 @@ data class ConsultSession(
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,
 ) {
-    /** One exchange is a question and its answer; the cap counts these, not lines. */
-    val exchanges: Int get() = turns.count { it.role == TurnRole.USER }
+    /** Answered exchanges, which is what "exchange 2 of 10" counts. */
+    val exchanges: Int get() = pairs().size
 
-    /** The question and answer pairs so far, oldest first. */
+    /**
+     * Questions asked, answered or not. The cap uses this: a model that keeps failing must stop
+     * too, not only one that keeps getting answers.
+     */
+    val questions: Int get() = turns.count { it.role == TurnRole.USER }
+
+    /** The question and answer pairs so far, oldest first. A failed question is not a pair. */
     fun pairs(): List<Pair<String, String>> {
         val out = mutableListOf<Pair<String, String>>()
         var question: String? = null

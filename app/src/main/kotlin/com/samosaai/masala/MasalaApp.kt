@@ -105,7 +105,7 @@ class MasalaApp : Application() {
     val chats by lazy {
         com.samosaai.masala.chat.ChatSessions(
             java.io.File(filesDir, com.samosaai.masala.chat.ChatSessions.DIR),
-            onDeleted = { id -> scope.launch { consults.deleteChat(id) } },
+            onDeleted = { id -> consults.deleteChat(id) },
         )
     }
 
@@ -351,7 +351,11 @@ class MasalaApp : Application() {
         ).also { controller ->
             controller.usesServerStt = { speechInput().usesServerStt() }
             controller.onTurn = ::recordTurn
-            scope.launch { chats.load() }
+            scope.launch {
+                chats.load()
+                // Consults whose chat is gone: the app was killed between the two deletes.
+                consults.pruneOrphans(chats.summaries.value.mapTo(HashSet()) { it.id })
+            }
         }
     }
 
