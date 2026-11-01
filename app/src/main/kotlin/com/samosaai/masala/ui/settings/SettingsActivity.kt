@@ -725,7 +725,8 @@ class SettingsActivity : ComponentActivity() {
     private fun HiddenAppRow(entry: AppEntry, onVisibility: (Visibility) -> Unit) {
         LauncherRow(
             label = entry.label,
-            icon = rememberAppIcon(masala.icons, entry.key),
+            icon = null,
+            iconContent = { com.samosaai.masala.launcher.AppIconTile(masala.icons, entry.key, entry.label, 40.dp) },
             subtitle = visibilityLabel(entry.visibility),
             onClick = null,
             onLongClick = null,

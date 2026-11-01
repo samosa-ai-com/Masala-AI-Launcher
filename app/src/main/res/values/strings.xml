@@ -27,6 +27,13 @@
     <string name="menu_options">Options</string>
     <string name="menu_pin">Pin to home</string>
     <string name="menu_remove_from_home">Remove from home</string>
+    <string name="menu_change_icon">Change icon</string>
+    <string name="icon_picker_title">Change icon</string>
+    <string name="icon_picker_symbols">Built-in icons</string>
+    <string name="icon_picker_custom">Or paste a small SVG</string>
+    <string name="icon_picker_use_svg">Use this SVG</string>
+    <string name="icon_picker_reset">Reset</string>
+    <string name="icon_picker_bad_svg">That isn’t a small inline SVG. It must start with &lt;svg, stay under 8 KB, and hold no scripts, images or links.</string>
     <string name="menu_rename">Rename</string>
     <string name="menu_app_info">App info</string>
     <string name="menu_uninstall">Uninstall</string>

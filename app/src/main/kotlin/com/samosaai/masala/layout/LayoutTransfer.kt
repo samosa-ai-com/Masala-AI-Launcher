@@ -25,7 +25,7 @@ class LayoutTransfer(private val layouts: LayoutRepository, private val override
     suspend fun export(): String? {
         val layout: LayoutDoc = layouts.base.value ?: return null
         val rows = overrides.all().first().filter { it.label != null || it.visibility != com.samosaai.masala.core.apps.Visibility.DEFAULT }
-        return LayoutBundle.of(layout, rows.map { AppOverrideExport(it.key, it.label, it.visibility) }).encode()
+        return LayoutBundle.of(layout, rows.map { AppOverrideExport(it.key, it.label, it.visibility, it.icon) }).encode()
     }
 
     suspend fun import(text: String): Result {
@@ -36,7 +36,8 @@ class LayoutTransfer(private val layouts: LayoutRepository, private val override
         if (problems.isNotEmpty()) return Result.Rejected(problems)
         for (o in imported.appOverrides) {
             val key = runCatching { AppKey.parse(o.key) }.getOrNull() ?: continue
-            val next = (overrides.get(o.key) ?: AppOverrideEntity.empty(key)).copy(label = o.label, visibility = o.visibility)
+            val next = (overrides.get(o.key) ?: AppOverrideEntity.empty(key))
+                .copy(label = o.label, visibility = o.visibility, icon = com.samosaai.masala.core.layout.IconSpec.sanitize(o.icon))
             if (next.isEmpty) overrides.delete(o.key) else overrides.upsert(next)
         }
         return Result.Imported

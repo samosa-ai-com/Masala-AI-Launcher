@@ -43,6 +43,22 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material.icons.rounded.Work
+import androidx.compose.material.icons.rounded.Calculate
+import androidx.compose.material.icons.rounded.Contacts
+import androidx.compose.material.icons.rounded.Flight
+import androidx.compose.material.icons.rounded.Map
+import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.Newspaper
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Pets
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.SportsSoccer
+import androidx.compose.material.icons.rounded.TaskAlt
+import androidx.compose.material.icons.rounded.Translate
+import androidx.compose.material.icons.rounded.VideogameAsset
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
+import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -76,6 +92,22 @@ object SymbolIcons {
         "timer" to { Icons.Rounded.Timer }, "tune" to { Icons.Rounded.Tune },
         "wb_sunny" to { Icons.Rounded.WbSunny }, "widgets" to { Icons.Rounded.Widgets },
         "work" to { Icons.Rounded.Work },
+        "calculate" to { Icons.Rounded.Calculate },
+        "contacts" to { Icons.Rounded.Contacts },
+        "flight" to { Icons.Rounded.Flight },
+        "map" to { Icons.Rounded.Map },
+        "movie" to { Icons.Rounded.Movie },
+        "newspaper" to { Icons.Rounded.Newspaper },
+        "palette" to { Icons.Rounded.Palette },
+        "pets" to { Icons.Rounded.Pets },
+        "public" to { Icons.Rounded.Public },
+        "radio" to { Icons.Rounded.Radio },
+        "sports_soccer" to { Icons.Rounded.SportsSoccer },
+        "task_alt" to { Icons.Rounded.TaskAlt },
+        "translate" to { Icons.Rounded.Translate },
+        "videogame_asset" to { Icons.Rounded.VideogameAsset },
+        "wallet" to { Icons.Rounded.AccountBalanceWallet },
+        "wifi" to { Icons.Rounded.Wifi },
     )
 
     val names: Set<String> get() = icons.keys

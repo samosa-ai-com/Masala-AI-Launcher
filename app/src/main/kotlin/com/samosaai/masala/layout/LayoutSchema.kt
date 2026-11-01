@@ -29,7 +29,7 @@ import kotlinx.serialization.json.putJsonObject
 object LayoutSchema {
 
     /** Symbol names the model may use, as a schema enum — cheap grounding against invented icons. */
-    fun schema(symbols: Set<String> = KnownSymbols.names): JsonObject {
+    fun schema(symbols: Set<String> = KnownSymbols.promptable): JsonObject {
         val symbolNames = symbols.sorted()
         return buildJsonObject {
             put("type", "object")

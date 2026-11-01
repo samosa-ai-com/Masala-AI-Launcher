@@ -93,7 +93,10 @@ class LayoutCheckerTest {
             SkillWidgetSection("s", "nope"),
         )
         assertEquals(listOf("$.pages[0].sections[0].items[0].icon.name", "$.pages[0].sections[1].skillId"), paths(l))
-        assertTrue(KnownSymbols.names.all { Regex("[a-z_]+").matches(it) })
+        assertTrue(KnownSymbols.all.all { Regex("[a-z_]+").matches(it) })
+        // The model may only name the smaller promptable set, and that set must stay drawable.
+        assertTrue(KnownSymbols.promptable.all { Regex("[a-z_]+").matches(it) })
+        assertTrue(KnownSymbols.all.containsAll(KnownSymbols.promptable))
     }
 
     @Test

@@ -105,6 +105,7 @@ import com.samosaai.masala.core.apps.UsageRange
 import com.samosaai.masala.core.apps.Visibility
 import com.samosaai.masala.data.DrawerLayout
 import com.samosaai.masala.launcher.AppCatalog
+import com.samosaai.masala.launcher.AppIconTile
 import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.ui.components.LauncherRow
@@ -681,8 +682,7 @@ private fun AppCell(entry: AppEntry, icons: IconCache, profiles: AppCatalog.Snap
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        val icon = rememberAppIcon(icons, entry.key)
-        Box(Modifier.size(iconSize.dp)) { if (icon != null) Image(icon, null, Modifier.size(iconSize.dp)) }
+        Box(Modifier.size(iconSize.dp)) { AppIconTile(icons, entry.key, entry.label, iconSize.dp) }
         Text(
             entry.label, style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.5.sp), maxLines = 1, overflow = TextOverflow.Ellipsis,
             color = if (paused) MasalaTheme.tokens.textLow else MasalaTheme.tokens.textHigh, modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
@@ -742,7 +742,8 @@ private fun AppRow(
     var bounds by remember { mutableStateOf<Rect?>(null) }
     LauncherRow(
         label = entry.label,
-        icon = rememberAppIcon(icons, entry.key),
+        icon = null,
+        iconContent = { AppIconTile(icons, entry.key, entry.label, 40.dp) },
         onClick = { onLaunch(entry, bounds) },
         onLongClick = { onMenu(entry) },
         longClickLabel = stringResource(R.string.menu_options),

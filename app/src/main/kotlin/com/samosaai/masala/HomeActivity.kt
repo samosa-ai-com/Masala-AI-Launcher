@@ -205,6 +205,8 @@ class HomeActivity : ComponentActivity() {
         val scope = rememberCoroutineScope()
         var menuFor by remember { mutableStateOf<AppEntry?>(null) }
         var renaming by remember { mutableStateOf<AppEntry?>(null) }
+        // The app whose icon is being chosen; the sheet writes through LauncherModel, so it sticks.
+        var choosingIcon by remember { mutableStateOf<AppEntry?>(null) }
         var renamingFolder by remember { mutableStateOf<String?>(null) }
         // The folder, and whether it is in the saved layout (not added by a mode).
         var openFolder by remember { mutableStateOf<Pair<Item, Boolean>?>(null) }
@@ -752,6 +754,7 @@ class HomeActivity : ComponentActivity() {
                         }
                     }
                     override fun rename(entry: AppEntry) = done { renaming = entry }
+                    override fun changeIcon(entry: AppEntry) = done { choosingIcon = entry }
                     override fun setVisibility(entry: AppEntry, visibility: Visibility) = done {
                         scope.launch { launcher.setVisibility(entry.key, visibility) }
                     }
@@ -763,6 +766,18 @@ class HomeActivity : ComponentActivity() {
                         action()
                     }
                 },
+            )
+        }
+
+        choosingIcon?.let { entry ->
+            com.samosaai.masala.ui.drawer.IconPickerSheet(
+                entry = entry,
+                icons = app.icons,
+                onPick = { spec ->
+                    choosingIcon = null
+                    scope.launch { launcher.setIcon(entry.key, spec) }
+                },
+                onDismiss = { choosingIcon = null },
             )
         }
 

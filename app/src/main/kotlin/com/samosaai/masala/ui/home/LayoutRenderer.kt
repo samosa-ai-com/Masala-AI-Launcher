@@ -104,6 +104,7 @@ import com.samosaai.masala.core.contract.SkillWidgetSection
 import com.samosaai.masala.core.contract.StackSection
 import com.samosaai.masala.core.contract.WidgetSection
 import com.samosaai.masala.miniapps.MiniAppIconView
+import com.samosaai.masala.miniapps.SpecIcon
 import com.samosaai.masala.core.layout.ResolvedLayout
 import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.rememberAppIcon
@@ -656,6 +657,13 @@ internal fun ItemIcon(item: Item, app: AppEntry?, ctx: RenderContext, size: Int)
         MiniAppIconView(stored, item.label, size.dp)
         return
     }
+    // The icon the user chose for an app follows the app everywhere: a layout that drew a symbol for
+    // the slot doesn't win over an explicit choice.
+    val chosen = app?.let { ctx.icons.override(it.key) }
+    if (chosen != null) {
+        SpecIcon(chosen, app?.label.orEmpty(), size.dp)
+        return
+    }
     IconView(item.icon, app, ctx, size)
 }
 
@@ -672,15 +680,28 @@ internal fun IconView(icon: IconRef, app: AppEntry?, ctx: RenderContext, size: I
         is IconRef.AppIcon -> {
             // The same app in another profile has its own key and badge.
             val entry = app ?: ctx.appFor(icon.packageName, icon.user, null)
-            val bitmap = entry?.let { rememberAppIcon(ctx.icons, it.key) }
-            if (bitmap != null) {
-                Image(bitmap, contentDescription = null, modifier = Modifier.size(size.dp))
-            } else {
-                SymbolDisc(Icons.Rounded.Apps, null, size)
+            val chosen = entry?.let { ctx.icons.override(it.key) }
+            val bitmap = entry?.takeIf { chosen == null }?.let { rememberAppIcon(ctx.icons, it.key) }
+            when {
+                chosen != null -> SpecIcon(chosen, entry?.label.orEmpty(), size.dp)
+                bitmap != null -> Image(bitmap, contentDescription = null, modifier = Modifier.size(size.dp))
+                else -> SymbolDisc(Icons.Rounded.Apps, null, size)
             }
         }
         is IconRef.Symbol -> SymbolDisc(SymbolIcons.icon(icon.name), SymbolIcons.tint(icon.tint), size)
-        is IconRef.Override -> SymbolDisc(SymbolIcons.Fallback, null, size)
+        // An id that names an installed app draws that app (with whatever icon it carries); anything
+        // else is the generic app disc, never a blank circle.
+        is IconRef.Override -> {
+            val key = runCatching { com.samosaai.masala.core.apps.AppKey.parse(icon.id) }.getOrNull()
+            val entry = key?.let { ctx.appFor(it.packageName, it.user, null) }
+            val chosen = entry?.let { ctx.icons.override(it.key) }
+            val bitmap = entry?.takeIf { chosen == null }?.let { rememberAppIcon(ctx.icons, it.key) }
+            when {
+                chosen != null -> SpecIcon(chosen, entry?.label.orEmpty(), size.dp)
+                bitmap != null -> Image(bitmap, contentDescription = null, modifier = Modifier.size(size.dp))
+                else -> SymbolDisc(Icons.Rounded.Apps, null, size)
+            }
+        }
     }
 }
 

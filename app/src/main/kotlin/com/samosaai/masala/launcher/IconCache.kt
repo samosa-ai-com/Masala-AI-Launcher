@@ -21,10 +21,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
 import androidx.core.graphics.drawable.toBitmap
+import com.samosaai.masala.miniapps.SpecIcon
 import com.samosaai.masala.core.apps.AppKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -50,6 +55,17 @@ class IconCache(context: Context, private val catalog: AppCatalog) {
     fun applyStyle(next: Style) {
         if (next != style) style = next
     }
+
+    /** Icons the user chose, by `AppKey.id` (`IconSpec`). State, so a change repaints that tile. */
+    var overrides: Map<String, String> by mutableStateOf(emptyMap())
+        private set
+
+    fun applyOverrides(next: Map<String, String>) {
+        if (next != overrides) overrides = next
+    }
+
+    /** The icon chosen for [key], or null to draw the app's own. */
+    fun override(key: AppKey): String? = overrides[key.id]
 
     private val cache = object : LruCache<String, ImageBitmap>((Runtime.getRuntime().maxMemory() / 8).toInt()) {
         override fun sizeOf(key: String, value: ImageBitmap) = value.asAndroidBitmap().byteCount
@@ -139,6 +155,18 @@ class IconCache(context: Context, private val catalog: AppCatalog) {
 
         fun shortcutId(info: ShortcutInfo) = "shortcut:${info.`package`}/${info.id}#${info.userHandle.hashCode()}"
     }
+}
+
+/** An app's tile: the icon chosen for it when it has one, otherwise the app's own. */
+@Composable
+fun AppIconTile(icons: IconCache, key: AppKey, label: String, size: Dp) {
+    val chosen = icons.override(key)
+    if (chosen != null) {
+        SpecIcon(chosen, label, size)
+        return
+    }
+    val bitmap = rememberAppIcon(icons, key)
+    if (bitmap != null) Image(bitmap, contentDescription = null, modifier = Modifier.size(size))
 }
 
 @Composable

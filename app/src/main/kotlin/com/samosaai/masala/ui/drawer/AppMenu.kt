@@ -10,6 +10,7 @@ import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.AddHome
 import androidx.compose.material.icons.Icons
@@ -54,6 +55,7 @@ import com.samosaai.masala.core.apps.AppEntry
 import com.samosaai.masala.core.apps.ProfileKind
 import com.samosaai.masala.core.apps.Visibility
 import com.samosaai.masala.launcher.AppActions
+import com.samosaai.masala.launcher.AppIconTile
 import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.launcher.rememberShortcutIcon
@@ -68,6 +70,7 @@ interface AppMenuActions {
     fun pinShortcut(shortcut: ShortcutInfo)
     fun setPinned(entry: AppEntry, pinned: Boolean)
     fun rename(entry: AppEntry)
+    fun changeIcon(entry: AppEntry)
     fun setVisibility(entry: AppEntry, visibility: Visibility)
     fun appInfo(entry: AppEntry)
     fun uninstall(entry: AppEntry)
@@ -108,9 +111,8 @@ fun AppMenu(
                 stringResource(R.string.menu_renamed_from, entry.originalLabel).takeIf { entry.renamed },
             ).joinToString(" · ").ifEmpty { null }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                val icon = rememberAppIcon(icons, entry.key)
                 Box(Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).clickable(role = Role.Button) { menu.launch(entry) }) {
-                    if (icon != null) Image(icon, stringResource(R.string.menu_open, entry.label), Modifier.size(48.dp))
+                    AppIconTile(icons, entry.key, entry.label, 48.dp)
                 }
                 Column(Modifier.weight(1f)) {
                     Text(entry.label, style = MaterialTheme.typography.titleLarge)
@@ -151,11 +153,13 @@ fun AppMenu(
 
             // Pinned means the app is somewhere in the home layout (any grid section), so the
             // button reads as removing it rather than the vaguer "unpin".
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Five actions: three to a row, so the labels stay readable at large text sizes.
+            FlowRow(Modifier.fillMaxWidth(), maxItemsInEachRow = 3, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ActionTile(if (entry.pinned) Icons.Rounded.PushPin else Icons.Rounded.AddHome, stringResource(if (entry.pinned) R.string.menu_remove_from_home else R.string.menu_pin), Modifier.weight(1f)) {
                     menu.setPinned(entry, !entry.pinned)
                 }
                 ActionTile(Icons.Rounded.Edit, stringResource(R.string.menu_rename), Modifier.weight(1f)) { menu.rename(entry) }
+                ActionTile(Icons.Rounded.Palette, stringResource(R.string.menu_change_icon), Modifier.weight(1f)) { menu.changeIcon(entry) }
                 ActionTile(Icons.Rounded.VisibilityOff, stringResource(R.string.menu_hide), Modifier.weight(1f)) { menu.setVisibility(entry, Visibility.HIDDEN) }
                 if (canUninstall) ActionTile(Icons.Rounded.Delete, stringResource(R.string.menu_uninstall), Modifier.weight(1f), danger = true) { menu.uninstall(entry) }
             }

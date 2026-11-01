@@ -38,7 +38,7 @@ import kotlinx.coroutines.flow.Flow
         WatchEntity::class,
         AppLaunchEntity::class,
     ],
-    version = 3,
+    version = 4,
 )
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
@@ -65,8 +65,16 @@ abstract class MasalaDatabase : RoomDatabase() {
             }
         }
 
+        /** Icons: an app can carry a chosen icon, so every row that remembers one keeps it. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE app_overrides ADD COLUMN icon TEXT")
+            }
+        }
+
         fun create(context: Context): MasalaDatabase =
-            Room.databaseBuilder(context, MasalaDatabase::class.java, "masala.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+            Room.databaseBuilder(context, MasalaDatabase::class.java, "masala.db")
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
     }
 }
 
@@ -147,11 +155,13 @@ data class AppOverrideEntity(
     val visibility: Visibility = Visibility.DEFAULT,
     /** When it was pinned to home, for ordering; null when it isn't. */
     val pinnedAt: Long? = null,
+    /** A chosen icon (`IconSpec`): `symbol:<name>` or one small inline SVG; null draws the app's own. */
+    val icon: String? = null,
 ) {
-    fun toOverride() = AppOverride(AppKey.parse(key), label, visibility, pinned = pinnedAt != null)
+    fun toOverride() = AppOverride(AppKey.parse(key), label, visibility, pinned = pinnedAt != null, icon = icon)
 
     /** Nothing left to remember, so the row can go. */
-    val isEmpty get() = label == null && visibility == Visibility.DEFAULT && pinnedAt == null
+    val isEmpty get() = label == null && visibility == Visibility.DEFAULT && pinnedAt == null && icon == null
 
     companion object {
         fun empty(key: AppKey) = AppOverrideEntity(key.id, key.packageName, key.user)
