@@ -18,9 +18,12 @@ class BundledSkillsTest {
     private val skills = files.map { MasalaJson.lenient.decodeFromString<MasalaSkill>(it.readText()) }
 
     @Test
-    fun `the seven personas are bundled and only the daily brief is a job`() {
+    fun `the eight experts are bundled and only the daily brief is a job`() {
         assertEquals(
-            setOf("chef", "doctor", "fitness_coach", "handyman", "travel_planner", "tutor", "software_engineer"),
+            setOf(
+                "chef", "doctor", "fitness_coach", "handyman", "travel_planner",
+                "software_engineer", "researcher", "editor",
+            ),
             skills.filter { it.persona != null }.map { it.id }.toSet(),
         )
         // App making is an expert's job now (the software engineer), so the only job left is the brief.
