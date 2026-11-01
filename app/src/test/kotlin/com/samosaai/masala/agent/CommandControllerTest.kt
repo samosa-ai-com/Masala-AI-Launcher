@@ -1,6 +1,7 @@
 package com.samosaai.masala.agent
 
 import com.samosaai.masala.actions.ActionDispatcher
+import com.samosaai.masala.audio.PttEngine
 import com.samosaai.masala.core.agent.ToolInfo
 import com.samosaai.masala.core.agent.ToolScope
 import com.samosaai.masala.core.contract.MasalaAction
@@ -190,6 +191,38 @@ class CommandControllerTest {
         assertEquals(CommandState.Listening, c.state.value)
         c.stopListening()
         c.settled()
+        assertEquals(listOf<MasalaAction>(MasalaAction.StartTimer(60)), ran)
+    }
+
+    @Test fun engineFailureEndsTheTakeWithItsMessage() = runBlocking<Unit> {
+        var listener: ((PttEngine.TakeAutoEnd) -> Unit)? = null
+        val speech = object : SpeechInput {
+            override fun start(onFailure: (String) -> Unit) = true
+            override suspend fun stop() = Result.failure<String>(Exception("unused"))
+            override fun cancel() = Unit
+            override fun setTakeAutoEndListener(l: ((PttEngine.TakeAutoEnd) -> Unit)?) { listener = l }
+        }
+        val c = controller(speech)
+        assertTrue(c.startListening())
+        // A dead capture ends the take at once; the UI never sits on "Listening…".
+        listener?.invoke(PttEngine.TakeAutoEnd.Failed("Recording captured no audio (microphone returned silence)"))
+        val error = assertIs<CommandState.Error>(c.state.value)
+        assertEquals("Recording captured no audio (microphone returned silence)", error.message)
+    }
+
+    @Test fun capReachedSendsWhatWasCaptured() = runBlocking<Unit> {
+        var listener: ((PttEngine.TakeAutoEnd) -> Unit)? = null
+        val speech = object : SpeechInput {
+            override fun start(onFailure: (String) -> Unit) = true
+            override suspend fun stop() = Result.success("set a timer for 1 minute")
+            override fun cancel() = Unit
+            override fun setTakeAutoEndListener(l: ((PttEngine.TakeAutoEnd) -> Unit)?) { listener = l }
+        }
+        val c = controller(speech)
+        assertTrue(c.startListening())
+        // The 90 s cap ends the take by sending what was heard; nothing is lost.
+        listener?.invoke(PttEngine.TakeAutoEnd.CapReached)
+        assertIs<CommandState.Reply>(c.settled())
         assertEquals(listOf<MasalaAction>(MasalaAction.StartTimer(60)), ran)
     }
 

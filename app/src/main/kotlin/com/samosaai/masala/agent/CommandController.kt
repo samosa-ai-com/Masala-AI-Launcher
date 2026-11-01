@@ -1,6 +1,7 @@
 package com.samosaai.masala.agent
 
 import com.samosaai.masala.actions.ActionDispatcher
+import com.samosaai.masala.audio.PttEngine
 import com.samosaai.masala.core.agent.CommandFastPath
 import com.samosaai.masala.core.agent.NameCorrector
 import com.samosaai.masala.core.agent.SkillRouter
@@ -123,7 +124,7 @@ class CommandController(
         }
     }
 
-    /** Push-to-talk pressed. Returns false if listening can't start. */
+    /** Tap on the mic. Returns false if listening can't start. */
     fun startListening(): Boolean {
         val input = speech ?: return false
         job?.cancel()
@@ -133,6 +134,14 @@ class CommandController(
         if (!input.start(async)) {
             publish(CommandState.Error("", reason ?: "Speech recognition isn't available"))
             return false
+        }
+        // A take that ends by itself must still leave Listening: a dead capture shows
+        // its error at once, the 90 s cap sends what was heard.
+        input.setTakeAutoEndListener { end ->
+            when (end) {
+                is PttEngine.TakeAutoEnd.Failed -> async(end.message)
+                PttEngine.TakeAutoEnd.CapReached -> stopListening()
+            }
         }
         _state.value = CommandState.Listening
         return true

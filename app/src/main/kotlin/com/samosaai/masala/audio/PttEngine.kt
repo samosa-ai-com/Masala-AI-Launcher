@@ -23,6 +23,22 @@ interface PttEngine {
     fun cancelListening(provider: AudioProvider)
 
     /**
+     * How a take ended by itself, without Send or cancel: the capture failed mid-take,
+     * or the safety cap stopped it. The take still has to leave Listening, so the engine
+     * reports it instead of waiting for a Send that may never come.
+     */
+    sealed interface TakeAutoEnd {
+        /** Capture failed; the message is what the user should read. */
+        data class Failed(val message: String) : TakeAutoEnd
+
+        /** The safety cap stopped the capture; what was heard should still be sent. */
+        data object CapReached : TakeAutoEnd
+    }
+
+    /** Reports [TakeAutoEnd]; null stops reports. Default no-op, so fakes ignore it. */
+    fun setTakeAutoEndListener(listener: ((TakeAutoEnd) -> Unit)?) {}
+
+    /**
      * Tap to talk (plan UI refresh U2): listen until a pause of [silenceTimeoutMs] after speech, then
      * transcribe. [finishUtterance] ends it early and still transcribes what was said.
      */

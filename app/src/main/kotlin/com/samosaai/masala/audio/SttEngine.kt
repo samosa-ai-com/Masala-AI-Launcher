@@ -39,9 +39,10 @@ sealed class SttOutcome {
 /**
  * From the private prototype's `SttEngine`: package, `R` and log calls only; settings come from the caller (see [SpeechConfig]).
  * Speech-to-Text engine supporting two providers.
- * Both use a push-to-talk pattern: startRecording() / stopRecording().
+ * A tap starts an open-ended take; Send (or cancel, failure, or the safety cap)
+ * ends it, and the engine reports a take that ended by itself at once.
  *
- * - API provider: records 16 kHz PCM via AudioRecord (the release ends the take), transcribes via API
+ * - API provider: records 16 kHz PCM via AudioRecord, transcribes the WAV via API
  * - Android provider: uses SpeechRecognizer (live recognition)
  */
 @Suppress("TooManyFunctions")
@@ -57,8 +58,6 @@ class SttEngine(
     } else {
         null
     }
-    private var currentRecorder: MediaRecorder? = null
-    private var currentAudioFile: File? = null
 
     /** Set by [cancelListening] to abort an in-flight VAD (hands-free) recording. */
     @Volatile
@@ -101,14 +100,24 @@ class SttEngine(
     /** Words heard so far in this session (on-device recognizer only; API transcription has none). */
     val partial: kotlinx.coroutines.flow.StateFlow<String> = _partial
 
-    private val _autoSendIn = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
+    /** Fires once when a take ends by itself; see [PttEngine.TakeAutoEnd]. Main thread. */
+    @Volatile
+    private var takeAutoEndListener: ((PttEngine.TakeAutoEnd) -> Unit)? = null
+
+    override fun setTakeAutoEndListener(listener: ((PttEngine.TakeAutoEnd) -> Unit)?) {
+        takeAutoEndListener = listener
+    }
 
     /**
-     * Seconds until the detector ends the take on its own, or null when it has not accepted
-     * speech (or the provider does not use this detector). The UI shows this instead of
-     * guessing from the level, so the countdown matches what will actually happen.
+     * Reports a take that ended by itself, once: the listener is cleared first so a
+     * later Send or cancel can't re-fire it. The forwarders clear their own state on
+     * stop/cancel too, so a post already in flight is dropped there as well.
      */
-    val autoSendIn: kotlinx.coroutines.flow.StateFlow<Int?> = _autoSendIn
+    private fun postTakeAutoEnd(end: PttEngine.TakeAutoEnd) {
+        val listener = takeAutoEndListener ?: return
+        takeAutoEndListener = null
+        mainHandler.post { listener(end) }
+    }
 
     private val _heard = kotlinx.coroutines.flow.MutableStateFlow(0L)
 
@@ -233,15 +242,20 @@ class SttEngine(
         }
     }
 
-    // ---- API STT (hold-to-talk PCM + transcription) ----
+    // ---- API STT (tap-to-send PCM + transcription) ----
     //
-    // Hold-to-talk records with AudioRecord (16 kHz mono PCM-16, MIC source),
-    // the same capture the hands-free path uses: one engine for the mic button,
-    // sized by the release. The take ends when [stopRecording] runs, so the
-    // voice detector never auto-stops a hold.
+    // A tap starts an open-ended AudioRecord capture (16 kHz mono PCM-16, MIC
+    // source), the same capture the test card uses. The take ends on Send, on
+    // cancel, or by itself: a dead capture fails fast, a 90 s take hits the
+    // safety cap. Both self-ends report through [takeAutoEndListener] at once,
+    // so the UI never sits on "Listening…" for a take that is already over.
 
     private var holdThread: Thread? = null
     private var holdRecorder: AudioRecord? = null
+
+    /** Take generation: a stale thread (join timed out) must not touch the next take. */
+    @Volatile
+    private var holdGen = 0
 
     /** Set by [stopRecording]/[cancelListening] to end the hold capture thread. */
     @Volatile
@@ -259,7 +273,7 @@ class SttEngine(
     /** Any non-zero sample at all, like [recordPcmWithVad]'s guard. */
     private var holdSawSignal = false
 
-    /** Start a hold-to-talk capture; the take ends when [stopRecording] runs. */
+    /** Start an open-ended capture; the take ends on Send, cancel, failure or cap. */
     @SuppressLint("MissingPermission")
     fun startRecording(): Boolean {
         stopRecordingThread()
@@ -295,10 +309,11 @@ class SttEngine(
         holdError = null
         holdPcm = ByteArrayOutputStream()
         holdSawSignal = false
+        takeAutoEndListener = null
         resetLive()
         _vadState.value = null
-        _autoSendIn.value = null
         holdRecorder = recorder
+        val gen = ++holdGen
         return try {
             recorder.startRecording()
             holdThread = Thread {
@@ -307,10 +322,12 @@ class SttEngine(
                 var zeroRunMs = 0L
                 val startMs = System.currentTimeMillis()
                 try {
-                    while (!holdStopRequested) {
+                    while (!holdStopRequested && gen == holdGen) {
                         val count = recorder.read(shorts, 0, shorts.size)
+                        if (gen != holdGen) break
                         if (count < 0) {
                             holdError = Exception("Audio capture failed (error code $count)")
+                            postTakeAutoEnd(PttEngine.TakeAutoEnd.Failed(holdError?.message ?: "Recording failed"))
                             break
                         }
                         if (count == 0) continue
@@ -324,6 +341,7 @@ class SttEngine(
                             bytes[i * 2] = (sample and 0xFF).toByte()
                             bytes[i * 2 + 1] = ((sample shr 8) and 0xFF).toByte()
                         }
+                        if (gen != holdGen) break
                         holdPcm.write(bytes, 0, count * 2)
                         if (allZero && !holdSawSignal) {
                             zeroRunMs += HOLD_WINDOW_MS
@@ -332,14 +350,22 @@ class SttEngine(
                             if (zeroRunFailsFast(zeroRunMs)) {
                                 holdError = Exception(CAPTURE_SILENCE_MESSAGE)
                                 holdStopRequested = true
+                                postTakeAutoEnd(PttEngine.TakeAutoEnd.Failed(CAPTURE_SILENCE_MESSAGE))
                                 break
                             }
                         }
                         _level.value = ((SilenceDetector.rmsDb(shorts, count) + 60f) / 50f).coerceIn(0f, 1f)
-                        if (System.currentTimeMillis() - startMs > MAX_VAD_RECORDING_MS) break
+                        if (System.currentTimeMillis() - startMs > MAX_VAD_RECORDING_MS) {
+                            // Safety cap, and it is loud about itself: what was heard
+                            // is kept for Send, and the take ends now on its own.
+                            holdStopRequested = true
+                            postTakeAutoEnd(PttEngine.TakeAutoEnd.CapReached)
+                            break
+                        }
                     }
                 } catch (e: Exception) {
                     holdError = Exception("Recording failed: ${e.message ?: e.javaClass.simpleName}")
+                    postTakeAutoEnd(PttEngine.TakeAutoEnd.Failed(holdError?.message ?: "Recording failed"))
                 } finally {
                     _level.value = 0f
                 }
@@ -357,11 +383,17 @@ class SttEngine(
 
     /**
      * Stop the hold capture and return its audio as a WAV file for API STT.
-     * Null when there is nothing to send; [holdError] says why.
+     * Null when there is nothing to send; [holdError] says why. A take that
+     * already ended itself (failure or cap) stopped its thread, so this just
+     * collects what is there.
      */
     fun stopRecording(): File? {
-        // The release is the stop: join the capture thread first so the file is whole.
+        // The thread may already be gone (self-ended take); joining a dead
+        // thread returns at once. The generation moves on either way, so a
+        // thread stuck past the join can never write into the next take.
+        takeAutoEndListener = null
         holdStopRequested = true
+        holdGen++
         try {
             holdThread?.join(3000)
         } catch (_: Exception) {
@@ -377,7 +409,6 @@ class SttEngine(
         }
         holdRecorder = null
         _level.value = 0f
-        _autoSendIn.value = null
         holdError?.let { return null }
         val pcm = holdPcm.toByteArray()
         return when {
@@ -395,7 +426,9 @@ class SttEngine(
 
     /** Ends the hold capture thread and frees its recorder; the take is discarded. */
     private fun stopRecordingThread() {
+        takeAutoEndListener = null
         holdStopRequested = true
+        holdGen++
         try {
             holdThread?.join(2000)
         } catch (_: Exception) {
@@ -522,7 +555,6 @@ class SttEngine(
         vadUserStopped = false
         vadRecordError = null
         _vadState.value = null
-        _autoSendIn.value = null
         val detector = SilenceDetector(silenceTimeoutMs)
         val shortBuf = ShortArray(windowShorts)
         val byteBuf = ByteArray(windowShorts * 2)
@@ -530,7 +562,6 @@ class SttEngine(
         val startMs = System.currentTimeMillis()
         var result: File? = null
         var peakDb = -50f
-        var lastLoudAt = 0L
         // Any non-zero sample at all. rmsDb clamps at the floor, so a genuinely
         // quiet room is indistinguishable from a broken stream by level alone.
         var sawSignal = false
@@ -557,11 +588,6 @@ class SttEngine(
                 peakDb = maxOf(peakDb, db)
                 val decision = detector.update(db, now)
                 _vadState.value = VadSnapshot(detector.floorDb, detector.thresholdDb, peakDb, detector.speechDetected)
-                // The detector's own clock: silence since the last window above its threshold.
-                if (db > detector.thresholdDb) lastLoudAt = now
-                _autoSendIn.value = if (detector.speechDetected && lastLoudAt > 0) {
-                    ((silenceTimeoutMs - (now - lastLoudAt)).coerceAtLeast(0) / 1000).toInt()
-                } else null
                 if (decision != SilenceDetector.Decision.CONTINUE ||
                     now - startMs > MAX_VAD_RECORDING_MS
                 ) {
@@ -595,7 +621,6 @@ class SttEngine(
             recorder.release()
             vadStopRequested = false
             vadUserStopped = false
-            _autoSendIn.value = null
             _level.value = 0f
         }
         return result
@@ -985,14 +1010,6 @@ class SttEngine(
                 stopRecordingThread()
                 holdError = null
                 vadStopRequested = true
-                try {
-                    currentRecorder?.apply {
-                        stop()
-                        release()
-                    }
-                } catch (_: Exception) { }
-                currentRecorder = null
-                currentAudioFile = null
             }
             else -> {}
         }

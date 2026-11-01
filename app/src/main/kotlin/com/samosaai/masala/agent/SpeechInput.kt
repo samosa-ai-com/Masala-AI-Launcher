@@ -20,8 +20,8 @@ interface SpeechInput {
      */
     suspend fun listenOnce(): Result<String> = Result.failure(UnsupportedOperationException("Hands-free isn't available"))
 
-    /** Ends [listenOnce] now; what was said so far is still transcribed. */
-    fun finish() {}
+    /** Reports a take that ended by itself; the test card path never needs it. */
+    fun setTakeAutoEndListener(listener: ((com.samosaai.masala.audio.PttEngine.TakeAutoEnd) -> Unit)?) {}
 
     /** Mic level 0..1 while listening (UI refresh U4). */
     val level: kotlinx.coroutines.flow.StateFlow<Float> get() = NO_LEVEL
@@ -129,10 +129,19 @@ class ConfiguredSpeechInput(
     /** True when push-to-talk records for a transcription endpoint (which sends no partials). */
     fun usesServerStt(): Boolean = configured().isApiBased()
 
+    /** The engine ended the take by itself; [onEngineTakeEnd] routes it. */
+    private var failure: ((String) -> Unit)? = null
+    private var autoEnd: ((PttEngine.TakeAutoEnd) -> Unit)? = null
+
+    override fun setTakeAutoEndListener(listener: ((PttEngine.TakeAutoEnd) -> Unit)?) {
+        autoEnd = listener
+    }
+
     override fun start(onFailure: (String) -> Unit): Boolean {
         live?.resetLive()
         // A press while a previous session is still around must not leak its recorder.
         cancel()
+        failure = onFailure
         val reasons = mutableListOf<String>()
         val lang = configuredLanguage(config())
         for (provider in SpeechPolicy.order(configured())) {
@@ -147,6 +156,7 @@ class ConfiguredSpeechInput(
             }
             if (started) {
                 active = provider
+                if (provider.isApiBased()) engine.setTakeAutoEndListener(::onEngineTakeEnd)
                 return true
             }
             reasons += if (provider == AudioProvider.ANDROID) {
@@ -163,6 +173,9 @@ class ConfiguredSpeechInput(
     override suspend fun stop(): Result<String> {
         val provider = active ?: return Result.failure(Exception("Wasn't listening"))
         active = null
+        failure = null
+        autoEnd = null
+        engine.setTakeAutoEndListener(null)
         val settings = config()
         val model = if (provider.isApiBased()) settings.sttModel else ""
         val language = if (provider.isApiBased()) settings.sttLanguage.ifBlank { language().iso639 } else ""
@@ -204,10 +217,27 @@ class ConfiguredSpeechInput(
         return firstFailure ?: last!!
     }
 
-    override fun finish() = engine.finishUtterance()
+    /**
+     * The engine ended the take by itself: a failure reports at once so the UI never
+     * sits on "Listening…" for a dead take; the cap forwards for Send-with-what-we-have.
+     * One-shot: the first event wins and clears the rest.
+     */
+    private fun onEngineTakeEnd(end: PttEngine.TakeAutoEnd) {
+        engine.setTakeAutoEndListener(null)
+        when (end) {
+            is PttEngine.TakeAutoEnd.Failed -> {
+                autoEnd = null
+                failure?.invoke(end.message)
+            }
+            PttEngine.TakeAutoEnd.CapReached -> autoEnd?.invoke(end).also { autoEnd = null }
+        }
+    }
 
     override fun cancel() {
         active = null
+        failure = null
+        autoEnd = null
+        engine.setTakeAutoEndListener(null)
         engine.cancelListening(AudioProvider.ANDROID)
         engine.cancelListening(AudioProvider.API)
     }
