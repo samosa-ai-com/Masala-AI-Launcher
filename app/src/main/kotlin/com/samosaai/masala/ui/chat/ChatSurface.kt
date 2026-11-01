@@ -474,10 +474,14 @@ private fun ResultCard(result: ChatResult) {
             maxLines = 1,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            TextButton(onClick = {
-                if (miniApp) context.openMiniApp(result.ref)
-                else runCatching { context.startActivity(context.packageManager.getLaunchIntentForPackage(result.ref)) }
-            }) { Text(stringResource(R.string.miniapp_open)) }
+            // Only a mini app or an installed app has an address we can open from here.
+            val canOpen = miniApp || result.kind == "installed_app"
+            if (canOpen) {
+                TextButton(onClick = {
+                    if (miniApp) context.openMiniApp(result.ref)
+                    else runCatching { context.packageManager.getLaunchIntentForPackage(result.ref)?.let(context::startActivity) }
+                }) { Text(stringResource(R.string.miniapp_open)) }
+            }
             if (miniApp) {
                 TextButton(onClick = {
                     scope.launch {

@@ -87,11 +87,22 @@ class ConfirmationGateTest {
     }
 
     @Test
-    fun `a long argument is cut in the summary so the sheet stays usable`() {
+    fun `making an app is confirmed in words, not as a wall of HTML`() {
         val html = "<html>" + "x".repeat(20_000) + "</html>"
-        val summary = ConfirmationGate.summarize("create_mini_app", JsonObject(mapOf("title" to JsonPrimitive("Snake"), "html" to JsonPrimitive(html))))
-        assertTrue(summary.length < 300, summary)
-        assertTrue(summary.contains("\"title\":\"Snake\""), summary)
-        assertTrue(summary.contains("(20013 characters)"), summary)
+        val summary = ConfirmationGate.summarize(
+            "create_mini_app",
+            JsonObject(mapOf("title" to JsonPrimitive("Snake"), "html" to JsonPrimitive(html))),
+        )
+        assertEquals("Add \"Snake\" to your home screen as an app", summary)
+        // Changing one is a short sentence too.
+        assertEquals("Change that app", ConfirmationGate.summarize("update_mini_app", JsonObject(mapOf("id" to JsonPrimitive("a1")))))
+    }
+
+    @Test
+    fun `a long argument is still cut in the summary so the sheet stays usable`() {
+        val layout = "{\"pages\":" + "x".repeat(20_000) + "}"
+        val summary = ConfirmationGate.summarize("edit_layout", JsonObject(mapOf("label" to JsonPrimitive("Tidy"), "layout_json" to JsonPrimitive(layout))))
+        assertTrue(summary.length < 400, summary)
+        assertTrue(summary.contains("characters)"), summary)
     }
 }
