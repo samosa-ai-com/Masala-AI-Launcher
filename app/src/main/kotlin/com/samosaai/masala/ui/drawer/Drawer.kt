@@ -128,7 +128,7 @@ private data class Ranked<T>(val query: String, val results: List<T>)
 private const val AUTO_LAUNCH_PAUSE_MS = 800L
 
 /** Radius of the semicircle the letters swing out on while sliding. */
-private val ARC_RADIUS = 90.dp
+private val ARC_RADIUS = 60.dp
 
 /** How much the finger's letter grows at the deepest point of the arc. */
 private const val LETTER_GROW = 1.1f
