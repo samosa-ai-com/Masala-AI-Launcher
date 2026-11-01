@@ -40,8 +40,9 @@ import kotlinx.coroutines.flow.Flow
         WidgetEntity::class,
         WidgetVersionEntity::class,
         StreamSourceEntity::class,
+        WidgetHttpValueEntity::class,
     ],
-    version = 7,
+    version = 8,
 )
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
@@ -54,6 +55,7 @@ abstract class MasalaDatabase : RoomDatabase() {
     abstract fun widgets(): WidgetDao
     abstract fun widgetVersions(): WidgetVersionDao
     abstract fun streamSources(): StreamSourceDao
+    abstract fun httpValues(): WidgetHttpValueDao
     abstract fun wikiPages(): WikiDao
     abstract fun appLaunches(): AppLaunchDao
 
@@ -88,8 +90,7 @@ abstract class MasalaDatabase : RoomDatabase() {
         }
 
         /** Widget library (plan `docs/plans/widget-maker.md` §6.1): specs plus the last versions of each. */
-        val MIGRATION_5_6 = object : Migration(5, 6) {
-            override fun migrate(db: SupportSQLiteDatabase) {
+        val MIGRATION_5_6 = object : Migration(5, 6) {            override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `widgets` (`id` TEXT NOT NULL, `specJson` TEXT NOT NULL, `tier` TEXT NOT NULL, `title` TEXT, `createdBy` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))")
                 db.execSQL("CREATE TABLE IF NOT EXISTS `widget_versions` (`widgetId` TEXT NOT NULL, `version` INTEGER NOT NULL, `specJson` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`widgetId`, `version`))")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_widget_versions_widgetId_version` ON `widget_versions` (`widgetId`, `version`)")
@@ -103,9 +104,16 @@ abstract class MasalaDatabase : RoomDatabase() {
             }
         }
 
+        /** Fetched web values (plan `docs/plans/widget-maker.md` §5): display strings and ages. */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `widget_http_values` (`key` TEXT NOT NULL, `widgetId` TEXT NOT NULL, `value` TEXT NOT NULL, `fetchedAt` INTEGER NOT NULL, PRIMARY KEY(`key`))")
+            }
+        }
+
         fun create(context: Context): MasalaDatabase =
             Room.databaseBuilder(context, MasalaDatabase::class.java, "masala.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build()
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8).build()
     }
 }
 
@@ -367,6 +375,27 @@ interface StreamSourceDao {
 
     @Query("DELETE FROM stream_sources WHERE id = :id")
     suspend fun delete(id: String)
+}
+
+/** One fetched web value (plan `docs/plans/widget-maker.md` §5): the display string and its age. */
+@Entity(tableName = "widget_http_values")
+data class WidgetHttpValueEntity(
+    @PrimaryKey val key: String,
+    val widgetId: String,
+    val value: String,
+    val fetchedAt: Long,
+)
+
+@Dao
+interface WidgetHttpValueDao {
+    @Query("SELECT * FROM widget_http_values")
+    suspend fun all(): List<WidgetHttpValueEntity>
+
+    @Upsert
+    suspend fun upsert(entity: WidgetHttpValueEntity)
+
+    @Query("DELETE FROM widget_http_values WHERE widgetId = :widgetId")
+    suspend fun deleteForWidget(widgetId: String)
 }
 
 /** One run of a skill (arch §3.9, Phase 4). */
