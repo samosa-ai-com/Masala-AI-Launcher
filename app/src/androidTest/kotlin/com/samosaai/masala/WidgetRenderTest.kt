@@ -1,7 +1,9 @@
 package com.samosaai.masala
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -103,8 +105,10 @@ class WidgetRenderTest {
             ),
         )
         draw(spec, store())
-        compose.onNodeWithText("Video · live on home in W4").assertIsDisplayed()
-        compose.onNodeWithText("Snapshot · live on home in W4").assertIsDisplayed()
+        // No stream library in this test: both media components explain where a source comes from.
+        compose.onAllNodesWithText("Video · add its source in Settings → Widgets → Cameras", substring = false, ignoreCase = false).assertCountEquals(2)
         compose.onNodeWithText("Price").assertIsDisplayed()
+        // The web value draws through the real store: nothing fetched yet, so an em dash.
+        compose.onNodeWithText("—", substring = true).assertIsDisplayed()
     }
 }
