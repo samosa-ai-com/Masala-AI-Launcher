@@ -196,4 +196,44 @@ class ChatSessionsTest {
         assertNull(s.deleteTurn("missing", 0))
         assertEquals(1, s.get(chat.id)!!.turns.size)
     }
+
+    @Test
+    fun `reverting drops the message and everything after it for editing`() = runBlocking<Unit> {
+        val s = store()
+        val chat = s.create()
+        s.append(chat.id, user("one"))
+        s.append(chat.id, masala("two"))
+        s.append(chat.id, user("three"))
+
+        val next = s.revertTo(chat.id, 2)
+        assertNotNull(next)
+        assertEquals(listOf("one", "two"), next!!.turns.map { it.text })
+
+        val reopened = s.get(chat.id)
+        assertNotNull(reopened)
+        assertEquals(listOf("one", "two"), reopened!!.turns.map { it.text })
+    }
+
+    @Test
+    fun `reverting to the first turn empties the thread`() = runBlocking<Unit> {
+        val s = store()
+        val chat = s.create()
+        s.append(chat.id, user("one"))
+        s.append(chat.id, masala("two"))
+
+        val next = s.revertTo(chat.id, 0)
+        assertNotNull(next)
+        assertTrue(next!!.turns.isEmpty())
+    }
+
+    @Test
+    fun `reverting an unknown turn changes nothing`() = runBlocking<Unit> {
+        val s = store()
+        val chat = s.create()
+        s.append(chat.id, user("one"))
+
+        assertNull(s.revertTo(chat.id, 5))
+        assertNull(s.revertTo("missing", 0))
+        assertEquals(1, s.get(chat.id)!!.turns.size)
+    }
 }

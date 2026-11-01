@@ -180,6 +180,9 @@ class HomeActivity : ComponentActivity() {
             val commandState by app.commands.state.collectAsStateWithLifecycle()
             var turns by remember { mutableStateOf<List<com.samosaai.masala.chat.ChatTurn>>(emptyList()) }
             var sessionTitle by remember { mutableStateOf("") }
+            // A reverted prompt, dropped back into the chat box for editing.
+            var chatPrefill by remember { mutableStateOf("") }
+            var chatPrefillNonce by remember { mutableStateOf(0) }
             var expanded by rememberSaveable { mutableStateOf(false) }
             var chatOpen by rememberSaveable { mutableStateOf(false) }
             var showHistory by remember { mutableStateOf(false) }
@@ -683,6 +686,28 @@ class HomeActivity : ComponentActivity() {
                             }
                         }
                     },
+                    onRevertTurn = { index ->
+                        val id = activeId ?: return@ChatSurface
+                        // The prompt being redone, before the store drops it.
+                        val redone = turns.getOrNull(index)?.text.orEmpty()
+                        app.scope.launch {
+                            app.chats.revertTo(id, index)?.let {
+                                turns = it.turns
+                                // Same rule as delete: never cancel a live take or run.
+                                if (app.commands.state.value != CommandState.Listening &&
+                                    app.commands.state.value !is CommandState.Thinking
+                                ) {
+                                    app.commands.restoreSession(it.turns)
+                                }
+                                // Back into the box for editing, like editing the old
+                                // message and sending the edited prompt.
+                                chatPrefill = redone
+                                chatPrefillNonce += 1
+                            }
+                        }
+                    },
+                    prefill = chatPrefill,
+                    prefillNonce = chatPrefillNonce,
                 )
             }
             if (showHistory && !hidden) SessionListSheet(

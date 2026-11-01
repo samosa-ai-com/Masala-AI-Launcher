@@ -118,6 +118,11 @@ fun ChatSurface(
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
     onDeleteTurn: (Int) -> Unit = {},
+    onRevertTurn: (Int) -> Unit = {},
+    /** Text dropped back into the type field by a revert, so it can be edited and resent. */
+    prefill: String = "",
+    /** Bumped every revert so an identical text still replaces what is typed. */
+    prefillNonce: Int = 0,
     /** The installed experts, offered in an empty thread and from the header. */
     experts: List<ExpertCredit> = emptyList(),
     onAskExpert: (ExpertCredit) -> Unit = {},
@@ -187,13 +192,14 @@ fun ChatSurface(
                         turns.isEmpty() && !listening && !thinking -> EmptyThread(level, character, experts, onAskExpert)
                         else -> Thread(
                             turns, listening, thinking, state, character, level, onStop, onDeleteTurn,
+                            onRevertTurn,
                             onCollapse = { onExpanded(false) },
                             onGrant = grant,
                             onRetry = onRetry,
                         )
                     }
                 }
-                Controls(listening, mic, level, onSend, onAsk, onClose)
+                Controls(listening, mic, level, onSend, onAsk, onClose, prefill, prefillNonce)
             }
         }
     }
@@ -383,6 +389,7 @@ private fun Thread(
     level: () -> Float,
     onStop: () -> Unit,
     onDeleteTurn: (Int) -> Unit,
+    onRevertTurn: (Int) -> Unit,
     onCollapse: () -> Unit,
     onGrant: (String) -> Unit,
     onRetry: () -> Unit,
@@ -437,7 +444,25 @@ private fun Thread(
         modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp).nestedScroll(nested),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        itemsIndexed(turns) { index, turn -> Bubble(turn, key = index, onDelete = { onDeleteTurn(index) }) }
+        itemsIndexed(turns) { index, turn ->
+            // Only the user's own messages carry a menu: there is nothing to
+            // redo from a reply, and reverting means re-sending the prompt.
+            val mine = turn.role == TurnRole.USER
+            Bubble(
+                turn,
+                key = index,
+                onDelete = if (mine) {
+                    { onDeleteTurn(index) }
+                } else {
+                    null
+                },
+                onRevert = if (mine) {
+                    { onRevertTurn(index) }
+                } else {
+                    null
+                },
+            )
+        }
         if (listening || transcribing) {
             item("live") {
                 Bubble(
@@ -527,10 +552,16 @@ private fun AccessRow(capability: String, onGrant: (String) -> Unit, onRetry: ()
 private const val MAX_EXPERT_BADGES = 3
 
 @Composable
-private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1, onDelete: (() -> Unit)? = null) {
+private fun Bubble(
+    turn: ChatTurn,
+    live: Boolean = false,
+    key: Int = -1,
+    onDelete: (() -> Unit)? = null,
+    onRevert: (() -> Unit)? = null,
+) {
     var menu by remember { mutableStateOf(false) }
-    // Live turns are transient; only stored turns can be deleted.
-    val longPress = if (onDelete != null && !live) {
+    // Live turns are transient; only stored turns can be deleted or reverted to.
+    val longPress = if ((onDelete != null || onRevert != null) && !live) {
         Modifier.combinedClickable(onClick = {}, onLongClick = { menu = true })
     } else {
         Modifier
@@ -539,12 +570,17 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1, onDelet
         menu = false
         onDelete?.invoke()
     }
+    fun dismissRevert() {
+        menu = false
+        onRevert?.invoke()
+    }
     val user = turn.role == TurnRole.USER
     if (turn.role == TurnRole.SYSTEM) {
         // A history summary: the app wrote it, so it reads as a note, not as a reply.
+        // No menu: only the user's own messages can be deleted or reverted to.
         Box(Modifier.fillMaxWidth()) {
             Column(
-                longPress.fillMaxWidth().padding(vertical = 6.dp)
+                Modifier.fillMaxWidth().padding(vertical = 6.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color.White.copy(alpha = 0.04f))
                     .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -561,7 +597,6 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1, onDelet
                 modifier = Modifier.padding(top = 4.dp),
             )
             }
-            TurnMenu(menu, onDismiss = { menu = false }, onDelete = ::dismissDelete)
         }
         return
     }
@@ -573,7 +608,7 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1, onDelet
     )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (user) Arrangement.End else Arrangement.Start) {
         Box(Modifier.fillMaxWidth(0.92f)) {
-            TurnMenu(menu, onDismiss = { menu = false }, onDelete = ::dismissDelete)
+            TurnMenu(menu, onDismiss = { menu = false }, onDelete = ::dismissDelete, onRevert = onRevert?.let { { dismissRevert() } })
         Column(
             longPress.fillMaxWidth().clip(shape)
                 .background(
@@ -645,10 +680,13 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1, onDelet
     }
 }
 
-/** Long-press menu on one stored turn: deleting it also drops it from the agent's history. */
+/** Long-press menu on one of the user's turns: deleting or reverting also updates the agent's history. */
 @Composable
-private fun TurnMenu(expanded: Boolean, onDismiss: () -> Unit, onDelete: () -> Unit) {
+private fun TurnMenu(expanded: Boolean, onDismiss: () -> Unit, onDelete: () -> Unit, onRevert: (() -> Unit)? = null) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        if (onRevert != null) {
+            DropdownMenuItem(text = { Text(stringResource(R.string.chat_revert_to_here)) }, onClick = onRevert)
+        }
         DropdownMenuItem(text = { Text(stringResource(R.string.chat_delete_turn)) }, onClick = onDelete)
     }
 }
@@ -668,6 +706,8 @@ private fun Controls(
     onSend: () -> Unit,
     onAsk: (String) -> Unit = {},
     onClose: () -> Unit,
+    prefill: String = "",
+    prefillNonce: Int = 0,
 ) {
     val tokens = MasalaTheme.tokens
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
@@ -686,6 +726,11 @@ private fun Controls(
                 }
             } else {
                 var text by remember { mutableStateOf("") }
+                // A revert drops the message back here for editing; the nonce re-applies
+                // even when the same words are reverted twice in a row.
+                LaunchedEffect(prefillNonce) {
+                    if (prefillNonce > 0) text = prefill
+                }
                 androidx.compose.material3.OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
