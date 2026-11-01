@@ -16,7 +16,7 @@ class WidgetGeneratorTest {
         var calls = 0
         override suspend fun call(messages: List<ChatMessage>, responseFormat: ResponseFormat?, maxTokens: Int, temperature: Float?): String {
             calls++
-            return when (val next = replies.removeFirst()) {
+            return when (val next = replies.removeAt(0)) {
                 is String -> next
                 is Exception -> throw next
                 else -> error("bad reply")
