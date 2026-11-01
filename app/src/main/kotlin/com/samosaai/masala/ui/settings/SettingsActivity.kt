@@ -456,6 +456,10 @@ class SettingsActivity : ComponentActivity() {
         val source = remember(snapshot) {
             WidgetSource(snapshot = { snapshot }, store = masala.widgetStates, onAction = { toast(getString(R.string.widgets_preview_note)) }, streams = masala.streamSources, http = masala.httpValues)
         }
+        // Template blurbs by widget id, so the Templates tab can say what each one does.
+        val templatesByWidgetId = remember {
+            runCatching { com.samosaai.masala.core.widgets.WidgetTemplates.all().associateBy { it.widget.id } }.getOrDefault(emptyMap())
+        }
         SettingsScaffold(stringResource(R.string.settings_widgets), onBack = onBack) {
             Button(onClick = { askInChat(getString(R.string.widgets_describe_prefill)) }) { Text(stringResource(R.string.widgets_describe)) }
             var editSpec by remember { mutableStateOf<com.samosaai.masala.core.contract.WidgetSpec?>(null) }
@@ -515,6 +519,16 @@ class SettingsActivity : ComponentActivity() {
                 val placements = remember(base, spec.id) { base?.let { LayoutEdits.widgetPlacements(it, spec.id) }.orEmpty() }
                 Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     WidgetCard(spec, rows = null, source = source)
+                    if (!mine) {
+                        templatesByWidgetId[spec.id]?.description?.let { blurb ->
+                            Text(
+                                blurb,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
+                    }
                     Text(
                         if (placements.isEmpty()) stringResource(R.string.widgets_not_on_home)
                         else stringResource(R.string.widgets_on_home) + " · ${placements.size}",
@@ -539,26 +553,35 @@ class SettingsActivity : ComponentActivity() {
                                 }
                             }) { Text(stringResource(R.string.widgets_add_to_home)) }
                         }
-                        TextButton(onClick = { editSpec = spec }) { Text(stringResource(R.string.widgets_edit)) }
-                        TextButton(onClick = {
-                            scope.launch {
-                                val known = masala.widgetLibrary.current().keys
-                                var copyId = "${spec.id}-copy"
-                                var n = 2
-                                while (copyId in known) copyId = "${spec.id}-copy-$n".also { n++ }
-                                masala.widgetLibrary.save(
-                                    spec.copy(id = copyId, title = (spec.title ?: spec.id) + " (copy)"),
-                                    createdBy = "user",
-                                )
+                        if (mine) {
+                            TextButton(onClick = { editSpec = spec }) { Text(stringResource(R.string.widgets_edit)) }
+                            TextButton(onClick = {
+                                scope.launch {
+                                    val known = masala.widgetLibrary.current().keys
+                                    var copyId = "${spec.id}-copy"
+                                    var n = 2
+                                    while (copyId in known) copyId = "${spec.id}-copy-$n".also { n++ }
+                                    masala.widgetLibrary.save(
+                                        spec.copy(id = copyId, title = (spec.title ?: spec.id) + " (copy)"),
+                                        createdBy = "user",
+                                    )
+                                }
+                            }) { Text(stringResource(R.string.widgets_duplicate)) }
+                            TextButton(onClick = { confirmDelete = true }) {
+                                Text(stringResource(R.string.settings_version_delete))
                             }
-                        }) { Text(stringResource(R.string.widgets_duplicate)) }
-                        TextButton(onClick = { confirmDelete = true }) {
-                            Text(stringResource(R.string.settings_version_delete))
+                        } else {
+                            // Templates stay pristine: personalizing goes through the Widget Maker in chat,
+                            // which saves a new widget and leaves the template untouched.
+                            TextButton(onClick = {
+                                val template = templatesByWidgetId[spec.id]
+                                askInChat(getString(R.string.widgets_customize_prefill, template?.name ?: spec.title ?: spec.id))
+                            }) { Text(stringResource(R.string.widgets_customize)) }
                         }
                     }
                 }
                 HorizontalDivider()
-                if (confirmDelete) {
+                if (mine && confirmDelete) {
                     AlertDialog(
                         onDismissRequest = { confirmDelete = false },
                         title = { Text(stringResource(R.string.widgets_delete_title)) },
