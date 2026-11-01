@@ -118,7 +118,7 @@ fun ListSearchField(value: String, onValue: (String) -> Unit, hint: String) {
 
 /** A label and a switch. The whole row toggles, so the touch target is the full width. */
 @Composable
-fun SettingsToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+fun SettingsToggleRow(label: String, checked: Boolean, summary: String? = null, onCheckedChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -127,7 +127,10 @@ fun SettingsToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            summary?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
         // The row handles the tap; the switch only shows the state.
         Switch(checked = checked, onCheckedChange = null)
     }

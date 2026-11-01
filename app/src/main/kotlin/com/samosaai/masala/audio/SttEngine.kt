@@ -95,11 +95,6 @@ class SttEngine(
     /** The mic level while listening, 0..1 (UI refresh U4: Sam's rings and the level bars follow it). */
     val level: kotlinx.coroutines.flow.StateFlow<Float> = _level
 
-    private val _partial = kotlinx.coroutines.flow.MutableStateFlow("")
-
-    /** Words heard so far in this session (on-device recognizer only; API transcription has none). */
-    val partial: kotlinx.coroutines.flow.StateFlow<String> = _partial
-
     /** Fires once when a take ends by itself; see [PttEngine.TakeAutoEnd]. Main thread. */
     @Volatile
     private var takeAutoEndListener: ((PttEngine.TakeAutoEnd) -> Unit)? = null
@@ -134,10 +129,9 @@ class SttEngine(
     private val _vadState = kotlinx.coroutines.flow.MutableStateFlow<VadSnapshot?>(null)
     val vadState: kotlinx.coroutines.flow.StateFlow<VadSnapshot?> = _vadState
 
-    /** A new listening session starts from silence and no words. */
+    /** A new listening session starts from silence. */
     fun resetLive() {
         _level.value = 0f
-        _partial.value = ""
     }
 
     /** Language for the current/next Android recognizer session. */
@@ -741,7 +735,6 @@ class SttEngine(
                     val text = matches?.firstOrNull() ?: ""
                     if (text.isNotBlank()) {
                         currentPartialResult = text
-                        _partial.value = text
                         _heard.value = _heard.value + 1
                     }
                 }

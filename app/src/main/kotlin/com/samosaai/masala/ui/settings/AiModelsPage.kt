@@ -230,10 +230,10 @@ fun AiModelsPage(onBack: () -> Unit) {
                     // Chat always has a provider: switching it on moves chat here; off is done by picking another.
                     if (on) scope.launch { persist { it.copy(chat = Endpoint(preset.id, urlCheck.getOrThrow(), model)) } }
                 }
-                UseRow(stringResource(R.string.ai_use_voice_in), profile.voiceIn?.presetId == preset.id, preset.capabilities.voiceIn) { on ->
+                UseRow(stringResource(R.string.ai_use_voice_in), profile.voiceIn?.presetId == preset.id, preset.capabilities.voiceIn, stringResource(R.string.ai_use_voice_same_choice)) { on ->
                     scope.launch { persist { it.copy(voiceIn = if (on) Endpoint(preset.id, urlCheck.getOrThrow()) else null) } }
                 }
-                UseRow(stringResource(R.string.ai_use_voice_out), profile.voiceOut?.presetId == preset.id, preset.capabilities.voiceOut) { on ->
+                UseRow(stringResource(R.string.ai_use_voice_out), profile.voiceOut?.presetId == preset.id, preset.capabilities.voiceOut, stringResource(R.string.ai_use_voice_same_choice)) { on ->
                     scope.launch {
                         persist {
                             val model = it.voiceOut?.takeIf { v -> v.presetId == preset.id }?.model?.ifBlank { preset.defaultTtsModel }
@@ -395,11 +395,11 @@ private fun CapChip(ok: Boolean, label: String) {
 }
 
 @Composable
-private fun UseRow(label: String, checked: Boolean, offered: Boolean, onChange: (Boolean) -> Unit) {
+private fun UseRow(label: String, checked: Boolean, offered: Boolean, summary: String? = null, onChange: (Boolean) -> Unit) {
     val text = if (offered) label else stringResource(R.string.ai_not_offered, label)
     Box(Modifier.fillMaxWidth().heightIn(min = 46.dp)) {
         if (offered) {
-            SettingsToggleRow(text, checked, onChange)
+            SettingsToggleRow(text, checked, summary, onChange)
         } else {
             Text(text, style = MaterialTheme.typography.bodyLarge, color = MasalaTheme.tokens.textLow, modifier = Modifier.align(Alignment.CenterStart))
         }

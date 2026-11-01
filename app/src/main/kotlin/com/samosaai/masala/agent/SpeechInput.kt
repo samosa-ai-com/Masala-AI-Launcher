@@ -13,14 +13,7 @@ interface SpeechInput {
     suspend fun stop(): Result<String>
     fun cancel()
 
-    /**
-     * Listens until the speaker pauses, then returns the transcript. Only the
-     * providers the detector can time itself are asked to. The mic no longer uses
-     * this (a tap ends only on Send); the Settings test card does.
-     */
-    suspend fun listenOnce(): Result<String> = Result.failure(UnsupportedOperationException("Hands-free isn't available"))
-
-    /** Reports a take that ended by itself; the test card path never needs it. */
+    /** Reports a take that ended by itself (a failed capture, or the 90 s cap). */
     fun setTakeAutoEndListener(listener: ((com.samosaai.masala.audio.PttEngine.TakeAutoEnd) -> Unit)?) {}
 
     /**
@@ -95,19 +88,13 @@ fun speechLanguage(settings: SpeechConfig): Language =
         ?: phoneLanguage()
 
 /**
- * Silence that ends the test-card turn: 2.5 s, so a breath or a slow sentence does not
- * cut the user off mid-thought.
- */
-private const val SILENCE_MS = 2500L
-
-/**
  * [SpeechInput] that follows the app's STT configuration: cloud transcription when
  * [SpeechConfig] names an endpoint, otherwise the on-device recognizer — with the
  * other one as fallback when the first can't start. A phone whose default recognizer
  * is a stub (or has none) therefore records for the server instead of failing.
  *
- * A tap starts an open-ended take; only Send (or cancel) ends it. `listenOnce` stays
- * for the Settings test card, which is the only place that still ends a take by itself.
+ * A tap starts an open-ended take; only Send (or cancel) ends it. The mic button and the
+ * Settings test card both record this way.
  */
 class ConfiguredSpeechInput(
     private val engine: PttEngine,
@@ -182,41 +169,6 @@ class ConfiguredSpeechInput(
         val model = if (provider.isApiBased()) settings.sttModel else ""
         val language = if (provider.isApiBased()) settings.sttLanguage.ifBlank { language().iso639 } else ""
         return engine.stopListeningAndTranscribe(provider, model, language)
-    }
-
-    override suspend fun listenOnce(): Result<String> {
-        cancel()
-        live?.resetLive()
-        val settings = config()
-        // Only the providers the detector can time itself; the Settings test card is
-        // the only caller that still ends a take by itself.
-        val order = SpeechPolicy.order(configured())
-            .filter { it.isApiBased() }
-            .filter { it != AudioProvider.ANDROID || localAvailable() }
-        if (order.isEmpty()) return Result.failure(Exception(strings.localUnavailable))
-        val lang = configuredLanguage(settings)
-        var last: Result<String>? = null
-        // The first technical failure, kept: once the user has spoken, a fallback provider
-        // only hears the room, and reporting its silence would hide the real error.
-        var firstFailure: Result<String>? = null
-        for (provider in order) {
-            active = provider
-            val model = if (provider.isApiBased()) settings.sttModel else ""
-            val result = try {
-                engine.listenForUtterance(provider, model, lang, SILENCE_MS)
-            } finally {
-                active = null
-            }
-            if (result.isSuccess) return result
-            if (com.samosaai.masala.audio.SttEngine.isBenignSttError(result.exceptionOrNull())) {
-                // The fallback heard nothing because the speaking already happened: the
-                // server's failure is the answer, not "no speech detected".
-                return firstFailure ?: result
-            }
-            if (firstFailure == null) firstFailure = result
-            last = result
-        }
-        return firstFailure ?: last!!
     }
 
     /**

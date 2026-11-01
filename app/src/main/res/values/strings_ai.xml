@@ -26,6 +26,8 @@
     <string name="ai_use_chat">Chat and tools</string>
     <string name="ai_use_voice_in">Voice input</string>
     <string name="ai_use_voice_out">Voice output</string>
+    <!-- Voice in/out hold one provider each; the toggle and Settings → Voice are the same choice. -->
+    <string name="ai_use_voice_same_choice">Same choice as Settings → Voice. One provider at a time.</string>
     <string name="ai_not_offered">%1$s (not offered)</string>
     <string name="ai_test_connection">Test connection</string>
     <string name="ai_testing">Testing…</string>
@@ -66,7 +68,7 @@
     <string name="voice_first_model">The server’s first speech model</string>
     <string name="voice_set_up_first">Set it up in Models &amp; keys first</string>
     <string name="voice_needs_key">Needs a %1$s key</string>
-    <string name="voice_from_models">From Models &amp; keys</string>
+    <string name="voice_ready">Ready · tap to use</string>
     <string name="voice_language">Language</string>
     <string name="voice_language_auto">Auto · the phone’s language</string>
     <string name="voice_output">Voice output</string>
@@ -75,13 +77,11 @@
     <string name="voice_test">Test voice</string>
     <string name="stt_test">Test microphone</string>
     <string name="stt_test_summary">Speak to check the microphone and transcription</string>
-    <string name="stt_test_listening">Listening… speak now</string>
+    <string name="stt_test_listening">Listening… tap Stop when you’re done</string>
     <string name="stt_test_stop">Stop</string>
     <string name="stt_test_cancel">Cancel</string>
     <string name="stt_test_peak">Mic peak %1$d%%</string>
-    <string name="stt_test_vad">Detector floor %1$d · speaks above %2$d · peak %3$d dB</string>
     <string name="stt_test_heard">Heard: %1$s</string>
-    <string name="stt_test_fell_back">The configured server failed, so the phone recognizer did it instead.</string>
     <string name="voice_from_anywhere">From anywhere</string>
     <string name="voice_assist_title">Masala as the assist app</string>
     <string name="voice_assist_summary">Hold Home or Power to talk from any app</string>
