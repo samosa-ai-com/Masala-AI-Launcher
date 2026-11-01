@@ -17,6 +17,8 @@ sealed interface CommandState {
         val experts: List<com.samosaai.masala.chat.ExpertCredit> = emptyList(),
         /** Access a step needed but could not use, for the Grant affordance under the answer. */
         val capabilities: List<String> = emptyList(),
+        /** What the turn made (a mini app, a file), for the card under the answer. */
+        val results: List<com.samosaai.masala.chat.ChatResult> = emptyList(),
     ) : CommandState
     /** [capability] is the marker of a permission or special access that would fix it, for a Grant button. */
     data class Error(val prompt: String, val message: String, val capability: String? = null) : CommandState

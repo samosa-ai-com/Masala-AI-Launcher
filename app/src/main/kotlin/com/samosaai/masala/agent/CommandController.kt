@@ -4,7 +4,6 @@ import com.samosaai.masala.actions.ActionDispatcher
 import com.samosaai.masala.audio.PttEngine
 import com.samosaai.masala.core.agent.CommandFastPath
 import com.samosaai.masala.core.agent.NameCorrector
-import com.samosaai.masala.core.agent.SkillRouter
 import com.samosaai.masala.core.contract.MasalaAction
 import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.llm.ChatMessage
@@ -53,7 +52,8 @@ class CommandController(
         _state.value = state
         val turn = when (state) {
             is CommandState.Reply -> com.samosaai.masala.chat.ChatTurn(
-                com.samosaai.masala.chat.TurnRole.MASALA, state.text, state.steps, experts = state.experts,
+                com.samosaai.masala.chat.TurnRole.MASALA, state.text, state.steps,
+                experts = state.experts, results = state.results,
             )
             is CommandState.Error -> com.samosaai.masala.chat.ChatTurn(
                 com.samosaai.masala.chat.TurnRole.ERROR, state.message,
@@ -224,11 +224,6 @@ class CommandController(
             publish(stateFor(prompt, run(action), spoken))
             return
         }
-        // No model call from home: the skill's own run builds the app, with its few tools.
-        SkillRouter.handoff(prompt, skills())?.let { skill ->
-            publish(stateFor(prompt, run(MasalaAction.RunSkill(skill.id, prompt)), spoken, "Opened ${skill.title.ifBlank { skill.id }}."))
-            return
-        }
         // Advice in an expert's area goes to the agent too: it consults the expert itself, in place.
         val agent = newAgent().also { it.restore(history) }
         val steps = mutableListOf<String>()
@@ -236,6 +231,8 @@ class CommandController(
         val consulted = linkedMapOf<String, com.samosaai.masala.chat.ExpertCredit>()
         // Access a step asked for and did not have: the answer still comes, plus a Grant row.
         val missingAccess = linkedSetOf<String>()
+        // What the turn made, for the card under the answer.
+        val results = linkedMapOf<String, com.samosaai.masala.chat.ChatResult>()
         try {
             agent.run(ChatMessage("user", JsonPrimitive(prompt))).collect { event ->
                 when (event) {
@@ -249,6 +246,9 @@ class CommandController(
                         }
                         _state.value = CommandState.Thinking(prompt, steps.toList())
                     }
+                    is AgentEvent.Results -> event.items.forEach { item ->
+                        results[item.ref] = com.samosaai.masala.chat.ChatResult(item.kind, item.title, item.ref)
+                    }
                     is AgentEvent.Done -> publish(
                         CommandState.Reply(
                             prompt,
@@ -257,6 +257,7 @@ class CommandController(
                             spoken = spoken,
                             experts = consulted.values.toList(),
                             capabilities = missingAccess.toList(),
+                            results = results.values.toList(),
                         ),
                     )
                     is AgentEvent.Failed -> publish(CommandState.Error(prompt, event.message))

@@ -56,6 +56,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,13 +76,17 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import com.samosaai.masala.R
 import com.samosaai.masala.agent.CommandState
+import com.samosaai.masala.chat.ChatResult
 import com.samosaai.masala.chat.ChatSession
 import com.samosaai.masala.chat.ExpertCredit
 import com.samosaai.masala.chat.ChatTurn
 import com.samosaai.masala.chat.TurnRole
 import com.samosaai.masala.data.Character
+import com.samosaai.masala.masala
+import com.samosaai.masala.miniapps.openMiniApp
 import com.samosaai.masala.ui.character.CharacterState
 import com.samosaai.masala.ui.character.MasalaCharacter
 import com.samosaai.masala.ui.home.MicButton
@@ -448,6 +453,45 @@ private fun Thread(
     }
 }
 
+/** What the turn made: open it, or put it on the home screen. */
+@Composable
+private fun ResultCard(result: ChatResult) {
+    val context = LocalContext.current
+    val app = context.masala
+    val scope = rememberCoroutineScope()
+    var pinned by remember(result.ref) { mutableStateOf(false) }
+    val miniApp = result.kind == "mini_app"
+    Column(
+        Modifier.fillMaxWidth().padding(top = 8.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White.copy(alpha = 0.06f))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Text(
+            result.title.ifBlank { result.ref },
+            style = MaterialTheme.typography.titleSmall,
+            color = MasalaTheme.tokens.textHigh,
+            maxLines = 1,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            TextButton(onClick = {
+                if (miniApp) context.openMiniApp(result.ref)
+                else runCatching { context.startActivity(context.packageManager.getLaunchIntentForPackage(result.ref)) }
+            }) { Text(stringResource(R.string.miniapp_open)) }
+            if (miniApp) {
+                TextButton(onClick = {
+                    scope.launch {
+                        app.layouts.pinMiniApp(result.ref, result.title)
+                        pinned = true
+                    }
+                }) {
+                    Text(stringResource(if (pinned) R.string.miniapp_pinned else R.string.miniapp_pin))
+                }
+            }
+        }
+    }
+}
+
 /** The answer came without a step that needed access; offer the grant, then the retry. */
 @Composable
 private fun AccessRow(capability: String, onGrant: (String) -> Unit, onRetry: () -> Unit) {
@@ -559,6 +603,7 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1, onDelet
                 color = if (user && !live) MasalaTheme.tokens.onAccent else MasalaTheme.tokens.textHigh,
                 fontSize = 14.sp,
             )
+            turn.results.forEach { result -> ResultCard(result) }
             if (turn.steps.isNotEmpty()) {
                 Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     turn.steps.forEach { step ->

@@ -1,5 +1,7 @@
 package com.samosaai.masala
 
+import com.samosaai.masala.miniapps.openMiniApp
+
 import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.graphics.Color
@@ -29,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -183,6 +186,20 @@ class HomeActivity : ComponentActivity() {
                 if (commandState != CommandState.Idle) chatOpen = true
                 if (commandState == CommandState.Listening) expanded = false
                 if (commandState is CommandState.Thinking) expanded = true
+            }
+            // A newly made app opens once, then the card is how it is opened again. The count is
+            // seeded from what is already on screen, so a reload or a reopened chat never reopens it.
+            var seenTurns by remember { mutableIntStateOf(turns.size) }
+            LaunchedEffect(turns.size) {
+                if (turns.size <= seenTurns) {
+                    seenTurns = turns.size
+                    return@LaunchedEffect
+                }
+                seenTurns = turns.size
+                val made = turns.lastOrNull()?.results?.firstOrNull { it.kind == "mini_app" } ?: return@LaunchedEffect
+                chatOpen = false
+                expanded = false
+                runCatching { openMiniApp(made.ref) }
             }
         val pinnedShortcuts by launcher.pinnedShortcuts.collectAsStateWithLifecycle()
         val profiles by launcher.profiles.collectAsStateWithLifecycle()

@@ -34,10 +34,6 @@ class CommandControllerTest {
     private var agentsBuilt = 0
     private val replies = ArrayDeque<ChatMessage>()
     private val chef = MasalaSkill(id = "chef", title = "Chef", instructions = "i", keywords = listOf("cook"), persona = Persona("chef"))
-    private val gameMaker = MasalaSkill(
-        id = "game_maker", title = "Game maker", instructions = "i", keywords = listOf("game"),
-        widget = SkillWidget("sports_esports", output = SkillOutput.MINI_APP),
-    )
     private val spotify = MasalaAction.LaunchApp("com.spotify")
 
     private fun reply(text: String) = ChatMessage("assistant", JsonPrimitive(text))
@@ -50,7 +46,7 @@ class CommandControllerTest {
         resolveApp = { if (it == "spotify") spotify else null },
         names = { listOf("Spotify") },
         run = { ran += it; ActionDispatcher.Outcome.Done("ok: $it") },
-        skills = { listOf(chef, gameMaker) },
+        skills = { listOf(chef) },
         newAgent = {
             agentsBuilt++
             MasalaAgent(
@@ -67,12 +63,15 @@ class CommandControllerTest {
 
     private suspend fun CommandController.settled() = withTimeout(5_000) { state.first { it is CommandState.Reply || it is CommandState.Error } }
 
-    @Test fun aGameRequestOpensTheGameMaker() = runBlocking<Unit> {
+    @Test fun aGameRequestIsAnsweredInTheChat() = runBlocking<Unit> {
+        replies += reply("I made Snake and put it on your home screen.")
         val c = controller()
         c.ask("make me a snake game")
-        assertEquals(CommandState.Reply("make me a snake game", "Opened Game maker."), c.settled())
-        assertEquals(listOf<MasalaAction>(MasalaAction.RunSkill("game_maker", "make me a snake game")), ran)
-        assertEquals(0, agentsBuilt)
+        val answer = assertIs<CommandState.Reply>(c.settled())
+        assertEquals("I made Snake and put it on your home screen.", answer.text)
+        // No builder opens and no skill is started from the turn.
+        assertEquals(emptyList<MasalaAction>(), ran)
+        assertEquals(1, agentsBuilt)
     }
 
     @Test fun fastPathBypassesTheModel() = runBlocking<Unit> {
@@ -332,6 +331,53 @@ class CommandControllerTest {
             consultCredit("consult_expert", kotlinx.serialization.json.buildJsonObject { put("skill_id", JsonPrimitive("gone")) }, listOf(chef)),
         )
         assertEquals(null, consultCredit("get_time", args, listOf(chef)))
+    }
+
+    @Test fun aMadeAppIsCarriedOnTheReplyAndTheStoredTurn() = runBlocking<Unit> {
+        val scripts = ArrayDeque(
+            listOf(
+                ChatMessage(
+                    "assistant",
+                    JsonPrimitive(""),
+                    toolCalls = listOf(
+                        com.samosaai.masala.llm.ToolCall(
+                            "1",
+                            function = com.samosaai.masala.llm.FunctionCall("build", "{}"),
+                        ),
+                    ),
+                ),
+                reply("I made Snake and put it on your home screen."),
+            ),
+        )
+        val c = CommandController(
+            scope = scope,
+            resolveApp = { null },
+            names = { emptyList() },
+            run = { ActionDispatcher.Outcome.Done() },
+            skills = { emptyList() },
+            newAgent = {
+                MasalaAgent(
+                    AgentModel { _, _ -> scripts.removeFirst() },
+                    { _, _ ->
+                        ToolResult.Success(
+                            "Mini app 'a1' created and pinned to home.",
+                            produced = listOf(com.samosaai.masala.core.tool.Produced("mini_app", "Snake", "a1")),
+                        )
+                    },
+                    listOf(ToolDefinition("build", "", JsonObject(emptyMap()))),
+                    ToolScope.command(listOf(ToolInfo("build", ToolSensitivity.CHANGES_SOMETHING))),
+                    { "system" },
+                )
+            },
+        )
+        val stored = mutableListOf<com.samosaai.masala.chat.ChatTurn>()
+        c.onTurn = { stored += it }
+        c.ask("make me a snake game")
+        val settled = assertIs<CommandState.Reply>(c.settled())
+        val expected = listOf(com.samosaai.masala.chat.ChatResult("mini_app", "Snake", "a1"))
+        assertEquals(expected, settled.results)
+        // The card has to survive a reload, so the turn keeps it too.
+        assertEquals(expected, stored.last().results)
     }
 
     @Test fun theReplyCarriesTheExpertItConsulted() = runBlocking<Unit> {

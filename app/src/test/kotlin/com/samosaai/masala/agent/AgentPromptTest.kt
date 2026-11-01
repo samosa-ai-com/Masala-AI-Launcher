@@ -66,6 +66,15 @@ class AgentPromptTest {
     }
 
     @Test
+    fun thePromptSaysHowAppsAreMadeAndOpened() {
+        val prompt = AgentPrompt.build("Monday", listOf(doctor))
+        assertTrue(prompt.contains("open_mini_app"))
+        assertTrue(prompt.contains("There is no separate builder to open"))
+        assertTrue(prompt.contains("build it with create_mini_app"))
+        assertTrue(prompt.contains("Never open a screen just because a word matched"))
+    }
+
+    @Test
     fun aRunWithNoSkillsListsNeitherSection() {
         val prompt = AgentPrompt.build("Monday", emptyList())
         assertFalse(prompt.contains("consult_expert"))
