@@ -96,6 +96,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import com.samosaai.masala.ui.settings.SettingsActivity
 import com.samosaai.masala.ui.theme.MasalaTheme
 import com.samosaai.masala.ui.theme.Motion
+import com.samosaai.masala.util.MasalaLog
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import androidx.lifecycle.lifecycleScope
@@ -310,6 +311,22 @@ class HomeActivity : ComponentActivity() {
                     SystemClock.uptimeMillis() - lastDrawerDragAt > 350
                 ) {
                     drawerProgress.animateTo(if (open) 1f else 0f, drawerSpring)
+                }
+            }
+        }
+        // Redraws once the drawer comes to rest. On the Redmi the frame that lands a settle can
+        // fail to reach the screen: progress is at 0 or 1, nothing animates, so nothing draws
+        // again and the last mid-slide frame (a see-through drawer) stays up until something
+        // unrelated, like the clock's minute tick, redraws home. Two later invalidations replace
+        // it; they cost two frames per open or close.
+        val composeView = androidx.compose.ui.platform.LocalView.current
+        LaunchedEffect(composeView) {
+            snapshotFlow { drawerProgress.value.let { it == 0f || it == 1f } }.collectLatest { atRest ->
+                if (!atRest) return@collectLatest
+                for (wait in longArrayOf(100, 400)) {
+                    kotlinx.coroutines.delay(wait)
+                    MasalaLog.d("HomeDrawer") { "rest redraw p=${drawerProgress.value} open=$drawerOpen finger=$drawerFingerDown" }
+                    composeView.invalidate()
                 }
             }
         }
