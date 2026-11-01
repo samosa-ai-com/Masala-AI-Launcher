@@ -342,25 +342,29 @@ class LayoutEditsTest {
         // Home starts with a 4-item grid with a title: 3 rendered rows.
         var doc = LayoutDoc(pages = listOf(Page("home", sections = listOf(GridSection("g", title = "Apps", columns = 4, items = items("a", "b", "c", "d"))))))
         val first = assertNotNull(LayoutEdits.placeWidget(doc, "big", specs = specs))
-        // Grid 3 + widget 4 = 7: fits.
+        // Grid 3 + widget 3 = 6: fits.
         assertEquals("home", first.pageId)
         doc = first.doc
         val second = assertNotNull(LayoutEdits.placeWidget(doc, "big", specs = specs))
-        // 7 + 4 = 11: fits.
+        // 6 + 3 = 9: fits.
         assertEquals("home", second.pageId)
         doc = second.doc
         val third = assertNotNull(LayoutEdits.placeWidget(doc, "big", specs = specs))
-        // 11 + 4 > 12: a new home screen opens.
-        assertEquals(2, third.doc.pages.size)
-        assertEquals("home-2", third.pageId)
-        assertEquals("Home 2", third.doc.pages.last().title)
+        // 9 + 3 = 12: exactly a screenful, still fits.
+        assertEquals("home", third.pageId)
+        doc = third.doc
+        val fourth = assertNotNull(LayoutEdits.placeWidget(doc, "big", specs = specs))
+        // 12 + 3 > 12: a new home screen opens.
+        assertEquals(2, fourth.doc.pages.size)
+        assertEquals("home-2", fourth.pageId)
+        assertEquals("Home 2", fourth.doc.pages.last().title)
     }
 
     @Test
     fun `widgetRowsUsed counts headers, grids and widgets at drawn size`() {
-        // w1: water at drawn 4; s1: tallest of water 4 and steps override 1 is 4.
-        assertEquals(8, LayoutEdits.widgetRowsUsed(widgetDoc(), "home", lib))
-        assertEquals(2, LayoutEdits.widgetRowsUsed(widgetDoc(), "two", lib))
+        // w1: water at drawn 3; s1: tallest of water 3 and steps override 1 is 3.
+        assertEquals(6, LayoutEdits.widgetRowsUsed(widgetDoc(), "home", lib))
+        assertEquals(1, LayoutEdits.widgetRowsUsed(widgetDoc(), "two", lib))
         assertEquals(0, LayoutEdits.widgetRowsUsed(widgetDoc(), "missing", lib))
         val grid = LayoutDoc(pages = listOf(Page("home", sections = listOf(HeaderSection("h"), GridSection("g", title = "T", columns = 4, items = items("a", "b", "c", "d", "e"))))))
         // Header 3 (clock + date) + grid title 1 + ceil(5/4)*2 rows.
@@ -476,7 +480,7 @@ class LayoutEditsTest {
     @Test
     fun `a small widget joins a nearly full home screen instead of opening a new one`() {
         // The follow-up report: header + blank-title grid + price, then tea (timer only).
-        // Estimated 3 + 2 + 4 = 9, plus tea 3 = 12: fits, no new page.
+        // Estimated 3 + 2 + 2 = 7, plus tea 3 = 10: fits, no new page.
         val tea = WidgetSpec("tea", null, listOf(WidgetComponent.Timer("tea", "Tea", 60)), SizeRange(1, 1, 2))
         val price = WidgetSpec("price", "Price", listOf(WidgetComponent.WebValue("Now", HttpBinding("https://example.com", "$"))), SizeRange(1, 1, 2))
         val specs = mapOf("tea" to tea, "price" to price)
@@ -492,9 +496,56 @@ class LayoutEditsTest {
                 ),
             ),
         )
-        assertEquals(9, LayoutEdits.widgetRowsUsed(doc, "home", specs))
+        assertEquals(7, LayoutEdits.widgetRowsUsed(doc, "home", specs))
         val placed = assertNotNull(LayoutEdits.placeWidget(doc, "tea", specs = specs))
         assertEquals("home", placed.pageId)
         assertEquals(1, placed.doc.pages.size)
+    }
+
+    @Test
+    fun `a text card joins the first page with room instead of opening a third`() {
+        // The NiftyBEES report: home holds a price card (7 rows), page two holds two text cards
+        // (4 rows each), and a joke card (4 rows) must land on home (7 + 4 = 11), not a new page.
+        val card = { id: String, title: String, big: String, small: String ->
+            WidgetSpec(
+                id, title,
+                listOf(
+                    WidgetComponent.Text(big, style = com.samosaai.masala.core.contract.WidgetStyle(emphasis = com.samosaai.masala.core.contract.Emphasis.LARGE)),
+                    WidgetComponent.Text(small),
+                    WidgetComponent.Button("Check", MasalaAction.OpenDrawer),
+                ),
+                SizeRange(1, 1, 2),
+            )
+        }
+        val price = WidgetSpec("price", "Price", listOf(WidgetComponent.WebValue("Now", HttpBinding("https://example.com", "$"))), SizeRange(1, 1, 2))
+        val nifty = card("nifty", "Nifty", "NiftyBEES • NSE", "Live price coming soon - tap Check for latest")
+        val joke = card("joke", "Joke", "Morning Joke", "Why don't scientists trust atoms? Because they make up everything!")
+        assertEquals(4, LayoutEdits.estimateWidgetRows(nifty))
+        assertEquals(4, LayoutEdits.estimateWidgetRows(joke))
+        val specs = mapOf("price" to price, "nifty" to nifty, "nifty-live" to nifty.copy(id = "nifty-live"), "joke" to joke)
+        val doc = LayoutDoc(
+            pages = listOf(
+                Page(
+                    "home",
+                    sections = listOf(
+                        HeaderSection("h", showClock = true, showDate = true),
+                        GridSection("g", title = "", columns = 3, items = items("a", "b", "c")),
+                        WidgetSection("w", ref = WidgetRef("price")),
+                    ),
+                ),
+                Page(
+                    "page-2",
+                    sections = listOf(
+                        WidgetSection("w1", ref = WidgetRef("nifty")),
+                        WidgetSection("w2", ref = WidgetRef("nifty-live")),
+                    ),
+                ),
+            ),
+        )
+        assertEquals(7, LayoutEdits.widgetRowsUsed(doc, "home", specs))
+        assertEquals(8, LayoutEdits.widgetRowsUsed(doc, "page-2", specs))
+        val placed = assertNotNull(LayoutEdits.placeWidget(doc, "joke", specs = specs))
+        assertEquals("home", placed.pageId)
+        assertEquals(2, placed.doc.pages.size)
     }
 }

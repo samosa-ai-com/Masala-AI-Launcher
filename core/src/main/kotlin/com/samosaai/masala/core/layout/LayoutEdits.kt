@@ -1,6 +1,7 @@
 package com.samosaai.masala.core.layout
 
 import com.samosaai.masala.core.contract.DockSection
+import com.samosaai.masala.core.contract.Emphasis
 import com.samosaai.masala.core.contract.GridSection
 import com.samosaai.masala.core.contract.GroupSection
 import com.samosaai.masala.core.contract.HeaderSection
@@ -22,6 +23,9 @@ import com.samosaai.masala.core.contract.WidgetSpec
 
 /** User edits to a base layout by item id (home drag and drop). Each returns null when it can't apply. */
 object LayoutEdits {
+    /** A text component wraps at about this many characters a line; the renderer caps it at four. */
+    private const val MAX_TEXT_LINES = 4
+
     /** A slot in an [ItemSection]: insert before [index] (0..size). */
     data class Slot(val sectionId: String, val index: Int)
 
@@ -266,25 +270,39 @@ object LayoutEdits {
         }
 
     /** What a widget draws: title, components, card padding — never less than its default rows. */
-    fun estimateWidgetRows(spec: WidgetSpec, rowsOverride: Int? = null): Int {        fun component(component: WidgetComponent): Int = when (component) {
-            is WidgetComponent.Text -> 1
-            is WidgetComponent.Counter -> 2
-            is WidgetComponent.Checklist -> component.items.size + 1
-            is WidgetComponent.Timer -> 2
-            is WidgetComponent.Progress -> 2
-            is WidgetComponent.Chart -> 2
-            is WidgetComponent.Button -> 1
-            is WidgetComponent.Image -> 2
-            is WidgetComponent.ListRows -> 3
-            is WidgetComponent.Gauge -> 2
-            is WidgetComponent.Row -> component.children.maxOfOrNull(::component) ?: 0
+    fun estimateWidgetRows(spec: WidgetSpec, rowsOverride: Int? = null): Int {
+        // Rows are 48dp units, measured against the phone: the card title is ~28dp, a body line ~24dp,
+        // a full-width button 40dp, card padding ~24dp. Halves stay inside so short text cards stop
+        // counted double and spilling pages; the total still rounds up, and the default is a floor.
+        fun component(component: WidgetComponent): Double = when (component) {
+            is WidgetComponent.Text -> {
+                val large = component.style?.emphasis == Emphasis.LARGE
+                val perLine = if (large) 0.75 else 0.5
+                val charsPerLine = if (large) 25 else 40
+                val text = component.text
+                if (text == null) {
+                    if (component.binding == null) 0.0 else perLine
+                } else {
+                    ((text.length + charsPerLine - 1) / charsPerLine).coerceIn(1, MAX_TEXT_LINES) * perLine
+                }
+            }
+            is WidgetComponent.Counter -> 2.0
+            is WidgetComponent.Checklist -> (component.items.size + 1).toDouble()
+            is WidgetComponent.Timer -> 2.0
+            is WidgetComponent.Progress -> 1.5
+            is WidgetComponent.Chart -> 2.0
+            is WidgetComponent.Button -> 1.0
+            is WidgetComponent.Image -> 1.0
+            is WidgetComponent.ListRows -> 3.0
+            is WidgetComponent.Gauge -> 2.0
+            is WidgetComponent.Row -> component.children.maxOfOrNull(::component) ?: 0.0
             is WidgetComponent.Column -> component.children.sumOf(::component)
-            is WidgetComponent.Video -> 4
-            is WidgetComponent.Snapshot -> 3
-            is WidgetComponent.WebValue -> 2
+            is WidgetComponent.Video -> 4.0
+            is WidgetComponent.Snapshot -> 3.0
+            is WidgetComponent.WebValue -> 1.0
         }
-        val content = (if (spec.title != null) 1 else 0) + spec.components.sumOf(::component) + 1
-        return maxOf(content, rowsOverride ?: spec.size.default)
+        val content = (if (spec.title != null) 0.5 else 0.0) + spec.components.sumOf(::component) + 0.5
+        return maxOf(kotlin.math.ceil(content).toInt(), rowsOverride ?: spec.size.default)
     }
 
     /** A fresh overflow page: "Home 2", "Home 3"… beside home pages, "Page N" anywhere else. */

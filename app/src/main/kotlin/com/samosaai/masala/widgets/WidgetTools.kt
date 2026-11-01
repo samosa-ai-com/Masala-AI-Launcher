@@ -248,8 +248,13 @@ Components (each has "type"):
 - gauge {label, binding, max}: a ring; style like text
 - row/column {children[]}: grouping only, leaves inside, nested at most 2 deep
 Bindings {"source", "key"?}: source storage reads the widget's own key; next_event, battery, steps,
-sleep, weather and urgent_count read the phone (no key). No video, snapshot, web_value or http
-bindings yet: those arrive later, so never put them in a generated spec.
+sleep, weather and urgent_count read the phone (no key). A web_value reads one JSON value over http:
+{"source":"http","url","jsonPath"?,"every"?} (http or https, no credentials or tokens in the url;
+every is 30 seconds or more, 900 for a price). Its host is approved when the widget is placed:
+place_widget names hosts it hasn't seen, and you call it again with approved=true once the user
+agrees. A video or snapshot shows a stream source by id from list_stream_sources (run test_stream
+first); never invent a source. One request makes exactly one widget: if the live URL or source
+isn't known, ask the user for it instead of building a second widget.
 Limits: ids and storage keys are slugs; one component owns each storage key; tint is a palette name
 (accent, blue, green, amber, red), never a free color.
 """

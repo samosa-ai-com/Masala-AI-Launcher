@@ -91,7 +91,7 @@ class WidgetGenerator(
         append("one storage key per component (a counter, checklist, timer or list line owns its key); ")
         append("styling stays bounded: a palette tint, normal or large emphasis, start/center/end. ")
         append("Buttons only ask_masala, run_skill (an installed id, exactly as listed) or start_timer. ")
-        append("No video, snapshot or web_value components and no rules: those arrive later. ")
+        append("A web_value reads one JSON value over http (its host is approved at placement); video and snapshot need a source id from list_stream_sources. ")
         append("Ids are short slugs; titles are short. Counters start at 0, checklists unticked.\n")
         if (request.skillIds.isNotEmpty()) {
             append("Installed skills (run_skill ids): ${request.skillIds.sorted().joinToString(", ")}.\n")
