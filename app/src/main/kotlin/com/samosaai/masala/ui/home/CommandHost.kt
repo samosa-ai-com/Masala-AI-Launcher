@@ -269,7 +269,8 @@ fun ReplyCard(
                         { text = it },
                         Modifier.weight(1f).focusRequester(field),
                         placeholder = { Text(stringResource(R.string.command_hint)) },
-                        singleLine = true,
+                        minLines = 1,
+                        maxLines = 5,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                         keyboardActions = KeyboardActions(onSend = { if (text.text.isNotBlank()) { app.commands.ask(text.text); text = TextFieldValue("") } }),
                     )

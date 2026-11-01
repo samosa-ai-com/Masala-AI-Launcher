@@ -567,6 +567,7 @@ class HomeActivity : ComponentActivity() {
                     serverProvider = app.commands.usesServerStt(),
                     onSend = { app.commands.sendNow() },
                     onStop = { app.commands.dismiss() },
+                    onAsk = { app.commands.ask(it) },
                     onClose = {
                         app.commands.dismiss()
                         chatOpen = false

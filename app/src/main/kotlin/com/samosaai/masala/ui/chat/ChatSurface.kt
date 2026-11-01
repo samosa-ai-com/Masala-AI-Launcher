@@ -113,6 +113,7 @@ fun ChatSurface(
     serverProvider: Boolean = false,
     onSend: () -> Unit,
     onStop: () -> Unit,
+    onAsk: (String) -> Unit = {},
     onClose: () -> Unit,
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
@@ -188,7 +189,7 @@ fun ChatSurface(
                         )
                     }
                 }
-                Controls(listening, mic, level, onSend, onClose)
+                Controls(listening, mic, level, onSend, onAsk, onClose)
             }
         }
     }
@@ -641,9 +642,18 @@ private fun TurnMenu(expanded: Boolean, onDismiss: () -> Unit, onDelete: () -> U
  * Mic to open Sam, and while listening the cancel/send pair. Sending is explicit: the
  * arrow ends the take now. There is no mic button while listening — tapping it is how
  * a take starts, so showing one there could only end the take by accident.
+ * Otherwise a multi-line type field sits beside the mic, so a failed microphone never
+ * strands the conversation; the send arrow appears once there is text.
  */
 @Composable
-private fun Controls(listening: Boolean, mic: () -> Unit, level: () -> Float, onSend: () -> Unit, onClose: () -> Unit) {
+private fun Controls(
+    listening: Boolean,
+    mic: () -> Unit,
+    level: () -> Float,
+    onSend: () -> Unit,
+    onAsk: (String) -> Unit = {},
+    onClose: () -> Unit,
+) {
     val tokens = MasalaTheme.tokens
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         Row(
@@ -660,7 +670,27 @@ private fun Controls(listening: Boolean, mic: () -> Unit, level: () -> Float, on
                     Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
                 }
             } else {
-                MicButton(mic, level = level, size = 68.dp)
+                var text by remember { mutableStateOf("") }
+                androidx.compose.material3.OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text(stringResource(R.string.command_hint)) },
+                    minLines = 1,
+                    maxLines = 5,
+                    shape = RoundedCornerShape(24.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                if (text.isBlank()) {
+                    MicButton(mic, level = level, size = 52.dp)
+                } else {
+                    IconButton(
+                        onClick = { onAsk(text.trim()); text = "" },
+                        modifier = Modifier.size(52.dp).clip(CircleShape).background(tokens.accent),
+                    ) {
+                        Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
+                    }
+                }
             }
         }
     }
