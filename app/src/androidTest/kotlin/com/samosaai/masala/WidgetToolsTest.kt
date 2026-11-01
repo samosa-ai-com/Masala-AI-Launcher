@@ -48,6 +48,11 @@ class WidgetToolsTest {
         val base = runBlocking { withTimeout(15_000) { app.layouts.base.first { it != null } } }!!
         assertTrue(id, LayoutEdits.widgetPlacements(base, id).isNotEmpty())
 
+        // Placing twice doesn't duplicate: one placement, and the library still holds one widget.
+        success("place_widget", args("id" to id))
+        val same = runBlocking { withTimeout(15_000) { app.layouts.base.first { it != null } } }!!
+        assertEquals(1, LayoutEdits.widgetPlacements(same, id).size)
+
         success("remove_widget", args("id" to id))
         val off = runBlocking { withTimeout(15_000) { app.layouts.base.first { it != null && LayoutEdits.widgetPlacements(it, id).isEmpty() } } }
         assertTrue(id, LayoutEdits.widgetPlacements(off!!, id).isEmpty())

@@ -94,9 +94,13 @@ private fun WidgetActions(result: SkillRunEvent.Result) {
     val snapshot by app.contextService.snapshot.collectAsStateWithLifecycle()
     fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
     val previewNote = stringResource(R.string.widgets_preview_note)
-    val addedNote = stringResource(R.string.widgets_added)
+    val addedOn = { pageId: String -> app.getString(R.string.widgets_added_on, app.layouts.pageLabel(pageId)) }
     val addFailedNote = stringResource(R.string.widgets_add_failed)
     val goneNote = stringResource(R.string.result_widget_gone)
+    val base by app.layouts.base.collectAsStateWithLifecycle()
+    val isPlaced = remember(base, result.ref) {
+        base?.let { com.samosaai.masala.core.layout.LayoutEdits.widgetPlacements(it, result.ref) }.orEmpty().isNotEmpty()
+    }
     var approval by remember(result.ref) { mutableStateOf<List<com.samosaai.masala.widgets.HttpApproval.Fetch>?>(null) }
     approval?.let { fetches ->
         com.samosaai.masala.ui.home.widgets.HttpApprovalDialog(
@@ -107,7 +111,7 @@ private fun WidgetActions(result: SkillRunEvent.Result) {
                 app.httpApproval.approve(result.ref, fetches.map { it.host })
                 scope.launch {
                     val placed = app.layouts.placeWidget("Add to home: ${specNow.title ?: specNow.id}", specNow.id)
-                    toast(if (placed.problems.isEmpty()) app.getString(R.string.widgets_added_on, app.layouts.pageLabel(placed.pageId ?: specNow.id)) else addFailedNote)
+                    toast(if (placed.problems.isEmpty()) addedOn(placed.pageId ?: specNow.id) else addFailedNote)
                 }
             },
             onDismiss = { approval = null },
@@ -124,22 +128,24 @@ private fun WidgetActions(result: SkillRunEvent.Result) {
     }
     com.samosaai.masala.ui.home.widgets.WidgetCard(current, rows = null, source = source)
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        TextButton(onClick = {
-            val specNow = app.widgetLibrary.current()[result.ref]
-            if (specNow == null) {
-                toast(goneNote)
-                return@TextButton
-            }
-            val pending = com.samosaai.masala.widgets.HttpApproval.needingApproval(specNow, app.httpApproval.approved(specNow.id))
-            if (pending.isEmpty()) {
-                scope.launch {
-                    val placed = app.layouts.placeWidget("Add to home: ${current.title ?: current.id}", current.id)
-                    toast(if (placed.problems.isEmpty()) app.getString(R.string.widgets_added_on, app.layouts.pageLabel(placed.pageId ?: current.id)) else addFailedNote)
+        if (!isPlaced) {
+            TextButton(onClick = {
+                val specNow = app.widgetLibrary.current()[result.ref]
+                if (specNow == null) {
+                    toast(goneNote)
+                    return@TextButton
                 }
-            } else {
-                approval = pending
-            }
-        }) { Text(stringResource(R.string.miniapp_pin)) }
+                val pending = com.samosaai.masala.widgets.HttpApproval.needingApproval(specNow, app.httpApproval.approved(specNow.id))
+                if (pending.isEmpty()) {
+                    scope.launch {
+                        val placed = app.layouts.placeWidget("Add to home: ${current.title ?: current.id}", current.id)
+                        toast(if (placed.problems.isEmpty()) addedOn(placed.pageId ?: current.id) else addFailedNote)
+                    }
+                } else {
+                    approval = pending
+                }
+            }) { Text(stringResource(R.string.miniapp_pin)) }
+        }
         TextButton(onClick = {
             context.startActivity(
                 Intent(context, com.samosaai.masala.ui.settings.SettingsActivity::class.java)

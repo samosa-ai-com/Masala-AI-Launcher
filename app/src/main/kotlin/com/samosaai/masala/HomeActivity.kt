@@ -975,14 +975,25 @@ class HomeActivity : ComponentActivity() {
         }
 
         if (addWidgetSheet) {
+            val placedIds = remember(layout) {
+                layout.layout.pages.flatMap { it.sections }.flatMap { section ->
+                    when (section) {
+                        is com.samosaai.masala.core.contract.WidgetSection -> listOf(section.widgetId)
+                        is com.samosaai.masala.core.contract.StackSection -> section.widgetIds
+                        else -> emptyList()
+                    }
+                }.toSet()
+            }
             com.samosaai.masala.ui.home.widgets.AddWidgetSheet(
                 library = app.widgetLibrary,
                 approvalOf = { app.httpApproval.approved(it) },
+                isPlaced = { it in placedIds },
                 onAdd = { id, approved -> scope.launch {
                     if (approved) app.httpApproval.approve(id, com.samosaai.masala.widgets.HttpApproval.fetchesOf(app.widgetLibrary.current()[id] ?: return@launch).map { it.host })
                     val title = app.widgetLibrary.current()[id]?.title ?: id
                     val placed = app.layouts.placeWidget("Add to home: $title", id)
                     if (placed.problems.isNotEmpty()) toast(placed.problems.first().message)
+                    else if (placed.alreadyPlaced) toast(getString(R.string.widgets_already_on, app.layouts.pageLabel(placed.pageId ?: id)))
                     else toast(getString(R.string.widgets_added_on, app.layouts.pageLabel(placed.pageId ?: id)))
                     addWidgetSheet = false
                 } },

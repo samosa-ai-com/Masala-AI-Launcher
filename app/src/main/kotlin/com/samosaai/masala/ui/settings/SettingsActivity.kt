@@ -523,20 +523,22 @@ class SettingsActivity : ComponentActivity() {
                         modifier = Modifier.padding(top = 4.dp),
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = {
-                            scope.launch {
-                                val pending = com.samosaai.masala.widgets.HttpApproval.needingApproval(spec, masala.httpApproval.approved(spec.id))
-                                if (pending.isEmpty()) {
-                                    val placed = masala.layouts.placeWidget("Add to home: ${spec.title ?: spec.id}", spec.id)
-                                    toast(
-                                        if (placed.problems.isEmpty()) getString(R.string.widgets_added_on, masala.layouts.pageLabel(placed.pageId ?: spec.id))
-                                        else getString(R.string.widgets_add_failed),
-                                    )
-                                } else {
-                                    approval = pending
+                        if (placements.isEmpty()) {
+                            TextButton(onClick = {
+                                scope.launch {
+                                    val pending = com.samosaai.masala.widgets.HttpApproval.needingApproval(spec, masala.httpApproval.approved(spec.id))
+                                    if (pending.isEmpty()) {
+                                        val placed = masala.layouts.placeWidget("Add to home: ${spec.title ?: spec.id}", spec.id)
+                                        toast(
+                                            if (placed.problems.isEmpty()) getString(R.string.widgets_added_on, masala.layouts.pageLabel(placed.pageId ?: spec.id))
+                                            else getString(R.string.widgets_add_failed),
+                                        )
+                                    } else {
+                                        approval = pending
+                                    }
                                 }
-                            }
-                        }) { Text(stringResource(R.string.widgets_add_to_home)) }
+                            }) { Text(stringResource(R.string.widgets_add_to_home)) }
+                        }
                         TextButton(onClick = { editSpec = spec }) { Text(stringResource(R.string.widgets_edit)) }
                         TextButton(onClick = {
                             scope.launch {
@@ -732,15 +734,17 @@ class SettingsActivity : ComponentActivity() {
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = {
-                        scope.launch {
-                            val placed = masala.layouts.placeHtml("Add to home: ${row.title}", row.id)
-                            toast(
-                                if (placed.problems.isEmpty()) getString(R.string.widgets_added_on, masala.layouts.pageLabel(placed.pageId ?: row.id))
-                                else getString(R.string.widgets_add_failed),
-                            )
-                        }
-                    }) { Text(stringResource(R.string.widgets_add_to_home)) }
+                    if (placements.isEmpty()) {
+                        TextButton(onClick = {
+                            scope.launch {
+                                val placed = masala.layouts.placeHtml("Add to home: ${row.title}", row.id)
+                                toast(
+                                    if (placed.problems.isEmpty()) getString(R.string.widgets_added_on, masala.layouts.pageLabel(placed.pageId ?: row.id))
+                                    else getString(R.string.widgets_add_failed),
+                                )
+                            }
+                        }) { Text(stringResource(R.string.widgets_add_to_home)) }
+                    }
                     TextButton(onClick = {
                         scope.launch {
                             masala.layouts.removeHtmlApp("Remove from home: ${row.title}", row.id)

@@ -248,7 +248,8 @@ class LayoutRepository(
     /**
      * Puts a library widget on home: the requested page when it has room, else the first page
      * that does, else a new home screen. Always asks (arch §3.3), so the caller gates it.
-     * Returns the check problems plus where it landed, for the "on Home 2" message.
+     * One widget sits on home once: placing again reports where it already is.
+     * Returns the check problems plus where it landed (or already sits), for the "on Home 2" message.
      */
     suspend fun placeWidget(
         label: String,
@@ -256,6 +257,7 @@ class LayoutRepository(
         rowsOverride: Int? = null,
         pageId: String? = null,
     ): PlaceResult {
+        widgetPlacements(widgetId).lastOrNull()?.let { return PlaceResult(emptyList(), it.pageId, alreadyPlaced = true) }
         val specs = widgets.current()
         val problems = edit(label) { LayoutEdits.placeWidget(it, widgetId, rowsOverride, pageId, specs)?.doc }
         if (problems.isNotEmpty()) return PlaceResult(problems, null)
@@ -263,7 +265,7 @@ class LayoutRepository(
         return PlaceResult(emptyList(), at)
     }
 
-    data class PlaceResult(val problems: List<LayoutChecker.Problem>, val pageId: String?)
+    data class PlaceResult(val problems: List<LayoutChecker.Problem>, val pageId: String?, val alreadyPlaced: Boolean = false)
 
     /** Takes one library widget off home wherever it sits, in one undoable step. */
     suspend fun removeWidgetRefs(label: String, widgetId: String): List<LayoutChecker.Problem> =
@@ -279,6 +281,7 @@ class LayoutRepository(
 
     /** Shows a mini app on home at widget size, with the same one-screenful overflow as widgets. */
     suspend fun placeHtml(label: String, appId: String, rows: Int = 2, pageId: String? = null): PlaceResult {
+        htmlPlacements(appId).lastOrNull()?.let { return PlaceResult(emptyList(), it.pageId, alreadyPlaced = true) }
         val specs = widgets.current()
         val problems = edit(label) { LayoutEdits.placeHtml(it, appId, rows, pageId, specs)?.doc }
         if (problems.isNotEmpty()) return PlaceResult(problems, null)

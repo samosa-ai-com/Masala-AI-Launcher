@@ -6,6 +6,7 @@ import com.samosaai.masala.core.contract.DockSection
 import com.samosaai.masala.core.contract.GridSection
 import com.samosaai.masala.core.contract.HeaderSection
 import com.samosaai.masala.core.contract.HtmlSection
+import com.samosaai.masala.core.contract.HttpBinding
 import com.samosaai.masala.core.contract.IconRef
 import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.ItemSection
@@ -448,8 +449,7 @@ class LayoutEditsTest {
     }
 
     @Test
-    fun `the reported overflowing screen sends new widgets to a new page`() {
-        // The Redmi screen from the bug report: clock + date, an Essentials grid, the gauge,
+    fun `the reported overflowing screen sends new widgets to a new page`() {        // The Redmi screen from the bug report: clock + date, an Essentials grid, the gauge,
         // habits and price widgets from the bundled templates.
         val lib = com.samosaai.masala.core.widgets.WidgetTemplates.all().associate { it.widget.id to it.widget }
         val doc = LayoutDoc(
@@ -471,5 +471,30 @@ class LayoutEditsTest {
         val placed = assertNotNull(LayoutEdits.placeWidget(doc, "water", specs = lib))
         assertEquals("home-2", placed.pageId)
         assertEquals("Home 2", placed.doc.pages.last().title)
+    }
+
+    @Test
+    fun `a small widget joins a nearly full home screen instead of opening a new one`() {
+        // The follow-up report: header + blank-title grid + price, then tea (timer only).
+        // Estimated 3 + 2 + 4 = 9, plus tea 3 = 12: fits, no new page.
+        val tea = WidgetSpec("tea", null, listOf(WidgetComponent.Timer("tea", "Tea", 60)), SizeRange(1, 1, 2))
+        val price = WidgetSpec("price", "Price", listOf(WidgetComponent.WebValue("Now", HttpBinding("https://example.com", "$"))), SizeRange(1, 1, 2))
+        val specs = mapOf("tea" to tea, "price" to price)
+        val doc = LayoutDoc(
+            pages = listOf(
+                Page(
+                    "home",
+                    sections = listOf(
+                        HeaderSection("h", showClock = true, showDate = true),
+                        GridSection("g", title = "", columns = 3, items = items("a", "b", "c")),
+                        WidgetSection("w", ref = WidgetRef("price")),
+                    ),
+                ),
+            ),
+        )
+        assertEquals(9, LayoutEdits.widgetRowsUsed(doc, "home", specs))
+        val placed = assertNotNull(LayoutEdits.placeWidget(doc, "tea", specs = specs))
+        assertEquals("home", placed.pageId)
+        assertEquals(1, placed.doc.pages.size)
     }
 }

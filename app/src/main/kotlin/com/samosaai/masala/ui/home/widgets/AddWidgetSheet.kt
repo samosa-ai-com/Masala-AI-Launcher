@@ -32,6 +32,7 @@ import com.samosaai.masala.widgets.WidgetLibrary
 fun AddWidgetSheet(
     library: WidgetLibrary,
     approvalOf: (String) -> Set<String>,
+    isPlaced: (String) -> Boolean,
     onAdd: (id: String, approved: Boolean) -> Unit,
     onDescribe: () -> Unit,
     onManage: () -> Unit,
@@ -61,10 +62,18 @@ fun AddWidgetSheet(
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
                     )
-                    TextButton(onClick = {
-                        val pending = com.samosaai.masala.widgets.HttpApproval.needingApproval(spec, approvalOf(spec.id))
-                        if (pending.isEmpty()) onAdd(spec.id, false) else approval = spec.id to pending
-                    }) { Text(stringResource(R.string.widgets_add)) }
+                    if (isPlaced(spec.id)) {
+                        Text(
+                            stringResource(R.string.widgets_on_home),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        TextButton(onClick = {
+                            val pending = com.samosaai.masala.widgets.HttpApproval.needingApproval(spec, approvalOf(spec.id))
+                            if (pending.isEmpty()) onAdd(spec.id, false) else approval = spec.id to pending
+                        }) { Text(stringResource(R.string.widgets_add)) }
+                    }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {

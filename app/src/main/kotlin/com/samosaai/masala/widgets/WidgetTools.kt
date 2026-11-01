@@ -142,6 +142,9 @@ object WidgetTools {
                     pageId = it.string("page"),
                 )
                 if (placed.problems.isNotEmpty()) return@FunctionTool ActionResult.error(placed.problems.joinToString("\n"))
+                if (placed.alreadyPlaced) {
+                    return@FunctionTool ActionResult.ok("Widget '$id' is already on ${host().layouts.pageLabel(placed.pageId ?: id)}.")
+                }
                 host().httpApproval.approve(id, pending.map { it.host })
                 val fetchNote = pending.takeIf { it.isNotEmpty() }?.let { "\nApproved fetching:\n${HttpApproval.describe(it)}" }.orEmpty()
                 val where = host().layouts.pageLabel(placed.pageId ?: id)
