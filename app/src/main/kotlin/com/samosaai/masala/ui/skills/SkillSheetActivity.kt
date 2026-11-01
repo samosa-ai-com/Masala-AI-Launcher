@@ -59,6 +59,7 @@ import com.samosaai.masala.skills.SkillRunEvent
 import com.samosaai.masala.skills.SkillRunState
 import com.samosaai.masala.ui.components.rememberCapabilityGrant
 import com.samosaai.masala.ui.home.ConfirmationSheet
+import com.samosaai.masala.ui.home.QuestionSheet
 import com.samosaai.masala.ui.home.SymbolDisc
 import com.samosaai.masala.ui.home.SymbolIcons
 import com.samosaai.masala.ui.theme.MasalaTheme
@@ -97,6 +98,7 @@ class SkillSheetActivity : ComponentActivity() {
                     SkillSheet(skill, intent.getStringExtra(EXTRA_PROMPT), intent.getLongExtra(EXTRA_RUN_ID, -1L).takeIf { it >= 0 })
                     // This activity can run the agent, so it has to show the confirmation question too.
                     ConfirmationSheet(masala.confirmationGate)
+                    QuestionSheet(masala.questionGate)
                 }
             }
         }

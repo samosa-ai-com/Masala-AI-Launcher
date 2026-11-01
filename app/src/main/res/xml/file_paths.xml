@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Only Masala's own result folders can be opened or shared (skill run results). -->
+<!-- Anything the file tools can read can be shared (grant-based, one Uri at a time). -->
 <paths>
+    <!-- Anything the file tools can read can be shared: grant-based, so the roots stay safe. -->
+    <files-path name="internal_root" path="." />
+    <external-path name="external_root" path="." />
     <external-files-path name="output" path="output/" />
     <!-- Where results go when there is no external files folder -->
     <files-path name="output_internal" path="output/" />

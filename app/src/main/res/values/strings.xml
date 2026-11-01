@@ -167,6 +167,9 @@
     <string name="confirm_destructive_title">This can\’t be undone</string>
     <string name="confirm_allow">Allow</string>
     <string name="confirm_cancel">Cancel</string>
+    <string name="question_title">A question for you</string>
+    <string name="question_custom_hint">Or answer in your own words…</string>
+    <string name="question_send">Send</string>
     <string name="action_declined">Cancelled</string>
     <string name="action_failed">%1$s</string>
     <string name="home_locked_toast">Home is locked. Unlock it in Settings to change it.</string>

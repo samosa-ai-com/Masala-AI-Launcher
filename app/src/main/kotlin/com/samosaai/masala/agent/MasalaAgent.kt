@@ -34,7 +34,7 @@ class MasalaAgent(
     private val tools: AgentToolRunner,
     private val definitions: List<ToolDefinition>,
     private val scope: ToolScope,
-    private val systemPrompt: () -> String,
+    private val systemPrompt: (AgentPrompt.PromptContext) -> String,
     private val maxSteps: Int = DEFAULT_MAX_STEPS,
     private val maxHistoryChars: Int = DEFAULT_MAX_HISTORY_CHARS,
     private val maxRepeatedToolCalls: Int = DEFAULT_MAX_REPEATED_TOOL_CALLS,
@@ -69,7 +69,9 @@ class MasalaAgent(
         try {
             repeat(maxSteps) {
                 emit(AgentEvent.Thinking)
-                val request = listOf(ChatMessage("system", JsonPrimitive(systemPrompt()))) + AgentHistory.trim(messages, maxHistoryChars)
+                val request = listOf(
+                    ChatMessage("system", JsonPrimitive(systemPrompt(promptContext()))),
+                ) + AgentHistory.cullImages(AgentHistory.trim(messages, maxHistoryChars))
                 val reply = try {
                     model.next(request, visible).withValidToolCallArguments()
                 } catch (e: CancellationException) {
@@ -120,6 +122,33 @@ class MasalaAgent(
             messages = AgentHistory.repairOrphanedToolCalls(messages)
             throw e
         }
+    }
+
+    /**
+     * What the prompt lists this turn: the latest user text (wildcard skills gate on it) and the
+     * skills already started or consulted this conversation (the prompt skips those).
+     */
+    private fun promptContext(): AgentPrompt.PromptContext = AgentPrompt.PromptContext(
+        lastUserText = messages.lastOrNull { it.role == "user" }?.textContent,
+        fetchedSkillIds = fetchedSkillIds(),
+    )
+
+    private fun fetchedSkillIds(): Set<String> {
+        // A refused or failed call answers nothing, so the skill stays listed (tool results that
+        // begin with "Error:" or "Not run:" are failures; successes carry the raw output).
+        val failedCalls = messages
+            .filter { it.role == "tool" && (it.textContent.startsWith("Error:") || it.textContent.startsWith("Not run:")) }
+            .mapNotNullTo(HashSet()) { it.toolCallId }
+        val ids = HashSet<String>()
+        for (message in messages) {
+            for (call in message.toolCalls.orEmpty()) {
+                if (call.function.name != "run_skill" && call.function.name != "consult_expert") continue
+                if (call.id in failedCalls) continue
+                runCatching { Json.parseToJsonElement(call.function.arguments) as? JsonObject }
+                    .getOrNull()?.get("skill_id")?.let { (it as? JsonPrimitive)?.content }?.let(ids::add)
+            }
+        }
+        return ids
     }
 
     /**

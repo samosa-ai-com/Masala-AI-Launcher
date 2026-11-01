@@ -62,7 +62,7 @@ class ConsultServiceTest {
                     tools = AgentToolRunner { _, _ -> ToolResult.Failure("no tools") },
                     definitions = emptyList(),
                     scope = ToolScope.command(emptyList()),
-                    systemPrompt = { skill.persona?.systemPrompt.orEmpty() },
+                    systemPrompt = { _ -> skill.persona?.systemPrompt.orEmpty() },
                     maxSteps = 4,
                 )
             },
@@ -193,7 +193,7 @@ class ConsultServiceTest {
                     },
                     definitions = listOf(ToolDefinition("health", "", JsonObject(emptyMap()))),
                     scope = ToolScope.command(listOf(ToolInfo("health", ToolSensitivity.READ_ONLY))),
-                    systemPrompt = { "s" },
+                    systemPrompt = { _ -> "s" },
                     maxSteps = 4,
                 )
             },
@@ -234,7 +234,7 @@ class ConsultServiceTest {
                     },
                     definitions = listOf(ToolDefinition("build", "", JsonObject(emptyMap()))),
                     scope = ToolScope.command(listOf(ToolInfo("build", ToolSensitivity.CHANGES_SOMETHING))),
-                    systemPrompt = { "s" },
+                    systemPrompt = { _ -> "s" },
                     maxSteps = 4,
                 )
             },
@@ -264,7 +264,7 @@ class ConsultServiceTest {
                         tools = AgentToolRunner { _, _ -> ToolResult.Failure("no") },
                         definitions = emptyList(),
                         scope = ToolScope.command(emptyList()),
-                        systemPrompt = { "s" },
+                        systemPrompt = { _ -> "s" },
                         maxSteps = 2,
                     )
                 },
@@ -288,7 +288,7 @@ class ConsultServiceTest {
                     tools = AgentToolRunner { _, _ -> ToolResult.Failure("no") },
                     definitions = emptyList(),
                     scope = ToolScope.command(emptyList()),
-                    systemPrompt = { "s" },
+                    systemPrompt = { _ -> "s" },
                     maxSteps = 2,
                 )
             },

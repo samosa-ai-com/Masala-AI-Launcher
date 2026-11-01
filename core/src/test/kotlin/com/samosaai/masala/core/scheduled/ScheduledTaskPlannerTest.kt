@@ -354,4 +354,13 @@ class ScheduledTaskPlannerTest {
         assertEquals(at("2026-10-19T09:00"), saved.nextRunAt)
         assertEquals(ran.history, saved.history)
     }
+
+    @Test
+    fun `a saved edit keeps the task's note link`() {
+        val noted = daily().copy(memoryNote = "notes/gym.md")
+        val saved = ScheduledTaskPlanner.savedEdit(noted, noted.copy(name = "renamed"), at("2026-10-19T08:02"), zone)
+        assertEquals("notes/gym.md", saved.memoryNote)
+        val cleared = ScheduledTaskPlanner.savedEdit(noted, noted.copy(memoryNote = null), at("2026-10-19T08:02"), zone)
+        assertNull(cleared.memoryNote)
+    }
 }

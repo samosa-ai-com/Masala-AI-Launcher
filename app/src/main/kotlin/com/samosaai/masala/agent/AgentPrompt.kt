@@ -1,6 +1,7 @@
 package com.samosaai.masala.agent
 
 import com.samosaai.masala.core.contract.MasalaSkill
+import com.samosaai.masala.core.tool.matchesIntent
 import com.samosaai.masala.secondbrain.SecondBrainPrompt
 
 /** The system prompt for a [MasalaAgent] run. */
@@ -9,17 +10,29 @@ object AgentPrompt {
     private const val MAX_MEMORY_TITLES = 50
 
     /**
+     * What the prompt lists this turn. [lastUserText] gates wildcard skills (those targeting every
+     * package) to ones whose keywords match it; [fetchedSkillIds] drops skills already started or
+     * consulted this conversation, so the index doesn't repeat them.
+     */
+    data class PromptContext(
+        val lastUserText: String? = null,
+        val fetchedSkillIds: Set<String> = emptySet(),
+    )
+
+    /**
      * @param now the current date, time and zone, already formatted
      * @param skills installed skills, listed so the model can start one with `run_skill`
      * @param secondBrain the Second Brain: capped SOUL.md + MEMORY.md, the profile, plus entry titles,
      * readable in detail with `memory_read` / `memory_search`, written with `memory_write` / `memory_edit`
      * @param instructions a persona's or skill's own instructions, for skill runs
+     * @param context which skills to list this turn; defaults list everything (first turn shape)
      */
     fun build(
         now: String,
         skills: List<MasalaSkill> = emptyList(),
         secondBrain: SecondBrainPrompt? = null,
         instructions: String? = null,
+        context: PromptContext = PromptContext(),
     ): String = buildString {
         append("You are Masala, the assistant built into an Android home screen. Use the tools to act on the ")
         append("phone when the user asks for something a tool can do; otherwise answer briefly, in the ")
@@ -34,7 +47,18 @@ object AgentPrompt {
         append("A small change to an app you already know can go straight to update_mini_app. Open an app when the user ")
         append("asked you to open it, or when they clearly want to use it now; if they only hinted at it, offer. ")
         append("Never open a screen just because a word matched.\n")
-        val listed = skills.filter { it.title.isNotBlank() || it.description.isNotBlank() }.take(MAX_SKILLS)
+        val listed = skills
+            .filter { it.title.isNotBlank() || it.description.isNotBlank() }
+            .filterNot { it.id in context.fetchedSkillIds }
+            .filter { skill ->
+                // A skill targeting every package only earns its line when its keywords match what
+                // the user just asked; a blank last message lists everything (first-turn shape).
+                "*" !in skill.targetPackageNames ||
+                    skill.keywords.isEmpty() ||
+                    context.lastUserText.isNullOrBlank() ||
+                    skill.matchesIntent(context.lastUserText)
+            }
+            .take(MAX_SKILLS)
         val experts = listed.filter { it.persona != null }
         val jobs = listed.filter { it.persona == null }
         if (experts.isNotEmpty()) {
@@ -61,6 +85,7 @@ object AgentPrompt {
         if (jobs.isNotEmpty()) {
             append("\nInstalled skills (start one with run_skill when the request fits it):\n")
             jobs.forEach { append("- ").append(it.id).append(": ").append(it.description.ifBlank { it.title }).append('\n') }
+            append("If none of these fits, call search_skills to look for more.\n")
         }
         secondBrain?.let { brain ->
             val soul = brain.soul

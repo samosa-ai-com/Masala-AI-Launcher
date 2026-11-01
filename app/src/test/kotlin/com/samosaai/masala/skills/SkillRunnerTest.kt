@@ -88,7 +88,7 @@ class SkillRunnerTest {
         return SkillRunner(scope, runs, artifacts, transcripts, { if (it == "chef") chef else null }, { skill, unattended ->
             val toolScope = ToolScope.skill(skill, infos).let { if (unattended) ToolScope.unattended(it, infos) else it }
             scopesSeen += toolScope.names
-            MasalaAgent(model ?: AgentModel { messages, _ -> synchronized(requests) { requests += messages }; queue.removeFirst() }, { name, _ -> tool(name) }, definitions, toolScope, { "system" })
+            MasalaAgent(model ?: AgentModel { messages, _ -> synchronized(requests) { requests += messages }; queue.removeFirst() }, { name, _ -> tool(name) }, definitions, toolScope, { _ -> "system" })
         }, runData = runData, fallback = fallback)
     }
 
@@ -190,7 +190,7 @@ class SkillRunnerTest {
     }
 
     @Test fun failedModelMarksTheRunFailed() = runBlocking {
-        val r = SkillRunner(scope, runs, artifacts, transcripts, { chef }, { _, _ -> MasalaAgent(AgentModel { _, _ -> error("offline") }, { _, _ -> ToolResult.Success("") }, definitions, ToolScope.command(infos), { "s" }) })
+        val r = SkillRunner(scope, runs, artifacts, transcripts, { chef }, { _, _ -> MasalaAgent(AgentModel { _, _ -> error("offline") }, { _, _ -> ToolResult.Success("") }, definitions, ToolScope.command(infos), { _ -> "s" }) })
         val id = r.start("chef", user("x"))!!
         val state = r.finished(id)
         assertEquals(SkillRunEvent.Failed("offline"), state.events.last())
@@ -212,7 +212,7 @@ class SkillRunnerTest {
         val queue = ArrayDeque(listOf(reply("", call("1", "set_alarm")), reply("I couldn't set it")))
         val r = SkillRunner(scope, runs, artifacts, transcripts, { skill }, { s, unattended ->
             val toolScope = ToolScope.skill(s, infos).let { if (unattended) ToolScope.unattended(it, infos) else it }
-            MasalaAgent(AgentModel { _, _ -> queue.removeFirst() }, { name, _ -> ran += name; ToolResult.Success("ok") }, definitions, toolScope, { "system" })
+            MasalaAgent(AgentModel { _, _ -> queue.removeFirst() }, { name, _ -> ran += name; ToolResult.Success("ok") }, definitions, toolScope, { _ -> "system" })
         })
         val id = r.start("chef", user("wake me"), unattended = true)!!
         val state = r.finished(id)
@@ -227,14 +227,14 @@ class SkillRunnerTest {
         val skill = chef.copy(requiresTools = listOf("web_search", "set_alarm"))
         val queue = ArrayDeque(listOf(reply("", call("1", "set_alarm")), reply("Set")))
         val r = SkillRunner(scope, runs, artifacts, transcripts, { skill }, { s, _ ->
-            MasalaAgent(AgentModel { _, _ -> queue.removeFirst() }, { name, _ -> ran += name; ToolResult.Success("ok") }, definitions, ToolScope.skill(s, infos), { "system" })
+            MasalaAgent(AgentModel { _, _ -> queue.removeFirst() }, { name, _ -> ran += name; ToolResult.Success("ok") }, definitions, ToolScope.skill(s, infos), { _ -> "system" })
         })
         r.finished(r.start("chef", user("wake me"))!!)
         assertEquals(listOf("set_alarm"), ran)
     }
 
     @Test fun outcomeReportsFailuresWithTheirError() = runBlocking<Unit> {
-        val r = SkillRunner(scope, runs, artifacts, transcripts, { chef }, { _, _ -> MasalaAgent(AgentModel { _, _ -> error("offline") }, { _, _ -> ToolResult.Success("") }, definitions, ToolScope.command(infos), { "s" }) })
+        val r = SkillRunner(scope, runs, artifacts, transcripts, { chef }, { _, _ -> MasalaAgent(AgentModel { _, _ -> error("offline") }, { _, _ -> ToolResult.Success("") }, definitions, ToolScope.command(infos), { _ -> "s" }) })
         val id = r.start("chef", user("x"))!!
         r.finished(id)
         assertEquals("failed" to "offline", r.outcome(id))
@@ -286,7 +286,7 @@ class SkillRunnerTest {
         val queue = ArrayDeque(listOf(reply("Morning brief"), reply("", call("1", "set_alarm")), reply("Set")))
         val r = SkillRunner(scope, runs, artifacts, transcripts, { skill }, { s, unattended ->
             val toolScope = ToolScope.skill(s, infos).let { if (unattended) ToolScope.unattended(it, infos) else it }
-            MasalaAgent(AgentModel { _, _ -> queue.removeFirst() }, { name, _ -> ran += name; ToolResult.Success("ok") }, definitions, toolScope, { "system" })
+            MasalaAgent(AgentModel { _, _ -> queue.removeFirst() }, { name, _ -> ran += name; ToolResult.Success("ok") }, definitions, toolScope, { _ -> "system" })
         })
         val id = r.start("chef", user("brief"), unattended = true)!!
         r.finished(id)

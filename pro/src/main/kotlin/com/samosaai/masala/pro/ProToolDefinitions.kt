@@ -186,6 +186,39 @@ object ProToolDefinitions {
         }
     )
 
+    val edit = tool(
+        "edit",
+        "Replace one section of a text file, so the call only carries the changed span instead of the " +
+            "whole file. The match is literal (no regex) and must be exact, including whitespace and " +
+            "indentation. Fails when the match is missing or appears more than once unless replace_all " +
+            "is true. The file still has to fit in 1 MB and be valid UTF-8 text.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("path") {
+                    put("type", "string")
+                    put("description", "File path to edit.")
+                }
+                putJsonObject("old_string") {
+                    put("type", "string")
+                    put("description", "Exact text to replace. Pass enough surrounding lines to be unique.")
+                }
+                putJsonObject("new_string") {
+                    put("type", "string")
+                    put("description", "Replacement text.")
+                }
+                putJsonObject("replace_all") {
+                    put("type", "boolean")
+                    put("description", "Replace every occurrence instead of failing on multiple matches. Default false.")
+                }
+            }
+            putJsonArray("required") {
+                add("path")
+                add("old_string")
+                add("new_string")
+            }
+        }
+    )
+
     val mediaConvert = tool(
         "media_convert",
         "Convert an audio file from one format to another on-device, using Termux's ffmpeg. This is the ONLY " +

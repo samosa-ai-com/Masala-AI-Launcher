@@ -48,8 +48,10 @@ class ToolScope private constructor(val names: Set<String>) {
             ToolScope(all.filter { !it.opensScreen }.mapTo(HashSet()) { it.name }.apply { removeAll(excluded) })
 
         /** A run nobody is watching: nothing that would need a confirmation or bring up a screen. */
-        fun unattended(scope: ToolScope, all: List<ToolInfo>): ToolScope {
-            val safe = all.filter { it.sensitivity == ToolSensitivity.READ_ONLY && !it.opensScreen }.mapTo(HashSet()) { it.name }
+        fun unattended(scope: ToolScope, all: List<ToolInfo>, excluded: Set<String> = emptySet()): ToolScope {
+            val safe = all.filter {
+                it.sensitivity == ToolSensitivity.READ_ONLY && !it.opensScreen && it.name !in excluded
+            }.mapTo(HashSet()) { it.name }
             return ToolScope(scope.names.filterTo(HashSet()) { it in safe })
         }
     }

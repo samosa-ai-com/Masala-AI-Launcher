@@ -54,7 +54,7 @@ class CommandControllerTest {
                 { _, _ -> ToolResult.Success("") },
                 listOf(ToolDefinition("x", "", JsonObject(emptyMap()))),
                 ToolScope.command(listOf(ToolInfo("x", ToolSensitivity.READ_ONLY))),
-                { "system" },
+                { _ -> "system" },
             )
         },
         speech = speech,
@@ -140,7 +140,7 @@ class CommandControllerTest {
 
     @Test fun modelFailureIsShownAsAnError() = runBlocking<Unit> {
         val c = CommandController(scope, { null }, { emptyList() }, { ActionDispatcher.Outcome.Done() }, { emptyList() }, {
-            MasalaAgent(AgentModel { _, _ -> error("offline") }, { _, _ -> ToolResult.Success("") }, emptyList(), ToolScope.command(emptyList()), { "s" })
+            MasalaAgent(AgentModel { _, _ -> error("offline") }, { _, _ -> ToolResult.Success("") }, emptyList(), ToolScope.command(emptyList()), { _ -> "s" })
         })
         c.ask("hello")
         assertEquals("offline", assertIs<CommandState.Error>(c.settled()).message)
@@ -157,7 +157,7 @@ class CommandControllerTest {
                 { _, _ -> ToolResult.NeedsCapability("android.permission.READ_CALENDAR", "Calendar access is needed") },
                 listOf(ToolDefinition("x", "", JsonObject(emptyMap()))),
                 ToolScope.command(listOf(ToolInfo("x", ToolSensitivity.READ_ONLY))),
-                { "s" },
+                { _ -> "s" },
             )
         })
         c.ask("what is on my calendar")
@@ -368,7 +368,7 @@ class CommandControllerTest {
                     },
                     listOf(ToolDefinition("build", "", JsonObject(emptyMap()))),
                     ToolScope.command(listOf(ToolInfo("build", ToolSensitivity.CHANGES_SOMETHING))),
-                    { "system" },
+                    { _ -> "system" },
                 )
             },
         )
@@ -413,7 +413,7 @@ class CommandControllerTest {
                     { _, _ -> ToolResult.Success("Chef: risotto.") },
                     listOf(ToolDefinition("consult_expert", "", JsonObject(emptyMap()))),
                     ToolScope.command(listOf(ToolInfo("consult_expert", ToolSensitivity.READ_ONLY, readsPrivateData = true))),
-                    { "system" },
+                    { _ -> "system" },
                 )
             },
         )

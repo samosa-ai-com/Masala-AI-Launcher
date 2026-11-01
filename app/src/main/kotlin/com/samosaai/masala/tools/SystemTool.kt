@@ -62,11 +62,32 @@ class SystemTool(private val context: Context) {
         }
     }
 
+    /** Free and total space where the app lives, plus the app's own folder on shared storage. */
+    fun getStorageInfo(): ActionResult {
+        return try {
+            val internalFree = context.filesDir.freeSpace
+            val internalTotal = context.filesDir.totalSpace
+            // Emulated shared storage is the same volume: saying it twice reads as two disks.
+            val shared = if (android.os.Environment.isExternalStorageEmulated()) null
+            else context.getExternalFilesDirs(null).firstOrNull { it != null }?.let { dir ->
+                "App folder on shared storage: ${formatGb(dir.freeSpace)} free of ${formatGb(dir.totalSpace)}."
+            }
+            val parts = listOfNotNull(
+                "Internal storage: ${formatGb(internalFree)} free of ${formatGb(internalTotal)}.",
+                shared,
+            )
+            ActionResult.ok(parts.joinToString(" "))
+        } catch (e: Exception) {
+            ActionResult.error("Could not read storage info: ${e.message}")
+        }
+    }
+
+    private fun formatGb(bytes: Long): String = "%.1f GB".format(bytes / 1e9)
+
     /**
      * `setWifiEnabled` does nothing since Android 10, so this opens the system Wi-Fi panel where the
      * user flips it. [enabled] only shapes the message.
-     */
-    fun toggleWifi(enabled: Boolean): ActionResult {
+     */    fun toggleWifi(enabled: Boolean): ActionResult {
         return try {
             context.startActivity(Intent(Settings.Panel.ACTION_WIFI).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             ActionResult.ok(
@@ -78,8 +99,7 @@ class SystemTool(private val context: Context) {
         }
     }
 
-    /** Opens a web link in the user's browser. */
-    fun openUrl(url: String): ActionResult {
+    /** Opens a web link in the user's browser. */    fun openUrl(url: String): ActionResult {
         val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return try {

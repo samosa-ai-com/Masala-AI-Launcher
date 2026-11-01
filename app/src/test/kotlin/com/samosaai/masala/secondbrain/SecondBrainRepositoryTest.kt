@@ -167,7 +167,7 @@ class SecondBrainRepositoryTest {
             AgentToolRunner { name, args -> tools.first { it.name == name }.execute(args) },
             tools.map { it.definition },
             ToolScope.command(tools.map { ToolInfo(it.name, it.sensitivity) }),
-            { "s" },
+            { _ -> "s" },
         )
         agent.run(ChatMessage("user", JsonPrimitive("I like oat flat whites"))).first { it is AgentEvent.Done }
         assertTrue(brain.pages.first().any { brain.titleOf(it) == "Coffee" })

@@ -11,6 +11,7 @@ import com.samosaai.masala.core.files.FileIndex
 import com.samosaai.masala.core.tool.ToolFiles
 import com.samosaai.masala.actions.ActionDispatcher
 import com.samosaai.masala.actions.ConfirmationGate
+import com.samosaai.masala.actions.QuestionGate
 import com.samosaai.masala.agent.AgentModel
 import com.samosaai.masala.i18n.Language
 import com.samosaai.masala.core.contract.MasalaAction
@@ -24,6 +25,9 @@ import com.samosaai.masala.agent.SpeechStrings
 import com.samosaai.masala.audio.SpeechConfig
 import com.samosaai.masala.agent.AgentPrompt
 import com.samosaai.masala.agent.AgentTools
+import com.samosaai.masala.agent.AgentToolRunner
+import com.samosaai.masala.agent.TodoTools
+import com.samosaai.masala.skills.SkillSearchTool
 import com.samosaai.masala.agent.LlmAgentModel
 import com.samosaai.masala.agent.MasalaAgent
 import com.samosaai.masala.agent.MemoryRawTool
@@ -144,19 +148,26 @@ class MasalaApp : Application() {
         listSkills: Boolean = true,
     ): MasalaAgent {
         val executor = toolExecutor(gate)
-        val infos = tools.tools.map { ToolInfo(it.name, it.sensitivity, it.readsPrivateData, it.opensScreen) }
+        // The run's own scratchpad: one list per agent, answered locally so it never leaves the run.
+        val todos = TodoTools.TodoList()
+        val runner: AgentToolRunner = { name, args ->
+            if (name in TodoTools.names) todos.handle(name, args).toToolResult()
+            else executor.execute(name, args)
+        }
+        val infos = tools.tools.map { ToolInfo(it.name, it.sensitivity, it.readsPrivateData, it.opensScreen) } + TodoTools.infos
         return MasalaAgent(
             model = model,
-            tools = { name, args -> executor.execute(name, args) },
-            definitions = tools.tools.map { it.definition },
+            tools = runner,
+            definitions = tools.tools.map { it.definition } + TodoTools.definitions,
             scope = scope(infos),
-            systemPrompt = {
+            systemPrompt = { ctx ->
                 val now = java.text.SimpleDateFormat("EEEE d MMMM yyyy, HH:mm", java.util.Locale.US).format(java.util.Date())
                 AgentPrompt.build(
                     "$now (${java.util.TimeZone.getDefault().id})",
                     if (listSkills) effectiveSkills() else emptyList(),
                     secondBrain.promptNow(),
                     instructions,
+                    ctx,
                 )
             },
             maxSteps = maxSteps,
@@ -416,8 +427,8 @@ class MasalaApp : Application() {
         /** Consults one turn may make, so one question can't spend the chat's whole allowance. */
         const val MAX_CONSULT_CALLS_PER_TURN = 6
 
-        /** An expert can't consult, or open a skill sheet, from inside its own answer. */
-        val CONSULT_EXCLUDED = setOf("consult_expert", "run_skill")
+        /** An expert can't consult, open a skill sheet, or wait out the clock from inside its own answer. */
+        val CONSULT_EXCLUDED = setOf("consult_expert", "run_skill", "sleep")
     }
 
     private object NoScreen : ActionDispatcher.Screen {
@@ -429,7 +440,10 @@ class MasalaApp : Application() {
     private fun skillAgent(skill: MasalaSkill, unattended: Boolean) = agent(
         model = LlmAgentModel(LlmConfig.default.client(this)),
         // A run nobody watches can't ask, so it only gets tools that never need a confirmation.
-        scope = { infos -> ToolScope.skill(skill, infos).let { if (unattended) ToolScope.unattended(it, infos) else it } },
+        // Skill discovery stays out: a scheduled run does its own skill, not someone else's.
+        // Waiting stays out too: a 300 s sleep would hold the worker past its budget.
+        // Location stays out: background location needs a Play declaration a launcher won't get.
+        scope = { infos -> ToolScope.skill(skill, infos).let { if (unattended) ToolScope.unattended(it, infos, setOf("search_skills", "sleep", "get_location")) else it } },
         instructions = listOfNotNull(skill.persona?.systemPrompt, skill.instructions).joinToString("\n\n"),
         maxSteps = aiSettings.profile.value.maxToolRounds,
         maxRepeatedToolCalls = aiSettings.profile.value.maxRepeatedToolCalls,
@@ -517,6 +531,9 @@ class MasalaApp : Application() {
     /** The one gate for taps, gestures and widget buttons; the home screen shows its question. */
     val confirmationGate by lazy { ConfirmationGate(actionLog) }
 
+    /** The current `question` call, if any; the chat draws it as a sheet with the options. */
+    val questionGate by lazy { QuestionGate() }
+
     lateinit var catalog: AppCatalog
         private set
     lateinit var icons: IconCache
@@ -557,7 +574,13 @@ class MasalaApp : Application() {
             skills = { skills },
             toolNames = { tools.tools.map { it.name }.toSet() },
         )
-        AgentTools.create(this, layouts, modes, runSkill = ::openSkillSheet, consult = ::consultExpert).forEach(tools::register)
+        AgentTools.create(
+            this, layouts, modes,
+            runSkill = ::openSkillSheet,
+            consult = ::consultExpert,
+            ask = { question, options -> QuestionGate.actionResultOf(questionGate.ask(question, options)) },
+        ).forEach(tools::register)
+        tools.register(SkillSearchTool.create(skills::searchSkills, personas::hiddenIds))
         MemoryTools.create(secondBrain).forEach(tools::register)
         tools.register(MemoryRawTool.create(this, secondBrain) { tools.fileAccess })
         tools.register(MemoryTools.linkTask(taskNoteLinks))

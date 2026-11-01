@@ -240,7 +240,7 @@ object MasalaToolDefinitions {
 
     val createCalendarEvent = tool(
         "create_calendar_event",
-        "Add an event to the phone's calendar.",
+        "Add an event to the phone's calendar. The answer names the event id for later edits.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("title") {
@@ -270,6 +270,30 @@ object MasalaToolDefinitions {
                     put("type", "string")
                     put("description", "Optional calendar name; defaults to the primary calendar.")
                 }
+                putJsonObject("all_day") {
+                    put("type", "boolean")
+                    put("description", "Treat as an all-day event even when start has a time. Default false.")
+                }
+                putJsonObject("recurrence") {
+                    put("type", "string")
+                    put("description", "Repeat: daily, weekly, monthly or yearly. Omit for a one-time event.")
+                }
+                putJsonObject("recurrence_count") {
+                    put("type", "integer")
+                    put("description", "Stop after this many occurrences. Omit to repeat without end.")
+                }
+                putJsonObject("recurrence_until") {
+                    put("type", "string")
+                    put("description", "Last repeat, as a date (2026-12-31). Omit to repeat without end.")
+                }
+                putJsonObject("reminder_minutes") {
+                    put("type", "integer")
+                    put("description", "Remind this many minutes before, e.g. 30. Omit for no reminder.")
+                }
+                putJsonObject("attendees") {
+                    put("type", "string")
+                    put("description", "Invitees as comma-separated email addresses. Omit for none.")
+                }
             }
             putJsonArray("required") {
                 add("title")
@@ -278,19 +302,254 @@ object MasalaToolDefinitions {
         }
     )
 
+    val editCalendarEvent = tool(
+        "edit_calendar_event",
+        "Change an event's fields; only the arguments passed are touched. Reminders and attendees " +
+            "replace the whole set when passed. Find the event id with list_calendar_events first.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("event_id") {
+                    put("type", "integer")
+                    put("description", "The event's id, from list_calendar_events.")
+                }
+                putJsonObject("title") {
+                    put("type", "string")
+                    put("description", "New title.")
+                }
+                putJsonObject("start") {
+                    put("type", "string")
+                    put("description", "New start, ISO local like 2026-11-02T09:00.")
+                }
+                putJsonObject("end") {
+                    put("type", "string")
+                    put("description", "New end in the same form.")
+                }
+                putJsonObject("location") {
+                    put("type", "string")
+                    put("description", "New place.")
+                }
+                putJsonObject("notes") {
+                    put("type", "string")
+                    put("description", "New description.")
+                }
+                putJsonObject("all_day") {
+                    put("type", "boolean")
+                    put("description", "true for all-day, false for timed.")
+                }
+                putJsonObject("recurrence") {
+                    put("type", "string")
+                    put("description", "Repeat: daily, weekly, monthly or yearly.")
+                }
+                putJsonObject("recurrence_count") {
+                    put("type", "integer")
+                    put("description", "Stop after this many occurrences.")
+                }
+                putJsonObject("recurrence_until") {
+                    put("type", "string")
+                    put("description", "Last repeat, as a date (2026-12-31).")
+                }
+                putJsonObject("clear_recurrence") {
+                    put("type", "boolean")
+                    put("description", "true to make a repeating event one-time again.")
+                }
+                putJsonObject("clear_reminder") {
+                    put("type", "boolean")
+                    put("description", "true to remove the event's reminders.")
+                }
+                putJsonObject("reminder_minutes") {
+                    put("type", "integer")
+                    put("description", "Replace the reminder set with one this many minutes before.")
+                }
+                putJsonObject("attendees") {
+                    put("type", "string")
+                    put("description", "Replace the invitee set with these comma-separated emails (empty clears it).")
+                }
+            }
+            putJsonArray("required") {
+                add("event_id")
+            }
+        }
+    )
+
+    val deleteCalendarEvent = tool(
+        "delete_calendar_event",
+        "Delete one event by id. The user is asked first, and reminders and attendees go with it. " +
+            "Find the id with list_calendar_events first.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("event_id") {
+                    put("type", "integer")
+                    put("description", "The event's id, from list_calendar_events.")
+                }
+            }
+            putJsonArray("required") {
+                add("event_id")
+            }
+        }
+    )
+
+    val scheduleAgentTask = tool(
+        "schedule_agent_task",
+        "Remind yourself of something later: Masala runs the prompt at the set time, even with the " +
+            "app closed. The user approves every task, and one-time tasks must start in the future. " +
+            "Alarms are inexact (a few minutes late at worst).",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("name") {
+                    put("type", "string")
+                    put("description", "Short name, e.g. 'Water the plants'.")
+                }
+                putJsonObject("prompt") {
+                    put("type", "string")
+                    put("description", "What Masala should do when the time comes, e.g. 'Remind me to water the plants'.")
+                }
+                putJsonObject("start") {
+                    put("type", "string")
+                    put("description", "First run, local like 2026-11-02T08:00, or a date for midnight.")
+                }
+                putJsonObject("repeat") {
+                    put("type", "string")
+                    put("description", "none (default), hourly, daily, weekly or monthly.")
+                }
+                putJsonObject("interval") {
+                    put("type", "integer")
+                    put("description", "Every N hours/days for hourly/daily repeats. Default 1.")
+                }
+                putJsonObject("weekdays") {
+                    put("type", "array")
+                    put("description", "Weekly repeats only: e.g. ['mon','wed'] or ['weekdays'].")
+                    putJsonObject("items") { put("type", "string") }
+                }
+                putJsonObject("skill_id") {
+                    put("type", "string")
+                    put("description", "Optional installed skill to run instead of a bare prompt.")
+                }
+                putJsonObject("memory_note") {
+                    put("type", "string")
+                    put("description", "Optional Second Brain note path this task belongs to.")
+                }
+            }
+            putJsonArray("required") {
+                add("name")
+                add("start")
+            }
+        }
+    )
+
+    val listScheduledTasks = tool(
+        "list_scheduled_tasks",
+        "List the scheduled tasks with their ids, next runs and repeats.",
+        schema { putJsonObject("properties") {} }
+    )
+
+    val editScheduledTask = tool(
+        "edit_scheduled_task",
+        "Change a scheduled task; only the arguments passed are touched. Find the id with " +
+            "list_scheduled_tasks first.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("task_id") {
+                    put("type", "string")
+                    put("description", "The task's id.")
+                }
+                putJsonObject("name") {
+                    put("type", "string")
+                    put("description", "New name.")
+                }
+                putJsonObject("prompt") {
+                    put("type", "string")
+                    put("description", "New prompt.")
+                }
+                putJsonObject("start") {
+                    put("type", "string")
+                    put("description", "New first run, local like 2026-11-02T08:00.")
+                }
+                putJsonObject("repeat") {
+                    put("type", "string")
+                    put("description", "New repeat: none, hourly, daily, weekly or monthly.")
+                }
+                putJsonObject("interval") {
+                    put("type", "integer")
+                    put("description", "New every-N for hourly/daily repeats.")
+                }
+                putJsonObject("weekdays") {
+                    put("type", "array")
+                    put("description", "New weekday set for weekly repeats.")
+                    putJsonObject("items") { put("type", "string") }
+                }
+                putJsonObject("enabled") {
+                    put("type", "boolean")
+                    put("description", "false pauses the task, true resumes it.")
+                }
+                putJsonObject("skill_id") {
+                    put("type", "string")
+                    put("description", "New skill to run (empty clears it).")
+                }
+                putJsonObject("memory_note") {
+                    put("type", "string")
+                    put("description", "New note path (empty clears it).")
+                }
+            }
+            putJsonArray("required") {
+                add("task_id")
+            }
+        }
+    )
+
+    val deleteScheduledTask = tool(
+        "delete_scheduled_task",
+        "Delete a scheduled task by id; its future runs are cancelled. The user is asked first.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("task_id") {
+                    put("type", "string")
+                    put("description", "The task's id, from list_scheduled_tasks.")
+                }
+            }
+            putJsonArray("required") {
+                add("task_id")
+            }
+        }
+    )
+
     val searchContacts = tool(
         "search_contacts",
-        "Look up phone numbers and email addresses in the phone's contacts by name.",
+        "Look up phone numbers and email addresses in the phone's contacts by name or number.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("query") {
                     put("type", "string")
-                    put("description", "Part of a name. Empty lists the first few contacts.")
+                    put("description", "Part of a name or a phone number. Empty lists the first few contacts.")
                 }
                 putJsonObject("limit") {
                     put("type", "integer")
                     put("description", "Maximum matches, default 10.")
                 }
+            }
+        }
+    )
+
+    val addContact = tool(
+        "add_contact",
+        "Add a contact through the Contacts app: it opens prefilled and the user reviews and saves " +
+            "it there, so nothing is added silently.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("name") {
+                    put("type", "string")
+                    put("description", "Full name for the new contact.")
+                }
+                putJsonObject("phone") {
+                    put("type", "string")
+                    put("description", "Optional phone number.")
+                }
+                putJsonObject("email") {
+                    put("type", "string")
+                    put("description", "Optional email address.")
+                }
+            }
+            putJsonArray("required") {
+                add("name")
             }
         }
     )
@@ -599,7 +858,7 @@ object MasalaToolDefinitions {
 
     val webFetch = tool(
         "webfetch",
-        "Fetch content from an HTTP or HTTPS URL and return it as text. " +
+        "Fetch content from an HTTP or HTTPS URL and return it as text or Markdown. " +
             "Use this to look up documentation, read articles, or gather information from the web. " +
             "Only text responses (HTML, JSON, XML) are supported; binary content is rejected.",
         schema {
@@ -612,7 +871,7 @@ object MasalaToolDefinitions {
                     put("type", "string")
                     put(
                         "description",
-                        "Optional output format: 'text' (default) or 'markdown'. Currently always returns text."
+                        "Output format: 'text' (default, page text) or 'markdown' (headings, links, lists, code kept as Markdown)."
                     )
                 }
             }
@@ -622,7 +881,8 @@ object MasalaToolDefinitions {
 
     val weather = tool(
         "weather",
-        "Today's weather: conditions, temperature now, the high and low in °C and the chance of rain. " +
+        "Today's weather: conditions, temperature now, the high and low in °C, the chance of rain, " +
+            "and the coming hours. " +
             "Without a place it is for the place the user set in Settings → Daily brief.",
         schema {
             putJsonObject("properties") {
@@ -644,7 +904,8 @@ object MasalaToolDefinitions {
         "toggle_wifi",
         "Turn Wi-Fi on or off. Android 10 and newer forbid apps from toggling the radio, so on " +
             "any current device this opens the Wi-Fi panel for the user to flip instead — say so " +
-            "rather than claiming the radio changed. Direct toggling only works below Android 10.",
+            "rather than claiming the radio changed. Direct toggling only works below Android 10. " +
+            "For any other settings screen, use open_setting.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("enabled") {
@@ -653,6 +914,64 @@ object MasalaToolDefinitions {
                 }
             }
             putJsonArray("required") { add("enabled") }
+        }
+    )
+
+    val takePhoto = tool(
+        "take_photo",
+        "Take a photo through the camera app: it opens, the user takes the picture, and the file " +
+            "lands in Masala's work folder. Needs no permission, because the camera app (not Masala) " +
+            "takes the picture. The answer names the file; read it with read_file on a LATER turn — " +
+            "never chain a read in the same turn, the user hasn't taken the photo yet and " +
+            "cancelling leaves no file. If they cancel, say what to rephrase and move on.",
+        schema { putJsonObject("properties") {} }
+    )
+
+    val getStorageInfo = tool(
+        "get_storage_info",
+        "Report free and total space: internal storage, plus the app's folder on shared storage.",
+        schema { putJsonObject("properties") {} }
+    )
+
+    val openSetting = tool(
+        "open_setting",
+        "Open a system settings screen by name — wifi, internet, volume, nfc, bluetooth, location, " +
+            "notifications, battery, display, sound, apps, storage, language, date, airplane or " +
+            "accessibility. Nothing is toggled by the tool itself; the user flips the switch on the " +
+            "screen that opens.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("name") {
+                    put("type", "string")
+                    put("description", "Which settings screen to open, e.g. 'wifi' or 'location'.")
+                }
+            }
+            putJsonArray("required") { add("name") }
+        }
+    )
+
+    val getLocation = tool(
+        "get_location",
+        "The phone's coarse location from its last known fix, rounded to about a kilometre. Needs " +
+            "the Location permission; asks for it when missing. Says plainly when there is no fix yet.",
+        schema { putJsonObject("properties") {} }
+    )
+
+    val shareFile = tool(
+        "share_file",
+        "Send a file to the share sheet: the user picks where it goes (a chat, Drive, an email " +
+            "draft). Nothing leaves the phone without that tap. Shares anything the file tools can " +
+            "read: transcriptions, edited media, PDFs, skill outputs.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("path") {
+                    put("type", "string")
+                    put("description", "File path to share.")
+                }
+            }
+            putJsonArray("required") {
+                add("path")
+            }
         }
     )
 

@@ -14,8 +14,10 @@ import com.samosaai.masala.core.tool.ToolSensitivity.READ_ONLY
 import com.samosaai.masala.layout.LayoutRepository
 import com.samosaai.masala.layout.ModeStore
 import com.samosaai.masala.tools.boolean
+import com.samosaai.masala.tools.int
 import com.samosaai.masala.tools.missing
 import com.samosaai.masala.tools.string
+import com.samosaai.masala.tools.stringList
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.add
@@ -30,6 +32,21 @@ import kotlinx.serialization.json.putJsonObject
  */
 object AgentTools {
     private const val MAX_PROBLEMS = 10
+
+    /** What `about_masala` answers: the app's own features, in the user's terms. */
+    private const val ABOUT_MASALA =
+        "Masala is an Android home screen with an assistant built in. " +
+            "Home holds apps, folders and widgets; the drawer lists everything with search and an A-Z scrubber; " +
+            "a long press on anything opens its menu (hide, icon, edit with Masala). " +
+            "Chat (the orb or the type field beside the mic) acts on the phone with tools, or consults an expert " +
+            "persona — doctor, chef, coach and more under Settings → Experts. " +
+            "Skills under Settings → Skills add helpers; some build mini apps that pin to home. " +
+            "The Second Brain (Settings → Second Brain) remembers people, notes and routines. " +
+            "Scheduled tasks (Settings → Scheduled tasks) run prompts on a schedule. " +
+            "Hidden apps live under Settings → Privacy & data, optionally behind a PIN. " +
+            "Permissions, each asked when first needed: Calendar (read/write) for the calendar tools, " +
+            "Contacts for contact lookup, Location for weather and location, and Usage access plus " +
+            "Notification access for app stats and media controls."
 
     private fun schema(required: List<String>, block: JsonObjectBuilder.() -> Unit) = buildJsonObject {
         put("type", "object")
@@ -99,9 +116,47 @@ object AgentTools {
         },
     )
 
+    val sleep = ToolDefinition(
+        "sleep",
+        "Pause the run for a few seconds, e.g. waiting for something else to finish. " +
+            "Resolves at once when the run is cancelled.",
+        schema(emptyList()) {
+            putJsonObject("seconds") {
+                put("type", "integer")
+                put("description", "Seconds to wait (1-300).")
+            }
+        },
+    )
+
+    val question = ToolDefinition(
+        "question",
+        "Ask the user something mid-run, with up to 10 options. Use it when their answer changes " +
+            "what you do next; otherwise decide yourself. The user can also answer in their own " +
+            "words, or dismiss the question — then carry on without the answer. Never ask what you " +
+            "can look up with a tool.",
+        schema(listOf("question")) {
+            stringProp("question", "The question, in the user's words.")
+            putJsonObject("options") {
+                put("type", "array")
+                put("description", "Up to 10 short options. Empty lets the user answer freely.")
+                putJsonObject("items") { put("type", "string") }
+            }
+        },
+    )
+
+    val about = ToolDefinition(
+        "about_masala",
+        "What Masala is and does: the launcher's features, where its settings live, and which " +
+            "permissions each part needs. Answer questions about the app itself from this.",
+        schema(emptyList()) {},
+    )
+
+    private const val MAX_SLEEP_SECONDS = 300
+
     /**
      * [runSkill] opens the skill sheet and [consult] asks an expert in place; leave either null while
-     * there is none, and its tool isn't offered.
+     * there is none, and its tool isn't offered. [ask] answers a `question` call through the
+     * question sheet; without it the tool isn't offered either.
      */
     fun create(
         context: Context,
@@ -109,6 +164,7 @@ object AgentTools {
         modes: ModeStore,
         runSkill: ((skillId: String, prompt: String?) -> ActionResult)? = null,
         consult: (suspend (skillId: String, question: String, consultId: String?) -> ActionResult)? = null,
+        ask: (suspend (question: String, options: List<String>) -> ActionResult)? = null,
     ): List<Tool> {
         val app = context.applicationContext
         return listOfNotNull(
@@ -156,6 +212,25 @@ object AgentTools {
                 } catch (e: ActivityNotFoundException) {
                     ActionResult.error("No messaging app is available on this device.")
                 }
+            },
+            FunctionTool(sleep, READ_ONLY) { args ->
+                val seconds = (args.int("seconds") ?: 0).coerceIn(0, MAX_SLEEP_SECONDS)
+                if (seconds < 1) return@FunctionTool ActionResult.error("Wait 1-$MAX_SLEEP_SECONDS seconds.")
+                kotlinx.coroutines.delay(seconds * 1000L)
+                ActionResult.ok("Waited $seconds second(s).")
+            },
+            ask?.let { answer ->
+                FunctionTool(question, READ_ONLY, opensScreen = true) { args ->
+                    val options = args.stringList("options").orEmpty().map { it.trim() }
+                        .filter { it.isNotEmpty() }.take(com.samosaai.masala.actions.QuestionGate.MAX_OPTIONS)
+                    answer(
+                        args.string("question") ?: return@FunctionTool missing("question"),
+                        options,
+                    )
+                }
+            },
+            FunctionTool(about, READ_ONLY) {
+                ActionResult.ok(ABOUT_MASALA)
             },
         )
     }

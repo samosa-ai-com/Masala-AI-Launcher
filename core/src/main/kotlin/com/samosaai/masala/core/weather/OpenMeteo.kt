@@ -28,6 +28,8 @@ data class DailyWeather(
     val highC: Double?,
     val lowC: Double?,
     val rainChance: Int?,
+    /** The coming hours, oldest first (empty when the reply had no hourly block). */
+    val hourly: List<HourEntry> = emptyList(),
 ) {
     val now: WeatherNow? get() = tempC?.let { WeatherNow(kind, it) }
 
@@ -38,7 +40,29 @@ data class DailyWeather(
         if (highC != null && lowC != null) append(", ").append(highC.roundToText()).append('/').append(lowC.roundToText()).append("°C")
         rainChance?.let { append(", rain ").append(it).append('%') }
     }
+
+    /** One line for the `weather` tool: [line] plus the coming hours, e.g. "14:00 clear 22°C rain 5%". */
+    fun hourLine(maxHours: Int = 8): String {
+        val line = line()
+        val hours = hourly.take(maxHours)
+        if (hours.isEmpty()) return line
+        return line + "\nNext hours: " + hours.joinToString(", ") { h ->
+            buildString {
+                append(h.time).append(' ').append(h.description)
+                h.tempC?.let { append(' ').append(it.roundToText()).append("°C") }
+                h.rainChance?.let { append(" rain ").append(it).append('%') }
+            }
+        }
+    }
 }
+
+/** One coming hour: local "HH:MM", conditions and rain chance. */
+data class HourEntry(
+    val time: String,
+    val tempC: Double?,
+    val rainChance: Int?,
+    val description: String,
+)
 
 /**
  * The Open-Meteo forecast and geocoding APIs (no key): URLs and parsing only, so the app's client stays a
@@ -52,14 +76,16 @@ object OpenMeteo {
     fun forecastUrl(place: Place): String =
         "$FORECAST?latitude=${place.latitude}&longitude=${place.longitude}" +
             "&current=temperature_2m,weather_code" +
+            "&hourly=temperature_2m,precipitation_probability,weather_code" +
             "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
-            "&timezone=auto&forecast_days=1"
+            // Two days: late in the evening the next 8 hours cross midnight.
+            "&timezone=auto&forecast_days=2"
 
     fun searchUrl(name: String, language: String = "en", count: Int = 5): String =
         "$GEOCODING?name=${URLEncoder.encode(name.trim(), "UTF-8")}&count=$count&language=$language&format=json"
 
     /** Null when the reply has neither current nor daily weather. */
-    fun parseForecast(json: String, place: String): DailyWeather? {
+    fun parseForecast(json: String, place: String, nowEpochMs: Long = System.currentTimeMillis()): DailyWeather? {
         val root = runCatching { MasalaJson.lenient.parseToJsonElement(json) as? JsonObject }.getOrNull() ?: return null
         val current = root["current"] as? JsonObject
         val daily = root["daily"] as? JsonObject
@@ -73,8 +99,42 @@ object OpenMeteo {
             highC = daily?.firstDouble("temperature_2m_max"),
             lowC = daily?.firstDouble("temperature_2m_min"),
             rainChance = daily?.firstInt("precipitation_probability_max"),
+            hourly = parseHourly(root["hourly"] as? JsonObject, utcOffset(root), nowEpochMs),
         )
     }
+
+    /** The coming hours from the hourly block, oldest first, capped at 12. */
+    private fun parseHourly(hourly: JsonObject?, offsetSeconds: Long, nowEpochMs: Long): List<HourEntry> {
+        if (hourly == null) return emptyList()
+        val times = (hourly["time"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content } ?: return emptyList()
+        if (times.isEmpty()) return emptyList()
+        val offset = offsetSeconds
+        val temps = (hourly["temperature_2m"] as? JsonArray)?.map { (it as? JsonPrimitive)?.doubleOrNull }
+        val rains = (hourly["precipitation_probability"] as? JsonArray)?.map { (it as? JsonPrimitive)?.let { p -> p.intOrNull ?: p.doubleOrNull?.toInt() } }
+        val codes = (hourly["weather_code"] as? JsonArray)?.map { (it as? JsonPrimitive)?.let { p -> p.intOrNull ?: p.doubleOrNull?.toInt() } }
+        // Times are local ISO ("2026-11-01T14:00"); keep everything from the current hour on.
+        val nowLocal = (nowEpochMs / 1000 + offset) / 3600 * 3600
+        return times.indices.mapNotNull { i ->
+            val epoch = localIsoToEpoch(times[i], offset) ?: return@mapNotNull null
+            if (epoch + offset < nowLocal) return@mapNotNull null
+            HourEntry(
+                time = times[i].substringAfter("T").take(5),
+                tempC = temps?.getOrNull(i),
+                rainChance = rains?.getOrNull(i),
+                description = codes?.getOrNull(i)?.let(::describe) ?: "—",
+            )
+        }.take(12)
+    }
+
+    private fun utcOffset(root: JsonObject): Long =
+        ((root["utc_offset_seconds"] as? JsonPrimitive)?.let { it.intOrNull ?: it.doubleOrNull?.toInt() } ?: 0).toLong()
+
+    private fun localIsoToEpoch(iso: String, offsetSeconds: Long): Long? = runCatching {
+        val (date, time) = iso.split("T")
+        val (y, m, d) = date.split("-").map(String::toInt)
+        val (hh, mm) = time.split(":").take(2).map(String::toInt)
+        java.time.LocalDateTime.of(y, m, d, hh, mm).toEpochSecond(java.time.ZoneOffset.UTC) - offsetSeconds
+    }.getOrNull()
 
     /** Places for a typed name, best match first; empty when nothing matches. */
     fun parsePlaces(json: String): List<Place> {

@@ -1,7 +1,14 @@
 package com.samosaai.masala.agent
 
 import com.samosaai.masala.llm.ChatMessage
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
  * Conversation-history repairs that keep a request acceptable to strict OpenAI-compatible servers:
@@ -41,8 +48,59 @@ object AgentHistory {
         return trimmed
     }
 
-    /** Adds a stub result for every tool call of an assistant message that has none (an interrupted run). */
-    fun repairOrphanedToolCalls(history: List<ChatMessage>): List<ChatMessage> {
+    /**
+     * Strips images from the request down to the newest [keepParts] image parts, so a long visual
+     * thread doesn't pay for every screenshot on every turn. Text parts are untouched, and a message
+     * that loses parts keeps one note saying how many went. Only the request list is culled, never
+     * the stored history.
+     */
+    fun cullImages(history: List<ChatMessage>, keepParts: Int = 4): List<ChatMessage> {
+        val withImages = history.mapIndexed { i, m -> i to imagePartIndices(m) }.filter { it.second.isNotEmpty() }
+        if (withImages.sumOf { it.second.size } <= keepParts) return history
+        // The newest parts survive; everything older is stripped.
+        val keep = HashSet<Pair<Int, Int>>()
+        var budget = keepParts
+        for ((i, parts) in withImages.asReversed()) {
+            for (p in parts.asReversed()) {
+                if (budget == 0) break
+                keep += i to p
+                budget--
+            }
+            if (budget == 0) break
+        }
+        return history.mapIndexed { i, message ->
+            val parts = message.content as? JsonArray ?: return@mapIndexed message
+            val stripped = parts.indices.filter { isImagePart(parts[it]) && (i to it) !in keep }
+            if (stripped.isEmpty()) {
+                message
+            } else {
+                val first = stripped.first()
+                val note = if (stripped.size == 1) "[earlier image omitted to save context]"
+                else "[${stripped.size} earlier images omitted to save context]"
+                message.copy(content = buildJsonArray {
+                    parts.forEachIndexed { idx, part ->
+                        if (idx == first) {
+                            add(buildJsonObject {
+                                put("type", "text")
+                                put("text", note)
+                            })
+                        }
+                        if (idx !in stripped) add(part)
+                    }
+                })
+            }
+        }
+    }
+
+    private fun imagePartIndices(message: ChatMessage): List<Int> {
+        val parts = message.content as? JsonArray ?: return emptyList()
+        return parts.indices.filter { isImagePart(parts[it]) }
+    }
+
+    private fun isImagePart(part: JsonElement): Boolean =
+        (part as? JsonObject)?.get("type")?.jsonPrimitive?.content == "image_url"
+
+    /** Adds a stub result for every tool call of an assistant message that has none (an interrupted run). */    fun repairOrphanedToolCalls(history: List<ChatMessage>): List<ChatMessage> {
         val out = ArrayList<ChatMessage>(history.size)
         var i = 0
         while (i < history.size) {

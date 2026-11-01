@@ -49,7 +49,7 @@ class NestedAgentTest {
         tools = runner,
         definitions = consultDefinitions,
         scope = ToolScope.command(listOf(ToolInfo("consult_expert", ToolSensitivity.READ_ONLY))),
-        systemPrompt = { "You are Masala." },
+        systemPrompt = { _ -> "You are Masala." },
         maxSteps = 6,
     )
 
@@ -61,7 +61,7 @@ class NestedAgentTest {
             tools = AgentToolRunner { _, _ -> ToolResult.Failure("The doctor uses no tools here.") },
             definitions = emptyList(),
             scope = ToolScope.command(emptyList()),
-            systemPrompt = { "You are a doctor. Ask what would change your answer." },
+            systemPrompt = { _ -> "You are a doctor. Ask what would change your answer." },
             maxSteps = 6,
         )
 
@@ -95,7 +95,7 @@ class NestedAgentTest {
             tools = AgentToolRunner { _, _ -> ToolResult.Failure("none") },
             definitions = emptyList(),
             scope = ToolScope.command(emptyList()),
-            systemPrompt = { "You are a doctor." },
+            systemPrompt = { _ -> "You are a doctor." },
             maxSteps = 6,
         )
 
@@ -107,7 +107,7 @@ class NestedAgentTest {
             tools = AgentToolRunner { _, _ -> ToolResult.Failure("none") },
             definitions = emptyList(),
             scope = ToolScope.command(emptyList()),
-            systemPrompt = { "You are a doctor." },
+            systemPrompt = { _ -> "You are a doctor." },
             maxSteps = 6,
         )
         recalled.restore(saved)

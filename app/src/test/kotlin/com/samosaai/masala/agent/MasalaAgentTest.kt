@@ -49,7 +49,7 @@ class MasalaAgentTest {
         scope: ToolScope = ToolScope.command(infos),
         maxSteps: Int = 6,
         runner: AgentToolRunner = AgentToolRunner { name, _ -> ToolResult.Success("$name ok") },
-    ) = MasalaAgent(model, runner, definitions, scope, { "system" }, maxSteps)
+    ) = MasalaAgent(model, runner, definitions, scope, { _ -> "system" }, maxSteps)
 
     private fun script(vararg replies: ChatMessage) = Script(ArrayDeque(replies.toList()))
 
@@ -68,14 +68,14 @@ class MasalaAgentTest {
             assistant("", call("3", "webfetch", """{"url":"https://f1.example/a"}""")),
             assistant("Brief"),
         )
-        val guarded = MasalaAgent(replies(), runner, defs, scope, { "system" }, fetchOnlyResults = true).run(user("go")).toList()
+        val guarded = MasalaAgent(replies(), runner, defs, scope, { _ -> "system" }, fetchOnlyResults = true).run(user("go")).toList()
         assertEquals(listOf("https://f1.example/a"), fetched)
         val refusal = guarded.filterIsInstance<AgentEvent.ToolDone>().map { it.result }.filterIsInstance<ToolResult.Failure>().single()
         assertEquals(com.samosaai.masala.core.agent.FetchAllowance.REFUSAL, refusal.message)
 
         // A run someone watches is unchanged.
         fetched.clear()
-        MasalaAgent(replies(), runner, defs, scope, { "system" }).run(user("go")).toList()
+        MasalaAgent(replies(), runner, defs, scope, { _ -> "system" }).run(user("go")).toList()
         assertEquals(listOf("https://evil.example/?q=Standup", "https://f1.example/a"), fetched)
     }
 
@@ -93,7 +93,7 @@ class MasalaAgentTest {
             assistant("", call("2", "webfetch", """{"url":"https://evil.example/join"}""")),
             assistant("Done"),
         )
-        MasalaAgent(replies, runner, defs, scope, { "system" }, fetchOnlyResults = true).run(user("go")).toList()
+        MasalaAgent(replies, runner, defs, scope, { _ -> "system" }, fetchOnlyResults = true).run(user("go")).toList()
         assertEquals(emptyList(), fetched)
     }
 
@@ -111,7 +111,7 @@ class MasalaAgentTest {
         repeat(MasalaAgent.KEPT_EXCHANGES) { replies += assistant("ok") }
         replies += assistant("", call("f", "webfetch", """{"url":"https://f1.example/a"}"""))
         replies += assistant("done")
-        val agent = MasalaAgent(script(*replies.toTypedArray()), runner, defs, scope, { "system" }, fetchOnlyResults = true)
+        val agent = MasalaAgent(script(*replies.toTypedArray()), runner, defs, scope, { _ -> "system" }, fetchOnlyResults = true)
         agent.run(user("first")).toList()
         repeat(MasalaAgent.KEPT_EXCHANGES) { agent.run(user("again $it")).toList() }
         agent.run(user("open it")).toList()
@@ -121,6 +121,53 @@ class MasalaAgentTest {
     @Test fun answersWithNoTools() = runBlocking {
         val events = agent(script(assistant("Hello"))).run(user("hi")).toList()
         assertEquals(listOf(AgentEvent.Thinking, AgentEvent.Done("Hello")), events)
+    }
+
+    @Test fun aFailedSkillCallDoesNotSuppressTheListing() = runBlocking {
+        val skill = com.samosaai.masala.core.contract.MasalaSkill(
+            id = "chef", title = "Chef", description = "Cooks.", instructions = "Cook.",
+        )
+        val defs = definitions + ToolDefinition("run_skill", "", JsonObject(emptyMap()))
+        val scope = ToolScope.command(
+            infos + ToolInfo("run_skill", ToolSensitivity.READ_ONLY),
+        )
+        val model = script(
+            assistant("", call("1", "run_skill", """{"skill_id":"chef"}""")),
+            assistant("nope"),
+            assistant("done"),
+        )
+        val runner = AgentToolRunner { name, _ ->
+            if (name == "run_skill") ToolResult.Failure("refused") else ToolResult.Success("ok")
+        }
+        val prompt: (AgentPrompt.PromptContext) -> String =
+            { ctx -> AgentPrompt.build("Monday", listOf(skill), context = ctx) }
+        val a = MasalaAgent(model, runner, defs, scope, prompt)
+        a.run(user("cook?")).toList()
+        a.run(user("cook now?")).toList()
+        // The skill call failed, so the next turn's prompt still lists it.
+        assertTrue(model.requests.last()[0].textContent.contains("chef:"), model.requests.last()[0].textContent)
+    }
+
+    @Test fun aSuccessfulSkillCallSuppressesTheListing() = runBlocking {
+        val skill = com.samosaai.masala.core.contract.MasalaSkill(
+            id = "chef", title = "Chef", description = "Cooks.", instructions = "Cook.",
+        )
+        val defs = definitions + ToolDefinition("run_skill", "", JsonObject(emptyMap()))
+        val scope = ToolScope.command(
+            infos + ToolInfo("run_skill", ToolSensitivity.READ_ONLY),
+        )
+        val model = script(
+            assistant("", call("1", "run_skill", """{"skill_id":"chef"}""")),
+            assistant("nope"),
+            assistant("done"),
+        )
+        val runner = AgentToolRunner { _, _ -> ToolResult.Success("Skill [chef]: fetched") }
+        val prompt: (AgentPrompt.PromptContext) -> String =
+            { ctx -> AgentPrompt.build("Monday", listOf(skill), context = ctx) }
+        val a = MasalaAgent(model, runner, defs, scope, prompt)
+        a.run(user("cook?")).toList()
+        a.run(user("cook now?")).toList()
+        assertTrue(!model.requests.last()[0].textContent.contains("chef:"), model.requests.last()[0].textContent)
     }
 
     @Test fun oneToolCallThenAnswer() = runBlocking {

@@ -42,10 +42,19 @@ object MasalaTools {
         val transcribe = TranscribeTool(app, files)
         val probe = MiniAppProbe(app)
         val contacts = ContactsTool(app)
+        val photo = PhotoTool(app)
+        val settings = SettingTool(app)
+        val location = LocationTool(app)
+        val share = ShareTool(files, ShareTool.fireSheet(app))
 
         // Read lazily: the layout repository is built after the tools, and only tools that pin
         // need it.
         fun host() = app as com.samosaai.masala.MasalaApp
+        val scheduled = ScheduledTaskTools(
+            store = host().scheduledTasks,
+            reschedule = { com.samosaai.masala.scheduled.ScheduledTaskScheduler.reschedule(app) },
+            skillIds = { host().skills.getAllSkills().mapTo(HashSet()) { it.id } },
+        )
 
         return listOf(
             FunctionTool(Defs.dialNumber, READ_ONLY, opensScreen = true) { phone.dialNumber(it.string("number") ?: return@FunctionTool missing("number")) },
@@ -71,10 +80,46 @@ object MasalaTools {
                     location = it.string("location"),
                     notes = it.string("notes"),
                     calendarName = it.string("calendar"),
+                    allDay = it.boolean("all_day"),
+                    recurrence = it.string("recurrence"),
+                    recurrenceCount = it.int("recurrence_count"),
+                    recurrenceUntil = it.string("recurrence_until"),
+                    reminderMinutes = it.int("reminder_minutes"),
+                    attendees = it.string("attendees"),
+                )
+            },
+            FunctionTool(Defs.editCalendarEvent, CHANGES_SOMETHING) {
+                calendar.editEvent(
+                    eventId = it.long("event_id") ?: return@FunctionTool missing("event_id"),
+                    title = it.string("title"),
+                    start = it.string("start"),
+                    end = it.string("end"),
+                    location = it.string("location"),
+                    notes = it.string("notes"),
+                    allDay = it.boolean("all_day"),
+                    recurrence = it.string("recurrence"),
+                    recurrenceCount = it.int("recurrence_count"),
+                    recurrenceUntil = it.string("recurrence_until"),
+                    reminderMinutes = it.int("reminder_minutes"),
+                    attendees = it.string("attendees"),
+                    clearRecurrence = it.boolean("clear_recurrence") ?: false,
+                    clearReminder = it.boolean("clear_reminder") ?: false,
+                )
+            },
+            FunctionTool(Defs.deleteCalendarEvent, DESTRUCTIVE) {
+                calendar.deleteEvent(
+                    eventId = it.long("event_id") ?: return@FunctionTool missing("event_id"),
                 )
             },
             FunctionTool(Defs.searchContacts, READ_ONLY, readsPrivateData = true) {
                 contacts.search(it.string("query"), it.int("limit"))
+            },
+            FunctionTool(Defs.addContact, CHANGES_SOMETHING, opensScreen = true) {
+                contacts.addContact(
+                    name = it.string("name") ?: return@FunctionTool missing("name"),
+                    phone = it.string("phone"),
+                    email = it.string("email"),
+                )
             },
             FunctionTool(Defs.openUrl, READ_ONLY, opensScreen = true) {
                 val url = it.string("url") ?: return@FunctionTool missing("url")
@@ -102,6 +147,45 @@ object MasalaTools {
             },
             FunctionTool(Defs.showAlarms, READ_ONLY, opensScreen = true) { alarms.showAlarms() },
             FunctionTool(Defs.nextAlarm, READ_ONLY) { alarms.nextAlarm() },
+            FunctionTool(Defs.takePhoto, READ_ONLY, opensScreen = true) { photo.takePhoto() },
+            FunctionTool(Defs.getStorageInfo, READ_ONLY) { system.getStorageInfo() },
+            FunctionTool(Defs.openSetting, READ_ONLY, opensScreen = true) {
+                settings.open(it.string("name"))
+            },
+            FunctionTool(Defs.getLocation, READ_ONLY, readsPrivateData = true) { location.getLocation() },
+            FunctionTool(Defs.shareFile, READ_ONLY, readsPrivateData = true, opensScreen = true) {
+                share.share(it.string("path"))
+            },
+            FunctionTool(Defs.scheduleAgentTask, CHANGES_SOMETHING) {
+                scheduled.schedule(
+                    name = it.string("name"),
+                    prompt = it.string("prompt"),
+                    start = it.string("start"),
+                    repeat = it.string("repeat"),
+                    interval = it.int("interval"),
+                    weekdays = it.stringList("weekdays") ?: it.string("weekdays")?.let { listOf(it) },
+                    skillId = it.string("skill_id"),
+                    memoryNote = it.string("memory_note"),
+                )
+            },
+            FunctionTool(Defs.listScheduledTasks, READ_ONLY) { scheduled.list() },
+            FunctionTool(Defs.editScheduledTask, CHANGES_SOMETHING) {
+                scheduled.edit(
+                    taskId = it.string("task_id"),
+                    name = it.string("name"),
+                    prompt = it.string("prompt"),
+                    start = it.string("start"),
+                    repeat = it.string("repeat"),
+                    interval = it.int("interval"),
+                    weekdays = it.stringList("weekdays") ?: it.string("weekdays")?.let { listOf(it) },
+                    enabled = it.boolean("enabled"),
+                    skillId = it.string("skill_id"),
+                    memoryNote = it.string("memory_note"),
+                )
+            },
+            FunctionTool(Defs.deleteScheduledTask, DESTRUCTIVE) {
+                scheduled.delete(it.string("task_id"))
+            },
             FunctionTool(Defs.snoozeAlarm, CHANGES_SOMETHING) { alarms.snoozeAlarm(minutes = it.int("minutes")) },
             FunctionTool(Defs.toggleTorch, CHANGES_SOMETHING) {
                 device.toggleTorch(
@@ -157,7 +241,7 @@ object MasalaTools {
                         .firstOrNull() ?: return@FunctionTool ActionResult.error("No place called '$name' was found.")
                 }
                 host.weather.today(place).fold(
-                    { ActionResult.ok(it.line()) },
+                    { ActionResult.ok(it.hourLine()) },
                     { ActionResult.error(it.message ?: "The weather service can't be reached.") },
                 )
             },

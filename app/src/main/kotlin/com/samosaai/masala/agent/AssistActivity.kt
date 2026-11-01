@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.masala
 import com.samosaai.masala.ui.home.ConfirmationSheet
+import com.samosaai.masala.ui.home.QuestionSheet
 import com.samosaai.masala.ui.home.ReplyCard
 import com.samosaai.masala.ui.theme.MasalaTheme
 
@@ -48,6 +49,7 @@ class AssistActivity : ComponentActivity() {
                     CloseWhenDismissed()
                 }
                 ConfirmationSheet(masala.confirmationGate)
+                QuestionSheet(masala.questionGate)
             }
         }
     }

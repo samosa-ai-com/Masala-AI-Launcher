@@ -70,6 +70,7 @@ import androidx.compose.material3.Text
 import com.samosaai.masala.ui.home.ReplyCard
 import com.samosaai.masala.ui.home.rememberMicTap
 import com.samosaai.masala.ui.home.ConfirmationSheet
+import com.samosaai.masala.ui.home.QuestionSheet
 import com.samosaai.masala.ui.home.HomeScreen
 import com.samosaai.masala.ui.home.RenderContext
 import com.samosaai.masala.ui.home.DropTarget
@@ -684,6 +685,7 @@ class HomeActivity : ComponentActivity() {
 
         // Above the working sheet and the reply card: a confirmation must never be hidden by them.
         ConfirmationSheet(app.confirmationGate)
+        QuestionSheet(app.questionGate)
 
         Isolated { if (drawerReady || drawerOpen) Box(
             Modifier

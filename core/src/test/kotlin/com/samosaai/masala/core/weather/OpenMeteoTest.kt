@@ -71,7 +71,40 @@ class OpenMeteoTest {
     fun `urls ask for today in the place's zone and encode the name`() {
         val url = OpenMeteo.forecastUrl(Place("Bengaluru", 12.97, 77.59))
         assertTrue("latitude=12.97&longitude=77.59" in url, url)
-        assertTrue("timezone=auto" in url && "forecast_days=1" in url, url)
+        assertTrue("timezone=auto" in url && "forecast_days=2" in url, url)
+        assertTrue("hourly=temperature_2m,precipitation_probability,weather_code" in url, url)
         assertTrue("name=New+Delhi" in OpenMeteo.searchUrl(" New Delhi "))
+    }
+
+    @Test
+    fun `the coming hours start at the current one and cap at twelve`() {
+        // 2026-10-31T07:30 in Asia/Kolkata (+19800) = 02:00 UTC.
+        val nowMs = 1_793_412_000_000L
+        val json = """
+            {"latitude":12.97,"longitude":77.59,"utc_offset_seconds":19800,"timezone":"Asia/Kolkata",
+             "current":{"time":"2026-10-31T07:30","temperature_2m":21.4,"weather_code":61},
+             "hourly":{"time":["2026-10-31T05:00","2026-10-31T06:00","2026-10-31T07:00","2026-10-31T08:00"],
+                       "temperature_2m":[19.0,20.0,21.4,23.0],
+                       "precipitation_probability":[80,70,60,10],
+                       "weather_code":[63,63,61,1]},
+             "daily":{"time":["2026-10-31"],"weather_code":[63],"temperature_2m_max":[27.1],
+                      "temperature_2m_min":[18.0],"precipitation_probability_max":[60]}}
+        """.trimIndent()
+        val w = OpenMeteo.parseForecast(json, "Bengaluru", nowMs)!!
+        assertEquals(listOf("07:00", "08:00"), w.hourly.map { it.time })
+        assertEquals(21.4, w.hourly[0].tempC)
+        assertEquals(60, w.hourly[0].rainChance)
+        assertEquals("light rain", w.hourly[0].description)
+        val line = w.hourLine()
+        assertTrue(line.startsWith(w.line()))
+        assertTrue("07:00 light rain 21°C rain 60%" in line, line)
+        assertTrue("08:00 mainly clear 23°C rain 10%" in line, line)
+    }
+
+    @Test
+    fun `no hourly block means just the daily line`() {
+        val w = OpenMeteo.parseForecast(forecast, "Bengaluru")!!
+        assertEquals(emptyList(), w.hourly)
+        assertEquals(w.line(), w.hourLine())
     }
 }

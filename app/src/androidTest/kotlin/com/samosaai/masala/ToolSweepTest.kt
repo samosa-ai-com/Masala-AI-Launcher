@@ -14,6 +14,9 @@ import com.samosaai.masala.tools.MasalaToolExecutor
 import com.samosaai.masala.tools.ToolGate
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertTrue
@@ -58,6 +61,8 @@ class ToolSweepTest {
                 else "no Wi-Fi panel on this image"
             "read_notifications", "dismiss_notifications", "media_control", "get_now_playing" ->
                 if (listenerEnabled()) null else "notification access can't be granted on this image"
+            "question" -> "needs a user answer; covered by unit tests"
+            "update_user_profile" -> "writes the real vault; covered by BatchCToolsTest with restore"
             else -> null
         }
     }
@@ -153,6 +158,11 @@ class ToolSweepTest {
             put("content", "masala sweep content 42")
         })
         run(executor, "read_file", args { put("path", file) })
+        run(executor, "edit", args {
+            put("path", file)
+            put("old_string", "sweep content 42")
+            put("new_string", "sweep content 43")
+        })
         run(executor, "grep", args {
             put("path", "/sdcard/Download")
             put("pattern", "sweep content")
@@ -186,6 +196,54 @@ class ToolSweepTest {
             run(executor, "delete_mini_app", args { put("id", id) })
         }
 
+        // Calendar sequence: create, then use the provider row for edit and delete.
+        val sweepTitle = "Masala sweep event"
+        run(executor, "create_calendar_event", args {
+            put("title", sweepTitle)
+            put("start", "2026-11-02T09:00")
+        })
+        val sweepId = runCatching {
+            app.contentResolver.query(
+                android.provider.CalendarContract.Events.CONTENT_URI,
+                arrayOf(android.provider.CalendarContract.Events._ID),
+                "${android.provider.CalendarContract.Events.TITLE} = ?",
+                arrayOf(sweepTitle),
+                null,
+            )?.use { c -> if (c.moveToFirst()) c.getLong(0) else null }
+        }.getOrNull()
+        if (sweepId == null) {
+            record("edit_calendar_event", "FAIL", "no id from create_calendar_event")
+            record("delete_calendar_event", "FAIL", "no id from create_calendar_event")
+        } else {
+            run(executor, "edit_calendar_event", args {
+                put("event_id", sweepId)
+                put("notes", "edited by sweep")
+            })
+            run(executor, "delete_calendar_event", args { put("event_id", sweepId) })
+        }
+
+        // Scheduled-task sequence: schedule far ahead, then edit and delete by the listed id.
+        val sched = run(executor, "schedule_agent_task", args {
+            put("name", "Masala sweep task")
+            put("prompt", "Say hi")
+            put("start", "2099-06-01T08:00")
+        })
+        val schedId = (sched as? ToolResult.Success)?.let {
+            Regex("\\[([0-9a-f\\-]{8,})\\]").find(
+                (run(executor, "list_scheduled_tasks") as? ToolResult.Success)?.output.orEmpty(),
+            )?.groupValues?.get(1)
+        }
+        if (schedId == null) {
+            record("edit_scheduled_task", "FAIL", "no id from schedule_agent_task")
+            record("delete_scheduled_task", "FAIL", "no id from schedule_agent_task")
+        } else {
+            run(executor, "edit_scheduled_task", args {
+                put("task_id", schedId)
+                put("name", "Masala sweep task renamed")
+            })
+            run(executor, "delete_scheduled_task", args { put("task_id", schedId) })
+        }
+
         // Everything else, once each.
         val all = app.tools.tools.map { it.definition.name }.sorted()
         val recipes = mapOf(
@@ -217,6 +275,22 @@ class ToolSweepTest {
             "webfetch" to args { put("url", "https://example.com") },
             "toggle_wifi" to args { put("enabled", true) },
             "open_url" to args { put("url", "https://example.com") },
+            "search_skills" to args { put("query", "chef") },
+            "todowrite" to args {
+                put("items", buildJsonArray {
+                    addJsonObject {
+                        put("content", "Sweep")
+                        put("status", "in_progress")
+                    }
+                })
+            },
+            "sleep" to args { put("seconds", 1) },
+            "about_masala" to args { },
+            "take_photo" to args { },
+            "get_storage_info" to args { },
+            "open_setting" to args { put("name", "wifi") },
+            "get_location" to args { },
+            "share_file" to args { put("path", "/sdcard/Download/masala-sweep.txt") },
             "read_notifications" to args { put("limit", 5) },
             "media_control" to args { put("action", "play") },
             "list_files" to args { put("path", "/sdcard/Download") },
@@ -234,6 +308,15 @@ class ToolSweepTest {
         for (name in all) {
             if (name in reported) continue
             run(executor, name, recipes[name] ?: JsonObject(emptyMap()))
+        }
+
+        // The generic create recipe leaves its event behind; the sweep owns it, so remove it.
+        runCatching {
+            app.contentResolver.delete(
+                android.provider.CalendarContract.Events.CONTENT_URI,
+                "${android.provider.CalendarContract.Events.TITLE} = ?",
+                arrayOf("Masala sweep event"),
+            )
         }
 
         println("SWEEP-BEGIN tools=${all.size}")

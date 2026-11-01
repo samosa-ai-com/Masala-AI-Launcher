@@ -134,6 +134,31 @@ object MemoryTools {
             val path = args.string("path") ?: return@FunctionTool missing("path")
             result(secondBrain.remove(path))
         },
+        FunctionTool(updateUserProfile, CHANGES_SOMETHING, readsPrivateData = true) { args ->
+            val occupation = args.string("occupation")
+            val background = args.string("background")
+            if (occupation == null && background == null) {
+                return@FunctionTool ActionResult.error("Nothing to change: pass occupation and/or background.")
+            }
+            for ((label, value, cap) in listOf(Triple("occupation", occupation, 100), Triple("background", background, 250))) {
+                if (value != null && value.words() > cap) {
+                    return@FunctionTool ActionResult.error("The $label is ${value.words()} words; keep it under $cap.")
+                }
+            }
+            val fields = secondBrain.profile().toMutableMap()
+            // Complete values replace over what's on file: an empty string clears the field
+            // (syncUser drops empties), an absent argument leaves it alone.
+            if (occupation != null) fields["occupation"] = occupation.trim()
+            if (background != null) fields["background"] = background.trim()
+            secondBrain.syncUser(fields)
+            val kept = secondBrain.profile()
+            ActionResult.ok(
+                "Profile updated. Now on file: " +
+                    listOf("occupation", "background").mapNotNull { k ->
+                        kept[k]?.takeIf { it.isNotBlank() }?.let { "$k: ${it.take(120)}" }
+                    }.ifEmpty { listOf("nothing (both fields empty)") }.joinToString("; ") + ".",
+            )
+        },
     )
 
     val link = ToolDefinition(
@@ -145,6 +170,18 @@ object MemoryTools {
             prop("path", "The note, e.g. notes/2026-10-29-dentist.md; empty to remove the link.")
         },
     )
+
+    val updateUserProfile = ToolDefinition(
+        "update_user_profile",
+        "Update what Masala knows about the user: their occupation and background. Complete values " +
+            "replace: pass the whole new text, or an empty string to clear a field. Asks the user first.",
+        schema(emptyList()) {
+            prop("occupation", "What the user does, e.g. 'nurse on night shifts'. Up to 100 words; empty clears it.")
+            prop("background", "Anything else that shapes answers: routines, constraints, preferences. Up to 250 words; empty clears it.")
+        },
+    )
+
+    private fun String.words(): Int = trim().split(Regex("\\s+")).count { it.isNotEmpty() }
 
     fun linkTask(links: TaskNoteLinks): Tool = FunctionTool(link, CHANGES_SOMETHING, readsPrivateData = true) { args ->
         val task = args.string("task")?.takeIf { it.isNotBlank() } ?: return@FunctionTool missing("task")

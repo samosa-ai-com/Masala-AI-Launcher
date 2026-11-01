@@ -64,6 +64,19 @@ class ToolScopeTest {
         assertEquals(setOf("web_search", "memory_read"), scope.names)
     }
 
+    @Test fun unattendedHonorsAnExplicitExclusionList() {
+        val withSearch = all + listOf(
+            ToolInfo("search_skills", ToolSensitivity.READ_ONLY),
+            ToolInfo("sleep", ToolSensitivity.READ_ONLY),
+        )
+        val scope = ToolScope.unattended(ToolScope.skill(skill(), withSearch), withSearch, setOf("search_skills", "sleep"))
+        assertFalse(scope.allows("search_skills"))
+        assertFalse(scope.allows("sleep"))
+        assertTrue(scope.allows("web_search"))
+        // Without the exclusion, a read-only lookup stays available.
+        assertTrue(ToolScope.unattended(ToolScope.skill(skill(), withSearch), withSearch).allows("search_skills"))
+    }
+
     @Test fun unattendedLeavesOutToolsThatOpenAScreen() {
         val withScreens = all + ToolInfo("open_app", ToolSensitivity.READ_ONLY, opensScreen = true)
         val scope = ToolScope.unattended(ToolScope.skill(skill("set_alarm"), withScreens), withScreens)

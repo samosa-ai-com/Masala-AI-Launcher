@@ -104,6 +104,7 @@ object ScheduledTaskPlanner {
                 enabled = draft.enabled,
                 maxRetries = draft.maxRetries,
                 retryDelayMinutes = draft.retryDelayMinutes,
+                memoryNote = draft.memoryNote,
             ),
             now,
             zone,
