@@ -454,7 +454,7 @@ class SettingsActivity : ComponentActivity() {
         val base by masala.layouts.base.collectAsStateWithLifecycle()
         fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()
         val source = remember(snapshot) {
-            WidgetSource(snapshot = { snapshot }, store = masala.widgetStates, onAction = { toast(getString(R.string.widgets_preview_note)) })
+            WidgetSource(snapshot = { snapshot }, store = masala.widgetStates, onAction = { toast(getString(R.string.widgets_preview_note)) }, streams = masala.streamSources)
         }
         SettingsScaffold(stringResource(R.string.settings_widgets), onBack = onBack) {
             Button(onClick = { askInChat(getString(R.string.widgets_describe_prefill)) }) { Text(stringResource(R.string.widgets_describe)) }

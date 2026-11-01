@@ -101,6 +101,7 @@ private fun WidgetActions(result: SkillRunEvent.Result) {
             snapshot = { snapshot },
             store = app.widgetStates,
             onAction = { toast(previewNote) },
+            streams = app.streamSources,
         )
     }
     com.samosaai.masala.ui.home.widgets.WidgetCard(current, rows = null, source = source)

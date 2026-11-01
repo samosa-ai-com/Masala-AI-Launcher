@@ -32,7 +32,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.samosaai.masala.R
 import com.samosaai.masala.core.contract.Align
 import com.samosaai.masala.core.contract.ContextSnapshot
 import com.samosaai.masala.core.contract.Emphasis
@@ -46,6 +48,7 @@ import com.samosaai.masala.ui.home.WallpaperCard
 import com.samosaai.masala.ui.theme.MasalaTheme
 import com.samosaai.masala.ui.theme.OnWallpaper
 import com.samosaai.masala.widgets.WidgetStateStore
+import com.samosaai.masala.widgets.StreamSourceStore
 import java.time.Duration
 import java.time.LocalDateTime
 import kotlinx.coroutines.delay
@@ -60,6 +63,8 @@ data class WidgetSource(
     val store: WidgetStateStore,
     val onAction: (MasalaAction) -> Unit,
     val onLongPress: (() -> Unit)? = null,
+    /** Stream sources for video/snapshot; media without it keeps the W4 note. */
+    val streams: StreamSourceStore? = null,
 )
 
 /** One generated widget on home: a glass card with its components top to bottom. */
@@ -207,9 +212,21 @@ private fun Component(
                 component.children.forEach { child -> Component(child, widgetId, storage, snapshot, source, depth + 1) }
             }
         }
-        // Live media and web values arrive in W4/W5: a labelled line, never a crash or a blank card.
-        is WidgetComponent.Video -> MediaNote("Video · live on home in W4")
-        is WidgetComponent.Snapshot -> MediaNote("Snapshot · live on home in W4")
+        // Live media (W4): MJPEG and snapshots draw; player kinds follow with the player pool.
+        is WidgetComponent.Video -> {
+            val src = source.streams?.current()?.get(component.stream.sourceId)
+            when {
+                src == null -> MediaNote(stringResource(R.string.widgets_video_no_source))
+                src.kind == com.samosaai.masala.widgets.StreamKind.MJPEG ->
+                    com.samosaai.masala.widgets.media.MjpegImage(src.id, source.streams!!)
+                else -> MediaNote(stringResource(R.string.widgets_video_player_next))
+            }
+        }
+        is WidgetComponent.Snapshot -> {
+            val src = source.streams?.current()?.get(component.sourceId)
+            if (src == null || source.streams == null) MediaNote(stringResource(R.string.widgets_video_no_source))
+            else com.samosaai.masala.widgets.media.SnapshotImage(src.id, component.everySeconds, source.streams)
+        }
         is WidgetComponent.WebValue -> {
             Text(
                 component.label,

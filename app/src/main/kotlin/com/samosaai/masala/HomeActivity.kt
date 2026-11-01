@@ -455,7 +455,7 @@ class HomeActivity : ComponentActivity() {
         // Generated widgets (W1): one store for their stored values, shared by every card on home.
         val widgetStore = remember { app.widgetStates }
         val widgetSource = remember(snapshot) {
-            com.samosaai.masala.ui.home.widgets.WidgetSource(snapshot = { snapshot }, store = widgetStore, onAction = ::run)
+            com.samosaai.masala.ui.home.widgets.WidgetSource(snapshot = { snapshot }, store = widgetStore, onAction = ::run, streams = app.streamSources)
         }
         // The context below is remembered on purpose; drops read the live layout through these.
         val latestLayout = rememberUpdatedState(layout)

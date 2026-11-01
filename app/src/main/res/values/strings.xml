@@ -315,6 +315,12 @@
     <string name="widgets_describe_short">Describe…</string>
     <string name="widgets_manage">Manage</string>
     <string name="widgets_settings">Settings</string>
+    <string name="widgets_snapshot_loading">Loading picture…</string>
+    <string name="widgets_snapshot_failed">No picture yet</string>
+    <string name="widgets_snapshot_stale">Stale — retrying</string>
+    <string name="widgets_retry">Retry</string>
+    <string name="widgets_video_no_source">Video · add its source in Settings → Widgets → Cameras</string>
+    <string name="widgets_video_player_next">Video · live playback lands with the player next</string>
     <string name="result_widget_gone">That widget is gone from the library</string>
     <string name="settings_recording">Recording</string>
     <string name="settings_recording_summary">Meeting notes: 15-minute chunks in app storage</string>
