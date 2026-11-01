@@ -53,7 +53,7 @@ class CommandController(
         _state.value = state
         val turn = when (state) {
             is CommandState.Reply -> com.samosaai.masala.chat.ChatTurn(
-                com.samosaai.masala.chat.TurnRole.MASALA, state.text, state.steps,
+                com.samosaai.masala.chat.TurnRole.MASALA, state.text, state.steps, experts = state.experts,
             )
             is CommandState.Error -> com.samosaai.masala.chat.ChatTurn(
                 com.samosaai.masala.chat.TurnRole.ERROR, state.message,
@@ -237,14 +237,31 @@ class CommandController(
         }
         val agent = newAgent().also { it.restore(history) }
         val steps = mutableListOf<String>()
+        // Who answered, in order of first use; the badge on the reply and the stored turn.
+        val consulted = linkedMapOf<String, com.samosaai.masala.chat.ExpertCredit>()
         try {
             agent.run(ChatMessage("user", JsonPrimitive(prompt))).collect { event ->
                 when (event) {
                     is AgentEvent.ToolCall -> {
-                        steps += event.name
+                        val expert = consultCredit(event.name, event.args, skills())
+                        if (expert == null) {
+                            steps += event.name
+                        } else {
+                            consulted[expert.id] = expert
+                            steps += "Consulting ${expert.title}"
+                        }
                         _state.value = CommandState.Thinking(prompt, steps.toList())
                     }
-                    is AgentEvent.Done -> publish(CommandState.Reply(prompt, event.text.ifBlank { "Done." }, steps.toList(), chip, spoken))
+                    is AgentEvent.Done -> publish(
+                        CommandState.Reply(
+                            prompt,
+                            event.text.ifBlank { "Done." },
+                            steps.toList(),
+                            chip,
+                            spoken,
+                            experts = consulted.values.toList(),
+                        ),
+                    )
                     is AgentEvent.Failed -> publish(CommandState.Error(prompt, event.message))
                     is AgentEvent.NeedsCapability -> publish(CommandState.Error(prompt, event.reason, event.capability))
                     AgentEvent.StepLimit -> publish(CommandState.Error(prompt, "That took too many steps. Try asking in smaller pieces."))
@@ -269,4 +286,19 @@ class CommandController(
         is ActionDispatcher.Outcome.Failed -> CommandState.Error(prompt, outcome.message)
         is ActionDispatcher.Outcome.NeedsCapability -> CommandState.Error(prompt, outcome.reason, outcome.marker)
     }
+}
+
+/**
+ * The expert a tool call consulted, or null when the call isn't one. The title comes from the
+ * installed skill, so the thread names it the way the user knows it.
+ */
+internal fun consultCredit(
+    name: String,
+    args: kotlinx.serialization.json.JsonObject,
+    skills: List<MasalaSkill>,
+): com.samosaai.masala.chat.ExpertCredit? {
+    if (name != "consult_expert") return null
+    val id = (args["skill_id"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.takeIf { it.isNotBlank() } ?: return null
+    val title = skills.firstOrNull { it.id == id }?.title?.ifBlank { id } ?: id
+    return com.samosaai.masala.chat.ExpertCredit(id, title)
 }

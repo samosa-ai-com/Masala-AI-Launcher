@@ -317,4 +317,60 @@ class CommandControllerTest {
         c.dismiss()
         assertEquals(CommandState.Idle, c.state.value)
     }
+
+    @Test fun aConsultCallNamesTheExpertAndCreditsIt() = runBlocking<Unit> {
+        val args = kotlinx.serialization.json.buildJsonObject {
+            put("skill_id", JsonPrimitive("chef"))
+            put("question", JsonPrimitive("dinner"))
+        }
+        assertEquals(com.samosaai.masala.chat.ExpertCredit("chef", "Chef"), consultCredit("consult_expert", args, listOf(chef)))
+        // An id with no installed skill still names something rather than blank.
+        assertEquals(
+            com.samosaai.masala.chat.ExpertCredit("gone", "gone"),
+            consultCredit("consult_expert", kotlinx.serialization.json.buildJsonObject { put("skill_id", JsonPrimitive("gone")) }, listOf(chef)),
+        )
+        assertEquals(null, consultCredit("get_time", args, listOf(chef)))
+    }
+
+    @Test fun theReplyCarriesTheExpertItConsulted() = runBlocking<Unit> {
+        val scripts = ArrayDeque(
+            listOf(
+                ChatMessage(
+                    "assistant",
+                    JsonPrimitive(""),
+                    toolCalls = listOf(
+                        com.samosaai.masala.llm.ToolCall(
+                            "1",
+                            function = com.samosaai.masala.llm.FunctionCall(
+                                "consult_expert",
+                                """{"skill_id":"chef","question":"dinner"}""",
+                            ),
+                        ),
+                    ),
+                ),
+                reply("The chef suggests risotto."),
+            ),
+        )
+        val c = CommandController(
+            scope = scope,
+            resolveApp = { null },
+            names = { emptyList() },
+            run = { ActionDispatcher.Outcome.Done() },
+            skills = { listOf(chef) },
+            newAgent = {
+                MasalaAgent(
+                    AgentModel { _, _ -> scripts.removeFirst() },
+                    { _, _ -> ToolResult.Success("Chef: risotto.") },
+                    listOf(ToolDefinition("consult_expert", "", JsonObject(emptyMap()))),
+                    ToolScope.command(listOf(ToolInfo("consult_expert", ToolSensitivity.READ_ONLY, readsPrivateData = true))),
+                    { "system" },
+                )
+            },
+        )
+        c.ask("risotto idea")
+        val settled = assertIs<CommandState.Reply>(c.settled())
+        assertEquals("The chef suggests risotto.", settled.text)
+        assertEquals(listOf(com.samosaai.masala.chat.ExpertCredit("chef", "Chef")), settled.experts)
+        assertTrue(settled.steps.contains("Consulting Chef"))
+    }
 }

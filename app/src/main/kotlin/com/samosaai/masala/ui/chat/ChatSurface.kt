@@ -376,6 +376,9 @@ private fun Thread(
     }
 }
 
+/** Beyond this the badges would wrap under the text; the steps above still name every expert. */
+private const val MAX_EXPERT_BADGES = 3
+
 @Composable
 private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1, onDelete: (() -> Unit)? = null) {
     var menu by remember { mutableStateOf(false) }
@@ -435,6 +438,25 @@ private fun Bubble(turn: ChatTurn, live: Boolean = false, key: Int = -1, onDelet
                 )
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
+            if (turn.experts.isNotEmpty() && !user) {
+                // Who answered: the expert's name above the text, so scrolling back stays clear.
+                Row(
+                    Modifier.padding(bottom = 7.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    turn.experts.take(MAX_EXPERT_BADGES).forEach { expert ->
+                        Text(
+                            expert.title,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MasalaColors.Gold,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(MasalaColors.Gold.copy(alpha = 0.14f))
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+            }
             Text(
                 turn.text,
                 style = MaterialTheme.typography.bodyMedium,
