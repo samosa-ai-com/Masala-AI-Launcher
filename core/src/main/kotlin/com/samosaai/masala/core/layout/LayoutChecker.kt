@@ -70,8 +70,10 @@ object LayoutChecker {
     const val MAX_COLUMNS = 6
     const val MAX_WIDGETS_IN_STACK = 8
     const val MAX_HTML_PER_PAGE = 2
-    /** Widget rows on one page (widget sections, tallest of each stack, HTML): home stays one screenful. */
+    /** Declared widget rows on one page (refs, overrides, inline defaults, HTML rows). */
     const val MAX_WIDGET_ROWS_PER_PAGE = 8
+    /** Rendered rows on one page, for placement routing (header, grids, drawn widgets, HTML). */
+    const val MAX_PAGE_ROWS = 12
     const val MAX_ROWS = 8
     const val MAX_FOLDER_ITEMS = 16
     const val MAX_FOLDER_LABEL = 60
@@ -118,9 +120,11 @@ object LayoutChecker {
             if (page.sections.filterIsInstance<HtmlSection>().size > MAX_HTML_PER_PAGE) {
                 problems += Problem("$pagePath.sections", "At most $MAX_HTML_PER_PAGE HTML widgets on a page")
             }
-            // Widgets share one screenful per page; the rest belong on another page.
-            val widgetSizes = env.widgets?.mapValues { it.value.size.default }.orEmpty()
-            if (LayoutEdits.widgetRowsUsedSections(page.sections, widgetSizes) > MAX_WIDGET_ROWS_PER_PAGE) {
+            // A page holds at most eight declared widget rows: the author's height intent stays
+            // coherent. Items are never counted, so existing grids keep editing. Rendered fit is
+            // the placer's job (estimates, overflow), since cards draw taller than their rows.
+            val sizes = env.widgets?.mapValues { it.value.size.default }.orEmpty()
+            if (LayoutEdits.declaredWidgetRows(page.sections, sizes) > MAX_WIDGET_ROWS_PER_PAGE) {
                 problems += Problem("$pagePath.sections", "At most $MAX_WIDGET_ROWS_PER_PAGE widget rows on a page")
             }
             page.sections.forEachIndexed { s, section ->

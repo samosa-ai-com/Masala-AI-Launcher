@@ -251,8 +251,8 @@ class LayoutRepository(
         rowsOverride: Int? = null,
         pageId: String? = null,
     ): PlaceResult {
-        val sizes = widgets.current().mapValues { it.value.size.default }
-        val problems = edit(label) { LayoutEdits.placeWidget(it, widgetId, rowsOverride, pageId, sizes)?.doc }
+        val specs = widgets.current()
+        val problems = edit(label) { LayoutEdits.placeWidget(it, widgetId, rowsOverride, pageId, specs)?.doc }
         if (problems.isNotEmpty()) return PlaceResult(problems, null)
         val at = widgetPlacements(widgetId).lastOrNull()?.pageId
         return PlaceResult(emptyList(), at)
@@ -274,8 +274,8 @@ class LayoutRepository(
 
     /** Shows a mini app on home at widget size, with the same one-screenful overflow as widgets. */
     suspend fun placeHtml(label: String, appId: String, rows: Int = 2, pageId: String? = null): PlaceResult {
-        val sizes = widgets.current().mapValues { it.value.size.default }
-        val problems = edit(label) { LayoutEdits.placeHtml(it, appId, rows, pageId, sizes)?.doc }
+        val specs = widgets.current()
+        val problems = edit(label) { LayoutEdits.placeHtml(it, appId, rows, pageId, specs)?.doc }
         if (problems.isNotEmpty()) return PlaceResult(problems, null)
         val at = htmlPlacements(appId).lastOrNull()?.pageId
         return PlaceResult(emptyList(), at)

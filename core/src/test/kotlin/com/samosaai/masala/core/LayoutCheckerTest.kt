@@ -234,9 +234,10 @@ class LayoutCheckerTest {
     }
 
     @Test
-    fun `a page holds at most eight widget rows`() {
+    fun `a page holds at most eight declared widget rows`() {
         fun widget(sectionId: String, id: String, default: Int) = com.samosaai.masala.core.contract.WidgetSection(
-            sectionId, com.samosaai.masala.core.contract.WidgetSpec(id, components = listOf(com.samosaai.masala.core.contract.WidgetComponent.Text("x")), size = com.samosaai.masala.core.contract.SizeRange(1, default, 8)),
+            sectionId,
+            com.samosaai.masala.core.contract.WidgetSpec(id, components = listOf(com.samosaai.masala.core.contract.WidgetComponent.Text("x")), size = com.samosaai.masala.core.contract.SizeRange(1, default, 8)),
         )
         val full = layout(widget("sa", "a", 4), widget("sb", "b", 4))
         assertEquals(emptyList(), LayoutChecker.check(full, env))

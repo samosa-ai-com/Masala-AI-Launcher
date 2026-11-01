@@ -1,17 +1,24 @@
 package com.samosaai.masala.core.layout
 
 import com.samosaai.masala.core.contract.DockSection
+import com.samosaai.masala.core.contract.GridSection
+import com.samosaai.masala.core.contract.GroupSection
+import com.samosaai.masala.core.contract.HeaderSection
 import com.samosaai.masala.core.contract.HtmlSection
 import com.samosaai.masala.core.contract.IconRef
 import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.ItemSection
 import com.samosaai.masala.core.contract.LayoutDoc
+import com.samosaai.masala.core.contract.ListSection
 import com.samosaai.masala.core.contract.MasalaAction
 import com.samosaai.masala.core.contract.Page
 import com.samosaai.masala.core.contract.Section
+import com.samosaai.masala.core.contract.SkillWidgetSection
 import com.samosaai.masala.core.contract.StackSection
+import com.samosaai.masala.core.contract.WidgetComponent
 import com.samosaai.masala.core.contract.WidgetRef
 import com.samosaai.masala.core.contract.WidgetSection
+import com.samosaai.masala.core.contract.WidgetSpec
 
 /** User edits to a base layout by item id (home drag and drop). Each returns null when it can't apply. */
 object LayoutEdits {
@@ -206,28 +213,78 @@ object LayoutEdits {
     /** What placing found: the new document, and where the section landed. */
     data class Placed(val doc: LayoutDoc, val pageId: String, val sectionId: String)
 
-    /** Widget rows already on [pageId]: widget sections, the tallest of each stack, HTML widgets. */
-    fun widgetRowsUsed(doc: LayoutDoc, pageId: String, sizes: Map<String, Int> = emptyMap()): Int {
+    /** Widget rows already on [pageId]: header, item grids, widgets at rendered size, HTML, skills. */
+    fun widgetRowsUsed(doc: LayoutDoc, pageId: String, sizes: Map<String, WidgetSpec> = emptyMap()): Int {
         val page = doc.pages.firstOrNull { it.id == pageId } ?: return 0
-        return widgetRowsUsedSections(page.sections, sizes)
+        return page.sections.sumOf { estimateSectionRows(it, sizes) }
     }
 
-    /** The same count over bare sections, for the checker (plan widget-maker §6.1 budget). */
-    fun widgetRowsUsedSections(sections: List<Section>, sizes: Map<String, Int> = emptyMap()): Int =
+    /**
+     * A section's rendered height in rows (48 dp units). Widgets count what they draw — title,
+     * components, padding, at least their default rows — because cards grow past their minimum;
+     * grids count title plus two rows per item row; the header counts clock and date; the dock is
+     * pinned and costs nothing.
+     */
+    fun estimateSectionRows(section: Section, specs: Map<String, WidgetSpec> = emptyMap()): Int =
+        when (section) {
+            is WidgetSection -> section.ref?.let { ref ->
+                val spec = specs[ref.widgetId]
+                if (spec == null) ref.rowsOverride ?: 2
+                else maxOf(estimateWidgetRows(spec), ref.rowsOverride ?: spec.size.default)
+            } ?: section.widget?.let { maxOf(estimateWidgetRows(it), it.size.default) } ?: 2
+            is StackSection -> {
+                val inline = section.widgets.maxOfOrNull { maxOf(estimateWidgetRows(it), it.size.default) } ?: 0
+                val refs = section.refs.maxOfOrNull { ref ->
+                    val spec = specs[ref.widgetId]
+                    if (spec == null) ref.rowsOverride ?: 2
+                    else maxOf(estimateWidgetRows(spec), ref.rowsOverride ?: spec.size.default)
+                } ?: 0
+                maxOf(inline, refs)
+            }
+            is HtmlSection -> section.rows
+            is SkillWidgetSection -> 4
+            is HeaderSection -> (if (section.showClock) 3 else 0) + (if (section.showDate) 1 else 0)
+            is GridSection -> (if (section.title != null) 1 else 0) + ((section.items.size + section.columns - 1) / section.columns) * 2
+            is ListSection -> (if (section.title != null) 1 else 0) + section.items.size
+            is GroupSection -> 1
+            is DockSection -> 0
+        }
+
+    /** Declared widget rows for the checker: overrides and defaults, the author's height intent. */
+    fun declaredWidgetRows(sections: List<Section>, sizes: Map<String, Int> = emptyMap()): Int =
         sections.sumOf { section ->
             when (section) {
                 is WidgetSection -> section.ref?.let { it.rowsOverride ?: sizes[it.widgetId] ?: 2 }
                     ?: section.widget?.size?.default ?: 2
-                is StackSection -> stackHeight(section, sizes)
+                is StackSection -> maxOf(
+                    section.widgets.maxOfOrNull { it.size.default } ?: 0,
+                    section.refs.maxOfOrNull { it.rowsOverride ?: sizes[it.widgetId] ?: 2 } ?: 0,
+                )
                 is HtmlSection -> section.rows
                 else -> 0
             }
         }
 
-    private fun stackHeight(section: StackSection, sizes: Map<String, Int>): Int {
-        val inline = section.widgets.maxOfOrNull { it.size.default } ?: 0
-        val refs = section.refs.maxOfOrNull { it.rowsOverride ?: sizes[it.widgetId] ?: 2 } ?: 0
-        return maxOf(inline, refs)
+    /** What a widget draws: title, components, card padding — never less than its default rows. */
+    fun estimateWidgetRows(spec: WidgetSpec, rowsOverride: Int? = null): Int {        fun component(component: WidgetComponent): Int = when (component) {
+            is WidgetComponent.Text -> 1
+            is WidgetComponent.Counter -> 2
+            is WidgetComponent.Checklist -> component.items.size + 1
+            is WidgetComponent.Timer -> 1
+            is WidgetComponent.Progress -> 2
+            is WidgetComponent.Chart -> 2
+            is WidgetComponent.Button -> 1
+            is WidgetComponent.Image -> 2
+            is WidgetComponent.ListRows -> 3
+            is WidgetComponent.Gauge -> 2
+            is WidgetComponent.Row -> component.children.maxOfOrNull(::component) ?: 0
+            is WidgetComponent.Column -> component.children.sumOf(::component)
+            is WidgetComponent.Video -> 4
+            is WidgetComponent.Snapshot -> 3
+            is WidgetComponent.WebValue -> 2
+        }
+        val content = (if (spec.title != null) 1 else 0) + spec.components.sumOf(::component) + 1
+        return maxOf(content, rowsOverride ?: spec.size.default)
     }
 
     /** A fresh overflow page: "Home 2", "Home 3"… beside home pages, "Page N" anywhere else. */
@@ -257,27 +314,27 @@ object LayoutEdits {
         }
 
     /**
-     * Puts [widgetId] on home as a new [WidgetSection] holding a ref: the requested page when it
-     * has room, else the first page that does, else a new page. A page holds at most
-     * [LayoutChecker.MAX_WIDGET_ROWS_PER_PAGE] widget rows, so home stays one screenful and extra
-     * widgets open a new home screen instead of stretching the scroll. Null when the id is blank
-     * or the requested page isn't there. [sizes] maps library ids to their default rows.
+     * Puts [widgetId] on home as a new [WidgetSection] holding a ref: the requested page when the
+     * rendered content still fits one screenful, else the first page that does, else a new page.
+     * Null when the id is blank or the requested page isn't there. [specs] is the widget library,
+     * for rendered heights.
      */
     fun placeWidget(
         doc: LayoutDoc,
         widgetId: String,
         rowsOverride: Int? = null,
         pageId: String? = null,
-        sizes: Map<String, Int> = emptyMap(),
+        specs: Map<String, WidgetSpec> = emptyMap(),
     ): Placed? {
         if (widgetId.isBlank() || doc.pages.isEmpty()) return null
-        val height = rowsOverride ?: sizes[widgetId] ?: 2
+        val spec = specs[widgetId]
+        val height = if (spec == null) rowsOverride ?: 2 else estimateWidgetRows(spec, rowsOverride)
         val target = pageId?.let { id -> doc.pages.firstOrNull { it.id == id } } ?: doc.pages.first()
         if (pageId != null && doc.pages.none { it.id == pageId }) return null
-        val page = if (widgetRowsUsed(doc, target.id, sizes) + height <= LayoutChecker.MAX_WIDGET_ROWS_PER_PAGE) {
+        val page = if (widgetRowsUsed(doc, target.id, specs) + height <= LayoutChecker.MAX_PAGE_ROWS) {
             target
         } else {
-            doc.pages.firstOrNull { widgetRowsUsed(doc, it.id, sizes) + height <= LayoutChecker.MAX_WIDGET_ROWS_PER_PAGE }
+            doc.pages.firstOrNull { widgetRowsUsed(doc, it.id, specs) + height <= LayoutChecker.MAX_PAGE_ROWS }
         }
         var next = doc
         val at = if (page != null) {
@@ -385,15 +442,15 @@ object LayoutEdits {
         appId: String,
         rows: Int = 2,
         pageId: String? = null,
-        sizes: Map<String, Int> = emptyMap(),
+        specs: Map<String, WidgetSpec> = emptyMap(),
     ): Placed? {
         if (appId.isBlank() || doc.pages.isEmpty()) return null
         val target = pageId?.let { id -> doc.pages.firstOrNull { it.id == id } } ?: doc.pages.first()
         if (pageId != null && doc.pages.none { it.id == pageId }) return null
-        val page = if (widgetRowsUsed(doc, target.id, sizes) + rows <= LayoutChecker.MAX_WIDGET_ROWS_PER_PAGE) {
+        val page = if (widgetRowsUsed(doc, target.id, specs) + rows <= LayoutChecker.MAX_PAGE_ROWS) {
             target
         } else {
-            doc.pages.firstOrNull { widgetRowsUsed(doc, it.id, sizes) + rows <= LayoutChecker.MAX_WIDGET_ROWS_PER_PAGE }
+            doc.pages.firstOrNull { widgetRowsUsed(doc, it.id, specs) + rows <= LayoutChecker.MAX_PAGE_ROWS }
         }
         var next = doc
         val at = if (page != null) {
