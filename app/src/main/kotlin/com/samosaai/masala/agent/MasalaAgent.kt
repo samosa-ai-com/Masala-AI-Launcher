@@ -108,8 +108,10 @@ class MasalaAgent(
                     emit(AgentEvent.ToolDone(name, result))
                     if (result is ToolResult.Success) result.results().takeIf { it.isNotEmpty() }?.let { emit(AgentEvent.Results(it)) }
                     if (result is ToolResult.NeedsCapability) {
-                        messages = AgentHistory.repairOrphanedToolCalls(messages)
-                        return@flow emit(AgentEvent.NeedsCapability(result.capability, result.reason))
+                        // A missing permission is one failed step, not the end of the turn: the
+                        // host shows the grant, and the model finishes around it instead of
+                        // leaving the user with an error and no answer.
+                        emit(AgentEvent.NeedsCapability(result.capability, result.reason))
                     }
                 }
             }
@@ -131,8 +133,17 @@ class MasalaAgent(
         return FetchAllowance.allows(url, all.filter { it.role == "tool" && it.toolCallId in searchCalls }.map { it.textContent })
     }
 
-    private fun toolMessage(callId: String, result: ToolResult) =
-        ChatMessage("tool", JsonPrimitive(result.asText()), toolCallId = callId)
+    private fun toolMessage(callId: String, result: ToolResult): ChatMessage {
+        val text = when (result) {
+            // Tell the model plainly to stop trying and say what is missing, as a sub-agent's
+            // parent expects one clear report rather than a retry loop.
+            is ToolResult.NeedsCapability ->
+                "Not run: ${result.reason} This needs ${result.capability} from the user, which is not granted. " +
+                    "Do not call it again. Finish your answer and say what they have to grant."
+            else -> result.asText()
+        }
+        return ChatMessage("tool", JsonPrimitive(text), toolCallId = callId)
+    }
 
     companion object {
         /** A request that needs many steps (search, read, edit, verify) must not stop early. */

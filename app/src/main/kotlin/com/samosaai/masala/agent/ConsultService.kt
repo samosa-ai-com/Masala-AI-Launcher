@@ -83,6 +83,7 @@ class ConsultService(
 
             var answer: String? = null
             var failure: String? = null
+            var missingAccess: String? = null
             try {
                 val finished = withTimeoutOrNull(timeoutMs) {
                     agent.run(ChatMessage("user", JsonPrimitive(asked))).collect { event ->
@@ -90,7 +91,8 @@ class ConsultService(
                             is AgentEvent.Done -> answer = event.text.ifBlank { null }
                             is AgentEvent.Failed -> failure = event.message
                             AgentEvent.StepLimit -> failure = "It took too many steps."
-                            is AgentEvent.NeedsCapability -> failure = "It needs ${event.capability}: ${event.reason}"
+                            // Not fatal: the expert finishes around it, and the gap is reported.
+                            is AgentEvent.NeedsCapability -> missingAccess = event.capability
                             else -> Unit
                         }
                     }
@@ -115,12 +117,15 @@ class ConsultService(
             val saved = sessions.append(chatId, session.id, turns)
                 ?: return Outcome.Refused("$title answered, but the consult couldn't be saved. Don't retry; answer from what you know.")
 
-            if (text == null) return Outcome.Refused("$title couldn't answer: $reason")
+            if (text == null) {
+                val why = missingAccess?.let { "it needs $it, which isn't granted" } ?: reason
+                return Outcome.Refused("$title couldn't answer: $why")
+            }
             return Outcome.Answered(
                 session = saved,
                 exchange = saved.exchanges,
                 answer = text,
-                text = render(saved, text, title, expert.persona?.disclaimer),
+                text = render(saved, text, title, expert.persona?.disclaimer, missingAccess),
             )
         } finally {
             busy.remove(key)
@@ -131,7 +136,13 @@ class ConsultService(
      * What the main agent reads: where the answer came from, the answer, and the ids it needs to
      * come back — including after its own history was compacted.
      */
-    private suspend fun render(session: ConsultSession, answer: String, title: String, disclaimer: String?): String {
+    private suspend fun render(
+        session: ConsultSession,
+        answer: String,
+        title: String,
+        disclaimer: String?,
+        missingAccess: String?,
+    ): String {
         val earlier = session.pairs().dropLast(1)
         val recap = if (earlier.isEmpty()) "" else buildString {
             appendLine("Earlier in this consult:")
@@ -153,6 +164,10 @@ class ConsultService(
             if (!disclaimer.isNullOrBlank()) {
                 appendLine()
                 appendLine("Disclaimer to pass on: ${disclaimer.trim()}")
+            }
+            if (!missingAccess.isNullOrBlank()) {
+                appendLine()
+                appendLine("A step needed $missingAccess, which is not granted. Mention it only if it changes your answer.")
             }
             if (recap.isNotBlank()) {
                 appendLine()

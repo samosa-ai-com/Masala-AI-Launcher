@@ -346,6 +346,7 @@
 
     <!-- Phase 4 -->
     <string name="command_grant">Grant</string>
+    <string name="chat_needs_access">One step needed access this phone hasn’t granted yet.</string>
     <string name="command_try_again">Try again</string>
     <string name="capability_retry_prompt">I’ve granted it. Please try again.</string>
     <string name="jobs_channel">Background jobs</string>

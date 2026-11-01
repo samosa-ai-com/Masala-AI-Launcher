@@ -234,6 +234,8 @@ class CommandController(
         val steps = mutableListOf<String>()
         // Who answered, in order of first use; the badge on the reply and the stored turn.
         val consulted = linkedMapOf<String, com.samosaai.masala.chat.ExpertCredit>()
+        // Access a step asked for and did not have: the answer still comes, plus a Grant row.
+        val missingAccess = linkedSetOf<String>()
         try {
             agent.run(ChatMessage("user", JsonPrimitive(prompt))).collect { event ->
                 when (event) {
@@ -254,10 +256,12 @@ class CommandController(
                             steps.toList(),
                             spoken = spoken,
                             experts = consulted.values.toList(),
+                            capabilities = missingAccess.toList(),
                         ),
                     )
                     is AgentEvent.Failed -> publish(CommandState.Error(prompt, event.message))
-                    is AgentEvent.NeedsCapability -> publish(CommandState.Error(prompt, event.reason, event.capability))
+                    // Recorded, not fatal: the model keeps going and finishes around the gap.
+                    is AgentEvent.NeedsCapability -> missingAccess += event.capability
                     AgentEvent.StepLimit -> publish(CommandState.Error(prompt, "That took too many steps. Try asking in smaller pieces."))
                     else -> Unit
                 }

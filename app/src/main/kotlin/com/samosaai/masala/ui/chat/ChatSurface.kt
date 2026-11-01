@@ -49,6 +49,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -114,9 +115,13 @@ fun ChatSurface(
     /** The installed experts, offered in an empty thread and from the header. */
     experts: List<ExpertCredit> = emptyList(),
     onAskExpert: (ExpertCredit) -> Unit = {},
+    /** Asked after a missing access was granted, so the step can run again. */
+    onRetry: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val tokens = MasalaTheme.tokens
+    // A step that lacked access still gets its answer; this is how the user fixes it afterwards.
+    val grant = com.samosaai.masala.ui.components.rememberCapabilityGrant { granted -> if (granted) onRetry() }
     val listening = state == CommandState.Listening
     val thinking = state is CommandState.Thinking
     val turns = session?.turns.orEmpty()
@@ -170,7 +175,12 @@ fun ChatSurface(
                             },
                         )
                         turns.isEmpty() && !listening && !thinking -> EmptyThread(level, character, experts, onAskExpert)
-                        else -> Thread(turns, liveWords, listening, thinking, state, character, level, onStop, onDeleteTurn, onCollapse = { onExpanded(false) })
+                        else -> Thread(
+                            turns, liveWords, listening, thinking, state, character, level, onStop, onDeleteTurn,
+                            onCollapse = { onExpanded(false) },
+                            onGrant = grant,
+                            onRetry = onRetry,
+                        )
                     }
                 }
                 Controls(listening, mic, level, onSend, onClose)
@@ -365,6 +375,8 @@ private fun Thread(
     onStop: () -> Unit,
     onDeleteTurn: (Int) -> Unit,
     onCollapse: () -> Unit,
+    onGrant: (String) -> Unit,
+    onRetry: () -> Unit,
 ) {
     val list = rememberLazyListState()
     LaunchedEffect(turns.size, liveWords, thinking, (state as? CommandState.Thinking)?.steps?.size) {
@@ -428,7 +440,27 @@ private fun Thread(
                 StepTimeline(steps = (state as? CommandState.Thinking)?.steps.orEmpty(), onStop = onStop)
             }
         }
+        val answered = state as? CommandState.Reply
+        if (answered != null && answered.capabilities.isNotEmpty()) {
+            item("access") { AccessRow(answered.capabilities.first(), onGrant, onRetry) }
+        }
         item("tail") { Spacer(Modifier.height(6.dp)) }
+    }
+}
+
+/** The answer came without a step that needed access; offer the grant, then the retry. */
+@Composable
+private fun AccessRow(capability: String, onGrant: (String) -> Unit, onRetry: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp)) {
+        Text(
+            stringResource(R.string.chat_needs_access),
+            style = MaterialTheme.typography.bodySmall,
+            color = MasalaTheme.tokens.textMedium,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TextButton(onClick = { onGrant(capability) }) { Text(stringResource(R.string.command_grant)) }
+            TextButton(onClick = onRetry) { Text(stringResource(R.string.command_try_again)) }
+        }
     }
 }
 

@@ -5,7 +5,13 @@ import com.samosaai.masala.chat.TurnRole
 import com.samosaai.masala.core.agent.ToolScope
 import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.core.contract.Persona
+import com.samosaai.masala.core.agent.ToolInfo
+import com.samosaai.masala.core.tool.ToolDefinition
 import com.samosaai.masala.core.tool.ToolResult
+import com.samosaai.masala.core.tool.ToolSensitivity
+import com.samosaai.masala.llm.FunctionCall
+import com.samosaai.masala.llm.ToolCall
+import kotlinx.serialization.json.JsonObject
 import com.samosaai.masala.llm.ChatMessage
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -159,6 +165,44 @@ class ConsultServiceTest {
         // With the full id it is refused rather than silently continuing past the cap.
         val refused = service.consult("chat-1", "doctor", "one more", consulted.session.id)
         assertTrue(refused is ConsultService.Outcome.Refused)
+    }
+
+    @Test
+    fun aMissingPermissionDoesNotStopTheExpertAnswering() = runBlocking<Unit> {
+        var request = 0
+        val model = AgentModel { _, _ ->
+            request += 1
+            if (request == 1) {
+                ChatMessage(
+                    "assistant",
+                    JsonPrimitive(""),
+                    toolCalls = listOf(ToolCall("1", function = FunctionCall("health", "{}"))),
+                )
+            } else {
+                ChatMessage("assistant", JsonPrimitive("I can't read your steps without Health Connect access."))
+            }
+        }
+        val service = ConsultService(
+            sessions = ConsultSessions(tmp.root),
+            skill = { doctor },
+            agentFor = {
+                MasalaAgent(
+                    model = model,
+                    tools = AgentToolRunner { _, _ ->
+                        ToolResult.NeedsCapability("special:health_connect", "Health Connect access")
+                    },
+                    definitions = listOf(ToolDefinition("health", "", JsonObject(emptyMap()))),
+                    scope = ToolScope.command(listOf(ToolInfo("health", ToolSensitivity.READ_ONLY))),
+                    systemPrompt = { "s" },
+                    maxSteps = 4,
+                )
+            },
+        )
+        val answered = service.consult("chat-1", "doctor", "how many steps did I take", null)
+            as ConsultService.Outcome.Answered
+        // The expert finished around the missing access instead of the turn failing.
+        assertTrue(answered.answer.contains("without Health Connect access"))
+        assertTrue(answered.text.contains("special:health_connect"))
     }
 
     @Test

@@ -15,6 +15,8 @@ sealed interface CommandState {
         val spoken: Boolean = false,
         /** The experts whose answers shaped this reply, for the badges on it. */
         val experts: List<com.samosaai.masala.chat.ExpertCredit> = emptyList(),
+        /** Access a step needed but could not use, for the Grant affordance under the answer. */
+        val capabilities: List<String> = emptyList(),
     ) : CommandState
     /** [capability] is the marker of a permission or special access that would fix it, for a Grant button. */
     data class Error(val prompt: String, val message: String, val capability: String? = null) : CommandState
