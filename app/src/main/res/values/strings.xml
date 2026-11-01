@@ -293,6 +293,8 @@
     <string name="widgets_filter">Filter widgets</string>
     <string name="widgets_describe">Describe a widget…</string>
     <string name="widgets_describe_prefill">"I want a home-screen widget that "</string>
+    <string name="widgets_edit_prefill">"Change the '%1$s' widget so that "</string>
+    <string name="widgets_versions_empty">No earlier versions yet. Each chat edit saves a new one.</string>
     <string name="widgets_customize">Customize…</string>
     <string name="widgets_customize_prefill">"I want a home-screen widget like the '%1$s' template, but "</string>
     <string name="widgets_add_to_home">Add to home</string>

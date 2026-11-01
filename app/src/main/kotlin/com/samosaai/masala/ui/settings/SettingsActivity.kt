@@ -2,10 +2,8 @@ package com.samosaai.masala.ui.settings
 
 import com.samosaai.masala.ui.theme.MasalaColors
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
@@ -462,8 +460,11 @@ class SettingsActivity : ComponentActivity() {
         }
         SettingsScaffold(stringResource(R.string.settings_widgets), onBack = onBack) {
             Button(onClick = { askInChat(getString(R.string.widgets_describe_prefill)) }) { Text(stringResource(R.string.widgets_describe)) }
-            var editSpec by remember { mutableStateOf<com.samosaai.masala.core.contract.WidgetSpec?>(null) }
-            editSpec?.let { WidgetEditDialog(it, onClose = { editSpec = null }) }
+            var versionsId by remember { mutableStateOf<String?>(null) }
+            versionsId?.let { id ->
+                val title = entries.firstOrNull { it.spec.id == id }?.spec?.title ?: id
+                WidgetVersionsDialog(id, title, onClose = { versionsId = null })
+            }
             var tab by rememberSaveable { mutableStateOf(0) }
             val tabs = listOf(stringResource(R.string.widgets_mine), stringResource(R.string.widgets_templates), stringResource(R.string.widgets_cameras), stringResource(R.string.widgets_html))
             androidx.compose.material3.ScrollableTabRow(selectedTabIndex = tab, edgePadding = 0.dp) {
@@ -536,7 +537,10 @@ class SettingsActivity : ComponentActivity() {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp),
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    ) {
                         if (placements.isEmpty()) {
                             TextButton(onClick = {
                                 scope.launch {
@@ -554,7 +558,10 @@ class SettingsActivity : ComponentActivity() {
                             }) { Text(stringResource(R.string.widgets_add_to_home)) }
                         }
                         if (mine) {
-                            TextButton(onClick = { editSpec = spec }) { Text(stringResource(R.string.widgets_edit)) }
+                            TextButton(onClick = {
+                                askInChat(getString(R.string.widgets_edit_prefill, spec.title ?: spec.id))
+                            }) { Text(stringResource(R.string.widgets_edit)) }
+                            TextButton(onClick = { versionsId = spec.id }) { Text(stringResource(R.string.widgets_versions)) }
                             TextButton(onClick = {
                                 scope.launch {
                                     val known = masala.widgetLibrary.current().keys
@@ -782,47 +789,29 @@ class SettingsActivity : ComponentActivity() {
     }
 
     /**
-     * Edits one library widget: title plus the raw spec JSON, checker problems inline, and the last
-     * versions to restore. The id never changes, so storage, taps and home refs carry over.
+     * Earlier saves of one library widget, without JSON: restoring puts one back as the newest
+     * version. The id never changes, so storage, taps and home refs carry over.
      */
     @Composable
-    private fun WidgetEditDialog(spec: com.samosaai.masala.core.contract.WidgetSpec, onClose: () -> Unit) {
+    private fun WidgetVersionsDialog(specId: String, specTitle: String, onClose: () -> Unit) {
         val scope = rememberCoroutineScope()
         fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()
-        var title by rememberSaveable(spec.id) { mutableStateOf(spec.title.orEmpty()) }
-        var json by rememberSaveable(spec.id) {
-            mutableStateOf(com.samosaai.masala.core.contract.MasalaJson.strict.encodeToString(com.samosaai.masala.core.contract.WidgetSpec.serializer(), spec))
-        }
-        var versions by remember(spec.id) { mutableStateOf<List<com.samosaai.masala.core.contract.WidgetSpec>?>(null) }
-        androidx.compose.runtime.LaunchedEffect(spec.id) { versions = masala.widgetLibrary.history(spec.id) }
-        var env by remember(spec.id) { mutableStateOf<com.samosaai.masala.core.layout.LayoutChecker.Environment?>(null) }
-        androidx.compose.runtime.LaunchedEffect(spec.id) { env = masala.layouts.environment() }
-        val parsed = remember(json) {
-            runCatching { com.samosaai.masala.core.contract.MasalaJson.strict.decodeFromString(com.samosaai.masala.core.contract.WidgetSpec.serializer(), json) }.getOrNull()
-        }
-        val problems = remember(parsed, title, env) {
-            val environment = env
-            when {
-                parsed == null -> listOf(com.samosaai.masala.core.layout.LayoutChecker.Problem("$", "Not valid JSON"))
-                parsed.id != spec.id -> listOf(com.samosaai.masala.core.layout.LayoutChecker.Problem("$.id", "The id stays '${spec.id}' so refs keep working"))
-                environment == null -> emptyList()
-                else -> com.samosaai.masala.core.widgets.WidgetChecker.check(parsed.copy(title = title.ifBlank { null }), environment)
-            }
-        }
+        var versions by remember(specId) { mutableStateOf<List<com.samosaai.masala.core.contract.WidgetSpec>?>(null) }
+        androidx.compose.runtime.LaunchedEffect(specId) { versions = masala.widgetLibrary.history(specId) }
         AlertDialog(
             onDismissRequest = onClose,
-            title = { Text(stringResource(R.string.widgets_edit) + " · ${spec.id}") },
+            title = { Text(stringResource(R.string.widgets_versions) + " · $specTitle") },
             text = {
-                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(title, { title = it }, Modifier.fillMaxWidth(), singleLine = true)
-                    OutlinedTextField(
-                        json, { json = it }, Modifier.fillMaxWidth().heightIn(min = 160.dp),
-                        textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    )
-                    problems.forEach { problem ->
-                        Text("${problem.path}: ${problem.message}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                    }
-                    versions?.takeIf { it.size > 1 }?.let { older ->
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val older = versions
+                    if (older == null) {
+                        Text("…", style = MaterialTheme.typography.bodyMedium)
+                    } else if (older.size <= 1) {
+                        Text(
+                            stringResource(R.string.widgets_versions_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    } else {
                         Text(
                             stringResource(R.string.widgets_versions) + " (${older.size})",
                             style = MaterialTheme.typography.labelLarge,
@@ -830,7 +819,7 @@ class SettingsActivity : ComponentActivity() {
                         older.drop(1).forEachIndexed { i, old ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    (stringResource(R.string.widgets_versions) + " ${older.size - i - 1}").take(40),
+                                    stringResource(R.string.widgets_versions) + " ${older.size - i - 1}",
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.weight(1f),
                                 )
@@ -846,17 +835,7 @@ class SettingsActivity : ComponentActivity() {
                     }
                 }
             },
-            confirmButton = {
-                TextButton(
-                    enabled = problems.isEmpty() && parsed != null,
-                    onClick = {
-                        scope.launch {
-                            masala.widgetLibrary.save(parsed!!.copy(title = title.ifBlank { null }))
-                            onClose()
-                        }
-                    },
-                ) { Text(stringResource(R.string.widgets_save)) }
-            },
+            confirmButton = {},
             dismissButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.action_back)) } },
         )
     }
