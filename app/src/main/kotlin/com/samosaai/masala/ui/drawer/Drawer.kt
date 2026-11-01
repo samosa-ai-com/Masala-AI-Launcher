@@ -592,20 +592,21 @@ internal fun Scrubber(letters: List<Char>, modifier: Modifier = Modifier, onLett
         Column(
             Modifier.weight(0.7f).fillMaxWidth()
                 .onGloballyPositioned { heightPx = it.size.height.coerceAtLeast(1) }
-                // A disc behind the curve, following the finger, so the letters never sit on the app
-                // icons under them; solid in the middle, fading at the rim. Drawn outside the 22 dp
-                // strip, like the letters.
+                // A halo behind the curve, following the finger: clear in the middle where the
+                // letters sit, denser toward the rim, gone at the very edge. Drawn outside the
+                // 22 dp strip, like the letters.
                 .drawBehind {
                     val a = active.value
                     if (a <= 0f) return@drawBehind
                     val radius = (ARC_RADIUS + ARC_DISC_PAD).toPx()
                     // Concentric with the letters' arc and centred on the finger, so the swung
-                    // letters always sit inside it; solid in the middle, fading at the rim.
+                    // letters always sit inside its clear middle.
                     val centre = Offset(size.width / 2, dragY)
                     drawCircle(
                         brush = Brush.radialGradient(
-                            0f to panel.copy(alpha = 0.97f * a),
-                            0.7f to panel.copy(alpha = 0.94f * a),
+                            0f to panel.copy(alpha = 0.10f * a),
+                            0.55f to panel.copy(alpha = 0.28f * a),
+                            0.85f to panel.copy(alpha = 0.45f * a),
                             1f to panel.copy(alpha = 0f),
                             center = centre,
                             radius = radius,
