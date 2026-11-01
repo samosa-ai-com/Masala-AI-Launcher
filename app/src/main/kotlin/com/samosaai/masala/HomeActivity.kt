@@ -199,6 +199,9 @@ class HomeActivity : ComponentActivity() {
                 val made = turns.lastOrNull()?.results?.firstOrNull { it.kind == "mini_app" } ?: return@LaunchedEffect
                 chatOpen = false
                 expanded = false
+                // Home's search pill only draws while the command is idle; leaving it on the
+                // reply would hand the user back a home screen with no way to start a chat.
+                app.commands.dismiss()
                 runCatching { openMiniApp(made.ref) }
             }
         val pinnedShortcuts by launcher.pinnedShortcuts.collectAsStateWithLifecycle()
