@@ -320,39 +320,39 @@ class HomeActivity : ComponentActivity() {
             drawerReady = true
         }
         val windowHeight = LocalWindowInfo.current.containerSize.height.toFloat()
-        val drawerDrag = remember(windowHeight) {
+        // Full travel for a finger-driven drawer move, shared by the open and close drags.
+        val dragDistance = (windowHeight * 0.4f).coerceAtLeast(1f)
+        // The single place a drag release settles. Opening is positional: released past the
+        // threshold it opens, otherwise it falls back closed. A fast upward flick that
+        // travelled almost nowhere must not fling it open: an opening animation starting
+        // from ~15% reads as a broken ghost rising. (A fast downward fling still closes.)
+        fun settleDrawerRelease(velocityY: Float) {
+            lastDrawerDragAt = 0L
+            val open = velocityY < FLING_VELOCITY && drawerProgress.value > 0.35f
+            if (drawerOpen == open) {
+                // No state change, so the effect below won't run: settle directly. Without
+                // this a partial drag that releases below the threshold freezes mid-slide
+                // with no later event able to move it.
+                scope.launch {
+                    drawerProgress.animateTo(if (open) 1f else 0f, drawerSpring, initialVelocity = -velocityY / dragDistance)
+                }
+            } else {
+                // Record the fling for the effect to consume; it owns the animation, so the
+                // two can never fight over the same frame. (Only here, so a sub-threshold
+                // release can't leak a stale velocity into a later tap-to-open.)
+                releaseVelocity = -velocityY / dragDistance
+                drawerOpen = open
+            }
+        }
+        val drawerDrag = remember(dragDistance) {
             object : DrawerDrag {
-                // The drawer is fully open after this much travel.
-                val distance = (windowHeight * 0.4f).coerceAtLeast(1f)
-
                 override fun onDrag(upPx: Float) {
                     drawerReady = true
                     lastDrawerDragAt = SystemClock.uptimeMillis()
-                    scope.launch { drawerProgress.snapTo((upPx / distance).coerceIn(0f, 1f)) }
+                    scope.launch { drawerProgress.snapTo((upPx / dragDistance).coerceIn(0f, 1f)) }
                 }
 
-                override fun onRelease(velocityY: Float) {
-                    lastDrawerDragAt = 0L
-                    // Opening is positional: released past the threshold it opens, otherwise it
-                    // falls back closed. A fast upward flick that travelled almost nowhere must
-                    // not fling it open anyway: an opening animation starting from ~15% reads as
-                    // a broken ghost rising. (A fast downward fling still closes from anywhere.)
-                    val open = velocityY < FLING_VELOCITY && drawerProgress.value > 0.35f
-                    if (drawerOpen == open) {
-                        // No state change, so the effect below won't run: settle directly. Without
-                        // this a partial drag that releases below the threshold freezes mid-slide
-                        // with no later event able to move it.
-                        scope.launch {
-                            drawerProgress.animateTo(if (open) 1f else 0f, drawerSpring, initialVelocity = -velocityY / distance)
-                        }
-                    } else {
-                        // Record the fling for the effect to consume; it owns the animation, so the
-                        // two can never fight over the same frame. (Only here, so a sub-threshold
-                        // release can't leak a stale velocity into a later tap-to-open.)
-                        releaseVelocity = -velocityY / distance
-                        drawerOpen = open
-                    }
-                }
+                override fun onRelease(velocityY: Float) = settleDrawerRelease(velocityY)
             }
         }
 
@@ -800,6 +800,12 @@ class HomeActivity : ComponentActivity() {
                 focusSignal = searchRequests,
                 autoKeyboard = settings.drawerKeyboard,
                 settled = drawerSettled.value,
+                onCloseDrag = { downPx ->
+                    lastDrawerDragAt = SystemClock.uptimeMillis()
+                    scope.launch { drawerProgress.snapTo((1f - downPx / dragDistance).coerceIn(0f, 1f)) }
+                },
+                onCloseRelease = ::settleDrawerRelease,
+                onCloseFingerActive = { drawerFingerDown = it },
             )
         } }
 
