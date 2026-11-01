@@ -3,6 +3,7 @@ package com.samosaai.masala.core.layout
 import com.samosaai.masala.core.contract.DockSection
 import com.samosaai.masala.core.contract.GridSection
 import com.samosaai.masala.core.contract.HeaderSection
+import com.samosaai.masala.core.contract.HtmlSection
 import com.samosaai.masala.core.contract.IconRef
 import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.ItemSection
@@ -323,8 +324,7 @@ class LayoutEditsTest {
     }
 
     @Test
-    fun `removeWidgetRefs drops sections and strips stacks`() {
-        val doc = widgetDoc()
+    fun `removeWidgetRefs drops sections and strips stacks`() {        val doc = widgetDoc()
         val out = assertNotNull(LayoutEdits.removeWidgetRefs(doc, "water"))
         assertEquals(emptyList(), LayoutEdits.widgetPlacements(out, "water"))
         // The water section is gone; s1 keeps its steps ref, s2 is untouched.
@@ -361,4 +361,27 @@ class LayoutEditsTest {
             Page("two", sections = listOf(StackSection("s2", refs = listOf(WidgetRef("steps"))))),
         ),
     )
+
+    @Test
+    fun `placeHtml appends a sized section with a free id`() {
+        val once = assertNotNull(LayoutEdits.placeHtml(widgetDoc(), "dice"))
+        val section = once.pages.first().sections.last() as HtmlSection
+        assertEquals("dice", section.appId)
+        assertEquals(2, section.rows)
+        val twice = assertNotNull(LayoutEdits.placeHtml(once, "dice", rows = 3))
+        assertEquals(3, (twice.pages.first().sections.last() as HtmlSection).rows)
+        assertEquals(twice.pages.first().sections.map { it.id }.size, twice.pages.first().sections.map { it.id }.toSet().size)
+        assertNull(LayoutEdits.placeHtml(widgetDoc(), ""))
+        assertNull(LayoutEdits.placeHtml(widgetDoc(), "dice", pageId = "missing"))
+    }
+
+    @Test
+    fun `removeHtmlApp drops only matching sections`() {
+        val doc = assertNotNull(LayoutEdits.placeHtml(widgetDoc(), "dice"))
+        assertEquals(listOf(LayoutEdits.WidgetPlacement("home", "html-dice")), LayoutEdits.htmlPlacements(doc, "dice"))
+        val out = assertNotNull(LayoutEdits.removeHtmlApp(doc, "dice"))
+        assertEquals(emptyList(), LayoutEdits.htmlPlacements(out, "dice"))
+        assertEquals(doc.pages.first().sections.size - 1, out.pages.first().sections.size)
+        assertNull(LayoutEdits.removeHtmlApp(doc, "missing"))
+    }
 }

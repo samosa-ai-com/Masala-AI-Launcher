@@ -6,6 +6,7 @@ import com.samosaai.masala.core.contract.Effect
 import com.samosaai.masala.core.contract.GridSection
 import com.samosaai.masala.core.contract.GroupSection
 import com.samosaai.masala.core.contract.HeaderSection
+import com.samosaai.masala.core.contract.HtmlSection
 import com.samosaai.masala.core.contract.IconRef
 import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.ItemSection
@@ -50,6 +51,8 @@ object LayoutChecker {
         val widgets: Map<String, WidgetSpec>? = null,
         /** Stream source IDs `video`/`snapshot` may use; null skips the check. */
         val streamSourceIds: Set<String>? = null,
+        /** Mini-app IDs `html` sections may show; null skips the check. */
+        val miniAppIds: Set<String>? = null,
     ) {
         fun installed(packageName: String, user: Long) = user in installedApps[packageName].orEmpty()
     }
@@ -66,6 +69,7 @@ object LayoutChecker {
     const val MAX_DOCK_ITEMS = 6
     const val MAX_COLUMNS = 6
     const val MAX_WIDGETS_IN_STACK = 8
+    const val MAX_HTML_PER_PAGE = 2
     const val MAX_ROWS = 8
     const val MAX_FOLDER_ITEMS = 16
     const val MAX_FOLDER_LABEL = 60
@@ -108,6 +112,10 @@ object LayoutChecker {
             if (page.sections.size > MAX_SECTIONS_PER_PAGE) {
                 problems += Problem("$pagePath.sections", "At most $MAX_SECTIONS_PER_PAGE sections on a page")
             }
+            // An HTML widget is a live WebView: at most two per page, so home keeps its frame time.
+            if (page.sections.filterIsInstance<HtmlSection>().size > MAX_HTML_PER_PAGE) {
+                problems += Problem("$pagePath.sections", "At most $MAX_HTML_PER_PAGE HTML widgets on a page")
+            }
             page.sections.forEachIndexed { s, section ->
                 val path = "$pagePath.sections[$s]"
                 id(section.id, path)
@@ -125,6 +133,7 @@ object LayoutChecker {
                     is StackSection -> checkStack(section, path, env, ::id, problems)
                     is SkillWidgetSection ->
                         if (section.skillId !in env.skillIds) problems += Problem("$path.skillId", "Unknown skill '${section.skillId}'")
+                    is HtmlSection -> checkHtml(section, path, env, problems)
                 }
             }
         }
@@ -279,6 +288,18 @@ object LayoutChecker {
         if (rows !in range.min..range.max) {
             problems += Problem("$path.rowsOverride", "$rows is outside the widget's size range ${range.min}..${range.max}")
         }
+    }
+
+    /** A generated HTML widget: a known mini app at widget size, same sandbox as its screen. */
+    private fun checkHtml(section: HtmlSection, path: String, env: Environment, problems: MutableList<Problem>) {
+        if (section.appId.isBlank()) {
+            problems += Problem("$path.appId", "An HTML widget needs an app")
+            return
+        }
+        if (env.miniAppIds != null && section.appId !in env.miniAppIds) {
+            problems += Problem("$path.appId", "Unknown mini app '${section.appId}'")
+        }
+        if (section.rows !in 1..MAX_ROWS) problems += Problem("$path.rows", "rows is 1..$MAX_ROWS")
     }
 
     private fun checkStack(

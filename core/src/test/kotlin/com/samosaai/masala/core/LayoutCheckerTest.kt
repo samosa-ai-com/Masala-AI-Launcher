@@ -209,4 +209,28 @@ class LayoutCheckerTest {
         val l = layout(com.samosaai.masala.core.contract.WidgetSection("ws", WidgetSpec("w", components = listOf(button))))
         assertEquals(listOf("$.pages[0].sections[0].widget.components[0].action"), paths(l))
     }
+
+    @Test
+    fun `an html section needs a known app, sane rows, and at most two per page`() {
+        val rich = env.copy(miniAppIds = setOf("dice"))
+        assertEquals(emptyList(), LayoutChecker.check(layout(com.samosaai.masala.core.contract.HtmlSection("h", "dice", rows = 3)), rich))
+        assertEquals(
+            listOf("$.pages[0].sections[0].appId"),
+            LayoutChecker.check(layout(com.samosaai.masala.core.contract.HtmlSection("h", "gone")), rich).map { it.path },
+        )
+        assertEquals(
+            listOf("$.pages[0].sections[0].appId"),
+            LayoutChecker.check(layout(com.samosaai.masala.core.contract.HtmlSection("h", "")), rich).map { it.path },
+        )
+        assertEquals(
+            listOf("$.pages[0].sections[0].rows"),
+            LayoutChecker.check(layout(com.samosaai.masala.core.contract.HtmlSection("h", "dice", rows = 9)), rich).map { it.path },
+        )
+        val three = layout(
+            com.samosaai.masala.core.contract.HtmlSection("h1", "dice"),
+            com.samosaai.masala.core.contract.HtmlSection("h2", "dice"),
+            com.samosaai.masala.core.contract.HtmlSection("h3", "dice"),
+        )
+        assertEquals(listOf("$.pages[0].sections"), LayoutChecker.check(three, rich).map { it.path })
+    }
 }

@@ -124,11 +124,22 @@ data class StackSection(
     val widgetIds: List<String> get() = if (refs.isNotEmpty()) refs.map { it.widgetId } else widgets.map { it.id }
 }
 
+/** A generated HTML mini-app drawn at widget size (plan `docs/plans/widget-maker.md` §3.3). */
+@Serializable
+@SerialName("html")
+data class HtmlSection(
+    override val id: String,
+    /** The mini app to draw; sandboxed exactly like on its own screen, no phone data. */
+    val appId: String,
+    /** Height in rows. */
+    val rows: Int = 2,
+    override val rules: List<Rule> = emptyList(),
+) : Section
+
 /** A Pro or hub skill's widget (arch §3.9). Not drawn by the generated-widget renderer. */
 @Serializable
 @SerialName("skill_widget")
-data class SkillWidgetSection(
-    override val id: String,
+data class SkillWidgetSection(    override val id: String,
     val skillId: String,
     val size: SkillWidgetSize = SkillWidgetSize.MEDIUM,
     override val rules: List<Rule> = emptyList(),

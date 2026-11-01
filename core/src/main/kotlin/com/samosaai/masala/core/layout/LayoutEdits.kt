@@ -1,6 +1,7 @@
 package com.samosaai.masala.core.layout
 
 import com.samosaai.masala.core.contract.DockSection
+import com.samosaai.masala.core.contract.HtmlSection
 import com.samosaai.masala.core.contract.IconRef
 import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.ItemSection
@@ -296,6 +297,54 @@ object LayoutEdits {
                                 } else section
                             else -> section
                         }
+                    },
+                )
+            },
+        )
+        return if (changed) next else null
+    }
+
+    // ---- HTML widgets (plan docs/plans/widget-maker.md §3.3) ----
+
+    /** Every place a mini app sits on home at widget size. */
+    fun htmlPlacements(doc: LayoutDoc, appId: String): List<WidgetPlacement> =
+        doc.pages.flatMap { page ->
+            page.sections.mapNotNull { section ->
+                if (section is HtmlSection && section.appId == appId) WidgetPlacement(page.id, section.id) else null
+            }
+        }
+
+    /**
+     * Shows a mini app on home at widget size, at the end of [pageId] (or the first page). Null
+     * when the id is blank or the page isn't there.
+     */
+    fun placeHtml(doc: LayoutDoc, appId: String, rows: Int = 2, pageId: String? = null): LayoutDoc? {
+        if (appId.isBlank() || doc.pages.isEmpty()) return null
+        val taken = doc.pages.flatMap { it.sections }.map { it.id }.toSet()
+        var sectionId = "html-$appId"
+        if (sectionId in taken) {
+            var n = 2
+            while ("$sectionId-$n" in taken) n++
+            sectionId = "$sectionId-$n"
+        }
+        val section = HtmlSection(id = sectionId, appId = appId, rows = rows)
+        val index = pageId?.let { id -> doc.pages.indexOfFirst { it.id == id } } ?: 0
+        if (index < 0) return null
+        return doc.copy(
+            pages = doc.pages.mapIndexed { i, page ->
+                if (i != index) page else page.copy(sections = page.sections + section)
+            },
+        )
+    }
+
+    /** Takes a mini app off home wherever it sits at widget size. Null when it wasn't placed. */
+    fun removeHtmlApp(doc: LayoutDoc, appId: String): LayoutDoc? {
+        var changed = false
+        val next = doc.copy(
+            pages = doc.pages.map { page ->
+                page.copy(
+                    sections = page.sections.filterNot { section ->
+                        (section is HtmlSection && section.appId == appId).also { if (it) changed = true }
                     },
                 )
             },
