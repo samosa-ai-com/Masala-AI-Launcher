@@ -79,7 +79,7 @@ object PromptContext {
             val detail = when (section) {
                 is ItemSection -> "${section.items.size} items" +
                     section.items.take(3).joinToString(", ", prefix = " [", postfix = "]") { it.label }
-                is WidgetSection -> "widget ${section.widget.id}"
+                is WidgetSection -> "widget ${section.widgetId}"
                 is SkillWidgetSection -> "skill ${section.skillId}"
                 else -> ""
             }

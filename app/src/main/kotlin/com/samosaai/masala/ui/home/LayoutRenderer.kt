@@ -373,7 +373,10 @@ private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: Render
         is DockSection -> Dock(section, ctx)
         is ListSection -> ItemList(section.id, section.title, section.items, ctx)
         is GroupSection -> Group(section, ctx)
-        is WidgetSection -> Placeholder(section.widget.title ?: section.widget.id, stringResource(R.string.home_widget_placeholder), layout.widgetRows[section.widget.id])
+        // A resolved layout always carries the widget inline (refs are filled in from the library).
+        is WidgetSection -> section.widget?.let {
+            Placeholder(it.title ?: it.id, stringResource(R.string.home_widget_placeholder), layout.widgetRows[it.id])
+        }
         is StackSection -> section.widgets.firstOrNull()?.let {
             Placeholder(it.title ?: it.id, stringResource(R.string.home_stack_placeholder, section.widgets.size), layout.widgetRows[it.id])
         }

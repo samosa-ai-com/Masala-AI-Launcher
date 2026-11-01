@@ -1,12 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.com/masala/schema/layout-v1.json",
-  "title": "Masala layout, version 1",
+  "$id": "https://example.com/masala/schema/layout-v3.json",
+  "title": "Masala layout, version 3",
   "description": "Kept by hand to match the Kotlin contracts in com.samosaai.masala.core.contract. LayoutSchemaTest keeps them in step. $defs/ModePatch is the mode patch schema.",
   "type": "object",
   "properties": {
     "schemaVersion": {
-      "const": 1
+      "enum": [
+        1,
+        2,
+        3
+      ]
     },
     "pages": {
       "type": "array",
@@ -230,7 +234,11 @@
               "minLength": 1
             },
             "widget": {
-              "$ref": "#/$defs/WidgetSpec"
+              "$ref": "#/$defs/WidgetSpec",
+              "description": "Inline widget, read for one schema so older exports import. New layouts use ref."
+            },
+            "ref": {
+              "$ref": "#/$defs/WidgetRef"
             },
             "rules": {
               "type": "array",
@@ -242,8 +250,19 @@
           "additionalProperties": false,
           "required": [
             "type",
-            "id",
-            "widget"
+            "id"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "ref"
+              ]
+            },
+            {
+              "required": [
+                "widget"
+              ]
+            }
           ]
         },
         {
@@ -261,6 +280,14 @@
               "items": {
                 "$ref": "#/$defs/WidgetSpec"
               },
+              "minItems": 1,
+              "description": "Inline widgets, read for one schema. New layouts use refs."
+            },
+            "refs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/WidgetRef"
+              },
               "minItems": 1
             },
             "rules": {
@@ -273,8 +300,19 @@
           "additionalProperties": false,
           "required": [
             "type",
-            "id",
-            "widgets"
+            "id"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "refs"
+              ]
+            },
+            {
+              "required": [
+                "widgets"
+              ]
+            }
           ]
         },
         {
@@ -1045,11 +1083,17 @@
             "sleep",
             "steps",
             "weather",
-            "urgent_count"
+            "urgent_count",
+            "http",
+            "stream_status",
+            "skill_result"
           ]
         },
         "key": {
           "type": "string"
+        },
+        "http": {
+          "$ref": "#/$defs/HttpBinding"
         }
       },
       "additionalProperties": false,
@@ -1070,6 +1114,9 @@
             },
             "binding": {
               "$ref": "#/$defs/Binding"
+            },
+            "style": {
+              "$ref": "#/$defs/WidgetStyle"
             }
           },
           "additionalProperties": false,
@@ -1095,6 +1142,9 @@
             },
             "goal": {
               "type": "integer"
+            },
+            "style": {
+              "$ref": "#/$defs/WidgetStyle"
             }
           },
           "additionalProperties": false,
@@ -1168,6 +1218,9 @@
             },
             "max": {
               "type": "number"
+            },
+            "style": {
+              "$ref": "#/$defs/WidgetStyle"
             }
           },
           "additionalProperties": false,
@@ -1237,6 +1290,165 @@
           "required": [
             "type",
             "icon"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "list"
+            },
+            "binding": {
+              "$ref": "#/$defs/Binding"
+            },
+            "maxRows": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "rowAction": {
+              "$ref": "#/$defs/MasalaAction"
+            },
+            "style": {
+              "$ref": "#/$defs/WidgetStyle"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "binding"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "gauge"
+            },
+            "label": {
+              "type": "string"
+            },
+            "binding": {
+              "$ref": "#/$defs/Binding"
+            },
+            "max": {
+              "type": "number"
+            },
+            "style": {
+              "$ref": "#/$defs/WidgetStyle"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "label",
+            "binding",
+            "max"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "row"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/WidgetComponent"
+              },
+              "minItems": 1,
+              "maxItems": 4
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "children"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "column"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/WidgetComponent"
+              },
+              "minItems": 1,
+              "maxItems": 4
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "children"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "video"
+            },
+            "stream": {
+              "$ref": "#/$defs/StreamRef"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "stream"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "snapshot"
+            },
+            "sourceId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "everySeconds": {
+              "type": "integer",
+              "minimum": 2
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "sourceId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "web_value"
+            },
+            "label": {
+              "type": "string"
+            },
+            "http": {
+              "$ref": "#/$defs/HttpBinding"
+            },
+            "suffix": {
+              "type": "string"
+            },
+            "style": {
+              "$ref": "#/$defs/WidgetStyle"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "label",
+            "http"
           ]
         }
       ]
@@ -1405,6 +1617,97 @@
         "id",
         "name"
       ]
+    },
+    "WidgetRef": {
+      "type": "object",
+      "properties": {
+        "widgetId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rowsOverride": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "widgetId"
+      ]
+    },
+    "HttpBinding": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jsonPath": {
+          "type": "string"
+        },
+        "every": {
+          "type": "integer",
+          "minimum": 30
+        },
+        "background": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "url"
+      ]
+    },
+    "StreamRef": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "enum": [
+            "live",
+            "snapshot"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "sourceId"
+      ]
+    },
+    "WidgetStyle": {
+      "type": "object",
+      "properties": {
+        "tint": {
+          "enum": [
+            "orange",
+            "teal",
+            "blue",
+            "green",
+            "red",
+            "purple",
+            "pink",
+            "yellow",
+            "gray"
+          ]
+        },
+        "emphasis": {
+          "enum": [
+            "normal",
+            "large"
+          ]
+        },
+        "align": {
+          "enum": [
+            "start",
+            "center",
+            "end"
+          ]
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

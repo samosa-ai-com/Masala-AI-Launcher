@@ -1,0 +1,13 @@
+{
+  "id": "habits",
+  "name": "Habit checklist",
+  "description": "A daily checklist of a few habits.",
+  "widget": {
+    "id": "habits",
+    "title": "Today's habits",
+    "components": [
+      { "type": "checklist", "key": "done", "items": ["Stretch", "Read 10 pages", "Walk outside"] }
+    ],
+    "size": { "min": 2, "default": 2, "max": 3 }
+  }
+}

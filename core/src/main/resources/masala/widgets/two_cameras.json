@@ -1,0 +1,19 @@
+{
+  "id": "two_cameras",
+  "name": "Two-camera grid",
+  "description": "Two cameras side by side as stills refreshed every 5 seconds (cheap on battery).",
+  "widget": {
+    "id": "two-cameras",
+    "title": "Cameras",
+    "components": [
+      {
+        "type": "row",
+        "children": [
+          { "type": "snapshot", "sourceId": "front-door", "everySeconds": 5 },
+          { "type": "snapshot", "sourceId": "garage", "everySeconds": 5 }
+        ]
+      }
+    ],
+    "size": { "min": 2, "default": 2, "max": 4 }
+  }
+}

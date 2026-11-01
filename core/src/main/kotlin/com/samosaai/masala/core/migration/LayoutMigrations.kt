@@ -18,6 +18,9 @@ object LayoutMigrations {
     /** `steps[n]` turns version n JSON into version n + 1. */
     private val steps: Map<Int, (JsonObject) -> JsonObject> = mapOf(
         1 to { json -> json }, // 2 adds folders (open_folder); nothing to rewrite
+        // 3 adds library refs (widget.ref, stack.refs). Inline widgets stay readable for one schema, so
+        // the JSON is unchanged; WidgetLift moves them into the library where there is one to save to.
+        2 to { json -> json },
     )
 
     fun migrate(json: JsonObject): JsonObject {

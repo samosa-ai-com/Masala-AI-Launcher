@@ -1,0 +1,19 @@
+{
+  "id": "price_from_url",
+  "name": "Price from a URL",
+  "description": "A value read from a JSON endpoint every 15 minutes. Replace the url and path with yours.",
+  "widget": {
+    "id": "price",
+    "title": "Price",
+    "components": [
+      {
+        "type": "web_value",
+        "label": "Now",
+        "http": { "url": "https://api.example.com/v1/price", "jsonPath": "$.data.price", "every": 900 },
+        "suffix": "€",
+        "style": { "emphasis": "large" }
+      }
+    ],
+    "size": { "min": 1, "default": 1, "max": 2 }
+  }
+}

@@ -31,10 +31,10 @@ import kotlin.test.assertTrue
 class MigrationAndPolicyTest {
 
     @Test
-    fun `version 1 upgrades to 2 unchanged, and a missing version means 1`() {
+    fun `version 1 upgrades to the current schema unchanged, and a missing version means 1`() {
         val classic = Json.parseToJsonElement(Fixtures.text("examples/classic.json"))
         assertEquals(1, MasalaJson.strict.decodeFromJsonElement(LayoutDoc.serializer(), classic).schemaVersion)
-        val upgraded = MasalaJson.strict.decodeFromJsonElement(LayoutDoc.serializer(), classic).copy(schemaVersion = 2)
+        val upgraded = MasalaJson.strict.decodeFromJsonElement(LayoutDoc.serializer(), classic).copy(schemaVersion = LayoutDoc.CURRENT_SCHEMA_VERSION)
         assertEquals(upgraded, LayoutMigrations.decode(classic))
 
         val unversioned = JsonObject((classic as JsonObject) - "schemaVersion")
