@@ -284,6 +284,8 @@
     <string name="widgets_not_on_home">Not on home</string>
     <string name="widgets_duplicate">Duplicate</string>
     <string name="widgets_edit">Edit</string>
+    <string name="widgets_save">Save</string>
+    <string name="widgets_restore">Restore</string>
     <string name="widgets_versions">Versions</string>
     <string name="widgets_delete_title">Delete this widget?</string>
     <string name="widgets_delete_message">“%1$s” will be removed from the library and taken off home. This can’t be undone.</string>
