@@ -260,19 +260,28 @@ fun ReplyCard(
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    text,
-                    { text = it },
-                    Modifier.weight(1f).focusRequester(field),
-                    placeholder = { Text(stringResource(R.string.command_hint)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { if (text.text.isNotBlank()) { app.commands.ask(text.text); text = TextFieldValue("") } }),
-                )
-                if (text.text.isNotBlank()) {
-                    TextButton(onClick = { app.commands.ask(text.text); text = TextFieldValue("") }) { Text(stringResource(R.string.skill_send)) }
+                if (state == CommandState.Listening) {
+                    // The assist surface has no listening overlay: this Send is the only
+                    // way to end the take here. Close would throw it away.
+                    Box(Modifier.weight(1f))
+                    androidx.compose.material3.Button(onClick = { app.commands.sendNow() }) {
+                        Text(stringResource(R.string.chat_send_now))
+                    }
                 } else {
-                    MicButton(micTap, level = { micLvl })
+                    OutlinedTextField(
+                        text,
+                        { text = it },
+                        Modifier.weight(1f).focusRequester(field),
+                        placeholder = { Text(stringResource(R.string.command_hint)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { if (text.text.isNotBlank()) { app.commands.ask(text.text); text = TextFieldValue("") } }),
+                    )
+                    if (text.text.isNotBlank()) {
+                        TextButton(onClick = { app.commands.ask(text.text); text = TextFieldValue("") }) { Text(stringResource(R.string.skill_send)) }
+                    } else {
+                        MicButton(micTap, level = { micLvl })
+                    }
                 }
             }
             Row {

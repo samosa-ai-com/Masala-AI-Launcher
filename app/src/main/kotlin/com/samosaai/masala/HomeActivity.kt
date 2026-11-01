@@ -536,11 +536,16 @@ class HomeActivity : ComponentActivity() {
                     onDeleteTurn = { index ->
                         val id = activeId ?: return@ChatSurface
                         app.scope.launch {
-                            // The agent's history drops the turn too, the way deleting
-                            // a whole chat clears it.
                             app.chats.deleteTurn(id, index)?.let {
                                 turns = it.turns
-                                app.commands.restoreSession(it.turns)
+                                // A live take or run keeps its context: restoring now
+                                // would cancel it and drop the pending answer. The turn
+                                // is gone from the store either way.
+                                if (app.commands.state.value != CommandState.Listening &&
+                                    app.commands.state.value !is CommandState.Thinking
+                                ) {
+                                    app.commands.restoreSession(it.turns)
+                                }
                             }
                         }
                     },

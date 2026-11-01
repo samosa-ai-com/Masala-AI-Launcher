@@ -567,16 +567,8 @@
     <string name="usage_access_allow">Allow</string>
     <string name="usage_access_skip">Not now</string>
     <!-- UI refresh U4 -->
-    <string name="listening_chip">Listening · %1$s</string>
-    <string name="listening_on_device">on-device</string>
     <string name="listening_sam">Masala is listening</string>
-    <string name="listening_hint">Sends after about 2 seconds of silence · tap ■ to send now</string>
-    <string name="listening_hint_hold">Release to send · tap ■ to send now</string>
-    <string name="listening_chip_hold">Holding · %1$s</string>
     <string name="listening_cancel">Cancel</string>
-    <string name="listening_stop">Stop and send</string>
-    <string name="listening_type">Switch to typing</string>
-    <string name="working_sam">Masala is thinking</string>
     <string name="working_title">Working on it</string>
     <string name="working_layout">Building your screen</string>
     <string name="working_layout_usual">usually about 20 s</string>
@@ -592,7 +584,7 @@
     <string name="chat_tap_mic">Tap the mic and speak, then tap Send. Drag up for the conversation.</string>
     <string name="chat_close">Close chat</string>
     <string name="chat_history">Chat history</string>
-    <string name="chat_empty">Hold the mic to talk, or tap it and speak. Everything you say stays here.</string>
+    <string name="chat_empty">Tap the mic and speak, then tap Send. Everything you say stays here.</string>
     <string name="chat_working">Working on it…</string>
     <string name="chat_drag_for_thread">Drag up to see the conversation</string>
     <string name="chat_sessions_title">Chats</string>
