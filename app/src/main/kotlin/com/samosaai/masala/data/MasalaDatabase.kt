@@ -39,8 +39,9 @@ import kotlinx.coroutines.flow.Flow
         AppLaunchEntity::class,
         WidgetEntity::class,
         WidgetVersionEntity::class,
+        StreamSourceEntity::class,
     ],
-    version = 6,
+    version = 7,
 )
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
@@ -52,6 +53,7 @@ abstract class MasalaDatabase : RoomDatabase() {
     abstract fun usageWeights(): UsageWeightDao
     abstract fun widgets(): WidgetDao
     abstract fun widgetVersions(): WidgetVersionDao
+    abstract fun streamSources(): StreamSourceDao
     abstract fun wikiPages(): WikiDao
     abstract fun appLaunches(): AppLaunchDao
 
@@ -94,9 +96,16 @@ abstract class MasalaDatabase : RoomDatabase() {
             }
         }
 
+        /** Stream sources (plan `docs/plans/widget-maker.md` §4.2): registry without secrets. */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `stream_sources` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `kind` TEXT NOT NULL, `url` TEXT NOT NULL, `snapshotUrl` TEXT, `secret` TEXT, `transport` TEXT, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))")
+            }
+        }
+
         fun create(context: Context): MasalaDatabase =
             Room.databaseBuilder(context, MasalaDatabase::class.java, "masala.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build()
     }
 }
 
@@ -323,6 +332,41 @@ interface WidgetVersionDao {
 
     @Query("DELETE FROM widget_versions WHERE widgetId = :widgetId")
     suspend fun deleteForWidget(widgetId: String)
+}
+
+/** One camera or stream a widget may show (plan `docs/plans/widget-maker.md` §4.2). */
+@Entity(tableName = "stream_sources")
+data class StreamSourceEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    /** rtsp, hls, dash, mjpeg, snapshot or progressive. */
+    val kind: String,
+    /** Never carries userinfo; credentials live in [secret], sealed by the Keystore. */
+    val url: String,
+    val snapshotUrl: String?,
+    /** `base64(iv ‖ ciphertext+tag)` of `username + "\n" + password`, or null. */
+    val secret: String?,
+    val transport: String?,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
+@Dao
+interface StreamSourceDao {
+    @Query("SELECT * FROM stream_sources ORDER BY name COLLATE NOCASE")
+    suspend fun all(): List<StreamSourceEntity>
+
+    @Query("SELECT * FROM stream_sources ORDER BY name COLLATE NOCASE")
+    fun watch(): Flow<List<StreamSourceEntity>>
+
+    @Query("SELECT * FROM stream_sources WHERE id = :id")
+    suspend fun get(id: String): StreamSourceEntity?
+
+    @Upsert
+    suspend fun upsert(entity: StreamSourceEntity)
+
+    @Query("DELETE FROM stream_sources WHERE id = :id")
+    suspend fun delete(id: String)
 }
 
 /** One run of a skill (arch §3.9, Phase 4). */

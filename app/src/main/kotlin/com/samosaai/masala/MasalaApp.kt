@@ -91,6 +91,9 @@ class MasalaApp : Application() {
 
     val database by lazy { MasalaDatabase.create(this) }
     val miniApps by lazy { MiniAppStore(database.miniApps()) }
+    val streamSources by lazy {
+        com.samosaai.masala.widgets.StreamSourceStore(database.streamSources(), com.samosaai.masala.llm.KeyCipher.androidKeystore("masala_stream_secrets"))
+    }
     /** Every generated widget's own values (counters, ticks); shared by home and the manager. */
     val widgetStates by lazy { com.samosaai.masala.widgets.WidgetStateStore(scope, database.widgetStates()) }
     val widgetLibrary by lazy { com.samosaai.masala.widgets.WidgetLibrary(database.widgets(), database.widgetVersions()) }
@@ -594,6 +597,7 @@ class MasalaApp : Application() {
             skills = { skills },
             toolNames = { tools.tools.map { it.name }.toSet() },
             widgets = widgetLibrary,
+            streams = streamSources,
         )
         AgentTools.create(
             this, layouts, modes,

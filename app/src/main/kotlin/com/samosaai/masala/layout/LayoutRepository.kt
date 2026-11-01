@@ -61,6 +61,7 @@ class LayoutRepository(
     private val skills: () -> SkillRegistry,
     private val toolNames: () -> Set<String>,
     private val widgets: WidgetLibrary,
+    private val streams: com.samosaai.masala.widgets.StreamSourceStore,
 ) {
     enum class Source { CACHE, MINIMAL }
 
@@ -127,6 +128,7 @@ class LayoutRepository(
 
     private suspend fun load() {
         widgets.load()
+        streams.load()
         val saved = dao.all().mapNotNull { row ->
             runCatching {
                 LayoutHistory.Version(row.id, row.label, LayoutMigrations.decode(MasalaJson.strict.parseToJsonElement(row.json)), row.createdAt)
@@ -370,6 +372,7 @@ class LayoutRepository(
             toolNames = toolNames(),
             modeIds = modes.patches.value.map { it.id }.toSet(),
             widgets = widgets.current(),
+            streamSourceIds = streams.current().keys,
         )
     }
 
