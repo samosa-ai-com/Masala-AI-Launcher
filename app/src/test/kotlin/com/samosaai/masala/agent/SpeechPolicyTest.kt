@@ -168,87 +168,12 @@ class SpeechPolicyTest {
     }
 
     @Test
-    fun tapCloudSuccessUsesCloudOnly() = runBlocking<Unit> {
-        val engine = FakeEngine(utteranceResults = mapOf(AudioProvider.API to Result.success("open youtube")))
-        val text = input(engine).listenOnce()
-        assertTrue(text.isSuccess)
-        assertEquals("open youtube", text.getOrNull())
-        assertEquals(listOf(AudioProvider.API), engine.utterances)
-    }
-
-    @Test
-    fun tapCloudFailureIsReportedInsteadOfRelistening() = runBlocking<Unit> {
-        // The user already spoke during the server take; asking the phone's recognizer to
-        // listen again would only hear the room and hide the real error.
-        val engine = FakeEngine(
-            utteranceResults = mapOf(
-                AudioProvider.API to Result.failure(Exception("HTTP 500 boom")),
-                AudioProvider.ANDROID to Result.success("never asked"),
-            )
-        )
-        val text = input(engine).listenOnce()
-        assertTrue(text.isFailure)
-        assertEquals("HTTP 500 boom", text.exceptionOrNull()?.message)
-        assertEquals(listOf(AudioProvider.API), engine.utterances)
-    }
-
-    @Test
-    fun tapSilenceDoesNotRepeatTheWaitOnLocal() = runBlocking<Unit> {
-        val engine = FakeEngine(
-            utteranceResults = mapOf(
-                AudioProvider.API to Result.failure(Exception("No speech detected")),
-                AudioProvider.ANDROID to Result.success("should not be asked"),
-            )
-        )
-        val text = input(engine).listenOnce()
-        assertTrue(text.isFailure)
-        assertEquals(listOf(AudioProvider.API), engine.utterances)
-    }
-
-    @Test
-    fun tapWaitsLongEnoughForASlowSentence() = runBlocking<Unit> {
-        val engine = FakeEngine(utteranceResults = mapOf(AudioProvider.API to Result.success("hi")))
-        input(engine).listenOnce()
-        // 2.5 s: a breath mid-sentence must not end the take (it was 1.5 s).
-        assertEquals(2500L, engine.lastSilenceMs)
-    }
-
-    @Test
-    fun `a server failure is reported, not the fallback's silence`() = runBlocking<Unit> {
-        // The user spoke during the server take; the fallback only hears the room. The
-        // reason the user sees must be the server error, not "no speech detected".
-        val engine = FakeEngine(
-            utteranceResults = mapOf(
-                AudioProvider.API to Result.failure(Exception("HTTP 401 rejected")),
-                AudioProvider.ANDROID to Result.failure(Exception("No speech detected")),
-            )
-        )
-        val result = input(engine).listenOnce()
-        assertTrue(result.isFailure)
-        assertEquals("HTTP 401 rejected", result.exceptionOrNull()?.message)
-    }
-
-    @Test
     fun `the take-end listener is attached before recording starts`() {
         val engine = FakeEngine()
         input(engine).start {}
         // A failure on the very first read must already have somewhere to go:
         // the attach lands before the first start call (cancel noise aside).
         assertEquals(listOf("listener", "start"), engine.events.takeLast(2))
-    }
-
-    @Test
-    fun `listenOnce never reaches the on-device recognizer`() = runBlocking<Unit> {
-        val engine = FakeEngine(
-            utteranceResults = mapOf(
-                AudioProvider.ANDROID to Result.success("should not be asked"),
-            )
-        )
-        // On-device only: nothing can be timed, so the test card fails instead of half-listening.
-        // (The mic itself never ends a take: only Send does.)
-        val result = input(engine, baseUrl = "").listenOnce()
-        assertTrue(result.isFailure)
-        assertTrue(engine.utterances.isEmpty())
     }
 
     @Test

@@ -39,6 +39,8 @@ class CommandController(
     private val summarize: (suspend (String) -> String?)? = null,
     /** Called when a turn starts, so per-turn budgets (expert consults) reset with it. */
     private val onTurnStart: (() -> Unit)? = null,
+    /** Tidies a spoken transcript before it is sent; null sends it as heard. */
+    private val cleaner: TranscriptCleaner? = null,
 ) {
     private val _state = MutableStateFlow<CommandState>(CommandState.Idle)
     /**
@@ -75,12 +77,8 @@ class CommandController(
      */
     var onTurn: ((com.samosaai.masala.chat.ChatTurn) -> Unit)? = null
 
-    /** The mic level and live words while listening, for the listening overlay (UI refresh U4). */
+    /** The mic level while listening, for the listening overlay (UI refresh U4). */
     val micLevel: StateFlow<Float> get() = speech?.level ?: kotlinx.coroutines.flow.MutableStateFlow(0f)
-    val liveWords: StateFlow<String> get() = speech?.partial ?: kotlinx.coroutines.flow.MutableStateFlow("")
-
-    /** True while listening records for a transcription endpoint (which sends no partials). */
-    var usesServerStt: () -> Boolean = { false }
 
     private var history: List<ChatMessage> = emptyList()
     private var readAloud: CommandState.Reply? = null
@@ -205,17 +203,26 @@ class CommandController(
         }
     }
 
-    /** Send ends the take now; what was said still runs. */
+    /**
+     * Send ends the take now; what was said still runs. Only the final transcript is
+     * used: it is transcribed, cleaned up by [cleaner], and then sent as one turn.
+     */
     fun stopListening() {
         val input = speech ?: return
         if (_state.value != CommandState.Listening) return
-        // Sending is not instantaneous: the take still has to be transcribed. Show the
-        // working row at once instead of leaving "Listening…" on screen until the text
-        // lands.
+        // Sending is not instantaneous: the take still has to be transcribed and cleaned.
+        // A blank-prompt Thinking is the "Transcribing…" row until the text lands.
         _state.value = CommandState.Thinking("")
         job = scope.launch {
             input.stop()
-                .onSuccess { ask(it, spoken = true) }
+                .onSuccess { heard ->
+                    // A command the fast path already matches as heard ("open camera") skips
+                    // the cleanup call: it would only add the model's round trip.
+                    val quick = heard.isBlank() ||
+                        CommandFastPath.match(NameCorrector(names()).correct(heard.trim()), resolveApp) != null
+                    val text = if (quick) heard else cleaner?.clean(heard) ?: heard
+                    ask(text, spoken = true)
+                }
                 .onFailure { publish(CommandState.Error("", friendlySttMessage(it.message, speechStrings))) }
         }
     }

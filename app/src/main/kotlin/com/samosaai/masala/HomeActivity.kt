@@ -7,6 +7,7 @@ import android.content.pm.ShortcutInfo
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -32,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -94,6 +96,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import com.samosaai.masala.ui.settings.SettingsActivity
 import com.samosaai.masala.ui.theme.MasalaTheme
 import com.samosaai.masala.ui.theme.Motion
+import com.samosaai.masala.util.MasalaLog
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import androidx.lifecycle.lifecycleScope
@@ -279,6 +282,16 @@ class HomeActivity : ComponentActivity() {
         // it and flips the state; the effect below is the single place that animates, so a
         // cancelled animation can never strand the state behind the progress.
         var releaseVelocity by remember { mutableFloatStateOf(0f) }
+        // Last finger movement on the drawer, or 0 while the finger is up. A lost lift leaves
+        // this non-zero, so the watchdog below compares timestamps instead of waiting for a
+        // reset that only a received lift can make.
+        var lastDrawerDragAt by remember { mutableLongStateOf(0L) }
+        // A finger is down on home (its gesture observer) or on the drawer's pull-to-close header.
+        // One flag per writer, so one surface lifting can't clear the other's held finger. Keeps
+        // the watchdog from settling under a held finger.
+        var homeFingerDown by remember { mutableStateOf(false) }
+        var headerFingerDown by remember { mutableStateOf(false) }
+        val drawerFingerDown by remember { derivedStateOf { homeFingerDown || headerFingerDown } }
         LaunchedEffect(Unit) {
             snapshotFlow { drawerOpen }.collectLatest { open ->
                 val target = if (open) 1f else 0f
@@ -288,6 +301,38 @@ class HomeActivity : ComponentActivity() {
                 if (!(drawerProgress.isRunning && drawerProgress.targetValue == target)) drawerProgress.animateTo(target, drawerSpring, initialVelocity = v)
             }
         }
+        // Heals a lost lift: progress parked off its target with no finger down, no recent drag
+        // and no animation running settles to the state's target. collectLatest restarts on every
+        // animation frame, state flip, drag event and finger change, so the delay only ever
+        // completes after 400 ms of quiet — an in-flight settle is cancelled the moment the
+        // finger returns, so it can never fight an active drag or animation.
+        LaunchedEffect(Unit) {
+            snapshotFlow { Triple(drawerProgress.value, drawerOpen, drawerFingerDown) }.collectLatest { (p, open, _) ->
+                if (p == (if (open) 1f else 0f)) return@collectLatest
+                kotlinx.coroutines.delay(400)
+                if (!drawerFingerDown && !drawerProgress.isRunning &&
+                    SystemClock.uptimeMillis() - lastDrawerDragAt > 350
+                ) {
+                    drawerProgress.animateTo(if (open) 1f else 0f, drawerSpring)
+                }
+            }
+        }
+        // Redraws once the drawer comes to rest. On the Redmi the frame that lands a settle can
+        // fail to reach the screen: progress is at 0 or 1, nothing animates, so nothing draws
+        // again and the last mid-slide frame (a see-through drawer) stays up until something
+        // unrelated, like the clock's minute tick, redraws home. Two later invalidations replace
+        // it; they cost two frames per open or close.
+        val composeView = androidx.compose.ui.platform.LocalView.current
+        LaunchedEffect(composeView) {
+            snapshotFlow { drawerProgress.value.let { it == 0f || it == 1f } }.collectLatest { atRest ->
+                if (!atRest) return@collectLatest
+                for (wait in longArrayOf(100, 400)) {
+                    kotlinx.coroutines.delay(wait)
+                    MasalaLog.d("HomeDrawer") { "rest redraw p=${drawerProgress.value} open=$drawerOpen finger=$drawerFingerDown" }
+                    composeView.invalidate()
+                }
+            }
+        }
         // Composed once home has drawn its first frame, so the first open is as quick as the rest.
         var drawerReady by remember { mutableStateOf(false) }
         LaunchedEffect(Unit) {
@@ -295,33 +340,39 @@ class HomeActivity : ComponentActivity() {
             drawerReady = true
         }
         val windowHeight = LocalWindowInfo.current.containerSize.height.toFloat()
-        val drawerDrag = remember(windowHeight) {
+        // Full travel for a finger-driven drawer move, shared by the open and close drags.
+        val dragDistance = (windowHeight * 0.4f).coerceAtLeast(1f)
+        // The single place a drag release settles. Opening is positional: released past the
+        // threshold it opens, otherwise it falls back closed. A fast upward flick that
+        // travelled almost nowhere must not fling it open: an opening animation starting
+        // from ~15% reads as a broken ghost rising. (A fast downward fling still closes.)
+        fun settleDrawerRelease(velocityY: Float) {
+            lastDrawerDragAt = 0L
+            val open = velocityY < FLING_VELOCITY && drawerProgress.value > 0.35f
+            if (drawerOpen == open) {
+                // No state change, so the effect below won't run: settle directly. Without
+                // this a partial drag that releases below the threshold freezes mid-slide
+                // with no later event able to move it.
+                scope.launch {
+                    drawerProgress.animateTo(if (open) 1f else 0f, drawerSpring, initialVelocity = -velocityY / dragDistance)
+                }
+            } else {
+                // Record the fling for the effect to consume; it owns the animation, so the
+                // two can never fight over the same frame. (Only here, so a sub-threshold
+                // release can't leak a stale velocity into a later tap-to-open.)
+                releaseVelocity = -velocityY / dragDistance
+                drawerOpen = open
+            }
+        }
+        val drawerDrag = remember(dragDistance) {
             object : DrawerDrag {
-                // The drawer is fully open after this much travel.
-                val distance = (windowHeight * 0.4f).coerceAtLeast(1f)
-
                 override fun onDrag(upPx: Float) {
                     drawerReady = true
-                    scope.launch { drawerProgress.snapTo((upPx / distance).coerceIn(0f, 1f)) }
+                    lastDrawerDragAt = SystemClock.uptimeMillis()
+                    scope.launch { drawerProgress.snapTo((upPx / dragDistance).coerceIn(0f, 1f)) }
                 }
 
-                override fun onRelease(velocityY: Float) {
-                    val open = velocityY < -FLING_VELOCITY || (velocityY < FLING_VELOCITY && drawerProgress.value > 0.35f)
-                    if (drawerOpen == open) {
-                        // No state change, so the effect below won't run: settle directly. Without
-                        // this a partial drag that releases below the threshold freezes mid-slide
-                        // with no later event able to move it.
-                        scope.launch {
-                            drawerProgress.animateTo(if (open) 1f else 0f, drawerSpring, initialVelocity = -velocityY / distance)
-                        }
-                    } else {
-                        // Record the fling for the effect to consume; it owns the animation, so the
-                        // two can never fight over the same frame. (Only here, so a sub-threshold
-                        // release can't leak a stale velocity into a later tap-to-open.)
-                        releaseVelocity = -velocityY / distance
-                        drawerOpen = open
-                    }
-                }
+                override fun onRelease(velocityY: Float) = settleDrawerRelease(velocityY)
             }
         }
 
@@ -515,6 +566,7 @@ class HomeActivity : ComponentActivity() {
             homePresses = homePresses,
             entrySignal = entrySignal,
             drawerDrag = drawerDrag.takeIf { settings.swipeUp == MasalaAction.OpenDrawer },
+            onFingerActive = { homeFingerDown = it },
             aboveDock = {
                 val command by app.commands.state.collectAsStateWithLifecycle()
                 val pillLevel by app.commands.micLevel.collectAsStateWithLifecycle()
@@ -550,7 +602,6 @@ class HomeActivity : ComponentActivity() {
             val hidden = drawerOpen || drawerShown.value
             val command by app.commands.state.collectAsStateWithLifecycle()
             val level by app.commands.micLevel.collectAsStateWithLifecycle()
-            val words by app.commands.liveWords.collectAsStateWithLifecycle()
             if (hidden) Unit else when (val c = command) {
                 CommandState.Input -> Box(
                     Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(),
@@ -560,14 +611,12 @@ class HomeActivity : ComponentActivity() {
                     session = turns.takeIf { it.isNotEmpty() }?.let {
                         com.samosaai.masala.chat.ChatSession(id = activeId.orEmpty(), title = sessionTitle, turns = it)
                     },
-                    liveWords = words,
                     level = { level },
                     state = command,
                     character = settings.character,
                     expanded = expanded,
                     onExpanded = { expanded = it },
                     mic = rememberMicTap(app),
-                    serverProvider = app.commands.usesServerStt(),
                     onSend = { app.commands.sendNow() },
                     onStop = { app.commands.dismiss() },
                     onAsk = { app.commands.ask(it) },
@@ -771,6 +820,12 @@ class HomeActivity : ComponentActivity() {
                 focusSignal = searchRequests,
                 autoKeyboard = settings.drawerKeyboard,
                 settled = drawerSettled.value,
+                onCloseDrag = { downPx ->
+                    lastDrawerDragAt = SystemClock.uptimeMillis()
+                    scope.launch { drawerProgress.snapTo((1f - downPx / dragDistance).coerceIn(0f, 1f)) }
+                },
+                onCloseRelease = ::settleDrawerRelease,
+                onCloseFingerActive = { headerFingerDown = it },
             )
         } }
 

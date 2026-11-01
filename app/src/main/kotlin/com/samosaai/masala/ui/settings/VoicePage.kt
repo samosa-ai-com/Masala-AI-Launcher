@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -38,6 +39,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -61,10 +63,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.samosaai.masala.R
-import com.samosaai.masala.agent.SpeechPolicy
+import com.samosaai.masala.agent.ConfiguredSpeechInput
 import com.samosaai.masala.agent.SpeechStrings
 import com.samosaai.masala.agent.friendlySttMessage
-import com.samosaai.masala.audio.AudioProvider
+import com.samosaai.masala.audio.PttEngine
+import com.samosaai.masala.audio.SpeechConfig
 import com.samosaai.masala.core.ai.Endpoint
 import com.samosaai.masala.core.ai.KeyKind
 import com.samosaai.masala.core.ai.ProviderPresets
@@ -75,7 +78,6 @@ import com.samosaai.masala.ui.components.Radii
 import com.samosaai.masala.ui.theme.MasalaMono
 import com.samosaai.masala.ui.theme.MasalaTheme
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 
 /**
@@ -122,7 +124,7 @@ fun VoicePage(settings: LauncherSettings, update: ((LauncherSettings) -> Launche
                     profile.voiceIn?.presetId == p.id -> profile.voiceIn?.model?.ifBlank { stringResource(R.string.voice_first_model) } ?: ""
                     !ready && known.isBlank() -> stringResource(R.string.voice_set_up_first)
                     !ready -> stringResource(R.string.voice_needs_key, p.name)
-                    else -> stringResource(R.string.voice_from_models)
+                    else -> stringResource(R.string.voice_ready)
                 }
                 OptionRow(p.name, sub, profile.voiceIn?.presetId == p.id, enabled = ready) {
                     scope.launch { store.update { it.copy(voiceIn = Endpoint(p.id, known)) } }
@@ -288,9 +290,10 @@ private fun phoneVoiceLabel(name: String): String {
 }
 
 /**
- * Settings → Voice → microphone test: runs the same utterance path the mic button uses and
- * reports the live mic level, the peak, and the transcript or the mapped failure — so a dead
- * mic, a deaf detector, and a bad server each show up as themselves.
+ * Settings → Voice → microphone test: the same take the mic button records — tap to start,
+ * Stop to end, no words while speaking — then the final transcript or the mapped failure,
+ * with the live mic level and the peak so a dead mic and a bad server each show up as
+ * themselves.
  */
 @Composable
 private fun SttTestCard() {
@@ -300,16 +303,13 @@ private fun SttTestCard() {
     val scope = rememberCoroutineScope()
     val voiceTint = MasalaTheme.tokens.voice
     var testing by remember { mutableStateOf(false) }
+    var transcribing by remember { mutableStateOf(false) }
     var outcome by remember { mutableStateOf<String?>(null) }
     var heard by remember { mutableStateOf<String?>(null) }
     var peak by remember { mutableFloatStateOf(0f) }
-    var activeProvider by remember { mutableStateOf<AudioProvider?>(null) }
-    var usedOnDevice by remember { mutableStateOf(false) }
-    var detail by remember { mutableStateOf<String?>(null) }
-    var userCancelled by remember { mutableStateOf(false) }
+    var transcription by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    val timedOut = stringResource(R.string.stt_test_timeout)
     val level by engine.level.collectAsState()
-    val partial by engine.partial.collectAsState()
-    val vad by engine.vadState.collectAsState()
     LaunchedEffect(testing, level) { if (testing && level > peak) peak = level }
     val strings = SpeechStrings(
         localUnavailable = stringResource(R.string.speech_local_unavailable),
@@ -322,92 +322,59 @@ private fun SttTestCard() {
         recordError = stringResource(R.string.stt_error_record),
         generic = stringResource(R.string.stt_error_generic),
     )
+    // Same provider order and fallback as the mic button, so the test reports what a real tap does.
+    val input = remember(engine) { ConfiguredSpeechInput(engine, { SpeechConfig.default }, engine::isLocalRecognitionAvailable, strings, live = engine) }
+    DisposableEffect(input) { onDispose { input.cancel() } }
+
+    fun finish() {
+        if (!testing) return
+        testing = false
+        transcribing = true
+        transcription = scope.launch {
+            try {
+                // Bounded, so a server that never answers can't leave the card spinning.
+                val result = kotlinx.coroutines.withTimeoutOrNull(TRANSCRIBE_TIMEOUT_MS) { input.stop() }
+                if (result == null) {
+                    input.cancel()
+                    outcome = timedOut
+                } else {
+                    result
+                        .onSuccess { if (it.isBlank()) outcome = strings.didntCatch else heard = it }
+                        .onFailure { outcome = friendlySttMessage(it.message, strings) }
+                }
+            } finally {
+                transcribing = false
+            }
+        }
+    }
 
     fun start(requestGrant: () -> Unit) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestGrant()
             return
         }
-        if (testing) return
-        testing = true
-        userCancelled = false
+        if (testing || transcribing) return
         outcome = null
         heard = null
-        detail = null
-        usedOnDevice = false
         peak = 0f
-        scope.launch {
-            try {
-                val cfg = app.aiSettings.speechConfig()
-                val code = cfg.sttLanguage.ifBlank { Locale.getDefault().language }
-                val lang = Language.entries.firstOrNull { it.matchesCode(code) } ?: Language.ENGLISH
-                // Same order and fallback the mic button uses, so the test reports what
-                // a real tap would do, not a rosier single-provider attempt.
-                val order = SpeechPolicy.order(if (cfg.baseUrl.isNotBlank()) AudioProvider.API else AudioProvider.ANDROID)
-                    .filter { it != AudioProvider.ANDROID || engine.isLocalRecognitionAvailable() }
-                if (order.isEmpty()) {
-                    if (!userCancelled) outcome = strings.localUnavailable
-                    return@launch
-                }
-                var lastResult: Result<String>? = null
-                var lastFailure: String? = null
-                // Why a configured server failed, kept apart from lastFailure: a fallback
-                // that then hears nothing must still be able to name the server problem.
-                var serverFailure: String? = null
-                for (provider in order) {
-                    activeProvider = provider
-                    val model = if (provider.isApiBased()) cfg.sttModel else ""
-                    val result = withTimeoutOrNull(45_000L) { engine.listenForUtterance(provider, model, lang, 2_500L) }
-                    if (userCancelled) return@launch
-                    if (result == null) {
-                        lastFailure = strings.server
-                        if (provider.isApiBased()) serverFailure = strings.server
-                        continue
-                    }
-                    if (result.isSuccess) {
-                        lastResult = result
-                        // Only a stand-in when a configured server actually failed first.
-                        usedOnDevice = provider == AudioProvider.ANDROID && serverFailure != null
-                        break
-                    }
-                    lastFailure = result.exceptionOrNull()?.message
-                    if (provider.isApiBased()) serverFailure = lastFailure
-                    // Silence is final: another provider would only repeat the wait.
-                    if (com.samosaai.masala.audio.SttEngine.isBenignSttError(result.exceptionOrNull())) {
-                        lastResult = result
-                        break
-                    }
-                }
-                lastResult?.onSuccess {
-                    if (it.isBlank()) outcome = strings.didntCatch else heard = it
-                }?.onFailure {
-                    outcome = friendlySttMessage(it.message, strings)
-                }
-                // A configured server that failed first is the likelier cause than
-                // silence, so say it under the outcome — once, never as a repeat.
-                serverFailure?.let { f ->
-                    val extra = friendlySttMessage(f, strings)
-                    if (extra != outcome) detail = extra
-                }
-                if (!userCancelled && lastResult == null) {
-                    outcome = friendlySttMessage(lastFailure, strings)
-                }
-            } catch (e: Exception) {
-                if (!userCancelled) outcome = friendlySttMessage(e.message, strings)
-            } finally {
-                activeProvider = null
-                testing = false
-            }
+        val onFailure: (String) -> Unit = { reason ->
+            testing = false
+            outcome = friendlySttMessage(reason, strings)
         }
+        if (!input.start(onFailure)) return
+        // A take only ends by itself at the 90 s cap, and then sends what was heard.
+        input.setTakeAutoEndListener { end -> if (end == PttEngine.TakeAutoEnd.CapReached) finish() }
+        testing = true
     }
 
     val grant = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) start({}) else outcome = strings.recordError
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    // The panel has no padding of its own (its option rows pad themselves); the card matches them.
+    Column(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.stt_test_summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (!testing && heard == null && outcome == null) {
+        if (!testing && !transcribing && heard == null && outcome == null) {
             OutlinedButton(
                 onClick = { start { grant.launch(Manifest.permission.RECORD_AUDIO) } },
                 border = BorderStroke(1.dp, voiceTint.copy(alpha = 0.4f)),
@@ -418,27 +385,16 @@ private fun SttTestCard() {
             }
         }
         if (testing) {
-            val liveText = partial.takeIf { it.isNotBlank() }?.let { " — “$it”" } ?: ""
-            Text(
-                stringResource(R.string.stt_test_listening) + liveText,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            Text(stringResource(R.string.stt_test_listening), style = MaterialTheme.typography.bodyMedium)
             Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.10f))) {
                 Box(Modifier.fillMaxWidth(level.coerceIn(0f, 1f)).height(8.dp).clip(RoundedCornerShape(4.dp)).background(voiceTint))
             }
             Text(stringResource(R.string.stt_test_peak, (peak.coerceIn(0f, 1f) * 100).toInt()), fontFamily = MasalaMono, style = MaterialTheme.typography.bodySmall, color = voiceTint)
-            vad?.let {
-                Text(
-                    stringResource(R.string.stt_test_vad, it.floorDb.toInt(), it.thresholdDb.toInt(), it.peakDb.toInt()),
-                    fontFamily = MasalaMono, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { engine.finishUtterance() }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.stt_test_stop)) }
+                OutlinedButton(onClick = { finish() }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.stt_test_stop)) }
                 OutlinedButton(
                     onClick = {
-                        userCancelled = true
-                        activeProvider?.let { engine.cancelListening(it) }
+                        input.cancel()
                         testing = false
                         outcome = null
                     },
@@ -446,27 +402,33 @@ private fun SttTestCard() {
                 ) { Text(stringResource(R.string.stt_test_cancel)) }
             }
         }
+        if (transcribing) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 46.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                CircularProgressIndicator(Modifier.size(18.dp), color = voiceTint, strokeWidth = 2.dp)
+                Text(stringResource(R.string.command_transcribing), style = MaterialTheme.typography.bodyMedium, color = voiceTint, modifier = Modifier.weight(1f))
+                OutlinedButton(
+                    onClick = {
+                        transcription?.cancel()
+                        input.cancel()
+                        outcome = null
+                    },
+                ) { Text(stringResource(R.string.stt_test_cancel)) }
+            }
+        }
         heard?.let {
             Text(stringResource(R.string.stt_test_heard, it), style = MaterialTheme.typography.bodyMedium)
-            if (usedOnDevice) {
-                Text(
-                    stringResource(R.string.stt_test_fell_back),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
             OutlinedButton(onClick = { start { grant.launch(Manifest.permission.RECORD_AUDIO) } }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.stt_test))
             }
         }
         outcome?.let {
             Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-            detail?.let { d ->
-                Text(d, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
             OutlinedButton(onClick = { start { grant.launch(Manifest.permission.RECORD_AUDIO) } }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.stt_test))
             }
         }
     }
 }
+
+/** Longer than on-device transcription's own 120 s cap, so only a stuck take hits it. */
+private const val TRANSCRIBE_TIMEOUT_MS = 150_000L

@@ -40,7 +40,8 @@ interface PttEngine {
 
     /**
      * Tap to talk (plan UI refresh U2): listen until a pause of [silenceTimeoutMs] after speech, then
-     * transcribe. [finishUtterance] ends it early and still transcribes what was said.
+     * transcribe. [finishUtterance] ends it early and still transcribes what was said. No caller
+     * today: the mic and the Settings test card both end a take only on Send/Stop.
      */
     suspend fun listenForUtterance(
         provider: AudioProvider,

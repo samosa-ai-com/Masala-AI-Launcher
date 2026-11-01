@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.input.pointer.util.addPointerInputChange
@@ -91,6 +92,8 @@ fun HomeScreen(
     entrySignal: Int = 0,
     /** False when embedded in another screen that already handles insets (e.g. the AI preview). */
     applyWindowInsets: Boolean = true,
+    /** True while any finger is down on home, false once every finger is up (or tracking ends). */
+    onFingerActive: (Boolean) -> Unit = {},
 ) {
     val swipeThreshold = with(LocalDensity.current) { 64.dp.toPx() }
     val swipeUpLabel = stringResource(R.string.home_swipe_up_description)
@@ -107,6 +110,7 @@ fun HomeScreen(
     val latestUp by rememberUpdatedState(onSwipeUp)
     val latestDown by rememberUpdatedState(onSwipeDown)
     val latestDrawer by rememberUpdatedState(drawerDrag)
+    val latestFinger by rememberUpdatedState(onFingerActive)
     val slop = with(LocalDensity.current) { 12.dp.toPx() }
     val swipes = remember(swipeThreshold, slop) {
         object {
@@ -220,20 +224,41 @@ fun HomeScreen(
                 while (true) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
-                        swipes.velocity.resetTracking()
-                        swipes.velocity.addPointerInputChange(down)
-                        var up = false
-                        while (!up) {
-                            val event = awaitPointerEvent(PointerEventPass.Final)
-                            event.changes.firstOrNull { it.id == down.id }?.let(swipes.velocity::addPointerInputChange)
-                            // A lifted pointer can vanish from later events instead of arriving
-                            // pressed=false: if our pointer is gone, the gesture is over. Without
-                            // this the observer can wait forever and every later lift is lost,
-                            // leaving the drawer frozen mid-slide.
-                            up = event.changes.isEmpty() || event.changes.none { it.id == down.id } ||
-                                (event.changes.isNotEmpty() && event.changes.all { !it.pressed })
+                        latestFinger(true)
+                        try {
+                            swipes.velocity.resetTracking()
+                            swipes.velocity.addPointerInputChange(down)
+                            // The release velocity follows one finger; when it lifts while another
+                            // is still down, tracking moves to that one, so its fling counts.
+                            var tracked = down.id
+                            while (true) {
+                                // Bounded per event, not per gesture: if the stream dies with no
+                                // lift and no cancel (a system steal mid-gesture), two seconds of
+                                // silence settles by position. A slow drag that keeps moving is
+                                // never cut off.
+                                val event = withTimeoutOrNull(2_000) { awaitPointerEvent(PointerEventPass.Final) } ?: break
+                                val change = event.changes.firstOrNull { it.id == tracked }
+                                if (change != null && !change.pressed) {
+                                    event.changes.firstOrNull { it.pressed }?.let { next ->
+                                        tracked = next.id
+                                        swipes.velocity.resetTracking()
+                                        swipes.velocity.addPointerInputChange(next)
+                                    } ?: swipes.velocity.addPointerInputChange(change)
+                                } else {
+                                    change?.let(swipes.velocity::addPointerInputChange)
+                                }
+                                // The gesture is over only once every finger is up: ending it when
+                                // just the first finger lifts (while a second is still down) fired
+                                // the release early, and the remaining finger's drag then moved the
+                                // drawer with no lift left to settle it — freezing it mid-slide.
+                                // A lifted pointer can still vanish from later events instead of
+                                // arriving pressed=false: an empty change list ends it too.
+                                if (event.changes.isEmpty() || event.changes.all { !it.pressed }) break
+                            }
+                            swipes.onLift()
+                        } finally {
+                            latestFinger(false)
                         }
-                        swipes.onLift()
                     }
                 }
             }

@@ -9,8 +9,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -182,6 +185,12 @@ fun Drawer(
     suggested: List<AppEntry> = emptyList(),
     globe: GlobeSource? = null,
     sources: SearchSources = SearchSources.None,
+    /** Pull-down to close from the fixed header: down-travel in px since the drag started. */
+    onCloseDrag: ((Float) -> Unit)? = null,
+    /** Release velocity in px/s (positive is downward) ending a close drag. */
+    onCloseRelease: ((Float) -> Unit)? = null,
+    /** True while a close drag is under way. */
+    onCloseFingerActive: ((Boolean) -> Unit)? = null,
 ) {
     var query by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
     val text = query.text
@@ -275,6 +284,26 @@ fun Drawer(
     var showWork by rememberSaveable { mutableStateOf(false) }
     val work = profiles.work
     val tokens = MasalaTheme.tokens
+    // Pull-down to close lives on the fixed header only (handle + search row), so the
+    // scrolling lists below keep their own gestures. Taps pass through: with no drag
+    // there is nothing to consume, so the field still focuses and buttons still fire.
+    val latestCloseDrag by rememberUpdatedState(onCloseDrag)
+    val latestCloseRelease by rememberUpdatedState(onCloseRelease)
+    val latestCloseFinger by rememberUpdatedState(onCloseFingerActive)
+    var closeTravel by remember { mutableFloatStateOf(0f) }
+    // Net travel both ways: dragging back up reopens, so changing your mind mid-pull works.
+    val closeState = rememberDraggableState { dy ->
+        closeTravel = (closeTravel + dy).coerceAtLeast(0f)
+        latestCloseDrag?.invoke(closeTravel)
+    }
+    val closeDraggable = if (onCloseDrag != null && onCloseRelease != null) {
+        Modifier.draggable(
+            state = closeState,
+            orientation = Orientation.Vertical,
+            onDragStarted = { closeTravel = 0f; latestCloseFinger?.invoke(true) },
+            onDragStopped = { v -> latestCloseFinger?.invoke(false); latestCloseRelease?.invoke(v) },
+        )
+    } else Modifier
     // A dimmed glass sheet: the wallpaper stays visible behind (home fades out under it).
     val sheet = if (tokens.dark) Color(0xD60C0A12) else MasalaColors.Paper.copy(alpha = 0.94f)
     Box(
@@ -288,26 +317,28 @@ fun Drawer(
         // No Surface under the sheet any more, so rows get their text colour from here.
         CompositionLocalProvider(LocalContentColor provides tokens.textHigh) {
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
-            Box(Modifier.align(Alignment.CenterHorizontally).padding(top = 10.dp).size(38.dp, 4.dp).clip(RoundedCornerShape(50)).background(tokens.textLow))
-            SearchRow(
-                query = query,
-                onQuery = { query = it },
-                focus = focus,
-                onGo = {
-                    // Enter while composing finishes the character instead (Olauncher §2.4).
-                    if (!composing) {
-                        if (extra.askFirst && text.isNotBlank()) onAsk(text.trim())
-                        else {
-                            // Async ranking may lag the text; rank once on submit so Enter
-                            // never launches the previous query's hit.
-                            val fresh = if (current) results else AppSearch.rank(text, latestPrepared)
-                            fresh.firstOrNull()?.let(launch)
-                                ?: text.takeIf { it.isNotBlank() }?.let { onAsk(it.trim()) }
+            Column(closeDraggable) {
+                Box(Modifier.align(Alignment.CenterHorizontally).padding(top = 10.dp).size(38.dp, 4.dp).clip(RoundedCornerShape(50)).background(tokens.textLow))
+                SearchRow(
+                    query = query,
+                    onQuery = { query = it },
+                    focus = focus,
+                    onGo = {
+                        // Enter while composing finishes the character instead (Olauncher §2.4).
+                        if (!composing) {
+                            if (extra.askFirst && text.isNotBlank()) onAsk(text.trim())
+                            else {
+                                // Async ranking may lag the text; rank once on submit so Enter
+                                // never launches the previous query's hit.
+                                val fresh = if (current) results else AppSearch.rank(text, latestPrepared)
+                                fresh.firstOrNull()?.let(launch)
+                                    ?: text.takeIf { it.isNotBlank() }?.let { onAsk(it.trim()) }
+                            }
                         }
-                    }
-                },
-                onOpenSettings = onOpenSettings,
-            )
+                    },
+                    onOpenSettings = onOpenSettings,
+                )
+            }
 
             // Results and the browse view are both kept composed and the one not in use is hidden: building
             // the results list on the first letter, and the grid again after the last, each took a frame
