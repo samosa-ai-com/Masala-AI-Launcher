@@ -28,6 +28,12 @@ android {
 
     // The suite is a thousand small pure tests: two JVMs halve the wait on CI and are safe
     // (each test uses its own temp folders).
+    lint {
+        // Unit-test and androidTest sources are checked by the compiler and the tests themselves;
+        // linting them again cost three and a half minutes per CI run.
+        checkTestSources = false
+    }
+
     testOptions {
         unitTests.all { test ->
             test.maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 2)
