@@ -46,6 +46,8 @@ abstract class MasalaDatabase : RoomDatabase() {
     abstract fun miniApps(): MiniAppDao
     abstract fun skillRuns(): SkillRunDao
     abstract fun skillArtifacts(): SkillArtifactDao
+    abstract fun widgetStates(): WidgetStateDao
+    abstract fun usageWeights(): UsageWeightDao
     abstract fun wikiPages(): WikiDao
     abstract fun appLaunches(): AppLaunchDao
 
@@ -228,6 +230,15 @@ data class WidgetStateEntity(
     val updatedAt: Long,
 )
 
+@Dao
+interface WidgetStateDao {
+    @Query("SELECT * FROM widget_state WHERE widgetId = :widgetId")
+    suspend fun get(widgetId: String): WidgetStateEntity?
+
+    @Upsert
+    suspend fun upsert(entity: WidgetStateEntity)
+}
+
 /** Tap weights for stack ordering and usage ranking (Phase 6): `weight += α(1 − weight)`. */
 @Entity(tableName = "usage_weights")
 data class UsageWeightEntity(
@@ -235,6 +246,15 @@ data class UsageWeightEntity(
     val weight: Double,
     val updatedAt: Long,
 )
+
+@Dao
+interface UsageWeightDao {
+    @Query("SELECT * FROM usage_weights")
+    suspend fun all(): List<UsageWeightEntity>
+
+    @Upsert
+    suspend fun upsert(entity: UsageWeightEntity)
+}
 
 /** One run of a skill (arch §3.9, Phase 4). */
 @Entity(tableName = "skill_runs", indices = [Index("skillId")])

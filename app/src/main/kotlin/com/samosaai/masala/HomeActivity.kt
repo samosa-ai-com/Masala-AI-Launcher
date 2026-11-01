@@ -450,9 +450,14 @@ class HomeActivity : ComponentActivity() {
         val miniAppRows by remember { app.miniApps.all }.collectAsStateWithLifecycle(emptyList())
         val miniAppIcons = remember(miniAppRows) { miniAppRows.associate { it.id to it.icon } }
         val drag = remember { HomeDragState() }
+        // Generated widgets (W1): one store for their stored values, shared by every card on home.
+        val widgetStore = remember { com.samosaai.masala.widgets.WidgetStateStore(scope, app.database.widgetStates()) }
+        val widgetSource = remember(snapshot) {
+            com.samosaai.masala.ui.home.widgets.WidgetSource(snapshot = { snapshot }, store = widgetStore, onAction = ::run)
+        }
         // The context below is remembered on purpose; drops read the live layout through these.
         val latestLayout = rememberUpdatedState(layout)
-        val render = remember(apps, settings.homeLocked, modeName, movable, miniAppIcons) {
+        val render = remember(apps, settings.homeLocked, modeName, movable, miniAppIcons, widgetSource) {
             RenderContext(
                 icons = app.icons,
                 apps = apps,
@@ -462,6 +467,7 @@ class HomeActivity : ComponentActivity() {
                 onAppMenu = { menuFor = it },
                 onClockClick = { run(MasalaAction.RunTool("show_alarms")) },
                 skillWidgets = skillWidgets,
+                widgets = widgetSource,
                 modeName = modeName,
                 onModeChip = ::openSettings,
                 onLaunchFrom = { action, bounds ->

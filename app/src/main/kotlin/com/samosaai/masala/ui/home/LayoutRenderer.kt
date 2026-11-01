@@ -133,6 +133,8 @@ class RenderContext(
     val onClockClick: () -> Unit,
     /** Where skill widgets get their skill and latest result; without it they stay placeholders. */
     val skillWidgets: SkillWidgetSource? = null,
+    /** Where generated widgets get their snapshot, stored values and actions; none keeps the placeholder. */
+    val widgets: com.samosaai.masala.ui.home.widgets.WidgetSource? = null,
     /** The active mode's name for the chip above the clock (UI refresh U3); none hides the chip. */
     val modeName: String? = null,
     val onModeChip: (() -> Unit)? = null,
@@ -375,10 +377,14 @@ private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: Render
         is GroupSection -> Group(section, ctx)
         // A resolved layout always carries the widget inline (refs are filled in from the library).
         is WidgetSection -> section.widget?.let {
-            Placeholder(it.title ?: it.id, stringResource(R.string.home_widget_placeholder), layout.widgetRows[it.id])
+            ctx.widgets?.let { source ->
+                com.samosaai.masala.ui.home.widgets.WidgetCard(it, layout.widgetRows[it.id], source)
+            } ?: Placeholder(it.title ?: it.id, stringResource(R.string.home_widget_placeholder), layout.widgetRows[it.id])
         }
         is StackSection -> section.widgets.firstOrNull()?.let {
-            Placeholder(it.title ?: it.id, stringResource(R.string.home_stack_placeholder, section.widgets.size), layout.widgetRows[it.id])
+            ctx.widgets?.let { source ->
+                com.samosaai.masala.ui.home.widgets.StackCard(section.widgets, layout.widgetRows, source)
+            } ?: Placeholder(it.title ?: it.id, stringResource(R.string.home_stack_placeholder, section.widgets.size), layout.widgetRows[it.id])
         }
         is SkillWidgetSection -> ctx.skillWidgets?.let { SkillWidgetCard(section, it, ctx.onAction) }
             ?: Placeholder(section.skillId, stringResource(R.string.home_skill_widget_placeholder), null)
