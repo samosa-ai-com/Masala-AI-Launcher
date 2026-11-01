@@ -76,6 +76,19 @@ object AgentTools {
         },
     )
 
+    val consultExpert = ToolDefinition(
+        "consult_expert",
+        "Ask a specialist (an expert such as Doctor, Chef or Fitness coach) for their view. They answer from " +
+            "their own instructions and tools and cannot see this chat, so include the facts they need. Use it " +
+            "when the request is advice in their area, or when their expertise would change your answer. Pass " +
+            "the consult_id from an earlier result to continue with the same expert.",
+        schema(listOf("skill_id", "question")) {
+            stringProp("skill_id", "The expert's id, from the experts list.")
+            stringProp("question", "What to ask them.")
+            stringProp("consult_id", "Optional. Continue an earlier consult with this id.")
+        },
+    )
+
     val composeMessage = ToolDefinition(
         "compose_message",
         "Open the messaging app with a draft. Masala never sends: the user reads the draft and presses send.",
@@ -86,13 +99,15 @@ object AgentTools {
     )
 
     /**
-     * [runSkill] opens the skill sheet; leave it null while there is none, and the tool isn't offered.
+     * [runSkill] opens the skill sheet and [consult] asks an expert in place; leave either null while
+     * there is none, and its tool isn't offered.
      */
     fun create(
         context: Context,
         layouts: LayoutRepository,
         modes: ModeStore,
         runSkill: ((skillId: String, prompt: String?) -> ActionResult)? = null,
+        consult: (suspend (skillId: String, question: String, consultId: String?) -> ActionResult)? = null,
     ): List<Tool> {
         val app = context.applicationContext
         return listOfNotNull(
@@ -116,6 +131,16 @@ object AgentTools {
             runSkill?.let { start ->
                 FunctionTool(this.runSkill, READ_ONLY, opensScreen = true) { args ->
                     start(args.string("skill_id") ?: return@FunctionTool missing("skill_id"), args.string("prompt"))
+                }
+            },
+            consult?.let { ask ->
+                // It reads the conversation, so it is never offered to a skill run's narrower scope.
+                FunctionTool(this.consultExpert, READ_ONLY, readsPrivateData = true) { args ->
+                    ask(
+                        args.string("skill_id") ?: return@FunctionTool missing("skill_id"),
+                        args.string("question") ?: return@FunctionTool missing("question"),
+                        args.string("consult_id"),
+                    )
                 }
             },
             FunctionTool(composeMessage, READ_ONLY, opensScreen = true) { args ->
