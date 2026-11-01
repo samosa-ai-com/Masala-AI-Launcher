@@ -20,11 +20,18 @@ concurrency:
 
 jobs:
   check:
-    # GitHub-hosted runners come with the Android SDK and ANDROID_HOME set.
-    runs-on: ubuntu-latest
+    # CI self-hosted — 0 minutes, same box as the private prototype's runs.
+    runs-on: [self-hosted, ci]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      # Self-hosted only: the checkout has no local.properties (gitignored),
+      # so Gradle needs ANDROID_HOME. GitHub-hosted images set it already.
+      - name: Point at CI Android SDK
+        run: |
+          echo "ANDROID_HOME=~/Android/Sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=~/Android/Sdk" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v4
         with:
