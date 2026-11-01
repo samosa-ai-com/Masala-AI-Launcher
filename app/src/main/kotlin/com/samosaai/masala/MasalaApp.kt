@@ -437,13 +437,19 @@ class MasalaApp : Application() {
         fetchOnlyResults = unattended,
     )
 
+    /** What the user changed about an expert: its prompt and the tools it may use. */
+    val personas by lazy { com.samosaai.masala.skills.PersonaStore(java.io.File(filesDir, "personas")) }
+
     /** The agent for one expert consult: its persona's own instructions, its tools, a bounded run. */
     private fun consultAgent(skill: MasalaSkill) = agent(
         model = LlmAgentModel(LlmConfig.default.client(this)),
         // The main agent's tools, minus a consult inside a consult, a skill sheet, and anything
-        // that would take the phone's screen away from the chat.
-        scope = { infos -> ToolScope.consult(infos, CONSULT_EXCLUDED) },
-        instructions = listOfNotNull(skill.persona?.systemPrompt, skill.instructions).joinToString("\n\n"),
+        // that would take the phone's screen away from the chat — plus the user's own switches.
+        scope = { infos -> ToolScope.consult(infos, CONSULT_EXCLUDED + personas.toolsFor(skill.id)) },
+        instructions = listOfNotNull(
+            personas.promptFor(skill.id) ?: skill.persona?.systemPrompt,
+            skill.instructions,
+        ).joinToString("\n\n"),
         maxSteps = MAX_CONSULT_STEPS,
         listSkills = false,
     )

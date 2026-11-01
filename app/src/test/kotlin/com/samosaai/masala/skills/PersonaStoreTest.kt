@@ -1,0 +1,63 @@
+package com.samosaai.masala.skills
+
+import java.io.File
+import kotlin.io.path.createTempDirectory
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class PersonaStoreTest {
+    private val root: File = createTempDirectory("personas").toFile()
+
+    @Test
+    fun nothingSavedMeansAsShipped() {
+        val store = PersonaStore(root)
+        assertNull(store.promptFor("doctor"))
+        assertEquals(emptySet(), store.toolsFor("doctor"))
+    }
+
+    @Test
+    fun aPromptAndAToolListSurviveAReload() {
+        PersonaStore(root).save("doctor", PersonaOverride(systemPrompt = "Answer in one line.", allowTools = listOf("memory_read")))
+        val reopened = PersonaStore(root)
+        assertEquals("Answer in one line.", reopened.promptFor("doctor"))
+        assertEquals(setOf("memory_read"), reopened.toolsFor("doctor"))
+    }
+
+    @Test
+    fun anOverrideWithEverythingNullIsRemoved() {
+        val store = PersonaStore(root)
+        store.save("doctor", PersonaOverride(systemPrompt = "one line"))
+        store.save("doctor", PersonaOverride())
+        assertNull(store.promptFor("doctor"))
+        assertEquals(emptyMap(), store.read())
+    }
+
+    @Test
+    fun resetRestoresTheShippedPrompt() {
+        val store = PersonaStore(root)
+        store.save("doctor", PersonaOverride(systemPrompt = "one line"))
+        store.reset("doctor")
+        assertNull(store.promptFor("doctor"))
+        assertTrue(PersonaStore(root).read().isEmpty())
+    }
+
+    @Test
+    fun aCorruptFileReadsAsNothingChanged() {
+        root.mkdirs()
+        File(root, "overrides.json").writeText("{ not json")
+        assertNull(PersonaStore(root).promptFor("doctor"))
+    }
+
+    @Test
+    fun oneExpertDoesNotAffectAnother() {
+        val store = PersonaStore(root)
+        store.save("doctor", PersonaOverride(systemPrompt = "doctor voice"))
+        store.save("chef", PersonaOverride(systemPrompt = "chef voice"))
+        assertEquals("doctor voice", store.promptFor("doctor"))
+        assertEquals("chef voice", store.promptFor("chef"))
+        store.reset("doctor")
+        assertEquals("chef voice", store.promptFor("chef"))
+    }
+}
