@@ -38,8 +38,12 @@ class AgentPromptTest {
     fun thePromptSaysToCreditTheExpertAndContinueById() {
         val prompt = AgentPrompt.build("Monday", listOf(doctor))
         assertTrue(prompt.contains("consult_id"))
-        assertTrue(prompt.contains("Credit an expert by name"))
+        assertTrue(prompt.contains("Credit the expert by name"))
         assertTrue(prompt.contains("never claim to be the expert"))
+        // The chat stays short: the expert's answer is summarised, with safety lines kept.
+        assertTrue(prompt.contains("2–4 short sentences"))
+        assertTrue(prompt.contains("never paste or quote its whole answer"))
+        assertTrue(prompt.contains("Keep, word for word, any instruction to seek care"))
     }
 
     @Test

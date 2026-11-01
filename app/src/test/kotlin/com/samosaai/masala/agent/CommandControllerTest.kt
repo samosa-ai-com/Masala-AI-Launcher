@@ -367,9 +367,13 @@ class CommandControllerTest {
                 )
             },
         )
+        val stored = mutableListOf<com.samosaai.masala.chat.ChatTurn>()
+        c.onTurn = { stored += it }
         c.ask("risotto idea")
         val settled = assertIs<CommandState.Reply>(c.settled())
         assertEquals("The chef suggests risotto.", settled.text)
+        // What lands in the session keeps the credit, so the badge survives a reload.
+        assertEquals(listOf(com.samosaai.masala.chat.ExpertCredit("chef", "Chef")), stored.last().experts)
         assertEquals(listOf(com.samosaai.masala.chat.ExpertCredit("chef", "Chef")), settled.experts)
         assertTrue(settled.steps.contains("Consulting Chef"))
     }

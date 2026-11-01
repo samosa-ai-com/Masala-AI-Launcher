@@ -39,6 +39,22 @@ class ChatSessionsTest {
     }
 
     @Test
+    fun `a turn keeps its experts through a reload`() = runBlocking<Unit> {
+        val s = store()
+        val chat = s.create()
+        s.append(
+            chat.id,
+            ChatTurn(TurnRole.MASALA, "the doctor said so", experts = listOf(ExpertCredit("doctor", "Doctor"))),
+        )
+        val restored = store()
+        restored.load()
+        assertEquals(
+            listOf(ExpertCredit("doctor", "Doctor")),
+            restored.get(chat.id)?.turns?.single()?.experts,
+        )
+    }
+
+    @Test
     fun `the first user turn titles the session`() = runBlocking<Unit> {
         val s = store()
         val chat = s.create()

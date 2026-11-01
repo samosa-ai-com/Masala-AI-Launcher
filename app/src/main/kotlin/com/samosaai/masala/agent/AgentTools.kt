@@ -80,8 +80,10 @@ object AgentTools {
         "consult_expert",
         "Ask a specialist (an expert such as Doctor, Chef or Fitness coach) for their view. They answer from " +
             "their own instructions and tools and cannot see this chat, so include the facts they need. Use it " +
-            "when the request is advice in their area, or when their expertise would change your answer. Pass " +
-            "the consult_id from an earlier result to continue with the same expert.",
+            "when the request is advice in their area, or when their expertise would change your answer. Their " +
+            "answer can be long: summarise it for the user in 2–4 short sentences, keeping any safety " +
+            "instruction and their disclaimer as given. Pass the consult_id from an earlier result to continue " +
+            "with the same expert.",
         schema(listOf("skill_id", "question")) {
             stringProp("skill_id", "The expert's id, from the experts list.")
             stringProp("question", "What to ask them.")

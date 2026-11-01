@@ -36,8 +36,12 @@ object AgentPrompt {
             experts.forEach { append("- ").append(it.id).append(": ").append(it.description.ifBlank { it.title }).append('\n') }
             append("Consult one when the request is advice in its area, or when its expertise would change your answer. ")
             append("They cannot see this chat, so include the facts they need. Pass consult_id to continue with the same ")
-            append("expert. Credit an expert by name when you use its answer (\"the doctor said…\"); quote its advice, ")
-            append("health and safety wording as given, trimming only greetings, and never claim to be the expert.\n")
+            append("expert. ")
+            append("Answer the user in 2–4 short sentences, focused on what they asked: summarise the expert, ")
+            append("never paste or quote its whole answer. Keep, word for word, any instruction to seek care or call ")
+            append("emergency services — first, when it is urgent — and pass on a disclaimer or a question the expert ")
+            append("asks back. Credit the expert by name (\"the doctor said…\"), never claim to be the expert, and write ")
+            append("prose without markdown blockquotes. If the user wants the detail, they can ask for it.\n")
         }
         if (jobs.isNotEmpty()) {
             append("\nInstalled skills (start one with run_skill when the request fits it):\n")

@@ -26,7 +26,7 @@ class ConsultServiceTest {
         id = "doctor",
         title = "Doctor",
         instructions = "Talk as a GP.",
-        persona = Persona(systemPrompt = "You are a doctor."),
+        persona = Persona(systemPrompt = "You are a doctor.", disclaimer = "Not a diagnosis."),
     )
     private val chef = MasalaSkill(
         id = "chef",
@@ -74,6 +74,8 @@ class ConsultServiceTest {
         assertTrue(replied.text.contains("exchange 1 of 10"))
         assertTrue(replied.text.contains("Doctor"))
         assertTrue(replied.text.contains("Ask about the pain first."))
+        // The main agent must be able to pass the persona's own disclaimer on.
+        assertTrue(replied.text.contains("Disclaimer to pass on: Not a diagnosis."))
     }
 
     @Test

@@ -297,7 +297,10 @@ fun ReplyCard(
 
 @Composable
 private fun Steps(steps: List<String>) {
-    steps.forEach { Text(stringResource(R.string.skill_step_done, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    steps.forEach { step ->
+        val label = if (step.startsWith("Consulting ")) step else stringResource(R.string.skill_step_done, step)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 

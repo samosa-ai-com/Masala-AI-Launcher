@@ -120,7 +120,7 @@ class ConsultService(
                 session = saved,
                 exchange = saved.exchanges,
                 answer = text,
-                text = render(saved, text, title),
+                text = render(saved, text, title, expert.persona?.disclaimer),
             )
         } finally {
             busy.remove(key)
@@ -131,7 +131,7 @@ class ConsultService(
      * What the main agent reads: where the answer came from, the answer, and the ids it needs to
      * come back — including after its own history was compacted.
      */
-    private suspend fun render(session: ConsultSession, answer: String, title: String): String {
+    private suspend fun render(session: ConsultSession, answer: String, title: String, disclaimer: String?): String {
         val earlier = session.pairs().dropLast(1)
         val recap = if (earlier.isEmpty()) "" else buildString {
             appendLine("Earlier in this consult:")
@@ -150,6 +150,10 @@ class ConsultService(
             append(ConsultSessions.MAX_EXCHANGES)
             appendLine("]")
             appendLine(answer.trim())
+            if (!disclaimer.isNullOrBlank()) {
+                appendLine()
+                appendLine("Disclaimer to pass on: ${disclaimer.trim()}")
+            }
             if (recap.isNotBlank()) {
                 appendLine()
                 append(recap.trimEnd())

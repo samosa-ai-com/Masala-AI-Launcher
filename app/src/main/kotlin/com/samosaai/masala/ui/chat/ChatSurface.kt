@@ -368,8 +368,14 @@ private fun Thread(
 ) {
     val list = rememberLazyListState()
     LaunchedEffect(turns.size, liveWords, thinking, (state as? CommandState.Thinking)?.steps?.size) {
-        val last = list.layoutInfo.totalItemsCount - 1
-        if (last >= 0) list.animateScrollToItem(last)
+        // A finished answer scrolls to its start, so the expert badge that credits it is visible;
+        // while working, the steps at the bottom are what matters.
+        val target = when {
+            thinking || listening -> list.layoutInfo.totalItemsCount - 1
+            turns.isNotEmpty() -> turns.lastIndex
+            else -> -1
+        }
+        if (target >= 0) list.animateScrollToItem(target)
     }
     // The handle's rule, on the list itself: a downward pull past the top,
     // beyond 120 dp, returns to the orb. Down is the handle's collapse
