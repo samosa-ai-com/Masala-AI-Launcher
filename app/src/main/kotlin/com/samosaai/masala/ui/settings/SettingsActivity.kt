@@ -116,9 +116,14 @@ class SettingsActivity : ComponentActivity() {
                     // Search can open a page directly (UI refresh U3); Back then leaves settings.
                     val start = remember { intent.getStringExtra(EXTRA_PAGE)?.let { n -> Page.entries.firstOrNull { it.name == n } } }
                     var page by rememberSaveable { mutableStateOf(start ?: Page.MAIN) }
-                    // Set when Skills sends the user to one expert; the experts page opens its editor.
+                    // Set when Skills sends the user to one expert; the experts page opens its editor
+                    // once and clears it, and Back returns to wherever the user came from.
                     var editExpertId by rememberSaveable { mutableStateOf<String?>(null) }
-                    BackHandler(enabled = page != Page.MAIN) { if (start != null && page == start) finish() else page = Page.MAIN }
+                    var personasReturn by rememberSaveable { mutableStateOf(Page.MAIN) }
+                    BackHandler(enabled = page != Page.MAIN) {
+                        if (start != null && page == start) finish()
+                        else page = if (page == Page.PERSONAS) personasReturn else Page.MAIN
+                    }
                     // Each page keeps its scroll position (and other saved state) while another page is shown.
                     val pageStates = rememberSaveableStateHolder()
                     pageStates.SaveableStateProvider(page.name) { when (page) {
@@ -133,7 +138,7 @@ class SettingsActivity : ComponentActivity() {
                             onFiles = { page = Page.FILES },
                             onAiModels = { page = Page.AI_MODELS },
                             onVoice = { page = Page.VOICE },
-                            onPersonas = { page = Page.PERSONAS },
+                            onPersonas = { editExpertId = null; personasReturn = Page.MAIN; page = Page.PERSONAS },
                             onPage = { page = it },
                         )
                         Page.HIDDEN_APPS -> HiddenAppsPage(onBack = { page = Page.MAIN })
@@ -142,11 +147,13 @@ class SettingsActivity : ComponentActivity() {
                         Page.MINI_APPS -> MiniAppsPage(onBack = { page = Page.MAIN })
                         Page.SKILLS -> SkillsPage(onBack = { page = Page.MAIN }, onEditExpert = { id ->
                             editExpertId = id
+                            personasReturn = Page.SKILLS
                             page = Page.PERSONAS
                         })
                         Page.PERSONAS -> PersonasPage(
-                            onBack = { page = Page.MAIN; editExpertId = null },
+                            onBack = { page = personasReturn; editExpertId = null },
                             initialEditId = editExpertId,
+                            onConsumed = { editExpertId = null },
                         )
                         Page.TASKS -> ScheduledTasksPage(onBack = { page = Page.MAIN }, onAskInChat = { askInChat(it) })
                         Page.FILES -> masala.fileIndex?.let { FilesPage(it, onBack = { page = Page.MAIN }) }

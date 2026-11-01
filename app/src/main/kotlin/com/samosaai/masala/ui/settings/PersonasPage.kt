@@ -49,7 +49,7 @@ import java.util.UUID
  * it is on the list at all.
  */
 @Composable
-fun PersonasPage(onBack: () -> Unit, initialEditId: String? = null) {
+fun PersonasPage(onBack: () -> Unit, initialEditId: String? = null, onConsumed: () -> Unit = {}) {
     val app = LocalContext.current.masala
     var editing by remember { mutableStateOf<MasalaSkill?>(null) }
     var creating by remember { mutableStateOf(false) }
@@ -59,11 +59,21 @@ fun PersonasPage(onBack: () -> Unit, initialEditId: String? = null) {
         app.personas.hiddenIds().mapNotNull { id -> app.skills.getSkillById(id) }
     }
 
-    // Coming from Skills: open the expert that was tapped, not the list.
-    LaunchedEffect(initialEditId, version) {
-        if (editing == null && initialEditId != null) {
-            editing = app.skills.getSkillById(initialEditId)?.takeIf { it.persona != null }
-        }
+    // Coming from Skills: open the expert that was tapped, once. The activity clears the id after
+    // this, so coming back from the editor (or re-entering the page) shows the list.
+    LaunchedEffect(initialEditId) {
+        val id = initialEditId ?: return@LaunchedEffect
+        editing = app.skills.getSkillById(id)?.takeIf { it.persona != null }
+        onConsumed()
+    }
+
+    // Opened straight into one expert (from Skills): closing it returns where the user came from,
+    // not to a list they never asked for. Any other editor closes back to the list.
+    val openedDirectly = remember { initialEditId != null }
+    androidx.activity.compose.BackHandler(enabled = editing != null || creating) {
+        editing = null
+        creating = false
+        if (openedDirectly) onBack()
     }
 
     val editingNow = editing
@@ -299,6 +309,7 @@ private fun NewExpertForm(onSaved: () -> Unit, onCancel: () -> Unit) {
     var whenToUse by remember { mutableStateOf("") }
     var prompt by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
     val valid = name.isNotBlank() && whenToUse.isNotBlank() && prompt.isNotBlank()
 
     SettingsScaffold(stringResource(R.string.personas_new_title), onBack = onCancel) {
@@ -327,11 +338,19 @@ private fun NewExpertForm(onSaved: () -> Unit, onCancel: () -> Unit) {
             maxLines = 12,
             textStyle = MaterialTheme.typography.bodySmall,
         )
+        if (failed) {
+            Text(
+                stringResource(R.string.personas_new_failed),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         Button(
             enabled = valid && !saving,
             onClick = {
                 saving = true
-                val id = "custom-" + UUID.randomUUID().toString().take(8)
+                // The skill id rule is ^[a-z][a-z0-9_]{0,31}$: no hyphen, so strip them.
+                val id = "custom_" + UUID.randomUUID().toString().replace("-", "").take(8)
                 val skill = MasalaSkill(
                     id = id,
                     title = name.trim().take(40),
@@ -344,9 +363,9 @@ private fun NewExpertForm(onSaved: () -> Unit, onCancel: () -> Unit) {
                     widget = SkillWidget("psychology", "indigo", inputs = listOf(SkillInput.TEXT), output = SkillOutput.MARKDOWN),
                 )
                 app.scope.launch {
-                    app.skills.saveCommunity(skill)
+                    val saved = app.skills.saveCommunity(skill)
                     saving = false
-                    if (app.skills.getSkillById(id) != null) onSaved() else onCancel()
+                    if (saved && app.skills.getSkillById(id) != null) onSaved() else failed = true
                 }
             },
             modifier = Modifier.fillMaxWidth(),

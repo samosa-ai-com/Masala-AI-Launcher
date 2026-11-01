@@ -274,6 +274,7 @@
     <string name="personas_new_title">New expert</string>
     <string name="personas_new_name">Name</string>
     <string name="personas_new_save">Add it</string>
+    <string name="personas_new_failed">Couldn’t save that expert. Check the name and try again.</string>
     <string name="chat_ask_someone">Ask an expert</string>
     <string name="search_ask_expert">Ask the %1$s: </string>
     <string name="skills_delete">Delete</string>
