@@ -311,16 +311,45 @@ class LayoutEditsTest {
     @Test
     fun `placeWidget appends a ref section with a free id`() {
         val once = assertNotNull(LayoutEdits.placeWidget(widgetDoc(), "habits"))
-        val section = once.pages.first().sections.last() as WidgetSection
+        val section = once.doc.pages.first().sections.last() as WidgetSection
         assertEquals(WidgetRef("habits"), section.ref)
-        val twice = assertNotNull(LayoutEdits.placeWidget(once, "habits"))
-        val ids = twice.pages.first().sections.map { it.id }
+        assertEquals("home", once.pageId)
+        val twice = assertNotNull(LayoutEdits.placeWidget(once.doc, "habits"))
+        val ids = twice.doc.pages.first().sections.map { it.id }
         assertEquals(ids.size, ids.toSet().size)
         assertNull(LayoutEdits.placeWidget(widgetDoc(), ""))
         assertNull(LayoutEdits.placeWidget(widgetDoc(), "habits", pageId = "missing"))
         val other = assertNotNull(LayoutEdits.placeWidget(widgetDoc(), "habits", rowsOverride = 3, pageId = "two"))
-        assertEquals(listOf("s2", "widget-habits"), other.pages.last().sections.map { it.id })
-        assertEquals(3, (other.pages.last().sections.last() as WidgetSection).ref?.rowsOverride)
+        assertEquals("two", other.pageId)
+        assertEquals(listOf("s2", "widget-habits"), other.doc.pages.last().sections.map { it.id })
+        assertEquals(3, (other.doc.pages.last().sections.last() as WidgetSection).ref?.rowsOverride)
+    }
+
+    @Test
+    fun `placing past the page budget overflows to room, then a new page`() {
+        val sizes = mapOf("a" to 4, "b" to 4)
+        var doc = widgetDoc()
+        val first = assertNotNull(LayoutEdits.placeWidget(doc, "a", sizes = sizes))
+        // Home holds 4 (w1 2 + s1 max 2) + 4 = 8: exactly full.
+        assertEquals("home", first.pageId)
+        doc = first.doc
+        val second = assertNotNull(LayoutEdits.placeWidget(doc, "b", sizes = sizes))
+        // Home is full, but two holds 1 and takes 4 more.
+        assertEquals("two", second.pageId)
+        doc = second.doc
+        val third = assertNotNull(LayoutEdits.placeWidget(doc, "a", sizes = sizes))
+        // Both pages are full: a new home screen opens.
+        assertEquals(3, third.doc.pages.size)
+        assertEquals("home-2", third.pageId)
+        assertEquals("Home 2", third.doc.pages.last().title)
+    }
+
+    @Test
+    fun `widgetRowsUsed counts sections, tallest of stacks, html`() {
+        val sizes = mapOf("water" to 2, "steps" to 1)
+        assertEquals(4, LayoutEdits.widgetRowsUsed(widgetDoc(), "home", sizes))
+        assertEquals(1, LayoutEdits.widgetRowsUsed(widgetDoc(), "two", sizes))
+        assertEquals(0, LayoutEdits.widgetRowsUsed(widgetDoc(), "missing", sizes))
     }
 
     @Test
@@ -365,19 +394,22 @@ class LayoutEditsTest {
     @Test
     fun `placeHtml appends a sized section with a free id`() {
         val once = assertNotNull(LayoutEdits.placeHtml(widgetDoc(), "dice"))
-        val section = once.pages.first().sections.last() as HtmlSection
+        val section = once.doc.pages.first().sections.last() as HtmlSection
         assertEquals("dice", section.appId)
         assertEquals(2, section.rows)
-        val twice = assertNotNull(LayoutEdits.placeHtml(once, "dice", rows = 3))
-        assertEquals(3, (twice.pages.first().sections.last() as HtmlSection).rows)
-        assertEquals(twice.pages.first().sections.map { it.id }.size, twice.pages.first().sections.map { it.id }.toSet().size)
+        assertEquals("home", once.pageId)
+        val twice = assertNotNull(LayoutEdits.placeHtml(once.doc, "dice", rows = 3))
+        // Home holds 6, so rows 3 overflows to two.
+        assertEquals("two", twice.pageId)
+        assertEquals(3, (twice.doc.pages.last().sections.last() as HtmlSection).rows)
+        assertEquals(twice.doc.pages.flatMap { it.sections }.map { it.id }.size, twice.doc.pages.flatMap { it.sections }.map { it.id }.toSet().size)
         assertNull(LayoutEdits.placeHtml(widgetDoc(), ""))
         assertNull(LayoutEdits.placeHtml(widgetDoc(), "dice", pageId = "missing"))
     }
 
     @Test
     fun `removeHtmlApp drops only matching sections`() {
-        val doc = assertNotNull(LayoutEdits.placeHtml(widgetDoc(), "dice"))
+        val doc = assertNotNull(LayoutEdits.placeHtml(widgetDoc(), "dice")).doc
         assertEquals(listOf(LayoutEdits.WidgetPlacement("home", "html-dice")), LayoutEdits.htmlPlacements(doc, "dice"))
         val out = assertNotNull(LayoutEdits.removeHtmlApp(doc, "dice"))
         assertEquals(emptyList(), LayoutEdits.htmlPlacements(out, "dice"))

@@ -981,8 +981,9 @@ class HomeActivity : ComponentActivity() {
                 onAdd = { id, approved -> scope.launch {
                     if (approved) app.httpApproval.approve(id, com.samosaai.masala.widgets.HttpApproval.fetchesOf(app.widgetLibrary.current()[id] ?: return@launch).map { it.host })
                     val title = app.widgetLibrary.current()[id]?.title ?: id
-                    app.layouts.placeWidget("Add to home: $title", id)
-                        .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_added))
+                    val placed = app.layouts.placeWidget("Add to home: $title", id)
+                    if (placed.problems.isNotEmpty()) toast(placed.problems.first().message)
+                    else toast(getString(R.string.widgets_added_on, app.layouts.pageLabel(placed.pageId ?: id)))
                     addWidgetSheet = false
                 } },
                 onDescribe = { addWidgetSheet = false; askMasala(getString(R.string.widgets_describe_prefill)) },

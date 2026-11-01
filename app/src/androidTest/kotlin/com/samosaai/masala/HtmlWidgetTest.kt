@@ -28,7 +28,7 @@ class HtmlWidgetTest {
         val id = app.miniApps.create(title = "Tiny", html = "<html><body>hi</body></html>")
         assertTrue(id != null)
         try {
-            val problems = app.layouts.placeHtml("Add to home: Tiny", id!!)
+            val problems = app.layouts.placeHtml("Add to home: Tiny", id!!).problems
             assertTrue(problems.toString(), problems.isEmpty())
             val base = withTimeout(15_000) { app.layouts.base.first { it != null } }!!
             assertTrue(LayoutEdits.htmlPlacements(base, id).isNotEmpty())

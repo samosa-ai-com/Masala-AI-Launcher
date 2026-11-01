@@ -211,8 +211,7 @@ class LayoutCheckerTest {
     }
 
     @Test
-    fun `an html section needs a known app, sane rows, and at most two per page`() {
-        val rich = env.copy(miniAppIds = setOf("dice"))
+    fun `an html section needs a known app, sane rows, and at most two per page`() {        val rich = env.copy(miniAppIds = setOf("dice"))
         assertEquals(emptyList(), LayoutChecker.check(layout(com.samosaai.masala.core.contract.HtmlSection("h", "dice", rows = 3)), rich))
         assertEquals(
             listOf("$.pages[0].sections[0].appId"),
@@ -223,7 +222,7 @@ class LayoutCheckerTest {
             LayoutChecker.check(layout(com.samosaai.masala.core.contract.HtmlSection("h", "")), rich).map { it.path },
         )
         assertEquals(
-            listOf("$.pages[0].sections[0].rows"),
+            listOf("$.pages[0].sections", "$.pages[0].sections[0].rows"),
             LayoutChecker.check(layout(com.samosaai.masala.core.contract.HtmlSection("h", "dice", rows = 9)), rich).map { it.path },
         )
         val three = layout(
@@ -232,5 +231,16 @@ class LayoutCheckerTest {
             com.samosaai.masala.core.contract.HtmlSection("h3", "dice"),
         )
         assertEquals(listOf("$.pages[0].sections"), LayoutChecker.check(three, rich).map { it.path })
+    }
+
+    @Test
+    fun `a page holds at most eight widget rows`() {
+        fun widget(sectionId: String, id: String, default: Int) = com.samosaai.masala.core.contract.WidgetSection(
+            sectionId, com.samosaai.masala.core.contract.WidgetSpec(id, components = listOf(com.samosaai.masala.core.contract.WidgetComponent.Text("x")), size = com.samosaai.masala.core.contract.SizeRange(1, default, 8)),
+        )
+        val full = layout(widget("sa", "a", 4), widget("sb", "b", 4))
+        assertEquals(emptyList(), LayoutChecker.check(full, env))
+        val over = layout(widget("sa", "a", 5), widget("sb", "b", 4))
+        assertEquals(listOf("$.pages[0].sections"), LayoutChecker.check(over, env).map { it.path })
     }
 }

@@ -106,7 +106,7 @@ class WidgetCheckerTest {
         // Without a library the ref isn't looked up, but rows are still bounded.
         assertEquals(emptyList(), LayoutChecker.check(layout(WidgetSection("s", ref = WidgetRef("nope"))), env))
         assertEquals(
-            listOf("$.pages[0].sections[0].ref.rowsOverride"),
+            listOf("$.pages[0].sections", "$.pages[0].sections[0].ref.rowsOverride"),
             LayoutChecker.check(layout(WidgetSection("s", ref = WidgetRef("x", 99))), env).map { it.path },
         )
     }

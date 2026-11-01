@@ -106,8 +106,8 @@ private fun WidgetActions(result: SkillRunEvent.Result) {
                 val specNow = app.widgetLibrary.current()[result.ref] ?: return@HttpApprovalDialog
                 app.httpApproval.approve(result.ref, fetches.map { it.host })
                 scope.launch {
-                    val problems = app.layouts.placeWidget("Add to home: ${specNow.title ?: specNow.id}", specNow.id)
-                    toast(if (problems.isEmpty()) addedNote else addFailedNote)
+                    val placed = app.layouts.placeWidget("Add to home: ${specNow.title ?: specNow.id}", specNow.id)
+                    toast(if (placed.problems.isEmpty()) app.getString(R.string.widgets_added_on, app.layouts.pageLabel(placed.pageId ?: specNow.id)) else addFailedNote)
                 }
             },
             onDismiss = { approval = null },
@@ -133,8 +133,8 @@ private fun WidgetActions(result: SkillRunEvent.Result) {
             val pending = com.samosaai.masala.widgets.HttpApproval.needingApproval(specNow, app.httpApproval.approved(specNow.id))
             if (pending.isEmpty()) {
                 scope.launch {
-                    val problems = app.layouts.placeWidget("Add to home: ${current.title ?: current.id}", current.id)
-                    toast(if (problems.isEmpty()) addedNote else addFailedNote)
+                    val placed = app.layouts.placeWidget("Add to home: ${current.title ?: current.id}", current.id)
+                    toast(if (placed.problems.isEmpty()) app.getString(R.string.widgets_added_on, app.layouts.pageLabel(placed.pageId ?: current.id)) else addFailedNote)
                 }
             } else {
                 approval = pending

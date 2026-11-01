@@ -135,16 +135,17 @@ object WidgetTools {
                         "This widget fetches:\n${HttpApproval.describe(pending)}\nTell the user, and call again with approved=true once they agree.",
                     )
                 }
-                val problems = host().layouts.placeWidget(
+                val placed = host().layouts.placeWidget(
                     "Place widget $id",
                     id,
                     rowsOverride = it.string("rows")?.toIntOrNull(),
                     pageId = it.string("page"),
                 )
-                if (problems.isNotEmpty()) return@FunctionTool ActionResult.error(problems.joinToString("\n"))
+                if (placed.problems.isNotEmpty()) return@FunctionTool ActionResult.error(placed.problems.joinToString("\n"))
                 host().httpApproval.approve(id, pending.map { it.host })
                 val fetchNote = pending.takeIf { it.isNotEmpty() }?.let { "\nApproved fetching:\n${HttpApproval.describe(it)}" }.orEmpty()
-                ActionResult.ok("Widget '$id' is on home.$fetchNote")
+                val where = host().layouts.pageLabel(placed.pageId ?: id)
+                ActionResult.ok("Widget '$id' is on $where.$fetchNote")
             },
             FunctionTool(Defs.removeWidget, CHANGES_SOMETHING) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")

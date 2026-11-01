@@ -7,6 +7,7 @@ import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.ItemSection
 import com.samosaai.masala.core.contract.LayoutDoc
 import com.samosaai.masala.core.contract.MasalaAction
+import com.samosaai.masala.core.contract.Page
 import com.samosaai.masala.core.contract.Section
 import com.samosaai.masala.core.contract.StackSection
 import com.samosaai.masala.core.contract.WidgetRef
@@ -202,6 +203,43 @@ object LayoutEdits {
 
     // ---- generated widgets (plan docs/plans/widget-maker.md §6.1) ----
 
+    /** What placing found: the new document, and where the section landed. */
+    data class Placed(val doc: LayoutDoc, val pageId: String, val sectionId: String)
+
+    /** Widget rows already on [pageId]: widget sections, the tallest of each stack, HTML widgets. */
+    fun widgetRowsUsed(doc: LayoutDoc, pageId: String, sizes: Map<String, Int> = emptyMap()): Int {
+        val page = doc.pages.firstOrNull { it.id == pageId } ?: return 0
+        return widgetRowsUsedSections(page.sections, sizes)
+    }
+
+    /** The same count over bare sections, for the checker (plan widget-maker §6.1 budget). */
+    fun widgetRowsUsedSections(sections: List<Section>, sizes: Map<String, Int> = emptyMap()): Int =
+        sections.sumOf { section ->
+            when (section) {
+                is WidgetSection -> section.ref?.let { it.rowsOverride ?: sizes[it.widgetId] ?: 2 }
+                    ?: section.widget?.size?.default ?: 2
+                is StackSection -> stackHeight(section, sizes)
+                is HtmlSection -> section.rows
+                else -> 0
+            }
+        }
+
+    private fun stackHeight(section: StackSection, sizes: Map<String, Int>): Int {
+        val inline = section.widgets.maxOfOrNull { it.size.default } ?: 0
+        val refs = section.refs.maxOfOrNull { it.rowsOverride ?: sizes[it.widgetId] ?: 2 } ?: 0
+        return maxOf(inline, refs)
+    }
+
+    /** A fresh overflow page: "Home 2", "Home 3"… beside home pages, "Page N" anywhere else. */
+    internal fun newPage(doc: LayoutDoc): Page {
+        val taken = doc.pages.map { it.id }.toSet()
+        val stem = if (taken.any { it == "home" || it.startsWith("home-") }) "home" else "page"
+        var n = 2
+        while ("$stem-$n" in taken) n++
+        val title = (if (stem == "home") "Home" else "Page") + " $n"
+        return Page("$stem-$n", title = title, sections = emptyList())
+    }
+
     /** One library widget placement: the page and section holding its ref. */
     data class WidgetPlacement(val pageId: String, val sectionId: String)
 
@@ -219,13 +257,37 @@ object LayoutEdits {
         }
 
     /**
-     * Puts [widgetId] on home as a new [WidgetSection] holding a ref, at the end of [pageId] (or the
-     * first page). Null when the id is blank or the page isn't there; placing twice is allowed, so a
-     * widget can sit on two pages.
+     * Puts [widgetId] on home as a new [WidgetSection] holding a ref: the requested page when it
+     * has room, else the first page that does, else a new page. A page holds at most
+     * [LayoutChecker.MAX_WIDGET_ROWS_PER_PAGE] widget rows, so home stays one screenful and extra
+     * widgets open a new home screen instead of stretching the scroll. Null when the id is blank
+     * or the requested page isn't there. [sizes] maps library ids to their default rows.
      */
-    fun placeWidget(doc: LayoutDoc, widgetId: String, rowsOverride: Int? = null, pageId: String? = null): LayoutDoc? {
+    fun placeWidget(
+        doc: LayoutDoc,
+        widgetId: String,
+        rowsOverride: Int? = null,
+        pageId: String? = null,
+        sizes: Map<String, Int> = emptyMap(),
+    ): Placed? {
         if (widgetId.isBlank() || doc.pages.isEmpty()) return null
-        val taken = doc.pages.flatMap { it.sections }.map { it.id }.toSet()
+        val height = rowsOverride ?: sizes[widgetId] ?: 2
+        val target = pageId?.let { id -> doc.pages.firstOrNull { it.id == id } } ?: doc.pages.first()
+        if (pageId != null && doc.pages.none { it.id == pageId }) return null
+        val page = if (widgetRowsUsed(doc, target.id, sizes) + height <= LayoutChecker.MAX_WIDGET_ROWS_PER_PAGE) {
+            target
+        } else {
+            doc.pages.firstOrNull { widgetRowsUsed(doc, it.id, sizes) + height <= LayoutChecker.MAX_WIDGET_ROWS_PER_PAGE }
+        }
+        var next = doc
+        val at = if (page != null) {
+            page.id
+        } else {
+            val created = newPage(doc)
+            next = doc.copy(pages = doc.pages + created)
+            created.id
+        }
+        val taken = next.pages.flatMap { it.sections }.map { it.id }.toSet()
         var sectionId = "widget-$widgetId"
         if (sectionId in taken) {
             var n = 2
@@ -233,13 +295,12 @@ object LayoutEdits {
             sectionId = "$sectionId-$n"
         }
         val section = WidgetSection(id = sectionId, ref = WidgetRef(widgetId, rowsOverride))
-        val index = pageId?.let { id -> doc.pages.indexOfFirst { it.id == id } } ?: 0
-        if (index < 0) return null
-        return doc.copy(
-            pages = doc.pages.mapIndexed { i, page ->
-                if (i != index) page else page.copy(sections = page.sections + section)
+        next = next.copy(
+            pages = next.pages.map { p ->
+                if (p.id != at) p else p.copy(sections = p.sections + section)
             },
         )
+        return Placed(next, at, sectionId)
     }
 
     /**
@@ -315,12 +376,34 @@ object LayoutEdits {
         }
 
     /**
-     * Shows a mini app on home at widget size, at the end of [pageId] (or the first page). Null
-     * when the id is blank or the page isn't there.
+     * Shows a mini app on home at widget size: the requested page when it has room, else the
+     * first page that does, else a new page (same one-screenful rule as [placeWidget]). Null when
+     * the id is blank or the requested page isn't there.
      */
-    fun placeHtml(doc: LayoutDoc, appId: String, rows: Int = 2, pageId: String? = null): LayoutDoc? {
+    fun placeHtml(
+        doc: LayoutDoc,
+        appId: String,
+        rows: Int = 2,
+        pageId: String? = null,
+        sizes: Map<String, Int> = emptyMap(),
+    ): Placed? {
         if (appId.isBlank() || doc.pages.isEmpty()) return null
-        val taken = doc.pages.flatMap { it.sections }.map { it.id }.toSet()
+        val target = pageId?.let { id -> doc.pages.firstOrNull { it.id == id } } ?: doc.pages.first()
+        if (pageId != null && doc.pages.none { it.id == pageId }) return null
+        val page = if (widgetRowsUsed(doc, target.id, sizes) + rows <= LayoutChecker.MAX_WIDGET_ROWS_PER_PAGE) {
+            target
+        } else {
+            doc.pages.firstOrNull { widgetRowsUsed(doc, it.id, sizes) + rows <= LayoutChecker.MAX_WIDGET_ROWS_PER_PAGE }
+        }
+        var next = doc
+        val at = if (page != null) {
+            page.id
+        } else {
+            val created = newPage(doc)
+            next = doc.copy(pages = doc.pages + created)
+            created.id
+        }
+        val taken = next.pages.flatMap { it.sections }.map { it.id }.toSet()
         var sectionId = "html-$appId"
         if (sectionId in taken) {
             var n = 2
@@ -328,13 +411,12 @@ object LayoutEdits {
             sectionId = "$sectionId-$n"
         }
         val section = HtmlSection(id = sectionId, appId = appId, rows = rows)
-        val index = pageId?.let { id -> doc.pages.indexOfFirst { it.id == id } } ?: 0
-        if (index < 0) return null
-        return doc.copy(
-            pages = doc.pages.mapIndexed { i, page ->
-                if (i != index) page else page.copy(sections = page.sections + section)
+        next = next.copy(
+            pages = next.pages.map { p ->
+                if (p.id != at) p else p.copy(sections = p.sections + section)
             },
         )
+        return Placed(next, at, sectionId)
     }
 
     /** Takes a mini app off home wherever it sits at widget size. Null when it wasn't placed. */

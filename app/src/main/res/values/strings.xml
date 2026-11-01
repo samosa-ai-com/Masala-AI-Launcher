@@ -295,6 +295,7 @@
     <string name="widgets_describe_prefill">"I want a home-screen widget that "</string>
     <string name="widgets_add_to_home">Add to home</string>
     <string name="widgets_added">Added — see it on home</string>
+    <string name="widgets_added_on">Added — see it on %1$s</string>
     <string name="widgets_add_failed">Couldn’t add it to home</string>
     <string name="widgets_on_home">On home</string>
     <string name="widgets_not_on_home">Not on home</string>

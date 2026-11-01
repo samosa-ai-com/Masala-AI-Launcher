@@ -241,11 +241,24 @@ class LayoutRepository(
         base.value?.let { LayoutEdits.widgetPlacements(it, widgetId) }.orEmpty()
 
     /**
-     * Puts a library widget on home as a new section holding a ref. Always asks (arch §3.3), so the
-     * caller gates it; a duplicate id gets a fresh section id.
+     * Puts a library widget on home: the requested page when it has room, else the first page
+     * that does, else a new home screen. Always asks (arch §3.3), so the caller gates it.
+     * Returns the check problems plus where it landed, for the "on Home 2" message.
      */
-    suspend fun placeWidget(label: String, widgetId: String, rowsOverride: Int? = null, pageId: String? = null): List<LayoutChecker.Problem> =
-        edit(label) { LayoutEdits.placeWidget(it, widgetId, rowsOverride, pageId) }
+    suspend fun placeWidget(
+        label: String,
+        widgetId: String,
+        rowsOverride: Int? = null,
+        pageId: String? = null,
+    ): PlaceResult {
+        val sizes = widgets.current().mapValues { it.value.size.default }
+        val problems = edit(label) { LayoutEdits.placeWidget(it, widgetId, rowsOverride, pageId, sizes)?.doc }
+        if (problems.isNotEmpty()) return PlaceResult(problems, null)
+        val at = widgetPlacements(widgetId).lastOrNull()?.pageId
+        return PlaceResult(emptyList(), at)
+    }
+
+    data class PlaceResult(val problems: List<LayoutChecker.Problem>, val pageId: String?)
 
     /** Takes one library widget off home wherever it sits, in one undoable step. */
     suspend fun removeWidgetRefs(label: String, widgetId: String): List<LayoutChecker.Problem> =
@@ -259,9 +272,18 @@ class LayoutRepository(
     fun htmlPlacements(appId: String): List<LayoutEdits.WidgetPlacement> =
         base.value?.let { LayoutEdits.htmlPlacements(it, appId) }.orEmpty()
 
-    /** Shows a mini app on home at widget size. */
-    suspend fun placeHtml(label: String, appId: String, rows: Int = 2, pageId: String? = null): List<LayoutChecker.Problem> =
-        edit(label) { LayoutEdits.placeHtml(it, appId, rows, pageId) }
+    /** Shows a mini app on home at widget size, with the same one-screenful overflow as widgets. */
+    suspend fun placeHtml(label: String, appId: String, rows: Int = 2, pageId: String? = null): PlaceResult {
+        val sizes = widgets.current().mapValues { it.value.size.default }
+        val problems = edit(label) { LayoutEdits.placeHtml(it, appId, rows, pageId, sizes)?.doc }
+        if (problems.isNotEmpty()) return PlaceResult(problems, null)
+        val at = htmlPlacements(appId).lastOrNull()?.pageId
+        return PlaceResult(emptyList(), at)
+    }
+
+    /** The display name of a page ("Home 2", or the id when it has no title). */
+    fun pageLabel(pageId: String): String =
+        base.value?.pages?.firstOrNull { it.id == pageId }?.title ?: pageId
 
     /** Takes a mini app off home wherever it sits at widget size, in one undoable step. */
     suspend fun removeHtmlApp(label: String, appId: String): List<LayoutChecker.Problem> =

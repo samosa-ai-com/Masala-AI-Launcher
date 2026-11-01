@@ -502,8 +502,11 @@ class SettingsActivity : ComponentActivity() {
                             approval = null
                             scope.launch {
                                 masala.httpApproval.approve(spec.id, fetches.map { it.host })
-                                val problems = masala.layouts.placeWidget("Add to home: ${spec.title ?: spec.id}", spec.id)
-                                toast(getString(if (problems.isEmpty()) R.string.widgets_added else R.string.widgets_add_failed))
+                                val placed = masala.layouts.placeWidget("Add to home: ${spec.title ?: spec.id}", spec.id)
+                                toast(
+                                    if (placed.problems.isEmpty()) getString(R.string.widgets_added_on, masala.layouts.pageLabel(placed.pageId ?: spec.id))
+                                    else getString(R.string.widgets_add_failed),
+                                )
                             }
                         },
                         onDismiss = { approval = null },
@@ -524,8 +527,11 @@ class SettingsActivity : ComponentActivity() {
                             scope.launch {
                                 val pending = com.samosaai.masala.widgets.HttpApproval.needingApproval(spec, masala.httpApproval.approved(spec.id))
                                 if (pending.isEmpty()) {
-                                    val problems = masala.layouts.placeWidget("Add to home: ${spec.title ?: spec.id}", spec.id)
-                                    toast(getString(if (problems.isEmpty()) R.string.widgets_added else R.string.widgets_add_failed))
+                                    val placed = masala.layouts.placeWidget("Add to home: ${spec.title ?: spec.id}", spec.id)
+                                    toast(
+                                        if (placed.problems.isEmpty()) getString(R.string.widgets_added_on, masala.layouts.pageLabel(placed.pageId ?: spec.id))
+                                        else getString(R.string.widgets_add_failed),
+                                    )
                                 } else {
                                     approval = pending
                                 }
@@ -728,8 +734,11 @@ class SettingsActivity : ComponentActivity() {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = {
                         scope.launch {
-                            val problems = masala.layouts.placeHtml("Add to home: ${row.title}", row.id)
-                            toast(getString(if (problems.isEmpty()) R.string.widgets_added else R.string.widgets_add_failed))
+                            val placed = masala.layouts.placeHtml("Add to home: ${row.title}", row.id)
+                            toast(
+                                if (placed.problems.isEmpty()) getString(R.string.widgets_added_on, masala.layouts.pageLabel(placed.pageId ?: row.id))
+                                else getString(R.string.widgets_add_failed),
+                            )
                         }
                     }) { Text(stringResource(R.string.widgets_add_to_home)) }
                     TextButton(onClick = {

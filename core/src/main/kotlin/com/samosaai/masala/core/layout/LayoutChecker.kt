@@ -70,6 +70,8 @@ object LayoutChecker {
     const val MAX_COLUMNS = 6
     const val MAX_WIDGETS_IN_STACK = 8
     const val MAX_HTML_PER_PAGE = 2
+    /** Widget rows on one page (widget sections, tallest of each stack, HTML): home stays one screenful. */
+    const val MAX_WIDGET_ROWS_PER_PAGE = 8
     const val MAX_ROWS = 8
     const val MAX_FOLDER_ITEMS = 16
     const val MAX_FOLDER_LABEL = 60
@@ -115,6 +117,11 @@ object LayoutChecker {
             // An HTML widget is a live WebView: at most two per page, so home keeps its frame time.
             if (page.sections.filterIsInstance<HtmlSection>().size > MAX_HTML_PER_PAGE) {
                 problems += Problem("$pagePath.sections", "At most $MAX_HTML_PER_PAGE HTML widgets on a page")
+            }
+            // Widgets share one screenful per page; the rest belong on another page.
+            val widgetSizes = env.widgets?.mapValues { it.value.size.default }.orEmpty()
+            if (LayoutEdits.widgetRowsUsedSections(page.sections, widgetSizes) > MAX_WIDGET_ROWS_PER_PAGE) {
+                problems += Problem("$pagePath.sections", "At most $MAX_WIDGET_ROWS_PER_PAGE widget rows on a page")
             }
             page.sections.forEachIndexed { s, section ->
                 val path = "$pagePath.sections[$s]"
