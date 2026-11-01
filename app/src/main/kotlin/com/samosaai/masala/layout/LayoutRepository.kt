@@ -233,6 +233,25 @@ class LayoutRepository(
     suspend fun renameItems(label: String, match: (Item) -> Boolean): List<LayoutChecker.Problem> =
         edit(label) { LayoutEdits.renameWhere(it, label, match) }
 
+    /** Where one library widget sits on home, for the Widgets manager. */
+    fun widgetPlacements(widgetId: String): List<LayoutEdits.WidgetPlacement> =
+        base.value?.let { LayoutEdits.widgetPlacements(it, widgetId) }.orEmpty()
+
+    /**
+     * Puts a library widget on home as a new section holding a ref. Always asks (arch §3.3), so the
+     * caller gates it; a duplicate id gets a fresh section id.
+     */
+    suspend fun placeWidget(label: String, widgetId: String, rowsOverride: Int? = null, pageId: String? = null): List<LayoutChecker.Problem> =
+        edit(label) { LayoutEdits.placeWidget(it, widgetId, rowsOverride, pageId) }
+
+    /** Takes one library widget off home wherever it sits, in one undoable step. */
+    suspend fun removeWidgetRefs(label: String, widgetId: String): List<LayoutChecker.Problem> =
+        edit(label) { LayoutEdits.removeWidgetRefs(it, widgetId) }
+
+    /** Sets the per-placement height override on every ref of [widgetId]. */
+    suspend fun resizeWidget(label: String, widgetId: String, rows: Int): List<LayoutChecker.Problem> =
+        edit(label) { LayoutEdits.resizeWidget(it, widgetId, rows) }
+
     suspend fun undo(): Boolean = lock.withLock { history.undo()?.also { savePointer(); publish() } != null }
 
     suspend fun redo(): Boolean = lock.withLock { history.redo()?.also { savePointer(); publish() } != null }

@@ -6,6 +6,10 @@ import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.ItemSection
 import com.samosaai.masala.core.contract.LayoutDoc
 import com.samosaai.masala.core.contract.MasalaAction
+import com.samosaai.masala.core.contract.Section
+import com.samosaai.masala.core.contract.StackSection
+import com.samosaai.masala.core.contract.WidgetRef
+import com.samosaai.masala.core.contract.WidgetSection
 
 /** User edits to a base layout by item id (home drag and drop). Each returns null when it can't apply. */
 object LayoutEdits {
@@ -194,4 +198,108 @@ object LayoutEdits {
             page.copy(sections = page.sections.map { if (it is ItemSection) change(it) else it })
         },
     )
+
+    // ---- generated widgets (plan docs/plans/widget-maker.md §6.1) ----
+
+    /** One library widget placement: the page and section holding its ref. */
+    data class WidgetPlacement(val pageId: String, val sectionId: String)
+
+    /** Every place [widgetId] sits on home, by ref (or by an inline spec not yet lifted). */
+    fun widgetPlacements(doc: LayoutDoc, widgetId: String): List<WidgetPlacement> =
+        doc.pages.flatMap { page ->
+            page.sections.mapNotNull { section ->
+                val holds = when (section) {
+                    is WidgetSection -> section.ref?.widgetId == widgetId || section.widget?.id == widgetId
+                    is StackSection -> widgetId in section.widgetIds
+                    else -> false
+                }
+                if (holds) WidgetPlacement(page.id, section.id) else null
+            }
+        }
+
+    /**
+     * Puts [widgetId] on home as a new [WidgetSection] holding a ref, at the end of [pageId] (or the
+     * first page). Null when the id is blank or the page isn't there; placing twice is allowed, so a
+     * widget can sit on two pages.
+     */
+    fun placeWidget(doc: LayoutDoc, widgetId: String, rowsOverride: Int? = null, pageId: String? = null): LayoutDoc? {
+        if (widgetId.isBlank() || doc.pages.isEmpty()) return null
+        val taken = doc.pages.flatMap { it.sections }.map { it.id }.toSet()
+        var sectionId = "widget-$widgetId"
+        if (sectionId in taken) {
+            var n = 2
+            while ("$sectionId-$n" in taken) n++
+            sectionId = "$sectionId-$n"
+        }
+        val section = WidgetSection(id = sectionId, ref = WidgetRef(widgetId, rowsOverride))
+        val index = pageId?.let { id -> doc.pages.indexOfFirst { it.id == id } } ?: 0
+        if (index < 0) return null
+        return doc.copy(
+            pages = doc.pages.mapIndexed { i, page ->
+                if (i != index) page else page.copy(sections = page.sections + section)
+            },
+        )
+    }
+
+    /**
+     * Takes [widgetId] off home wherever it sits: whole widget sections go, stack refs are stripped
+     * (an emptied stack goes too). Null when it wasn't placed.
+     */
+    fun removeWidgetRefs(doc: LayoutDoc, widgetId: String): LayoutDoc? {
+        var changed = false
+        val next = doc.copy(
+            pages = doc.pages.map { page ->
+                page.copy(
+                    sections = page.sections.mapNotNull { section ->
+                        when (section) {
+                            is WidgetSection ->
+                                if (section.ref?.widgetId == widgetId || section.widget?.id == widgetId) {
+                                    changed = true
+                                    null
+                                } else section
+                            is StackSection -> {
+                                val keepWidgets = section.widgets.filterNot { it.id == widgetId }
+                                val keepRefs = section.refs.filterNot { it.widgetId == widgetId }
+                                if (keepWidgets.size == section.widgets.size && keepRefs.size == section.refs.size) section
+                                else {
+                                    changed = true
+                                    if (section.refs.isNotEmpty() && keepRefs.isEmpty()) null
+                                    else if (section.refs.isEmpty() && keepWidgets.isEmpty()) null
+                                    else section.copy(widgets = keepWidgets, refs = keepRefs)
+                                }
+                            }
+                            else -> section
+                        }
+                    },
+                )
+            },
+        )
+        return if (changed) next else null
+    }
+
+    /** Sets [rows] as the per-placement height override on every ref of [widgetId]. Null when none. */
+    fun resizeWidget(doc: LayoutDoc, widgetId: String, rows: Int): LayoutDoc? {
+        var changed = false
+        fun refs(refs: List<WidgetRef>): List<WidgetRef> =
+            refs.map { if (it.widgetId == widgetId) { changed = true; it.copy(rowsOverride = rows) } else it }
+        val next = doc.copy(
+            pages = doc.pages.map { page ->
+                page.copy(
+                    sections = page.sections.map { section ->
+                        when (section) {
+                            is WidgetSection ->
+                                section.ref?.takeIf { it.widgetId == widgetId }?.let { section.copy(ref = it.copy(rowsOverride = rows)).also { changed = true } }
+                                    ?: section
+                            is StackSection ->
+                                if (section.refs.isNotEmpty() && section.refs.any { it.widgetId == widgetId }) {
+                                    section.copy(refs = refs(section.refs))
+                                } else section
+                            else -> section
+                        }
+                    },
+                )
+            },
+        )
+        return if (changed) next else null
+    }
 }

@@ -9,6 +9,9 @@ import com.samosaai.masala.core.contract.ItemSection
 import com.samosaai.masala.core.contract.LayoutDoc
 import com.samosaai.masala.core.contract.MasalaAction
 import com.samosaai.masala.core.contract.Page
+import com.samosaai.masala.core.contract.StackSection
+import com.samosaai.masala.core.contract.WidgetRef
+import com.samosaai.masala.core.contract.WidgetSection
 import com.samosaai.masala.core.layout.LayoutEdits.Slot
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -292,4 +295,70 @@ class LayoutEditsTest {
         val single = LayoutDoc(pages = listOf(Page("home", sections = listOf(GridSection("grid", items = listOf(item("a"), one, item("b")))))))
         assertEquals(listOf("a", "c", "b"), ids(assertNotNull(LayoutEdits.moveOutOfFolder(single, "f", "c")), "grid"))
     }
+
+    @Test
+    fun `widget placements cover refs, stacks and inline specs`() {
+        val doc = widgetDoc()
+        assertEquals(
+            listOf(LayoutEdits.WidgetPlacement("home", "w1"), LayoutEdits.WidgetPlacement("home", "s1")),
+            LayoutEdits.widgetPlacements(doc, "water"),
+        )
+        assertEquals(listOf(LayoutEdits.WidgetPlacement("home", "s1"), LayoutEdits.WidgetPlacement("two", "s2")), LayoutEdits.widgetPlacements(doc, "steps"))
+        assertEquals(emptyList(), LayoutEdits.widgetPlacements(doc, "missing"))
+    }
+
+    @Test
+    fun `placeWidget appends a ref section with a free id`() {
+        val once = assertNotNull(LayoutEdits.placeWidget(widgetDoc(), "habits"))
+        val section = once.pages.first().sections.last() as WidgetSection
+        assertEquals(WidgetRef("habits"), section.ref)
+        val twice = assertNotNull(LayoutEdits.placeWidget(once, "habits"))
+        val ids = twice.pages.first().sections.map { it.id }
+        assertEquals(ids.size, ids.toSet().size)
+        assertNull(LayoutEdits.placeWidget(widgetDoc(), ""))
+        assertNull(LayoutEdits.placeWidget(widgetDoc(), "habits", pageId = "missing"))
+        val other = assertNotNull(LayoutEdits.placeWidget(widgetDoc(), "habits", rowsOverride = 3, pageId = "two"))
+        assertEquals(listOf("s2", "widget-habits"), other.pages.last().sections.map { it.id })
+        assertEquals(3, (other.pages.last().sections.last() as WidgetSection).ref?.rowsOverride)
+    }
+
+    @Test
+    fun `removeWidgetRefs drops sections and strips stacks`() {
+        val doc = widgetDoc()
+        val out = assertNotNull(LayoutEdits.removeWidgetRefs(doc, "water"))
+        assertEquals(emptyList(), LayoutEdits.widgetPlacements(out, "water"))
+        // The water section is gone; s1 keeps its steps ref, s2 is untouched.
+        val stacks = out.pages.flatMap { it.sections }.filterIsInstance<StackSection>()
+        assertEquals(listOf("s1", "s2"), stacks.map { it.id })
+        assertEquals(listOf(WidgetRef("steps", rowsOverride = 1)), stacks.first().refs)
+        assertNull(LayoutEdits.removeWidgetRefs(doc, "missing"))
+    }
+
+    @Test
+    fun `resizeWidget sets the override on every matching ref`() {
+        val out = assertNotNull(LayoutEdits.resizeWidget(widgetDoc(), "water", 3))
+        val refs = out.pages.flatMap { it.sections }.flatMap {
+            when (it) {
+                is WidgetSection -> listOfNotNull(it.ref)
+                is StackSection -> it.refs
+                else -> emptyList()
+            }
+        }.filter { it.widgetId == "water" }
+        assertEquals(2, refs.size)
+        assertEquals(listOf(3, 3), refs.map { it.rowsOverride })
+        assertNull(LayoutEdits.resizeWidget(widgetDoc(), "missing", 3))
+    }
+
+    private fun widgetDoc() = LayoutDoc(
+        pages = listOf(
+            Page(
+                "home",
+                sections = listOf(
+                    WidgetSection("w1", ref = WidgetRef("water")),
+                    StackSection("s1", refs = listOf(WidgetRef("water"), WidgetRef("steps", rowsOverride = 1))),
+                ),
+            ),
+            Page("two", sections = listOf(StackSection("s2", refs = listOf(WidgetRef("steps"))))),
+        ),
+    )
 }
