@@ -150,6 +150,8 @@ class RenderContext(
     val onItemMenu: ((Item) -> Unit)? = null,
     /** A mini app's stored icon by id; null draws the pinned item's own icon. */
     val miniAppIcon: (String) -> String? = { null },
+    /** A mini app's document for HTML widgets; none keeps the placeholder. */
+    val htmlWidget: (String) -> com.samosaai.masala.data.MiniAppEntity? = { null },
     /** Tapping a folder (an `open_folder` item) shows its items; folders are never dispatched. */
     val onOpenFolder: ((Item) -> Unit)? = null,
     /** A folder's own menu (rename, ungroup). */
@@ -398,6 +400,14 @@ private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: Render
         }
         is SkillWidgetSection -> ctx.skillWidgets?.let { SkillWidgetCard(section, it, ctx.onAction) }
             ?: Placeholder(section.skillId, stringResource(R.string.home_skill_widget_placeholder), null)
+        // An HTML widget draws its mini app at widget size, sandboxed like its own screen.
+        is com.samosaai.masala.core.contract.HtmlSection -> ctx.htmlWidget(section.appId)?.let { row ->
+            androidx.compose.foundation.layout.Box(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = ((section.rows) * 48).dp),
+            ) {
+                com.samosaai.masala.miniapps.MiniAppView(row.id, row.html, row.networkAllowed, Modifier.fillMaxWidth())
+            }
+        } ?: Placeholder(section.appId, stringResource(R.string.home_widget_placeholder), section.rows)
     }
 }
 

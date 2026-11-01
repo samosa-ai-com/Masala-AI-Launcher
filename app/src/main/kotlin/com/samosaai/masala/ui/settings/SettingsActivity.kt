@@ -461,7 +461,7 @@ class SettingsActivity : ComponentActivity() {
             var editSpec by remember { mutableStateOf<com.samosaai.masala.core.contract.WidgetSpec?>(null) }
             editSpec?.let { WidgetEditDialog(it, onClose = { editSpec = null }) }
             var tab by rememberSaveable { mutableStateOf(0) }
-            val tabs = listOf(stringResource(R.string.widgets_mine), stringResource(R.string.widgets_templates), stringResource(R.string.widgets_cameras))
+            val tabs = listOf(stringResource(R.string.widgets_mine), stringResource(R.string.widgets_templates), stringResource(R.string.widgets_cameras), stringResource(R.string.widgets_html))
             androidx.compose.material3.TabRow(selectedTabIndex = tab) {
                 tabs.forEachIndexed { i, title ->
                     androidx.compose.material3.Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title) })
@@ -469,6 +469,10 @@ class SettingsActivity : ComponentActivity() {
             }
             if (tab == 2) {
                 CamerasTab()
+                return@SettingsScaffold
+            }
+            if (tab == 3) {
+                HtmlTab()
                 return@SettingsScaffold
             }
             val mine = tab == 0
@@ -569,10 +573,6 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Edits one library widget: title plus the raw spec JSON, checker problems inline, and the last
-     * versions to restore. The id never changes, so storage, taps and home refs carry over.
-     */
     /** Stream sources (plan §4.2): the registry behind video and snapshot widgets. */
     @Composable
     private fun CamerasTab() {
@@ -699,7 +699,57 @@ class SettingsActivity : ComponentActivity() {
     /**
      * Edits one library widget: title plus the raw spec JSON, checker problems inline, and the last
      * versions to restore. The id never changes, so storage, taps and home refs carry over.
-     */    @Composable
+     */
+    @Composable
+    private fun HtmlTab() {
+        val scope = rememberCoroutineScope()
+        val apps by remember { masala.miniApps.all }.collectAsStateWithLifecycle(emptyList())
+        val base by masala.layouts.base.collectAsStateWithLifecycle()
+        fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()
+        if (apps.isEmpty()) {
+            Text(stringResource(R.string.widgets_html_empty), style = MaterialTheme.typography.bodyMedium)
+            return
+        }
+        apps.forEach { row ->
+            val placements = remember(base, row.id) { base?.let { com.samosaai.masala.core.layout.LayoutEdits.htmlPlacements(it, row.id) }.orEmpty() }
+            Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    com.samosaai.masala.miniapps.MiniAppIconView(row.icon, row.title, 40.dp)
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text(row.title, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            if (placements.isEmpty()) stringResource(R.string.widgets_not_on_home)
+                            else stringResource(R.string.widgets_on_home) + " · ${placements.size}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        scope.launch {
+                            val problems = masala.layouts.placeHtml("Add to home: ${row.title}", row.id)
+                            toast(getString(if (problems.isEmpty()) R.string.widgets_added else R.string.widgets_add_failed))
+                        }
+                    }) { Text(stringResource(R.string.widgets_add_to_home)) }
+                    TextButton(onClick = {
+                        scope.launch {
+                            masala.layouts.removeHtmlApp("Remove from home: ${row.title}", row.id)
+                        }
+                    }) {
+                        Text(stringResource(R.string.widgets_remove_from_home))
+                    }
+                }
+            }
+            HorizontalDivider()
+        }
+    }
+
+    /**
+     * Edits one library widget: title plus the raw spec JSON, checker problems inline, and the last
+     * versions to restore. The id never changes, so storage, taps and home refs carry over.
+     */
+    @Composable
     private fun WidgetEditDialog(spec: com.samosaai.masala.core.contract.WidgetSpec, onClose: () -> Unit) {
         val scope = rememberCoroutineScope()
         fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()
@@ -709,15 +759,18 @@ class SettingsActivity : ComponentActivity() {
         }
         var versions by remember(spec.id) { mutableStateOf<List<com.samosaai.masala.core.contract.WidgetSpec>?>(null) }
         androidx.compose.runtime.LaunchedEffect(spec.id) { versions = masala.widgetLibrary.history(spec.id) }
-        val env = remember(spec.id) { masala.layouts.environment() }
+        var env by remember(spec.id) { mutableStateOf<com.samosaai.masala.core.layout.LayoutChecker.Environment?>(null) }
+        androidx.compose.runtime.LaunchedEffect(spec.id) { env = masala.layouts.environment() }
         val parsed = remember(json) {
             runCatching { com.samosaai.masala.core.contract.MasalaJson.strict.decodeFromString(com.samosaai.masala.core.contract.WidgetSpec.serializer(), json) }.getOrNull()
         }
-        val problems = remember(parsed, title) {
+        val problems = remember(parsed, title, env) {
+            val environment = env
             when {
                 parsed == null -> listOf(com.samosaai.masala.core.layout.LayoutChecker.Problem("$", "Not valid JSON"))
                 parsed.id != spec.id -> listOf(com.samosaai.masala.core.layout.LayoutChecker.Problem("$.id", "The id stays '${spec.id}' so refs keep working"))
-                else -> com.samosaai.masala.core.widgets.WidgetChecker.check(parsed.copy(title = title.ifBlank { null }), env)
+                environment == null -> emptyList()
+                else -> com.samosaai.masala.core.widgets.WidgetChecker.check(parsed.copy(title = title.ifBlank { null }), environment)
             }
         }
         AlertDialog(

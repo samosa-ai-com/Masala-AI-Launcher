@@ -43,7 +43,7 @@ object WidgetTools {
         fun skillIds(): Set<String> = host().skills.getAllSkills().map { it.id }.toSet()
 
         /** The probe: the spec placed in a scratch layout must check clean against the phone. */
-        fun probe(spec: WidgetSpec): List<LayoutChecker.Problem> {
+        suspend fun probe(spec: WidgetSpec): List<LayoutChecker.Problem> {
             val env = host().layouts.environment().copy(widgets = host().widgetLibrary.current() + (spec.id to spec))
             val scratch = LayoutDoc(pages = listOf(Page("probe", sections = listOf(WidgetSection("probe", ref = WidgetRef(spec.id))))))
             return LayoutChecker.check(scratch, env)

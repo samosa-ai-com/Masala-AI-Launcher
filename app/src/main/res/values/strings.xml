@@ -271,6 +271,8 @@
     <string name="widgets_mine">My widgets</string>
     <string name="widgets_templates">Templates</string>
     <string name="widgets_cameras">Cameras &amp; streams</string>
+    <string name="widgets_html">HTML</string>
+    <string name="widgets_html_empty">No mini apps yet. The model builds one from chat, then it can sit on home at widget size here.</string>
     <string name="widgets_sources_empty">No cameras yet. Add one below; video and snapshot widgets show it on home.</string>
     <string name="widgets_source_login">with login</string>
     <string name="widgets_source_login_gone">The saved login no longer opens; re-add the source.</string>

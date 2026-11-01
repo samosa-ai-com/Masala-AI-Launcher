@@ -454,6 +454,7 @@ class HomeActivity : ComponentActivity() {
         // folder sheet draw what the agent chose.
         val miniAppRows by remember { app.miniApps.all }.collectAsStateWithLifecycle(emptyList())
         val miniAppIcons = remember(miniAppRows) { miniAppRows.associate { it.id to it.icon } }
+        val miniAppDocs = remember(miniAppRows) { miniAppRows.associateBy { it.id } }
         val drag = remember { HomeDragState() }
         // Generated widgets (W1): one store for their stored values, shared by every card on home.
         val widgetStore = remember { app.widgetStates }
@@ -469,7 +470,7 @@ class HomeActivity : ComponentActivity() {
         }
         // The context below is remembered on purpose; drops read the live layout through these.
         val latestLayout = rememberUpdatedState(layout)
-        val render = remember(apps, settings.homeLocked, modeName, movable, miniAppIcons, widgetSource) {
+        val render = remember(apps, settings.homeLocked, modeName, movable, miniAppIcons, miniAppDocs, widgetSource) {
             RenderContext(
                 icons = app.icons,
                 apps = apps,
@@ -490,6 +491,7 @@ class HomeActivity : ComponentActivity() {
                 drag = drag,
                 movable = movable,
                 miniAppIcon = { miniAppIcons[it] },
+                htmlWidget = { miniAppDocs[it] },
                 onOpenFolder = { openFolder = it to (it.id in movable) },
                 onFolderMenu = { if (it.id in movable) folderMenu = it },
                 onItemMenu = { itemMenuFor = it },

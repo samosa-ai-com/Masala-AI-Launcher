@@ -62,6 +62,7 @@ class LayoutRepository(
     private val toolNames: () -> Set<String>,
     private val widgets: WidgetLibrary,
     private val streams: com.samosaai.masala.widgets.StreamSourceStore,
+    private val miniApps: com.samosaai.masala.miniapps.MiniAppStore,
 ) {
     enum class Source { CACHE, MINIMAL }
 
@@ -254,6 +255,18 @@ class LayoutRepository(
     suspend fun resizeWidget(label: String, widgetId: String, rows: Int): List<LayoutChecker.Problem> =
         edit(label) { LayoutEdits.resizeWidget(it, widgetId, rows) }
 
+    /** Where one mini app sits on home at widget size, for the Widgets manager. */
+    fun htmlPlacements(appId: String): List<LayoutEdits.WidgetPlacement> =
+        base.value?.let { LayoutEdits.htmlPlacements(it, appId) }.orEmpty()
+
+    /** Shows a mini app on home at widget size. */
+    suspend fun placeHtml(label: String, appId: String, rows: Int = 2, pageId: String? = null): List<LayoutChecker.Problem> =
+        edit(label) { LayoutEdits.placeHtml(it, appId, rows, pageId) }
+
+    /** Takes a mini app off home wherever it sits at widget size, in one undoable step. */
+    suspend fun removeHtmlApp(label: String, appId: String): List<LayoutChecker.Problem> =
+        edit(label) { LayoutEdits.removeHtmlApp(it, appId) }
+
     suspend fun undo(): Boolean = lock.withLock { history.undo()?.also { savePointer(); publish() } != null }
 
     suspend fun redo(): Boolean = lock.withLock { history.redo()?.also { savePointer(); publish() } != null }
@@ -364,7 +377,7 @@ class LayoutRepository(
             (action.activity == null || action.activity == entry.key.activity)
 
     /** What the checker knows about this phone. */
-    fun environment(): LayoutChecker.Environment {
+    suspend fun environment(): LayoutChecker.Environment {
         val installed = catalog.state.value.apps.groupBy({ it.key.packageName }, { it.key.user }).mapValues { it.value.toSet() }
         return LayoutChecker.Environment(
             installedApps = installed,
@@ -373,6 +386,7 @@ class LayoutRepository(
             modeIds = modes.patches.value.map { it.id }.toSet(),
             widgets = widgets.current(),
             streamSourceIds = streams.current().keys,
+            miniAppIds = miniApps.list().map { it.id }.toSet(),
         )
     }
 

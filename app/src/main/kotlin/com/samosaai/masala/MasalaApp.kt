@@ -265,6 +265,7 @@ class MasalaApp : Application() {
     suspend fun deleteMiniApp(id: String) {
         miniApps.delete(id)
         layouts.unpinMiniApp(id)
+        layouts.removeHtmlApp("Remove HTML widget", id)
         MiniAppConsole.clear(id)
     }
 
@@ -607,6 +608,7 @@ class MasalaApp : Application() {
             toolNames = { tools.tools.map { it.name }.toSet() },
             widgets = widgetLibrary,
             streams = streamSources,
+            miniApps = miniApps,
         )
         AgentTools.create(
             this, layouts, modes,

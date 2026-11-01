@@ -41,7 +41,7 @@ class WidgetGenerator(
     suspend fun generate(
         request: Request,
         /** Extra checks on a clean spec (the caller places it in the real layout); empties pass. */
-        probe: (WidgetSpec) -> List<LayoutChecker.Problem> = { emptyList() },
+        probe: suspend (WidgetSpec) -> List<LayoutChecker.Problem> = { emptyList() },
     ): Result {
         val system = buildSystem(request)
         val user = ChatMessage(
@@ -135,7 +135,7 @@ class WidgetGenerator(
      * places it on the first page and checks against the phone's environment. Off-screen draw
      * overflow stays a W3 check on the device, not here.
      */
-    private fun checkProbe(generated: Result.Generated, probe: (WidgetSpec) -> List<LayoutChecker.Problem>): Result {
+    private suspend fun checkProbe(generated: Result.Generated, probe: suspend (WidgetSpec) -> List<LayoutChecker.Problem>): Result {
         val problems = probe(generated.spec)
         return if (problems.isEmpty()) generated else Result.Rejected(problems)
     }
