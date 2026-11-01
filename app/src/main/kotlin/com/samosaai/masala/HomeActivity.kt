@@ -655,6 +655,14 @@ class HomeActivity : ComponentActivity() {
                         hiddenUndo?.let { entry ->
                             com.samosaai.masala.ui.components.GlassPill {
                                 Text(getString(R.string.menu_hidden_pill, entry.label), color = com.samosaai.masala.ui.theme.MasalaColors.Text)
+                                // Where it went, and how to get it back later: one tap to the list.
+                                androidx.compose.material3.TextButton(onClick = {
+                                    hiddenUndo = null
+                                    startActivity(
+                                        Intent(this@HomeActivity, SettingsActivity::class.java)
+                                            .putExtra(SettingsActivity.EXTRA_PAGE, "HIDDEN_APPS"),
+                                    )
+                                }) { Text(getString(R.string.menu_hidden_manage), color = com.samosaai.masala.ui.theme.MasalaColors.Gold) }
                                 androidx.compose.material3.TextButton(onClick = {
                                     hiddenUndo = null
                                     scope.launch {

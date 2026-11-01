@@ -3,6 +3,7 @@ package com.samosaai.masala.ui.settings
 import com.samosaai.masala.ui.theme.MasalaColors
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.BugReport
@@ -10,6 +11,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.FiberManualRecord
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Extension
@@ -70,6 +72,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -81,6 +85,7 @@ import com.samosaai.masala.R
 import com.samosaai.masala.core.apps.AppEntry
 import com.samosaai.masala.core.apps.Visibility
 import com.samosaai.masala.core.scheduled.ScheduledTask
+import com.samosaai.masala.data.HiddenPin
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.data.ThemeMode
 import com.samosaai.masala.launcher.HomeRole
@@ -198,6 +203,7 @@ class SettingsActivity : ComponentActivity() {
             onPauseOrDispose {}
         }
         val profile by masala.aiSettings.profile.collectAsStateWithLifecycle()
+        val hiddenApps by masala.launcher.apps.collectAsStateWithLifecycle()
         val tokens = com.samosaai.masala.ui.theme.MasalaTheme.tokens
         val ai = MasalaColors.Gold
         val voice = MasalaColors.Indigo
@@ -219,6 +225,18 @@ class SettingsActivity : ComponentActivity() {
             add(Entry(2, Icons.Rounded.Apps, auto, stringResource(R.string.settings_miniapps), stringResource(R.string.settings_miniapps_summary), onMiniApps))
             add(Entry(3, Icons.Rounded.MenuBook, data, stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) { startActivity(Intent(this@SettingsActivity, SecondBrainActivity::class.java)) })
             add(Entry(3, Icons.Rounded.Shield, data, stringResource(R.string.privacy_title), stringResource(R.string.privacy_summary)) { onPage(Page.PRIVACY) })
+            add(
+                Entry(
+                    3, Icons.Rounded.VisibilityOff, data,
+                    stringResource(R.string.settings_hidden_apps),
+                    stringResource(
+                        R.string.settings_hidden_apps_summary,
+                        hiddenApps.count { it.visibility == Visibility.HIDDEN },
+                        hiddenApps.count { it.visibility == Visibility.SEARCH_ONLY },
+                    ),
+                    onHiddenApps,
+                ),
+            )
             // Only with :pro in the build: without it there is no index and no all-files access.
             if (masala.fileIndex != null) add(Entry(4, Icons.Rounded.Folder, ai, stringResource(R.string.settings_files), stringResource(R.string.settings_files_summary), onFiles))
             add(Entry(4, Icons.Rounded.FiberManualRecord, auto, stringResource(R.string.settings_recording), stringResource(R.string.settings_recording_summary), onRecording))
@@ -710,19 +728,132 @@ class SettingsActivity : ComponentActivity() {
     }
 
     /** Apps that are hidden or search-only, with their level; picking "Drawer and search" shows them again. */
+    /** Set or change the PIN, or none at all. */
+    private enum class PinMode { SET, CHANGE }
+
+    /**
+     * Hidden apps: behind an optional PIN, with a way back. "Show on home" returns the app to the
+     * drawer and puts it back on home; "Show in drawer" only undoes the hiding.
+     */
     @Composable
     private fun HiddenAppsPage(onBack: () -> Unit) {
         val scope = rememberCoroutineScope()
+        val settings by masala.settings.settings.collectAsStateWithLifecycle(LauncherSettings())
         val apps by masala.launcher.apps.collectAsStateWithLifecycle()
         val hidden = apps.filter { it.visibility != Visibility.DEFAULT }
+        val pin = settings.hiddenPin
+        var unlocked by remember(pin) { mutableStateOf(pin == null) }
+        var pinMode by remember { mutableStateOf<PinMode?>(null) }
+        var forgot by remember { mutableStateOf(false) }
+
         SettingsScaffold(stringResource(R.string.settings_hidden_apps), onBack = onBack) {
+            if (!unlocked) {
+                var attempt by remember { mutableStateOf("") }
+                var wrong by remember { mutableStateOf(false) }
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.hidden_locked_hint), style = MaterialTheme.typography.bodyMedium)
+                    OutlinedTextField(
+                        value = attempt,
+                        onValueChange = { attempt = it.filter(Char::isDigit).take(HiddenPin.MAX_LENGTH); wrong = false },
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.hidden_pin_label)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
+                    )
+                    if (wrong) {
+                        Text(
+                            stringResource(R.string.hidden_pin_wrong),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Button(
+                        onClick = { if (HiddenPin.matches(pin, attempt)) unlocked = true else wrong = true },
+                        enabled = attempt.length >= HiddenPin.MIN_LENGTH,
+                    ) { Text(stringResource(R.string.hidden_unlock)) }
+                    TextButton(onClick = { forgot = true }) { Text(stringResource(R.string.hidden_forgot)) }
+                }
+                if (forgot) {
+                    AlertDialog(
+                        onDismissRequest = { forgot = false },
+                        title = { Text(stringResource(R.string.hidden_forgot_title)) },
+                        text = { Text(stringResource(R.string.hidden_forgot_message)) },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                forgot = false
+                                scope.launch { masala.settings.update { it.copy(hiddenPin = null) } }
+                            }) { Text(stringResource(R.string.hidden_forgot_confirm)) }
+                        },
+                        dismissButton = { TextButton(onClick = { forgot = false }) { Text(stringResource(R.string.action_cancel)) } },
+                    )
+                }
+                return@SettingsScaffold
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(if (pin == null) R.string.hidden_no_pin else R.string.hidden_locked_on),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { pinMode = if (pin == null) PinMode.SET else PinMode.CHANGE }) {
+                    Text(stringResource(if (pin == null) R.string.hidden_set_pin else R.string.hidden_change_pin))
+                }
+                if (pin != null) {
+                    TextButton(onClick = { scope.launch { masala.settings.update { it.copy(hiddenPin = null) } } }) {
+                        Text(stringResource(R.string.hidden_remove_pin))
+                    }
+                }
+            }
+            Text(
+                stringResource(R.string.hidden_page_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             if (hidden.isEmpty()) Text(stringResource(R.string.settings_hidden_apps_empty))
-            hidden.forEach { entry -> HiddenAppRow(entry) { level -> scope.launch { masala.launcher.setVisibility(entry.key, level) } } }
+            hidden.forEach { entry ->
+                HiddenAppRow(
+                    entry = entry,
+                    onShowOnHome = {
+                        scope.launch {
+                            masala.launcher.setVisibility(entry.key, Visibility.DEFAULT)
+                            masala.layouts.pin(entry)
+                            android.widget.Toast.makeText(
+                                this@SettingsActivity,
+                                getString(R.string.hidden_restored_home, entry.label),
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    },
+                    onShowInDrawer = {
+                        scope.launch {
+                            masala.launcher.setVisibility(entry.key, Visibility.DEFAULT)
+                            android.widget.Toast.makeText(
+                                this@SettingsActivity,
+                                getString(R.string.hidden_restored_drawer, entry.label),
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    },
+                )
+            }
+        }
+
+        pinMode?.let { mode ->
+            PinDialog(
+                mode = mode,
+                onDone = { entered ->
+                    pinMode = null
+                    scope.launch { masala.settings.update { it.copy(hiddenPin = HiddenPin.store(entered)) } }
+                },
+                onDismiss = { pinMode = null },
+            )
         }
     }
 
     @Composable
-    private fun HiddenAppRow(entry: AppEntry, onVisibility: (Visibility) -> Unit) {
+    private fun HiddenAppRow(entry: AppEntry, onShowOnHome: () -> Unit, onShowInDrawer: () -> Unit) {
         LauncherRow(
             label = entry.label,
             icon = null,
@@ -733,14 +864,44 @@ class SettingsActivity : ComponentActivity() {
             longClickLabel = null,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Visibility.entries.forEach { level ->
-                FilterChip(
-                    selected = entry.visibility == level,
-                    onClick = { onVisibility(level) },
-                    label = { Text(visibilityLabel(level)) },
-                )
-            }
+            TextButton(onClick = onShowOnHome) { Text(stringResource(R.string.hidden_show_on_home)) }
+            TextButton(onClick = onShowInDrawer) { Text(stringResource(R.string.hidden_show_in_drawer)) }
         }
+    }
+
+    /** A 4–8 digit PIN, typed twice when setting it. Save stays off until both match. */
+    @Composable
+    private fun PinDialog(mode: PinMode, onDone: (String) -> Unit, onDismiss: () -> Unit) {
+        var first by remember { mutableStateOf("") }
+        var second by remember { mutableStateOf("") }
+        val digits = { s: String -> s.filter(Char::isDigit).take(HiddenPin.MAX_LENGTH) }
+        val valid = HiddenPin.isValid(first) && (mode == PinMode.CHANGE || first == second)
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(if (mode == PinMode.SET) R.string.hidden_pin_set_title else R.string.hidden_pin_change_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = first,
+                        onValueChange = { first = digits(it) },
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.hidden_pin_label)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
+                    )
+                    OutlinedTextField(
+                        value = second,
+                        onValueChange = { second = digits(it) },
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.hidden_pin_repeat)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { onDone(first) }, enabled = valid) { Text(stringResource(R.string.action_save)) } },
+            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        )
     }
 
     companion object {
