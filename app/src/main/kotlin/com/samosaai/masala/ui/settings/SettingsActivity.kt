@@ -17,6 +17,7 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.WbSunny
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.GridView
@@ -40,6 +41,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.samosaai.masala.audio.RecordingService
 import com.samosaai.masala.core.layout.LayoutChecker
+import com.samosaai.masala.core.layout.LayoutEdits
+import com.samosaai.masala.ui.home.widgets.WidgetCard
+import com.samosaai.masala.ui.home.widgets.WidgetSource
 import com.samosaai.masala.layout.LayoutTransfer
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
@@ -105,7 +109,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, PERSONAS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, ABOUT, BRIEF }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, PERSONAS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, ABOUT, BRIEF, WIDGETS }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -138,6 +142,7 @@ class SettingsActivity : ComponentActivity() {
                             onLayout = { page = Page.LAYOUT },
                             onRecording = { page = Page.RECORDING },
                             onMiniApps = { page = Page.MINI_APPS },
+                            onWidgets = { page = Page.WIDGETS },
                             onSkills = { page = Page.SKILLS },
                             onTasks = { page = Page.TASKS },
                             onFiles = { page = Page.FILES },
@@ -169,6 +174,7 @@ class SettingsActivity : ComponentActivity() {
                         Page.PRIVACY -> PrivacyPage(onBack = { page = Page.MAIN })
                         Page.ABOUT -> AboutPage(onBack = { page = Page.MAIN })
                         Page.BRIEF -> BriefPage(settings, update = { change -> lifecycleScope.launch { masala.settings.update(change) } }, onBack = { page = Page.MAIN })
+                        Page.WIDGETS -> WidgetsPage(onBack = { page = Page.MAIN })
                     } }
                 }
             }
@@ -189,6 +195,7 @@ class SettingsActivity : ComponentActivity() {
         onLayout: () -> Unit,
         onRecording: () -> Unit,
         onMiniApps: () -> Unit,
+        onWidgets: () -> Unit,
         onSkills: () -> Unit,
         onTasks: () -> Unit,
         onFiles: () -> Unit,
@@ -223,6 +230,7 @@ class SettingsActivity : ComponentActivity() {
             add(Entry(2, Icons.Rounded.WbSunny, auto, stringResource(R.string.brief_title), stringResource(R.string.brief_summary)) { onPage(Page.BRIEF) })
             add(Entry(2, Icons.Rounded.Extension, auto, stringResource(R.string.mcp_title), stringResource(R.string.mcp_summary)) { startActivity(Intent(this@SettingsActivity, McpActivity::class.java)) })
             add(Entry(2, Icons.Rounded.Apps, auto, stringResource(R.string.settings_miniapps), stringResource(R.string.settings_miniapps_summary), onMiniApps))
+            add(Entry(1, Icons.Rounded.Widgets, look, stringResource(R.string.settings_widgets), stringResource(R.string.settings_widgets_summary), onWidgets))
             add(Entry(3, Icons.Rounded.MenuBook, data, stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) { startActivity(Intent(this@SettingsActivity, SecondBrainActivity::class.java)) })
             add(Entry(3, Icons.Rounded.Shield, data, stringResource(R.string.privacy_title), stringResource(R.string.privacy_summary)) { onPage(Page.PRIVACY) })
             add(
@@ -424,6 +432,105 @@ class SettingsActivity : ComponentActivity() {
                             TextButton(onClick = {
                                 confirmDelete = false
                                 scope.launch { masala.deleteMiniApp(row.id) }
+                            }) { Text(stringResource(R.string.settings_version_delete)) }
+                        },
+                        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_back)) } },
+                    )
+                }
+            }
+        }
+    }
+
+    /** The widget library in one place: preview, add to home, duplicate, delete (plan W2). */
+    @Composable
+    private fun WidgetsPage(onBack: () -> Unit) {
+        val scope = rememberCoroutineScope()
+        val entries by remember { masala.widgetLibrary.watch() }.collectAsStateWithLifecycle(emptyList())
+        val snapshot by masala.contextService.snapshot.collectAsStateWithLifecycle()
+        val base by masala.layouts.base.collectAsStateWithLifecycle()
+        fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()
+        val source = remember(snapshot) {
+            WidgetSource(snapshot = { snapshot }, store = masala.widgetStates, onAction = { toast(getString(R.string.widgets_preview_note)) })
+        }
+        SettingsScaffold(stringResource(R.string.settings_widgets), onBack = onBack) {
+            Button(onClick = { askInChat(getString(R.string.widgets_describe_prefill)) }) { Text(stringResource(R.string.widgets_describe)) }
+            var tab by rememberSaveable { mutableStateOf(0) }
+            val tabs = listOf(stringResource(R.string.widgets_mine), stringResource(R.string.widgets_templates), stringResource(R.string.widgets_cameras))
+            androidx.compose.material3.TabRow(selectedTabIndex = tab) {
+                tabs.forEachIndexed { i, title ->
+                    androidx.compose.material3.Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title) })
+                }
+            }
+            if (tab == 2) {
+                Text(stringResource(R.string.widgets_cameras_note), style = MaterialTheme.typography.bodyMedium)
+                return@SettingsScaffold
+            }
+            val mine = tab == 0
+            var filter by rememberSaveable { mutableStateOf("") }
+            val rows = remember(entries, mine, filter) {
+                val q = filter.trim().lowercase()
+                entries.filter { (it.createdBy != "template") == mine }
+                    .filter { q.isEmpty() || it.spec.id.lowercase().contains(q) || (it.spec.title?.lowercase()?.contains(q) == true) }
+            }
+            if (entries.any { (it.createdBy != "template") == mine } && (rows.size > 5 || filter.isNotEmpty())) {
+                ListSearchField(filter, { filter = it }, stringResource(R.string.widgets_filter))
+            }
+            if (rows.isEmpty()) {
+                Text(
+                    stringResource(if (filter.isNotBlank()) R.string.widgets_empty_no_match else R.string.widgets_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                return@SettingsScaffold
+            }
+            rows.forEach { (spec, _) ->
+                var confirmDelete by remember(spec.id) { mutableStateOf(false) }
+                val placements = remember(base, spec.id) { base?.let { LayoutEdits.widgetPlacements(it, spec.id) }.orEmpty() }
+                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    WidgetCard(spec, rows = null, source = source)
+                    Text(
+                        if (placements.isEmpty()) stringResource(R.string.widgets_not_on_home)
+                        else stringResource(R.string.widgets_on_home) + " · ${placements.size}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = {
+                            scope.launch {
+                                val problems = masala.layouts.placeWidget("Add to home: ${spec.title ?: spec.id}", spec.id)
+                                toast(getString(if (problems.isEmpty()) R.string.widgets_added else R.string.widgets_add_failed))
+                            }
+                        }) { Text(stringResource(R.string.widgets_add_to_home)) }
+                        TextButton(onClick = {
+                            scope.launch {
+                                val known = masala.widgetLibrary.current().keys
+                                var copyId = "${spec.id}-copy"
+                                var n = 2
+                                while (copyId in known) copyId = "${spec.id}-copy-$n".also { n++ }
+                                masala.widgetLibrary.save(
+                                    spec.copy(id = copyId, title = (spec.title ?: spec.id) + " (copy)"),
+                                    createdBy = "user",
+                                )
+                            }
+                        }) { Text(stringResource(R.string.widgets_duplicate)) }
+                        TextButton(onClick = { confirmDelete = true }) {
+                            Text(stringResource(R.string.settings_version_delete))
+                        }
+                    }
+                }
+                HorizontalDivider()
+                if (confirmDelete) {
+                    AlertDialog(
+                        onDismissRequest = { confirmDelete = false },
+                        title = { Text(stringResource(R.string.widgets_delete_title)) },
+                        text = { Text(stringResource(R.string.widgets_delete_message, spec.title ?: spec.id)) },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                confirmDelete = false
+                                scope.launch {
+                                    masala.widgetLibrary.delete(spec.id)
+                                    masala.layouts.removeWidgetRefs("Remove from home: ${spec.title ?: spec.id}", spec.id)
+                                }
                             }) { Text(stringResource(R.string.settings_version_delete)) }
                         },
                         dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_back)) } },

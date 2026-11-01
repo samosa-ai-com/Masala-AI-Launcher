@@ -8,6 +8,7 @@ import com.samosaai.masala.data.WidgetDao
 import com.samosaai.masala.data.WidgetEntity
 import com.samosaai.masala.data.WidgetVersionDao
 import com.samosaai.masala.data.WidgetVersionEntity
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +34,19 @@ class WidgetLibrary(
 
     /** The specs, for [com.samosaai.masala.core.migration.WidgetLift] and the resolver. */
     fun current(): Map<String, WidgetSpec> = _widgets.value
+
+    /** One saved widget with who made it, for the manager's My widgets / Templates split. */
+    data class LibraryWidget(val spec: WidgetSpec, val createdBy: String)
+
+    /** The library as a flow, decoded; bad rows are skipped like in [load]. */
+    fun watch(): kotlinx.coroutines.flow.Flow<List<LibraryWidget>> =
+        dao.watch().map { rows ->
+            rows.mapNotNull { row ->
+                runCatching {
+                    LibraryWidget(MasalaJson.strict.decodeFromString(WidgetSpec.serializer(), row.specJson), row.createdBy)
+                }.getOrNull()
+            }
+        }
 
     suspend fun load() {
         val rows = runCatching { dao.all() }.getOrElse {

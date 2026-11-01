@@ -451,7 +451,7 @@ class HomeActivity : ComponentActivity() {
         val miniAppIcons = remember(miniAppRows) { miniAppRows.associate { it.id to it.icon } }
         val drag = remember { HomeDragState() }
         // Generated widgets (W1): one store for their stored values, shared by every card on home.
-        val widgetStore = remember { com.samosaai.masala.widgets.WidgetStateStore(scope, app.database.widgetStates()) }
+        val widgetStore = remember { app.widgetStates }
         val widgetSource = remember(snapshot) {
             com.samosaai.masala.ui.home.widgets.WidgetSource(snapshot = { snapshot }, store = widgetStore, onAction = ::run)
         }

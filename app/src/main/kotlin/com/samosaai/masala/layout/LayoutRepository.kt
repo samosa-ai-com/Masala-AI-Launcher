@@ -369,6 +369,7 @@ class LayoutRepository(
             skillIds = skills().getAllSkills().map { it.id }.toSet(),
             toolNames = toolNames(),
             modeIds = modes.patches.value.map { it.id }.toSet(),
+            widgets = widgets.current(),
         )
     }
 

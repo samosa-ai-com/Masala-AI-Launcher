@@ -91,6 +91,8 @@ class MasalaApp : Application() {
 
     val database by lazy { MasalaDatabase.create(this) }
     val miniApps by lazy { MiniAppStore(database.miniApps()) }
+    /** Every generated widget's own values (counters, ticks); shared by home and the manager. */
+    val widgetStates by lazy { com.samosaai.masala.widgets.WidgetStateStore(scope, database.widgetStates()) }
     val widgetLibrary by lazy { com.samosaai.masala.widgets.WidgetLibrary(database.widgets(), database.widgetVersions()) }
     val settings by lazy { SettingsStore(this) }
 
