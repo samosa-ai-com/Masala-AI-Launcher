@@ -206,6 +206,45 @@ class ConsultServiceTest {
     }
 
     @Test
+    fun whatTheExpertMadeComesBackWithItsAnswer() = runBlocking<Unit> {
+        var request = 0
+        val model = AgentModel { _, _ ->
+            request += 1
+            if (request == 1) {
+                ChatMessage(
+                    "assistant",
+                    JsonPrimitive(""),
+                    toolCalls = listOf(ToolCall("1", function = FunctionCall("build", "{}"))),
+                )
+            } else {
+                ChatMessage("assistant", JsonPrimitive("I made Snake and put it on your home screen."))
+            }
+        }
+        val service = ConsultService(
+            sessions = ConsultSessions(tmp.root),
+            skill = { doctor },
+            agentFor = {
+                MasalaAgent(
+                    model = model,
+                    tools = AgentToolRunner { _, _ ->
+                        ToolResult.Success(
+                            "Mini app 'a1' created and pinned to home.",
+                            produced = listOf(com.samosaai.masala.core.tool.Produced("mini_app", "Snake", "a1")),
+                        )
+                    },
+                    definitions = listOf(ToolDefinition("build", "", JsonObject(emptyMap()))),
+                    scope = ToolScope.command(listOf(ToolInfo("build", ToolSensitivity.CHANGES_SOMETHING))),
+                    systemPrompt = { "s" },
+                    maxSteps = 4,
+                )
+            },
+        )
+        val answered = service.consult("chat-1", "doctor", "make me a snake game", null)
+            as ConsultService.Outcome.Answered
+        assertEquals(listOf(com.samosaai.masala.core.tool.Produced("mini_app", "Snake", "a1")), answered.produced)
+    }
+
+    @Test
     fun tenExpertsIsTheChatsLimit() = runBlocking<Unit> {
         val (service, _) = service(*Array(10) { "answer" })
         repeat(10) { n ->

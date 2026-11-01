@@ -27,7 +27,14 @@ class ConsultService(
 ) {
     sealed interface Outcome {
         /** [text] is what the main agent receives: the answer plus where it came from. */
-        data class Answered(val session: ConsultSession, val exchange: Int, val answer: String, val text: String) : Outcome
+        data class Answered(
+            val session: ConsultSession,
+            val exchange: Int,
+            val answer: String,
+            val text: String,
+            /** What the expert made (a mini app, a file), so the chat can offer it. */
+            val produced: List<com.samosaai.masala.core.tool.Produced> = emptyList(),
+        ) : Outcome
         data class Refused(val reason: String) : Outcome
     }
 
@@ -84,6 +91,7 @@ class ConsultService(
             var answer: String? = null
             var failure: String? = null
             var missingAccess: String? = null
+            val produced = mutableListOf<com.samosaai.masala.core.tool.Produced>()
             try {
                 val finished = withTimeoutOrNull(timeoutMs) {
                     agent.run(ChatMessage("user", JsonPrimitive(asked))).collect { event ->
@@ -93,6 +101,11 @@ class ConsultService(
                             AgentEvent.StepLimit -> failure = "It took too many steps."
                             // Not fatal: the expert finishes around it, and the gap is reported.
                             is AgentEvent.NeedsCapability -> missingAccess = event.capability
+                            is AgentEvent.Results -> event.items.forEach { item ->
+                                // A rebuild of the same app updates its entry instead of being dropped.
+                                produced.removeAll { it.ref == item.ref }
+                                produced += item
+                            }
                             else -> Unit
                         }
                     }
@@ -126,6 +139,7 @@ class ConsultService(
                 exchange = saved.exchanges,
                 answer = text,
                 text = render(saved, text, title, expert.persona?.disclaimer, missingAccess),
+                produced = produced.toList(),
             )
         } finally {
             busy.remove(key)

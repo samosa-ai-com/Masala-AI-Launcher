@@ -89,6 +89,14 @@ class ConfirmationGate(
          * layout) is cut to its start and its size, so the sheet's buttons stay on screen.
          */
         internal fun summarize(name: String, args: JsonObject): String {
+            // Making an app is confirmed in the user's words, not as a wall of HTML.
+            if (name == "create_mini_app") {
+                val title = (args["title"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                    ?.trim()?.take(60)?.takeIf { it.isNotEmpty() }
+                return if (title != null) "Add \"$title\" to your home screen as an app"
+                else "Add a new app to your home screen"
+            }
+            if (name == "update_mini_app") return "Change that app"
             val shown = JsonObject(args.mapValues { (_, value) ->
                 val text = (value as? JsonPrimitive)?.takeIf { it.isString }?.content ?: value.toString()
                 if (text.length <= MAX_VALUE_CHARS) value

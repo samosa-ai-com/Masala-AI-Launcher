@@ -9,6 +9,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class TurnRole { USER, MASALA, ERROR, SYSTEM }
 
+/** Something a reply made that the user can open: a mini app, a file, an installed app. */
+@Serializable
+data class ChatResult(val kind: String, val title: String, val ref: String)
+
 /** An expert a reply consulted, named so the thread can credit it after a reload. */
 @Serializable
 data class ExpertCredit(val id: String, val title: String)
@@ -25,6 +29,8 @@ data class ChatTurn(
     val steps: List<String> = emptyList(),
     val at: Long = 0L,
     val experts: List<ExpertCredit> = emptyList(),
+    /** What the turn made, kept so the card survives a reload. */
+    val results: List<ChatResult> = emptyList(),
 )
 
 /**

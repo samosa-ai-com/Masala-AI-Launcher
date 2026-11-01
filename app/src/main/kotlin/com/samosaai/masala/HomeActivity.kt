@@ -1,5 +1,7 @@
 package com.samosaai.masala
 
+import com.samosaai.masala.miniapps.openMiniApp
+
 import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.graphics.Color
@@ -29,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -183,6 +186,18 @@ class HomeActivity : ComponentActivity() {
                 if (commandState != CommandState.Idle) chatOpen = true
                 if (commandState == CommandState.Listening) expanded = false
                 if (commandState is CommandState.Thinking) expanded = true
+                // A newly made app opens once. This hangs off the live reply, not off the stored
+                // turns, so a reload, a cold start or opening another chat never reopens one.
+                val reply = commandState as? CommandState.Reply
+                val made = reply?.results?.firstOrNull { it.kind == "mini_app" }
+                if (made != null) {
+                    chatOpen = false
+                    expanded = false
+                    // Home's search pill only draws while the command is idle; leaving it on the
+                    // reply would hand the user back a home screen with no way to start a chat.
+                    app.commands.dismiss()
+                    runCatching { openMiniApp(made.ref) }
+                }
             }
         val pinnedShortcuts by launcher.pinnedShortcuts.collectAsStateWithLifecycle()
         val profiles by launcher.profiles.collectAsStateWithLifecycle()

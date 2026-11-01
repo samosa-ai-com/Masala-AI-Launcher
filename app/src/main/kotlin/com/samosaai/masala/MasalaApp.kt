@@ -487,7 +487,7 @@ class MasalaApp : Application() {
             )
         }
         return when (val outcome = consultService.consult(chatId, skillId, question, consultId)) {
-            is ConsultService.Outcome.Answered -> ActionResult.ok(outcome.text)
+            is ConsultService.Outcome.Answered -> ActionResult.ok(outcome.text, outcome.produced)
             is ConsultService.Outcome.Refused -> ActionResult.error(outcome.reason)
         }
     }
