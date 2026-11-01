@@ -49,7 +49,6 @@ class CommandController(
         // The same finished state can be set twice (a synchronous start failure calls the
         // async handler and then the caller does): record its turn once.
         if (_state.value === state) return
-        _state.value = state
         val turn = when (state) {
             is CommandState.Reply -> com.samosaai.masala.chat.ChatTurn(
                 com.samosaai.masala.chat.TurnRole.MASALA, state.text, state.steps,
@@ -60,7 +59,10 @@ class CommandController(
             )
             else -> null
         }
+        // Hand the turn over before the state wakes anyone: a reader of the state must never see a
+        // reply that the session doesn't have yet (that race failed the CI suite once).
         turn?.let { onTurn?.invoke(it) }
+        _state.value = state
     }
 
     val state: StateFlow<CommandState> = _state.asStateFlow()

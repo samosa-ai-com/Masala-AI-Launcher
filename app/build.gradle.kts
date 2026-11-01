@@ -26,6 +26,14 @@ android {
     namespace = "com.samosaai.masala"
     compileSdk = 36
 
+    // The suite is a thousand small pure tests: two JVMs halve the wait on CI and are safe
+    // (each test uses its own temp folders).
+    testOptions {
+        unitTests.all { test ->
+            test.maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 2)
+        }
+    }
+
     defaultConfig {
         // Placeholder until the real app ID is chosen (plan §8).
         applicationId = "com.samosaai.masala"
