@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -361,7 +362,8 @@ private fun SttTestCard() {
         if (granted) start({}) else outcome = strings.recordError
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    // The panel has no padding of its own (its option rows pad themselves); the card matches them.
+    Column(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.stt_test_summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (!testing && !transcribing && heard == null && outcome == null) {
             OutlinedButton(
@@ -392,7 +394,10 @@ private fun SttTestCard() {
             }
         }
         if (transcribing) {
-            Text(stringResource(R.string.command_transcribing), style = MaterialTheme.typography.bodyMedium)
+            Row(Modifier.heightIn(min = 46.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                CircularProgressIndicator(Modifier.size(18.dp), color = voiceTint, strokeWidth = 2.dp)
+                Text(stringResource(R.string.command_transcribing), style = MaterialTheme.typography.bodyMedium, color = voiceTint)
+            }
         }
         heard?.let {
             Text(stringResource(R.string.stt_test_heard, it), style = MaterialTheme.typography.bodyMedium)
