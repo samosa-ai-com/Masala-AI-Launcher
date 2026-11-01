@@ -861,9 +861,6 @@ class HomeActivity : ComponentActivity() {
                     override fun editWithMasala(app: com.samosaai.masala.data.MiniAppEntity) = done {
                         askMasala(getString(R.string.miniapp_edit_prefill, app.title, app.id))
                     }
-                    override fun setInternet(app: com.samosaai.masala.data.MiniAppEntity, allowed: Boolean) = done {
-                        scope.launch { masala.miniApps.setNetworkAllowed(app.id, allowed) }
-                    }
                     override fun deleteApp(app: com.samosaai.masala.data.MiniAppEntity) = done { deletingMiniApp = app }
                 },
             )

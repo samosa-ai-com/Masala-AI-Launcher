@@ -38,7 +38,7 @@ import kotlinx.coroutines.flow.Flow
         WatchEntity::class,
         AppLaunchEntity::class,
     ],
-    version = 4,
+    version = 5,
 )
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
@@ -72,9 +72,16 @@ abstract class MasalaDatabase : RoomDatabase() {
             }
         }
 
+        /** Internet is always on for mini apps now; existing rows come along. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("UPDATE mini_apps SET networkAllowed = 1")
+            }
+        }
+
         fun create(context: Context): MasalaDatabase =
             Room.databaseBuilder(context, MasalaDatabase::class.java, "masala.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
     }
 }
 
@@ -298,8 +305,8 @@ data class MiniAppEntity(
     @PrimaryKey val id: String,
     val title: String,
     val html: String,
-    /** Off unless the user turns it on for this app. */
-    val networkAllowed: Boolean = false,
+    /** Always on: every mini app may load from the web. Kept so old rows still read. */
+    val networkAllowed: Boolean = true,
     /** The agent-chosen icon: `symbol:<name>` or one small inline SVG; null draws the title's letter. */
     val icon: String? = null,
     val createdAt: Long,

@@ -68,10 +68,10 @@
     <string name="hidden_pin_set_title">Set a PIN for hidden apps</string>
     <string name="hidden_pin_change_title">Change the PIN</string>
     <string name="hidden_page_hint">Showing an app again puts it back in the drawer; “Show on home” also adds it to your home screen. The PIN hides this list from a glance, not from the phone.</string>
-    <string name="hidden_show_on_home">Show on home</string>
-    <string name="hidden_show_in_drawer">Show in drawer</string>
+    <string name="hidden_show">Show</string>
+    <string name="hidden_show_and_pin">Show and pin to home</string>
     <string name="hidden_restored_home">%1$s is back on home</string>
-    <string name="hidden_restored_drawer">%1$s is back in the drawer</string>
+    <string name="hidden_restored">%1$s is visible again</string>
     <string name="menu_hidden_manage">Manage</string>
     <string name="menu_uninstall">Uninstall</string>
     <string name="menu_visibility">Visibility</string>

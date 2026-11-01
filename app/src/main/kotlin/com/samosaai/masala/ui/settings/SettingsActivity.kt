@@ -393,11 +393,6 @@ class SettingsActivity : ComponentActivity() {
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            if (row.networkAllowed) Text(
-                                stringResource(R.string.miniapp_network_badge),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -815,23 +810,23 @@ class SettingsActivity : ComponentActivity() {
             hidden.forEach { entry ->
                 HiddenAppRow(
                     entry = entry,
-                    onShowOnHome = {
+                    onShow = {
+                        scope.launch {
+                            masala.launcher.setVisibility(entry.key, Visibility.DEFAULT)
+                            android.widget.Toast.makeText(
+                                this@SettingsActivity,
+                                getString(R.string.hidden_restored, entry.label),
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    },
+                    onShowAndPin = {
                         scope.launch {
                             masala.launcher.setVisibility(entry.key, Visibility.DEFAULT)
                             masala.layouts.pin(entry)
                             android.widget.Toast.makeText(
                                 this@SettingsActivity,
                                 getString(R.string.hidden_restored_home, entry.label),
-                                android.widget.Toast.LENGTH_SHORT,
-                            ).show()
-                        }
-                    },
-                    onShowInDrawer = {
-                        scope.launch {
-                            masala.launcher.setVisibility(entry.key, Visibility.DEFAULT)
-                            android.widget.Toast.makeText(
-                                this@SettingsActivity,
-                                getString(R.string.hidden_restored_drawer, entry.label),
                                 android.widget.Toast.LENGTH_SHORT,
                             ).show()
                         }
@@ -853,7 +848,7 @@ class SettingsActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun HiddenAppRow(entry: AppEntry, onShowOnHome: () -> Unit, onShowInDrawer: () -> Unit) {
+    private fun HiddenAppRow(entry: AppEntry, onShow: () -> Unit, onShowAndPin: () -> Unit) {
         LauncherRow(
             label = entry.label,
             icon = null,
@@ -864,8 +859,8 @@ class SettingsActivity : ComponentActivity() {
             longClickLabel = null,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = onShowOnHome) { Text(stringResource(R.string.hidden_show_on_home)) }
-            TextButton(onClick = onShowInDrawer) { Text(stringResource(R.string.hidden_show_in_drawer)) }
+            TextButton(onClick = onShow) { Text(stringResource(R.string.hidden_show)) }
+            TextButton(onClick = onShowAndPin) { Text(stringResource(R.string.hidden_show_and_pin)) }
         }
     }
 

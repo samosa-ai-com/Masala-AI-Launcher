@@ -131,7 +131,7 @@ private const val AUTO_LAUNCH_PAUSE_MS = 800L
 private val ARC_SWING = 36.dp
 
 /** Radius of the disc behind the curve; its centre sits between the rail and the swung-out letter. */
-private val ARC_DISC_RADIUS = 56.dp
+private val ARC_DISC_RADIUS = 150.dp
 private const val GLOBE_MAX = 30
 
 /** Where the globe gets its counts and whether to ask for Usage access (decision 11). */

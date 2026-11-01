@@ -25,8 +25,6 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
-import androidx.compose.material.icons.rounded.Wifi
-import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -69,7 +67,6 @@ interface ItemMenuActions {
     fun removeFromHome(item: Item)
     /** Opens the chat ready to be told what to change in [app]. */
     fun editWithMasala(app: MiniAppEntity)
-    fun setInternet(app: MiniAppEntity, allowed: Boolean)
     fun deleteApp(app: MiniAppEntity)
 }
 
@@ -125,22 +122,8 @@ fun ItemMenu(
                 }
                 MenuTile(Icons.Rounded.RemoveCircleOutline, stringResource(R.string.menu_remove_from_home), Modifier.weight(1f)) { menu.removeFromHome(item) }
                 if (miniApp != null) {
-                    MenuTile(
-                        if (miniApp.networkAllowed) Icons.Rounded.Wifi else Icons.Rounded.WifiOff,
-                        stringResource(if (miniApp.networkAllowed) R.string.menu_internet_on else R.string.menu_internet_off),
-                        Modifier.weight(1f),
-                    ) { menu.setInternet(miniApp, !miniApp.networkAllowed) }
-                }
-                if (miniApp != null) {
                     MenuTile(Icons.Rounded.Delete, stringResource(R.string.menu_delete_app), Modifier.weight(1f), danger = true) { menu.deleteApp(miniApp) }
                 }
-            }
-            if (miniApp != null) {
-                Text(
-                    stringResource(if (miniApp.networkAllowed) R.string.menu_internet_on_hint else R.string.menu_internet_off_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
             Text(
                 stringResource(R.string.menu_home_hint),

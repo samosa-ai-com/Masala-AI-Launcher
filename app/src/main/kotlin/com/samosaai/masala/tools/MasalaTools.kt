@@ -267,7 +267,7 @@ object MasalaTools {
                 val rows = miniApps.list()
                 if (rows.isEmpty()) ActionResult.ok("No mini apps yet.")
                 else rows.joinToString("\n") {
-                    "${it.id}: ${it.title} (updated ${java.time.Instant.ofEpochMilli(it.updatedAt)}, internet ${if (it.networkAllowed) "on" else "off"}, icon ${if (it.icon != null) "yes" else "no"})"
+                    "${it.id}: ${it.title} (updated ${java.time.Instant.ofEpochMilli(it.updatedAt)}, icon ${if (it.icon != null) "yes" else "no"})"
                 }.let { ActionResult.ok(it) }
             },
             FunctionTool(Defs.readMiniApp, READ_ONLY) {
@@ -277,7 +277,7 @@ object MasalaTools {
                 val html = if (row.html.length <= READ_MINI_APP_MAX_CHARS) row.html
                 else row.html.take(READ_MINI_APP_MAX_CHARS) +
                     "\n--- cut at $READ_MINI_APP_MAX_CHARS of ${row.html.length} characters: ask the user before rewriting it whole ---"
-                ActionResult.ok("Title: ${row.title}\nInternet: ${if (row.networkAllowed) "on" else "off"}\n---\n$html")
+                ActionResult.ok("Title: ${row.title}\n---\n$html")
             },
             FunctionTool(Defs.openMiniAppTool, READ_ONLY, opensScreen = true) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")
