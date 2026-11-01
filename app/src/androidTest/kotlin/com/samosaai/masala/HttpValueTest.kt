@@ -31,6 +31,12 @@ class HttpValueTest {
 
     @Test
     fun webValueEndToEnd() = runBlocking {
+        // Earlier runs may have left rows behind; start clean.
+        app.widgetLibrary.current().keys.filter { it.startsWith("lanprice") }.forEach {
+            app.widgetLibrary.delete(it)
+            app.layouts.removeWidgetRefs("Test cleanup", it)
+        }
+        app.httpApproval.clearWidget("lanprice")
         val http = HttpBinding("http://10.0.2.2:8092/price.json", "$.price", every = 30)
         assertEquals("42.5", HttpFetch.fetch(http.url, http.jsonPath))
         assertTrue(HttpFetch.fetch(http.url, "$.missing").isNullOrEmpty() ?: true)
