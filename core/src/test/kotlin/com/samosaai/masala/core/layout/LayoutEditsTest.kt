@@ -23,6 +23,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class LayoutEditsTest {
     private fun item(id: String) = Item(id, "Label $id", IconRef.Symbol("apps"), MasalaAction.OpenDrawer)
@@ -335,8 +336,7 @@ class LayoutEditsTest {
     }
 
     @Test
-    fun `placing past the page budget overflows to room, then a new page`() {
-        val big = WidgetSpec("big", "Big", listOf(WidgetComponent.Counter("n", "N")), SizeRange(1, 1, 2))
+    fun `placing past the page budget overflows to room, then a new page`() {        val big = WidgetSpec("big", "Big", listOf(WidgetComponent.Counter("n", "N")), SizeRange(1, 1, 2))
         val specs = mapOf("big" to big)
         // Home starts with a 4-item grid with a title: 3 rendered rows.
         var doc = LayoutDoc(pages = listOf(Page("home", sections = listOf(GridSection("g", title = "Apps", columns = 4, items = items("a", "b", "c", "d"))))))
@@ -429,5 +429,31 @@ class LayoutEditsTest {
         assertEquals(emptyList(), LayoutEdits.htmlPlacements(out, "dice"))
         assertEquals(doc.pages.first().sections.size - 1, out.pages.first().sections.size)
         assertNull(LayoutEdits.removeHtmlApp(doc, "missing"))
+    }
+
+    @Test
+    fun `the reported overflowing screen sends new widgets to a new page`() {
+        // The Redmi screen from the bug report: clock + date, an Essentials grid, the gauge,
+        // habits and price widgets from the bundled templates.
+        val lib = com.samosaai.masala.core.widgets.WidgetTemplates.all().associate { it.widget.id to it.widget }
+        val doc = LayoutDoc(
+            pages = listOf(
+                Page(
+                    "home",
+                    sections = listOf(
+                        HeaderSection("h", showClock = true, showDate = true),
+                        GridSection("g", title = "Essentials", columns = 4, items = items("a", "b", "c")),
+                        WidgetSection("w1", ref = WidgetRef("battery-steps")),
+                        WidgetSection("w2", ref = WidgetRef("habits")),
+                        WidgetSection("w3", ref = WidgetRef("price")),
+                    ),
+                ),
+            ),
+        )
+        // Sanity: that screen really does overflow a 12-row page.
+        assertTrue(LayoutEdits.widgetRowsUsed(doc, "home", lib) > LayoutChecker.MAX_PAGE_ROWS)
+        val placed = assertNotNull(LayoutEdits.placeWidget(doc, "water", specs = lib))
+        assertEquals("home-2", placed.pageId)
+        assertEquals("Home 2", placed.doc.pages.last().title)
     }
 }
