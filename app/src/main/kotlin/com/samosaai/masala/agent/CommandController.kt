@@ -229,12 +229,7 @@ class CommandController(
             publish(stateFor(prompt, run(MasalaAction.RunSkill(skill.id, prompt)), spoken, "Opened ${skill.title.ifBlank { skill.id }}."))
             return
         }
-        val chip = SkillRouter.route(prompt, skills())?.let { SkillChip(it.id, it.title.ifBlank { it.id }) }
-        // Asking for advice goes straight to the persona; asking the phone to act runs, with the persona offered beside it.
-        if (chip != null && !SkillRouter.isCommand(prompt)) {
-            publish(CommandState.Reply(prompt, "${chip.title} can help with that.", skill = chip, spoken = spoken))
-            return
-        }
+        // Advice in an expert's area goes to the agent too: it consults the expert itself, in place.
         val agent = newAgent().also { it.restore(history) }
         val steps = mutableListOf<String>()
         // Who answered, in order of first use; the badge on the reply and the stored turn.
@@ -257,8 +252,7 @@ class CommandController(
                             prompt,
                             event.text.ifBlank { "Done." },
                             steps.toList(),
-                            chip,
-                            spoken,
+                            spoken = spoken,
                             experts = consulted.values.toList(),
                         ),
                     )

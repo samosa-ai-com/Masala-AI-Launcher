@@ -38,7 +38,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AssistChip
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
@@ -70,10 +69,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.MasalaApp
 import com.samosaai.masala.R
 import com.samosaai.masala.agent.CommandState
-import com.samosaai.masala.agent.SkillChip
 import com.samosaai.masala.ui.components.Markdown
 import com.samosaai.masala.ui.components.rememberCapabilityGrant
-import com.samosaai.masala.ui.skills.SkillSheetActivity
 import com.samosaai.masala.ui.secondbrain.RememberedCards
 import kotlinx.coroutines.launch
 
@@ -244,7 +241,6 @@ fun ReplyCard(
                         if (s.prompt.isNotBlank()) Text(s.prompt, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Steps(s.steps)
                         Markdown(s.text)
-                        s.skill?.let { chip -> SkillChipButton(chip) { openSkill(context, app, chip, s.prompt) } }
                         RememberedCards(app)
                     }
                     is CommandState.Error -> {
@@ -304,12 +300,4 @@ private fun Steps(steps: List<String>) {
     steps.forEach { Text(stringResource(R.string.skill_step_done, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
 }
 
-@Composable
-private fun SkillChipButton(chip: SkillChip, onClick: () -> Unit) {
-    AssistChip(onClick = onClick, label = { Text(stringResource(R.string.command_continue_in, chip.title)) })
-}
 
-private fun openSkill(context: android.content.Context, app: MasalaApp, chip: SkillChip, prompt: String) {
-    context.startActivity(SkillSheetActivity.intent(context, chip.id, prompt))
-    app.commands.dismiss()
-}

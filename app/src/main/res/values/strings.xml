@@ -252,6 +252,8 @@
     <string name="skills_empty">No skills match.</string>
     <string name="skills_community">Community skill</string>
     <string name="skills_open">Open chat</string>
+    <string name="skills_edit">Edit</string>
+    <string name="search_ask_expert">Ask the %1$s: </string>
     <string name="skills_delete">Delete</string>
     <string name="skills_import_url">Skill URL to import</string>
     <string name="skills_import">Import</string>
@@ -470,7 +472,6 @@
     <string name="command_thinking">Thinking…</string>
     <string name="command_read_aloud">Read aloud</string>
     <string name="command_close">Close</string>
-    <string name="command_continue_in">Continue in %1$s</string>
     <string name="skill_missing">That skill isn’t available</string>
     <string name="skill_new_chat">New chat</string>
     <string name="skill_input_hint">Message</string>

@@ -83,12 +83,14 @@ class CommandControllerTest {
         assertEquals(0, agentsBuilt)
     }
 
-    @Test fun personaRequestOffersAChipWithoutCallingTheModel() = runBlocking<Unit> {
+    @Test fun aPersonaRequestRunsTheAgentInsteadOfOfferingAChip() = runBlocking<Unit> {
+        replies += reply("The chef suggests an omelette.")
         val c = controller()
         c.ask("what can I cook with eggs")
         val reply = assertIs<CommandState.Reply>(c.settled())
-        assertEquals(SkillChip("chef", "Chef"), reply.skill)
-        assertEquals(0, agentsBuilt)
+        // Advice is answered in the chat: no hand-off chip, and the agent is the one that answers.
+        assertEquals("The chef suggests an omelette.", reply.text)
+        assertEquals(1, agentsBuilt)
     }
 
     @Test fun aCommandWithAPersonaKeywordStillRuns() = runBlocking<Unit> {
@@ -98,8 +100,6 @@ class CommandControllerTest {
         val reply = assertIs<CommandState.Reply>(c.settled())
         assertEquals("Added to your calendar", reply.text)
         assertEquals(1, agentsBuilt)
-        // The persona is still offered next to the answer.
-        assertEquals(SkillChip("chef", "Chef"), reply.skill)
     }
 
     @Test fun eachReplyIsReadAloudOnce() = runBlocking<Unit> {

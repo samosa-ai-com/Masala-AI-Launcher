@@ -1,8 +1,5 @@
 package com.samosaai.masala.agent
 
-/** The skill a command was routed to, offered as "Continue in …". */
-data class SkillChip(val id: String, val title: String)
-
 /** What the reply card shows for a typed or spoken command. */
 sealed interface CommandState {
     data object Idle : CommandState
@@ -15,7 +12,6 @@ sealed interface CommandState {
         val prompt: String,
         val text: String,
         val steps: List<String> = emptyList(),
-        val skill: SkillChip? = null,
         val spoken: Boolean = false,
         /** The experts whose answers shaped this reply, for the badges on it. */
         val experts: List<com.samosaai.masala.chat.ExpertCredit> = emptyList(),
