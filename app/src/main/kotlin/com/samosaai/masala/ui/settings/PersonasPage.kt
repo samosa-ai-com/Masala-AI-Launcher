@@ -104,8 +104,10 @@ fun PersonasPage(onBack: () -> Unit) {
 private fun PersonaEditor(skill: MasalaSkill, onDone: () -> Unit, onCancel: () -> Unit) {
     val app = LocalContext.current.masala
     val shipped = skill.persona?.systemPrompt.orEmpty()
+    val shippedWhen = skill.persona?.whenToUse.orEmpty()
     val stored = remember(skill.id) { app.personas.override(skill.id) }
     var prompt by remember(skill.id) { mutableStateOf(stored?.systemPrompt ?: shipped) }
+    var whenToUse by remember(skill.id) { mutableStateOf(stored?.whenToUse ?: shippedWhen) }
     // Null = every tool the consult scope allows; a set = exactly these.
     var limits by remember(skill.id) { mutableStateOf(stored?.allowTools != null) }
     var chosen by remember(skill.id) {
@@ -114,6 +116,22 @@ private fun PersonaEditor(skill: MasalaSkill, onDone: () -> Unit, onCancel: () -
     val tools = remember { offerableTools(app) }
 
     SettingsScaffold(stringResource(R.string.personas_edit_title, skill.title.ifBlank { skill.id }), onBack = onCancel) {
+        // What the main agent reads when it decides whether to call this expert.
+        Text(stringResource(R.string.personas_when_label), style = MaterialTheme.typography.labelLarge)
+        OutlinedTextField(
+            whenToUse,
+            { whenToUse = it },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 2,
+            maxLines = 4,
+            textStyle = MaterialTheme.typography.bodySmall,
+        )
+        Text(
+            stringResource(R.string.personas_when_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MasalaTheme.tokens.textMedium,
+        )
+
         Text(
             stringResource(R.string.personas_prompt_label),
             style = MaterialTheme.typography.labelLarge,
@@ -126,7 +144,7 @@ private fun PersonaEditor(skill: MasalaSkill, onDone: () -> Unit, onCancel: () -
             maxLines = 12,
             textStyle = MaterialTheme.typography.bodySmall,
         )
-        TextButton(onClick = { prompt = shipped; limits = false; chosen = tools.toSet() }) {
+        TextButton(onClick = { prompt = shipped; whenToUse = shippedWhen; limits = false; chosen = tools.toSet() }) {
             Text(stringResource(R.string.personas_reset))
         }
 
@@ -171,8 +189,9 @@ private fun PersonaEditor(skill: MasalaSkill, onDone: () -> Unit, onCancel: () -
         Button(
             onClick = {
                 val text = prompt.trim().takeIf { it.isNotBlank() && it != shipped }
+                val whenText = whenToUse.trim().takeIf { it.isNotBlank() && it != shippedWhen }
                 val list = if (limits) chosen.toList() else null
-                app.personas.save(skill.id, PersonaOverride(systemPrompt = text, allowTools = list))
+                app.personas.save(skill.id, PersonaOverride(systemPrompt = text, allowTools = list, whenToUse = whenText))
                 onDone()
             },
             modifier = Modifier.fillMaxWidth(),

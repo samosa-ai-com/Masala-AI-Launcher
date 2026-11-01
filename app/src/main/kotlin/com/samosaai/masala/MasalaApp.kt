@@ -154,7 +154,7 @@ class MasalaApp : Application() {
                 val now = java.text.SimpleDateFormat("EEEE d MMMM yyyy, HH:mm", java.util.Locale.US).format(java.util.Date())
                 AgentPrompt.build(
                     "$now (${java.util.TimeZone.getDefault().id})",
-                    if (listSkills) skills.getAllSkills() else emptyList(),
+                    if (listSkills) effectiveSkills() else emptyList(),
                     secondBrain.promptNow(),
                     instructions,
                 )
@@ -437,8 +437,22 @@ class MasalaApp : Application() {
         fetchOnlyResults = unattended,
     )
 
-    /** What the user changed about an expert: its prompt and the tools it may use. */
+    /** What the user changed about an expert: its prompt, when it is called, and its tools. */
     val personas by lazy { com.samosaai.masala.skills.PersonaStore(java.io.File(filesDir, "personas")) }
+
+    /**
+     * The installed skills with the user's persona edits applied. Everything that describes or runs
+     * an expert reads this, so nothing about a persona is fixed in the prompt.
+     */
+    private fun effectiveSkills(): List<MasalaSkill> = skills.getAllSkills().map { skill ->
+        val persona = skill.persona ?: return@map skill
+        skill.copy(
+            persona = persona.copy(
+                systemPrompt = personas.promptFor(skill.id) ?: persona.systemPrompt,
+                whenToUse = personas.whenToUseFor(skill.id) ?: persona.whenToUse,
+            ),
+        )
+    }
 
     /** The agent for one expert consult: its persona's own instructions, its tools, a bounded run. */
     private fun consultAgent(skill: MasalaSkill) = agent(
@@ -446,16 +460,18 @@ class MasalaApp : Application() {
         // The main agent's tools, minus a consult inside a consult, a skill sheet, and anything
         // that would take the phone's screen away from the chat — plus the user's own switches.
         scope = { infos -> ToolScope.consult(infos, CONSULT_EXCLUDED + personas.toolsFor(skill.id)) },
-        instructions = listOfNotNull(
-            personas.promptFor(skill.id) ?: skill.persona?.systemPrompt,
-            skill.instructions,
-        ).joinToString("\n\n"),
+        // [skill] already carries the user's prompt and "when to use" edits.
+        instructions = listOfNotNull(skill.persona?.systemPrompt, skill.instructions).joinToString("\n\n"),
         maxSteps = MAX_CONSULT_STEPS,
         listSkills = false,
     )
 
     private val consultService by lazy {
-        ConsultService(sessions = consults, skill = { skills.getSkillById(it) }, agentFor = ::consultAgent)
+        ConsultService(
+            sessions = consults,
+            skill = { id -> effectiveSkills().firstOrNull { it.id == id } },
+            agentFor = ::consultAgent,
+        )
     }
 
     /** Consult calls spent in the current chat turn; reset when the turn starts. */

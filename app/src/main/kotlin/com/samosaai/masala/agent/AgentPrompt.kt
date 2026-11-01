@@ -32,16 +32,25 @@ object AgentPrompt {
         val experts = listed.filter { it.persona != null }
         val jobs = listed.filter { it.persona == null }
         if (experts.isNotEmpty()) {
-            append("\nExperts you can consult with consult_expert (id: what they are for):\n")
-            experts.forEach { append("- ").append(it.id).append(": ").append(it.description.ifBlank { it.title }).append('\n') }
-            append("Consult one when the request is advice in its area, or when its expertise would change your answer. ")
-            append("They cannot see this chat, so include the facts they need. Pass consult_id to continue with the same ")
-            append("expert. ")
-            append("Answer the user in 2–4 short sentences, focused on what they asked: summarise the expert, ")
-            append("never paste or quote its whole answer. Keep, word for word, any instruction to seek care or call ")
-            append("emergency services — first, when it is urgent — and pass on a disclaimer or a question the expert ")
-            append("asks back. Credit the expert by name (\"the doctor said…\"), never claim to be the expert, and write ")
-            append("prose without markdown blockquotes. If the user wants the detail, they can ask for it.\n")
+            // The list and its "when" come from the installed personas, so an edited expert is
+            // described by what the user wrote, not by anything compiled in here.
+            append("\nExperts you can consult with consult_expert (id: when to call them):\n")
+            experts.forEach { skill ->
+                val whenToUse = skill.persona?.whenToUse?.takeIf { it.isNotBlank() }
+                    ?: skill.description.ifBlank { skill.title }
+                append("- ").append(skill.id).append(": ").append(whenToUse).append('\n')
+            }
+            append("Consult one only when its expertise would change your answer — not for small talk or a fact you know. ")
+            append("Send it only the facts it needs; it cannot see this chat. Pass consult_id to continue with the same ")
+            append("expert. You may consult several in one turn: combine ")
+            append("their views into one answer, and say plainly when they disagree. ")
+            append("You are the one talking to the user: answer in your own voice, then say what you would do about it. ")
+            append("An expert is one input, not the answer — never paste its whole reply. Mention whose view it is when that ")
+            append("helps (\"the doctor's read…\"); you don't have to name every expert or repeat everything. Quoting one ")
+            append("sentence is fine when that sentence is the point. Keep word for word any instruction not to do ")
+            append("something or to get help now, and a persona's disclaimer if it gave one. As short as the question ")
+            append("allows: a sentence or two for a simple question, a short list for a plan. Add your own part: what you ")
+            append("make of it and the next step, including anything you can do on this phone now.\n")
         }
         if (jobs.isNotEmpty()) {
             append("\nInstalled skills (start one with run_skill when the request fits it):\n")

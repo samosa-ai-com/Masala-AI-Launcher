@@ -258,6 +258,8 @@
     <string name="personas_empty">No personas are installed.</string>
     <string name="personas_edited">Edited</string>
     <string name="personas_edit_title">Edit %1$s</string>
+    <string name="personas_when_label">When should Masala call this expert?</string>
+    <string name="personas_when_hint">Masala reads this to decide whether a question belongs to this expert.</string>
     <string name="personas_prompt_label">What it is told to be</string>
     <string name="personas_reset">Reset to default</string>
     <string name="personas_limit_tools">Limit which tools it can use</string>

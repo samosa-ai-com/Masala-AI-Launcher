@@ -13,6 +13,8 @@ data class PersonaOverride(
     val systemPrompt: String? = null,
     /** Null means every tool the consult scope allows; an empty list means none of them. */
     val allowTools: List<String>? = null,
+    /** When the main agent should call this expert. Null keeps the one the skill ships. */
+    val whenToUse: String? = null,
 )
 
 /**
@@ -34,13 +36,17 @@ class PersonaStore(private val root: File) {
     /** The prompt to use, or null to keep the skill's own. */
     fun promptFor(id: String): String? = override(id)?.systemPrompt?.takeIf { it.isNotBlank() }
 
+    /** When to call this expert, or null to keep the skill's own wording. */
+    fun whenToUseFor(id: String): String? = override(id)?.whenToUse?.takeIf { it.isNotBlank() }
+
     /** Tools to leave out, empty for "all of them". */
     fun toolsFor(id: String): Set<String> = override(id)?.allowTools?.toSet().orEmpty()
 
     @Synchronized
     fun save(id: String, override: PersonaOverride) {
         val next = read().toMutableMap()
-        if (override.systemPrompt == null && override.allowTools == null) next.remove(id) else next[id] = override
+        val untouched = override.systemPrompt == null && override.allowTools == null && override.whenToUse == null
+        if (untouched) next.remove(id) else next[id] = override
         write(next)
     }
 

@@ -78,12 +78,11 @@ object AgentTools {
 
     val consultExpert = ToolDefinition(
         "consult_expert",
-        "Ask a specialist (an expert such as Doctor, Chef or Fitness coach) for their view. They answer from " +
-            "their own instructions and tools and cannot see this chat, so include the facts they need. Use it " +
-            "when the request is advice in their area, or when their expertise would change your answer. Their " +
-            "answer can be long: summarise it for the user in 2–4 short sentences, keeping any safety " +
-            "instruction and their disclaimer as given. Pass the consult_id from an earlier result to continue " +
-            "with the same expert.",
+        "Consult a specialist (a persona such as Doctor or Chef) and get its answer. It runs on its own " +
+            "instructions and tools and cannot see this chat, so include the facts it needs. Use it when the " +
+            "expert's knowledge would change what you tell the user; you decide what, if anything, the user " +
+            "needs to hear. Returns the answer, this consult's id and the consults in this chat. Pass consult_id " +
+            "from an earlier result to continue with the same expert.",
         schema(listOf("skill_id", "question")) {
             stringProp("skill_id", "The expert's id, from the experts list.")
             stringProp("question", "What to ask them.")

@@ -18,11 +18,30 @@ class PersonaStoreTest {
     }
 
     @Test
-    fun aPromptAndAToolListSurviveAReload() {
-        PersonaStore(root).save("doctor", PersonaOverride(systemPrompt = "Answer in one line.", allowTools = listOf("memory_read")))
+    fun aPromptAToolListAndAWhenLineSurviveAReload() {
+        PersonaStore(root).save(
+            "doctor",
+            PersonaOverride(
+                systemPrompt = "Answer in one line.",
+                allowTools = listOf("memory_read"),
+                whenToUse = "Anything about the body.",
+            ),
+        )
         val reopened = PersonaStore(root)
         assertEquals("Answer in one line.", reopened.promptFor("doctor"))
         assertEquals(setOf("memory_read"), reopened.toolsFor("doctor"))
+        assertEquals("Anything about the body.", reopened.whenToUseFor("doctor"))
+    }
+
+    @Test
+    fun whenToUseIsIndependentOfTheOtherEdits() {
+        val store = PersonaStore(root)
+        store.save("chef", PersonaOverride(whenToUse = "Dinner ideas."))
+        assertEquals("Dinner ideas.", store.whenToUseFor("chef"))
+        assertNull(store.promptFor("chef"))
+        assertEquals(emptySet(), store.toolsFor("chef"))
+        store.reset("chef")
+        assertNull(store.whenToUseFor("chef"))
     }
 
     @Test
