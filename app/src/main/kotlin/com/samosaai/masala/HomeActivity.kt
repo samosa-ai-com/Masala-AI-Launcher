@@ -548,7 +548,7 @@ class HomeActivity : ComponentActivity() {
                         app.commands.restoreSession(emptyList())
                         expanded = false
                     },
-                    experts = app.skills.getPersonas().map {
+                    experts = app.experts().map {
                         com.samosaai.masala.chat.ExpertCredit(it.id, it.title.ifBlank { it.id })
                     },
                     onRetry = { app.commands.ask(getString(R.string.capability_retry_prompt)) },

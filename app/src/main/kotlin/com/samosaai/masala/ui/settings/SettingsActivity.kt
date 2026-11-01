@@ -116,6 +116,8 @@ class SettingsActivity : ComponentActivity() {
                     // Search can open a page directly (UI refresh U3); Back then leaves settings.
                     val start = remember { intent.getStringExtra(EXTRA_PAGE)?.let { n -> Page.entries.firstOrNull { it.name == n } } }
                     var page by rememberSaveable { mutableStateOf(start ?: Page.MAIN) }
+                    // Set when Skills sends the user to one expert; the experts page opens its editor.
+                    var editExpertId by rememberSaveable { mutableStateOf<String?>(null) }
                     BackHandler(enabled = page != Page.MAIN) { if (start != null && page == start) finish() else page = Page.MAIN }
                     // Each page keeps its scroll position (and other saved state) while another page is shown.
                     val pageStates = rememberSaveableStateHolder()
@@ -138,8 +140,14 @@ class SettingsActivity : ComponentActivity() {
                         Page.LAYOUT -> LayoutPage(settings, onBack = { page = Page.MAIN })
                         Page.RECORDING -> RecordingPage(onBack = { page = Page.MAIN })
                         Page.MINI_APPS -> MiniAppsPage(onBack = { page = Page.MAIN })
-                        Page.SKILLS -> SkillsPage(onBack = { page = Page.MAIN }, onEditPersonas = { page = Page.PERSONAS })
-                        Page.PERSONAS -> PersonasPage(onBack = { page = Page.MAIN })
+                        Page.SKILLS -> SkillsPage(onBack = { page = Page.MAIN }, onEditExpert = { id ->
+                            editExpertId = id
+                            page = Page.PERSONAS
+                        })
+                        Page.PERSONAS -> PersonasPage(
+                            onBack = { page = Page.MAIN; editExpertId = null },
+                            initialEditId = editExpertId,
+                        )
                         Page.TASKS -> ScheduledTasksPage(onBack = { page = Page.MAIN }, onAskInChat = { askInChat(it) })
                         Page.FILES -> masala.fileIndex?.let { FilesPage(it, onBack = { page = Page.MAIN }) }
                         Page.AI_MODELS -> AiModelsPage(onBack = { page = Page.MAIN })
@@ -407,7 +415,7 @@ class SettingsActivity : ComponentActivity() {
 
     /** Every installed skill in one place, so a chat is one tap away (plan F4). */
     @Composable
-    private fun SkillsPage(onBack: () -> Unit, onEditPersonas: () -> Unit) {
+    private fun SkillsPage(onBack: () -> Unit, onEditExpert: (String) -> Unit) {
         val scope = rememberCoroutineScope()
         var filter by rememberSaveable { mutableStateOf("") }
         var url by rememberSaveable { mutableStateOf("") }
@@ -441,7 +449,7 @@ class SettingsActivity : ComponentActivity() {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         // An expert has no chat of its own; its row leads to what can be changed.
                         if (skill.persona != null) {
-                            TextButton(onClick = onEditPersonas) { Text(stringResource(R.string.skills_edit)) }
+                            TextButton(onClick = { onEditExpert(skill.id) }) { Text(stringResource(R.string.skills_edit)) }
                         } else {
                             TextButton(onClick = {
                                 startActivity(SkillSheetActivity.intent(this@SettingsActivity, skill.id, null))

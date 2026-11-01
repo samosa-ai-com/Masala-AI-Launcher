@@ -440,11 +440,16 @@ class MasalaApp : Application() {
     /** What the user changed about an expert: its prompt, when it is called, and its tools. */
     val personas by lazy { com.samosaai.masala.skills.PersonaStore(java.io.File(filesDir, "personas")) }
 
+    /** The experts on offer: installed personas minus any the user removed. */
+    fun experts(): List<MasalaSkill> = skills.getPersonas().filterNot { personas.isHidden(it.id) }
+
     /**
      * The installed skills with the user's persona edits applied. Everything that describes or runs
      * an expert reads this, so nothing about a persona is fixed in the prompt.
      */
-    private fun effectiveSkills(): List<MasalaSkill> = skills.getAllSkills().map { skill ->
+    private fun effectiveSkills(): List<MasalaSkill> = skills.getAllSkills()
+        .filterNot { it.persona != null && personas.isHidden(it.id) }
+        .map { skill ->
         val persona = skill.persona ?: return@map skill
         skill.copy(
             persona = persona.copy(

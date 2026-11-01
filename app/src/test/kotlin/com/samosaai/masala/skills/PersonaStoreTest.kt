@@ -63,6 +63,28 @@ class PersonaStoreTest {
     }
 
     @Test
+    fun hidingAnExpertKeepsItsEditsAndCanBeRestored() {
+        val store = PersonaStore(root)
+        store.save("doctor", PersonaOverride(systemPrompt = "short answers", whenToUse = "anything medical"))
+        store.setHidden("doctor", true)
+        assertTrue(store.isHidden("doctor"))
+        assertEquals(setOf("doctor"), store.hiddenIds())
+        // Hiding is its own flag: the edits are still there behind it.
+        assertEquals("short answers", store.promptFor("doctor"))
+        assertEquals("anything medical", store.whenToUseFor("doctor"))
+        store.setHidden("doctor", false)
+        // Showing it again keeps what the user wrote; only the flag goes.
+        assertEquals("short answers", store.promptFor("doctor"))
+        assertEquals(emptySet(), store.hiddenIds())
+
+        // With nothing else changed, hide then show leaves no override at all.
+        val plain = PersonaStore(root)
+        plain.setHidden("chef", true)
+        plain.setHidden("chef", false)
+        assertNull(plain.override("chef"))
+    }
+
+    @Test
     fun aCorruptFileReadsAsNothingChanged() {
         root.mkdirs()
         File(root, "overrides.json").writeText("{ not json")

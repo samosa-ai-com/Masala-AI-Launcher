@@ -265,6 +265,15 @@
     <string name="personas_limit_tools">Limit which tools it can use</string>
     <string name="personas_tools_hint">Only the checked tools are offered to this expert.</string>
     <string name="personas_save">Save</string>
+    <string name="personas_add">Add an expert</string>
+    <string name="personas_hidden_title">Removed</string>
+    <string name="personas_restore">Restore</string>
+    <string name="personas_remove">Remove</string>
+    <string name="personas_remove_title">Remove %1$s?</string>
+    <string name="personas_remove_message">It stops appearing and is never consulted again. The ones Masala ships can be restored from this page.</string>
+    <string name="personas_new_title">New expert</string>
+    <string name="personas_new_name">Name</string>
+    <string name="personas_new_save">Add it</string>
     <string name="chat_ask_someone">Ask an expert</string>
     <string name="search_ask_expert">Ask the %1$s: </string>
     <string name="skills_delete">Delete</string>

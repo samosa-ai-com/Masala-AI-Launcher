@@ -7,6 +7,7 @@ import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.core.tool.isAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
 
 /**
  * From the private prototype's `SkillRegistry`, on `MasalaSkill`. the private prototype's is a singleton behind `init(context)`;
@@ -122,6 +123,15 @@ class SkillRegistry(
             reload()
             preview.skill
         }
+
+    /** Writes an expert or skill the user made, so it lands in the merged list like an imported one. */
+    suspend fun saveCommunity(skill: MasalaSkill): Boolean = withContext(Dispatchers.IO) {
+        val ok = runCatching {
+            CommunitySkillStore(context).save(MasalaJson.lenient.encodeToString(skill))
+        }.isSuccess
+        if (ok) reload()
+        ok
+    }
 
     /** Persist a community skill from a raw JSON string, validated on [Dispatchers.IO]. */
     suspend fun importCommunity(rawJson: String): MasalaSkill = withContext(Dispatchers.IO) {

@@ -87,7 +87,7 @@ fun HomeLayoutPage(
     val scope = rememberCoroutineScope()
     val history by app.layouts.historyState.collectAsStateWithLifecycle()
     var status by remember { mutableStateOf<String?>(null) }
-    val skills = remember { app.skills.getPersonas() }
+    val skills = remember { app.experts() }
 
     SettingsScaffold(stringResource(R.string.settings_home_layout), onBack = onBack) {
         // The toggle labels itself, so this card needs no heading of its own.

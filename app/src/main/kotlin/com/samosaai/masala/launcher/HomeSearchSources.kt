@@ -50,7 +50,10 @@ class HomeSearchSources(private val context: Context, private val app: MasalaApp
     override fun skills(query: String): List<MasalaSkill> {
         val q = query.trim().lowercase()
         if (q.length < 2) return emptyList()
-        return app.skills.getAllSkills().filter { it.title.lowercase().split(' ').any { w -> w.startsWith(q) } }
+        return app.skills.getAllSkills()
+            // A removed expert is gone from search too; a job skill has no hide switch.
+            .filterNot { it.persona != null && app.personas.isHidden(it.id) }
+            .filter { it.title.lowercase().split(' ').any { w -> w.startsWith(q) } }
     }
 
     override fun settings(query: String): List<SettingsEntry> = SearchGroups.matchSettings(query, entries)

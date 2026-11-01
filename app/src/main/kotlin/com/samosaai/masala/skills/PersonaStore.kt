@@ -15,6 +15,8 @@ data class PersonaOverride(
     val allowTools: List<String>? = null,
     /** When the main agent should call this expert. Null keeps the one the skill ships. */
     val whenToUse: String? = null,
+    /** Removed from the list and from consults; bundled experts are hidden rather than deleted. */
+    val hidden: Boolean = false,
 )
 
 /**
@@ -39,13 +41,25 @@ class PersonaStore(private val root: File) {
     /** When to call this expert, or null to keep the skill's own wording. */
     fun whenToUseFor(id: String): String? = override(id)?.whenToUse?.takeIf { it.isNotBlank() }
 
+    fun isHidden(id: String): Boolean = override(id)?.hidden == true
+
+    fun hiddenIds(): Set<String> = read().filterValues { it.hidden }.keys
+
+    /** A bundled expert can't be deleted, so removing it hides it; restoring shows it again. */
+    @Synchronized
+    fun setHidden(id: String, hidden: Boolean) {
+        val current = override(id) ?: PersonaOverride()
+        save(id, current.copy(hidden = hidden))
+    }
+
     /** Tools to leave out, empty for "all of them". */
     fun toolsFor(id: String): Set<String> = override(id)?.allowTools?.toSet().orEmpty()
 
     @Synchronized
     fun save(id: String, override: PersonaOverride) {
         val next = read().toMutableMap()
-        val untouched = override.systemPrompt == null && override.allowTools == null && override.whenToUse == null
+        val untouched = override.systemPrompt == null && override.allowTools == null &&
+            override.whenToUse == null && !override.hidden
         if (untouched) next.remove(id) else next[id] = override
         write(next)
     }
