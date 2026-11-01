@@ -330,6 +330,10 @@ object MasalaToolDefinitions {
                     put("type", "integer")
                     put("description", "Height override in rows, inside the widget's own size range. Missing keeps its default.")
                 }
+                putJsonObject("approved") {
+                    put("type", "boolean")
+                    put("description", "Set true after the user agreed to the widget's web fetching (the error names the hosts). Missing asks first.")
+                }
             }
             putJsonArray("required") { add("id") }
         },

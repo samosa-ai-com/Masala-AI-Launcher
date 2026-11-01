@@ -454,7 +454,7 @@ class SettingsActivity : ComponentActivity() {
         val base by masala.layouts.base.collectAsStateWithLifecycle()
         fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()
         val source = remember(snapshot) {
-            WidgetSource(snapshot = { snapshot }, store = masala.widgetStates, onAction = { toast(getString(R.string.widgets_preview_note)) }, streams = masala.streamSources)
+            WidgetSource(snapshot = { snapshot }, store = masala.widgetStates, onAction = { toast(getString(R.string.widgets_preview_note)) }, streams = masala.streamSources, http = masala.httpValues)
         }
         SettingsScaffold(stringResource(R.string.settings_widgets), onBack = onBack) {
             Button(onClick = { askInChat(getString(R.string.widgets_describe_prefill)) }) { Text(stringResource(R.string.widgets_describe)) }
@@ -490,6 +490,21 @@ class SettingsActivity : ComponentActivity() {
             }
             rows.forEach { (spec, _) ->
                 var confirmDelete by remember(spec.id) { mutableStateOf(false) }
+                var approval by remember(spec.id) { mutableStateOf<List<com.samosaai.masala.widgets.HttpApproval.Fetch>?>(null) }
+                approval?.let { fetches ->
+                    com.samosaai.masala.ui.home.widgets.HttpApprovalDialog(
+                        fetches = fetches,
+                        onApprove = {
+                            approval = null
+                            scope.launch {
+                                masala.httpApproval.approve(spec.id, fetches.map { it.host })
+                                val problems = masala.layouts.placeWidget("Add to home: ${spec.title ?: spec.id}", spec.id)
+                                toast(getString(if (problems.isEmpty()) R.string.widgets_added else R.string.widgets_add_failed))
+                            }
+                        },
+                        onDismiss = { approval = null },
+                    )
+                }
                 val placements = remember(base, spec.id) { base?.let { LayoutEdits.widgetPlacements(it, spec.id) }.orEmpty() }
                 Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     WidgetCard(spec, rows = null, source = source)
@@ -503,8 +518,13 @@ class SettingsActivity : ComponentActivity() {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = {
                             scope.launch {
-                                val problems = masala.layouts.placeWidget("Add to home: ${spec.title ?: spec.id}", spec.id)
-                                toast(getString(if (problems.isEmpty()) R.string.widgets_added else R.string.widgets_add_failed))
+                                val pending = com.samosaai.masala.widgets.HttpApproval.needingApproval(spec, masala.httpApproval.approved(spec.id))
+                                if (pending.isEmpty()) {
+                                    val problems = masala.layouts.placeWidget("Add to home: ${spec.title ?: spec.id}", spec.id)
+                                    toast(getString(if (problems.isEmpty()) R.string.widgets_added else R.string.widgets_add_failed))
+                                } else {
+                                    approval = pending
+                                }
                             }
                         }) { Text(stringResource(R.string.widgets_add_to_home)) }
                         TextButton(onClick = { editSpec = spec }) { Text(stringResource(R.string.widgets_edit)) }
@@ -537,6 +557,8 @@ class SettingsActivity : ComponentActivity() {
                                 scope.launch {
                                     masala.widgetLibrary.delete(spec.id)
                                     masala.layouts.removeWidgetRefs("Remove from home: ${spec.title ?: spec.id}", spec.id)
+                                    masala.httpValues.clearWidget(spec.id)
+                                    masala.httpApproval.clearWidget(spec.id)
                                 }
                             }) { Text(stringResource(R.string.settings_version_delete)) }
                         },

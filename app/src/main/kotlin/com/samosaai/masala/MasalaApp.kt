@@ -91,6 +91,10 @@ class MasalaApp : Application() {
 
     val database by lazy { MasalaDatabase.create(this) }
     val miniApps by lazy { MiniAppStore(database.miniApps()) }
+    /** Fetched web values (plan widget-maker §5): display strings and ages for web_value. */
+    val httpValues by lazy { com.samosaai.masala.widgets.HttpValueStore(scope, database.httpValues()) }
+    /** Hosts the user approved per widget for web fetching. */
+    val httpApproval by lazy { com.samosaai.masala.widgets.HttpApprovalStore(this) }
     /** The 2-player pool for live video widgets (plan widget-maker §4.3, D3 fixed). */
     val videoPool by lazy { com.samosaai.masala.widgets.media.PlayerPool(this) }
     val streamSources by lazy {
@@ -582,6 +586,8 @@ class MasalaApp : Application() {
         super.onCreate()
         // Tools ask for permissions from background threads; the gate needs a context for that.
         PermissionGate.context = this
+        scope.launch { httpValues.load() }
+        com.samosaai.masala.widgets.WidgetHttpWorker.ensure(this)
         catalog = AppCatalog(this, scope)
         icons = IconCache(this, catalog)
         actions = AppActions(this, catalog) { usage.record(it) }

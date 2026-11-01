@@ -47,6 +47,7 @@ import com.samosaai.masala.ui.home.SymbolIcons
 import com.samosaai.masala.ui.home.WallpaperCard
 import com.samosaai.masala.ui.theme.MasalaTheme
 import com.samosaai.masala.ui.theme.OnWallpaper
+import com.samosaai.masala.widgets.HttpValueStore
 import com.samosaai.masala.widgets.WidgetStateStore
 import com.samosaai.masala.widgets.StreamSourceStore
 import java.time.Duration
@@ -67,6 +68,8 @@ data class WidgetSource(
     val streams: StreamSourceStore? = null,
     /** The player pool and fullscreen tap for live video; without it video stays a note. */
     val media: com.samosaai.masala.widgets.media.MediaHost? = null,
+    /** Fetched web values; web_value without it keeps the W5 note. */
+    val http: HttpValueStore? = null,
 )
 
 /** One generated widget on home: a glass card with its components top to bottom. */
@@ -233,16 +236,21 @@ private fun Component(
             else com.samosaai.masala.widgets.media.SnapshotImage(src.id, component.everySeconds, source.streams)
         }
         is WidgetComponent.WebValue -> {
-            Text(
-                component.label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MasalaTheme.tokens.onWallpaperMedium,
-            )
-            Text(
-                (component.suffix?.let { "— $it" } ?: "—") + " · web value in W5",
-                style = MaterialTheme.typography.titleLarge,
-                color = OnWallpaper,
-            )
+            val store = source.http
+            if (store == null) {
+                Text(
+                    component.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MasalaTheme.tokens.onWallpaperMedium,
+                )
+                Text(
+                    (component.suffix?.let { "— $it" } ?: "—") + " · web value in W5",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = OnWallpaper,
+                )
+            } else {
+                com.samosaai.masala.widgets.media.WebValueView(component, widgetId, component.suffix, store, component.style)
+            }
         }
     }
 }

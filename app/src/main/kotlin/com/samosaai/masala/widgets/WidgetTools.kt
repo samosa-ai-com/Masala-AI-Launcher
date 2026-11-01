@@ -127,8 +127,13 @@ object WidgetTools {
             },
             FunctionTool(Defs.placeWidget, CHANGES_SOMETHING) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")
-                if (id !in host().widgetLibrary.current()) {
-                    return@FunctionTool ActionResult.error("No widget '$id'. Call list_widgets to see the library.")
+                val spec = host().widgetLibrary.current()[id]
+                    ?: return@FunctionTool ActionResult.error("No widget '$id'. Call list_widgets to see the library.")
+                val pending = HttpApproval.needingApproval(spec, host().httpApproval.approved(id))
+                if (pending.isNotEmpty() && it.string("approved")?.trim()?.lowercase() != "true") {
+                    return@FunctionTool ActionResult.error(
+                        "This widget fetches:\n${HttpApproval.describe(pending)}\nTell the user, and call again with approved=true once they agree.",
+                    )
                 }
                 val problems = host().layouts.placeWidget(
                     "Place widget $id",
@@ -137,7 +142,9 @@ object WidgetTools {
                     pageId = it.string("page"),
                 )
                 if (problems.isNotEmpty()) return@FunctionTool ActionResult.error(problems.joinToString("\n"))
-                ActionResult.ok("Widget '$id' is on home.")
+                host().httpApproval.approve(id, pending.map { it.host })
+                val fetchNote = pending.takeIf { it.isNotEmpty() }?.let { "\nApproved fetching:\n${HttpApproval.describe(it)}" }.orEmpty()
+                ActionResult.ok("Widget '$id' is on home.$fetchNote")
             },
             FunctionTool(Defs.removeWidget, CHANGES_SOMETHING) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")
@@ -149,6 +156,8 @@ object WidgetTools {
                 val id = it.string("id") ?: return@FunctionTool missing("id")
                 host().widgetLibrary.delete(id)
                 host().layouts.removeWidgetRefs("Delete widget $id", id)
+                host().httpValues.clearWidget(id)
+                host().httpApproval.clearWidget(id)
                 ActionResult.ok("Widget '$id' is deleted from the library and off home everywhere.")
             },
             FunctionTool(Defs.listStreamSources, READ_ONLY) {

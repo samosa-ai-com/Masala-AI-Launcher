@@ -465,7 +465,7 @@ class HomeActivity : ComponentActivity() {
             )
         }
         val widgetSource = remember(snapshot, mediaHost) {
-            com.samosaai.masala.ui.home.widgets.WidgetSource(snapshot = { snapshot }, store = widgetStore, onAction = ::run, streams = app.streamSources, media = mediaHost)
+            com.samosaai.masala.ui.home.widgets.WidgetSource(snapshot = { snapshot }, store = widgetStore, onAction = ::run, streams = app.streamSources, media = mediaHost, http = app.httpValues)
         }
         // The context below is remembered on purpose; drops read the live layout through these.
         val latestLayout = rememberUpdatedState(layout)
@@ -975,7 +975,9 @@ class HomeActivity : ComponentActivity() {
         if (addWidgetSheet) {
             com.samosaai.masala.ui.home.widgets.AddWidgetSheet(
                 library = app.widgetLibrary,
-                onAdd = { id -> scope.launch {
+                approvalOf = { app.httpApproval.approved(it) },
+                onAdd = { id, approved -> scope.launch {
+                    if (approved) app.httpApproval.approve(id, com.samosaai.masala.widgets.HttpApproval.fetchesOf(app.widgetLibrary.current()[id] ?: return@launch).map { it.host })
                     val title = app.widgetLibrary.current()[id]?.title ?: id
                     app.layouts.placeWidget("Add to home: $title", id)
                         .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_added))
