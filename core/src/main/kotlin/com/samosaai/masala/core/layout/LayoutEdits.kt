@@ -40,6 +40,33 @@ object LayoutEdits {
     }
 
     /**
+     * Renames every item [match] selects, top-level or inside a folder. Null when nothing matched, or
+     * the name is blank.
+     */
+    fun renameWhere(doc: LayoutDoc, label: String, match: (Item) -> Boolean): LayoutDoc? {
+        val clean = label.trim().take(LayoutChecker.MAX_FOLDER_LABEL)
+        if (clean.isEmpty()) return null
+        var found = false
+        val next = mapSections(doc) { section ->
+            section.withItems(section.items.map { item ->
+                val renamed = if (match(item)) { found = true; item.copy(label = clean) } else item
+                val children = renamed.children
+                if (children != null && children.any(match)) {
+                    found = true
+                    renamed.withChildren(children.map { if (match(it)) it.copy(label = clean) else it })
+                } else {
+                    renamed
+                }
+            })
+        }
+        return next.takeIf { found }
+    }
+
+    /** Renames the top-level item or the folder child [itemId]. */
+    fun renameItem(doc: LayoutDoc, itemId: String, label: String): LayoutDoc? =
+        renameWhere(doc, label) { it.id == itemId }
+
+    /**
      * Moves [itemId] into section [sectionId] just before [beforeId], or to its end when [beforeId] is
      * null or not in that section. What home drops use: the visible order can skip hidden items.
      */

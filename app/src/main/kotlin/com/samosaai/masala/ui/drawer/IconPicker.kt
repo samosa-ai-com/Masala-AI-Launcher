@@ -37,30 +37,28 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.samosaai.masala.R
-import com.samosaai.masala.core.apps.AppEntry
 import com.samosaai.masala.core.layout.IconSpec
 import com.samosaai.masala.core.layout.KnownSymbols
-import com.samosaai.masala.launcher.AppIconTile
-import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.ui.home.SymbolDisc
 import com.samosaai.masala.ui.home.SymbolIcons
 import com.samosaai.masala.ui.theme.MasalaTheme
 
 /**
- * Choosing an app's icon: one of the built-in symbols, or a small inline SVG pasted in. Reset puts the
- * app's own icon back. Either way the choice is stored on the app (IconSpec), not on a layout slot, so
- * it follows the app onto home, into a folder and into the drawer.
+ * Choosing an icon for something that owns one: one of the built-in symbols, or a small inline SVG
+ * pasted in. Reset puts the original back. An installed app keeps it on its override row, a mini app
+ * on its own record — either way the choice follows it everywhere, not a single layout slot.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun IconPickerSheet(
-    entry: AppEntry,
-    icons: IconCache,
+    label: String,
+    current: String?,
+    preview: @Composable () -> Unit,
     onPick: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var svg by remember(entry.key) { mutableStateOf("") }
-    var refused by remember(entry.key) { mutableStateOf(false) }
+    var svg by remember(label) { mutableStateOf("") }
+    var refused by remember(label) { mutableStateOf(false) }
     val tokens = MasalaTheme.tokens
     val shape = RoundedCornerShape(16.dp)
 
@@ -74,12 +72,12 @@ fun IconPickerSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.size(48.dp).clip(shape)) { AppIconTile(icons, entry.key, entry.label, 48.dp) }
+                Box(Modifier.size(48.dp).clip(shape)) { preview() }
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.icon_picker_title), style = MaterialTheme.typography.titleLarge)
-                    Text(entry.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                TextButton(onClick = { onPick(null) }, enabled = entry.icon != null) {
+                TextButton(onClick = { onPick(null) }, enabled = current != null) {
                     Text(stringResource(R.string.icon_picker_reset))
                 }
             }

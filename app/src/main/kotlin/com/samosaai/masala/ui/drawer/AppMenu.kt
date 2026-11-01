@@ -10,6 +10,7 @@ import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.AddHome
@@ -155,6 +156,7 @@ fun AppMenu(
             // button reads as removing it rather than the vaguer "unpin".
             // Five actions: three to a row, so the labels stay readable at large text sizes.
             FlowRow(Modifier.fillMaxWidth(), maxItemsInEachRow = 3, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ActionTile(Icons.Rounded.OpenInNew, stringResource(R.string.menu_open_action), Modifier.weight(1f)) { menu.launch(entry) }
                 ActionTile(if (entry.pinned) Icons.Rounded.PushPin else Icons.Rounded.AddHome, stringResource(if (entry.pinned) R.string.menu_remove_from_home else R.string.menu_pin), Modifier.weight(1f)) {
                     menu.setPinned(entry, !entry.pinned)
                 }
@@ -168,6 +170,11 @@ fun AppMenu(
             Segmented(Visibility.entries.map { visibilityLabel(it) }, Visibility.entries.indexOf(entry.visibility)) {
                 menu.setVisibility(entry, Visibility.entries[it])
             }
+            Text(
+                stringResource(R.string.menu_visibility_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
