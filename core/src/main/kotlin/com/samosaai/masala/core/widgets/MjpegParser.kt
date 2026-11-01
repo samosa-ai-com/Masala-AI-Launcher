@@ -16,6 +16,12 @@ class MjpegParser(boundary: String?, private val maxFrameBytes: Int = DEFAULT_MA
 
     private var buffer = ByteArray(64 * 1024)
     private var size = 0
+    /**
+     * How far the start-of-image search has already swept: the next [feed] resumes there instead
+     * of rescanning the whole buffer, so a camera that sends no boundary costs one pass, not one
+     * per read. [consume] keeps it pointing at the same bytes.
+     */
+    private var scanned = 0
 
     /** Frames dropped for being too big or not JPEG; a hint for the error line. */
     var dropped: Int = 0
@@ -28,6 +34,7 @@ class MjpegParser(boundary: String?, private val maxFrameBytes: Int = DEFAULT_MA
         if (size > maxFrameBytes * 2) { // nothing completed in far too much data: start over
             dropped++
             size = 0
+            scanned = 0
         }
         return frames
     }
@@ -76,8 +83,14 @@ class MjpegParser(boundary: String?, private val maxFrameBytes: Int = DEFAULT_MA
     private fun readMarkers(frames: MutableList<ByteArray>) {
         while (true) {
             var start = -1
-            for (i in 0 until size - 1) if (buffer[i] == FF && buffer[i + 1] == SOI) { start = i; break }
-            if (start < 0) { if (size > 1) consume(size - 1); return }
+            for (i in scanned until size - 1) if (buffer[i] == FF && buffer[i + 1] == SOI) { start = i; break }
+            if (start < 0) {
+                // Nothing starts here: keep a possibly split trailing FF, drop the swept rest.
+                if (size > 1) consume(size - 1)
+                scanned = maxOf(0, size - 1)
+                return
+            }
+            scanned = start
             var depth = 0
             var i = start
             var end = -1
@@ -136,6 +149,7 @@ class MjpegParser(boundary: String?, private val maxFrameBytes: Int = DEFAULT_MA
         if (count <= 0) return
         System.arraycopy(buffer, count, buffer, 0, size - count)
         size -= count
+        scanned = maxOf(0, scanned - count)
     }
 
     companion object {

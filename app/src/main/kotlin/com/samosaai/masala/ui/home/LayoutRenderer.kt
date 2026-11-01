@@ -384,19 +384,19 @@ private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: Render
             ctx.widgets?.let { source ->
                 val menu = ctx.onWidgetMenu
                 com.samosaai.masala.ui.home.widgets.WidgetCard(
-                    it, layout.widgetRows[it.id],
+                    it, layout.widgetRows[section.id],
                     if (menu == null) source else source.copy(onLongPress = { menu(it, section.id) }),
                 )
-            } ?: Placeholder(it.title ?: it.id, stringResource(R.string.home_widget_placeholder), layout.widgetRows[it.id])
+            } ?: Placeholder(it.title ?: it.id, stringResource(R.string.home_widget_placeholder), layout.widgetRows[section.id])
         }
         is StackSection -> section.widgets.firstOrNull()?.let {
             ctx.widgets?.let { source ->
                 val menu = ctx.onWidgetMenu
                 com.samosaai.masala.ui.home.widgets.StackCard(
-                    section.widgets, layout.widgetRows,
+                    section.widgets, layout.widgetRows[section.id],
                     if (menu == null) source else source.copy(onLongPress = { menu(it, section.id) }),
                 )
-            } ?: Placeholder(it.title ?: it.id, stringResource(R.string.home_stack_placeholder, section.widgets.size), layout.widgetRows[it.id])
+            } ?: Placeholder(it.title ?: it.id, stringResource(R.string.home_stack_placeholder, section.widgets.size), layout.widgetRows[section.id])
         }
         is SkillWidgetSection -> ctx.skillWidgets?.let { SkillWidgetCard(section, it, ctx.onAction) }
             ?: Placeholder(section.skillId, stringResource(R.string.home_skill_widget_placeholder), null)

@@ -19,10 +19,14 @@ data class HttpEntry(val value: String, val fetchedAt: Long)
  * Fetched web values (plan `docs/plans/widget-maker.md` §5): `widget_http_values` rows keyed by
  * widget + URL + path, kept in memory for the renderer. Foreground polls and the background
  * worker both write through [refresh]; failures keep the last value with its age.
+ *
+ * Nothing fetches without consent: [refresh] only contacts hosts in [approved] for that widget,
+ * so an edited URL or a generated layout stays inert until the user approves its host.
  */
 class HttpValueStore(
     private val scope: CoroutineScope,
     private val dao: WidgetHttpValueDao?,
+    private val approved: (widgetId: String) -> Set<String> = { emptySet() },
 ) {
     private val _entries = MutableStateFlow<Map<String, HttpEntry>>(emptyMap())
     val entries: StateFlow<Map<String, HttpEntry>> = _entries.asStateFlow()
@@ -37,9 +41,15 @@ class HttpValueStore(
         _entries.value = rows.associate { it.key to HttpEntry(it.value, it.fetchedAt) }
     }
 
-    /** Fetches [http] now; true when a new value landed, false when the old one stands. */
+    /**
+     * Fetches [http] now when its host is approved for [widgetId]; true when a new value landed,
+     * false when the old one stands (unapproved, unreachable or unparseable).
+     */
     suspend fun refresh(widgetId: String, http: HttpBinding): Boolean {
-        val value = HttpFetch.fetch(http.url, http.jsonPath) ?: return false
+        val allowed = approved(widgetId)
+        val host = HttpApproval.hostOf(http.url) ?: return false
+        if (host !in allowed) return false
+        val value = HttpFetch.fetch(http.url, http.jsonPath, allowed) ?: return false
         val entry = HttpEntry(value, System.currentTimeMillis())
         _entries.value = _entries.value + (keyFor(widgetId, http) to entry)
         val dao = dao ?: return true

@@ -124,6 +124,7 @@ private fun WidgetActions(result: SkillRunEvent.Result) {
             onAction = { toast(previewNote) },
             streams = app.streamSources,
             http = app.httpValues,
+            approved = { app.httpApproval.approved(it) },
         )
     }
     com.samosaai.masala.ui.home.widgets.WidgetCard(current, rows = null, source = source)

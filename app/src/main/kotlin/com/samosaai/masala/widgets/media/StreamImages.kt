@@ -120,50 +120,54 @@ private fun kotlinx.coroutines.CoroutineScope.launchReader(
     onFrame: (androidx.compose.ui.graphics.ImageBitmap) -> Unit,
     onError: (String) -> Unit,
 ): kotlinx.coroutines.Job = launch(Dispatchers.IO) {
-    var connection: HttpURLConnection? = null
-    try {
-        val url = store.urlWithCredentials(sourceId) ?: run {
-            withContext(Dispatchers.Main) { onError("Unknown source") }
-            return@launch
-        }
-        connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 8_000
-            readTimeout = 0
-            setRequestProperty("Accept", "multipart/x-mixed-replace")
-        }
-        connection.connect()
-        if (connection.responseCode !in 200..299) {
-            withContext(Dispatchers.Main) { onError("HTTP ${connection.responseCode}") }
-            return@launch
-        }
-        val boundary = connection.contentType?.let { type ->
-            type.split(';').map { it.trim() }.firstOrNull { it.startsWith("boundary=", ignoreCase = true) }
-                ?.substringAfter('=')?.trim('"')
-        }
-        val parser = MjpegParser(boundary)
-        val buffer = ByteArray(32 * 1024)
-        var backoff = 0L
-        while (isActive) {
-            val read = try {
-                connection.inputStream.read(buffer)
-            } catch (e: Exception) {
-                if (!isActive) return@launch
-                delay(backoff(backoff++))
-                continue
+    val url = store.urlWithCredentials(sourceId) ?: run {
+        withContext(Dispatchers.Main) { onError("Unknown source") }
+        return@launch
+    }
+    // One connection per pass: on EOS or a read error the loop re-opens it (capped backoff),
+    // so a dropped camera resumes instead of freezing on its last frame. Only a non-2xx
+    // status or a dead source ends the loop through onError; the retry button re-enters above.
+    var backoffCount = 0L
+    while (isActive) {
+        var connection: HttpURLConnection? = null
+        try {
+            val (cleanUrl, auth) = com.samosaai.masala.widgets.StreamAuth.split(url)
+            connection = (URL(cleanUrl).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 8_000
+                readTimeout = 0
+                setRequestProperty("Accept", "multipart/x-mixed-replace")
+                if (auth != null) setRequestProperty("Authorization", auth)
             }
-            if (read < 0) {
-                delay(backoff(backoff++))
-                continue
+            connection.connect()
+            if (connection.responseCode !in 200..299) {
+                withContext(Dispatchers.Main) { onError("HTTP ${connection.responseCode}") }
+                return@launch
             }
-            backoff = 0
-            val frames = parser.feed(buffer, 0, read)
-            val last = frames.lastOrNull()?.let { decode(it) }
-            if (last != null) withContext(Dispatchers.Main) { onFrame(last) }
+            backoffCount = 0
+            val boundary = connection.contentType?.let { type ->
+                type.split(';').map { it.trim() }.firstOrNull { it.startsWith("boundary=", ignoreCase = true) }
+                    ?.substringAfter('=')?.trim('"')
+            }
+            val parser = MjpegParser(boundary)
+            val buffer = ByteArray(32 * 1024)
+            while (isActive) {
+                val read = try {
+                    connection.inputStream.read(buffer)
+                } catch (e: Exception) {
+                    if (!isActive) return@launch
+                    break
+                }
+                if (read < 0) break
+                val frames = parser.feed(buffer, 0, read)
+                val last = frames.lastOrNull()?.let { decode(it) }
+                if (last != null) withContext(Dispatchers.Main) { onFrame(last) }
+            }
+        } catch (e: Exception) {
+            if (!isActive) return@launch
+        } finally {
+            runCatching { connection?.disconnect() }
         }
-    } catch (e: Exception) {
-        if (isActive) withContext(Dispatchers.Main) { onError((e.message ?: e.javaClass.simpleName).take(120)) }
-    } finally {
-        runCatching { connection?.disconnect() }
+        delay(backoff(backoffCount++))
     }
 }
 
@@ -172,10 +176,12 @@ private fun backoff(failures: Long): Long = minOf(5_000L shl failures.coerceAtMo
 private fun fetchFrame(url: String?): androidx.compose.ui.graphics.ImageBitmap? {
     if (url == null) return null
     return runCatching {
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+        val (cleanUrl, auth) = com.samosaai.masala.widgets.StreamAuth.split(url)
+        val connection = (URL(cleanUrl).openConnection() as HttpURLConnection).apply {
             connectTimeout = 8_000
             readTimeout = 8_000
             instanceFollowRedirects = true
+            if (auth != null) setRequestProperty("Authorization", auth)
         }
         try {
             if (connection.responseCode !in 200..299) return null

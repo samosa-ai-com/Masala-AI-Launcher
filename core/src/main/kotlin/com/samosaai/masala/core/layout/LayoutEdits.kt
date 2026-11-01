@@ -414,6 +414,44 @@ object LayoutEdits {
         return if (changed) next else null
     }
 
+    /**
+     * Drops every ref to a widget the library no longer has (repair after an undo that restored a
+     * deleted widget's placement): whole widget sections go, stack refs are stripped, an emptied
+     * stack goes too. Null when nothing dangles.
+     */
+    fun stripUnknownWidgets(doc: LayoutDoc, knownIds: Set<String>): LayoutDoc? {
+        var changed = false
+        val next = doc.copy(
+            pages = doc.pages.map { page ->
+                page.copy(
+                    sections = page.sections.mapNotNull { section ->
+                        when (section) {
+                            is WidgetSection -> {
+                                val id = section.ref?.widgetId ?: section.widget?.id
+                                if (id != null && id !in knownIds) {
+                                    changed = true
+                                    null
+                                } else section
+                            }
+                            is StackSection -> {
+                                val keepWidgets = section.widgets.filter { it.id in knownIds }
+                                val keepRefs = section.refs.filter { it.widgetId in knownIds }
+                                if (keepWidgets.size == section.widgets.size && keepRefs.size == section.refs.size) section
+                                else {
+                                    changed = true
+                                    if (keepWidgets.isEmpty() && keepRefs.isEmpty()) null
+                                    else section.copy(widgets = keepWidgets, refs = keepRefs)
+                                }
+                            }
+                            else -> section
+                        }
+                    },
+                )
+            },
+        )
+        return if (changed) next else null
+    }
+
     /** Sets [rows] as the per-placement height override on every ref of [widgetId]. Null when none. */
     fun resizeWidget(doc: LayoutDoc, widgetId: String, rows: Int): LayoutDoc? {
         var changed = false

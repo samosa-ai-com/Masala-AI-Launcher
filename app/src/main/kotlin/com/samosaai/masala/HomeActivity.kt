@@ -466,7 +466,7 @@ class HomeActivity : ComponentActivity() {
             )
         }
         val widgetSource = remember(snapshot, mediaHost) {
-            com.samosaai.masala.ui.home.widgets.WidgetSource(snapshot = { snapshot }, store = widgetStore, onAction = ::run, streams = app.streamSources, media = mediaHost, http = app.httpValues)
+            com.samosaai.masala.ui.home.widgets.WidgetSource(snapshot = { snapshot }, store = widgetStore, onAction = ::run, streams = app.streamSources, media = mediaHost, http = app.httpValues, approved = { app.httpApproval.approved(it) })
         }
         // The context below is remembered on purpose; drops read the live layout through these.
         val latestLayout = rememberUpdatedState(layout)

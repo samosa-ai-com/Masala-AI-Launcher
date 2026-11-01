@@ -128,7 +128,22 @@ object WidgetTools {
                     listOf(Produced("widget", final.title ?: id, id)),
                 )
             },
-            FunctionTool(Defs.placeWidget, CHANGES_SOMETHING) {
+            FunctionTool(
+                Defs.placeWidget,
+                CHANGES_SOMETHING,
+                // The sheet names what placing approves: the gate always fires, so approved=true
+                // only ever confirms a conversation the user already saw the hosts for.
+                confirmSummary = { args ->
+                    val id = args.string("id")
+                    val fetches = id?.let { host().widgetLibrary.current()[it] }
+                        ?.let { HttpApproval.fetchesOf(it) }.orEmpty().distinctBy { it.host }
+                    when {
+                        id == null -> "Put a widget on home"
+                        fetches.isEmpty() -> "Put \"$id\" on home"
+                        else -> "Put \"$id\" on home (fetches ${fetches.joinToString(", ") { "${it.host} every ${it.every}s" }})"
+                    }
+                },
+            ) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")
                 val spec = host().widgetLibrary.current()[id]
                     ?: return@FunctionTool ActionResult.error("No widget '$id'. Call list_widgets to see the library.")
@@ -161,6 +176,10 @@ object WidgetTools {
             },
             FunctionTool(Defs.deleteWidget, DESTRUCTIVE) {
                 val id = it.string("id") ?: return@FunctionTool missing("id")
+                // Strip first: deleting the library before its refs bricks later edits as
+                // "Unknown widget", and undo can't bring the library entry back.
+                val problems = host().layouts.removeWidgetRefs("Delete widget $id", id)
+                if (problems.isNotEmpty()) return@FunctionTool ActionResult.error(problems.joinToString("\n"))
                 host().widgetLibrary.delete(id)
                 host().layouts.removeWidgetRefs("Delete widget $id", id)
                 host().httpValues.clearWidget(id)

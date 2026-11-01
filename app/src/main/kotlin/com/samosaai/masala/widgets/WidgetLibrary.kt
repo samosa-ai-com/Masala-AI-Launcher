@@ -48,13 +48,17 @@ class WidgetLibrary(
             }
         }
 
-    suspend fun load() {
+    /**
+     * Loads the library, seeding the bundled templates only on a truly fresh install (no saved
+     * layout versions): a user who deleted every widget must not get them all back on restart.
+     */
+    suspend fun load(seedIfEmpty: Boolean = true) {
         val rows = runCatching { dao.all() }.getOrElse {
             Log.w(TAG, "Widget library unreadable", it)
             return
         }
         if (rows.isEmpty()) {
-            seedTemplates()
+            if (seedIfEmpty) seedTemplates()
             return
         }
         _widgets.value = rows.mapNotNull { row ->

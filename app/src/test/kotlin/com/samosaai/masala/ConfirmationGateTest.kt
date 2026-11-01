@@ -63,6 +63,20 @@ class ConfirmationGateTest {
     }
 
     @Test
+    fun `a tool-provided summary replaces the generic one`() = runBlocking<Unit> {
+        val gate = gate()
+        val args = JsonObject(mapOf("id" to JsonPrimitive("price")))
+        val tool = com.samosaai.masala.core.tool.FunctionTool(
+            ToolDefinition("place_widget", "", JsonObject(emptyMap())),
+            ToolSensitivity.CHANGES_SOMETHING,
+            confirmSummary = { "Put \"price\" on home (fetches api.example.com every 15s)" },
+        ) { com.samosaai.masala.core.tool.ActionResult.ok("") }
+        answerWhenAsked(gate, true)
+        assertNull(gate.check(tool, args))
+        assertEquals("Put \"price\" on home (fetches api.example.com every 15s)", log.last().second)
+    }
+
+    @Test
     fun `questions are asked one at a time`() = runBlocking<Unit> {
         val gate = gate()
         val first = async { gate.confirm("first") }

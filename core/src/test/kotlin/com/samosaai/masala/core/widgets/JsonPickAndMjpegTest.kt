@@ -97,6 +97,32 @@ class JsonPickAndMjpegTest {
     }
 
     @Test
+    fun `a split start marker still opens the frame`() {
+        val parser = MjpegParser(null)
+        val frame = jpeg(3, payload = 20)
+        assertTrue(parser.feed(byteArrayOf(0xFF.toByte())).isEmpty())
+        val got = parser.feed(byteArrayOf(0xD8.toByte()) + frame.copyOfRange(2, frame.size))
+        assertEquals(1, got.size)
+        assertContentEquals(frame, got[0])
+    }
+
+    @Test
+    fun `junk before a frame is skipped, then the frame completes`() {
+        val parser = MjpegParser(null)
+        val junk = ByteArray(1000) { 0x41 }
+        val frame = jpeg(4, payload = 10)
+        var i = 0
+        while (i < junk.size) {
+            val n = minOf(7, junk.size - i)
+            assertTrue(parser.feed(junk, i, n).isEmpty())
+            i += n
+        }
+        val got = parser.feed(frame)
+        assertEquals(1, got.size)
+        assertContentEquals(frame, got[0])
+    }
+
+    @Test
     fun `oversized and non-jpeg parts are dropped`() {
         val parser = MjpegParser("f", maxFrameBytes = 100)
         val big = jpeg(1, payload = 500)

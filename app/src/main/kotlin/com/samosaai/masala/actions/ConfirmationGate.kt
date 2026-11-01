@@ -1,5 +1,6 @@
 package com.samosaai.masala.actions
 
+import com.samosaai.masala.core.tool.FunctionTool
 import com.samosaai.masala.core.tool.Tool
 import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.core.tool.ToolSensitivity
@@ -69,7 +70,7 @@ class ConfirmationGate(
 
     override suspend fun check(tool: Tool, args: JsonObject): ToolResult? {
         val decision = confirm(
-            summary = summarize(tool.definition.name, args),
+            summary = (tool as? FunctionTool)?.confirmSummary?.invoke(args) ?: summarize(tool.definition.name, args),
             destructive = tool.sensitivity == ToolSensitivity.DESTRUCTIVE,
             subject = tool.definition.name,
         )

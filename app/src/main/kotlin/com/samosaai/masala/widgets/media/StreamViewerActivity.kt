@@ -73,6 +73,7 @@ class StreamViewerActivity : ComponentActivity() {
 }
 
 @Composable
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 private fun Viewer(sourceId: String, onClose: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val app = context.masala
@@ -89,7 +90,15 @@ private fun Viewer(sourceId: String, onClose: () -> Unit) {
             return@DisposableEffect onDispose { }
         }
         val created = ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(url))
+            if (url.lowercase().let { it.startsWith("rtsp://") || it.startsWith("rtsps://") }) {
+                setMediaSource(
+                    androidx.media3.exoplayer.rtsp.RtspMediaSource.Factory()
+                        .setForceUseRtpTcp(!source.transport.equals("Udp", ignoreCase = true))
+                        .createMediaSource(MediaItem.fromUri(url)),
+                )
+            } else {
+                setMediaItem(MediaItem.fromUri(url))
+            }
             playWhenReady = true
             prepare()
         }
@@ -138,9 +147,11 @@ private suspend fun saveSnapshot(context: android.content.Context, name: String,
     val toast = { text: String -> Toast.makeText(context, text, Toast.LENGTH_SHORT).show() }
     withContext(Dispatchers.IO) {
         runCatching {
-            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            val (cleanUrl, auth) = com.samosaai.masala.widgets.StreamAuth.split(url)
+            val connection = (URL(cleanUrl).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 8_000
                 readTimeout = 8_000
+                if (auth != null) setRequestProperty("Authorization", auth)
             }
             try {
                 if (connection.responseCode !in 200..299) error("HTTP ${connection.responseCode}")

@@ -42,8 +42,43 @@ object WidgetLift {
 
     /** True when [layout] still has inline widgets to lift. */
     fun hasInline(layout: LayoutDoc): Boolean = layout.pages.any { page ->
-        page.sections.any { (it is WidgetSection && it.widget != null) || (it is StackSection && it.widgets.isNotEmpty()) }
+        page.sections.any(::sectionHasInline)
     }
+
+    /** True when [patch] adds inline widgets to lift. */
+    fun hasInline(patch: ModePatch): Boolean = patch.addSections.any { sectionHasInline(it.section) }
+
+    /**
+     * Drops [widgetId] refs from a mode patch (delete path); null when untouched. Mirrors
+     * [LayoutEdits.removeWidgetRefs]: a widget section goes, emptied stacks go with their add.
+     */
+    fun stripRefs(patch: ModePatch, widgetId: String): ModePatch? {
+        var changed = false
+        val adds = patch.addSections.mapNotNull { add ->
+            when (val section = add.section) {
+                is WidgetSection ->
+                    if (section.ref?.widgetId == widgetId || section.widget?.id == widgetId) {
+                        changed = true
+                        null
+                    } else add
+                is StackSection -> {
+                    val keepWidgets = section.widgets.filterNot { it.id == widgetId }
+                    val keepRefs = section.refs.filterNot { it.widgetId == widgetId }
+                    if (keepWidgets.size == section.widgets.size && keepRefs.size == section.refs.size) add
+                    else {
+                        changed = true
+                        if (keepWidgets.isEmpty() && keepRefs.isEmpty()) null
+                        else add.copy(section = section.copy(widgets = keepWidgets, refs = keepRefs))
+                    }
+                }
+                else -> add
+            }
+        }
+        return if (changed) patch.copy(addSections = adds) else null
+    }
+
+    private fun sectionHasInline(section: Section): Boolean =
+        (section is WidgetSection && section.widget != null) || (section is StackSection && section.widgets.isNotEmpty())
 
     private class State(library: Map<String, WidgetSpec>) {
         private val known = LinkedHashMap(library)

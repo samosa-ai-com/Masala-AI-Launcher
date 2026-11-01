@@ -18,7 +18,7 @@ import com.samosaai.masala.core.rules.RuleEvaluator
  */
 data class ResolvedLayout(
     val layout: LayoutDoc,
-    /** Height in rows of each widget, by widget ID. */
+    /** Height in rows of each widget placement, by section ID (one widget twice sits at two heights). */
     val widgetRows: Map<String, Int>,
     val conflicts: List<OverlayMerge.Conflict>,
     /** Library widget IDs a ref pointed at that the library doesn't have. */
@@ -68,7 +68,7 @@ object LayoutResolver {
                                 } else {
                                     val r = RuleEvaluator.resolve(spec.rules, ctx, rangeFor(spec, section.ref))
                                     if (!r.visible) null
-                                    else section.copy(widget = spec).also { rows[spec.id] = r.rows!! }
+                                    else section.copy(widget = spec).also { rows[section.id] = r.rows!! }
                                 }
                             }
                             is StackSection -> {
@@ -79,10 +79,10 @@ object LayoutResolver {
                                     .map { (spec, ref) -> Triple(spec, ref, RuleEvaluator.resolve(spec.rules, ctx, rangeFor(spec, ref))) }
                                     .filter { (_, _, r) -> r.visible }
                                     .sortedByDescending { (_, _, r) -> r.priority } // stable for ties
-                                visible.forEach { (w, _, r) -> rows[w.id] = r.rows!! }
                                 if (visible.isEmpty()) {
                                     null
                                 } else {
+                                    rows[section.id] = visible.maxOf { (_, _, r) -> r.rows!! }
                                     section.copy(
                                         widgets = visible.map { it.first },
                                         refs = if (section.refs.isEmpty()) emptyList() else visible.map { it.second!! },

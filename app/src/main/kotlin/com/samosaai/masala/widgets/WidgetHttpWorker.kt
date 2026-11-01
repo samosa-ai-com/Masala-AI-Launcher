@@ -6,7 +6,6 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.samosaai.masala.core.contract.HttpBinding
 import com.samosaai.masala.core.contract.MasalaJson
 import com.samosaai.masala.core.contract.WidgetSpec
 import com.samosaai.masala.data.MasalaDatabase
@@ -26,9 +25,14 @@ class WidgetHttpWorker(context: Context, params: WorkerParameters) : CoroutineWo
             val specs = database.widgets().all().mapNotNull { row ->
                 runCatching { MasalaJson.strict.decodeFromString(WidgetSpec.serializer(), row.specJson) }.getOrNull()
             }
-            val store = HttpValueStore(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO), database.httpValues())
+            val store = HttpValueStore(
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO),
+                database.httpValues(),
+            ) { widgetId -> HttpApprovalStore(applicationContext).approved(widgetId) }
             store.load()
-            specs.flatMap { spec -> HttpApproval.fetchesOf(spec).map { spec.id to bindingFor(spec, it.host) } }
+            // Every binding refreshes on its own cadence; only approved hosts are fetched
+            // (the store enforces it), so an edited URL stays inert until the user allows it.
+            specs.flatMap { spec -> HttpApproval.fetchesOf(spec).map { spec.id to it.http } }
                 .distinct()
                 .forEach { (widgetId, http) ->
                     if (http.background) store.refresh(widgetId, http)
@@ -37,25 +41,6 @@ class WidgetHttpWorker(context: Context, params: WorkerParameters) : CoroutineWo
         } catch (e: Exception) {
             Result.retry()
         }
-    }
-
-    private fun bindingFor(spec: WidgetSpec, host: String): HttpBinding {
-        val all = mutableListOf<HttpBinding>()
-        fun walk(component: com.samosaai.masala.core.contract.WidgetComponent) {
-            when (component) {
-                is com.samosaai.masala.core.contract.WidgetComponent.WebValue -> all.add(component.http)
-                is com.samosaai.masala.core.contract.WidgetComponent.Row -> component.children.forEach(::walk)
-                is com.samosaai.masala.core.contract.WidgetComponent.Column -> component.children.forEach(::walk)
-                is com.samosaai.masala.core.contract.WidgetComponent.Text -> component.binding?.http?.let(all::add)
-                is com.samosaai.masala.core.contract.WidgetComponent.Progress -> component.binding.http?.let(all::add)
-                is com.samosaai.masala.core.contract.WidgetComponent.Chart -> component.binding.http?.let(all::add)
-                is com.samosaai.masala.core.contract.WidgetComponent.ListRows -> component.binding.http?.let(all::add)
-                is com.samosaai.masala.core.contract.WidgetComponent.Gauge -> component.binding.http?.let(all::add)
-                else -> Unit
-            }
-        }
-        spec.components.forEach(::walk)
-        return all.first { HttpApproval.hostOf(it.url) == host }
     }
 
     companion object {

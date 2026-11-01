@@ -38,11 +38,13 @@ object StreamTest {
         val elapsed = { System.currentTimeMillis() - start }
         var connection: HttpURLConnection? = null
         try {
-            connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            val (cleanUrl, auth) = com.samosaai.masala.widgets.StreamAuth.split(url)
+            connection = (URL(cleanUrl).openConnection() as HttpURLConnection).apply {
                 connectTimeout = TIMEOUT_MS.toInt()
                 readTimeout = TIMEOUT_MS.toInt()
                 instanceFollowRedirects = true
                 setRequestProperty("Accept", if (mjpeg) "multipart/x-mixed-replace" else "image/*")
+                if (auth != null) setRequestProperty("Authorization", auth)
             }
             connection.connect()
             if (connection.responseCode !in 200..299) {

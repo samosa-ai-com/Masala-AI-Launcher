@@ -22,6 +22,8 @@ import com.samosaai.masala.core.migration.WidgetLift
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class WidgetLiftAndResolveTest {
@@ -51,6 +53,24 @@ class WidgetLiftAndResolveTest {
         assertEquals(emptyList(), LayoutChecker.check(lifted.value, env))
         val json = MasalaJson.strict.encodeToString(LayoutDoc.serializer(), lifted.value)
         assertEquals(lifted.value, LayoutMigrations.decode(MasalaJson.strict.parseToJsonElement(json)))
+    }
+
+    @Test
+    fun `stripRefs drops a deleted widget from a mode patch`() {
+        val patch = ModePatch(
+            id = "m", name = "M", order = 1,
+            addSections = listOf(
+                AddSection("home", WidgetSection("w", ref = WidgetRef("gone"))),
+                AddSection("home", WidgetSection("keep", ref = WidgetRef("here"))),
+            ),
+        )
+        assertTrue(WidgetLift.hasInline(patch.copy(addSections = listOf(
+            AddSection("home", WidgetSection("i", widget = WidgetSpec("i", components = emptyList()))),
+        ))))
+        assertFalse(WidgetLift.hasInline(patch))
+        val stripped = assertNotNull(WidgetLift.stripRefs(patch, "gone"))
+        assertEquals(listOf("keep"), stripped.addSections.map { it.section.id })
+        assertNull(WidgetLift.stripRefs(patch, "missing"))
     }
 
     @Test
@@ -127,7 +147,7 @@ class WidgetLiftAndResolveTest {
             emptyList(),
             at("10:00").copy(charging = charging),
             mapOf("w" to spec),
-        ).widgetRows["w"]
+        ).widgetRows["s"]
         assertEquals(1, rows(WidgetRef("w"), charging = false))
         assertEquals(3, rows(WidgetRef("w", 3), charging = false))
         assertEquals(3, rows(WidgetRef("w", 9), charging = false))

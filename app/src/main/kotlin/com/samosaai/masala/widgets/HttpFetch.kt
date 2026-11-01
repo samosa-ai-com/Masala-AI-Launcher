@@ -13,30 +13,66 @@ import kotlinx.serialization.json.JsonElement
  * One web value fetch (plan `docs/plans/widget-maker.md` §5): GETs the URL (at most [MAX_BYTES]),
  * picks [HttpBinding.jsonPath] and stringifies it for the card. Failures return null, so the card
  * keeps the last value with its age.
+ *
+ * Redirects are followed by hand, never by the connection: each hop's host must already be in
+ * [allowedHosts], so an approved host can't bounce the request somewhere the user never approved.
+ * The first URL is the caller's responsibility (the store checks approval before calling).
  */
 object HttpFetch {
     const val MAX_BYTES = 256 * 1024
     const val TIMEOUT_MS = 10_000
+    private const val MAX_REDIRECTS = 5
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    suspend fun fetch(url: String, jsonPath: String): String? = withContext(Dispatchers.IO) {
+    suspend fun fetch(url: String, jsonPath: String, allowedHosts: Set<String> = emptySet()): String? = withContext(Dispatchers.IO) {
+        var current = url
+        var hops = 0
+        while (true) {
+            when (val step = attempt(current, jsonPath, allowedHosts)) {
+                is Attempt.Redirect -> {
+                    if (hops++ >= MAX_REDIRECTS) return@withContext null
+                    current = step.url
+                }
+                is Attempt.Done -> return@withContext step.value
+            }
+        }
+        @Suppress("UNREACHABLE_CODE") // the loop only exits via return; this types the lambda.
+        return@withContext null
+    }
+
+    private sealed interface Attempt {
+        data class Redirect(val url: String) : Attempt
+        data class Done(val value: String?) : Attempt
+    }
+
+    private fun attempt(current: String, jsonPath: String, allowedHosts: Set<String>): Attempt {
         var connection: HttpURLConnection? = null
         try {
-            connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            connection = (URL(current).openConnection() as HttpURLConnection).apply {
                 connectTimeout = TIMEOUT_MS
                 readTimeout = TIMEOUT_MS
-                instanceFollowRedirects = true
+                instanceFollowRedirects = false
                 setRequestProperty("Accept", "application/json")
             }
             connection.connect()
-            if (connection.responseCode !in 200..299) return@withContext null
-            val bytes = connection.inputStream.use { it.readBytesCapped(MAX_BYTES) } ?: return@withContext null
-            val root = runCatching { json.parseToJsonElement(bytes.decodeToString()) }.getOrNull() ?: return@withContext null
-            val picked = runCatching { JsonPick.pick(root, jsonPath) }.getOrNull() ?: return@withContext null
-            stringify(picked)
+            if (connection.responseCode in 300..399) {
+                val next = connection.headerFields.entries
+                    .firstOrNull { (k, _) -> k?.equals("Location", ignoreCase = true) == true }
+                    ?.value?.firstOrNull() ?: return Attempt.Done(null)
+                val resolved = runCatching { URL(URL(current), next).toString() }.getOrNull() ?: return Attempt.Done(null)
+                val host = runCatching { URL(resolved).host?.lowercase()?.trimEnd('.') }.getOrNull()
+                    ?.takeIf { it.isNotEmpty() } ?: return Attempt.Done(null)
+                if (host !in allowedHosts) return Attempt.Done(null)
+                return Attempt.Redirect(resolved)
+            }
+            if (connection.responseCode !in 200..299) return Attempt.Done(null)
+            val bytes = connection.inputStream.use { it.readBytesCapped(MAX_BYTES) } ?: return Attempt.Done(null)
+            val root = runCatching { json.parseToJsonElement(bytes.decodeToString()) }.getOrNull() ?: return Attempt.Done(null)
+            val picked = runCatching { JsonPick.pick(root, jsonPath) }.getOrNull() ?: return Attempt.Done(null)
+            return Attempt.Done(stringify(picked))
         } catch (e: Exception) {
-            null
+            return Attempt.Done(null)
         } finally {
             runCatching { connection?.disconnect() }
         }

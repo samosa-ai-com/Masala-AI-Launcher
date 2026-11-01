@@ -372,6 +372,28 @@ class LayoutEditsTest {
     }
 
     @Test
+    fun `stripUnknownWidgets drops refs to deleted widgets`() {
+        val doc = LayoutDoc(
+            pages = listOf(
+                Page(
+                    "home",
+                    sections = listOf(
+                        WidgetSection("w1", ref = WidgetRef("gone")),
+                        WidgetSection("w2", ref = WidgetRef("here")),
+                        StackSection("s", refs = listOf(WidgetRef("gone"), WidgetRef("here"))),
+                        StackSection("s2", refs = listOf(WidgetRef("gone"))),
+                    ),
+                ),
+            ),
+        )
+        val cleaned = assertNotNull(LayoutEdits.stripUnknownWidgets(doc, setOf("here")))
+        val sections = cleaned.pages.single().sections
+        assertEquals(listOf("w2", "s"), sections.map { it.id })
+        assertEquals(listOf(WidgetRef("here")), (sections.single { it.id == "s" } as StackSection).refs)
+        assertNull(LayoutEdits.stripUnknownWidgets(cleaned, setOf("here")))
+    }
+
+    @Test
     fun `removeWidgetRefs drops sections and strips stacks`() {        val doc = widgetDoc()
         val out = assertNotNull(LayoutEdits.removeWidgetRefs(doc, "water"))
         assertEquals(emptyList(), LayoutEdits.widgetPlacements(out, "water"))

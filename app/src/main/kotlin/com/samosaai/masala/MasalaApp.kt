@@ -92,7 +92,7 @@ class MasalaApp : Application() {
     val database by lazy { MasalaDatabase.create(this) }
     val miniApps by lazy { MiniAppStore(database.miniApps()) }
     /** Fetched web values (plan widget-maker §5): display strings and ages for web_value. */
-    val httpValues by lazy { com.samosaai.masala.widgets.HttpValueStore(scope, database.httpValues()) }
+    val httpValues by lazy { com.samosaai.masala.widgets.HttpValueStore(scope, database.httpValues()) { httpApproval.approved(it) } }
     /** Hosts the user approved per widget for web fetching. */
     val httpApproval by lazy { com.samosaai.masala.widgets.HttpApprovalStore(this) }
     /** The 2-player pool for live video widgets (plan widget-maker §4.3, D3 fixed). */

@@ -70,6 +70,8 @@ data class WidgetSource(
     val media: com.samosaai.masala.widgets.media.MediaHost? = null,
     /** Fetched web values; web_value without it keeps the W5 note. */
     val http: HttpValueStore? = null,
+    /** Hosts the user approved, per widget; the web_value view won't fetch without approval. */
+    val approved: (widgetId: String) -> Set<String> = { emptySet() },
 )
 
 /** One generated widget on home: a glass card with its components top to bottom. */
@@ -258,7 +260,11 @@ private fun Component(
                     color = OnWallpaper,
                 )
             } else {
-                com.samosaai.masala.widgets.media.WebValueView(component, widgetId, component.suffix, store, component.style)
+                val host = com.samosaai.masala.widgets.HttpApproval.hostOf(component.http.url)
+                com.samosaai.masala.widgets.media.WebValueView(
+                    component, widgetId, component.suffix, store, component.style,
+                    allowed = host != null && host in source.approved(widgetId),
+                )
             }
         }
     }
@@ -364,9 +370,9 @@ private fun formatDuration(millis: Long): String {
 
 /** A stack draws its first widget, like before, but now for real (tap weights order it in W2). */
 @Composable
-fun StackCard(widgets: List<WidgetSpec>, rows: Map<String, Int>, source: WidgetSource, modifier: Modifier = Modifier) {
+fun StackCard(widgets: List<WidgetSpec>, rows: Int?, source: WidgetSource, modifier: Modifier = Modifier) {
     val first = widgets.firstOrNull() ?: return
-    WidgetCard(first, rows[first.id], source, modifier)
+    WidgetCard(first, rows, source, modifier)
     if (widgets.size > 1) {
         Text(
             "+ ${widgets.size - 1} more",

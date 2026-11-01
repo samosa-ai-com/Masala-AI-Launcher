@@ -38,11 +38,20 @@ class PlayerPool(private val context: Context, private val max: Int = 2) {
             it.player.playWhenReady = !backgrounded
             return it.player
         }
-        if (slots.size >= max) return null
+        // Dead slots don't count: drop players nobody watches before calling the pool full,
+        // or a removed widget pins a slot and new cameras fall back to snapshots.
+        if (slots.size >= max) {
+            slots.filter { it.value.refs == 0 }.keys.toList().forEach(::evict)
+            if (slots.size >= max) return null
+        }
         val player = ExoPlayer.Builder(context).build().apply {
             volume = 0f
             repeatMode = androidx.media3.common.Player.REPEAT_MODE_ONE
-            setMediaItem(MediaItem.fromUri(url))
+            if (isRtsp(url)) {
+                setMediaSource(rtspSource(url, transport))
+            } else {
+                setMediaItem(MediaItem.fromUri(url))
+            }
             playWhenReady = !backgrounded
             prepare()
         }
@@ -95,6 +104,19 @@ class PlayerPool(private val context: Context, private val max: Int = 2) {
             slots.remove(url)?.player?.release()
         }
     }
+
+    private fun isRtsp(url: String): Boolean =
+        url.lowercase().let { it.startsWith("rtsp://") || it.startsWith("rtsps://") }
+
+    /**
+     * The source's transport setting, honored at last: UDP only when the source says "udp",
+     * TCP interleaved otherwise (firewall-friendly default).
+     */
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun rtspSource(url: String, transport: String?): androidx.media3.exoplayer.source.MediaSource =
+        androidx.media3.exoplayer.rtsp.RtspMediaSource.Factory()
+            .setForceUseRtpTcp(!transport.equals("udp", ignoreCase = true))
+            .createMediaSource(MediaItem.fromUri(url))
 }
 
 /** Whether [url] stays on the LAN (a private host, .local or loopback): live even when metered. */
