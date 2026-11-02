@@ -72,6 +72,24 @@ class CommandController(
     private var job: Job? = null
 
     /**
+     * Set when the user hides the chat mid-turn (sheet X, Back, drawer): the turn
+     * keeps running and an ongoing notification carries the progress. Only an
+     * explicit Stop ([dismiss]) cancels. Cleared by any new turn or focus.
+     */
+    private val _minimized = MutableStateFlow(false)
+    val minimized: StateFlow<Boolean> = _minimized.asStateFlow()
+
+    /** Hides the chat without cancelling the running turn. */
+    fun minimize() {
+        _minimized.value = true
+    }
+
+    /** The chat is visible again (or a new turn starts): auto-open may resume. */
+    fun focus() {
+        _minimized.value = false
+    }
+
+    /**
      * Every finished turn is handed here so the conversation can be stored and shown;
      * null until the app wires its chat store.
      */
@@ -140,23 +158,25 @@ class CommandController(
         job?.cancel()
         speech?.cancel()
         stopTicker()
+        _minimized.value = false
         _listeningElapsed.value = 0L
         _state.value = CommandState.Idle
     }
 
     /** [spoken] transcripts get their names corrected against apps, modes and skills the phone knows. */
-    fun ask(text: String, spoken: Boolean = false) {
+    fun ask(text: String, spoken: Boolean = false, images: List<String> = emptyList()) {
+        _minimized.value = false
         val raw = text.trim()
-        if (raw.isEmpty()) return openInput()
+        if (raw.isEmpty() && images.isEmpty()) return openInput()
         job?.cancel()
         val prompt = if (spoken) NameCorrector(names()).correct(raw) else raw
-        _state.value = CommandState.Thinking(prompt)
+        _state.value = CommandState.Thinking(if (prompt.isBlank()) com.samosaai.masala.chat.IMAGE_PLACEHOLDER else prompt)
         job = scope.launch {
             // Compact first: the summary must appear above the turn that triggered it, not
             // below it, and the new prompt must not be part of what gets summarised.
             compactIfNeeded()
-            onTurn?.invoke(com.samosaai.masala.chat.ChatTurn(com.samosaai.masala.chat.TurnRole.USER, prompt))
-            handle(prompt, spoken)
+            onTurn?.invoke(com.samosaai.masala.chat.ChatTurn(com.samosaai.masala.chat.TurnRole.USER, if (prompt.isBlank()) com.samosaai.masala.chat.IMAGE_PLACEHOLDER else prompt))
+            handle(prompt, spoken, images)
         }
     }
 
@@ -314,7 +334,7 @@ class CommandController(
         }
     }
 
-    private suspend fun handle(prompt: String, spoken: Boolean) {
+    private suspend fun handle(prompt: String, spoken: Boolean, images: List<String> = emptyList()) {
         onTurnStart?.invoke()
         CommandFastPath.match(prompt, resolveApp)?.let { action ->
             publish(stateFor(prompt, run(action), spoken))
@@ -329,8 +349,14 @@ class CommandController(
         val missingAccess = linkedSetOf<String>()
         // What the turn made, for the card under the answer.
         val results = linkedMapOf<String, com.samosaai.masala.chat.ChatResult>()
+        // Attached photos ride as vision parts; image bytes stay in-memory, the stored
+        // turn keeps the placeholder text so reopened chats still read sensibly.
+        val userMessage = if (images.isEmpty()) ChatMessage("user", JsonPrimitive(prompt))
+        else com.samosaai.masala.llm.attachmentsUserMessage(prompt, emptyList(), images)
+        // What's shown while working: an image-only turn still names itself.
+        val display = if (prompt.isBlank() && images.isNotEmpty()) com.samosaai.masala.chat.IMAGE_PLACEHOLDER else prompt
         try {
-            agent.run(ChatMessage("user", JsonPrimitive(prompt))).collect { event ->
+            agent.run(userMessage).collect { event ->
                 when (event) {
                     is AgentEvent.ToolCall -> {
                         val expert = consultCredit(event.name, event.args, skills())
@@ -340,7 +366,7 @@ class CommandController(
                             consulted[expert.id] = expert
                             steps += "Consulting ${expert.title}"
                         }
-                        _state.value = CommandState.Thinking(prompt, steps.toList())
+                        _state.value = CommandState.Thinking(display, steps.toList())
                     }
                     is AgentEvent.Results -> event.items.forEach { item ->
                         results[item.ref] = com.samosaai.masala.chat.ChatResult(item.kind, item.title, item.ref)

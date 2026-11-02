@@ -26,6 +26,10 @@ class ReplyDoneGateTest {
         assertFalse(shouldNotifyReply(TurnRole.MASALA, "Done.", emptyList(), true, true))
     }
 
+    @Test fun `minimized reply on home notifies`() {
+        assertTrue(shouldNotifyReply(TurnRole.MASALA, "Done.", emptyList(), true, true, minimized = true))
+    }
+
     @Test fun `opted out never notifies`() {
         assertFalse(shouldNotifyReply(TurnRole.MASALA, "Done.", emptyList(), false, false))
     }

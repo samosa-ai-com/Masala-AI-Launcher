@@ -69,6 +69,24 @@ object MasalaTools {
                 GenerateWallpaperTool(app, host().aiSettings, wallpaper, host().wallpapers)
                     .generate(prompt, it.string("style"), it.string("target"))
             },
+            FunctionTool(Defs.generateImage, CHANGES_SOMETHING, usesNetwork = true) {
+                val prompt = it.string("prompt") ?: return@FunctionTool missing("prompt")
+                GenerateImageTool(app, host().aiSettings).generate(prompt, it.string("style"))
+            },
+            FunctionTool(Defs.editImage, CHANGES_SOMETHING) {
+                val path = it.string("path") ?: return@FunctionTool missing("path")
+                val action = it.string("action") ?: return@FunctionTool missing("action")
+                EditImageTool(app, files).edit(path, action, it.string("arg"))
+            },
+            FunctionTool(Defs.segmentImage, READ_ONLY, usesNetwork = true) {
+                val path = it.string("path") ?: return@FunctionTool missing("path")
+                val prompt = it.string("prompt") ?: return@FunctionTool missing("prompt")
+                SamSegmentTool(app, host().aiSettings, files).segment(path, prompt)
+            },
+            FunctionTool(Defs.speakText, CHANGES_SOMETHING) {
+                val text = it.string("text") ?: return@FunctionTool missing("text")
+                SpeakTool(app, host().aiSettings, (app as com.samosaai.masala.MasalaApp).ttsEngine()).speak(text, it.string("voice"))
+            },
             FunctionTool(Defs.listCalendarEvents, READ_ONLY, readsPrivateData = true) {
                 calendar.listEvents(
                     daysAhead = it.int("days_ahead"),
@@ -325,7 +343,8 @@ object MasalaTools {
             FunctionTool(Defs.createMiniApp, CHANGES_SOMETHING) {
                 val title = it.string("title") ?: "Mini app"
                 val html = it.string("html") ?: return@FunctionTool missing("html")
-                val id = miniApps.create(title = title, html = html, icon = it.string("icon")) ?: return@FunctionTool ActionResult.error(
+                val allowMedia = it.boolean("allow_media") ?: false
+                val id = miniApps.create(title = title, html = html, icon = it.string("icon"), mediaAllowed = allowMedia) ?: return@FunctionTool ActionResult.error(
                     "That HTML is too large (max ${MiniAppStore.MAX_HTML_CHARS} characters). Make it smaller."
                 )
                 // Pinning here is what makes "it created the app" true for the user: a stored app

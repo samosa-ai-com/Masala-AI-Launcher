@@ -24,7 +24,7 @@ class MiniAppStore(private val dao: MiniAppDao) {
     }
 
     /** Stores new HTML under a random id; returns the id, or null when the HTML is too large. */
-    suspend fun create(title: String, html: String, icon: String? = null): String? = withContext(Dispatchers.IO) {
+    suspend fun create(title: String, html: String, icon: String? = null, mediaAllowed: Boolean = false): String? = withContext(Dispatchers.IO) {
         if (html.length > MAX_HTML_CHARS) return@withContext null
         val now = System.currentTimeMillis()
         val id = UUID.randomUUID().toString().take(8)
@@ -34,6 +34,7 @@ class MiniAppStore(private val dao: MiniAppDao) {
                 title = title.trim().ifEmpty { "Mini app" }.take(MAX_TITLE_CHARS),
                 html = html,
                 icon = MiniAppIcon.sanitize(icon),
+                mediaAllowed = mediaAllowed,
                 createdAt = now,
                 updatedAt = now,
             )
@@ -68,6 +69,14 @@ class MiniAppStore(private val dao: MiniAppDao) {
 
     suspend fun setNetworkAllowed(id: String, allowed: Boolean): Unit = withContext(Dispatchers.IO) {
         dao.setNetworkAllowed(id, allowed, System.currentTimeMillis())
+    }
+
+    suspend fun mediaAllowed(id: String): Boolean = withContext(Dispatchers.IO) {
+        dao.get(id)?.mediaAllowed ?: false
+    }
+
+    suspend fun setMediaAllowed(id: String, allowed: Boolean): Unit = withContext(Dispatchers.IO) {
+        dao.setMediaAllowed(id, allowed, System.currentTimeMillis())
     }
 
     companion object {

@@ -26,6 +26,9 @@ class MiniAppStoreTest {
         override suspend fun setNetworkAllowed(id: String, allowed: Boolean, now: Long) {
             rows.value = rows.value.map { if (it.id == id) it.copy(networkAllowed = allowed, updatedAt = now) else it }
         }
+        override suspend fun setMediaAllowed(id: String, allowed: Boolean, now: Long) {
+            rows.value = rows.value.map { if (it.id == id) it.copy(mediaAllowed = allowed, updatedAt = now) else it }
+        }
     }
 
     @Test
@@ -51,6 +54,16 @@ class MiniAppStoreTest {
         val store = MiniAppStore(FakeDao())
         val id = store.create("x".repeat(200), "<html/>")!!
         assertEquals(MiniAppStore.MAX_TITLE_CHARS, store.get(id)?.title?.length)
+    }
+
+    @Test
+    fun `media bridge is opt-in per app`() = runBlocking {
+        val dao = FakeDao()
+        val store = MiniAppStore(dao)
+        val id = store.create("Media app", "<html/>")!!
+        assertFalse(store.mediaAllowed(id))
+        store.setMediaAllowed(id, true)
+        assertTrue(store.mediaAllowed(id))
     }
 
     @Test

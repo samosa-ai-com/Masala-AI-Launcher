@@ -118,6 +118,97 @@ object MasalaToolDefinitions {
         }
     )
 
+    val generateImage = tool(
+        "generate_image",
+        "Generate a general image from a text description with the configured image " +
+            "model. The picture is saved under files and returned as a preview card. " +
+            "For a phone wallpaper use generate_wallpaper instead.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("prompt") {
+                    put("type", "string")
+                    put("description", "What the image shows, e.g. 'a red bicycle by a lake'.")
+                }
+                putJsonObject("style") {
+                    put("type", "string")
+                    put("description", "Optional style appended, e.g. 'watercolor'.")
+                }
+            }
+            putJsonArray("required") { add("prompt") }
+        }
+    )
+
+    val editImage = tool(
+        "edit_image",
+        "Small on-device edits to an image file already on disk: rotate (arg degrees, " +
+            "default 90), crop_square, resize (arg max side px, default 1024) or grayscale. " +
+            "No network, no extra setup. Returns the edited picture as a preview card.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("path") {
+                    put("type", "string")
+                    put("description", "Image file path from an earlier result.")
+                }
+                putJsonObject("action") {
+                    put("type", "string")
+                    put("description", "rotate, crop_square, resize or grayscale.")
+                }
+                putJsonObject("arg") {
+                    put("type", "string")
+                    put("description", "Degrees for rotate, max side for resize. Omit otherwise.")
+                }
+            }
+            putJsonArray("required") {
+                add("path")
+                add("action")
+            }
+        }
+    )
+
+    val segmentImage = tool(
+        "segment_image",
+        "Find one thing in an image with SAM 3.1 (configured image endpoint, no extra " +
+            "setup): pass an image file path and a short noun phrase like 'red bicycle'. " +
+            "Returns an annotated preview (boxes drawn) with match counts, plus the full " +
+            "box list in a text file.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("path") {
+                    put("type", "string")
+                    put("description", "Image file path, or an https URL Masala may fetch.")
+                }
+                putJsonObject("prompt") {
+                    put("type", "string")
+                    put("description", "One short noun phrase naming the thing, e.g. 'yellow school bus'.")
+                }
+            }
+            putJsonArray("required") {
+                add("path")
+                add("prompt")
+            }
+        }
+    )
+
+    val speakText = tool(
+        "speak_text",
+        "Read text aloud with the configured voice and save the audio file. Uses the same " +
+            "voice output as reply Read-aloud; without an API voice it speaks on-device " +
+            "and keeps no file.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("text") {
+                    put("type", "string")
+                    put("description", "What to say (under 2000 characters).")
+                }
+                putJsonObject("voice") {
+                    put("type", "string")
+                    put("description", "Optional voice id; omit for the configured voice.")
+                }
+            }
+            putJsonArray("required") { add("text") }
+        }
+    )
+
     val listCalendarEvents = tool(
         "list_calendar_events",
         "List events from the phone's calendars in a date range, with optional title search.",
@@ -149,8 +240,10 @@ object MasalaToolDefinitions {
     val createMiniApp = tool(
         "create_mini_app",
         "Save a self-contained HTML mini-app (single file: inline CSS and JS, no external " +
-            "requests unless the user enabled network for it). Returns the new mini-app id and any " +
-            "console errors from loading it once; tell the user to open it from home once pinned.",
+            "requests unless the user enabled network for it). Pass allow_media true only when the " +
+            "app needs Masala's image, segmentation or speech (masala://media/*); default false. " +
+            "Returns the new mini-app id and any console errors from loading it once; tell the user " +
+            "to open it from home once pinned.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("title") {
@@ -167,6 +260,13 @@ object MasalaToolDefinitions {
                         "description",
                         "Optional icon: a built-in name (e.g. timer, music_note, checklist) or one small " +
                             "inline SVG (<= 8 KB, viewBox, no scripts, no links).",
+                    )
+                }
+                putJsonObject("allow_media") {
+                    put("type", "boolean")
+                    put(
+                        "description",
+                        "true only when the app calls masala://media/* (generate/segment/speak). Default false.",
                     )
                 }
             }
@@ -1621,6 +1721,10 @@ object MasalaToolDefinitions {
         openApp,
         setWallpaper,
         generateWallpaper,
+        generateImage,
+        editImage,
+        segmentImage,
+        speakText,
         listCalendarEvents,
         createCalendarEvent,
         searchContacts,

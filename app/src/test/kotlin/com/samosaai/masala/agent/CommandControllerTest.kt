@@ -553,4 +553,32 @@ class CommandControllerTest {
         assertEquals(listOf(com.samosaai.masala.chat.ExpertCredit("chef", "Chef")), settled.experts)
         assertTrue(settled.steps.contains("Consulting Chef"))
     }
+
+    @Test fun minimizeNeverCancelsOnlyDismissDoes() = runBlocking<Unit> {
+        val c = controller()
+        assertFalse(c.minimized.value)
+        c.minimize()
+        assertTrue(c.minimized.value)
+        c.focus()
+        assertFalse(c.minimized.value)
+        c.minimize()
+        c.dismiss()
+        assertFalse(c.minimized.value)
+        assertIs<CommandState.Idle>(c.state.value)
+    }
+
+    @Test fun imageAskSendsVisionPartsWithPlaceholderTurn() = runBlocking<Unit> {
+        replies += reply("A red bicycle.")
+        val c = controller()
+        val stored = mutableListOf<com.samosaai.masala.chat.ChatTurn>()
+        c.onTurn = { stored += it }
+        c.ask("", images = listOf("QUJD"))
+        val answer = assertIs<CommandState.Reply>(c.settled())
+        assertEquals("A red bicycle.", answer.text)
+        // The stored turn keeps the marker; the model got the bytes.
+        assertEquals(com.samosaai.masala.chat.IMAGE_PLACEHOLDER, stored.first().text)
+        val sent = requests.flatten().last().content.toString()
+        assertTrue(sent.contains("image_url"), "vision parts missing: $sent")
+        assertTrue(sent.contains("data:image/jpeg;base64,QUJD"), "image bytes missing: $sent")
+    }
 }

@@ -183,6 +183,8 @@ class HomeActivity : ComponentActivity() {
             val sessions by app.chats.summaries.collectAsStateWithLifecycle()
             val activeId by app.activeChatId.collectAsStateWithLifecycle()
             val commandState by app.commands.state.collectAsStateWithLifecycle()
+            val minimized by app.commands.minimized.collectAsStateWithLifecycle()
+            val homeVisible by app.contextService.homeVisible.collectAsStateWithLifecycle()
             var turns by remember { mutableStateOf<List<com.samosaai.masala.chat.ChatTurn>>(emptyList()) }
             var sessionTitle by remember { mutableStateOf("") }
             // A reverted prompt, dropped back into the chat box for editing.
@@ -198,14 +200,27 @@ class HomeActivity : ComponentActivity() {
                 chatPrefill = ""
                 chatPrefillNonce = 0
                 drawerOpen = false
-                app.commands.dismiss()
+                val target = id?.takeIf { it.isNotBlank() }
+                // Returning to the same thread (notification tap) resumes it; switching
+                // threads cancels the live one so its reply can't land in the new chat.
+                // Blank ids (old notices) just reopen what's showing.
+                val isDifferentSession = target != null && target != app.activeChatId.value
+                if (isDifferentSession) app.commands.dismiss()
+                app.commands.focus()
                 app.scope.launch {
-                    val session = id?.let { app.chats.get(it) }
+                    val session = target?.let { app.chats.get(it) }
                     if (session != null) {
                         app.activeChatId.value = session.id
                         turns = session.turns
                         sessionTitle = session.title
-                        app.commands.restoreSession(session.turns)
+                        // Resuming a live thread must not touch its run: restoreSession
+                        // cancels the job, which would freeze it in Thinking forever.
+                        val live = app.commands.state.value is CommandState.Thinking ||
+                            app.commands.state.value == CommandState.Listening ||
+                            app.commands.state.value == CommandState.ListeningPaused
+                        if (isDifferentSession || !live) {
+                            app.commands.restoreSession(session.turns)
+                        }
                     }
                     chatOpen = true
                     expanded = true
@@ -229,8 +244,22 @@ class HomeActivity : ComponentActivity() {
             }
             // Talking or a finished turn brings the surface up by itself; starting to talk
             // always shows the orb, so the big animation is what a press produces.
-            LaunchedEffect(commandState) {
-                if (commandState != CommandState.Idle) chatOpen = true
+            LaunchedEffect(commandState, minimized, activeId, homeVisible) {
+                // A minimized chat stays hidden until the user comes back; anything else
+                // reopens on new activity. The working notice covers the hidden run.
+                if (commandState != CommandState.Idle && !minimized) chatOpen = true
+                // Leaving HomeActivity (another app, lock screen) hides the surface too,
+                // even with the chat still open: HomeActivity is paused then.
+                val hidden = minimized || !chatOpen || !homeVisible
+                val working = commandState is CommandState.Thinking ||
+                    commandState == CommandState.Listening ||
+                    commandState == CommandState.ListeningPaused
+                if (working && hidden) {
+                    val step = (commandState as? CommandState.Thinking)?.steps?.lastOrNull().orEmpty()
+                    com.samosaai.masala.notifications.ChatWorkingNotification.show(this@HomeActivity, activeId.orEmpty(), step)
+                } else {
+                    com.samosaai.masala.notifications.ChatWorkingNotification.cancel(this@HomeActivity)
+                }
                 if (commandState == CommandState.Listening || commandState == CommandState.ListeningPaused) expanded = false
                 if (commandState is CommandState.Thinking) expanded = true
                 // A newly made app opens once. This hangs off the live reply, not off the stored
@@ -316,7 +345,7 @@ class HomeActivity : ComponentActivity() {
                 // The drawer is on top of the chat, so it goes first.
                 drawerOpen -> drawerOpen = false
                 chatOpen && expanded -> expanded = false
-                chatOpen -> { app.commands.dismiss(); chatOpen = false }
+                chatOpen -> { app.commands.minimize(); chatOpen = false; expanded = false }
                 else -> drawerOpen = false
             }
         }
@@ -669,6 +698,7 @@ class HomeActivity : ComponentActivity() {
                         mic = rememberMicTap(app),
                         level = { pillLevel },
                         onOpenChat = {
+                            app.commands.focus()
                             chatOpen = true
                             expanded = true
                             chatPrefill = ""
@@ -718,9 +748,11 @@ class HomeActivity : ComponentActivity() {
                     onContinue = { app.commands.continueListening() },
                     elapsedMs = elapsedMs,
                     ready = voiceReady,
-                    onAsk = { app.commands.ask(it) },
+                    onAsk = { text, images -> app.commands.ask(text, images = images) },
                     onClose = {
-                        app.commands.dismiss()
+                        // Minimizing keeps a running turn alive (notification carries it);
+                        // only Stop cancels.
+                        app.commands.minimize()
                         chatOpen = false
                         expanded = false
                     },

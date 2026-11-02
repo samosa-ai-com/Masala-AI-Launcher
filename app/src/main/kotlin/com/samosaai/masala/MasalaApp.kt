@@ -311,6 +311,9 @@ class MasalaApp : Application() {
 
     fun stopSpeaking() = tts.stop()
 
+    /** Host TTS engine for the `speak_text` tool and the mini-app media bridge. */
+    fun ttsEngine(): TtsEngine = tts
+
     /** The widget's Run now: starts [skillId]'s scheduled task; null when it started, else why not. */
     suspend fun runSkillTaskNow(skillId: String): String? {
         val task = kotlinx.coroutines.withContext(Dispatchers.IO) { scheduledTasks.all().firstOrNull { it.skillId == skillId } }
@@ -435,6 +438,7 @@ class MasalaApp : Application() {
                     turn.role, turn.text, turn.results,
                     notifyEnabled = settings.current().replyNotify,
                     homeVisible = contextService.homeVisible.value,
+                    minimized = commands.minimized.value,
                 )
             ) {
                 val title = chats.summaries.value.firstOrNull { it.id == id }?.title.orEmpty()

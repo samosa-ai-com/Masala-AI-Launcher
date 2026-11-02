@@ -43,7 +43,7 @@ import kotlinx.coroutines.flow.Flow
         WidgetHttpValueEntity::class,
         WallpaperEntity::class,
     ],
-    version = 9,
+    version = 10,
 )
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
@@ -120,9 +120,16 @@ abstract class MasalaDatabase : RoomDatabase() {
             }
         }
 
+        /** Mini-app media bridge (plan `docs/plans/media-tools.md`): per-app opt-in, default off. */
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE mini_apps ADD COLUMN mediaAllowed INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun create(context: Context): MasalaDatabase =
             Room.databaseBuilder(context, MasalaDatabase::class.java, "masala.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9).build()
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10).build()
     }
 }
 
@@ -222,6 +229,9 @@ interface MiniAppDao {
 
     @Query("UPDATE mini_apps SET networkAllowed = :allowed, updatedAt = :now WHERE id = :id")
     suspend fun setNetworkAllowed(id: String, allowed: Boolean, now: Long)
+
+    @Query("UPDATE mini_apps SET mediaAllowed = :allowed, updatedAt = :now WHERE id = :id")
+    suspend fun setMediaAllowed(id: String, allowed: Boolean, now: Long)
 }
 
 /** The user's changes to one app in one profile, keyed by [AppKey.id]. */
@@ -509,6 +519,8 @@ data class MiniAppEntity(
     val html: String,
     /** Always on: every mini app may load from the web. Kept so old rows still read. */
     val networkAllowed: Boolean = true,
+    /** Mediated media bridge; Masala opts an app in. Default off. */
+    val mediaAllowed: Boolean = false,
     /** The agent-chosen icon: `symbol:<name>` or one small inline SVG; null draws the title's letter. */
     val icon: String? = null,
     val createdAt: Long,

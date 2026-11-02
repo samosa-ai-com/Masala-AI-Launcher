@@ -15,6 +15,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
+import androidx.compose.material.icons.rounded.AddPhotoAlternate
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.Icons
@@ -190,6 +192,7 @@ fun ReplyCard(
     character: com.samosaai.masala.data.Character? = null,
 ) {
     val state by app.commands.state.collectAsStateWithLifecycle()
+    val minimized by app.commands.minimized.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val micTap = rememberMicTap(app)
@@ -202,7 +205,7 @@ fun ReplyCard(
     val reply = state as? CommandState.Reply
     // "Read replies aloud" applies to every reply; the button reads one on request.
     LaunchedEffect(reply) { if (readAloud && reply != null && app.commands.claimReadAloud(reply)) app.speakReply(reply.text) }
-    if (state == CommandState.Idle) return
+    if (state == CommandState.Idle || minimized) return
     if (sheets && (state == CommandState.Listening || state is CommandState.Thinking)) return
 
     // A glass sheet over home (UI refresh U3); opened for typing, its field takes focus.
@@ -276,6 +279,72 @@ fun ReplyCard(
                         Text(stringResource(R.string.chat_send_now))
                     }
                 } else {
+                    val tooManyText = stringResource(R.string.chat_too_many_images, com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE)
+                    val badImageText = stringResource(R.string.chat_bad_image)
+                    var queued by remember { mutableStateOf(listOf<com.samosaai.masala.chat.AttachedImage>()) }
+                    var cameraTarget by remember { mutableStateOf<android.net.Uri?>(null) }
+                    fun addUri(uri: android.net.Uri, name: String) {
+                        if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                            android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
+                            return
+                        }
+                        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            val b64 = com.samosaai.masala.chat.compressToJpegBase64(context, uri)
+                            if (b64 == null) {
+                                launch(kotlinx.coroutines.Dispatchers.Main) {
+                                    android.widget.Toast.makeText(context, badImageText, android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                val item = com.samosaai.masala.chat.AttachedImage(
+                                    id = "${System.currentTimeMillis()}-${queued.size}", name = name, jpegBase64 = b64,
+                                )
+                                launch(kotlinx.coroutines.Dispatchers.Main) { queued = queued + item }
+                            }
+                        }
+                    }
+                    val pickImage = androidx.activity.compose.rememberLauncherForActivityResult(
+                        androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(maxItems = com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE),
+                    ) { uris -> uris.forEachIndexed { i, u -> addUri(u, "image ${queued.size + i + 1}") } }
+                    val takePhoto = androidx.activity.compose.rememberLauncherForActivityResult(
+                        androidx.activity.result.contract.ActivityResultContracts.TakePicture(),
+                    ) { ok -> if (ok) cameraTarget?.let { addUri(it, "photo") } }
+                    Column(Modifier.weight(1f)) {
+                    com.samosaai.masala.chat.AttachmentStrip(queued, onRemove = { id -> queued = queued.filterNot { it.id == id } })
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    androidx.compose.material3.IconButton(
+                        onClick = {
+                            if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                                android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
+                            } else pickImage.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Icon(
+                            Icons.Rounded.AddPhotoAlternate,
+                            stringResource(R.string.chat_attach_image),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    androidx.compose.material3.IconButton(
+                        onClick = {
+                            if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                                android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
+                                return@IconButton
+                            }
+                            val dir = java.io.File(context.filesDir, "work").apply { mkdirs() }
+                            val file = com.samosaai.masala.tools.PhotoTool.photoFile(dir)
+                            val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+                            cameraTarget = uri
+                            takePhoto.launch(uri)
+                        },
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Icon(
+                            Icons.Rounded.PhotoCamera,
+                            stringResource(R.string.chat_take_photo),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     OutlinedTextField(
                         text,
                         { text = it },
@@ -284,12 +353,14 @@ fun ReplyCard(
                         minLines = 1,
                         maxLines = 5,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                        keyboardActions = KeyboardActions(onSend = { if (text.text.isNotBlank()) { app.commands.ask(text.text); text = TextFieldValue("") } }),
+                        keyboardActions = KeyboardActions(onSend = { if (text.text.isNotBlank() || queued.isNotEmpty()) { app.commands.ask(text.text, images = queued.map { it.jpegBase64 }); text = TextFieldValue(""); queued = emptyList() } }),
                     )
-                    if (text.text.isNotBlank()) {
-                        TextButton(onClick = { app.commands.ask(text.text); text = TextFieldValue("") }) { Text(stringResource(R.string.skill_send)) }
+                    if (text.text.isNotBlank() || queued.isNotEmpty()) {
+                        TextButton(onClick = { app.commands.ask(text.text, images = queued.map { it.jpegBase64 }); text = TextFieldValue(""); queued = emptyList() }) { Text(stringResource(R.string.skill_send)) }
                     } else {
                         MicButton(micTap, level = { micLvl })
+                    }
+                    }
                     }
                 }
             }
@@ -302,7 +373,7 @@ fun ReplyCard(
                     }
                 }) { Text(stringResource(R.string.command_read_aloud)) }
                 Box(Modifier.weight(1f))
-                TextButton(onClick = { app.stopSpeaking(); app.commands.dismiss() }) { Text(stringResource(R.string.command_close)) }
+                TextButton(onClick = { app.stopSpeaking(); app.commands.minimize() }) { Text(stringResource(R.string.command_close)) }
             }
         }
     }
