@@ -273,6 +273,11 @@
     <string name="wallpaper_search_hint">Search prompts…</string>
     <string name="wallpaper_empty">No wallpapers yet. Ask Masala to generate one.</string>
     <string name="wallpaper_delete_title">Delete this wallpaper?</string>
+    <string name="wallpaper_generate_ai">Generate with AI</string>
+    <string name="wallpaper_generate_prefill">Generate a phone wallpaper of </string>
+    <string name="wallpaper_from_device">From device</string>
+    <string name="wallpaper_chip_all">All</string>
+    <string name="wallpaper_chip_generated">Generated</string>
     <string name="wallpaper_delete">Delete</string>
     <string name="wallpaper_deleted">Wallpaper deleted</string>
     <string name="wallpaper_set">Set</string>

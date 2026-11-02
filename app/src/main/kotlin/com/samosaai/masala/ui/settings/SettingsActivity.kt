@@ -178,7 +178,7 @@ class SettingsActivity : ComponentActivity() {
                         Page.ABOUT -> AboutPage(onBack = { page = Page.MAIN })
                         Page.BRIEF -> BriefPage(settings, update = { change -> lifecycleScope.launch { masala.settings.update(change) } }, onBack = { page = Page.MAIN })
                         Page.WIDGETS -> WidgetsPage(onBack = { page = Page.MAIN })
-                        Page.WALLPAPERS -> WallpapersPage(onBack = { page = Page.MAIN })
+                        Page.WALLPAPERS -> WallpapersPage(onBack = { page = Page.MAIN }, onGenerateWithAI = { askInChat(getString(R.string.wallpaper_generate_prefill)) })
                     } }
                 }
             }
