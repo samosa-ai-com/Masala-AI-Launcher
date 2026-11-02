@@ -39,9 +39,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AddPhotoAlternate
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
@@ -117,7 +119,7 @@ fun ChatSurface(
     mic: () -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
-    onAsk: (String) -> Unit = {},
+    onAsk: (String, List<String>) -> Unit = { _, _ -> },
     onClose: () -> Unit,
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
@@ -842,13 +844,17 @@ private fun Controls(
     level: () -> Float,
     onSend: () -> Unit,
     onContinue: () -> Unit = {},
-    onAsk: (String) -> Unit = {},
+    onAsk: (String, List<String>) -> Unit = { _, _ -> },
     onClose: () -> Unit,
     prefill: String = "",
     prefillNonce: Int = 0,
     onPrefillConsumed: () -> Unit = {},
 ) {
     val tokens = MasalaTheme.tokens
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val tooManyText = stringResource(R.string.chat_too_many_images, com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE)
+    val badImageText = stringResource(R.string.chat_bad_image)
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         if (listening && elapsedMs >= com.samosaai.masala.audio.SttEngine.CAP_WARN_MS) {
             Text(
@@ -897,6 +903,8 @@ private fun Controls(
                 }
             } else {
                 var text by remember { mutableStateOf("") }
+                var queued by remember { mutableStateOf(listOf<com.samosaai.masala.chat.AttachedImage>()) }
+                var cameraTarget by remember { mutableStateOf<android.net.Uri?>(null) }
                 // A revert drops the message back here for editing; the nonce re-applies
                 // even when the same words are reverted twice in a row. Consuming it
                 // at once stops the old text refilling the box on a later rebuild
@@ -907,25 +915,85 @@ private fun Controls(
                         onPrefillConsumed()
                     }
                 }
-                androidx.compose.material3.OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text(stringResource(R.string.command_hint)) },
-                    minLines = 1,
-                    maxLines = 5,
-                    shape = RoundedCornerShape(24.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                if (text.isBlank()) {
-                    MicButton(mic, level = level, size = 52.dp)
-                } else {
-                    IconButton(
-                        onClick = { onAsk(text.trim()); text = "" },
-                        modifier = Modifier.size(52.dp).clip(CircleShape).background(tokens.accent),
-                    ) {
-                        Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
+                fun addUri(uri: android.net.Uri, name: String) {
+                    if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                        android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
+                        return
                     }
+                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        val b64 = com.samosaai.masala.chat.compressToJpegBase64(context, uri)
+                        if (b64 == null) {
+                            launch(kotlinx.coroutines.Dispatchers.Main) {
+                                android.widget.Toast.makeText(context, badImageText, android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            val item = com.samosaai.masala.chat.AttachedImage(
+                                id = "${System.currentTimeMillis()}-${queued.size}", name = name, jpegBase64 = b64,
+                            )
+                            launch(kotlinx.coroutines.Dispatchers.Main) { queued = queued + item }
+                        }
+                    }
+                }
+                val pickImage = androidx.activity.compose.rememberLauncherForActivityResult(
+                    androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(maxItems = com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE),
+                ) { uris -> uris.forEachIndexed { i, u -> addUri(u, "image ${queued.size + i + 1}") } }
+                val takePhoto = androidx.activity.compose.rememberLauncherForActivityResult(
+                    androidx.activity.result.contract.ActivityResultContracts.TakePicture(),
+                ) { ok -> if (ok) cameraTarget?.let { addUri(it, "photo") } }
+                Column(Modifier.weight(1f)) {
+                com.samosaai.masala.chat.AttachmentStrip(queued, onRemove = { id -> queued = queued.filterNot { it.id == id } })
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    IconButton(
+                        onClick = {
+                            if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                                android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
+                            } else pickImage.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Icon(Icons.Rounded.AddPhotoAlternate, stringResource(R.string.chat_attach_image), tint = tokens.textMedium)
+                    }
+                    IconButton(
+                        onClick = {
+                            if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                                android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
+                                return@IconButton
+                            }
+                            val dir = java.io.File(context.filesDir, "work").apply { mkdirs() }
+                            val file = com.samosaai.masala.tools.PhotoTool.photoFile(dir)
+                            val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+                            cameraTarget = uri
+                            takePhoto.launch(uri)
+                        },
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Icon(Icons.Rounded.PhotoCamera, stringResource(R.string.chat_take_photo), tint = tokens.textMedium)
+                    }
+                    androidx.compose.material3.OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text(stringResource(R.string.command_hint)) },
+                        minLines = 1,
+                        maxLines = 5,
+                        shape = RoundedCornerShape(24.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    if (text.isBlank() && queued.isEmpty()) {
+                        MicButton(mic, level = level, size = 52.dp)
+                    } else {
+                        IconButton(
+                            onClick = {
+                                onAsk(text.trim(), queued.map { it.jpegBase64 })
+                                text = ""
+                                queued = emptyList()
+                            },
+                            modifier = Modifier.size(52.dp).clip(CircleShape).background(tokens.accent),
+                        ) {
+                            Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
+                        }
+                    }
+                }
                 }
             }
         }

@@ -239,8 +239,11 @@ internal fun hostMiniApp(
     wv.webViewClient = object : WebViewClient() {
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
             val url = request.url.toString()
-            // Mediated media bridge first: keys never enter JS, per-app opt-in.
-            if (app != null) {
+            // Mediated media bridge first: keys never enter JS, per-app opt-in. The probe
+            // (no app) gets a clean JSON denial, not the offline 403, so working media
+            // calls don't look like errors to the repair turn.
+            if (url.startsWith("${MiniAppMediaBridge.SCHEME}://${MiniAppMediaBridge.HOST}/")) {
+                if (app == null) return MiniAppMediaBridge.probeDenial()
                 runCatching { MiniAppMediaBridge.intercept(app, appId, url) }.getOrNull()?.let { return it }
             }
             // The document itself, and in-page routing, come from the stored HTML.

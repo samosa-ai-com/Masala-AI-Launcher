@@ -718,7 +718,7 @@ class HomeActivity : ComponentActivity() {
                     onContinue = { app.commands.continueListening() },
                     elapsedMs = elapsedMs,
                     ready = voiceReady,
-                    onAsk = { app.commands.ask(it) },
+                    onAsk = { text, images -> app.commands.ask(text, images = images) },
                     onClose = {
                         app.commands.dismiss()
                         chatOpen = false
