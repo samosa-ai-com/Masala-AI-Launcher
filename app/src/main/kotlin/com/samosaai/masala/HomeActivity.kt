@@ -561,6 +561,17 @@ class HomeActivity : ComponentActivity() {
                     val base = app.layouts.base.value
                     base?.pages.orEmpty().flatMap { it.sections }.any { it.id == id } || (base != null && LayoutEdits.isCell(base, id))
                 },
+                onCellDrop = { cellId, target ->
+                    scope.launch {
+                        val title = latestLayout.value.layout.pages.flatMap { it.sections }
+                            .filterIsInstance<com.samosaai.masala.core.contract.CellGridSection>().flatMap { it.cells }
+                            .firstOrNull { it.id == cellId }?.content
+                            ?.let { (it as? com.samosaai.masala.core.contract.CellContent.WidgetCell)?.widget?.title } ?: cellId
+                        app.layouts.edit(getString(R.string.layout_label_moved, title)) {
+                            LayoutEdits.moveCell(it, cellId, target.x, target.y)
+                        }.firstOrNull()?.let { toast(it.message) }
+                    }
+                },
                 onWidgetDrop = { sectionId, target ->
                     scope.launch {
                         val doc = latestLayout.value.layout
