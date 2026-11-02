@@ -455,8 +455,7 @@ private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: Render
         }
         is SkillWidgetSection -> ctx.skillWidgets?.let { SkillWidgetCard(section, it, ctx.onAction) }
             ?: Placeholder(section.skillId, stringResource(R.string.home_skill_widget_placeholder), null)
-        // Drawn from step 2 of docs/plans/home-cell-grid.md; nothing writes one before then.
-        is com.samosaai.masala.core.contract.CellGridSection -> Unit
+        is com.samosaai.masala.core.contract.CellGridSection -> CellGridView(section, ctx, enabled)
         // An HTML widget draws its mini app at widget size, sandboxed like its own screen.
         is com.samosaai.masala.core.contract.HtmlSection -> ctx.htmlWidget(section.appId)?.let { row ->
             androidx.compose.foundation.layout.Box(
@@ -510,6 +509,57 @@ private fun ModeChip(name: String, onClick: (() -> Unit)?) {
 }
 
 // ---- items ----
+
+/** A cell grid row: an icon cell's height, two 48 dp widget rows ([CellLift.ROWS_PER_CELL]). */
+private val CELL_HEIGHT = (com.samosaai.masala.core.migration.CellLift.ROWS_PER_CELL * 48).dp
+
+/**
+ * A launcher grid (plan `docs/plans/home-cell-grid.md`): every cell at its column and row with its
+ * span. Cards fill their cell; a card taller than its cell is clipped until it is resized.
+ */
+@Composable
+private fun CellGridView(section: com.samosaai.masala.core.contract.CellGridSection, ctx: RenderContext, enabled: Boolean) {
+    if (section.cells.isEmpty()) return
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+        val cellWidth = maxWidth / section.columns
+        Box(Modifier.fillMaxWidth().height(CELL_HEIGHT * section.rows)) {
+            for (cell in section.cells) {
+                Box(
+                    Modifier
+                        .offset(x = cellWidth * cell.x, y = CELL_HEIGHT * cell.y)
+                        .size(cellWidth * cell.w, CELL_HEIGHT * cell.h)
+                        .padding(4.dp),
+                ) { CellContentView(cell, ctx, enabled) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CellContentView(cell: com.samosaai.masala.core.contract.Cell, ctx: RenderContext, enabled: Boolean) {
+    val rows = cell.h * com.samosaai.masala.core.migration.CellLift.ROWS_PER_CELL
+    val fill = Modifier.fillMaxSize()
+    when (val content = cell.content) {
+        // Not a drop target or draggable yet (step 4); taps and the item menu work as anywhere else.
+        is com.samosaai.masala.core.contract.CellContent.ItemCell -> ItemCell(content.item, ctx, sectionId = null)
+        is com.samosaai.masala.core.contract.CellContent.WidgetCell -> content.widget?.let { spec ->
+            ctx.widgets?.let { com.samosaai.masala.ui.home.widgets.WidgetCard(spec, rows, it, fill, enabled = enabled) }
+                ?: Placeholder(spec.title ?: spec.id, stringResource(R.string.home_widget_placeholder), rows)
+        }
+        is com.samosaai.masala.core.contract.CellContent.StackCell -> if (content.widgets.isNotEmpty()) {
+            ctx.widgets?.let { com.samosaai.masala.ui.home.widgets.StackCard(content.widgets, rows, it, fill, enabled = enabled) }
+                ?: Placeholder(content.widgets.first().title ?: content.widgets.first().id, stringResource(R.string.home_stack_placeholder, content.widgets.size), rows)
+        }
+        is com.samosaai.masala.core.contract.CellContent.SkillCell -> {
+            val section = SkillWidgetSection(cell.id, content.skillId)
+            ctx.skillWidgets?.let { SkillWidgetCard(section, it, ctx.onAction) }
+                ?: Placeholder(content.skillId, stringResource(R.string.home_skill_widget_placeholder), rows)
+        }
+        is com.samosaai.masala.core.contract.CellContent.HtmlCell -> ctx.htmlWidget(content.appId)?.let { row ->
+            com.samosaai.masala.miniapps.MiniAppView(row.id, row.html, row.networkAllowed, fill)
+        } ?: Placeholder(content.appId, stringResource(R.string.home_widget_placeholder), rows)
+    }
+}
 
 /** Columns that fit: the section's own number, fewer when the screen is narrow or the text is large. */
 @Composable

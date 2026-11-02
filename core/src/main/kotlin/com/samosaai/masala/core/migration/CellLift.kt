@@ -12,6 +12,7 @@ import com.samosaai.masala.core.contract.StackSection
 import com.samosaai.masala.core.contract.WidgetRef
 import com.samosaai.masala.core.contract.WidgetSection
 import com.samosaai.masala.core.contract.WidgetSpec
+import com.samosaai.masala.core.layout.LayoutEdits
 
 /**
  * Folds a layout's widget sections into cell grids (plan `docs/plans/home-cell-grid.md`, step 1):
@@ -55,7 +56,11 @@ object CellLift {
     }
 
     private fun cellFor(section: Section, library: Map<String, WidgetSpec>, columns: Int, y: Int): Cell? {
-        fun rowsOf(ref: WidgetRef) = ref.rowsOverride ?: library[ref.widgetId]?.size?.default ?: 2
+        // What the card draws today (it grows past its default rows), so nothing is cut off after folding.
+        fun rowsOf(ref: WidgetRef): Int {
+            val spec = library[ref.widgetId] ?: return ref.rowsOverride ?: 2
+            return maxOf(LayoutEdits.estimateWidgetRows(spec), ref.rowsOverride ?: spec.size.default)
+        }
         val (content, rows) = when (section) {
             // Inline widgets are WidgetLift's to move first; a section with one is left alone.
             is WidgetSection -> (section.ref ?: return null).let { CellContent.WidgetCell(it) to rowsOf(it) }
