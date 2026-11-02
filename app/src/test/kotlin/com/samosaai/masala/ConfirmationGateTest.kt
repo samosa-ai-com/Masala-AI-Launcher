@@ -9,6 +9,7 @@ import com.samosaai.masala.core.tool.ToolSensitivity
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
@@ -88,6 +89,39 @@ class ConfirmationGateTest {
         gate.answer(false)
         assertEquals(Decision.ALLOWED, first.await())
         assertEquals(Decision.DECLINED, second.await())
+    }
+
+    @Test
+    fun `allow all lets a changing tool through without asking and logs it`() = runBlocking<Unit> {
+        val gate = gate()
+        val result = withContext(ConfirmationGate.AllowAll { true }) {
+            gate.check(tool(ToolSensitivity.CHANGES_SOMETHING), JsonObject(emptyMap()))
+        }
+        assertNull(result)
+        assertNull(gate.pending.value)
+        assertEquals("confirm:set_alarm", log.single().first)
+        assertEquals("allowed (allow all)", (log.single().third as ToolResult.Success).output)
+    }
+
+    @Test
+    fun `allow all still asks before anything destructive`() = runBlocking<Unit> {
+        val gate = gate()
+        val check = async(ConfirmationGate.AllowAll { true }) {
+            gate.check(tool(ToolSensitivity.DESTRUCTIVE), JsonObject(emptyMap()))
+        }
+        while (gate.pending.value == null) delay(5)
+        assertTrue(gate.pending.value!!.destructive)
+        gate.answer(false)
+        assertEquals("The user declined.", (check.await() as ToolResult.Failure).message)
+    }
+
+    @Test
+    fun `allow all switched off asks as usual`() = runBlocking<Unit> {
+        val gate = gate()
+        val check = async(ConfirmationGate.AllowAll { false }) { gate.confirm("Turn on Focus") }
+        while (gate.pending.value == null) delay(5)
+        gate.answer(true)
+        assertEquals(Decision.ALLOWED, check.await())
     }
 
     @Test

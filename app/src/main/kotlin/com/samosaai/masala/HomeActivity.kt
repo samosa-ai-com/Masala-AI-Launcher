@@ -183,6 +183,7 @@ class HomeActivity : ComponentActivity() {
             val activeId by app.activeChatId.collectAsStateWithLifecycle()
             val commandState by app.commands.state.collectAsStateWithLifecycle()
             val minimized by app.commands.minimized.collectAsStateWithLifecycle()
+            val allowAll by app.commands.allowAll.collectAsStateWithLifecycle()
             val homeVisible by app.contextService.homeVisible.collectAsStateWithLifecycle()
             var turns by remember { mutableStateOf<List<com.samosaai.masala.chat.ChatTurn>>(emptyList()) }
             var sessionTitle by remember { mutableStateOf("") }
@@ -218,7 +219,7 @@ class HomeActivity : ComponentActivity() {
                             app.commands.state.value == CommandState.Listening ||
                             app.commands.state.value == CommandState.ListeningPaused
                         if (isDifferentSession || !live) {
-                            app.commands.restoreSession(session.turns)
+                            app.commands.restoreSession(session.turns, sameChat = !isDifferentSession)
                         }
                     }
                     chatOpen = true
@@ -289,6 +290,7 @@ class HomeActivity : ComponentActivity() {
         var choosingIcon by remember { mutableStateOf<AppEntry?>(null) }
         // Tiles that aren't installed apps get their own menu, so nothing on home is menu-less.
         var itemMenuFor by remember { mutableStateOf<Item?>(null) }
+        var resizingCell by remember { mutableStateOf<String?>(null) }
         var widgetMenuFor by remember { mutableStateOf<Pair<com.samosaai.masala.core.contract.WidgetSpec, String>?>(null) }
         var addWidgetSheet by remember { mutableStateOf(false) }
         // Long-press on empty home space: Change wallpaper / Add widget / Settings.
@@ -530,7 +532,7 @@ class HomeActivity : ComponentActivity() {
         }
         // The context below is remembered on purpose; drops read the live layout through these.
         val latestLayout = rememberUpdatedState(layout)
-        val render = remember(apps, settings.homeLocked, modeName, movable, miniAppIcons, miniAppDocs, widgetSource) {
+        val render = remember(apps, settings.homeLocked, modeName, movable, miniAppIcons, miniAppDocs, widgetSource, resizingCell) {
             RenderContext(
                 icons = app.icons,
                 apps = apps,
@@ -557,7 +559,32 @@ class HomeActivity : ComponentActivity() {
                 onItemMenu = { itemMenuFor = it },
                 onWidgetMenu = { spec, sectionId -> widgetMenuFor = spec to sectionId },
                 isBaseSection = { id ->
-                    app.layouts.base.value?.pages.orEmpty().flatMap { it.sections }.any { it.id == id }
+                    val base = app.layouts.base.value
+                    base?.pages.orEmpty().flatMap { it.sections }.any { it.id == id } || (base != null && LayoutEdits.isCell(base, id))
+                },
+                resizingCell = resizingCell,
+                onCellResize = { cellId, w, h ->
+                    scope.launch {
+                        val cell = latestLayout.value.layout.pages.flatMap { it.sections }
+                            .filterIsInstance<com.samosaai.masala.core.contract.CellGridSection>().flatMap { it.cells }
+                            .firstOrNull { it.id == cellId }
+                        val problem = if (cell != null && (cell.w != w || cell.h != h)) {
+                            app.layouts.edit(getString(R.string.widgets_resized)) { LayoutEdits.resizeCell(it, cellId, w, h) }.firstOrNull()
+                        } else null
+                        // A rejected size keeps the handle up, so the user can try again without the menu.
+                        if (problem != null) toast(problem.message) else resizingCell = null
+                    }
+                },
+                onCellDrop = { cellId, target ->
+                    scope.launch {
+                        val title = latestLayout.value.layout.pages.flatMap { it.sections }
+                            .filterIsInstance<com.samosaai.masala.core.contract.CellGridSection>().flatMap { it.cells }
+                            .firstOrNull { it.id == cellId }?.content
+                            ?.let { (it as? com.samosaai.masala.core.contract.CellContent.WidgetCell)?.widget?.title } ?: cellId
+                        app.layouts.edit(getString(R.string.layout_label_moved, title)) {
+                            LayoutEdits.moveCell(it, cellId, target.x, target.y)
+                        }.firstOrNull()?.let { toast(it.message) }
+                    }
                 },
                 onWidgetDrop = { sectionId, target ->
                     scope.launch {
@@ -695,12 +722,14 @@ class HomeActivity : ComponentActivity() {
                             chatPrefill = ""
                             chatPrefillNonce = 0
                             app.chats.latest()?.let { latest ->
+                                // Back to the chat that was open keeps its "Allow all".
+                                val sameChat = latest.id == app.activeChatId.value
                                 app.activeChatId.value = latest.id
                                 app.scope.launch {
                                     app.chats.get(latest.id)?.let { session ->
                                         turns = session.turns
                                         sessionTitle = session.title
-                                        app.commands.restoreSession(session.turns)
+                                        app.commands.restoreSession(session.turns, sameChat)
                                     }
                                 }
                             }
@@ -748,6 +777,8 @@ class HomeActivity : ComponentActivity() {
                         expanded = false
                     },
                     onHistory = { showHistory = true },
+                    allowAll = allowAll,
+                    onAllowAll = { app.commands.setAllowAll(it) },
                     onNewChat = {
                         app.activeChatId.value = null
                         turns = emptyList()
@@ -795,7 +826,7 @@ class HomeActivity : ComponentActivity() {
                             } else {
                                 app.chats.revertTo(id, index, expectedAt = redone.at)?.let {
                                     turns = it.turns
-                                    app.commands.restoreSession(it.turns)
+                                    app.commands.restoreSession(it.turns, sameChat = true)
                                 } ?: return@launch
                             }
                             // Back into the box for editing, like editing the old
@@ -1072,6 +1103,8 @@ class HomeActivity : ComponentActivity() {
         }
 
         widgetMenuFor?.let { (spec, sectionId) ->
+            val cellWidth = layout.layout.pages.flatMap { it.sections }.filterIsInstance<com.samosaai.masala.core.contract.CellGridSection>()
+                .flatMap { it.cells }.firstOrNull { it.id == sectionId }?.w
             fun done(action: () -> Unit) {
                 widgetMenuFor = null
                 action()
@@ -1079,7 +1112,10 @@ class HomeActivity : ComponentActivity() {
             com.samosaai.masala.ui.home.widgets.WidgetMenuDialog(
                 spec = spec,
                 pages = layout.layout.pages.map { it.id to (it.title ?: it.id) },
-                currentPageId = layout.layout.pages.firstOrNull { p -> p.sections.any { it.id == sectionId } }?.id,
+                currentPageId = layout.layout.pages.firstOrNull { p ->
+                    p.sections.any { it.id == sectionId || (it is com.samosaai.masala.core.contract.CellGridSection && it.cells.any { c -> c.id == sectionId }) }
+                }?.id,
+                onResizeOnHome = if (cellWidth == null) null else ({ done { resizingCell = sectionId } }),
                 onRemove = { done { scope.launch {
                     app.layouts.removeWidgetRefs("Remove from home: ${spec.title ?: spec.id}", spec.id)
                         .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_removed))

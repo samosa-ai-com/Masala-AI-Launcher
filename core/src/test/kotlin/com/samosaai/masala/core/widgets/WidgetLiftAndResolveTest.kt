@@ -30,9 +30,9 @@ class WidgetLiftAndResolveTest {
     private val workday = Fixtures.layout("workday")
 
     @Test
-    fun `old layouts migrate to schema 3 with their inline widgets intact`() {
+    fun `old layouts migrate to the current schema with their inline widgets intact`() {
         assertEquals(LayoutDoc.CURRENT_SCHEMA_VERSION, workday.schemaVersion)
-        assertEquals(3, LayoutDoc.CURRENT_SCHEMA_VERSION)
+        assertEquals(4, LayoutDoc.CURRENT_SCHEMA_VERSION)
         assertTrue(WidgetLift.hasInline(workday))
     }
 

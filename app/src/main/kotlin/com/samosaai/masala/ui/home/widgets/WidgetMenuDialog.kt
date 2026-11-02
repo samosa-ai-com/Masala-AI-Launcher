@@ -37,6 +37,11 @@ fun WidgetMenuDialog(
     onMoveToPage: ((String) -> Unit)? = null,
     onEdit: () -> Unit,
     onDismiss: () -> Unit,
+    /**
+     * Set for a widget on a cell grid: Resize then shows a drag handle on the widget itself
+     * instead of the rows stepper.
+     */
+    onResizeOnHome: (() -> Unit)? = null,
 ) {
     var resizing by rememberSaveable(spec.id) { mutableStateOf(false) }
     var moving by rememberSaveable(spec.id) { mutableStateOf(false) }
@@ -48,9 +53,13 @@ fun WidgetMenuDialog(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (!resizing && !moving) {
                     MenuRow(stringResource(R.string.widgets_remove_from_home), onRemove)
-                    MenuRow(stringResource(R.string.widgets_resize, spec.size.min, spec.size.max)) {
-                        rows = spec.size.default
-                        resizing = true
+                    if (onResizeOnHome != null) {
+                        MenuRow(stringResource(R.string.widgets_resize_on_home), onResizeOnHome)
+                    } else {
+                        MenuRow(stringResource(R.string.widgets_resize, spec.size.min, spec.size.max)) {
+                            rows = spec.size.default
+                            resizing = true
+                        }
                     }
                     if (onMoveUp != null || onMoveDown != null || onMoveToPage != null) {
                         MenuRow(stringResource(R.string.widgets_move)) { moving = true }

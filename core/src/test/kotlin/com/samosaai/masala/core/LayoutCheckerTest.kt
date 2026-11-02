@@ -244,4 +244,49 @@ class LayoutCheckerTest {
         val over = layout(widget("sa", "a", 5), widget("sb", "b", 4))
         assertEquals(listOf("$.pages[0].sections"), LayoutChecker.check(over, env).map { it.path })
     }
+
+    private fun cell(id: String, x: Int, y: Int, w: Int = 1, h: Int = 1, content: com.samosaai.masala.core.contract.CellContent =
+        com.samosaai.masala.core.contract.CellContent.ItemCell(item("i$id"))) =
+        com.samosaai.masala.core.contract.Cell(id, x, y, w, h, content)
+
+    private fun cells(vararg c: com.samosaai.masala.core.contract.Cell) =
+        layout(com.samosaai.masala.core.contract.CellGridSection("g", cells = c.toList()))
+
+    @Test
+    fun `a cell grid with icons and a skill widget side by side passes`() {
+        val skill = com.samosaai.masala.core.contract.CellContent.SkillCell("chef")
+        assertEquals(emptyList(), paths(cells(cell("a", 0, 0), cell("b", 1, 0), cell("s", 2, 0, w = 2, h = 2, content = skill))))
+    }
+
+    @Test
+    fun `overlapping, out of bounds and stretched icon cells are rejected`() {
+        assertEquals(listOf("$.pages[0].sections[0].cells[1]"), paths(cells(cell("a", 0, 0), cell("b", 0, 0))))
+        assertEquals(listOf("$.pages[0].sections[0].cells[0]"), paths(cells(cell("a", 3, 0, w = 2, content = com.samosaai.masala.core.contract.CellContent.SkillCell("chef")))))
+        assertEquals(listOf("$.pages[0].sections[0].cells[0]"), paths(cells(cell("a", 0, 0, w = 2))))
+    }
+
+    @Test
+    fun `a widget cell must fit its width range`() {
+        val spec = WidgetSpec("w", components = listOf(com.samosaai.masala.core.contract.WidgetComponent.Text(text = "hi")), size = SizeRange(maxW = 2, defaultW = 2))
+        val withLib = env.copy(widgets = mapOf("w" to spec))
+        val wide = cells(cell("a", 0, 0, w = 4, content = com.samosaai.masala.core.contract.CellContent.WidgetCell(com.samosaai.masala.core.contract.WidgetRef("w"))))
+        assertEquals(listOf("$.pages[0].sections[0].cells[0].w"), LayoutChecker.check(wide, withLib).map { it.path })
+    }
+
+    @Test
+    fun `HTML cells count toward the per-page WebView cap`() {
+        val html = { app: String -> com.samosaai.masala.core.contract.CellContent.HtmlCell(app) }
+        assertEquals(emptyList(), paths(cells(cell("a", 0, 0, content = html("x")), cell("b", 1, 0, content = html("y")))))
+        val withSection = layout(
+            com.samosaai.masala.core.contract.HtmlSection("h", appId = "z"),
+            com.samosaai.masala.core.contract.CellGridSection("g", cells = listOf(cell("a", 0, 0, content = html("x")), cell("b", 1, 0, content = html("y")))),
+        )
+        assertEquals(listOf("$.pages[0].sections"), paths(withSection))
+    }
+
+    @Test
+    fun `a cell past the grid's row limit is rejected`() {
+        val far = cell("a", 0, LayoutChecker.MAX_GRID_ROWS, content = com.samosaai.masala.core.contract.CellContent.SkillCell("chef"))
+        assertEquals(listOf("$.pages[0].sections[0].cells[0]"), paths(cells(far)))
+    }
 }

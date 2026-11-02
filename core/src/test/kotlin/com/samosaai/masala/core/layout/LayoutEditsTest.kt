@@ -320,20 +320,35 @@ class LayoutEditsTest {
     private val lib = mapOf("water" to waterSpec, "steps" to stepsSpec)
 
     @Test
-    fun `placeWidget appends a ref section with a free id`() {
+    fun `placeWidget puts a ref cell on the page's grid with a free id`() {
+        fun cellsOf(doc: LayoutDoc, page: Int = 0) =
+            doc.pages[page].sections.filterIsInstance<com.samosaai.masala.core.contract.CellGridSection>().single().cells
         val once = assertNotNull(LayoutEdits.placeWidget(widgetDoc(), "habits", specs = lib))
-        val section = once.doc.pages.first().sections.last() as WidgetSection
-        assertEquals(WidgetRef("habits"), section.ref)
+        val content = cellsOf(once.doc).single().content as com.samosaai.masala.core.contract.CellContent.WidgetCell
+        assertEquals(WidgetRef("habits"), content.ref)
         assertEquals("home", once.pageId)
+        assertEquals("widget-habits", once.sectionId)
         val twice = assertNotNull(LayoutEdits.placeWidget(once.doc, "habits", specs = lib))
-        val ids = twice.doc.pages.first().sections.map { it.id }
-        assertEquals(ids.size, ids.toSet().size)
+        assertEquals(listOf("widget-habits", "widget-habits-2"), cellsOf(twice.doc).map { it.id })
         assertNull(LayoutEdits.placeWidget(widgetDoc(), ""))
         assertNull(LayoutEdits.placeWidget(widgetDoc(), "habits", pageId = "missing"))
         val other = assertNotNull(LayoutEdits.placeWidget(widgetDoc(), "habits", rowsOverride = 3, pageId = "two", specs = lib))
         assertEquals("two", other.pageId)
-        assertEquals(listOf("s2", "widget-habits"), other.doc.pages.last().sections.map { it.id })
-        assertEquals(3, (other.doc.pages.last().sections.last() as WidgetSection).ref?.rowsOverride)
+        assertEquals(listOf("s2", "cells-two"), other.doc.pages.last().sections.map { it.id })
+        val cell = cellsOf(other.doc, 1).single()
+        assertEquals(3, (cell.content as com.samosaai.masala.core.contract.CellContent.WidgetCell).ref.rowsOverride)
+        assertEquals(2, cell.h)
+    }
+
+    @Test
+    fun `narrow widgets share a grid row, so the second costs no height`() {
+        val half = WidgetSpec("half", "Half", listOf(WidgetComponent.Counter("n", "N")), SizeRange(1, 1, 2, defaultW = 2, maxW = 4))
+        val specs = mapOf("half" to half)
+        val one = assertNotNull(LayoutEdits.placeWidget(widgetDoc(), "half", specs = specs)).doc
+        val two = assertNotNull(LayoutEdits.placeWidget(one, "half", specs = specs)).doc
+        val grid = two.pages[0].sections.filterIsInstance<com.samosaai.masala.core.contract.CellGridSection>().single()
+        assertEquals(listOf(0 to 0, 2 to 0), grid.cells.map { it.x to it.y })
+        assertEquals(LayoutEdits.widgetRowsUsed(one, "home"), LayoutEdits.widgetRowsUsed(two, "home"))
     }
 
     @Test
@@ -341,23 +356,20 @@ class LayoutEditsTest {
         val specs = mapOf("big" to big)
         // Home starts with a 4-item grid with a title: 3 rendered rows.
         var doc = LayoutDoc(pages = listOf(Page("home", sections = listOf(GridSection("g", title = "Apps", columns = 4, items = items("a", "b", "c", "d"))))))
+        // A full-width widget drawing 3 rows takes 2 grid rows (4 rows: cells are whole).
         val first = assertNotNull(LayoutEdits.placeWidget(doc, "big", specs = specs))
-        // Grid 3 + widget 3 = 6: fits.
+        // Grid 3 + widget 4 = 7: fits.
         assertEquals("home", first.pageId)
         doc = first.doc
         val second = assertNotNull(LayoutEdits.placeWidget(doc, "big", specs = specs))
-        // 6 + 3 = 9: fits.
+        // 7 + 4 = 11: fits.
         assertEquals("home", second.pageId)
         doc = second.doc
         val third = assertNotNull(LayoutEdits.placeWidget(doc, "big", specs = specs))
-        // 9 + 3 = 12: exactly a screenful, still fits.
-        assertEquals("home", third.pageId)
-        doc = third.doc
-        val fourth = assertNotNull(LayoutEdits.placeWidget(doc, "big", specs = specs))
-        // 12 + 3 > 12: a new home screen opens.
-        assertEquals(2, fourth.doc.pages.size)
-        assertEquals("home-2", fourth.pageId)
-        assertEquals("Home 2", fourth.doc.pages.last().title)
+        // 11 + 4 > 12: a new home screen opens.
+        assertEquals(2, third.doc.pages.size)
+        assertEquals("home-2", third.pageId)
+        assertEquals("Home 2", third.doc.pages.last().title)
     }
 
     @Test
@@ -433,17 +445,18 @@ class LayoutEditsTest {
     )
 
     @Test
-    fun `placeHtml appends a sized section with a free id`() {
+    fun `placeHtml puts a sized cell on the grid with a free id`() {
+        fun cells(doc: LayoutDoc) = doc.pages.first().sections.filterIsInstance<com.samosaai.masala.core.contract.CellGridSection>().single().cells
         val once = assertNotNull(LayoutEdits.placeHtml(widgetDoc(), "dice"))
-        val section = once.doc.pages.first().sections.last() as HtmlSection
-        assertEquals("dice", section.appId)
-        assertEquals(2, section.rows)
+        val cell = cells(once.doc).single()
+        assertEquals("dice", (cell.content as com.samosaai.masala.core.contract.CellContent.HtmlCell).appId)
+        assertEquals(1, cell.h)
         assertEquals("home", once.pageId)
         val twice = assertNotNull(LayoutEdits.placeHtml(once.doc, "dice", rows = 3))
-        // Home holds 6, so rows 3 still fits at 9.
+        // Home holds 6 plus the first cell's 2, so 4 more still fits at 12.
         assertEquals("home", twice.pageId)
-        assertEquals(3, (twice.doc.pages.first().sections.last() as HtmlSection).rows)
-        assertEquals(twice.doc.pages.flatMap { it.sections }.map { it.id }.size, twice.doc.pages.flatMap { it.sections }.map { it.id }.toSet().size)
+        assertEquals(listOf("html-dice", "html-dice-2"), cells(twice.doc).map { it.id })
+        assertEquals(2, cells(twice.doc).last().h)
         assertNull(LayoutEdits.placeHtml(widgetDoc(), ""))
         assertNull(LayoutEdits.placeHtml(widgetDoc(), "dice", pageId = "missing"))
     }

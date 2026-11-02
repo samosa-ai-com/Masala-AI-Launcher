@@ -1,6 +1,7 @@
 package com.samosaai.masala.agent
 
 import com.samosaai.masala.actions.ActionDispatcher
+import com.samosaai.masala.actions.ConfirmationGate
 import com.samosaai.masala.audio.PttEngine
 import com.samosaai.masala.core.agent.CommandFastPath
 import com.samosaai.masala.core.agent.NameCorrector
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
@@ -78,6 +80,29 @@ class CommandController(
      */
     private val _minimized = MutableStateFlow(false)
     val minimized: StateFlow<Boolean> = _minimized.asStateFlow()
+
+    /**
+     * This chat's "Allow all": its turns skip the confirmation sheet for anything that isn't
+     * destructive. Every new chat and every switch to another one starts from the global default
+     * (Settings → Permissions); coming back to the same chat (after minimizing) keeps it.
+     */
+    private var allowAllDefault = false
+    private val _allowAll = MutableStateFlow(false)
+    val allowAll: StateFlow<Boolean> = _allowAll.asStateFlow()
+
+    /** The user flipped this chat's switch: the global default no longer moves it. */
+    private var allowAllOverridden = false
+
+    fun setAllowAll(on: Boolean) {
+        allowAllOverridden = true
+        _allowAll.value = on
+    }
+
+    /** The global default changed: chats start from it, and the open chat follows unless its switch was flipped. */
+    fun setAllowAllDefault(on: Boolean) {
+        allowAllDefault = on
+        if (!allowAllOverridden) _allowAll.value = on
+    }
 
     /** Hides the chat without cancelling the running turn. */
     fun minimize() {
@@ -151,6 +176,8 @@ class CommandController(
     fun openInput(prefill: String = "") {
         job?.cancel()
         draft = prefill
+        // Asking to type is coming back: a chat minimized earlier would hide the card.
+        _minimized.value = false
         _state.value = CommandState.Input
     }
 
@@ -265,7 +292,7 @@ class CommandController(
      * Continues a stored conversation: its turns become the agent's context, so
      * "go back to that chat and keep talking" answers with what came before.
      */
-    fun restoreSession(turns: List<com.samosaai.masala.chat.ChatTurn>) {
+    fun restoreSession(turns: List<com.samosaai.masala.chat.ChatTurn>, sameChat: Boolean = false) {
         job?.cancel()
         speech?.cancel()
         // A summary written earlier stands in for everything before it, so reopening a very
@@ -286,6 +313,10 @@ class CommandController(
                     JsonPrimitive(it.text),
                 )
             }
+        if (!sameChat) {
+            allowAllOverridden = false
+            _allowAll.value = allowAllDefault
+        }
         history = listOfNotNull(summary?.let { com.samosaai.masala.llm.ChatMessage("assistant", JsonPrimitive(it)) }) + spoken
         _state.value = CommandState.Idle
     }
@@ -334,7 +365,10 @@ class CommandController(
         }
     }
 
-    private suspend fun handle(prompt: String, spoken: Boolean, images: List<String> = emptyList()) {
+    private suspend fun handle(prompt: String, spoken: Boolean, images: List<String> = emptyList()) =
+        withContext(ConfirmationGate.AllowAll { _allowAll.value }) { runTurn(prompt, spoken, images) }
+
+    private suspend fun runTurn(prompt: String, spoken: Boolean, images: List<String>) {
         onTurnStart?.invoke()
         CommandFastPath.match(prompt, resolveApp)?.let { action ->
             publish(stateFor(prompt, run(action), spoken))

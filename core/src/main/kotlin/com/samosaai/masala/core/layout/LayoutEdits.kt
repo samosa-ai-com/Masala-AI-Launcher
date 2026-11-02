@@ -1,5 +1,9 @@
 package com.samosaai.masala.core.layout
 
+import com.samosaai.masala.core.migration.CellLift
+import com.samosaai.masala.core.contract.CellContent
+import com.samosaai.masala.core.contract.Cell
+import com.samosaai.masala.core.contract.CellGridSection
 import com.samosaai.masala.core.contract.DockSection
 import com.samosaai.masala.core.contract.Emphasis
 import com.samosaai.masala.core.contract.GridSection
@@ -298,6 +302,8 @@ object LayoutEdits {
             is ListSection -> (if (!section.title.isNullOrBlank()) 1 else 0) + section.items.size
             is GroupSection -> 1
             is DockSection -> 0
+            // A grid row is an icon cell's height, two 48 dp units like an item grid row.
+            is CellGridSection -> section.rows * 2
         }
 
     /** Declared widget rows for the checker: overrides and defaults, the author's height intent. */
@@ -373,9 +379,131 @@ object LayoutEdits {
                     is StackSection -> widgetId in section.widgetIds
                     else -> false
                 }
-                if (holds) WidgetPlacement(page.id, section.id) else null
-            }
+                if (holds) listOf(WidgetPlacement(page.id, section.id))
+                else if (section is CellGridSection) section.cells.filter { it.holdsWidget(widgetId) }.map { WidgetPlacement(page.id, it.id) }
+                else emptyList()
+            }.flatten()
         }
+
+    private fun Cell.holdsWidget(widgetId: String) = when (val c = content) {
+        is CellContent.WidgetCell -> c.ref.widgetId == widgetId
+        is CellContent.StackCell -> c.refs.any { it.widgetId == widgetId }
+        else -> false
+    }
+
+    // ---- cell grids (plan docs/plans/home-cell-grid.md) ----
+
+    /**
+     * [keep] decides per widget id; cells whose widget goes are removed (a stack keeps the rest, an
+     * emptied one goes) and the grid closes up. Null when nothing changed.
+     */
+    private fun LayoutDoc.stripCellWidgets(keep: (String) -> Boolean): LayoutDoc? {
+        var changed = false
+        val next = mapGrids { grid ->
+            val cells = grid.cells.mapNotNull { cell ->
+                when (val c = cell.content) {
+                    is CellContent.WidgetCell -> if (keep(c.ref.widgetId)) cell else null.also { changed = true }
+                    is CellContent.StackCell -> {
+                        val refs = c.refs.filter { keep(it.widgetId) }
+                        when {
+                            refs.size == c.refs.size -> cell
+                            refs.isEmpty() -> null.also { changed = true }
+                            else -> cell.copy(content = c.copy(refs = refs)).also { changed = true }
+                        }
+                    }
+                    else -> cell
+                }
+            }
+            if (cells.size == grid.cells.size && cells == grid.cells) grid else CellGrid.compact(grid.copy(cells = cells))
+        }
+        return if (changed) next else null
+    }
+
+    /** Cell grid rows a widget of [rows] 48 dp rows takes. */
+    fun cellsHigh(rows: Int): Int =
+        ((rows + CellLift.ROWS_PER_CELL - 1) / CellLift.ROWS_PER_CELL).coerceAtLeast(1)
+
+    /** Applies [transform] to every grid; a grid it empties goes, like an emptied stack. */
+    private fun LayoutDoc.mapGrids(transform: (CellGridSection) -> CellGridSection): LayoutDoc =
+        copy(
+            pages = pages.map { page ->
+                page.copy(
+                    sections = page.sections.mapNotNull { section ->
+                        if (section !is CellGridSection) section
+                        else transform(section).takeUnless { it.cells.isEmpty() && section.cells.isNotEmpty() }
+                    },
+                )
+            },
+        )
+
+    private fun LayoutDoc.gridHolding(cellId: String): Pair<Page, CellGridSection>? =
+        pages.firstNotNullOfOrNull { page ->
+            page.sections.filterIsInstance<CellGridSection>().firstOrNull { g -> g.cells.any { it.id == cellId } }?.let { page to it }
+        }
+
+    /** True when [id] is a cell on some grid (menus pass cell ids where they used to pass section ids). */
+    fun isCell(doc: LayoutDoc, id: String): Boolean = doc.gridHolding(id) != null
+
+    /**
+     * Adds [cell] to [pageId]'s grid at its first free spot, creating the grid (above the dock) when
+     * the page has none. The page must exist.
+     */
+    fun addCell(doc: LayoutDoc, pageId: String, cell: Cell, columns: Int = 4): LayoutDoc =
+        doc.copy(
+            pages = doc.pages.map { page ->
+                if (page.id != pageId) return@map page
+                val grid = page.sections.filterIsInstance<CellGridSection>().firstOrNull()
+                if (grid != null) {
+                    page.copy(sections = page.sections.map { if (it.id == grid.id) CellGrid.add(grid, cell.copy(x = 0, y = 0)) else it })
+                } else {
+                    val taken = doc.pages.flatMap { it.sections }.map { it.id }.toSet()
+                    var id = "cells-$pageId"
+                    var n = 2
+                    while (id in taken) id = "cells-$pageId-${n++}"
+                    val created = CellGrid.add(CellGridSection(id, columns, emptyList()), cell.copy(x = 0, y = 0))
+                    val dock = page.sections.indexOfFirst { it is DockSection }
+                    val sections = page.sections.toMutableList().apply { if (dock < 0) add(created) else add(dock, created) }
+                    page.copy(sections = sections)
+                }
+            },
+        )
+
+    /** Grid rows (as 48 dp rows) adding [cell] to [pageId] costs: zero when it fits beside others. */
+    private fun addedRows(doc: LayoutDoc, pageId: String, cell: Cell): Int {
+        val page = doc.pages.firstOrNull { it.id == pageId } ?: return 0
+        val before = page.sections.filterIsInstance<CellGridSection>().firstOrNull()?.rows ?: 0
+        val after = addCell(doc, pageId, cell).pages.first { it.id == pageId }.sections.filterIsInstance<CellGridSection>().first().rows
+        return (after - before) * CellLift.ROWS_PER_CELL
+    }
+
+    /** Moves cell [cellId] to ([x], [y]) on its grid; cells in the way go down. Null when it isn't a cell. */
+    fun moveCell(doc: LayoutDoc, cellId: String, x: Int, y: Int): LayoutDoc? {
+        val (_, grid) = doc.gridHolding(cellId) ?: return null
+        return doc.mapGrids { if (it.id == grid.id) CellGrid.move(it, cellId, x, y) else it }
+    }
+
+    /** Resizes cell [cellId] to [w] × [h] cells; cells in the way go down. Null when it isn't a cell. */
+    fun resizeCell(doc: LayoutDoc, cellId: String, w: Int, h: Int): LayoutDoc? {
+        val (_, grid) = doc.gridHolding(cellId) ?: return null
+        return doc.mapGrids { if (it.id == grid.id) CellGrid.resize(it, cellId, w, h) else it }
+    }
+
+    /**
+     * The menu's Move up / down / to page for a cell: [steps] rows up or down on its grid (pushing
+     * what is there), or onto [targetPageId]'s grid at its first free spot. Null when nothing moves.
+     */
+    fun moveCellBy(doc: LayoutDoc, cellId: String, steps: Int = 0, targetPageId: String? = null): LayoutDoc? {
+        val (page, grid) = doc.gridHolding(cellId) ?: return null
+        val cell = grid.cells.first { it.id == cellId }
+        if (targetPageId != null && targetPageId != page.id) {
+            if (doc.pages.none { it.id == targetPageId }) return null
+            val removed = doc.mapGrids { if (it.id == grid.id) CellGrid.compact(CellGrid.remove(it, cellId)) else it }
+            return addCell(removed, targetPageId, cell)
+        }
+        val y = (cell.y + steps).coerceAtLeast(0)
+        if (y == cell.y) return null
+        return doc.mapGrids { if (it.id == grid.id) CellGrid.compact(CellGrid.move(it, cellId, cell.x, y)) else it }
+    }
 
     /**
      * Puts [widgetId] on home as a new [WidgetSection] holding a ref: the requested page when the
@@ -395,33 +523,30 @@ object LayoutEdits {
         val height = if (spec == null) rowsOverride ?: 2 else estimateWidgetRows(spec, rowsOverride)
         val target = pageId?.let { id -> doc.pages.firstOrNull { it.id == id } } ?: doc.pages.first()
         if (pageId != null && doc.pages.none { it.id == pageId }) return null
-        val page = if (widgetRowsUsed(doc, target.id, specs) + height <= LayoutChecker.MAX_PAGE_ROWS) {
-            target
-        } else {
-            doc.pages.firstOrNull { widgetRowsUsed(doc, it.id, specs) + height <= LayoutChecker.MAX_PAGE_ROWS }
-        }
-        var next = doc
+        val taken0 = doc.allIdsInDoc()
+        val cellId = freeId("widget-$widgetId", taken0)
+        // A cell, so a narrow widget sits beside others (plan docs/plans/home-cell-grid.md, step 3).
+        val cell = Cell(cellId, 0, 0, spec?.size?.defaultW ?: 4, cellsHigh(height), CellContent.WidgetCell(WidgetRef(widgetId, rowsOverride)))
+        val fits = { p: Page -> widgetRowsUsed(doc, p.id, specs) + addedRows(doc, p.id, cell) <= LayoutChecker.MAX_PAGE_ROWS }
+        val page = if (fits(target)) target else doc.pages.firstOrNull(fits)
+        var placed = doc
         val at = if (page != null) {
             page.id
         } else {
             val created = newPage(doc)
-            next = doc.copy(pages = doc.pages + created)
+            placed = doc.copy(pages = doc.pages + created)
             created.id
         }
-        val taken = next.pages.flatMap { it.sections }.map { it.id }.toSet()
-        var sectionId = "widget-$widgetId"
-        if (sectionId in taken) {
-            var n = 2
-            while ("$sectionId-$n" in taken) n++
-            sectionId = "$sectionId-$n"
-        }
-        val section = WidgetSection(id = sectionId, ref = WidgetRef(widgetId, rowsOverride))
-        next = next.copy(
-            pages = next.pages.map { p ->
-                if (p.id != at) p else p.copy(sections = p.sections + section)
-            },
-        )
-        return Placed(next, at, sectionId)
+        return Placed(addCell(placed, at, cell), at, cellId)
+    }
+
+    private fun LayoutDoc.allIdsInDoc(): Set<String> = pages.allIds()
+
+    private fun freeId(stem: String, taken: Set<String>): String {
+        if (stem !in taken) return stem
+        var n = 2
+        while ("$stem-$n" in taken) n++
+        return "$stem-$n"
     }
 
     /**
@@ -457,7 +582,8 @@ object LayoutEdits {
                 )
             },
         )
-        return if (changed) next else null
+        val stripped = next.stripCellWidgets { it != widgetId }
+        return stripped ?: if (changed) next else null
     }
 
     /**
@@ -495,7 +621,8 @@ object LayoutEdits {
                 )
             },
         )
-        return if (changed) next else null
+        val stripped = next.stripCellWidgets { it in knownIds }
+        return stripped ?: if (changed) next else null
     }
 
     /** Sets [rows] as the per-placement height override on every ref of [widgetId]. Null when none. */
@@ -521,7 +648,21 @@ object LayoutEdits {
                 )
             },
         )
-        return if (changed) next else null
+        // A cell's height is its span: the rows become whole cells, pushing what is below.
+        val cells = next.pages.flatMap { it.sections }.filterIsInstance<CellGridSection>().flatMap { g -> g.cells.filter { it.holdsWidget(widgetId) } }
+        if (cells.isEmpty()) return if (changed) next else null
+        return cells.fold(next) { d, cell ->
+            val withRef = d.mapGrids { g ->
+                g.copy(cells = g.cells.map { c ->
+                    if (c.id != cell.id) c else when (val content = c.content) {
+                        is CellContent.WidgetCell -> c.copy(content = content.copy(ref = content.ref.copy(rowsOverride = rows)))
+                        is CellContent.StackCell -> c.copy(content = content.copy(refs = content.refs.map { if (it.widgetId == widgetId) it.copy(rowsOverride = rows) else it }))
+                        else -> c
+                    }
+                })
+            }
+            resizeCell(withRef, cell.id, cell.w, cellsHigh(rows)) ?: withRef
+        }
     }
 
     // ---- HTML widgets (plan docs/plans/widget-maker.md §3.3) ----
@@ -529,8 +670,14 @@ object LayoutEdits {
     /** Every place a mini app sits on home at widget size. */
     fun htmlPlacements(doc: LayoutDoc, appId: String): List<WidgetPlacement> =
         doc.pages.flatMap { page ->
-            page.sections.mapNotNull { section ->
-                if (section is HtmlSection && section.appId == appId) WidgetPlacement(page.id, section.id) else null
+            page.sections.flatMap { section ->
+                when {
+                    section is HtmlSection && section.appId == appId -> listOf(WidgetPlacement(page.id, section.id))
+                    section is CellGridSection -> section.cells
+                        .filter { (it.content as? CellContent.HtmlCell)?.appId == appId }
+                        .map { WidgetPlacement(page.id, it.id) }
+                    else -> emptyList()
+                }
             }
         }
 
@@ -549,11 +696,10 @@ object LayoutEdits {
         if (appId.isBlank() || doc.pages.isEmpty()) return null
         val target = pageId?.let { id -> doc.pages.firstOrNull { it.id == id } } ?: doc.pages.first()
         if (pageId != null && doc.pages.none { it.id == pageId }) return null
-        val page = if (widgetRowsUsed(doc, target.id, specs) + rows <= LayoutChecker.MAX_PAGE_ROWS) {
-            target
-        } else {
-            doc.pages.firstOrNull { widgetRowsUsed(doc, it.id, specs) + rows <= LayoutChecker.MAX_PAGE_ROWS }
-        }
+        val cellId = freeId("html-$appId", doc.allIdsInDoc())
+        val cell = Cell(cellId, 0, 0, 4, cellsHigh(rows), CellContent.HtmlCell(appId))
+        val fits = { p: Page -> widgetRowsUsed(doc, p.id, specs) + addedRows(doc, p.id, cell) <= LayoutChecker.MAX_PAGE_ROWS }
+        val page = if (fits(target)) target else doc.pages.firstOrNull(fits)
         var next = doc
         val at = if (page != null) {
             page.id
@@ -562,20 +708,7 @@ object LayoutEdits {
             next = doc.copy(pages = doc.pages + created)
             created.id
         }
-        val taken = next.pages.flatMap { it.sections }.map { it.id }.toSet()
-        var sectionId = "html-$appId"
-        if (sectionId in taken) {
-            var n = 2
-            while ("$sectionId-$n" in taken) n++
-            sectionId = "$sectionId-$n"
-        }
-        val section = HtmlSection(id = sectionId, appId = appId, rows = rows)
-        next = next.copy(
-            pages = next.pages.map { p ->
-                if (p.id != at) p else p.copy(sections = p.sections + section)
-            },
-        )
-        return Placed(next, at, sectionId)
+        return Placed(addCell(next, at, cell), at, cellId)
     }
 
     /** Takes a mini app off home wherever it sits at widget size. Null when it wasn't placed. */
@@ -589,7 +722,10 @@ object LayoutEdits {
                     },
                 )
             },
-        )
+        ).mapGrids { grid ->
+            val cells = grid.cells.filterNot { (it.content as? CellContent.HtmlCell)?.appId == appId }
+            if (cells.size == grid.cells.size) grid else CellGrid.compact(grid.copy(cells = cells)).also { changed = true }
+        }
         return if (changed) next else null
     }
 
@@ -605,6 +741,7 @@ object LayoutEdits {
             is WidgetSection -> section.widget != null || section.ref != null
             is StackSection -> section.widgets.isNotEmpty() || section.refs.isNotEmpty()
             is HtmlSection, is SkillWidgetSection, is DockSection -> true
+            is CellGridSection -> section.cells.isNotEmpty()
             else -> false
         }
         val kept = doc.pages.filter { page -> page.id in referenced || page.sections.any(::shows) }

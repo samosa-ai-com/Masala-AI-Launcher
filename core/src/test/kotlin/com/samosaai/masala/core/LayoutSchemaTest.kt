@@ -93,4 +93,21 @@ class LayoutSchemaTest {
             assertTrue(layoutSchema.validate(mapper.readTree(json)).isNotEmpty(), json)
         }
     }
+
+    @Test
+    fun `a cell grid Kotlin writes passes the schema`() {
+        val item = com.samosaai.masala.core.contract.Item("i", "Mail", com.samosaai.masala.core.contract.IconRef.Symbol("mail"), com.samosaai.masala.core.contract.MasalaAction.OpenDrawer)
+        val grid = com.samosaai.masala.core.contract.CellGridSection(
+            "g",
+            cells = listOf(
+                com.samosaai.masala.core.contract.Cell("a", 0, 0, 2, 2, com.samosaai.masala.core.contract.CellContent.WidgetCell(com.samosaai.masala.core.contract.WidgetRef("water"))),
+                com.samosaai.masala.core.contract.Cell("b", 2, 0, content = com.samosaai.masala.core.contract.CellContent.ItemCell(item)),
+                com.samosaai.masala.core.contract.Cell("c", 3, 0, content = com.samosaai.masala.core.contract.CellContent.HtmlCell("dice")),
+            ),
+        )
+        val doc = com.samosaai.masala.core.contract.LayoutDoc(pages = listOf(com.samosaai.masala.core.contract.Page("home", sections = listOf(grid))))
+        val json = com.samosaai.masala.core.contract.MasalaJson.strict.encodeToString(com.samosaai.masala.core.contract.LayoutDoc.serializer(), doc)
+        val errors = layoutSchema.validate(mapper.readTree(json))
+        assertTrue(errors.isEmpty(), "$errors")
+    }
 }

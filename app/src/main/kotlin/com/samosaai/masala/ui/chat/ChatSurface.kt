@@ -12,6 +12,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
@@ -39,6 +41,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
@@ -125,6 +128,9 @@ fun ChatSurface(
     onClose: () -> Unit,
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
+    /** This chat's "Allow all": skip confirmations for anything that isn't destructive. */
+    allowAll: Boolean = false,
+    onAllowAll: (Boolean) -> Unit = {},
     onRevertTurn: (Int) -> Unit = {},
     onContinue: () -> Unit = {},
     /** ms since the live take started; the timer and near-cap warning read this. */
@@ -170,11 +176,12 @@ fun ChatSurface(
                 ) { onClose() },
         )
         Box(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp).fillMaxHeight(threadHeight)
-                // Everything rides above the keyboard: the thread and the type field move up
-                // together, so no message is ever stuck behind it. (The activity uses
-                // adjustNothing, so without this the window never makes room.)
-                .imePadding()
+            // Everything rides above the keyboard: the thread and the type field move up
+            // together, so no message is ever stuck behind it. (The activity uses
+            // adjustNothing, so without this the window never makes room.) The padding comes
+            // before the height, so the sheet's share is of the space above the keyboard, not
+            // of the screen with the keyboard taken out of it (that left only the header).
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp).imePadding().fillMaxHeight(threadHeight)
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                 .background(Color(0xFF15171E))
                 .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
@@ -186,6 +193,8 @@ fun ChatSurface(
                     onClose = onClose,
                     onHistory = onHistory,
                     onNewChat = onNewChat,
+                    allowAll = allowAll,
+                    onAllowAll = onAllowAll,
                     onToggle = { onExpanded(!expanded) },
                     onExpanded = onExpanded,
                     experts = experts,
@@ -221,7 +230,7 @@ fun ChatSurface(
     }
 }
 
-/** The drag handle, title and the three actions: back, new chat, history. */
+/** The drag handle, title, the "Allow all" switch and the three actions: back, new chat, history. */
 @Composable
 private fun Header(
     title: String,
@@ -229,6 +238,8 @@ private fun Header(
     onClose: () -> Unit,
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
+    allowAll: Boolean,
+    onAllowAll: (Boolean) -> Unit,
     onToggle: () -> Unit,
     onExpanded: (Boolean) -> Unit,
     experts: List<ExpertCredit> = emptyList(),
@@ -268,8 +279,32 @@ private fun Header(
                 style = MaterialTheme.typography.titleSmall,
                 color = MasalaTheme.tokens.textHigh,
                 maxLines = 1,
-                modifier = Modifier.weight(1f),
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(end = 4.dp),
             )
+            // One icon, so the title keeps the room; gold while on, and the strip below says so.
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val allowLabel = stringResource(R.string.chat_allow_all)
+            val allowState = stringResource(if (allowAll) R.string.chat_allow_all_state_on else R.string.chat_allow_all_state_off)
+            Box(
+                Modifier.size(40.dp).clip(CircleShape)
+                    .background(if (allowAll) MasalaTheme.tokens.accent.copy(alpha = 0.18f) else Color.Transparent)
+                    .combinedClickable(
+                        onClick = { onAllowAll(!allowAll) },
+                        onLongClick = { android.widget.Toast.makeText(context, allowLabel, android.widget.Toast.LENGTH_SHORT).show() },
+                    )
+                    .semantics {
+                        contentDescription = allowLabel
+                        stateDescription = allowState
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.Bolt,
+                    null,
+                    tint = if (allowAll) MasalaTheme.tokens.accent else MasalaTheme.tokens.textLow,
+                )
+            }
             if (experts.isNotEmpty()) {
                 var asking by remember { mutableStateOf(false) }
                 Box {
@@ -291,6 +326,25 @@ private fun Header(
             }
             IconButton(onClick = onNewChat) { Icon(Icons.Rounded.Add, stringResource(R.string.chat_new), tint = MasalaTheme.tokens.textMedium) }
             IconButton(onClick = onHistory) { Icon(Icons.Rounded.History, stringResource(R.string.chat_history), tint = MasalaTheme.tokens.textMedium) }
+        }
+        // While confirmations are skipped it says so, and turning it off is one tap away.
+        if (allowAll) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 2.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MasalaTheme.tokens.accent.copy(alpha = 0.12f))
+                    .padding(start = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Rounded.Bolt, null, tint = MasalaTheme.tokens.accent, modifier = Modifier.size(16.dp))
+                Text(
+                    stringResource(R.string.chat_allow_all_on),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MasalaTheme.tokens.textHigh,
+                    modifier = Modifier.weight(1f).padding(start = 8.dp),
+                )
+                TextButton(onClick = { onAllowAll(false) }) { Text(stringResource(R.string.chat_allow_all_turn_off)) }
+            }
         }
     }
 }
@@ -526,7 +580,8 @@ private fun ResultCard(result: ChatResult) {
             result.title.ifBlank { result.ref },
             style = MaterialTheme.typography.titleSmall,
             color = MasalaTheme.tokens.textHigh,
-            maxLines = 1,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
         // Only a mini app or an installed app has an address we can open from here; a produced
         // file still gets its title, without a row of buttons that would do nothing.

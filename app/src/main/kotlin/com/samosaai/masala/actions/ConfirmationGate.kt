@@ -15,6 +15,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.coroutineContext
 
 /**
  * Asks the user before anything that isn't read-only runs (arch §3.6, plan Phase 2). The home screen shows
@@ -41,8 +44,21 @@ class ConfirmationGate(
     private val _pending = MutableStateFlow<Request?>(null)
     val pending: StateFlow<Request?> = _pending.asStateFlow()
 
-    suspend fun confirm(summary: String, destructive: Boolean = false, subject: String = "action"): Decision =
-        queue.withLock {
+    /**
+     * A chat's "Allow all" switch, carried in the coroutine context of that chat's turn so it never
+     * reaches other chats or background runs. Read at ask time, so flipping it mid-turn applies to the
+     * next question. Destructive questions are always asked.
+     */
+    class AllowAll(val enabled: () -> Boolean) : AbstractCoroutineContextElement(AllowAll) {
+        companion object Key : CoroutineContext.Key<AllowAll>
+    }
+
+    suspend fun confirm(summary: String, destructive: Boolean = false, subject: String = "action"): Decision {
+        if (!destructive && coroutineContext[AllowAll]?.enabled?.invoke() == true) {
+            record("confirm:$subject", summary, ToolResult.Success("allowed (allow all)"))
+            return Decision.ALLOWED
+        }
+        return queue.withLock {
             val request = Request(summary, destructive)
             _pending.value = request
             val answer = try {
@@ -62,6 +78,7 @@ class ConfirmationGate(
             )
             decision
         }
+    }
 
     /** The user's tap on the sheet. */
     fun answer(allowed: Boolean) {

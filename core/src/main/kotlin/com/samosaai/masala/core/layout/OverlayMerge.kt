@@ -1,5 +1,8 @@
 package com.samosaai.masala.core.layout
 
+import com.samosaai.masala.core.contract.CellGridSection
+import com.samosaai.masala.core.contract.CellContent
+import com.samosaai.masala.core.contract.Cell
 import com.samosaai.masala.core.contract.ItemSection
 import com.samosaai.masala.core.contract.LayoutDoc
 import com.samosaai.masala.core.contract.ModePatch
@@ -39,7 +42,12 @@ object OverlayMerge {
                 continue
             }
             result = result.map { page ->
-                if (page.id != add.pageId) page else page.copy(sections = page.sections.insertAfter(add.section, add.after) { it.id })
+                if (page.id != add.pageId) return@map page
+                // After a cell (a widget folded into a grid keeps its old section id): after its grid.
+                val after = add.after?.let { a ->
+                    page.sections.firstOrNull { s -> s is CellGridSection && s.cells.any { it.id == a } }?.id ?: a
+                }
+                page.copy(sections = page.sections.insertAfter(add.section, after) { it.id })
             }
         }
 
@@ -47,8 +55,13 @@ object OverlayMerge {
             val target = result.flatMap { it.sections }.firstOrNull { it.id == add.sectionId }
             when {
                 target == null -> conflict("No section ${add.sectionId} for item ${add.item.id}")
-                target !is ItemSection -> conflict("Section ${add.sectionId} can't hold items")
                 result.allIds().contains(add.item.id) -> conflict("ID ${add.item.id} is already used")
+                // A grid takes the item at its first free cell; [AddItem.after] has no meaning there.
+                target is CellGridSection -> result = result.mapSections { section ->
+                    if (section.id != add.sectionId || section !is CellGridSection) section
+                    else CellGrid.add(section, Cell(add.item.id, 0, 0, content = CellContent.ItemCell(add.item)))
+                }
+                target !is ItemSection -> conflict("Section ${add.sectionId} can't hold items")
                 else -> result = result.mapSections { section ->
                     if (section.id != add.sectionId || section !is ItemSection) section
                     else section.withItems(section.items.insertAfter(add.item, add.after) { it.id })
@@ -64,8 +77,17 @@ object OverlayMerge {
                     sections = page.sections
                         .filter { it.id !in hiddenSections }
                         .map { section ->
-                            if (section is ItemSection) section.withItems(section.items.filter { it.id !in hiddenItems })
-                            else section
+                            when (section) {
+                                is ItemSection -> section.withItems(section.items.filter { it.id !in hiddenItems })
+                                // Hidden cells leave their spot empty, so nothing else shifts while a mode is on.
+                                is CellGridSection -> section.copy(
+                                    cells = section.cells.filter { cell ->
+                                        cell.id !in hiddenSections && cell.id !in hiddenItems &&
+                                            (cell.content as? CellContent.ItemCell)?.item?.id !in hiddenItems
+                                    },
+                                )
+                                else -> section
+                            }
                         },
                 )
             }
@@ -89,6 +111,10 @@ fun List<Page>.allIds(): Set<String> = buildSet {
         for (section in page.sections) {
             add(section.id)
             if (section is ItemSection) section.items.forEach { add(it.id) }
+            if (section is CellGridSection) section.cells.forEach { cell ->
+                add(cell.id)
+                (cell.content as? CellContent.ItemCell)?.let { add(it.item.id) }
+            }
         }
     }
 }

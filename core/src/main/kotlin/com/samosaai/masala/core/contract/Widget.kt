@@ -19,9 +19,16 @@ data class WidgetSpec(
     val rules: List<Rule> = emptyList(),
 )
 
-/** Height in rows. */
+/** Height in rows; width in grid cells ([defaultW] full width unless the widget says otherwise). */
 @Serializable
-data class SizeRange(val min: Int = 1, val default: Int = 2, val max: Int = 4)
+data class SizeRange(
+    val min: Int = 1,
+    val default: Int = 2,
+    val max: Int = 4,
+    val minW: Int = 1,
+    val defaultW: Int = 4,
+    val maxW: Int = 4,
+)
 
 /**
  * A layout's pointer at a library widget. [rowsOverride] replaces the widget's default height on

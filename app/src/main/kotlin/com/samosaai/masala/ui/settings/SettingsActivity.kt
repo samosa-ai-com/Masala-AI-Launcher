@@ -12,9 +12,10 @@ import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.FiberManualRecord
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Schedule
@@ -112,7 +113,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, PERSONAS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, ABOUT, BRIEF, WIDGETS, WALLPAPERS }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, PERSONAS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, PERMISSIONS, ABOUT, BRIEF, WIDGETS, WALLPAPERS }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -175,6 +176,7 @@ class SettingsActivity : ComponentActivity() {
                         Page.APPEARANCE -> AppearancePage(settings, update = { change -> lifecycleScope.launch { masala.settings.update(change) } }, onBack = { page = Page.MAIN })
                         Page.DRAWER -> DrawerPage(settings, onHiddenApps = { page = Page.HIDDEN_APPS }, onBack = { page = Page.MAIN })
                         Page.PRIVACY -> PrivacyPage(onBack = { page = Page.MAIN })
+                        Page.PERMISSIONS -> SettingsScaffold(getString(R.string.permissions_title), onBack = { page = Page.MAIN }) { PermissionsSection() }
                         Page.ABOUT -> AboutPage(onBack = { page = Page.MAIN })
                         Page.BRIEF -> BriefPage(settings, update = { change -> lifecycleScope.launch { masala.settings.update(change) } }, onBack = { page = Page.MAIN })
                         Page.WIDGETS -> WidgetsPage(onBack = { page = Page.MAIN })
@@ -236,8 +238,9 @@ class SettingsActivity : ComponentActivity() {
             add(Entry(2, Icons.Rounded.Apps, auto, stringResource(R.string.settings_miniapps), stringResource(R.string.settings_miniapps_summary), onMiniApps))
             add(Entry(1, Icons.Rounded.Widgets, look, stringResource(R.string.settings_widgets), stringResource(R.string.settings_widgets_summary), onWidgets))
             add(Entry(1, Icons.Rounded.Image, look, stringResource(R.string.wallpaper_title), stringResource(R.string.wallpaper_summary)) { onPage(Page.WALLPAPERS) })
-            add(Entry(3, Icons.Rounded.MenuBook, data, stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) { startActivity(Intent(this@SettingsActivity, SecondBrainActivity::class.java)) })
+            add(Entry(3, Icons.AutoMirrored.Rounded.MenuBook, data, stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) { startActivity(Intent(this@SettingsActivity, SecondBrainActivity::class.java)) })
             add(Entry(3, Icons.Rounded.Shield, data, stringResource(R.string.privacy_title), stringResource(R.string.privacy_summary)) { onPage(Page.PRIVACY) })
+            add(Entry(3, Icons.Rounded.Lock, data, stringResource(R.string.permissions_title), stringResource(R.string.permissions_summary)) { onPage(Page.PERMISSIONS) })
             add(
                 Entry(
                     3, Icons.Rounded.VisibilityOff, data,
