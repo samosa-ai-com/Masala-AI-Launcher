@@ -183,6 +183,7 @@ class HomeActivity : ComponentActivity() {
             val activeId by app.activeChatId.collectAsStateWithLifecycle()
             val commandState by app.commands.state.collectAsStateWithLifecycle()
             val minimized by app.commands.minimized.collectAsStateWithLifecycle()
+            val allowAll by app.commands.allowAll.collectAsStateWithLifecycle()
             val homeVisible by app.contextService.homeVisible.collectAsStateWithLifecycle()
             var turns by remember { mutableStateOf<List<com.samosaai.masala.chat.ChatTurn>>(emptyList()) }
             var sessionTitle by remember { mutableStateOf("") }
@@ -748,6 +749,8 @@ class HomeActivity : ComponentActivity() {
                         expanded = false
                     },
                     onHistory = { showHistory = true },
+                    allowAll = allowAll,
+                    onAllowAll = { app.commands.setAllowAll(it) },
                     onNewChat = {
                         app.activeChatId.value = null
                         turns = emptyList()

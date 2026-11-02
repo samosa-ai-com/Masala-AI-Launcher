@@ -773,6 +773,7 @@
     <string name="chat_tap_mic">Tap the mic and speak, then tap Send. Drag up for the conversation.</string>
     <string name="chat_close">Close chat</string>
     <string name="chat_history">Chat history</string>
+    <string name="chat_allow_all">Allow all</string>
     <string name="chat_empty">Tap the mic and speak, then tap Send. Everything you say stays here.</string>
     <string name="chat_working">Working on it…</string>
     <string name="chat_drag_for_thread">Drag up to see the conversation</string>

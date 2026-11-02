@@ -1,6 +1,7 @@
 package com.samosaai.masala.agent
 
 import com.samosaai.masala.actions.ActionDispatcher
+import com.samosaai.masala.actions.ConfirmationGate
 import com.samosaai.masala.audio.PttEngine
 import com.samosaai.masala.core.agent.CommandFastPath
 import com.samosaai.masala.core.agent.NameCorrector
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
@@ -78,6 +80,17 @@ class CommandController(
      */
     private val _minimized = MutableStateFlow(false)
     val minimized: StateFlow<Boolean> = _minimized.asStateFlow()
+
+    /**
+     * This chat's "Allow all": its turns skip the confirmation sheet for anything that isn't
+     * destructive. Off for every new or reopened chat.
+     */
+    private val _allowAll = MutableStateFlow(false)
+    val allowAll: StateFlow<Boolean> = _allowAll.asStateFlow()
+
+    fun setAllowAll(on: Boolean) {
+        _allowAll.value = on
+    }
 
     /** Hides the chat without cancelling the running turn. */
     fun minimize() {
@@ -286,6 +299,7 @@ class CommandController(
                     JsonPrimitive(it.text),
                 )
             }
+        _allowAll.value = false
         history = listOfNotNull(summary?.let { com.samosaai.masala.llm.ChatMessage("assistant", JsonPrimitive(it)) }) + spoken
         _state.value = CommandState.Idle
     }
@@ -334,7 +348,10 @@ class CommandController(
         }
     }
 
-    private suspend fun handle(prompt: String, spoken: Boolean, images: List<String> = emptyList()) {
+    private suspend fun handle(prompt: String, spoken: Boolean, images: List<String> = emptyList()) =
+        withContext(ConfirmationGate.AllowAll { _allowAll.value }) { runTurn(prompt, spoken, images) }
+
+    private suspend fun runTurn(prompt: String, spoken: Boolean, images: List<String>) {
         onTurnStart?.invoke()
         CommandFastPath.match(prompt, resolveApp)?.let { action ->
             publish(stateFor(prompt, run(action), spoken))

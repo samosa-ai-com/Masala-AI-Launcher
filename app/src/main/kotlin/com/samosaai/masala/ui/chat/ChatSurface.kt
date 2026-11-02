@@ -53,6 +53,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -68,6 +69,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -125,6 +127,9 @@ fun ChatSurface(
     onClose: () -> Unit,
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
+    /** This chat's "Allow all": skip confirmations for anything that isn't destructive. */
+    allowAll: Boolean = false,
+    onAllowAll: (Boolean) -> Unit = {},
     onRevertTurn: (Int) -> Unit = {},
     onContinue: () -> Unit = {},
     /** ms since the live take started; the timer and near-cap warning read this. */
@@ -186,6 +191,8 @@ fun ChatSurface(
                     onClose = onClose,
                     onHistory = onHistory,
                     onNewChat = onNewChat,
+                    allowAll = allowAll,
+                    onAllowAll = onAllowAll,
                     onToggle = { onExpanded(!expanded) },
                     onExpanded = onExpanded,
                     experts = experts,
@@ -221,7 +228,7 @@ fun ChatSurface(
     }
 }
 
-/** The drag handle, title and the three actions: back, new chat, history. */
+/** The drag handle, title, the "Allow all" switch and the three actions: back, new chat, history. */
 @Composable
 private fun Header(
     title: String,
@@ -229,6 +236,8 @@ private fun Header(
     onClose: () -> Unit,
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
+    allowAll: Boolean,
+    onAllowAll: (Boolean) -> Unit,
     onToggle: () -> Unit,
     onExpanded: (Boolean) -> Unit,
     experts: List<ExpertCredit> = emptyList(),
@@ -269,6 +278,17 @@ private fun Header(
                 color = MasalaTheme.tokens.textHigh,
                 maxLines = 1,
                 modifier = Modifier.weight(1f),
+            )
+            Text(
+                stringResource(R.string.chat_allow_all),
+                style = MaterialTheme.typography.labelMedium,
+                color = MasalaTheme.tokens.textMedium,
+            )
+            Switch(
+                checked = allowAll,
+                onCheckedChange = onAllowAll,
+                modifier = Modifier.padding(start = 6.dp).scale(0.75f)
+                    .semantics { contentDescription = "Allow all actions in this chat without asking, except deleting" },
             )
             if (experts.isNotEmpty()) {
                 var asking by remember { mutableStateOf(false) }
