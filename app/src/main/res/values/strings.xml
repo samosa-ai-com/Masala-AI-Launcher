@@ -658,6 +658,10 @@
     <string name="composer_attach_close">Close attach options</string>
     <string name="composer_photo">Photo</string>
     <string name="composer_camera">Camera</string>
+    <string name="ask_greeting">What should we make?</string>
+    <string name="ask_chip_today">What\'s on today?</string>
+    <string name="ask_chip_widget">Make a widget</string>
+    <string name="ask_chip_widget_prompt">"Make a widget that shows "</string>
     <string name="chat_too_many_images">At most %1$d pictures per message</string>
     <string name="chat_bad_image">That file isn\'t a readable picture</string>
     <string name="media_play">Play</string>

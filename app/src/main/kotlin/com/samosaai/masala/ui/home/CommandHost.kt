@@ -226,9 +226,23 @@ fun ReplyCard(
     val closeLabel = stringResource(R.string.command_close)
     val pull = remember { androidx.compose.animation.core.Animatable(0f) }
     val closeAt = with(androidx.compose.ui.platform.LocalDensity.current) { 80.dp.toPx() }
+    val todayChip = stringResource(R.string.ask_chip_today)
+    val widgetChip = stringResource(R.string.ask_chip_widget)
+    val widgetPrompt = stringResource(R.string.ask_chip_widget_prompt)
+    Column(if (docked) modifier.fillMaxWidth() else Modifier) {
+    if (docked) {
+        // Sam, the greeting and suggestion chips on the dimmed home above the sheet (step 4). The last
+        // chat's title (its first prompt) is the third chip.
+        val last = remember { app.chats.latest()?.title?.takeIf { it.isNotBlank() } }
+        val chips = listOfNotNull(todayChip to todayChip, widgetChip to widgetPrompt, last?.let { it to it })
+        AskIntro(character, chips, onChip = { prompt ->
+            text = TextFieldValue(prompt, TextRange(prompt.length))
+            runCatching { field.requestFocus() }
+        })
+    }
     Card(
         if (docked) {
-            modifier.fillMaxWidth()
+            Modifier.fillMaxWidth()
                 .graphicsLayer { translationY = pull.value }
                 .draggable(
                     androidx.compose.foundation.gestures.rememberDraggableState { d -> scope.launch { pull.snapTo((pull.value + d).coerceAtLeast(0f)) } },
@@ -385,6 +399,7 @@ fun ReplyCard(
                 }
             }
         }
+    }
     }
 }
 
