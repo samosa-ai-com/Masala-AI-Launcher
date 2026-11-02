@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.com/masala/schema/layout-v3.json",
-  "title": "Masala layout, version 3",
+  "$id": "https://example.com/masala/schema/layout-v4.json",
+  "title": "Masala layout, version 4",
   "description": "Kept by hand to match the Kotlin contracts in com.samosaai.masala.core.contract. LayoutSchemaTest keeps them in step. $defs/ModePatch is the mode patch schema.",
   "type": "object",
   "properties": {
@@ -9,7 +9,8 @@
       "enum": [
         1,
         2,
-        3
+        3,
+        4
       ]
     },
     "pages": {
@@ -348,6 +349,41 @@
             "type",
             "id",
             "skillId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "cells"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "columns": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "cells": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Cell"
+              }
+            },
+            "rules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Rule"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "cells"
           ]
         }
       ]
@@ -1067,6 +1103,18 @@
         "max": {
           "type": "integer",
           "minimum": 1
+        },
+        "minW": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "defaultW": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxW": {
+          "type": "integer",
+          "minimum": 1
         }
       },
       "additionalProperties": false
@@ -1708,6 +1756,145 @@
         }
       },
       "additionalProperties": false
+    },
+    "CellContent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "item"
+            },
+            "item": {
+              "$ref": "#/$defs/Item"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "widget"
+            },
+            "ref": {
+              "$ref": "#/$defs/WidgetRef"
+            },
+            "widget": {
+              "$ref": "#/$defs/WidgetSpec"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "ref"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "stack"
+            },
+            "refs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/WidgetRef"
+              }
+            },
+            "widgets": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/WidgetSpec"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "refs"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "html"
+            },
+            "appId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "appId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "skill"
+            },
+            "skillId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "skillId"
+          ]
+        }
+      ]
+    },
+    "Cell": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "x": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "w": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "h": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "content": {
+          "$ref": "#/$defs/CellContent"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Rule"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "x",
+        "y",
+        "content"
+      ]
     }
   }
 }

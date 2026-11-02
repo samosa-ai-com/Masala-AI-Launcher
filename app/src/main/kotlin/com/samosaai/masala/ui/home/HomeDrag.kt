@@ -13,6 +13,25 @@ import kotlin.math.abs
 /** Where a dragged widget section lands: its own page, before [beforeSectionId] or at its end. */
 data class SectionDrop(val pageId: String, val beforeSectionId: String?)
 
+/** Where a dragged grid cell lands: its top-left cell on its own grid. */
+data class CellDrop(val gridId: String, val x: Int, val y: Int)
+
+/** A cell grid on screen, in root pixels, so a drag can snap to its cells. */
+data class GridGeom(val box: Box2, val columns: Int, val cellWidth: Float, val cellHeight: Float)
+
+/** Snapping a dragged cell to the grid (pure). */
+object CellSnap {
+    /**
+     * The cell whose top-left is nearest the dragged card's top-left ([left], [top]), kept inside the
+     * columns for a card [w] cells wide; never above the first row.
+     */
+    fun at(left: Float, top: Float, grid: GridGeom, w: Int): Pair<Int, Int> {
+        val x = kotlin.math.round((left - grid.box.left) / grid.cellWidth).toInt()
+        val y = kotlin.math.round((top - grid.box.top) / grid.cellHeight).toInt()
+        return x.coerceIn(0, (grid.columns - w).coerceAtLeast(0)) to y.coerceAtLeast(0)
+    }
+}
+
 /** Where a drop lands. */
 sealed interface DropTarget {
     /**
@@ -155,7 +174,47 @@ class HomeDragState(
     }
 
     fun moveTo(at: Offset) {
-        if (dragging != null || draggingSection != null) pointer = at
+        if (dragging != null || draggingSection != null || draggingCell != null) pointer = at
+    }
+
+    /** The grid cell being dragged (finger-drag on a cell grid); null when none. */
+    var draggingCell: com.samosaai.masala.core.contract.Cell? by mutableStateOf(null)
+        private set
+    private var cellGrid: String? = null
+
+    /** Grid id → its geometry, registered by the renderer while on screen. */
+    val grids = mutableStateMapOf<String, GridGeom>()
+
+    /** Starts dragging [cell] of grid [gridId]; the card's top-left follows the finger at the grab offset. */
+    fun startCell(cell: com.samosaai.masala.core.contract.Cell, gridId: String, at: Offset) {
+        if (dragging != null || draggingSection != null || draggingCell != null) return
+        val grid = grids[gridId] ?: return
+        grab = at - Offset(grid.box.left + cell.x * grid.cellWidth, grid.box.top + cell.y * grid.cellHeight)
+        cellGrid = gridId
+        draggingCell = cell
+        moveTo(at)
+    }
+
+    /** Where the dragged cell would land now (same grid only; other pages stay in the menu). */
+    fun cellTarget(): CellDrop? {
+        val cell = draggingCell ?: return null
+        val gridId = cellGrid ?: return null
+        val grid = grids[gridId] ?: return null
+        val (x, y) = CellSnap.at(pointer.x - grab.x, pointer.y - grab.y, grid, cell.w)
+        return CellDrop(gridId, x, y)
+    }
+
+    /** Ends a cell drag; returns where it landed, or null when it didn't move. */
+    fun dropCell(): CellDrop? {
+        val cell = draggingCell
+        val target = cellTarget()
+        cancelCell()
+        return target?.takeUnless { cell != null && it.x == cell.x && it.y == cell.y }
+    }
+
+    fun cancelCell() {
+        draggingCell = null
+        cellGrid = null
     }
 
     /** Where a drop at the pointer lands now: read it on every move to draw the indicator. */

@@ -1,5 +1,8 @@
 package com.samosaai.masala.core.layout
 
+import com.samosaai.masala.core.contract.CellGridSection
+import com.samosaai.masala.core.contract.CellContent
+import com.samosaai.masala.core.contract.Cell
 import com.samosaai.masala.core.contract.ContextSnapshot
 import com.samosaai.masala.core.contract.ItemSection
 import com.samosaai.masala.core.contract.LayoutDoc
@@ -89,6 +92,11 @@ object LayoutResolver {
                                     )
                                 }
                             }
+                            is CellGridSection -> section.copy(
+                                cells = section.cells
+                                    .filter { RuleEvaluator.resolve(it.rules, ctx).visible }
+                                    .mapNotNull { cell -> resolveCell(cell, ctx, ::lookup)?.let { cell.copy(content = it) } },
+                            )
                             else -> section
                         }
                     }
@@ -97,4 +105,24 @@ object LayoutResolver {
 
         return ResolvedLayout(merged.layout.copy(pages = pages), rows, merged.conflicts, missing.toList())
     }
+
+    /**
+     * A cell's content as drawn, or null when it is hidden: widget refs carry their spec, stacks
+     * their visible widgets by priority. A cell's size is its span, so rule size effects don't apply.
+     */
+    private fun resolveCell(cell: Cell, ctx: ContextSnapshot, lookup: (WidgetRef) -> WidgetSpec?): CellContent? =
+        when (val content = cell.content) {
+            is CellContent.ItemCell -> content.takeIf { RuleEvaluator.resolve(it.item.rules, ctx).visible }
+            is CellContent.WidgetCell -> lookup(content.ref)
+                ?.takeIf { RuleEvaluator.resolve(it.rules, ctx).visible }
+                ?.let { content.copy(widget = it) }
+            is CellContent.StackCell -> content.refs
+                .mapNotNull { ref -> lookup(ref)?.let { ref to it } }
+                .map { (ref, spec) -> Triple(ref, spec, RuleEvaluator.resolve(spec.rules, ctx)) }
+                .filter { it.third.visible }
+                .sortedByDescending { it.third.priority }
+                .takeIf { it.isNotEmpty() }
+                ?.let { visible -> content.copy(refs = visible.map { it.first }, widgets = visible.map { it.second }) }
+            is CellContent.HtmlCell, is CellContent.SkillCell -> content
+        }
 }

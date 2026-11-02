@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -162,6 +164,12 @@ class RenderContext(
     val onWidgetDrop: ((sectionId: String, target: SectionDrop) -> Unit)? = null,
     /** Whether a section id lives in the base layout (not added by a mode): only those drag. */
     val isBaseSection: (String) -> Boolean = { true },
+    /** Long-press-then-drag a widget cell to another spot on its grid; none keeps the menu only. */
+    val onCellDrop: ((cellId: String, target: CellDrop) -> Unit)? = null,
+    /** The cell showing a resize handle (from the widget menu); null when none. */
+    val resizingCell: String? = null,
+    /** A handle drag ended at [w] × [h] cells; also called with the old size to just close it. */
+    val onCellResize: ((cellId: String, w: Int, h: Int) -> Unit)? = null,
 ) {
     /** A fixed time, for previews and tests. */
     constructor(
@@ -238,7 +246,7 @@ fun LayoutRenderer(
     }
     // A generated layout, an undo or a mode turning on can replace the document under a drag: cancel
     // it rather than write an edit against a version the item or section may no longer be in.
-    LaunchedEffect(drag, layout.layout, drag?.dragging?.id, drag?.draggingSection) {
+    LaunchedEffect(drag, layout.layout, drag?.dragging?.id, drag?.draggingSection, drag?.draggingCell?.id) {
         drag?.dragging?.id?.let { id ->
             val present = layout.layout.pages.any { page ->
                 page.sections.filterIsInstance<ItemSection>().any { section -> section.items.any { it.id == id } }
@@ -248,6 +256,12 @@ fun LayoutRenderer(
         drag?.draggingSection?.let { sid ->
             val present = layout.layout.pages.any { page -> page.sections.any { it.id == sid } }
             if (!present) drag.cancelSection()
+        }
+        drag?.draggingCell?.let { cell ->
+            val present = layout.layout.pages.any { page ->
+                page.sections.any { it is com.samosaai.masala.core.contract.CellGridSection && it.cells.any { c -> c.id == cell.id } }
+            }
+            if (!present) drag.cancelCell()
         }
     }
     Box(modifier.onGloballyPositioned { origin = it.positionInRoot(); width = it.size.width }) {
@@ -265,6 +279,23 @@ fun LayoutRenderer(
         if (drag?.draggingSection != null) {
             SectionDropIndicator(drag.sectionTarget(), drag, origin)
         }
+        drag?.draggingCell?.let { cell -> CellDropIndicator(drag.cellTarget(), cell, drag, origin) }
+    }
+}
+
+/** Where a dragged cell would land: its outline on the grid, at its own size. */
+@Composable
+private fun CellDropIndicator(target: CellDrop?, cell: com.samosaai.masala.core.contract.Cell, drag: HomeDragState, origin: Offset) {
+    val grid = target?.let { drag.grids[it.gridId] } ?: return
+    val accent = MasalaTheme.tokens.accent
+    Canvas(Modifier.fillMaxSize()) {
+        val inset = 4.dp.toPx()
+        val left = grid.box.left + target.x * grid.cellWidth - origin.x + inset
+        val top = grid.box.top + target.y * grid.cellHeight - origin.y + inset
+        val size = Size(cell.w * grid.cellWidth - 2 * inset, cell.h * grid.cellHeight - 2 * inset)
+        val corner = androidx.compose.ui.geometry.CornerRadius(26.dp.toPx())
+        drawRoundRect(accent.copy(alpha = 0.18f), Offset(left, top), size, corner)
+        drawRoundRect(accent, Offset(left, top), size, corner, style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
     }
 }
 
@@ -455,6 +486,7 @@ private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: Render
         }
         is SkillWidgetSection -> ctx.skillWidgets?.let { SkillWidgetCard(section, it, ctx.onAction) }
             ?: Placeholder(section.skillId, stringResource(R.string.home_skill_widget_placeholder), null)
+        is com.samosaai.masala.core.contract.CellGridSection -> CellGridView(section, ctx, enabled)
         // An HTML widget draws its mini app at widget size, sandboxed like its own screen.
         is com.samosaai.masala.core.contract.HtmlSection -> ctx.htmlWidget(section.appId)?.let { row ->
             androidx.compose.foundation.layout.Box(
@@ -508,6 +540,211 @@ private fun ModeChip(name: String, onClick: (() -> Unit)?) {
 }
 
 // ---- items ----
+
+/** A cell grid row: an icon cell's height, two 48 dp widget rows ([CellLift.ROWS_PER_CELL]). */
+private val CELL_HEIGHT = (com.samosaai.masala.core.migration.CellLift.ROWS_PER_CELL * 48).dp
+
+/**
+ * A launcher grid (plan `docs/plans/home-cell-grid.md`): every cell at its column and row with its
+ * span. Cards fill their cell; a card taller than its cell is clipped until it is resized.
+ */
+@Composable
+private fun CellGridView(section: com.samosaai.masala.core.contract.CellGridSection, ctx: RenderContext, enabled: Boolean) {
+    if (section.cells.isEmpty()) return
+    val drag = ctx.drag
+    if (drag != null) DisposableEffect(drag, section.id) { onDispose { drag.grids.remove(section.id) } }
+    val cellHeightPx = with(LocalDensity.current) { CELL_HEIGHT.toPx() }
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+        val cellWidth = maxWidth / section.columns
+        // A drag can push cells below the last row: room for one more row while dragging.
+        val rows = section.rows + if (drag?.draggingCell != null && section.cells.any { it.id == drag.draggingCell?.id }) 1 else 0
+        Box(
+            Modifier.fillMaxWidth().height(CELL_HEIGHT * rows).onGloballyPositioned {
+                if (drag == null) return@onGloballyPositioned
+                val box = it.boundsInRoot()
+                // Off screen (a page kept for the drag) the clipped box is empty: not a target.
+                if (box.isEmpty) drag.grids.remove(section.id)
+                else drag.grids[section.id] = GridGeom(box.toBox2(), section.columns, it.size.width.toFloat() / section.columns, cellHeightPx)
+            },
+        ) {
+            for (cell in section.cells) {
+                Box(
+                    Modifier
+                        .offset(x = cellWidth * cell.x.coerceAtLeast(0), y = CELL_HEIGHT * cell.y.coerceAtLeast(0))
+                        .size(cellWidth * cell.w.coerceAtLeast(1), CELL_HEIGHT * cell.h.coerceAtLeast(1))
+                        .padding(4.dp)
+                        .graphicsLayer { alpha = if (drag?.draggingCell?.id == cell.id) 0.3f else 1f },
+                ) { CellContentView(cell, section.id, ctx, enabled) }
+                if (cell.id == ctx.resizingCell) ResizeHandle(cell, section.columns, cellWidth, ctx)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CellContentView(cell: com.samosaai.masala.core.contract.Cell, gridId: String, ctx: RenderContext, enabled: Boolean) {
+    val rows = cell.h * com.samosaai.masala.core.migration.CellLift.ROWS_PER_CELL
+    val fill = Modifier.fillMaxSize()
+    when (val content = cell.content) {
+        // Not a drop target or draggable yet (deferred to step 5); taps and the item menu work as anywhere else.
+        is com.samosaai.masala.core.contract.CellContent.ItemCell -> ItemCell(content.item, ctx, sectionId = null)
+        is com.samosaai.masala.core.contract.CellContent.WidgetCell -> content.widget?.let { spec ->
+            ctx.widgets?.let { com.samosaai.masala.ui.home.widgets.WidgetCard(spec, rows, cellSource(it, cell, spec, ctx), fill.cellDrag(cell, gridId, spec, ctx), enabled = enabled) }
+                ?: Placeholder(spec.title ?: spec.id, stringResource(R.string.home_widget_placeholder), rows)
+        }
+        is com.samosaai.masala.core.contract.CellContent.StackCell -> if (content.widgets.isNotEmpty()) {
+            ctx.widgets?.let { com.samosaai.masala.ui.home.widgets.StackCard(content.widgets, rows, cellSource(it, cell, content.widgets.first(), ctx), fill.cellDrag(cell, gridId, content.widgets.first(), ctx), enabled = enabled) }
+                ?: Placeholder(content.widgets.first().title ?: content.widgets.first().id, stringResource(R.string.home_stack_placeholder, content.widgets.size), rows)
+        }
+        is com.samosaai.masala.core.contract.CellContent.SkillCell -> {
+            val section = SkillWidgetSection(cell.id, content.skillId)
+            ctx.skillWidgets?.let { SkillWidgetCard(section, it, ctx.onAction) }
+                ?: Placeholder(content.skillId, stringResource(R.string.home_skill_widget_placeholder), rows)
+        }
+        is com.samosaai.masala.core.contract.CellContent.HtmlCell -> ctx.htmlWidget(content.appId)?.let { row ->
+            com.samosaai.masala.miniapps.MiniAppView(row.id, row.html, row.networkAllowed, fill)
+        } ?: Placeholder(content.appId, stringResource(R.string.home_widget_placeholder), rows)
+    }
+}
+
+/**
+ * The resize frame on one cell: an outline at the size the handle shows and a round handle at its
+ * bottom-right. Dragging snaps to whole cells (inside the columns, at least 1 × 1); letting go saves.
+ */
+@Composable
+private fun ResizeHandle(cell: com.samosaai.masala.core.contract.Cell, columns: Int, cellWidth: androidx.compose.ui.unit.Dp, ctx: RenderContext) {
+    val density = LocalDensity.current
+    val cellWidthPx = with(density) { cellWidth.toPx() }
+    val cellHeightPx = with(density) { CELL_HEIGHT.toPx() }
+    // Within the widget's own width range and the columns right of it; never an empty range.
+    val spec = when (val c = cell.content) {
+        is com.samosaai.masala.core.contract.CellContent.WidgetCell -> c.widget
+        is com.samosaai.masala.core.contract.CellContent.StackCell -> c.widgets.firstOrNull()
+        else -> null
+    }
+    val maxW = minOf(spec?.size?.maxW ?: columns, columns - cell.x).coerceAtLeast(1)
+    val minW = (spec?.size?.minW ?: 1).coerceIn(1, maxW)
+    var w by remember(cell) { mutableStateOf(cell.w) }
+    var h by remember(cell) { mutableStateOf(cell.h) }
+    var delta by remember(cell) { mutableStateOf(Offset.Zero) }
+    val accent = MasalaTheme.tokens.accent
+    Box(
+        Modifier
+            .offset(x = cellWidth * cell.x, y = CELL_HEIGHT * cell.y)
+            .size(cellWidth * w, CELL_HEIGHT * h)
+            .padding(2.dp)
+            .border(2.dp, accent, RoundedCornerShape(28.dp)),
+    ) {
+        Box(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .size(36.dp)
+                .background(accent, androidx.compose.foundation.shape.CircleShape)
+                // A tap without a drag closes the frame unchanged.
+                .pointerInput(cell.id, "tap") {
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        val up = waitForUpOrCancellation()
+                        if (up != null && (up.position - down.position).getDistance() < viewConfiguration.touchSlop) {
+                            ctx.onCellResize?.invoke(cell.id, cell.w, cell.h)
+                        }
+                    }
+                }
+                .pointerInput(cell.id) {
+                    detectDragGestures(
+                        onDragEnd = { ctx.onCellResize?.invoke(cell.id, w, h); delta = Offset.Zero },
+                        onDragCancel = { w = cell.w; h = cell.h; delta = Offset.Zero },
+                    ) { change, amount ->
+                        change.consume()
+                        delta += amount
+                        w = (cell.w + kotlin.math.round(delta.x / cellWidthPx).toInt()).coerceIn(minW, maxW)
+                        h = (cell.h + kotlin.math.round(delta.y / cellHeightPx).toInt()).coerceAtLeast(1)
+                    }
+                },
+        )
+    }
+}
+
+/** A widget cell's long-press opens the widget menu for that placement (by cell id); never while locked. */
+private fun cellSource(
+    source: com.samosaai.masala.ui.home.widgets.WidgetSource,
+    cell: com.samosaai.masala.core.contract.Cell,
+    spec: com.samosaai.masala.core.contract.WidgetSpec,
+    ctx: RenderContext,
+): com.samosaai.masala.ui.home.widgets.WidgetSource {
+    val menu = ctx.onWidgetMenu?.takeIf { !ctx.locked && ctx.isBaseSection(cell.id) } ?: return source
+    // A draggable card keeps a no-op long-press so the press is consumed; cellDrag opens the menu.
+    if (cellDraggable(cell, ctx)) return source.copy(onLongPress = {})
+    return source.copy(onLongPress = { menu(spec, cell.id) })
+}
+
+private fun cellDraggable(cell: com.samosaai.masala.core.contract.Cell, ctx: RenderContext) =
+    ctx.drag != null && ctx.onCellDrop != null && ctx.onWidgetMenu != null && !ctx.locked && ctx.isBaseSection(cell.id)
+
+/**
+ * Long-press-then-drag a widget cell to another spot on its grid, snapping to cells; a still finger
+ * opens the widget menu after [MENU_HOLD_MS]. Same gesture shape as [sectionDrag].
+ */
+@Composable
+private fun Modifier.cellDrag(
+    cell: com.samosaai.masala.core.contract.Cell,
+    gridId: String,
+    spec: com.samosaai.masala.core.contract.WidgetSpec,
+    ctx: RenderContext,
+): Modifier {
+    if (!cellDraggable(cell, ctx)) return this
+    val drag = ctx.drag!!
+    val haptics = rememberHaptics()
+    val scope = rememberCoroutineScope()
+    val menu = { ctx.onWidgetMenu?.invoke(spec, cell.id); Unit }
+    var coords by remember(cell.id) { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
+    val latest by androidx.compose.runtime.rememberUpdatedState(cell)
+    return this
+        .onGloballyPositioned { coords = it }
+        .pointerInput(cell.id, gridId, drag) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                val long = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
+                haptics.heavy()
+                long.consume()
+                fun rootOf(p: Offset) = coords?.takeIf { it.isAttached }?.localToRoot(p) ?: p
+                var moved = false
+                var opened = false
+                val openMenu = scope.launch {
+                    delay((down.uptimeMillis + MENU_HOLD_MS - long.uptimeMillis).coerceAtLeast(0L))
+                    if (!moved) {
+                        opened = true
+                        menu()
+                    }
+                }
+                try {
+                    while (true) {
+                        val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) {
+                            change.consume()
+                            break
+                        }
+                        if (!moved && !opened && (change.position - long.position).getDistance() > viewConfiguration.touchSlop) {
+                            moved = true
+                            openMenu.cancel()
+                            drag.startCell(latest, gridId, rootOf(change.position))
+                        }
+                        if (moved) drag.moveTo(rootOf(change.position))
+                        change.consume()
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    if (moved && drag.draggingCell?.id == cell.id) drag.cancelCell()
+                    throw e
+                } finally {
+                    openMenu.cancel()
+                }
+                when {
+                    moved -> drag.dropCell()?.let { haptics.confirm(); ctx.onCellDrop?.invoke(cell.id, it) }
+                    !opened -> menu()
+                }
+            }
+        }
+}
 
 /** Columns that fit: the section's own number, fewer when the screen is narrow or the text is large. */
 @Composable
