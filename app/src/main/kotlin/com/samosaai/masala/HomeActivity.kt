@@ -1,6 +1,7 @@
 package com.samosaai.masala
 
 import com.samosaai.masala.miniapps.openMiniApp
+import com.samosaai.masala.miniapps.MiniAppOpenGuard
 
 import android.content.Intent
 import android.content.pm.ShortcutInfo
@@ -200,6 +201,8 @@ class HomeActivity : ComponentActivity() {
                 if (commandState is CommandState.Thinking) expanded = true
                 // A newly made app opens once. This hangs off the live reply, not off the stored
                 // turns, so a reload, a cold start or opening another chat never reopens one.
+                // Skipped when the run already opened it itself (the open_mini_app tool): both
+                // firing stacked two identical activities, so Back revealed the same app again.
                 val reply = commandState as? CommandState.Reply
                 val made = reply?.results?.firstOrNull { it.kind == "mini_app" }
                 if (made != null) {
@@ -208,7 +211,9 @@ class HomeActivity : ComponentActivity() {
                     // Home's search pill only draws while the command is idle; leaving it on the
                     // reply would hand the user back a home screen with no way to start a chat.
                     app.commands.dismiss()
-                    runCatching { openMiniApp(made.ref) }
+                    if (!MiniAppOpenGuard.isFreshlyOpened(made.ref)) {
+                        runCatching { openMiniApp(made.ref) }
+                    }
                 }
             }
         val pinnedShortcuts by launcher.pinnedShortcuts.collectAsStateWithLifecycle()

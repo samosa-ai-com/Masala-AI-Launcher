@@ -103,9 +103,10 @@ fun HomeScreen(
     val openSettingsLabel = stringResource(R.string.home_open_settings_description)
     // Two detectors feed one decision, because neither sees every gesture alone. A scrollable
     // child consumes the drag, so the outer drag detector only survives on empty space; the
-    // nested connection only sees the scroll the list couldn't use. Both feed peak overscroll
-    // here, and the action fires exactly once, on finger lift — never mid-gesture, so a trip to
-    // the end of a long layout never triggers anything by itself.
+    // nested connection sees both what the list used (to disqualify the gesture) and what it
+    // couldn't (peak overscroll). The drawer and the swipe actions engage only for gestures
+    // that never moved content, and the action fires exactly once, on finger lift — so a trip
+    // to the end of a long layout, and the overscroll past it, never trigger anything.
     //
     // The tracker object is stable across recompositions (callbacks go through UpdatedState);
     // otherwise a recomposition mid-swipe would restart tracking and swallow the gesture.
@@ -123,19 +124,37 @@ fun HomeScreen(
             // Live drawer tracking: net travel since the gesture started, and whether the drawer took it.
             var net = 0f
             var following = false
+            // Whether any home content moved vertically during this gesture. A swipe that
+            // scrolled the layout must never open the drawer or fire the swipe actions —
+            // not when it reaches the end, not from the overscroll past it, not on lift.
+            // Only a gesture that never moved content (empty space, or a list already
+            // parked at its end) counts as a swipe. Set from consumed scroll, so it latches
+            // even while the list still has room and only overscroll reaches the tracker.
+            var contentMoved = false
             // Fed from the pointer events (their own timestamps) by the lift observer below.
             val velocity = VelocityTracker()
 
             val connection = object : NestedScrollConnection {
+                // While the drawer follows the finger it owns the gesture outright: consume
+                // here so the list underneath can't start scrolling mid-drag and freeze it.
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    if (source == NestedScrollSource.UserInput && following) return Offset(available.x, available.y)
+                    return Offset.Zero
+                }
+
                 override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                    if (source == NestedScrollSource.UserInput && available.y != 0f) add(available.y)
+                    if (source == NestedScrollSource.UserInput && (consumed.y != 0f || available.y != 0f)) {
+                        ensureTracking()
+                        if (consumed.y != 0f) contentMoved = true
+                        if (available.y != 0f) add(available.y)
+                    }
                     return Offset.Zero
                 }
 
                 override suspend fun onPreFling(available: Velocity): Velocity = Velocity.Zero
             }
 
-            fun add(dy: Float) {
+            fun ensureTracking() {
                 if (!tracking) {
                     tracking = true
                     peakUp = 0f
@@ -143,12 +162,18 @@ fun HomeScreen(
                     handled = false
                     net = 0f
                     following = false
+                    contentMoved = false
                 }
+            }
+
+            fun add(dy: Float) {
+                ensureTracking()
                 net += dy
                 val drawer = latestDrawer
-                // Upward travel past the slop hands the gesture to the drawer, which then follows
-                // the finger both ways until lift.
-                if (drawer != null && (following || (-net > slop && -net > peakDown))) {
+                // Upward travel past the slop hands the gesture to the drawer, which then owns
+                // it and follows the finger both ways until lift — but only when no content
+                // moved: pushing past the end of a scroll is still a scroll, never a drawer open.
+                if (drawer != null && (following || (!contentMoved && -net > slop && -net > peakDown))) {
                     following = true
                     drawer.onDrag((-net).coerceAtLeast(0f))
                 }
@@ -168,6 +193,7 @@ fun HomeScreen(
                     peakDown = 0f
                     net = 0f
                     following = false
+                    contentMoved = false
                     return
                 }
                 handled = true
@@ -176,14 +202,17 @@ fun HomeScreen(
                     val vy = runCatching { velocity.calculateVelocity().y }.getOrDefault(0f)
                     latestDrawer?.onRelease(if (vy.isFinite()) vy else 0f)
                 } else {
-                    // The further excursion wins; ties and sub-threshold lifts do nothing.
-                    if (-peakUp >= swipeThreshold && -peakUp >= peakDown) latestUp()
-                    else if (peakDown >= swipeThreshold && peakDown > -peakUp) latestDown()
+                    // The further excursion wins; ties and sub-threshold lifts do nothing. A gesture
+                    // that scrolled content fires neither action: its overscroll peaks belong to the
+                    // scroll, not to a swipe.
+                    if (-peakUp >= swipeThreshold && -peakUp >= peakDown && !contentMoved) latestUp()
+                    else if (peakDown >= swipeThreshold && peakDown > -peakUp && !contentMoved) latestDown()
                 }
                 peakUp = 0f
                 peakDown = 0f
                 net = 0f
                 following = false
+                contentMoved = false
                 handled = false
             }
         }
