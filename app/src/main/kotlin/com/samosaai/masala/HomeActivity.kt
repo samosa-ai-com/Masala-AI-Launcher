@@ -674,7 +674,16 @@ class HomeActivity : ComponentActivity() {
             )
         }
         // Faded out under the open drawer and hidden from TalkBack; the drawer above takes the touches.
-        Isolated { Box(
+        Isolated {
+            // Home recedes while the typing sheet is up (plan reply-sheet-refresh step 3): its icons and
+            // widgets blur (API 31+; below that only the backdrop's dim shows).
+            val askState by app.commands.state.collectAsStateWithLifecycle()
+            val askMinimized by app.commands.minimized.collectAsStateWithLifecycle()
+            val homeBlur by androidx.compose.animation.core.animateDpAsState(
+                if (askState == CommandState.Input && !askMinimized && !drawerOpen) 10.dp else 0.dp,
+                label = "homeBlur",
+            )
+            Box(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
@@ -691,6 +700,7 @@ class HomeActivity : ComponentActivity() {
         ) { HomeScreen(
             layout = layout,
             render = render,
+            blur = homeBlur,
             pinnedShortcuts = pinnedShortcuts,
             isDefault = isDefault,
             onSetDefault = { HomeRole.requestIntent(this@HomeActivity)?.let(roleRequest::launch) ?: HomeRole.openSettings(this@HomeActivity) },
@@ -761,13 +771,20 @@ class HomeActivity : ComponentActivity() {
             val elapsedMs by app.commands.listeningElapsed.collectAsStateWithLifecycle()
             val voiceReady by app.commands.listeningReady.collectAsStateWithLifecycle()
             if (hidden) Unit else when (val c = command) {
-                CommandState.Input -> Box(
-                    // The docked sheet pads itself for the navigation bar and runs under it; only the
-                    // keyboard's height above that lifts it.
-                    Modifier.fillMaxSize().statusBarsPadding()
-                        .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars)),
-                    contentAlignment = Alignment.BottomCenter,
-                ) { ReplyCard(app, settings.readRepliesAloud, sheets = true, character = settings.character) }
+                CommandState.Input -> Box(Modifier.fillMaxSize()) {
+                    // The dimmed home above the sheet; a tap there closes it like a swipe down. Closing
+                    // only minimizes (the state stays Input), so the backdrop goes with the sheet: left
+                    // up, it would dim home and swallow every tap on it.
+                    val inputMinimized by app.commands.minimized.collectAsStateWithLifecycle()
+                    if (!inputMinimized) com.samosaai.masala.ui.home.AskBackdrop(onDismiss = { app.stopSpeaking(); app.commands.minimize() })
+                    Box(
+                        // The docked sheet pads itself for the navigation bar and runs under it; only
+                        // the keyboard's height above that lifts it.
+                        Modifier.fillMaxSize().statusBarsPadding()
+                            .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars)),
+                        contentAlignment = Alignment.BottomCenter,
+                    ) { ReplyCard(app, settings.readRepliesAloud, sheets = true, character = settings.character) }
+                }
                 else -> if (chatOpen) ChatSurface(
                     session = turns.takeIf { it.isNotEmpty() }?.let {
                         com.samosaai.masala.chat.ChatSession(id = activeId.orEmpty(), title = sessionTitle, turns = it)

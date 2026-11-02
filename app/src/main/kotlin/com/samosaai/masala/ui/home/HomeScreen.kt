@@ -34,6 +34,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -99,6 +100,8 @@ fun HomeScreen(
     applyWindowInsets: Boolean = true,
     /** True while any finger is down on home, false once every finger is up (or tracking ends). */
     onFingerActive: (Boolean) -> Unit = {},
+    /** Blurs the layout (API 31+) while a sheet over home is up; 0 draws it sharp. */
+    blur: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     val swipeThreshold = with(LocalDensity.current) { 64.dp.toPx() }
     val swipeUpLabel = stringResource(R.string.home_swipe_up_description)
@@ -330,7 +333,7 @@ fun HomeScreen(
             }
             .then(if (applyWindowInsets) Modifier.systemBarsPadding() else Modifier),
     ) {
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().then(if (blur > 0.dp) Modifier.blur(blur) else Modifier)) {
             if (!isDefault) DefaultBanner(onSetDefault)
             LayoutRenderer(layout, render, Modifier.weight(1f), resetSignal = homePresses, aboveDock = aboveDock, entrySignal = entrySignal) {
                 if (pinnedShortcuts.isNotEmpty()) {
