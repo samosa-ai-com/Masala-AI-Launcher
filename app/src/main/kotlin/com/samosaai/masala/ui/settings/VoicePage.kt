@@ -3,6 +3,7 @@ package com.samosaai.masala.ui.settings
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -26,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -44,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -167,6 +170,43 @@ fun VoicePage(settings: LauncherSettings, update: ((LauncherSettings) -> Launche
                 )
             }
             SettingsToggleRow(stringResource(R.string.settings_read_replies), settings.readRepliesAloud) { on -> update { it.copy(readRepliesAloud = on) } }
+            val permissionRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+            // Reflecting system state: a fresh install has never been asked, and the toggle
+            // alone can't deliver. Ask on enable; a blocked channel gets a row to settings.
+            var settingsCheck by remember { mutableIntStateOf(0) }
+            val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+            DisposableEffect(lifecycle) {
+                val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                    if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) settingsCheck++
+                }
+                lifecycle.addObserver(observer)
+                onDispose { lifecycle.removeObserver(observer) }
+            }
+            val notificationsBlocked = remember(settingsCheck) {
+                com.samosaai.masala.notifications.ReplyDoneNotification.areBlocked(context)
+            }
+            SettingsToggleRow(stringResource(R.string.settings_reply_notify), settings.replyNotify) { on ->
+                update { it.copy(replyNotify = on) }
+                if (on && Build.VERSION.SDK_INT >= 33 &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    permissionRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+            if (settings.replyNotify && notificationsBlocked) {
+                com.samosaai.masala.ui.components.SettingsRow(
+                    Icons.Rounded.Notifications,
+                    stringResource(R.string.settings_reply_notify),
+                    summary = stringResource(R.string.settings_reply_blocked),
+                    onClick = {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+                        )
+                    },
+                )
+            }
+            SettingsToggleRow(stringResource(R.string.settings_reply_notify), settings.replyNotify) { on -> update { it.copy(replyNotify = on) } }
             val testSentence = stringResource(R.string.settings_test_voice_sentence)
             val testVoiceOk = stringResource(R.string.settings_test_voice_ok)
             OutlinedButton(

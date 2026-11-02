@@ -69,6 +69,8 @@ data class LauncherSettings(
     val briefPlace: Place? = null,
     /** Post a quiet notification when the daily brief is ready. */
     val briefNotify: Boolean = false,
+    /** Notify when a reply lands while Masala isn't visible. */
+    val replyNotify: Boolean = true,
     /** `salt:hash` for the Hidden apps page; null leaves the page open. See [HiddenPin]. */
     val hiddenPin: String? = null,
 ) {
@@ -112,6 +114,7 @@ private object Keys {
     val usageAsked = booleanPreferencesKey("usage_asked")
     val briefPlace = stringPreferencesKey("brief_place")
     val briefNotify = booleanPreferencesKey("brief_notify")
+    val replyNotify = booleanPreferencesKey("reply_notify")
     val hiddenPin = stringPreferencesKey("hidden_pin")
 }
 
@@ -136,6 +139,7 @@ internal fun MutablePreferences.write(next: LauncherSettings) {
     this[Keys.usageAsked] = next.usageAsked
     if (next.briefPlace != null) this[Keys.briefPlace] = MasalaJson.strict.encodeToString(Place.serializer(), next.briefPlace) else remove(Keys.briefPlace)
     this[Keys.briefNotify] = next.briefNotify
+    this[Keys.replyNotify] = next.replyNotify
     if (next.hiddenPin != null) this[Keys.hiddenPin] = next.hiddenPin else remove(Keys.hiddenPin)
 }
 
@@ -162,6 +166,7 @@ internal fun Preferences.toSettings(): LauncherSettings {
         usageAsked = this[Keys.usageAsked] ?: defaults.usageAsked,
         briefPlace = this[Keys.briefPlace]?.let { runCatching { MasalaJson.lenient.decodeFromString(Place.serializer(), it) }.getOrNull() },
         briefNotify = this[Keys.briefNotify] ?: defaults.briefNotify,
+        replyNotify = this[Keys.replyNotify] ?: defaults.replyNotify,
         hiddenPin = this[Keys.hiddenPin],
     )
 }

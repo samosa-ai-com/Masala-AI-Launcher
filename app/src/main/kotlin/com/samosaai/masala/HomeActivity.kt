@@ -114,11 +114,14 @@ class HomeActivity : ComponentActivity() {
     private var homePresses by mutableStateOf(0)
     /** Bumped by the search pill: the drawer opens with its search field focused. */
     private var searchRequests by mutableStateOf(0)
+    /** Set from the reply notification: open this chat thread once composed. */
+    private var openChatId by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Light icons on the wallpaper; HomeContent switches them while a light drawer is open.
         enableEdgeToEdge(SystemBarStyle.dark(Color.TRANSPARENT), SystemBarStyle.dark(Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
+        openChatId = intent.getStringExtra(EXTRA_OPEN_CHAT)
         // Once per creation: a rotation while Welcome is in flight must not launch it again.
         if (savedInstanceState == null) showWelcomeOnce()
         setContent {
@@ -163,6 +166,7 @@ class HomeActivity : ComponentActivity() {
             drawerOpen = false
             homePresses++
         }
+        openChatId = intent.getStringExtra(EXTRA_OPEN_CHAT) ?: openChatId
         // The input card is hidden while the drawer is open.
         if (intent.getBooleanExtra(EXTRA_SHOW_INPUT, false)) drawerOpen = false
     }
@@ -187,6 +191,36 @@ class HomeActivity : ComponentActivity() {
             var expanded by rememberSaveable { mutableStateOf(false) }
             var chatOpen by rememberSaveable { mutableStateOf(false) }
             var showHistory by remember { mutableStateOf(false) }
+            // One way to open a thread, from history and from the reply notification:
+            // unknown ids (a deleted chat) leave the current thread showing.
+            // Declared before the effects that call it.
+            fun openSession(id: String?) {
+                chatPrefill = ""
+                chatPrefillNonce = 0
+                drawerOpen = false
+                app.commands.dismiss()
+                app.scope.launch {
+                    val session = id?.let { app.chats.get(it) }
+                    if (session != null) {
+                        app.activeChatId.value = session.id
+                        turns = session.turns
+                        sessionTitle = session.title
+                        app.commands.restoreSession(session.turns)
+                    }
+                    chatOpen = true
+                    expanded = true
+                }
+            }
+            // The reply notification's tap lands here: open that thread once the store
+            // can read it. Resolving via get (disk-backed) instead of the in-memory
+            // summaries, so a tap after a process death waits for the real session
+            // instead of consuming the request against an unloaded store.
+            // Opening also restores the agent context (like history does) and dismisses
+            // any live command, so a pending auto-open can't hijack the requested thread.
+            LaunchedEffect(openChatId) {
+                openChatId?.let { openSession(it) }
+                openChatId = null
+            }
             LaunchedEffect(activeId, sessions) {
                 val id = activeId ?: return@LaunchedEffect
                 val session = app.chats.get(id) ?: return@LaunchedEffect
@@ -213,6 +247,8 @@ class HomeActivity : ComponentActivity() {
                     app.commands.dismiss()
                     if (!MiniAppOpenGuard.isFreshlyOpened(made.ref)) {
                         runCatching { openMiniApp(made.ref) }
+                        // The viewer is the notice now; a raced post must not linger over it.
+                        com.samosaai.masala.notifications.ReplyDoneNotification.cancel(this@HomeActivity)
                     }
                 }
             }
@@ -754,17 +790,7 @@ class HomeActivity : ComponentActivity() {
                 sessions = sessions,
                 onOpen = { id ->
                     showHistory = false
-                    app.activeChatId.value = id
-                    chatPrefill = ""
-                    chatPrefillNonce = 0
-                    app.scope.launch {
-                        val session = app.chats.get(id) ?: return@launch
-                        turns = session.turns
-                        sessionTitle = session.title
-                        app.commands.restoreSession(session.turns)
-                        chatOpen = true
-                        expanded = true
-                    }
+                    openSession(id)
                 },
                 onRename = { id, title -> app.scope.launch { app.chats.rename(id, title) } },
                 onDelete = { id ->
@@ -1230,6 +1256,9 @@ class HomeActivity : ComponentActivity() {
 
         /** Started to show the input card (Settings' Create buttons): the drawer closes so the card shows. */
         const val EXTRA_SHOW_INPUT = "com.samosaai.masala.SHOW_INPUT"
+
+        /** Open this chat thread (the reply notification's tap target). */
+        const val EXTRA_OPEN_CHAT = "com.samosaai.masala.OPEN_CHAT"
     }
 
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()

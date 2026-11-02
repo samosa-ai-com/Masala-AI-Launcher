@@ -618,6 +618,9 @@
     <string name="wiki_dismiss">Dismiss</string>
     <string name="settings_ask">Ask Masala</string>
     <string name="settings_read_replies">Read replies aloud</string>
+    <string name="settings_reply_notify">Notify when a reply lands while you’re away</string>
+    <string name="settings_reply_blocked">Notifications are off for Masala — tap to enable them</string>
+    <string name="replies_channel">Replies</string>
     <string name="settings_test_voice">Test voice</string>
     <string name="settings_test_voice_summary">Speaks a sentence to check read-aloud works</string>
     <string name="settings_test_voice_sentence">This is Masala speaking. If you hear this, read-aloud works.</string>
