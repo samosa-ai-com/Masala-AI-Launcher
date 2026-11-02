@@ -224,7 +224,7 @@ fun ChatSurface(
                         )
                     }
                 }
-                Controls(listening, paused, ready, elapsedMs, mic, level, onSend, onContinue, onAsk, onClose, prefill, prefillNonce, onPrefillConsumed)
+                Controls(listening, paused, ready, elapsedMs, mic, level, onSend, onContinue, onAsk, onClose, onCancel = onStop, prefill, prefillNonce, onPrefillConsumed)
             }
         }
     }
@@ -910,6 +910,8 @@ private fun Controls(
     onContinue: () -> Unit = {},
     onAsk: (String, List<String>) -> Unit = { _, _ -> },
     onClose: () -> Unit,
+    /** Cancel ends the live take (mic off); close only hides the sheet. Defaults to close. */
+    onCancel: () -> Unit = onClose,
     prefill: String = "",
     prefillNonce: Int = 0,
     onPrefillConsumed: () -> Unit = {},
@@ -935,7 +937,7 @@ private fun Controls(
             horizontalArrangement = Arrangement.Center,
         ) {
             if (listening) {
-                IconButton(onClick = onClose, modifier = Modifier.size(52.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.06f))) {
+                IconButton(onClick = onCancel, modifier = Modifier.size(52.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.06f))) {
                     Icon(Icons.Rounded.Close, stringResource(R.string.listening_cancel), tint = tokens.textHigh)
                 }
                 Spacer(Modifier.width(12.dp))
@@ -954,7 +956,7 @@ private fun Controls(
                     Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent.copy(alpha = if (ready) 1f else 0.6f))
                 }
             } else if (paused) {
-                IconButton(onClick = onClose, modifier = Modifier.size(52.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.06f))) {
+                IconButton(onClick = onCancel, modifier = Modifier.size(52.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.06f))) {
                     Icon(Icons.Rounded.Close, stringResource(R.string.listening_cancel), tint = tokens.textHigh)
                 }
                 Spacer(Modifier.width(12.dp))
