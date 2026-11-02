@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -311,11 +313,19 @@ fun Drawer(
         closeTravel = (closeTravel + dy).coerceAtLeast(0f)
         latestCloseDrag?.invoke(closeTravel)
     }
+    // True while the current finger's press started at the top and owns downward drags.
+    var downAtTop by remember { mutableStateOf(false) }
+    // A close-owned gesture's fling must be swallowed, but onPreFling runs after the lift
+    // observer already cleared the per-gesture state — so the fact is latched here and
+    // cleared on the next press.
+    var swallowFling by remember { mutableStateOf(false) }
     val closeDraggable = if (onCloseDrag != null && onCloseRelease != null) {
         Modifier.draggable(
             state = closeState,
             orientation = Orientation.Vertical,
-            onDragStarted = { closeTravel = 0f; latestCloseFinger?.invoke(true) },
+            // The header owns this press now: clear the list-path latch so the lift
+            // observer below doesn't settle the same gesture a second time.
+            onDragStarted = { downAtTop = false; closeTravel = 0f; latestCloseFinger?.invoke(true) },
             onDragStopped = { v -> latestCloseFinger?.invoke(false); latestCloseRelease?.invoke(v) },
         )
     } else Modifier
@@ -331,8 +341,6 @@ fun Drawer(
     fun anyListScrolling(): Boolean =
         gridState.isScrollInProgress || listState.isScrollInProgress ||
             resultsState.isScrollInProgress || globeListState.isScrollInProgress
-    // True while the current finger's press started at the top and owns downward drags.
-    var downAtTop by remember { mutableStateOf(false) }
     // Grabs downward drags for closing only when the press started at the top. Upward
     // drags first unwind an in-progress close, then fall through to the list, so a
     // reversed pull reopens instead of scrolling away underneath.
@@ -340,6 +348,7 @@ fun Drawer(
         object : NestedScrollConnection {
             private fun grabDown(delta: Float): Offset {
                 closeTravel += delta
+                swallowFling = true
                 latestCloseDrag?.invoke(closeTravel)
                 return Offset(0f, delta)
             }
@@ -351,24 +360,41 @@ fun Drawer(
                     available.y < 0f && closeTravel > 0f -> {
                         val unwind = minOf(-available.y, closeTravel)
                         closeTravel -= unwind
+                        swallowFling = true
                         latestCloseDrag?.invoke(closeTravel)
                         Offset(0f, -unwind)
                     }
-                    else -> Offset.Zero
+                    // Falling through to the list: the gesture became a content scroll and
+                    // must not revert to a close if the finger reverses mid-gesture.
+                    else -> {
+                        if (available.y < 0f) downAtTop = false
+                        Offset.Zero
+                    }
                 }
             }
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 // The safety net: a downward remainder the list couldn't use (overscroll at
                 // the top) belongs to the close, same as a pre-scroll grab.
-                if (!downAtTop || source != NestedScrollSource.UserInput || available.y <= 0f || latestCloseDrag == null) return Offset.Zero
+                if (!downAtTop || source != NestedScrollSource.UserInput || latestCloseDrag == null) return Offset.Zero
+                if (consumed.y != 0f) {
+                    // The list moved: content owns this gesture from here on.
+                    downAtTop = false
+                    return Offset.Zero
+                }
+                if (available.y <= 0f) return Offset.Zero
                 return grabDown(available.y)
             }
 
             // A close-owned gesture's fling must not fling the list underneath. The lift
-            // observer below already settled the drawer, so there is nothing to route here.
+            // observer already settled the drawer, so there is nothing to route here.
+            // Latched during the drag: onPreFling runs after the lift observer clears
+            // the per-gesture state, so downAtTop/closeTravel are already gone by then.
             override suspend fun onPreFling(available: Velocity): Velocity =
-                if (downAtTop && closeTravel > 0f) available else Velocity.Zero
+                if (swallowFling) {
+                    swallowFling = false
+                    available
+                } else Velocity.Zero
         }
     }
     // Observes only (consumes nothing): latches whether the press started at the top, tracks
@@ -381,6 +407,8 @@ fun Drawer(
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
                 closeTravel = 0f
+                // A new press starts unowned: any latched fling-swallow belongs to the last gesture.
+                swallowFling = false
                 downAtTop = latestCloseDrag != null && latestCloseRelease != null && listAtTop() && !anyListScrolling()
                 latestCloseFinger?.invoke(downAtTop)
                 var tracked = down.id
@@ -660,7 +688,7 @@ private fun AppListWithRail(
     profiles: AppCatalog.Snapshot,
     onLaunch: (AppEntry, Rect?) -> Unit,
     onMenu: (AppEntry) -> Unit,
-    state: androidx.compose.foundation.lazy.LazyListState,
+    state: LazyListState,
     modifier: Modifier,
 ) {
     val sections = remember(apps) { apps.groupBy { sectionOf(it.label) }.toSortedMap(compareBy { if (it == '#') '[' else it }) }
@@ -859,7 +887,7 @@ private fun GlobePage(
     onMenu: (AppEntry) -> Unit,
     profiles: AppCatalog.Snapshot,
     modifier: Modifier,
-    listState: androidx.compose.foundation.lazy.LazyListState = androidx.compose.foundation.lazy.rememberLazyListState(),
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val onGlobe = remember(ranked) { ranked.map { it.entry.key.id }.toSet() }
     // Most used first; never-opened apps keep the catalog's A–Z order (the sort is stable).

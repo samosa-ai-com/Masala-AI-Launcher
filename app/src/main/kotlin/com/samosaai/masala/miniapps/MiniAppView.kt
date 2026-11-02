@@ -335,8 +335,9 @@ class MiniAppActivity : ComponentActivity() {
     override fun onDestroy() {
         // A full-size app hid them; whatever shows next gets them back.
         WindowCompat.getInsetsController(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
-        // Gone from the screen, so a later auto-open for the same id must fire again.
-        MiniAppOpenGuard.clear(intent.getStringExtra(EXTRA_APP_ID).orEmpty())
+        // Gone for good, so a later auto-open for the same id must fire again — but not on a
+        // rotation or theme change, where the activity is recreated around the same app.
+        if (isFinishing) MiniAppOpenGuard.clear(intent.getStringExtra(EXTRA_APP_ID).orEmpty())
         super.onDestroy()
     }
 

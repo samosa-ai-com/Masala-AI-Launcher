@@ -13,6 +13,7 @@ import com.samosaai.masala.core.tool.ToolSensitivity
 import com.samosaai.masala.launcher.AppActions
 import com.samosaai.masala.launcher.LauncherModel
 import com.samosaai.masala.layout.ModeStore
+import com.samosaai.masala.miniapps.openMiniApp
 import com.samosaai.masala.skills.SkillRegistry
 import com.samosaai.masala.tools.MasalaToolExecutor
 import com.samosaai.masala.ui.skills.SkillSheetActivity
@@ -145,12 +146,7 @@ class ActionDispatcher(
 
     private fun openMiniApp(action: MasalaAction.OpenMiniApp): Outcome {
         // Existence is checked in the activity, which shows a "gone" state for unknown ids.
-        context.startActivity(
-            android.content.Intent(context, com.samosaai.masala.miniapps.MiniAppActivity::class.java)
-                .putExtra(com.samosaai.masala.miniapps.MiniAppActivity.EXTRA_APP_ID, action.id)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
-        com.samosaai.masala.miniapps.MiniAppOpenGuard.noteOpened(action.id)
+        context.openMiniApp(action.id)
         return Outcome.Done()
     }
 

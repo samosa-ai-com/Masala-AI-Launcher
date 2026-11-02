@@ -1,6 +1,7 @@
 package com.samosaai.masala
 
 import com.samosaai.masala.miniapps.openMiniApp
+import com.samosaai.masala.miniapps.MiniAppOpenGuard
 
 import android.content.Intent
 import android.content.pm.ShortcutInfo
@@ -210,7 +211,7 @@ class HomeActivity : ComponentActivity() {
                     // Home's search pill only draws while the command is idle; leaving it on the
                     // reply would hand the user back a home screen with no way to start a chat.
                     app.commands.dismiss()
-                    if (!com.samosaai.masala.miniapps.MiniAppOpenGuard.isFreshlyOpened(made.ref)) {
+                    if (!MiniAppOpenGuard.isFreshlyOpened(made.ref)) {
                         runCatching { openMiniApp(made.ref) }
                     }
                 }

@@ -135,6 +135,13 @@ fun HomeScreen(
             val velocity = VelocityTracker()
 
             val connection = object : NestedScrollConnection {
+                // While the drawer follows the finger it owns the gesture outright: consume
+                // here so the list underneath can't start scrolling mid-drag and freeze it.
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    if (source == NestedScrollSource.UserInput && following) return Offset(available.x, available.y)
+                    return Offset.Zero
+                }
+
                 override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                     if (source == NestedScrollSource.UserInput && (consumed.y != 0f || available.y != 0f)) {
                         ensureTracking()
@@ -163,10 +170,10 @@ fun HomeScreen(
                 ensureTracking()
                 net += dy
                 val drawer = latestDrawer
-                // Upward travel past the slop hands the gesture to the drawer, which then follows
-                // the finger both ways until lift — but only when no content moved: pushing past
-                // the end of a scroll is still a scroll, never a drawer open.
-                if (drawer != null && !contentMoved && (following || (-net > slop && -net > peakDown))) {
+                // Upward travel past the slop hands the gesture to the drawer, which then owns
+                // it and follows the finger both ways until lift — but only when no content
+                // moved: pushing past the end of a scroll is still a scroll, never a drawer open.
+                if (drawer != null && (following || (!contentMoved && -net > slop && -net > peakDown))) {
                     following = true
                     drawer.onDrag((-net).coerceAtLeast(0f))
                 }
