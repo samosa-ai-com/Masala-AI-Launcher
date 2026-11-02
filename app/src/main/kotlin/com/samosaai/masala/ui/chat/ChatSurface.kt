@@ -12,6 +12,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
@@ -39,6 +41,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
@@ -53,7 +56,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -69,7 +71,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -278,19 +279,31 @@ private fun Header(
                 style = MaterialTheme.typography.titleSmall,
                 color = MasalaTheme.tokens.textHigh,
                 maxLines = 1,
-                modifier = Modifier.weight(1f),
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(end = 4.dp),
             )
-            Text(
-                stringResource(R.string.chat_allow_all),
-                style = MaterialTheme.typography.labelMedium,
-                color = MasalaTheme.tokens.textMedium,
-            )
-            Switch(
-                checked = allowAll,
-                onCheckedChange = onAllowAll,
-                modifier = Modifier.padding(start = 6.dp).scale(0.75f)
-                    .semantics { contentDescription = "Allow all actions in this chat without asking, except deleting" },
-            )
+            // One icon, so the title keeps the room; gold while on, and the strip below says so.
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val allowLabel = stringResource(R.string.chat_allow_all)
+            Box(
+                Modifier.size(40.dp).clip(CircleShape)
+                    .background(if (allowAll) MasalaTheme.tokens.accent.copy(alpha = 0.18f) else Color.Transparent)
+                    .combinedClickable(
+                        onClick = { onAllowAll(!allowAll) },
+                        onLongClick = { android.widget.Toast.makeText(context, allowLabel, android.widget.Toast.LENGTH_SHORT).show() },
+                    )
+                    .semantics {
+                        contentDescription = allowLabel
+                        stateDescription = if (allowAll) "On" else "Off"
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.Bolt,
+                    null,
+                    tint = if (allowAll) MasalaTheme.tokens.accent else MasalaTheme.tokens.textLow,
+                )
+            }
             if (experts.isNotEmpty()) {
                 var asking by remember { mutableStateOf(false) }
                 Box {
@@ -312,6 +325,25 @@ private fun Header(
             }
             IconButton(onClick = onNewChat) { Icon(Icons.Rounded.Add, stringResource(R.string.chat_new), tint = MasalaTheme.tokens.textMedium) }
             IconButton(onClick = onHistory) { Icon(Icons.Rounded.History, stringResource(R.string.chat_history), tint = MasalaTheme.tokens.textMedium) }
+        }
+        // While confirmations are skipped it says so, and turning it off is one tap away.
+        if (allowAll) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 2.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MasalaTheme.tokens.accent.copy(alpha = 0.12f))
+                    .padding(start = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Rounded.Bolt, null, tint = MasalaTheme.tokens.accent, modifier = Modifier.size(16.dp))
+                Text(
+                    stringResource(R.string.chat_allow_all_on),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MasalaTheme.tokens.textHigh,
+                    modifier = Modifier.weight(1f).padding(start = 8.dp),
+                )
+                TextButton(onClick = { onAllowAll(false) }) { Text(stringResource(R.string.chat_allow_all_turn_off)) }
+            }
         }
     }
 }
@@ -547,7 +579,8 @@ private fun ResultCard(result: ChatResult) {
             result.title.ifBlank { result.ref },
             style = MaterialTheme.typography.titleSmall,
             color = MasalaTheme.tokens.textHigh,
-            maxLines = 1,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
         // Only a mini app or an installed app has an address we can open from here; a produced
         // file still gets its title, without a row of buttons that would do nothing.

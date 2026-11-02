@@ -774,6 +774,8 @@
     <string name="chat_close">Close chat</string>
     <string name="chat_history">Chat history</string>
     <string name="chat_allow_all">Allow all</string>
+    <string name="chat_allow_all_on">Allow all is on: Masala won\'t ask, except to delete</string>
+    <string name="chat_allow_all_turn_off">Turn off</string>
     <string name="chat_empty">Tap the mic and speak, then tap Send. Everything you say stays here.</string>
     <string name="chat_working">Working on it…</string>
     <string name="chat_drag_for_thread">Drag up to see the conversation</string>
