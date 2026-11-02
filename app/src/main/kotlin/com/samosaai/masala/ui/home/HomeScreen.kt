@@ -131,14 +131,25 @@ fun HomeScreen(
             // parked at its end) counts as a swipe. Set from consumed scroll, so it latches
             // even while the list still has room and only overscroll reaches the tracker.
             var contentMoved = false
+            // Set by the lift observer for the span of a gesture. The list's drag deltas reach the
+            // nested connection through a channel, so a quick flick's last deltas can land after
+            // the lift: taken then, they started a new drag with no lift left to settle it,
+            // stranding the drawer mid-slide.
+            var fingerDown = false
             // Fed from the pointer events (their own timestamps) by the lift observer below.
             val velocity = VelocityTracker()
 
             val connection = object : NestedScrollConnection {
                 // While the drawer follows the finger it owns the gesture outright: consume
                 // here so the list underneath can't start scrolling mid-drag and freeze it.
+                // The delta must still reach the tracker from here: the list's drag consumes
+                // the pointer changes (cancelling the outer detector), and nothing is left for
+                // onPostScroll, so this is the only path the drag still flows through.
                 override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                    if (source == NestedScrollSource.UserInput && following) return Offset(available.x, available.y)
+                    if (source == NestedScrollSource.UserInput && following) {
+                        add(available.y)
+                        return Offset(available.x, available.y)
+                    }
                     return Offset.Zero
                 }
 
@@ -167,6 +178,7 @@ fun HomeScreen(
             }
 
             fun add(dy: Float) {
+                if (!fingerDown) return
                 ensureTracking()
                 net += dy
                 val drawer = latestDrawer
@@ -255,6 +267,7 @@ fun HomeScreen(
                 while (true) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
+                        swipes.fingerDown = true
                         latestFinger(true)
                         try {
                             swipes.velocity.resetTracking()
@@ -286,8 +299,10 @@ fun HomeScreen(
                                 // arriving pressed=false: an empty change list ends it too.
                                 if (event.changes.isEmpty() || event.changes.all { !it.pressed }) break
                             }
+                            swipes.fingerDown = false
                             swipes.onLift()
                         } finally {
+                            swipes.fingerDown = false
                             latestFinger(false)
                         }
                     }

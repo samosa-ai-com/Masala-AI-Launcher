@@ -98,7 +98,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import com.samosaai.masala.ui.settings.SettingsActivity
 import com.samosaai.masala.ui.theme.MasalaTheme
 import com.samosaai.masala.ui.theme.Motion
-import com.samosaai.masala.util.MasalaLog
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import androidx.lifecycle.lifecycleScope
@@ -384,8 +383,10 @@ class HomeActivity : ComponentActivity() {
         // Heals a lost lift: progress parked off its target with no finger down, no recent drag
         // and no animation running settles to the state's target. collectLatest restarts on every
         // animation frame, state flip, drag event and finger change, so the delay only ever
-        // completes after 400 ms of quiet — an in-flight settle is cancelled the moment the
-        // finger returns, so it can never fight an active drag or animation.
+        // completes after 400 ms of quiet. The settle runs in its own job: inside the collector,
+        // its first frame would change progress, restart the collector and cancel it, crawling
+        // the drawer shut one frame per 400 ms. A drag's snapTo still cancels it (Animatable's
+        // mutex), so it never fights the finger.
         LaunchedEffect(Unit) {
             snapshotFlow { Triple(drawerProgress.value, drawerOpen, drawerFingerDown) }.collectLatest { (p, open, _) ->
                 if (p == (if (open) 1f else 0f)) return@collectLatest
@@ -393,23 +394,7 @@ class HomeActivity : ComponentActivity() {
                 if (!drawerFingerDown && !drawerProgress.isRunning &&
                     SystemClock.uptimeMillis() - lastDrawerDragAt > 350
                 ) {
-                    drawerProgress.animateTo(if (open) 1f else 0f, drawerSpring)
-                }
-            }
-        }
-        // Redraws once the drawer comes to rest. On the Redmi the frame that lands a settle can
-        // fail to reach the screen: progress is at 0 or 1, nothing animates, so nothing draws
-        // again and the last mid-slide frame (a see-through drawer) stays up until something
-        // unrelated, like the clock's minute tick, redraws home. Two later invalidations replace
-        // it; they cost two frames per open or close.
-        val composeView = androidx.compose.ui.platform.LocalView.current
-        LaunchedEffect(composeView) {
-            snapshotFlow { drawerProgress.value.let { it == 0f || it == 1f } }.collectLatest { atRest ->
-                if (!atRest) return@collectLatest
-                for (wait in longArrayOf(100, 400)) {
-                    kotlinx.coroutines.delay(wait)
-                    MasalaLog.d("HomeDrawer") { "rest redraw p=${drawerProgress.value} open=$drawerOpen finger=$drawerFingerDown" }
-                    composeView.invalidate()
+                    scope.launch { drawerProgress.animateTo(if (open) 1f else 0f, drawerSpring) }
                 }
             }
         }
