@@ -63,7 +63,7 @@ class WallpaperTool(private val context: Context) {
                 ?: return@withContext ActionResult.error(
                     "'${file.name}' isn't an image Masala can decode (unsupported or corrupted file).",
                 )
-            val jpeg = File(context.cacheDir, "wallpaper-out.jpg").also { temp += it }
+            val jpeg = File.createTempFile("wallpaper-out-", ".jpg", context.cacheDir).also { temp += it }
             val wrote = runCatching {
                 jpeg.outputStream().use { out -> fitted.compress(Bitmap.CompressFormat.JPEG, 95, out) }
             }.getOrDefault(false)
@@ -83,7 +83,7 @@ class WallpaperTool(private val context: Context) {
                 flags == (WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK) -> "home and lock screens"
                 else -> "the home screen"
             }
-            ActionResult.ok("Wallpaper set for $where at ${width}x$height, fitted with matching edge fill.")
+            ActionResult.ok("Wallpaper set for $where at ${width}x$height, center-cropped to fill.")
         } catch (e: SecurityException) {
             ActionResult.error("Masala isn't allowed to set the wallpaper: ${e.message}")
         } catch (e: OutOfMemoryError) {
@@ -99,10 +99,13 @@ class WallpaperTool(private val context: Context) {
     suspend fun saveToGallery(path: String): ActionResult = withContext(Dispatchers.IO) {
         val file = File(path)
         if (!file.canRead()) return@withContext ActionResult.error("Couldn't read '${file.name}'.")
+        // Name and type follow the bytes: generations and bundled art are WebP.
+        val webp = file.extension.equals("webp", ignoreCase = true)
+        val ext = if (webp) ".webp" else ".png"
         runCatching {
             val values = android.content.ContentValues().apply {
-                put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, file.nameWithoutExtension + ".png")
-                put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png")
+                put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, file.nameWithoutExtension.removePrefix("bundled-") + ext)
+                put(android.provider.MediaStore.Images.Media.MIME_TYPE, if (webp) "image/webp" else "image/png")
                 if (Build.VERSION.SDK_INT >= 29) {
                     put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Masala")
                     put(android.provider.MediaStore.Images.Media.IS_PENDING, 1)
@@ -119,7 +122,7 @@ class WallpaperTool(private val context: Context) {
                 resolver.update(uri, values, null, null)
             }
         }.fold(
-            onSuccess = { ActionResult.ok("Saved to the gallery.") },
+            onSuccess = { ActionResult.ok(context.getString(R.string.wallpaper_saved_gallery)) },
             onFailure = { ActionResult.error("Couldn't save to the gallery: ${it.message}") },
         )
     }
@@ -133,7 +136,7 @@ class WallpaperTool(private val context: Context) {
         return when {
             lower.startsWith("http://") || lower.startsWith("https://") -> download(source, temp)
             lower.startsWith("content://") -> runCatching {
-                val target = File(context.cacheDir, "wallpaper-in").also { temp += it }
+                val target = File.createTempFile("wallpaper-in-", null, context.cacheDir).also { temp += it }
                 context.contentResolver.openInputStream(Uri.parse(source))?.use { input ->
                     target.outputStream().use { input.copyTo(it) }
                 }
@@ -158,7 +161,7 @@ class WallpaperTool(private val context: Context) {
     }
 
     private fun download(url: String, temp: MutableList<File>): File? = runCatching {
-        val target = File(context.cacheDir, "wallpaper-in").also { temp += it }
+        val target = File.createTempFile("wallpaper-in-", null, context.cacheDir).also { temp += it }
         httpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
             if (!response.isSuccessful) return null
             val body = response.body ?: return null

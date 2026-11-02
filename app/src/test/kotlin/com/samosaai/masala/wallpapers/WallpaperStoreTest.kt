@@ -17,6 +17,7 @@ class WallpaperStoreTest {
             rows += wallpaper.copy(id = seq)
             return seq++
         }
+        override suspend fun get(id: Long): WallpaperEntity? = rows.firstOrNull { it.id == id }
         override suspend fun all(): List<WallpaperEntity> = rows.sortedByDescending { it.createdAt }
         override suspend fun search(query: String): List<WallpaperEntity> =
             rows.filter { it.prompt.contains(query, ignoreCase = true) || it.style.contains(query, ignoreCase = true) }
@@ -64,6 +65,18 @@ class WallpaperStoreTest {
         store.delete(id)
         assertTrue(dao.rows.isEmpty())
         assertFalse(file.exists())
+    }
+
+    @Test
+    fun `prune keeps the newest rows and deletes their files`() = runBlocking {
+        val dir = Files2.tempDir()
+        val (store, dao) = store(dir)
+        repeat(3) { i -> File(dir, "w$i.png").apply { writeBytes(byteArrayOf(1)) }; store.add("w$i.png", "p$i", "") ; kotlinx.coroutines.delay(2) }
+        store.prune(2)
+        assertEquals(2, dao.rows.size)
+        assertEquals(2, dir.listFiles()!!.size)
+        assertTrue(dao.rows.none { it.fileName == "w0.png" })
+        assertFalse(File(dir, "w0.png").exists())
     }
 }
 

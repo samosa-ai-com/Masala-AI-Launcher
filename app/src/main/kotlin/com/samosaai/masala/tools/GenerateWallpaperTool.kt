@@ -16,6 +16,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -64,10 +65,10 @@ class GenerateWallpaperTool(
                 )
             val fullPrompt = listOf(trimmed, style?.trim().orEmpty())
                 .filter { it.isNotEmpty() }.joinToString(", ") + ", phone wallpaper, no text unless asked"
-            val bytes = requestImage(cfg.baseUrl, cfg.apiKey, model, fullPrompt)?.fold(
+            val bytes = requestImage(cfg.baseUrl, cfg.apiKey, model, fullPrompt).fold(
                 onSuccess = { it },
                 onFailure = { return@withContext ActionResult.error(it.message ?: "Couldn't generate the wallpaper.") },
-            ) ?: return@withContext ActionResult.error("The image endpoint returned nothing usable.")
+            )
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
@@ -78,8 +79,9 @@ class GenerateWallpaperTool(
             runCatching { file.writeBytes(bytes) }.onFailure {
                 return@withContext ActionResult.error("Couldn't save the generated wallpaper.")
             }
-            prune(dir)
             store.add(file.name, trimmed, style?.trim().orEmpty())
+            // Pruning lives in the store so rows never outlive their files (or vice versa).
+            store.prune(KEEP)
             if (!target.isNullOrBlank()) {
                 val applied = wallpaper.setWallpaper(file.absolutePath, target)
                 if (!applied.success) return@withContext applied
@@ -130,13 +132,21 @@ class GenerateWallpaperTool(
                 }
                 val url = item["url"]?.jsonPrimitive?.content
                     ?: throw IllegalStateException("The image endpoint returned no picture.")
-                download(url, apiKey)
+                download(url, apiKey, baseUrl)
             }
         }
 
-    private fun download(url: String, apiKey: String): ByteArray {
+    /**
+     * Downloads a generated picture. The key goes only to the endpoint itself: image URLs
+     * are usually presigned object-store links, which both must not receive the secret and
+     * reject requests carrying an unexpected Authorization header.
+     */
+    private fun download(url: String, apiKey: String, baseUrl: String): ByteArray {
+        val sameHost = runCatching {
+            url.toHttpUrl().host.equals(baseUrl.trimEnd('/').toHttpUrl().host, ignoreCase = true)
+        }.getOrDefault(false)
         val req = Request.Builder().url(url).get()
-            .apply { if (apiKey.isNotBlank()) header("Authorization", "Bearer $apiKey") }
+            .apply { if (apiKey.isNotBlank() && sameHost) header("Authorization", "Bearer $apiKey") }
             .build()
         http.newCall(req).execute().use { response ->
             val body = response.body ?: throw IllegalStateException("Empty download.")
@@ -144,13 +154,6 @@ class GenerateWallpaperTool(
             if (body.contentLength() > MAX_BYTES) throw IllegalStateException("The generated picture is too large.")
             return body.bytes()
         }
-    }
-
-    private fun prune(dir: File) {
-        dir.listFiles { f -> f.name.startsWith("wallpaper-") }
-            .orEmpty().sortedByDescending { it.lastModified() }
-            .drop(KEEP)
-            .forEach { runCatching { it.delete() } }
     }
 
     companion object {

@@ -9,6 +9,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -108,6 +111,7 @@ fun WallpapersPage(onBack: () -> Unit, onGenerateWithAI: () -> Unit) {
     }
 
     val deletedText = stringResource(R.string.wallpaper_deleted)
+    val saveFailedText = stringResource(R.string.result_save_failed)
     fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_LONG).show()
 
     val devicePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -210,19 +214,34 @@ fun WallpapersPage(onBack: () -> Unit, onGenerateWithAI: () -> Unit) {
     }
 
     pickedBundled?.let { w ->
-        val cacheFile = remember(w.file) { File(context.cacheDir, "bundled-${w.file}").also { runCatching { context.assets.open("wallpapers/${w.file}").use { input -> it.outputStream().use { out -> input.copyTo(out) } } } } }
+        // Extracted on demand inside the Set/Save actions below, never during composition.
+        suspend fun bundledFile(): File = withContext(Dispatchers.IO) {
+            val out = File(context.cacheDir, "bundled-${w.file}")
+            if (!out.exists() || out.length() == 0L) {
+                context.assets.open("wallpapers/${w.file}").use { input ->
+                    out.outputStream().use { o -> input.copyTo(o) }
+                }
+            }
+            out
+        }
         WallpaperDialog(
             title = w.title,
             thumbKey = "asset:${w.file}",
             loadThumb = { decodeAssetThumb(context, w.file, 1080) },
             onSet = { target ->
                 pickedBundled = null
-                scope.launch { toast(app.wallpaperTool.setWallpaper(cacheFile.absolutePath, target).message) }
+                scope.launch {
+                    val f = withContext(Dispatchers.IO) { runCatching { bundledFile() }.getOrNull() }
+                    toast(if (f == null) saveFailedText else app.wallpaperTool.setWallpaper(f.absolutePath, target).message)
+                }
             },
             onExtra = {
                 TextButton(onClick = {
                     pickedBundled = null
-                    scope.launch { toast(app.wallpaperTool.saveToGallery(cacheFile.absolutePath).message) }
+                    scope.launch {
+                        val f = withContext(Dispatchers.IO) { runCatching { bundledFile() }.getOrNull() }
+                        toast(if (f == null) saveFailedText else app.wallpaperTool.saveToGallery(f.absolutePath).message)
+                    }
                 }) { Text(stringResource(R.string.result_save)) }
             },
             onDismiss = { pickedBundled = null },
@@ -295,10 +314,11 @@ private fun WallpaperDialog(
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Column(
-            Modifier.clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(14.dp),
+            Modifier.clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(14.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            WallpaperThumb(thumbKey = thumbKey, load = loadThumb, Modifier.fillMaxWidth().aspectRatio(9f / 16f))
+            WallpaperThumb(thumbKey = thumbKey, load = loadThumb, Modifier.fillMaxWidth().aspectRatio(9f / 16f).heightIn(max = 420.dp))
             Text(title, style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = { onSet("home") }) { Text(stringResource(R.string.wallpaper_set_home)) }
@@ -351,12 +371,16 @@ private fun decodeAssetThumb(context: android.content.Context, file: String, max
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
 }.getOrNull()
 
-private fun decodeUriThumb(context: android.content.Context, uri: Uri, maxDim: Int): ImageBitmap? = runCatching {    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+private fun decodeUriThumb(context: android.content.Context, uri: Uri, maxDim: Int): ImageBitmap? = runCatching {
+    // Bounds and pixels need separate streams; a camera photo must never sit whole in heap.
+    val resolver = context.contentResolver
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
     var sample = 1
     while (bounds.outWidth / (sample * 2) >= maxDim || bounds.outHeight / (sample * 2) >= maxDim) sample *= 2
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
+    resolver.openInputStream(uri)?.use {
+        BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
+    }?.asImageBitmap()
 }.getOrNull()
 

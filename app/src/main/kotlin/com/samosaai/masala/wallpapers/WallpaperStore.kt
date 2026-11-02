@@ -24,8 +24,13 @@ class WallpaperStore(private val dao: WallpaperDao, private val dir: File) {
     }
 
     suspend fun delete(id: Long) {
-        dao.all().firstOrNull { it.id == id }?.let { runCatching { File(dir, it.fileName).delete() } }
+        dao.get(id)?.let { runCatching { File(dir, it.fileName).delete() } }
         dao.delete(id)
+    }
+
+    /** Keeps the newest [keep] rows; older rows and their files go together. */
+    suspend fun prune(keep: Int) {
+        all().drop(keep.coerceAtLeast(0)).forEach { delete(it.id) }
     }
 
     fun fileFor(fileName: String): File = File(dir, fileName)

@@ -122,7 +122,9 @@ fun AiModelsPage(onBack: () -> Unit) {
                     chat = p.chat.refreshed(),
                     voiceIn = p.voiceIn?.let { it.refreshed(it.model) },
                     voiceOut = p.voiceOut?.let { it.refreshed(it.model) },
-                    image = p.image?.let { it.refreshed(it.model) },
+                    // The image box has its own state: refreshing with the chat box's model
+                    // would silently discard a dropdown pick.
+                    image = p.image?.let { it.refreshed(imageModel) },
                 ),
             )
         }

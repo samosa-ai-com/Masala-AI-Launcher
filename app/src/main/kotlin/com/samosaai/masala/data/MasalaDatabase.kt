@@ -167,6 +167,9 @@ interface WallpaperDao {
     @Insert
     suspend fun insert(wallpaper: WallpaperEntity): Long
 
+    @Query("SELECT * FROM wallpapers WHERE id = :id LIMIT 1")
+    suspend fun get(id: Long): WallpaperEntity?
+
     @Query("SELECT * FROM wallpapers ORDER BY createdAt DESC")
     suspend fun all(): List<WallpaperEntity>
 

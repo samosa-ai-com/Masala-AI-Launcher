@@ -79,7 +79,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.samosaai.masala.R
 import com.samosaai.masala.ui.components.Markdown
 import com.samosaai.masala.agent.CommandState
@@ -556,13 +558,10 @@ private fun ResultCard(result: ChatResult) {
 private fun WallpaperPreview(result: ChatResult, app: com.samosaai.masala.MasalaApp) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val bitmap = remember(result.ref) { decodePreview(result.ref) }
-    bitmap?.let {
-        androidx.compose.foundation.Image(
-            it, result.title.ifBlank { null },
-            modifier = Modifier.fillMaxWidth().aspectRatio(9f / 16f).clip(RoundedCornerShape(8.dp)),
-            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-        )
+    var bitmap by remember(result.ref) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    // Decode off the main thread: a full-size file decodes megabytes of pixels.
+    LaunchedEffect(result.ref) {
+        bitmap = withContext(Dispatchers.IO) { decodePreview(result.ref) }
     }
     fun run(action: suspend () -> com.samosaai.masala.core.tool.ActionResult) {
         scope.launch {
@@ -570,9 +569,19 @@ private fun WallpaperPreview(result: ChatResult, app: com.samosaai.masala.Masala
             android.widget.Toast.makeText(context, r.message, android.widget.Toast.LENGTH_LONG).show()
         }
     }
+    bitmap?.let {
+        androidx.compose.foundation.Image(
+            it, result.title.ifBlank { null },
+            modifier = Modifier.fillMaxWidth().aspectRatio(9f / 16f).clip(RoundedCornerShape(8.dp)),
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+        )
+    }
+    // Two rows of two: four buttons side by side clip on 360-390dp screens.
     Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
         TextButton(onClick = { run { app.wallpaperTool.setWallpaper(result.ref, "home") } }) { Text(stringResource(R.string.wallpaper_set_home)) }
         TextButton(onClick = { run { app.wallpaperTool.setWallpaper(result.ref, "lock") } }) { Text(stringResource(R.string.wallpaper_set_lock)) }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
         TextButton(onClick = { run { app.wallpaperTool.setWallpaper(result.ref, "both") } }) { Text(stringResource(R.string.wallpaper_set_both)) }
         TextButton(onClick = { run { app.wallpaperTool.saveToGallery(result.ref) } }) { Text(stringResource(R.string.result_save)) }
     }
