@@ -80,6 +80,38 @@ class CommandController(
     /** The mic level while listening, for the listening overlay (UI refresh U4). */
     val micLevel: StateFlow<Float> get() = speech?.level ?: kotlinx.coroutines.flow.MutableStateFlow(0f)
 
+    /** ms since the live take (re)started; the UI timer and the near-cap warning read this. */
+    private val _listeningElapsed = MutableStateFlow(0L)
+    val listeningElapsed: StateFlow<Long> = _listeningElapsed.asStateFlow()
+
+    /** True once the live take is really capturing; the UI holds "Get ready…" until then. */
+    val listeningReady: StateFlow<Boolean> get() = speech?.ready ?: neverReady
+
+    private var ticker: Job? = null
+    private var takeSinceMs = 0L
+    private val neverReady = MutableStateFlow(false)
+
+    private fun startTicker() {
+        stopTicker()
+        takeSinceMs = System.currentTimeMillis()
+        _listeningElapsed.value = 0L
+        ticker = scope.launch {
+            // The Android recognizer has no engine-side cap (it restarts forever), so the
+            // clock enforces the same 5-minute budget the API capture thread enforces itself.
+            while (_state.value == CommandState.Listening) {
+                kotlinx.coroutines.delay(500)
+                val elapsed = System.currentTimeMillis() - takeSinceMs
+                _listeningElapsed.value = elapsed
+                if (elapsed >= com.samosaai.masala.audio.SttEngine.MAX_VAD_RECORDING_MS) pauseTake()
+            }
+        }
+    }
+
+    private fun stopTicker() {
+        ticker?.cancel()
+        ticker = null
+    }
+
     private var history: List<ChatMessage> = emptyList()
     private var readAloud: CommandState.Reply? = null
 
@@ -107,6 +139,8 @@ class CommandController(
     fun dismiss() {
         job?.cancel()
         speech?.cancel()
+        stopTicker()
+        _listeningElapsed.value = 0L
         _state.value = CommandState.Idle
     }
 
@@ -138,20 +172,50 @@ class CommandController(
             return false
         }
         // A take that ends by itself must still leave Listening: a dead capture shows
-        // its error at once, the 90 s cap sends what was heard.
+        // its error at once, the 5-minute cap pauses with its audio kept (never auto-sends).
         input.setTakeAutoEndListener { end ->
             when (end) {
                 is PttEngine.TakeAutoEnd.Failed -> async(end.message)
-                PttEngine.TakeAutoEnd.CapReached -> stopListening()
+                PttEngine.TakeAutoEnd.CapReached -> pauseTake()
             }
         }
         _state.value = CommandState.Listening
+        startTicker()
         return true
     }
 
     /**
+     * The cap paused the take (or the clock did on the Android path): the capture stopped
+     * but its audio/transcript is kept. The UI offers Continue / Send / Cancel from here.
+     */
+    private fun pauseTake() {
+        val input = speech ?: return
+        if (_state.value != CommandState.Listening) return
+        stopTicker()
+        _state.value = CommandState.ListeningPaused
+        // API cap path already stopped its thread (a no-op true); the Android clock path
+        // stops its recognizer here, keeping the transcript for Send or Continue.
+        job = scope.launch { input.pause() }
+    }
+
+    /**
+     * Continue a paused take: capture restarts into the same take with a fresh 5-minute
+     * budget. When the recorder won't restart, fall back to sending what was kept.
+     */
+    fun continueListening() {
+        val input = speech ?: return
+        if (_state.value != CommandState.ListeningPaused) return
+        _state.value = CommandState.Listening
+        startTicker()
+        job = scope.launch {
+            if (!input.resume()) stopListening()
+        }
+    }
+
+    /**
      * The listening overlay's send button: ends the take now and transcribes it.
-     * Listening never ends by itself — there is no hold and no auto-send.
+     * Listening ends on Send, Cancel, a dead capture — or the 5-minute cap, which pauses
+     * instead of sending.
      */
     fun sendNow() = stopListening()
 
@@ -207,9 +271,14 @@ class CommandController(
      * Send ends the take now; what was said still runs. Only the final transcript is
      * used: it is transcribed, cleaned up by [cleaner], and then sent as one turn.
      */
+    /**
+     * Send ends the take now; what was said still runs. Works from Listening and from the
+     * cap-paused state — both transcribe what was kept. Only the final transcript is used.
+     */
     fun stopListening() {
         val input = speech ?: return
-        if (_state.value != CommandState.Listening) return
+        if (_state.value != CommandState.Listening && _state.value != CommandState.ListeningPaused) return
+        stopTicker()
         // Sending is not instantaneous: the take still has to be transcribed and cleaned.
         // A blank-prompt Thinking is the "Transcribing…" row until the text lands.
         _state.value = CommandState.Thinking("")

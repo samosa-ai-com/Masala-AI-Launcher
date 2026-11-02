@@ -7,6 +7,8 @@ sealed interface CommandState {
     /** The card with just its input field (the Ask gesture, the assist gesture). */
     data object Input : CommandState
     data object Listening : CommandState
+    /** A take paused by itself (5-minute cap) or by the clock: audio/transcript kept, resumable. */
+    data object ListeningPaused : CommandState
     data class Thinking(val prompt: String, val steps: List<String> = emptyList()) : CommandState
     data class Reply(
         val prompt: String,

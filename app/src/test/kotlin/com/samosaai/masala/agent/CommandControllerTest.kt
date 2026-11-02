@@ -250,18 +250,71 @@ class CommandControllerTest {
         assertEquals("Recording captured no audio (microphone returned silence)", error.message)
     }
 
-    @Test fun capReachedSendsWhatWasCaptured() = runBlocking<Unit> {
+    @Test fun capReachedPausesInsteadOfSending() = runBlocking<Unit> {
+        var listener: ((PttEngine.TakeAutoEnd) -> Unit)? = null
+        var paused = 0
+        val speech = object : SpeechInput {
+            override fun start(onFailure: (String) -> Unit) = true
+            override suspend fun stop() = Result.success("set a timer for 1 minute")
+            override fun cancel() = Unit
+            override suspend fun pause(): Boolean {
+                paused++
+                return true
+            }
+            override fun setTakeAutoEndListener(l: ((PttEngine.TakeAutoEnd) -> Unit)?) { listener = l }
+        }
+        val c = controller(speech)
+        assertTrue(c.startListening())
+        // The 5-minute cap pauses with the audio kept; nothing is sent by itself.
+        listener?.invoke(PttEngine.TakeAutoEnd.CapReached)
+        assertEquals(CommandState.ListeningPaused, c.state.value)
+        assertEquals(emptyList(), ran)
+        // The engine pause runs one launch later; wait for it, don't race it.
+        withTimeout(5_000) { while (paused == 0) kotlinx.coroutines.delay(50) }
+        assertEquals(1, paused)
+    }
+
+    @Test fun continueListeningResumesAPausedTake() = runBlocking<Unit> {
+        var listener: ((PttEngine.TakeAutoEnd) -> Unit)? = null
+        var resumed = 0
+        val speech = object : SpeechInput {
+            override fun start(onFailure: (String) -> Unit) = true
+            override suspend fun stop() = Result.success("set a timer for 1 minute")
+            override fun cancel() = Unit
+            override suspend fun pause() = true
+            override fun resume(): Boolean {
+                resumed++
+                return true
+            }
+            override fun setTakeAutoEndListener(l: ((PttEngine.TakeAutoEnd) -> Unit)?) { listener = l }
+        }
+        val c = controller(speech)
+        assertTrue(c.startListening())
+        listener?.invoke(PttEngine.TakeAutoEnd.CapReached)
+        assertEquals(CommandState.ListeningPaused, c.state.value)
+        c.continueListening()
+        assertEquals(CommandState.Listening, c.state.value)
+        withTimeout(5_000) { while (resumed == 0) kotlinx.coroutines.delay(50) }
+        assertEquals(1, resumed)
+        c.stopListening()
+        assertIs<CommandState.Reply>(c.settled())
+        assertEquals(listOf<MasalaAction>(MasalaAction.StartTimer(60)), ran)
+    }
+
+    @Test fun sendFromPausedTranscribesWhatWasKept() = runBlocking<Unit> {
         var listener: ((PttEngine.TakeAutoEnd) -> Unit)? = null
         val speech = object : SpeechInput {
             override fun start(onFailure: (String) -> Unit) = true
             override suspend fun stop() = Result.success("set a timer for 1 minute")
             override fun cancel() = Unit
+            override suspend fun pause() = true
             override fun setTakeAutoEndListener(l: ((PttEngine.TakeAutoEnd) -> Unit)?) { listener = l }
         }
         val c = controller(speech)
         assertTrue(c.startListening())
-        // The 90 s cap ends the take by sending what was heard; nothing is lost.
         listener?.invoke(PttEngine.TakeAutoEnd.CapReached)
+        assertEquals(CommandState.ListeningPaused, c.state.value)
+        c.stopListening()
         assertIs<CommandState.Reply>(c.settled())
         assertEquals(listOf<MasalaAction>(MasalaAction.StartTimer(60)), ran)
     }

@@ -118,6 +118,11 @@ fun ChatSurface(
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
     onRevertTurn: (Int) -> Unit = {},
+    onContinue: () -> Unit = {},
+    /** ms since the live take started; the timer and near-cap warning read this. */
+    elapsedMs: Long = 0L,
+    /** False until the take is really capturing; the UI holds "Get ready…" until then. */
+    ready: Boolean = true,
     /** Text dropped back into the type field by a revert, so it can be edited and resent. */
     prefill: String = "",
     /** Bumped every revert so an identical text still replaces what is typed. */
@@ -135,6 +140,7 @@ fun ChatSurface(
     // A step that lacked access still gets its answer; this is how the user fixes it afterwards.
     val grant = com.samosaai.masala.ui.components.rememberCapabilityGrant { granted -> if (granted) onRetry() }
     val listening = state == CommandState.Listening
+    val paused = state == CommandState.ListeningPaused
     val thinking = state is CommandState.Thinking
     val turns = session?.turns.orEmpty()
     // A newly stored turn pulls the thread up on its own; talking shows the orb. Keyed on the
@@ -181,18 +187,19 @@ fun ChatSurface(
                     when {
                         // Collapsed is the live orb, whether or not a conversation exists:
                         // that is the state's whole point, and what the swipe returns to.
+                        // A cap-paused take keeps the orb (no shimmer): its words are kept.
                         !expanded -> Orb(
                             level = level,
                             character = character,
-                            listening = listening,
+                            listening = listening || paused,
                             // Words are not streamed while talking: the pulse stands in until
                             // the final transcript is sent.
                             showShimmer = listening,
-                            caption = (turns.lastOrNull { it.role == TurnRole.MASALA }?.text ?: "").take(140),
+                            caption = if (paused) stringResource(R.string.voice_paused) else (turns.lastOrNull { it.role == TurnRole.MASALA }?.text ?: "").take(140),
                         )
-                        turns.isEmpty() && !listening && !thinking -> EmptyThread(level, character, experts, onAskExpert)
+                        turns.isEmpty() && !listening && !paused && !thinking -> EmptyThread(level, character, experts, onAskExpert)
                         else -> Thread(
-                            turns, listening, thinking, state, character, level, onStop,
+                            turns, listening, paused, ready, elapsedMs, thinking, state, character, level, onStop,
                             onRevertTurn,
                             onCollapse = { onExpanded(false) },
                             onGrant = grant,
@@ -200,7 +207,7 @@ fun ChatSurface(
                         )
                     }
                 }
-                Controls(listening, mic, level, onSend, onAsk, onClose, prefill, prefillNonce, onPrefillConsumed)
+                Controls(listening, paused, ready, elapsedMs, mic, level, onSend, onContinue, onAsk, onClose, prefill, prefillNonce, onPrefillConsumed)
             }
         }
     }
@@ -384,6 +391,9 @@ private fun EmptyThread(
 private fun Thread(
     turns: List<ChatTurn>,
     listening: Boolean,
+    paused: Boolean,
+    ready: Boolean,
+    elapsedMs: Long,
     thinking: Boolean,
     state: CommandState,
     character: Character,
@@ -401,7 +411,7 @@ private fun Thread(
         // A finished answer scrolls to its start, so the expert badge that credits it is visible;
         // while working, the steps at the bottom are what matters.
         val target = when {
-            thinking || listening -> list.layoutInfo.totalItemsCount - 1
+            thinking || listening || paused -> list.layoutInfo.totalItemsCount - 1
             turns.isNotEmpty() -> turns.lastIndex
             else -> -1
         }
@@ -457,12 +467,20 @@ private fun Thread(
                 },
             )
         }
-        if (listening || transcribing) {
+        if (listening || paused || transcribing) {
             item("live") {
+                val base = stringResource(
+                    when {
+                        paused -> R.string.voice_paused
+                        listening && !ready -> R.string.voice_get_ready
+                        listening -> R.string.command_listening
+                        else -> R.string.command_transcribing
+                    },
+                )
                 Bubble(
                     ChatTurn(
                         TurnRole.USER,
-                        stringResource(if (listening) R.string.command_listening else R.string.command_transcribing),
+                        if ((listening || paused) && elapsedMs > 0) "$base · ${elapsedLabel(elapsedMs)}" else base,
                     ),
                     live = true,
                 )
@@ -679,19 +697,32 @@ private fun TurnMenu(expanded: Boolean, onDismiss: () -> Unit, onRevert: () -> U
     }
 }
 
+/** "m:ss" for the listening timer. */
+private fun elapsedLabel(ms: Long): String {
+    val s = (ms / 1000).coerceAtLeast(0)
+    return "${s / 60}:${(s % 60).toString().padStart(2, '0')}"
+}
+
 /**
  * Mic to open Sam, and while listening the cancel/send pair. Sending is explicit: the
  * arrow ends the take now. There is no mic button while listening — tapping it is how
  * a take starts, so showing one there could only end the take by accident.
  * Otherwise a multi-line type field sits beside the mic, so a failed microphone never
  * strands the conversation; the send arrow appears once there is text.
+ *
+ * A paused take (5-minute cap) offers Continue / Send / Cancel instead: its audio and
+ * transcript are kept either way.
  */
 @Composable
 private fun Controls(
     listening: Boolean,
+    paused: Boolean,
+    ready: Boolean,
+    elapsedMs: Long,
     mic: () -> Unit,
     level: () -> Float,
     onSend: () -> Unit,
+    onContinue: () -> Unit = {},
     onAsk: (String) -> Unit = {},
     onClose: () -> Unit,
     prefill: String = "",
@@ -700,6 +731,15 @@ private fun Controls(
 ) {
     val tokens = MasalaTheme.tokens
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
+        if (listening && elapsedMs >= com.samosaai.masala.audio.SttEngine.CAP_WARN_MS) {
+            Text(
+                stringResource(R.string.voice_cap_warning),
+                style = MaterialTheme.typography.bodySmall,
+                color = tokens.textMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            )
+        }
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -709,8 +749,27 @@ private fun Controls(
                 IconButton(onClick = onClose, modifier = Modifier.size(52.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.06f))) {
                     Icon(Icons.Rounded.Close, stringResource(R.string.listening_cancel), tint = tokens.textHigh)
                 }
-                Spacer(Modifier.width(20.dp))
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    (if (ready) stringResource(R.string.command_listening) else stringResource(R.string.voice_get_ready)) +
+                        if (elapsedMs > 0) " · ${elapsedLabel(elapsedMs)}" else "",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = tokens.textMedium,
+                )
+                Spacer(Modifier.width(12.dp))
                 IconButton(onClick = onSend, modifier = Modifier.size(68.dp).clip(CircleShape).background(tokens.accent)) {
+                    Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
+                }
+            } else if (paused) {
+                IconButton(onClick = onClose, modifier = Modifier.size(52.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.06f))) {
+                    Icon(Icons.Rounded.Close, stringResource(R.string.listening_cancel), tint = tokens.textHigh)
+                }
+                Spacer(Modifier.width(12.dp))
+                androidx.compose.material3.Button(onClick = onContinue) {
+                    Text(stringResource(R.string.voice_continue))
+                }
+                Spacer(Modifier.width(8.dp))
+                IconButton(onClick = onSend, modifier = Modifier.size(52.dp).clip(CircleShape).background(tokens.accent)) {
                     Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
                 }
             } else {

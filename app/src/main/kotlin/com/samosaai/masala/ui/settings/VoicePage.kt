@@ -362,7 +362,7 @@ private fun SttTestCard() {
             outcome = friendlySttMessage(reason, strings)
         }
         if (!input.start(onFailure)) return
-        // A take only ends by itself at the 90 s cap, and then sends what was heard.
+        // A take only pauses by itself at the 5-minute cap; transcribe what was kept.
         input.setTakeAutoEndListener { end -> if (end == PttEngine.TakeAutoEnd.CapReached) finish() }
         testing = true
     }

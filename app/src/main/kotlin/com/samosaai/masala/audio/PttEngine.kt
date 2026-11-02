@@ -20,6 +20,20 @@ interface PttEngine {
         language: String = "",
     ): Result<String>
 
+    /**
+     * Pause a live take without transcribing: the API capture thread stops but its buffered
+     * audio is kept; the Android recognizer stops but its accumulated transcript is kept.
+     * [resumeListening] continues the same take. Default false: providers without pause support.
+     */
+    suspend fun pauseListening(provider: AudioProvider): Boolean = false
+
+    /** Continue a paused take; false when there is nothing paused to continue. */
+    fun resumeListening(provider: AudioProvider): Boolean = false
+
+    /** True once the current take is actually capturing (first audio window / recognizer ready). */
+    val captureReady: kotlinx.coroutines.flow.StateFlow<Boolean>
+        get() = com.samosaai.masala.audio.NoCaptureReady
+
     fun cancelListening(provider: AudioProvider)
 
     /**
@@ -38,6 +52,9 @@ interface PttEngine {
     /** Reports [TakeAutoEnd]; null stops reports. Default no-op, so fakes ignore it. */
     fun setTakeAutoEndListener(listener: ((TakeAutoEnd) -> Unit)?) {}
 
+    /** Warns once near the take's cap; the take keeps recording. Default no-op. */
+    fun setCapWarningListener(listener: (() -> Unit)?) {}
+
     /**
      * Tap to talk (plan UI refresh U2): listen until a pause of [silenceTimeoutMs] after speech, then
      * transcribe. [finishUtterance] ends it early and still transcribes what was said. No caller
@@ -52,3 +69,6 @@ interface PttEngine {
 
     fun finishUtterance() {}
 }
+
+/** Default "not ready" flow for engines without readiness reporting. */
+internal val NoCaptureReady = kotlinx.coroutines.flow.MutableStateFlow(false)
