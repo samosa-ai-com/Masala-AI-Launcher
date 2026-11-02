@@ -604,6 +604,8 @@ class HomeActivity : ComponentActivity() {
                         onOpenChat = {
                             chatOpen = true
                             expanded = true
+                            chatPrefill = ""
+                            chatPrefillNonce = 0
                             app.chats.latest()?.let { latest ->
                                 app.activeChatId.value = latest.id
                                 app.scope.launch {
@@ -655,6 +657,8 @@ class HomeActivity : ComponentActivity() {
                         app.activeChatId.value = null
                         turns = emptyList()
                         sessionTitle = ""
+                        chatPrefill = ""
+                        chatPrefillNonce = 0
                         // Empty history too: otherwise the agent answers in the new chat
                         // with the old conversation's context.
                         app.commands.restoreSession(emptyList())
@@ -673,25 +677,40 @@ class HomeActivity : ComponentActivity() {
                     onRevertTurn = { index ->
                         val id = activeId ?: return@ChatSurface
                         // The prompt being redone, before the store drops it.
-                        val redone = turns.getOrNull(index)?.text.orEmpty()
+                        val redone = turns.getOrNull(index) ?: return@ChatSurface
                         app.scope.launch {
-                            app.chats.revertTo(id, index)?.let {
-                                turns = it.turns
-                                // Same rule as delete: never cancel a live take or run.
-                                if (app.commands.state.value != CommandState.Listening &&
-                                    app.commands.state.value !is CommandState.Thinking
-                                ) {
-                                    app.commands.restoreSession(it.turns)
-                                }
-                                // Back into the box for editing, like editing the old
-                                // message and sending the edited prompt.
-                                chatPrefill = redone
-                                chatPrefillNonce += 1
+                            // Stop any live take/run first: otherwise the agent keeps
+                            // the removed messages, and its pending reply would land
+                            // in the cut thread with no question above it.
+                            if (app.commands.state.value == CommandState.Listening ||
+                                app.commands.state.value is CommandState.Thinking
+                            ) {
+                                app.commands.dismiss()
                             }
+                            if (index == 0) {
+                                // Redoing the opener restarts the chat: no empty,
+                                // still-titled thread left behind in history. The
+                                // next send starts a fresh session (see recordTurn).
+                                app.chats.delete(id)
+                                app.activeChatId.value = null
+                                turns = emptyList()
+                                sessionTitle = ""
+                                app.commands.restoreSession(emptyList())
+                            } else {
+                                app.chats.revertTo(id, index, expectedAt = redone.at)?.let {
+                                    turns = it.turns
+                                    app.commands.restoreSession(it.turns)
+                                } ?: return@launch
+                            }
+                            // Back into the box for editing, like editing the old
+                            // message and sending the edited prompt.
+                            chatPrefill = redone.text
+                            chatPrefillNonce += 1
                         }
                     },
                     prefill = chatPrefill,
                     prefillNonce = chatPrefillNonce,
+                    onPrefillConsumed = { chatPrefillNonce = 0 },
                 )
             }
             if (showHistory && !hidden) SessionListSheet(
@@ -699,6 +718,8 @@ class HomeActivity : ComponentActivity() {
                 onOpen = { id ->
                     showHistory = false
                     app.activeChatId.value = id
+                    chatPrefill = ""
+                    chatPrefillNonce = 0
                     app.scope.launch {
                         val session = app.chats.get(id) ?: return@launch
                         turns = session.turns
@@ -716,6 +737,8 @@ class HomeActivity : ComponentActivity() {
                             app.activeChatId.value = null
                             turns = emptyList()
                             sessionTitle = ""
+                            chatPrefill = ""
+                            chatPrefillNonce = 0
                             // Its context goes with it.
                             app.commands.restoreSession(emptyList())
                         }

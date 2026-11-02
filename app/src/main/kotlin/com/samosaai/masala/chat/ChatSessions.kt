@@ -111,13 +111,23 @@ class ChatSessions(
     /**
      * Reverts the conversation to the user message at [index]: drops that
      * message and everything after it, so its text can be edited and resent.
-     * Unknown ids and out-of-range indices return null without writing.
+     * Only user turns can be reverted to; [expectedAt] (the turn's timestamp
+     * as the thread showed it) guards against a turn appended mid-tap shifting
+     * positions — a mismatch resolves by timestamp, and an unknown timestamp
+     * reverts nothing. Unknown ids and out-of-range indices return null
+     * without writing.
      */
-    suspend fun revertTo(id: String, index: Int): ChatSession? = lock.withLock { withContext(Dispatchers.IO) {
+    suspend fun revertTo(id: String, index: Int, expectedAt: Long? = null): ChatSession? = lock.withLock { withContext(Dispatchers.IO) {
         val session = loaded[id] ?: read(id) ?: return@withContext null
-        if (index !in session.turns.indices) return@withContext null
+        val resolved = if (expectedAt != null && session.turns.getOrNull(index)?.at != expectedAt) {
+            session.turns.indexOfFirst { it.at == expectedAt }.takeIf { it >= 0 } ?: return@withContext null
+        } else {
+            index
+        }
+        if (resolved !in session.turns.indices) return@withContext null
+        if (session.turns[resolved].role != TurnRole.USER) return@withContext null
         val next = session.copy(
-            turns = session.turns.take(index),
+            turns = session.turns.take(resolved),
             updatedAt = clock(),
         )
         loaded[id] = next

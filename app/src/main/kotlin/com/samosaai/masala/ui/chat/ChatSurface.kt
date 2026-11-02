@@ -122,6 +122,8 @@ fun ChatSurface(
     prefill: String = "",
     /** Bumped every revert so an identical text still replaces what is typed. */
     prefillNonce: Int = 0,
+    /** The box calls this once it has taken the prefill, so it can't refill later. */
+    onPrefillConsumed: () -> Unit = {},
     /** The installed experts, offered in an empty thread and from the header. */
     experts: List<ExpertCredit> = emptyList(),
     onAskExpert: (ExpertCredit) -> Unit = {},
@@ -198,7 +200,7 @@ fun ChatSurface(
                         )
                     }
                 }
-                Controls(listening, mic, level, onSend, onAsk, onClose, prefill, prefillNonce)
+                Controls(listening, mic, level, onSend, onAsk, onClose, prefill, prefillNonce, onPrefillConsumed)
             }
         }
     }
@@ -694,6 +696,7 @@ private fun Controls(
     onClose: () -> Unit,
     prefill: String = "",
     prefillNonce: Int = 0,
+    onPrefillConsumed: () -> Unit = {},
 ) {
     val tokens = MasalaTheme.tokens
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
@@ -713,9 +716,14 @@ private fun Controls(
             } else {
                 var text by remember { mutableStateOf("") }
                 // A revert drops the message back here for editing; the nonce re-applies
-                // even when the same words are reverted twice in a row.
+                // even when the same words are reverted twice in a row. Consuming it
+                // at once stops the old text refilling the box on a later rebuild
+                // (mic, drawer, reopen) or leaking into another chat.
                 LaunchedEffect(prefillNonce) {
-                    if (prefillNonce > 0) text = prefill
+                    if (prefillNonce > 0) {
+                        text = prefill
+                        onPrefillConsumed()
+                    }
                 }
                 androidx.compose.material3.OutlinedTextField(
                     value = text,
