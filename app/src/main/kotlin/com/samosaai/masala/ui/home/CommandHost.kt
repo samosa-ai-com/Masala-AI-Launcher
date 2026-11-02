@@ -12,17 +12,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
-import androidx.compose.material.icons.rounded.AddPhotoAlternate
-import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.clip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,15 +37,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -326,71 +317,33 @@ fun ReplyCard(
                     val takePhoto = androidx.activity.compose.rememberLauncherForActivityResult(
                         androidx.activity.result.contract.ActivityResultContracts.TakePicture(),
                     ) { ok -> if (ok) cameraTarget?.let { addUri(it, "photo") } }
-                    Column(Modifier.weight(1f)) {
-                    com.samosaai.masala.chat.AttachmentStrip(queued, onRemove = { id -> queued = queued.filterNot { it.id == id } })
-                    // Bottom-aligned: as the field grows the buttons stay on its last line.
-                    Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.fillMaxWidth()) {
-                    androidx.compose.material3.IconButton(
-                        onClick = {
+                    com.samosaai.masala.ui.chat.ComposerPill(
+                        value = text,
+                        onValueChange = { text = it },
+                        images = queued,
+                        onRemoveImage = { id -> queued = queued.filterNot { it.id == id } },
+                        onPickPhoto = {
                             if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
                                 android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
                             } else pickImage.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
                         },
-                        modifier = Modifier.padding(bottom = 6.dp).size(44.dp),
-                    ) {
-                        Icon(
-                            Icons.Rounded.AddPhotoAlternate,
-                            stringResource(R.string.chat_attach_image),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    androidx.compose.material3.IconButton(
-                        onClick = {
+                        onTakePhoto = {
                             if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
                                 android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
-                                return@IconButton
+                            } else {
+                                val dir = java.io.File(context.filesDir, "work").apply { mkdirs() }
+                                val file = com.samosaai.masala.tools.PhotoTool.photoFile(dir)
+                                val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+                                cameraTarget = uri
+                                takePhoto.launch(uri)
                             }
-                            val dir = java.io.File(context.filesDir, "work").apply { mkdirs() }
-                            val file = com.samosaai.masala.tools.PhotoTool.photoFile(dir)
-                            val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
-                            cameraTarget = uri
-                            takePhoto.launch(uri)
                         },
-                        modifier = Modifier.padding(bottom = 6.dp).size(44.dp),
-                    ) {
-                        Icon(
-                            Icons.Rounded.PhotoCamera,
-                            stringResource(R.string.chat_take_photo),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    OutlinedTextField(
-                        text,
-                        { text = it },
-                        Modifier.weight(1f).focusRequester(field),
-                        placeholder = { Text(stringResource(R.string.command_hint)) },
-                        minLines = 1,
-                        maxLines = 5,
-                        // The chat composer's shape, so the two read as one input.
-                        shape = RoundedCornerShape(24.dp),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                        keyboardActions = KeyboardActions(onSend = { if (text.text.isNotBlank() || queued.isNotEmpty()) { app.commands.ask(text.text, images = queued.map { it.jpegBase64 }); text = TextFieldValue(""); queued = emptyList() } }),
+                        onMic = micTap,
+                        micLevel = { micLvl },
+                        onSend = { app.commands.ask(text.text, images = queued.map { it.jpegBase64 }); text = TextFieldValue(""); queued = emptyList() },
+                        modifier = Modifier.weight(1f),
+                        fieldModifier = Modifier.focusRequester(field),
                     )
-                    Spacer(Modifier.width(8.dp))
-                    // Same place and size as the mic it replaces once there is something to send.
-                    if (text.text.isNotBlank() || queued.isNotEmpty()) {
-                        val tokens = MasalaTheme.tokens
-                        IconButton(
-                            onClick = { app.commands.ask(text.text, images = queued.map { it.jpegBase64 }); text = TextFieldValue(""); queued = emptyList() },
-                            modifier = Modifier.padding(bottom = 4.dp).size(48.dp).clip(CircleShape).background(tokens.accent),
-                        ) {
-                            Icon(Icons.AutoMirrored.Rounded.Send, stringResource(R.string.skill_send), tint = tokens.onAccent)
-                        }
-                    } else {
-                        MicButton(micTap, level = { micLvl }, modifier = Modifier.padding(bottom = 4.dp))
-                    }
-                    }
-                    }
                 }
             }
         }
