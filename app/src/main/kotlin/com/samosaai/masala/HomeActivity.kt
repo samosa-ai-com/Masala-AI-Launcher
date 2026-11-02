@@ -25,6 +25,9 @@ import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.samosaai.masala.ui.home.DrawerDrag
@@ -318,6 +321,9 @@ class HomeActivity : ComponentActivity() {
         var entrySignal by remember { mutableStateOf(0) }
         var undoOffer by remember { mutableStateOf(false) }
         var undoing by remember { mutableStateOf(false) }
+        // The search pill's top and the toast layer's bottom (root px): the undo pills sit just above the pill.
+        var pillTop by remember { mutableStateOf<Float?>(null) }
+        var toastLayerBottom by remember { mutableStateOf<Float?>(null) }
         LaunchedEffect(currentVersion) {
             val before = lastVersion
             lastVersion = currentVersion
@@ -710,6 +716,7 @@ class HomeActivity : ComponentActivity() {
                 val resumable = pillMinimized && command != CommandState.Idle
                 if (command == CommandState.Idle || pillMinimized) {
                     SearchPill(
+                        modifier = Modifier.onGloballyPositioned { pillTop = it.boundsInRoot().top },
                         onSearch = {
                             if (resumable) openSession(activeId) else { drawerOpen = true; searchRequests++ }
                         },
@@ -864,7 +871,15 @@ class HomeActivity : ComponentActivity() {
                 onDismiss = { showHistory = false },
             )
             if ((undoOffer || hiddenUndo != null) && !hidden) {
-                Box(Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = 150.dp), contentAlignment = Alignment.BottomCenter) {
+                // 12 dp above the search pill once both are measured; before that, the old fixed offset.
+                val density = LocalDensity.current
+                val lift = pillTop?.let { top -> toastLayerBottom?.let { with(density) { (it - top).toDp() } + 12.dp } }
+                Box(
+                    Modifier.fillMaxSize()
+                        .onGloballyPositioned { toastLayerBottom = it.boundsInRoot().bottom }
+                        .then(if (lift != null) Modifier.padding(bottom = lift) else Modifier.navigationBarsPadding().padding(bottom = 150.dp)),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         if (undoOffer) {
                             com.samosaai.masala.ui.components.GlassPill {

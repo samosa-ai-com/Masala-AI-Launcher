@@ -34,7 +34,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -317,6 +320,14 @@ fun HomeScreen(
                     CustomAccessibilityAction(openSettingsLabel) { onOpenSettings(); true },
                 )
             }
+            // Before the insets, so it reaches under the navigation bar: the dock and pill read on light pictures.
+            .drawBehind {
+                val height = BOTTOM_SCRIM.toPx().coerceAtMost(size.height)
+                drawRect(
+                    Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f)), startY = size.height - height, endY = size.height),
+                    topLeft = Offset(0f, size.height - height),
+                )
+            }
             .then(if (applyWindowInsets) Modifier.systemBarsPadding() else Modifier),
     ) {
         Column(Modifier.fillMaxSize()) {
@@ -334,6 +345,9 @@ fun HomeScreen(
         }
     }
 }
+
+/** How far up home's bottom scrim reaches: the dock, the search pill and a little air. */
+private val BOTTOM_SCRIM = 220.dp
 
 @Composable
 private fun DefaultBanner(onSetDefault: () -> Unit) {    Card(Modifier.fillMaxWidth().padding(16.dp)) {

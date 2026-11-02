@@ -788,10 +788,10 @@ private fun ItemGrid(sectionId: String, title: String?, items: List<Item>, colum
 
 @Composable
 private fun Dock(section: DockSection, ctx: RenderContext, pageId: String? = null) {
-    val shape = RoundedCornerShape(30.dp)
+    // No slab: the icons sit on the wallpaper, over home's bottom scrim (plan home-visual-polish).
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).heightIn(min = 78.dp).dropSection(section.id, ctx, pageId).clip(shape)
-            .background(MasalaTheme.tokens.wallpaperGlass).border(1.dp, Color.White.copy(alpha = 0.09f), shape).padding(horizontal = 8.dp),
+        Modifier.fillMaxWidth().padding(horizontal = HOME_GUTTER, vertical = 8.dp).heightIn(min = 78.dp).dropSection(section.id, ctx, pageId)
+            .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
