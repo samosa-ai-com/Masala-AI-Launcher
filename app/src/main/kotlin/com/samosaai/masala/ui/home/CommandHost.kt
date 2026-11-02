@@ -60,6 +60,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -211,17 +218,48 @@ fun ReplyCard(
             runCatching { field.requestFocus() }
         }
     }
+    // Typing on home: a sheet docked to the keyboard, edge to edge, with a grab handle and no Close
+    // button (plan reply-sheet-refresh step 2). Swiping it down, Back, or TalkBack's Close action
+    // closes it. The assist screen keeps the floating card with its header.
+    val docked = sheets && state == CommandState.Input
+    val close = { app.stopSpeaking(); app.commands.minimize() }
+    val closeLabel = stringResource(R.string.command_close)
+    val pull = remember { androidx.compose.animation.core.Animatable(0f) }
+    val closeAt = with(androidx.compose.ui.platform.LocalDensity.current) { 80.dp.toPx() }
     Card(
-        modifier.fillMaxWidth().padding(12.dp),
-        shape = RoundedCornerShape(Radii.sheet),
+        if (docked) {
+            modifier.fillMaxWidth()
+                .graphicsLayer { translationY = pull.value }
+                .draggable(
+                    androidx.compose.foundation.gestures.rememberDraggableState { d -> scope.launch { pull.snapTo((pull.value + d).coerceAtLeast(0f)) } },
+                    androidx.compose.foundation.gestures.Orientation.Vertical,
+                    onDragStopped = { velocity ->
+                        if (pull.value > closeAt || velocity > 1500f) close() else pull.animateTo(0f)
+                    },
+                )
+                .semantics { customActions = listOf(CustomAccessibilityAction(closeLabel) { close(); true }) }
+        } else {
+            modifier.fillMaxWidth().padding(12.dp)
+        },
+        shape = if (docked) RoundedCornerShape(topStart = Radii.sheet, topEnd = Radii.sheet) else RoundedCornerShape(Radii.sheet),
         // Opaque: widgets under a translucent sheet showed through the field.
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer, contentColor = MaterialTheme.colorScheme.onSurface),
         border = BorderStroke(1.dp, MasalaTheme.tokens.hairline),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            // Docked, the sheet runs under the navigation bar; its content stays above it.
+            if (docked) Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp) else Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(if (docked) 10.dp else 8.dp),
+        ) {
+            if (docked) {
+                Box(
+                    Modifier.align(Alignment.CenterHorizontally).size(width = 36.dp, height = 4.dp).clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f)),
+                )
+            }
             // One header: Sam in the corner for a reply or a failure, Read aloud and Close as round
             // icon buttons on the other side (the chat screen's close, not a text link).
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (!docked) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (character != null && (state is CommandState.Reply || state is CommandState.Error)) {
                     val speaking by app.speaking.collectAsStateWithLifecycle()
                     com.samosaai.masala.ui.character.MasalaCharacter(
@@ -238,7 +276,7 @@ fun ReplyCard(
                         }
                     }
                 }
-                CircleAction(Icons.Rounded.Close, stringResource(R.string.command_close)) { app.stopSpeaking(); app.commands.minimize() }
+                CircleAction(Icons.Rounded.Close, closeLabel) { close() }
             }
             // Nothing to show while typing: no empty gap between the header and the field.
             if (state != CommandState.Input) Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -26,6 +26,11 @@ import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -757,7 +762,10 @@ class HomeActivity : ComponentActivity() {
             val voiceReady by app.commands.listeningReady.collectAsStateWithLifecycle()
             if (hidden) Unit else when (val c = command) {
                 CommandState.Input -> Box(
-                    Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(),
+                    // The docked sheet pads itself for the navigation bar and runs under it; only the
+                    // keyboard's height above that lifts it.
+                    Modifier.fillMaxSize().statusBarsPadding()
+                        .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars)),
                     contentAlignment = Alignment.BottomCenter,
                 ) { ReplyCard(app, settings.readRepliesAloud, sheets = true, character = settings.character) }
                 else -> if (chatOpen) ChatSurface(
