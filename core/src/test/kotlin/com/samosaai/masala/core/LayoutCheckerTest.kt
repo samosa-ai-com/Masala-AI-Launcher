@@ -272,4 +272,21 @@ class LayoutCheckerTest {
         val wide = cells(cell("a", 0, 0, w = 4, content = com.samosaai.masala.core.contract.CellContent.WidgetCell(com.samosaai.masala.core.contract.WidgetRef("w"))))
         assertEquals(listOf("$.pages[0].sections[0].cells[0].w"), LayoutChecker.check(wide, withLib).map { it.path })
     }
+
+    @Test
+    fun `HTML cells count toward the per-page WebView cap`() {
+        val html = { app: String -> com.samosaai.masala.core.contract.CellContent.HtmlCell(app) }
+        assertEquals(emptyList(), paths(cells(cell("a", 0, 0, content = html("x")), cell("b", 1, 0, content = html("y")))))
+        val withSection = layout(
+            com.samosaai.masala.core.contract.HtmlSection("h", appId = "z"),
+            com.samosaai.masala.core.contract.CellGridSection("g", cells = listOf(cell("a", 0, 0, content = html("x")), cell("b", 1, 0, content = html("y")))),
+        )
+        assertEquals(listOf("$.pages[0].sections"), paths(withSection))
+    }
+
+    @Test
+    fun `a cell past the grid's row limit is rejected`() {
+        val far = cell("a", 0, LayoutChecker.MAX_GRID_ROWS, content = com.samosaai.masala.core.contract.CellContent.SkillCell("chef"))
+        assertEquals(listOf("$.pages[0].sections[0].cells[0]"), paths(cells(far)))
+    }
 }

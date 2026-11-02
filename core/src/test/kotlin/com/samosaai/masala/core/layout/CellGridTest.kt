@@ -48,9 +48,10 @@ class CellGridTest {
         assertNoOverlap(moved)
     }
 
-    @Test fun moveClampsIntoColumns() {
-        val g = CellGrid.move(grid(cell("a", 0, 0, w = 2)), "a", 9, 1)
-        assertEquals(2 to 1, g.at("a"))
+    @Test fun moveClampsIntoColumnsAndJustBelowTheOthers() {
+        val g = CellGrid.move(grid(cell("a", 0, 0, w = 2), cell("b", 0, 1)), "a", 9, 999)
+        // Below "b" (rows 1..2) is row 2: a far drop lands there, not hundreds of rows down.
+        assertEquals(2 to 2, g.at("a"))
     }
 
     @Test fun resizePushesNeighboursDown() {
@@ -65,5 +66,24 @@ class CellGridTest {
         assertEquals(1 to 0, g.at("b"))
         assertEquals(0 to 1, g.at("c"))
         assertNoOverlap(g)
+    }
+
+    @Test fun aZeroHeightCellIsPlacedAsOneRowInsteadOfLoopingForever() {
+        val g = CellGrid.add(grid(cell("a", 0, 0, w = 4)), cell("b", 0, 0, h = 0))
+        assertEquals(0 to 1, g.at("b"))
+        assertEquals(1, g.cells.first { it.id == "b" }.h)
+        assertEquals(0 to 1, CellGrid.firstFree(grid(cell("a", 0, 0, w = 4)), 1, 0))
+    }
+
+    @Test fun compactJumpsAFarDownCellUpWithoutSteppingRowByRow() {
+        val g = CellGrid.compact(grid(cell("a", 0, 0), cell("b", 0, 1_000_000_000)))
+        assertEquals(0 to 1, g.at("b"))
+    }
+
+    @Test fun badColumnsAndWidthsClampInsteadOfThrowing() {
+        val broken = CellGridSection("g", columns = 0, cells = listOf(cell("a", 5, 0, w = 9)))
+        CellGrid.add(broken, cell("b", 0, 0))
+        CellGrid.move(broken, "a", 0, 0)
+        CellGrid.resize(broken, "a", 3, 1)
     }
 }

@@ -62,4 +62,14 @@ class CellLiftTest {
         )
         assertEquals(LayoutDoc.CURRENT_SCHEMA_VERSION, doc.schemaVersion)
     }
+
+    @Test fun theGridIdNeverClashesWithAnExistingSection() {
+        val doc = LayoutDoc(
+            pages = listOf(
+                Page("home", sections = listOf(HeaderSection("cells-w1"), WidgetSection("w1", ref = WidgetRef("tall")))),
+            ),
+        )
+        val ids = CellLift.fold(doc, mapOf("tall" to tall))!!.pages[0].sections.map { it.id }
+        assertEquals(listOf("cells-w1", "cells-w1-2"), ids)
+    }
 }

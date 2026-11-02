@@ -60,4 +60,10 @@ class CellOverlayTest {
         assertEquals(clock, assertIs<CellContent.WidgetCell>(cells[0].content).widget)
         assertEquals(listOf("missing"), resolved.missingWidgets)
     }
+
+    @Test fun aModeCannotAddAnItemWhoseIdACellAlreadyUses() {
+        val merged = OverlayMerge.merge(base, listOf(ModePatch("m", "M", addItems = listOf(AddItem("g", item("clock"))))))
+        assertEquals(1, merged.conflicts.size)
+        assertEquals(3, cellsOf(merged.layout).size)
+    }
 }

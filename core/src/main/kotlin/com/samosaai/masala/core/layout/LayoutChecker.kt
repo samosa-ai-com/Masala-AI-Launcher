@@ -70,6 +70,9 @@ object LayoutChecker {
     const val MAX_ITEMS_PER_SECTION = 48
     const val MAX_DOCK_ITEMS = 6
     const val MAX_COLUMNS = 6
+
+    /** How far down a cell grid may reach: a bound for imported and generated layouts. */
+    const val MAX_GRID_ROWS = 64
     const val MAX_WIDGETS_IN_STACK = 8
     const val MAX_HTML_PER_PAGE = 2
     /** Declared widget rows on one page (refs, overrides, inline defaults, HTML rows). */
@@ -338,6 +341,8 @@ object LayoutChecker {
             checkRules(cell.rules, "$cellPath.rules", null, problems)
             if (cell.x < 0 || cell.y < 0 || cell.w < 1 || cell.h < 1 || cell.x + cell.w > section.columns) {
                 problems += Problem(cellPath, "A cell needs x >= 0, y >= 0, w and h >= 1, and x + w <= ${section.columns}")
+            } else if (cell.y + cell.h > MAX_GRID_ROWS) {
+                problems += Problem(cellPath, "A cell ends at row ${cell.y + cell.h}; a grid has at most $MAX_GRID_ROWS rows")
             }
             section.cells.take(c).firstOrNull { CellGrid.overlaps(it, cell) }?.let {
                 problems += Problem(cellPath, "Cell '${cell.id}' overlaps '${it.id}'")

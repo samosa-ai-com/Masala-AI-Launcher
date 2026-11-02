@@ -564,15 +564,15 @@ class HomeActivity : ComponentActivity() {
                 },
                 resizingCell = resizingCell,
                 onCellResize = { cellId, w, h ->
-                    resizingCell = null
                     scope.launch {
                         val cell = latestLayout.value.layout.pages.flatMap { it.sections }
                             .filterIsInstance<com.samosaai.masala.core.contract.CellGridSection>().flatMap { it.cells }
                             .firstOrNull { it.id == cellId }
-                        if (cell != null && (cell.w != w || cell.h != h)) {
-                            app.layouts.edit(getString(R.string.widgets_resized)) { LayoutEdits.resizeCell(it, cellId, w, h) }
-                                .firstOrNull()?.let { toast(it.message) }
-                        }
+                        val problem = if (cell != null && (cell.w != w || cell.h != h)) {
+                            app.layouts.edit(getString(R.string.widgets_resized)) { LayoutEdits.resizeCell(it, cellId, w, h) }.firstOrNull()
+                        } else null
+                        // A rejected size keeps the handle up, so the user can try again without the menu.
+                        if (problem != null) toast(problem.message) else resizingCell = null
                     }
                 },
                 onCellDrop = { cellId, target ->

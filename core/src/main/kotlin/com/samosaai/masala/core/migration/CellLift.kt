@@ -31,12 +31,18 @@ object CellLift {
     /** The folded layout, or null when there is nothing to fold. */
     fun fold(layout: LayoutDoc, library: Map<String, WidgetSpec>, columns: Int = 4): LayoutDoc? {
         var changed = false
+        val taken = layout.pages.flatMap { it.sections }.map { it.id }.toMutableSet()
         val pages = layout.pages.map { page ->
             val out = mutableListOf<Section>()
             var run = mutableListOf<Cell>()
             fun flush() {
                 if (run.isEmpty()) return
-                out += CellGridSection("cells-${run.first().id}", columns, run)
+                // Free against every section id, so a layout that already has a grid can't get a twin.
+                var id = "cells-${run.first().id}"
+                var n = 2
+                while (id in taken) id = "cells-${run.first().id}-${n++}"
+                taken += id
+                out += CellGridSection(id, columns, run)
                 run = mutableListOf()
                 changed = true
             }

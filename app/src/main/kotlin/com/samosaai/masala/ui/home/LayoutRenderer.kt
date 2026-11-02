@@ -557,7 +557,7 @@ private fun CellGridView(section: com.samosaai.masala.core.contract.CellGridSect
     BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         val cellWidth = maxWidth / section.columns
         // A drag can push cells below the last row: room for one more row while dragging.
-        val rows = section.rows + if (drag?.draggingCell != null && section.cells.any { it.id == drag.draggingCell?.id }) drag.draggingCell!!.h else 0
+        val rows = section.rows + if (drag?.draggingCell != null && section.cells.any { it.id == drag.draggingCell?.id }) 1 else 0
         Box(
             Modifier.fillMaxWidth().height(CELL_HEIGHT * rows).onGloballyPositioned {
                 if (drag == null) return@onGloballyPositioned
@@ -570,8 +570,8 @@ private fun CellGridView(section: com.samosaai.masala.core.contract.CellGridSect
             for (cell in section.cells) {
                 Box(
                     Modifier
-                        .offset(x = cellWidth * cell.x, y = CELL_HEIGHT * cell.y)
-                        .size(cellWidth * cell.w, CELL_HEIGHT * cell.h)
+                        .offset(x = cellWidth * cell.x.coerceAtLeast(0), y = CELL_HEIGHT * cell.y.coerceAtLeast(0))
+                        .size(cellWidth * cell.w.coerceAtLeast(1), CELL_HEIGHT * cell.h.coerceAtLeast(1))
                         .padding(4.dp)
                         .graphicsLayer { alpha = if (drag?.draggingCell?.id == cell.id) 0.3f else 1f },
                 ) { CellContentView(cell, section.id, ctx, enabled) }
@@ -586,7 +586,7 @@ private fun CellContentView(cell: com.samosaai.masala.core.contract.Cell, gridId
     val rows = cell.h * com.samosaai.masala.core.migration.CellLift.ROWS_PER_CELL
     val fill = Modifier.fillMaxSize()
     when (val content = cell.content) {
-        // Not a drop target or draggable yet (step 4); taps and the item menu work as anywhere else.
+        // Not a drop target or draggable yet (deferred to step 5); taps and the item menu work as anywhere else.
         is com.samosaai.masala.core.contract.CellContent.ItemCell -> ItemCell(content.item, ctx, sectionId = null)
         is com.samosaai.masala.core.contract.CellContent.WidgetCell -> content.widget?.let { spec ->
             ctx.widgets?.let { com.samosaai.masala.ui.home.widgets.WidgetCard(spec, rows, cellSource(it, cell, spec, ctx), fill.cellDrag(cell, gridId, spec, ctx), enabled = enabled) }
@@ -616,6 +616,14 @@ private fun ResizeHandle(cell: com.samosaai.masala.core.contract.Cell, columns: 
     val density = LocalDensity.current
     val cellWidthPx = with(density) { cellWidth.toPx() }
     val cellHeightPx = with(density) { CELL_HEIGHT.toPx() }
+    // Within the widget's own width range and the columns right of it; never an empty range.
+    val spec = when (val c = cell.content) {
+        is com.samosaai.masala.core.contract.CellContent.WidgetCell -> c.widget
+        is com.samosaai.masala.core.contract.CellContent.StackCell -> c.widgets.firstOrNull()
+        else -> null
+    }
+    val maxW = minOf(spec?.size?.maxW ?: columns, columns - cell.x).coerceAtLeast(1)
+    val minW = (spec?.size?.minW ?: 1).coerceIn(1, maxW)
     var w by remember(cell) { mutableStateOf(cell.w) }
     var h by remember(cell) { mutableStateOf(cell.h) }
     var delta by remember(cell) { mutableStateOf(Offset.Zero) }
@@ -649,7 +657,7 @@ private fun ResizeHandle(cell: com.samosaai.masala.core.contract.Cell, columns: 
                     ) { change, amount ->
                         change.consume()
                         delta += amount
-                        w = (cell.w + kotlin.math.round(delta.x / cellWidthPx).toInt()).coerceIn(1, columns - cell.x)
+                        w = (cell.w + kotlin.math.round(delta.x / cellWidthPx).toInt()).coerceIn(minW, maxW)
                         h = (cell.h + kotlin.math.round(delta.y / cellHeightPx).toInt()).coerceAtLeast(1)
                     }
                 },

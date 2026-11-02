@@ -53,4 +53,11 @@ class CellEditsTest {
         assertTrue(d.pages[0].sections.none { it is CellGridSection })
         assertEquals(listOf(LayoutEdits.WidgetPlacement("home", "b")), LayoutEdits.widgetPlacements(doc, "b"))
     }
+
+    @Test fun aFarDragDropLandsOnTheRowBelowTheGrid() {
+        val moved = assertNotNull(LayoutEdits.moveCell(doc, "a", 0, 999))
+        val grid = moved.pages[0].sections.filterIsInstance<CellGridSection>().single()
+        assertEquals(2, cells(moved).first { it.id == "a" }.y)
+        assertEquals(3, grid.rows)
+    }
 }
