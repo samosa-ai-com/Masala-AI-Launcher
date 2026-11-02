@@ -16,6 +16,7 @@ import com.samosaai.masala.core.layout.LayoutEdits
 import com.samosaai.masala.core.layout.LayoutHistory
 import com.samosaai.masala.core.layout.ResolveCache
 import com.samosaai.masala.core.layout.ResolvedLayout
+import com.samosaai.masala.core.migration.CellLift
 import com.samosaai.masala.core.migration.LayoutMigrations
 import com.samosaai.masala.core.migration.WidgetLift
 import com.samosaai.masala.widgets.WidgetLibrary
@@ -144,6 +145,7 @@ class LayoutRepository(
             lock.withLock { push("Classic", classic) }
         }
         liftInlineWidgets()
+        foldIntoCells()
         // Heal layouts bricked by the old delete order (library deleted before refs stripped):
         // an undo or a crash could leave refs to missing widgets that reject every later edit.
         history.current?.let { repairDanglingRefs(it) }
@@ -178,6 +180,19 @@ class LayoutRepository(
         }
         val lifted = liftedBase?.value
         if (lifted != null && lifted != current.layout) lock.withLock { push("Widgets to library", lifted) }
+    }
+
+    /**
+     * Schema 4 once per install: the home's widget sections become one cell grid each run, looking
+     * as before (plan `docs/plans/home-cell-grid.md`), as one undoable version. Once only, so an undo
+     * back past it stays undone; later placements land in grids anyway.
+     */
+    private suspend fun foldIntoCells() {
+        if (pointer.getBoolean(KEY_CELLS_FOLDED, false)) return
+        val current = history.current ?: return
+        val folded = CellLift.fold(current.layout, widgets.current())
+        if (folded != null) lock.withLock { push("Widgets to grid", folded) }
+        pointer.edit().putBoolean(KEY_CELLS_FOLDED, true).commit()
     }
 
     private suspend fun push(label: String, layout: LayoutDoc) {
@@ -548,6 +563,7 @@ class LayoutRepository(
     internal companion object {
         private const val TAG = "LayoutRepository"
         private const val KEY_CURRENT = "current"
+        private const val KEY_CELLS_FOLDED = "cells_folded"
 
         /** [doc] without the items that open mini-app [id], in any section, the dock and folders included. */
         fun withoutMiniApp(doc: LayoutDoc, id: String): LayoutDoc =
