@@ -164,6 +164,8 @@ class CommandController(
     fun openInput(prefill: String = "") {
         job?.cancel()
         draft = prefill
+        // Asking to type is coming back: a chat minimized earlier would hide the card.
+        _minimized.value = false
         _state.value = CommandState.Input
     }
 
