@@ -531,6 +531,14 @@ private fun ResultCard(result: ChatResult) {
             WallpaperPreview(result, app)
             return@Column
         }
+        if (result.kind == "image" || result.kind == "segmentation") {
+            GeneratedPreview(result, app)
+            return@Column
+        }
+        if (result.kind == "audio") {
+            AudioPreview(result)
+            return@Column
+        }
         val canOpen = miniApp || result.kind == "installed_app"
         if (canOpen) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -584,6 +592,63 @@ private fun WallpaperPreview(result: ChatResult, app: com.samosaai.masala.Masala
     Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
         TextButton(onClick = { run { app.wallpaperTool.setWallpaper(result.ref, "both") } }) { Text(stringResource(R.string.wallpaper_set_both)) }
         TextButton(onClick = { run { app.wallpaperTool.saveToGallery(result.ref) } }) { Text(stringResource(R.string.result_save)) }
+    }
+}
+
+/** A generated/segmented image: sampled preview with gallery Save. */
+@Composable
+private fun GeneratedPreview(result: ChatResult, app: com.samosaai.masala.MasalaApp) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var bitmap by remember(result.ref) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    LaunchedEffect(result.ref) {
+        bitmap = withContext(Dispatchers.IO) { decodePreview(result.ref) }
+    }
+    bitmap?.let {
+        androidx.compose.foundation.Image(
+            it, result.title.ifBlank { null },
+            modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(8.dp)),
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+        )
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = {
+            scope.launch {
+                val r = runCatching { app.wallpaperTool.saveToGallery(result.ref) }
+                    .getOrElse { com.samosaai.masala.core.tool.ActionResult.error(it.message ?: "?") }
+                android.widget.Toast.makeText(context, r.message, android.widget.Toast.LENGTH_LONG).show()
+            }
+        }) { Text(stringResource(R.string.result_save)) }
+    }
+}
+
+/** A synthesized clip: plays the saved file. */
+@Composable
+private fun AudioPreview(result: ChatResult) {
+    val context = LocalContext.current
+    var playing by remember(result.ref) { mutableStateOf(false) }
+    var player by remember(result.ref) { mutableStateOf<android.media.MediaPlayer?>(null) }
+    androidx.compose.runtime.DisposableEffect(result.ref) {
+        onDispose { runCatching { player?.release() }; player = null }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = {
+            runCatching {
+                if (playing) {
+                    player?.stop(); runCatching { player?.release() }; player = null; playing = false
+                } else {
+                    val mp = android.media.MediaPlayer().apply {
+                        setDataSource(result.ref)
+                        prepare()
+                        start()
+                        setOnCompletionListener { playing = false }
+                    }
+                    player = mp; playing = true
+                }
+            }.onFailure {
+                android.widget.Toast.makeText(context, it.message ?: "?", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }) { Text(if (playing) stringResource(R.string.media_stop) else stringResource(R.string.media_play)) }
     }
 }
 

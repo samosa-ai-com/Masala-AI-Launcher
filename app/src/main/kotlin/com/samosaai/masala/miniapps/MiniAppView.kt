@@ -104,7 +104,8 @@ fun MiniAppView(
                     // Fill the slot: a wrap-content WebView gives the page a collapsed viewport, so
                     // `height: 100%` layouts squash to the top.
                     layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-                    hostMiniApp(this, appId, html, networkAllowed) { line -> MiniAppConsole.record(appId, line) }
+                    val masalaApp = ctx.applicationContext as? com.samosaai.masala.MasalaApp
+                    hostMiniApp(this, appId, html, networkAllowed, masalaApp) { line -> MiniAppConsole.record(appId, line) }
                     webView = this
                     onWebView(this)
                 }
@@ -213,6 +214,7 @@ internal fun hostMiniApp(
     appId: String,
     html: String,
     networkAllowed: Boolean,
+    app: com.samosaai.masala.MasalaApp? = null,
     onPageFinished: () -> Unit = {},
     onConsole: (String) -> Unit,
 ) {
@@ -237,6 +239,10 @@ internal fun hostMiniApp(
     wv.webViewClient = object : WebViewClient() {
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
             val url = request.url.toString()
+            // Mediated media bridge first: keys never enter JS, per-app opt-in.
+            if (app != null) {
+                runCatching { MiniAppMediaBridge.intercept(app, appId, url) }.getOrNull()?.let { return it }
+            }
             // The document itself, and in-page routing, come from the stored HTML.
             if (url == origin || url.startsWith(origin + "#") || url.startsWith(origin + "?")) {
                 return WebResourceResponse(

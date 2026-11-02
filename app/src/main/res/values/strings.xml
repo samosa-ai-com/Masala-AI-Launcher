@@ -647,6 +647,8 @@
     <string name="command_transcribing">Transcribing…</string>
     <string name="command_thinking">Thinking…</string>
     <string name="command_read_aloud">Read aloud</string>
+    <string name="media_play">Play</string>
+    <string name="media_stop">Stop</string>
     <string name="command_close">Close</string>
     <string name="skill_missing">That skill isn’t available</string>
     <string name="skill_new_chat">New chat</string>
