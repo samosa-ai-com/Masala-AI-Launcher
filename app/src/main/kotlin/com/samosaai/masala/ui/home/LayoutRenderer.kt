@@ -543,11 +543,11 @@ private fun CellContentView(cell: com.samosaai.masala.core.contract.Cell, ctx: R
         // Not a drop target or draggable yet (step 4); taps and the item menu work as anywhere else.
         is com.samosaai.masala.core.contract.CellContent.ItemCell -> ItemCell(content.item, ctx, sectionId = null)
         is com.samosaai.masala.core.contract.CellContent.WidgetCell -> content.widget?.let { spec ->
-            ctx.widgets?.let { com.samosaai.masala.ui.home.widgets.WidgetCard(spec, rows, it, fill, enabled = enabled) }
+            ctx.widgets?.let { com.samosaai.masala.ui.home.widgets.WidgetCard(spec, rows, cellSource(it, cell, spec, ctx), fill, enabled = enabled) }
                 ?: Placeholder(spec.title ?: spec.id, stringResource(R.string.home_widget_placeholder), rows)
         }
         is com.samosaai.masala.core.contract.CellContent.StackCell -> if (content.widgets.isNotEmpty()) {
-            ctx.widgets?.let { com.samosaai.masala.ui.home.widgets.StackCard(content.widgets, rows, it, fill, enabled = enabled) }
+            ctx.widgets?.let { com.samosaai.masala.ui.home.widgets.StackCard(content.widgets, rows, cellSource(it, cell, content.widgets.first(), ctx), fill, enabled = enabled) }
                 ?: Placeholder(content.widgets.first().title ?: content.widgets.first().id, stringResource(R.string.home_stack_placeholder, content.widgets.size), rows)
         }
         is com.samosaai.masala.core.contract.CellContent.SkillCell -> {
@@ -559,6 +559,17 @@ private fun CellContentView(cell: com.samosaai.masala.core.contract.Cell, ctx: R
             com.samosaai.masala.miniapps.MiniAppView(row.id, row.html, row.networkAllowed, fill)
         } ?: Placeholder(content.appId, stringResource(R.string.home_widget_placeholder), rows)
     }
+}
+
+/** A widget cell's long-press opens the widget menu for that placement (by cell id); never while locked. */
+private fun cellSource(
+    source: com.samosaai.masala.ui.home.widgets.WidgetSource,
+    cell: com.samosaai.masala.core.contract.Cell,
+    spec: com.samosaai.masala.core.contract.WidgetSpec,
+    ctx: RenderContext,
+): com.samosaai.masala.ui.home.widgets.WidgetSource {
+    val menu = ctx.onWidgetMenu?.takeIf { !ctx.locked && ctx.isBaseSection(cell.id) } ?: return source
+    return source.copy(onLongPress = { menu(spec, cell.id) })
 }
 
 /** Columns that fit: the section's own number, fewer when the screen is narrow or the text is large. */

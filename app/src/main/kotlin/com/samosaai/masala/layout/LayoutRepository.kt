@@ -292,6 +292,14 @@ class LayoutRepository(
     }
 
     /** Sets the per-placement height override on every ref of [widgetId]. */
+    /** Sets one cell's width in cells, keeping its height; cells in the way go down. */
+    suspend fun resizeCellWidth(label: String, cellId: String, width: Int): List<LayoutChecker.Problem> =
+        edit(label) { doc ->
+            val cell = doc.pages.flatMap { it.sections }.filterIsInstance<com.samosaai.masala.core.contract.CellGridSection>()
+                .flatMap { it.cells }.firstOrNull { it.id == cellId }
+            cell?.let { LayoutEdits.resizeCell(doc, cellId, width, it.h) }
+        }
+
     suspend fun resizeWidget(label: String, widgetId: String, rows: Int): List<LayoutChecker.Problem> =
         edit(label) { LayoutEdits.resizeWidget(it, widgetId, rows) }
 
@@ -317,6 +325,13 @@ class LayoutRepository(
         } else {
             doc?.let { LayoutEdits.widgetPlacements(it, widgetId).firstOrNull() }
         } ?: return listOf(LayoutChecker.Problem("$", "Widget '$widgetId' is not on home"))
+        // A cell (on a grid) moves by rows or onto the other page's grid.
+        if (LayoutEdits.isCell(doc, at.sectionId)) {
+            if (targetPageId == null && LayoutEdits.moveCellBy(doc, at.sectionId, steps) == null) {
+                return listOf(LayoutChecker.Problem("$", "Widget '$widgetId' is already at the ${if (steps < 0) "top" else "bottom"}"))
+            }
+            return edit(label) { LayoutEdits.moveCellBy(it, at.sectionId, steps, targetPageId) }
+        }
         val section = doc.pages.flatMap { it.sections }.firstOrNull { it.id == at.sectionId }
         if (targetPageId == null) {
             // The dock never moves: measure bounds in the movable sections only, so stopping

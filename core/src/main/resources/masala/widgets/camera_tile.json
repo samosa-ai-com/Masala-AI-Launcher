@@ -9,6 +9,6 @@
       { "type": "video", "stream": { "sourceId": "front-door" } },
       { "type": "text", "binding": { "source": "stream_status", "key": "front-door" }, "style": { "align": "end" } }
     ],
-    "size": { "min": 2, "default": 3, "max": 5 }
+    "size": { "min": 2, "default": 3, "max": 5, "minW": 2, "defaultW": 2, "maxW": 4 }
   }
 }
