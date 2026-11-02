@@ -227,6 +227,8 @@ class HomeActivity : ComponentActivity() {
         var itemMenuFor by remember { mutableStateOf<Item?>(null) }
         var widgetMenuFor by remember { mutableStateOf<Pair<com.samosaai.masala.core.contract.WidgetSpec, String>?>(null) }
         var addWidgetSheet by remember { mutableStateOf(false) }
+        // Long-press on empty home space: Change wallpaper / Add widget / Settings.
+        var homeMenu by remember { mutableStateOf(false) }
         var renamingItem by remember { mutableStateOf<Item?>(null) }
         var choosingIconForApp by remember { mutableStateOf<com.samosaai.masala.data.MiniAppEntity?>(null) }
         var deletingMiniApp by remember { mutableStateOf<com.samosaai.masala.data.MiniAppEntity?>(null) }
@@ -608,9 +610,9 @@ class HomeActivity : ComponentActivity() {
             onSwipeDown = { run(settings.swipeDown) },
             onOpenSettings = ::openSettings,
             onAddWidget = {
-                // Never pop the sheet under a live drag (a press the drag already owns still
+                // Never pop the menu under a live drag (a press the drag already owns still
                 // reaches the background detector on surfaces that consume nothing, like video).
-                if (drag.dragging == null && drag.draggingSection == null) addWidgetSheet = true
+                if (drag.dragging == null && drag.draggingSection == null) homeMenu = true
             },
             onLaunchShortcut = ::launchShortcut,
             onUnpinShortcut = {
@@ -1052,6 +1054,18 @@ class HomeActivity : ComponentActivity() {
                 } } },
                 onEdit = { done { startActivity(Intent(this@HomeActivity, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_PAGE, "WIDGETS")) } },
                 onDismiss = { widgetMenuFor = null },
+            )
+        }
+
+        if (homeMenu) {
+            com.samosaai.masala.ui.home.HomeLongPressMenu(
+                onWallpaper = {
+                    homeMenu = false
+                    startActivity(Intent(this@HomeActivity, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_PAGE, "WALLPAPERS"))
+                },
+                onWidgets = { homeMenu = false; addWidgetSheet = true },
+                onSettings = { homeMenu = false; openSettings() },
+                onDismiss = { homeMenu = false },
             )
         }
 

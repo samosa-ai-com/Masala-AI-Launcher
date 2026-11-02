@@ -20,11 +20,19 @@ class AiConnectionTest {
     """.trimIndent()
 
     @Test
-    fun `models sort into chat, transcription and voices`() {
+    fun `models sort into chat, transcription, voices and images`() {
         val found = AiConnection.classify(body, 12)
         assertEquals(listOf("llama-3.3-70b", "muse-spark-1.3"), found.chat)
         assertEquals(listOf("muse-voice-transcribe-1.0", "whisper-large-v3"), found.transcription)
         assertEquals(listOf("gpt-4o-mini-tts", "kokoro"), found.voices)
+        assertEquals(emptyList(), found.images)
+    }
+
+    @Test
+    fun `image models land in images, not chat`() {
+        val found = AiConnection.classify("""{"data":[{"id":"muse-image-1.0"},{"id":"muse-spark-1.3"}]}""", 1)
+        assertEquals(listOf("muse-image-1.0"), found.images)
+        assertEquals(listOf("muse-spark-1.3"), found.chat)
     }
 
     @Test

@@ -5,7 +5,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Rect
@@ -28,9 +27,10 @@ import java.util.concurrent.TimeUnit
  * Sets the wallpaper from anything the user points at — a link, a `content://` URI from a picker, a
  * `file://` path or a bare path.
  *
- * The image is fitted, not cropped: it is scaled to fit inside the screen and the leftover bars are
- * filled with the average colour of the image's own edges, so a portrait photo on a tall screen
- * keeps its whole frame. Delivery goes through [WallpaperManager.setStream] with a compressed JPEG:
+ * The image covers the screen (centre-crop): it is scaled to fill the screen and the overflow is
+ * cropped symmetrically, so there are never bars. A portrait photo on a tall screen keeps its
+ * full height and loses its sides.
+ * Delivery goes through [WallpaperManager.setStream] with a compressed JPEG:
  * `setBitmap` pushes the bitmap across Binder and fails on high-DPI screens.
  */
 class WallpaperTool(private val context: Context) {
@@ -95,6 +95,35 @@ class WallpaperTool(private val context: Context) {
         }
     }
 
+    /** Copies a wallpaper file into the gallery (Pictures/Masala), for keeps. */
+    suspend fun saveToGallery(path: String): ActionResult = withContext(Dispatchers.IO) {
+        val file = File(path)
+        if (!file.canRead()) return@withContext ActionResult.error("Couldn't read '${file.name}'.")
+        runCatching {
+            val values = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, file.nameWithoutExtension + ".png")
+                put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png")
+                if (Build.VERSION.SDK_INT >= 29) {
+                    put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Masala")
+                    put(android.provider.MediaStore.Images.Media.IS_PENDING, 1)
+                }
+            }
+            val resolver = context.contentResolver
+            val uri = resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                ?: error("No slot")
+            resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } }
+                ?: error("No stream")
+            if (Build.VERSION.SDK_INT >= 29) {
+                values.clear()
+                values.put(android.provider.MediaStore.Images.Media.IS_PENDING, 0)
+                resolver.update(uri, values, null, null)
+            }
+        }.fold(
+            onSuccess = { ActionResult.ok("Saved to the gallery.") },
+            onFailure = { ActionResult.error("Couldn't save to the gallery: ${it.message}") },
+        )
+    }
+
     /**
      * Turns [source] into a readable local file: downloads a URL, copies content URIs out of the
      * provider (their permission may lapse), and resolves file:// and bare paths.
@@ -140,9 +169,10 @@ class WallpaperTool(private val context: Context) {
     }.getOrNull()
 
     /**
-     * Decodes to screen size, honouring EXIF rotation, then draws the image centred on a screen-sized
-     * canvas filled with the average colour of the image's edges. The whole photo survives; the bars
-     * blend into it.
+     * Decodes to screen size, honouring EXIF rotation, then draws the image covering a screen-sized
+     * canvas (centre-crop): the scale covers the screen on both axes and the overflow is cropped
+     * symmetrically, so there are never bars. Wide and square images lose their sides, but a
+     * wallpaper with bars reads as broken.
      */
     private fun composeForScreen(file: File): Bitmap? {
         val (screenW, screenH) = screenSize()
@@ -168,14 +198,13 @@ class WallpaperTool(private val context: Context) {
         ) ?: return null
 
         val upright = applyExif(decoded, orientation).also { if (it !== decoded) decoded.recycle() }
-        val fill = averageEdgeColour(upright)
 
         val out = Bitmap.createBitmap(screenW, screenH, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(out)
-        canvas.drawColor(fill)
 
-        // Fit: the larger of the two ratios keeps the whole image inside the screen.
-        val scale = minOf(screenW.toFloat() / upright.width, screenH.toFloat() / upright.height)
+        // Fill: the smaller of the two ratios would letterbox; the larger covers the screen and
+        // the overflow is cropped by the centred destination rect.
+        val scale = maxOf(screenW.toFloat() / upright.width, screenH.toFloat() / upright.height)
         val drawW = (upright.width * scale).toInt().coerceAtLeast(1)
         val drawH = (upright.height * scale).toInt().coerceAtLeast(1)
         val dst = Rect((screenW - drawW) / 2, (screenH - drawH) / 2, (screenW + drawW) / 2, (screenH + drawH) / 2)
@@ -184,33 +213,6 @@ class WallpaperTool(private val context: Context) {
         return out
     }
 
-    /** Average of the outermost pixels: cheap, and the bars it paints blend into the photo. */
-    private fun averageEdgeColour(bitmap: Bitmap): Int {
-        val stepX = (bitmap.width / 16).coerceAtLeast(1)
-        val stepY = (bitmap.height / 16).coerceAtLeast(1)
-        var r = 0L
-        var g = 0L
-        var b = 0L
-        var n = 0L
-        fun add(x: Int, y: Int) {
-            val c = bitmap.getPixel(x.coerceIn(0, bitmap.width - 1), y.coerceIn(0, bitmap.height - 1))
-            r += Color.red(c); g += Color.green(c); b += Color.blue(c); n++
-        }
-        var x = 0
-        while (x < bitmap.width) {
-            add(x, 0)
-            add(x, bitmap.height - 1)
-            x += stepX
-        }
-        var y = 0
-        while (y < bitmap.height) {
-            add(0, y)
-            add(bitmap.width - 1, y)
-            y += stepY
-        }
-        if (n == 0L) return Color.BLACK
-        return Color.rgb((r / n).toInt(), (g / n).toInt(), (b / n).toInt())
-    }
 
     private fun applyExif(bitmap: Bitmap, orientation: Int): Bitmap {
         val matrix = Matrix()

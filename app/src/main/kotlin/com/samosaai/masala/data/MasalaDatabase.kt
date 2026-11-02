@@ -41,8 +41,9 @@ import kotlinx.coroutines.flow.Flow
         WidgetVersionEntity::class,
         StreamSourceEntity::class,
         WidgetHttpValueEntity::class,
+        WallpaperEntity::class,
     ],
-    version = 8,
+    version = 9,
 )
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
@@ -58,6 +59,7 @@ abstract class MasalaDatabase : RoomDatabase() {
     abstract fun httpValues(): WidgetHttpValueDao
     abstract fun wikiPages(): WikiDao
     abstract fun appLaunches(): AppLaunchDao
+    abstract fun wallpapers(): WallpaperDao
 
     companion object {
         /** UI refresh U3: the launch log behind the globe drawer and "Suggested now". */
@@ -111,9 +113,16 @@ abstract class MasalaDatabase : RoomDatabase() {
             }
         }
 
+        /** Generated wallpapers (plan `docs/plans/wallpaper-generation.md`): file + prompt catalog. */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `wallpapers` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fileName` TEXT NOT NULL, `prompt` TEXT NOT NULL, `style` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)")
+            }
+        }
+
         fun create(context: Context): MasalaDatabase =
             Room.databaseBuilder(context, MasalaDatabase::class.java, "masala.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8).build()
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9).build()
     }
 }
 
@@ -138,6 +147,34 @@ interface AppLaunchDao {
 
     @Query("DELETE FROM app_launches WHERE at < :before")
     suspend fun prune(before: Long): Int
+}
+
+/**
+ * One AI-generated wallpaper (plan `docs/plans/wallpaper-generation.md`): the file under
+ * `filesDir/wallpapers/` plus the prompt that made it, so the catalog can search it.
+ */
+@Entity(tableName = "wallpapers")
+data class WallpaperEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val fileName: String,
+    val prompt: String,
+    val style: String = "",
+    val createdAt: Long,
+)
+
+@Dao
+interface WallpaperDao {
+    @Insert
+    suspend fun insert(wallpaper: WallpaperEntity): Long
+
+    @Query("SELECT * FROM wallpapers ORDER BY createdAt DESC")
+    suspend fun all(): List<WallpaperEntity>
+
+    @Query("SELECT * FROM wallpapers WHERE prompt LIKE '%' || :query || '%' OR style LIKE '%' || :query || '%' ORDER BY createdAt DESC")
+    suspend fun search(query: String): List<WallpaperEntity>
+
+    @Query("DELETE FROM wallpapers WHERE id = :id")
+    suspend fun delete(id: Long)
 }
 
 /** A saved home layout (Phase 2): the `LayoutDoc` JSON, labeled for undo and the version list. */

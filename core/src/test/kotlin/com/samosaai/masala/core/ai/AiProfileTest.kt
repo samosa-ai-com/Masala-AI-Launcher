@@ -15,8 +15,9 @@ class AiProfileTest {
     }
 
     @Test
-    fun `only Meta names a model, and every fixed URL is already normalized`() {
+    fun `only Meta names models, and every fixed URL is already normalized`() {
         assertEquals(listOf("meta"), ProviderPresets.all.filter { it.defaultChatModel.isNotBlank() }.map { it.id })
+        assertEquals(listOf("meta"), ProviderPresets.all.filter { it.defaultImageModel.isNotBlank() }.map { it.id })
         ProviderPresets.all.filter { it.baseUrl.isNotBlank() }.forEach {
             assertEquals(it.baseUrl, AiValidation.normalizeBaseUrl(it.baseUrl).getOrThrow(), it.id)
         }
@@ -52,6 +53,15 @@ class AiProfileTest {
     }
 
     @Test
+    fun `image-capable presets are openai, meta, gemini, openrouter and custom`() {
+        assertEquals(
+            listOf("openai", "meta", "gemini", "openrouter", "custom"),
+            ProviderPresets.all.filter { it.capabilities.image }.map { it.id },
+        )
+        assertEquals("muse-image-1.0", ProviderPresets.Meta.defaultImageModel)
+    }
+
+    @Test
     fun `a profile names what is missing before anything is sent`() {
         val ok = AiProfile(Endpoint("meta", "https://api.meta.ai/v1/", "muse-spark-1.3"))
         assertTrue(AiValidation.problems(ok) { true }.isEmpty())
@@ -62,5 +72,27 @@ class AiProfileTest {
         assertTrue("chat: no model" in problems, problems.toString())
         assertTrue(problems.any { it.startsWith("voice in: NOT_HTTP") }, problems.toString())
         assertTrue(problems.none { it.startsWith("chat: no API key") }, "LM Studio needs no key: $problems")
+    }
+
+    @Test
+    fun `image role is validated like the other server roles`() {
+        val ok = AiProfile(
+            Endpoint("meta", "https://api.meta.ai/v1/", "muse-spark-1.3"),
+            image = Endpoint("meta", "https://api.meta.ai/v1/", "muse-image-1.0"),
+        )
+        assertTrue(AiValidation.problems(ok) { true }.isEmpty())
+        // Blank image model is fine (the server is asked for its first image model).
+        val blank = AiProfile(
+            Endpoint("meta", "https://api.meta.ai/v1/", "muse-spark-1.3"),
+            image = Endpoint("meta", "https://api.meta.ai/v1/", ""),
+        )
+        assertTrue(AiValidation.problems(blank) { true }.isEmpty())
+        val bad = AiProfile(
+            Endpoint("meta", "https://api.meta.ai/v1/", "muse-spark-1.3"),
+            image = Endpoint("custom", "ftp://x"),
+        )
+        val problems = AiValidation.problems(bad) { false }
+        assertTrue(problems.any { it.startsWith("image: NOT_HTTP") }, problems.toString())
+        assertTrue(problems.any { it == "image: no API key for Custom" }, problems.toString())
     }
 }

@@ -24,6 +24,13 @@ class AudioModelClassifyTest {
     }
 
     @Test
+    fun `image models classify as image, never chat`() {
+        assertEquals(ModelCategory.IMAGE, AudioModel.categorize("muse-image-1.0"))
+        assertEquals(ModelCategory.IMAGE, AudioModel.categorize("dall-e-3", task = "image-generation"))
+        assertEquals(ModelCategory.IMAGE, AudioModel.categorize("mystery-model", task = "image-generation"))
+    }
+
+    @Test
     fun `an explicit task hint still wins`() {
         assertEquals(ModelCategory.STT, AudioModel.categorize("mystery-model", task = "transcription"))
         assertEquals(ModelCategory.TTS, AudioModel.categorize("mystery-model", task = "text-to-speech"))

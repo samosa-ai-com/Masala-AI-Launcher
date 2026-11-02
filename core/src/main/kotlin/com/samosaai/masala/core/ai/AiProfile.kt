@@ -13,9 +13,11 @@ data class Endpoint(val presetId: String, val baseUrl: String, val model: String
 enum class MicMode { TAP, HOLD }
 
 /**
- * The AI and voice choices (plan UI refresh U2): chat, voice in and voice out, each a provider and
- * model, mixed freely. Voice in and out may be "on this phone" (null endpoint): Android's recognizer
- * and text-to-speech. Pure data, so `:core` tests cover validation without Android.
+ * The AI and voice choices (plan UI refresh U2): chat, voice in, voice out and image
+ * generation, each a provider and model, mixed freely. Voice in and out may be "on this
+ * phone" (null endpoint): Android's recognizer and text-to-speech. Image generation is
+ * always a server endpoint (null = unset). Pure data, so `:core` tests cover validation
+ * without Android.
  */
 @Serializable
 data class AiProfile(
@@ -24,6 +26,8 @@ data class AiProfile(
     val voiceIn: Endpoint? = null,
     /** Null: the phone's voice. */
     val voiceOut: Endpoint? = null,
+    /** Null: image generation unset. Blank model = ask the server (first image model). */
+    val image: Endpoint? = null,
     val micMode: MicMode = MicMode.TAP,
     /** ISO 639-1 code, blank = the phone's language. */
     val voiceLanguage: String = "",
@@ -49,7 +53,7 @@ data class AiProfile(
     val handsFree: Boolean? = null,
 ) {
     /** Every endpoint the profile uses, for "what leaves the phone" and key lookups. */
-    val endpoints: List<Endpoint> get() = listOfNotNull(chat, voiceIn, voiceOut)
+    val endpoints: List<Endpoint> get() = listOfNotNull(chat, voiceIn, voiceOut, image)
 
     companion object {
         const val MIN_RATE = 0.5f
@@ -83,7 +87,7 @@ object AiValidation {
 
     /** Problems with [profile] that would make a call fail before it is sent; empty when usable. */
     fun problems(profile: AiProfile, hasKey: (presetId: String) -> Boolean): List<String> = buildList {
-        for ((role, e) in listOf("chat" to profile.chat, "voice in" to profile.voiceIn, "voice out" to profile.voiceOut)) {
+        for ((role, e) in listOf("chat" to profile.chat, "voice in" to profile.voiceIn, "voice out" to profile.voiceOut, "image" to profile.image)) {
             if (e == null) continue
             normalizeBaseUrl(e.baseUrl).onFailure { add("$role: ${(it as? InvalidUrl)?.problem ?: UrlProblem.EMPTY}") }
             if (e.preset.keyKind == KeyKind.KEY && !hasKey(e.presetId)) add("$role: no API key for ${e.preset.name}")

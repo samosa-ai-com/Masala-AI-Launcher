@@ -31,7 +31,7 @@ object MasalaTools {
         val device = DeviceTool(app)
         val phone = PhoneTool(app)
         val system = SystemTool(app)
-        val wallpaper = WallpaperTool(app)
+        val wallpaper = (app as? com.samosaai.masala.MasalaApp)?.wallpaperTool ?: WallpaperTool(app)
         val webSearch = WebSearchTool()
         val webFetch = WebFetchTool()
         val capture = MediaCaptureTool(app, files)
@@ -63,6 +63,11 @@ object MasalaTools {
             },
             FunctionTool(Defs.setWallpaper, CHANGES_SOMETHING, usesNetwork = true) {
                 wallpaper.setWallpaper(it.string("url"), it.string("target"))
+            },
+            FunctionTool(Defs.generateWallpaper, CHANGES_SOMETHING, usesNetwork = true) {
+                val prompt = it.string("prompt") ?: return@FunctionTool missing("prompt")
+                GenerateWallpaperTool(app, host().aiSettings, wallpaper, host().wallpapers)
+                    .generate(prompt, it.string("style"), it.string("target"))
             },
             FunctionTool(Defs.listCalendarEvents, READ_ONLY, readsPrivateData = true) {
                 calendar.listEvents(

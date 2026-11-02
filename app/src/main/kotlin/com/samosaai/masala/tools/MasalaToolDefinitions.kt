@@ -87,6 +87,37 @@ object MasalaToolDefinitions {
         }
     )
 
+    val generateWallpaper = tool(
+        "generate_wallpaper",
+        "Generate a portrait phone wallpaper from a text description with the configured image " +
+            "model. The picture is saved to the wallpaper catalog with its prompt (searchable " +
+            "later) and returned as a preview. Pass target to apply it at once (home, lock or " +
+            "both); otherwise preview first and let set_wallpaper apply the kept file. Generated " +
+            "images are portrait with no text unless the description asks for it.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("prompt") {
+                    put("type", "string")
+                    put("description", "What the wallpaper shows, e.g. 'misty pine forest at dawn'.")
+                }
+                putJsonObject("style") {
+                    put("type", "string")
+                    put("description", "Optional style appended, e.g. 'minimalist, muted colours'.")
+                }
+                putJsonObject("target") {
+                    put("type", "string")
+                    put("description", "Apply at once: home, lock or both. Omit to preview only.")
+                    putJsonArray("enum") {
+                        add("home")
+                        add("lock")
+                        add("both")
+                    }
+                }
+            }
+            putJsonArray("required") { add("prompt") }
+        }
+    )
+
     val listCalendarEvents = tool(
         "list_calendar_events",
         "List events from the phone's calendars in a date range, with optional title search.",
@@ -1589,6 +1620,7 @@ object MasalaToolDefinitions {
         dialNumber,
         openApp,
         setWallpaper,
+        generateWallpaper,
         listCalendarEvents,
         createCalendarEvent,
         searchContacts,
