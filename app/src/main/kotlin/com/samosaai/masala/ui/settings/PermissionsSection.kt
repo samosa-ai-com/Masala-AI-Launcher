@@ -20,6 +20,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -35,8 +37,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.launch
 import com.samosaai.masala.R
 import com.samosaai.masala.launcher.HomeRole
+import com.samosaai.masala.masala
 import com.samosaai.masala.tools.HealthPermissionState
 import com.samosaai.masala.tools.healthConnectPermissionIntent
 
@@ -78,7 +82,18 @@ fun PermissionsSection() {
         healthConnectGranted = HealthPermissionState.refresh(context)
     }
 
+    val app = context.masala
+    val settings by app.settings.settings.collectAsState(initial = null)
+    val scope = rememberCoroutineScope()
+
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        settings?.let { s ->
+            SettingsToggleRow(
+                stringResource(R.string.permissions_allow_all_default),
+                s.allowAllDefault,
+                summary = stringResource(R.string.permissions_allow_all_default_summary),
+            ) { on -> scope.launch { app.settings.update { it.copy(allowAllDefault = on) } } }
+        }
         Text(
             stringResource(R.string.permissions_intro),
             style = MaterialTheme.typography.bodySmall,

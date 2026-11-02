@@ -397,6 +397,25 @@ class CommandControllerTest {
         assertTrue(recorded.any { it.role == com.samosaai.masala.chat.TurnRole.SYSTEM })
     }
 
+    @Test fun newChatsStartFromTheGlobalAllowAll() {
+        val c = controller()
+        c.setAllowAllDefault(true)
+        assertTrue(c.allowAll.value)
+        c.restoreSession(emptyList())
+        assertTrue(c.allowAll.value)
+        // A chat's own switch wins over the default, even when the default moves.
+        c.setAllowAll(false)
+        c.setAllowAllDefault(true)
+        assertEquals(false, c.allowAll.value)
+        // Coming back to the same chat keeps its switch; another chat starts from the default again.
+        c.restoreSession(emptyList(), sameChat = true)
+        assertEquals(false, c.allowAll.value)
+        c.restoreSession(emptyList())
+        assertTrue(c.allowAll.value)
+        c.setAllowAllDefault(false)
+        assertEquals(false, c.allowAll.value)
+    }
+
     @Test fun listeningWithoutAMicrophoneIsAnError() = runBlocking<Unit> {
         val speech = object : SpeechInput {
             override fun start(onFailure: (String) -> Unit) = false

@@ -83,14 +83,25 @@ class CommandController(
 
     /**
      * This chat's "Allow all": its turns skip the confirmation sheet for anything that isn't
-     * destructive. Off for every new chat and every switch to another one; coming back to the
-     * same chat (after minimizing) keeps it.
+     * destructive. Every new chat and every switch to another one starts from the global default
+     * (Settings → Permissions); coming back to the same chat (after minimizing) keeps it.
      */
+    private var allowAllDefault = false
     private val _allowAll = MutableStateFlow(false)
     val allowAll: StateFlow<Boolean> = _allowAll.asStateFlow()
 
+    /** The user flipped this chat's switch: the global default no longer moves it. */
+    private var allowAllOverridden = false
+
     fun setAllowAll(on: Boolean) {
+        allowAllOverridden = true
         _allowAll.value = on
+    }
+
+    /** The global default changed: chats start from it, and the open chat follows unless its switch was flipped. */
+    fun setAllowAllDefault(on: Boolean) {
+        allowAllDefault = on
+        if (!allowAllOverridden) _allowAll.value = on
     }
 
     /** Hides the chat without cancelling the running turn. */
@@ -302,7 +313,10 @@ class CommandController(
                     JsonPrimitive(it.text),
                 )
             }
-        if (!sameChat) _allowAll.value = false
+        if (!sameChat) {
+            allowAllOverridden = false
+            _allowAll.value = allowAllDefault
+        }
         history = listOfNotNull(summary?.let { com.samosaai.masala.llm.ChatMessage("assistant", JsonPrimitive(it)) }) + spoken
         _state.value = CommandState.Idle
     }

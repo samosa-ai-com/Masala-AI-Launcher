@@ -82,6 +82,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 
@@ -689,6 +691,10 @@ class MasalaApp : Application() {
                 val tint = com.samosaai.masala.ui.theme.accentColor(this@MasalaApp, s.accent).toArgb()
                 icons.applyStyle(IconCache.Style(s.iconShape, s.iconStyle, tint))
             }
+        }
+        // Chats start from the global "Allow all" (Settings → Permissions).
+        scope.launch(Dispatchers.Default) {
+            settings.settings.map { it.allowAllDefault }.distinctUntilChanged().collect { commands.setAllowAllDefault(it) }
         }
     }
 }
