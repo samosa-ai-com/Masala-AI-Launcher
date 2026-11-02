@@ -335,6 +335,8 @@ class MiniAppActivity : ComponentActivity() {
     override fun onDestroy() {
         // A full-size app hid them; whatever shows next gets them back.
         WindowCompat.getInsetsController(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
+        // Gone from the screen, so a later auto-open for the same id must fire again.
+        MiniAppOpenGuard.clear(intent.getStringExtra(EXTRA_APP_ID).orEmpty())
         super.onDestroy()
     }
 
@@ -502,4 +504,6 @@ fun Context.openMiniApp(appId: String) {
             .putExtra(MiniAppActivity.EXTRA_APP_ID, appId)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
     )
+    // Noted after the start succeeds, so a failed launch never suppresses the fallback open.
+    MiniAppOpenGuard.noteOpened(appId)
 }

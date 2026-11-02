@@ -150,6 +150,7 @@ class ActionDispatcher(
                 .putExtra(com.samosaai.masala.miniapps.MiniAppActivity.EXTRA_APP_ID, action.id)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         )
+        com.samosaai.masala.miniapps.MiniAppOpenGuard.noteOpened(action.id)
         return Outcome.Done()
     }
 
