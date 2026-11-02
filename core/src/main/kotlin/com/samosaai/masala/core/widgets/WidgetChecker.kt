@@ -3,6 +3,7 @@ package com.samosaai.masala.core.widgets
 import com.samosaai.masala.core.contract.Binding
 import com.samosaai.masala.core.contract.BindingSource
 import com.samosaai.masala.core.contract.HttpBinding
+import com.samosaai.masala.core.contract.MasalaAction
 import com.samosaai.masala.core.contract.MasalaJson
 import com.samosaai.masala.core.contract.WidgetComponent
 import com.samosaai.masala.core.contract.WidgetSpec
@@ -127,12 +128,16 @@ object WidgetChecker {
             is WidgetComponent.Button -> {
                 if (component.label.isBlank()) problems += Problem("$path.label", "label is empty")
                 LayoutChecker.checkAction(component.action, "$path.action", env, problems)
+                checkButtonAction(component.action, "$path.action", problems)
             }
             is WidgetComponent.Image -> LayoutChecker.checkIcon(component.icon, "$path.icon", env, problems)
             is WidgetComponent.ListRows -> {
                 if (component.maxRows !in 1..MAX_LIST_ROWS) problems += Problem("$path.maxRows", "maxRows must be 1 to $MAX_LIST_ROWS")
                 checkBinding(component.binding, "$path.binding", env, problems)
-                component.rowAction?.let { LayoutChecker.checkAction(it, "$path.rowAction", env, problems) }
+                component.rowAction?.let {
+                    LayoutChecker.checkAction(it, "$path.rowAction", env, problems)
+                    checkButtonAction(it, "$path.rowAction", problems)
+                }
                 checkStyle(component.style, "$path.style", problems)
             }
             is WidgetComponent.Gauge -> {
@@ -241,6 +246,18 @@ object WidgetChecker {
             }
             (if (where(c)) 1 else 0) + nested
         }
+
+    /** Widget buttons may only run safe tools; taps are explicit, so the gate stays as the tool defines it. */
+    val WIDGET_RUN_TOOL_ALLOWLIST = setOf("toggle_torch", "toggle_wifi", "set_timer")
+
+    private fun checkButtonAction(action: MasalaAction, path: String, problems: MutableList<Problem>) {
+        if (action is MasalaAction.RunTool && action.name !in WIDGET_RUN_TOOL_ALLOWLIST) {
+            problems += Problem("$path.name", "A widget button can only run ${WIDGET_RUN_TOOL_ALLOWLIST.sorted().joinToString(", ")}")
+        }
+        if (action is MasalaAction.PlaySound && action.kind != "click") {
+            problems += Problem("$path.kind", "A widget plays 'click' only")
+        }
+    }
 
     private val SECRET_QUERY = Regex("""[?&;](password|passwd|pwd|pass|token|access_token|api_key|apikey|key|secret|auth)=""", RegexOption.IGNORE_CASE)
     private val TEMPLATE = Regex("""\{\{|\$\{|%7B%7B""", RegexOption.IGNORE_CASE)

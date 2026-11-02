@@ -156,7 +156,26 @@ class WidgetCheckerTest {
         val bad = WidgetSpec("w", components = listOf(WidgetComponent.WebValue("x", HttpBinding("https://u:p@a.example/"))))
         assertEquals(
             listOf("$.pages[0].sections[0].widget.components[0].http.url"),
-            LayoutChecker.check(layout(WidgetSection("s", bad)), env).map { it.path },
+            LayoutChecker.check(layout(WidgetSection("s", widget = bad)), env).map { it.path },
+        )
+    }
+
+    @Test
+    fun `widget buttons allow only safe run_tool names and click sounds`() {
+        fun button(action: com.samosaai.masala.core.contract.MasalaAction) =
+            WidgetSpec("w", components = listOf(WidgetComponent.Button("Go", action)))
+        val tools = com.samosaai.masala.core.layout.LayoutChecker.Environment(
+            installedApps = emptyMap(), skillIds = emptySet(), toolNames = setOf("toggle_torch", "toggle_wifi", "set_timer", "read_file"),
+        )
+        assertEquals(emptyList(), WidgetChecker.check(button(com.samosaai.masala.core.contract.MasalaAction.RunTool("toggle_torch")), tools))
+        assertEquals(emptyList(), WidgetChecker.check(button(com.samosaai.masala.core.contract.MasalaAction.PlaySound("click")), env))
+        assertEquals(
+            listOf("$.components[0].action.name"),
+            WidgetChecker.check(button(com.samosaai.masala.core.contract.MasalaAction.RunTool("read_file")), tools).map { it.path },
+        )
+        assertEquals(
+            listOf("$.components[0].action.kind"),
+            WidgetChecker.check(button(com.samosaai.masala.core.contract.MasalaAction.PlaySound("boop")), env).map { it.path },
         )
     }
 }

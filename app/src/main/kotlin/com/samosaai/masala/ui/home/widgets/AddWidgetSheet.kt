@@ -33,6 +33,7 @@ fun AddWidgetSheet(
     library: WidgetLibrary,
     approvalOf: (String) -> Set<String>,
     isPlaced: (String) -> Boolean,
+    sourceExists: (String) -> Boolean = { true },
     onAdd: (id: String, approved: Boolean) -> Unit,
     onDescribe: () -> Unit,
     onManage: () -> Unit,
@@ -55,19 +56,34 @@ fun AddWidgetSheet(
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(stringResource(R.string.widgets_add_sheet_title), style = MaterialTheme.typography.titleLarge)
             entries.forEach { (spec, _) ->
+                val needsSource = spec.components.any {
+                    it is com.samosaai.masala.core.contract.WidgetComponent.Video ||
+                        it is com.samosaai.masala.core.contract.WidgetComponent.Snapshot
+                }
+                val missingSource = needsSource && sourceIds(spec).none(sourceExists)
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        spec.title ?: spec.id,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1,
-                    )
+                    androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                        Text(
+                            spec.title ?: spec.id,
+                            style = MaterialTheme.typography.bodyLarge,
+                            maxLines = 1,
+                        )
+                        if (missingSource) {
+                            Text(
+                                stringResource(R.string.widgets_needs_source),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     if (isPlaced(spec.id)) {
                         Text(
                             stringResource(R.string.widgets_on_home),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    } else if (missingSource) {
+                        TextButton(onClick = onSettings) { Text(stringResource(R.string.widgets_setup_source)) }
                     } else {
                         TextButton(onClick = {
                             val pending = com.samosaai.masala.widgets.HttpApproval.needingApproval(spec, approvalOf(spec.id))
@@ -83,4 +99,23 @@ fun AddWidgetSheet(
             }
         }
     }
+}
+
+private fun sourceIds(spec: com.samosaai.masala.core.contract.WidgetSpec): List<String> {
+    fun com.samosaai.masala.core.contract.WidgetComponent.bindingKey(): String? = when (this) {
+        is com.samosaai.masala.core.contract.WidgetComponent.Text -> binding?.takeIf { it.source == com.samosaai.masala.core.contract.BindingSource.STREAM_STATUS }?.key
+        is com.samosaai.masala.core.contract.WidgetComponent.ListRows -> binding.takeIf { it.source == com.samosaai.masala.core.contract.BindingSource.STREAM_STATUS }?.key
+        is com.samosaai.masala.core.contract.WidgetComponent.Gauge -> binding.takeIf { it.source == com.samosaai.masala.core.contract.BindingSource.STREAM_STATUS }?.key
+        is com.samosaai.masala.core.contract.WidgetComponent.Progress -> binding.takeIf { it.source == com.samosaai.masala.core.contract.BindingSource.STREAM_STATUS }?.key
+        is com.samosaai.masala.core.contract.WidgetComponent.Chart -> binding.takeIf { it.source == com.samosaai.masala.core.contract.BindingSource.STREAM_STATUS }?.key
+        else -> null
+    }
+    fun walk(c: com.samosaai.masala.core.contract.WidgetComponent): List<String> = when (c) {
+        is com.samosaai.masala.core.contract.WidgetComponent.Video -> listOf(c.stream.sourceId)
+        is com.samosaai.masala.core.contract.WidgetComponent.Snapshot -> listOf(c.sourceId)
+        is com.samosaai.masala.core.contract.WidgetComponent.Row -> c.children.flatMap(::walk)
+        is com.samosaai.masala.core.contract.WidgetComponent.Column -> c.children.flatMap(::walk)
+        else -> listOfNotNull(c.bindingKey())
+    }
+    return spec.components.flatMap(::walk).distinct()
 }

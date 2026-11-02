@@ -10,6 +10,9 @@ import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.MasalaAction
 import kotlin.math.abs
 
+/** Where a dragged widget section lands: its own page, before [beforeSectionId] or at its end. */
+data class SectionDrop(val pageId: String, val beforeSectionId: String?)
+
 /** Where a drop lands. */
 sealed interface DropTarget {
     /**
@@ -114,6 +117,10 @@ class HomeDragState(
     var dragging: Item? by mutableStateOf(null)
         private set
 
+    /** The widget section being dragged (finger-drag reorder); null when no section drag is live. */
+    var draggingSection: String? by mutableStateOf(null)
+        private set
+
     /** Pointer minus the item's top-left at lift, so the lifted copy stays under the finger. */
     var grab: Offset by mutableStateOf(Offset.Zero)
         private set
@@ -123,10 +130,13 @@ class HomeDragState(
     /** Item id → (owning section id, box). */
     val itemBoxes = mutableStateMapOf<String, Pair<String, Box2>>()
     val sectionBoxes = mutableStateMapOf<String, Box2>()
+    /** Widget section id → page id, registered with its box; a section drag never leaves its page. */
+    val sectionPages = mutableStateMapOf<String, String>()
 
     /** The page on screen, set by the renderer; a drop off the sections of another page moves the item there. */
     var page: String? = null
     private var startPage: String? = null
+    private var startSectionPage: String? = null
 
     /**
      * A drag inside a surface that is not home (the folder sheet): set to that surface's box. A drop
@@ -145,7 +155,7 @@ class HomeDragState(
     }
 
     fun moveTo(at: Offset) {
-        if (dragging != null) pointer = at
+        if (dragging != null || draggingSection != null) pointer = at
     }
 
     /** Where a drop at the pointer lands now: read it on every move to draw the indicator. */
@@ -166,5 +176,40 @@ class HomeDragState(
 
     fun cancel() {
         dragging = null
+        draggingSection = null
+        startSectionPage = null
+    }
+
+    /**
+     * Starts a widget-section drag (same page only; cross-page moves stay in the menu). A second
+     * finger never takes over a drag in progress.
+     */
+    fun startSection(id: String, pageId: String, at: Offset) {
+        if (dragging != null || draggingSection != null) return
+        val box = sectionBoxes[id]
+        grab = if (box != null) at - Offset(box.left, box.top) else Offset.Zero
+        startSectionPage = pageId
+        draggingSection = id
+        moveTo(at)
+    }
+
+    /** Where a dragged section would land now: the sibling it sits before, or the page end. */
+    fun sectionTarget(): SectionDrop? {
+        val id = draggingSection ?: return null
+        val pageId = startSectionPage ?: return null
+        val ordered = sectionBoxes.entries
+            .filter { (sid, _) -> sid != id && sectionPages[sid] == pageId }
+            .sortedBy { it.value.top }
+        if (ordered.isEmpty()) return null
+        val index = ordered.count { it.value.centerY < pointer.y }
+        return SectionDrop(pageId, ordered.getOrNull(index)?.key)
+    }
+
+    /** Ends a section drag; returns where it landed, or null to cancel. */
+    fun dropSection(): SectionDrop? = sectionTarget().also { cancelSection() }
+
+    fun cancelSection() {
+        draggingSection = null
+        startSectionPage = null
     }
 }

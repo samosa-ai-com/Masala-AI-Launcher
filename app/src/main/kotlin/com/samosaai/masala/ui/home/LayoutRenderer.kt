@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -157,6 +158,10 @@ class RenderContext(
     /** A folder's own menu (rename, ungroup). */
     val onFolderMenu: ((Item) -> Unit)? = null,
     val onDrop: ((Item, DropTarget) -> Unit)? = null,
+    /** Long-press-then-drag to reorder a widget section on its page; none keeps the menu only. */
+    val onWidgetDrop: ((sectionId: String, target: SectionDrop) -> Unit)? = null,
+    /** Whether a section id lives in the base layout (not added by a mode): only those drag. */
+    val isBaseSection: (String) -> Boolean = { true },
 ) {
     /** A fixed time, for previews and tests. */
     constructor(
@@ -232,25 +237,33 @@ fun LayoutRenderer(
         }
     }
     // A generated layout, an undo or a mode turning on can replace the document under a drag: cancel
-    // it rather than write an edit against a version the item may no longer be in.
-    LaunchedEffect(drag, layout.layout, drag?.dragging?.id) {
-        val id = drag?.dragging?.id ?: return@LaunchedEffect
-        val present = layout.layout.pages.any { page ->
-            page.sections.filterIsInstance<ItemSection>().any { section -> section.items.any { it.id == id } }
+    // it rather than write an edit against a version the item or section may no longer be in.
+    LaunchedEffect(drag, layout.layout, drag?.dragging?.id, drag?.draggingSection) {
+        drag?.dragging?.id?.let { id ->
+            val present = layout.layout.pages.any { page ->
+                page.sections.filterIsInstance<ItemSection>().any { section -> section.items.any { it.id == id } }
+            }
+            if (!present) drag.cancel()
         }
-        if (!present) drag.cancel()
+        drag?.draggingSection?.let { sid ->
+            val present = layout.layout.pages.any { page -> page.sections.any { it.id == sid } }
+            if (!present) drag.cancelSection()
+        }
     }
     Box(modifier.onGloballyPositioned { origin = it.positionInRoot(); width = it.size.width }) {
         Column(Modifier.fillMaxSize()) {
             // While dragging, every page stays composed so the dragged cell's gesture survives a flip.
             HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth(), beyondViewportPageCount = if (dragging) pages.size else 0) { index ->
-                pages.getOrNull(index)?.let { PageContent(it, layout, ctx, aboveDock, entrySignal, footer = if (index == pages.lastIndex) footer else ({})) }
+                pages.getOrNull(index)?.let { PageContent(it, layout, ctx, aboveDock, entrySignal, enabled = index == pager.currentPage, footer = if (index == pages.lastIndex) footer else ({})) }
             }
             if (pages.size > 1) PageDots(pages.size, pager.currentPage)
         }
         drag?.dragging?.let { item ->
             DropIndicator(drag.target(), drag, origin)
             LiftedItem(item, drag, origin, ctx)
+        }
+        if (drag?.draggingSection != null) {
+            SectionDropIndicator(drag.sectionTarget(), drag, origin)
         }
     }
 }
@@ -323,6 +336,24 @@ private fun DropIndicator(target: DropTarget?, drag: HomeDragState, origin: Offs
     }
 }
 
+/** Where a dragged widget section would land: a bar across its page above the next sibling. */
+@Composable
+private fun SectionDropIndicator(target: SectionDrop?, drag: HomeDragState, origin: Offset) {
+    if (target == null) return
+    val accent = MasalaTheme.tokens.accent
+    Canvas(Modifier.fillMaxSize()) {
+        val line = 3.dp.toPx()
+        val boxes = drag.sectionBoxes.entries
+            .filter { (id, _) -> id != drag.draggingSection && drag.sectionPages[id] == target.pageId }
+            .sortedBy { it.value.top }
+        val box = target.beforeSectionId?.let { id -> boxes.firstOrNull { it.key == id }?.value }
+            ?: boxes.lastOrNull()?.value
+            ?: return@Canvas
+        val y = (if (target.beforeSectionId == null) box.bottom else box.top) - origin.y - line / 2
+        drawRoundRect(accent, Offset(16.dp.toPx(), y), Size(size.width - 32.dp.toPx(), line))
+    }
+}
+
 @Composable
 private fun PageDots(count: Int, current: Int) {
     Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), horizontalArrangement = Arrangement.Center) {
@@ -336,12 +367,12 @@ private fun PageDots(count: Int, current: Int) {
 }
 
 @Composable
-private fun PageContent(page: Page, layout: ResolvedLayout, ctx: RenderContext, aboveDock: @Composable () -> Unit, entrySignal: Int, footer: @Composable () -> Unit) {
+private fun PageContent(page: Page, layout: ResolvedLayout, ctx: RenderContext, aboveDock: @Composable () -> Unit, entrySignal: Int, enabled: Boolean = true, footer: @Composable () -> Unit = {}) {
     val (docks, body) = page.sections.partition { it is DockSection }
     val listState = rememberLazyListState()
     var viewport by remember { mutableStateOf(Box2(0f, 0f, 0f, 0f)) }
     val drag = ctx.drag
-    val dragging = drag?.dragging != null && drag.page == page.id
+    val dragging = (drag?.dragging != null || drag?.draggingSection != null) && drag.page == page.id
     val bandPx = with(LocalDensity.current) { DRAG_SCROLL_BAND.toPx() }
     val stepPx = with(LocalDensity.current) { DRAG_SCROLL_STEP.toPx() }
     // A drag held near the top or bottom of the list scrolls it, so an item can reach a section that
@@ -362,7 +393,7 @@ private fun PageContent(page: Page, layout: ResolvedLayout, ctx: RenderContext, 
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             body.forEachIndexed { i, section ->
-                item(key = section.id) { Box(Modifier.sectionEntry(i, entrySignal)) { SectionContent(section, layout, ctx) } }
+                item(key = section.id) { Box(Modifier.sectionEntry(i, entrySignal)) { SectionContent(section, layout, ctx, enabled) } }
             }
             item(key = "footer") { footer() }
         }
@@ -372,7 +403,7 @@ private fun PageContent(page: Page, layout: ResolvedLayout, ctx: RenderContext, 
 }
 
 @Composable
-private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: RenderContext) {
+private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: RenderContext, enabled: Boolean = true) {
     when (section) {
         is HeaderSection -> Header(section, ctx)
         is GridSection -> ItemGrid(section.id, section.title, section.items, section.columns, ctx)
@@ -383,18 +414,36 @@ private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: Render
         is WidgetSection -> section.widget?.let {
             ctx.widgets?.let { source ->
                 val menu = ctx.onWidgetMenu
+                val pageId = layout.layout.pages.firstOrNull { p -> p.sections.any { it.id == section.id } }?.id
+                val draggable = menu != null && pageId != null && ctx.drag != null && ctx.onWidgetDrop != null && !ctx.locked && ctx.isBaseSection(section.id)
+                // Draggable cards keep a no-op long-press so the press is consumed: otherwise the
+                // background's long-press (Add widget sheet) races the drag's own hold-to-menu.
+                // The real menu comes from sectionDrag at MENU_HOLD_MS; a move cancels it.
+                // WidgetCard's own combinedClickable (onClick + the no-op) consumes the press.
+                val cardSource = if (draggable) source.copy(onLongPress = {}) else if (menu == null) source else source.copy(onLongPress = { menu(it, section.id) })
+                val cardModifier = if (draggable) {
+                    Modifier.dropSection(section.id, ctx, pageId)
+                        .sectionDrag(section.id, pageId!!, { menu!!(it, section.id) }, ctx)
+                        .graphicsLayer { alpha = if (ctx.drag?.draggingSection == section.id) 0.3f else 1f }
+                } else Modifier
                 com.samosaai.masala.ui.home.widgets.WidgetCard(
-                    it, layout.widgetRows[section.id],
-                    if (menu == null) source else source.copy(onLongPress = { menu(it, section.id) }),
+                    it, layout.widgetRows[section.id], cardSource, cardModifier, enabled = enabled,
                 )
             } ?: Placeholder(it.title ?: it.id, stringResource(R.string.home_widget_placeholder), layout.widgetRows[section.id])
         }
         is StackSection -> section.widgets.firstOrNull()?.let {
             ctx.widgets?.let { source ->
                 val menu = ctx.onWidgetMenu
+                val pageId = layout.layout.pages.firstOrNull { p -> p.sections.any { it.id == section.id } }?.id
+                val draggable = menu != null && pageId != null && ctx.drag != null && ctx.onWidgetDrop != null && !ctx.locked && ctx.isBaseSection(section.id)
+                val cardSource = if (draggable) source.copy(onLongPress = {}) else if (menu == null) source else source.copy(onLongPress = { menu(it, section.id) })
+                val cardModifier = if (draggable) {
+                    Modifier.dropSection(section.id, ctx, pageId)
+                        .sectionDrag(section.id, pageId!!, { menu!!(it, section.id) }, ctx)
+                        .graphicsLayer { alpha = if (ctx.drag?.draggingSection == section.id) 0.3f else 1f }
+                } else Modifier
                 com.samosaai.masala.ui.home.widgets.StackCard(
-                    section.widgets, layout.widgetRows[section.id],
-                    if (menu == null) source else source.copy(onLongPress = { menu(it, section.id) }),
+                    section.widgets, layout.widgetRows[section.id], cardSource, cardModifier, enabled = enabled,
                 )
             } ?: Placeholder(it.title ?: it.id, stringResource(R.string.home_stack_placeholder, section.widgets.size), layout.widgetRows[section.id])
         }
@@ -592,16 +641,86 @@ private fun Modifier.dropItem(item: Item, sectionId: String?, ctx: RenderContext
 
 /** Registers an item section's box as a drop area while it is on screen. */
 @Composable
-private fun Modifier.dropSection(sectionId: String, ctx: RenderContext): Modifier {
+private fun Modifier.dropSection(sectionId: String, ctx: RenderContext, pageId: String? = null): Modifier {
     val drag = ctx.drag ?: return this
-    DisposableEffect(drag, sectionId) { onDispose { drag.sectionBoxes.remove(sectionId) } }
+    DisposableEffect(drag, sectionId) {
+        onDispose {
+            drag.sectionBoxes.remove(sectionId)
+            drag.sectionPages.remove(sectionId)
+        }
+    }
     return onGloballyPositioned {
         val box = it.boundsInRoot()
-        if (box.isEmpty) drag.sectionBoxes.remove(sectionId) else drag.sectionBoxes[sectionId] = box.toBox2()
+        if (box.isEmpty) {
+            drag.sectionBoxes.remove(sectionId)
+            drag.sectionPages.remove(sectionId)
+        } else {
+            drag.sectionBoxes[sectionId] = box.toBox2()
+            if (pageId != null) drag.sectionPages[sectionId] = pageId
+        }
     }
 }
 
 internal fun androidx.compose.ui.geometry.Rect.toBox2() = Box2(left, top, right, bottom)
+
+/**
+ * Long-press-then-drag to reorder a widget section on its page. Same shape as [itemClicks]: a
+ * still finger opens the menu after [MENU_HOLD_MS]; moving past touch slop starts the drag and
+ * cancels the menu. Consumes moves only after the long press, so taps, buttons and scrolling
+ * behave as before. Cross-page moves stay in the menu.
+ */
+@Composable
+private fun Modifier.sectionDrag(sectionId: String, pageId: String, menu: () -> Unit, ctx: RenderContext): Modifier {
+    val drag = ctx.drag?.takeIf { ctx.onWidgetDrop != null } ?: return this
+    val haptics = rememberHaptics()
+    val scope = rememberCoroutineScope()
+    var coords by remember(sectionId) { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
+    return this
+        .onGloballyPositioned { coords = it }
+        .pointerInput(sectionId, pageId, drag) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                val long = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
+                haptics.heavy()
+                long.consume()
+                fun rootOf(p: Offset) = coords?.takeIf { it.isAttached }?.localToRoot(p) ?: p
+                var moved = false
+                var opened = false
+                val openMenu = scope.launch {
+                    delay((down.uptimeMillis + MENU_HOLD_MS - long.uptimeMillis).coerceAtLeast(0L))
+                    if (!moved) {
+                        opened = true
+                        menu()
+                    }
+                }
+                try {
+                    while (true) {
+                        val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) {
+                            change.consume()
+                            break
+                        }
+                        if (!moved && !opened && (change.position - long.position).getDistance() > viewConfiguration.touchSlop) {
+                            moved = true
+                            openMenu.cancel()
+                            drag.startSection(sectionId, pageId, rootOf(change.position))
+                        }
+                        if (moved) drag.moveTo(rootOf(change.position))
+                        change.consume()
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    if (moved && drag.draggingSection == sectionId) drag.cancelSection()
+                    throw e
+                } finally {
+                    openMenu.cancel()
+                }
+                when {
+                    moved -> drag.dropSection()?.let { haptics.confirm(); ctx.onWidgetDrop?.invoke(sectionId, it) }
+                    !opened -> menu()
+                }
+            }
+        }
+}
 
 /**
  * Tap runs the action. A long press opens the item's menu unless the home layout is locked; on an item

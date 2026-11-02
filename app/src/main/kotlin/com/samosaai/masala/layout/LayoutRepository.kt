@@ -295,6 +295,38 @@ class LayoutRepository(
     suspend fun resizeWidget(label: String, widgetId: String, rows: Int): List<LayoutChecker.Problem> =
         edit(label) { LayoutEdits.resizeWidget(it, widgetId, rows) }
 
+    /**
+     * Moves a widget's first placement up/down ([steps]) or to another page: one undoable version,
+     * same height cap as placing (the moved section's rendered height, stacks included). Returns
+     * the check problems (empty means moved); a no-op reports where it already sits.
+     */
+    suspend fun moveWidget(
+        label: String,
+        widgetId: String,
+        steps: Int = 0,
+        targetPageId: String? = null,
+    ): List<LayoutChecker.Problem> {
+        val doc = base.value
+        val at = doc?.let { LayoutEdits.widgetPlacements(it, widgetId).firstOrNull() }
+            ?: return listOf(LayoutChecker.Problem("$", "Widget '$widgetId' is not on home"))
+        val section = doc.pages.flatMap { it.sections }.firstOrNull { it.id == at.sectionId }
+        if (targetPageId == null) {
+            val ids = doc.pages.first { it.id == at.pageId }.sections.map { it.id }
+            val idx = ids.indexOf(at.sectionId)
+            if (idx < 0 || (idx + steps).coerceIn(0, ids.size - 1) == idx) {
+                return listOf(LayoutChecker.Problem("$", "Widget '$widgetId' is already at the ${if (steps < 0) "top" else "bottom"}"))
+            }
+        } else if (targetPageId != at.pageId) {
+            val specs = widgets.current()
+            val height = section?.let { LayoutEdits.estimateSectionRows(it, specs) } ?: 2
+            val used = LayoutEdits.widgetRowsUsed(doc, targetPageId, specs)
+            if (used + height > LayoutChecker.MAX_PAGE_ROWS) {
+                return listOf(LayoutChecker.Problem("$", "That page is full"))
+            }
+        }
+        return edit(label) { LayoutEdits.moveSection(it, at.sectionId, steps, targetPageId) }
+    }
+
     /** Where one mini app sits on home at widget size, for the Widgets manager. */
     fun htmlPlacements(appId: String): List<LayoutEdits.WidgetPlacement> =
         base.value?.let { LayoutEdits.htmlPlacements(it, appId) }.orEmpty()

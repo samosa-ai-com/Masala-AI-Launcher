@@ -88,6 +88,17 @@ object WidgetTools {
             return "$base-$n"
         }
 
+        fun norm(s: String): String = s.lowercase().filter { it.isLetterOrDigit() }
+
+        fun findSimilar(lib: Map<String, WidgetSpec>, spec: WidgetSpec): WidgetSpec? {
+            // Titles are the dedupe key: storage keys and ids are safely reused across widgets
+            // (state is per widget id), so only a matching title blocks with an offer to reuse it.
+            // Bare id collisions fall through to freeId's numeric suffix.
+            val wantName = norm(spec.title ?: return null)
+            if (wantName.isEmpty()) return null
+            return lib.values.firstOrNull { norm(it.title ?: it.id) == wantName }
+        }
+
         return listOf(
             FunctionTool(Defs.listWidgets, READ_ONLY) {
                 val lib = host().widgetLibrary.current()
@@ -107,6 +118,14 @@ object WidgetTools {
             FunctionTool(Defs.createWidget, CHANGES_SOMETHING, confirmWhen = { false }) {
                 val (spec, error) = specFromArgs(it)
                 if (spec == null) return@FunctionTool ActionResult.error(error!!)
+                findSimilar(host().widgetLibrary.current(), spec)?.let { dup ->
+                    val n = host().layouts.widgetPlacements(dup.id).size
+                    val where = if (n == 0) "not on home" else "on home ×$n"
+                    return@FunctionTool ActionResult.error(
+                        "A similar widget already exists: '${dup.id}' (${dup.title ?: dup.id}, $where). " +
+                            "Offer to use it (place_widget), revise it (update_widget), or confirm the new one is different before saving.",
+                    )
+                }
                 val id = freeId(spec.id, spec.title)
                 val final = spec.copy(id = id)
                 host().widgetLibrary.save(final)
@@ -261,7 +280,7 @@ Components (each has "type"):
 - timer {key, label, seconds}: counts down from Start; the key holds its deadline
 - progress {label, binding, max}: a bar; style like text
 - chart {binding, kind bar|line, days}: comma-separated values in storage, oldest first, at most 31
-- button {label, action}: action is ask_masala {prompt}, run_skill {skillId}, start_timer {seconds}, or refresh_widget (reloads this widget's web values in place; no id needed)
+- button {label, action}: action is ask_masala {prompt}, run_skill {skillId}, start_timer {seconds}, refresh_widget (reloads this widget's web values in place; no id needed), run_tool (only toggle_torch, toggle_wifi, set_timer), or play_sound (click only)
 - image {icon {type symbol, name}}: a built-in symbol name like star, timer, checklist
 - list {binding, maxRows}: rows from a binding, at most 8
 - gauge {label, binding, max}: a ring; style like text

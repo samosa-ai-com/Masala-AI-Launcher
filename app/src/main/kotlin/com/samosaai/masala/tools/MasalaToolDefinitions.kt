@@ -242,6 +242,7 @@ object MasalaToolDefinitions {
     val listWidgets = tool(
         "list_widgets",
         "List the widget library: id, title, where each widget sits on home. " +
+            "Call it directly for read-only questions (what exists, is one on home), no consult. " +
             "To change one: read_widget, then update_widget. To use a template as a start, read it too.",
         schema { putJsonObject("properties") {} },
     )
@@ -271,7 +272,9 @@ object MasalaToolDefinitions {
     val createWidget = tool(
         "create_widget",
         "Make a home-screen widget: either the full spec JSON, or one sentence and the maker " +
-            "writes the spec (checked, one repair turn). The answer names the widget id and any " +
+            "writes the spec (checked, one repair turn). If a similar widget already exists, the call " +
+            "refuses and names it — offer to use, place or revise it instead of saving a duplicate. " +
+            "The answer names the widget id and any " +
             "problems; a spec with problems is never saved. Nothing goes on home until place_widget, " +
             "which always asks the user first.",
         schema {

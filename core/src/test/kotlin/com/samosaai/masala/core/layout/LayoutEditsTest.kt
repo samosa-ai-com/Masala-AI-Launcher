@@ -570,4 +570,53 @@ class LayoutEditsTest {
         assertEquals("home", placed.pageId)
         assertEquals(2, placed.doc.pages.size)
     }
+
+    @Test
+    fun `moveSection reorders within a page and across pages`() {
+        val sdoc = LayoutDoc(
+            pages = listOf(
+                Page("home", sections = listOf(GridSection("g", items = items("a")), WidgetSection("w1", ref = WidgetRef("one")), WidgetSection("w2", ref = WidgetRef("two")))),
+                Page("two", sections = listOf(GridSection("g2", items = items("b")))),
+            ),
+        )
+        val up = assertNotNull(LayoutEdits.moveSection(sdoc, "w2", steps = -1))
+        assertEquals(listOf("g", "w2", "w1"), up.pages[0].sections.map { it.id })
+        val noop = LayoutEdits.moveSection(sdoc, "g", steps = 0)
+        assertNull(noop)
+        val docked = LayoutDoc(pages = listOf(Page("home", sections = listOf(DockSection("dock", items = items("x")), WidgetSection("w1", ref = WidgetRef("one"))))))
+        assertNull(LayoutEdits.moveSection(docked, "dock", steps = 1))
+        val across = assertNotNull(LayoutEdits.moveSection(sdoc, "w1", targetPageId = "two"))
+        assertEquals(listOf("g", "w2"), across.pages[0].sections.map { it.id })
+        assertEquals(listOf("g2", "w1"), across.pages[1].sections.map { it.id })
+        assertNull(LayoutEdits.moveSection(sdoc, "missing", steps = 1))
+        assertNull(LayoutEdits.moveSection(sdoc, "w1", targetPageId = "nowhere"))
+    }
+
+    @Test
+    fun `moveSection never lands after the dock`() {
+        val docked = LayoutDoc(
+            pages = listOf(
+                Page("home", sections = listOf(WidgetSection("w1", ref = WidgetRef("one")), WidgetSection("w2", ref = WidgetRef("two")), DockSection("dock", items = items("x")))),
+            ),
+        )
+        assertNull(LayoutEdits.moveSection(docked, "w2", steps = 1))
+        val up = assertNotNull(LayoutEdits.moveSection(docked, "w1", targetPageId = "home", beforeSectionId = null))
+        assertEquals(listOf("w2", "w1", "dock"), up.pages[0].sections.map { it.id })
+        assertNull(LayoutEdits.moveSection(docked, "dock", steps = 1))
+    }
+
+    @Test
+    fun `moveSection before-sibling drops that change nothing are null`() {
+        val sdoc = LayoutDoc(
+            pages = listOf(
+                Page("home", sections = listOf(GridSection("g", items = items("a")), WidgetSection("w1", ref = WidgetRef("one")), WidgetSection("w2", ref = WidgetRef("two")))),
+            ),
+        )
+        // w1 already sits right before w2, and w2 is already last.
+        assertNull(LayoutEdits.moveSection(sdoc, "w1", targetPageId = "home", beforeSectionId = "w2"))
+        assertNull(LayoutEdits.moveSection(sdoc, "w2", targetPageId = "home", beforeSectionId = null))
+        // A real reorder still applies.
+        val moved = assertNotNull(LayoutEdits.moveSection(sdoc, "w2", targetPageId = "home", beforeSectionId = "w1"))
+        assertEquals(listOf("g", "w2", "w1"), moved.pages[0].sections.map { it.id })
+    }
 }

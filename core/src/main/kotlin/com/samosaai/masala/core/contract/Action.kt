@@ -85,6 +85,11 @@ sealed interface MasalaAction {
     @SerialName("refresh_widget")
     data class RefreshWidget(val widgetId: String = "") : MasalaAction
 
+    /** Click feedback on a widget button. Only "click" exists; unknown kinds are rejected. */
+    @Serializable
+    @SerialName("play_sound")
+    data class PlaySound(val kind: String = "click") : MasalaAction
+
     @Serializable
     @SerialName("open_mini_app")
     data class OpenMiniApp(val id: String) : MasalaAction
@@ -122,6 +127,7 @@ fun MasalaAction.sensitivity(toolSensitivity: (String) -> ToolSensitivity?): Too
     is MasalaAction.AskMasala,
     is MasalaAction.RunSkill,
     is MasalaAction.RefreshWidget,
+    is MasalaAction.PlaySound,
     is MasalaAction.OpenMiniApp,
     is MasalaAction.OpenFolder -> ToolSensitivity.READ_ONLY
 }

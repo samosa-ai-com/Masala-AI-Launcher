@@ -46,13 +46,13 @@ data class MediaHost(
 )
 
 /**
- * A live player-kind stream on home (plan §4.3): plays muted while home shows it, pauses behind
- * the drawer or after 5 idle minutes (tap resumes), falls back to snapshot mode when both pool
- * slots are held — with a Live button that steals the stalest slot. Errors stay inline with a
- * retry; nothing ever crash-loops.
+ * A live player-kind stream on home (plan §4.3): plays muted while home shows its page, pauses
+ * behind the drawer, on another home page, or after 5 idle minutes (tap resumes), falls back to
+ * snapshot mode when both pool slots are held — with a Live button that steals the stalest slot.
+ * Errors stay inline with a retry; nothing ever crash-loops.
  */
 @Composable
-fun LiveVideo(sourceId: String, store: StreamSourceStore, media: MediaHost, modifier: Modifier = Modifier) {
+fun LiveVideo(sourceId: String, store: StreamSourceStore, media: MediaHost, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val context = LocalContext.current
     val source = store.current()[sourceId]
     if (source == null) {
@@ -73,7 +73,7 @@ fun LiveVideo(sourceId: String, store: StreamSourceStore, media: MediaHost, modi
     var stolen by remember(sourceId) { mutableStateOf(false) }
     if (!liveOk && snapshotUrl != null && !forced) {
         Column(modifier.fillMaxWidth()) {
-            SnapshotImage(sourceId, 10, store)
+            SnapshotImage(sourceId, 10, store, enabled = enabled)
             TextButton(onClick = { forced = true; liveOk = true }) { Text(stringResource(R.string.widgets_video_live)) }
         }
         return
@@ -85,7 +85,7 @@ fun LiveVideo(sourceId: String, store: StreamSourceStore, media: MediaHost, modi
         }
         return
     }
-    PlayerBody(sourceId, streamUrl, source.transport, media, forced || stolen, onSteal = { stolen = true }, modifier)
+    PlayerBody(sourceId, streamUrl, source.transport, media, forced || stolen, onSteal = { stolen = true }, modifier, enabled)
 }
 
 @Composable
@@ -97,6 +97,7 @@ private fun PlayerBody(
     steal: Boolean,
     onSteal: () -> Unit,
     modifier: Modifier,
+    enabled: Boolean = true,
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var exo by remember { mutableStateOf<androidx.media3.exoplayer.ExoPlayer?>(null) }
@@ -104,8 +105,11 @@ private fun PlayerBody(
     var pausedIdle by remember(sourceId) { mutableStateOf(false) }
     var poolFull by remember(sourceId) { mutableStateOf(false) }
     var retryNonce by remember(sourceId) { mutableStateOf(0) }
-    // Play only while resumed; the drawer gate and the idle timer tick below.
-    LaunchedEffect(sourceId, streamUrl, steal, retryNonce) {
+    // Play only while resumed and while this page is showing; leaving either releases the pool
+    // slot through the finally below, so an off-screen widget holds no player and no connection.
+    // The drawer gate and the idle timer tick below.
+    LaunchedEffect(sourceId, streamUrl, steal, retryNonce, enabled) {
+        if (!enabled) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             val got = if (steal) media.pool.steal(streamUrl, transport) else media.pool.acquire(streamUrl, transport)
             if (got == null) {

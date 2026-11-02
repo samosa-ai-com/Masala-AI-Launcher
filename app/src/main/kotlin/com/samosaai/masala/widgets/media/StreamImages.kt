@@ -34,27 +34,31 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * A still image refreshed from a stream source while visible (plan `docs/plans/widget-maker.md`
+ * A still image refreshed from a stream source while its page is showing (plan `docs/plans/widget-maker.md`
  * §4.1): polls every [everySeconds] (at least 2 s), keeps the last frame when a poll fails, and
- * says so instead of going blank. Credentials come from the store, never from the widget.
+ * says so instead of going blank. Off-screen pages keep their last frame and fetch nothing:
+ * the pager pre-composes neighbours, so composition alone can't gate it. Credentials come from
+ * the store, never from the widget.
  */
 @Composable
-fun SnapshotImage(sourceId: String, everySeconds: Int, store: StreamSourceStore, modifier: Modifier = Modifier) {
+fun SnapshotImage(sourceId: String, everySeconds: Int, store: StreamSourceStore, modifier: Modifier = Modifier, enabled: Boolean = true) {
     var bitmap by remember(sourceId) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     var stale by remember(sourceId) { mutableStateOf(false) }
     var failed by remember(sourceId) { mutableStateOf(false) }
-    LaunchedEffect(sourceId, everySeconds) {
+    LaunchedEffect(sourceId, everySeconds, enabled) {
         val every = (everySeconds.coerceAtLeast(2) * 1000L)
         while (isActive) {
-            val frame = withContext(Dispatchers.IO) { fetchFrame(store.snapshotUrlWithCredentials(sourceId)) }
-            if (frame != null) {
-                bitmap = frame
-                stale = false
-                failed = false
-            } else if (bitmap == null) {
-                failed = true
-            } else {
-                stale = true
+            if (enabled) {
+                val frame = withContext(Dispatchers.IO) { fetchFrame(store.snapshotUrlWithCredentials(sourceId)) }
+                if (frame != null) {
+                    bitmap = frame
+                    stale = false
+                    failed = false
+                } else if (bitmap == null) {
+                    failed = true
+                } else {
+                    stale = true
+                }
             }
             delay(every)
         }
@@ -80,14 +84,16 @@ fun SnapshotImage(sourceId: String, everySeconds: Int, store: StreamSourceStore,
 
 /**
  * A live MJPEG stream (plan §4.1): Media3 has no MJPEG, so a reader thread splits frames with
- * [MjpegParser] and the latest decodes on screen. Stops when the card leaves composition.
+ * [MjpegParser] and the latest decodes on screen. Stops when the card leaves composition or its
+ * page scrolls away (the pager pre-composes neighbours, so composition alone can't gate it).
  */
 @Composable
-fun MjpegImage(sourceId: String, store: StreamSourceStore, modifier: Modifier = Modifier) {
+fun MjpegImage(sourceId: String, store: StreamSourceStore, modifier: Modifier = Modifier, enabled: Boolean = true) {
     var bitmap by remember(sourceId) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     var error by remember(sourceId) { mutableStateOf<String?>(null) }
     var attempt by remember(sourceId) { mutableStateOf(0) }
-    DisposableEffect(sourceId, attempt) {
+    DisposableEffect(sourceId, attempt, enabled) {
+        if (!enabled) return@DisposableEffect onDispose {}
         val job = kotlinx.coroutines.CoroutineScope(Dispatchers.IO).let { scope ->
             scope.launchReader(store, sourceId, onFrame = { bitmap = it }, onError = { error = it })
         }
