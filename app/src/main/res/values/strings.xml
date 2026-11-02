@@ -775,6 +775,8 @@
     <string name="chat_close">Close chat</string>
     <string name="chat_history">Chat history</string>
     <string name="chat_allow_all">Allow all</string>
+    <string name="chat_allow_all_state_on">On</string>
+    <string name="chat_allow_all_state_off">Off</string>
     <string name="chat_allow_all_on">Allow all is on: Masala won\'t ask, except to delete</string>
     <string name="chat_allow_all_turn_off">Turn off</string>
     <string name="permissions_allow_all_default">Allow all in new chats</string>

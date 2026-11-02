@@ -15,7 +15,7 @@ import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Schedule
@@ -238,7 +238,7 @@ class SettingsActivity : ComponentActivity() {
             add(Entry(2, Icons.Rounded.Apps, auto, stringResource(R.string.settings_miniapps), stringResource(R.string.settings_miniapps_summary), onMiniApps))
             add(Entry(1, Icons.Rounded.Widgets, look, stringResource(R.string.settings_widgets), stringResource(R.string.settings_widgets_summary), onWidgets))
             add(Entry(1, Icons.Rounded.Image, look, stringResource(R.string.wallpaper_title), stringResource(R.string.wallpaper_summary)) { onPage(Page.WALLPAPERS) })
-            add(Entry(3, Icons.Rounded.MenuBook, data, stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) { startActivity(Intent(this@SettingsActivity, SecondBrainActivity::class.java)) })
+            add(Entry(3, Icons.AutoMirrored.Rounded.MenuBook, data, stringResource(R.string.wiki_title), stringResource(R.string.wiki_summary)) { startActivity(Intent(this@SettingsActivity, SecondBrainActivity::class.java)) })
             add(Entry(3, Icons.Rounded.Shield, data, stringResource(R.string.privacy_title), stringResource(R.string.privacy_summary)) { onPage(Page.PRIVACY) })
             add(Entry(3, Icons.Rounded.Lock, data, stringResource(R.string.permissions_title), stringResource(R.string.permissions_summary)) { onPage(Page.PERMISSIONS) })
             add(

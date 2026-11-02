@@ -624,6 +624,11 @@ private fun ResizeHandle(cell: com.samosaai.masala.core.contract.Cell, columns: 
     }
     val maxW = minOf(spec?.size?.maxW ?: columns, columns - cell.x).coerceAtLeast(1)
     val minW = (spec?.size?.minW ?: 1).coerceIn(1, maxW)
+    // Height up to the widget's tallest and the grid's last row; a cell already taller can keep its height.
+    val maxH = minOf(
+        spec?.size?.max?.let { com.samosaai.masala.core.layout.LayoutEdits.cellsHigh(it) } ?: Int.MAX_VALUE,
+        com.samosaai.masala.core.layout.LayoutChecker.MAX_GRID_ROWS - cell.y,
+    ).coerceAtLeast(cell.h)
     var w by remember(cell) { mutableStateOf(cell.w) }
     var h by remember(cell) { mutableStateOf(cell.h) }
     var delta by remember(cell) { mutableStateOf(Offset.Zero) }
@@ -658,7 +663,7 @@ private fun ResizeHandle(cell: com.samosaai.masala.core.contract.Cell, columns: 
                         change.consume()
                         delta += amount
                         w = (cell.w + kotlin.math.round(delta.x / cellWidthPx).toInt()).coerceIn(minW, maxW)
-                        h = (cell.h + kotlin.math.round(delta.y / cellHeightPx).toInt()).coerceAtLeast(1)
+                        h = (cell.h + kotlin.math.round(delta.y / cellHeightPx).toInt()).coerceIn(1, maxH)
                     }
                 },
         )

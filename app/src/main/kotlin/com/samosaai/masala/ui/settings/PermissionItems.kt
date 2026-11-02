@@ -3,6 +3,7 @@ package com.samosaai.masala.ui.settings
 import android.content.Context
 import android.os.Build
 import androidx.annotation.StringRes
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.samosaai.masala.R
 import com.samosaai.masala.launcher.HomeRole
@@ -36,6 +37,8 @@ sealed interface Special {
     data class Of(val capability: Capability) : Special
     data object HealthConnect : Special
     data object DefaultHome : Special
+    /** Masala's notification settings: below Android 13 there is no runtime dialog to show. */
+    data object AppNotifications : Special
 }
 
 /** Every permission and special access Masala can use. Only what the manifest declares. */
@@ -58,13 +61,11 @@ fun allPermissionGroups(): List<PermissionGroup> = listOf(
             PermissionItem(
                 R.string.permission_show_notifications,
                 R.string.permission_show_notifications_description,
-                android.Manifest.permission.POST_NOTIFICATIONS,
-                null,
-                // Below Android 13 it is granted at install time; there is no dialog to show.
-                { c ->
-                    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                        checkPerm(c, android.Manifest.permission.POST_NOTIFICATIONS)
-                },
+                // Below Android 13 there is no permission to ask for, but the user can still turn
+                // notifications off; the switch then leads to Masala's notification settings.
+                android.Manifest.permission.POST_NOTIFICATIONS.takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU },
+                Special.AppNotifications.takeIf { Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU },
+                { c -> NotificationManagerCompat.from(c).areNotificationsEnabled() },
             ),
             special(Capability.NOTIFICATION_LISTENER, R.string.permission_notification_listener, R.string.permission_notification_listener_description),
         ),

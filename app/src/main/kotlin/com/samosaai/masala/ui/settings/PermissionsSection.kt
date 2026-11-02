@@ -24,6 +24,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -102,10 +103,14 @@ fun PermissionsSection() {
         for (group in groups) {
             val items = remember(resumeSignal, group) { group.items.filter { it.isRelevant(context) } }
             if (items.isEmpty()) continue
-            val hasUngranted = remember(resumeSignal, group) { items.any { !it.isGranted(context) } }
+            // Health Connect is driven by the refreshed state above; the rest read Android directly.
+            val granted = remember(resumeSignal, healthConnectGranted, items) {
+                items.map { if (it.special == Special.HealthConnect) healthConnectGranted else it.isGranted(context) }
+            }
+            val grantedCount = granted.count { it }
+            val hasUngranted = grantedCount < items.size
             // Collapsed until the user opens it, so the section stays short inside Privacy.
             val expanded = userToggledGroups[group.name] ?: false
-            val grantedCount = remember(resumeSignal, healthConnectGranted, group) { items.count { it.isGranted(context) } }
             Row(
                 Modifier.fillMaxWidth()
                     .clickable { userToggledGroups = userToggledGroups + (group.name to !expanded) }
@@ -127,21 +132,18 @@ fun PermissionsSection() {
             }
             AnimatedVisibility(visible = expanded) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    for (item in items) {
-                        // Health Connect is driven by the refreshed state above; the rest read Android directly.
-                        val granted = if (item.special == Special.HealthConnect) {
-                            healthConnectGranted
-                        } else {
-                            remember(resumeSignal) { item.isGranted(context) }
+                    items.forEachIndexed { i, item ->
+                        // Keyed, so a row's dialog state stays with its permission when the list changes.
+                        key(item.name) {
+                            PermissionRow(
+                                item = item,
+                                granted = granted[i],
+                                onRequestRuntime = { perms -> runtimeLauncher.launch(perms) },
+                                onRequestHome = {
+                                    HomeRole.requestIntent(context)?.let { homeLauncher.launch(it) } ?: HomeRole.openSettings(context)
+                                },
+                            )
                         }
-                        PermissionRow(
-                            item = item,
-                            granted = granted,
-                            onRequestRuntime = { perms -> runtimeLauncher.launch(perms) },
-                            onRequestHome = {
-                                HomeRole.requestIntent(context)?.let { homeLauncher.launch(it) } ?: HomeRole.openSettings(context)
-                            },
-                        )
                     }
                 }
             }
@@ -241,6 +243,12 @@ private fun openSpecialAccess(context: Context, special: Special) {
             runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         }
         Special.DefaultHome -> HomeRole.openSettings(context)
+        Special.AppNotifications -> {
+            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { context.startActivity(intent) }
+        }
     }
 }
 

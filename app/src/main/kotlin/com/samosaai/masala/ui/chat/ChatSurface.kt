@@ -285,6 +285,7 @@ private fun Header(
             // One icon, so the title keeps the room; gold while on, and the strip below says so.
             val context = androidx.compose.ui.platform.LocalContext.current
             val allowLabel = stringResource(R.string.chat_allow_all)
+            val allowState = stringResource(if (allowAll) R.string.chat_allow_all_state_on else R.string.chat_allow_all_state_off)
             Box(
                 Modifier.size(40.dp).clip(CircleShape)
                     .background(if (allowAll) MasalaTheme.tokens.accent.copy(alpha = 0.18f) else Color.Transparent)
@@ -294,7 +295,7 @@ private fun Header(
                     )
                     .semantics {
                         contentDescription = allowLabel
-                        stateDescription = if (allowAll) "On" else "Off"
+                        stateDescription = allowState
                     },
                 contentAlignment = Alignment.Center,
             ) {
