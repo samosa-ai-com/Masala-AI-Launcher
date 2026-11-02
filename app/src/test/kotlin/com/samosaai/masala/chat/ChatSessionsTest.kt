@@ -170,30 +170,82 @@ class ChatSessionsTest {
     }
 
     @Test
-    fun `deleting one turn keeps the rest in order`() = runBlocking<Unit> {
+    fun `reverting drops the message and everything after it for editing`() = runBlocking<Unit> {
         val s = store()
         val chat = s.create()
         s.append(chat.id, user("one"))
         s.append(chat.id, masala("two"))
         s.append(chat.id, user("three"))
 
-        val next = s.deleteTurn(chat.id, 1)
+        val next = s.revertTo(chat.id, 2)
         assertNotNull(next)
-        assertEquals(listOf("one", "three"), next!!.turns.map { it.text })
+        assertEquals(listOf("one", "two"), next!!.turns.map { it.text })
 
         val reopened = s.get(chat.id)
         assertNotNull(reopened)
-        assertEquals(listOf("one", "three"), reopened!!.turns.map { it.text })
+        assertEquals(listOf("one", "two"), reopened!!.turns.map { it.text })
+
+        val summary = s.summaries.value.single()
+        assertEquals(2, summary.turns)
+        assertTrue(summary.search.contains("two"))
+        assertTrue(!summary.search.contains("three"))
     }
 
     @Test
-    fun `deleting an unknown turn changes nothing`() = runBlocking<Unit> {
+    fun `reverting to the first turn empties the thread and persists`() = runBlocking<Unit> {
+        val s = store()
+        val chat = s.create()
+        s.append(chat.id, user("one"))
+        s.append(chat.id, masala("two"))
+
+        val next = s.revertTo(chat.id, 0)
+        assertNotNull(next)
+        assertTrue(next!!.turns.isEmpty())
+
+        val reopened = s.get(chat.id)
+        assertNotNull(reopened)
+        assertTrue(reopened!!.turns.isEmpty())
+    }
+
+    @Test
+    fun `reverting with a stale index follows the message not the position`() = runBlocking<Unit> {
+        val s = store()
+        val chat = s.create()
+        s.append(chat.id, user("one"))
+        s.append(chat.id, masala("two"))
+        s.append(chat.id, user("three"))
+        val at = s.get(chat.id)!!.turns[2].at
+
+        // A reply lands between the long-press and the tap, shifting positions.
+        s.append(chat.id, masala("four"))
+
+        val next = s.revertTo(chat.id, 2, expectedAt = at)
+        assertNotNull(next)
+        assertEquals(listOf("one", "two"), next!!.turns.map { it.text })
+    }
+
+    @Test
+    fun `reverting to a reply or an unknown message changes nothing`() = runBlocking<Unit> {
+        val s = store()
+        val chat = s.create()
+        s.append(chat.id, user("one"))
+        s.append(chat.id, masala("two"))
+
+        assertNull(s.revertTo(chat.id, 1))
+        assertNull(s.revertTo(chat.id, 2))
+        assertNull(s.revertTo(chat.id, 0, expectedAt = 123L))
+        assertNull(s.revertTo("missing", 0))
+        assertEquals(2, s.get(chat.id)!!.turns.size)
+    }
+
+    @Test
+    fun `reverting an unknown turn changes nothing`() = runBlocking<Unit> {
         val s = store()
         val chat = s.create()
         s.append(chat.id, user("one"))
 
-        assertNull(s.deleteTurn(chat.id, 5))
-        assertNull(s.deleteTurn("missing", 0))
+        assertNull(s.revertTo(chat.id, 5))
+        assertNull(s.revertTo("missing", 0))
         assertEquals(1, s.get(chat.id)!!.turns.size)
     }
 }

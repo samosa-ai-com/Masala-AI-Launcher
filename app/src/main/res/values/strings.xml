@@ -736,7 +736,7 @@
     <string name="chat_drag_for_thread">Drag up to see the conversation</string>
     <string name="chat_sessions_title">Chats</string>
     <string name="chat_delete">Delete</string>
-    <string name="chat_delete_turn">Delete message</string>
+    <string name="chat_revert_to_here">Revert to here</string>
     <string name="chat_send_now">Send now</string>
     <string name="chat_search">Search chats</string>
     <string name="chat_summary_note">Earlier messages were summarised</string>
