@@ -82,6 +82,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.samosaai.masala.masala
 import com.samosaai.masala.ui.components.IconTile
 import com.samosaai.masala.ui.components.Radii
+import com.samosaai.masala.ui.components.wallpaperGlass
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -533,8 +534,7 @@ private fun ModeChip(name: String, onClick: (() -> Unit)?) {
     val tokens = MasalaTheme.tokens
     val shape = RoundedCornerShape(50)
     Row(
-        Modifier.padding(bottom = 18.dp).heightIn(min = 34.dp).clip(shape).background(tokens.wallpaperGlass)
-            .border(1.dp, Color.White.copy(alpha = 0.12f), shape)
+        Modifier.padding(bottom = 18.dp).heightIn(min = 34.dp).wallpaperGlass(shape)
             .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .padding(start = 10.dp, end = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1162,8 +1162,7 @@ internal fun WallpaperCard(
     val shape = RoundedCornerShape(Radii.card)
     Column(
         // 14 dp top and bottom: a one-cell card (88 dp) still fits a title and a value.
-        modifier.clip(shape).background(MasalaTheme.tokens.wallpaperGlass).border(1.dp, Color.White.copy(alpha = 0.10f), shape)
-            .padding(horizontal = 18.dp, vertical = 14.dp),
+        modifier.wallpaperGlass(shape).padding(horizontal = 18.dp, vertical = 14.dp),
         verticalArrangement = verticalArrangement,
         content = content,
     )

@@ -882,7 +882,7 @@ class HomeActivity : ComponentActivity() {
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         if (undoOffer) {
-                            com.samosaai.masala.ui.components.GlassPill {
+                            com.samosaai.masala.ui.components.GlassPill(fill = com.samosaai.masala.ui.theme.MasalaTheme.tokens.wallpaperGlass) {
                                 Text(getString(R.string.layout_applied), color = com.samosaai.masala.ui.theme.MasalaColors.Text)
                                 androidx.compose.material3.TextButton(onClick = {
                                     undoOffer = false
@@ -892,7 +892,7 @@ class HomeActivity : ComponentActivity() {
                             }
                         }
                         hiddenUndo?.let { (entry, hadHome) ->
-                            com.samosaai.masala.ui.components.GlassPill {
+                            com.samosaai.masala.ui.components.GlassPill(fill = com.samosaai.masala.ui.theme.MasalaTheme.tokens.wallpaperGlass) {
                                 Text(getString(R.string.menu_hidden_pill, entry.label), color = com.samosaai.masala.ui.theme.MasalaColors.Text)
                                 // Where it went, and how to get it back later: one tap to the list.
                                 androidx.compose.material3.TextButton(onClick = {

@@ -134,7 +134,7 @@ fun SkillWidgetCard(
         // The translucent container matches no theme colour, so the text colour has to be set.
         // Glass on the wallpaper (UI refresh U3), always light text whatever the scheme.
         colors = CardDefaults.cardColors(containerColor = com.samosaai.masala.ui.theme.MasalaTheme.tokens.wallpaperGlass, contentColor = com.samosaai.masala.ui.theme.MasalaColors.Text),
-        border = androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.10f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, com.samosaai.masala.ui.components.LitEdge),
     ) {
         Column(
             Modifier.clickable(role = Role.Button, onClick = open).padding(16.dp).heightIn(min = 48.dp),
