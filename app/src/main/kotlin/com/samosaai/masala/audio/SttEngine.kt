@@ -304,10 +304,10 @@ class SttEngine(
     /** Any non-zero sample at all, like [recordPcmWithVad]'s guard. */
     private var holdSawSignal = false
 
-    /** Budget already spent by earlier segments of this take (pause → continue keeps one take). */
-    private var holdBaseMs = 0L
-
-    /** This take's segment start, for the warn/cap budget math. */
+    /**
+     * When the live segment started, for the warn/cap budget math. A continue restarts the
+     * thread with a fresh budget — each segment is capped on its own, never accumulated.
+     */
     private var holdSegmentStartMs = 0L
 
     /** The warn fired once for this take; a continue re-arms it with the fresh budget. */
@@ -355,7 +355,6 @@ class SttEngine(
         holdError = null
         holdPcm = ByteArrayOutputStream()
         holdSawSignal = false
-        holdBaseMs = 0L
         holdWarned = false
         holdPaused = false
         capWarningListener = null
@@ -439,7 +438,7 @@ class SttEngine(
                     }
                 }
                 _level.value = ((SilenceDetector.rmsDb(shorts, count) + 60f) / 50f).coerceIn(0f, 1f)
-                val elapsedMs = holdBaseMs + (System.currentTimeMillis() - holdSegmentStartMs)
+                val elapsedMs = System.currentTimeMillis() - holdSegmentStartMs
                 if (!holdWarned && elapsedMs > CAP_WARN_MS) {
                     // Heads-up only: the take keeps recording. One shot per segment.
                     holdWarned = true
@@ -510,7 +509,6 @@ class SttEngine(
      */
     fun pauseRecording(): Boolean {
         if (holdThread == null || holdPaused) return holdPaused
-        holdBaseMs += System.currentTimeMillis() - holdSegmentStartMs
         takeAutoEndListener = null
         holdStopRequested = true
         holdGen++
@@ -565,7 +563,6 @@ class SttEngine(
             return false
         }
         holdStopRequested = false
-        holdBaseMs = 0L
         holdWarned = false
         holdRecorder = recorder
         holdSegmentStartMs = System.currentTimeMillis()
@@ -898,13 +895,15 @@ class SttEngine(
                     MasalaLog.d(TAG) { "onResults" }
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     val text = matches?.firstOrNull() ?: ""
+                    // Older first: the stash holds a previous segment's words that never
+                    // finalized; this result holds this segment's.
+                    commitPending()
                     if (text.isNotBlank()) {
                         if (continuousTranscript.isNotEmpty()) continuousTranscript.append(" ")
                         continuousTranscript.append(text)
                         _heard.value = _heard.value + 1
                     }
                     currentPartialResult = "" // Final result supersedes partial
-                    pendingPartial = "" // ...and anything stashed from the restart that produced it.
                     if (isContinuousListening) {
                         mainHandler.post { startContinuousListeningCycle() }
                     } else {
@@ -927,6 +926,7 @@ class SttEngine(
                     MasalaLog.d(TAG) { "onSegmentResults" }
                     val matches = segmentResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     val text = matches?.firstOrNull() ?: ""
+                    commitPending()
                     if (text.isNotBlank()) {
                         if (continuousTranscript.isNotEmpty()) continuousTranscript.append(" ")
                         continuousTranscript.append(text)
@@ -945,7 +945,7 @@ class SttEngine(
                 }
             })
         }
-        val active = recognizer ?: return
+        val active = recognizer
         listenWithInstalledTag(active, currentLanguage) { tag ->
             // Stopped, or replaced, while the recognizer was asked about its languages.
             if (isContinuousListening && currentRecognizer === active) startCycle(active, tag)
@@ -1071,16 +1071,28 @@ class SttEngine(
     }
 
     /**
+     * Folds stashed restart words into the transcript: the segment that produced them never
+     * finalized, so committing is the only way to keep them. Called when a newer segment
+     * finalizes, and by [buildFinalTranscript] at the end of the take.
+     */
+    private fun commitPending() {
+        if (pendingPartial.isBlank()) return
+        if (continuousTranscript.isNotEmpty()) continuousTranscript.append(" ")
+        continuousTranscript.append(pendingPartial)
+        pendingPartial = ""
+    }
+
+    /**
      * Build the final transcript by appending the stashed restart partial and the current
      * in-flight partial (if any) to the accumulated finalized segments.
      */
     private fun buildFinalTranscript(): String {
+        commitPending()
         val base = continuousTranscript.toString()
-        val tail = listOf(pendingPartial, currentPartialResult).filter { it.isNotBlank() }.joinToString(" ")
-        pendingPartial = ""
+        val partial = currentPartialResult
         currentPartialResult = ""
-        if (tail.isBlank()) return base
-        return if (base.isNotBlank()) "$base $tail" else tail
+        if (partial.isBlank()) return base
+        return if (base.isNotBlank()) "$base $partial" else partial
     }
 
     /**

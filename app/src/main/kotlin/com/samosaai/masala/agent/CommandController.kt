@@ -184,18 +184,40 @@ class CommandController(
         return true
     }
 
+    /** True while a pause is settling; the clock must not stack a second one. */
+    private var pauseInflight = false
+
     /**
-     * The cap paused the take (or the clock did on the Android path): the capture stopped
+     * The cap paused the take (or the clock did on the Android path): the capture stops
      * but its audio/transcript is kept. The UI offers Continue / Send / Cancel from here.
+     *
+     * The engine stop is awaited before advertising Paused: Continue is only offered once
+     * the recorder/recognizer is really down, so resume can never race a half-stopped
+     * take into an auto-send. Send/Cancel keep working meanwhile (the state is still
+     * Listening), and if the pause itself fails the take is sent instead of stranded.
      */
     private fun pauseTake() {
         val input = speech ?: return
-        if (_state.value != CommandState.Listening) return
-        stopTicker()
-        _state.value = CommandState.ListeningPaused
-        // API cap path already stopped its thread (a no-op true); the Android clock path
-        // stops its recognizer here, keeping the transcript for Send or Continue.
-        job = scope.launch { input.pause() }
+        if (_state.value != CommandState.Listening || pauseInflight) return
+        pauseInflight = true
+        job = scope.launch {
+            val ok = try {
+                // API cap path already stopped its thread (a no-op true); the Android
+                // clock path stops its recognizer here, keeping the transcript.
+                input.pause()
+            } catch (_: Exception) {
+                false
+            } finally {
+                pauseInflight = false
+            }
+            if (_state.value != CommandState.Listening) return@launch
+            if (ok) {
+                stopTicker()
+                _state.value = CommandState.ListeningPaused
+            } else {
+                stopListening()
+            }
+        }
     }
 
     /**
@@ -267,10 +289,6 @@ class CommandController(
         }
     }
 
-    /**
-     * Send ends the take now; what was said still runs. Only the final transcript is
-     * used: it is transcribed, cleaned up by [cleaner], and then sent as one turn.
-     */
     /**
      * Send ends the take now; what was said still runs. Works from Listening and from the
      * cap-paused state — both transcribe what was kept. Only the final transcript is used.

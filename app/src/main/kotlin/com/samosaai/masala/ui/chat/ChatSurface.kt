@@ -757,8 +757,12 @@ private fun Controls(
                     color = tokens.textMedium,
                 )
                 Spacer(Modifier.width(12.dp))
-                IconButton(onClick = onSend, modifier = Modifier.size(68.dp).clip(CircleShape).background(tokens.accent)) {
-                    Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
+                IconButton(
+                    onClick = onSend,
+                    enabled = ready,
+                    modifier = Modifier.size(68.dp).clip(CircleShape).background(tokens.accent.copy(alpha = if (ready) 1f else 0.4f)),
+                ) {
+                    Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent.copy(alpha = if (ready) 1f else 0.6f))
                 }
             } else if (paused) {
                 IconButton(onClick = onClose, modifier = Modifier.size(52.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.06f))) {
@@ -768,7 +772,7 @@ private fun Controls(
                 androidx.compose.material3.Button(onClick = onContinue) {
                     Text(stringResource(R.string.voice_continue))
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(12.dp))
                 IconButton(onClick = onSend, modifier = Modifier.size(52.dp).clip(CircleShape).background(tokens.accent)) {
                     Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
                 }

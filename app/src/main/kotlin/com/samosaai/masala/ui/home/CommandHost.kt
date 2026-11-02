@@ -268,6 +268,9 @@ fun ReplyCard(
                     androidx.compose.material3.Button(onClick = { app.commands.continueListening() }) {
                         Text(stringResource(R.string.voice_continue))
                     }
+                    TextButton(onClick = { app.commands.dismiss() }) {
+                        Text(stringResource(R.string.listening_cancel))
+                    }
                     Box(Modifier.weight(1f))
                     androidx.compose.material3.Button(onClick = { app.commands.sendNow() }) {
                         Text(stringResource(R.string.chat_send_now))
