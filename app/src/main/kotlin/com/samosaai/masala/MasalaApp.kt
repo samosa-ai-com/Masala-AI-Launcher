@@ -438,6 +438,7 @@ class MasalaApp : Application() {
                     turn.role, turn.text, turn.results,
                     notifyEnabled = settings.current().replyNotify,
                     homeVisible = contextService.homeVisible.value,
+                    minimized = commands.minimized.value,
                 )
             ) {
                 val title = chats.summaries.value.firstOrNull { it.id == id }?.title.orEmpty()

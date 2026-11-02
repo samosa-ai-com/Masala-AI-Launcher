@@ -39,9 +39,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AddPhotoAlternate
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
@@ -49,10 +51,12 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -117,7 +121,7 @@ fun ChatSurface(
     mic: () -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
-    onAsk: (String) -> Unit = {},
+    onAsk: (String, List<String>) -> Unit = { _, _ -> },
     onClose: () -> Unit,
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
@@ -515,7 +519,7 @@ private fun ResultCard(result: ChatResult) {
     Column(
         Modifier.fillMaxWidth().padding(top = 8.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.White.copy(alpha = 0.06f))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         Text(
@@ -708,7 +712,7 @@ private fun Bubble(
             Column(
                 Modifier.fillMaxWidth().padding(vertical = 6.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White.copy(alpha = 0.04f))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
             Text(
@@ -741,64 +745,71 @@ private fun Bubble(
             longPress.fillMaxWidth().clip(shape)
                 .background(
                     when {
-                        user -> MasalaTheme.tokens.accent.copy(alpha = if (live) 0.22f else 0.92f)
-                        error -> Color(0x33FF6B6B)
-                        else -> Color.White.copy(alpha = 0.06f)
+                        user -> MasalaTheme.tokens.accent.copy(alpha = if (live) 0.6f else 0.92f)
+                        error -> MaterialTheme.colorScheme.errorContainer
+                        // Opaque theme pair: the old translucent white washed out over wallpapers.
+                        else -> MaterialTheme.colorScheme.surfaceContainerHigh
                     },
                 )
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
-            if (turn.experts.isNotEmpty() && !user) {
-                // Who answered: the expert's name above the text, so scrolling back stays clear.
-                Row(
-                    Modifier.padding(bottom = 7.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    val context = LocalContext.current
-                    turn.experts.take(MAX_EXPERT_BADGES).forEach { expert ->
-                        Text(
-                            expert.title,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MasalaColors.Gold,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(MasalaColors.Gold.copy(alpha = 0.14f))
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                                // Who answered, and where its instructions can be changed.
-                                .clickable {
-                                    context.startActivity(
-                                        Intent(context, SettingsActivity::class.java)
-                                            .putExtra(SettingsActivity.EXTRA_PAGE, "PERSONAS"),
-                                    )
-                                },
-                        )
+            val bubbleContent = MaterialTheme.colorScheme.onSurface
+            CompositionLocalProvider(
+                LocalContentColor provides
+                    if (error) MaterialTheme.colorScheme.onErrorContainer else bubbleContent,
+            ) {
+                if (turn.experts.isNotEmpty() && !user) {
+                    // Who answered: the expert's name above the text, so scrolling back stays clear.
+                    Row(
+                        Modifier.padding(bottom = 7.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        val context = LocalContext.current
+                        turn.experts.take(MAX_EXPERT_BADGES).forEach { expert ->
+                            Text(
+                                expert.title,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MasalaColors.Gold,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(MasalaColors.Gold.copy(alpha = 0.14f))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    // Who answered, and where its instructions can be changed.
+                                    .clickable {
+                                        context.startActivity(
+                                            Intent(context, SettingsActivity::class.java)
+                                                .putExtra(SettingsActivity.EXTRA_PAGE, "PERSONAS"),
+                                        )
+                                    },
+                            )
+                        }
                     }
                 }
-            }
-            // The model answers in Markdown — tables, lists, code — and the bubble is where it
-            // lands, so render it, not the raw pipes and hashes. The user's own words stay plain
-            // text on the accent tile.
-            if (user) {
-                Text(
-                    turn.text,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (!live) MasalaTheme.tokens.onAccent else MasalaTheme.tokens.textHigh,
-                    fontSize = 14.sp,
-                )
-            } else {
-                Markdown(turn.text)
-            }
-            turn.results.forEach { result -> ResultCard(result) }
-            if (turn.steps.isNotEmpty()) {
-                Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    turn.steps.forEach { step ->
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Box(Modifier.size(5.dp).clip(CircleShape).background(MasalaColors.Cardamom.copy(alpha = 0.85f)))
-                            Text(
-                                step,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MasalaTheme.tokens.textLow,
-                            )
+                // The model answers in Markdown — tables, lists, code — and the bubble is where it
+                // lands, so render it, not the raw pipes and hashes. The user's own words stay plain
+                // text on the accent tile.
+                if (user) {
+                    Text(
+                        turn.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (!live) MasalaTheme.tokens.onAccent else MasalaTheme.tokens.textHigh,
+                        fontSize = 14.sp,
+                    )
+                } else {
+                    Markdown(turn.text)
+                }
+                turn.results.forEach { result -> ResultCard(result) }
+                if (turn.steps.isNotEmpty()) {
+                    Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        turn.steps.forEach { step ->
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Box(Modifier.size(5.dp).clip(CircleShape).background(MasalaColors.Cardamom.copy(alpha = 0.85f)))
+                                Text(
+                                    step,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MasalaTheme.tokens.textLow,
+                                )
+                            }
                         }
                     }
                 }
@@ -842,13 +853,17 @@ private fun Controls(
     level: () -> Float,
     onSend: () -> Unit,
     onContinue: () -> Unit = {},
-    onAsk: (String) -> Unit = {},
+    onAsk: (String, List<String>) -> Unit = { _, _ -> },
     onClose: () -> Unit,
     prefill: String = "",
     prefillNonce: Int = 0,
     onPrefillConsumed: () -> Unit = {},
 ) {
     val tokens = MasalaTheme.tokens
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val tooManyText = stringResource(R.string.chat_too_many_images, com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE)
+    val badImageText = stringResource(R.string.chat_bad_image)
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         if (listening && elapsedMs >= com.samosaai.masala.audio.SttEngine.CAP_WARN_MS) {
             Text(
@@ -897,6 +912,8 @@ private fun Controls(
                 }
             } else {
                 var text by remember { mutableStateOf("") }
+                var queued by remember { mutableStateOf(listOf<com.samosaai.masala.chat.AttachedImage>()) }
+                var cameraTarget by remember { mutableStateOf<android.net.Uri?>(null) }
                 // A revert drops the message back here for editing; the nonce re-applies
                 // even when the same words are reverted twice in a row. Consuming it
                 // at once stops the old text refilling the box on a later rebuild
@@ -907,25 +924,85 @@ private fun Controls(
                         onPrefillConsumed()
                     }
                 }
-                androidx.compose.material3.OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text(stringResource(R.string.command_hint)) },
-                    minLines = 1,
-                    maxLines = 5,
-                    shape = RoundedCornerShape(24.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                if (text.isBlank()) {
-                    MicButton(mic, level = level, size = 52.dp)
-                } else {
-                    IconButton(
-                        onClick = { onAsk(text.trim()); text = "" },
-                        modifier = Modifier.size(52.dp).clip(CircleShape).background(tokens.accent),
-                    ) {
-                        Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
+                fun addUri(uri: android.net.Uri, name: String) {
+                    if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                        android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
+                        return
                     }
+                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        val b64 = com.samosaai.masala.chat.compressToJpegBase64(context, uri)
+                        if (b64 == null) {
+                            launch(kotlinx.coroutines.Dispatchers.Main) {
+                                android.widget.Toast.makeText(context, badImageText, android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            val item = com.samosaai.masala.chat.AttachedImage(
+                                id = "${System.currentTimeMillis()}-${queued.size}", name = name, jpegBase64 = b64,
+                            )
+                            launch(kotlinx.coroutines.Dispatchers.Main) { queued = queued + item }
+                        }
+                    }
+                }
+                val pickImage = androidx.activity.compose.rememberLauncherForActivityResult(
+                    androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(maxItems = com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE),
+                ) { uris -> uris.forEachIndexed { i, u -> addUri(u, "image ${queued.size + i + 1}") } }
+                val takePhoto = androidx.activity.compose.rememberLauncherForActivityResult(
+                    androidx.activity.result.contract.ActivityResultContracts.TakePicture(),
+                ) { ok -> if (ok) cameraTarget?.let { addUri(it, "photo") } }
+                Column(Modifier.weight(1f)) {
+                com.samosaai.masala.chat.AttachmentStrip(queued, onRemove = { id -> queued = queued.filterNot { it.id == id } })
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    IconButton(
+                        onClick = {
+                            if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                                android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
+                            } else pickImage.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Icon(Icons.Rounded.AddPhotoAlternate, stringResource(R.string.chat_attach_image), tint = tokens.textMedium)
+                    }
+                    IconButton(
+                        onClick = {
+                            if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                                android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
+                                return@IconButton
+                            }
+                            val dir = java.io.File(context.filesDir, "work").apply { mkdirs() }
+                            val file = com.samosaai.masala.tools.PhotoTool.photoFile(dir)
+                            val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+                            cameraTarget = uri
+                            takePhoto.launch(uri)
+                        },
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Icon(Icons.Rounded.PhotoCamera, stringResource(R.string.chat_take_photo), tint = tokens.textMedium)
+                    }
+                    androidx.compose.material3.OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text(stringResource(R.string.command_hint)) },
+                        minLines = 1,
+                        maxLines = 5,
+                        shape = RoundedCornerShape(24.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    if (text.isBlank() && queued.isEmpty()) {
+                        MicButton(mic, level = level, size = 52.dp)
+                    } else {
+                        IconButton(
+                            onClick = {
+                                onAsk(text.trim(), queued.map { it.jpegBase64 })
+                                text = ""
+                                queued = emptyList()
+                            },
+                            modifier = Modifier.size(52.dp).clip(CircleShape).background(tokens.accent),
+                        ) {
+                            Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
+                        }
+                    }
+                }
                 }
             }
         }

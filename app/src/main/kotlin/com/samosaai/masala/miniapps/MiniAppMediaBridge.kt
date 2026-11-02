@@ -32,8 +32,15 @@ object MiniAppMediaBridge {
     const val SCHEME = "masala"
     const val HOST = "media"
 
-    fun intercept(app: MasalaApp, appId: String, url: String): WebResourceResponse? {
-        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return null
+    /**
+     * What the pre-answer probe answers: valid JSON saying media isn't available in
+     * previews, so the page loads with no console errors and the repair turn doesn't
+     * strip working media calls. Real runs go through [intercept].
+     */
+    fun probeDenial(): WebResourceResponse =
+        json(200, """{"ok":false,"error":"media not available in preview"}""")
+
+    fun intercept(app: MasalaApp, appId: String, url: String): WebResourceResponse? {        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return null
         if (uri.scheme != SCHEME || uri.host != HOST) return null
         val allowed = runBlocking { runCatching { app.miniApps.mediaAllowed(appId) }.getOrDefault(false) }
         if (!allowed) return json(403, """{"ok":false,"error":"media not allowed for this app"}""")
