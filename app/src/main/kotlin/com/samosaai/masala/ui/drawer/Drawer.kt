@@ -81,7 +81,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.input.pointer.util.addPointerInputChange
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
@@ -245,6 +252,7 @@ fun Drawer(
     val listState = rememberLazyListState()
     val resultsState = rememberLazyListState()
     val gridState = rememberLazyGridState()
+    val globeListState = rememberLazyListState()
     var handledSignal by remember { mutableIntStateOf(focusSignal) }
     LaunchedEffect(open, settled, autoKeyboard, focusSignal) {
         if (open && settled && (autoKeyboard || focusSignal != handledSignal)) {
@@ -257,10 +265,11 @@ fun Drawer(
             focusManager.clearFocus(force = true)
             keyboard?.hide()
             query = TextFieldValue()
-            // Only one of the two is on screen; requests don't wait for a layout that may never come.
+            // Only one of the three is on screen; requests don't wait for a layout that may never come.
             listState.requestScrollToItem(0)
             resultsState.requestScrollToItem(0)
             gridState.requestScrollToItem(0)
+            globeListState.requestScrollToItem(0)
         }
     }
     // New results start at the top; applied in the next layout pass, without a frame of its own.
@@ -284,9 +293,15 @@ fun Drawer(
     var showWork by rememberSaveable { mutableStateOf(false) }
     val work = profiles.work
     val tokens = MasalaTheme.tokens
-    // Pull-down to close lives on the fixed header only (handle + search row), so the
-    // scrolling lists below keep their own gestures. Taps pass through: with no drag
-    // there is nothing to consume, so the field still focuses and buttons still fire.
+    // Pull-down to close works from anywhere in the drawer, but only when the gesture
+    // starts with the visible list parked at the top: a press that lands mid-scroll (or
+    // mid-fling) keeps scrolling, even if that same gesture reaches the top — and leftover
+    // fling motion can never start a close. The header keeps its own draggable (it owns
+    // presses there whenever the list is scrolled); the nested connection below owns
+    // presses that start at the top. One owner per gesture, never both: while the
+    // connection grabs, the header's draggable sees nothing, and vice versa. Taps pass
+    // through: the observer below consumes nothing, so the field still focuses and
+    // buttons still fire.
     val latestCloseDrag by rememberUpdatedState(onCloseDrag)
     val latestCloseRelease by rememberUpdatedState(onCloseRelease)
     val latestCloseFinger by rememberUpdatedState(onCloseFingerActive)
@@ -304,14 +319,116 @@ fun Drawer(
             onDragStopped = { v -> latestCloseFinger?.invoke(false); latestCloseRelease?.invoke(v) },
         )
     } else Modifier
+    // The list on screen, read fresh (plain vals go stale inside the remembered blocks below).
+    val latestSearching by rememberUpdatedState(searching)
+    val latestShownLayout by rememberUpdatedState(shownLayout)
+    fun listAtTop(): Boolean = when {
+        latestSearching -> resultsState.firstVisibleItemIndex == 0 && resultsState.firstVisibleItemScrollOffset == 0
+        latestShownLayout == DrawerLayout.GRID -> gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
+        latestShownLayout == DrawerLayout.LIST -> listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+        else -> globeListState.firstVisibleItemIndex == 0 && globeListState.firstVisibleItemScrollOffset == 0
+    }
+    fun anyListScrolling(): Boolean =
+        gridState.isScrollInProgress || listState.isScrollInProgress ||
+            resultsState.isScrollInProgress || globeListState.isScrollInProgress
+    // True while the current finger's press started at the top and owns downward drags.
+    var downAtTop by remember { mutableStateOf(false) }
+    // Grabs downward drags for closing only when the press started at the top. Upward
+    // drags first unwind an in-progress close, then fall through to the list, so a
+    // reversed pull reopens instead of scrolling away underneath.
+    val closeNested = remember {
+        object : NestedScrollConnection {
+            private fun grabDown(delta: Float): Offset {
+                closeTravel += delta
+                latestCloseDrag?.invoke(closeTravel)
+                return Offset(0f, delta)
+            }
+
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (!downAtTop || source != NestedScrollSource.UserInput || latestCloseDrag == null) return Offset.Zero
+                return when {
+                    available.y > 0f -> grabDown(available.y)
+                    available.y < 0f && closeTravel > 0f -> {
+                        val unwind = minOf(-available.y, closeTravel)
+                        closeTravel -= unwind
+                        latestCloseDrag?.invoke(closeTravel)
+                        Offset(0f, -unwind)
+                    }
+                    else -> Offset.Zero
+                }
+            }
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                // The safety net: a downward remainder the list couldn't use (overscroll at
+                // the top) belongs to the close, same as a pre-scroll grab.
+                if (!downAtTop || source != NestedScrollSource.UserInput || available.y <= 0f || latestCloseDrag == null) return Offset.Zero
+                return grabDown(available.y)
+            }
+
+            // A close-owned gesture's fling must not fling the list underneath. The lift
+            // observer below already settled the drawer, so there is nothing to route here.
+            override suspend fun onPreFling(available: Velocity): Velocity =
+                if (downAtTop && closeTravel > 0f) available else Velocity.Zero
+        }
+    }
+    // Observes only (consumes nothing): latches whether the press started at the top, tracks
+    // its velocity, and settles the drawer on lift when a close is in progress — the single
+    // place a list-started close settles, so it fires exactly once per gesture. Final pass
+    // on purpose, mirroring home's lift observer: siblings may consume the up event first.
+    val closeLift = Modifier.pointerInput(Unit) {
+        val velocities = VelocityTracker()
+        while (true) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                closeTravel = 0f
+                downAtTop = latestCloseDrag != null && latestCloseRelease != null && listAtTop() && !anyListScrolling()
+                latestCloseFinger?.invoke(downAtTop)
+                var tracked = down.id
+                try {
+                    velocities.resetTracking()
+                    velocities.addPointerInputChange(down)
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Final)
+                        val change = event.changes.firstOrNull { it.id == tracked }
+                        if (change != null && !change.pressed) {
+                            event.changes.firstOrNull { it.pressed }?.let { next ->
+                                tracked = next.id
+                                velocities.resetTracking()
+                                velocities.addPointerInputChange(next)
+                            } ?: velocities.addPointerInputChange(change)
+                        } else {
+                            change?.let(velocities::addPointerInputChange)
+                        }
+                        if (event.changes.isEmpty() || event.changes.all { !it.pressed }) break
+                    }
+                } finally {
+                    // The gesture is over only once every finger is up: settling on the first
+                    // lift would strand the rest of that finger's drag with no lift left, the
+                    // same freeze the drawer-ghost fix removed on the home side.
+                    if (downAtTop && closeTravel > 0f) {
+                        val vy = runCatching { velocities.calculateVelocity().y }.getOrDefault(0f)
+                        closeTravel = 0f
+                        downAtTop = false
+                        latestCloseFinger?.invoke(false)
+                        latestCloseRelease?.invoke(if (vy.isFinite()) vy else 0f)
+                    } else {
+                        downAtTop = false
+                        latestCloseFinger?.invoke(false)
+                    }
+                }
+            }
+        }
+    }
     // A dimmed glass sheet: the wallpaper stays visible behind (home fades out under it).
     val sheet = if (tokens.dark) Color(0xD60C0A12) else MasalaColors.Paper.copy(alpha = 0.94f)
     Box(
         Modifier
             .fillMaxSize()
-            // No pointer handler here: any listener on this root (even one that consumes nothing) made
-            // the buttons and rows inside drop taps whose finger moved a little. Home keeps itself out
-            // of reach instead ([blockTouches] in HomeActivity).
+            // The nested connection grabs close drags before the lists see them; the lift
+            // observer consumes nothing, so taps, long-presses and the scrubber are untouched.
+            // (Home keeps itself out of reach instead: [blockTouches] in HomeActivity.)
+            .nestedScroll(closeNested)
+            .then(closeLift)
             .background(sheet),
     ) {
         // No Surface under the sheet any more, so rows get their text colour from here.
@@ -365,7 +482,7 @@ fun Drawer(
                     when (shownLayout) {
                         DrawerLayout.GRID -> AppGrid(shown, suggested.takeIf { !showWork }.orEmpty(), icons, profiles, onLaunch, onMenu, gridState, Modifier.weight(1f))
                         DrawerLayout.LIST -> AppListWithRail(shown, icons, profiles, onLaunch, onMenu, listState, Modifier.weight(1f))
-                        DrawerLayout.GLOBE -> GlobePage(shown, globeRanked, usageOrder, range, { range = it }, icons, open, globe, onLaunch, onMenu, profiles, Modifier.weight(1f))
+                        DrawerLayout.GLOBE -> GlobePage(shown, globeRanked, usageOrder, range, { range = it }, icons, open, globe, onLaunch, onMenu, profiles, Modifier.weight(1f), globeListState)
                     }
                 }
                 // Ends above the keyboard, so only the rows that can be seen are composed on each letter.
@@ -742,13 +859,14 @@ private fun GlobePage(
     onMenu: (AppEntry) -> Unit,
     profiles: AppCatalog.Snapshot,
     modifier: Modifier,
+    listState: androidx.compose.foundation.lazy.LazyListState = androidx.compose.foundation.lazy.rememberLazyListState(),
 ) {
     val onGlobe = remember(ranked) { ranked.map { it.entry.key.id }.toSet() }
     // Most used first; never-opened apps keep the catalog's A–Z order (the sort is stable).
     val rest = remember(apps, onGlobe, usageOrder) {
         apps.filter { it.key.id !in onGlobe }.sortedBy { usageOrder[it.key.id] ?: Int.MAX_VALUE }
     }
-    LazyColumn(modifier.fillMaxWidth()) {
+    LazyColumn(state = listState, modifier = modifier.fillMaxWidth()) {
         if (source != null && !source.usageAccess) item(key = "usage") { UsageAccessCard(source.asked, source.onAllow, source.onSkip) }
         item(key = "globe") {
             Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)) {
