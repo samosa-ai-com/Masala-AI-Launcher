@@ -290,6 +290,7 @@ class HomeActivity : ComponentActivity() {
         var choosingIcon by remember { mutableStateOf<AppEntry?>(null) }
         // Tiles that aren't installed apps get their own menu, so nothing on home is menu-less.
         var itemMenuFor by remember { mutableStateOf<Item?>(null) }
+        var resizingCell by remember { mutableStateOf<String?>(null) }
         var widgetMenuFor by remember { mutableStateOf<Pair<com.samosaai.masala.core.contract.WidgetSpec, String>?>(null) }
         var addWidgetSheet by remember { mutableStateOf(false) }
         // Long-press on empty home space: Change wallpaper / Add widget / Settings.
@@ -531,7 +532,7 @@ class HomeActivity : ComponentActivity() {
         }
         // The context below is remembered on purpose; drops read the live layout through these.
         val latestLayout = rememberUpdatedState(layout)
-        val render = remember(apps, settings.homeLocked, modeName, movable, miniAppIcons, miniAppDocs, widgetSource) {
+        val render = remember(apps, settings.homeLocked, modeName, movable, miniAppIcons, miniAppDocs, widgetSource, resizingCell) {
             RenderContext(
                 icons = app.icons,
                 apps = apps,
@@ -560,6 +561,19 @@ class HomeActivity : ComponentActivity() {
                 isBaseSection = { id ->
                     val base = app.layouts.base.value
                     base?.pages.orEmpty().flatMap { it.sections }.any { it.id == id } || (base != null && LayoutEdits.isCell(base, id))
+                },
+                resizingCell = resizingCell,
+                onCellResize = { cellId, w, h ->
+                    resizingCell = null
+                    scope.launch {
+                        val cell = latestLayout.value.layout.pages.flatMap { it.sections }
+                            .filterIsInstance<com.samosaai.masala.core.contract.CellGridSection>().flatMap { it.cells }
+                            .firstOrNull { it.id == cellId }
+                        if (cell != null && (cell.w != w || cell.h != h)) {
+                            app.layouts.edit(getString(R.string.widgets_resized)) { LayoutEdits.resizeCell(it, cellId, w, h) }
+                                .firstOrNull()?.let { toast(it.message) }
+                        }
+                    }
                 },
                 onCellDrop = { cellId, target ->
                     scope.launch {
@@ -1089,6 +1103,8 @@ class HomeActivity : ComponentActivity() {
         }
 
         widgetMenuFor?.let { (spec, sectionId) ->
+            val cellWidth = layout.layout.pages.flatMap { it.sections }.filterIsInstance<com.samosaai.masala.core.contract.CellGridSection>()
+                .flatMap { it.cells }.firstOrNull { it.id == sectionId }?.w
             fun done(action: () -> Unit) {
                 widgetMenuFor = null
                 action()
@@ -1099,8 +1115,8 @@ class HomeActivity : ComponentActivity() {
                 currentPageId = layout.layout.pages.firstOrNull { p ->
                     p.sections.any { it.id == sectionId || (it is com.samosaai.masala.core.contract.CellGridSection && it.cells.any { c -> c.id == sectionId }) }
                 }?.id,
-                width = layout.layout.pages.flatMap { it.sections }.filterIsInstance<com.samosaai.masala.core.contract.CellGridSection>()
-                    .flatMap { it.cells }.firstOrNull { it.id == sectionId }?.w,
+                width = cellWidth,
+                onResizeOnHome = if (cellWidth == null) null else ({ done { resizingCell = sectionId } }),
                 onResizeWidth = { w -> done { scope.launch {
                     app.layouts.resizeCellWidth("Resize ${spec.title ?: spec.id}", sectionId, w)
                         .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_resized))

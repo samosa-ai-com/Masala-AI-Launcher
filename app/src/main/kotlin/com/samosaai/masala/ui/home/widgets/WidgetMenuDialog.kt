@@ -40,6 +40,8 @@ fun WidgetMenuDialog(
     /** The placement's width in cells when it sits on a cell grid; null hides the Width option. */
     width: Int? = null,
     onResizeWidth: ((Int) -> Unit)? = null,
+    /** Shows a drag handle on the cell itself; null hides the option. */
+    onResizeOnHome: (() -> Unit)? = null,
 ) {
     var resizing by rememberSaveable(spec.id) { mutableStateOf(false) }
     var widening by rememberSaveable(spec.id) { mutableStateOf(false) }
@@ -59,6 +61,7 @@ fun WidgetMenuDialog(
                         rows = spec.size.default
                         resizing = true
                     }
+                    if (onResizeOnHome != null) MenuRow(stringResource(R.string.widgets_resize_on_home), onResizeOnHome)
                     if (width != null && onResizeWidth != null && minW < maxW) {
                         MenuRow(stringResource(R.string.widgets_width, minW, maxW)) {
                             cells = width

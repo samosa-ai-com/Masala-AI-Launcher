@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -164,6 +166,10 @@ class RenderContext(
     val isBaseSection: (String) -> Boolean = { true },
     /** Long-press-then-drag a widget cell to another spot on its grid; none keeps the menu only. */
     val onCellDrop: ((cellId: String, target: CellDrop) -> Unit)? = null,
+    /** The cell showing a resize handle (from the widget menu); null when none. */
+    val resizingCell: String? = null,
+    /** A handle drag ended at [w] × [h] cells; also called with the old size to just close it. */
+    val onCellResize: ((cellId: String, w: Int, h: Int) -> Unit)? = null,
 ) {
     /** A fixed time, for previews and tests. */
     constructor(
@@ -569,6 +575,7 @@ private fun CellGridView(section: com.samosaai.masala.core.contract.CellGridSect
                         .padding(4.dp)
                         .graphicsLayer { alpha = if (drag?.draggingCell?.id == cell.id) 0.3f else 1f },
                 ) { CellContentView(cell, section.id, ctx, enabled) }
+                if (cell.id == ctx.resizingCell) ResizeHandle(cell, section.columns, cellWidth, ctx)
             }
         }
     }
@@ -597,6 +604,56 @@ private fun CellContentView(cell: com.samosaai.masala.core.contract.Cell, gridId
         is com.samosaai.masala.core.contract.CellContent.HtmlCell -> ctx.htmlWidget(content.appId)?.let { row ->
             com.samosaai.masala.miniapps.MiniAppView(row.id, row.html, row.networkAllowed, fill)
         } ?: Placeholder(content.appId, stringResource(R.string.home_widget_placeholder), rows)
+    }
+}
+
+/**
+ * The resize frame on one cell: an outline at the size the handle shows and a round handle at its
+ * bottom-right. Dragging snaps to whole cells (inside the columns, at least 1 × 1); letting go saves.
+ */
+@Composable
+private fun ResizeHandle(cell: com.samosaai.masala.core.contract.Cell, columns: Int, cellWidth: androidx.compose.ui.unit.Dp, ctx: RenderContext) {
+    val density = LocalDensity.current
+    val cellWidthPx = with(density) { cellWidth.toPx() }
+    val cellHeightPx = with(density) { CELL_HEIGHT.toPx() }
+    var w by remember(cell) { mutableStateOf(cell.w) }
+    var h by remember(cell) { mutableStateOf(cell.h) }
+    var delta by remember(cell) { mutableStateOf(Offset.Zero) }
+    val accent = MasalaTheme.tokens.accent
+    Box(
+        Modifier
+            .offset(x = cellWidth * cell.x, y = CELL_HEIGHT * cell.y)
+            .size(cellWidth * w, CELL_HEIGHT * h)
+            .padding(2.dp)
+            .border(2.dp, accent, RoundedCornerShape(28.dp)),
+    ) {
+        Box(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .size(36.dp)
+                .background(accent, androidx.compose.foundation.shape.CircleShape)
+                // A tap without a drag closes the frame unchanged.
+                .pointerInput(cell.id, "tap") {
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        val up = waitForUpOrCancellation()
+                        if (up != null && (up.position - down.position).getDistance() < viewConfiguration.touchSlop) {
+                            ctx.onCellResize?.invoke(cell.id, cell.w, cell.h)
+                        }
+                    }
+                }
+                .pointerInput(cell.id) {
+                    detectDragGestures(
+                        onDragEnd = { ctx.onCellResize?.invoke(cell.id, w, h); delta = Offset.Zero },
+                        onDragCancel = { w = cell.w; h = cell.h; delta = Offset.Zero },
+                    ) { change, amount ->
+                        change.consume()
+                        delta += amount
+                        w = (cell.w + kotlin.math.round(delta.x / cellWidthPx).toInt()).coerceIn(1, columns - cell.x)
+                        h = (cell.h + kotlin.math.round(delta.y / cellHeightPx).toInt()).coerceAtLeast(1)
+                    }
+                },
+        )
     }
 }
 

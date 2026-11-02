@@ -342,6 +342,7 @@
     <string name="widgets_moved">Moved</string>
     <string name="widgets_resize">Resize (%1$d–%2$d rows)</string>
     <string name="widgets_rows">%1$d rows</string>
+    <string name="widgets_resize_on_home">Resize on home (drag the corner)</string>
     <string name="widgets_width">Width (%1$d–%2$d cells)</string>
     <string name="widgets_cells">%1$d cells wide</string>
     <string name="widgets_edit_in_manager">Edit in manager</string>
