@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -65,6 +66,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -77,7 +79,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.samosaai.masala.R
 import com.samosaai.masala.ui.components.Markdown
 import com.samosaai.masala.agent.CommandState
@@ -522,6 +526,11 @@ private fun ResultCard(result: ChatResult) {
         )
         // Only a mini app or an installed app has an address we can open from here; a produced
         // file still gets its title, without a row of buttons that would do nothing.
+        // A generated wallpaper gets its preview with Set / Save actions instead.
+        if (result.kind == "wallpaper") {
+            WallpaperPreview(result, app)
+            return@Column
+        }
         val canOpen = miniApp || result.kind == "installed_app"
         if (canOpen) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -543,6 +552,51 @@ private fun ResultCard(result: ChatResult) {
         }
     }
 }
+
+/** A generated wallpaper: sampled preview with Set (home/lock/both) and gallery Save. */
+@Composable
+private fun WallpaperPreview(result: ChatResult, app: com.samosaai.masala.MasalaApp) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var bitmap by remember(result.ref) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    // Decode off the main thread: a full-size file decodes megabytes of pixels.
+    LaunchedEffect(result.ref) {
+        bitmap = withContext(Dispatchers.IO) { decodePreview(result.ref) }
+    }
+    fun run(action: suspend () -> com.samosaai.masala.core.tool.ActionResult) {
+        scope.launch {
+            val r = runCatching { action() }.getOrElse { com.samosaai.masala.core.tool.ActionResult.error(it.message ?: "?") }
+            android.widget.Toast.makeText(context, r.message, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+    bitmap?.let {
+        androidx.compose.foundation.Image(
+            it, result.title.ifBlank { null },
+            modifier = Modifier.fillMaxWidth().aspectRatio(9f / 16f).clip(RoundedCornerShape(8.dp)),
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+        )
+    }
+    // Two rows of two: four buttons side by side clip on 360-390dp screens.
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = { run { app.wallpaperTool.setWallpaper(result.ref, "home") } }) { Text(stringResource(R.string.wallpaper_set_home)) }
+        TextButton(onClick = { run { app.wallpaperTool.setWallpaper(result.ref, "lock") } }) { Text(stringResource(R.string.wallpaper_set_lock)) }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = { run { app.wallpaperTool.setWallpaper(result.ref, "both") } }) { Text(stringResource(R.string.wallpaper_set_both)) }
+        TextButton(onClick = { run { app.wallpaperTool.saveToGallery(result.ref) } }) { Text(stringResource(R.string.result_save)) }
+    }
+}
+
+/** Preview-sized bitmap for a wallpaper file; null when the file isn't a readable image. */
+private fun decodePreview(path: String): androidx.compose.ui.graphics.ImageBitmap? = runCatching {
+    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    android.graphics.BitmapFactory.decodeFile(path, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    var sample = 1
+    while (bounds.outWidth / (sample * 2) >= 720 || bounds.outHeight / (sample * 2) >= 1280) sample *= 2
+    android.graphics.BitmapFactory.decodeFile(path, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+        ?.asImageBitmap()
+}.getOrNull()
 
 /** The answer came without a step that needed access; offer the grant, then the retry. */
 @Composable

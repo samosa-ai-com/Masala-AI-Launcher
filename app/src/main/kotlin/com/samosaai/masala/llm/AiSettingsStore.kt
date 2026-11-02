@@ -38,6 +38,8 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
         val profile = stringPreferencesKey("profile")
         val keys = stringPreferencesKey("keys")
         val seeded = booleanPreferencesKey("seeded")
+        /** One-shot: backfill `image` for profiles stored before it existed. */
+        val imageSeeded = booleanPreferencesKey("image_seeded")
     }
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -78,6 +80,24 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
         }
         if (stored != null) _profile.value = stored
         if (prefs[Keys.seeded] != true || stored == null) seed()
+        // Profiles stored before image generation existed get the same seed a fresh install
+        // gets (once): the chat host when it offers image models. The flag — not nullness —
+        // marks it done, so turning image off afterwards stays off.
+        if (prefs[Keys.imageSeeded] != true) {
+            val current = _profile.value
+            val filled = current.image ?: current.chat.preset
+                .takeIf { it.capabilities.image && current.chat.baseUrl.isNotBlank() }
+                ?.let { Endpoint(current.chat.presetId, current.chat.baseUrl, it.defaultImageModel) }
+            if (filled != null && filled != current.image) {
+                _profile.value = current.copy(image = filled)
+                context.aiStore.edit {
+                    it[Keys.profile] = json.encodeToString(AiProfile.serializer(), _profile.value)
+                    it[Keys.imageSeeded] = true
+                }
+            } else {
+                context.aiStore.edit { it[Keys.imageSeeded] = true }
+            }
+        }
     }
 
     /** The key saved for [presetId], or blank. */
@@ -128,6 +148,16 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
     /** What chat calls use now. */
     fun chatConfig(): LlmConfig = _profile.value.chat.let { LlmConfig(it.baseUrl, keyFor(it), it.model) }
 
+    /** What image generation uses now; null when unset. Blank model = ask the server. */
+    data class ImageConfig(val baseUrl: String, val apiKey: String, val imageModel: String)
+
+    /** What image generation uses now; null when unset. */
+    fun imageConfig(): ImageConfig? {
+        val p = _profile.value
+        val e = p.image ?: return null
+        return ImageConfig(e.baseUrl, keyFor(e), e.model)
+    }
+
     /** What voice input uses now; a blank URL means "on this phone". */
     fun speechConfig(): SpeechConfig {
         val p = _profile.value
@@ -145,7 +175,11 @@ class AiSettingsStore(private val context: Context, private val cipher: KeyCiphe
         val stt = SpeechConfig.fromBuild
         val chat = Endpoint(ProviderPresets.detect(llm.baseUrl).id, llm.baseUrl, llm.model)
         val voiceIn = stt.baseUrl.takeIf { it.isNotBlank() }?.let { Endpoint(ProviderPresets.detect(it).id, it, stt.sttModel) }
-        return AiProfile(chat = chat, voiceIn = voiceIn)
+        // Image generation rides the chat host when it offers image models (Meta does):
+        // same key, the preset's default image model.
+        val image = chat.preset.takeIf { it.capabilities.image && chat.baseUrl.isNotBlank() }
+            ?.let { Endpoint(chat.presetId, chat.baseUrl, it.defaultImageModel) }
+        return AiProfile(chat = chat, voiceIn = voiceIn, image = image)
     }
 
     private suspend fun seed() {

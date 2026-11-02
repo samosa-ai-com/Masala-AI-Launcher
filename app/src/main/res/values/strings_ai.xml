@@ -3,13 +3,14 @@
 <resources>
     <string name="ai_models_title">Models &amp; keys</string>
     <string name="ai_models_summary">Provider, key and model for chat and voice</string>
-    <string name="ai_models_intro">Pick a provider and Masala fills in the endpoints. Paste a key, test, done. You can mix providers for chat, voice in and voice out.</string>
+    <string name="ai_models_intro">Pick a provider and Masala fills in the endpoints. Paste a key, test, done. You can mix providers for chat, voice in, voice out and image generation.</string>
     <string name="ai_models_provider">Provider</string>
     <string name="ai_cap_chat">Chat</string>
     <string name="ai_cap_in">In</string>
     <string name="ai_cap_out">Out</string>
     <string name="ai_cap_voice_in">Voice in</string>
     <string name="ai_cap_voice_out">Voice out</string>
+    <string name="ai_cap_image">Image</string>
     <string name="ai_base_url">Base URL</string>
     <string name="ai_computer_address">Your computer’s address on this Wi-Fi</string>
     <string name="ai_api_key">API key</string>
@@ -20,12 +21,15 @@
     <string name="ai_key_note">Kept encrypted on this phone. Sent only to the URL above.</string>
     <string name="ai_no_key_needed">No key needed on your network.</string>
     <string name="ai_chat_model">Chat model</string>
+    <string name="ai_image_model">Image model</string>
+    <string name="ai_image_model_hint">Blank = first image model listed</string>
     <string name="ai_fetch_hint">Tap Fetch list to choose</string>
     <string name="ai_fetch_list">Fetch list</string>
     <string name="ai_use_for">Use %1$s for</string>
     <string name="ai_use_chat">Chat and tools</string>
     <string name="ai_use_voice_in">Voice input</string>
     <string name="ai_use_voice_out">Voice output</string>
+    <string name="ai_use_image">Wallpaper generation</string>
     <!-- Voice in/out hold one provider each; the toggle and Settings → Voice are the same choice. -->
     <string name="ai_use_voice_same_choice">Same choice as Settings → Voice. One provider at a time.</string>
     <string name="ai_not_offered">%1$s (not offered)</string>
@@ -36,6 +40,7 @@
     <string name="ai_key_refused">The key was refused</string>
     <string name="ai_found_chat">%1$d chat</string>
     <string name="ai_found_stt">%1$d transcription</string>
+    <string name="ai_found_images">%1$d image</string>
     <plurals name="ai_found_tts">
         <item quantity="one">%1$d voice</item>
         <item quantity="other">%1$d voices</item>
@@ -45,8 +50,8 @@
     <string name="ai_url_not_http">Start with http:// or https://</string>
     <string name="ai_url_no_host">The address has no host name</string>
     <string name="ai_url_query">Leave out ? and # parts</string>
-    <string name="ai_note_openai">Chat, transcription and voices from one key.</string>
-    <string name="ai_note_meta">Meta’s model API.</string>
+    <string name="ai_note_openai">Chat, transcription, voices and images from one key.</string>
+    <string name="ai_note_meta">Meta’s model API, including image generation.</string>
     <string name="ai_note_chat_only">OpenAI-compatible endpoint. Chat only.</string>
     <string name="ai_note_anthropic">Anthropic’s own API is not OpenAI-shaped. Use an OpenAI-to-Anthropic proxy.</string>
     <string name="ai_note_groq">Fast chat and fast transcription.</string>

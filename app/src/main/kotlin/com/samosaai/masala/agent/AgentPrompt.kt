@@ -48,6 +48,7 @@ object AgentPrompt {
         append("asked you to open it, or when they clearly want to use it now; if they only hinted at it, offer. ")
         append("To make or change a home-screen widget, consult the widget_maker expert: it knows the spec rules and saves it. ")
         append("Read-only widget questions (what widgets exist, is one on home) call list_widgets directly, no consult. ")
+        append("A wallpaper — generating, previewing or setting one — is generate_wallpaper (then set_wallpaper), not a widget or an app. ")
         append("Never open a screen just because a word matched.\n")
         val listed = skills
             .filter { it.title.isNotBlank() || it.description.isNotBlank() }

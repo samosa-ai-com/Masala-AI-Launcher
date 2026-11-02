@@ -24,6 +24,8 @@ class AiConnection(private val client: OkHttpClient = defaultClient) {
         val chat: List<String>,
         val transcription: List<String>,
         val voices: List<String>,
+        /** Image-generation models (never counted as chat). */
+        val images: List<String> = emptyList(),
         val millis: Long,
     )
 
@@ -72,6 +74,7 @@ class AiConnection(private val client: OkHttpClient = defaultClient) {
                 chat = (byKind[ModelCategory.LLM].orEmpty() + byKind[ModelCategory.UNKNOWN].orEmpty()).sorted(),
                 transcription = byKind[ModelCategory.STT].orEmpty().sorted(),
                 voices = byKind[ModelCategory.TTS].orEmpty().sorted(),
+                images = byKind[ModelCategory.IMAGE].orEmpty().sorted(),
                 millis = millis,
             )
         }

@@ -81,7 +81,7 @@ fun HomeScreen(
     onSwipeUp: () -> Unit,
     onSwipeDown: () -> Unit,
     onOpenSettings: () -> Unit,
-    /** Empty-space long-press: the Add widget sheet (settings stays one tap inside it). */
+    /** Empty-space long-press: the home menu (wallpaper, widgets, settings). */
     onAddWidget: () -> Unit = onOpenSettings,
     onLaunchShortcut: (ShortcutInfo) -> Unit,
     onUnpinShortcut: (ShortcutInfo) -> Unit,

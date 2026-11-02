@@ -100,6 +100,9 @@ fun AiModelsPage(onBack: () -> Unit) {
     var model by rememberSaveable(pickedId) { mutableStateOf(if (profile.chat.presetId == preset.id) profile.chat.model else preset.defaultChatModel) }
     var models by remember(pickedId) { mutableStateOf<List<String>>(emptyList()) }
     var menu by remember { mutableStateOf(false) }
+    var imageModel by rememberSaveable(pickedId) { mutableStateOf(if (profile.image?.presetId == preset.id) profile.image?.model.orEmpty() else preset.defaultImageModel) }
+    var imageModels by remember(pickedId) { mutableStateOf<List<String>>(emptyList()) }
+    var imageMenu by remember { mutableStateOf(false) }
     var testing by remember { mutableStateOf(false) }
     var outcome by remember(pickedId) { mutableStateOf<AiConnection.Outcome?>(null) }
 
@@ -119,6 +122,9 @@ fun AiModelsPage(onBack: () -> Unit) {
                     chat = p.chat.refreshed(),
                     voiceIn = p.voiceIn?.let { it.refreshed(it.model) },
                     voiceOut = p.voiceOut?.let { it.refreshed(it.model) },
+                    // The image box has its own state: refreshing with the chat box's model
+                    // would silently discard a dropdown pick.
+                    image = p.image?.let { it.refreshed(imageModel) },
                 ),
             )
         }
@@ -146,6 +152,7 @@ fun AiModelsPage(onBack: () -> Unit) {
                 CapChip(preset.capabilities.chat, stringResource(R.string.ai_cap_chat))
                 CapChip(preset.capabilities.voiceIn, stringResource(R.string.ai_cap_voice_in))
                 CapChip(preset.capabilities.voiceOut, stringResource(R.string.ai_cap_voice_out))
+                CapChip(preset.capabilities.image, stringResource(R.string.ai_cap_image))
             }
             if (preset.onLan) {
                 OutlinedTextField(
@@ -223,6 +230,37 @@ fun AiModelsPage(onBack: () -> Unit) {
                     }
                 }
             }
+            if (preset.capabilities.image) {
+                Box {
+                    OutlinedTextField(
+                        imageModel, { imageModel = it.trim() },
+                        label = { Text(stringResource(R.string.ai_image_model)) },
+                        placeholder = { Text(stringResource(R.string.ai_image_model_hint)) },
+                        textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = MasalaMono),
+                        singleLine = true,
+                        trailingIcon = {
+                            TextButton(enabled = urlCheck.isSuccess, onClick = {
+                                scope.launch {
+                                    when (val o = app.aiConnection.test(urlCheck.getOrThrow(), key)) {
+                                        is AiConnection.Outcome.Connected -> { imageModels = o.found.images; imageMenu = imageModels.isNotEmpty() }
+                                        else -> outcome = o
+                                    }
+                                }
+                            }) { Text(stringResource(R.string.ai_fetch_list)) }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    DropdownMenu(expanded = imageMenu, onDismissRequest = { imageMenu = false }) {
+                        imageModels.forEach { id ->
+                            DropdownMenuItem(text = { Text(id, fontFamily = MasalaMono) }, onClick = {
+                                imageModel = id
+                                imageMenu = false
+                                scope.launch { persist() }
+                            })
+                        }
+                    }
+                }
+            }
 
             Column {
                 Text(stringResource(R.string.ai_use_for, preset.name), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -240,6 +278,14 @@ fun AiModelsPage(onBack: () -> Unit) {
                                 ?: preset.defaultTtsModel
                             // A phone voice picked earlier would 400 on the API; start unpicked.
                             it.copy(voiceOut = if (on) Endpoint(preset.id, urlCheck.getOrThrow(), model) else null, voice = if (on) "" else it.voice)
+                        }
+                    }
+                }
+                UseRow(stringResource(R.string.ai_use_image), profile.image?.presetId == preset.id, preset.capabilities.image) { on ->
+                    scope.launch {
+                        persist {
+                            // Blank model is valid: generation asks the server for its first image model.
+                            it.copy(image = if (on) Endpoint(preset.id, urlCheck.getOrThrow(), imageModel) else null)
                         }
                     }
                 }
@@ -353,6 +399,7 @@ private fun caps(p: ProviderPreset): String = listOfNotNull(
     stringResource(R.string.ai_cap_chat).takeIf { p.capabilities.chat },
     stringResource(R.string.ai_cap_in).takeIf { p.capabilities.voiceIn },
     stringResource(R.string.ai_cap_out).takeIf { p.capabilities.voiceOut },
+    stringResource(R.string.ai_cap_image).takeIf { p.capabilities.image },
 ).joinToString(" · ")
 
 @Composable
@@ -416,6 +463,7 @@ private fun TestResult(outcome: AiConnection.Outcome) {
                 stringResource(R.string.ai_found_chat, f.chat.size).takeIf { f.chat.isNotEmpty() },
                 stringResource(R.string.ai_found_stt, f.transcription.size).takeIf { f.transcription.isNotEmpty() },
                 pluralStringResource(R.plurals.ai_found_tts, f.voices.size, f.voices.size).takeIf { f.voices.isNotEmpty() },
+                stringResource(R.string.ai_found_images, f.images.size).takeIf { f.images.isNotEmpty() },
             ).ifEmpty { listOf(stringResource(R.string.ai_found_nothing)) }
             Triple(true, stringResource(R.string.ai_connected), parts.joinToString(", ") + " · ${f.millis} ms")
         }

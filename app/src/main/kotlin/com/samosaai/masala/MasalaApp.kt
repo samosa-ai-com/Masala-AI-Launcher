@@ -90,6 +90,7 @@ class MasalaApp : Application() {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     val database by lazy { MasalaDatabase.create(this) }
+    val wallpaperTool by lazy { com.samosaai.masala.tools.WallpaperTool(this) }
     val miniApps by lazy { MiniAppStore(database.miniApps()) }
     /** Fetched web values (plan widget-maker §5): display strings and ages for web_value. */
     val httpValues by lazy { com.samosaai.masala.widgets.HttpValueStore(scope, database.httpValues()) { httpApproval.approved(it) } }
@@ -104,6 +105,8 @@ class MasalaApp : Application() {
     /** Every generated widget's own values (counters, ticks); shared by home and the manager. */
     val widgetStates by lazy { com.samosaai.masala.widgets.WidgetStateStore(scope, database.widgetStates()) }
     val widgetLibrary by lazy { com.samosaai.masala.widgets.WidgetLibrary(database.widgets(), database.widgetVersions()) }
+    /** Generated wallpapers and their prompts (plan wallpaper-generation): the catalog. */
+    val wallpapers by lazy { com.samosaai.masala.wallpapers.WallpaperStore(database.wallpapers(), java.io.File(filesDir, "wallpapers")) }
     val settings by lazy { SettingsStore(this) }
 
     /** Open-Meteo for the daily brief and the `weather` tool. */
