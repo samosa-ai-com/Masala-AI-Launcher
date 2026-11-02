@@ -27,7 +27,9 @@ object ChatWorkingNotification {
     fun show(context: Context, chatId: String, step: String) {
         if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
-        manager.createNotificationChannel(NotificationChannel(CHANNEL, context.getString(R.string.chat_working_channel), NotificationManager.IMPORTANCE_LOW))
+        if (manager.getNotificationChannel(CHANNEL) == null) {
+            manager.createNotificationChannel(NotificationChannel(CHANNEL, context.getString(R.string.chat_working_channel), NotificationManager.IMPORTANCE_LOW))
+        }
         val open = PendingIntent.getActivity(
             context, 1,
             Intent(context, HomeActivity::class.java)

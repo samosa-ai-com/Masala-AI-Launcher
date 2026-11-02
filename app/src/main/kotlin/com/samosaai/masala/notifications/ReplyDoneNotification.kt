@@ -63,8 +63,9 @@ object ReplyDoneNotification {
 
 /**
  * Whether a finished turn earns a notification: a Masala answer or error, the
- * user opted in, home wasn't visible when it landed, and the turn didn't just
- * open something itself (an auto-opened mini app is its own notice).
+ * user opted in, home wasn't visible when it landed (a minimized chat counts as
+ * away even on home: the reply lands in no visible surface), and the turn didn't
+ * just open something itself (an auto-opened mini app is its own notice).
  */
 internal fun shouldNotifyReply(
     role: TurnRole,
@@ -72,10 +73,11 @@ internal fun shouldNotifyReply(
     results: List<ChatResult>,
     notifyEnabled: Boolean,
     homeVisible: Boolean,
+    minimized: Boolean = false,
     isFreshlyOpened: (String) -> Boolean = MiniAppOpenGuard::isFreshlyOpened,
 ): Boolean {
     if (role != TurnRole.MASALA && role != TurnRole.ERROR) return false
-    if (!notifyEnabled || homeVisible) return false
+    if (!notifyEnabled || (homeVisible && !minimized)) return false
     if (text.isBlank()) return false
     if (results.any { it.kind == "mini_app" && isFreshlyOpened(it.ref) }) return false
     return true

@@ -184,6 +184,7 @@ class HomeActivity : ComponentActivity() {
             val activeId by app.activeChatId.collectAsStateWithLifecycle()
             val commandState by app.commands.state.collectAsStateWithLifecycle()
             val minimized by app.commands.minimized.collectAsStateWithLifecycle()
+            val homeVisible by app.contextService.homeVisible.collectAsStateWithLifecycle()
             var turns by remember { mutableStateOf<List<com.samosaai.masala.chat.ChatTurn>>(emptyList()) }
             var sessionTitle by remember { mutableStateOf("") }
             // A reverted prompt, dropped back into the chat box for editing.
@@ -199,17 +200,27 @@ class HomeActivity : ComponentActivity() {
                 chatPrefill = ""
                 chatPrefillNonce = 0
                 drawerOpen = false
+                val target = id?.takeIf { it.isNotBlank() }
                 // Returning to the same thread (notification tap) resumes it; switching
                 // threads cancels the live one so its reply can't land in the new chat.
-                if (id != null && id != app.activeChatId.value) app.commands.dismiss()
+                // Blank ids (old notices) just reopen what's showing.
+                val isDifferentSession = target != null && target != app.activeChatId.value
+                if (isDifferentSession) app.commands.dismiss()
                 app.commands.focus()
                 app.scope.launch {
-                    val session = id?.let { app.chats.get(it) }
+                    val session = target?.let { app.chats.get(it) }
                     if (session != null) {
                         app.activeChatId.value = session.id
                         turns = session.turns
                         sessionTitle = session.title
-                        app.commands.restoreSession(session.turns)
+                        // Resuming a live thread must not touch its run: restoreSession
+                        // cancels the job, which would freeze it in Thinking forever.
+                        val live = app.commands.state.value is CommandState.Thinking ||
+                            app.commands.state.value == CommandState.Listening ||
+                            app.commands.state.value == CommandState.ListeningPaused
+                        if (isDifferentSession || !live) {
+                            app.commands.restoreSession(session.turns)
+                        }
                     }
                     chatOpen = true
                     expanded = true
@@ -233,11 +244,13 @@ class HomeActivity : ComponentActivity() {
             }
             // Talking or a finished turn brings the surface up by itself; starting to talk
             // always shows the orb, so the big animation is what a press produces.
-            LaunchedEffect(commandState, minimized) {
+            LaunchedEffect(commandState, minimized, activeId, homeVisible) {
                 // A minimized chat stays hidden until the user comes back; anything else
                 // reopens on new activity. The working notice covers the hidden run.
                 if (commandState != CommandState.Idle && !minimized) chatOpen = true
-                val hidden = minimized || !chatOpen
+                // Leaving HomeActivity (another app, lock screen) hides the surface too,
+                // even with the chat still open: HomeActivity is paused then.
+                val hidden = minimized || !chatOpen || !homeVisible
                 val working = commandState is CommandState.Thinking ||
                     commandState == CommandState.Listening ||
                     commandState == CommandState.ListeningPaused
