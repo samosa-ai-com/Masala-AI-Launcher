@@ -39,6 +39,8 @@ class WidgetToolsTest {
 
     @Test
     fun widgetToolCycle() {
+        // Hermetic: a previous run may have left 'cycle' behind (installs keep app data).
+        runBlocking { runCatching { tools.getValue("delete_widget").execute(args("id" to "cycle")) } }
         val spec = """{"id":"cycle","title":"Cycle","components":[{"type":"counter","key":"n","label":"N"}],"size":{"min":1,"default":1,"max":2}}"""
         val created = success("create_widget", args("spec" to spec))
         assertEquals(1, created.produced.size)

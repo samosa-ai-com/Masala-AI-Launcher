@@ -27,8 +27,8 @@ import kotlinx.coroutines.isActive
 /**
  * A web value on home (plan `docs/plans/widget-maker.md` §5): the fetched string plus [suffix],
  * or an em dash when nothing arrived yet; a stale value stays on screen with its age. Polls while
- * visible at [HttpBinding.every] (checker floor: 30 s); background refresh is the worker's job.
- * Nothing fetches unless [allowed]: the host needs the user's approval first.
+ * its page is showing at [HttpBinding.every] (checker floor: 30 s); background refresh is the
+ * worker's job. Nothing fetches unless [allowed]: the host needs the user's approval first.
  */
 @Composable
 fun WebValueView(
@@ -39,12 +39,13 @@ fun WebValueView(
     style: WidgetStyle?,
     modifier: Modifier = Modifier,
     allowed: Boolean = true,
+    enabled: Boolean = true,
 ) {
     val http: HttpBinding = component.http
     val entries by store.entries.collectAsState()
-    LaunchedEffect(widgetId, http.url, http.jsonPath, allowed) {
+    LaunchedEffect(widgetId, http.url, http.jsonPath, allowed, enabled) {
         while (isActive) {
-            if (allowed) store.refresh(widgetId, http)
+            if (allowed && enabled) store.refresh(widgetId, http)
             delay((http.every.coerceAtLeast(30) * 1000L))
         }
     }

@@ -113,6 +113,15 @@ class ActionDispatcher(
             else if (refresh(action.widgetId)) Outcome.Done()
             else Outcome.Failed("Couldn't refresh that widget yet")
         }
+        is MasalaAction.PlaySound -> playClick(action)
+    }
+
+    private fun playClick(action: MasalaAction.PlaySound): Outcome {
+        if (action.kind != "click") return Outcome.Failed("Unknown sound '${action.kind}'")
+        val audio = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            ?: return Outcome.Failed("No audio on this device")
+        audio.playSoundEffect(android.media.AudioManager.FX_KEY_CLICK)
+        return Outcome.Done()
     }
 
     private suspend fun setMode(action: MasalaAction.SetMode): Outcome {

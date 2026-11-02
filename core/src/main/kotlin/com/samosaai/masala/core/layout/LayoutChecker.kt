@@ -271,7 +271,8 @@ object LayoutChecker {
             // An empty ask_masala prompt opens the ask box with nothing typed. A blank refresh_widget
             // id means the widget holding the button; the renderer fills it in before dispatching.
             MasalaAction.OpenDrawer, MasalaAction.ExpandNotifications, is MasalaAction.Search,
-            is MasalaAction.OpenMiniApp, is MasalaAction.AskMasala, is MasalaAction.RefreshWidget -> Unit
+            is MasalaAction.OpenMiniApp, is MasalaAction.AskMasala, is MasalaAction.RefreshWidget,
+            is MasalaAction.PlaySound -> Unit
         }
     }
 

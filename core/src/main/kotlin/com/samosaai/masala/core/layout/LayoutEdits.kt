@@ -23,6 +23,52 @@ import com.samosaai.masala.core.contract.WidgetSpec
 
 /** User edits to a base layout by item id (home drag and drop). Each returns null when it can't apply. */
 object LayoutEdits {
+    /**
+     * Moves section [sectionId] within its page by [steps] (negative is up), or to [targetPageId]'s
+     * end (or before [beforeSectionId]) across pages. Widget sections move like any other section;
+     * the dock never moves and nothing ever lands after it. Null when the section is missing, the
+     * target page is missing, or the move changes nothing. Pure reorder — the caller checks the
+     * page height cap.
+     */
+    fun moveSection(
+        doc: LayoutDoc,
+        sectionId: String,
+        steps: Int = 0,
+        targetPageId: String? = null,
+        beforeSectionId: String? = null,
+    ): LayoutDoc? {
+        val fromPage = doc.pages.firstOrNull { p -> p.sections.any { it.id == sectionId } } ?: return null
+        val section = fromPage.sections.first { it.id == sectionId }
+        if (section is DockSection) return null
+        val toPageId = targetPageId ?: fromPage.id
+        if (doc.pages.none { it.id == toPageId }) return null
+        // Insert before the dock when no sibling names the spot, so a drop at the page end can
+        // never strand a widget below it (and the indicator, drawn at the last widget, stays true).
+        fun endOf(sections: List<Section>): Int =
+            sections.indexOfFirst { it is DockSection }.takeIf { it >= 0 } ?: sections.size
+        val next = if (targetPageId == null && beforeSectionId == null) {
+            val idx = fromPage.sections.indexOfFirst { it.id == sectionId }
+            val to = (idx + steps).coerceIn(0, fromPage.sections.size - 1)
+            if (to == idx) return null
+            val rest = fromPage.sections.filterNot { it.id == sectionId }.toMutableList()
+            // After removal the list shrank by one below the old index; clamp into it, above the dock.
+            rest.add(to.coerceIn(0, rest.size).coerceAtMost(endOf(rest)), section)
+            doc.copy(pages = doc.pages.map { if (it.id != fromPage.id) it else it.copy(sections = rest) })
+        } else {
+            val without = doc.pages.map { p ->
+                if (p.id != fromPage.id) p else p.copy(sections = p.sections.filterNot { it.id == sectionId })
+            }
+            val dest = without.first { it.id == toPageId }
+            val at = beforeSectionId?.let { id -> dest.sections.indexOfFirst { it.id == id }.takeIf { it >= 0 } }
+                ?: endOf(dest.sections)
+            val sections = dest.sections.toMutableList().also { it.add(at.coerceIn(0, it.size), section) }
+            doc.copy(pages = without.map { if (it.id != toPageId) it else it.copy(sections = sections) })
+        }
+        // Same order in every page: the drop changed nothing.
+        val same = next.pages.zip(doc.pages).all { (a, b) -> a.sections.map { it.id } == b.sections.map { it.id } }
+        return if (same) null else next
+    }
+
     /** A text component wraps at about this many characters a line; the renderer caps it at four. */
     private const val MAX_TEXT_LINES = 4
 

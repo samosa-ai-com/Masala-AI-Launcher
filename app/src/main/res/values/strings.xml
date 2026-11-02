@@ -301,6 +301,8 @@
     <string name="widgets_added">Added — see it on home</string>
     <string name="widgets_added_on">Added — see it on %1$s</string>
     <string name="widgets_needs_approval">Needs approval in Settings → Widgets</string>
+    <string name="widgets_needs_source">Needs a camera source</string>
+    <string name="widgets_setup_source">Setup…</string>
     <string name="widgets_allow_fetching">Allow fetching</string>
     <string name="widgets_fetch_approved">Fetching allowed — values arrive shortly</string>
     <string name="widgets_already_on">Already on %1$s</string>
@@ -317,6 +319,11 @@
     <string name="widgets_deleted">Deleted</string>
     <string name="widgets_preview_note">Preview — add it to home to use its buttons</string>
     <string name="widgets_remove_from_home">Remove from home</string>
+    <string name="widgets_move">Move…</string>
+    <string name="widgets_move_up">Move up</string>
+    <string name="widgets_move_down">Move down</string>
+    <string name="widgets_move_to">Move to %1$s</string>
+    <string name="widgets_moved">Moved</string>
     <string name="widgets_resize">Resize (%1$d–%2$d rows)</string>
     <string name="widgets_rows">%1$d rows</string>
     <string name="widgets_edit_in_manager">Edit in manager</string>

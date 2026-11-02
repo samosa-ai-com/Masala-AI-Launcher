@@ -77,7 +77,7 @@ data class WidgetSource(
 /** One generated widget on home: a glass card with its components top to bottom. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun WidgetCard(spec: WidgetSpec, rows: Int?, source: WidgetSource, modifier: Modifier = Modifier) {
+fun WidgetCard(spec: WidgetSpec, rows: Int?, source: WidgetSource, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val snapshot = source.snapshot()
     val states by source.store.states.collectAsState()
     // New values (a counter tap, a checklist tick) recompose this card alone.
@@ -93,7 +93,7 @@ fun WidgetCard(spec: WidgetSpec, rows: Int?, source: WidgetSource, modifier: Mod
             Spacer(Modifier.height(4.dp))
         }
         spec.components.forEach { component ->
-            Component(component, spec.id, storage, snapshot, source, depth = 0)
+            Component(component, spec.id, storage, snapshot, source, depth = 0, enabled = enabled)
         }
     }
 }
@@ -106,6 +106,7 @@ private fun Component(
     snapshot: ContextSnapshot,
     source: WidgetSource,
     depth: Int,
+    enabled: Boolean = true,
 ) {
     // A refresh button with no id means this widget; the renderer fills it before dispatching.
     fun fire(action: com.samosaai.masala.core.contract.MasalaAction) =
@@ -219,32 +220,34 @@ private fun Component(
         is WidgetComponent.Row -> {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 component.children.forEach { child ->
-                    Column(Modifier.weight(1f)) { Component(child, widgetId, storage, snapshot, source, depth + 1) }
+                    Column(Modifier.weight(1f)) { Component(child, widgetId, storage, snapshot, source, depth + 1, enabled) }
                 }
             }
         }
         is WidgetComponent.Column -> {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                component.children.forEach { child -> Component(child, widgetId, storage, snapshot, source, depth + 1) }
+                component.children.forEach { child -> Component(child, widgetId, storage, snapshot, source, depth + 1, enabled) }
             }
         }
         // Live media (W4): MJPEG and snapshots draw; player kinds need the pool.
         is WidgetComponent.Video -> {
-            val src = source.streams?.current()?.get(component.stream.sourceId)
+            val streams = source.streams
+            val src = streams?.current()?.get(component.stream.sourceId)
             val media = source.media
             when {
                 src == null -> MediaNote(stringResource(R.string.widgets_video_no_source))
-                src.kind == com.samosaai.masala.widgets.StreamKind.MJPEG && source.streams != null ->
-                    com.samosaai.masala.widgets.media.MjpegImage(src.id, source.streams)
-                media != null && source.streams != null ->
-                    com.samosaai.masala.widgets.media.LiveVideo(src.id, source.streams, media)
+                src.kind == com.samosaai.masala.widgets.StreamKind.MJPEG && streams != null ->
+                    com.samosaai.masala.widgets.media.MjpegImage(src.id, streams, enabled = enabled)
+                media != null && streams != null ->
+                    com.samosaai.masala.widgets.media.LiveVideo(src.id, streams, media, enabled = enabled)
                 else -> MediaNote(stringResource(R.string.widgets_video_player_next))
             }
         }
         is WidgetComponent.Snapshot -> {
-            val src = source.streams?.current()?.get(component.sourceId)
-            if (src == null || source.streams == null) MediaNote(stringResource(R.string.widgets_video_no_source))
-            else com.samosaai.masala.widgets.media.SnapshotImage(src.id, component.everySeconds, source.streams)
+            val streams = source.streams
+            val src = streams?.current()?.get(component.sourceId)
+            if (src == null || streams == null) MediaNote(stringResource(R.string.widgets_video_no_source))
+            else com.samosaai.masala.widgets.media.SnapshotImage(src.id, component.everySeconds, streams, enabled = enabled)
         }
         is WidgetComponent.WebValue -> {
             val store = source.http
@@ -264,6 +267,7 @@ private fun Component(
                 com.samosaai.masala.widgets.media.WebValueView(
                     component, widgetId, component.suffix, store, component.style,
                     allowed = host != null && host in source.approved(widgetId),
+                    enabled = enabled,
                 )
             }
         }
@@ -370,9 +374,9 @@ private fun formatDuration(millis: Long): String {
 
 /** A stack draws its first widget, like before, but now for real (tap weights order it in W2). */
 @Composable
-fun StackCard(widgets: List<WidgetSpec>, rows: Int?, source: WidgetSource, modifier: Modifier = Modifier) {
+fun StackCard(widgets: List<WidgetSpec>, rows: Int?, source: WidgetSource, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val first = widgets.firstOrNull() ?: return
-    WidgetCard(first, rows, source, modifier)
+    WidgetCard(first, rows, source, modifier, enabled)
     if (widgets.size > 1) {
         Text(
             "+ ${widgets.size - 1} more",

@@ -28,25 +28,40 @@ import com.samosaai.masala.core.contract.WidgetSpec
 @Composable
 fun WidgetMenuDialog(
     spec: WidgetSpec,
+    pages: List<Pair<String, String>> = emptyList(),
+    currentPageId: String? = null,
     onRemove: () -> Unit,
     onResize: (Int) -> Unit,
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null,
+    onMoveToPage: ((String) -> Unit)? = null,
     onEdit: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var resizing by rememberSaveable(spec.id) { mutableStateOf(false) }
+    var moving by rememberSaveable(spec.id) { mutableStateOf(false) }
     var rows by rememberSaveable(spec.id) { mutableIntStateOf(spec.size.default) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(spec.title ?: spec.id) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (!resizing) {
+                if (!resizing && !moving) {
                     MenuRow(stringResource(R.string.widgets_remove_from_home), onRemove)
                     MenuRow(stringResource(R.string.widgets_resize, spec.size.min, spec.size.max)) {
                         rows = spec.size.default
                         resizing = true
                     }
+                    if (onMoveUp != null || onMoveDown != null || onMoveToPage != null) {
+                        MenuRow(stringResource(R.string.widgets_move)) { moving = true }
+                    }
                     MenuRow(stringResource(R.string.widgets_edit_in_manager), onEdit)
+                } else if (moving) {
+                    if (onMoveUp != null) MenuRow(stringResource(R.string.widgets_move_up), onMoveUp)
+                    if (onMoveDown != null) MenuRow(stringResource(R.string.widgets_move_down), onMoveDown)
+                    pages.filter { it.first != currentPageId }.forEach { (id, label) ->
+                        if (onMoveToPage != null) MenuRow(stringResource(R.string.widgets_move_to, label)) { onMoveToPage(id) }
+                    }
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         TextButton(enabled = rows > spec.size.min, onClick = { rows-- }) { Text("−") }
@@ -66,8 +81,8 @@ fun WidgetMenuDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = { if (resizing) resizing = false else onDismiss() }) {
-                Text(stringResource(if (resizing) R.string.action_back else R.string.action_cancel))
+            TextButton(onClick = { if (resizing || moving) { resizing = false; moving = false } else onDismiss() }) {
+                Text(stringResource(if (resizing || moving) R.string.action_back else R.string.action_cancel))
             }
         },
     )

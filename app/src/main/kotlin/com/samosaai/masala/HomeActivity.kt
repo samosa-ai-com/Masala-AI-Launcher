@@ -220,7 +220,7 @@ class HomeActivity : ComponentActivity() {
         var choosingIcon by remember { mutableStateOf<AppEntry?>(null) }
         // Tiles that aren't installed apps get their own menu, so nothing on home is menu-less.
         var itemMenuFor by remember { mutableStateOf<Item?>(null) }
-        var widgetMenuFor by remember { mutableStateOf<com.samosaai.masala.core.contract.WidgetSpec?>(null) }
+        var widgetMenuFor by remember { mutableStateOf<Pair<com.samosaai.masala.core.contract.WidgetSpec, String>?>(null) }
         var addWidgetSheet by remember { mutableStateOf(false) }
         var renamingItem by remember { mutableStateOf<Item?>(null) }
         var choosingIconForApp by remember { mutableStateOf<com.samosaai.masala.data.MiniAppEntity?>(null) }
@@ -498,7 +498,27 @@ class HomeActivity : ComponentActivity() {
                 onOpenFolder = { openFolder = it to (it.id in movable) },
                 onFolderMenu = { if (it.id in movable) folderMenu = it },
                 onItemMenu = { itemMenuFor = it },
-                onWidgetMenu = { spec, _ -> widgetMenuFor = spec },
+                onWidgetMenu = { spec, sectionId -> widgetMenuFor = spec to sectionId },
+                isBaseSection = { id ->
+                    app.layouts.base.value?.pages.orEmpty().flatMap { it.sections }.any { it.id == id }
+                },
+                onWidgetDrop = { sectionId, target ->
+                    scope.launch {
+                        val doc = latestLayout.value.layout
+                        val section = doc.pages.flatMap { it.sections }.firstOrNull { it.id == sectionId }
+                        val specs = app.widgetLibrary.current()
+                        val title = when (section) {
+                            is com.samosaai.masala.core.contract.WidgetSection ->
+                                (section.ref?.widgetId ?: section.widget?.id)?.let { specs[it]?.title ?: it }
+                            is com.samosaai.masala.core.contract.StackSection ->
+                                section.widgets.firstOrNull()?.title ?: sectionId
+                            else -> null
+                        } ?: sectionId
+                        app.layouts.edit(getString(R.string.layout_label_moved, title)) {
+                            LayoutEdits.moveSection(it, sectionId, targetPageId = target.pageId, beforeSectionId = target.beforeSectionId)
+                        }.firstOrNull()?.let { toast(it.message) }
+                    }
+                },
                 onDrop = { item, target ->
                     scope.launch {
                         // What the user saw, which is the base document merged with the active modes: the
@@ -582,7 +602,11 @@ class HomeActivity : ComponentActivity() {
             onSwipeUp = { run(settings.swipeUp) },
             onSwipeDown = { run(settings.swipeDown) },
             onOpenSettings = ::openSettings,
-            onAddWidget = { addWidgetSheet = true },
+            onAddWidget = {
+                // Never pop the sheet under a live drag (a press the drag already owns still
+                // reaches the background detector on surfaces that consume nothing, like video).
+                if (drag.dragging == null && drag.draggingSection == null) addWidgetSheet = true
+            },
             onLaunchShortcut = ::launchShortcut,
             onUnpinShortcut = {
                 app.actions.unpin(it)
@@ -985,16 +1009,30 @@ class HomeActivity : ComponentActivity() {
             )
         }
 
-        widgetMenuFor?.let { spec ->
+        widgetMenuFor?.let { (spec, sectionId) ->
             fun done(action: () -> Unit) {
                 widgetMenuFor = null
                 action()
             }
             com.samosaai.masala.ui.home.widgets.WidgetMenuDialog(
                 spec = spec,
+                pages = layout.layout.pages.map { it.id to (it.title ?: it.id) },
+                currentPageId = layout.layout.pages.firstOrNull { p -> p.sections.any { it.id == sectionId } }?.id,
                 onRemove = { done { scope.launch {
                     app.layouts.removeWidgetRefs("Remove from home: ${spec.title ?: spec.id}", spec.id)
                         .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_removed))
+                } } },
+                onMoveUp = { done { scope.launch {
+                    app.layouts.moveWidget("Move up ${spec.title ?: spec.id}", spec.id, steps = -1, sectionId = sectionId)
+                        .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_moved))
+                } } },
+                onMoveDown = { done { scope.launch {
+                    app.layouts.moveWidget("Move down ${spec.title ?: spec.id}", spec.id, steps = 1, sectionId = sectionId)
+                        .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_moved))
+                } } },
+                onMoveToPage = { pageId -> done { scope.launch {
+                    app.layouts.moveWidget("Move ${spec.title ?: spec.id}", spec.id, targetPageId = pageId, sectionId = sectionId)
+                        .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_moved))
                 } } },
                 onResize = { rows -> done { scope.launch {
                     val coerced = rows.coerceIn(spec.size.min, spec.size.max)
@@ -1020,6 +1058,7 @@ class HomeActivity : ComponentActivity() {
                 library = app.widgetLibrary,
                 approvalOf = { app.httpApproval.approved(it) },
                 isPlaced = { it in placedIds },
+                sourceExists = { app.streamSources.current().containsKey(it) },
                 onAdd = { id, approved -> scope.launch {
                     if (approved) app.httpApproval.approve(id, com.samosaai.masala.widgets.HttpApproval.fetchesOf(app.widgetLibrary.current()[id] ?: return@launch).map { it.host })
                     val title = app.widgetLibrary.current()[id]?.title ?: id

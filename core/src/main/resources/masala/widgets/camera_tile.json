@@ -1,7 +1,7 @@
 {
   "id": "camera_tile",
   "name": "Camera tile",
-  "description": "One live camera, muted; tap for full screen. Replace the source with one of yours.",
+  "description": "One live camera, muted; tap for full screen. Needs one of your camera sources — the maker lists sources first and asks for the URL if none fits.",
   "widget": {
     "id": "camera",
     "title": "Front door",

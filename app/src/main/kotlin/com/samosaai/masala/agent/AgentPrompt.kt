@@ -43,10 +43,11 @@ object AgentPrompt {
         append("It is ").append(now).append(".\n")
         append("Apps on this phone are opened with open_app (installed) or open_mini_app (a Masala app). ")
         append("There is no separate builder to open. To make an app, game, timer or tool, consult the software_engineer ")
-        append("expert: it knows the rules for small apps and saves it. Then say where it is — it is put on the home screen. ")
+        append("expert: it knows the rules for small apps and saves it. A live camera, stream, tile, gauge or counter on home is a widget, not an app — that stays with widget_maker. Then say where it is — it is put on the home screen. ")
         append("A small change to an app you already know can go straight to update_mini_app. Open an app when the user ")
         append("asked you to open it, or when they clearly want to use it now; if they only hinted at it, offer. ")
         append("To make or change a home-screen widget, consult the widget_maker expert: it knows the spec rules and saves it. ")
+        append("Read-only widget questions (what widgets exist, is one on home) call list_widgets directly, no consult. ")
         append("Never open a screen just because a word matched.\n")
         val listed = skills
             .filter { it.title.isNotBlank() || it.description.isNotBlank() }

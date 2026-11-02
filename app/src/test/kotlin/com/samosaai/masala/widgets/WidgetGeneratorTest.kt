@@ -78,11 +78,13 @@ class WidgetGeneratorTest {
     }
 
     @Test
-    fun schemaHasEveryW1Component() {
+    fun schemaHasEveryComponent() {
         val text = WidgetSchema.schema().toString()
-        listOf("counter", "checklist", "timer", "progress", "chart", "button", "image", "list", "gauge", "row", "column", "text").forEach {
+        listOf("counter", "checklist", "timer", "progress", "chart", "button", "image", "list", "gauge", "row", "column", "text", "video", "snapshot", "web_value").forEach {
             assertTrue("schema names $it", text.contains("\"$it\""))
         }
-        assertTrue("no video yet", !text.contains("\"video\""))
+        listOf("refresh_widget", "run_tool", "play_sound").forEach {
+            assertTrue("schema names $it", text.contains("\"$it\""))
+        }
     }
 }

@@ -15,10 +15,12 @@ import kotlinx.serialization.json.putJsonObject
  * shape mirrors what `WidgetChecker.parse` decodes (same `"type"` discriminators, same field
  * names), so a valid reply parses with no translation step.
  *
- * Only what the home renderer draws in W1 is included: the native components except `button`
- * actions beyond three safe ones, and no `video`/`snapshot`/`web_value` (W4/W5), no rules (the
- * manager's JSON editor adds those). Strict-mode: every object lists its properties in `required`
- * and sets `additionalProperties: false`.
+ * Everything the home renderer draws is included: native components, `video`/`snapshot` (a
+ * stream source id the maker got from list_stream_sources), `web_value` (host approved at
+ * placement), and button actions ask_masala, run_skill, start_timer, refresh_widget, run_tool
+ * (allowlist only) and play_sound (click only). No rules (the manager's JSON editor adds those).
+ * Strict-mode: every object lists its properties in `required` and sets
+ * `additionalProperties: false`.
  */
 object WidgetSchema {
 
@@ -43,7 +45,7 @@ object WidgetSchema {
 
     private fun componentTypes(): List<JsonObject> = listOf(
         text(), counter(), checklist(), timer(), progress(), chart(), button(), image(),
-        listRows(), gauge(), row(), column(),
+        listRows(), gauge(), row(), column(), video(), snapshot(), webValue(),
     )
 
     private fun text(): JsonObject = buildJsonObject {
@@ -133,10 +135,67 @@ object WidgetSchema {
                     addJsonObject { merge(askMasala()) }
                     addJsonObject { merge(runSkill()) }
                     addJsonObject { merge(startTimer()) }
+                    addJsonObject { merge(refreshWidget()) }
+                    addJsonObject { merge(runTool()) }
+                    addJsonObject { merge(playSound()) }
                 }
             }
         }
         putJsonArray("required") { add("type"); add("label"); add("action") }
+        put("additionalProperties", false)
+    }
+
+    private fun video(): JsonObject = buildJsonObject {
+        put("type", "object")
+        putJsonObject("properties") {
+            put("type", const("video"))
+            putJsonObject("stream") {
+                put("type", "object")
+                putJsonObject("properties") {
+                    put("sourceId", string("A stream source id from list_stream_sources, never invented"))
+                    put("mode", enumOf("live", "snapshot"))
+                }
+                putJsonArray("required") { add("sourceId") }
+                put("additionalProperties", false)
+            }
+        }
+        putJsonArray("required") { add("type"); add("stream") }
+        put("additionalProperties", false)
+    }
+
+    private fun snapshot(): JsonObject = buildJsonObject {
+        put("type", "object")
+        putJsonObject("properties") {
+            put("type", const("snapshot"))
+            put("sourceId", string("A stream source id from list_stream_sources, never invented"))
+            put("everySeconds", int("Still refresh rate, 2 seconds or more"))
+        }
+        putJsonArray("required") { add("type"); add("sourceId") }
+        put("additionalProperties", false)
+    }
+
+    private fun webValue(): JsonObject = buildJsonObject {
+        put("type", "object")
+        putJsonObject("properties") {
+            put("type", const("web_value"))
+            put("label", string())
+            putJsonObject("http") { merge(http()) }
+            put("suffix", string("Shown after the value, e.g. € or °C"))
+            putJsonObject("style") { merge(style()) }
+        }
+        putJsonArray("required") { add("type"); add("label"); add("http") }
+        put("additionalProperties", false)
+    }
+
+    private fun http(): JsonObject = buildJsonObject {
+        put("type", "object")
+        putJsonObject("properties") {
+            put("url", string("http or https, no credentials or tokens"))
+            put("jsonPath", string("A $.a.b[0] path into the JSON"))
+            put("every", int("Foreground refresh rate, 30 seconds or more"))
+            put("background", buildJsonObject { put("type", "boolean") })
+        }
+        putJsonArray("required") { add("url") }
         put("additionalProperties", false)
     }
 
@@ -221,8 +280,9 @@ object WidgetSchema {
     private fun binding(): JsonObject = buildJsonObject {
         put("type", "object")
         putJsonObject("properties") {
-            put("source", enumOf("storage", "next_event", "battery", "steps", "sleep", "weather", "urgent_count"))
-            put("key", string("Storage key (source storage), else missing"))
+            put("source", enumOf("storage", "next_event", "battery", "media", "steps", "sleep", "weather", "urgent_count", "stream_status", "skill_result", "http"))
+            put("key", string("Storage key (source storage), stream source id (stream_status), skill id (skill_result), else missing"))
+            putJsonObject("http") { merge(http()) }
         }
         putJsonArray("required") { add("source") }
         put("additionalProperties", false)
@@ -277,6 +337,41 @@ object WidgetSchema {
             put("seconds", int())
         }
         putJsonArray("required") { add("type"); add("seconds") }
+        put("additionalProperties", false)
+    }
+
+    private fun refreshWidget(): JsonObject = buildJsonObject {
+        put("type", "object")
+        putJsonObject("properties") {
+            put("type", const("refresh_widget"))
+            put("widgetId", string("Missing: the holding widget is filled in"))
+        }
+        putJsonArray("required") { add("type") }
+        put("additionalProperties", false)
+    }
+
+    private fun runTool(): JsonObject = buildJsonObject {
+        put("type", "object")
+        putJsonObject("properties") {
+            put("type", const("run_tool"))
+            put("name", enumOf("toggle_torch", "toggle_wifi", "set_timer"))
+            // Free-form tool args (set_timer needs seconds): the checker validates the call.
+            putJsonObject("args") {
+                put("type", "object")
+                put("additionalProperties", true)
+            }
+        }
+        putJsonArray("required") { add("type"); add("name") }
+        put("additionalProperties", false)
+    }
+
+    private fun playSound(): JsonObject = buildJsonObject {
+        put("type", "object")
+        putJsonObject("properties") {
+            put("type", const("play_sound"))
+            put("kind", const("click"))
+        }
+        putJsonArray("required") { add("type") }
         put("additionalProperties", false)
     }
 
