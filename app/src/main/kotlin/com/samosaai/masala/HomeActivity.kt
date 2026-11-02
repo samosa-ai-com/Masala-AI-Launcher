@@ -191,15 +191,35 @@ class HomeActivity : ComponentActivity() {
             var expanded by rememberSaveable { mutableStateOf(false) }
             var chatOpen by rememberSaveable { mutableStateOf(false) }
             var showHistory by remember { mutableStateOf(false) }
-            // The reply notification's tap lands here: open that thread once composed.
-            // Unknown ids (a deleted chat) still open the surface on the current thread.
-            LaunchedEffect(openChatId) {
-                val id = openChatId ?: return@LaunchedEffect
-                openChatId = null
+            // One way to open a thread, from history and from the reply notification:
+            // unknown ids (a deleted chat) leave the current thread showing.
+            // Declared before the effects that call it.
+            fun openSession(id: String?) {
+                chatPrefill = ""
+                chatPrefillNonce = 0
                 drawerOpen = false
-                if (app.chats.summaries.value.any { it.id == id }) app.activeChatId.value = id
-                expanded = true
-                chatOpen = true
+                app.commands.dismiss()
+                app.scope.launch {
+                    val session = id?.let { app.chats.get(it) }
+                    if (session != null) {
+                        app.activeChatId.value = session.id
+                        turns = session.turns
+                        sessionTitle = session.title
+                        app.commands.restoreSession(session.turns)
+                    }
+                    chatOpen = true
+                    expanded = true
+                }
+            }
+            // The reply notification's tap lands here: open that thread once the store
+            // can read it. Resolving via get (disk-backed) instead of the in-memory
+            // summaries, so a tap after a process death waits for the real session
+            // instead of consuming the request against an unloaded store.
+            // Opening also restores the agent context (like history does) and dismisses
+            // any live command, so a pending auto-open can't hijack the requested thread.
+            LaunchedEffect(openChatId) {
+                openChatId?.let { openSession(it) }
+                openChatId = null
             }
             LaunchedEffect(activeId, sessions) {
                 val id = activeId ?: return@LaunchedEffect
@@ -227,6 +247,8 @@ class HomeActivity : ComponentActivity() {
                     app.commands.dismiss()
                     if (!MiniAppOpenGuard.isFreshlyOpened(made.ref)) {
                         runCatching { openMiniApp(made.ref) }
+                        // The viewer is the notice now; a raced post must not linger over it.
+                        com.samosaai.masala.notifications.ReplyDoneNotification.cancel(this@HomeActivity)
                     }
                 }
             }
@@ -768,17 +790,7 @@ class HomeActivity : ComponentActivity() {
                 sessions = sessions,
                 onOpen = { id ->
                     showHistory = false
-                    app.activeChatId.value = id
-                    chatPrefill = ""
-                    chatPrefillNonce = 0
-                    app.scope.launch {
-                        val session = app.chats.get(id) ?: return@launch
-                        turns = session.turns
-                        sessionTitle = session.title
-                        app.commands.restoreSession(session.turns)
-                        chatOpen = true
-                        expanded = true
-                    }
+                    openSession(id)
                 },
                 onRename = { id, title -> app.scope.launch { app.chats.rename(id, title) } },
                 onDelete = { id ->

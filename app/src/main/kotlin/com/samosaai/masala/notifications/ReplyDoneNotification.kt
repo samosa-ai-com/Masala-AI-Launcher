@@ -16,7 +16,7 @@ import com.samosaai.masala.chat.TurnRole
 import com.samosaai.masala.miniapps.MiniAppOpenGuard
 
 /**
- * The quiet "your reply is ready" notification (Phase A): a turn the user started
+ * The "your reply is ready" completion notification (Phase A): a turn the user started
  * finishes while Masala isn't visible, so the answer doesn't sit unseen in a
  * closed chat. Watching it finish never notifies. One live notice at a time
  * (fixed id, updated in place); tapping it opens that thread, and it clears.
@@ -45,6 +45,19 @@ object ReplyDoneNotification {
             .setAutoCancel(true)
             .build()
         manager.notify(ID, notification)
+    }
+
+    fun areBlocked(context: Context): Boolean {
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return false
+        if (!manager.areNotificationsEnabled()) return true
+        // A channel the user silenced in system settings stays silent whatever the in-app toggle says.
+        if (manager.getNotificationChannel(CHANNEL)?.importance == NotificationManager.IMPORTANCE_NONE) return true
+        return false
+    }
+
+    /** Clears the reply notice, e.g. when its thread auto-opens a mini-app viewer instead. */
+    fun cancel(context: Context) {
+        runCatching { context.getSystemService(NotificationManager::class.java)?.cancel(ID) }
     }
 }
 
