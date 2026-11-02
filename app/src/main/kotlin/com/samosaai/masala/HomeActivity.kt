@@ -219,7 +219,7 @@ class HomeActivity : ComponentActivity() {
                             app.commands.state.value == CommandState.Listening ||
                             app.commands.state.value == CommandState.ListeningPaused
                         if (isDifferentSession || !live) {
-                            app.commands.restoreSession(session.turns)
+                            app.commands.restoreSession(session.turns, sameChat = !isDifferentSession)
                         }
                     }
                     chatOpen = true
@@ -696,12 +696,14 @@ class HomeActivity : ComponentActivity() {
                             chatPrefill = ""
                             chatPrefillNonce = 0
                             app.chats.latest()?.let { latest ->
+                                // Back to the chat that was open keeps its "Allow all".
+                                val sameChat = latest.id == app.activeChatId.value
                                 app.activeChatId.value = latest.id
                                 app.scope.launch {
                                     app.chats.get(latest.id)?.let { session ->
                                         turns = session.turns
                                         sessionTitle = session.title
-                                        app.commands.restoreSession(session.turns)
+                                        app.commands.restoreSession(session.turns, sameChat)
                                     }
                                 }
                             }
@@ -798,7 +800,7 @@ class HomeActivity : ComponentActivity() {
                             } else {
                                 app.chats.revertTo(id, index, expectedAt = redone.at)?.let {
                                     turns = it.turns
-                                    app.commands.restoreSession(it.turns)
+                                    app.commands.restoreSession(it.turns, sameChat = true)
                                 } ?: return@launch
                             }
                             // Back into the box for editing, like editing the old

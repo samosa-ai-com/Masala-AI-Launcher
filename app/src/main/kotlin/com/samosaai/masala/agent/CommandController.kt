@@ -83,7 +83,8 @@ class CommandController(
 
     /**
      * This chat's "Allow all": its turns skip the confirmation sheet for anything that isn't
-     * destructive. Off for every new or reopened chat.
+     * destructive. Off for every new chat and every switch to another one; coming back to the
+     * same chat (after minimizing) keeps it.
      */
     private val _allowAll = MutableStateFlow(false)
     val allowAll: StateFlow<Boolean> = _allowAll.asStateFlow()
@@ -280,7 +281,7 @@ class CommandController(
      * Continues a stored conversation: its turns become the agent's context, so
      * "go back to that chat and keep talking" answers with what came before.
      */
-    fun restoreSession(turns: List<com.samosaai.masala.chat.ChatTurn>) {
+    fun restoreSession(turns: List<com.samosaai.masala.chat.ChatTurn>, sameChat: Boolean = false) {
         job?.cancel()
         speech?.cancel()
         // A summary written earlier stands in for everything before it, so reopening a very
@@ -301,7 +302,7 @@ class CommandController(
                     JsonPrimitive(it.text),
                 )
             }
-        _allowAll.value = false
+        if (!sameChat) _allowAll.value = false
         history = listOfNotNull(summary?.let { com.samosaai.masala.llm.ChatMessage("assistant", JsonPrimitive(it)) }) + spoken
         _state.value = CommandState.Idle
     }
