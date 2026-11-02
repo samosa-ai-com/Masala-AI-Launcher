@@ -676,13 +676,19 @@ class HomeActivity : ComponentActivity() {
             aboveDock = {
                 val command by app.commands.state.collectAsStateWithLifecycle()
                 val pillLevel by app.commands.micLevel.collectAsStateWithLifecycle()
-                // The pill makes way for the reply card while a command is shown.
-                if (command == CommandState.Idle) {
+                val pillMinimized by app.commands.minimized.collectAsStateWithLifecycle()
+                // The pill makes way for the reply card while a command is shown. A minimized
+                // chat keeps its state (a turn may still be running), so the pill stays and a
+                // tap brings that same thread back, like the working notification does.
+                val resumable = pillMinimized && command != CommandState.Idle
+                if (command == CommandState.Idle || pillMinimized) {
                     SearchPill(
-                        onSearch = { drawerOpen = true; searchRequests++ },
+                        onSearch = {
+                            if (resumable) openSession(activeId) else { drawerOpen = true; searchRequests++ }
+                        },
                         mic = rememberMicTap(app),
                         level = { pillLevel },
-                        onOpenChat = {
+                        onOpenChat = if (resumable) ({ openSession(activeId) }) else ({
                             app.commands.focus()
                             chatOpen = true
                             expanded = true
@@ -698,7 +704,7 @@ class HomeActivity : ComponentActivity() {
                                     }
                                 }
                             }
-                        },
+                        }),
                     )
                 }
             },
