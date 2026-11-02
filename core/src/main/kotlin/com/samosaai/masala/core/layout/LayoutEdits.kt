@@ -1,5 +1,6 @@
 package com.samosaai.masala.core.layout
 
+import com.samosaai.masala.core.contract.CellGridSection
 import com.samosaai.masala.core.contract.DockSection
 import com.samosaai.masala.core.contract.Emphasis
 import com.samosaai.masala.core.contract.GridSection
@@ -298,6 +299,8 @@ object LayoutEdits {
             is ListSection -> (if (!section.title.isNullOrBlank()) 1 else 0) + section.items.size
             is GroupSection -> 1
             is DockSection -> 0
+            // A grid row is an icon cell's height, two 48 dp units like an item grid row.
+            is CellGridSection -> section.rows * 2
         }
 
     /** Declared widget rows for the checker: overrides and defaults, the author's height intent. */
@@ -605,6 +608,7 @@ object LayoutEdits {
             is WidgetSection -> section.widget != null || section.ref != null
             is StackSection -> section.widgets.isNotEmpty() || section.refs.isNotEmpty()
             is HtmlSection, is SkillWidgetSection, is DockSection -> true
+            is CellGridSection -> section.cells.isNotEmpty()
             else -> false
         }
         val kept = doc.pages.filter { page -> page.id in referenced || page.sections.any(::shows) }

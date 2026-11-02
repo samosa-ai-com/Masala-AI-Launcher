@@ -1,5 +1,7 @@
 package com.samosaai.masala.core.layout
 
+import com.samosaai.masala.core.contract.CellGridSection
+import com.samosaai.masala.core.contract.CellContent
 import com.samosaai.masala.core.contract.Condition
 import com.samosaai.masala.core.contract.DockSection
 import com.samosaai.masala.core.contract.Effect
@@ -117,7 +119,8 @@ object LayoutChecker {
                 problems += Problem("$pagePath.sections", "At most $MAX_SECTIONS_PER_PAGE sections on a page")
             }
             // An HTML widget is a live WebView: at most two per page, so home keeps its frame time.
-            if (page.sections.filterIsInstance<HtmlSection>().size > MAX_HTML_PER_PAGE) {
+            val htmlCells = page.sections.filterIsInstance<CellGridSection>().sumOf { g -> g.cells.count { it.content is CellContent.HtmlCell } }
+            if (page.sections.filterIsInstance<HtmlSection>().size + htmlCells > MAX_HTML_PER_PAGE) {
                 problems += Problem("$pagePath.sections", "At most $MAX_HTML_PER_PAGE HTML widgets on a page")
             }
             // A page holds at most eight declared widget rows: the author's height intent stays
@@ -145,6 +148,7 @@ object LayoutChecker {
                     is SkillWidgetSection ->
                         if (section.skillId !in env.skillIds) problems += Problem("$path.skillId", "Unknown skill '${section.skillId}'")
                     is HtmlSection -> checkHtml(section, path, env, problems)
+                    is CellGridSection -> checkCells(section, path, env, ::id, problems)
                 }
             }
         }
@@ -315,6 +319,59 @@ object LayoutChecker {
         if (section.rows !in 1..MAX_ROWS) problems += Problem("$path.rows", "rows is 1..$MAX_ROWS")
     }
 
+    /**
+     * A launcher grid: cells inside the columns, no two overlapping, icons 1 × 1, a widget's span
+     * inside its size range. Contents are checked like the section of the same kind.
+     */
+    private fun checkCells(
+        section: CellGridSection,
+        path: String,
+        env: Environment,
+        id: (String, String) -> Unit,
+        problems: MutableList<Problem>,
+    ) {
+        if (section.columns !in 1..MAX_COLUMNS) problems += Problem("$path.columns", "columns must be 1 to $MAX_COLUMNS")
+        if (section.cells.size > MAX_ITEMS_PER_SECTION) problems += Problem("$path.cells", "At most $MAX_ITEMS_PER_SECTION cells in a grid")
+        section.cells.forEachIndexed { c, cell ->
+            val cellPath = "$path.cells[$c]"
+            id(cell.id, cellPath)
+            checkRules(cell.rules, "$cellPath.rules", null, problems)
+            if (cell.x < 0 || cell.y < 0 || cell.w < 1 || cell.h < 1 || cell.x + cell.w > section.columns) {
+                problems += Problem(cellPath, "A cell needs x >= 0, y >= 0, w and h >= 1, and x + w <= ${section.columns}")
+            }
+            section.cells.take(c).firstOrNull { CellGrid.overlaps(it, cell) }?.let {
+                problems += Problem(cellPath, "Cell '${cell.id}' overlaps '${it.id}'")
+            }
+            when (val content = cell.content) {
+                is CellContent.ItemCell -> {
+                    if (cell.w != 1 || cell.h != 1) problems += Problem(cellPath, "An icon cell is 1 x 1")
+                    id(content.item.id, "$cellPath.content.item")
+                    checkItem(content.item, "$cellPath.content.item", env, id, problems)
+                }
+                is CellContent.WidgetCell -> {
+                    checkRef(content.ref, "$cellPath.content.ref", env, problems)
+                    val size = env.widgets?.get(content.ref.widgetId)?.size
+                    if (size != null && cell.w !in size.minW..size.maxW) {
+                        problems += Problem("$cellPath.w", "${cell.w} is outside the widget's width range ${size.minW}..${size.maxW}")
+                    }
+                }
+                is CellContent.StackCell -> {
+                    if (content.refs.isEmpty()) problems += Problem("$cellPath.content.refs", "A stack needs a widget")
+                    if (content.refs.size > MAX_WIDGETS_IN_STACK) problems += Problem("$cellPath.content.refs", "At most $MAX_WIDGETS_IN_STACK widgets in a stack")
+                    content.refs.forEachIndexed { r, ref -> checkRef(ref, "$cellPath.content.refs[$r]", env, problems) }
+                }
+                is CellContent.HtmlCell -> when {
+                    content.appId.isBlank() -> problems += Problem("$cellPath.content.appId", "An HTML widget needs an app")
+                    env.miniAppIds != null && content.appId !in env.miniAppIds ->
+                        problems += Problem("$cellPath.content.appId", "Unknown mini app '${content.appId}'")
+                }
+                is CellContent.SkillCell -> if (content.skillId !in env.skillIds) {
+                    problems += Problem("$cellPath.content.skillId", "Unknown skill '${content.skillId}'")
+                }
+            }
+        }
+    }
+
     private fun checkStack(
         section: StackSection,
         path: String,
@@ -343,6 +400,9 @@ object LayoutChecker {
     internal fun checkSize(size: SizeRange, path: String, problems: MutableList<Problem>) {
         if (size.min < 1 || size.max > MAX_ROWS || size.min > size.default || size.default > size.max) {
             problems += Problem(path, "Sizes need 1 <= min <= default <= max <= $MAX_ROWS")
+        }
+        if (size.minW < 1 || size.maxW > MAX_COLUMNS || size.minW > size.defaultW || size.defaultW > size.maxW) {
+            problems += Problem(path, "Widths need 1 <= minW <= defaultW <= maxW <= $MAX_COLUMNS")
         }
     }
 

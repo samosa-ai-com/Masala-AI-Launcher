@@ -455,6 +455,8 @@ private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: Render
         }
         is SkillWidgetSection -> ctx.skillWidgets?.let { SkillWidgetCard(section, it, ctx.onAction) }
             ?: Placeholder(section.skillId, stringResource(R.string.home_skill_widget_placeholder), null)
+        // Drawn from step 2 of docs/plans/home-cell-grid.md; nothing writes one before then.
+        is com.samosaai.masala.core.contract.CellGridSection -> Unit
         // An HTML widget draws its mini app at widget size, sandboxed like its own screen.
         is com.samosaai.masala.core.contract.HtmlSection -> ctx.htmlWidget(section.appId)?.let { row ->
             androidx.compose.foundation.layout.Box(

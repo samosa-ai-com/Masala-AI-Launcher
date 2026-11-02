@@ -152,6 +152,59 @@ enum class SkillWidgetSize {
     @SerialName("large") LARGE,
 }
 
+/**
+ * A launcher grid inside a page (plan `docs/plans/home-cell-grid.md`): icons and widgets each sit at
+ * a cell with a span, so small widgets share a row and a drag lands on a cell. Rows grow as needed.
+ */
+@Serializable
+@SerialName("cells")
+data class CellGridSection(
+    override val id: String,
+    val columns: Int = 4,
+    val cells: List<Cell>,
+    override val rules: List<Rule> = emptyList(),
+) : Section {
+    /** Rows in use: one past the lowest cell's bottom edge. */
+    val rows: Int get() = cells.maxOfOrNull { it.y + it.h } ?: 0
+}
+
+/** One thing on a [CellGridSection]: top-left at ([x], [y]), [w] × [h] cells, 0-based. */
+@Serializable
+data class Cell(
+    val id: String,
+    val x: Int,
+    val y: Int,
+    val w: Int = 1,
+    val h: Int = 1,
+    val content: CellContent,
+    val rules: List<Rule> = emptyList(),
+)
+
+@Serializable
+sealed interface CellContent {
+    /** An icon; always 1 × 1. */
+    @Serializable
+    @SerialName("item")
+    data class ItemCell(val item: Item) : CellContent
+
+    @Serializable
+    @SerialName("widget")
+    data class WidgetCell(val ref: WidgetRef, val widget: WidgetSpec? = null) : CellContent
+
+    /** Like [StackSection]: [widgets] is filled in when resolved, in display order. */
+    @Serializable
+    @SerialName("stack")
+    data class StackCell(val refs: List<WidgetRef>, val widgets: List<WidgetSpec> = emptyList()) : CellContent
+
+    @Serializable
+    @SerialName("html")
+    data class HtmlCell(val appId: String) : CellContent
+
+    @Serializable
+    @SerialName("skill")
+    data class SkillCell(val skillId: String) : CellContent
+}
+
 /** A label, an icon and an action. Not always an app: "Gym" can be an action with a symbol icon. */
 @Serializable
 data class Item(
