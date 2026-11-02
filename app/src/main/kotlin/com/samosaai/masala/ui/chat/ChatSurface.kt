@@ -51,10 +51,12 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -517,7 +519,7 @@ private fun ResultCard(result: ChatResult) {
     Column(
         Modifier.fillMaxWidth().padding(top = 8.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.White.copy(alpha = 0.06f))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         Text(
@@ -710,7 +712,7 @@ private fun Bubble(
             Column(
                 Modifier.fillMaxWidth().padding(vertical = 6.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White.copy(alpha = 0.04f))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
             Text(
@@ -743,64 +745,71 @@ private fun Bubble(
             longPress.fillMaxWidth().clip(shape)
                 .background(
                     when {
-                        user -> MasalaTheme.tokens.accent.copy(alpha = if (live) 0.22f else 0.92f)
-                        error -> Color(0x33FF6B6B)
-                        else -> Color.White.copy(alpha = 0.06f)
+                        user -> MasalaTheme.tokens.accent.copy(alpha = if (live) 0.6f else 0.92f)
+                        error -> MaterialTheme.colorScheme.errorContainer
+                        // Opaque theme pair: the old translucent white washed out over wallpapers.
+                        else -> MaterialTheme.colorScheme.surfaceContainerHigh
                     },
                 )
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
-            if (turn.experts.isNotEmpty() && !user) {
-                // Who answered: the expert's name above the text, so scrolling back stays clear.
-                Row(
-                    Modifier.padding(bottom = 7.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    val context = LocalContext.current
-                    turn.experts.take(MAX_EXPERT_BADGES).forEach { expert ->
-                        Text(
-                            expert.title,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MasalaColors.Gold,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(MasalaColors.Gold.copy(alpha = 0.14f))
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                                // Who answered, and where its instructions can be changed.
-                                .clickable {
-                                    context.startActivity(
-                                        Intent(context, SettingsActivity::class.java)
-                                            .putExtra(SettingsActivity.EXTRA_PAGE, "PERSONAS"),
-                                    )
-                                },
-                        )
+            val bubbleContent = MaterialTheme.colorScheme.onSurface
+            CompositionLocalProvider(
+                LocalContentColor provides
+                    if (error) MaterialTheme.colorScheme.onErrorContainer else bubbleContent,
+            ) {
+                if (turn.experts.isNotEmpty() && !user) {
+                    // Who answered: the expert's name above the text, so scrolling back stays clear.
+                    Row(
+                        Modifier.padding(bottom = 7.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        val context = LocalContext.current
+                        turn.experts.take(MAX_EXPERT_BADGES).forEach { expert ->
+                            Text(
+                                expert.title,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MasalaColors.Gold,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(MasalaColors.Gold.copy(alpha = 0.14f))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    // Who answered, and where its instructions can be changed.
+                                    .clickable {
+                                        context.startActivity(
+                                            Intent(context, SettingsActivity::class.java)
+                                                .putExtra(SettingsActivity.EXTRA_PAGE, "PERSONAS"),
+                                        )
+                                    },
+                            )
+                        }
                     }
                 }
-            }
-            // The model answers in Markdown — tables, lists, code — and the bubble is where it
-            // lands, so render it, not the raw pipes and hashes. The user's own words stay plain
-            // text on the accent tile.
-            if (user) {
-                Text(
-                    turn.text,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (!live) MasalaTheme.tokens.onAccent else MasalaTheme.tokens.textHigh,
-                    fontSize = 14.sp,
-                )
-            } else {
-                Markdown(turn.text)
-            }
-            turn.results.forEach { result -> ResultCard(result) }
-            if (turn.steps.isNotEmpty()) {
-                Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    turn.steps.forEach { step ->
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Box(Modifier.size(5.dp).clip(CircleShape).background(MasalaColors.Cardamom.copy(alpha = 0.85f)))
-                            Text(
-                                step,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MasalaTheme.tokens.textLow,
-                            )
+                // The model answers in Markdown — tables, lists, code — and the bubble is where it
+                // lands, so render it, not the raw pipes and hashes. The user's own words stay plain
+                // text on the accent tile.
+                if (user) {
+                    Text(
+                        turn.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (!live) MasalaTheme.tokens.onAccent else MasalaTheme.tokens.textHigh,
+                        fontSize = 14.sp,
+                    )
+                } else {
+                    Markdown(turn.text)
+                }
+                turn.results.forEach { result -> ResultCard(result) }
+                if (turn.steps.isNotEmpty()) {
+                    Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        turn.steps.forEach { step ->
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Box(Modifier.size(5.dp).clip(CircleShape).background(MasalaColors.Cardamom.copy(alpha = 0.85f)))
+                                Text(
+                                    step,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MasalaTheme.tokens.textLow,
+                                )
+                            }
                         }
                     }
                 }

@@ -72,6 +72,24 @@ class CommandController(
     private var job: Job? = null
 
     /**
+     * Set when the user hides the chat mid-turn (sheet X, Back, drawer): the turn
+     * keeps running and an ongoing notification carries the progress. Only an
+     * explicit Stop ([dismiss]) cancels. Cleared by any new turn or focus.
+     */
+    private val _minimized = MutableStateFlow(false)
+    val minimized: StateFlow<Boolean> = _minimized.asStateFlow()
+
+    /** Hides the chat without cancelling the running turn. */
+    fun minimize() {
+        _minimized.value = true
+    }
+
+    /** The chat is visible again (or a new turn starts): auto-open may resume. */
+    fun focus() {
+        _minimized.value = false
+    }
+
+    /**
      * Every finished turn is handed here so the conversation can be stored and shown;
      * null until the app wires its chat store.
      */
@@ -140,12 +158,14 @@ class CommandController(
         job?.cancel()
         speech?.cancel()
         stopTicker()
+        _minimized.value = false
         _listeningElapsed.value = 0L
         _state.value = CommandState.Idle
     }
 
     /** [spoken] transcripts get their names corrected against apps, modes and skills the phone knows. */
     fun ask(text: String, spoken: Boolean = false, images: List<String> = emptyList()) {
+        _minimized.value = false
         val raw = text.trim()
         if (raw.isEmpty() && images.isEmpty()) return openInput()
         job?.cancel()

@@ -653,6 +653,9 @@
     <string name="chat_bad_image">That file isn\'t a readable picture</string>
     <string name="media_play">Play</string>
     <string name="media_stop">Stop</string>
+    <string name="chat_working_channel">Chat working</string>
+    <string name="chat_working_title">Masala is working</string>
+    <string name="chat_working_body">Your chat keeps running — tap to come back.</string>
     <string name="command_close">Close</string>
     <string name="skill_missing">That skill isn’t available</string>
     <string name="skill_new_chat">New chat</string>
