@@ -183,6 +183,7 @@ class HomeActivity : ComponentActivity() {
             val sessions by app.chats.summaries.collectAsStateWithLifecycle()
             val activeId by app.activeChatId.collectAsStateWithLifecycle()
             val commandState by app.commands.state.collectAsStateWithLifecycle()
+            val minimized by app.commands.minimized.collectAsStateWithLifecycle()
             var turns by remember { mutableStateOf<List<com.samosaai.masala.chat.ChatTurn>>(emptyList()) }
             var sessionTitle by remember { mutableStateOf("") }
             // A reverted prompt, dropped back into the chat box for editing.
@@ -198,7 +199,10 @@ class HomeActivity : ComponentActivity() {
                 chatPrefill = ""
                 chatPrefillNonce = 0
                 drawerOpen = false
-                app.commands.dismiss()
+                // Returning to the same thread (notification tap) resumes it; switching
+                // threads cancels the live one so its reply can't land in the new chat.
+                if (id != null && id != app.activeChatId.value) app.commands.dismiss()
+                app.commands.focus()
                 app.scope.launch {
                     val session = id?.let { app.chats.get(it) }
                     if (session != null) {
@@ -229,8 +233,20 @@ class HomeActivity : ComponentActivity() {
             }
             // Talking or a finished turn brings the surface up by itself; starting to talk
             // always shows the orb, so the big animation is what a press produces.
-            LaunchedEffect(commandState) {
-                if (commandState != CommandState.Idle) chatOpen = true
+            LaunchedEffect(commandState, minimized) {
+                // A minimized chat stays hidden until the user comes back; anything else
+                // reopens on new activity. The working notice covers the hidden run.
+                if (commandState != CommandState.Idle && !minimized) chatOpen = true
+                val hidden = minimized || !chatOpen
+                val working = commandState is CommandState.Thinking ||
+                    commandState == CommandState.Listening ||
+                    commandState == CommandState.ListeningPaused
+                if (working && hidden) {
+                    val step = (commandState as? CommandState.Thinking)?.steps?.lastOrNull().orEmpty()
+                    com.samosaai.masala.notifications.ChatWorkingNotification.show(this@HomeActivity, activeId.orEmpty(), step)
+                } else {
+                    com.samosaai.masala.notifications.ChatWorkingNotification.cancel(this@HomeActivity)
+                }
                 if (commandState == CommandState.Listening || commandState == CommandState.ListeningPaused) expanded = false
                 if (commandState is CommandState.Thinking) expanded = true
                 // A newly made app opens once. This hangs off the live reply, not off the stored
@@ -316,7 +332,7 @@ class HomeActivity : ComponentActivity() {
                 // The drawer is on top of the chat, so it goes first.
                 drawerOpen -> drawerOpen = false
                 chatOpen && expanded -> expanded = false
-                chatOpen -> { app.commands.dismiss(); chatOpen = false }
+                chatOpen -> { app.commands.minimize(); chatOpen = false; expanded = false }
                 else -> drawerOpen = false
             }
         }
@@ -669,6 +685,7 @@ class HomeActivity : ComponentActivity() {
                         mic = rememberMicTap(app),
                         level = { pillLevel },
                         onOpenChat = {
+                            app.commands.focus()
                             chatOpen = true
                             expanded = true
                             chatPrefill = ""
@@ -720,7 +737,9 @@ class HomeActivity : ComponentActivity() {
                     ready = voiceReady,
                     onAsk = { text, images -> app.commands.ask(text, images = images) },
                     onClose = {
-                        app.commands.dismiss()
+                        // Minimizing keeps a running turn alive (notification carries it);
+                        // only Stop cancels.
+                        app.commands.minimize()
                         chatOpen = false
                         expanded = false
                     },

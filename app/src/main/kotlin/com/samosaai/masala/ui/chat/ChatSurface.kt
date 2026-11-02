@@ -55,6 +55,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -517,7 +518,7 @@ private fun ResultCard(result: ChatResult) {
     Column(
         Modifier.fillMaxWidth().padding(top = 8.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.White.copy(alpha = 0.06f))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         Text(
@@ -710,7 +711,7 @@ private fun Bubble(
             Column(
                 Modifier.fillMaxWidth().padding(vertical = 6.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White.copy(alpha = 0.04f))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
             Text(
@@ -743,13 +744,19 @@ private fun Bubble(
             longPress.fillMaxWidth().clip(shape)
                 .background(
                     when {
-                        user -> MasalaTheme.tokens.accent.copy(alpha = if (live) 0.22f else 0.92f)
-                        error -> Color(0x33FF6B6B)
-                        else -> Color.White.copy(alpha = 0.06f)
+                        user -> MasalaTheme.tokens.accent.copy(alpha = if (live) 0.6f else 0.92f)
+                        error -> MaterialTheme.colorScheme.errorContainer
+                        // Opaque theme pair: the old translucent white washed out over wallpapers.
+                        else -> MaterialTheme.colorScheme.surfaceContainerHigh
                     },
                 )
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
+            val bubbleContent = MaterialTheme.colorScheme.onSurface
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.material3.LocalContentColor provides
+                    if (error) MaterialTheme.colorScheme.onErrorContainer else bubbleContent,
+            ) {
             if (turn.experts.isNotEmpty() && !user) {
                 // Who answered: the expert's name above the text, so scrolling back stays clear.
                 Row(
@@ -804,6 +811,7 @@ private fun Bubble(
                         }
                     }
                 }
+            }
             }
         }
         }

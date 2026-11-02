@@ -192,6 +192,7 @@ fun ReplyCard(
     character: com.samosaai.masala.data.Character? = null,
 ) {
     val state by app.commands.state.collectAsStateWithLifecycle()
+    val minimized by app.commands.minimized.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val micTap = rememberMicTap(app)
@@ -204,7 +205,7 @@ fun ReplyCard(
     val reply = state as? CommandState.Reply
     // "Read replies aloud" applies to every reply; the button reads one on request.
     LaunchedEffect(reply) { if (readAloud && reply != null && app.commands.claimReadAloud(reply)) app.speakReply(reply.text) }
-    if (state == CommandState.Idle) return
+    if (state == CommandState.Idle || minimized) return
     if (sheets && (state == CommandState.Listening || state is CommandState.Thinking)) return
 
     // A glass sheet over home (UI refresh U3); opened for typing, its field takes focus.
@@ -372,7 +373,7 @@ fun ReplyCard(
                     }
                 }) { Text(stringResource(R.string.command_read_aloud)) }
                 Box(Modifier.weight(1f))
-                TextButton(onClick = { app.stopSpeaking(); app.commands.dismiss() }) { Text(stringResource(R.string.command_close)) }
+                TextButton(onClick = { app.stopSpeaking(); app.commands.minimize() }) { Text(stringResource(R.string.command_close)) }
             }
         }
     }
