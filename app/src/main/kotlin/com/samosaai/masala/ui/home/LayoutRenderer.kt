@@ -349,7 +349,12 @@ private fun SectionDropIndicator(target: SectionDrop?, drag: HomeDragState, orig
         val box = target.beforeSectionId?.let { id -> boxes.firstOrNull { it.key == id }?.value }
             ?: boxes.lastOrNull()?.value
             ?: return@Canvas
-        val y = (if (target.beforeSectionId == null) box.bottom else box.top) - origin.y - line / 2
+        val y = when {
+            target.beforeSectionId != null -> box.top
+            // A null before lands before the dock (moveSection caps there): draw at its top.
+            boxes.any { it.key == "dock" } -> boxes.first { it.key == "dock" }.value.top
+            else -> box.bottom
+        } - origin.y - line / 2
         drawRoundRect(accent, Offset(16.dp.toPx(), y), Size(size.width - 32.dp.toPx(), line))
     }
 }
@@ -404,17 +409,19 @@ private fun PageContent(page: Page, layout: ResolvedLayout, ctx: RenderContext, 
 
 @Composable
 private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: RenderContext, enabled: Boolean = true) {
+    // The page holding this section: widget drops and box registration are page-scoped, so every
+    // section (grids and dock included) registers with it — a widget must order against them too.
+    val pageId = layout.layout.pages.firstOrNull { p -> p.sections.any { it.id == section.id } }?.id
     when (section) {
         is HeaderSection -> Header(section, ctx)
-        is GridSection -> ItemGrid(section.id, section.title, section.items, section.columns, ctx)
-        is DockSection -> Dock(section, ctx)
-        is ListSection -> ItemList(section.id, section.title, section.items, ctx)
+        is GridSection -> ItemGrid(section.id, section.title, section.items, section.columns, ctx, pageId)
+        is DockSection -> Dock(section, ctx, pageId)
+        is ListSection -> ItemList(section.id, section.title, section.items, ctx, pageId)
         is GroupSection -> Group(section, ctx)
         // A resolved layout always carries the widget inline (refs are filled in from the library).
         is WidgetSection -> section.widget?.let {
             ctx.widgets?.let { source ->
                 val menu = ctx.onWidgetMenu
-                val pageId = layout.layout.pages.firstOrNull { p -> p.sections.any { it.id == section.id } }?.id
                 val draggable = menu != null && pageId != null && ctx.drag != null && ctx.onWidgetDrop != null && !ctx.locked && ctx.isBaseSection(section.id)
                 // Draggable cards keep a no-op long-press so the press is consumed: otherwise the
                 // background's long-press (Add widget sheet) races the drag's own hold-to-menu.
@@ -434,7 +441,6 @@ private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: Render
         is StackSection -> section.widgets.firstOrNull()?.let {
             ctx.widgets?.let { source ->
                 val menu = ctx.onWidgetMenu
-                val pageId = layout.layout.pages.firstOrNull { p -> p.sections.any { it.id == section.id } }?.id
                 val draggable = menu != null && pageId != null && ctx.drag != null && ctx.onWidgetDrop != null && !ctx.locked && ctx.isBaseSection(section.id)
                 val cardSource = if (draggable) source.copy(onLongPress = {}) else if (menu == null) source else source.copy(onLongPress = { menu(it, section.id) })
                 val cardModifier = if (draggable) {
@@ -512,9 +518,9 @@ private fun columnsFor(wanted: Int, maxWidthDp: Float): Int {
 }
 
 @Composable
-private fun ItemGrid(sectionId: String, title: String?, items: List<Item>, columns: Int, ctx: RenderContext) {
+private fun ItemGrid(sectionId: String, title: String?, items: List<Item>, columns: Int, ctx: RenderContext, pageId: String? = null) {
     if (items.isEmpty() && title.isNullOrBlank()) return
-    Column(Modifier.fillMaxWidth().dropSection(sectionId, ctx).padding(horizontal = 12.dp)) {
+    Column(Modifier.fillMaxWidth().dropSection(sectionId, ctx, pageId).padding(horizontal = 12.dp)) {
         if (!title.isNullOrBlank()) Text(title, style = wallpaperText(MaterialTheme.typography.titleSmall), modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val cols = columnsFor(columns, maxWidth.value)
@@ -531,10 +537,10 @@ private fun ItemGrid(sectionId: String, title: String?, items: List<Item>, colum
 }
 
 @Composable
-private fun Dock(section: DockSection, ctx: RenderContext) {
+private fun Dock(section: DockSection, ctx: RenderContext, pageId: String? = null) {
     val shape = RoundedCornerShape(30.dp)
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).heightIn(min = 78.dp).dropSection(section.id, ctx).clip(shape)
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).heightIn(min = 78.dp).dropSection(section.id, ctx, pageId).clip(shape)
             .background(MasalaTheme.tokens.wallpaperGlass).border(1.dp, Color.White.copy(alpha = 0.09f), shape).padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
@@ -544,8 +550,8 @@ private fun Dock(section: DockSection, ctx: RenderContext) {
 }
 
 @Composable
-private fun ItemList(sectionId: String, title: String?, items: List<Item>, ctx: RenderContext) {
-    Column(Modifier.fillMaxWidth().dropSection(sectionId, ctx)) {
+private fun ItemList(sectionId: String, title: String?, items: List<Item>, ctx: RenderContext, pageId: String? = null) {
+    Column(Modifier.fillMaxWidth().dropSection(sectionId, ctx, pageId)) {
         if (!title.isNullOrBlank()) Text(title, style = wallpaperText(MaterialTheme.typography.titleSmall), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         items.forEach { item -> ItemRow(item, ctx, sectionId) }
     }

@@ -220,7 +220,7 @@ class HomeActivity : ComponentActivity() {
         var choosingIcon by remember { mutableStateOf<AppEntry?>(null) }
         // Tiles that aren't installed apps get their own menu, so nothing on home is menu-less.
         var itemMenuFor by remember { mutableStateOf<Item?>(null) }
-        var widgetMenuFor by remember { mutableStateOf<com.samosaai.masala.core.contract.WidgetSpec?>(null) }
+        var widgetMenuFor by remember { mutableStateOf<Pair<com.samosaai.masala.core.contract.WidgetSpec, String>?>(null) }
         var addWidgetSheet by remember { mutableStateOf(false) }
         var renamingItem by remember { mutableStateOf<Item?>(null) }
         var choosingIconForApp by remember { mutableStateOf<com.samosaai.masala.data.MiniAppEntity?>(null) }
@@ -498,7 +498,7 @@ class HomeActivity : ComponentActivity() {
                 onOpenFolder = { openFolder = it to (it.id in movable) },
                 onFolderMenu = { if (it.id in movable) folderMenu = it },
                 onItemMenu = { itemMenuFor = it },
-                onWidgetMenu = { spec, _ -> widgetMenuFor = spec },
+                onWidgetMenu = { spec, sectionId -> widgetMenuFor = spec to sectionId },
                 isBaseSection = { id ->
                     app.layouts.base.value?.pages.orEmpty().flatMap { it.sections }.any { it.id == id }
                 },
@@ -1009,7 +1009,7 @@ class HomeActivity : ComponentActivity() {
             )
         }
 
-        widgetMenuFor?.let { spec ->
+        widgetMenuFor?.let { (spec, sectionId) ->
             fun done(action: () -> Unit) {
                 widgetMenuFor = null
                 action()
@@ -1017,21 +1017,21 @@ class HomeActivity : ComponentActivity() {
             com.samosaai.masala.ui.home.widgets.WidgetMenuDialog(
                 spec = spec,
                 pages = layout.layout.pages.map { it.id to (it.title ?: it.id) },
-                currentPageId = app.layouts.widgetPlacements(spec.id).firstOrNull()?.pageId,
+                currentPageId = layout.layout.pages.firstOrNull { p -> p.sections.any { it.id == sectionId } }?.id,
                 onRemove = { done { scope.launch {
                     app.layouts.removeWidgetRefs("Remove from home: ${spec.title ?: spec.id}", spec.id)
                         .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_removed))
                 } } },
                 onMoveUp = { done { scope.launch {
-                    app.layouts.moveWidget("Move up ${spec.title ?: spec.id}", spec.id, steps = -1)
+                    app.layouts.moveWidget("Move up ${spec.title ?: spec.id}", spec.id, steps = -1, sectionId = sectionId)
                         .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_moved))
                 } } },
                 onMoveDown = { done { scope.launch {
-                    app.layouts.moveWidget("Move down ${spec.title ?: spec.id}", spec.id, steps = 1)
+                    app.layouts.moveWidget("Move down ${spec.title ?: spec.id}", spec.id, steps = 1, sectionId = sectionId)
                         .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_moved))
                 } } },
                 onMoveToPage = { pageId -> done { scope.launch {
-                    app.layouts.moveWidget("Move ${spec.title ?: spec.id}", spec.id, targetPageId = pageId)
+                    app.layouts.moveWidget("Move ${spec.title ?: spec.id}", spec.id, targetPageId = pageId, sectionId = sectionId)
                         .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_moved))
                 } } },
                 onResize = { rows -> done { scope.launch {

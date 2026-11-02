@@ -90,7 +90,7 @@ class WidgetGenerator(
         append("At most 12 components; rows and columns hold leaves only and nest at most 2 deep; ")
         append("one storage key per component (a counter, checklist, timer or list line owns its key); ")
         append("styling stays bounded: a palette tint, normal or large emphasis, start/center/end. ")
-        append("Buttons only ask_masala, run_skill (an installed id, exactly as listed), start_timer, refresh_widget (reloads this widget's web values in place; no id needed), run_tool (only toggle_torch, toggle_wifi, set_timer) or play_sound (click only). ")
+        append("Buttons only ask_masala, run_skill (an installed id, exactly as listed), start_timer, refresh_widget (reloads this widget's web values in place; no id needed), run_tool (only toggle_torch, toggle_wifi, set_timer with its seconds in args) or play_sound (click only). ")
         append("A web_value reads one JSON value over http (its host is approved at placement); video and snapshot need a source id from list_stream_sources. ")
         append("Ids are short slugs; titles are short. Counters start at 0, checklists unticked.\n")
         if (request.skillIds.isNotEmpty()) {
@@ -108,6 +108,8 @@ class WidgetGenerator(
         problems += WidgetChecker.check(spec, checkerEnv(request))
         if (problems.isEmpty()) return Result.Generated(normalize(spec, request))
         // Mechanical slips (capitalized or spaced id) are fixed locally without spending the repair turn.
+        // A renamed revision and duplicate storage keys still go through the repair turn: the
+        // existing revisionKeepsItsId test pins the reject, and key ownership needs model judgment.
         val fixed = mechanicalFix(spec, problems)
         if (fixed != null) {
             val rechecked = meaningProblems(fixed, request) + WidgetChecker.check(fixed, checkerEnv(request))

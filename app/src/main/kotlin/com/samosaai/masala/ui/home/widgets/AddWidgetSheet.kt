@@ -56,11 +56,10 @@ fun AddWidgetSheet(
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(stringResource(R.string.widgets_add_sheet_title), style = MaterialTheme.typography.titleLarge)
             entries.forEach { (spec, _) ->
-                val needsSource = spec.components.any {
-                    it is com.samosaai.masala.core.contract.WidgetComponent.Video ||
-                        it is com.samosaai.masala.core.contract.WidgetComponent.Snapshot
-                }
-                val missingSource = needsSource && sourceIds(spec).none(sourceExists)
+                // Any video/snapshot anywhere in the card (rows and columns nest) needs a source;
+                // sourceIds already walks the whole tree, so a nested stream can't slip through.
+                val requiredSources = sourceIds(spec)
+                val missingSource = requiredSources.isNotEmpty() && requiredSources.none(sourceExists)
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
                         Text(

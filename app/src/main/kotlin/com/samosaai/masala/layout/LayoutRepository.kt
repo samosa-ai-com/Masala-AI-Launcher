@@ -296,22 +296,34 @@ class LayoutRepository(
         edit(label) { LayoutEdits.resizeWidget(it, widgetId, rows) }
 
     /**
-     * Moves a widget's first placement up/down ([steps]) or to another page: one undoable version,
+     * Moves a widget placement up/down ([steps]) or to another page: one undoable version,
      * same height cap as placing (the moved section's rendered height, stacks included). Returns
-     * the check problems (empty means moved); a no-op reports where it already sits.
+     * the check problems (empty means moved); a no-op reports where it already sits. When
+     * [sectionId] names the exact placement (the menu passes the tapped one), that placement
+     * moves instead of the first — placements on other pages stay put.
      */
     suspend fun moveWidget(
         label: String,
         widgetId: String,
         steps: Int = 0,
         targetPageId: String? = null,
+        sectionId: String? = null,
     ): List<LayoutChecker.Problem> {
         val doc = base.value
-        val at = doc?.let { LayoutEdits.widgetPlacements(it, widgetId).firstOrNull() }
             ?: return listOf(LayoutChecker.Problem("$", "Widget '$widgetId' is not on home"))
+        val at = if (sectionId != null) {
+            doc?.pages?.firstOrNull { p -> p.sections.any { it.id == sectionId } }
+                ?.let { LayoutEdits.WidgetPlacement(it.id, sectionId) }
+        } else {
+            doc?.let { LayoutEdits.widgetPlacements(it, widgetId).firstOrNull() }
+        } ?: return listOf(LayoutChecker.Problem("$", "Widget '$widgetId' is not on home"))
         val section = doc.pages.flatMap { it.sections }.firstOrNull { it.id == at.sectionId }
         if (targetPageId == null) {
-            val ids = doc.pages.first { it.id == at.pageId }.sections.map { it.id }
+            // The dock never moves: measure bounds in the movable sections only, so stopping
+            // against it reports "already at the bottom" instead of a false Moved.
+            val page = doc.pages.firstOrNull { it.id == at.pageId }
+                ?: return listOf(LayoutChecker.Problem("$", "Page '${at.pageId}' is gone; try again"))
+            val ids = page.sections.filterNot { it is DockSection }.map { it.id }
             val idx = ids.indexOf(at.sectionId)
             if (idx < 0 || (idx + steps).coerceIn(0, ids.size - 1) == idx) {
                 return listOf(LayoutChecker.Problem("$", "Widget '$widgetId' is already at the ${if (steps < 0) "top" else "bottom"}"))

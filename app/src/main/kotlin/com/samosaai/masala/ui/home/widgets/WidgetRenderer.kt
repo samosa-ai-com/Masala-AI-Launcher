@@ -231,21 +231,23 @@ private fun Component(
         }
         // Live media (W4): MJPEG and snapshots draw; player kinds need the pool.
         is WidgetComponent.Video -> {
-            val src = source.streams?.current()?.get(component.stream.sourceId)
+            val streams = source.streams
+            val src = streams?.current()?.get(component.stream.sourceId)
             val media = source.media
             when {
                 src == null -> MediaNote(stringResource(R.string.widgets_video_no_source))
-                src.kind == com.samosaai.masala.widgets.StreamKind.MJPEG && source.streams != null ->
-                    com.samosaai.masala.widgets.media.MjpegImage(src.id, source.streams, enabled = enabled)
-                media != null && source.streams != null ->
-                    com.samosaai.masala.widgets.media.LiveVideo(src.id, source.streams, media, enabled = enabled)
+                src.kind == com.samosaai.masala.widgets.StreamKind.MJPEG && streams != null ->
+                    com.samosaai.masala.widgets.media.MjpegImage(src.id, streams, enabled = enabled)
+                media != null && streams != null ->
+                    com.samosaai.masala.widgets.media.LiveVideo(src.id, streams, media, enabled = enabled)
                 else -> MediaNote(stringResource(R.string.widgets_video_player_next))
             }
         }
         is WidgetComponent.Snapshot -> {
-            val src = source.streams?.current()?.get(component.sourceId)
-            if (src == null || source.streams == null) MediaNote(stringResource(R.string.widgets_video_no_source))
-            else com.samosaai.masala.widgets.media.SnapshotImage(src.id, component.everySeconds, source.streams, enabled = enabled)
+            val streams = source.streams
+            val src = streams?.current()?.get(component.sourceId)
+            if (src == null || streams == null) MediaNote(stringResource(R.string.widgets_video_no_source))
+            else com.samosaai.masala.widgets.media.SnapshotImage(src.id, component.everySeconds, streams, enabled = enabled)
         }
         is WidgetComponent.WebValue -> {
             val store = source.http

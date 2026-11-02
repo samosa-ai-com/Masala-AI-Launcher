@@ -9,7 +9,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -92,12 +91,11 @@ fun MjpegImage(sourceId: String, store: StreamSourceStore, modifier: Modifier = 
     var bitmap by remember(sourceId) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     var error by remember(sourceId) { mutableStateOf<String?>(null) }
     var attempt by remember(sourceId) { mutableStateOf(0) }
-    DisposableEffect(sourceId, attempt, enabled) {
-        if (!enabled) return@DisposableEffect onDispose {}
-        val job = kotlinx.coroutines.CoroutineScope(Dispatchers.IO).let { scope ->
-            scope.launchReader(store, sourceId, onFrame = { bitmap = it }, onError = { error = it })
-        }
-        onDispose { job.cancel() }
+    // Structured concurrency: the reader is a child of this effect, so leaving composition or
+    // the page going off-screen cancels it without a detached scope or manual job handling.
+    LaunchedEffect(sourceId, attempt, enabled) {
+        if (!enabled) return@LaunchedEffect
+        launchReader(store, sourceId, onFrame = { bitmap = it }, onError = { error = it })
     }
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         val image = bitmap

@@ -88,17 +88,6 @@ object WidgetTools {
             return "$base-$n"
         }
 
-        fun norm(s: String): String = s.lowercase().filter { it.isLetterOrDigit() }
-
-        fun findSimilar(lib: Map<String, WidgetSpec>, spec: WidgetSpec): WidgetSpec? {
-            // Titles are the dedupe key: storage keys and ids are safely reused across widgets
-            // (state is per widget id), so only a matching title blocks with an offer to reuse it.
-            // Bare id collisions fall through to freeId's numeric suffix.
-            val wantName = norm(spec.title ?: return null)
-            if (wantName.isEmpty()) return null
-            return lib.values.firstOrNull { norm(it.title ?: it.id) == wantName }
-        }
-
         return listOf(
             FunctionTool(Defs.listWidgets, READ_ONLY) {
                 val lib = host().widgetLibrary.current()
@@ -118,7 +107,7 @@ object WidgetTools {
             FunctionTool(Defs.createWidget, CHANGES_SOMETHING, confirmWhen = { false }) {
                 val (spec, error) = specFromArgs(it)
                 if (spec == null) return@FunctionTool ActionResult.error(error!!)
-                findSimilar(host().widgetLibrary.current(), spec)?.let { dup ->
+                findSimilarWidget(host().widgetLibrary.current(), spec)?.let { dup ->
                     val n = host().layouts.widgetPlacements(dup.id).size
                     val where = if (n == 0) "not on home" else "on home ×$n"
                     return@FunctionTool ActionResult.error(
@@ -254,6 +243,19 @@ object WidgetTools {
     }
 
     private fun missing(param: String) = ActionResult.error("Missing or invalid required parameter '$param'.")
+
+    /**
+     * Titles are the dedupe key: storage keys and ids are safely reused across widgets (state
+     * is per widget id), so only a matching title blocks with an offer to reuse it. Bare id
+     * collisions fall through to numeric suffixes at the call site.
+     */
+    internal fun normWidgetName(s: String): String = s.lowercase().filter { it.isLetterOrDigit() }
+
+    internal fun findSimilarWidget(lib: Map<String, WidgetSpec>, spec: WidgetSpec): WidgetSpec? {
+        val wantName = normWidgetName(spec.title ?: return null)
+        if (wantName.isEmpty()) return null
+        return lib.values.firstOrNull { normWidgetName(it.title ?: it.id) == wantName }
+    }
 
     internal fun guessKind(url: String): StreamKind? {
         val lower = url.trim().lowercase()

@@ -355,9 +355,14 @@ object WidgetSchema {
         putJsonObject("properties") {
             put("type", const("run_tool"))
             put("name", enumOf("toggle_torch", "toggle_wifi", "set_timer"))
+            // Free-form tool args (set_timer needs seconds): the checker validates the call.
+            putJsonObject("args") {
+                put("type", "object")
+                put("additionalProperties", true)
+            }
         }
         putJsonArray("required") { add("type"); add("name") }
-        put("additionalProperties", true)
+        put("additionalProperties", false)
     }
 
     private fun playSound(): JsonObject = buildJsonObject {
