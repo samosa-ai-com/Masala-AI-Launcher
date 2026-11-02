@@ -68,7 +68,6 @@ import androidx.webkit.WebViewFeature
 import com.samosaai.masala.R
 import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.masala
-import com.samosaai.masala.ui.skills.ReportDialog
 import com.samosaai.masala.ui.theme.MasalaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -318,7 +317,7 @@ private fun applyMiniAppSettings(wv: WebView, networkAllowed: Boolean) {
     wv.settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
 }
 
-/** Full-screen host for one mini-app: Back, network toggle, Share, Pin, Report, Delete. */
+/** Full-screen host for one mini-app: Back, network toggle, Share, Pin, Delete. */
 class MiniAppActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
@@ -350,7 +349,6 @@ class MiniAppActivity : ComponentActivity() {
         var html by remember { mutableStateOf<String?>(null) }
         var gone by remember { mutableStateOf(false) }
         var confirmDelete by remember { mutableStateOf(false) }
-        var reporting by remember { mutableStateOf(false) }
         var webView by remember { mutableStateOf<WebView?>(null) }
         // Full size hides Masala's chrome and the system bars; kept per app on this phone.
         val fullPrefs = remember { getSharedPreferences("mini_apps", MODE_PRIVATE) }
@@ -467,24 +465,11 @@ class MiniAppActivity : ComponentActivity() {
                                     android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             }) { Text(stringResource(R.string.miniapp_pin)) }
-                            TextButton(onClick = { reporting = true }) { Text(stringResource(R.string.report_action)) }
                             TextButton(onClick = { confirmDelete = true }) { Text(stringResource(R.string.settings_version_delete)) }
                         }
                     }
                 }
             }
-        }
-        if (reporting) {
-            ReportDialog(
-                title = stringResource(R.string.miniapp_report_title),
-                onReport = { reasons, note ->
-                    // The app's id and title identify it; its HTML stays in the mini-app table.
-                    app.aiReports.add("mini_app:$appId", reasons, note, title)
-                    reporting = false
-                    android.widget.Toast.makeText(context, R.string.report_thanks, android.widget.Toast.LENGTH_SHORT).show()
-                },
-                onDismiss = { reporting = false },
-            )
         }
         if (confirmDelete) {
             AlertDialog(
