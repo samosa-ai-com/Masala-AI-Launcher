@@ -317,6 +317,9 @@
     <string name="widgets_added">Added — see it on home</string>
     <string name="widgets_added_on">Added — see it on %1$s</string>
     <string name="widgets_needs_approval">Needs approval in Settings → Widgets</string>
+    <string name="widgets_waiting_value">Waiting for a value</string>
+    <string name="widget_timer_start">Start timer</string>
+    <string name="widget_timer_reset">Reset timer</string>
     <string name="widgets_needs_source">Needs a camera source</string>
     <string name="widgets_setup_source">Setup…</string>
     <string name="widgets_allow_fetching">Allow fetching</string>

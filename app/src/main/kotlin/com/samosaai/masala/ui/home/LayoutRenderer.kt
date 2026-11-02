@@ -1154,10 +1154,17 @@ internal val HOME_GUTTER = 16.dp
 
 /** A glass card straight on the wallpaper (home boards): card corners, stronger glass, white hairline. */
 @Composable
-internal fun WallpaperCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+internal fun WallpaperCard(
+    modifier: Modifier = Modifier,
+    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     val shape = RoundedCornerShape(Radii.card)
     Column(
-        modifier.clip(shape).background(MasalaTheme.tokens.wallpaperGlass).border(1.dp, Color.White.copy(alpha = 0.10f), shape).padding(18.dp),
+        // 14 dp top and bottom: a one-cell card (88 dp) still fits a title and a value.
+        modifier.clip(shape).background(MasalaTheme.tokens.wallpaperGlass).border(1.dp, Color.White.copy(alpha = 0.10f), shape)
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalArrangement = verticalArrangement,
         content = content,
     )
 }

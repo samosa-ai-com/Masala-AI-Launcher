@@ -40,6 +40,8 @@ fun WebValueView(
     modifier: Modifier = Modifier,
     allowed: Boolean = true,
     enabled: Boolean = true,
+    /** False when the label only repeats the card's title. */
+    showLabel: Boolean = true,
 ) {
     val http: HttpBinding = component.http
     val entries by store.entries.collectAsState()
@@ -51,15 +53,24 @@ fun WebValueView(
     }
     val entry = entries[store.keyFor(widgetId, http)]
     Column(modifier.fillMaxWidth()) {
-        Text(
+        if (showLabel) Text(
             component.label,
             style = MaterialTheme.typography.labelLarge,
             color = MasalaTheme.tokens.onWallpaperMedium,
             textAlign = alignOf(style),
             modifier = Modifier.fillMaxWidth(),
         )
-        Text(
-            (entry?.value ?: "—") + (suffix?.let { " $it" }.orEmpty()),
+        // Nothing fetched yet: say so, rather than a bare "— €". Unapproved, the note below says why.
+        if (entry == null) {
+            if (allowed) Text(
+                stringResource(R.string.widgets_waiting_value),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MasalaTheme.tokens.onWallpaperMedium,
+                textAlign = alignOf(style),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else Text(
+            entry.value + (suffix?.let { " $it" }.orEmpty()),
             style = if (style?.emphasis == Emphasis.LARGE) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
             color = OnWallpaper,
             textAlign = alignOf(style),

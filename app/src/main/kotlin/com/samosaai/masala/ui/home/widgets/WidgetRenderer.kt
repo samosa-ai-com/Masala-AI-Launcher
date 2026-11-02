@@ -15,7 +15,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -74,7 +79,10 @@ data class WidgetSource(
     val approved: (widgetId: String) -> Set<String> = { emptySet() },
 )
 
-/** One generated widget on home: a glass card with its components top to bottom. */
+/**
+ * One generated widget on home: a glass card, its title at the top and its components together at the
+ * bottom, so a card taller than its content reads as a widget rather than an empty box.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WidgetCard(spec: WidgetSpec, rows: Int?, source: WidgetSource, modifier: Modifier = Modifier, enabled: Boolean = true) {
@@ -87,16 +95,22 @@ fun WidgetCard(spec: WidgetSpec, rows: Int?, source: WidgetSource, modifier: Mod
     WallpaperCard(
         modifier.fillMaxWidth().heightIn(min = ((rows ?: spec.size.default) * 48).dp)
             .then(if (longPress != null) Modifier.combinedClickable(onClick = {}, onLongClick = longPress) else Modifier),
+        verticalArrangement = Arrangement.SpaceBetween,
     ) {
         spec.title?.let {
             Text(it, style = MaterialTheme.typography.titleMedium, color = OnWallpaper, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(4.dp))
         }
-        spec.components.forEach { component ->
-            Component(component, spec.id, storage, snapshot, source, depth = 0, enabled = enabled)
+        Column(if (spec.title != null) Modifier.padding(top = 4.dp) else Modifier) {
+            spec.components.forEach { component ->
+                Component(component, spec.id, storage, snapshot, source, depth = 0, enabled = enabled, title = spec.title)
+            }
         }
     }
 }
+
+/** A label that repeats the card's title ("Tea" over "Tea") is left out. */
+private fun labelShown(label: String, title: String?): Boolean =
+    title == null || !label.trim().equals(title.trim(), ignoreCase = true)
 
 @Composable
 private fun Component(
@@ -107,6 +121,8 @@ private fun Component(
     source: WidgetSource,
     depth: Int,
     enabled: Boolean = true,
+    /** The card's title, so a label repeating it is dropped. */
+    title: String? = null,
 ) {
     // A refresh button with no id means this widget; the renderer fills it before dispatching.
     fun fire(action: com.samosaai.masala.core.contract.MasalaAction) =
@@ -134,7 +150,7 @@ private fun Component(
             val value = source.store.int(widgetId, component.key)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.weight(1f)) {
-                    Text(component.label, style = MaterialTheme.typography.labelLarge, color = MasalaTheme.tokens.onWallpaperMedium)
+                    if (labelShown(component.label, title)) Text(component.label, style = MaterialTheme.typography.labelLarge, color = MasalaTheme.tokens.onWallpaperMedium)
                     Text(
                         if (component.goal != null) "$value / ${component.goal}" else value.toString(),
                         style = if (component.style?.emphasis == Emphasis.LARGE) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,
@@ -164,12 +180,12 @@ private fun Component(
                 }
             }
         }
-        is WidgetComponent.Timer -> TimerRow(component, widgetId, storage, source)
+        is WidgetComponent.Timer -> TimerRow(component, widgetId, storage, source, labelShown(component.label, title))
         is WidgetComponent.Progress -> {
             val value = component.binding.let { WidgetValues.numberOf(it, storage, snapshot) }
             Column(Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(component.label, style = MaterialTheme.typography.labelLarge, color = MasalaTheme.tokens.onWallpaperMedium)
+                    if (labelShown(component.label, title)) Text(component.label, style = MaterialTheme.typography.labelLarge, color = MasalaTheme.tokens.onWallpaperMedium)
                     Text(value?.let { trim(it) } ?: "—", style = MaterialTheme.typography.labelLarge, color = tinted(component.style))
                 }
                 LinearProgressIndicator(
@@ -212,7 +228,7 @@ private fun Component(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 GaugeRing(value, component.max, tinted(component.style))
                 Column {
-                    Text(component.label, style = MaterialTheme.typography.labelLarge, color = MasalaTheme.tokens.onWallpaperMedium)
+                    if (labelShown(component.label, title)) Text(component.label, style = MaterialTheme.typography.labelLarge, color = MasalaTheme.tokens.onWallpaperMedium)
                     Text(value?.let { trim(it) } ?: "—", style = MaterialTheme.typography.titleLarge, color = tinted(component.style))
                 }
             }
@@ -220,13 +236,13 @@ private fun Component(
         is WidgetComponent.Row -> {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 component.children.forEach { child ->
-                    Column(Modifier.weight(1f)) { Component(child, widgetId, storage, snapshot, source, depth + 1, enabled) }
+                    Column(Modifier.weight(1f)) { Component(child, widgetId, storage, snapshot, source, depth + 1, enabled, title) }
                 }
             }
         }
         is WidgetComponent.Column -> {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                component.children.forEach { child -> Component(child, widgetId, storage, snapshot, source, depth + 1, enabled) }
+                component.children.forEach { child -> Component(child, widgetId, storage, snapshot, source, depth + 1, enabled, title) }
             }
         }
         // Live media (W4): MJPEG and snapshots draw; player kinds need the pool.
@@ -252,7 +268,7 @@ private fun Component(
         is WidgetComponent.WebValue -> {
             val store = source.http
             if (store == null) {
-                Text(
+                if (labelShown(component.label, title)) Text(
                     component.label,
                     style = MaterialTheme.typography.labelLarge,
                     color = MasalaTheme.tokens.onWallpaperMedium,
@@ -268,6 +284,7 @@ private fun Component(
                     component, widgetId, component.suffix, store, component.style,
                     allowed = host != null && host in source.approved(widgetId),
                     enabled = enabled,
+                    showLabel = labelShown(component.label, title),
                 )
             }
         }
@@ -280,7 +297,7 @@ private fun MediaNote(note: String) {
 }
 
 @Composable
-private fun TimerRow(component: WidgetComponent.Timer, widgetId: String, storage: Map<String, String>, source: WidgetSource) {
+private fun TimerRow(component: WidgetComponent.Timer, widgetId: String, storage: Map<String, String>, source: WidgetSource, showLabel: Boolean = true) {
     val deadline = storage[component.key]?.toLongOrNull()
     val now = System.currentTimeMillis()
     val left = if (deadline == null) null else (deadline - now).coerceAtLeast(0)
@@ -290,19 +307,28 @@ private fun TimerRow(component: WidgetComponent.Timer, widgetId: String, storage
             delay(left.coerceAtMost(3_600_000L))
         }
     }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-        Text(component.label, style = MaterialTheme.typography.labelLarge, color = MasalaTheme.tokens.onWallpaperMedium)
-        Text(
-            left?.let { formatDuration(it) } ?: formatDuration(component.seconds * 1000L),
-            style = MaterialTheme.typography.titleLarge,
-            color = OnWallpaper,
-        )
-        if (left == null || left <= 0) {
-            TextButton(onClick = { source.store.set(widgetId, component.key, (System.currentTimeMillis() + component.seconds * 1000L).toString()) }) {
-                Text("Start")
-            }
-        } else {
-            TextButton(onClick = { source.store.set(widgetId, component.key, "0") }) { Text("Reset") }
+    val running = left != null && left > 0
+    // The time as the card's hero, the action as one round accent button beside it.
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.weight(1f)) {
+            if (showLabel) Text(component.label, style = MaterialTheme.typography.labelLarge, color = MasalaTheme.tokens.onWallpaperMedium)
+            Text(
+                left?.let { formatDuration(it) } ?: formatDuration(component.seconds * 1000L),
+                // Tabular figures: the digits don't shift while it counts down.
+                style = MaterialTheme.typography.headlineSmall.copy(fontFeatureSettings = "tnum"),
+                color = OnWallpaper,
+            )
+        }
+        FilledIconButton(
+            onClick = {
+                source.store.set(widgetId, component.key, if (running) "0" else (System.currentTimeMillis() + component.seconds * 1000L).toString())
+            },
+            modifier = Modifier.size(48.dp),
+        ) {
+            Icon(
+                if (running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
+                contentDescription = stringResource(if (running) R.string.widget_timer_reset else R.string.widget_timer_start),
+            )
         }
     }
 }
