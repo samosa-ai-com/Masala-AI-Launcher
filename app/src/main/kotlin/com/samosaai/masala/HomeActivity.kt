@@ -1115,12 +1115,7 @@ class HomeActivity : ComponentActivity() {
                 currentPageId = layout.layout.pages.firstOrNull { p ->
                     p.sections.any { it.id == sectionId || (it is com.samosaai.masala.core.contract.CellGridSection && it.cells.any { c -> c.id == sectionId }) }
                 }?.id,
-                width = cellWidth,
                 onResizeOnHome = if (cellWidth == null) null else ({ done { resizingCell = sectionId } }),
-                onResizeWidth = { w -> done { scope.launch {
-                    app.layouts.resizeCellWidth("Resize ${spec.title ?: spec.id}", sectionId, w)
-                        .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_resized))
-                } } },
                 onRemove = { done { scope.launch {
                     app.layouts.removeWidgetRefs("Remove from home: ${spec.title ?: spec.id}", spec.id)
                         .firstOrNull()?.let { toast(it.message) } ?: toast(getString(R.string.widgets_removed))

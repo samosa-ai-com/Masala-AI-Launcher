@@ -307,14 +307,6 @@ class LayoutRepository(
     }
 
     /** Sets the per-placement height override on every ref of [widgetId]. */
-    /** Sets one cell's width in cells, keeping its height; cells in the way go down. */
-    suspend fun resizeCellWidth(label: String, cellId: String, width: Int): List<LayoutChecker.Problem> =
-        edit(label) { doc ->
-            val cell = doc.pages.flatMap { it.sections }.filterIsInstance<com.samosaai.masala.core.contract.CellGridSection>()
-                .flatMap { it.cells }.firstOrNull { it.id == cellId }
-            cell?.let { LayoutEdits.resizeCell(doc, cellId, width, it.h) }
-        }
-
     suspend fun resizeWidget(label: String, widgetId: String, rows: Int): List<LayoutChecker.Problem> =
         edit(label) { LayoutEdits.resizeWidget(it, widgetId, rows) }
 

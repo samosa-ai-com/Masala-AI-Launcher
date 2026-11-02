@@ -37,17 +37,13 @@ fun WidgetMenuDialog(
     onMoveToPage: ((String) -> Unit)? = null,
     onEdit: () -> Unit,
     onDismiss: () -> Unit,
-    /** The placement's width in cells when it sits on a cell grid; null hides the Width option. */
-    width: Int? = null,
-    onResizeWidth: ((Int) -> Unit)? = null,
-    /** Shows a drag handle on the cell itself; null hides the option. */
+    /**
+     * Set for a widget on a cell grid: Resize then shows a drag handle on the widget itself
+     * instead of the rows stepper.
+     */
     onResizeOnHome: (() -> Unit)? = null,
 ) {
     var resizing by rememberSaveable(spec.id) { mutableStateOf(false) }
-    var widening by rememberSaveable(spec.id) { mutableStateOf(false) }
-    var cells by rememberSaveable(spec.id) { mutableIntStateOf(width ?: spec.size.defaultW) }
-    val minW = spec.size.minW.coerceAtMost(4)
-    val maxW = spec.size.maxW.coerceAtMost(4)
     var moving by rememberSaveable(spec.id) { mutableStateOf(false) }
     var rows by rememberSaveable(spec.id) { mutableIntStateOf(spec.size.default) }
     AlertDialog(
@@ -55,17 +51,14 @@ fun WidgetMenuDialog(
         title = { Text(spec.title ?: spec.id) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (!resizing && !moving && !widening) {
+                if (!resizing && !moving) {
                     MenuRow(stringResource(R.string.widgets_remove_from_home), onRemove)
-                    MenuRow(stringResource(R.string.widgets_resize, spec.size.min, spec.size.max)) {
-                        rows = spec.size.default
-                        resizing = true
-                    }
-                    if (onResizeOnHome != null) MenuRow(stringResource(R.string.widgets_resize_on_home), onResizeOnHome)
-                    if (width != null && onResizeWidth != null && minW < maxW) {
-                        MenuRow(stringResource(R.string.widgets_width, minW, maxW)) {
-                            cells = width
-                            widening = true
+                    if (onResizeOnHome != null) {
+                        MenuRow(stringResource(R.string.widgets_resize_on_home), onResizeOnHome)
+                    } else {
+                        MenuRow(stringResource(R.string.widgets_resize, spec.size.min, spec.size.max)) {
+                            rows = spec.size.default
+                            resizing = true
                         }
                     }
                     if (onMoveUp != null || onMoveDown != null || onMoveToPage != null) {
@@ -77,16 +70,6 @@ fun WidgetMenuDialog(
                     if (onMoveDown != null) MenuRow(stringResource(R.string.widgets_move_down), onMoveDown)
                     pages.filter { it.first != currentPageId }.forEach { (id, label) ->
                         if (onMoveToPage != null) MenuRow(stringResource(R.string.widgets_move_to, label)) { onMoveToPage(id) }
-                    }
-                } else if (widening) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        TextButton(enabled = cells > minW, onClick = { cells-- }) { Text("−") }
-                        Text(
-                            stringResource(R.string.widgets_cells, cells),
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.weight(1f),
-                        )
-                        TextButton(enabled = cells < maxW, onClick = { cells++ }) { Text("+") }
                     }
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -104,13 +87,11 @@ fun WidgetMenuDialog(
         confirmButton = {
             if (resizing) {
                 TextButton(onClick = { onResize(rows) }) { Text(stringResource(R.string.widgets_save)) }
-            } else if (widening) {
-                TextButton(onClick = { onResizeWidth?.invoke(cells) }) { Text(stringResource(R.string.widgets_save)) }
             }
         },
         dismissButton = {
-            TextButton(onClick = { if (resizing || moving || widening) { resizing = false; moving = false; widening = false } else onDismiss() }) {
-                Text(stringResource(if (resizing || moving || widening) R.string.action_back else R.string.action_cancel))
+            TextButton(onClick = { if (resizing || moving) { resizing = false; moving = false } else onDismiss() }) {
+                Text(stringResource(if (resizing || moving) R.string.action_back else R.string.action_cancel))
             }
         },
     )
