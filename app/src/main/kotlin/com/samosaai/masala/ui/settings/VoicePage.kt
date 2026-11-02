@@ -167,6 +167,7 @@ fun VoicePage(settings: LauncherSettings, update: ((LauncherSettings) -> Launche
                 )
             }
             SettingsToggleRow(stringResource(R.string.settings_read_replies), settings.readRepliesAloud) { on -> update { it.copy(readRepliesAloud = on) } }
+            SettingsToggleRow(stringResource(R.string.settings_reply_notify), settings.replyNotify) { on -> update { it.copy(replyNotify = on) } }
             val testSentence = stringResource(R.string.settings_test_voice_sentence)
             val testVoiceOk = stringResource(R.string.settings_test_voice_ok)
             OutlinedButton(

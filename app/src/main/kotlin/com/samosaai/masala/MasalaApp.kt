@@ -423,9 +423,23 @@ class MasalaApp : Application() {
 
     internal fun recordTurn(turn: com.samosaai.masala.chat.ChatTurn) {
         scope.launch {
-            turnLock.withLock {
+            val id = turnLock.withLock {
                 val id = activeChatId.value ?: chats.create().id.also { activeChatId.value = it }
                 chats.append(id, turn)
+                id
+            }
+            // A finished turn notifies only when the user looked away; watching it land
+            // is notice enough. The check runs after the append so the thread exists
+            // when the tap opens it.
+            if (com.samosaai.masala.notifications.shouldNotifyReply(
+                    turn.role, turn.text, turn.results,
+                    notifyEnabled = settings.current().replyNotify,
+                    homeVisible = contextService.homeVisible.value,
+                )
+            ) {
+                val title = chats.summaries.value.firstOrNull { it.id == id }?.title.orEmpty()
+                val body = turn.text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
+                com.samosaai.masala.notifications.ReplyDoneNotification.post(this@MasalaApp, id, title, body)
             }
         }
     }

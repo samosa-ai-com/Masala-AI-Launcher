@@ -114,11 +114,14 @@ class HomeActivity : ComponentActivity() {
     private var homePresses by mutableStateOf(0)
     /** Bumped by the search pill: the drawer opens with its search field focused. */
     private var searchRequests by mutableStateOf(0)
+    /** Set from the reply notification: open this chat thread once composed. */
+    private var openChatId by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Light icons on the wallpaper; HomeContent switches them while a light drawer is open.
         enableEdgeToEdge(SystemBarStyle.dark(Color.TRANSPARENT), SystemBarStyle.dark(Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
+        openChatId = intent.getStringExtra(EXTRA_OPEN_CHAT)
         // Once per creation: a rotation while Welcome is in flight must not launch it again.
         if (savedInstanceState == null) showWelcomeOnce()
         setContent {
@@ -163,6 +166,7 @@ class HomeActivity : ComponentActivity() {
             drawerOpen = false
             homePresses++
         }
+        openChatId = intent.getStringExtra(EXTRA_OPEN_CHAT) ?: openChatId
         // The input card is hidden while the drawer is open.
         if (intent.getBooleanExtra(EXTRA_SHOW_INPUT, false)) drawerOpen = false
     }
@@ -187,6 +191,16 @@ class HomeActivity : ComponentActivity() {
             var expanded by rememberSaveable { mutableStateOf(false) }
             var chatOpen by rememberSaveable { mutableStateOf(false) }
             var showHistory by remember { mutableStateOf(false) }
+            // The reply notification's tap lands here: open that thread once composed.
+            // Unknown ids (a deleted chat) still open the surface on the current thread.
+            LaunchedEffect(openChatId) {
+                val id = openChatId ?: return@LaunchedEffect
+                openChatId = null
+                drawerOpen = false
+                if (app.chats.summaries.value.any { it.id == id }) app.activeChatId.value = id
+                expanded = true
+                chatOpen = true
+            }
             LaunchedEffect(activeId, sessions) {
                 val id = activeId ?: return@LaunchedEffect
                 val session = app.chats.get(id) ?: return@LaunchedEffect
@@ -1230,6 +1244,9 @@ class HomeActivity : ComponentActivity() {
 
         /** Started to show the input card (Settings' Create buttons): the drawer closes so the card shows. */
         const val EXTRA_SHOW_INPUT = "com.samosaai.masala.SHOW_INPUT"
+
+        /** Open this chat thread (the reply notification's tap target). */
+        const val EXTRA_OPEN_CHAT = "com.samosaai.masala.OPEN_CHAT"
     }
 
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()

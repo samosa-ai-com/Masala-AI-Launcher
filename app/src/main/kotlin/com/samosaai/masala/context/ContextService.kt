@@ -68,6 +68,9 @@ class ContextService(
     private val minute = MutableStateFlow(minuteNow())
     private val overrideState = MutableStateFlow(ContextOverride())
 
+    /** Whether home is the visible screen (Resume/Pause). A finished turn notifies only when this is false. */
+    val homeVisible = MutableStateFlow(false)
+
     /** What the debug panel set; empty in normal use. */
     val override: StateFlow<ContextOverride> = overrideState.asStateFlow()
 
@@ -116,6 +119,7 @@ class ContextService(
 
     /** The minute tick runs only while home shows (plan Phase 2); coming back also refreshes at once. */
     fun setHomeVisible(visible: Boolean) {
+        homeVisible.value = visible
         tick?.cancel()
         tick = null
         if (!visible) return
