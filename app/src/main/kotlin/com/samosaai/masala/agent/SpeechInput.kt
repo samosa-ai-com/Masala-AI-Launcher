@@ -13,7 +13,7 @@ interface SpeechInput {
     suspend fun stop(): Result<String>
     fun cancel()
 
-    /** Reports a take that ended by itself (a failed capture, or the 90 s cap). */
+    /** Reports a take that ended by itself (a failed capture, or the 5-minute cap). */
     fun setTakeAutoEndListener(listener: ((com.samosaai.masala.audio.PttEngine.TakeAutoEnd) -> Unit)?) {}
 
     /**
@@ -21,9 +21,20 @@ interface SpeechInput {
      * listening: only the final transcript from [stop] reaches the chat.
      */
     val level: kotlinx.coroutines.flow.StateFlow<Float> get() = NO_LEVEL
+
+    /** True once the live take is really capturing; the UI holds "Get ready…" until then. */
+    val ready: kotlinx.coroutines.flow.StateFlow<Boolean> get() = NO_READY
+
+    /**
+     * Pause the live take without transcribing; [resume] continues it. Send/Cancel from the
+     * paused state reuse [stop]/[cancel].
+     */
+    suspend fun pause(): Boolean = false
+    fun resume(): Boolean = false
 }
 
 private val NO_LEVEL = kotlinx.coroutines.flow.MutableStateFlow(0f)
+private val NO_READY = kotlinx.coroutines.flow.MutableStateFlow(false)
 
 /**
  * Which provider push-to-talk tries, in order. The configured cloud STT goes first when
@@ -104,6 +115,21 @@ class ConfiguredSpeechInput(
     private val live: com.samosaai.masala.audio.SttEngine? = null,
 ) : SpeechInput {
     override val level get() = live?.level ?: super.level
+    override val ready: kotlinx.coroutines.flow.StateFlow<Boolean> get() = engine.captureReady
+
+    /**
+     * Pause the live take, keeping its audio/transcript for Send or [resume].
+     * The active provider stays set: stopping or cancelling from the paused state works.
+     */
+    override suspend fun pause(): Boolean {
+        val provider = active ?: return false
+        return engine.pauseListening(provider)
+    }
+
+    override fun resume(): Boolean {
+        val provider = active ?: return false
+        return engine.resumeListening(provider)
+    }
 
     @Volatile
     private var active: AudioProvider? = null

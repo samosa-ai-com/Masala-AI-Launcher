@@ -232,6 +232,7 @@ fun ReplyCard(
             Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 when (val s = state) {
                     CommandState.Listening -> Text(stringResource(R.string.command_listening), style = MaterialTheme.typography.titleMedium)
+                    CommandState.ListeningPaused -> Text(stringResource(R.string.voice_paused), style = MaterialTheme.typography.titleMedium)
                     is CommandState.Thinking -> {
                         if (s.prompt.isNotBlank()) Text(s.prompt, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(stringResource(R.string.command_thinking), style = MaterialTheme.typography.titleMedium)
@@ -259,6 +260,17 @@ fun ReplyCard(
                 if (state == CommandState.Listening) {
                     // The assist surface has no listening overlay: this Send is the only
                     // way to end the take here. Close would throw it away.
+                    Box(Modifier.weight(1f))
+                    androidx.compose.material3.Button(onClick = { app.commands.sendNow() }) {
+                        Text(stringResource(R.string.chat_send_now))
+                    }
+                } else if (state == CommandState.ListeningPaused) {
+                    androidx.compose.material3.Button(onClick = { app.commands.continueListening() }) {
+                        Text(stringResource(R.string.voice_continue))
+                    }
+                    TextButton(onClick = { app.commands.dismiss() }) {
+                        Text(stringResource(R.string.listening_cancel))
+                    }
                     Box(Modifier.weight(1f))
                     androidx.compose.material3.Button(onClick = { app.commands.sendNow() }) {
                         Text(stringResource(R.string.chat_send_now))

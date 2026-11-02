@@ -621,6 +621,10 @@
     <string name="command_open_chat">Open chat</string>
     <string name="command_mic">Hold to talk</string>
     <string name="command_listening">Listening…</string>
+    <string name="voice_get_ready">Get ready…</string>
+    <string name="voice_paused">Paused — what you said so far is kept</string>
+    <string name="voice_continue">Continue</string>
+    <string name="voice_cap_warning">Almost at the 5:00 limit — Send now, or Continue to keep going.</string>
     <string name="command_transcribing">Transcribing…</string>
     <string name="command_thinking">Thinking…</string>
     <string name="command_read_aloud">Read aloud</string>

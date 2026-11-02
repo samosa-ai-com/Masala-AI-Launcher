@@ -61,8 +61,9 @@ class AudioApi(
         }
         client = OkHttpClient.Builder()
             .connectTimeout(timeoutSeconds, TimeUnit.SECONDS)
-            .readTimeout(timeoutSeconds * 2, TimeUnit.SECONDS)
-            .writeTimeout(timeoutSeconds * 2, TimeUnit.SECONDS)
+            // Reads/writes allow a long voice take's WAV (~10 MB at the 5-minute cap).
+            .readTimeout(timeoutSeconds * 4, TimeUnit.SECONDS)
+            .writeTimeout(timeoutSeconds * 4, TimeUnit.SECONDS)
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
                 if (apiKey.isNotBlank()) {

@@ -196,7 +196,7 @@ class HomeActivity : ComponentActivity() {
             // always shows the orb, so the big animation is what a press produces.
             LaunchedEffect(commandState) {
                 if (commandState != CommandState.Idle) chatOpen = true
-                if (commandState == CommandState.Listening) expanded = false
+                if (commandState == CommandState.Listening || commandState == CommandState.ListeningPaused) expanded = false
                 if (commandState is CommandState.Thinking) expanded = true
                 // A newly made app opens once. This hangs off the live reply, not off the stored
                 // turns, so a reload, a cold start or opening another chat never reopens one.
@@ -653,6 +653,8 @@ class HomeActivity : ComponentActivity() {
             val hidden = drawerOpen || drawerShown.value
             val command by app.commands.state.collectAsStateWithLifecycle()
             val level by app.commands.micLevel.collectAsStateWithLifecycle()
+            val elapsedMs by app.commands.listeningElapsed.collectAsStateWithLifecycle()
+            val voiceReady by app.commands.listeningReady.collectAsStateWithLifecycle()
             if (hidden) Unit else when (val c = command) {
                 CommandState.Input -> Box(
                     Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(),
@@ -670,6 +672,9 @@ class HomeActivity : ComponentActivity() {
                     mic = rememberMicTap(app),
                     onSend = { app.commands.sendNow() },
                     onStop = { app.commands.dismiss() },
+                    onContinue = { app.commands.continueListening() },
+                    elapsedMs = elapsedMs,
+                    ready = voiceReady,
                     onAsk = { app.commands.ask(it) },
                     onClose = {
                         app.commands.dismiss()
@@ -707,6 +712,7 @@ class HomeActivity : ComponentActivity() {
                             // the removed messages, and its pending reply would land
                             // in the cut thread with no question above it.
                             if (app.commands.state.value == CommandState.Listening ||
+                                app.commands.state.value == CommandState.ListeningPaused ||
                                 app.commands.state.value is CommandState.Thinking
                             ) {
                                 app.commands.dismiss()

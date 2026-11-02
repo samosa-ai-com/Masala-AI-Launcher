@@ -1,5 +1,6 @@
 package com.samosaai.masala.audio
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -72,6 +73,16 @@ class SttEngineTest {
     @Test
     fun `unaccepted audio without a stop is dropped`() {
         assertFalse(SttEngine.shouldKeepRecording(speechDetected = false, userStopped = false, pcmBytes = 6400))
+    }
+
+    @Test
+    fun `warn fires before the cap`() {
+        assertTrue(SttEngine.CAP_WARN_MS < SttEngine.MAX_VAD_RECORDING_MS)
+    }
+
+    @Test
+    fun `cap is five minutes`() {
+        assertEquals(300_000L, SttEngine.MAX_VAD_RECORDING_MS)
     }
 
     @Test

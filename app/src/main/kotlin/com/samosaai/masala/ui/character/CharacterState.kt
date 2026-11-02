@@ -24,7 +24,7 @@ private val SEARCH_STEPS = Regex("""search|find|fetch|read_file|glob|grep|wiki_r
  * nothing is going on; hello otherwise.
  */
 fun characterStateFor(command: CommandState, speaking: Boolean, night: Boolean): CharacterState = when (command) {
-    CommandState.Listening -> CharacterState.LISTENING
+    CommandState.Listening, CommandState.ListeningPaused -> CharacterState.LISTENING
     is CommandState.Thinking -> if (command.steps.lastOrNull()?.let(SEARCH_STEPS::containsMatchIn) == true) CharacterState.SEARCHING else CharacterState.THINKING
     is CommandState.Reply -> if (speaking) CharacterState.SPEAKING else CharacterState.DONE
     is CommandState.Error -> CharacterState.SORRY
