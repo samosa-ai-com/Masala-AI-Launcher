@@ -43,7 +43,13 @@ class SegmentVideoTool(
     private val settings: AiSettingsStore,
     private val resolver: ToolFiles,
 ) {
-    suspend fun segment(path: String, prompt: String, maxFrames: Int? = null, mode: String? = null): ActionResult =
+    suspend fun segment(
+        path: String,
+        prompt: String,
+        maxFrames: Int? = null,
+        mode: String? = null,
+        qualityName: String? = null,
+    ): ActionResult =
         withContext(Dispatchers.IO) {
             val phrase = prompt.trim()
             if (phrase.isEmpty()) return@withContext ActionResult.error("Say what to find, e.g. 'red bicycle'.")
@@ -52,13 +58,24 @@ class SegmentVideoTool(
                     "Segmentation isn't set up yet. Pick a provider in Settings → Masala AI → Models & keys.",
                 )
             val hint = SamShared.clampMaxFrames(maxFrames)
+            val quality = SamShared.VideoQuality.parse(qualityName)
             val file = runCatching { resolveVideoFile(path) }.getOrElse {
                 return@withContext ActionResult.error(it.message ?: "Couldn't read that video.")
             }
             SamShared.checkVideoSize(file.length())?.let { return@withContext ActionResult.error(it) }
             // One probe frame first, so an unreadable video fails before the network call.
             val durationMs = readDurationMs(file)
-            if (durationMs <= 0 && !probeFrame(file, 0L)) {
+            // Without a duration neither the cap nor the render timeline is known: reading it
+            // wrong would either skip the limit or produce an empty clip, so stop here.
+            if (durationMs <= 0) {
+                return@withContext ActionResult.error(
+                    "Couldn't read how long that clip is. Re-save or re-encode it (media_edit " +
+                        "with operation copy) and try again.",
+                )
+            }
+            // A long clip is minutes of work at one frame at a time: say so before starting.
+            SamShared.clipTooLong(durationMs)?.let { return@withContext ActionResult.error(it) }
+            if (!probeFrame(file, 0L)) {
                 return@withContext ActionResult.error(
                     "Couldn't read any frames from '${file.name}'. It may be corrupt or DRM-protected.",
                 )
@@ -84,15 +101,14 @@ class SegmentVideoTool(
             val jsonFile = File(dir, "segment-video-$stamp.json")
             jsonFile.writeText(SamShared.framesJson(hits).take(200_000))
             val recordFrames = SamShared.parseVideoRecords(text)
-            val plan = SamShared.encodePlan(recordFrames)
             val maskTotal = recordFrames.sumOf { it.records.size }
             // The annotated clip is the result; the contact sheet survives only
             // as the fallback when encoding fails (it was a stand-in).
             var videoPath: String? = null
             var stats: OverlayStats? = null
             var encodeNote: String? = null
-            if (plan.isNotEmpty()) {
-                runCatching { encodeOverlay(file, durationMs, recordFrames, plan, dir, stamp) }
+            if (recordFrames.isNotEmpty()) {
+                runCatching { encodeOverlay(file, durationMs, recordFrames, dir, stamp, quality) }
                     .onSuccess { (path, s) -> videoPath = path; stats = s }
                     .onFailure { encodeNote = it.message?.take(160) }
             }
@@ -109,7 +125,12 @@ class SegmentVideoTool(
                 val s = stats
                 if (s != null && videoPath != null) {
                     val seconds = s.frames / s.fps.toFloat()
-                    append(" Annotated clip: ${s.frames} frames encoded at ${s.fps} fps, ${s.width}x${s.height} MP4 (~%.1f s)".format(seconds))
+                    append(
+                        " Annotated clip: ${s.frames} frames at ${s.fps} fps, ${s.width}x${s.height} MP4 " +
+                            "(~%.1f s, ${quality.wire} quality, ~%d Mbps)".format(
+                                seconds, s.width * s.height * quality.bitrateFactor / 1_000_000,
+                            ),
+                    )
                     if (s.skipped > 0) append(" (${s.skipped} sampled frame${if (s.skipped == 1) "" else "s"} wouldn't decode and were skipped)")
                     append(".")
                 } else if (sheetPath != null) {
@@ -194,11 +215,11 @@ class SegmentVideoTool(
         file: File,
         durationMs: Long,
         all: List<SamShared.VideoRecordFrame>,
-        plan: List<SamShared.VideoRecordFrame>,
         dir: File,
         stamp: Long,
+        quality: SamShared.VideoQuality,
     ): Pair<String, OverlayStats> {
-        require(plan.isNotEmpty()) { "no frames with detections to encode" }
+        require(all.isNotEmpty()) { "no frames with detections to encode" }
         val out = File(dir, "segment-video-$stamp.mp4")
         val retriever = MediaMetadataRetriever()
         var encoder: MediaCodec? = null
@@ -210,16 +231,22 @@ class SegmentVideoTool(
                 sourceTimeUs(0, all.size, durationMs),
                 MediaMetadataRetriever.OPTION_CLOSEST,
             ) ?: throw IllegalStateException("couldn't decode a source frame")
-            val (outW, outH) = SamShared.overlaySize(probe.width, probe.height)
+            val (outW, outH) = SamShared.overlaySize(probe.width, probe.height, quality.maxSide)
             if (!probe.isRecycled()) probe.recycle()
-            val fps = SamShared.overlayFps(all.size, durationMs)
+            // A fixed grid at a bounded rate: the API may return hundreds of frames, and the
+            // clip must still play at its own pace (see SamShared.renderSlots).
+            val fps = SamShared.renderFps(durationMs, quality)
+            val slots = SamShared.renderSlots(all, durationMs, fps, quality)
             val mime = MediaFormat.MIMETYPE_VIDEO_AVC
             // Name and format from the same probe: creating by mime can pick a different encoder
             // that doesn't accept the format we configured.
-            val (codecName, color) = pickEncoder(mime)
+            val (codecName, color) = pickEncoder(mime, outW, outH)
             val format = MediaFormat.createVideoFormat(mime, outW, outH).apply {
                 setInteger(MediaFormat.KEY_COLOR_FORMAT, color)
-                setInteger(MediaFormat.KEY_BIT_RATE, (outW * outH * 4).coerceIn(400_000, 6_000_000))
+                setInteger(
+                    MediaFormat.KEY_BIT_RATE,
+                    (outW * outH * quality.bitrateFactor).coerceIn(400_000, 20_000_000),
+                )
                 setInteger(MediaFormat.KEY_FRAME_RATE, fps)
                 setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
             }
@@ -272,46 +299,63 @@ class SegmentVideoTool(
             }
             var encoded = 0
             var skipped = 0
-            val slotCount = plan.size
-            for (rec in plan) {
-                // Cancellation point: a 10 s clip at 10 fps is ~100 quick frames.
+            val slotCount = slots.size
+            if (slotCount == 0) throw IllegalStateException("no frames to render")
+            var lastPixels: IntArray? = null
+            // Queue one composed frame; shared by the normal path and the carried one.
+            fun feed(pixels: IntArray, ptsUs: Long) {
+                val yuv = argbToYuv420(pixels, outW, outH, semiPlanar)
+                var fed = false
+                var tries = 0
+                while (!fed && tries++ < 3) {
+                    val inIdx = enc.dequeueInputBuffer(10_000)
+                    if (inIdx >= 0) {
+                        val ib = enc.getInputBuffer(inIdx)
+                            ?: throw IllegalStateException("encoder input buffer gone")
+                        ib.clear()
+                        ib.put(yuv)
+                        // The slot's own timestamp, so the clip keeps its real duration.
+                        enc.queueInputBuffer(inIdx, 0, yuv.size, ptsUs, 0)
+                        fed = true
+                        break
+                    }
+                    drain(false)
+                }
+                if (!fed) throw IllegalStateException("encoder stalled")
+                drain(false)
+            }
+            for ((slot, rec) in slots.withIndex()) {
+                // Cancellation point: a few dozen frames now, not one per API sample.
                 yield()
+                val slotTimeUs = slot * 1_000_000L / fps
                 val src = retriever.getFrameAtTime(
-                    sourceTimeUs(rec.frame, slotCount, durationMs),
+                    slotTimeUs,
                     MediaMetadataRetriever.OPTION_CLOSEST,
                 )
                 if (src == null) {
-                    skipped++
+                    // Repeat what was last encoded rather than dropping the slot: a gap at the
+                    // end would end the file before the clip does.
+                    val carried = lastPixels
+                    if (carried == null) {
+                        skipped++
+                        continue
+                    }
+                    feed(carried, slotTimeUs)
+                    encoded++
                     continue
                 }
                 try {
                     // No detection on this slot: the real frame still goes in, unannotated.
-                    val composed = composeFrame(src, rec, outW, outH)
+                    val composed = rec?.let { composeFrame(src, it, outW, outH) }
+                        ?: scaleFrame(src, outW, outH)
                     val pixels = IntArray(outW * outH)
                     try {
                         composed.getPixels(pixels, 0, outW, 0, 0, outW, outH)
                     } finally {
                         if (!composed.isRecycled()) composed.recycle()
                     }
-                    val yuv = argbToYuv420(pixels, outW, outH, semiPlanar)
-                    var fed = false
-                    var tries = 0
-                    while (!fed && tries++ < 3) {
-                        val inIdx = enc.dequeueInputBuffer(10_000)
-                        if (inIdx >= 0) {
-                            val ib = enc.getInputBuffer(inIdx)
-                                ?: throw IllegalStateException("encoder input buffer gone")
-                            ib.clear()
-                            ib.put(yuv)
-                            // The slot's own timestamp: skipped frames must not squeeze the timeline.
-                            enc.queueInputBuffer(inIdx, 0, yuv.size, rec.frame * 1_000_000L / fps, 0)
-                            fed = true
-                            break
-                        }
-                        drain(false)
-                    }
-                    if (!fed) throw IllegalStateException("encoder stalled")
-                    drain(false)
+                    lastPixels = pixels
+                    feed(pixels, slotTimeUs)
                     encoded++
                 } finally {
                     if (!src.isRecycled()) src.recycle()
@@ -370,10 +414,11 @@ class SegmentVideoTool(
 
     /** Picks an explicit YUV420 input color both the encoder and we can write. */
     /** The encoder to use and a colour format it accepts, chosen together (see the caller). */
-    private fun pickEncoder(mime: String): Pair<String, Int> {
+    private fun pickEncoder(mime: String, width: Int, height: Int): Pair<String, Int> {
+        // Probe at the size the render will use: a codec that accepts 720x720 may refuse 1080.
         val name = runCatching {
             MediaCodecList(MediaCodecList.REGULAR_CODECS)
-                .findEncoderForFormat(MediaFormat.createVideoFormat(mime, 720, 720))
+                .findEncoderForFormat(MediaFormat.createVideoFormat(mime, width, height))
         }.getOrNull() ?: throw IllegalStateException("no usable $mime encoder on this device")
         val probe = runCatching { MediaCodec.createByCodecName(name) }.getOrNull()
             ?: throw IllegalStateException("no usable $mime encoder on this device")
@@ -400,6 +445,16 @@ class SegmentVideoTool(
      * red box. The caller recycles [src]; the returned bitmap is mutable and
      * owned by the caller.
      */
+    /** The source frame at the output size, mutable ARGB, with nothing drawn on it. */
+    private fun scaleFrame(src: Bitmap, outW: Int, outH: Int): Bitmap {
+        val scaled = Bitmap.createScaledBitmap(src, outW, outH, true)
+        if (scaled.config == Bitmap.Config.ARGB_8888 && scaled.isMutable) return scaled
+        val copy = scaled.copy(Bitmap.Config.ARGB_8888, true)
+            ?: throw IllegalStateException("couldn't copy a video frame")
+        if (!scaled.isRecycled()) scaled.recycle()
+        return copy
+    }
+
     private fun composeFrame(
         src: Bitmap,
         rec: SamShared.VideoRecordFrame,

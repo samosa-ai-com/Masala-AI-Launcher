@@ -86,7 +86,9 @@ object MasalaTools {
             FunctionTool(Defs.segmentVideo, READ_ONLY, usesNetwork = true) {
                 val path = it.string("path") ?: return@FunctionTool missing("path")
                 val prompt = it.string("prompt") ?: return@FunctionTool missing("prompt")
-                SegmentVideoTool(app, host().aiSettings, files).segment(path, prompt, it.int("max_frames"), it.string("mode"))
+                SegmentVideoTool(app, host().aiSettings, files).segment(
+                    path, prompt, it.int("max_frames"), it.string("mode"), it.string("quality"),
+                )
             },
             FunctionTool(Defs.speakText, CHANGES_SOMETHING) {
                 val text = it.string("text") ?: return@FunctionTool missing("text")

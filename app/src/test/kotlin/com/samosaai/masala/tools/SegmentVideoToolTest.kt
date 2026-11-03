@@ -169,17 +169,51 @@ class SegmentVideoToolTest {
     }
 
     @Test
-    fun `encodePlan keeps every frame slot so the clip keeps its timeline`() {
+    fun `a clip over the limit is refused with advice`() {
+        assertNull(SamShared.clipTooLong(30_000))
+        val why = SamShared.clipTooLong(48_000)
+        assertNotNull(why)
+        assertTrue(why.contains("48s"), why)
+        assertTrue(why.contains("Trim"), why)
+    }
+
+    @Test
+    fun `quality presets trade frames and size for time`() {
+        assertEquals(SamShared.VideoQuality.BALANCED, SamShared.VideoQuality.parse(null))
+        assertEquals(SamShared.VideoQuality.BALANCED, SamShared.VideoQuality.parse("nonsense"))
+        assertEquals(SamShared.VideoQuality.BEST, SamShared.VideoQuality.parse("BEST"))
+        // Same clip, more quality: more frames and a bigger picture.
+        assertTrue(SamShared.VideoQuality.BEST.maxFrames > SamShared.VideoQuality.BALANCED.maxFrames)
+        assertTrue(SamShared.VideoQuality.BALANCED.maxSide > SamShared.VideoQuality.FAST.maxSide)
+        assertTrue(SamShared.renderFps(7_000, SamShared.VideoQuality.BEST) >
+            SamShared.renderFps(7_000, SamShared.VideoQuality.FAST))
+    }
+
+    @Test
+    fun `render fps follows quality and the clip length`() {
+        // Fast: 150 frames over 7 s allows 21 fps, capped at its 15 fps ceiling.
+        assertEquals(15, SamShared.renderFps(7_000, SamShared.VideoQuality.FAST))
+        // Balanced (default): 300 frames over 7 s, capped at 30.
+        assertEquals(30, SamShared.renderFps(7_000))
+        // A 30 s clip: 300 frames is 10 fps, still inside the range.
+        assertEquals(10, SamShared.renderFps(30_000))
+        // Unknown duration: the ceiling rather than a divide by zero.
+        assertEquals(30, SamShared.renderFps(0))
+    }
+
+    @Test
+    fun `render slots cover the clip and keep undetected moments`() {
         val frames = SamShared.parseVideoRecords(
             "<0f>0<|box;x1=80;y1=120;x2=240;y2=180;w=320;h=240|><|mask;x=0;y=0;data=61,161,~abc|>" +
                 "<1f>" +
                 "<2f>0<|box;x1=90;y1=130;x2=250;y2=190;w=320;h=240|>",
         )
-        val plan = SamShared.encodePlan(frames)
-        // The skipped frame is still a slot: dropping it would compress the video into a montage.
-        assertEquals(listOf(0, 1, 2), plan.map { it.frame })
-        assertFalse(plan[1].hasDetections())
-        assertTrue(plan[0].hasDetections())
-        assertTrue(SamShared.encodePlan(emptyList()).isEmpty())
+        val fps = SamShared.renderFps(2_000, SamShared.VideoQuality.FAST)
+        val slots = SamShared.renderSlots(frames, 2_000, fps, SamShared.VideoQuality.FAST)
+        // ~2 s at 15 fps, and a frame the API reported with no detections is still rendered.
+        assertTrue(slots.size in 28..30, "slots=${slots.size}")
+        assertTrue(slots.any { it != null && !it.hasDetections() }, "the undetected moment should still be a slot")
+        assertTrue(slots.any { it != null && it.hasDetections() })
+        assertTrue(SamShared.renderSlots(emptyList(), 2_000, fps).isEmpty())
     }
 }
