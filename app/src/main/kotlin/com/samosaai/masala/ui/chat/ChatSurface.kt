@@ -682,6 +682,10 @@ private fun ResultCard(result: ChatResult) {
             AudioPreview(result)
             return@Column
         }
+        if (result.kind == "video") {
+            VideoPreview(result, context, app)
+            return@Column
+        }
         val canOpen = miniApp || result.kind == "installed_app"
         if (canOpen) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -787,6 +791,60 @@ private fun GeneratedPreview(result: ChatResult, app: com.samosaai.masala.Masala
         )
     }
     Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = {
+            scope.launch {
+                val r = runCatching { app.wallpaperTool.saveToGallery(result.ref) }
+                    .getOrElse { com.samosaai.masala.core.tool.ActionResult.error(it.message ?: "?") }
+                android.widget.Toast.makeText(context, r.message, android.widget.Toast.LENGTH_LONG).show()
+            }
+        }) { Text(stringResource(R.string.result_save)) }
+    }
+}
+
+/** An annotated clip: plays inline, with Open and Save for the file itself. */
+@Composable
+private fun VideoPreview(
+    result: ChatResult,
+    context: android.content.Context,
+    app: com.samosaai.masala.MasalaApp,
+) {
+    val scope = rememberCoroutineScope()
+    // The clip keeps its own shape; ask the file rather than assuming 16:9.
+    val aspect = remember(result.ref) {
+        val retriever = android.media.MediaMetadataRetriever()
+        runCatching {
+            retriever.setDataSource(result.ref)
+            val w = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toFloatOrNull() ?: 16f
+            val h = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toFloatOrNull() ?: 9f
+            if (w > 0f && h > 0f) (w / h).coerceIn(0.5f, 2.2f) else 16f / 9f
+        }.getOrDefault(16f / 9f).also { runCatching { retriever.release() } }
+    }
+    androidx.compose.ui.viewinterop.AndroidView(
+        factory = { ctx ->
+            android.widget.VideoView(ctx).apply {
+                setVideoPath(result.ref)
+                setOnPreparedListener { player ->
+                    player.isLooping = true
+                    start()
+                }
+            }
+        },
+        modifier = Modifier.fillMaxWidth().aspectRatio(aspect).clip(RoundedCornerShape(10.dp)),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = {
+            runCatching {
+                context.startActivity(
+                    android.content.Intent(android.content.Intent.ACTION_VIEW)
+                        .setDataAndType(androidx.core.content.FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.files",
+                            java.io.File(result.ref),
+                        ), "video/mp4")
+                        .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION),
+                )
+            }
+        }) { Text(stringResource(R.string.result_open)) }
         TextButton(onClick = {
             scope.launch {
                 val r = runCatching { app.wallpaperTool.saveToGallery(result.ref) }

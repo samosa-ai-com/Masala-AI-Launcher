@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -39,6 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -185,6 +187,7 @@ fun PocketStorePage(
                         apps = apps,
                         onPick = { detail = StoreDetail.Bundled(it) },
                         onOpen = onOpenBundled,
+                        onAskCreate = onAskCreate,
                     )
                 }
                 tab == StoreTab.SEARCH -> SearchTab(
@@ -266,6 +269,7 @@ private fun StoreHome(
     apps: List<PocketApp>,
     onPick: (PocketApp) -> Unit,
     onOpen: (PocketApp) -> Unit,
+    onAskCreate: () -> Unit,
 ) {
     var pill by rememberSaveable(category) { mutableStateOf("") }
     val shelves = remember(apps, category) { PocketStoreLogic.tabShelves(apps, category) }
@@ -289,6 +293,42 @@ private fun StoreHome(
         contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
+        // The way out of browsing: describe what you want and Masala builds it. First thing on
+        // the home, so it is found before the shelves rather than buried in My apps.
+        item(key = "create-$category") {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth().clickable(onClick = onAskCreate),
+            ) {
+                Row(
+                    Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Icon(
+                        Icons.Rounded.AutoAwesome,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.pocket_store_generate),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Text(
+                            stringResource(R.string.pocket_store_generate_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                        )
+                    }
+                    FilledTonalButton(onClick = onAskCreate) {
+                        Text(stringResource(R.string.pocket_store_generate_action))
+                    }
+                }
+            }
+        }
         item(key = "pills-$category") {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
