@@ -2,6 +2,7 @@ package com.samosaai.masala.tools
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -168,14 +169,17 @@ class SegmentVideoToolTest {
     }
 
     @Test
-    fun `encodePlan skips frames with no records`() {
+    fun `encodePlan keeps every frame slot so the clip keeps its timeline`() {
         val frames = SamShared.parseVideoRecords(
             "<0f>0<|box;x1=80;y1=120;x2=240;y2=180;w=320;h=240|><|mask;x=0;y=0;data=61,161,~abc|>" +
                 "<1f>" +
                 "<2f>0<|box;x1=90;y1=130;x2=250;y2=190;w=320;h=240|>",
         )
         val plan = SamShared.encodePlan(frames)
-        assertEquals(listOf(0, 2), plan.map { it.frame })
+        // The skipped frame is still a slot: dropping it would compress the video into a montage.
+        assertEquals(listOf(0, 1, 2), plan.map { it.frame })
+        assertFalse(plan[1].hasDetections())
+        assertTrue(plan[0].hasDetections())
         assertTrue(SamShared.encodePlan(emptyList()).isEmpty())
     }
 }

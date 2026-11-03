@@ -247,12 +247,17 @@ internal object SamShared {
     }
 
     /**
-     * Which parsed frames get encoded: only frames with detections (mask
-     * records or boxes). Empty frames are skipped — there is nothing to burn
-     * in — while their timestamps still come from their API frame index.
+     * The clip's frames in order, one per slot from 0 to the last frame the API reported.
+     * Frames the API skipped (no object visible) are kept as empty records: the annotated clip
+     * has to keep the source's timeline and show the real footage between detections, or the
+     * result plays as a sped-up montage of the detected frames instead of the video.
      */
-    fun encodePlan(frames: List<VideoRecordFrame>): List<VideoRecordFrame> =
-        frames.filter { it.hasDetections() }
+    fun encodePlan(frames: List<VideoRecordFrame>): List<VideoRecordFrame> {
+        if (frames.isEmpty()) return emptyList()
+        val byFrame = frames.associateBy { it.frame }
+        val last = frames.maxOf { it.frame }
+        return (0..last).map { byFrame[it] ?: VideoRecordFrame(it, emptyList(), emptyList()) }
+    }
 
     /** Scales one model-space box onto a decoded frame of [dstW]×[dstH]. */
     fun scaleBox(b: RichBox, dstW: Int, dstH: Int): FloatArray {
