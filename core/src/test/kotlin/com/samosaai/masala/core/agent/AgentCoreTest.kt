@@ -161,6 +161,16 @@ class NameCorrectorTest {
         assertEquals(text, corrector.correct(text))
     }
 
+    @Test fun singularOrPluralOfAnAppNameIsAnOrdinaryWord() {
+        // Seen on the phone: "each note has a draw button" became "each Notes has a draw button".
+        val apps = NameCorrector(listOf("Notes", "Photos", "Files", "Messages"))
+        val text = "build me a notes app where each note has a draw button, attach the photo and file"
+        assertEquals(text, apps.correct(text))
+        assertEquals("send the message", apps.correct("send the message"))
+        // A real mis-hearing of the name is still fixed.
+        assertEquals("open Photos", apps.correct("open phtos"))
+    }
+
     @Test fun exactNamesUntouchedAndAmbiguityRefused() {
         assertEquals("open spotify", corrector.correct("open spotify"))
         val ambiguous = NameCorrector(listOf("Camera", "Camers"))
