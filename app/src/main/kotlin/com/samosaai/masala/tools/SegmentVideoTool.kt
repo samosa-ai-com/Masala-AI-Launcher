@@ -5,26 +5,38 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RectF
+import android.media.MediaCodec
+import android.media.MediaCodecInfo
+import android.media.MediaCodecList
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
+import android.media.MediaMuxer
 import com.samosaai.masala.core.tool.ActionResult
 import com.samosaai.masala.core.tool.Produced
 import com.samosaai.masala.core.tool.ToolFiles
 import com.samosaai.masala.llm.AiSettingsStore
+import com.samosaai.masala.tools.sam.MaskCodec
+import com.samosaai.masala.tools.sam.MaskDraw
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import kotlinx.serialization.json.buildJsonArray
 import java.io.File
 
 /**
  * SAM 3.1 video segmentation: sends a video file + a short noun phrase to
  * `POST {base}/responses` (`model: "sam-3.1"`, same Bearer key as everything
- * else) and returns a contact-sheet PNG (up to 3 sampled frames with that
- * frame's boxes drawn) plus a JSON sidecar with the per-frame boxes.
+ * else) and returns an annotated MP4 (each sampled frame's masks/boxes burned
+ * in) plus a JSON sidecar with the per-frame boxes.
  *
  * The reply uses the same compact token format as images, with per-frame
  * markers (`<0f>…<|box;…|>…<1f>…`) tracking the object across the frames the
- * API samples. Play-safe: frames come from [MediaMetadataRetriever], one at a
- * time, bitmaps recycled — no ffmpeg, no new permissions.
+ * API samples. Play-safe: frames come from [MediaMetadataRetriever] and the
+ * clip is encoded with platform [MediaCodec] + [MediaMuxer] (AVC in MP4, no
+ * audio track) — no ffmpeg, no new permissions, no new dependencies. One
+ * decoded bitmap is alive at a time; every bitmap is recycled. When encoding
+ * fails, the tool falls back to the old contact-sheet PNG and says so.
  */
 class SegmentVideoTool(
     private val context: Context,
@@ -71,12 +83,38 @@ class SegmentVideoTool(
             val stamp = System.currentTimeMillis()
             val jsonFile = File(dir, "segment-video-$stamp.json")
             jsonFile.writeText(SamShared.framesJson(hits).take(200_000))
-            val sheetPath = runCatching { buildContactSheet(file, durationMs, hits, dir, stamp) }.getOrNull()
+            val recordFrames = SamShared.parseVideoRecords(text)
+            val plan = SamShared.encodePlan(recordFrames)
+            val maskTotal = recordFrames.sumOf { it.records.size }
+            // The annotated clip is the result; the contact sheet survives only
+            // as the fallback when encoding fails (it was a stand-in).
+            var videoPath: String? = null
+            var stats: OverlayStats? = null
+            var encodeNote: String? = null
+            if (plan.isNotEmpty()) {
+                runCatching { encodeOverlay(file, durationMs, recordFrames, plan, dir, stamp) }
+                    .onSuccess { (path, s) -> videoPath = path; stats = s }
+                    .onFailure { encodeNote = it.message?.take(160) }
+            }
+            val sheetPath = if (videoPath == null) {
+                runCatching { buildContactSheet(file, durationMs, hits, dir, stamp) }.getOrNull()
+            } else {
+                null
+            }
             val totalBoxes = hits.sumOf { it.boxes.size }
             val summary = buildString {
-                append("Tracked '$phrase' in ${hits.size} of ${groups.size} sampled frames ($totalBoxes boxes).")
+                append("Tracked '$phrase' in ${hits.size} of ${groups.size} sampled frames ($totalBoxes boxes, $maskTotal masks).")
                 append(" Note: max_frames is a hint — the API samples its own frames (asked $hint, got ${groups.size}).")
                 if (!mode.isNullOrBlank()) append(" Mode '$mode' is recorded only; tracking is the same.")
+                val s = stats
+                if (s != null && videoPath != null) {
+                    val seconds = s.frames / s.fps.toFloat()
+                    append(" Annotated clip: ${s.frames} frames encoded at ${s.fps} fps, ${s.width}x${s.height} MP4 (~%.1f s)".format(seconds))
+                    if (s.skipped > 0) append(" (${s.skipped} sampled frame${if (s.skipped == 1) "" else "s"} wouldn't decode and were skipped)")
+                    append(".")
+                } else if (sheetPath != null) {
+                    append(" Video encoding failed (${encodeNote ?: "no frames with detections"}) — contact sheet shown instead.")
+                }
                 hits.take(3).forEach { g ->
                     val first = g.boxes.first()
                     append(" f${g.frame}: ${g.boxes.size} [${first.x1},${first.y1},${first.x2},${first.y2}]")
@@ -85,6 +123,7 @@ class SegmentVideoTool(
             ActionResult.ok(
                 summary,
                 produced = listOfNotNull(
+                    videoPath?.let { Produced("video", "$phrase — annotated clip".take(80), it) },
                     sheetPath?.let { Produced("segmentation", "$phrase (${hits.size} frames)".take(80), it) },
                     Produced("file", jsonFile.name, jsonFile.absolutePath),
                 ),
@@ -130,6 +169,318 @@ class SegmentVideoTool(
         } finally {
             runCatching { retriever.release() }
         }
+    }
+
+    private data class OverlayStats(
+        val frames: Int,
+        val skipped: Int,
+        val fps: Int,
+        val width: Int,
+        val height: Int,
+    )
+
+    /**
+     * Encodes the annotated clip with platform [MediaCodec] (AVC) + [MediaMuxer]
+     * (MP4, no audio track) — Media3's Transformer edits existing clips and
+     * offers no bitmap-frame encoder, so the platform pair is the dependency-free
+     * path. Returns the output path with its stats; throws on any failure (the
+     * caller falls back to the contact sheet) and deletes the partial file.
+     *
+     * Streaming: one source frame is decoded, composed, converted and fed at a
+     * time; every bitmap is recycled before the next frame is read. Cancellable
+     * via [yield] between frames; runs on Dispatchers.IO.
+     */
+    private suspend fun encodeOverlay(
+        file: File,
+        durationMs: Long,
+        all: List<SamShared.VideoRecordFrame>,
+        plan: List<SamShared.VideoRecordFrame>,
+        dir: File,
+        stamp: Long,
+    ): Pair<String, OverlayStats> {
+        require(plan.isNotEmpty()) { "no frames with detections to encode" }
+        val out = File(dir, "segment-video-$stamp.mp4")
+        val retriever = MediaMetadataRetriever()
+        var encoder: MediaCodec? = null
+        var muxer: MediaMuxer? = null
+        try {
+            retriever.setDataSource(file.absolutePath)
+            val probe = retriever.getFrameAtTime(
+                sourceTimeUs(0, all.size, durationMs),
+                MediaMetadataRetriever.OPTION_CLOSEST,
+            ) ?: throw IllegalStateException("couldn't decode a source frame")
+            val (outW, outH) = SamShared.overlaySize(probe.width, probe.height)
+            if (!probe.isRecycled()) probe.recycle()
+            val fps = SamShared.overlayFps(all.size, durationMs)
+            val mime = MediaFormat.MIMETYPE_VIDEO_AVC
+            val color = pickColorFormat(mime)
+            val format = MediaFormat.createVideoFormat(mime, outW, outH).apply {
+                setInteger(MediaFormat.KEY_COLOR_FORMAT, color)
+                setInteger(MediaFormat.KEY_BIT_RATE, (outW * outH * 4).coerceIn(400_000, 6_000_000))
+                setInteger(MediaFormat.KEY_FRAME_RATE, fps)
+                setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
+            }
+            encoder = MediaCodec.createEncoderByType(mime).apply {
+                configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+                start()
+            }
+            muxer = MediaMuxer(out.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            val enc = encoder
+            val mux = muxer
+            val semiPlanar = color == MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar
+            var track = -1
+            var muxStarted = false
+            val info = MediaCodec.BufferInfo()
+            fun drain(eos: Boolean) {
+                while (true) {
+                    when (val oi = enc.dequeueOutputBuffer(info, 10_000)) {
+                        MediaCodec.INFO_TRY_AGAIN_LATER -> if (eos) continue else return
+                        MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                            if (muxStarted) throw IllegalStateException("encoder format changed twice")
+                            track = mux.addTrack(enc.outputFormat)
+                            mux.start()
+                            muxStarted = true
+                        }
+                        else -> {
+                            if (oi < 0) continue
+                            val ob = enc.getOutputBuffer(oi)
+                            if (ob != null) {
+                                if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) info.size = 0
+                                if (info.size > 0) {
+                                    if (!muxStarted) throw IllegalStateException("encoder emitted before muxer start")
+                                    ob.position(info.offset)
+                                    ob.limit(info.offset + info.size)
+                                    mux.writeSampleData(track, ob, info)
+                                }
+                            }
+                            enc.releaseOutputBuffer(oi, false)
+                            if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return
+                        }
+                    }
+                }
+            }
+            var encoded = 0
+            var skipped = 0
+            for (rec in plan) {
+                // Cancellation point: a 10 s clip at 10 fps is ~100 quick frames.
+                yield()
+                val pos = all.indexOfFirst { it.frame == rec.frame }.takeIf { it >= 0 } ?: continue
+                val src = retriever.getFrameAtTime(
+                    sourceTimeUs(pos, all.size, durationMs),
+                    MediaMetadataRetriever.OPTION_CLOSEST,
+                )
+                if (src == null) {
+                    skipped++
+                    continue
+                }
+                try {
+                    val composed = composeFrame(src, rec, outW, outH)
+                    val pixels = IntArray(outW * outH)
+                    try {
+                        composed.getPixels(pixels, 0, outW, 0, 0, outW, outH)
+                    } finally {
+                        if (!composed.isRecycled()) composed.recycle()
+                    }
+                    val yuv = argbToYuv420(pixels, outW, outH, semiPlanar)
+                    var fed = false
+                    var tries = 0
+                    while (!fed && tries++ < 3) {
+                        val inIdx = enc.dequeueInputBuffer(10_000)
+                        if (inIdx >= 0) {
+                            val ib = enc.getInputBuffer(inIdx)
+                                ?: throw IllegalStateException("encoder input buffer gone")
+                            ib.clear()
+                            ib.put(yuv)
+                            enc.queueInputBuffer(inIdx, 0, yuv.size, encoded * 1_000_000L / fps, 0)
+                            fed = true
+                            break
+                        }
+                        drain(false)
+                    }
+                    if (!fed) throw IllegalStateException("encoder stalled")
+                    drain(false)
+                    encoded++
+                } finally {
+                    if (!src.isRecycled()) src.recycle()
+                }
+            }
+            if (encoded == 0) throw IllegalStateException("no sampled frames would decode")
+            var eosQueued = false
+            var eosTries = 0
+            while (!eosQueued && eosTries++ < 3) {
+                val inIdx = enc.dequeueInputBuffer(10_000)
+                if (inIdx >= 0) {
+                    enc.queueInputBuffer(
+                        inIdx, 0, 0, encoded * 1_000_000L / fps,
+                        MediaCodec.BUFFER_FLAG_END_OF_STREAM,
+                    )
+                    eosQueued = true
+                    break
+                }
+            }
+            if (!eosQueued) throw IllegalStateException("encoder stalled at end of stream")
+            drain(true)
+            if (!out.exists() || out.length() == 0L) throw IllegalStateException("encoder wrote nothing")
+            return Pair(out.absolutePath, OverlayStats(encoded, skipped, fps, outW, outH))
+        } catch (e: Exception) {
+            runCatching { out.delete() }
+            throw e
+        } finally {
+            runCatching { encoder?.stop() }
+            runCatching { encoder?.release() }
+            runCatching { muxer?.stop() }
+            runCatching { muxer?.release() }
+            runCatching { retriever.release() }
+        }
+    }
+
+    /**
+     * Source timestamp for the API frame at [pos] of [apiCount]: the API samples
+     * evenly, so each frame sits at its segment centre; unknown durations fall
+     * back to 1 s apart (the retriever clamps to the nearest sync frame anyway).
+     */
+    private fun sourceTimeUs(pos: Int, apiCount: Int, durationMs: Long): Long =
+        if (durationMs > 0 && apiCount > 0) {
+            SamShared.videoFrameTimesMs(apiCount, durationMs).getOrNull(pos)?.times(1000)
+                ?: (pos + 1) * 1_000_000L
+        } else {
+            (pos + 1) * 1_000_000L
+        }
+
+    /** Picks an explicit YUV420 input color both the encoder and we can write. */
+    private fun pickColorFormat(mime: String): Int {
+        val name = runCatching {
+            MediaCodecList(MediaCodecList.REGULAR_CODECS)
+                .findEncoderForFormat(MediaFormat.createVideoFormat(mime, 720, 720))
+        }.getOrNull() ?: throw IllegalStateException("no usable $mime encoder on this device")
+        val probe = runCatching { MediaCodec.createByCodecName(name) }.getOrNull()
+            ?: throw IllegalStateException("no usable $mime encoder on this device")
+        try {
+            val formats = probe.codecInfo.getCapabilitiesForType(mime).colorFormats.toList()
+            return when {
+                MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar in formats ->
+                    MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar
+                MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar in formats ->
+                    MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar
+                else -> throw IllegalStateException("encoder has no YUV420 input ($formats)")
+            }
+        } finally {
+            runCatching { probe.release() }
+        }
+    }
+
+    /**
+     * Composes one output frame: the source frame scaled to the output size
+     * with each record's mask filled in its per-object hue (alpha 110) plus a
+     * 2 px edge, over a faint box — the still overlay's visual language.
+     * Records whose mask won't decode, and box-only detections, fall back to a
+     * red box. The caller recycles [src]; the returned bitmap is mutable and
+     * owned by the caller.
+     */
+    private fun composeFrame(
+        src: Bitmap,
+        rec: SamShared.VideoRecordFrame,
+        outW: Int,
+        outH: Int,
+    ): Bitmap {
+        val scaled = Bitmap.createScaledBitmap(src, outW, outH, true)
+        val work = if (scaled.config == Bitmap.Config.ARGB_8888 && scaled.isMutable) {
+            scaled
+        } else {
+            val copy = scaled.copy(Bitmap.Config.ARGB_8888, true)
+                ?: throw IllegalStateException("couldn't copy a video frame")
+            if (!scaled.isRecycled()) scaled.recycle()
+            copy
+        }
+        val canvas = Canvas(work)
+        val faintBox = Paint().apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = maxOf(2f, outW / 400f)
+            alpha = 48
+        }
+        val fallbackBox = Paint().apply {
+            color = Color.RED
+            style = Paint.Style.STROKE
+            strokeWidth = maxOf(3f, outW / 200f)
+        }
+        rec.records.forEachIndexed { i, r ->
+            val s = SamShared.scaleBox(r.box, outW, outH)
+            val left = s[0].coerceIn(0f, outW.toFloat())
+            val top = s[1].coerceIn(0f, outH.toFloat())
+            val right = s[2].coerceIn(0f, outW.toFloat())
+            val bottom = s[3].coerceIn(0f, outH.toFloat())
+            if (right <= left || bottom <= top) return@forEachIndexed
+            val raster = runCatching {
+                MaskCodec.decodeMask(r.maskHeight, r.maskWidth, r.maskPayload)
+            }.getOrNull()
+            if (raster == null || raster.size != r.maskHeight * r.maskWidth) {
+                canvas.drawRect(left, top, right, bottom, fallbackBox)
+                return@forEachIndexed
+            }
+            canvas.drawRect(left, top, right, bottom, faintBox)
+            val dst = RectF(left, top, right, bottom)
+            MaskDraw.fillOn(canvas, raster, r.maskWidth, r.maskHeight, dst, MaskDraw.fillFor(i))
+            MaskDraw.edgeOn(canvas, raster, r.maskWidth, r.maskHeight, dst, MaskDraw.edgeFor(i), 2f)
+        }
+        // Box-only detections have no record; draw the ones not already covered.
+        val recordBoxes = rec.records.map { it.box }.toSet()
+        for (b in rec.boxes) {
+            if (b in recordBoxes) continue
+            val s = SamShared.scaleBox(b, outW, outH)
+            canvas.drawRect(
+                s[0].coerceIn(0f, outW.toFloat()),
+                s[1].coerceIn(0f, outH.toFloat()),
+                s[2].coerceIn(0f, outW.toFloat()),
+                s[3].coerceIn(0f, outH.toFloat()),
+                fallbackBox,
+            )
+        }
+        return work
+    }
+
+    /**
+     * BT.601 ARGB → YUV420 for the encoder input: full-resolution Y plus
+     * quarter-resolution chroma (top-left sample of each 2×2 block), laid out
+     * interleaved (NV12, semi-planar) or planar (I420) per the encoder's color.
+     */
+    private fun argbToYuv420(pixels: IntArray, w: Int, h: Int, semiPlanar: Boolean): ByteArray {
+        val ySize = w * h
+        val out = ByteArray(ySize + ySize / 2)
+        for (i in pixels.indices) {
+            val px = pixels[i]
+            val r = px shr 16 and 0xFF
+            val g = px shr 8 and 0xFF
+            val b = px and 0xFF
+            out[i] = (((66 * r + 129 * g + 25 * b + 128) shr 8) + 16).coerceIn(0, 255).toByte()
+        }
+        if (semiPlanar) {
+            var uv = ySize
+            for (j in 0 until h step 2) {
+                for (i in 0 until w step 2) {
+                    val px = pixels[j * w + i]
+                    val r = px shr 16 and 0xFF
+                    val g = px shr 8 and 0xFF
+                    val b = px and 0xFF
+                    out[uv++] = (((-38 * r - 74 * g + 112 * b + 128) shr 8) + 128).coerceIn(0, 255).toByte()
+                    out[uv++] = (((112 * r - 94 * g - 56 * b + 128) shr 8) + 128).coerceIn(0, 255).toByte()
+                }
+            }
+        } else {
+            var u = ySize
+            var v = ySize + ySize / 4
+            for (j in 0 until h step 2) {
+                for (i in 0 until w step 2) {
+                    val px = pixels[j * w + i]
+                    val r = px shr 16 and 0xFF
+                    val g = px shr 8 and 0xFF
+                    val b = px and 0xFF
+                    out[u++] = (((-38 * r - 74 * g + 112 * b + 128) shr 8) + 128).coerceIn(0, 255).toByte()
+                    out[v++] = (((112 * r - 94 * g - 56 * b + 128) shr 8) + 128).coerceIn(0, 255).toByte()
+                }
+            }
+        }
+        return out
     }
 
     /**

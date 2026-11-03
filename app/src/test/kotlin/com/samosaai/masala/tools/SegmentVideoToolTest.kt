@@ -102,4 +102,80 @@ class SegmentVideoToolTest {
         assertTrue(parsed.contains("\"x1\":199"))
         assertTrue(parsed.contains("\"frame\":2"))
     }
+
+    @Test
+    fun `parseVideoRecords groups records per frame`() {
+        val wire = "<0f>0<|box;x1=80;y1=120;x2=240;y2=180;w=320;h=240|><|mask;x=0;y=0;data=61,161,~abc|>" +
+            "<1f>0<|box;x1=90;y1=130;x2=250;y2=190;w=320;h=240|>" +
+            "<2f>"
+        val frames = SamShared.parseVideoRecords(wire)
+        assertEquals(3, frames.size)
+        assertEquals(0, frames[0].frame)
+        assertEquals(0, frames[0].records.single().id)
+        assertEquals(SamShared.RichBox(80, 120, 240, 180, 320, 240), frames[0].records.single().box)
+        assertEquals(61, frames[0].records.single().maskHeight)
+        assertEquals(161, frames[0].records.single().maskWidth)
+        assertEquals("~abc", frames[0].records.single().maskPayload)
+        assertEquals(1, frames[0].boxes.size)
+        assertTrue(frames[1].records.isEmpty())
+        assertEquals(1, frames[1].boxes.size)
+        assertTrue(frames[2].records.isEmpty())
+        assertTrue(frames[2].boxes.isEmpty())
+    }
+
+    @Test
+    fun `parseVideoRecords is one frame without markers`() {
+        val frames = SamShared.parseVideoRecords(
+            "0<|box;x1=80;y1=120;x2=240;y2=180;w=320;h=240|><|mask;x=0;y=0;data=61,161,~abc|>",
+        )
+        assertEquals(1, frames.size)
+        assertEquals(0, frames[0].frame)
+        assertEquals(1, frames[0].records.size)
+        assertTrue(SamShared.parseVideoRecords("").isEmpty())
+        assertTrue(SamShared.parseVideoRecords("no matches here").isEmpty())
+    }
+
+    @Test
+    fun `videoFrameTimesMs spreads api frames across the clip`() {
+        assertEquals(listOf(2250L, 4500L, 6750L), SamShared.videoFrameTimesMs(3, 9000L))
+        assertEquals(listOf(4500L), SamShared.videoFrameTimesMs(1, 9000L))
+        assertTrue(SamShared.videoFrameTimesMs(0, 9000L).isEmpty())
+        assertTrue(SamShared.videoFrameTimesMs(3, 0L).isEmpty())
+    }
+
+    @Test
+    fun `overlayFps derives from the sampled rate and clamps`() {
+        // 8 frames over 10 s samples at ~1 fps: plays at the minimum.
+        assertEquals(5, SamShared.overlayFps(8, 10_000L))
+        assertEquals(10, SamShared.overlayFps(100, 10_000L))
+        // 200 frames over 10 s samples at 20 fps: capped for encode speed.
+        assertEquals(15, SamShared.overlayFps(200, 10_000L))
+        assertEquals(5, SamShared.overlayFps(0, 10_000L))
+        assertEquals(5, SamShared.overlayFps(8, 0L))
+        assertEquals(5, SamShared.overlayFps(8, -1L))
+    }
+
+    @Test
+    fun `overlaySize caps the long side and stays even`() {
+        assertEquals(Pair(720, 404), SamShared.overlaySize(1280, 720))
+        assertEquals(Pair(404, 720), SamShared.overlaySize(720, 1280))
+        assertEquals(Pair(720, 404), SamShared.overlaySize(1920, 1080))
+        // Small and odd sources: never upscale, always even.
+        assertEquals(Pair(320, 240), SamShared.overlaySize(320, 240))
+        assertEquals(Pair(320, 240), SamShared.overlaySize(321, 241))
+        // Unreadable source: square fallback.
+        assertEquals(Pair(720, 720), SamShared.overlaySize(0, 0))
+    }
+
+    @Test
+    fun `encodePlan skips frames with no records`() {
+        val frames = SamShared.parseVideoRecords(
+            "<0f>0<|box;x1=80;y1=120;x2=240;y2=180;w=320;h=240|><|mask;x=0;y=0;data=61,161,~abc|>" +
+                "<1f>" +
+                "<2f>0<|box;x1=90;y1=130;x2=250;y2=190;w=320;h=240|>",
+        )
+        val plan = SamShared.encodePlan(frames)
+        assertEquals(listOf(0, 2), plan.map { it.frame })
+        assertTrue(SamShared.encodePlan(emptyList()).isEmpty())
+    }
 }
