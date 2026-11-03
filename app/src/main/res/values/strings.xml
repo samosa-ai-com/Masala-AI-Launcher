@@ -1017,6 +1017,7 @@
     <string name="meeting_quick_recorder_busy">The quick recorder is recording. Stop it first.</string>
     <string name="meeting_mic_lost">The microphone was taken (a call?). Paused — Resume when you can.</string>
     <string name="meeting_mic_unavailable">The microphone could not start.</string>
+    <string name="meeting_low_storage">Storage is nearly full. Recording paused — free some space and resume.</string>
     <string name="meeting_needs_mic">Microphone access is needed to record a meeting.</string>
     <string name="meeting_start_failed">The recording could not start.</string>
     <string name="meeting_import_failed">That file could not be imported.</string>

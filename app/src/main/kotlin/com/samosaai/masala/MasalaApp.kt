@@ -159,6 +159,9 @@ class MasalaApp : Application() {
             "status" to status,
             "title" to (if (live) recorder.title else row?.title).orEmpty().ifBlank { "Meeting notes" },
             "elapsed_ms" to (if (live) recorder.elapsedMs else row?.activeMs ?: 0L).toString(),
+            "elapsed" to com.samosaai.masala.core.audio.DiarizedTranscript.clockOf(
+                if (live) recorder.elapsedMs else row?.activeMs ?: 0L,
+            ),
             "elapsed_at" to System.currentTimeMillis().toString(),
             "recording" to if (live && recorder.status == com.samosaai.masala.core.meeting.MeetingStatus.RECORDING) "1" else "0",
             "speakers" to if (speakerCount > 0) "$speakerCount speakers" else "",
@@ -748,7 +751,9 @@ class MasalaApp : Application() {
         PermissionGate.context = this
         scope.launch { httpValues.load() }
         // A meeting left recording by a killed process must not look live forever.
-        scope.launch { runCatching { meetings.recoverStale() } }
+        // No service can be running in a process that is just starting, so every active row is
+        // orphaned — not only the ones older than the heartbeat window.
+        scope.launch { runCatching { meetings.recoverStale(olderThanMs = 0) } }
         com.samosaai.masala.widgets.WidgetHttpWorker.ensure(this)
         catalog = AppCatalog(this, scope)
         icons = IconCache(this, catalog)

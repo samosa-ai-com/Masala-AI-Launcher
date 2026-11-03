@@ -34,12 +34,12 @@ class MeetingExportTest {
     @Test fun `a stable vault path per meeting`() {
         val date = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
             .format(java.util.Date(meeting.startedAt))
-        assertEquals("notes/$date-product-sync-q4.md", MeetingExport.brainPath(meeting))
+        assertEquals("notes/$date-product-sync-q4-m1.md", MeetingExport.brainPath(meeting))
     }
 
     @Test fun `the markdown carries valid frontmatter and the transcript`() {
         val text = MeetingExport.markdown(meeting, note, mapOf("A" to "Priya"), turns)
-        assertTrue(text.startsWith("---\ntitle: Product Sync / Q4"))
+        assertTrue(text.startsWith("---\ntitle: \"Product Sync / Q4\""))
         assertTrue(text.contains("type: meeting"))
         assertTrue(text.contains("_Meeting id: m1_"))
         assertTrue(text.contains("**Speakers:** Priya, Speaker B"))
@@ -52,6 +52,14 @@ class MeetingExportTest {
         val text = MeetingExport.markdown(meeting, note, mapOf("A" to "Priya"), turns, transcript = false)
         assertTrue(text.contains("## Summary"))
         assertTrue(!text.contains("## Transcript"))
+    }
+
+    @Test fun `a colon in the title is quoted so the frontmatter stays valid`() {
+        val text = MeetingExport.markdown(meeting.copy(title = "Planning: sprint"), note, emptyMap(), emptyList())
+        assertTrue(text.contains("title: \"Planning: sprint\""))
+        val noteWithColon = note.copy(summary = listOf("Ship: Friday"))
+        val withSummary = MeetingExport.markdown(meeting, noteWithColon, emptyMap(), emptyList())
+        assertTrue(withSummary.contains("summary: \"Ship: Friday\""))
     }
 
     @Test fun `the Second Brain accepts the note as a meeting record`() {

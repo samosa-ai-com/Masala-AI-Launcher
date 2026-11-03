@@ -17,6 +17,7 @@ import androidx.core.app.NotificationCompat
 import com.samosaai.masala.MasalaApp
 import com.samosaai.masala.R
 import com.samosaai.masala.audio.RecordingService
+import com.samosaai.masala.core.meeting.ChunkStatus
 import com.samosaai.masala.core.meeting.MeetingStatus
 import com.samosaai.masala.ui.meetings.MeetingActivity
 import java.io.File
@@ -88,11 +89,13 @@ class MeetingRecorderService : Service() {
     override fun onDestroy() {
         if (meetingId != null && _state.value.status in MeetingStatus.active) {
             // A stopService (or the system) must not throw away the meeting: finalize what exists.
-            // The service's own scope is cancelled on the next line, so the write runs in the app's.
+            // The service's own scope is cancelled on the next line, so the writes run in the app's.
             val app = applicationContext as? MasalaApp
             val id = meetingId
             val elapsed = elapsedMs()
+            val closed = closeOpenChunk((elapsed - chunkStartMs).coerceAtLeast(0))
             app?.scope?.launch {
+                if (id != null) closed?.let { saveClosed(id, it) }
                 runCatching { app.meetings.finish(id ?: return@runCatching, MeetingStatus.INTERRUPTED, elapsed) }
                 runCatching { id?.let { MeetingWork.enqueue(this@MeetingRecorderService, it) } }
             }
@@ -162,12 +165,12 @@ class MeetingRecorderService : Service() {
         if (meetingId == null || _state.value.status != MeetingStatus.RECORDING) return
         val elapsed = elapsedMs()
         val duration = (elapsed - chunkStartMs).coerceAtLeast(0)
-        closeChunk(duration)
+        val closed = closeOpenChunk(duration)
         baseMs = elapsed
         heartbeat?.cancel()
         amplitudeJob?.cancel()
         _state.value = _state.value.copy(status = MeetingStatus.PAUSED, elapsedMs = elapsed, amplitude = 0f)
-        scope.launch {
+        closeInBackground(closed) {
             meetingId?.let { id ->
                 (applicationContext as? MasalaApp)?.meetings?.heartbeat(id, elapsed)
                 (applicationContext as? MasalaApp)?.meetings?.setStatus(id, MeetingStatus.PAUSED)
@@ -180,7 +183,11 @@ class MeetingRecorderService : Service() {
         if (meetingId == null || _state.value.status != MeetingStatus.PAUSED) return
         runningSinceElapsed = SystemClock.elapsedRealtime()
         chunkStartMs = baseMs
-        beginChunk()
+        if (!beginChunk()) {
+            // The mic did not open: stay paused rather than counting time with no recorder.
+            _state.value = _state.value.copy(status = MeetingStatus.PAUSED, error = startFailure)
+            return
+        }
         _state.value = _state.value.copy(status = MeetingStatus.RECORDING, error = null)
         startHeartbeat()
         startAmplitude()
@@ -197,12 +204,16 @@ class MeetingRecorderService : Service() {
         }
         val elapsed = elapsedMs()
         val duration = if (_state.value.status == MeetingStatus.RECORDING) (elapsed - chunkStartMs).coerceAtLeast(0) else 0
-        closeChunk(duration)
+        val closed = closeOpenChunk(duration)
         baseMs = elapsed
         heartbeat?.cancel()
         amplitudeJob?.cancel()
         _state.value = _state.value.copy(status = MeetingStatus.TRANSCRIBING, elapsedMs = elapsed, amplitude = 0f)
-        scope.launch {
+        val app = applicationContext as? MasalaApp
+        // The app scope, not the service's: stopSelf() cancels this scope, and the last chunk must
+        // be closed *before* the worker is enqueued or it is skipped as still open.
+        app?.scope?.launch {
+            meetingId?.let { id -> closed?.let { saveClosed(id, it) } }
             finishSession(MeetingStatus.TRANSCRIBING)
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -230,6 +241,13 @@ class MeetingRecorderService : Service() {
         recorder?.runCatching { stop() }
         recorder?.runCatching { release() }
         recorder = null
+        // A three-hour meeting needs room; running out mid-chunk loses the part being written.
+        val free = runCatching { android.os.StatFs(filesDir.path).availableBytes }.getOrDefault(Long.MAX_VALUE)
+        if (free < MIN_FREE_BYTES) {
+            startFailure = getString(R.string.meeting_low_storage)
+            _state.value = _state.value.copy(error = startFailure, status = MeetingStatus.PAUSED)
+            return false
+        }
         val idx = chunkIndex
         val file = app.meetings.chunkFile(id, idx)
         file.parentFile?.mkdirs()
@@ -271,41 +289,54 @@ class MeetingRecorderService : Service() {
         if (meetingId == null || _state.value.status != MeetingStatus.RECORDING) return
         val elapsed = elapsedMs()
         val duration = (elapsed - chunkStartMs).coerceAtLeast(0)
-        closeChunk(duration)
+        val closed = closeOpenChunk(duration)
         chunkStartMs = elapsed
         beginChunk()
-        meetingId?.let { id ->
-            scope.launch {
+        val app = applicationContext as? MasalaApp
+        app?.scope?.launch {
+            meetingId?.let { id ->
+                closed?.let { saveClosed(id, it) }
                 runCatching { MeetingWork.enqueue(this@MeetingRecorderService, id) }
             }
         }
         updateNotification()
     }
 
-    private fun closeChunk(durationMs: Long) {
+    /** Stops the open recorder and returns the chunk it finished: (index, duration). */
+    private fun closeOpenChunk(durationMs: Long): Pair<Int, Long>? {
         recorder?.runCatching { stop() }
         recorder?.runCatching { release() }
         recorder = null
-        val app = applicationContext as? MasalaApp ?: return
-        val id = meetingId ?: return
         val idx = chunkIndex - 1
-        if (idx < 0) return
-        scope.launch {
-            runCatching {
-                app.meetings.setChunkDuration(id, idx, durationMs)
-                app.meetings.heartbeat(id, elapsedMs())
-            }
+        return if (idx >= 0) idx to durationMs else null
+    }
+
+    private suspend fun saveClosed(id: String, closed: Pair<Int, Long>) {
+        val app = applicationContext as? MasalaApp ?: return
+        runCatching {
+            app.meetings.closeChunk(id, closed.first, closed.second)
+            app.meetings.heartbeat(id, elapsedMs())
+        }
+    }
+
+    /** Runs a close/save sequence in the app scope, which outlives stopSelf(). */
+    private fun closeInBackground(closed: Pair<Int, Long>?, then: suspend () -> Unit) {
+        val app = applicationContext as? MasalaApp
+        val id = meetingId
+        app?.scope?.launch {
+            if (id != null) closed?.let { saveClosed(id, it) }
+            runCatching { then() }
         }
     }
 
     private fun onRecorderError(message: String) {
         val elapsed = elapsedMs()
-        closeChunk((elapsed - chunkStartMs).coerceAtLeast(0))
+        val closed = closeOpenChunk((elapsed - chunkStartMs).coerceAtLeast(0))
         baseMs = elapsed
         heartbeat?.cancel()
         amplitudeJob?.cancel()
         _state.value = _state.value.copy(status = MeetingStatus.PAUSED, elapsedMs = elapsed, error = message, amplitude = 0f)
-        scope.launch {
+        closeInBackground(closed) {
             meetingId?.let { id ->
                 (applicationContext as? MasalaApp)?.meetings?.setStatus(id, MeetingStatus.PAUSED)
                 (applicationContext as? MasalaApp)?.meetings?.setError(id, message)
@@ -474,6 +505,9 @@ class MeetingRecorderService : Service() {
         private const val CHANNEL = "meeting_recording"
         private const val NOTIF_ID = 42
         private const val HEARTBEAT_MS = 30_000L
+
+        /** Below this the recorder pauses with a message instead of failing mid-chunk. */
+        private const val MIN_FREE_BYTES = 200L * 1024 * 1024
 
         private val _state = MutableStateFlow(State())
 

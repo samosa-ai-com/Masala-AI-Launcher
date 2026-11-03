@@ -162,7 +162,12 @@ class ActionDispatcher(
             }
         }
         is MasalaAction.OpenMeeting -> {
-            start(com.samosaai.masala.ui.meetings.MeetingActivity.intent(context, action.id))
+            // A widget's "Open notes" carries no id: open what is live, else the newest meeting.
+            val app = context.applicationContext as? com.samosaai.masala.MasalaApp
+            val id = action.id
+                ?: app?.meetings?.active?.value?.id
+                ?: app?.meetings?.latest?.value?.id
+            start(com.samosaai.masala.ui.meetings.MeetingActivity.intent(context, id))
             Outcome.Done()
         }
     }

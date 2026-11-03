@@ -38,6 +38,8 @@ object MeetingStatus {
 
 /** Chunk states for the transcription queue. */
 object ChunkStatus {
+    /** Still being written by the recorder: never in the transcription queue. */
+    const val OPEN = "open"
     const val RECORDED = "recorded"
     const val TRANSCRIBING = "transcribing"
     const val DONE = "done"

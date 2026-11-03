@@ -21,7 +21,8 @@ object MeetingExport {
     /** The vault path for a meeting note; stable, so saving again updates the same file. */
     fun brainPath(meeting: MeetingSessionEntity): String {
         val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(meeting.startedAt))
-        return "notes/$date-${slug(meeting.title)}.md"
+        // The short id keeps two same-titled meetings on one day from overwriting each other.
+        return "notes/$date-${slug(meeting.title)}-${meeting.id.take(8)}.md"
     }
 
     fun markdown(
@@ -34,12 +35,12 @@ object MeetingExport {
         // Only the vault's allowed frontmatter keys: anything else fails its record check. The
         // meeting's own details belong in the body.
         appendLine("---")
-        appendLine("title: ${meeting.title}")
+        appendLine("title: ${yaml(meeting.title)}")
         appendLine("area: Personal")
         appendLine("type: meeting")
         appendLine("updated: ${SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())}")
         appendLine("source: Masala meeting notes")
-        note?.summary?.firstOrNull()?.takeIf { it.isNotBlank() }?.let { appendLine("summary: ${it.replace("\n", " ")}") }
+        note?.summary?.firstOrNull()?.takeIf { it.isNotBlank() }?.let { appendLine("summary: ${yaml(it)}") }
         appendLine("---")
         appendLine()
         appendLine("**Date:** ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date(meeting.startedAt))} · " +
@@ -92,6 +93,10 @@ object MeetingExport {
         "From the meeting \"${meeting.title}\" (${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(meeting.startedAt))}), " +
             "remind me to: $text" + (owner?.takeIf { it.isNotBlank() }?.let { " (owner $it)" } ?: "") +
             ". Ask me when if I did not say."
+
+    /** A frontmatter scalar that survives colons, quotes and a leading dash. */
+    internal fun yaml(value: String): String =
+        "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ") + "\""
 
     internal fun slug(title: String): String {
         val cleaned = title.lowercase(Locale.US)

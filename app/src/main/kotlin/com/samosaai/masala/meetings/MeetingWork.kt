@@ -69,14 +69,19 @@ class MeetingWork(context: Context, params: WorkerParameters) : CoroutineWorker(
         runCatching { setForeground(foreground(latest.title, done, total)) }
         if (app.meetings.remainingChunks(meetingId) == 0) {
             val force = inputData.getBoolean(KEY_FORCE_NOTES, false)
-            if (force || app.meetings.note(latest) == null) {
-                app.meetingNotes.generate(meetingId)
+            val wrote = if (force || app.meetings.note(latest) == null) {
+                app.meetingNotes.generate(meetingId).isSuccess
             } else {
                 app.meetings.setStatus(meetingId, MeetingStatus.READY)
+                true
             }
-            if (!MeetingSettings(applicationContext).keepAudio) {
+            // Only drop the audio once there is a note to keep: a failed generation must not take
+            // away the recording that could still produce one.
+            if (wrote && !MeetingSettings(applicationContext).keepAudio) {
                 app.meetings.deleteChunkFiles(meetingId)
             }
+            // Upload and overlap copies are only needed while chunks remain.
+            app.meetingTranscriber.forget(meetingId)
         } else {
             // A chunk left in an unknown state: stay transcribing and let the next run pick it up.
             app.meetings.setStatus(meetingId, MeetingStatus.TRANSCRIBING)
@@ -130,7 +135,20 @@ class MeetingWork(context: Context, params: WorkerParameters) : CoroutineWorker(
         /** Queue a meeting; Wi-Fi only unless the user allowed mobile data for it. */
         fun enqueue(context: Context, meetingId: String, forceNotes: Boolean = false, anyNetwork: Boolean = false) {
             val wifiOnly = !anyNetwork && MeetingSettings(context).wifiOnly
-            schedule(context, meetingId, forceNotes, if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED, ExistingWorkPolicy.KEEP)
+            // Append, not KEEP: a chunk can close while the previous run is finishing, and KEEP
+            // would drop that request until the meeting stops.
+            schedule(
+                context,
+                meetingId,
+                forceNotes,
+                if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED,
+                ExistingWorkPolicy.APPEND_OR_REPLACE,
+            )
+        }
+
+        /** Stops this meeting's queue (the meeting is being deleted). */
+        fun cancel(context: Context, meetingId: String) {
+            WorkManager.getInstance(context).cancelUniqueWork("meeting-$meetingId")
         }
 
         /** "Use mobile data": replace a job that is waiting for Wi-Fi. */

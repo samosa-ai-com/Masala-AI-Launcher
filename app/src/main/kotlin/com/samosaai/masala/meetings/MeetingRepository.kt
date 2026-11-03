@@ -20,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -70,7 +71,7 @@ class MeetingRepository(
                 hasAudio = chunks.byMeeting(row.id).any { File(it.path).isFile },
             )
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     fun session(id: String): Flow<MeetingSessionEntity?> = sessions.flow(id)
     fun turnsOf(id: String): Flow<List<MeetingTurnEntity>> = turns.flow(id)
@@ -111,7 +112,8 @@ class MeetingRepository(
 
     suspend fun setError(id: String, error: String?) = sessions.setError(id, error, clock())
 
-    suspend fun addChunk(meetingId: String, idx: Int, path: File, startMs: Long) {
+    /** Adds a chunk the recorder has just opened. It stays [ChunkStatus.OPEN] until it is closed. */
+    suspend fun addChunk(meetingId: String, idx: Int, path: File, startMs: Long, status: String = ChunkStatus.OPEN) {
         chunks.upsert(
             MeetingChunkEntity(
                 id = chunkId(meetingId, idx),
@@ -120,10 +122,15 @@ class MeetingRepository(
                 path = path.absolutePath,
                 startMs = startMs,
                 durationMs = 0,
-                status = ChunkStatus.RECORDED,
+                status = status,
             ),
         )
     }
+
+    /** The recorder closed this file: from here on the transcriber may take it. */
+    suspend fun closeChunk(meetingId: String, idx: Int, durationMs: Long) =
+        // One write: status and duration land together, and closing never spends a retry.
+        chunks.close(meetingId, idx, durationMs)
 
     suspend fun setChunkDuration(meetingId: String, idx: Int, durationMs: Long) =
         chunks.setDuration(chunkId(meetingId, idx), durationMs)
@@ -137,10 +144,14 @@ class MeetingRepository(
     suspend fun failChunk(meetingId: String, idx: Int, error: String) =
         chunks.finish(chunkId(meetingId, idx), ChunkStatus.FAILED, false, error)
 
-    suspend fun nextChunk(meetingId: String): MeetingChunkEntity? = chunks.nextRecorded(meetingId)
+    suspend fun nextChunk(meetingId: String, maxAttempts: Int = 3): MeetingChunkEntity? =
+        chunks.nextPending(meetingId, maxAttempts)
 
     /** Puts chunks a killed worker left mid-flight back in the queue. */
     suspend fun resetStuckChunks(meetingId: String) = chunks.resetStuck(meetingId)
+
+    /** The meeting screen's Retry: failed chunks are queued again from attempt zero. */
+    suspend fun retryFailedChunks(meetingId: String) = chunks.retryFailed(meetingId)
 
     /** The audio files of a meeting, for the "delete after notes" preference. */
     suspend fun deleteChunkFiles(meetingId: String) = withContext(Dispatchers.IO) {
@@ -170,6 +181,8 @@ class MeetingRepository(
                 },
             )
         }
+
+    suspend fun deleteTurn(turnId: Long) = turns.deleteById(turnId)
 
     suspend fun setNote(id: String, note: MeetingNote, status: String) {
         val json = MasalaJson.strict.encodeToString(MeetingNote.serializer(), note)
@@ -204,10 +217,13 @@ class MeetingRepository(
     suspend fun setBrainPath(id: String, path: String?) = sessions.setBrainPath(id, path, clock())
 
     suspend fun delete(id: String) = withContext(Dispatchers.IO) {
+        MeetingWork.cancel(context, id)
         turns.deleteByMeeting(id)
         chunks.deleteByMeeting(id)
         sessions.delete(id)
         dir(id).deleteRecursively()
+        // The overlap copies live in the cache, outside the meeting folder.
+        context.cacheDir.listFiles { f -> f.name.startsWith("meeting-prev-$id-") }?.forEach { runCatching { it.delete() } }
     }
 
     suspend fun deleteAudio(id: String) = withContext(Dispatchers.IO) {
@@ -216,11 +232,12 @@ class MeetingRepository(
     }
 
     /** A session left recording or paused by a killed process: keep the files, stop pretending. */
-    suspend fun recoverStale(now: Long = clock()) {
-        val cutoff = now - ORPHAN_MS
+    suspend fun recoverStale(now: Long = clock(), olderThanMs: Long = ORPHAN_MS) {
+        val cutoff = now - olderThanMs
         sessions.stale(cutoff).forEach { row ->
             sessions.setStatus(row.id, MeetingStatus.INTERRUPTED, now)
-            // Whatever was closed is still transcribable; the open chunk is unreadable and skipped.
+            // The chunk that was still being written has no intact file; the closed ones do.
+            chunks.abandonOpen(row.id, "The recording stopped before this part was finished.")
             MeetingWork.enqueue(context, row.id)
         }
     }

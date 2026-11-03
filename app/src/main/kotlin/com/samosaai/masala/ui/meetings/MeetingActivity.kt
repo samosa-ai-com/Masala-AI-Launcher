@@ -128,20 +128,36 @@ import kotlinx.coroutines.withContext
  * theme.
  */
 class MeetingActivity : ComponentActivity() {
+    private val incoming = androidx.compose.runtime.mutableStateOf<Intent?>(null)
+    private val intentSerial = androidx.compose.runtime.mutableIntStateOf(0)
+
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        val initialId = intent.getStringExtra(EXTRA_MEETING)
-        val autoStart = intent.getBooleanExtra(EXTRA_START, false)
+        incoming.value = intent
         setContent {
             val settings by this@MeetingActivity.masala.settings.settings
                 .collectAsStateWithLifecycle(com.samosaai.masala.data.LauncherSettings())
             MasalaTheme(settings) {
                 Surface(Modifier.fillMaxSize()) {
-                    MeetingHost(initialId = initialId, autoStart = autoStart, finish = { finish() })
+                    val serial = intentSerial.intValue
+                    val current = incoming.value
+                    MeetingHost(
+                        initialId = current?.getStringExtra(EXTRA_MEETING),
+                        autoStart = current?.getBooleanExtra(EXTRA_START, false) == true,
+                        serial = serial,
+                        finish = { finish() },
+                    )
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        incoming.value = intent
+        intentSerial.intValue++
     }
 
     companion object {
@@ -160,7 +176,7 @@ class MeetingActivity : ComponentActivity() {
 private enum class Dest { LIST, LIVE, DETAIL }
 
 @Composable
-private fun MeetingHost(initialId: String?, autoStart: Boolean, finish: () -> Unit) {
+private fun MeetingHost(initialId: String?, autoStart: Boolean, serial: Int, finish: () -> Unit) {
     val app = LocalContext.current.masala
     val context = LocalContext.current
     var dest by rememberSaveable { mutableStateOf(if (initialId != null) Dest.DETAIL else Dest.LIST) }
@@ -198,8 +214,15 @@ private fun MeetingHost(initialId: String?, autoStart: Boolean, finish: () -> Un
             dest = Dest.LIVE
         }
     }
-    LaunchedEffect(autoStart) {
-        if (autoStart && !recorder.active && activeRow == null) {
+    LaunchedEffect(autoStart, serial) {
+        if (serial > 0) {
+            // A new intent (a notification, a widget tap, another meeting): honour where it points.
+            initialId?.let {
+                openId = it
+                dest = Dest.DETAIL
+            }
+            if (autoStart && !recorder.active && activeRow == null) startMeeting()
+        } else if (autoStart && !recorder.active && activeRow == null) {
             startMeeting()
         }
     }
@@ -399,9 +422,19 @@ private fun MeetingRow(meeting: com.samosaai.masala.core.meeting.MeetingSummary,
 
 /** Copies a picked audio file into a new meeting and queues it; the same pipeline as a recording. */
 private suspend fun importMeeting(context: Context, app: MasalaApp, uri: Uri): String? = withContext(Dispatchers.IO) {
-    val name = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-        ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+    var size = -1L
+    val name = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)
+        ?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                if (!cursor.isNull(1)) size = cursor.getLong(1)
+                cursor.getString(0)
+            } else {
+                null
+            }
+        }
         ?: "Imported audio"
+    // A 60-minute meeting is ~115 MB decoded; refuse something far larger before copying it.
+    if (size > 300L * 1024 * 1024) return@withContext null
     val mime = context.contentResolver.getType(uri).orEmpty()
     val ext = when {
         mime.contains("mpeg") -> "mp3"
@@ -435,9 +468,25 @@ private suspend fun importMeeting(context: Context, app: MasalaApp, uri: Uri): S
         app.meetings.delete(session.id)
         return@withContext null
     }
-    // One part: the transcriber cuts its 10-minute windows from this file.
-    app.meetings.addChunk(session.id, 0, target, 0)
-    app.meetings.setChunkDuration(session.id, 0, duration)
+    // The endpoint takes WAV and one request is capped at ten minutes, so the import is decoded
+    // once and cut into the same five-minute windows a live recording produces.
+    val wav = File(app.meetings.dir(session.id), "import.asr.wav")
+    val decoded = com.samosaai.masala.audio.AndroidTranscriber.toWav(target, wav)
+    if (!decoded) {
+        app.meetings.delete(session.id)
+        return@withContext null
+    }
+    val parts = com.samosaai.masala.core.audio.WavSplitter.split(wav, app.meetings.dir(session.id), "chunk", 5 * 60_000L)
+    wav.delete()
+    target.delete()
+    if (parts.isEmpty()) {
+        app.meetings.delete(session.id)
+        return@withContext null
+    }
+    parts.forEachIndexed { index, part ->
+        app.meetings.addChunk(session.id, index, part.file, part.startMs, com.samosaai.masala.core.meeting.ChunkStatus.RECORDED)
+        app.meetings.setChunkDuration(session.id, index, part.durationMs)
+    }
     app.meetings.finish(session.id, MeetingStatus.TRANSCRIBING, duration)
     MeetingWork.enqueue(context, session.id)
     session.id
@@ -479,8 +528,12 @@ private fun LiveMeetingScreen(meetingId: String, onBack: () -> Unit, onFinished:
         app.meetings.setRawNotes(meetingId, notes, app.meetings.bookmarks(current))
     }
     LaunchedEffect(turns.size) {
-        if (turns.isNotEmpty() && listState.firstVisibleItemIndex < 2) {
-            listState.animateScrollToItem((turns.size - 1).coerceAtLeast(0))
+        if (turns.isEmpty()) return@LaunchedEffect
+        // Follow new turns only when the user is already at the bottom; scrolling up to read older
+        // text must not be yanked back every time a turn lands.
+        val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+        if (lastVisible >= turns.size - 2) {
+            listState.animateScrollToItem(turns.lastIndex)
         }
     }
     val active = recorder.active && recorder.meetingId == meetingId
@@ -754,7 +807,16 @@ private fun MeetingDetailScreen(meetingId: String, onBack: () -> Unit, onOpenSet
             playing = false
             return
         }
-        val withPlayer = player ?: MeetingPlayer(parts).also { player = it }
+        val withPlayer = player ?: MeetingPlayer(
+            parts = parts,
+            onEnded = {
+                playing = false
+                positionMs = 0
+            },
+            onError = {
+                playing = false
+            },
+        ).also { player = it }
         withPlayer.playFrom(from ?: positionMs)
         playing = true
     }
@@ -844,6 +906,24 @@ private fun MeetingDetailScreen(meetingId: String, onBack: () -> Unit, onOpenSet
             }
         }
 
+        if (meeting?.status == MeetingStatus.FAILED) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    meeting.error ?: stringResource(R.string.meeting_transcribe_retry),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = {
+                    scope.launch {
+                        app.meetings.retryFailedChunks(meetingId)
+                        app.meetings.setStatus(meetingId, MeetingStatus.TRANSCRIBING)
+                        MeetingWork.enqueue(context, meetingId)
+                    }
+                }) { Text(stringResource(R.string.meeting_retry)) }
+            }
+        }
+
         TabRow(selectedTabIndex = tab) {
             Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.meeting_notes_tab)) })
             Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.meeting_transcript_tab)) })
@@ -900,7 +980,7 @@ private fun MeetingDetailScreen(meetingId: String, onBack: () -> Unit, onOpenSet
                 labels = speakerLabels,
                 onSeek = { at ->
                     positionMs = at
-                    if (!playing) togglePlay(at)
+                    if (playing) player?.seekTo(at) else togglePlay(at)
                 },
                 onRename = { editingSpeaker = it },
             )
@@ -1186,7 +1266,11 @@ private fun SpeakerDialog(label: String, current: String, onDismiss: () -> Unit,
 /** Plays the meeting's chunk files as one timeline, so a turn's timestamp can seek into it. */
 private data class MeetingPart(val file: File, val startMs: Long, val durationMs: Long)
 
-private class MeetingPlayer(private val parts: List<MeetingPart>) {
+private class MeetingPlayer(
+    private val parts: List<MeetingPart>,
+    private val onEnded: () -> Unit,
+    private val onError: () -> Unit,
+) {
     private var player: MediaPlayer? = null
     private var index = -1
     private var baseMs = 0L
@@ -1194,29 +1278,57 @@ private class MeetingPlayer(private val parts: List<MeetingPart>) {
     val positionMs: Long get() = baseMs + (player?.currentPosition ?: 0).toLong()
 
     fun playFrom(globalMs: Long) {
+        if (parts.isEmpty()) return
         val target = parts.indexOfLast { globalMs >= it.startMs }.coerceAtLeast(0)
         play(target, (globalMs - parts[target].startMs).coerceAtLeast(0))
     }
 
-    private fun play(newIndex: Int, offsetMs: Long) {
+    /** Moves the running player, or prepares the part under [globalMs] without starting it. */
+    fun seekTo(globalMs: Long) {
+        val target = parts.indexOfLast { globalMs >= it.startMs }.coerceAtLeast(0)
+        val offset = (globalMs - parts[target].startMs).coerceAtLeast(0)
+        if (target == index && player != null) {
+            player?.seekTo(offset.toInt())
+        } else {
+            play(target, offset, start = player?.isPlaying == true)
+        }
+    }
+
+    private fun play(newIndex: Int, offsetMs: Long, start: Boolean = true) {
         if (newIndex == index && player != null) {
             player?.seekTo(offsetMs.toInt())
-            player?.start()
+            if (start) player?.start()
             return
         }
-        player?.release()
-        player = null
+        release()
         val part = parts.getOrNull(newIndex) ?: return
         baseMs = part.startMs
         index = newIndex
-        player = MediaPlayer().apply {
-            setDataSource(part.file.absolutePath)
-            setOnCompletionListener {
-                if (newIndex + 1 < parts.size) play(newIndex + 1, 0)
+        val media = MediaPlayer()
+        player = media
+        runCatching {
+            media.setDataSource(part.file.absolutePath)
+            media.setOnPreparedListener {
+                runCatching { it.seekTo(offsetMs.toInt()) }
+                if (start) runCatching { it.start() }
             }
-            prepare()
-            seekTo(offsetMs.toInt())
-            start()
+            media.setOnCompletionListener {
+                if (newIndex + 1 < parts.size) play(newIndex + 1, 0) else {
+                    release()
+                    onEnded()
+                }
+            }
+            media.setOnErrorListener { mp, _, _ ->
+                runCatching { mp.reset() }
+                release()
+                onError()
+                true
+            }
+            // Asynchronous: preparing a phone file on the main thread can stall the frame.
+            media.prepareAsync()
+        }.onFailure {
+            release()
+            onError()
         }
     }
 
@@ -1227,6 +1339,7 @@ private class MeetingPlayer(private val parts: List<MeetingPart>) {
     fun release() {
         runCatching { player?.release() }
         player = null
+        index = -1
     }
 }
 

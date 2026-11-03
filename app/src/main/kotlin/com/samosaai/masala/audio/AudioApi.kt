@@ -299,7 +299,7 @@ class AudioApi(
         const val DIARIZATION_MODE = "DIARIZATION"
 
         /** `speaker_B|>` is an artefact the endpoint sometimes emits as a turn of its own. */
-        private val SPEAKER_ARTIFACT = Regex("(?i)^speaker_[a-z]\\|?>?$")
+        private val SPEAKER_ARTIFACT = Regex("(?i)^<?\\|?speaker_[a-z]\\|?>?$")
 
         /**
          * Reads an `/asr/transcribe` answer with `turns`. Kept separate from the network call so the

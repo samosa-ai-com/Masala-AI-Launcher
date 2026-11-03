@@ -43,7 +43,7 @@ class MeetingTranscriber(
     suspend fun drain(meetingId: String): Boolean = withContext(Dispatchers.IO) {
         repo.resetStuckChunks(meetingId)
         while (true) {
-            val chunk = repo.nextChunk(meetingId) ?: return@withContext true
+            val chunk = repo.nextChunk(meetingId, MAX_ATTEMPTS) ?: return@withContext true
             val meeting = repo.get(meetingId) ?: return@withContext true
             val result = transcribeChunk(meeting, chunk)
             if (result.isFailure) {
@@ -95,11 +95,14 @@ class MeetingTranscriber(
                 WavPcm.write(uploadFile, upload)
 
                 val transcript = upload(uploadFile, config)
+                // The meeting may have been deleted while this upload was in flight.
+                if (repo.get(meeting.id) == null) return@runCatching
                 val mapped = mapLabels(meeting, chunk, previous, transcript, previousWav, overlapUsedMs)
                 // The window's own clock is local (0 = the start of the upload, overlap included);
                 // place() moves it onto the meeting's clock and drops the overlap.
                 val placed = MeetingTimeline.place(mapped.turns, chunk.startMs, overlapUsedMs)
                 repo.replaceTurns(meeting.id, chunk.idx, placed, 0)
+                trimBoundary(meeting.id, chunk.idx)
                 if (chunk.durationMs <= 0) repo.setChunkDuration(meeting.id, chunk.idx, durationMs)
                 repo.finishChunk(meeting.id, chunk.idx, uncertain = mapped.uncertain)
                 runCatching { uploadFile.delete() }
@@ -109,6 +112,10 @@ class MeetingTranscriber(
                 Unit
             }.onFailure { error ->
                 val message = error.message?.take(300) ?: error::class.java.simpleName
+                // A retry must re-convert from the AAC source: enhancing an already-enhanced WAV
+                // applies the high-pass, gate and normalization a second time.
+                runCatching { File(workDir(meeting.id), "chunk-%03d.wav".format(chunk.idx)).delete() }
+                runCatching { File(workDir(meeting.id), "upload-%03d.wav".format(chunk.idx)).delete() }
                 repo.failChunk(meeting.id, chunk.idx, message)
             }
         }
@@ -138,8 +145,10 @@ class MeetingTranscriber(
         if (wanted.isNotEmpty()) return wanted
         return runCatching { api.listAudioModels() }.getOrDefault(emptyList())
             .firstOrNull { it.category == ModelCategory.STT }?.id
-            ?: runCatching { api.listAudioModels() }.getOrDefault(emptyList()).firstOrNull()?.id
-            ?: error("The transcription endpoint advertises no speech model")
+            ?: error(
+                "The transcription endpoint advertises no speech model. Set one in Settings → " +
+                    "Meeting notes → Transcription model.",
+            )
     }
 
     private fun client(config: SpeechConfig): AudioApi = synchronized(this) {
@@ -150,10 +159,13 @@ class MeetingTranscriber(
 
     /** The previous chunk's audio, for the overlap; converted once per run and cached in the work dir. */
     private fun previousAudio(chunk: MeetingChunkEntity): WavPcm.Audio? {
-        if (chunk.idx <= 0) return null
+        // This is the *previous* chunk (idx 0 when transcribing chunk 1), so an `idx <= 0` guard
+        // here silently disabled every overlap. previousChunk() already returns null when there is
+        // no previous window.
         val source = File(chunk.path)
         if (!source.isFile) return null
-        val file = File(context.cacheDir, "meeting-prev-${chunk.meetingId}-${chunk.idx}.wav")
+        // Kept in the meeting's work dir, which is removed when the meeting finishes or is deleted.
+        val file = File(workDir(chunk.meetingId), "prev-%03d.wav".format(chunk.idx))
         if (!file.isFile) {
             file.parentFile?.mkdirs()
             if (!AndroidTranscriber.toWav(source, file)) return null
@@ -201,6 +213,28 @@ class MeetingTranscriber(
         return Mapped(mapped, mapping.uncertain)
     }
 
+    /**
+     * A window can end mid-sentence while the next one, which starts a few seconds earlier, has the
+     * whole sentence. Drop the previous chunk's trailing fragment when the new first turn covers it.
+     */
+    private suspend fun trimBoundary(meetingId: String, chunkIdx: Int) {
+        if (chunkIdx <= 0) return
+        val all = repo.turnsNow(meetingId)
+        val previous = all.filter { it.chunkIdx == chunkIdx - 1 }.maxByOrNull { it.endMs } ?: return
+        val first = all.filter { it.chunkIdx == chunkIdx }.minByOrNull { it.startMs } ?: return
+        if (previous.endMs <= first.startMs) return
+        val old = words(previous.text)
+        val new = words(first.text)
+        if (old.isEmpty() || new.isEmpty()) return
+        val shared = old.count { it in new }
+        if (shared * 2 >= old.size) repo.deleteTurn(previous.id)
+    }
+
+    private fun words(text: String): List<String> = text.lowercase()
+        .replace(Regex("[^\\p{L}\\p{N}\\p{M}\\s]"), " ")
+        .split(Regex("\\s+"))
+        .filter { it.isNotBlank() }
+
     private fun chunkStartOf(chunk: MeetingChunkEntity): Long = chunk.startMs
 
     private fun workDir(meetingId: String): File = File(context.cacheDir, "meeting-$meetingId")
@@ -215,5 +249,8 @@ class MeetingTranscriber(
 
         /** Five minutes of audio processes in about a minute; this only catches a dead connection. */
         const val ASR_TIMEOUT_SECONDS = 150L
+
+        /** A chunk is tried this many times before the meeting is marked failed. */
+        const val MAX_ATTEMPTS = 3
     }
 }

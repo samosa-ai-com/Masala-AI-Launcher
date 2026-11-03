@@ -770,6 +770,25 @@ interface MeetingChunkDao {
     @Query("SELECT * FROM meeting_chunks WHERE meetingId = :id AND status = 'recorded' ORDER BY idx LIMIT 1")
     suspend fun nextRecorded(id: String): MeetingChunkEntity?
 
+    /** Work the transcriber may take: a closed chunk, or a failed one that still has attempts left. */
+    @Query(
+        "SELECT * FROM meeting_chunks WHERE meetingId = :id AND " +
+            "(status = 'recorded' OR (status = 'failed' AND attempts < :maxAttempts)) ORDER BY idx LIMIT 1",
+    )
+    suspend fun nextPending(id: String, maxAttempts: Int): MeetingChunkEntity?
+
+    /** Closes a chunk the recorder was writing: it is only now safe to upload. */
+    @Query("UPDATE meeting_chunks SET status = 'recorded', durationMs = :durationMs WHERE meetingId = :id AND idx = :idx")
+    suspend fun close(id: String, idx: Int, durationMs: Long)
+
+    /** A chunk left open by a killed process cannot be read; keep the row honest about why. */
+    @Query("UPDATE meeting_chunks SET status = 'failed', error = :reason WHERE meetingId = :id AND status = 'open'")
+    suspend fun abandonOpen(id: String, reason: String)
+
+    /** The UI's Retry: failed chunks get their attempts back and rejoin the queue. */
+    @Query("UPDATE meeting_chunks SET status = 'recorded', attempts = 0, error = NULL WHERE meetingId = :id AND status = 'failed'")
+    suspend fun retryFailed(id: String)
+
     @Query("UPDATE meeting_chunks SET status = :status, attempts = attempts + 1, error = :error WHERE id = :id")
     suspend fun setStatus(id: String, status: String, error: String?)
 
@@ -809,6 +828,9 @@ interface MeetingTurnDao {
 
     @Query("DELETE FROM meeting_turns WHERE meetingId = :id AND chunkIdx = :chunkIdx")
     suspend fun deleteByChunk(id: String, chunkIdx: Int)
+
+    @Query("DELETE FROM meeting_turns WHERE id = :turnId")
+    suspend fun deleteById(turnId: Long)
 
     @Query("SELECT speaker, SUM(endMs - startMs) AS ms FROM meeting_turns WHERE meetingId = :id GROUP BY speaker ORDER BY ms DESC")
     suspend fun talkTime(id: String): List<SpeakerTalk>

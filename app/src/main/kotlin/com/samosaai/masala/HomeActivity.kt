@@ -878,11 +878,9 @@ class HomeActivity : ComponentActivity() {
                         app.commands.restoreSession(emptyList())
                         expanded = false
                     },
-                    experts = remember {
-                        app.experts().map {
-                            com.samosaai.masala.chat.ExpertCredit(it.id, it.title.ifBlank { it.id })
-                        }
-                    },
+                    // Recomputed on every composition (never remembered): hiding or restoring an
+                    // expert must show up here without recreating the activity.
+                    experts = expertCredits(app),
                     onRetry = {
                         if (!app.commands.ask(getString(R.string.capability_retry_prompt))) chatBusyToast()
                     },
@@ -1521,3 +1519,7 @@ private fun Isolated(content: @Composable () -> Unit) = content()
  */
 private fun drawerLayerStrategy(p: Float): CompositingStrategy =
     if (p > 0f && p < 1f) CompositingStrategy.Offscreen else CompositingStrategy.ModulateAlpha
+
+/** The chat sheet's expert chips. A plain list, read fresh each time the sheet composes. */
+private fun expertCredits(app: MasalaApp): List<com.samosaai.masala.chat.ExpertCredit> =
+    app.experts().map { com.samosaai.masala.chat.ExpertCredit(it.id, it.title.ifBlank { it.id }) }
