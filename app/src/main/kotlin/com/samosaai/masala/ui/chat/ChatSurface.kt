@@ -83,6 +83,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -201,7 +202,27 @@ fun ChatSurface(
                     experts = experts,
                     onAskExpert = onAskExpert,
                 )
-                Box(Modifier.weight(1f)) {
+                // The hint under the orb promises a drag up to the thread, so the
+                // collapsed body itself takes that vertical drag — not just the 26 dp
+                // handle above. Keyed off once expanded: there the thread scrolls in
+                // this spot and must keep its scroll without collapsing the sheet.
+                var bodyDrag by remember { mutableFloatStateOf(0f) }
+                Box(
+                    Modifier.weight(1f).pointerInput(expanded) {
+                        if (expanded) return@pointerInput
+                        // Same 40 px trip as the handle above; up opens, down closes.
+                        // A tap never trips it, so the hint button below still clicks.
+                        detectVerticalDragGestures(
+                            onDragEnd = {
+                                when {
+                                    bodyDrag < -40f -> onExpanded(true)
+                                    bodyDrag > 40f -> onClose()
+                                }
+                                bodyDrag = 0f
+                            },
+                        ) { _, dy -> bodyDrag += dy }
+                    },
+                ) {
                     when {
                         // Collapsed is the live orb, whether or not a conversation exists:
                         // that is the state's whole point, and what the swipe returns to.
@@ -214,6 +235,7 @@ fun ChatSurface(
                             // the final transcript is sent.
                             showShimmer = listening,
                             caption = if (paused) stringResource(R.string.voice_paused) else (turns.lastOrNull { it.role == TurnRole.MASALA }?.text ?: "").take(140),
+                            onExpand = { onExpanded(true) },
                         )
                         turns.isEmpty() && !listening && !paused && !thinking -> EmptyThread(level, character, experts, onAskExpert)
                         else -> Thread(
@@ -389,7 +411,14 @@ private fun Header(
 
 /** Talking: Sam and rings that follow the mic, with the last answer when idle. */
 @Composable
-private fun Orb(level: () -> Float, character: Character, listening: Boolean, caption: String, showShimmer: Boolean = false) {
+private fun Orb(
+    level: () -> Float,
+    character: Character,
+    listening: Boolean,
+    caption: String,
+    showShimmer: Boolean = false,
+    onExpand: () -> Unit,
+) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Box(contentAlignment = Alignment.Center) {
             // The engine reports one level per 200 ms audio window; animating between them
@@ -446,11 +475,17 @@ private fun Orb(level: () -> Float, character: Character, listening: Boolean, ca
             )
         }
         if (!listening) {
+            // The hint is the button for the drag the collapsed body takes: same
+            // look (bodySmall, textLow, same string), but TalkBack announces the
+            // role and tapping it expands.
+            val hint = stringResource(R.string.chat_drag_for_thread)
             Text(
-                stringResource(R.string.chat_drag_for_thread),
+                hint,
                 style = MaterialTheme.typography.bodySmall,
                 color = MasalaTheme.tokens.textLow,
-                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                    .clickable(role = Role.Button, onClickLabel = hint) { onExpand() }
+                    .semantics { contentDescription = hint },
             )
         }
     }
