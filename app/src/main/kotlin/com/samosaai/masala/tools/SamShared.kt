@@ -46,9 +46,26 @@ internal object SamShared {
     /** One `<Nf>` group of the video wire format: frame index plus its boxes. */
     data class VideoFrame(val frame: Int, val boxes: List<RichBox>)
 
+    /**
+     * One detection record: object id, box (source pixels, [RichBox.w]/[h] are
+     * the frame size) and the mask token's own raster size plus marker+payload
+     * (`~…` lossless, `!…` one_bit) for [com.samosaai.masala.tools.sam.MaskCodec].
+     */
+    data class SamRecord(
+        val id: Int,
+        val box: RichBox,
+        val maskHeight: Int,
+        val maskWidth: Int,
+        val maskPayload: String,
+    )
+
     private val BOX_RE = Regex("<\\|box;x1=(\\d+);y1=(\\d+);x2=(\\d+);y2=(\\d+);(?:w=(\\d+);h=(\\d+);?)?")
     private val FRAME_RE = Regex("<(\\d+)f>")
     private val MASK_RE = Regex("<\\|mask;")
+    private val RECORD_RE = Regex(
+        "(\\d+)<\\|box;x1=(\\d+);y1=(\\d+);x2=(\\d+);y2=(\\d+);(?:w=(\\d+);h=(\\d+))?[^|]*\\|>" +
+            "<\\|mask;[^|]*?;data=(\\d+),(\\d+),([~!][^|]+)\\|>",
+    )
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -91,6 +108,28 @@ internal object SamShared {
     }
 
     fun countMasks(wire: String): Int = MASK_RE.findAll(wire).count()
+
+    /**
+     * Parses `id<|box;…|><|mask;…|>` records in wire order. The base85 payload
+     * alphabet excludes `,;<>|` so the mask token ends at the first `|>`.
+     */
+    fun parseRecords(wire: String): List<SamRecord> =
+        RECORD_RE.findAll(wire).map {
+            SamRecord(
+                id = it.groupValues[1].toInt(),
+                box = RichBox(
+                    it.groupValues[2].toInt(),
+                    it.groupValues[3].toInt(),
+                    it.groupValues[4].toInt(),
+                    it.groupValues[5].toInt(),
+                    it.groupValues[6].toIntOrNull() ?: 0,
+                    it.groupValues[7].toIntOrNull() ?: 0,
+                ),
+                maskHeight = it.groupValues[8].toInt(),
+                maskWidth = it.groupValues[9].toInt(),
+                maskPayload = it.groupValues[10],
+            )
+        }.toList()
 
     /** `max_frames` is a hint: clamped to 1..16, default 8. */
     fun clampMaxFrames(v: Int?): Int = (v ?: DEFAULT_MAX_FRAMES).coerceIn(1, MAX_FRAMES_CAP)
