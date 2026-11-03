@@ -14,6 +14,10 @@ class PocketStoreLogicTest {
         PocketApp("games/quiz/angles", "Angle Trainer", "games", "quiz", "📐", "Train your eye for angles.", "1 player", "games/quiz/angles.html"),
     )
 
+    /** A minimal catalogue entry for the shelf tests. */
+    private fun app(id: String, title: String, category: String, group: String) =
+        PocketApp(id, title, category, group, "✨", "", "1 player", "$id.html")
+
     @Test fun `asset urls point at the loader domain`() {
         assertEquals(
             "https://appassets.androidplatform.net/assets/miniapps/games/puzzle/tower.html",
@@ -62,5 +66,36 @@ class PocketStoreLogicTest {
             val h = PocketStoreLogic.tileHue(it.id)
             assertTrue(h in 0f..360f, "hue $h out of range for ${it.id}")
         }
+    }
+
+    @Test fun `shelves start with featured and never repeat an app`() {
+        // Enough entries to make several groups shelf-worthy.
+        val many = (1..6).flatMap { n ->
+            listOf(
+                app("apps/tools/t$n", "Tool $n", "apps", "tools"),
+                app("apps/health/h$n", "Health $n", "apps", "health"),
+                app("games/puzzle/p$n", "Puzzle $n", "games", "puzzle"),
+                app("games/arcade/a$n", "Arcade $n", "games", "arcade"),
+            )
+        }
+        val shelves = PocketStoreLogic.shelves(many)
+
+        assertEquals(PocketStoreLogic.ShelfKind.FEATURED, shelves.first().kind)
+        // Featured is always full, and it starts from the tool groups rather than games.
+        assertEquals(PocketStoreLogic.FEATURED_COUNT, shelves.first().apps.size)
+        assertTrue(shelves.first().apps.any { it.category == "apps" })
+        val seen = mutableListOf<String>()
+        shelves.forEach { shelf ->
+            assertTrue(shelf.apps.isNotEmpty(), "empty shelf ${shelf.kind} ${shelf.title}")
+            seen += shelf.apps.map { it.id }
+        }
+        assertEquals(seen.size, seen.distinct().size, "an app appears on two shelves")
+        assertTrue(shelves.any { it.kind == PocketStoreLogic.ShelfKind.TOP_GAMES })
+        // The remaining tool apps still earn a shelf of their own.
+        assertTrue(shelves.any { it.kind == PocketStoreLogic.ShelfKind.GROUP && it.title == "Tools" })
+    }
+
+    @Test fun `an empty catalogue has no shelves`() {
+        assertEquals(emptyList(), PocketStoreLogic.shelves(emptyList()))
     }
 }

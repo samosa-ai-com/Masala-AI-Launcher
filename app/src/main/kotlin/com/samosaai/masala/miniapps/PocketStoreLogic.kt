@@ -41,6 +41,78 @@ object PocketStoreLogic {
         for (c in id) h = h * 31 + c.code
         return ((h % 360) + 360) % 360f
     }
+
+    /** One row of the storefront: a header kind, the group name for a category shelf, and the apps. */
+    enum class ShelfKind { FEATURED, TOP_GAMES, GROUP }
+
+    data class Shelf(val kind: ShelfKind, val apps: List<PocketApp>, val title: String = "")
+
+    /**
+     * The shelves the storefront shows, built once per catalogue:
+     *
+     * 1. **Featured** — one app from each of the tool groups, so the row spans the pack instead
+     *    of showing four puzzle games; games fill any gap when the pack has fewer tools.
+     * 2. **Top games** — the first games by title (there is no usage data to rank by yet).
+     * 3. **One shelf per category** with at least [SHELF_MIN] apps, the biggest first.
+     *
+     * An app appears on one shelf only, so the page never pads itself with repeats.
+     */
+    fun shelves(apps: List<PocketApp>, maxShelves: Int = 12, perShelf: Int = 20): List<Shelf> {
+        if (apps.isEmpty()) return emptyList()
+        val used = HashSet<String>()
+        val featured = mutableListOf<PocketApp>()
+        for (group in listOf("tools", "health", "money", "home")) {
+            apps.firstOrNull { it.category == "apps" && it.group == group && it.id !in used }?.let {
+                featured += it
+                used += it.id
+            }
+        }
+        if (featured.size < FEATURED_COUNT) {
+            apps.asSequence()
+                .filter { it.category == "games" && it.id !in used }
+                .sortedBy { it.title.lowercase() }
+                .take(FEATURED_COUNT - featured.size)
+                .forEach { featured += it; used += it.id }
+        }
+
+        val topGames = apps.asSequence()
+            .filter { it.category == "games" && it.id !in used }
+            .sortedBy { it.title.lowercase() }
+            .take(perShelf)
+            .toList()
+            .onEach { used += it.id }
+
+        val byGroup = apps.asSequence()
+            .filter { it.id !in used }
+            .groupBy { it.category to it.group }
+            .filter { it.value.size >= SHELF_MIN }
+            .entries
+            .sortedByDescending { it.value.size }
+            .take(maxShelves)
+            .map { (key, list) ->
+                val shelfApps = list.sortedBy { it.title.lowercase() }.take(perShelf)
+                shelfApps.forEach { used += it.id }
+                Shelf(ShelfKind.GROUP, shelfApps, shelfTitle(key.first, key.second))
+            }
+
+        return buildList {
+            if (featured.isNotEmpty()) add(Shelf(ShelfKind.FEATURED, featured))
+            if (topGames.isNotEmpty()) add(Shelf(ShelfKind.TOP_GAMES, topGames))
+            addAll(byGroup)
+        }
+    }
+
+    /** A shelf header: "Puzzle games" for a game group, the group's own name for an app group. */
+    fun shelfTitle(category: String, group: String): String {
+        val name = group.split('-', '_').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+        return if (category == "games") "$name games" else name
+    }
+
+    /** The featured row's width. */
+    const val FEATURED_COUNT = 4
+
+    /** A category needs this many apps before it earns its own shelf. */
+    const val SHELF_MIN = 4
 }
 
 /** Whether a lower-cased, trimmed query hits this entry's title, description, group or category. */

@@ -7,13 +7,18 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -50,11 +55,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The bundled mini-app store (Settings → Mini apps → Store): the whole pocket pack browsable by
- * category tab, group chip and search, in a lazy grid of emoji-tile cards. Tapping a card opens a
- * detail sheet with Open (straight from the pack, offline) and Customise with Masala (copies the
- * HTML into the user's apps and opens the chat with a prefilled prompt). No WebView per card and
- * no HTML reads while browsing, so 317 entries scroll smoothly.
+ * The bundled mini-app store (Settings → Mini apps → Store), laid out like a storefront rather than
+ * a list: a featured row, then one horizontally scrolling shelf per shelf-worthy category, and a
+ * search field that flips to a result grid. Cards carry an icon and a title only — a description in
+ * every tile is what made the first version read like a document. The full text lives in the detail
+ * sheet, where Open (straight from the pack, offline) and Customise with Masala sit.
+ *
+ * No WebView per card and no HTML reads while browsing, so 317 entries scroll smoothly.
  */
 @Composable
 fun PocketStorePage(
@@ -81,6 +88,7 @@ fun PocketStorePage(
     val shown = remember(apps, query, category, group) {
         PocketStoreLogic.filter(apps, query, category, group)
     }
+    val browsing = query.isBlank() && category.isEmpty() && group.isEmpty()
 
     SettingsScaffold(stringResource(R.string.pocket_store_title), onBack) {
         OutlinedTextField(
@@ -101,27 +109,30 @@ fun PocketStorePage(
                 }
             }
         }
-        Text(
-            stringResource(R.string.pocket_store_count, shown.size),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (shown.isEmpty()) {
-            Text(
+        when {
+            apps.isEmpty() -> Unit // first frame, the catalogue is still loading
+            browsing -> StoreShelves(apps, onPick = { picked = it }, modifier = Modifier.weight(1f))
+            shown.isEmpty() -> Text(
                 stringResource(R.string.pocket_store_empty),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 24.dp),
             )
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                items(shown, key = { it.id }) { app ->
-                    PocketCard(app, onClick = { picked = app })
+            else -> {
+                Text(
+                    stringResource(R.string.pocket_store_count, shown.size),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    gridItems(shown, key = { it.id }) { app ->
+                        AppTile(app, onClick = { picked = app })
+                    }
                 }
             }
         }
@@ -137,27 +148,76 @@ fun PocketStorePage(
     }
 }
 
-/** `word-guessing` → `Word guessing`; the catalogue stores machine names. */
-internal fun groupLabel(group: String): String =
-    group.split('-', '_').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
-
+/**
+ * The storefront proper: a featured shelf, a games shelf and then the biggest categories. Grouped
+ * once per catalogue load; a shelf never repeats an app to keep the rows distinct.
+ */
 @Composable
-private fun PocketCard(app: PocketApp, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(24.dp)
-    Column(
-        Modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh).clickable(onClick = onClick).padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+private fun StoreShelves(apps: List<PocketApp>, onPick: (PocketApp) -> Unit, modifier: Modifier = Modifier) {
+    val shelves = remember(apps) { PocketStoreLogic.shelves(apps) }
+    val featuredTitle = stringResource(R.string.pocket_store_featured)
+    val topGamesTitle = stringResource(R.string.pocket_store_top_games)
+    LazyColumn(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
-        EmojiTile(app.icon.ifBlank { "✨" }, app.id, 56.dp)
-        Text(app.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        shelves.forEach { shelf ->
+            val title = when (shelf.kind) {
+                PocketStoreLogic.ShelfKind.FEATURED -> featuredTitle
+                PocketStoreLogic.ShelfKind.TOP_GAMES -> topGamesTitle
+                PocketStoreLogic.ShelfKind.GROUP -> shelf.title
+            }
+            item(key = shelf.kind.name + shelf.title) {
+                Shelf(title, shelf.apps, onPick)
+            }
+        }
+    }
+}
+
+/** One titled row: a header and a horizontally scrolling line of tiles. */
+@Composable
+private fun Shelf(title: String, apps: List<PocketApp>, onPick: (PocketApp) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            app.description.ifBlank { groupLabel(app.group) },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(apps, key = { it.id }) { app ->
+                AppTile(app, onClick = { onPick(app) }, modifier = Modifier.width(112.dp))
+            }
+        }
+    }
+}
+
+/** Icon over a one-line title: the store's card. No description by design. */
+@Composable
+private fun AppTile(app: PocketApp, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier.width(104.dp).clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick).padding(vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        EmojiTile(app.icon.ifBlank { "✨" }, app.id, 64.dp)
+        Text(
+            app.title,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
     }
 }
+
+/** `word-guessing` → `Word guessing`; the catalogue stores machine names. */
+internal fun groupLabel(group: String): String =
+    group.split('-', '_').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
 
 @Composable
 private fun PocketDetailSheet(
@@ -207,7 +267,7 @@ internal fun EmojiTile(emoji: String, id: String, size: androidx.compose.ui.unit
         Color.hsl(PocketStoreLogic.tileHue(id), 0.55f, if (dark) 0.30f else 0.88f)
     }
     Box(
-        Modifier.size(size).clip(RoundedCornerShape(16.dp)).background(ground),
+        Modifier.size(size).clip(RoundedCornerShape(18.dp)).background(ground),
         contentAlignment = Alignment.Center,
     ) {
         Text(emoji, fontSize = (size.value * 0.5f).sp, fontWeight = FontWeight.Normal, maxLines = 1)

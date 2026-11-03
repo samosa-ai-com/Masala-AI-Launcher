@@ -264,6 +264,8 @@
     <string name="pocket_store_apps">Apps</string>
     <string name="pocket_store_games">Games</string>
     <string name="pocket_store_count">%1$d apps</string>
+    <string name="pocket_store_featured">Featured</string>
+    <string name="pocket_store_top_games">Top games</string>
     <string name="pocket_store_empty">No apps match.</string>
     <string name="pocket_store_included">Included with Masala — works offline, right on this phone.</string>
     <string name="pocket_store_customize">Customise with Masala</string>

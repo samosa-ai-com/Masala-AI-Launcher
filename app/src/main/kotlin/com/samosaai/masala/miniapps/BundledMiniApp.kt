@@ -94,10 +94,16 @@ internal fun hostBundledMiniApp(
             }
             val served = loader.shouldInterceptRequest(request.url) ?: return blockedPocketResponse("", onConsole)
             // Served as-is but with the offline CSP, so WebSockets can't reach past the interceptor.
-            return WebResourceResponse(
-                served.mimeType, served.encoding, served.statusCode, served.reasonPhrase,
-                mapOf("Content-Security-Policy" to miniAppOfflineCsp), served.data,
-            )
+            val headers = mapOf("Content-Security-Policy" to miniAppOfflineCsp)
+            // The asset loader's response carries no HTTP status (0), and WebResourceResponse
+            // rejects anything below 100; the three-argument form means "200 OK".
+            return if (served.statusCode >= 100) {
+                WebResourceResponse(served.mimeType, served.encoding, served.statusCode, served.reasonPhrase, headers, served.data)
+            } else {
+                WebResourceResponse(served.mimeType, served.encoding, served.data).apply {
+                    responseHeaders = headers
+                }
+            }
         }
 
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
