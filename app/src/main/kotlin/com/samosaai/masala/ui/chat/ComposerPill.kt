@@ -76,6 +76,11 @@ fun ComposerPill(
     fieldModifier: Modifier = Modifier,
     micLevel: () -> Float = { 0f },
     placeholder: String = stringResource(R.string.command_hint),
+    /**
+     * False when the caller cannot carry a pending draft into listening: tapping the mic would
+     * leave the typed text and photos behind. The surface that keeps its draft leaves this true.
+     */
+    micEnabled: Boolean = true,
 ) {
     val tokens = MasalaTheme.tokens
     var tray by remember { mutableStateOf(false) }
@@ -116,17 +121,22 @@ fun ComposerPill(
                 )
                 if (canSend) {
                     // The mic stays reachable with text in the field: switch to voice mid-sentence.
-                    IconButton(onClick = onMic, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Rounded.Mic, stringResource(R.string.voice_tap), tint = tokens.textMedium)
+                    // 48 dp of touch target around a 40 dp circle, so mic and Send don't overlap.
+                    IconButton(onClick = onMic, enabled = micEnabled, modifier = Modifier.size(48.dp)) {
+                        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Rounded.Mic, stringResource(R.string.voice_tap), tint = tokens.textMedium)
+                        }
                     }
-                    IconButton(
-                        onClick = onSend,
-                        modifier = Modifier.size(40.dp).clip(CircleShape).background(tokens.accent),
-                    ) {
-                        Icon(Icons.AutoMirrored.Rounded.Send, stringResource(R.string.skill_send), tint = tokens.onAccent, modifier = Modifier.size(20.dp))
+                    IconButton(onClick = onSend, modifier = Modifier.size(48.dp)) {
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape).background(tokens.accent),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.AutoMirrored.Rounded.Send, stringResource(R.string.skill_send), tint = tokens.onAccent, modifier = Modifier.size(20.dp))
+                        }
                     }
                 } else {
-                    MicButton(onMic, level = micLevel, size = 40.dp)
+                    MicButton(onMic, level = micLevel, size = 48.dp)
                 }
             }
         }
@@ -138,12 +148,15 @@ fun ComposerPill(
 private fun PinButton(open: Boolean, onClick: () -> Unit) {
     val tokens = MasalaTheme.tokens
     val label = stringResource(if (open) R.string.composer_attach_close else R.string.composer_attach)
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier.size(40.dp).clip(CircleShape)
-            .background(if (open) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else androidx.compose.ui.graphics.Color.Transparent),
-    ) {
-        Icon(if (open) Icons.Rounded.Close else Icons.Rounded.AttachFile, label, tint = if (open) MaterialTheme.colorScheme.onSurface else tokens.textMedium)
+    // 48 dp target around the 40 dp circle.
+    IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) {
+        Box(
+            Modifier.size(40.dp).clip(CircleShape)
+                .background(if (open) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else androidx.compose.ui.graphics.Color.Transparent),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(if (open) Icons.Rounded.Close else Icons.Rounded.AttachFile, label, tint = if (open) MaterialTheme.colorScheme.onSurface else tokens.textMedium)
+        }
     }
 }
 

@@ -959,6 +959,10 @@ private fun Controls(
     val scope = rememberCoroutineScope()
     val tooManyText = stringResource(R.string.chat_too_many_images, com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE)
     val badImageText = stringResource(R.string.chat_bad_image)
+    // Above the listening branches on purpose: a draft and its photos survive tapping the mic, so
+    // switching to voice mid-sentence never throws away what was typed.
+    var text by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue("")) }
+    var queued by remember { mutableStateOf(listOf<com.samosaai.masala.chat.AttachedImage>()) }
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         if (listening && elapsedMs >= com.samosaai.masala.audio.SttEngine.CAP_WARN_MS) {
             Text(
@@ -1006,8 +1010,6 @@ private fun Controls(
                     Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
                 }
             } else {
-                var text by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue("")) }
-                var queued by remember { mutableStateOf(listOf<com.samosaai.masala.chat.AttachedImage>()) }
                 var cameraTarget by remember { mutableStateOf<android.net.Uri?>(null) }
                 // A revert drops the message back here for editing; the nonce re-applies
                 // even when the same words are reverted twice in a row. Consuming it

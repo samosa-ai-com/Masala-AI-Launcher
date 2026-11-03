@@ -25,10 +25,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 /**
- * A web value on home (plan `docs/plans/widget-maker.md` §5): the fetched string plus [suffix],
- * or an em dash when nothing arrived yet; a stale value stays on screen with its age. Polls while
- * its page is showing at [HttpBinding.every] (checker floor: 30 s); background refresh is the
- * worker's job. Nothing fetches unless [allowed]: the host needs the user's approval first.
+ * A web value on home (plan `docs/plans/widget-maker.md` §5): the fetched string plus [suffix];
+ * before anything arrives it says "Waiting for a value" (or the approval note when the host has
+ * not been approved), and a stale value stays on screen with its age. Polls while its page is
+ * showing at [HttpBinding.every] (checker floor: 30 s); background refresh is the worker's job.
+ * Nothing fetches unless [allowed]: the host needs the user's approval first.
  */
 @Composable
 fun WebValueView(

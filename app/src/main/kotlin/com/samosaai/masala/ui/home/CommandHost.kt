@@ -230,179 +230,186 @@ fun ReplyCard(
     val widgetChip = stringResource(R.string.ask_chip_widget)
     val widgetPrompt = stringResource(R.string.ask_chip_widget_prompt)
     Column(if (docked) modifier.fillMaxWidth() else Modifier) {
-    if (docked) {
-        // Sam, the greeting and suggestion chips on the dimmed home above the sheet (step 4). The last
-        // chat's title (its first prompt) is the third chip.
-        val last = remember { app.chats.latest()?.title?.takeIf { it.isNotBlank() } }
-        val chips = listOfNotNull(todayChip to todayChip, widgetChip to widgetPrompt, last?.let { it to it })
-        AskIntro(character, chips, onChip = { prompt ->
-            text = TextFieldValue(prompt, TextRange(prompt.length))
-            runCatching { field.requestFocus() }
-        })
-    }
-    Card(
         if (docked) {
-            Modifier.fillMaxWidth()
-                .graphicsLayer { translationY = pull.value }
-                .draggable(
-                    androidx.compose.foundation.gestures.rememberDraggableState { d -> scope.launch { pull.snapTo((pull.value + d).coerceAtLeast(0f)) } },
-                    androidx.compose.foundation.gestures.Orientation.Vertical,
-                    onDragStopped = { velocity ->
-                        if (pull.value > closeAt || velocity > 1500f) close() else pull.animateTo(0f)
-                    },
-                )
-                .semantics { customActions = listOf(CustomAccessibilityAction(closeLabel) { close(); true }) }
-        } else {
-            modifier.fillMaxWidth().padding(12.dp)
-        },
-        shape = if (docked) RoundedCornerShape(topStart = Radii.sheet, topEnd = Radii.sheet) else RoundedCornerShape(Radii.sheet),
-        // Opaque: widgets under a translucent sheet showed through the field.
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer, contentColor = MaterialTheme.colorScheme.onSurface),
-        border = BorderStroke(1.dp, MasalaTheme.tokens.hairline),
-    ) {
-        Column(
-            // Docked, the sheet runs under the navigation bar; its content stays above it. The raw bar
-            // height, not windowInsetsPadding: the container already lifted the sheet by the keyboard
-            // minus the bar and marked that consumed, which zeroed a consuming nav-bar padding here
-            // and left the field under a docked keyboard (seen on the Redmi).
-            if (docked) Modifier.padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()).padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp) else Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(if (docked) 10.dp else 8.dp),
-        ) {
+            // Sam, the greeting and suggestion chips on the dimmed home above the sheet (step 4). The last
+            // chat's title (its first prompt) is the third chip.
+            val last = remember { app.chats.latest()?.title?.takeIf { it.isNotBlank() } }
+            val chips = listOfNotNull(todayChip to todayChip, widgetChip to widgetPrompt, last?.let { it to it })
+            AskIntro(character, chips, onChip = { prompt ->
+                text = TextFieldValue(prompt, TextRange(prompt.length))
+                runCatching { field.requestFocus() }
+            },
+                // Measured after the sheet, not before: the composer keeps its full height on a short
+                // screen and the greeting takes whatever is left (it scrolls rather than clipping).
+                modifier = Modifier.weight(1f, fill = false),
+            )
+        }
+        Card(
             if (docked) {
-                Box(
-                    Modifier.align(Alignment.CenterHorizontally).size(width = 36.dp, height = 4.dp).clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f)),
-                )
-            }
-            // One header: Sam in the corner for a reply or a failure, Read aloud and Close as round
-            // icon buttons on the other side (the chat screen's close, not a text link).
-            if (!docked) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (character != null && (state is CommandState.Reply || state is CommandState.Error)) {
-                    val speaking by app.speaking.collectAsStateWithLifecycle()
-                    com.samosaai.masala.ui.character.MasalaCharacter(
-                        character,
-                        com.samosaai.masala.ui.character.characterStateFor(state, speaking, night = false),
-                        Modifier.size(40.dp),
+                Modifier.fillMaxWidth()
+                    .graphicsLayer { translationY = pull.value }
+                    .draggable(
+                        androidx.compose.foundation.gestures.rememberDraggableState { d -> scope.launch { pull.snapTo((pull.value + d).coerceAtLeast(0f)) } },
+                        androidx.compose.foundation.gestures.Orientation.Vertical,
+                        onDragStopped = { velocity ->
+                            if (pull.value > closeAt || velocity > 1500f) close() else pull.animateTo(0f)
+                        },
+                    )
+                    .semantics { customActions = listOf(CustomAccessibilityAction(closeLabel) { close(); true }) }
+            } else {
+                modifier.fillMaxWidth().padding(12.dp)
+            },
+            shape = if (docked) RoundedCornerShape(topStart = Radii.sheet, topEnd = Radii.sheet) else RoundedCornerShape(Radii.sheet),
+            // Opaque: widgets under a translucent sheet showed through the field.
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer, contentColor = MaterialTheme.colorScheme.onSurface),
+            border = BorderStroke(1.dp, MasalaTheme.tokens.hairline),
+        ) {
+            Column(
+                // Docked, the sheet runs under the navigation bar; its content stays above it. The raw bar
+                // height, not windowInsetsPadding: the container already lifted the sheet by the keyboard
+                // minus the bar and marked that consumed, which zeroed a consuming nav-bar padding here
+                // and left the field under a docked keyboard (seen on the Redmi).
+                if (docked) Modifier.padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()).padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp) else Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(if (docked) 10.dp else 8.dp),
+            ) {
+                if (docked) {
+                    Box(
+                        Modifier.align(Alignment.CenterHorizontally).size(width = 36.dp, height = 4.dp).clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f)),
                     )
                 }
-                Box(Modifier.weight(1f))
-                if (reply != null) CircleAction(Icons.AutoMirrored.Rounded.VolumeUp, stringResource(R.string.command_read_aloud)) {
-                    scope.launch {
-                        app.speakReply(reply.text)?.let { reason ->
-                            android.widget.Toast.makeText(context, reason, android.widget.Toast.LENGTH_LONG).show()
-                        }
+                // One header: Sam in the corner for a reply or a failure, Read aloud and Close as round
+                // icon buttons on the other side (the chat screen's close, not a text link).
+                if (!docked) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (character != null && (state is CommandState.Reply || state is CommandState.Error)) {
+                        val speaking by app.speaking.collectAsStateWithLifecycle()
+                        com.samosaai.masala.ui.character.MasalaCharacter(
+                            character,
+                            com.samosaai.masala.ui.character.characterStateFor(state, speaking, night = false),
+                            Modifier.size(40.dp),
+                        )
                     }
-                }
-                CircleAction(Icons.Rounded.Close, closeLabel) { close() }
-            }
-            // Nothing to show while typing: no empty gap between the header and the field.
-            if (state != CommandState.Input) Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                when (val s = state) {
-                    CommandState.Listening -> Text(stringResource(R.string.command_listening), style = MaterialTheme.typography.titleMedium)
-                    CommandState.ListeningPaused -> Text(stringResource(R.string.voice_paused), style = MaterialTheme.typography.titleMedium)
-                    is CommandState.Thinking -> {
-                        if (s.prompt.isNotBlank()) Text(s.prompt, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(stringResource(R.string.command_thinking), style = MaterialTheme.typography.titleMedium)
-                        Steps(s.steps)
-                    }
-                    is CommandState.Reply -> {
-                        if (s.prompt.isNotBlank()) Text(s.prompt, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Steps(s.steps)
-                        Markdown(s.text)
-                        RememberedCards(app)
-                    }
-                    is CommandState.Error -> {
-                        Text(s.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
-                        s.capability?.let { marker ->
-                            Row {
-                                TextButton(onClick = { grant(marker) }) { Text(stringResource(R.string.command_grant)) }
-                                TextButton(onClick = { app.commands.ask(retryPrompt) }) { Text(stringResource(R.string.command_try_again)) }
+                    Box(Modifier.weight(1f))
+                    if (reply != null) CircleAction(Icons.AutoMirrored.Rounded.VolumeUp, stringResource(R.string.command_read_aloud)) {
+                        scope.launch {
+                            app.speakReply(reply.text)?.let { reason ->
+                                android.widget.Toast.makeText(context, reason, android.widget.Toast.LENGTH_LONG).show()
                             }
                         }
                     }
-                    CommandState.Input, CommandState.Idle -> Unit
+                    CircleAction(Icons.Rounded.Close, closeLabel) { close() }
                 }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (state == CommandState.Listening) {
-                    // The assist surface has no listening overlay: this Send is the only
-                    // way to end the take here. Close would throw it away.
-                    Box(Modifier.weight(1f))
-                    androidx.compose.material3.Button(onClick = { app.commands.sendNow() }) {
-                        Text(stringResource(R.string.chat_send_now))
-                    }
-                } else if (state == CommandState.ListeningPaused) {
-                    androidx.compose.material3.Button(onClick = { app.commands.continueListening() }) {
-                        Text(stringResource(R.string.voice_continue))
-                    }
-                    TextButton(onClick = { app.commands.dismiss() }) {
-                        Text(stringResource(R.string.listening_cancel))
-                    }
-                    Box(Modifier.weight(1f))
-                    androidx.compose.material3.Button(onClick = { app.commands.sendNow() }) {
-                        Text(stringResource(R.string.chat_send_now))
-                    }
-                } else {
-                    val tooManyText = stringResource(R.string.chat_too_many_images, com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE)
-                    val badImageText = stringResource(R.string.chat_bad_image)
-                    var queued by remember { mutableStateOf(listOf<com.samosaai.masala.chat.AttachedImage>()) }
-                    var cameraTarget by remember { mutableStateOf<android.net.Uri?>(null) }
-                    fun addUri(uri: android.net.Uri, name: String) {
-                        if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
-                            android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
-                            return
+                // Nothing to show while typing: no empty gap between the header and the field.
+                if (state != CommandState.Input) Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    when (val s = state) {
+                        CommandState.Listening -> Text(stringResource(R.string.command_listening), style = MaterialTheme.typography.titleMedium)
+                        CommandState.ListeningPaused -> Text(stringResource(R.string.voice_paused), style = MaterialTheme.typography.titleMedium)
+                        is CommandState.Thinking -> {
+                            if (s.prompt.isNotBlank()) Text(s.prompt, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.command_thinking), style = MaterialTheme.typography.titleMedium)
+                            Steps(s.steps)
                         }
-                        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                            val b64 = com.samosaai.masala.chat.compressToJpegBase64(context, uri)
-                            if (b64 == null) {
-                                launch(kotlinx.coroutines.Dispatchers.Main) {
-                                    android.widget.Toast.makeText(context, badImageText, android.widget.Toast.LENGTH_SHORT).show()
+                        is CommandState.Reply -> {
+                            if (s.prompt.isNotBlank()) Text(s.prompt, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Steps(s.steps)
+                            Markdown(s.text)
+                            RememberedCards(app)
+                        }
+                        is CommandState.Error -> {
+                            Text(s.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
+                            s.capability?.let { marker ->
+                                Row {
+                                    TextButton(onClick = { grant(marker) }) { Text(stringResource(R.string.command_grant)) }
+                                    TextButton(onClick = { app.commands.ask(retryPrompt) }) { Text(stringResource(R.string.command_try_again)) }
                                 }
-                            } else {
-                                val item = com.samosaai.masala.chat.AttachedImage(
-                                    id = "${System.currentTimeMillis()}-${queued.size}", name = name, jpegBase64 = b64,
-                                )
-                                launch(kotlinx.coroutines.Dispatchers.Main) { queued = queued + item }
                             }
                         }
+                        CommandState.Input, CommandState.Idle -> Unit
                     }
-                    val pickImage = androidx.activity.compose.rememberLauncherForActivityResult(
-                        androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(maxItems = com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE),
-                    ) { uris -> uris.forEachIndexed { i, u -> addUri(u, "image ${queued.size + i + 1}") } }
-                    val takePhoto = androidx.activity.compose.rememberLauncherForActivityResult(
-                        androidx.activity.result.contract.ActivityResultContracts.TakePicture(),
-                    ) { ok -> if (ok) cameraTarget?.let { addUri(it, "photo") } }
-                    com.samosaai.masala.ui.chat.ComposerPill(
-                        value = text,
-                        onValueChange = { text = it },
-                        images = queued,
-                        onRemoveImage = { id -> queued = queued.filterNot { it.id == id } },
-                        onPickPhoto = {
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (state == CommandState.Listening) {
+                        // The assist surface has no listening overlay: this Send is the only
+                        // way to end the take here. Close would throw it away.
+                        Box(Modifier.weight(1f))
+                        androidx.compose.material3.Button(onClick = { app.commands.sendNow() }) {
+                            Text(stringResource(R.string.chat_send_now))
+                        }
+                    } else if (state == CommandState.ListeningPaused) {
+                        androidx.compose.material3.Button(onClick = { app.commands.continueListening() }) {
+                            Text(stringResource(R.string.voice_continue))
+                        }
+                        TextButton(onClick = { app.commands.dismiss() }) {
+                            Text(stringResource(R.string.listening_cancel))
+                        }
+                        Box(Modifier.weight(1f))
+                        androidx.compose.material3.Button(onClick = { app.commands.sendNow() }) {
+                            Text(stringResource(R.string.chat_send_now))
+                        }
+                    } else {
+                        val tooManyText = stringResource(R.string.chat_too_many_images, com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE)
+                        val badImageText = stringResource(R.string.chat_bad_image)
+                        var queued by remember { mutableStateOf(listOf<com.samosaai.masala.chat.AttachedImage>()) }
+                        var cameraTarget by remember { mutableStateOf<android.net.Uri?>(null) }
+                        fun addUri(uri: android.net.Uri, name: String) {
                             if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
                                 android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
-                            } else pickImage.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
-                        },
-                        onTakePhoto = {
-                            if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
-                                android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
-                            } else {
-                                val dir = java.io.File(context.filesDir, "work").apply { mkdirs() }
-                                val file = com.samosaai.masala.tools.PhotoTool.photoFile(dir)
-                                val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
-                                cameraTarget = uri
-                                takePhoto.launch(uri)
+                                return
                             }
-                        },
-                        onMic = micTap,
-                        micLevel = { micLvl },
-                        onSend = { app.commands.ask(text.text, images = queued.map { it.jpegBase64 }); text = TextFieldValue(""); queued = emptyList() },
-                        modifier = Modifier.weight(1f),
-                        fieldModifier = Modifier.focusRequester(field),
-                    )
+                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                val b64 = com.samosaai.masala.chat.compressToJpegBase64(context, uri)
+                                if (b64 == null) {
+                                    launch(kotlinx.coroutines.Dispatchers.Main) {
+                                        android.widget.Toast.makeText(context, badImageText, android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    val item = com.samosaai.masala.chat.AttachedImage(
+                                        id = "${System.currentTimeMillis()}-${queued.size}", name = name, jpegBase64 = b64,
+                                    )
+                                    launch(kotlinx.coroutines.Dispatchers.Main) { queued = queued + item }
+                                }
+                            }
+                        }
+                        val pickImage = androidx.activity.compose.rememberLauncherForActivityResult(
+                            androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(maxItems = com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE),
+                        ) { uris -> uris.forEachIndexed { i, u -> addUri(u, "image ${queued.size + i + 1}") } }
+                        val takePhoto = androidx.activity.compose.rememberLauncherForActivityResult(
+                            androidx.activity.result.contract.ActivityResultContracts.TakePicture(),
+                        ) { ok -> if (ok) cameraTarget?.let { addUri(it, "photo") } }
+                        com.samosaai.masala.ui.chat.ComposerPill(
+                            value = text,
+                            onValueChange = { text = it },
+                            images = queued,
+                            onRemoveImage = { id -> queued = queued.filterNot { it.id == id } },
+                            onPickPhoto = {
+                                if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                                    android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
+                                } else pickImage.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            },
+                            onTakePhoto = {
+                                if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                                    android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
+                                } else {
+                                    val dir = java.io.File(context.filesDir, "work").apply { mkdirs() }
+                                    val file = com.samosaai.masala.tools.PhotoTool.photoFile(dir)
+                                    val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+                                    cameraTarget = uri
+                                    takePhoto.launch(uri)
+                                }
+                            },
+                            onMic = micTap,
+                            micLevel = { micLvl },
+                            // This card unmounts when listening starts, so it cannot carry the draft:
+                            // the mic stays off until what is typed (or attached) is sent or cleared.
+                            micEnabled = text.text.isBlank() && queued.isEmpty(),
+                            onSend = { app.commands.ask(text.text, images = queued.map { it.jpegBase64 }); text = TextFieldValue(""); queued = emptyList() },
+                            modifier = Modifier.weight(1f),
+                            fieldModifier = Modifier.focusRequester(field),
+                        )
+                    }
                 }
             }
         }
-    }
     }
 }
 

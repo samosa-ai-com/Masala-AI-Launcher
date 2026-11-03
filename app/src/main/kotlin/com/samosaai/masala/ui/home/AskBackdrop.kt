@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -50,7 +51,9 @@ fun AskIntro(
     modifier: Modifier = Modifier,
 ) {
     androidx.compose.foundation.layout.Column(
-        modifier.fillMaxWidth().padding(bottom = 12.dp),
+        // A short screen (landscape with the keyboard up) leaves little room: scroll instead of
+        // squeezing the composer, which is measured first by its weight in the caller.
+        modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 12.dp),
         verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
     ) {
         androidx.compose.foundation.layout.Column(

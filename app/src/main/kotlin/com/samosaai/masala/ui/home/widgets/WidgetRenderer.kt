@@ -185,7 +185,12 @@ private fun Component(
             val value = component.binding.let { WidgetValues.numberOf(it, storage, snapshot) }
             Column(Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    if (labelShown(component.label, title)) Text(component.label, style = MaterialTheme.typography.labelLarge, color = MasalaTheme.tokens.onWallpaperMedium)
+                    if (labelShown(component.label, title)) {
+                        Text(component.label, style = MaterialTheme.typography.labelLarge, color = MasalaTheme.tokens.onWallpaperMedium)
+                    } else {
+                        // No label (it repeats the title): the value still sits at the trailing edge.
+                        Spacer(Modifier.weight(1f))
+                    }
                     Text(value?.let { trim(it) } ?: "—", style = MaterialTheme.typography.labelLarge, color = tinted(component.style))
                 }
                 LinearProgressIndicator(
