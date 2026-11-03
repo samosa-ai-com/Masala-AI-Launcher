@@ -1,9 +1,9 @@
 package com.samosaai.masala.miniapps
 
 /**
- * Pure browse helpers for the bundled pocket-app store (`ui/miniapps/PocketStore.kt`): grouping,
- * search filtering, the asset-loader URL mapping and stable card-tile hues. JVM-only on purpose,
- * so the catalogue behaviour is unit-tested without Android.
+ * Pure browse helpers for the bundled pocket-app store (`ui/miniapps/PocketStore.kt`): the
+ * per-tab shelves, search filtering, the asset-loader URL mapping and stable card-tile hues.
+ * JVM-only on purpose, so the catalogue behaviour is unit-tested without Android.
  */
 object PocketStoreLogic {
     /** Where a bundled app loads from: the pack served by `WebViewAssetLoader` (see `BundledMiniApp`). */
@@ -16,25 +16,6 @@ object PocketStoreLogic {
     fun isServable(url: String): Boolean =
         url.startsWith(ASSET_BASE) && (url.removePrefix(ASSET_BASE).startsWith("miniapps/"))
 
-    /** Subcategories for the group chip row, for the selected category tab (`""` = all). */
-    fun groups(apps: List<PocketApp>, category: String): List<String> =
-        apps.asSequence()
-            .filter { category.isEmpty() || it.category == category }
-            .map { it.group }
-            .filter { it.isNotBlank() }
-            .distinct()
-            .sorted()
-            .toList()
-
-    fun filter(apps: List<PocketApp>, query: String, category: String, group: String): List<PocketApp> {
-        val q = query.trim().lowercase()
-        return apps.filter { app ->
-            (category.isEmpty() || app.category == category) &&
-                (group.isEmpty() || app.group == group) &&
-                (q.isEmpty() || app.matches(q))
-        }
-    }
-
     /** Stable tile hue (0..360) from the id, so a card keeps its colour across launches. */
     fun tileHue(id: String): Float {
         var h = 0
@@ -42,77 +23,101 @@ object PocketStoreLogic {
         return ((h % 360) + 360) % 360f
     }
 
-    /** One row of the storefront: a header kind, the group name for a category shelf, and the apps. */
-    enum class ShelfKind { FEATURED, TOP_GAMES, GROUP }
-
-    data class Shelf(val kind: ShelfKind, val apps: List<PocketApp>, val title: String = "")
-
-    /**
-     * The shelves the storefront shows, built once per catalogue:
-     *
-     * 1. **Featured** — one app from each of the tool groups, so the row spans the pack instead
-     *    of showing four puzzle games; games fill any gap when the pack has fewer tools.
-     * 2. **Top games** — the first games by title (there is no usage data to rank by yet).
-     * 3. **One shelf per category** with at least [SHELF_MIN] apps, the biggest first.
-     *
-     * An app appears on one shelf only, so the page never pads itself with repeats.
-     */
-    fun shelves(apps: List<PocketApp>, maxShelves: Int = 12, perShelf: Int = 20): List<Shelf> {
-        if (apps.isEmpty()) return emptyList()
-        val used = HashSet<String>()
-        val featured = mutableListOf<PocketApp>()
-        for (group in listOf("tools", "health", "money", "home")) {
-            apps.firstOrNull { it.category == "apps" && it.group == group && it.id !in used }?.let {
-                featured += it
-                used += it.id
-            }
-        }
-        if (featured.size < FEATURED_COUNT) {
-            apps.asSequence()
-                .filter { it.category == "games" && it.id !in used }
-                .sortedBy { it.title.lowercase() }
-                .take(FEATURED_COUNT - featured.size)
-                .forEach { featured += it; used += it.id }
-        }
-
-        val topGames = apps.asSequence()
-            .filter { it.category == "games" && it.id !in used }
-            .sortedBy { it.title.lowercase() }
-            .take(perShelf)
-            .toList()
-            .onEach { used += it.id }
-
-        val byGroup = apps.asSequence()
-            .filter { it.id !in used }
-            .groupBy { it.category to it.group }
-            .filter { it.value.size >= SHELF_MIN }
-            .entries
-            .sortedByDescending { it.value.size }
-            .take(maxShelves)
-            .map { (key, list) ->
-                val shelfApps = list.sortedBy { it.title.lowercase() }.take(perShelf)
-                shelfApps.forEach { used += it.id }
-                Shelf(ShelfKind.GROUP, shelfApps, shelfTitle(key.first, key.second))
-            }
-
-        return buildList {
-            if (featured.isNotEmpty()) add(Shelf(ShelfKind.FEATURED, featured))
-            if (topGames.isNotEmpty()) add(Shelf(ShelfKind.TOP_GAMES, topGames))
-            addAll(byGroup)
-        }
-    }
+    /** `word-guessing` → `Word guessing`; the catalogue stores machine names. */
+    fun pretty(group: String): String =
+        group.split('-', '_').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
 
     /** A shelf header: "Puzzle games" for a game group, the group's own name for an app group. */
-    fun shelfTitle(category: String, group: String): String {
-        val name = group.split('-', '_').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+    fun sectionTitle(category: String, group: String): String {
+        val name = pretty(group)
         return if (category == "games") "$name games" else name
     }
 
-    /** The featured row's width. */
-    const val FEATURED_COUNT = 4
+    /** One titled block of a tab home: the machine group name and its apps. */
+    data class Section(val group: String, val title: String, val apps: List<PocketApp>)
 
-    /** A category needs this many apps before it earns its own shelf. */
-    const val SHELF_MIN = 4
+    /**
+     * Everything a Games/Apps tab home shows, partitioned once per catalogue load:
+     *
+     * - [pills]: the tab's groups, biggest first, for the filter-pill row (the leading "Top"
+     *   pill means "all" and is added by the UI, not listed here).
+     * - [hero]: one app per group, round-robin by group size, for the wide-card carousel — the
+     *   row spans the tab instead of showing four puzzle games.
+     * - [featured]: the next apps by title, for the compact rows under the carousel.
+     * - [sections]: the biggest groups with their own top apps, for the titled list blocks.
+     *
+     * Hero and featured never repeat an app; sections are each group's own top list, so an app
+     * may appear there as well as above (the same app in two different blocks is normal shelf
+     * behaviour, unlike two identical shelves).
+     */
+    data class TabShelves(
+        val pills: List<String>,
+        val hero: List<PocketApp>,
+        val featured: List<PocketApp>,
+        val sections: List<Section>,
+    )
+
+    fun tabShelves(
+        apps: List<PocketApp>,
+        category: String,
+        heroCount: Int = 5,
+        featuredCount: Int = 3,
+        maxSections: Int = 4,
+        perSection: Int = 6,
+        maxPills: Int = 8,
+    ): TabShelves {
+        val inTab = apps.asSequence()
+            .filter { it.category == category }
+            .sortedBy { it.title.lowercase() }
+            .toList()
+        if (inTab.isEmpty()) return TabShelves(emptyList(), emptyList(), emptyList(), emptyList())
+        val byGroup = inTab.groupBy { it.group }.entries.sortedByDescending { it.value.size }
+
+        val hero = mutableListOf<PocketApp>()
+        var round = 0
+        while (hero.size < heroCount) {
+            var added = false
+            for (entry in byGroup) {
+                val pick = entry.value.getOrNull(round)
+                if (pick != null && hero.size < heroCount) {
+                    hero += pick
+                    added = true
+                }
+            }
+            if (!added) break
+            round++
+        }
+        val heroIds = hero.map { it.id }.toHashSet()
+        val featured = inTab.asSequence()
+            .filter { it.id !in heroIds }
+            .take(featuredCount)
+            .toList()
+        val sections = byGroup
+            .take(maxSections)
+            .map { entry ->
+                Section(entry.key, sectionTitle(category, entry.key), entry.value.take(perSection))
+            }
+        return TabShelves(
+            pills = byGroup.take(maxPills).map { it.key }.filter { it.isNotBlank() },
+            hero = hero,
+            featured = featured,
+            sections = sections,
+        )
+    }
+
+    /** The apps of one pill ("" = the whole tab), by title. */
+    fun pillApps(apps: List<PocketApp>, category: String, pill: String): List<PocketApp> =
+        apps.asSequence()
+            .filter { it.category == category && (pill.isEmpty() || it.group == pill) }
+            .sortedBy { it.title.lowercase() }
+            .toList()
+
+    /** Search over the whole catalogue: title, description, group or category. */
+    fun search(apps: List<PocketApp>, query: String): List<PocketApp> {
+        val q = query.trim().lowercase()
+        if (q.isEmpty()) return emptyList()
+        return apps.filter { it.matches(q) }
+    }
 }
 
 /** Whether a lower-cased, trimmed query hits this entry's title, description, group or category. */
