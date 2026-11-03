@@ -14,6 +14,12 @@ import kotlin.test.assertFailsWith
  * `decode_mask_to_raster` round-trips. Exact byte match required, no tolerance.
  */
 class MaskCodecTest {
+    @Test fun `an absurd mask size is refused before allocating`() {
+        assertFailsWith<MaskDecodeException> { MaskCodec.decodeMask(65_536, 65_536, "!") }
+        assertFailsWith<MaskDecodeException> { MaskCodec.decodeMask(4_000, 2_000, "!") }
+        assertFailsWith<MaskDecodeException> { MaskCodec.decodeMask(0, 10, "!") }
+    }
+
 
     // 24x16 circle (r^2 <= 36 around the centre), one_bit, 112 ones.
     private val circlePayload = "!!!!!7Crcs_[HeYLXy%z7:f`0PIl{+b"

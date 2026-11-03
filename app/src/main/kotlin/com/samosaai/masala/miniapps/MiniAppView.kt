@@ -458,8 +458,10 @@ class MiniAppActivity : ComponentActivity() {
                             TextButton(onClick = {
                                 scope.launch {
                                     val file = withContext(Dispatchers.IO) {
+                                        // A bundled id is a path ("games/puzzle/x"); the share file has to
+                                        // be one flat name or the write has no parent directory.
                                         java.io.File(cacheDir, "miniapps").apply { mkdirs() }
-                                            .resolve("$appId.html").apply {
+                                            .resolve("${appId.replace('/', '-').replace('\\', '-')}.html").apply {
                                                 if (doc != null) {
                                                     writeText(doc)
                                                 } else {

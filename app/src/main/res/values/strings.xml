@@ -683,6 +683,7 @@
     <string name="ask_chip_widget">Make a widget</string>
     <string name="ask_chip_widget_prompt">"Make a widget that shows "</string>
     <string name="chat_too_many_images">At most %1$d pictures per message</string>
+    <string name="chat_wait_for_photos">One moment — the photo is still being prepared.</string>
     <string name="chat_bad_image">That file isn\'t a readable picture</string>
     <string name="media_play">Play</string>
     <string name="media_stop">Stop</string>

@@ -65,6 +65,7 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -334,6 +335,7 @@ private fun Header(
                             }
                             drag = 0f
                         },
+                        onDragCancel = { drag = 0f },
                     ) { _, dy -> drag += dy }
                 }
                 .semantics { contentDescription = "Drag to expand or collapse" },
@@ -751,7 +753,14 @@ private fun AttachmentThumbnails(paths: List<String>) {
         LaunchedEffect(path) {
             if (loaded[path] == null) {
                 val bitmap = withContext(Dispatchers.IO) {
-                    android.graphics.BitmapFactory.decodeFile(path)?.asImageBitmap()
+                    // A 12–50 MP camera photo decoded whole for a 132 dp tile is an OOM waiting.
+                    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    android.graphics.BitmapFactory.decodeFile(path, bounds)
+                    var sample = 1
+                    while (bounds.outWidth / (sample * 2) >= 264 && bounds.outHeight / (sample * 2) >= 264) sample *= 2
+                    android.graphics.BitmapFactory
+                        .decodeFile(path, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+                        ?.asImageBitmap()
                 }
                 if (bitmap != null) loaded[path] = bitmap
             }
@@ -810,14 +819,16 @@ private fun VideoPreview(
 ) {
     val scope = rememberCoroutineScope()
     // The clip keeps its own shape; ask the file rather than assuming 16:9.
-    val aspect = remember(result.ref) {
-        val retriever = android.media.MediaMetadataRetriever()
-        runCatching {
-            retriever.setDataSource(result.ref)
-            val w = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toFloatOrNull() ?: 16f
-            val h = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toFloatOrNull() ?: 9f
-            if (w > 0f && h > 0f) (w / h).coerceIn(0.5f, 2.2f) else 16f / 9f
-        }.getOrDefault(16f / 9f).also { runCatching { retriever.release() } }
+    val aspect by produceState(16f / 9f, result.ref) {
+        value = withContext(Dispatchers.IO) {
+            val retriever = android.media.MediaMetadataRetriever()
+            runCatching {
+                retriever.setDataSource(result.ref)
+                val w = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toFloatOrNull() ?: 16f
+                val h = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toFloatOrNull() ?: 9f
+                if (w > 0f && h > 0f) (w / h).coerceIn(0.5f, 2.2f) else 16f / 9f
+            }.getOrDefault(16f / 9f).also { runCatching { retriever.release() } }
+        }
     }
     androidx.compose.ui.viewinterop.AndroidView(
         factory = { ctx ->
@@ -830,6 +841,7 @@ private fun VideoPreview(
             }
         },
         modifier = Modifier.fillMaxWidth().aspectRatio(aspect).clip(RoundedCornerShape(10.dp)),
+        onRelease = { view -> runCatching { view.stopPlayback() } },
     )
     Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
         TextButton(onClick = {
@@ -1098,10 +1110,14 @@ private fun Controls(
     val scope = rememberCoroutineScope()
     val tooManyText = stringResource(R.string.chat_too_many_images, com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE)
     val badImageText = stringResource(R.string.chat_bad_image)
+    val waitForPhotosText = stringResource(R.string.chat_wait_for_photos)
     // Above the listening branches on purpose: a draft and its photos survive tapping the mic, so
     // switching to voice mid-sentence never throws away what was typed.
     var text by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue("")) }
     var queued by remember { mutableStateOf(listOf<com.samosaai.masala.chat.AttachedImage>()) }
+    // Selections still being compressed. Without this, Send could fire while a photo is in
+    // flight and leave it out, and several fast picks could all pass the three-image check.
+    var pendingAttachments by remember { mutableStateOf(0) }
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         if (listening && elapsedMs >= com.samosaai.masala.audio.SttEngine.CAP_WARN_MS) {
             Text(
@@ -1161,21 +1177,26 @@ private fun Controls(
                     }
                 }
                 fun addUri(uri: android.net.Uri, name: String) {
-                    if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                    if (queued.size + pendingAttachments >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
                         android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
                         return
                     }
+                    pendingAttachments++
                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                        val b64 = com.samosaai.masala.chat.compressToJpegBase64(context, uri)
-                        if (b64 == null) {
-                            launch(kotlinx.coroutines.Dispatchers.Main) {
-                                android.widget.Toast.makeText(context, badImageText, android.widget.Toast.LENGTH_SHORT).show()
+                        try {
+                            val b64 = com.samosaai.masala.chat.compressToJpegBase64(context, uri)
+                            if (b64 == null) {
+                                launch(kotlinx.coroutines.Dispatchers.Main) {
+                                    android.widget.Toast.makeText(context, badImageText, android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                val item = com.samosaai.masala.chat.AttachedImage(
+                                    id = "${System.currentTimeMillis()}-${queued.size}", name = name, jpegBase64 = b64,
+                                )
+                                launch(kotlinx.coroutines.Dispatchers.Main) { queued = queued + item }
                             }
-                        } else {
-                            val item = com.samosaai.masala.chat.AttachedImage(
-                                id = "${System.currentTimeMillis()}-${queued.size}", name = name, jpegBase64 = b64,
-                            )
-                            launch(kotlinx.coroutines.Dispatchers.Main) { queued = queued + item }
+                        } finally {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { pendingAttachments-- }
                         }
                     }
                 }
@@ -1192,12 +1213,12 @@ private fun Controls(
                     images = queued,
                     onRemoveImage = { id -> queued = queued.filterNot { it.id == id } },
                     onPickPhoto = {
-                        if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                        if (queued.size + pendingAttachments >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
                             android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
                         } else pickImage.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
                     },
                     onTakePhoto = {
-                        if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                        if (queued.size + pendingAttachments >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
                             android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
                         } else {
                             val dir = java.io.File(context.filesDir, "work").apply { mkdirs() }
@@ -1210,9 +1231,15 @@ private fun Controls(
                     onMic = mic,
                     micLevel = level,
                     onSend = {
-                        onAsk(text.text.trim(), queued.map { it.jpegBase64 })
-                        text = androidx.compose.ui.text.input.TextFieldValue("")
-                        queued = emptyList()
+                        // A photo still being compressed is part of the message: sending now
+                        // would drop it silently.
+                        if (pendingAttachments > 0) {
+                            android.widget.Toast.makeText(context, waitForPhotosText, android.widget.Toast.LENGTH_SHORT).show()
+                        } else {
+                            onAsk(text.text.trim(), queued.map { it.jpegBase64 })
+                            text = androidx.compose.ui.text.input.TextFieldValue("")
+                            queued = emptyList()
+                        }
                     },
                     modifier = Modifier.weight(1f),
                 )

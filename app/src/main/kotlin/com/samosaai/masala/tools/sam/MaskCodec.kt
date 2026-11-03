@@ -62,6 +62,12 @@ object MaskCodec {
             if (c !in excluded) append(c)
         }
     }
+    /**
+     * Ceiling on a mask raster. Masks come back at a fraction of the source size (a few hundred
+     * pixels a side); 4 MP is far beyond any real mask and still small enough to allocate safely.
+     */
+    private const val MAX_MASK_PIXELS = 4_000_000L
+
     private val CHAR_VALUES: IntArray = IntArray(128) { -1 }.also {
         for (i in ALPHABET.indices) it[ALPHABET[i].code] = i
     }
@@ -77,9 +83,13 @@ object MaskCodec {
         if (width <= 0 || height <= 0) {
             throw MaskDecodeException("Mask dimensions must be positive.")
         }
-        if (height.toLong() * width > (1L shl 53) - 1) {
-            throw MaskDecodeException("Mask dimensions produce an unsafe decoded area.")
+        // The wire carries the raster size, so a malformed response could ask for gigabytes.
+        // Masks are small (a few hundred pixels a side); anything past this is not a mask.
+        val area = height.toLong() * width.toLong()
+        if (area > MAX_MASK_PIXELS) {
+            throw MaskDecodeException("Mask is larger than ${MAX_MASK_PIXELS / 1_000_000} MPixels.")
         }
+        if (area > Int.MAX_VALUE) throw MaskDecodeException("Mask dimensions overflow a raster.")
         if (markerAndPayload.isEmpty()) throw MaskDecodeException("Mask payload is empty.")
         return try {
             when (markerAndPayload[0]) {
@@ -219,6 +229,7 @@ object MaskCodec {
 
         /** Returns which frequency bin [code] falls in, saving the scale for [decode]. */
         fun frequency(total: Int): Int {
+            if (total <= 0) throw MaskDecodeException("Mask payload has an empty model.")
             scaled = range / total
             if (scaled == 0L) throw MaskDecodeException("Mask payload has invalid coding state.")
             val value = ((code - low) and MASK32) / scaled

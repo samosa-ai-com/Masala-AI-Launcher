@@ -73,7 +73,11 @@ internal fun hostBundledMiniApp(
     onConsole: (String) -> Unit,
 ) {
     applyMiniAppSettings(wv, networkAllowed = false)
+    // Served from this app's own origin only: the loader answers for its domain, and the
+    // interceptor below refuses anything else, so apps can't read each other's storage.
+    val domain = "${PocketStoreLogic.domainFor(app)}.${PocketStoreLogic.APP_DOMAIN}"
     val loader = WebViewAssetLoader.Builder()
+        .setDomain(domain)
         .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(wv.context))
         .build()
     if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
@@ -87,8 +91,8 @@ internal fun hostBundledMiniApp(
                 if (masalaApp == null) return MiniAppMediaBridge.probeDenial()
                 return runCatching { MiniAppMediaBridge.intercept(masalaApp, app.id, url) }.getOrNull()
             }
-            // The pack only: anything else from assets, or any network URL, is refused.
-            if (!PocketStoreLogic.isServable(url)) {
+            // This app's origin and the pack only: any other host or path is refused.
+            if (request.url.host != domain || !PocketStoreLogic.isServable(url)) {
                 val host = request.url.host.orEmpty().ifEmpty { url.take(80) }
                 return blockedPocketResponse(host, onConsole)
             }

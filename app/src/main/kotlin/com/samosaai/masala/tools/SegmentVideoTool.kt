@@ -203,6 +203,7 @@ class SegmentVideoTool(
         val retriever = MediaMetadataRetriever()
         var encoder: MediaCodec? = null
         var muxer: MediaMuxer? = null
+        var muxStopped = false
         try {
             retriever.setDataSource(file.absolutePath)
             val probe = retriever.getFrameAtTime(
@@ -213,14 +214,16 @@ class SegmentVideoTool(
             if (!probe.isRecycled()) probe.recycle()
             val fps = SamShared.overlayFps(all.size, durationMs)
             val mime = MediaFormat.MIMETYPE_VIDEO_AVC
-            val color = pickColorFormat(mime)
+            // Name and format from the same probe: creating by mime can pick a different encoder
+            // that doesn't accept the format we configured.
+            val (codecName, color) = pickEncoder(mime)
             val format = MediaFormat.createVideoFormat(mime, outW, outH).apply {
                 setInteger(MediaFormat.KEY_COLOR_FORMAT, color)
                 setInteger(MediaFormat.KEY_BIT_RATE, (outW * outH * 4).coerceIn(400_000, 6_000_000))
                 setInteger(MediaFormat.KEY_FRAME_RATE, fps)
                 setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
             }
-            encoder = MediaCodec.createEncoderByType(mime).apply {
+            encoder = MediaCodec.createByCodecName(codecName).apply {
                 configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
                 start()
             }
@@ -231,8 +234,16 @@ class SegmentVideoTool(
             var track = -1
             var muxStarted = false
             val info = MediaCodec.BufferInfo()
+            // A codec that stops answering after EOS must not hang the tool: the drain is bounded
+            // and cancellation is honoured, so the contact-sheet fallback still runs.
+            val drainDeadline = 15_000L
             fun drain(eos: Boolean) {
+                val startedAt = System.currentTimeMillis()
                 while (true) {
+                    if (Thread.currentThread().isInterrupted) throw InterruptedException("cancelled")
+                    if (eos && System.currentTimeMillis() - startedAt > drainDeadline) {
+                        throw IllegalStateException("encoder stopped answering after end of stream")
+                    }
                     when (val oi = enc.dequeueOutputBuffer(info, 10_000)) {
                         MediaCodec.INFO_TRY_AGAIN_LATER -> if (eos) continue else return
                         MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
@@ -307,7 +318,7 @@ class SegmentVideoTool(
             if (encoded == 0) throw IllegalStateException("no sampled frames would decode")
             var eosQueued = false
             var eosTries = 0
-            while (!eosQueued && eosTries++ < 3) {
+            while (!eosQueued && eosTries++ < 30) {
                 val inIdx = enc.dequeueInputBuffer(10_000)
                 if (inIdx >= 0) {
                     enc.queueInputBuffer(
@@ -317,9 +328,16 @@ class SegmentVideoTool(
                     eosQueued = true
                     break
                 }
+                // No free input yet: keep the output moving, or the encoder can never free one.
+                drain(false)
             }
             if (!eosQueued) throw IllegalStateException("encoder stalled at end of stream")
             drain(true)
+            // Finalize before trusting the file: a muxer that fails to stop leaves an
+            // unplayable MP4 behind, and that must reach the fallback rather than be returned.
+            if (!muxStarted) throw IllegalStateException("encoder never produced a track")
+            mux.stop()
+            muxStopped = true
             if (!out.exists() || out.length() == 0L) throw IllegalStateException("encoder wrote nothing")
             return Pair(out.absolutePath, OverlayStats(encoded, skipped, fps, outW, outH))
         } catch (e: Exception) {
@@ -328,7 +346,8 @@ class SegmentVideoTool(
         } finally {
             runCatching { encoder?.stop() }
             runCatching { encoder?.release() }
-            runCatching { muxer?.stop() }
+            // Only when the success path did not already stop it (a second stop throws).
+            if (!muxStopped) runCatching { muxer?.stop() }
             runCatching { muxer?.release() }
             runCatching { retriever.release() }
         }
@@ -348,7 +367,8 @@ class SegmentVideoTool(
         }
 
     /** Picks an explicit YUV420 input color both the encoder and we can write. */
-    private fun pickColorFormat(mime: String): Int {
+    /** The encoder to use and a colour format it accepts, chosen together (see the caller). */
+    private fun pickEncoder(mime: String): Pair<String, Int> {
         val name = runCatching {
             MediaCodecList(MediaCodecList.REGULAR_CODECS)
                 .findEncoderForFormat(MediaFormat.createVideoFormat(mime, 720, 720))
@@ -357,13 +377,14 @@ class SegmentVideoTool(
             ?: throw IllegalStateException("no usable $mime encoder on this device")
         try {
             val formats = probe.codecInfo.getCapabilitiesForType(mime).colorFormats.toList()
-            return when {
+            val color = when {
                 MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar in formats ->
                     MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar
                 MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar in formats ->
                     MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar
                 else -> throw IllegalStateException("encoder has no YUV420 input ($formats)")
             }
+            return name to color
         } finally {
             runCatching { probe.release() }
         }
@@ -463,7 +484,7 @@ class SegmentVideoTool(
                     val g = px shr 8 and 0xFF
                     val b = px and 0xFF
                     out[uv++] = (((-38 * r - 74 * g + 112 * b + 128) shr 8) + 128).coerceIn(0, 255).toByte()
-                    out[uv++] = (((112 * r - 94 * g - 56 * b + 128) shr 8) + 128).coerceIn(0, 255).toByte()
+                    out[uv++] = (((112 * r - 94 * g - 18 * b + 128) shr 8) + 128).coerceIn(0, 255).toByte()
                 }
             }
         } else {
@@ -476,7 +497,7 @@ class SegmentVideoTool(
                     val g = px shr 8 and 0xFF
                     val b = px and 0xFF
                     out[u++] = (((-38 * r - 74 * g + 112 * b + 128) shr 8) + 128).coerceIn(0, 255).toByte()
-                    out[v++] = (((112 * r - 94 * g - 56 * b + 128) shr 8) + 128).coerceIn(0, 255).toByte()
+                    out[v++] = (((112 * r - 94 * g - 18 * b + 128) shr 8) + 128).coerceIn(0, 255).toByte()
                 }
             }
         }

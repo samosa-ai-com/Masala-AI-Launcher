@@ -3,6 +3,7 @@ package com.samosaai.masala.miniapps
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /** Browse behaviour for the bundled store: tab shelves, search and the asset-loader URL mapping. */
@@ -18,18 +19,30 @@ class PocketStoreLogicTest {
     private fun app(id: String, title: String, category: String, group: String) =
         PocketApp(id, title, category, group, "✨", "", "1 player", "$id.html")
 
-    @Test fun `asset urls point at the loader domain`() {
-        assertEquals(
-            "https://appassets.androidplatform.net/assets/miniapps/games/puzzle/tower.html",
-            PocketStoreLogic.assetUrl(apps[2]),
-        )
+    @Test fun `each app loads from its own origin`() {
+        val url = PocketStoreLogic.assetUrl(apps[2])
+        assertTrue(url.startsWith("https://p-"), url)
+        assertTrue(url.endsWith(".${PocketStoreLogic.APP_DOMAIN}/assets/miniapps/games/puzzle/tower.html"), url)
+        // Two apps never share an origin, or their localStorage would be shared too.
+        assertEquals(apps.size, apps.map { PocketStoreLogic.domainFor(it) }.distinct().size)
+        assertNotEquals(PocketStoreLogic.domainFor(apps[0]), PocketStoreLogic.domainFor(apps[1]))
     }
 
     @Test fun `only the pack directory is servable`() {
         assertTrue(PocketStoreLogic.isServable(PocketStoreLogic.assetUrl(apps[0])))
-        assertFalse(PocketStoreLogic.isServable("https://appassets.androidplatform.net/assets/wallpapers/x.jpg"))
+        assertFalse(PocketStoreLogic.isServable("https://appassets.androidplatform.net/assets/miniapps/x.html"))
         assertFalse(PocketStoreLogic.isServable("https://example.com/miniapps/games/puzzle/tower.html"))
         assertFalse(PocketStoreLogic.isServable("file:///android_asset/miniapps/games/puzzle/tower.html"))
+    }
+
+    @Test fun `a traversal out of the pack is refused`() {
+        val host = PocketStoreLogic.domainFor(apps[0]) + "." + PocketStoreLogic.APP_DOMAIN
+        assertFalse(PocketStoreLogic.isServable("https://$host/assets/miniapps/../wallpapers/x.jpg"))
+        assertFalse(PocketStoreLogic.isServable("https://$host/assets/miniapps/%2e%2e/wallpapers/x.jpg"))
+        assertFalse(PocketStoreLogic.isServable("https://$host/assets/wallpapers/x.jpg"))
+        // A different app's origin is not this app's to load.
+        val other = PocketStoreLogic.domainFor(apps[1]) + "." + PocketStoreLogic.APP_DOMAIN
+        assertNotEquals(host, other)
     }
 
     @Test fun `tile hues are stable and in range`() {

@@ -6,15 +6,41 @@ package com.samosaai.masala.miniapps
  * JVM-only on purpose, so the catalogue behaviour is unit-tested without Android.
  */
 object PocketStoreLogic {
-    /** Where a bundled app loads from: the pack served by `WebViewAssetLoader` (see `BundledMiniApp`). */
-    const val ASSET_BASE = "https://appassets.androidplatform.net/assets/"
+    /** The parent domain bundled apps live under, one subdomain per app. */
+    const val APP_DOMAIN = "appassets.androidplatform.net"
 
-    /** The URL [BundledMiniAppView] loads for a catalogue entry. */
-    fun assetUrl(app: PocketApp): String = ASSET_BASE + app.assetPath
+    /**
+     * Each bundled app gets its own origin, like a user-made one: `localStorage` is scoped to the
+     * origin, so sharing one host would let any app read or overwrite another's saved data.
+     * The id is flattened to a legal label and suffixed with its hash, so two ids that differ only
+     * in where they put a slash can't collide.
+     */
+    fun domainFor(app: PocketApp): String {
+        val label = app.id.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').take(32).ifEmpty { "app" }
+        return "p-$label-${Integer.toHexString(app.id.hashCode())}"
+    }
 
-    /** True when the loader may serve this URL: only the pack directory, never the app's own assets. */
-    fun isServable(url: String): Boolean =
-        url.startsWith(ASSET_BASE) && (url.removePrefix(ASSET_BASE).startsWith("miniapps/"))
+    /** The URL a bundled app loads: its own origin, under the shared `/assets/` handler. */
+    fun assetUrl(app: PocketApp): String =
+        "https://${domainFor(app)}.$APP_DOMAIN/assets/${app.assetPath}"
+
+    /**
+     * True when a request may be served from the pack: the host must be one of our app origins and
+     * the path must stay inside `miniapps/`. The path is checked before and after normalisation —
+     * `miniapps/../wallpapers/x.jpg` otherwise passes the prefix test and the asset loader happily
+     * resolves it to another asset.
+     */
+    fun isServable(url: String): Boolean {
+        val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return false
+        val host = uri.host ?: return false
+        if (!host.endsWith(".$APP_DOMAIN")) return false
+        if (!host.startsWith("p-")) return false
+        val raw = uri.rawPath ?: return false
+        if (raw.contains("..")) return false
+        val path = uri.normalize().path ?: return false
+        if (path.contains("..")) return false
+        return path.startsWith("/assets/miniapps/")
+    }
 
     /** Stable tile hue (0..360) from the id, so a card keeps its colour across launches. */
     fun tileHue(id: String): Float {
