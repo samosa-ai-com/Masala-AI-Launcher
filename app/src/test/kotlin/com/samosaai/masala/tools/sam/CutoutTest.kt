@@ -63,4 +63,21 @@ class CutoutTest {
         assertEquals(0f, Cutout.sampleBilinear(m, 3, 3, -2f, 1f))
         assertEquals(0.25f, Cutout.sampleBilinear(m, 3, 3, 0.5f, 0.5f))
     }
+
+    @Test
+    fun cropToContentTrimsToTheObjectWithPadding() {
+        // 10x6 image, one opaque 2x2 block at x=6..7, y=3..4.
+        val w = 10; val h = 6
+        val px = IntArray(w * h)
+        for (y in 3..4) for (x in 6..7) px[y * w + x] = (0xFF shl 24) or 0x112233
+        val c = Cutout.cropToContent(px, w, h, pad = 1)!!
+        assertEquals(4, c.width)   // 5..8
+        assertEquals(4, c.height)  // 2..5 (clamped at the bottom edge)
+        assertEquals((0xFF shl 24) or 0x112233, c.pixels[1 * c.width + 1])
+    }
+
+    @Test
+    fun cropToContentOfAnEmptyCutoutIsNull() {
+        assertEquals(null, Cutout.cropToContent(IntArray(12), 4, 3))
+    }
 }

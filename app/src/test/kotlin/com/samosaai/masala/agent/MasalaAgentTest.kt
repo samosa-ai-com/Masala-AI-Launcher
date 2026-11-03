@@ -53,6 +53,21 @@ class MasalaAgentTest {
 
     private fun script(vararg replies: ChatMessage) = Script(ArrayDeque(replies.toList()))
 
+    @Test fun resultsTheChatShowsAreNamedSoTheModelDoesNotReadThemBack() = runBlocking {
+        // Seen on the phone: after "Overlay saved." the model listed folders and read the PNGs back as base64.
+        val model = script(assistant("", call("1", "get_time")), assistant("Here is the cut-out."))
+        val runner = AgentToolRunner { _, _ ->
+            ToolResult.Success(
+                "Found 1 object. Overlay saved.",
+                produced = listOf(com.samosaai.masala.core.tool.Produced("image", "cutout 1: mug", "/files/generated/cut.png")),
+            )
+        }
+        agent(model, runner = runner).run(user("cut out the mug")).collect {}
+        val toolText = model.requests[1].last { it.role == "tool" }.textContent
+        assertTrue(toolText.contains("Already shown to the user as cards"))
+        assertTrue(toolText.contains("/files/generated/cut.png"))
+    }
+
     @Test fun anUnwatchedRunOpensOnlyPagesItsSearchReturned() = runBlocking {
         val tools = listOf("websearch", "webfetch")
         val defs = tools.map { ToolDefinition(it, "", JsonObject(emptyMap())) }

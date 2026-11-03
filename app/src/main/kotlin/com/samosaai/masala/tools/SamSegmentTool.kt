@@ -187,8 +187,9 @@ class SamSegmentTool(
                 s[0].coerceIn(0f, w.toFloat()), s[1].coerceIn(0f, h.toFloat()),
                 s[2].coerceIn(0f, w.toFloat()), s[3].coerceIn(0f, h.toFloat()),
             )
-            if (cut.none { ((it ushr 24) and 0xFF) != 0 }) return@forEachIndexed
-            val bmp = Bitmap.createBitmap(cut, w, h, Bitmap.Config.ARGB_8888)
+            // Trimmed to the object: a photo-sized frame left the object small in one corner of the card.
+            val crop = Cutout.cropToContent(cut, w, h) ?: return@forEachIndexed
+            val bmp = Bitmap.createBitmap(crop.pixels, crop.width, crop.height, Bitmap.Config.ARGB_8888)
             val f = File(dir, "segment-$stamp-cutout-${i + 1}.png")
             f.outputStream().use { o -> bmp.compress(Bitmap.CompressFormat.PNG, 100, o) }
             if (!bmp.isRecycled()) bmp.recycle()
