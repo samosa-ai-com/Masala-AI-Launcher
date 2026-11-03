@@ -69,8 +69,14 @@ fun WidgetPreview(
 
 /** A Tuesday afternoon with a little of everything, so no preview is a wall of dashes. */
 private val SAMPLE_SNAPSHOT = ContextSnapshot(
-    now = LocalDateTime.now().withHour(14).withMinute(20),
-    nextEvent = NextEvent("Design review", LocalDateTime.now().withHour(15).withMinute(0), "Studio"),
+    // Whole minutes: `LocalTime.toString()` prints seconds and nanos, and a preview reading
+    // "15:00:02.266401" looked like a bug (it was one).
+    now = LocalDateTime.now().withHour(14).withMinute(20).withSecond(0).withNano(0),
+    nextEvent = NextEvent(
+        "Design review",
+        LocalDateTime.now().withHour(15).withMinute(0).withSecond(0).withNano(0),
+        "Studio",
+    ),
     charging = false,
     batteryPercent = 72,
     activeModes = emptyList(),

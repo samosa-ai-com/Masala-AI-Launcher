@@ -64,6 +64,9 @@ class WidgetLibrary(
             // Every bundled template counts as offered from here on: deleting one later must
             // not bring it back on the next start.
             seeds?.remember(WidgetTemplates.ids.toSet())
+            // An upgrade can arrive with an empty library but a saved layout; the new templates
+            // still belong in it. seedNewTemplates adds nothing when they were already offered.
+            seedNewTemplates(emptySet())
             return
         }
         _widgets.value = rows.mapNotNull { row ->
@@ -72,7 +75,10 @@ class WidgetLibrary(
                 .getOrNull()
         }.toMap()
         _version.value++
-        if (seedIfEmpty) seedNewTemplates(rows.map { it.id }.toSet())
+        // Not gated on seedIfEmpty: that flag means "this is a fresh install, seed everything".
+        // An upgrade with a saved layout passes false, and still needs the templates it was never
+        // offered — which is exactly what seedNewTemplates adds, without resurrecting deleted ones.
+        seedNewTemplates(rows.map { it.id }.toSet())
     }
 
     /**

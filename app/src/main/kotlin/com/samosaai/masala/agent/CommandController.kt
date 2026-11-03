@@ -603,6 +603,12 @@ class CommandController(
     }
 }
 
+/** Phrases a socket error carries when the network goes away mid-turn. */
+private val NETWORK_WORDS = listOf(
+    "connection abort", "connection reset", "failed to connect", "unable to resolve host",
+    "connection refused", "broken pipe", "network is unreachable", "timeout",
+)
+
 /** What the thread says when the user stops a running turn (the steps follow under it). */
 private const val STOPPED_NOTE = "Stopped. This is what it had done so far."
 
@@ -626,6 +632,11 @@ internal fun friendlyTurnError(error: Throwable): String {
 internal fun friendlyModelError(raw: String?): String {
     val message = raw?.trim().orEmpty()
     if (message.isEmpty()) return "The model didn't answer. Try again."
+    // A dropped socket reaches here as its raw errno text ("Software caused connection abort"),
+    // because the agent turns any exception into a Failed event. Say it in words.
+    if (NETWORK_WORDS.any { message.contains(it, ignoreCase = true) }) {
+        return "The connection dropped while working on that. Check the network and try again."
+    }
     // Only a real status line counts: "tool returned 400 items" is not an HTTP failure.
     val code = Regex("""\bHTTP[\s:]+(\d{3})\b""").find(message)?.groupValues?.get(1)
     return when (code) {

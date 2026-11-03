@@ -68,6 +68,28 @@ class WidgetLibraryTest {
     }
 
     @Test
+    fun `an upgrade with a saved layout still receives the new templates`() = runBlocking {
+        // The phone after an app update: layouts exist, so load is called with seedIfEmpty=false.
+        // That must still deliver the templates this install has never been offered.
+        val seeds = FakeSeeds()
+        val dao = FakeDao()
+        com.samosaai.masala.core.widgets.WidgetTemplates.legacyIds.forEach { id ->
+            dao.rows[id] = WidgetEntity(
+                id = id,
+                specJson = com.samosaai.masala.core.contract.MasalaJson.strict.encodeToString(
+                    com.samosaai.masala.core.contract.WidgetSpec.serializer(),
+                    com.samosaai.masala.core.widgets.WidgetTemplates.load(id).widget,
+                ),
+                tier = "spec", title = null, createdBy = "template", createdAt = 0, updatedAt = 0,
+            )
+        }
+        val lib = WidgetLibrary(dao, FakeVersions(), seeds)
+        lib.load(seedIfEmpty = false)
+        assertTrue("expected pomodoro, had ${lib.current().keys}", "pomodoro" in lib.current().keys)
+        assertTrue("second_brain" in lib.current().keys)
+    }
+
+    @Test
     fun `fresh install seeds templates, an emptied library stays empty`() = runBlocking {
         val lib = WidgetLibrary(FakeDao(), FakeVersions())
         lib.load(seedIfEmpty = true)

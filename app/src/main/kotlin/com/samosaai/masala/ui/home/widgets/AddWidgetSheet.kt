@@ -4,19 +4,23 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -90,8 +94,20 @@ fun AddWidgetSheet(
             shelfOk && textOk
         }
     }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    // A tall sheet with the list taking the leftover height: the old fixed 480dp list did not fit
+    // above the keyboard and the first card was clipped at the top.
+    val listState = rememberLazyListState()
+    // A new search or shelf starts at the first result: the sheet keeps its scroll position, so
+    // without this the best match could open above the fold.
+    LaunchedEffect(query, category) { listState.scrollToItem(0) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().fillMaxHeight(0.92f).padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             Text(stringResource(R.string.widgets_add_sheet_title), style = MaterialTheme.typography.titleLarge)
             OutlinedTextField(
                 query,
@@ -126,7 +142,8 @@ fun AddWidgetSheet(
                 )
             }
             LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
+                state = listState,
+                modifier = Modifier.fillMaxWidth().weight(1f),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 items(shown, key = { it.spec.id }) { (spec, _) ->

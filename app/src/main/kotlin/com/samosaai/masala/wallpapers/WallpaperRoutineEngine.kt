@@ -98,7 +98,9 @@ class WallpaperRoutineEngine(
         scheduleNext(routines)
         val match = RoutineEvaluator.choose(routines, snapshot.value)
         if (match == null) {
-            _status.value = _status.value.copy(error = null, nextChange = nextChange(routines))
+            // Nothing wants to change: a fresh status, not a copy. Keeping the old name made the
+            // settings card claim a disabled routine was still showing (seen on device).
+            _status.value = Status(nextChange = nextChange(routines))
             return@withLock
         }
         val key = "${match.routineId}|${match.ruleIndex}|${match.source}"
