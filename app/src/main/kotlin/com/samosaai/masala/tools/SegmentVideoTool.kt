@@ -75,6 +75,7 @@ class SegmentVideoTool(
             }
             // A long clip is minutes of work at one frame at a time: say so before starting.
             SamShared.clipTooLong(durationMs)?.let { return@withContext ActionResult.error(it) }
+            SamShared.tooManyFrames(readFrameCount(file), durationMs)?.let { return@withContext ActionResult.error(it) }
             if (!probeFrame(file, 0L)) {
                 return@withContext ActionResult.error(
                     "Couldn't read any frames from '${file.name}'. It may be corrupt or DRM-protected.",
@@ -172,6 +173,18 @@ class SegmentVideoTool(
             retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
         } catch (_: Exception) {
             0L
+        } finally {
+            runCatching { retriever.release() }
+        }
+    }
+
+    private fun readFrameCount(file: File): Int? {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(file.absolutePath)
+            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_FRAME_COUNT)?.toIntOrNull()
+        } catch (_: Exception) {
+            null
         } finally {
             runCatching { retriever.release() }
         }

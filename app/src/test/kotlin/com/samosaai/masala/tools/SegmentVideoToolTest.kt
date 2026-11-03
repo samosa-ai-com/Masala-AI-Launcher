@@ -216,4 +216,19 @@ class SegmentVideoToolTest {
         assertTrue(slots.any { it != null && it.hasDetections() })
         assertTrue(SamShared.renderSlots(emptyList(), 2_000, fps).isEmpty())
     }
+
+    @Test
+    fun aDenseClipIsRefusedBeforeUploadWithTheLengthThatFits() {
+        // Seen on the phone: 6 s at 120 fps = 720 frames, and Masala was killed for memory.
+        val why = SamShared.tooManyFrames(720, 6_000)
+        assertTrue(why!!.contains("720 frames"))
+        assertTrue(why.contains("120 fps"))
+        assertTrue(why.contains("about 2s"))
+    }
+
+    @Test
+    fun aNormalClipOrAnUnknownCountPasses() {
+        assertEquals(null, SamShared.tooManyFrames(181, 6_000))
+        assertEquals(null, SamShared.tooManyFrames(null, 6_000))
+    }
 }
