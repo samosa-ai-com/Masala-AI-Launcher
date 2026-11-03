@@ -1,0 +1,33 @@
+{
+  "id": "crypto_ticker",
+  "name": "Crypto ticker",
+  "description": "One coin in dollars, refreshed every 15 minutes.",
+  "category": "Money",
+  "widget": {
+    "id": "crypto_ticker",
+    "title": "BTC",
+    "components": [
+      {
+        "type": "web_value",
+        "label": "Bitcoin",
+        "http": {
+          "url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+          "jsonPath": "$.bitcoin.usd",
+          "every": 900
+        },
+        "suffix": "USD",
+        "style": {
+          "emphasis": "large"
+        }
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 1,
+      "max": 2,
+      "minW": 2,
+      "defaultW": 2,
+      "maxW": 2
+    }
+  }
+}

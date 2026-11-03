@@ -30,6 +30,43 @@ class WidgetLibraryTest {
         override suspend fun deleteForWidget(widgetId: String) = Unit
     }
 
+    private class FakeSeeds(var ids: MutableSet<String> = mutableSetOf()) : WidgetSeedStore {
+        override fun known(): Set<String> = ids
+        override fun remember(ids: Set<String>) { this.ids += ids }
+    }
+
+    @Test
+    fun `an upgrade adds the new templates once, and never a deleted one`() = runBlocking {
+        // An install from before seeding bookkeeping: it has the original eight, minus one the
+        // user deleted, and has never recorded what it was offered.
+        val seeds = FakeSeeds()
+        val dao = FakeDao()
+        com.samosaai.masala.core.widgets.WidgetTemplates.legacyIds.dropLast(1).forEachIndexed { i, id ->
+            dao.rows[id] = WidgetEntity(
+                id = id,
+                specJson = com.samosaai.masala.core.contract.MasalaJson.strict.encodeToString(
+                    com.samosaai.masala.core.contract.WidgetSpec.serializer(),
+                    com.samosaai.masala.core.widgets.WidgetTemplates.load(id).widget,
+                ),
+                tier = "spec", title = null, createdBy = "template", createdAt = 0, updatedAt = 0,
+            )
+        }
+        val lib = WidgetLibrary(dao, FakeVersions(), seeds)
+        lib.load(seedIfEmpty = true)
+        val afterUpgrade = lib.current().keys
+        // The new shelves arrived...
+        assertTrue("pomodoro" in afterUpgrade)
+        assertTrue("second_brain" in afterUpgrade)
+        // ...and the deleted legacy template stayed deleted.
+        val deleted = com.samosaai.masala.core.widgets.WidgetTemplates.legacyIds.last()
+        assertFalse(deleted in afterUpgrade)
+
+        // A second start adds nothing and keeps a fresh deletion gone.
+        lib.delete("pomodoro")
+        lib.load(seedIfEmpty = true)
+        assertFalse("pomodoro" in lib.current())
+    }
+
     @Test
     fun `fresh install seeds templates, an emptied library stays empty`() = runBlocking {
         val lib = WidgetLibrary(FakeDao(), FakeVersions())

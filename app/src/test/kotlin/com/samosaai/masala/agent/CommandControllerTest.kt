@@ -44,6 +44,12 @@ class CommandControllerTest {
         cleaner: TranscriptCleaner? = null,
         maxContextTokens: Int = MasalaAgent.DEFAULT_MAX_CONTEXT_TOKENS,
         materialize: (suspend (String, List<String>) -> List<String>)? = null,
+        /** Suspends the model call until completed, so a turn stays live on purpose. */
+        hold: kotlinx.coroutines.CompletableDeferred<Unit>? = null,
+        /** Throws from [newAgent], the way a broken model client does. */
+        agentThrows: Boolean = false,
+        /** Calls one tool, then fails the next model call: a turn that dies mid-way. */
+        failAfterFirstTool: Boolean = false,
     ) = CommandController(
         scope = scope,
         resolveApp = { if (it == "spotify") spotify else null },
@@ -52,8 +58,28 @@ class CommandControllerTest {
         skills = { listOf(chef) },
         newAgent = {
             agentsBuilt++
+            if (agentThrows) throw IllegalStateException("no model configured")
+            var calls = 0
             MasalaAgent(
-                AgentModel { messages, _ -> requests += messages; replies.removeFirst() },
+                AgentModel { messages, _ ->
+                    requests += messages
+                    hold?.await()
+                    if (failAfterFirstTool && calls++ == 0) {
+                        ChatMessage(
+                            "assistant",
+                            JsonPrimitive(""),
+                            toolCalls = listOf(
+                                com.samosaai.masala.llm.ToolCall(
+                                    "c1",
+                                    function = com.samosaai.masala.llm.FunctionCall("x", "{}"),
+                                ),
+                            ),
+                        )
+                    } else {
+                        if (failAfterFirstTool) throw IllegalStateException("the connection dropped")
+                        replies.removeFirst()
+                    }
+                },
                 { _, _ -> ToolResult.Success("") },
                 listOf(ToolDefinition("x", "", JsonObject(emptyMap()))),
                 ToolScope.command(listOf(ToolInfo("x", ToolSensitivity.READ_ONLY))),
@@ -66,6 +92,67 @@ class CommandControllerTest {
         maxContextTokens = maxContextTokens,
         materializeAttachments = materialize,
     )
+
+    @Test fun aSecondTurnCannotStartWhileOneIsRunning() = runBlocking<Unit> {
+        replies += reply("done")
+        val hold = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val c = controller(hold = hold)
+        assertTrue(c.ask("first"))
+        // Synchronous: the thinking state is set before ask returns, so this cannot race the turn.
+        assertIs<CommandState.Thinking>(c.state.value)
+        // The flow is fed on another dispatcher; wait for it rather than assume a dispatch.
+        withTimeout(5_000) { c.busy.first { it } }
+        // A second send, the input card and the mic all refuse instead of cancelling the turn.
+        assertFalse(c.ask("second"))
+        assertFalse(c.openInput("draft"))
+        assertFalse(c.startListening())
+        assertIs<CommandState.Thinking>(c.state.value)
+        assertEquals("", c.takeDraft())
+        hold.complete(Unit)
+        val answer = assertIs<CommandState.Reply>(c.settled())
+        assertEquals("done", answer.text)
+        withTimeout(5_000) { c.busy.first { !it } }
+    }
+
+    @Test fun aBrokenTurnIsRecordedInsteadOfCrashing() = runBlocking<Unit> {
+        val turns = mutableListOf<com.samosaai.masala.chat.ChatTurn>()
+        val c = controller(agentThrows = true)
+        c.onTurn = { turns += it }
+        assertTrue(c.ask("do the thing"))
+        val error = assertIs<CommandState.Error>(c.settled())
+        assertTrue(error.message.isNotBlank())
+        // The failure reached the thread as a stored turn, so reopening the chat shows it.
+        assertIs<com.samosaai.masala.chat.ChatTurn>(turns.firstOrNull())
+        assertEquals(com.samosaai.masala.chat.TurnRole.USER, turns.first().role)
+        assertEquals(com.samosaai.masala.chat.TurnRole.ERROR, turns.last().role)
+    }
+
+    @Test fun aFailureKeepsTheStepsItAlreadyTook() = runBlocking<Unit> {
+        val turns = mutableListOf<com.samosaai.masala.chat.ChatTurn>()
+        val c = controller(failAfterFirstTool = true)
+        c.onTurn = { turns += it }
+        c.ask("look something up")
+        val error = assertIs<CommandState.Error>(c.settled())
+        // The step ran before the model died; both the live card and the stored turn keep it.
+        assertEquals(listOf("x"), error.steps)
+        val stored = turns.last()
+        assertEquals(com.samosaai.masala.chat.TurnRole.ERROR, stored.role)
+        assertEquals(listOf("x"), stored.steps)
+    }
+
+    @Test fun stoppingATurnKeepsItsStepsAsANote() = runBlocking<Unit> {
+        val turns = mutableListOf<com.samosaai.masala.chat.ChatTurn>()
+        val hold = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val c = controller(hold = hold)
+        c.onTurn = { turns += it }
+        c.ask("look something up")
+        c.stop()
+        // Stop cancels the turn and writes what it had done, so a reload still shows the trace.
+        assertTrue(turns.any { it.role == com.samosaai.masala.chat.TurnRole.STATUS })
+        assertEquals(CommandState.Idle, c.state.value)
+        withTimeout(5_000) { c.busy.first { !it } }
+        hold.complete(Unit)
+    }
 
     // A ceiling for a hang, not a stopwatch: the turn runs on Dispatchers.Default, which also feeds
     // lint and the second test JVM, so a loaded machine can take seconds to publish a reply.

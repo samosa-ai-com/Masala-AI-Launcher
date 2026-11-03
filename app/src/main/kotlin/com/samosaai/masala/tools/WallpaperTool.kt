@@ -40,7 +40,13 @@ class WallpaperTool(private val context: Context) {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    suspend fun setWallpaper(source: String?, target: String? = null): ActionResult = withContext(Dispatchers.IO) {
+    /**
+     * Called after a set the user asked for, so a wallpaper routine stops treating its last
+     * rule as applied. Routine applies pass `manual = false` and do not trigger it.
+     */
+    var onManualSet: (() -> Unit)? = null
+
+    suspend fun setWallpaper(source: String?, target: String? = null, manual: Boolean = true): ActionResult = withContext(Dispatchers.IO) {
         val manager = WallpaperManager.getInstance(context)
         // A blocked device is reported before any download, but a device that *misreports* support
         // (some images and OEM builds answer false and then accept the wallpaper) still gets a try;
@@ -83,6 +89,7 @@ class WallpaperTool(private val context: Context) {
                 flags == (WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK) -> "home and lock screens"
                 else -> "the home screen"
             }
+            if (manual) runCatching { onManualSet?.invoke() }
             ActionResult.ok("Wallpaper set for $where at ${width}x$height, center-cropped to fill.")
         } catch (e: SecurityException) {
             ActionResult.error("Masala isn't allowed to set the wallpaper: ${e.message}")

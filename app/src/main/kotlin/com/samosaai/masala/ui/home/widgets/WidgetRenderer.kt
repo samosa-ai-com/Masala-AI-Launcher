@@ -1,5 +1,11 @@
 package com.samosaai.masala.ui.home.widgets
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
@@ -80,6 +86,10 @@ data class WidgetSource(
     val http: HttpValueStore? = null,
     /** Hosts the user approved, per widget; the web_value view won't fetch without approval. */
     val approved: (widgetId: String) -> Set<String> = { emptySet() },
+    /** Values only the app can read, keyed for `second_brain` bindings ("notes", "latest"). */
+    val extra: () -> Map<String, String> = { emptyMap() },
+    /** False keeps animated pieces (the globe) still, for long lists that render off screen. */
+    val animate: Boolean = true,
 )
 
 /**
@@ -90,6 +100,7 @@ data class WidgetSource(
 @Composable
 fun WidgetCard(spec: WidgetSpec, rows: Int?, source: WidgetSource, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val snapshot = source.snapshot()
+    val extra = source.extra()
     val states by source.store.states.collectAsState()
     // New values (a counter tap, a checklist tick) recompose this card alone.
     LaunchedEffect(spec.id) { source.store.load(listOf(spec.id)) }
@@ -105,7 +116,7 @@ fun WidgetCard(spec: WidgetSpec, rows: Int?, source: WidgetSource, modifier: Mod
         }
         Column(if (spec.title != null) Modifier.padding(top = 4.dp) else Modifier) {
             spec.components.forEach { component ->
-                Component(component, spec.id, storage, snapshot, source, depth = 0, enabled = enabled, title = spec.title)
+                Component(component, spec.id, storage, snapshot, source, depth = 0, enabled = enabled, title = spec.title, extra = extra)
             }
         }
     }
@@ -126,6 +137,8 @@ private fun Component(
     enabled: Boolean = true,
     /** The card's title, so a label repeating it is dropped. */
     title: String? = null,
+    /** App-supplied values for `second_brain` bindings. */
+    extra: Map<String, String> = emptyMap(),
 ) {
     // A refresh button with no id means this widget; the renderer fills it before dispatching.
     fun fire(action: com.samosaai.masala.core.contract.MasalaAction) =
@@ -138,7 +151,7 @@ private fun Component(
         )
     when (component) {
         is WidgetComponent.Text -> {
-            val text = component.text ?: component.binding?.let { WidgetValues.textOf(it, storage, snapshot) } ?: return
+            val text = component.text ?: component.binding?.let { WidgetValues.textOf(it, storage, snapshot, extra) } ?: return
             Text(
                 text,
                 style = if (component.style?.emphasis == Emphasis.LARGE) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.bodyLarge,
@@ -185,7 +198,7 @@ private fun Component(
         }
         is WidgetComponent.Timer -> TimerRow(component, widgetId, storage, source, labelShown(component.label, title))
         is WidgetComponent.Progress -> {
-            val value = component.binding.let { WidgetValues.numberOf(it, storage, snapshot) }
+            val value = component.binding.let { WidgetValues.numberOf(it, storage, snapshot, extra) }
             Column(Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     if (labelShown(component.label, title)) {
@@ -212,7 +225,7 @@ private fun Component(
             }
         }
         is WidgetComponent.ListRows -> {
-            val rows = component.binding.let { WidgetValues.rowsOf(it, storage, snapshot, component.maxRows) }
+            val rows = component.binding.let { WidgetValues.rowsOf(it, storage, snapshot, component.maxRows, extra) }
             if (rows.isEmpty()) {
                 Text("Nothing here yet", style = MaterialTheme.typography.bodyMedium, color = MasalaTheme.tokens.onWallpaperMedium)
             } else {
@@ -232,7 +245,7 @@ private fun Component(
             }
         }
         is WidgetComponent.Gauge -> {
-            val value = component.binding.let { WidgetValues.numberOf(it, storage, snapshot) }
+            val value = component.binding.let { WidgetValues.numberOf(it, storage, snapshot, extra) }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 GaugeRing(value, component.max, tinted(component.style))
                 Column {
@@ -241,16 +254,26 @@ private fun Component(
                 }
             }
         }
+        is WidgetComponent.Globe -> {
+            val raw = component.binding?.let { WidgetValues.numberOf(it, storage, snapshot, extra) }
+            val accent = tinted(component.style)
+            Globe(
+                value = raw?.let { trim(it) } ?: component.binding?.let { WidgetValues.textOf(it, storage, snapshot, extra) },
+                label = component.label,
+                accent = accent,
+                animate = source.animate,
+            )
+        }
         is WidgetComponent.Row -> {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 component.children.forEach { child ->
-                    Column(Modifier.weight(1f)) { Component(child, widgetId, storage, snapshot, source, depth + 1, enabled, title) }
+                    Column(Modifier.weight(1f)) { Component(child, widgetId, storage, snapshot, source, depth + 1, enabled, title, extra) }
                 }
             }
         }
         is WidgetComponent.Column -> {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                component.children.forEach { child -> Component(child, widgetId, storage, snapshot, source, depth + 1, enabled, title) }
+                component.children.forEach { child -> Component(child, widgetId, storage, snapshot, source, depth + 1, enabled, title, extra) }
             }
         }
         // Live media (W4): MJPEG and snapshots draw; player kinds need the pool.
@@ -306,12 +329,15 @@ private fun MediaNote(note: String) {
 
 @Composable
 private fun TimerRow(component: WidgetComponent.Timer, widgetId: String, storage: Map<String, String>, source: WidgetSource, showLabel: Boolean = true) {
-    val deadline = storage[component.key]?.toLongOrNull()
+    // A stopped timer has no deadline (empty, not "0"): "0" is an elapsed deadline and used to
+    // ring the chime the moment someone pressed Stop.
+    val deadline = storage[component.key]?.toLongOrNull()?.takeIf { it > 0 }
     // The shown time has to be state, not a clock read: composition only redraws when state
     // changes, so a bare System.currentTimeMillis() left the digits frozen until something else
     // refreshed the card (seen as a half-minute jump). The effect below advances it every second
     // while the timer runs, and settles once it is done.
     var now by remember(deadline) { mutableLongStateOf(System.currentTimeMillis()) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(deadline) {
         if (deadline == null) return@LaunchedEffect
         while (deadline > System.currentTimeMillis()) {
@@ -319,6 +345,12 @@ private fun TimerRow(component: WidgetComponent.Timer, widgetId: String, storage
             delay(1_000)
         }
         now = System.currentTimeMillis()
+        // The chime is for the moment it lands, once: the deadline itself is the token, so a
+        // recomposition or coming back to home doesn't ring it again.
+        if (component.sound && source.store.values(widgetId)[ringKey(component.key)] != deadline.toString()) {
+            com.samosaai.masala.widgets.WidgetSounds.chime(context)
+            source.store.set(widgetId, ringKey(component.key), deadline.toString())
+        }
     }
     val left = if (deadline == null) null else (deadline - now).coerceAtLeast(0)
     val running = left != null && left > 0
@@ -335,7 +367,11 @@ private fun TimerRow(component: WidgetComponent.Timer, widgetId: String, storage
         }
         FilledIconButton(
             onClick = {
-                source.store.set(widgetId, component.key, if (running) "0" else (System.currentTimeMillis() + component.seconds * 1000L).toString())
+                source.store.set(
+                    widgetId,
+                    component.key,
+                    if (running) "" else (System.currentTimeMillis() + component.seconds * 1000L).toString(),
+                )
             },
             modifier = Modifier.size(48.dp),
         ) {
@@ -346,6 +382,83 @@ private fun TimerRow(component: WidgetComponent.Timer, widgetId: String, storage
         }
     }
 }
+
+/**
+ * A slow wireframe globe: a soft core, a rim, meridians that turn and flat latitudes. The motion is
+ * one `animateFloat` read inside the draw phase, so it never recomposes the card, and it stops when
+ * the card is off screen.
+ */
+@Composable
+private fun Globe(value: String?, label: String?, accent: Color, animate: Boolean) {
+    // A still card keeps a readable angle instead of starting an animation nothing can see.
+    val spin by if (animate) {
+        rememberInfiniteTransition(label = "globe").animateFloat(
+            initialValue = 0f,
+            targetValue = (2.0 * Math.PI).toFloat(),
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 9_000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "spin",
+        )
+    } else {
+        remember { androidx.compose.runtime.mutableFloatStateOf(0.5f) }
+    }
+    androidx.compose.foundation.layout.Box(
+        Modifier.fillMaxWidth().height(118.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.foundation.Canvas(Modifier.size(112.dp)) {
+            val r = size.minDimension / 2f
+            drawCircle(
+                brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                    listOf(accent.copy(alpha = 0.34f), Color.Transparent),
+                    center = center,
+                    radius = r,
+                ),
+                radius = r,
+            )
+            drawCircle(accent.copy(alpha = 0.55f), radius = r, style = Stroke(width = 1.2.dp.toPx()))
+            // Meridians: ellipses whose width follows the turn, so the sphere reads as 3D.
+            repeat(3) { i ->
+                val phase = (spin + i * (Math.PI / 3).toFloat()).toDouble()
+                val w = (kotlin.math.abs(kotlin.math.cos(phase)) * r * 2.0).toFloat().coerceAtLeast(0.6f)
+                drawOval(
+                    color = accent.copy(alpha = 0.28f),
+                    topLeft = androidx.compose.ui.geometry.Offset(center.x - w / 2f, center.y - r),
+                    size = androidx.compose.ui.geometry.Size(w, 2 * r),
+                    style = Stroke(width = 1.dp.toPx()),
+                )
+            }
+            // Latitudes stay fixed; they are what makes the turning lines read as a globe.
+            listOf(-0.55f, 0f, 0.55f).forEach { at ->
+                val y = center.y + at * r
+                val half = (r * kotlin.math.sqrt((1.0 - at * at).coerceAtLeast(0.0))).toFloat()
+                drawLine(
+                    accent.copy(alpha = 0.22f),
+                    androidx.compose.ui.geometry.Offset(center.x - half, y),
+                    androidx.compose.ui.geometry.Offset(center.x + half, y),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            }
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            value?.let { Text(it, style = MaterialTheme.typography.headlineSmall, color = accent) }
+            label?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MasalaTheme.tokens.onWallpaperMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/** Where a timer records the deadline it already rang for. */
+private fun ringKey(key: String) = "$key.rang"
 
 @Composable
 private fun ChartBars(component: WidgetComponent.Chart, storage: Map<String, String>, snapshot: ContextSnapshot) {

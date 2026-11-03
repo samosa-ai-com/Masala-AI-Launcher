@@ -2,12 +2,25 @@
   "id": "countdown",
   "name": "Countdown timer",
   "description": "A one-tap countdown, for tea or a short break.",
+  "category": "Focus",
   "widget": {
-    "id": "tea-timer",
+    "id": "countdown",
     "title": "Tea",
     "components": [
-      { "type": "timer", "key": "tea", "label": "Tea", "seconds": 240 }
+      {
+        "type": "timer",
+        "key": "tea",
+        "label": "Tea",
+        "seconds": 240
+      }
     ],
-    "size": { "min": 1, "default": 1, "max": 2 }
+    "size": {
+      "min": 1,
+      "default": 1,
+      "max": 2,
+      "minW": 2,
+      "defaultW": 2,
+      "maxW": 2
+    }
   }
 }

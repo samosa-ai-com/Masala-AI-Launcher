@@ -39,6 +39,9 @@ object WidgetChecker {
     const val MIN_BACKGROUND_SECONDS = 15 * 60
     const val MAX_URL = 2048
 
+    /** The values the app can supply for a `second_brain` binding. */
+    val SECOND_BRAIN_KEYS = setOf("notes", "latest")
+
     /** Reads widget JSON the strict way; a document that doesn't decode gives one problem with its path. */
     fun parse(text: String, json: Json = MasalaJson.strict): Parsed = try {
         Parsed(json.decodeFromString(WidgetSpec.serializer(), text), emptyList())
@@ -70,6 +73,8 @@ object WidgetChecker {
         if (count > MAX_COMPONENTS) problems += Problem("$path.components", "At most $MAX_COMPONENTS components in a widget (has $count)")
         val videos = countComponents(widget.components) { it is WidgetComponent.Video }
         if (videos > MAX_VIDEOS) problems += Problem("$path.components", "At most $MAX_VIDEOS video in a widget")
+        val globes = countComponents(widget.components) { it is WidgetComponent.Globe }
+        if (globes > 1) problems += Problem("$path.components", "One globe per widget")
 
         val storageKeys = HashMap<String, String>()
         widget.components.forEachIndexed { c, component ->
@@ -145,6 +150,10 @@ object WidgetChecker {
                 checkBinding(component.binding, "$path.binding", env, problems)
                 checkStyle(component.style, "$path.style", problems)
             }
+            is WidgetComponent.Globe -> {
+                component.binding?.let { checkBinding(it, "$path.binding", env, problems) }
+                checkStyle(component.style, "$path.style", problems)
+            }
             is WidgetComponent.Row, is WidgetComponent.Column -> {
                 val children = if (component is WidgetComponent.Row) component.children else (component as WidgetComponent.Column).children
                 if (depth + 1 > MAX_NESTING) problems += Problem(path, "Rows and columns nest at most $MAX_NESTING deep")
@@ -179,6 +188,10 @@ object WidgetChecker {
             BindingSource.SKILL_RESULT ->
                 if (key.isNullOrBlank()) problems += Problem("$path.key", "skill_result needs the skill id as key")
                 else if (key !in env.skillIds) problems += Problem("$path.key", "Unknown skill '$key'")
+            BindingSource.SECOND_BRAIN ->
+                if (key !in SECOND_BRAIN_KEYS) {
+                    problems += Problem("$path.key", "second_brain key is one of ${SECOND_BRAIN_KEYS.joinToString()}")
+                }
             BindingSource.HTTP -> Unit
             else -> Unit
         }

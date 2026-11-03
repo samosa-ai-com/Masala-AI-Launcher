@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
 import androidx.compose.material.icons.rounded.AutoFixHigh
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -56,6 +57,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.samosaai.masala.R
 import com.samosaai.masala.masala
 import com.samosaai.masala.wallpapers.Wallpaper
@@ -88,7 +90,11 @@ private sealed interface CatalogItem {
  * long-press "Change wallpaper" opens.
  */
 @Composable
-fun WallpapersPage(onBack: () -> Unit, onGenerateWithAI: () -> Unit) {
+fun WallpapersPage(
+    onBack: () -> Unit,
+    onGenerateWithAI: () -> Unit,
+    onAskForRoutine: () -> Unit = onGenerateWithAI,
+) {
     val context = LocalContext.current
     val app = context.masala
     val store = app.wallpapers
@@ -135,6 +141,7 @@ fun WallpapersPage(onBack: () -> Unit, onGenerateWithAI: () -> Unit) {
     }
 
     SettingsScaffold(stringResource(R.string.wallpaper_title), onBack) {
+        RoutinesSection(app = app, onAsk = onAskForRoutine, toast = ::toast)
         OutlinedTextField(
             query, { query = it },
             placeholder = { Text(stringResource(R.string.wallpaper_search_hint)) },
@@ -200,7 +207,10 @@ fun WallpapersPage(onBack: () -> Unit, onGenerateWithAI: () -> Unit) {
             loadThumb = { decodeFileThumb(w.file.absolutePath, 1080) },
             onSet = { target ->
                 pickedGenerated = null
-                scope.launch { toast(app.wallpaperTool.setWallpaper(w.file.absolutePath, target).message) }
+                scope.launch {
+                    // The tool clears a routine's applied marker on any manual set.
+                    toast(app.wallpaperTool.setWallpaper(w.file.absolutePath, target).message)
+                }
             },
             onExtra = {
                 TextButton(onClick = {
@@ -232,7 +242,11 @@ fun WallpapersPage(onBack: () -> Unit, onGenerateWithAI: () -> Unit) {
                 pickedBundled = null
                 scope.launch {
                     val f = withContext(Dispatchers.IO) { runCatching { bundledFile() }.getOrNull() }
-                    toast(if (f == null) saveFailedText else app.wallpaperTool.setWallpaper(f.absolutePath, target).message)
+                    if (f == null) {
+                        toast(saveFailedText)
+                    } else {
+                        toast(app.wallpaperTool.setWallpaper(f.absolutePath, target).message)
+                    }
                 }
             },
             onExtra = {
@@ -255,7 +269,9 @@ fun WallpapersPage(onBack: () -> Unit, onGenerateWithAI: () -> Unit) {
             loadThumb = { decodeUriThumb(context, uri, 1080) },
             onSet = { target ->
                 pickedDeviceUri = null
-                scope.launch { toast(app.wallpaperTool.setWallpaper(uri.toString(), target).message) }
+                scope.launch {
+                    toast(app.wallpaperTool.setWallpaper(uri.toString(), target).message)
+                }
             },
             onExtra = {},
             onDismiss = { pickedDeviceUri = null },
@@ -344,6 +360,125 @@ private fun WallpaperThumb(thumbKey: String, load: suspend () -> ImageBitmap?, m
         Image(bitmap!!, null, modifier = modifier.clip(shape), contentScale = ContentScale.Crop)
     } else {
         Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest, shape))
+    }
+}
+
+/**
+ * Routines at the top of the wallpapers page (plan `docs/plans/wallpaper-routines.md` §6): what is
+ * showing and when it next changes, the switches, and a way to ask for a new one. Home only.
+ */
+@Composable
+private fun RoutinesSection(
+    app: com.samosaai.masala.MasalaApp,
+    onAsk: () -> Unit,
+    toast: (String) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val routines by remember { app.wallpaperRoutines.watch() }.collectAsStateWithLifecycle(emptyList())
+    val status by app.wallpaperRoutineEngine.status.collectAsStateWithLifecycle()
+    var open by rememberSaveable { mutableStateOf(false) }
+    val time = remember { java.time.format.DateTimeFormatter.ofPattern("HH:mm") }
+    Column(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.wallpaper_routines_title),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.weight(1f),
+            )
+            if (routines.isNotEmpty()) {
+                TextButton(onClick = { open = !open }) {
+                    Text(stringResource(if (open) R.string.wallpaper_routines_hide else R.string.wallpaper_routines_show))
+                }
+            }
+        }
+        // What is on now, and when it changes: the answer to "why is my wallpaper blue?".
+        val active = status.routineName
+        Text(
+            buildString {
+                append(stringResource(R.string.wallpaper_routines_now)).append(": ")
+                if (active == null) append(stringResource(R.string.wallpaper_routines_idle))
+                else {
+                    append(active)
+                    status.ruleIndex?.let { append(" · rule ").append(it + 1) }
+                }
+                status.nextChange?.let {
+                    append("  ·  ").append(stringResource(R.string.wallpaper_routines_next)).append(' ')
+                    append(time.format(it))
+                }
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        status.error?.let {
+            Text(
+                stringResource(R.string.wallpaper_routines_failed, it),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        if (routines.isEmpty()) {
+            Text(
+                stringResource(R.string.wallpaper_routines_none),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else if (open) {
+            routines.forEach { routine ->
+                // Resolved during composition: a resource lookup inside the tap lambda is a lint error.
+                val deleted = stringResource(R.string.wallpaper_routines_deleted, routine.name)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(routine.name, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            // Say what it does without making the user open JSON.
+                            routine.rules.take(3).joinToString(" · ") { rule ->
+                                listOfNotNull(
+                                    rule.conditions.from?.let { from -> "$from–${rule.conditions.to}" },
+                                    rule.conditions.weather.takeIf { it.isNotEmpty() }
+                                        ?.joinToString("/") { it.name.lowercase() },
+                                    rule.conditions.charging?.let { if (it) "charging" else "unplugged" },
+                                    rule.conditions.batteryBelow?.let { "under $it%" },
+                                ).joinToString(", ").ifBlank { "always" }
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    androidx.compose.material3.Switch(
+                        checked = routine.enabled,
+                        onCheckedChange = { on ->
+                            scope.launch {
+                                app.wallpaperRoutines.setEnabled(routine.id, on)
+                                app.wallpaperRoutineEngine.refresh("toggle")
+                            }
+                        },
+                    )
+                    androidx.compose.material3.IconButton(onClick = {
+                        scope.launch {
+                            app.wallpaperRoutines.delete(routine.id)
+                            app.wallpaperRoutineEngine.forgetApplied()
+                            toast(deleted)
+                        }
+                    }) {
+                        Icon(
+                            Icons.Rounded.DeleteOutline,
+                            stringResource(R.string.wallpaper_routines_delete),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+        TextButton(onClick = onAsk) { Text(stringResource(R.string.wallpaper_routines_ask)) }
     }
 }
 

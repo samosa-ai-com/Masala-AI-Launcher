@@ -4,10 +4,11 @@ import kotlinx.serialization.Serializable
 
 /**
  * Who said it. Errors are stored so a failed turn is visible when the session is reopened;
- * [SYSTEM] marks a note the app wrote, such as a history summary.
+ * [SYSTEM] marks a note the app wrote, such as a history summary. [STATUS] marks what the app
+ * noted about one turn — a stop — with the steps it had taken, so the trace survives the reload.
  */
 @Serializable
-enum class TurnRole { USER, MASALA, ERROR, SYSTEM }
+enum class TurnRole { USER, MASALA, ERROR, STATUS, SYSTEM }
 
 /** Something a reply made that the user can open: a mini app, a file, an installed app. */
 @Serializable

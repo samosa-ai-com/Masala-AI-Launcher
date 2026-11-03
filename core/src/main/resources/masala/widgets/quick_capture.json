@@ -1,0 +1,29 @@
+{
+  "id": "quick_capture",
+  "name": "Remember something",
+  "description": "One tap opens the chat with 'Remember this:' ready to finish.",
+  "category": "Masala",
+  "widget": {
+    "id": "quick_capture",
+    "title": "Capture",
+    "components": [
+      {
+        "type": "text",
+        "text": "Keep the thought before it goes."
+      },
+      {
+        "type": "button",
+        "label": "Remember",
+        "action": {
+          "type": "ask_masala",
+          "prompt": "Remember this: "
+        }
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 2,
+      "max": 3
+    }
+  }
+}

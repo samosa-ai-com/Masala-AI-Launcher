@@ -17,6 +17,9 @@ class WallpaperStore(private val dao: WallpaperDao, private val dir: File) {
 
     suspend fun all(): List<Wallpaper> = dao.all().map { it.wallpaper() }
 
+    /** One catalog row by id, for a routine that pinned it. */
+    suspend fun byId(id: Long): Wallpaper? = dao.get(id)?.wallpaper()
+
     suspend fun search(query: String): List<Wallpaper> {
         val q = query.trim()
         if (q.isEmpty()) return all()

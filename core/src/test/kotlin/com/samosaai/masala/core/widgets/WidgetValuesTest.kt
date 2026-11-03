@@ -44,6 +44,19 @@ class WidgetValuesTest {
     }
 
     @Test
+    fun secondBrainValuesComeFromTheApp() {
+        // The app supplies what only it can read; core only maps the key, so a widget can show
+        // the knowledge base without the contract knowing what a Second Brain is.
+        val extra = mapOf("notes" to "42", "latest" to "Trip notes")
+        assertEquals("42", WidgetValues.textOf(binding(BindingSource.SECOND_BRAIN, "notes"), emptyMap(), snapshot, extra))
+        assertEquals("Trip notes", WidgetValues.textOf(binding(BindingSource.SECOND_BRAIN, "latest"), emptyMap(), snapshot, extra))
+        assertEquals(42.0, WidgetValues.numberOf(binding(BindingSource.SECOND_BRAIN, "notes"), emptyMap(), snapshot, extra))
+        assertEquals(listOf("Trip notes"), WidgetValues.rowsOf(binding(BindingSource.SECOND_BRAIN, "latest"), emptyMap(), snapshot, 2, extra))
+        // Nothing yet: no value rather than a zero dressed up as data.
+        assertNull(WidgetValues.textOf(binding(BindingSource.SECOND_BRAIN, "notes"), emptyMap(), snapshot))
+    }
+
+    @Test
     fun futureStoresResolveToNull() {
         val empty = emptyMap<String, String>()
         assertNull(WidgetValues.textOf(binding(BindingSource.HTTP), empty, snapshot))

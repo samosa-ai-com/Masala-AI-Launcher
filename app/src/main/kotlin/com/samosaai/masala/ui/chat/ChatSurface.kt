@@ -127,7 +127,8 @@ fun ChatSurface(
     mic: () -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
-    onAsk: (String, List<String>) -> Unit = { _, _ -> },
+    /** Returns false when a turn is already running: the composer keeps the draft then. */
+    onAsk: (String, List<String>) -> Boolean = { _, _ -> true },
     onClose: () -> Unit,
     onHistory: () -> Unit,
     onNewChat: () -> Unit,
@@ -563,7 +564,10 @@ private fun Thread(
             turns.isNotEmpty() -> turns.lastIndex
             else -> -1
         }
-        if (target >= 0) list.animateScrollToItem(target)
+        // A turn landing and a chat being replaced can cross: never ask for a row the list
+        // doesn't have (animateScrollToItem throws on a negative index).
+        val last = list.layoutInfo.totalItemsCount - 1
+        if (target >= 0) list.animateScrollToItem(if (last >= 0) target.coerceAtMost(last) else target)
     }
     // The handle's rule, on the list itself: a downward pull past the top,
     // beyond 120 dp, returns to the orb. Down is the handle's collapse
@@ -946,6 +950,34 @@ private fun Bubble(
         onRevert?.invoke()
     }
     val user = turn.role == TurnRole.USER
+    if (turn.role == TurnRole.STATUS) {
+        // What the app noted about a turn (Stop): no bubble, no menu — the steps are the point.
+        Column(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                turn.text,
+                style = MaterialTheme.typography.labelMedium,
+                color = MasalaTheme.tokens.textLow,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            turn.steps.forEach { step ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(4.dp).clip(CircleShape).background(MasalaColors.Cardamom.copy(alpha = 0.7f)))
+                    Text(
+                        step,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MasalaTheme.tokens.textLow,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
+            }
+        }
+        return
+    }
     if (turn.role == TurnRole.SYSTEM) {
         // A history summary: the app wrote it, so it reads as a note, not as a reply.
         // No menu: only the user's own messages can be reverted to.
@@ -1097,7 +1129,7 @@ private fun Controls(
     level: () -> Float,
     onSend: () -> Unit,
     onContinue: () -> Unit = {},
-    onAsk: (String, List<String>) -> Unit = { _, _ -> },
+    onAsk: (String, List<String>) -> Boolean = { _, _ -> true },
     onClose: () -> Unit,
     /** Cancel ends the live take (mic off); close only hides the sheet. Defaults to close. */
     onCancel: () -> Unit = onClose,
@@ -1235,11 +1267,12 @@ private fun Controls(
                         // would drop it silently.
                         if (pendingAttachments > 0) {
                             android.widget.Toast.makeText(context, waitForPhotosText, android.widget.Toast.LENGTH_SHORT).show()
-                        } else {
-                            onAsk(text.text.trim(), queued.map { it.jpegBase64 })
+                        } else if (onAsk(text.text.trim(), queued.map { it.jpegBase64 })) {
                             text = androidx.compose.ui.text.input.TextFieldValue("")
                             queued = emptyList()
                         }
+                        // Refused (a turn is still running): the words and photos stay in the
+                        // box, and the screen that owns the controller says why.
                     },
                     modifier = Modifier.weight(1f),
                 )

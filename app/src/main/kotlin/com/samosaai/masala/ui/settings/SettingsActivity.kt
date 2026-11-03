@@ -50,6 +50,8 @@ import com.samosaai.masala.ui.home.widgets.WidgetCard
 import com.samosaai.masala.ui.home.widgets.WidgetSource
 import com.samosaai.masala.layout.LayoutTransfer
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -67,6 +69,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import com.samosaai.masala.ui.home.widgets.WidgetPreview
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -210,7 +214,11 @@ class SettingsActivity : ComponentActivity() {
                         Page.ABOUT -> AboutPage(onBack = { page = Page.MAIN })
                         Page.BRIEF -> BriefPage(settings, update = { change -> lifecycleScope.launch { masala.settings.update(change) } }, onBack = { page = Page.MAIN })
                         Page.WIDGETS -> WidgetsPage(onBack = { page = Page.MAIN })
-                        Page.WALLPAPERS -> WallpapersPage(onBack = { page = Page.MAIN }, onGenerateWithAI = { askInChat(getString(R.string.wallpaper_generate_prefill)) })
+                        Page.WALLPAPERS -> WallpapersPage(
+                            onBack = { page = Page.MAIN },
+                            onGenerateWithAI = { askInChat(getString(R.string.wallpaper_generate_prefill)) },
+                            onAskForRoutine = { askInChat(getString(R.string.wallpaper_routines_prefill)) },
+                        )
                     } }
                 }
             }
@@ -400,7 +408,12 @@ class SettingsActivity : ComponentActivity() {
 
     /** Home's input card, already holding [prefill], for the user to finish in their own words. */
     private fun askInChat(prefill: String) {
-        masala.commands.openInput(prefill)
+        // A reply already running owns the chat: opening the input card would cancel it (and
+        // used to crash), so say why and stay here.
+        if (!masala.commands.openInput(prefill)) {
+            android.widget.Toast.makeText(this, R.string.chat_busy, android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
         startActivity(Intent(this, com.samosaai.masala.HomeActivity::class.java).putExtra(com.samosaai.masala.HomeActivity.EXTRA_SHOW_INPUT, true)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
         finish()
@@ -411,12 +424,8 @@ class SettingsActivity : ComponentActivity() {
     private fun WidgetsPage(onBack: () -> Unit) {
         val scope = rememberCoroutineScope()
         val entries by remember { masala.widgetLibrary.watch() }.collectAsStateWithLifecycle(emptyList())
-        val snapshot by masala.contextService.snapshot.collectAsStateWithLifecycle()
         val base by masala.layouts.base.collectAsStateWithLifecycle()
         fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()
-        val source = remember(snapshot) {
-            WidgetSource(snapshot = { snapshot }, store = masala.widgetStates, onAction = { toast(getString(R.string.widgets_preview_note)) }, streams = masala.streamSources, http = masala.httpValues, approved = { masala.httpApproval.approved(it) })
-        }
         // Template blurbs by widget id, so the Templates tab can say what each one does.
         val templatesByWidgetId = remember {
             runCatching { com.samosaai.masala.core.widgets.WidgetTemplates.all().associateBy { it.widget.id } }.getOrDefault(emptyMap())
@@ -445,13 +454,46 @@ class SettingsActivity : ComponentActivity() {
             }
             val mine = tab == 0
             var filter by rememberSaveable { mutableStateOf("") }
-            val rows = remember(entries, mine, filter) {
+            var shelf by rememberSaveable { mutableStateOf<String?>(null) }
+            LaunchedEffect(tab) { if (tab == 0) shelf = null }
+            val shelves = remember(entries, mine, templatesByWidgetId) {
+                if (mine) emptyList()
+                else com.samosaai.masala.core.widgets.WidgetTemplates.categories.filter { category ->
+                    entries.any { (it.createdBy == "template") && templatesByWidgetId[it.spec.id]?.category == category }
+                }
+            }
+            val rows = remember(entries, mine, filter, shelf, templatesByWidgetId) {
                 val q = filter.trim().lowercase()
+                val template = templatesByWidgetId
                 entries.filter { (it.createdBy != "template") == mine }
-                    .filter { q.isEmpty() || it.spec.id.lowercase().contains(q) || (it.spec.title?.lowercase()?.contains(q) == true) }
+                    .filter { mine || shelf == null || template[it.spec.id]?.category == shelf }
+                    .filter {
+                        q.isEmpty() || it.spec.id.lowercase().contains(q) ||
+                            (it.spec.title?.lowercase()?.contains(q) == true) ||
+                            (template[it.spec.id]?.name?.lowercase()?.contains(q) == true) ||
+                            (template[it.spec.id]?.description?.lowercase()?.contains(q) == true)
+                    }
             }
             if (entries.any { (it.createdBy != "template") == mine } && (rows.size > 5 || filter.isNotEmpty())) {
                 ListSearchField(filter, { filter = it }, stringResource(R.string.widgets_filter))
+            }
+            if (shelves.size > 1) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    item {
+                        androidx.compose.material3.FilterChip(
+                            selected = shelf == null,
+                            onClick = { shelf = null },
+                            label = { Text(stringResource(R.string.widgets_all)) },
+                        )
+                    }
+                    items(shelves) { category ->
+                        androidx.compose.material3.FilterChip(
+                            selected = shelf == category,
+                            onClick = { shelf = if (shelf == category) null else category },
+                            label = { Text(category) },
+                        )
+                    }
+                }
             }
             if (rows.isEmpty()) {
                 Text(
@@ -502,7 +544,9 @@ class SettingsActivity : ComponentActivity() {
                     else com.samosaai.masala.widgets.HttpApproval.needingApproval(spec, masala.httpApproval.approved(spec.id))
                 }
                 Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    WidgetCard(spec, rows = null, source = source)
+                    // A still, isolated preview: the manager used to render the live card with the
+                    // real widget store, so a tap here changed what home shows.
+                    WidgetPreview(spec, rows = spec.size.default.coerceAtMost(2), animate = false)
                     if (!mine) {
                         templatesByWidgetId[spec.id]?.description?.let { blurb ->
                             Text(

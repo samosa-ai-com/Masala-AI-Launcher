@@ -1,14 +1,23 @@
 {
   "id": "camera_tile",
   "name": "Camera tile",
-  "description": "One live camera, muted; tap for full screen. Needs one of your camera sources — the maker lists sources first and asks for the URL if none fits.",
+  "description": "A live view from a camera stream source.",
+  "category": "Media",
   "widget": {
-    "id": "camera",
-    "title": "Front door",
+    "id": "camera_tile",
+    "title": "Camera",
     "components": [
-      { "type": "video", "stream": { "sourceId": "front-door" } },
-      { "type": "text", "binding": { "source": "stream_status", "key": "front-door" }, "style": { "align": "end" } }
+      {
+        "type": "video",
+        "stream": {
+          "sourceId": "camera"
+        }
+      }
     ],
-    "size": { "min": 2, "default": 3, "max": 5, "minW": 2, "defaultW": 2, "maxW": 4 }
+    "size": {
+      "min": 2,
+      "default": 3,
+      "max": 3
+    }
   }
 }

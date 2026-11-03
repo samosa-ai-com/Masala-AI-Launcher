@@ -1,0 +1,27 @@
+{
+  "id": "break_timer",
+  "name": "Five-minute break",
+  "description": "The other half of a Pomodoro: a short break that rings.",
+  "category": "Focus",
+  "widget": {
+    "id": "break_timer",
+    "title": "Break",
+    "components": [
+      {
+        "type": "timer",
+        "key": "break",
+        "label": "Break",
+        "seconds": 300,
+        "sound": true
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 1,
+      "max": 2,
+      "minW": 2,
+      "defaultW": 2,
+      "maxW": 2
+    }
+  }
+}

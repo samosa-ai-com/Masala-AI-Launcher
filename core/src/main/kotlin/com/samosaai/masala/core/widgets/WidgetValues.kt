@@ -13,8 +13,16 @@ import com.samosaai.masala.core.contract.ContextSnapshot
  */
 object WidgetValues {
 
-    /** Display text, or null when there is nothing to show yet. */
-    fun textOf(binding: Binding, storage: Map<String, String>, snapshot: ContextSnapshot): String? =
+    /**
+     * Display text, or null when there is nothing to show yet. [extra] carries values the app
+     * supplies at render time (the Second Brain); core stays free of Android types.
+     */
+    fun textOf(
+        binding: Binding,
+        storage: Map<String, String>,
+        snapshot: ContextSnapshot,
+        extra: Map<String, String> = emptyMap(),
+    ): String? =
         when (binding.source) {
             BindingSource.STORAGE -> storage[binding.key]
             BindingSource.NEXT_EVENT -> snapshot.nextEvent?.let { e ->
@@ -34,10 +42,16 @@ object WidgetValues {
             BindingSource.HTTP -> null
             BindingSource.STREAM_STATUS -> null
             BindingSource.SKILL_RESULT -> null
+            BindingSource.SECOND_BRAIN -> extra[binding.key]
         }
 
     /** A numeric value for progress and gauge, or null when there is nothing to show yet. */
-    fun numberOf(binding: Binding, storage: Map<String, String>, snapshot: ContextSnapshot): Double? =
+    fun numberOf(
+        binding: Binding,
+        storage: Map<String, String>,
+        snapshot: ContextSnapshot,
+        extra: Map<String, String> = emptyMap(),
+    ): Double? =
         when (binding.source) {
             BindingSource.STORAGE -> storage[binding.key]?.toDoubleOrNull()
             BindingSource.BATTERY -> snapshot.batteryPercent?.toDouble()
@@ -45,6 +59,7 @@ object WidgetValues {
             BindingSource.SLEEP -> snapshot.sleepHours
             BindingSource.URGENT_COUNT -> snapshot.urgentCount.takeIf { it > 0 }?.toDouble()
             BindingSource.WEATHER -> snapshot.weather?.tempC
+            BindingSource.SECOND_BRAIN -> extra[binding.key]?.toDoubleOrNull()
             BindingSource.NEXT_EVENT,
             BindingSource.MEDIA,
             BindingSource.HTTP,
@@ -54,10 +69,17 @@ object WidgetValues {
         }
 
     /** Rows for a `list` component: storage holds newline-separated lines, the snapshot has one. */
-    fun rowsOf(binding: Binding, storage: Map<String, String>, snapshot: ContextSnapshot, maxRows: Int): List<String> {
+    fun rowsOf(
+        binding: Binding,
+        storage: Map<String, String>,
+        snapshot: ContextSnapshot,
+        maxRows: Int,
+        extra: Map<String, String> = emptyMap(),
+    ): List<String> {
         val lines = when (binding.source) {
             BindingSource.STORAGE -> storage[binding.key]?.lines()?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
-            BindingSource.NEXT_EVENT -> listOfNotNull(textOf(binding, storage, snapshot))
+            BindingSource.NEXT_EVENT -> listOfNotNull(textOf(binding, storage, snapshot, extra))
+            BindingSource.SECOND_BRAIN -> extra[binding.key]?.lines()?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
             else -> return emptyList()
         }
         return lines.take(maxRows.coerceAtLeast(0))

@@ -293,6 +293,18 @@
     <string name="wallpaper_search_hint">Search prompts…</string>
     <string name="wallpaper_empty">No wallpapers yet. Ask Masala to generate one.</string>
     <string name="wallpaper_delete_title">Delete this wallpaper?</string>
+    <string name="wallpaper_routines_title">Wallpaper routines</string>
+    <string name="wallpaper_routines_none">No routines yet. A routine changes your home wallpaper by time, weather or charging — try “mornings bright, evenings warm, rain always gets the rainy one”.</string>
+    <string name="wallpaper_routines_ask">Ask Masala for a routine</string>
+    <string name="wallpaper_routines_prefill">Create a wallpaper routine that </string>
+    <string name="wallpaper_routines_now">Now</string>
+    <string name="wallpaper_routines_next">Next change</string>
+    <string name="wallpaper_routines_idle">Nothing active</string>
+    <string name="wallpaper_routines_show">Show routines</string>
+    <string name="wallpaper_routines_hide">Hide routines</string>
+    <string name="wallpaper_routines_delete">Delete routine</string>
+    <string name="wallpaper_routines_deleted">Deleted “%1$s”</string>
+    <string name="wallpaper_routines_failed">Last attempt: %1$s</string>
     <string name="wallpaper_generate_ai">Generate with AI</string>
     <string name="wallpaper_generate_prefill">Generate a phone wallpaper of </string>
     <string name="wallpaper_from_device">From device</string>
@@ -327,6 +339,8 @@
     <string name="widgets_empty">No widgets yet. Describe one below and the Widget Maker will build it.</string>
     <string name="widgets_empty_no_match">No widgets match.</string>
     <string name="widgets_filter">Filter widgets</string>
+    <string name="widgets_search">Search widgets</string>
+    <string name="widgets_all">All</string>
     <string name="widgets_describe">Describe a widget…</string>
     <string name="widgets_describe_prefill">"I want a home-screen widget that "</string>
     <string name="widgets_edit_prefill">"Change the '%1$s' widget so that "</string>
@@ -821,6 +835,7 @@
     <string name="chat_delete">Delete</string>
     <string name="chat_revert_to_here">Revert to here</string>
     <string name="chat_send_now">Send now</string>
+    <string name="chat_busy">Masala is still replying in this chat. Stop it or wait for it to finish.</string>
     <string name="chat_search">Search chats</string>
     <string name="chat_summary_note">Earlier messages were summarised</string>
     <string name="chat_group_today">Today</string>

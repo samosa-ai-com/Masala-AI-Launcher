@@ -1,0 +1,29 @@
+{
+  "id": "daily_brief",
+  "name": "Daily brief",
+  "description": "A one-tap brief built from your day.",
+  "category": "Masala",
+  "widget": {
+    "id": "daily_brief",
+    "title": "Brief",
+    "components": [
+      {
+        "type": "text",
+        "text": "Your day, in one tap."
+      },
+      {
+        "type": "button",
+        "label": "Brief me",
+        "action": {
+          "type": "ask_masala",
+          "prompt": "Give me my daily brief"
+        }
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 2,
+      "max": 3
+    }
+  }
+}

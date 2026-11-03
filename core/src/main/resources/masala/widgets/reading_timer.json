@@ -1,0 +1,27 @@
+{
+  "id": "reading_timer",
+  "name": "Reading timer",
+  "description": "Twenty quiet minutes with a book, then a chime.",
+  "category": "Focus",
+  "widget": {
+    "id": "reading_timer",
+    "title": "Read 20",
+    "components": [
+      {
+        "type": "timer",
+        "key": "read",
+        "label": "Reading",
+        "seconds": 1200,
+        "sound": true
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 1,
+      "max": 2,
+      "minW": 2,
+      "defaultW": 2,
+      "maxW": 2
+    }
+  }
+}

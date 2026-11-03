@@ -161,6 +161,8 @@ class HomeActivity : ComponentActivity() {
         masala.videoPool.backgrounded = false
         // Rules are evaluated again on resume and then on the minute tick (plan Phase 2).
         masala.contextService.setHomeVisible(true)
+        // Back on home: a routine that became due while another app was open applies now.
+        runCatching { masala.wallpaperRoutineEngine.refresh("home") }
         isDefault = HomeRole.isDefault(this)
         // Shortcut access comes with being the default home app.
         masala.launcher.refreshShortcuts()
@@ -205,10 +207,17 @@ class HomeActivity : ComponentActivity() {
             // unknown ids (a deleted chat) leave the current thread showing.
             // Declared before the effects that call it.
             fun openSession(id: String?) {
+                val target = id?.takeIf { it.isNotBlank() }
+                // One chat at a time: while a turn runs, another thread can't be opened, because
+                // replacing it would cancel the turn mid-flight (that used to crash the app).
+                // Coming back to the thread that is already open is always fine.
+                if (app.commands.busy.value && target != null && target != app.activeChatId.value) {
+                    chatBusyToast()
+                    return
+                }
                 chatPrefill = ""
                 chatPrefillNonce = 0
                 drawerOpen = false
-                val target = id?.takeIf { it.isNotBlank() }
                 // Returning to the same thread (notification tap) resumes it; switching
                 // threads cancels the live one so its reply can't land in the new chat.
                 // Blank ids (old notices) just reopen what's showing.
@@ -538,8 +547,24 @@ class HomeActivity : ComponentActivity() {
                 onFullscreen = { id -> this@HomeActivity.openStreamViewer(id) },
             )
         }
-        val widgetSource = remember(snapshot, mediaHost) {
-            com.samosaai.masala.ui.home.widgets.WidgetSource(snapshot = { snapshot }, store = widgetStore, onAction = ::run, streams = app.streamSources, media = mediaHost, http = app.httpValues, approved = { app.httpApproval.approved(it) })
+        // The Second Brain's own numbers: collected here so a widget showing them redraws when
+        // a note is added, without the renderer knowing what a Second Brain is.
+        val brainTitles by app.secondBrain.titles.collectAsStateWithLifecycle()
+        val brainFacts = remember(brainTitles) {
+            if (brainTitles.isEmpty()) emptyMap()
+            else mapOf("notes" to brainTitles.size.toString(), "latest" to brainTitles.last())
+        }
+        val widgetSource = remember(snapshot, mediaHost, brainFacts) {
+            com.samosaai.masala.ui.home.widgets.WidgetSource(
+                snapshot = { snapshot },
+                store = widgetStore,
+                onAction = ::run,
+                streams = app.streamSources,
+                media = mediaHost,
+                http = app.httpValues,
+                approved = { app.httpApproval.approved(it) },
+                extra = { brainFacts },
+            )
         }
         // The context below is remembered on purpose; drops read the live layout through these.
         val latestLayout = rememberUpdatedState(layout)
@@ -738,6 +763,9 @@ class HomeActivity : ComponentActivity() {
                         mic = rememberMicTap(app),
                         level = { pillLevel },
                         onOpenChat = if (resumable) ({ openSession(activeId) }) else ({
+                            if (app.commands.busy.value) {
+                                chatBusyToast()
+                            } else {
                             app.commands.focus()
                             chatOpen = true
                             expanded = true
@@ -754,6 +782,7 @@ class HomeActivity : ComponentActivity() {
                                         app.commands.restoreSession(session.turns, sameChat)
                                     }
                                 }
+                            }
                             }
                         }),
                     )
@@ -796,11 +825,13 @@ class HomeActivity : ComponentActivity() {
                     onExpanded = { expanded = it },
                     mic = rememberMicTap(app),
                     onSend = { app.commands.sendNow() },
-                    onStop = { app.commands.dismiss() },
+                    onStop = { app.commands.stop() },
                     onContinue = { app.commands.continueListening() },
                     elapsedMs = elapsedMs,
                     ready = voiceReady,
-                    onAsk = { text, images -> app.commands.ask(text, images = images) },
+                    onAsk = { text, images ->
+                        app.commands.ask(text, images = images).also { if (!it) chatBusyToast() }
+                    },
                     onClose = {
                         // Minimizing keeps a running turn alive (notification carries it);
                         // only Stop cancels.
@@ -812,6 +843,12 @@ class HomeActivity : ComponentActivity() {
                     allowAll = allowAll,
                     onAllowAll = { app.commands.setAllowAll(it) },
                     onNewChat = {
+                        // A live turn owns the thread: a new chat would cancel it and, before this
+                        // guard, took the app down with it.
+                        if (app.commands.busy.value) {
+                            chatBusyToast()
+                            return@ChatSurface
+                        }
                         app.activeChatId.value = null
                         turns = emptyList()
                         sessionTitle = ""
@@ -825,14 +862,25 @@ class HomeActivity : ComponentActivity() {
                     experts = app.experts().map {
                         com.samosaai.masala.chat.ExpertCredit(it.id, it.title.ifBlank { it.id })
                     },
-                    onRetry = { app.commands.ask(getString(R.string.capability_retry_prompt)) },
+                    onRetry = {
+                        if (!app.commands.ask(getString(R.string.capability_retry_prompt))) chatBusyToast()
+                    },
                     onAskExpert = { expert ->
                         // Seeded, not sent: the user finishes the sentence, the agent does the rest.
-                        app.commands.openInput(getString(R.string.search_ask_expert, expert.title))
-                        chatOpen = true
-                        expanded = true
+                        if (app.commands.openInput(getString(R.string.search_ask_expert, expert.title))) {
+                            chatOpen = true
+                            expanded = true
+                        } else {
+                            chatBusyToast()
+                        }
                     },
                     onRevertTurn = { index ->
+                        // Reverting replaces the thread; a live turn would be cancelled and its
+                        // reply lost. Stop first, then edit.
+                        if (app.commands.busy.value) {
+                            chatBusyToast()
+                            return@ChatSurface
+                        }
                         val id = activeId ?: return@ChatSurface
                         // The prompt being redone, before the store drops it.
                         val redone = turns.getOrNull(index) ?: return@ChatSurface
@@ -880,7 +928,11 @@ class HomeActivity : ComponentActivity() {
                 },
                 onRename = { id, title -> app.scope.launch { app.chats.rename(id, title) } },
                 onDelete = { id ->
-                    app.scope.launch {
+                    // Deleting the thread that is replying would cancel the turn; another
+                    // conversation can be deleted freely.
+                    if (activeId == id && app.commands.busy.value) {
+                        chatBusyToast()
+                    } else app.scope.launch {
                         app.chats.delete(id)
                         if (activeId == id) {
                             app.activeChatId.value = null
@@ -1218,6 +1270,18 @@ class HomeActivity : ComponentActivity() {
                     else toast(getString(R.string.widgets_added_on, app.layouts.pageLabel(placed.pageId ?: id)))
                     addWidgetSheet = false
                 } },
+                onCustomise = { id ->
+                    addWidgetSheet = false
+                    // Seed the chat instead of duplicating blind: the agent makes the user's own
+                    // version from the template, which is the whole point of Customize.
+                    val name = app.widgetLibrary.current()[id]?.title ?: id
+                    if (app.commands.openInput(getString(R.string.widgets_customize_prefill, name))) {
+                        chatOpen = true
+                        expanded = true
+                    } else {
+                        chatBusyToast()
+                    }
+                },
                 onDescribe = { addWidgetSheet = false; askMasala(getString(R.string.widgets_describe_prefill)) },
                 onManage = { addWidgetSheet = false; startActivity(Intent(this@HomeActivity, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_PAGE, "WIDGETS")) },
                 onSettings = { addWidgetSheet = false; openSettings() },
@@ -1341,12 +1405,18 @@ class HomeActivity : ComponentActivity() {
 
     /** `MasalaAction.AskMasala`; an empty prompt (the Ask gesture) opens the reply card for typing. */
     private fun askMasala(prompt: String) {
-        masala.commands.ask(prompt)
-        drawerOpen = false
+        // A refused ask (a turn already running) keeps the drawer open and says why; closing it
+        // would look like the request was accepted.
+        if (masala.commands.ask(prompt)) drawerOpen = false else chatBusyToast()
     }
 
     private fun openSettings() {
         startActivity(Intent(this, SettingsActivity::class.java))
+    }
+
+    /** One chat at a time: the same sentence wherever a chat action is refused mid-turn. */
+    private fun chatBusyToast() {
+        android.widget.Toast.makeText(this, R.string.chat_busy, android.widget.Toast.LENGTH_SHORT).show()
     }
 
     companion object {
