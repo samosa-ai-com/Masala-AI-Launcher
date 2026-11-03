@@ -118,7 +118,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, POCKET_STORE, SKILLS, PERSONAS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, PERMISSIONS, ABOUT, BRIEF, WIDGETS, WALLPAPERS }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MEETINGS, POCKET_STORE, SKILLS, PERSONAS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, PERMISSIONS, ABOUT, BRIEF, WIDGETS, WALLPAPERS }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -163,6 +163,7 @@ class SettingsActivity : ComponentActivity() {
                         Page.HIDDEN_APPS -> HiddenAppsPage(onBack = { page = Page.MAIN })
                         Page.LAYOUT -> LayoutPage(settings, onBack = { page = Page.MAIN })
                         Page.RECORDING -> RecordingPage(onBack = { page = Page.MAIN })
+                        Page.MEETINGS -> MeetingNotesPage(onBack = { page = Page.MAIN }, onQuickRecordings = { page = Page.RECORDING })
                         Page.POCKET_STORE -> {
                             val storeScope = rememberCoroutineScope()
                             com.samosaai.masala.ui.miniapps.PocketStorePage(
@@ -293,6 +294,7 @@ class SettingsActivity : ComponentActivity() {
             )
             // Only with :pro in the build: without it there is no index and no all-files access.
             if (masala.fileIndex != null) add(Entry(4, Icons.Rounded.Folder, ai, stringResource(R.string.settings_files), stringResource(R.string.settings_files_summary), onFiles))
+            add(Entry(4, Icons.Rounded.Mic, auto, stringResource(R.string.meeting_settings_title), stringResource(R.string.meeting_settings_summary)) { onPage(Page.MEETINGS) })
             add(Entry(4, Icons.Rounded.FiberManualRecord, auto, stringResource(R.string.settings_recording), stringResource(R.string.settings_recording_summary), onRecording))
             add(Entry(5, Icons.Rounded.Info, null, stringResource(R.string.about_title), stringResource(R.string.about_summary)) { onPage(Page.ABOUT) })
             if (BuildConfig.DEBUG) {
@@ -987,6 +989,96 @@ class SettingsActivity : ComponentActivity() {
                     },
                     dismissButton = { TextButton(onClick = { confirmImport = false }) { Text(stringResource(R.string.action_back)) } },
                 )
+            }
+        }
+    }
+
+    /**
+     * AI meeting notes (plan `docs/plans/meeting-notes.md`): where transcription goes, what it keeps,
+     * and the way into the app. The older quick recorder keeps its own page, untouched.
+     */
+    @Composable
+    private fun MeetingNotesPage(onBack: () -> Unit, onQuickRecordings: () -> Unit) {
+        val meetingSettings = remember { com.samosaai.masala.meetings.MeetingSettings(this@SettingsActivity) }
+        var wifiOnly by remember { mutableStateOf(meetingSettings.wifiOnly) }
+        var keepAudio by remember { mutableStateOf(meetingSettings.keepAudio) }
+        var language by remember { mutableStateOf(meetingSettings.language) }
+        var model by remember { mutableStateOf(meetingSettings.model) }
+        var template by remember { mutableStateOf(meetingSettings.template) }
+        val templates = com.samosaai.masala.core.meeting.MeetingTemplate.all
+        SettingsScaffold(stringResource(R.string.meeting_settings_title), onBack = onBack) {
+            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = { startActivity(com.samosaai.masala.ui.meetings.MeetingActivity.intent(this@SettingsActivity)) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.meeting_open)) }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.meeting_settings_wifi), style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            stringResource(R.string.meeting_settings_wifi_detail),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    androidx.compose.material3.Switch(checked = wifiOnly, onCheckedChange = {
+                        wifiOnly = it
+                        meetingSettings.wifiOnly = it
+                    })
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.meeting_settings_keep_audio), style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            stringResource(R.string.meeting_settings_keep_audio_detail),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    androidx.compose.material3.Switch(checked = keepAudio, onCheckedChange = {
+                        keepAudio = it
+                        meetingSettings.keepAudio = it
+                    })
+                }
+                OutlinedTextField(
+                    value = language,
+                    onValueChange = { language = it; meetingSettings.language = it },
+                    label = { Text(stringResource(R.string.meeting_settings_language)) },
+                    supportingText = { Text(stringResource(R.string.meeting_settings_language_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = model,
+                    onValueChange = { model = it; meetingSettings.model = it },
+                    label = { Text(stringResource(R.string.meeting_settings_model)) },
+                    supportingText = { Text(stringResource(R.string.meeting_settings_model_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(stringResource(R.string.meeting_settings_template), style = MaterialTheme.typography.titleSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    templates.forEach { option ->
+                        androidx.compose.material3.FilterChip(
+                            selected = template == option.id,
+                            onClick = { template = option.id; meetingSettings.template = option.id },
+                            label = { Text(option.name) },
+                        )
+                    }
+                }
+                HorizontalDivider()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.meeting_settings_recordings), style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            stringResource(R.string.meeting_settings_recordings_detail),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    TextButton(onClick = onQuickRecordings) { Text(stringResource(R.string.meeting_open)) }
+                }
             }
         }
     }

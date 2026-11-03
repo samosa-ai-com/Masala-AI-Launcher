@@ -210,6 +210,12 @@
             android:name=".ui.secondbrain.SecondBrainActivity"
             android:exported="false" />
 
+        <!-- AI meeting notes: list, live recorder, transcript and notes (plan meeting-notes) -->
+        <activity
+            android:name=".ui.meetings.MeetingActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />
+
         <!-- First run: Sam says hello, then make Masala the home app (UI refresh U1) -->
         <activity
             android:name=".ui.onboarding.WelcomeActivity"
@@ -267,6 +273,12 @@
         <!-- Meeting-notes recording (plan Phase 3, lane D): microphone FGS, user-started -->
         <service
             android:name=".audio.RecordingService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <!-- AI meeting notes: 5-minute chunks, pause/resume, hours-long sessions (plan meeting-notes) -->
+        <service
+            android:name=".meetings.MeetingRecorderService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
         <provider

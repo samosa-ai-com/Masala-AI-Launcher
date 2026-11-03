@@ -44,8 +44,11 @@ import kotlinx.coroutines.flow.Flow
         WidgetHttpValueEntity::class,
         WallpaperEntity::class,
         WallpaperRoutineEntity::class,
+        MeetingSessionEntity::class,
+        MeetingChunkEntity::class,
+        MeetingTurnEntity::class,
     ],
-    version = 11,
+    version = 12,
 )
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
@@ -63,6 +66,9 @@ abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appLaunches(): AppLaunchDao
     abstract fun wallpapers(): WallpaperDao
     abstract fun wallpaperRoutines(): WallpaperRoutineDao
+    abstract fun meetings(): MeetingDao
+    abstract fun meetingChunks(): MeetingChunkDao
+    abstract fun meetingTurns(): MeetingTurnDao
 
     companion object {
         /** UI refresh U3: the launch log behind the globe drawer and "Suggested now". */
@@ -130,6 +136,40 @@ abstract class MasalaDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * AI meeting notes (plan `docs/plans/meeting-notes.md`): sessions, their 5-minute chunks and
+         * the speaker-labelled turns. Audio stays in app-private files; these rows are the index.
+         */
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `meeting_sessions` (" +
+                        "`id` TEXT NOT NULL, `title` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, " +
+                        "`endedAt` INTEGER, `status` TEXT NOT NULL, `template` TEXT NOT NULL, " +
+                        "`language` TEXT NOT NULL, `activeMs` INTEGER NOT NULL, `speakerNames` TEXT NOT NULL, " +
+                        "`doneActions` TEXT NOT NULL, `rawNotes` TEXT NOT NULL, `bookmarks` TEXT NOT NULL, " +
+                        "`noteMarkdown` TEXT, `noteJson` TEXT, `brainPath` TEXT, `error` TEXT, " +
+                        "`createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_meeting_sessions_startedAt` ON `meeting_sessions` (`startedAt`)")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `meeting_chunks` (" +
+                        "`id` TEXT NOT NULL, `meetingId` TEXT NOT NULL, `idx` INTEGER NOT NULL, " +
+                        "`path` TEXT NOT NULL, `startMs` INTEGER NOT NULL, `durationMs` INTEGER NOT NULL, " +
+                        "`status` TEXT NOT NULL, `attempts` INTEGER NOT NULL, `labelsUncertain` INTEGER NOT NULL, " +
+                        "`error` TEXT, PRIMARY KEY(`id`))",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_meeting_chunks_meetingId_idx` ON `meeting_chunks` (`meetingId`, `idx`)")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `meeting_turns` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `meetingId` TEXT NOT NULL, " +
+                        "`chunkIdx` INTEGER NOT NULL, `startMs` INTEGER NOT NULL, `endMs` INTEGER NOT NULL, " +
+                        "`speaker` TEXT, `text` TEXT NOT NULL)",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_meeting_turns_meetingId_startMs` ON `meeting_turns` (`meetingId`, `startMs`)")
+            }
+        }
+
         val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE mini_apps ADD COLUMN mediaAllowed INTEGER NOT NULL DEFAULT 0")
@@ -141,6 +181,7 @@ abstract class MasalaDatabase : RoomDatabase() {
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
                     MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
+                    MIGRATION_11_12,
                 ).build()
     }
 }
@@ -583,3 +624,192 @@ data class WatchEntity(
     val lastCheckedAt: Long? = null,
     val createdAt: Long,
 )
+
+
+/**
+ * One recorded meeting (plan `docs/plans/meeting-notes.md`). Audio lives in
+ * `files/meetings/<id>/chunk-NNN.m4a`; the note is Markdown plus the structured JSON it came from.
+ * Status values are in `core/meeting/MeetingStatus` — they are strings so the DB stays a dumb store.
+ */
+@Entity(tableName = "meeting_sessions", indices = [Index("startedAt")])
+data class MeetingSessionEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val startedAt: Long,
+    val endedAt: Long? = null,
+    val status: String,
+    val template: String = "general",
+    val language: String = "",
+    val activeMs: Long = 0,
+    /** JSON `{"A":"Priya"}`: the name the user gave a detected speaker. */
+    val speakerNames: String = "{}",
+    /** JSON array of action indices the user ticked off. */
+    val doneActions: String = "[]",
+    val rawNotes: String = "",
+    /** JSON array of [com.samosaai.masala.core.meeting.MeetingBookmark]. */
+    val bookmarks: String = "[]",
+    val noteMarkdown: String? = null,
+    val noteJson: String? = null,
+    val brainPath: String? = null,
+    val error: String? = null,
+    val createdAt: Long = 0,
+    val updatedAt: Long = 0,
+)
+
+/** One 5-minute recording chunk; the transcription unit that stays under the endpoint's 10-minute cap. */
+@Entity(tableName = "meeting_chunks", indices = [Index("meetingId", "idx")])
+data class MeetingChunkEntity(
+    @PrimaryKey val id: String,
+    val meetingId: String,
+    val idx: Int,
+    val path: String,
+    /** Start on the meeting clock (pauses excluded). */
+    val startMs: Long,
+    val durationMs: Long,
+    val status: String,
+    val attempts: Int = 0,
+    val labelsUncertain: Boolean = false,
+    val error: String? = null,
+)
+
+/** One speaker-labelled turn, already on the meeting clock. */
+@Entity(tableName = "meeting_turns", indices = [Index("meetingId", "startMs")])
+data class MeetingTurnEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val meetingId: String,
+    val chunkIdx: Int,
+    val startMs: Long,
+    val endMs: Long,
+    val speaker: String? = null,
+    val text: String,
+)
+
+/** Who spoke how long, for the Speakers tab. */
+data class SpeakerTalk(val speaker: String?, val ms: Long)
+
+@Dao
+interface MeetingDao {
+    @Upsert
+    suspend fun upsert(session: MeetingSessionEntity)
+
+    @Query("SELECT * FROM meeting_sessions WHERE id = :id")
+    suspend fun get(id: String): MeetingSessionEntity?
+
+    @Query("SELECT * FROM meeting_sessions ORDER BY startedAt DESC")
+    fun all(): Flow<List<MeetingSessionEntity>>
+
+    @Query("SELECT * FROM meeting_sessions WHERE id = :id")
+    fun flow(id: String): Flow<MeetingSessionEntity?>
+
+    @Query("SELECT * FROM meeting_sessions ORDER BY startedAt DESC LIMIT :limit")
+    suspend fun latest(limit: Int): List<MeetingSessionEntity>
+
+    @Query("SELECT * FROM meeting_sessions ORDER BY startedAt DESC LIMIT 1")
+    fun latestFlow(): Flow<MeetingSessionEntity?>
+
+    @Query("SELECT * FROM meeting_sessions WHERE status IN ('recording', 'paused') ORDER BY startedAt DESC LIMIT 1")
+    suspend fun active(): MeetingSessionEntity?
+
+    @Query("SELECT * FROM meeting_sessions WHERE status IN ('recording', 'paused') ORDER BY startedAt DESC LIMIT 1")
+    fun activeFlow(): Flow<MeetingSessionEntity?>
+
+    @Query("SELECT * FROM meeting_sessions WHERE status IN ('recording', 'paused') AND updatedAt < :before")
+    suspend fun stale(before: Long): List<MeetingSessionEntity>
+
+    @Query("UPDATE meeting_sessions SET status = :status, activeMs = :activeMs, endedAt = :endedAt, updatedAt = :at WHERE id = :id")
+    suspend fun finish(id: String, status: String, activeMs: Long, endedAt: Long?, at: Long)
+
+    @Query("UPDATE meeting_sessions SET status = :status, updatedAt = :at WHERE id = :id")
+    suspend fun setStatus(id: String, status: String, at: Long)
+
+    @Query("UPDATE meeting_sessions SET activeMs = :activeMs, updatedAt = :at WHERE id = :id")
+    suspend fun setActiveMs(id: String, activeMs: Long, at: Long)
+
+    @Query("UPDATE meeting_sessions SET title = :title, updatedAt = :at WHERE id = :id")
+    suspend fun rename(id: String, title: String, at: Long)
+
+    @Query("UPDATE meeting_sessions SET speakerNames = :names, updatedAt = :at WHERE id = :id")
+    suspend fun setSpeakerNames(id: String, names: String, at: Long)
+
+    @Query("UPDATE meeting_sessions SET doneActions = :done, updatedAt = :at WHERE id = :id")
+    suspend fun setDoneActions(id: String, done: String, at: Long)
+
+    @Query("UPDATE meeting_sessions SET rawNotes = :notes, bookmarks = :bookmarks, updatedAt = :at WHERE id = :id")
+    suspend fun setNotes(id: String, notes: String, bookmarks: String, at: Long)
+
+    @Query("UPDATE meeting_sessions SET noteMarkdown = :markdown, noteJson = :json, status = :status, error = :error, updatedAt = :at WHERE id = :id")
+    suspend fun setNote(id: String, markdown: String?, json: String?, status: String, error: String?, at: Long)
+
+    @Query("UPDATE meeting_sessions SET brainPath = :path, updatedAt = :at WHERE id = :id")
+    suspend fun setBrainPath(id: String, path: String?, at: Long)
+
+    @Query("UPDATE meeting_sessions SET error = :error, updatedAt = :at WHERE id = :id")
+    suspend fun setError(id: String, error: String?, at: Long)
+
+    @Query("DELETE FROM meeting_sessions WHERE id = :id")
+    suspend fun delete(id: String)
+}
+
+@Dao
+interface MeetingChunkDao {
+    @Upsert
+    suspend fun upsert(chunk: MeetingChunkEntity)
+
+    @Query("SELECT * FROM meeting_chunks WHERE meetingId = :id ORDER BY idx")
+    suspend fun byMeeting(id: String): List<MeetingChunkEntity>
+
+    @Query("SELECT * FROM meeting_chunks WHERE meetingId = :id ORDER BY idx")
+    fun flow(id: String): Flow<List<MeetingChunkEntity>>
+
+    @Query("SELECT * FROM meeting_chunks WHERE meetingId = :id AND idx = :idx")
+    suspend fun byIndex(id: String, idx: Int): MeetingChunkEntity?
+
+    @Query("SELECT * FROM meeting_chunks WHERE meetingId = :id AND status IN ('recorded', 'failed') ORDER BY idx LIMIT 1")
+    suspend fun nextPending(id: String): MeetingChunkEntity?
+
+    @Query("SELECT * FROM meeting_chunks WHERE meetingId = :id AND status = 'recorded' ORDER BY idx LIMIT 1")
+    suspend fun nextRecorded(id: String): MeetingChunkEntity?
+
+    @Query("UPDATE meeting_chunks SET status = :status, attempts = attempts + 1, error = :error WHERE id = :id")
+    suspend fun setStatus(id: String, status: String, error: String?)
+
+    @Query("UPDATE meeting_chunks SET status = :status, labelsUncertain = :uncertain, error = :error WHERE id = :id")
+    suspend fun finish(id: String, status: String, uncertain: Boolean, error: String?)
+
+    @Query("UPDATE meeting_chunks SET durationMs = :durationMs WHERE id = :id")
+    suspend fun setDuration(id: String, durationMs: Long)
+
+    @Query("SELECT COUNT(*) FROM meeting_chunks WHERE meetingId = :id AND status != 'done'")
+    suspend fun remaining(id: String): Int
+
+    /** A worker killed mid-chunk leaves 'transcribing': the next run must pick it up again. */
+    @Query("UPDATE meeting_chunks SET status = 'recorded' WHERE meetingId = :id AND status = 'transcribing'")
+    suspend fun resetStuck(id: String)
+
+    @Query("SELECT COUNT(*) FROM meeting_chunks WHERE meetingId = :id")
+    suspend fun count(id: String): Int
+
+    @Query("DELETE FROM meeting_chunks WHERE meetingId = :id")
+    suspend fun deleteByMeeting(id: String)
+}
+
+@Dao
+interface MeetingTurnDao {
+    @Insert
+    suspend fun insertAll(turns: List<MeetingTurnEntity>)
+
+    @Query("SELECT * FROM meeting_turns WHERE meetingId = :id ORDER BY startMs")
+    fun flow(id: String): Flow<List<MeetingTurnEntity>>
+
+    @Query("SELECT * FROM meeting_turns WHERE meetingId = :id ORDER BY startMs")
+    suspend fun byMeeting(id: String): List<MeetingTurnEntity>
+
+    @Query("DELETE FROM meeting_turns WHERE meetingId = :id")
+    suspend fun deleteByMeeting(id: String)
+
+    @Query("DELETE FROM meeting_turns WHERE meetingId = :id AND chunkIdx = :chunkIdx")
+    suspend fun deleteByChunk(id: String, chunkIdx: Int)
+
+    @Query("SELECT speaker, SUM(endMs - startMs) AS ms FROM meeting_turns WHERE meetingId = :id GROUP BY speaker ORDER BY ms DESC")
+    suspend fun talkTime(id: String): List<SpeakerTalk>
+}

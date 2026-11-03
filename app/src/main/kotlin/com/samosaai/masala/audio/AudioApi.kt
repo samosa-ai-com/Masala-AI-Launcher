@@ -2,6 +2,8 @@ package com.samosaai.masala.audio
 
 import android.util.Log
 import com.samosaai.masala.BuildConfig
+import com.samosaai.masala.core.audio.DiarizedTranscript
+import com.samosaai.masala.core.audio.SpeakerTurn
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -12,6 +14,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -157,6 +160,33 @@ class AudioApi(
         language: String? = null,
         mode: String = DEFAULT_ASR_MODE,
     ): Result<String> = runCatching {
+        val jsonObj = jsonParser.parseToJsonElement(postAsr(wavFile, model, language, mode)).jsonObject
+        // `transcript` is present in every mode; older/plain responses carry `text`.
+        jsonObj["transcript"]?.jsonPrimitive?.contentOrNull
+            ?: jsonObj["text"]?.jsonPrimitive?.contentOrNull
+            ?: ""
+    }
+
+    /**
+     * Speaker-labelled transcription: the same upload with `mode = DIARIZATION`, answered with
+     * `turns[]` (text, startMs, endMs, speaker). Speakers are labelled per request — always starting
+     * at `A` for the first voice — so a meeting stitches windows together with
+     * [com.samosaai.masala.core.audio.SpeakerLabels]; this call does not pretend otherwise.
+     *
+     * The endpoint caps one request at ten minutes and times out near two minutes of processing, so
+     * callers upload windows of about five minutes. A response without `turns` still carries the flat
+     * transcript and comes back as one unlabelled turn.
+     */
+    fun transcribeDiarized(
+        wavFile: File,
+        model: String,
+        language: String? = null,
+    ): Result<DiarizedTranscript> = runCatching {
+        parseDiarized(postAsr(wavFile, model, language, DIARIZATION_MODE))
+    }
+
+    /** The multipart upload both transcription modes use; keeps the request shape in one place. */
+    private fun postAsr(wavFile: File, model: String, language: String?, mode: String): String {
         val url = "${baseUrl.trimEnd('/')}/asr/transcribe"
         val boundary = "Boundary-${System.currentTimeMillis()}"
         val settings = buildJsonObject {
@@ -179,11 +209,7 @@ class AudioApi(
         client.newCall(request).execute().use { response ->
             val responseBody = response.body?.string() ?: throw IOException("Empty response")
             if (!response.isSuccessful) throw IOException("HTTP ${response.code}: ${responseBody.take(300)}")
-            val jsonObj = jsonParser.parseToJsonElement(responseBody).jsonObject
-            // `transcript` is present in every mode; older/plain responses carry `text`.
-            jsonObj["transcript"]?.jsonPrimitive?.contentOrNull
-                ?: jsonObj["text"]?.jsonPrimitive?.contentOrNull
-                ?: ""
+            return responseBody
         }
     }
 
@@ -268,5 +294,48 @@ class AudioApi(
          * note or voice memo wants. ENDPOINTING and DIARIZATION split it into turns instead.
          */
         const val DEFAULT_ASR_MODE = "PUSH_TO_TALK"
+
+        /** Turns with speakers. The endpoint's own limit is ten minutes per request. */
+        const val DIARIZATION_MODE = "DIARIZATION"
+
+        /** `speaker_B|>` is an artefact the endpoint sometimes emits as a turn of its own. */
+        private val SPEAKER_ARTIFACT = Regex("(?i)^speaker_[a-z]\\|?>?$")
+
+        /**
+         * Reads an `/asr/transcribe` answer with `turns`. Kept separate from the network call so the
+         * shapes can be tested against captured responses.
+         */
+        fun parseDiarized(body: String): DiarizedTranscript {
+            val parser = Json { ignoreUnknownKeys = true; isLenient = true }
+            val obj = parser.parseToJsonElement(body).jsonObject
+            val duration = obj["audioDurationMs"]?.jsonPrimitive?.longOrNull ?: 0L
+            val turns = obj["turns"]?.jsonArray?.mapNotNull { element ->
+                val turn = runCatching { element.jsonObject }.getOrNull() ?: return@mapNotNull null
+                val text = (turn["transcript"] ?: turn["text"])?.jsonPrimitive?.contentOrNull
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: return@mapNotNull null
+                // The endpoint can echo a speaker token as a turn; it is not speech.
+                if (SPEAKER_ARTIFACT.matches(text)) return@mapNotNull null
+                val start = turn["startMs"]?.jsonPrimitive?.longOrNull ?: 0L
+                val end = turn["endMs"]?.jsonPrimitive?.longOrNull ?: start
+                SpeakerTurn(
+                    startMs = start,
+                    endMs = end.coerceAtLeast(start),
+                    speaker = turn["speaker"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() },
+                    text = text,
+                )
+            }.orEmpty()
+            if (turns.isNotEmpty()) return DiarizedTranscript(turns, duration.ifZero(turns.last().endMs))
+            // No turns: a flat transcript is still better than nothing, as one unlabelled turn.
+            val flat = (obj["transcript"] ?: obj["text"])?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+            return if (flat.isEmpty()) {
+                DiarizedTranscript(emptyList(), duration)
+            } else {
+                DiarizedTranscript(listOf(SpeakerTurn(0, duration, null, flat)), duration)
+            }
+        }
+
+        private fun Long.ifZero(other: Long): Long = if (this > 0) this else other
     }
 }

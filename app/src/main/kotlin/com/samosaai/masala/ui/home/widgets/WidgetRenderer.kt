@@ -181,6 +181,30 @@ private fun Component(
         )
     when (component) {
         is WidgetComponent.Text -> {
+            // The meeting's clock is not a stored string: the card ticks from the session's own
+            // numbers, so a running meeting shows the right second without a write every second.
+            if (component.binding?.source == com.samosaai.masala.core.contract.BindingSource.MEETING &&
+                component.binding?.key == "elapsed"
+            ) {
+                val base = extra["elapsed_ms"]?.toLongOrNull() ?: 0L
+                val measuredAt = extra["elapsed_at"]?.toLongOrNull() ?: System.currentTimeMillis()
+                val running = extra["recording"] == "1"
+                var now by remember(base, measuredAt, running) { mutableLongStateOf(measuredAt) }
+                LaunchedEffect(base, measuredAt, running) {
+                    while (running) {
+                        now = System.currentTimeMillis()
+                        delay(1_000)
+                    }
+                }
+                val shown = base + if (running) (now - measuredAt).coerceAtLeast(0) else 0L
+                Text(
+                    com.samosaai.masala.core.audio.DiarizedTranscript.clockOf(shown),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = tinted(component.style),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                return
+            }
             val bound = component.binding?.let { WidgetValues.textOf(it, storage, snapshot, extra) }
             if (component.text == null && bound == null &&
                 component.binding?.source != com.samosaai.masala.core.contract.BindingSource.STORAGE

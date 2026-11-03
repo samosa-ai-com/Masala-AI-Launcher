@@ -117,6 +117,29 @@ sealed interface MasalaAction {
     data class RunTool(val name: String, val args: JsonObject = JsonObject(emptyMap())) : MasalaAction
 
     /** A folder on home: tapping it shows [items]. Opened by the home screen, never dispatched. */
+    /**
+     * Starts a meeting recording. The phone opens the meeting screen when the app is not in front:
+     * Android 14+ refuses to start a microphone foreground service from a widget's background tap,
+     * and that is the only place the microphone may be opened.
+     */
+    @Serializable
+    @SerialName("meeting_start")
+    data object MeetingStart : MasalaAction
+
+    /** Pause a running meeting, or resume a paused one. One widget button, one decision. */
+    @Serializable
+    @SerialName("meeting_toggle")
+    data object MeetingToggle : MasalaAction
+
+    @Serializable
+    @SerialName("meeting_stop")
+    data object MeetingStop : MasalaAction
+
+    /** Opens the meeting app, on [id] when one is named and on the list otherwise. */
+    @Serializable
+    @SerialName("open_meeting")
+    data class OpenMeeting(val id: String? = null) : MasalaAction
+
     @Serializable
     @SerialName("open_folder")
     data class OpenFolder(val items: List<Item>) : MasalaAction
@@ -133,7 +156,10 @@ fun MasalaAction.sensitivity(toolSensitivity: (String) -> ToolSensitivity?): Too
     is MasalaAction.RunTool -> toolSensitivity(name) ?: ToolSensitivity.DESTRUCTIVE
     is MasalaAction.SetAlarm,
     is MasalaAction.StartTimer,
-    is MasalaAction.SetMode -> ToolSensitivity.CHANGES_SOMETHING
+    is MasalaAction.SetMode,
+    MasalaAction.MeetingStart,
+    MasalaAction.MeetingToggle,
+    MasalaAction.MeetingStop -> ToolSensitivity.CHANGES_SOMETHING
     is MasalaAction.LaunchApp,
     is MasalaAction.LaunchShortcut,
     is MasalaAction.OpenUrl,
@@ -149,5 +175,6 @@ fun MasalaAction.sensitivity(toolSensitivity: (String) -> ToolSensitivity?): Too
     is MasalaAction.OpenMiniApp,
     is MasalaAction.OpenSettings,
     is MasalaAction.Flip,
+    is MasalaAction.OpenMeeting,
     is MasalaAction.OpenFolder -> ToolSensitivity.READ_ONLY
 }

@@ -106,6 +106,65 @@ class MasalaApp : Application() {
     }
     /** Every generated widget's own values (counters, ticks); shared by home and the manager. */
     val widgetStates by lazy { com.samosaai.masala.widgets.WidgetStateStore(scope, database.widgetStates()) }
+
+    /** AI meeting notes (plan `docs/plans/meeting-notes.md`): sessions, recording, transcription, notes. */
+    val meetingSettings by lazy { com.samosaai.masala.meetings.MeetingSettings(this) }
+
+    val meetings by lazy { com.samosaai.masala.meetings.MeetingRepository(this, database, scope) }
+
+    val meetingTranscriber by lazy {
+        com.samosaai.masala.meetings.MeetingTranscriber(
+            context = this,
+            repo = meetings,
+            settings = meetingSettings,
+            speech = { com.samosaai.masala.meetings.MeetingSpeech.resolve(aiSettings, meetingSettings.model, meetingSettings.language) },
+        )
+    }
+
+    val meetingNotes by lazy {
+        com.samosaai.masala.meetings.MeetingNotesWriter(meetings) { messages, format ->
+            meetingClient().chat(messages, responseFormat = format, temperature = 0.2f, maxTokens = 4_000)
+                .choices.firstOrNull()?.message?.textContent.orEmpty()
+        }
+    }
+
+    private var meetingClientCache: Pair<com.samosaai.masala.llm.LlmConfig, com.samosaai.masala.llm.LLMClient>? = null
+
+    private fun meetingClient(): com.samosaai.masala.llm.LLMClient = synchronized(this) {
+        val config = com.samosaai.masala.llm.LlmConfig.default
+        meetingClientCache?.takeIf { it.first == config }?.second
+            ?: config.client(this).also { meetingClientCache = config to it }
+    }
+
+    /**
+     * What the meeting widget draws: the live recorder when one runs, otherwise the newest meeting.
+     * `elapsed` is a number plus the moment it was measured; the card ticks from there.
+     */
+    fun meetingFacts(): Map<String, String> {
+        val recorder = com.samosaai.masala.meetings.MeetingRecorderService.state.value
+        val live = recorder.meetingId != null && recorder.active
+        val row = meetings.active.value ?: meetings.latest.value
+        val status = when {
+            live && recorder.status == com.samosaai.masala.core.meeting.MeetingStatus.PAUSED -> "Paused"
+            live -> "Recording"
+            row?.status == com.samosaai.masala.core.meeting.MeetingStatus.TRANSCRIBING -> "Transcribing…"
+            row?.status == com.samosaai.masala.core.meeting.MeetingStatus.INTERRUPTED -> "Interrupted"
+            row?.noteMarkdown != null -> "Notes ready · ${row.activeMs / 60_000} min"
+            row != null -> "No notes yet"
+            else -> "Not recording"
+        }
+        val names = row?.let { meetings.speakerNames(it) }.orEmpty()
+        val speakerCount = names.size
+        return mapOf(
+            "status" to status,
+            "title" to (if (live) recorder.title else row?.title).orEmpty().ifBlank { "Meeting notes" },
+            "elapsed_ms" to (if (live) recorder.elapsedMs else row?.activeMs ?: 0L).toString(),
+            "elapsed_at" to System.currentTimeMillis().toString(),
+            "recording" to if (live && recorder.status == com.samosaai.masala.core.meeting.MeetingStatus.RECORDING) "1" else "0",
+            "speakers" to if (speakerCount > 0) "$speakerCount speakers" else "",
+            "summary" to (row?.let { meetings.note(it)?.summary?.firstOrNull() } ?: ""),
+        )
+    }
     val widgetLibrary by lazy {
         com.samosaai.masala.widgets.WidgetLibrary(
             database.widgets(),
@@ -688,6 +747,8 @@ class MasalaApp : Application() {
         // Tools ask for permissions from background threads; the gate needs a context for that.
         PermissionGate.context = this
         scope.launch { httpValues.load() }
+        // A meeting left recording by a killed process must not look live forever.
+        scope.launch { runCatching { meetings.recoverStale() } }
         com.samosaai.masala.widgets.WidgetHttpWorker.ensure(this)
         catalog = AppCatalog(this, scope)
         icons = IconCache(this, catalog)

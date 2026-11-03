@@ -23,6 +23,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
@@ -560,7 +562,18 @@ class HomeActivity : ComponentActivity() {
             if (brainTitles.isEmpty()) emptyMap()
             else mapOf("notes" to brainTitles.size.toString(), "latest" to brainTitles.last())
         }
-        val widgetSource = remember(snapshot, mediaHost, brainFacts) {
+        // The meeting widget: the live recorder when one runs, otherwise the newest meeting. The
+        // amplitude changes ~8 times a second and is deliberately not collected here.
+        val meetingActive by app.meetings.active.collectAsStateWithLifecycle(null)
+        val meetingLatest by app.meetings.latest.collectAsStateWithLifecycle(null)
+        val recorderTick by remember {
+            com.samosaai.masala.meetings.MeetingRecorderService.state
+                .map { Triple(it.meetingId, it.status, it.elapsedMs) }
+                .distinctUntilChanged()
+        }.collectAsStateWithLifecycle(initialValue = Triple<String?, String, Long>(null, "", 0L))
+        val meetingFacts = remember(meetingActive, meetingLatest, recorderTick) { app.meetingFacts() }
+        val widgetExtras = remember(brainFacts, meetingFacts) { brainFacts + meetingFacts }
+        val widgetSource = remember(snapshot, mediaHost, brainFacts, widgetExtras) {
             com.samosaai.masala.ui.home.widgets.WidgetSource(
                 snapshot = { snapshot },
                 store = widgetStore,
@@ -569,7 +582,7 @@ class HomeActivity : ComponentActivity() {
                 media = mediaHost,
                 http = app.httpValues,
                 approved = { app.httpApproval.approved(it) },
-                extra = { brainFacts },
+                extra = { widgetExtras },
             )
         }
         // The context below is remembered on purpose; drops read the live layout through these.
@@ -865,8 +878,10 @@ class HomeActivity : ComponentActivity() {
                         app.commands.restoreSession(emptyList())
                         expanded = false
                     },
-                    experts = app.experts().map {
-                        com.samosaai.masala.chat.ExpertCredit(it.id, it.title.ifBlank { it.id })
+                    experts = remember {
+                        app.experts().map {
+                            com.samosaai.masala.chat.ExpertCredit(it.id, it.title.ifBlank { it.id })
+                        }
                     },
                     onRetry = {
                         if (!app.commands.ask(getString(R.string.capability_retry_prompt))) chatBusyToast()

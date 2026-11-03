@@ -123,6 +123,48 @@ class ActionDispatcher(
         // dispatched from anywhere else there is nothing for the phone to do.
         is MasalaAction.Flip -> Outcome.Failed("A flip happens on its widget")
         is MasalaAction.PlaySound -> playClick(action)
+        MasalaAction.MeetingStart -> {
+            // The mic foreground service may not start from a widget's background tap (Android 14+),
+            // so the meeting screen opens and starts from a visible tap.
+            start(com.samosaai.masala.ui.meetings.MeetingActivity.intent(context, start = true))
+            Outcome.Done()
+        }
+        MasalaAction.MeetingToggle -> {
+            val state = com.samosaai.masala.meetings.MeetingRecorderService.state.value
+            if (!state.active) {
+                Outcome.Failed("No meeting is recording")
+            } else {
+                val command = if (state.status == com.samosaai.masala.core.meeting.MeetingStatus.PAUSED) {
+                    com.samosaai.masala.meetings.MeetingRecorderService.ACTION_RESUME
+                } else {
+                    com.samosaai.masala.meetings.MeetingRecorderService.ACTION_PAUSE
+                }
+                runCatching {
+                    context.startService(com.samosaai.masala.meetings.MeetingRecorderService.command(context, command))
+                }
+                Outcome.Done()
+            }
+        }
+        MasalaAction.MeetingStop -> {
+            val state = com.samosaai.masala.meetings.MeetingRecorderService.state.value
+            if (!state.active) {
+                Outcome.Failed("No meeting is recording")
+            } else {
+                runCatching {
+                    context.startService(
+                        com.samosaai.masala.meetings.MeetingRecorderService.command(
+                            context,
+                            com.samosaai.masala.meetings.MeetingRecorderService.ACTION_STOP,
+                        ),
+                    )
+                }
+                Outcome.Done()
+            }
+        }
+        is MasalaAction.OpenMeeting -> {
+            start(com.samosaai.masala.ui.meetings.MeetingActivity.intent(context, action.id))
+            Outcome.Done()
+        }
     }
 
     private fun playClick(action: MasalaAction.PlaySound): Outcome = when (action.kind) {

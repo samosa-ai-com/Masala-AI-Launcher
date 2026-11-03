@@ -61,6 +61,9 @@ enum class BindingSource {
 
     /** Masala's own knowledge base: `notes` (count), `latest` (title). Filled by the app. */
     @SerialName("second_brain") SECOND_BRAIN,
+
+    /** The meeting app: `status`, `title`, `elapsed`, `speakers`, `summary`. Filled by the app. */
+    @SerialName("meeting") MEETING,
 }
 
 /**

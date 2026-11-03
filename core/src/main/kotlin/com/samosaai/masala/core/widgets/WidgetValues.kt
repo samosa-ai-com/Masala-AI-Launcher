@@ -44,6 +44,7 @@ object WidgetValues {
             BindingSource.STREAM_STATUS -> null
             BindingSource.SKILL_RESULT -> null
             BindingSource.SECOND_BRAIN -> extra[binding.key]
+            BindingSource.MEETING -> extra[binding.key]
         }
 
     /** A numeric value for progress and gauge, or null when there is nothing to show yet. */
@@ -61,6 +62,7 @@ object WidgetValues {
             BindingSource.URGENT_COUNT -> snapshot.urgentCount.toDouble()
             BindingSource.WEATHER -> snapshot.weather?.tempC
             BindingSource.SECOND_BRAIN -> extra[binding.key]?.toDoubleOrNull()
+            BindingSource.MEETING -> extra[binding.key]?.toDoubleOrNull()
             BindingSource.NEXT_EVENT,
             BindingSource.MEDIA,
             BindingSource.HTTP,

@@ -36,7 +36,7 @@ object WidgetTemplates {
         "stock_ticker", "crypto_ticker", "budget_month", "subscription_countdown",
         "battery_globe", "urgent_inbox",
         "dice", "coin_flip",
-        "second_brain", "quick_capture", "memory_recall", "daily_brief",
+        "second_brain", "quick_capture", "memory_recall", "daily_brief", "meeting_notes",
     )
 
     /** Gallery shelves, in the order they are shown; a template names one of these. */

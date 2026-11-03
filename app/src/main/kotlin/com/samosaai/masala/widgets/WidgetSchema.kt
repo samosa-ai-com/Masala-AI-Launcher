@@ -299,8 +299,8 @@ object WidgetSchema {
     private fun binding(): JsonObject = buildJsonObject {
         put("type", "object")
         putJsonObject("properties") {
-            put("source", enumOf("storage", "next_event", "battery", "media", "steps", "sleep", "weather", "urgent_count", "stream_status", "skill_result", "second_brain", "http"))
-            put("key", string("Storage key (storage), source id (stream_status), skill id (skill_result), notes|latest (second_brain), else missing"))
+            put("source", enumOf("storage", "next_event", "battery", "media", "steps", "sleep", "weather", "urgent_count", "stream_status", "skill_result", "second_brain", "meeting", "http"))
+            put("key", string("Storage key (storage), source id (stream_status), skill id (skill_result), notes|latest (second_brain), status|title|elapsed|speakers|summary (meeting), else missing"))
             putJsonObject("http") { merge(http()) }
         }
         putJsonArray("required") { add("source") }

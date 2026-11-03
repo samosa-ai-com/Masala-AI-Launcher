@@ -44,6 +44,7 @@ receiver com.samosaai.masala.scheduled.ScheduledTaskReceiver  # The scheduled-ta
 
 # The recording service is added here, by class name, in the commit that creates it (Phase 3).
 service com.samosaai.masala.audio.RecordingService  # Meeting-notes recording (mic FGS, user-started)
+service com.samosaai.masala.meetings.MeetingRecorderService  # AI meeting notes: chunked mic FGS, user-started
 
 provider androidx.core.content.FileProvider  # Sharing a mini-app's HTML file (grant-uri only)
 

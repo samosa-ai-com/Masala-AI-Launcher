@@ -42,6 +42,9 @@ object WidgetChecker {
     /** The values the app can supply for a `second_brain` binding. */
     val SECOND_BRAIN_KEYS = setOf("notes", "latest")
 
+    /** What the meeting widget may ask for; elapsed ticks in the renderer from the session clock. */
+    val MEETING_KEYS = setOf("status", "title", "elapsed", "speakers", "summary")
+
     /** Reads widget JSON the strict way; a document that doesn't decode gives one problem with its path. */
     fun parse(text: String, json: Json = MasalaJson.strict): Parsed = try {
         Parsed(json.decodeFromString(WidgetSpec.serializer(), text), emptyList())
@@ -203,6 +206,11 @@ object WidgetChecker {
                 if (key !in SECOND_BRAIN_KEYS) {
                     problems += Problem("$path.key", "second_brain key is one of ${SECOND_BRAIN_KEYS.joinToString()}")
                 }
+            BindingSource.MEETING -> {
+                if (key !in MEETING_KEYS) {
+                    problems += Problem("$path.key", "meeting key is one of ${MEETING_KEYS.joinToString()}")
+                }
+            }
             BindingSource.HTTP -> Unit
             else -> Unit
         }

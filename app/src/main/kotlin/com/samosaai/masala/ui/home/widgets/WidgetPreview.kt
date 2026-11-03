@@ -55,7 +55,7 @@ fun WidgetPreview(
             snapshot = { SAMPLE_SNAPSHOT },
             store = store,
             onAction = {},
-            extra = { app.brainFacts().ifEmpty { SAMPLE_EXTRA } },
+            extra = { (app.brainFacts() + app.meetingFacts()).ifEmpty { SAMPLE_EXTRA } },
             animate = animate,
         )
     }

@@ -1,0 +1,77 @@
+{
+  "id": "meeting_notes",
+  "name": "Meeting notes",
+  "description": "Record, pause or stop a meeting from home, and open the notes when they are ready.",
+  "category": "Masala",
+  "widget": {
+    "id": "meeting_notes",
+    "title": "Meeting notes",
+    "components": [
+      {
+        "type": "text",
+        "binding": {
+          "source": "meeting",
+          "key": "title"
+        },
+        "style": {
+          "emphasis": "large"
+        }
+      },
+      {
+        "type": "text",
+        "binding": {
+          "source": "meeting",
+          "key": "status"
+        }
+      },
+      {
+        "type": "text",
+        "binding": {
+          "source": "meeting",
+          "key": "elapsed"
+        }
+      },
+      {
+        "type": "row",
+        "children": [
+          {
+            "type": "button",
+            "label": "Record",
+            "action": {
+              "type": "meeting_start"
+            }
+          },
+          {
+            "type": "button",
+            "label": "Pause",
+            "action": {
+              "type": "meeting_toggle"
+            }
+          },
+          {
+            "type": "button",
+            "label": "Stop",
+            "action": {
+              "type": "meeting_stop"
+            }
+          }
+        ]
+      },
+      {
+        "type": "button",
+        "label": "Open notes",
+        "action": {
+          "type": "open_meeting"
+        }
+      }
+    ],
+    "size": {
+      "min": 2,
+      "default": 3,
+      "max": 4,
+      "minW": 2,
+      "defaultW": 4,
+      "maxW": 4
+    }
+  }
+}

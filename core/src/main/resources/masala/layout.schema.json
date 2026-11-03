@@ -814,6 +814,57 @@
             "key",
             "kind"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "meeting_start"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "meeting_toggle"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "meeting_stop"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "open_meeting"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -1182,7 +1233,8 @@
             "http",
             "stream_status",
             "skill_result",
-            "second_brain"
+            "second_brain",
+            "meeting"
           ]
         },
         "key": {

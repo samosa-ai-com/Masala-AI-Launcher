@@ -239,6 +239,11 @@ object LayoutChecker {
     ) {
         when (action) {
             is MasalaAction.OpenFolder -> checkFolder(action, path, env, id, problems)
+            // The meeting app and its widget state need nothing from the layout environment.
+            MasalaAction.MeetingStart,
+            MasalaAction.MeetingToggle,
+            MasalaAction.MeetingStop,
+            is MasalaAction.OpenMeeting -> Unit
             is MasalaAction.LaunchApp -> if (!env.installed(action.packageName, action.user)) {
                 problems += Problem("$path.packageName", "${action.packageName} is not installed for user ${action.user}")
             }

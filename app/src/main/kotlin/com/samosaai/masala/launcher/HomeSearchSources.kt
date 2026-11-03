@@ -108,6 +108,7 @@ class HomeSearchSources(private val context: Context, private val app: MasalaApp
             SettingsEntry(context.getString(R.string.settings_files), listOf("files", "index", "storage"), "FILES"),
             SettingsEntry(context.getString(R.string.settings_skills), listOf("skills", "expert", "experts"), "SKILLS"),
             SettingsEntry(context.getString(R.string.brief_title), listOf("brief", "morning", "weather", "topics", "news"), "BRIEF"),
+            SettingsEntry(context.getString(R.string.meeting_settings_title), listOf("meeting", "notes", "record", "transcript", "speakers", "minutes"), "MEETINGS"),
             SettingsEntry(context.getString(R.string.wallpaper_title), listOf("wallpaper", "background", "gallery", "generate"), "WALLPAPERS"),
         )
     }
