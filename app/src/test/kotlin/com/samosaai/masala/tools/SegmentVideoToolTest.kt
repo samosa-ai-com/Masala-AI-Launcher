@@ -63,9 +63,9 @@ class SegmentVideoToolTest {
     }
 
     @Test
-    fun `checkVideoSize refuses over 20 MB`() {
-        assertNotNull(SamShared.checkVideoSize(21L * 1024 * 1024))
-        assertNull(SamShared.checkVideoSize(20L * 1024 * 1024))
+    fun `checkVideoSize refuses an oversized clip`() {
+        assertNotNull(SamShared.checkVideoSize(SamShared.MAX_VIDEO_BYTES + 1))
+        assertNull(SamShared.checkVideoSize(SamShared.MAX_VIDEO_BYTES))
         assertNull(SamShared.checkVideoSize(1024))
     }
 

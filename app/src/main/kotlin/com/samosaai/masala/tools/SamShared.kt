@@ -27,7 +27,12 @@ internal object SamShared {
     const val SAM_MODEL = "sam-3.1"
 
     /** Refused above this: the whole file is base64'd into one request body. */
-    const val MAX_VIDEO_BYTES = 20L * 1024 * 1024
+    /**
+     * Videos are inlined as base64 in the request, which costs roughly three copies in memory
+     * (bytes, encoded string, JSON body). 12 MB keeps the peak around 50 MB on a phone heap,
+     * still enough for a short clip; longer ones are refused with advice to trim.
+     */
+    const val MAX_VIDEO_BYTES = 12L * 1024 * 1024
 
     const val DEFAULT_MAX_FRAMES = 8
     const val MAX_FRAMES_CAP = 16
@@ -94,7 +99,7 @@ internal object SamShared {
     fun checkVideoSize(bytes: Long): String? =
         if (bytes > MAX_VIDEO_BYTES) {
             val mb = bytes / (1024.0 * 1024.0)
-            "That video is too large (%.1f MB). Send one under ~20 MB, or trim it with media_edit first.".format(mb)
+            "That video is too large (%.1f MB). Send one under ~12 MB (a short clip), or trim it with media_edit first.".format(mb)
         } else {
             null
         }

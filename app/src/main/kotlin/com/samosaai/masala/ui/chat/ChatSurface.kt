@@ -220,6 +220,9 @@ fun ChatSurface(
                                 }
                                 bodyDrag = 0f
                             },
+                            // A cancelled gesture must not leave the trip count half-way, or the
+                            // next small drag would open the thread.
+                            onDragCancel = { bodyDrag = 0f },
                         ) { _, dy -> bodyDrag += dy }
                     },
                 ) {
