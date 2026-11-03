@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Siege Smash</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+html,body{height:100%;background:#0f172a;overflow-x:hidden}
+body{display:flex;justify-content:center}
+#app{width:100%;max-width:428px;min-height:100vh;background:#e0f2fe;display:flex;flex-direction:column;overflow:hidden;position:relative}
+header{background:#1e293b;color:#fff;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.hud{display:flex;gap:10px;font-weight:800;font-size:15px;align-items:center}
+.hud span{color:#fde68a}
+.wind-bar{display:flex;align-items:center;gap:6px;background:#334155;padding:6px 10px;border-radius:999px;font-size:13px;font-weight:700}
+#windArrow{font-size:18px;transition:transform .2s}
+#windVal{min-width:36px;text-align:right}
+#canvasWrap{position:relative;flex:1;background:linear-gradient(#7dd3fc 0%, #bae6fd 55%, #fef9c3 100%);overflow:hidden}
+canvas{display:block;width:100%;height:560px;touch-action:none}
+#overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(15,23,42,.72);color:#fff;padding:20px;text-align:center;backdrop-filter:blur(2px)}
+#overlay h2{font-size:28px;margin-bottom:8px}
+#overlay p{font-size:15px;opacity:.9;line-height:1.4;max-width:320px}
+.btn{margin-top:14px;background:#f59e0b;color:#1e293b;border:none;padding:14px 22px;border-radius:14px;font-weight:900;font-size:16px;min-height:48px;min-width:140px;box-shadow:0 6px 0 #92400e}
+.btn:active{transform:translateY(2px);box-shadow:0 4px 0 #92400e}
+.controls{background:#fff;padding:10px 12px 14px;border-top:3px solid #1e293b}
+.readout{display:flex;justify-content:space-between;font-weight:800;font-size:14px;color:#1e293b;background:#f1f5f9;padding:8px 10px;border-radius:10px}
+.buttons{display:flex;gap:10px;margin-top:10px}
+.buttons button{flex:1;padding:14px 10px;border-radius:12px;border:2px solid #1e293b;font-weight:900;font-size:15px;min-height:48px;background:#fff;color:#1e293b}
+.buttons button.primary{background:#f59e0b;border-color:#92400e;color:#1e293b}
+.hint{font-size:12px;color:#475569;text-align:center;margin-top:8px;line-height:1.3}
+.badge{display:inline-block;background:#f59e0b;color:#1e293b;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:900;margin-left:6px}
+.levelTag{position:absolute;top:10px;left:10px;background:rgba(255,255,255,.9);padding:6px 10px;border-radius:999px;font-weight:800;font-size:12px;color:#1e293b}
+.shotsDots{display:flex;gap:4px;align-items:center}
+.dot{width:10px;height:10px;border-radius:50%;background:#f59e0b;border:2px solid #1e293b}
+.dot.used{background:#cbd5e1}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+  <div class="hud">
+    <div>Lv<span id="lvl">1</span><span class="badge" id="lvlName">Outpost</span></div>
+    <div>★<span id="score">0</span></div>
+  </div>
+  <div class="wind-bar"><span>WIND</span><span id="windArrow">→</span><span id="windVal">0.0</span></div>
+</header>
+<div id="canvasWrap">
+  <canvas id="c" width="400" height="560"></canvas>
+  <div class="levelTag" id="levelTag">Fort 1 • 3 shots</div>
+  <div id="overlay">
+    <h2>🏰 SIEGE SMASH</h2>
+    <p>Drag <b>behind</b> the catapult to aim. Pull farther for power. Dotted line shows wind drift.</p>
+    <p style="margin-top:8px;font-size:13px;opacity:.8">Topple the forts and smash the golden targets!</p>
+    <button class="btn" id="playBtn">PULL TO FIRE →</button>
+  </div>
+</div>
+<div class="controls">
+  <div class="readout">
+    <span id="angleRead">Angle 42°</span>
+    <span id="powerRead">Power 0%</span>
+    <span class="shotsDots" id="shotsDots"></span>
+  </div>
+  <div class="buttons">
+    <button id="restartBtn">↻ Restart</button>
+    <button id="nextBtn" class="primary" style="display:none">Next Fort →</button>
+    <button id="fireBtn" class="primary">FIRE!</button>
+  </div>
+  <p class="hint">Tip: strong wind bends the shot — aim into it. Targets glow gold. Restart anytime.</p>
+</div>
+</div>
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const wrap=document.getElementById('canvasWrap');
+const overlay=document.getElementById('overlay');
+const lvlEl=document.getElementById('lvl'), scoreEl=document.getElementById('score'), lvlNameEl=document.getElementById('lvlName');
+const windArrow=document.getElementById('windArrow'), windVal=document.getElementById('windVal');
+const angleRead=document.getElementById('angleRead'), powerRead=document.getElementById('powerRead');
+const shotsDots=document.getElementById('shotsDots'), levelTag=document.getElementById('levelTag');
+const restartBtn=document.getElementById('restartBtn'), nextBtn=document.getElementById('nextBtn'), fireBtn=document.getElementById('fireBtn'), playBtn=document.getElementById('playBtn');
+
+let DPR=Math.min(2, window.devicePixelRatio||1);
+let W=0,H=560, groundY=0, pivot={x:78,y:0};
+let blocks=[], projectile=null, particles=[], wind=0, score=0, levelIdx=0, shots=3, maxShots=3;
+let angle=42*Math.PI/180, power=0, isDragging=false, dragPower=0, gameState='aim'; // aim,flying,levelDone,gameDone
+let gravity=0.42;
+let totalScore=0;
+
+const LEVELS=[
+  {name:"Outpost", wind:1.1, fort:(g)=>[
+    {x:270,y:g-15,w:44,h:28,type:'stone'},
+    {x:314,y:g-15,w:44,h:28,type:'stone'},
+    {x:292,y:g-43,w:44,h:28,type:'wood'},
+    {x:292,y:g-71,w:32,h:32,type:'target'},
+  ]},
+  {name:"Gatehouse", wind:-1.6, fort:(g)=>[
+    {x:250,y:g-40,w:28,h:80,type:'stone'},
+    {x:330,y:g-40,w:28,h:80,type:'stone'},
+    {x:290,y:g-90,w:108,h:18,type:'wood'},
+    {x:270,y:g-108,w:30,h:30,type:'stone'},
+    {x:310,y:g-108,w:30,h:30,type:'stone'},
+    {x:290,y:g-133,w:28,h:28,type:'target'},
+  ]},
+  {name:"Castle", wind:2.2, fort:(g)=>[
+    {x:240,y:g-45,w:32,h:90,type:'stone'},
+    {x:340,y:g-45,w:32,h:90,type:'stone'},
+    {x:290,y:g-30,w:60,h:28,type:'stone'},
+    {x:290,y:g-58,w:60,h:28,type:'wood'},
+    {x:240,y:g-105,w:32,h:32,type:'target'},
+    {x:340,y:g-105,w:32,h:32,type:'target'},
+    {x:290,y:g-86,w:28,h:28,type:'target'},
+  ]},
+  {name:"Pyramid", wind:-2.4, fort:(g)=>[
+    {x:250,y:g-15,w:40,h:28,type:'stone'},
+    {x:290,y:g-15,w:40,h:28,type:'stone'},
+    {x:330,y:g-15,w:40,h:28,type:'stone'},
+    {x:270,y:g-43,w:40,h:28,type:'stone'},
+    {x:310,y:g-43,w:40,h:28,type:'stone'},
+    {x:290,y:g-71,w:40,h:28,type:'wood'},
+    {x:290,y:g-99,w:30,h:30,type:'target'},
+  ]},
+  {name:"Fortress", wind:1.8, fort:(g)=>[
+    {x:235,y:g-40,w:26,h:80,type:'stone'},
+    {x:345,y:g-40,w:26,h:80,type:'stone'},
+    {x:290,y:g-85,w:120,h:16,type:'wood'},
+    {x:260,y:g-105,w:36,h:36,type:'stone'},
+    {x:320,y:g-105,w:36,h:36,type:'stone'},
+    {x:290,y:g-125,w:44,h:18,type:'wood'},
+    {x:290,y:g-148,w:28,h:28,type:'target'},
+    {x:235,y:g-95,w:28,h:28,type:'target'},
+    {x:345,y:g-95,w:28,h:28,type:'target'},
+  ]},
+];
+
+function resize(){
+  W=wrap.clientWidth;
+  H=560;
+  groundY=H-56;
+  pivot.y=groundY-38;
+  canvas.style.height=H+'px';
+  canvas.width=W*DPR;
+  canvas.height=H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+function makeBlocks(){
+  const def=LEVELS[levelIdx];
+  wind=def.wind + (Math.random()*0.6-0.3);
+  const raw=def.fort(groundY);
+  blocks=raw.map(b=>({
+    x:b.x, y:b.y, w:b.w, h:b.h, type:b.type,
+    vx:0, vy:0, angle:0, av:0,
+    mass:b.w*b.h/900,
+    startX:b.x, startY:b.y,
+    smashed:false, isTarget:b.type==='target',
+    sleep:0
+  }));
+  shots=maxShots=3;
+  projectile=null;
+  particles=[];
+  power=0; dragPower=0; angle=42*Math.PI/180;
+  gameState='aim';
+  updateHUD();
+  windVal.textContent=(wind>0?'+':'')+wind.toFixed(1);
+  windArrow.textContent= wind>0.3?'→': wind<-0.3?'←':'→';
+  windArrow.style.transform=`scaleX(${Math.min(1.6,0.8+Math.abs(wind)*0.4)}) ${wind<0?'scaleX(-1)':''}`;
+  windArrow.style.opacity= Math.abs(wind)<0.4?0.6:1;
+  lvlEl.textContent=levelIdx+1;
+  lvlNameEl.textContent=def.name;
+  levelTag.textContent=`Fort ${levelIdx+1} • ${def.name} • Wind ${wind>0?'+':''}${wind.toFixed(1)}`;
+  nextBtn.style.display='none';
+  fireBtn.style.display='block';
+}
+
+function updateHUD(){
+  angleRead.textContent=`Angle ${Math.round(angle*180/Math.PI)}°`;
+  powerRead.textContent=`Power ${Math.round(power)}%`;
+  scoreEl.textContent=totalScore;
+  shotsDots.innerHTML='';
+  for(let i=0;i<maxShots;i++){
+    const d=document.createElement('div');
+    d.className='dot'+(i>=shots?' used':'');
+    shotsDots.appendChild(d);
+  }
+}
+
+function getCorners(b){
+  const c=Math.cos(b.angle), s=Math.sin(b.angle);
+  const hw=b.w/2, hh=b.h/2;
+  const pts=[ [hw,hh],[hw,-hh],[-hw,-hh],[-hw,hh] ];
+  return pts.map(([lx,ly])=>({x:b.x + c*lx - s*ly, y:b.y + s*lx + c*ly}));
+}
+function project(corners, axis){
+  let min=Infinity,max=-Infinity;
+  for(const p of corners){ const d=p.x*axis.x + p.y*axis.y; if(d<min)min=d; if(d>max)max=d; }
+  return {min,max};
+}
+function getAxes(corners){
+  const axes=[];
+  for(let i=0;i<4;i++){
+    const p1=corners[i], p2=corners[(i+1)%4];
+    const edge={x:p2.x-p1.x, y:p2.y-p1.y};
+    const len=Math.hypot(edge.x,edge.y)||1;
+    axes.push({x:-edge.y/len, y:edge.x/len});
+  }
+  return axes.slice(0,2);
+}
+function satOverlap(aCorners,bCorners){
+  const axes=[...getAxes(aCorners), ...getAxes(bCorners)];
+  let minOverlap=Infinity, minAxis=null;
+  for(const ax of axes){
+    const pa=project(aCorners,ax), pb=project(bCorners,ax);
+    const overlap=Math.min(pa.max,pb.max)-Math.max(pa.min,pb.min);
+    if(overlap<=0) return null;
+    if(overlap<minOverlap){ minOverlap=overlap; minAxis=ax; }
+  }
+  // ensure axis points from a to b
+  const toB={x:bCorners[0].x-aCorners[0].x, y:bCorners[0].y-aCorners[0].y};
+  // Actually use centers
+  // compute centers
+  // flip if needed
+  return {overlap:minOverlap, axis:minAxis};
+}
+function circleVsBlock(circle, block){
+  const corners=getCorners(block);
+  // transform circle to block local space
+  const c=Math.cos(-block.angle), s=Math.sin(-block.angle);
+  const dx=circle.x - block.x, dy=circle.y - block.y;
+  const lx= c*dx - s*dy, ly= s*dx + c*dy;
+  const hw=block.w/2, hh=block.h/2;
+  const closestX=Math.max(-hw, Math.min(hw, lx));
+  const closestY=Math.max(-hh, Math.min(hh, ly));
+  const ddx=lx-closestX, ddy=ly-closestY;
+  const dist2=ddx*ddx+ddy*ddy;
+  if(dist2 > circle.r*circle.r) return null;
+  const dist=Math.sqrt(dist2)||0.001;
+  // world normal
+  const nxWorld = Math.cos(block.angle)*(ddx/dist) - Math.sin(block.angle)*(ddy/dist);
+  const nyWorld = Math.sin(block.angle)*(ddx/dist) + Math.cos(block.angle)*(ddy/dist);
+  // if inside, dist small, use push out
+  const overlap=circle.r - dist;
+  return {overlap, nx:nxWorld, ny:nyWorld, closest:{x:block.x + Math.cos(block.angle)*closestX - Math.sin(block.angle)*closestY, y:block.y + Math.sin(block.angle)*closestX + Math.cos(block.angle)*closestY}};
+}
+
+function spawnDust(x,y, n=10, color='#a8a29e'){
+  for(let i=0;i<n;i++){
+    particles.push({x,y, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6 -1, life:1, decay:0.04+Math.random()*0.04, size:2+Math.random()*4, color, gravity:0.15});
+  }
+}
+function spawnDebris(x,y){
+  spawnDust(x,y,14,'#78716c');
+  spawnDust(x,y,6,'#f59e0b');
+}
+
+function fireProjectile(){
+  if(gameState!=='aim' || shots<=0) return;
+  if(power<8) return;
+  const armLen=44;
+  const sx=pivot.x + Math.cos(angle)*armLen;
+  const sy=pivot.y - Math.sin(angle)*armLen;
+  const spd= power*0.26; // tuned
+  projectile={x:sx, y:sy, vx:Math.cos(angle)*spd, vy:-Math.sin(angle)*spd, r:9, active:true, bounces:0};
+  shots--;
+  gameState='flying';
+  updateHUD();
+  // catapult kick
+  spawnDust(pivot.x, pivot.y, 6, '#92400e');
+  if(shots===0) fireBtn.style.display='none';
+  overlay.style.display='none';
+}
+
+function checkTargets(){
+  let smashedCount=0, totalTargets=0;
+  for(const b of blocks){
+    if(b.isTarget){
+      totalTargets++;
+      const moved=Math.hypot(b.x-b.startX, b.y-b.startY);
+      const tilted=Math.abs(b.angle) > 0.9;
+      const fallen=b.y > groundY-10;
+      const hitHard=Math.hypot(b.vx,b.vy)>3;
+      if(!b.smashed && (moved>28 || tilted || fallen || hitHard)){
+        b.smashed=true;
+        totalScore+=200;
+        spawnDebris(b.x,b.y);
+        // bonus for block topple
+      }
+      if(b.smashed) smashedCount++;
+    }
+  }
+  // also score for blocks toppled
+  return {smashedCount,totalTargets};
+}
+
+function isSettled(){
+  if(projectile && projectile.active) return false;
+  for(const b of blocks){
+    if(Math.hypot(b.vx,b.vy)>0.3 || Math.abs(b.av)>0.04) return false;
+  }
+  return true;
+}
+
+function updatePhysics(){
+  // projectile
+  if(projectile && projectile.active){
+    projectile.vx += wind*0.035;
+    projectile.vy += gravity;
+    projectile.x += projectile.vx;
+    projectile.y += projectile.vy;
+    // ground
+    if(projectile.y + projectile.r > groundY){
+      projectile.y = groundY - projectile.r;
+      projectile.vy *= -0.35;
+      projectile.vx *= 0.7;
+      spawnDust(projectile.x, groundY, 8, '#a8a29e');
+      projectile.bounces++;
+      if(Math.abs(projectile.vy)<1.2 || projectile.bounces>3){
+        projectile.active=false;
+        // settle check later
+      }
+    }
+    // walls
+    if(projectile.x < -20 || projectile.x > W+20 || projectile.y > H+40){
+      projectile.active=false;
+    }
+    // collision with blocks
+    for(const b of blocks){
+      const col=circleVsBlock(projectile,b);
+      if(col){
+        // push projectile out
+        projectile.x += col.nx * (col.overlap+1);
+        projectile.y += col.ny * (col.overlap+1);
+        // reflect
+        const dot=projectile.vx*col.nx + projectile.vy*col.ny;
+        projectile.vx -= 1.6*dot*col.nx;
+        projectile.vy -= 1.6*dot*col.ny;
+        projectile.vx*=0.8; projectile.vy*=0.8;
+        // impart to block
+        b.vx += -col.nx * Math.abs(projectile.vx)*0.35 + (Math.random()-0.5)*1;
+        b.vy += -col.ny * Math.abs(projectile.vy)*0.35 -1;
+        b.av += (Math.random()-0.5)*0.25 + col.nx*0.1;
+        spawnDust(col.closest.x, col.closest.y, 10, b.isTarget?'#facc15':'#78716c');
+        if(b.isTarget) b.smashed=true, totalScore+=50;
+        // damp projectile
+        if(Math.hypot(projectile.vx,projectile.vy)<2) projectile.active=false;
+        break;
+      }
+    }
+  }
+
+  // blocks physics
+  for(const b of blocks){
+    if(b.smashed && b.isTarget){
+      // make target fall faster and fade? keep physics but add gravity extra
+    }
+    b.vy += gravity*0.55;
+    b.vx += wind*0.012;
+    b.vx *= 0.995;
+    b.vy *= 0.995;
+    b.av *= 0.985;
+    b.x += b.vx;
+    b.y += b.vy;
+    b.angle += b.av;
+
+    // ground collision
+    const corners=getCorners(b);
+    let lowestY=Math.max(...corners.map(p=>p.y));
+    if(lowestY > groundY){
+      const pen=lowestY - groundY;
+      b.y -= pen;
+      b.vy *= -0.25;
+      if(Math.abs(b.vy)<0.6) b.vy=0;
+      b.vx *= 0.82;
+      b.av *= 0.85;
+      if(Math.abs(b.vy)>1) spawnDust(b.x, groundY, 4, '#a8a29e');
+      // friction stop
+      if(Math.hypot(b.vx,b.vy)<0.2 && Math.abs(b.av)<0.02){
+        b.vx*=0.9; b.av*=0.9;
+      }
+    }
+    // wall bounds
+    if(b.x < b.w/2){ b.x=b.w/2; b.vx*=-0.3; }
+    if(b.x > W - b.w/2){ b.x=W - b.w/2; b.vx*=-0.3; }
+  }
+
+  // block-block collisions (pairwise)
+  for(let i=0;i<blocks.length;i++){
+    for(let j=i+1;j<blocks.length;j++){
+      const a=blocks[i], b=blocks[j];
+      const ca=getCorners(a), cb=getCorners(b);
+      const res=satOverlap(ca,cb);
+      if(res){
+        // determine direction from a to b
+        const cxA=a.x, cyA=a.y, cxB=b.x, cyB=b.y;
+        let nx=res.axis.x, ny=res.axis.y;
+        if((cxB-cxA)*nx + (cyB-cyA)*ny <0){ nx=-nx; ny=-ny; }
+        const overlap=res.overlap;
+        // separate
+        const totalMass=a.mass+b.mass;
+        const moveA= overlap * (b.mass/totalMass);
+        const moveB= overlap * (a.mass/totalMass);
+        a.x -= nx*moveA; a.y -= ny*moveA;
+        b.x += nx*moveB; b.y += ny*moveB;
+        // impulse
+        const rvx=b.vx - a.vx, rvy=b.vy - a.vy;
+        const velAlong= rvx*nx + rvy*ny;
+        if(velAlong <0){
+          const restitution=0.15;
+          const impulse= -(1+restitution)*velAlong / (1/a.mass + 1/b.mass);
+          const ix=impulse*nx, iy=impulse*ny;
+          a.vx -= ix / a.mass *0.6; a.vy -= iy / a.mass *0.6;
+          b.vx += ix / b.mass *0.6; b.vy += iy / b.mass *0.6;
+          a.av += (Math.random()-0.5)*0.08;
+          b.av += (Math.random()-0.5)*0.08;
+        }
+      }
+    }
+  }
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vy+=p.gravity; p.vx*=0.98; p.life-=p.decay;
+    if(p.life<=0) particles.splice(i,1);
+  }
+
+  // check win/lose
+  const {smashedCount,totalTargets}=checkTargets();
+  if(smashedCount===totalTargets && totalTargets>0){
+    if(gameState!=='levelDone'){
+      gameState='levelDone';
+      totalScore+= shots*50 + 100; // bonus
+      scoreEl.textContent=totalScore;
+      spawnDust(W/2, groundY-80, 30, '#fde68a');
+      setTimeout(()=>{
+        if(levelIdx < LEVELS.length-1){
+          nextBtn.style.display='block';
+          fireBtn.style.display='none';
+          showMessage(`FORT CRUSHED!`, `+${smashedCount*200} for targets • +${shots*50} bonus`, 'Next Fort →', ()=>nextLevel());
+        } else {
+          gameState='gameDone';
+          showMessage(`🏆 SIEGE MASTER!`, `Final Score ${totalScore} — All forts toppled!`, 'Play Again', ()=>{levelIdx=0; totalScore=0; makeBlocks(); hideOverlay();});
+        }
+      }, 600);
+    }
+  } else if(shots===0 && !projectile?.active && isSettled() && gameState==='flying'){
+    gameState='aim';
+    if(smashedCount < totalTargets){
+      // out of shots but not won
+      setTimeout(()=>{
+        if(gameState==='aim' && shots===0){
+          showMessage(`OUT OF SHOTS`, `You smashed ${smashedCount}/${totalTargets} targets`, 'Retry Fort', ()=>{makeBlocks(); hideOverlay();});
+        }
+      }, 700);
+    }
+  } else if(projectile && !projectile.active && isSettled() && gameState==='flying'){
+    // ready for next shot
+    gameState='aim';
+    power=0; updateHUD();
+  }
+}
+
+function showMessage(title, sub, btnText, cb){
+  overlay.innerHTML=`<h2>${title}</h2><p>${sub}</p><button class="btn" id="overlayBtn">${btnText}</button>`;
+  overlay.style.display='flex';
+  document.getElementById('overlayBtn').onclick=cb;
+}
+function hideOverlay(){ overlay.style.display='none'; }
+
+function nextLevel(){
+  levelIdx++;
+  if(levelIdx>=LEVELS.length) levelIdx=0;
+  makeBlocks();
+  hideOverlay();
+}
+
+// drawing
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // sky clouds
+  ctx.fillStyle='rgba(255,255,255,.85)';
+  for(let i=0;i<3;i++){
+    const cx= (W*0.2 + i*W*0.35 + (Date.now()*0.01 + wind*20)%W )%W;
+    const cy= 60 + i*18;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 28,14,0,0,Math.PI*2);
+    ctx.ellipse(cx+18, cy+4, 22,10,0,0,Math.PI*2);
+    ctx.ellipse(cx-16, cy+6, 18,9,0,0,Math.PI*2);
+    ctx.fill();
+  }
+  // ground
+  ctx.fillStyle='#a3a3a3';
+  ctx.fillRect(0,groundY,W,H-groundY);
+  ctx.fillStyle='#78716c';
+  ctx.fillRect(0,groundY,W,6);
+  // distance markers
+  ctx.fillStyle='rgba(0,0,0,.08)';
+  for(let x=120;x<W;x+=60){ ctx.fillRect(x,groundY,2,10); }
+
+  // wind flag pole near fort
+  const flagX=W-40, flagY=groundY-110;
+  ctx.strokeStyle='#1e293b'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(flagX, groundY); ctx.lineTo(flagX, flagY); ctx.stroke();
+  ctx.fillStyle= Math.abs(wind)>1.5 ? '#ef4444' : '#38bdf8';
+  ctx.beginPath();
+  const flagW= 18 + Math.abs(wind)*6;
+  const dir= wind>=0?1:-1;
+  ctx.moveTo(flagX, flagY);
+  ctx.lineTo(flagX+dir*flagW, flagY+6);
+  ctx.lineTo(flagX+dir*flagW*0.9, flagY+14);
+  ctx.lineTo(flagX, flagY+12);
+  ctx.closePath(); ctx.fill();
+
+  // blocks
+  for(const b of blocks){
+    ctx.save();
+    ctx.translate(b.x,b.y);
+    ctx.rotate(b.angle);
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,.12)';
+    ctx.fillRect(-b.w/2+2, -b.h/2+2, b.w, b.h);
+    if(b.isTarget){
+      ctx.fillStyle= b.smashed ? '#a16207' : '#facc15';
+      ctx.strokeStyle='#854d0e'; ctx.lineWidth=2;
+      ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
+      ctx.strokeRect(-b.w/2, -b.h/2, b.w, b.h);
+      // star
+      ctx.fillStyle='#854d0e';
+      ctx.font='bold 14px system-ui';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(b.smashed?'✕':'★',0,1);
+      if(!b.smashed){
+        ctx.shadowColor='#fde68a'; ctx.shadowBlur=8;
+        ctx.strokeStyle='#fef08a'; ctx.lineWidth=1.5; ctx.strokeRect(-b.w/2-2,-b.h/2-2,b.w+4,b.h+4);
+      }
+    } else if(b.type==='stone'){
+      ctx.fillStyle='#d6d3d1';
+      ctx.strokeStyle='#57534e'; ctx.lineWidth=1.6;
+      ctx.fillRect(-b.w/2,-b.h/2,b.w,b.h);
+      ctx.strokeRect(-b.w/2,-b.h/2,b.w,b.h);
+      // mortar lines
+      ctx.strokeStyle='rgba(0,0,0,.12)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(-b.w/2,0); ctx.lineTo(b.w/2,0); ctx.stroke();
+    } else {
+      ctx.fillStyle='#a16207';
+      ctx.strokeStyle='#451a03'; ctx.lineWidth=1.6;
+      ctx.fillRect(-b.w/2,-b.h/2,b.w,b.h);
+      ctx.strokeRect(-b.w/2,-b.h/2,b.w,b.h);
+      ctx.fillStyle='rgba(0,0,0,.15)';
+      for(let i=-b.w/2+6;i<b.w/2;i+=8) ctx.fillRect(i,-b.h/2,2,b.h);
+    }
+    ctx.restore();
+  }
+
+  // catapult
+  const armLen=44;
+  const bucketX= pivot.x + Math.cos(angle)*armLen;
+  const bucketY= pivot.y - Math.sin(angle)*armLen;
+  // base
+  ctx.fillStyle='#1e293b';
+  ctx.fillRect(pivot.x-28, groundY-10, 56,10);
+  ctx.fillStyle='#92400e';
+  ctx.beginPath(); ctx.moveTo(pivot.x-22, groundY-10); ctx.lineTo(pivot.x-10, pivot.y); ctx.lineTo(pivot.x+10, pivot.y); ctx.lineTo(pivot.x+22, groundY-10); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='#451a03'; ctx.lineWidth=2; ctx.stroke();
+  // arm
+  ctx.strokeStyle='#451a03'; ctx.lineWidth=6; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(pivot.x, pivot.y); ctx.lineTo(bucketX, bucketY); ctx.stroke();
+  ctx.fillStyle='#f59e0b'; ctx.beginPath(); ctx.arc(pivot.x,pivot.y,7,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#1e293b'; ctx.lineWidth=2; ctx.stroke();
+  // bucket
+  ctx.fillStyle='#1e293b';
+  ctx.beginPath(); ctx.arc(bucketX, bucketY, 10,0,Math.PI*2); ctx.fill();
+  if(!projectile || !projectile.active){
+    // stone in bucket when aiming
+    ctx.fillStyle='#57534e'; ctx.beginPath(); ctx.arc(bucketX, bucketY, 7,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#a8a29e'; ctx.beginPath(); ctx.arc(bucketX-2, bucketY-2,2,0,Math.PI*2); ctx.fill();
+  }
+  // elastic bands when dragging
+  if(isDragging){
+    ctx.strokeStyle='rgba(245,158,11,.9)'; ctx.lineWidth=2; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(pivot.x-14, pivot.y-6); ctx.lineTo(bucketX, bucketY); ctx.moveTo(pivot.x+14, pivot.y-6); ctx.lineTo(bucketX, bucketY); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // trajectory preview
+  if(gameState==='aim' && power>5){
+    const sx=bucketX, sy=bucketY;
+    let vx=Math.cos(angle)*power*0.26, vy=-Math.sin(angle)*power*0.26;
+    let x=sx, y=sy;
+    ctx.fillStyle='rgba(30,41,59,.9)';
+    for(let i=0;i<28;i++){
+      x+=vx; y+=vy; vy+=gravity; vx+=wind*0.035;
+      if(y>groundY) break;
+      if(i%2===0){
+        ctx.beginPath(); ctx.arc(x,y, i<10?3:2,0,Math.PI*2); ctx.fill();
+        if(i%4===0){ ctx.globalAlpha=0.35; ctx.beginPath(); ctx.arc(x,y,5,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1; }
+      }
+      if(x<0||x>W) break;
+    }
+    // aim line
+    ctx.strokeStyle='rgba(245,158,11,.35)'; ctx.lineWidth=2; ctx.setLineDash([6,6]);
+    ctx.beginPath(); ctx.moveTo(pivot.x,pivot.y); ctx.lineTo(bucketX,bucketY); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // projectile
+  if(projectile){
+    ctx.fillStyle='#1e293b';
+    ctx.beginPath(); ctx.arc(projectile.x, projectile.y, projectile.r+1,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#57534e'; ctx.beginPath(); ctx.arc(projectile.x, projectile.y, projectile.r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#a8a29e'; ctx.beginPath(); ctx.arc(projectile.x-2.5, projectile.y-2.5,2.2,0,Math.PI*2); ctx.fill();
+  }
+
+  // particles
+  for(const p of particles){
+    ctx.globalAlpha=Math.max(0,p.life);
+    ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+  }
+
+  // power arc indicator near catapult
+  if(gameState==='aim'){
+    ctx.strokeStyle='rgba(30,41,59,.15)'; ctx.lineWidth=8; ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(pivot.x,pivot.y,36, -angle-0.2, -0.1); ctx.stroke();
+    ctx.strokeStyle='#f59e0b'; ctx.lineWidth=6;
+    ctx.beginPath(); ctx.arc(pivot.x,pivot.y,36, -angle-0.2, -angle+0.2 + (power/100)*1.2); ctx.stroke();
+  }
+}
+
+function loop(){
+  updatePhysics();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// input
+function getPos(e){
+  const rect=canvas.getBoundingClientRect();
+  const x=(e.clientX - rect.left) * (W / rect.width);
+  const y=(e.clientY - rect.top) * (H / rect.height);
+  return {x,y};
+}
+let pointerId=null;
+canvas.addEventListener('pointerdown', e=>{
+  if(gameState!=='aim') return;
+  const p=getPos(e);
+  const d=Math.hypot(p.x-pivot.x, p.y-pivot.y);
+  if(d<90){
+    isDragging=true; pointerId=e.pointerId; canvas.setPointerCapture(pointerId);
+    overlay.style.display='none';
+    e.preventDefault();
+  }
+});
+canvas.addEventListener('pointermove', e=>{
+  if(!isDragging) return;
+  const p=getPos(e);
+  let dx=pivot.x - p.x, dy=pivot.y - p.y;
+  let rawPower=Math.hypot(dx,dy);
+  rawPower=Math.max(12, Math.min(92, rawPower));
+  let rawAngle=Math.atan2(dy,dx);
+  // clamp angle 12° to 78°
+  const minA=12*Math.PI/180, maxA=78*Math.PI/180;
+  rawAngle=Math.max(minA, Math.min(maxA, rawAngle));
+  angle=rawAngle;
+  dragPower=rawPower;
+  power= ((rawPower-12)/80)*100;
+  updateHUD();
+});
+function endDrag(e){
+  if(!isDragging) return;
+  isDragging=false;
+  if(pointerId!==null) try{canvas.releasePointerCapture(pointerId);}catch{}
+  if(power>10 && gameState==='aim' && shots>0){
+    fireProjectile();
+  }
+}
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+canvas.addEventListener('pointerleave', ()=>{ if(isDragging) isDragging=false; });
+
+fireBtn.addEventListener('click', ()=>{
+  if(gameState==='aim' && power<10){
+    // give a default shot if not dragged
+    power=62; angle=44*Math.PI/180; updateHUD();
+  }
+  fireProjectile();
+});
+restartBtn.addEventListener('click', ()=>{ makeBlocks(); hideOverlay(); });
+playBtn.addEventListener('click', ()=> hideOverlay());
+nextBtn.addEventListener('click', nextLevel);
+
+// init
+makeBlocks();
+updateHUD();
+loop();
+
+// hide overlay after 2.5s hint
+setTimeout(()=>{ if(overlay.style.display!=='none' && gameState==='aim') overlay.style.display='none'; }, 3500);
+
+// prevent scroll
+document.body.addEventListener('touchmove', e=>{ if(e.target===canvas) e.preventDefault(); }, {passive:false});
+</script>
+</body>
+</html>

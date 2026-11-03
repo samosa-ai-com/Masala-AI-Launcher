@@ -101,6 +101,7 @@ import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.masala
 import com.samosaai.masala.miniapps.MiniAppActivity
 import com.samosaai.masala.miniapps.MiniAppIconView
+import com.samosaai.masala.miniapps.openMiniApp
 import com.samosaai.masala.ui.skills.SkillSheetActivity
 import com.samosaai.masala.ui.components.LauncherRow
 import com.samosaai.masala.ui.drawer.visibilityLabel
@@ -113,7 +114,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, PERSONAS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, PERMISSIONS, ABOUT, BRIEF, WIDGETS, WALLPAPERS }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, POCKET_STORE, SKILLS, PERSONAS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, PERMISSIONS, ABOUT, BRIEF, WIDGETS, WALLPAPERS }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -135,7 +136,7 @@ class SettingsActivity : ComponentActivity() {
                     var personasReturn by rememberSaveable { mutableStateOf(Page.MAIN) }
                     BackHandler(enabled = page != Page.MAIN) {
                         if (start != null && page == start) finish()
-                        else page = if (page == Page.PERSONAS) personasReturn else Page.MAIN
+                        else page = if (page == Page.PERSONAS) personasReturn else if (page == Page.POCKET_STORE) Page.MINI_APPS else Page.MAIN
                     }
                     // Each page keeps its scroll position (and other saved state) while another page is shown.
                     val pageStates = rememberSaveableStateHolder()
@@ -158,7 +159,33 @@ class SettingsActivity : ComponentActivity() {
                         Page.HIDDEN_APPS -> HiddenAppsPage(onBack = { page = Page.MAIN })
                         Page.LAYOUT -> LayoutPage(settings, onBack = { page = Page.MAIN })
                         Page.RECORDING -> RecordingPage(onBack = { page = Page.MAIN })
-                        Page.MINI_APPS -> MiniAppsPage(onBack = { page = Page.MAIN })
+                        Page.MINI_APPS -> MiniAppsPage(onBack = { page = Page.MAIN }, onStore = { page = Page.POCKET_STORE })
+                        Page.POCKET_STORE -> {
+                            val storeScope = rememberCoroutineScope()
+                            com.samosaai.masala.ui.miniapps.PocketStorePage(
+                                onBack = { page = Page.MINI_APPS },
+                                onOpen = { pocket -> openMiniApp(pocket.id) },
+                                onCustomize = { pocket ->
+                                    storeScope.launch {
+                                        val html = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                            runCatching {
+                                                assets.open(pocket.assetPath).bufferedReader().use { it.readText() }
+                                            }.getOrNull()
+                                        }
+                                        if (html.isNullOrEmpty()) {
+                                            android.widget.Toast.makeText(this@SettingsActivity, getString(R.string.pocket_store_copy_failed), android.widget.Toast.LENGTH_SHORT).show()
+                                            return@launch
+                                        }
+                                        val id = masala.miniApps.create(pocket.title, html)
+                                        if (id == null) {
+                                            android.widget.Toast.makeText(this@SettingsActivity, getString(R.string.pocket_store_copy_too_large), android.widget.Toast.LENGTH_SHORT).show()
+                                            return@launch
+                                        }
+                                        askInChat(getString(R.string.miniapp_customize_prefill, pocket.title, id))
+                                    }
+                                },
+                            )
+                        }
                         Page.SKILLS -> SkillsPage(onBack = { page = Page.MAIN }, onEditExpert = { id ->
                             editExpertId = id
                             personasReturn = Page.SKILLS
@@ -378,11 +405,17 @@ class SettingsActivity : ComponentActivity() {
 
     /** Every stored mini-app, so a created app is never invisible (plan: Lane D follow-ups). */
     @Composable
-    private fun MiniAppsPage(onBack: () -> Unit) {
+    private fun MiniAppsPage(onBack: () -> Unit, onStore: () -> Unit) {
         val scope = rememberCoroutineScope()
         val apps by remember { masala.miniApps.all }.collectAsStateWithLifecycle(emptyList())
         val format = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
         SettingsScaffold(stringResource(R.string.settings_miniapps), onBack = onBack) {
+            Button(onClick = onStore, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.pocket_store_browse)) }
+            Text(
+                stringResource(R.string.pocket_store_browse_summary),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Button(onClick = { askInChat(getString(R.string.miniapp_create_prefill)) }) { Text(stringResource(R.string.miniapp_create)) }
             var filter by rememberSaveable { mutableStateOf("") }
             // The search sits below Create (Batch A added the button on top), and only for long lists.

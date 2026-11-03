@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Station Charts: Route Trace</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden;background:#050814}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;justify-content:center;color:#eaf2ff}
+.app{width:100%;max-width:428px;min-width:360px;background:linear-gradient(180deg,#0b1026 0%,#070a14 55%,#0a0f2a 100%);min-height:100vh;display:flex;flex-direction:column;position:relative}
+.header{padding:10px 12px 8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:38px;height:38px;border-radius:10px;background:conic-gradient(from 0deg,#3bff8d,#3b8dff,#8d3bff,#ff3b8d,#ff8a3d,#ffe53b,#3bff8d);display:grid;place-items:center;font-size:18px;box-shadow:0 0 12px rgba(120,140,255,.6)}
+.brand h1{font-size:12px;letter-spacing:.08em;line-height:1}
+.brand p{font-size:10px;opacity:.7;letter-spacing:.06em}
+.stats{display:flex;gap:6px}
+.stat{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px 8px;text-align:center;min-width:58px}
+.stat b{font-size:12px;display:block}
+.stat span{font-size:9px;opacity:.7;letter-spacing:.06em}
+.view{padding:0 10px 10px;flex:1;display:flex;flex-direction:column;gap:8px}
+.galleryTitle{font-size:11px;letter-spacing:.1em;opacity:.8;margin-top:4px;display:flex;justify-content:space-between;align-items:center}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.card{background:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.13);border-radius:14px;padding:10px;position:relative;overflow:hidden;cursor:pointer}
+.card.locked{opacity:.45;filter:grayscale(.3)}
+.card.done{border-color:rgba(80,255,180,.4)}
+.card h3{font-size:12px;margin:2px 0}
+.card p{font-size:10px;opacity:.7;line-height:1.3}
+.stars{font-size:11px;letter-spacing:1px}
+.chip{font-size:9px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:2px 6px;display:inline-block;margin-top:4px}
+.badge{font-size:9px;background:linear-gradient(90deg,#00e5ff,#7a3bff);color:#001018;border-radius:20px;padding:2px 6px;font-weight:800;margin-left:4px}
+.hud{display:flex;gap:6px;flex-wrap:wrap}
+.hud .box{flex:1;min-width:0;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px 8px;text-align:center}
+.hud b{font-size:13px}
+.hud span{font-size:9px;opacity:.7;letter-spacing:.06em;display:block}
+.canvasWrap{position:relative;background:radial-gradient(ellipse at 50% 0%,#1a2450 0%,#0e1430 45%,#070a14 100%);border:1px solid rgba(120,140,255,.25);border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08)}
+canvas{width:100%;height:auto;display:block;touch-action:none}
+.progress{height:6px;background:rgba(255,255,255,.12);border-radius:20px;overflow:hidden}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,#00e5ff,#7a3bff);transition:width .2s}
+.controls{display:flex;gap:8px;flex-wrap:wrap}
+.btn{flex:1;min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:#eaf2ff;font-weight:800;font-size:12px;letter-spacing:.02em;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;user-select:none;-webkit-user-select:none}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:linear-gradient(180deg,#3b8dff,#7a3bff);border-color:rgba(120,140,255,.5);box-shadow:0 4px 14px rgba(90,80,255,.35)}
+.btn.ghost{background:rgba(255,255,255,.06)}
+.btn:disabled{opacity:.45;pointer-events:none}
+.overlay{position:absolute;inset:0;background:rgba(3,7,18,.78);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;pointer-events:none;transition:.2s;z-index:5}
+.overlay.show{opacity:1;pointer-events:auto}
+.sheet{width:100%;max-width:360px;background:linear-gradient(180deg,#0f1f3d,#0a1430);border:1px solid rgba(120,170,255,.25);border-radius:18px;padding:16px;box-shadow:0 16px 40px rgba(0,0,0,.5);max-height:86vh;overflow:auto}
+.sheet h2{font-size:14px;letter-spacing:.06em}
+.sheet p{font-size:12px;opacity:.85;line-height:1.5;margin-top:6px}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.kv div{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:8px;text-align:center}
+.kv b{font-size:14px}
+.kv span{font-size:10px;opacity:.6;letter-spacing:.08em}
+.toast{position:absolute;left:50%;top:12px;transform:translateX(-50%) translateY(-8px);background:rgba(10,20,40,.95);border:1px solid rgba(0,255,200,.35);color:#bfffee;padding:7px 12px;border-radius:20px;font-size:12px;font-weight:700;opacity:0;pointer-events:none;transition:.25s;z-index:6;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="header">
+<div class="brand"><div class="logo">✦</div><div><h1>STATION CHARTS</h1><p>ROUTE TRACE • EULERIAN RUN</p></div></div>
+<div class="stats"><div class="stat"><b id="totalStars">0/36</b><span>STARS</span></div><div class="stat"><b id="totalBadges">0</b><span>FLAWLESS</span></div></div>
+</div>
+
+<div class="view" id="viewGalleries">
+<div style="background:linear-gradient(180deg,rgba(0,229,255,.14),rgba(120,80,255,.08));border:1px solid rgba(0,229,255,.3);border-radius:14px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+<div><div style="font-size:12px;font-weight:800;letter-spacing:.06em">◐ STAR-CHART GALLERIES</div><div style="font-size:11px;opacity:.75;margin-top:2px">Inspect every route exactly once from assigned port.</div></div>
+<button class="btn" style="min-height:40px;flex:0 0 auto;padding:0 12px" id="btnReset">Reset</button>
+</div>
+<div id="galleries"></div>
+<div style="display:flex;gap:8px"><button class="btn ghost" style="flex:1" id="btnHow">How to Play</button><button class="btn primary" style="flex:1" id="btnContinue">Continue ▶</button></div>
+</div>
+
+<div class="view" id="viewChart" style="display:none">
+<div style="background:linear-gradient(180deg,rgba(0,229,255,.14),rgba(0,100,255,.08));border:1px solid rgba(0,229,255,.3);border-radius:14px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px" id="chartBanner"></div>
+<div class="hud">
+<div class="box"><span>COVERED</span><b id="hudCovered">0/0</b></div>
+<div class="box"><span>MOVES</span><b id="hudMoves">0</b></div>
+<div class="box"><span>STATUS</span><b id="hudStatus">Ready</b></div>
+</div>
+<div class="progress"><i id="progressBar" style="width:0%"></i></div>
+<div class="canvasWrap" id="wrap">
+<canvas id="c" width="360" height="360"></canvas>
+<div class="toast" id="toast"></div>
+<div class="overlay" id="overlayDone"><div class="sheet" style="text-align:center"><h2 id="doneTitle">CHART COMPLETE</h2><p id="doneDesc"></p><div class="kv"><div><span>MOVES</span><b id="doneMoves">0</b></div><div><span>STARS</span><b id="doneStars">★★★</b></div></div><div id="doneBonus" style="margin-top:8px;font-size:12px;font-weight:700;color:#7fffd4"></div><div style="display:flex;gap:8px;margin-top:12px"><button class="btn ghost" style="flex:1" id="doneGalleries">Galleries</button><button class="btn primary" style="flex:1" id="doneNext">Next Chart ▶</button></div></div></div>
+</div>
+<div class="controls">
+<button class="btn" id="btnUndo">↩ Undo</button>
+<button class="btn" id="btnHint">✦ Hint</button>
+<button class="btn" id="btnRef">◎ Reference</button>
+</div>
+<div style="display:flex;gap:8px">
+<button class="btn ghost" style="flex:1" id="btnBack">◀ Galleries</button>
+<button class="btn ghost" style="flex:1" id="btnRestart">Restart</button>
+</div>
+<p style="font-size:10px;opacity:.55;text-align:center;line-height:1.4">Tap a directly linked station to move • Cover every route once • Hint keeps solution possible • Reference replays optimal trail</p>
+</div>
+
+<div class="overlay" id="overlayHow"><div class="sheet"><h2>HOW TO PLAY</h2><p><b>Goal:</b> starting from the green assigned port, tap directly linked stations to traverse <b>every route exactly once</b> in a single run (Eulerian trail).</p><p><b>Rules:</b> you can only move to adjacent stations via an unused route. Covered routes glow cyan. You must use all routes — no repeats, no skips.</p><p><b>Tools:</b> <b>Undo</b> steps back (breaks flawless), <b>Hint</b> highlights one safe next station that keeps a solution possible, <b>Reference</b> animates the optimal trail.</p><p><b>Stars:</b> ★★★ no hints & no undo (flawless ⬢), ★★ no hints, ★ completed. Stars & flawless badges persist.</p><button class="btn primary" style="width:100%;margin-top:12px" id="howClose">Got it</button></div></div>
+</div>
+<script>
+const STORAGE_KEY='stationCharts_v2';
+const GALLERIES=[
+ {id:'nebula',name:'Nebula Drift',desc:'Calm drift — 4 charts to learn tracing',charts:[1,2,3,4]},
+ {id:'orion',name:'Orion Crossing',desc:'Busy crossing — intersections & loops',charts:[5,6,7,8]},
+ {id:'void',name:'Void Atlas',desc:'Deep void — complex stars, flawless only',charts:[9,10,11,12]},
+];
+const CHARTS=[
+ // 1: simple triangle with tail - Eulerian trail
+ {id:1,gallery:'nebula',name:'Harbor Loop',nodes:[{x:80,y:80},{x:280,y:80},{x:180,y:200},{x:80,y:280},{x:280,y:280}],edges:[[0,1],[1,2],[2,0],[0,3],[3,4],[4,1]],start:0},
+ {id:2,gallery:'nebula',name:'Twin Diamonds',nodes:[{x:180,y:60},{x:80,y:140},{x:280,y:140},{x:80,y:220},{x:280,y:220},{x:180,y:300}],edges:[[0,1],[0,2],[1,2],[1,3],[2,4],[3,4],[3,5],[4,5]],start:0},
+ {id:3,gallery:'nebula',name:'Crossing',nodes:[{x:60,y:60},{x:300,y:60},{x:60,y:300},{x:300,y:300},{x:180,y:180},{x:60,y:180},{x:300,y:180}],edges:[[0,1],[0,5],[1,6],[2,5],[3,6],[4,5],[4,6],[5,6]],start:0},
+ {id:4,gallery:'nebula',name:'Orbital',nodes:[{x:180,y:50},{x:70,y:120},{x:290,y:120},{x:70,y:240},{x:290,y:240},{x:180,y:310}],edges:[[0,1],[0,2],[1,2],[1,3],[2,4],[3,4],[3,5],[4,5],[1,4],[2,3]],start:0},
+ {id:5,gallery:'orion',name:'Junction',nodes:[{x:60,y:80},{x:180,y:60},{x:300,y:80},{x:60,y:200},{x:180,y:200},{x:300,y:200},{x:60,y:300},{x:300,y:300}],edges:[[0,1],[1,2],[0,3],[1,4],[2,5],[3,4],[4,5],[3,6],[5,7],[4,6],[4,7]],start:0},
+ {id:6,gallery:'orion',name:'Star Mesh',nodes:[{x:180,y:50},{x:80,y:110},{x:280,y:110},{x:60,y:200},{x:180,y:200},{x:300,y:200},{x:80,y:280},{x:280,y:280}],edges:[[0,1],[0,2],[1,2],[1,3],[2,5],[3,4],[4,5],[3,6],[5,7],[6,7],[1,4],[2,4]],start:0},
+ {id:7,gallery:'orion',name:'Warp Lanes',nodes:[{x:60,y:60},{x:180,y:60},{x:300,y:60},{x:60,y:180},{x:180,y:180},{x:300,y:180},{x:60,y:300},{x:180,y:300},{x:300,y:300}],edges:[[0,1],[1,2],[0,3],[1,4],[2,5],[3,4],[4,5],[3,6],[4,7],[5,8],[6,7],[7,8]],start:0},
+ {id:8,gallery:'orion',name:'Loopback',nodes:[{x:80,y:80},{x:280,y:80},{x:80,y:180},{x:280,y:180},{x:80,y:280},{x:280,y:280},{x:180,y:140}],edges:[[0,1],[0,2],[1,3],[2,3],[2,4],[3,5],[4,5],[0,6],[1,6],[2,6],[3,6]],start:0},
+ {id:9,gallery:'void',name:'Void Star',nodes:[{x:180,y:40},{x:70,y:100},{x:290,y:100},{x:50,y:200},{x:180,y:180},{x:310,y:200},{x:70,y:280},{x:290,y:280},{x:180,y:320}],edges:[[0,1],[0,2],[1,2],[1,3],[2,5],[3,4],[4,5],[3,6],[5,7],[6,7],[6,8],[7,8],[1,4],[2,4]],start:0},
+ {id:10,gallery:'void',name:'Atlas Prime',nodes:[{x:60,y:60},{x:180,y:50},{x:300,y:60},{x:60,y:160},{x:180,y:160},{x:300,y:160},{x:60,y:260},{x:180,y:260},{x:300,y:260}],edges:[[0,1],[1,2],[0,3],[1,4],[2,5],[3,4],[4,5],[3,6],[4,7],[5,8],[6,7],[7,8],[0,4],[2,4]],start:0},
+ {id:11,gallery:'void',name:'Nebula Core',nodes:[{x:180,y:50},{x:80,y:100},{x:280,y:100},{x:60,y:180},{x:180,y:180},{x:300,y:180},{x:80,y:260},{x:280,y:260},{x:180,y:310}],edges:[[0,1],[0,2],[1,2],[1,3],[2,5],[3,4],[4,5],[3,6],[5,7],[6,7],[6,8],[7,8],[1,4],[2,4],[4,6],[4,7]],start:0},
+ {id:12,gallery:'void',name:'Crown Chart',nodes:[{x:60,y:60},{x:180,y:40},{x:300,y:60},{x:60,y:160},{x:180,y:140},{x:300,y:160},{x:60,y:260},{x:180,y:280},{x:300,y:260},{x:180,y:200}],edges:[[0,1],[1,2],[0,3],[1,4],[2,5],[3,4],[4,5],[3,6],[4,9],[5,8],[6,7],[7,8],[6,9],[8,9],[0,4],[2,4]],start:0},
+];
+let store={progress:{}};
+try{const s=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null'); if(s) store=s;}catch(e){}
+if(!store.progress) store.progress={};
+function getP(id){return store.progress[id]||{stars:0,bestMoves:9999,flawless:false,completed:false}}
+function isUnlocked(id){if(id===1) return true; return getP(id-1).completed}
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(store))}
+function totalStars(){let s=0;for(let i=1;i<=12;i++) s+=getP(i).stars;return s}
+function totalBadges(){let c=0;for(let i=1;i<=12;i++) if(getP(i).flawless) c++;return c}
+
+const $=id=>document.getElementById(id);
+const galleriesEl=$('galleries'), viewGalleries=$('viewGalleries'), viewChart=$('viewChart');
+const canvas=$('c'), ctx=canvas.getContext('2d');
+let currentChart=null, pos=null, visited=new Set(), path=[], hints=0, undos=0, replayTimer=null, hintNode=null;
+
+function edgeKey(a,b){return a<b? `${a}-${b}`:`${b}-${a}`}
+
+function renderGalleries(){
+ galleriesEl.innerHTML='';
+ GALLERIES.forEach(g=>{
+  const title=document.createElement('div');
+  title.className='galleryTitle';
+  title.innerHTML=`<span>${g.name}</span><span style="font-size:10px;opacity:.6">${g.desc}</span>`;
+  galleriesEl.appendChild(title);
+  const grid=document.createElement('div'); grid.className='grid';
+  g.charts.forEach(cid=>{
+   const ch=CHARTS.find(x=>x.id===cid), p=getP(cid), unlocked=isUnlocked(cid);
+   const stars=p.stars?'★'.repeat(p.stars)+'☆'.repeat(3-p.stars):'☆☆☆';
+   const el=document.createElement('div');
+   el.className='card'+(unlocked?'':' locked')+(p.completed?' done':'');
+   el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:10px;opacity:.7;letter-spacing:.08em">CHART ${String(ch.id).padStart(2,'0')}</span><span class="stars" style="color:${p.stars===3?'#ffd84d':p.stars?'#7fffd4':'rgba(255,255,255,.35)'}">${stars}</span></div><h3>${ch.name}</h3><p>${ch.nodes.length} stations • ${ch.edges.length} routes</p><span class="chip">${g.name}</span>${p.flawless?' <span class="badge">⬢ flawless</span>':''}`;
+   el.onclick=()=>openChart(ch.id);
+   grid.appendChild(el);
+  });
+  galleriesEl.appendChild(grid);
+ });
+ $('totalStars').textContent=totalStars()+'/36';
+ $('totalBadges').textContent=totalBadges();
+ const last=Math.max(0,...Object.keys(store.progress).filter(k=>store.progress[k].completed).map(Number));
+ $('btnContinue').onclick=()=>openChart(Math.min(12,last+1));
+}
+function openChart(id){
+ currentChart=CHARTS.find(x=>x.id===id);
+ pos=currentChart.start; visited=new Set(); path=[pos]; hints=0; undos=0; hintNode=null;
+ viewGalleries.style.display='none'; viewChart.style.display='flex';
+ $('chartBanner').innerHTML=`<div><div style="font-size:12px;font-weight:800;letter-spacing:.06em">CHART ${String(currentChart.id).padStart(2,'0')} — ${currentChart.name}</div><div style="font-size:11px;opacity:.75">${currentChart.nodes.length} stations • ${currentChart.edges.length} routes • Start at green port</div></div><div style="text-align:right"><div style="font-size:10px;opacity:.7">GALLERY</div><div style="font-size:11px;font-weight:800">${GALLERIES.find(g=>g.id===currentChart.gallery).name}</div></div>`;
+ $('overlayDone').classList.remove('show');
+ updateHUD(); draw();
+ toast('Chart deployed — trace every route once',true);
+}
+function updateHUD(){
+ const total=currentChart.edges.length, covered=visited.size;
+ $('hudCovered').textContent=`${covered}/${total}`;
+ $('hudMoves').textContent=path.length-1;
+ $('progressBar').style.width=(covered/total*100)+'%';
+ const remaining=total-covered;
+ if(covered===total) $('hudStatus').textContent='Complete!';
+ else if(remaining<=2) $('hudStatus').textContent='Final stretch';
+ else $('hudStatus').textContent='Tracing';
+ $('hudStatus').style.color= covered===total?'#7fffd4':'#eaf2ff';
+}
+function draw(){
+ ctx.clearRect(0,0,360,360);
+ // starfield
+ ctx.fillStyle='#0a0f2a'; ctx.fillRect(0,0,360,360);
+ ctx.fillStyle='rgba(255,255,255,.5)';
+ for(let i=0;i<40;i++){ const x=(i*73)%360, y=(i*47)%360; ctx.beginPath(); ctx.arc(x,y,0.8,0,Math.PI*2); ctx.fill(); }
+ // grid
+ ctx.strokeStyle='rgba(120,140,255,.06)'; ctx.lineWidth=1;
+ for(let x=0;x<360;x+=36){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,360); ctx.stroke(); }
+ for(let y=0;y<360;y+=36){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(360,y); ctx.stroke(); }
+ // edges
+ currentChart.edges.forEach(([a,b])=>{
+  const n1=currentChart.nodes[a], n2=currentChart.nodes[b];
+  const key=edgeKey(a,b), covered=visited.has(key);
+  ctx.strokeStyle= covered?'#00e5ff':'rgba(180,190,220,.35)';
+  ctx.lineWidth= covered?3:2;
+  ctx.setLineDash(covered?[]:[6,6]);
+  ctx.shadowBlur= covered?8:0; ctx.shadowColor='#00e5ff';
+  ctx.beginPath(); ctx.moveTo(n1.x,n1.y); ctx.lineTo(n2.x,n2.y); ctx.stroke();
+  ctx.shadowBlur=0; ctx.setLineDash([]);
+  // covered dot
+  if(covered){
+   const mx=(n1.x+n2.x)/2, my=(n1.y+n2.y)/2;
+   ctx.fillStyle='#00e5ff'; ctx.beginPath(); ctx.arc(mx,my,3,0,Math.PI*2); ctx.fill();
+  }
+ });
+ // nodes
+ currentChart.nodes.forEach((n,i)=>{
+  const isPos=i===pos, isStart=i===currentChart.start, isHint=hintNode===i;
+  // outer ring
+  if(isStart){
+   ctx.strokeStyle='#3bff8d'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(n.x,n.y,18,0,Math.PI*2); ctx.stroke();
+  }
+  if(isPos){
+   ctx.strokeStyle='#00e5ff'; ctx.lineWidth=2.5; ctx.shadowBlur=10; ctx.shadowColor='#00e5ff';
+   ctx.beginPath(); ctx.arc(n.x,n.y,16,0,Math.PI*2); ctx.stroke(); ctx.shadowBlur=0;
+  }
+  if(isHint){
+   ctx.strokeStyle='#ffe53b'; ctx.lineWidth=2.5; ctx.setLineDash([4,4]);
+   ctx.beginPath(); ctx.arc(n.x,n.y,20,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // node fill
+  ctx.fillStyle= isPos?'#00e5ff': isStart?'#3bff8d':'#1a2450';
+  ctx.strokeStyle='rgba(255,255,255,.6)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(n.x,n.y,12,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#fff'; ctx.font='10px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(String(i+1),n.x,n.y+1);
+ });
+}
+
+function neighbors(nodeIdx){
+ const res=[];
+ currentChart.edges.forEach(([a,b])=>{
+  if(a===nodeIdx) res.push(b);
+  else if(b===nodeIdx) res.push(a);
+ });
+ return res;
+}
+function canMove(to){
+ if(to===pos) return false;
+ const key=edgeKey(pos,to);
+ if(visited.has(key)) return false;
+ // must be directly linked
+ return neighbors(pos).includes(to);
+}
+function isDeadEnd(){
+ const avail=neighbors(pos).filter(n=>!visited.has(edgeKey(pos,n)));
+ return avail.length===0 && visited.size < currentChart.edges.length;
+}
+function checkWin(){
+ if(visited.size===currentChart.edges.length){
+  const p=getP(currentChart.id);
+  let stars=1;
+  if(hints===0) stars=2;
+  if(hints===0 && undos===0) stars=3;
+  if(stars>p.stars) p.stars=stars;
+  if(undos===0 && hints===0) p.flawless=true;
+  p.completed=true;
+  if(path.length-1 < p.bestMoves) p.bestMoves=path.length-1;
+  store.progress[currentChart.id]=p; save(); renderGalleries();
+  $('doneTitle').textContent= stars===3?'FLAWLESS TRACE':'CHART COMPLETE';
+  $('doneDesc').textContent=`${currentChart.name} — ${visited.size} routes in ${path.length-1} moves • ${hints? hints+' hints • ':''}${undos? undos+' undos': 'no undo'}`;
+  $('doneMoves').textContent=path.length-1;
+  $('doneStars').textContent='★'.repeat(stars)+'☆'.repeat(3-stars);
+  $('doneStars').style.color= stars===3?'#ffd84d':'#7fffd4';
+  $('doneBonus').textContent= stars===3?'⬢ NO-UNDO BADGE EARNED': stars===2?'CLEAN TRACE':'COMPLETED';
+  $('overlayDone').classList.add('show');
+  try{navigator.vibrate&&navigator.vibrate([30,30,30])}catch(e){}
+  return true;
+ }
+ return false;
+}
+function toast(msg,ok=true){
+ const t=$('toast');t.textContent=msg; t.style.borderColor=ok?'rgba(0,255,200,.35)':'rgba(255,80,80,.4)'; t.style.color=ok?'#bfffee':'#ffb3b3';
+ t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1500);
+}
+
+// interactions
+canvas.addEventListener('click',e=>{
+ if(!currentChart) return;
+ const rect=canvas.getBoundingClientRect();
+ const x=(e.clientX-rect.left)/rect.width*360, y=(e.clientY-rect.top)/rect.height*360;
+ let best=-1, bestDist=28;
+ currentChart.nodes.forEach((n,i)=>{
+  const d=Math.hypot(n.x-x,n.y-y);
+  if(d<bestDist){ bestDist=d; best=i; }
+ });
+ if(best===-1) return;
+ if(best===pos) return;
+ if(!canMove(best)){
+  // check if not linked or already visited
+  const key=edgeKey(pos,best);
+  if(visited.has(key)) toast('Route already inspected',false);
+  else if(!neighbors(pos).includes(best)) toast('Not directly linked',false);
+  try{navigator.vibrate&&navigator.vibrate(20)}catch(e){}
+  return;
+ }
+ // move
+ visited.add(edgeKey(pos,best));
+ path.push(best); pos=best; hintNode=null;
+ updateHUD(); draw();
+ if(isDeadEnd()){ toast('Dead end — use Undo',false); try{navigator.vibrate&&navigator.vibrate([60,40,60])}catch(e){} }
+ else checkWin();
+});
+
+$('btnUndo').onclick=()=>{
+ if(path.length<=1) return;
+ const last=path.pop();
+ const prev=path[path.length-1];
+ visited.delete(edgeKey(prev,last));
+ pos=prev; undos++; hintNode=null;
+ updateHUD(); draw(); toast('Undone ↩',true);
+};
+$('btnHint').onclick=()=>{
+ if(!currentChart) return;
+ // find safe next moves that keep Eulerian trail possible
+ const avail=neighbors(pos).filter(n=>!visited.has(edgeKey(pos,n)));
+ if(avail.length===0){ toast('No moves — undo',false); return; }
+ // simple heuristic: try each, check if remaining graph is connected and has 0 or 2 odd degrees
+ let safe=null;
+ for(const cand of avail){
+  const tempVisited=new Set(visited); tempVisited.add(edgeKey(pos,cand));
+  if(isRemainingSolvable(cand,tempVisited)){ safe=cand; break; }
+ }
+ if(safe===null) safe=avail[0];
+ hintNode=safe; hints++;
+ draw(); toast(`Hint: try station ${safe+1}`,true);
+ try{navigator.vibrate&&navigator.vibrate(30)}catch(e){}
+};
+function isRemainingSolvable(curPos,tempVisited){
+ // build remaining edges
+ const remaining=currentChart.edges.filter(([a,b])=>!tempVisited.has(edgeKey(a,b)));
+ if(remaining.length===0) return true;
+ // check connectivity of remaining graph (ignoring isolated nodes)
+ const nodesInRemaining=new Set();
+ remaining.forEach(([a,b])=>{nodesInRemaining.add(a); nodesInRemaining.add(b)});
+ // BFS from curPos if curPos in remaining, else from first node in remaining
+ let start=curPos;
+ if(!nodesInRemaining.has(start)){
+  // find any node with remaining edge
+  start=remaining[0][0];
+ }
+ const adj=new Map();
+ remaining.forEach(([a,b])=>{
+  if(!adj.has(a)) adj.set(a,[]);
+  if(!adj.has(b)) adj.set(b,[]);
+  adj.get(a).push(b); adj.get(b).push(a);
+ });
+ const seen=new Set([start]), q=[start];
+ while(q.length){
+  const u=q.shift();
+  (adj.get(u)||[]).forEach(v=>{ if(!seen.has(v)){ seen.add(v); q.push(v); }});
+ }
+ for(const n of nodesInRemaining) if(!seen.has(n)) return false;
+ // odd degree check: count odd degree nodes in remaining graph
+ const deg=new Map();
+ remaining.forEach(([a,b])=>{
+  deg.set(a,(deg.get(a)||0)+1);
+  deg.set(b,(deg.get(b)||0)+1);
+ });
+ let odd=0;
+ for(const d of deg.values()) if(d%2===1) odd++;
+ // For Eulerian trail from curPos, we need 0 or 2 odds, and if 2, curPos must be one of them
+ if(odd===0) return true;
+ if(odd===2) return deg.get(curPos)%2===1;
+ return false;
+}
+$('btnRef').onclick=()=>{
+ if(!currentChart) return;
+ // generate reference trail via Hierholzer from start
+ const trail=hierholzer(currentChart.start);
+ if(!trail) { toast('No reference',false); return; }
+ // animate
+ let idx=0;
+ visited=new Set(); path=[trail[0]]; pos=trail[0]; hintNode=null;
+ updateHUD(); draw();
+ clearInterval(replayTimer);
+ replayTimer=setInterval(()=>{
+  if(idx>=trail.length-1){ clearInterval(replayTimer); checkWin(); return; }
+  const a=trail[idx], b=trail[idx+1];
+  visited.add(edgeKey(a,b)); path.push(b); pos=b; idx++;
+  updateHUD(); draw();
+ }, 400);
+ toast('Reference replay ▶',true);
+};
+function hierholzer(start){
+ // build adjacency with edge indices
+ const adj=new Map();
+ currentChart.edges.forEach(([a,b],i)=>{
+  if(!adj.has(a)) adj.set(a,[]);
+  if(!adj.has(b)) adj.set(b,[]);
+  adj.get(a).push({to:b,idx:i});
+  adj.get(b).push({to:a,idx:i});
+ });
+ const stack=[start], trail=[], used=new Set();
+ while(stack.length){
+  const v=stack[stack.length-1];
+  const list=adj.get(v)||[];
+  let found=null;
+  while(list.length){
+   const e=list.pop();
+   if(!used.has(e.idx)){ found=e; break; }
+  }
+  if(found){
+   used.add(found.idx);
+   stack.push(found.to);
+  } else {
+   trail.push(stack.pop());
+  }
+ }
+ trail.reverse();
+ // verify uses all edges
+ if(trail.length-1 !== currentChart.edges.length) return null;
+ return trail;
+}
+$('btnBack').onclick=()=>{ viewChart.style.display='none'; viewGalleries.style.display='flex'; clearInterval(replayTimer); };
+$('btnRestart').onclick=()=>{
+ if(!currentChart) return;
+ pos=currentChart.start; visited=new Set(); path=[pos]; hints=0; undos=0; hintNode=null;
+ clearInterval(replayTimer); updateHUD(); draw(); toast('Chart reset',true);
+};
+$('btnReset').onclick=()=>{ if(confirm('Reset all charts?')){ store={progress:{}}; save(); renderGalleries(); toast('Progress reset',true); }};
+$('btnHow').onclick=()=>$('overlayHow').classList.add('show');
+$('howClose').onclick=()=>$('overlayHow').classList.remove('show');
+$('overlayHow').addEventListener('click',e=>{if(e.target===$('overlayHow'))$('overlayHow').classList.remove('show')});
+$('doneGalleries').onclick=()=>{ $('overlayDone').classList.remove('show'); viewChart.style.display='none'; viewGalleries.style.display='flex'; clearInterval(replayTimer); };
+$('doneNext').onclick=()=>{
+ $('overlayDone').classList.remove('show');
+ const nid=Math.min(12, currentChart.id+1);
+ if(isUnlocked(nid)) openChart(nid); else { viewChart.style.display='none'; viewGalleries.style.display='flex'; }
+};
+$('overlayDone').addEventListener('click',e=>{if(e.target===$('overlayDone')) $('overlayDone').classList.remove('show')});
+
+renderGalleries();
+</script>
+</body>
+</html>

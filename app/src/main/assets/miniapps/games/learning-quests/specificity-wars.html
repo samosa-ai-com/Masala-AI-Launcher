@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Selector Duel Casino</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0a0f0a;--felt:#0f2a1a;--felt2:#143d22;--gold:#d4a017;--gold2:#f0c040;--line:#2a5a2a;--text:#e8f0e8;--muted:#8aa08a;--panel:#1a241a;--panel2:#223322}
+body{font-family:ui-sans-system,-apple-system,Segoe UI,Roboto,sans-serif;background:radial-gradient(ellipse at center,#0f2a1a 0%,#0a0f0a 70%);color:var(--text);min-height:100vh}
+header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:2px solid var(--gold);background:linear-gradient(180deg,#1a2a1a,#0f1a0f);position:sticky;top:0;z-index:10;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#d4a017,#f0c040);display:grid;place-items:center;font-size:20px;box-shadow:0 0 16px rgba(212,160,23,.4);border:2px solid #f0c040}
+.brand h1{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold2)}
+.brand p{font-size:11px;color:var(--muted)}
+.stats{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.stat{background:var(--panel);border:1px solid var(--gold);border-radius:10px;padding:6px 10px;min-width:70px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.stat b{display:block;font-size:14px;color:var(--gold2)}
+.stat span{font-size:10px;letter-spacing:.07em;color:var(--muted);text-transform:uppercase}
+.container{max-width:1200px;margin:0 auto;padding:14px;display:grid;grid-template-columns:1fr 340px;gap:14px}
+@media(max-width:860px){.container{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:2px solid var(--gold);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.panel-head{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,rgba(212,160,23,.1),transparent)}
+.panel-head h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold2)}
+.badge{font-size:10px;padding:4px 8px;border-radius:999px;background:#1a2e0a;color:var(--gold2);border:1px solid var(--gold)}
+.felt{margin:12px;padding:16px;background:radial-gradient(ellipse at center,var(--felt2),var(--felt));border:3px solid var(--gold);border-radius:16px;min-height:220px;position:relative;box-shadow:inset 0 0 30px rgba(0,0,0,.5),0 4px 16px rgba(0,0,0,.3)}
+.felt::before{content:"";position:absolute;inset:8px;border:1px solid rgba(212,160,23,.2);border-radius:12px;pointer-events:none}
+.felt h3{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold2);text-align:center;margin-bottom:12px}
+.felt-area{display:flex;gap:10px;flex-wrap:wrap;min-height:100px;align-items:center;justify-content:center;padding:10px;border:2px dashed rgba(212,160,23,.3);border-radius:12px;transition:.2s}
+.felt-area.drag-over{border-color:var(--gold2);background:rgba(212,160,23,.08)}
+.felt-empty{font-size:12px;color:var(--muted);text-align:center;padding:20px}
+.target-box{margin:12px;padding:12px;background:var(--panel2);border:1px solid var(--line);border-radius:12px}
+.target-box h4{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.target-cards{display:flex;gap:8px;flex-wrap:wrap}
+.card{width:110px;height:150px;border-radius:12px;background:linear-gradient(180deg,#fff,#f5f0e0);border:2px solid var(--gold);color:#1a1200;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;text-align:center;cursor:grab;transition:.15s;box-shadow:0 4px 12px rgba(0,0,0,.3);user-select:none;position:relative}
+.card:active{cursor:grabbing;transform:scale(.96)}
+.card:hover{transform:translateY(-4px);box-shadow:0 8px 20px rgba(0,0,0,.4)}
+.card.element{border-color:#5aa8ff;background:linear-gradient(180deg,#e0f0ff,#c0d8ff)}
+.card.class{border-color:#3ee0a0;background:linear-gradient(180deg,#e0fff0,#c0f0d8)}
+.card.identifier{border-color:#d4a017;background:linear-gradient(180deg,#fff8e0,#ffe8a0)}
+.card.override{border-color:#ff6b6b;background:linear-gradient(180deg,#ffe0e0,#ffc0c0);border-width:3px}
+.card .card-type{font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;opacity:.6}
+.card .card-name{font-size:13px;font-weight:900;margin:6px 0}
+.card .card-spec{font-size:10px;background:rgba(0,0,0,.08);padding:3px 6px;border-radius:999px;font-weight:700}
+.card .card-power{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:var(--gold);color:#1a1200;font-size:10px;font-weight:900;display:grid;place-items:center;border:1px solid #b89400}
+.card.small{width:90px;height:120px}
+.card.small .card-name{font-size:11px}
+.hand{padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;min-height:160px}
+.meter{height:10px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;overflow:hidden;margin:10px}
+.meter i{display:block;height:100%;width:50%;background:linear-gradient(90deg,#ff6b6b,#f0c040,#3ee0a0);transition:.3s}
+.vs{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;margin:10px}
+.vs .score{font-size:12px;text-align:center}
+.vs .score b{display:block;font-size:16px;color:var(--gold2)}
+.vs .divider{width:2px;height:40px;background:var(--line);border-radius:999px}
+.history{padding:10px;display:grid;gap:6px;max-height:200px;overflow:auto}
+.history-item{padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);font-size:11px;display:flex;justify-content:space-between;align-items:center}
+.history-item.win{border-color:var(--accent2);background:rgba(62,224,160,.08)}
+.history-item.lose{border-color:rgba(255,90,106,.3);background:rgba(255,90,106,.06)}
+.history-item.push{border-color:var(--gold);background:rgba(212,160,23,.08)}
+.actions{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.btn{padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-weight:700;font-size:12px;cursor:pointer;flex:1}
+.btn.primary{background:linear-gradient(180deg,#f0c040,#d4a017);color:#1a1200;border-color:var(--gold);box-shadow:0 4px 12px rgba(212,160,23,.3)}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.4;pointer-events:none}
+.btn.small{padding:6px 10px;font-size:11px}
+.guide{padding:10px}
+.guide-item{padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);margin-bottom:6px;font-size:11px}
+.guide-item b{color:var(--gold2)}
+.toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%) translateY(16px);background:#1a241a;color:#e8f0e8;border:1px solid var(--gold);padding:10px 14px;border-radius:999px;font-size:12px;opacity:0;pointer-events:none;transition:.25s;z-index:20;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.footer{padding:8px 12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted)}
+.footer a{color:var(--gold2);text-decoration:none}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">♠️</div><div><h1>Selector Duel Casino</h1><p>Felt & Gold • Specificity Duel • Best Score</p></div></div>
+  <div class="stats">
+    <div class="stat"><b id="score">0</b><span>Score</span></div>
+    <div class="stat"><b id="best">0</b><span>Best</span></div>
+    <div class="stat"><b id="record">0-0-0</b><span>W-L-P</span></div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="panel">
+    <div class="panel-head"><h2>♣️ Your Hand — Tap or Drag to Felt</h2><span class="badge" id="roundBadge">Round 1</span></div>
+    <div class="hand" id="hand"></div>
+    <div class="felt" id="felt">
+      <h3>✨ Gold Felt — Play 1-4 Cards</h3>
+      <div class="felt-area" id="feltArea"><div class="felt-empty">Drag cards here or tap to play<br><span style="font-size:10px;opacity:.6">Max 4 cards • Specificity sums</span></div></div>
+      <div class="vs">
+        <div class="score"><span style="font-size:10px;color:var(--muted);letter-spacing:.07em;text-transform:uppercase">Your Power</span><b id="yourScore" style="color:var(--accent2)">0</b><span id="yourSpec" style="font-size:10px;color:var(--muted)">(0,0,0)</span></div>
+        <div class="divider"></div>
+        <div class="score"><span style="font-size:10px;color:var(--muted);letter-spacing:.07em;text-transform:uppercase">Target Power</span><b id="targetScore" style="color:var(--gold2)">0</b><span id="targetSpec" style="font-size:10px;color:var(--muted)">(0,0,0)</span></div>
+      </div>
+      <div class="meter"><i id="meter"></i></div>
+      <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:4px"><span id="leadText">Play cards to lead</span></div>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" id="clearBtn">🗑️ Clear Felt</button>
+      <button class="btn ghost" id="newHandBtn">🎴 New Hand</button>
+      <button class="btn primary" id="duelBtn">⚔️ DUEL!</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>🎯 Target Style</h2><span class="badge" style="background:#1a2e0a;color:var(--accent2);border-color:var(--accent2)">Beat This</span></div>
+    <div class="target-box">
+      <h4>House Cards — Outrank to Win</h4>
+      <div class="target-cards" id="targetCards"></div>
+      <div style="margin-top:8px;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--line);font-size:11px">
+        <div style="color:var(--muted);font-size:10px;letter-spacing:.07em;text-transform:uppercase">Specificity Rule</div>
+        <div style="margin-top:4px;line-height:1.5">ID = 100 • Class = 10 • Element = 1<br><code style="background:var(--panel);padding:2px 6px;border-radius:4px;border:1px solid var(--line)">!important</code> = +10000 (wins all)</div>
+      </div>
+    </div>
+    <div style="padding:10px;border-top:1px solid var(--line)">
+      <h4 style="font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Round History</h4>
+      <div class="history" id="history"></div>
+    </div>
+    <div class="guide">
+      <h4 style="font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Card Guide</h4>
+      <div class="guide-item"><b>Element</b> — <code>div</code>, <code>p</code> — (0,0,1) = 1 pt</div>
+      <div class="guide-item"><b>Class</b> — <code>.card</code> — (0,1,0) = 10 pts</div>
+      <div class="guide-item"><b>Identifier</b> — <code>#hero</code> — (1,0,0) = 100 pts</div>
+      <div class="guide-item"><b>Override</b> — <code>!important</code> — +10000 pts</div>
+      <div style="font-size:11px;line-height:1.5;color:var(--muted);margin-top:8px">• Win +100 (+20 streak) • Push +25 • Lose 0<br>• Best score saved locally</div>
+    </div>
+    <div class="footer"><span>Felt & Gold • Big Touch</span><a href="#" id="resetBtn">Reset</a></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const POOL = [
+  {type:'element', name:'div', spec:[0,0,1], power:1, color:'element', icon:'◻️'},
+  {type:'element', name:'p', spec:[0,0,1], power:1, color:'element', icon:'◻️'},
+  {type:'element', name:'span', spec:[0,0,1], power:1, color:'element', icon:'◻️'},
+  {type:'class', name:'.card', spec:[0,1,0], power:10, color:'class', icon:'◆'},
+  {type:'class', name:'.active', spec:[0,1,0], power:10, color:'class', icon:'◆'},
+  {type:'class', name:'.hero', spec:[0,1,0], power:10, color:'class', icon:'◆'},
+  {type:'identifier', name:'#main', spec:[1,0,0], power:100, color:'identifier', icon:'★'},
+  {type:'identifier', name:'#hero', spec:[1,0,0], power:100, color:'identifier', icon:'★'},
+  {type:'override', name:'!important', spec:[0,0,0], power:10000, color:'override', icon:'💎', important:true}
+];
+
+const LS_KEY="selector-duel-casino-v1";
+let state={best:0, wins:0, losses:0, pushes:0, score:0, streak:0, round:1};
+function load(){ try{ const s=JSON.parse(localStorage.getItem(LS_KEY)); if(s) Object.assign(state,s); }catch(e){} }
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+
+let hand=[], felt=[], target=[];
+
+const els={
+  hand:document.getElementById('hand'),
+  feltArea:document.getElementById('feltArea'),
+  targetCards:document.getElementById('targetCards'),
+  yourScore:document.getElementById('yourScore'),
+  targetScore:document.getElementById('targetScore'),
+  yourSpec:document.getElementById('yourSpec'),
+  targetSpec:document.getElementById('targetSpec'),
+  meter:document.getElementById('meter'),
+  leadText:document.getElementById('leadText'),
+  history:document.getElementById('history'),
+  score:document.getElementById('score'),
+  best:document.getElementById('best'),
+  record:document.getElementById('record'),
+  roundBadge:document.getElementById('roundBadge'),
+  toast:document.getElementById('toast')
+};
+
+function genHand(){
+  hand=[];
+  for(let i=0;i<6;i++){
+    const r=Math.random();
+    let pick;
+    if(r<0.4) pick=POOL[Math.floor(Math.random()*3)]; // element
+    else if(r<0.75) pick=POOL[3+Math.floor(Math.random()*3)]; // class
+    else if(r<0.92) pick=POOL[6+Math.floor(Math.random()*2)]; // id
+    else pick=POOL[8]; // override rare
+    hand.push({...pick, uid:Date.now()+i+Math.random()});
+  }
+}
+
+function genTarget(round){
+  target=[];
+  const count = round<3?1 : round<6?2 : 3;
+  for(let i=0;i<count;i++){
+    const r=Math.random();
+    let pick;
+    if(round<2) pick=POOL[Math.floor(Math.random()*3)]; // only elements early
+    else if(round<4) pick=POOL[Math.floor(Math.random()*6)]; // element/class
+    else if(r<0.5) pick=POOL[3+Math.floor(Math.random()*3)];
+    else if(r<0.85) pick=POOL[6+Math.floor(Math.random()*2)];
+    else pick=POOL[8];
+    target.push({...pick, uid:'t'+i});
+  }
+  // ensure at least some challenge
+  if(round>5 && Math.random()<0.3) target.push({...POOL[8], uid:'t99'});
+}
+
+function calc(cards){
+  let a=0,b=0,c=0, hasImportant=false;
+  cards.forEach(card=>{
+    a+=card.spec[0]; b+=card.spec[1]; c+=card.spec[2];
+    if(card.important) hasImportant=true;
+  });
+  let score = a*100 + b*10 + c;
+  if(hasImportant) score+=10000;
+  return {a,b,c,score, hasImportant};
+}
+
+function renderHand(){
+  els.hand.innerHTML="";
+  hand.forEach((card,i)=>{
+    const div=document.createElement('div');
+    div.className=`card ${card.color}`;
+    div.draggable=true;
+    div.innerHTML=`<div class="card-type">${card.type}</div><div class="card-name">${card.name}</div><div class="card-spec">(${card.spec.join(',')})</div><div class="card-power">${card.power}</div>`;
+    div.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/plain', 'hand:'+i); });
+    div.addEventListener('click', ()=> playToFelt(i));
+    els.hand.appendChild(div);
+  });
+}
+
+function renderFelt(){
+  if(felt.length===0){
+    els.feltArea.innerHTML=`<div class="felt-empty">Drag cards here or tap to play<br><span style="font-size:10px;opacity:.6">Max 4 cards • Specificity sums</span></div>`;
+  } else {
+    els.feltArea.innerHTML="";
+    felt.forEach((card,i)=>{
+      const div=document.createElement('div');
+      div.className=`card ${card.color} small`;
+      div.draggable=true;
+      div.innerHTML=`<div class="card-type">${card.type}</div><div class="card-name">${card.name}</div><div class="card-spec">(${card.spec.join(',')})</div><div class="card-power">${card.power}</div>`;
+      div.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/plain', 'felt:'+i); });
+      div.addEventListener('click', ()=> removeFromFelt(i));
+      els.feltArea.appendChild(div);
+    });
+  }
+  updateMeter();
+}
+
+function renderTarget(){
+  els.targetCards.innerHTML="";
+  target.forEach(card=>{
+    const div=document.createElement('div');
+    div.className=`card ${card.color} small`;
+    div.style.cursor='default';
+    div.innerHTML=`<div class="card-type">${card.type}</div><div class="card-name">${card.name}</div><div class="card-spec">(${card.spec.join(',')})</div><div class="card-power">${card.power}</div>`;
+    els.targetCards.appendChild(div);
+  });
+  updateMeter();
+}
+
+function updateMeter(){
+  const y=calc(felt), t=calc(target);
+  els.yourScore.textContent=y.score;
+  els.targetScore.textContent=t.score;
+  els.yourSpec.textContent=`(${y.a},${y.b},${y.c})${y.hasImportant?' !important':''}`;
+  els.targetSpec.textContent=`(${t.a},${t.b},${t.c})${t.hasImportant?' !important':''}`;
+  const total=y.score+t.score;
+  const pct = total===0?50: (y.score/total)*100;
+  els.meter.style.width=Math.max(5,Math.min(95,pct))+"%";
+  if(y.score>t.score) els.leadText.textContent="You lead — DUEL to win!";
+  else if(y.score===t.score) els.leadText.textContent="Push — tie goes to house? No, push!";
+  else els.leadText.textContent="House leads — add power!";
+  els.leadText.style.color = y.score>t.score?'var(--accent2)': y.score===t.score?'var(--gold2)':'var(--muted)';
+}
+
+function playToFelt(idx){
+  if(felt.length>=4){ showToast("Felt max 4 cards"); return; }
+  const card=hand.splice(idx,1)[0];
+  felt.push(card);
+  renderHand(); renderFelt();
+  if(navigator.vibrate) navigator.vibrate(20);
+}
+
+function removeFromFelt(idx){
+  const card=felt.splice(idx,1)[0];
+  hand.push(card);
+  renderHand(); renderFelt();
+}
+
+function updateStats(){
+  els.score.textContent=state.score;
+  els.best.textContent=state.best;
+  els.record.textContent=`${state.wins}-${state.losses}-${state.pushes}`;
+  els.roundBadge.textContent=`Round ${state.round}`;
+}
+
+function addHistory(result, yScore, tScore){
+  const div=document.createElement('div');
+  div.className=`history-item ${result}`;
+  const icon=result==='win'?'✓':result==='lose'?'✗':'═';
+  div.innerHTML=`<span>${icon} R${state.round} ${yScore} vs ${tScore}</span><b style="color:${result==='win'?'var(--accent2)':result==='lose'?'var(--bad)':'var(--gold2)'}">${result.toUpperCase()}</b>`;
+  els.history.prepend(div);
+  if(els.history.children.length>12) els.history.removeChild(els.history.lastChild);
+}
+
+function doDuel(){
+  if(felt.length===0){ showToast("Play at least 1 card"); return; }
+  const y=calc(felt), t=calc(target);
+  let result;
+  if(y.score>t.score) result='win';
+  else if(y.score===t.score) result='push';
+  else result='lose';
+
+  if(result==='win'){
+    const bonus = state.streak*20;
+    state.score+=100+bonus;
+    state.wins+=1;
+    state.streak+=1;
+    if(state.score>state.best) state.best=state.score;
+    showToast(`WIN! +${100+bonus} ${bonus?`(+${bonus} streak)`:''}`);
+    if(navigator.vibrate) navigator.vibrate([30,20,30]);
+  } else if(result==='push'){
+    state.score+=25;
+    state.pushes+=1;
+    state.streak=0;
+    if(state.score>state.best) state.best=state.score;
+    showToast("PUSH — +25");
+    if(navigator.vibrate) navigator.vibrate(20);
+  } else {
+    state.losses+=1;
+    state.streak=0;
+    showToast("LOSE — house wins");
+    if(navigator.vibrate) navigator.vibrate([50]);
+  }
+  addHistory(result, y.score, t.score);
+  state.round+=1;
+  save(); updateStats();
+  // new round
+  felt=[]; genHand(); genTarget(state.round);
+  renderHand(); renderFelt(); renderTarget();
+}
+
+function showToast(msg){
+  els.toast.textContent=msg;
+  els.toast.classList.add('show');
+  setTimeout(()=>els.toast.classList.remove('show'),2000);
+}
+
+// drag handlers
+els.feltArea.addEventListener('dragover', e=>{ e.preventDefault(); els.feltArea.classList.add('drag-over'); });
+els.feltArea.addEventListener('dragleave', ()=> els.feltArea.classList.remove('drag-over'));
+els.feltArea.addEventListener('drop', e=>{
+  e.preventDefault(); els.feltArea.classList.remove('drag-over');
+  const data=e.dataTransfer.getData('text/plain');
+  if(data.startsWith('hand:')){
+    const idx=parseInt(data.split(':')[1]);
+    playToFelt(idx);
+  }
+});
+els.hand.addEventListener('dragover', e=> e.preventDefault());
+els.hand.addEventListener('drop', e=>{
+  e.preventDefault();
+  const data=e.dataTransfer.getData('text/plain');
+  if(data.startsWith('felt:')){
+    const idx=parseInt(data.split(':')[1]);
+    removeFromFelt(idx);
+  }
+});
+
+document.getElementById('duelBtn').onclick=doDuel;
+document.getElementById('clearBtn').onclick=()=>{
+  hand.push(...felt); felt=[]; renderHand(); renderFelt();
+};
+document.getElementById('newHandBtn').onclick=()=>{
+  if(confirm("New hand? Current hand discarded.")){
+    genHand(); renderHand();
+  }
+};
+document.getElementById('resetBtn').onclick=(e)=>{
+  e.preventDefault();
+  if(confirm("Reset best score and record?")){
+    localStorage.removeItem(LS_KEY);
+    state={best:0,wins:0,losses:0,pushes:0,score:0,streak:0,round:1};
+    els.history.innerHTML="";
+    genHand(); genTarget(1); renderHand(); renderFelt(); renderTarget(); updateStats();
+    showToast("Reset done");
+  }
+};
+
+// init
+load();
+genHand(); genTarget(state.round);
+renderHand(); renderFelt(); renderTarget(); updateStats();
+</script>
+</body>
+</html>

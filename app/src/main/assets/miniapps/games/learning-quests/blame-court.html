@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Commit Court — Bug Detective</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --wood1:#3e2723; --wood2:#5d4037; --wood3:#795548;
+  --parch:#fdf6e3; --parch2:#f5e6c8; --parch3:#e8d5a3;
+  --ink:#2c1e13; --gold:#b58900; --gold2:#d4a017; --gold3:#8c6a00;
+  --red:#c0392b; --green:#1e7e34; --muted:#6d5a44;
+  --radius:14px;
+}
+html,body{background:#2b1a12;color:var(--ink);font-family: ui-serif, Georgia, 'Times New Roman', serif;min-height:100%}
+body{
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.35)),
+    repeating-linear-gradient(90deg, #4e342e 0 18px, #3e2723 18px 36px, #5d4037 36px 54px);
+  display:flex;justify-content:center;
+}
+.wrap{
+  width:100%;max-width:428px;min-width:360px;
+  min-height:100dvh;
+  background: linear-gradient(180deg, var(--parch) 0%, var(--parch2) 100%);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.2), 0 12px 40px rgba(0,0,0,.5);
+  display:flex;flex-direction:column;
+  overflow-x:hidden;
+}
+/* Header */
+.header{
+  background: linear-gradient(180deg, #5d4037 0%, #3e2723 100%);
+  color:#fbe9c0;
+  padding:12px 12px 10px;
+  border-bottom:4px solid var(--gold2);
+  position:sticky;top:0;z-index:10;
+}
+.h-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{display:flex;align-items:center;gap:10px}
+.gavel{
+  width:38px;height:38px;border-radius:10px;
+  background: radial-gradient(circle at 30% 30%, #ffecb3, #b58900);
+  display:grid;place-items:center;font-size:20px;
+  border:2px solid #fff3; box-shadow: inset 0 1px 0 #fff8;
+}
+.brand h1{font-size:16px;letter-spacing:.04em;line-height:1.1;text-transform:uppercase}
+.brand h1 span{display:block;font-size:11px;letter-spacing:.14em;color:#ffecb3;opacity:.9;font-weight:700}
+.h-actions{display:flex;align-items:center;gap:8px}
+.rep{
+  background: linear-gradient(180deg, #fff8e1, #ffe082);
+  color:#3e2723;
+  border:1px solid #d4a017;
+  border-radius:999px;
+  padding:6px 10px;
+  font-weight:900;font-size:12px;
+  display:flex;align-items:center;gap:6px;
+  white-space:nowrap;
+}
+.icon-btn{
+  width:44px;height:44px;border-radius:12px;
+  border:1px solid #d4a017;
+  background: linear-gradient(180deg, #fff8e1, #ffecb3);
+  color:#3e2723;
+  display:grid;place-items:center;
+  font-size:18px;cursor:pointer;
+  touch-action:manipulation;
+}
+.icon-btn:active{transform:scale(.97)}
+.subhead{
+  margin-top:8px;
+  background: rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:10px;
+  padding:8px 10px;
+  display:flex;justify-content:space-between;gap:8px;
+  font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#ffecb3;
+}
+.subhead b{color:#fff}
+/* Tabs */
+.tabs{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:6px;
+  padding:10px 10px 0;
+  background: linear-gradient(180deg, #efdbac, #fdf6e3);
+  border-bottom:1px solid #d9c49a;
+}
+.tab{
+  border:1px solid #c9b48a;
+  background: linear-gradient(180deg, #fffaf0, #f5e6c8);
+  border-radius:12px;
+  padding:8px 4px;
+  text-align:center;
+  cursor:pointer;
+  touch-action:manipulation;
+  min-height:56px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+}
+.tab.active{
+  background: linear-gradient(180deg, #3e2723, #5d4037);
+  color:#ffecb3;
+  border-color:#3e2723;
+  box-shadow: 0 4px 10px rgba(0,0,0,.2);
+}
+.tab .k{font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.8}
+.tab .t{font-size:11px;font-weight:900;line-height:1.1}
+.tab .stars{font-size:10px;letter-spacing:.08em}
+.tab.done{outline:2px solid var(--gold2);outline-offset:1px}
+/* Main */
+.main{padding:10px 10px 14px;flex:1;display:flex;flex-direction:column;gap:10px}
+.card{
+  background: linear-gradient(180deg, #fffdf5, #fdf6e3);
+  border:1px solid #d9c49a;
+  border-radius:14px;
+  box-shadow: 0 2px 0 rgba(61,40,23,.08), 0 6px 16px rgba(61,40,23,.08);
+  overflow:hidden;
+}
+.card-h{
+  padding:10px 12px;
+  background: linear-gradient(180deg, #fff8e1, #f5e6c8);
+  border-bottom:1px solid #e0cda0;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.card-h h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#5d4037}
+.badge{
+  font-size:11px;font-weight:900;
+  padding:5px 8px;border-radius:999px;
+  border:1px solid #c9b48a;
+  background:#fff;
+  color:#5d4037;
+  white-space:nowrap;
+}
+.badge.open{background: linear-gradient(180deg, #fff3e0, #ffe0b2);border-color:#e6a23c;color:#7a4a00}
+.badge.solved{background: linear-gradient(180deg, #e8f5e9, #c8e6c9);border-color:#66bb6a;color:#1b5e20}
+.badge.failed{background: linear-gradient(180deg, #ffebee, #ffcdd2);border-color:#ef5350;color:#b71c1c}
+.case-intro{padding:10px 12px;font-size:13px;line-height:1.45;color:#3e2723}
+.case-intro strong{color:#5d4037}
+.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px 10px}
+.meta{
+  background:#fff;border:1px solid #e0cda0;border-radius:10px;padding:8px 9px;
+}
+.meta .l{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.meta .v{font-size:12px;font-weight:800;margin-top:2px;word-break:break-word}
+/* Evidence */
+.evidence{padding:10px 10px 12px}
+.evidence h3{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5d4037;display:flex;align-items:center;gap:8px}
+.evidence h3 i{width:22px;height:22px;border-radius:7px;background:linear-gradient(180deg,#3e2723,#5d4037);color:#ffecb3;display:grid;place-items:center;font-style:normal;font-size:12px}
+.hint{font-size:11px;color:var(--muted);margin:6px 0 8px;line-height:1.4}
+.commits{display:flex;flex-direction:column;gap:8px}
+.commit{
+  border:1px solid #d9c49a;
+  border-radius:12px;
+  background: linear-gradient(180deg, #ffffff, #fff8e1);
+  overflow:hidden;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.commit.selected{border-color:var(--gold2);box-shadow:0 0 0 2px rgba(212,160,23,.25)}
+.commit.accused{border-color:#2e7d32;box-shadow:0 0 0 2px rgba(46,125,50,.2)}
+.commit-head{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 10px 8px;
+}
+.dot{width:10px;height:10px;border-radius:50%;background:#bdbdbd;flex:0 0 10px;box-shadow:inset 0 1px 0 #fff}
+.commit.selected .dot{background:var(--gold2)}
+.commit.accused .dot{background:var(--green)}
+.hash{
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size:11px;font-weight:900;
+  background:#3e2723;color:#ffecb3;
+  padding:3px 6px;border-radius:6px;
+  letter-spacing:.04em;
+}
+.author{font-size:12px;font-weight:800;color:#3e2723}
+.date{font-size:11px;color:var(--muted);margin-left:auto;white-space:nowrap}
+.msg{padding:0 10px 8px 28px;font-size:12px;line-height:1.35;color:#4e342e}
+.msg b{color:#3e2723}
+.commit-actions{
+  display:flex;gap:6px;
+  padding:0 10px 10px 28px;
+}
+.mini-btn{
+  flex:1;
+  min-height:40px;
+  border-radius:10px;
+  border:1px solid #c9b48a;
+  background: linear-gradient(180deg, #fff, #f5e6c8);
+  font-size:12px;font-weight:800;
+  color:#5d4037;
+  cursor:pointer;
+  touch-action:manipulation;
+  padding:6px 8px;
+}
+.mini-btn.primary{
+  background: linear-gradient(180deg, #3e2723, #5d4037);
+  color:#ffecb3;
+  border-color:#3e2723;
+}
+.mini-btn:disabled{opacity:.5;cursor:not-allowed}
+.diff{
+  margin:0 10px 10px 28px;
+  background:#1e1a16;
+  color:#e8e6e1;
+  border-radius:10px;
+  border:1px solid #3e2723;
+  overflow:hidden;
+  display:none;
+}
+.diff.open{display:block}
+.diff-h{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:7px 9px;
+  background: linear-gradient(180deg, #2c1e13, #3e2723);
+  color:#ffecb3;
+  font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+}
+.diff pre{
+  margin:0;padding:8px 9px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size:11px;line-height:1.45;
+  overflow-x:auto;white-space:pre;
+}
+.add{color:#a5d6a7}
+.rem{color:#ef9a9a}
+.ctx{color:#b0bec5}
+.file{color:#ffe082}
+/* Cross exam */
+.xexam{padding:10px 12px}
+.xexam h3{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5d4037;display:flex;align-items:center;gap:8px}
+.xexam h3 i{width:22px;height:22px;border-radius:7px;background:linear-gradient(180deg,#b58900,#8c6a00);color:#fff;display:grid;place-items:center;font-style:normal;font-size:12px}
+.q{
+  margin-top:10px;
+  border:1px solid #e0cda0;
+  border-radius:12px;
+  background:#fff;
+  overflow:hidden;
+}
+.q-h{padding:9px 10px;background:linear-gradient(180deg,#fff8e1,#f5e6c8);border-bottom:1px solid #e0cda0;font-size:12px;font-weight:900;color:#3e2723;line-height:1.35}
+.q-opts{padding:8px;display:grid;gap:6px}
+.opt{
+  min-height:44px;
+  border-radius:10px;
+  border:1px solid #d9c49a;
+  background: linear-gradient(180deg, #fff, #fff8e1);
+  padding:9px 10px;
+  font-size:12px;line-height:1.35;
+  text-align:left;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.opt:active{transform:scale(.99)}
+.opt.correct{border-color:#2e7d32;background:linear-gradient(180deg,#e8f5e9,#c8e6c9)}
+.opt.wrong{border-color:#c62828;background:linear-gradient(180deg,#ffebee,#ffcdd2)}
+.opt:disabled{opacity:1}
+.explain{
+  display:none;
+  margin:0 8px 8px;
+  padding:8px 9px;
+  border-radius:10px;
+  background: linear-gradient(180deg, #fff8e1, #fff3c4);
+  border:1px solid #e0cda0;
+  font-size:11px;line-height:1.45;color:#4e342e;
+}
+.explain.show{display:block}
+.explain b{color:#3e2723}
+/* Verdict */
+.verdict{
+  padding:12px;
+  text-align:center;
+}
+.verdict h3{font-size:14px;letter-spacing:.06em;text-transform:uppercase}
+.verdict p{font-size:12px;line-height:1.5;color:#4e342e;margin-top:6px}
+.seal{
+  width:64px;height:64px;border-radius:50%;
+  margin:0 auto 8px;
+  display:grid;place-items:center;
+  font-size:28px;
+  border:3px solid #d4a017;
+  background: radial-gradient(circle at 30% 30%, #fff8e1, #ffecb3);
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+}
+.seal.guilty{background: radial-gradient(circle at 30% 30%, #ffebee, #ffcdd2);border-color:#c62828}
+.seal.mistrial{background: radial-gradient(circle at 30% 30%, #fff8e1, #ffe0b2);border-color:#e6a23c}
+.delta{
+  display:inline-flex;align-items:center;gap:6px;
+  margin-top:8px;
+  padding:6px 10px;border-radius:999px;
+  font-size:12px;font-weight:900;
+  border:1px solid #c9b48a;background:#fff;
+}
+.delta.pos{color:#1b5e20;border-color:#66bb6a;background:#e8f5e9}
+.delta.neg{color:#b71c1c;border-color:#ef5350;background:#ffebee}
+/* Controls */
+.controls{
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;
+  padding:0 10px 10px;
+}
+.btn{
+  min-height:48px;
+  border-radius:12px;
+  border:1px solid #c9b48a;
+  background: linear-gradient(180deg, #fff, #f5e6c8);
+  color:#3e2723;
+  font-size:13px;font-weight:900;
+  cursor:pointer;
+  touch-action:manipulation;
+  padding:8px 10px;
+}
+.btn.primary{
+  background: linear-gradient(180deg, #3e2723, #5d4037);
+  color:#ffecb3;
+  border-color:#3e2723;
+  box-shadow: 0 4px 10px rgba(0,0,0,.2);
+}
+.btn.gold{
+  background: linear-gradient(180deg, #ffecb3, #d4a017);
+  color:#3e2723;
+  border-color:#b58900;
+}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn:active{transform:scale(.98)}
+.footer{
+  padding:10px 12px 14px;
+  display:flex;justify-content:space-between;gap:8px;
+  background: linear-gradient(180deg, #fdf6e3, #efdbac);
+  border-top:1px solid #d9c49a;
+}
+.link-btn{
+  min-height:40px;
+  border-radius:10px;
+  border:1px solid #c9b48a;
+  background:#fff;
+  padding:6px 10px;
+  font-size:11px;font-weight:800;
+  color:#5d4037;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.progress{
+  height:8px;background:#e0cda0;border-radius:999px;overflow:hidden;
+  margin:8px 12px 0;
+  border:1px solid #d9c49a;
+}
+.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,#b58900,#d4a017);transition:width .3s}
+.note{
+  margin:0 10px;
+  padding:8px 10px;
+  border-radius:10px;
+  background: linear-gradient(180deg, #fff, #fff8e1);
+  border:1px dashed #c9b48a;
+  font-size:11px;line-height:1.45;color:#6d5a44;
+}
+.kbd{font-family:ui-monospace,monospace;font-size:10px;background:#3e2723;color:#ffecb3;padding:2px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header class="header">
+    <div class="h-top">
+      <div class="brand">
+        <div class="gavel">⚖️</div>
+        <h1>Commit Court <span>Bug Detective • Commit Archaeology</span></h1>
+      </div>
+      <div class="h-actions">
+        <div class="rep" id="repBadge">⭐ <span id="repVal">100</span> REP</div>
+        <button class="icon-btn" id="soundBtn" aria-label="Toggle sound">🔊</button>
+      </div>
+    </div>
+    <div class="subhead">
+      <span>Reputation: <b id="repText">100</b> • <b id="solvedText">0/4</b> solved</span>
+      <span id="caseStatus">Case 1 of 4</span>
+    </div>
+    <div class="progress" aria-hidden="true"><i id="prog"></i></div>
+  </header>
+
+  <nav class="tabs" id="tabs"></nav>
+
+  <main class="main">
+    <section class="card" id="caseCard"></section>
+    <section class="card" id="evidenceCard"></section>
+    <section class="card" id="xexamCard"></section>
+    <section class="card" id="verdictCard" style="display:none"></section>
+
+    <div class="controls">
+      <button class="btn" id="hintBtn">💡 Hint</button>
+      <button class="btn primary" id="verdictBtn" disabled>Deliver Verdict →</button>
+    </div>
+    <div class="note" id="hintNote" style="display:none"></div>
+    <div class="note">Tap a commit to <b>accuse</b> it. Tap <span class="kbd">▾ Diff</span> to inspect evidence. Answer both cross-examinations before verdict. Cosmetic touches ≠ culprit.</div>
+  </main>
+
+  <footer class="footer">
+    <button class="link-btn" id="resetBtn">↺ Reset Progress</button>
+    <button class="link-btn" id="nextBtn">Next Case →</button>
+  </footer>
+</div>
+
+<script>
+const CASES = [
+  {
+    id:1, title:"The Vanishing Discount", file:"src/cart.js", bug:"Bulk discount off-by-one skips last item",
+    intro:"<strong>Incident:</strong> Customers report bulk discount (buy 5+) not applying to the 5th item. Regression appeared last week. Four commits touched <code>cart.js</code>. One introduced the bug — others are renames & formatting.",
+    meta:{reported:"2026-10-18", severity:"Medium", tests:"cart.test.js failing"},
+    culprit:"c3d4e5f",
+    commits:[
+      {hash:"a1b2c3d", author:"Maya Patel", date:"2026-10-12", msg:"refactor: rename variables in cart.js for clarity", type:"cosmetic", diff:`@@ cart.js
+- let x = cart.items;
+- for(let i=0;i<x.length;i++){
++ let items = cart.items;
++ for(let i=0;i<items.length;i++){
+    apply(items[i]);
+ }`, note:"Pure rename. No logic change."},
+      {hash:"b2c3d4e", author:"Jon Kim", date:"2026-10-13", msg:"style: format cart.js with prettier", type:"cosmetic", diff:`@@ cart.js
+- function calc(a,b){return a+b}
++ function calc(a, b) {
++   return a + b;
++ }`, note:"Whitespace only."},
+      {hash:"c3d4e5f", author:"Priya Nair", date:"2026-10-14", msg:"feat: add bulk discount logic for 5+ items", type:"bug", diff:`@@ cart.js
++ // bulk discount: 10% off if 5+ items
++ for(let i=0;i<items.length-1;i++){
++   if(items.length>=5) items[i].price *= 0.9;
++ }`, note:"Loop stops at length-1 — last item never discounted. Off-by-one."},
+      {hash:"d4e5f6a", author:"Alex Rivera", date:"2026-10-15", msg:"fix: handle null coupon gracefully", type:"cosmetic", diff:`@@ cart.js
++ if(!coupon) return total;
+  total = applyCoupon(total, coupon);`, note:"Null guard for coupons, unrelated to bulk discount."}
+    ],
+    questions:[
+      {q:"Which change actually alters discount behavior?", opts:["Renaming x → items","Prettier formatting","Loop bound items.length-1","Null coupon guard"], correct:2, explain:"Only the loop bound changes which items get discounted. Renames/formatting and null guard don't affect bulk logic."},
+      {q:"Why is the null-coupon commit NOT the culprit?", opts:["It was reverted","It touches coupon path, not bulk loop","It was authored by a bot","It has no diff"], correct:1, explain:"Blame shows it edits coupon handling. The failing test is bulk discount — different code path."}
+    ],
+    verdict:{good:"Guilty: Priya's bulk loop. The <code>i < items.length-1</code> excludes the last item. Fix: <code>i < items.length</code>.", bad:"Mistrial — cosmetic touches don't change logic. The real bug is the off-by-one loop that skips the final item."}
+  },
+  {
+    id:2, title:"The Leaking Token", file:"src/auth/middleware.js", bug:"Auth token logged to console in production",
+    intro:"<strong>Incident:</strong> Security audit found JWTs in production logs. One commit started logging tokens — others only touched comments and lint.",
+    meta:{reported:"2026-10-20", severity:"High", tests:"audit: token in logs"},
+    culprit:"f6a7b8c",
+    commits:[
+      {hash:"e5f6a7b", author:"Samir Das", date:"2026-10-16", msg:"docs: clarify auth middleware comments", type:"cosmetic", diff:`@@ middleware.js
+- // check token
++ // verify JWT and attach user to req`, note:"Comment only."},
+      {hash:"f6a7b8c", author:"Lena Wu", date:"2026-10-17", msg:"debug: log auth flow for troubleshooting", type:"bug", diff:`@@ middleware.js
+  const token = req.headers.authorization;
++ console.log("[auth] token:", token);
+  next();`, note:"Logs raw token — leaks secret to log aggregator."},
+      {hash:"a7b8c9d", author:"Dev Bot", date:"2026-10-18", msg:"chore: eslint --fix auth/", type:"cosmetic", diff:`@@ middleware.js
+- if(!token) return res.status(401).end()
++ if (!token) return res.status(401).end();`, note:"Lint fix, no behavior change."},
+      {hash:"b8c9d0e", author:"Maya Patel", date:"2026-10-19", msg:"refactor: extract verifyToken helper", type:"cosmetic", diff:`@@ middleware.js
+- jwt.verify(token, SECRET)
++ verifyToken(token)`, note:"Extract helper, same logic."}
+    ],
+    questions:[
+      {q:"Which diff introduces a security regression?", opts:["Comment update","console.log token","eslint --fix","extract helper"], correct:1, explain:"Logging the token exposes secrets. Others are docs/lint/refactor with identical runtime."},
+      {q:"Best fix that preserves debugging?", opts:["Delete all logs","Log token hash / redacted","Move log to client","Disable auth"], correct:1, explain:"Redact or hash tokens; never log raw secrets. Keep observability without leaking."}
+    ],
+    verdict:{good:"Guilty: debug log. Remove or redact <code>console.log(token)</code> — use <code>token.slice(0,6)+'…'</code> or log user id only.", bad:"Mistrial — lint and comments don't leak secrets. The debug commit that prints the raw token is the culprit."}
+  },
+  {
+    id:3, title:"The Slow Query", file:"src/db/orders.js", bug:"N+1 query inside loop kills performance",
+    intro:"<strong>Incident:</strong> Orders page went from 120ms → 4s. One commit added a query inside a loop — others are renames and index hints.",
+    meta:{reported:"2026-10-22", severity:"Medium", tests:"perf: p95 4.2s"},
+    culprit:"c9d0e1f",
+    commits:[
+      {hash:"b9c0d1e", author:"Jon Kim", date:"2026-10-19", msg:"perf: add index on orders.user_id", type:"cosmetic", diff:`@@ orders.js
++ // index: CREATE INDEX idx_user ON orders(user_id)`, note:"Comment about index, not executed here."},
+      {hash:"c9d0e1f", author:"Ravi Singh", date:"2026-10-20", msg:"feat: enrich orders with user names", type:"bug", diff:`@@ orders.js
+  for(const o of orders){
++   const u = await db.query("SELECT * FROM users WHERE id=?", [o.user_id]);
++   o.userName = u.name;
+  }`, note:"N+1: one query per order. Should JOIN or batch."},
+      {hash:"d0e1f2a", author:"Maya Patel", date:"2026-10-21", msg:"refactor: rename o → order", type:"cosmetic", diff:`@@ orders.js
+- for(const o of orders){ o.userName = u.name }
++ for(const order of orders){ order.userName = u.name }`, note:"Rename only, still N+1 but not introduced here."},
+      {hash:"e1f2a3b", author:"Alex Rivera", date:"2026-10-22", msg:"style: prettier db/ files", type:"cosmetic", diff:`@@ orders.js
+- await db.query("SELECT * FROM users WHERE id=?",[o.user_id])
++ await db.query("SELECT * FROM users WHERE id=?", [o.user_id]);`, note:"Formatting."}
+    ],
+    questions:[
+      {q:"Which commit truly introduced the slowdown?", opts:["Index comment","N+1 query in loop","Rename o→order","Prettier"], correct:1, explain:"The N+1 adds DB round-trips per row. Renames/formatting keep the same queries."},
+      {q:"How to confirm via archaeology?", opts:["Check file size","git blame the loop line","Count authors","Check branch name"], correct:1, explain:"<code>git blame</code> on the loop shows which commit added the query line."}
+    ],
+    verdict:{good:"Guilty: enrich loop. Replace N+1 with <code>JOIN users</code> or batched <code>WHERE id IN (…)</code>.", bad:"Mistrial — renames don't add queries. The commit that inserted <code>await db.query</code> inside the loop is the culprit."}
+  },
+  {
+    id:4, title:"The Broken Avatar", file:"src/upload/avatar.js", bug:"File extension check is case-sensitive, rejects .JPG",
+    intro:"<strong>Incident:</strong> iPhone uploads (.JPG) fail validation. One commit added strict extension check — others are docs and MIME tweaks.",
+    meta:{reported:"2026-10-25", severity:"Low", tests:"upload.test.js: .JPG rejected"},
+    culprit:"f2a3b4c",
+    commits:[
+      {hash:"e2f3a4b", author:"Lena Wu", date:"2026-10-22", msg:"docs: update avatar upload README", type:"cosmetic", diff:`@@ avatar.js
+- // allowed: jpg, png
++ // allowed: jpg, png, webp`, note:"README only."},
+      {hash:"f2a3b4c", author:"Jon Kim", date:"2026-10-23", msg:"feat: validate avatar file extensions", type:"bug", diff:`@@ avatar.js
++ const ext = file.name.split(".").pop();
++ if(!["jpg","png","webp"].includes(ext)) throw Error("bad type");`, note:"Case-sensitive: 'JPG' !== 'jpg'. Rejects uppercase."},
+      {hash:"a3b4c5d", author:"Priya Nair", date:"2026-10-24", msg:"fix: allow webp MIME type", type:"cosmetic", diff:`@@ avatar.js
+- if(mime==="image/jpeg"||mime==="image/png")
++ if(["image/jpeg","image/png","image/webp"].includes(mime))`, note:"MIME allowlist, not extension path."},
+      {hash:"b4c5d6e", author:"Dev Bot", date:"2026-10-25", msg:"chore: eslint --fix upload/", type:"cosmetic", diff:`@@ avatar.js
+- if(!["jpg","png","webp"].includes(ext))throw Error("bad type")
++ if (!["jpg", "png", "webp"].includes(ext)) throw Error("bad type");`, note:"Lint only."}
+    ],
+    questions:[
+      {q:"Why do .JPG uploads fail?", opts:["MIME check","Case-sensitive ext check","README update","eslint"], correct:1, explain:"<code>ext</code> is 'JPG' but allowlist has 'jpg' — strict compare fails."},
+      {q:"Minimal correct fix?", opts:["Remove validation","ext.toLowerCase() before check","Accept any file","Rename file on client"], correct:1, explain:"Normalize case: <code>ext.toLowerCase()</code> then compare."}
+    ],
+    verdict:{good:"Guilty: extension validator. Fix: <code>ext.toLowerCase()</code> before <code>includes</code>.", bad:"Mistrial — MIME tweak and docs don't touch extension logic. The case-sensitive check is the culprit."}
+  }
+];
+
+const LS_KEY="commit-court-v1";
+let state = loadState();
+let current = 0;
+let soundOn = state.soundOn ?? true;
+
+function loadState(){
+  try{
+    const s = JSON.parse(localStorage.getItem(LS_KEY)||"null");
+    if(s) return s;
+  }catch{}
+  return {rep:100, picks:{}, answers:{}, verdicts:{}, solved:0};
+}
+function saveState(){
+  state.soundOn = soundOn;
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+}
+function playTone(freq, dur, type='sine', vol=0.2){
+  if(!soundOn) return;
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.value=vol;
+    o.connect(g); g.connect(ctx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+dur);
+    setTimeout(()=>{o.stop(); ctx.close();}, dur*1000+100);
+  }catch{}
+}
+function gavelSound(ok){
+  if(ok){ playTone(180,0.12,'square',0.25); setTimeout(()=>playTone(240,0.18,'sine',0.2),120); }
+  else { playTone(120,0.25,'sawtooth',0.2); setTimeout(()=>playTone(90,0.3,'sine',0.15),180); }
+}
+
+function renderTabs(){
+  const tabs = document.getElementById('tabs');
+  tabs.innerHTML = CASES.map((c,i)=>{
+    const v = state.verdicts[c.id];
+    const cls = i===current ? 'tab active' : 'tab';
+    const done = v ? ' done' : '';
+    const stars = v ? (v.correct ? '★★★' : '☆☆☆') : '—';
+    const label = v ? (v.correct ? 'Solved' : 'Mistrial') : 'Open';
+    return `<button class="${cls}${done}" data-i="${i}" aria-label="Case ${c.id}">
+      <span class="k">Case ${c.id}</span>
+      <span class="t">${c.title}</span>
+      <span class="stars">${stars} • ${label}</span>
+    </button>`;
+  }).join('');
+  tabs.querySelectorAll('.tab').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      current = parseInt(b.dataset.i,10);
+      renderAll();
+      playTone(520,0.08,'sine',0.12);
+    });
+  });
+}
+
+function renderCase(){
+  const c = CASES[current];
+  const v = state.verdicts[c.id];
+  const badge = v ? (v.correct ? '<span class="badge solved">✓ Solved</span>' : '<span class="badge failed">✗ Mistrial</span>') : '<span class="badge open">● Open</span>';
+  document.getElementById('caseCard').innerHTML = `
+    <div class="card-h"><h2>📜 ${c.title}</h2>${badge}</div>
+    <div class="case-intro">${c.intro}</div>
+    <div class="meta-grid">
+      <div class="meta"><div class="l">File</div><div class="v">${c.file}</div></div>
+      <div class="meta"><div class="l">Reported</div><div class="v">${c.meta.reported} • ${c.meta.severity}</div></div>
+      <div class="meta"><div class="l">Signal</div><div class="v">${c.meta.tests}</div></div>
+      <div class="meta"><div class="l">Bug</div><div class="v">${c.bug}</div></div>
+    </div>
+  `;
+  document.getElementById('caseStatus').textContent = `Case ${c.id} of 4`;
+  document.getElementById('solvedText').textContent = `${Object.values(state.verdicts).filter(x=>x.correct).length}/4 solved`;
+  document.getElementById('repVal').textContent = state.rep;
+  document.getElementById('repText').textContent = state.rep;
+  document.getElementById('prog').style.width = `${(Object.keys(state.verdicts).length/4)*100}%`;
+}
+
+function renderEvidence(){
+  const c = CASES[current];
+  const pick = state.picks[c.id];
+  const isVerdicted = !!state.verdicts[c.id];
+  const el = document.getElementById('evidenceCard');
+  el.innerHTML = `
+    <div class="evidence">
+      <h3><i>▦</i> Evidence Board — File History</h3>
+      <div class="hint">Tap a commit to accuse. Cosmetic touches (rename, format, docs, lint) look busy but don't change behavior. The bug commit changes logic.</div>
+      <div class="commits" id="commits"></div>
+    </div>
+  `;
+  const list = el.querySelector('#commits');
+  c.commits.forEach(cm=>{
+    const sel = pick===cm.hash ? ' selected accused' : '';
+    const disabled = isVerdicted ? 'disabled' : '';
+    const div = document.createElement('div');
+    div.className = 'commit'+sel;
+    div.innerHTML = `
+      <div class="commit-head">
+        <span class="dot"></span>
+        <span class="hash">${cm.hash}</span>
+        <span class="author">${cm.author}</span>
+        <span class="date">${cm.date}</span>
+      </div>
+      <div class="msg">${cm.msg}</div>
+      <div class="commit-actions">
+        <button class="mini-btn" data-diff="${cm.hash}">▾ Diff</button>
+        <button class="mini-btn primary" data-pick="${cm.hash}" ${disabled}>${pick===cm.hash ? '★ Accused' : 'Accuse'}</button>
+      </div>
+      <div class="diff" id="diff-${cm.hash}">
+        <div class="diff-h"><span class="file">${c.file}</span><span>${cm.type==='bug' ? 'logic change' : 'cosmetic'}</span></div>
+        <pre>${escapeHtml(cm.diff)}</pre>
+      </div>
+    `;
+    // accuse click on card
+    div.addEventListener('click', (e)=>{
+      if(e.target.closest('button')) return;
+      if(isVerdicted) return;
+      state.picks[c.id]=cm.hash;
+      saveState(); renderAll(); playTone(600,0.07,'sine',0.15);
+    });
+    list.appendChild(div);
+  });
+  // wire buttons
+  list.querySelectorAll('[data-diff]').forEach(b=>{
+    b.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const h=b.dataset.diff;
+      const d=document.getElementById('diff-'+h);
+      d.classList.toggle('open');
+      b.textContent = d.classList.contains('open') ? '▴ Hide' : '▾ Diff';
+      playTone(400,0.06,'sine',0.1);
+    });
+  });
+  list.querySelectorAll('[data-pick]').forEach(b=>{
+    b.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if(state.verdicts[c.id]) return;
+      state.picks[c.id]=b.dataset.pick;
+      saveState(); renderAll(); playTone(700,0.08,'sine',0.15);
+    });
+  });
+}
+
+function renderXexam(){
+  const c = CASES[current];
+  const ans = state.answers[c.id] || {};
+  const isVerdicted = !!state.verdicts[c.id];
+  const el = document.getElementById('xexamCard');
+  el.innerHTML = `
+    <div class="xexam">
+      <h3><i>?</i> Cross-Examination</h3>
+      <div class="hint">Answer both to strengthen your case. +10 for correct, −5 for wrong (applied at verdict).</div>
+      <div id="qs"></div>
+    </div>
+  `;
+  const qs = el.querySelector('#qs');
+  c.questions.forEach((q,qi)=>{
+    const chosen = ans[qi];
+    const qDiv = document.createElement('div');
+    qDiv.className='q';
+    qDiv.innerHTML = `<div class="q-h">Q${qi+1}. ${q.q}</div><div class="q-opts" id="opts-${qi}"></div><div class="explain" id="exp-${qi}"><b>Analyst note:</b> ${q.explain}</div>`;
+    qs.appendChild(qDiv);
+    const opts = qDiv.querySelector(`#opts-${qi}`);
+    q.opts.forEach((o,oi)=>{
+      const btn=document.createElement('button');
+      btn.className='opt';
+      btn.textContent=o;
+      if(chosen!==undefined){
+        btn.disabled=true;
+        if(oi===q.correct) btn.classList.add('correct');
+        if(chosen===oi && oi!==q.correct) btn.classList.add('wrong');
+      }
+      btn.addEventListener('click', ()=>{
+        if(state.verdicts[c.id]) return;
+        if(state.answers[c.id]===undefined) state.answers[c.id]={};
+        // store
+        if(typeof state.answers[c.id] !== 'object' || Array.isArray(state.answers[c.id])) state.answers[c.id]={};
+        state.answers[c.id][qi]=oi;
+        saveState();
+        // show explain
+        renderAll();
+        playTone(oi===q.correct? 880: 220, 0.12, oi===q.correct?'sine':'square', 0.15);
+      });
+      opts.appendChild(btn);
+    });
+    if(chosen!==undefined){
+      qDiv.querySelector(`#exp-${qi}`).classList.add('show');
+    }
+  });
+}
+
+function renderVerdict(){
+  const c = CASES[current];
+  const v = state.verdicts[c.id];
+  const card = document.getElementById('verdictCard');
+  const btn = document.getElementById('verdictBtn');
+  const pick = state.picks[c.id];
+  const ans = state.answers[c.id] || {};
+  const answeredCount = Object.keys(ans).length;
+  // enable verdict if pick + both answered OR allow with pick only? Require pick + 2 answers
+  const canVerdict = !!pick && answeredCount>=2 && !v;
+  btn.disabled = !canVerdict;
+  btn.textContent = v ? (v.correct ? '✓ Verdict Delivered' : '✗ Verdict Delivered') : 'Deliver Verdict →';
+  if(!v){
+    card.style.display='none';
+    return;
+  }
+  card.style.display='block';
+  const isCorrect = v.correct;
+  card.innerHTML = `
+    <div class="verdict">
+      <div class="seal ${isCorrect?'':'mistrial'}">${isCorrect?'⚖️':'🔨'}</div>
+      <h3 style="color:${isCorrect?'#1b5e20':'#b71c1c'}">${isCorrect?'Guilty Verdict — Correct Culprit':'Mistrial — Wrong Accusation'}</h3>
+      <p>${isCorrect? c.verdict.good : c.verdict.bad}</p>
+      <div class="delta ${v.delta>=0?'pos':'neg'}">${v.delta>=0?'+':''}${v.delta} REP • Accused: <span style="font-family:monospace">${v.pick}</span></div>
+      <p style="margin-top:8px;font-size:11px;color:#6d5a44">Culprit was <b style="font-family:monospace">${c.culprit}</b> — ${c.commits.find(x=>x.hash===c.culprit).msg}</p>
+    </div>
+  `;
+}
+
+function renderAll(){
+  renderTabs();
+  renderCase();
+  renderEvidence();
+  renderXexam();
+  renderVerdict();
+  updateHint();
+}
+
+function updateHint(){
+  const c = CASES[current];
+  const note = document.getElementById('hintNote');
+  if(!state._hint || state._hintCase!==c.id){
+    note.style.display='none'; return;
+  }
+  note.style.display='block';
+  note.innerHTML = `💡 <b>Hint:</b> ${state._hint}`;
+}
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/&lt;span class="add"&gt;/g,'<span class="add">').replace(/&lt;\/span&gt;/g,'</span>')
+    .split('\n').map(l=>{
+      if(l.startsWith('+') && !l.startsWith('+++')) return `<span class="add">${l}</span>`;
+      if(l.startsWith('-') && !l.startsWith('---')) return `<span class="rem">${l}</span>`;
+      if(l.startsWith('@@')) return `<span class="ctx">${l}</span>`;
+      return `<span class="ctx">${l}</span>`;
+    }).join('\n');
+}
+
+// Controls
+document.getElementById('hintBtn').addEventListener('click', ()=>{
+  const c = CASES[current];
+  if(state.verdicts[c.id]) return;
+  const culpritCommit = c.commits.find(x=>x.hash===c.culprit);
+  const hints = [
+    `Look for logic change, not renames. The culprit message is: “${culpritCommit.msg}”`,
+    `Check the diff that adds new behavior — cosmetic diffs only touch whitespace/comments.`,
+    `Use git blame on the buggy line: it points to ${c.culprit} by ${culpritCommit.author}.`,
+    `Ask: which commit could break the test “${c.meta.tests}”? Only one touches that path.`
+  ];
+  const idx = Math.floor(Math.random()*hints.length);
+  state._hint = hints[idx];
+  state._hintCase = c.id;
+  saveState();
+  updateHint();
+  playTone(500,0.08,'sine',0.12);
+});
+
+document.getElementById('verdictBtn').addEventListener('click', ()=>{
+  const c = CASES[current];
+  if(state.verdicts[c.id]) return;
+  const pick = state.picks[c.id];
+  if(!pick) return;
+  const correct = pick===c.culprit;
+  let delta = correct ? 25 : -15;
+  // cross-exam scoring
+  const ans = state.answers[c.id] || {};
+  c.questions.forEach((q,qi)=>{
+    if(ans[qi]!==undefined){
+      if(ans[qi]===q.correct) delta+=10;
+      else delta-=5;
+    }
+  });
+  state.rep = Math.max(0, state.rep + delta);
+  state.verdicts[c.id] = {pick, correct, delta, at: Date.now()};
+  saveState();
+  renderAll();
+  gavelSound(correct);
+  // scroll to verdict
+  setTimeout(()=>document.getElementById('verdictCard').scrollIntoView({behavior:'smooth', block:'center'}), 100);
+});
+
+document.getElementById('nextBtn').addEventListener('click', ()=>{
+  current = (current+1)%CASES.length;
+  renderAll();
+  window.scrollTo({top:0, behavior:'smooth'});
+  playTone(600,0.07,'sine',0.12);
+});
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(!confirm('Reset all progress and reputation?')) return;
+  state = {rep:100, picks:{}, answers:{}, verdicts:{}, solved:0, soundOn};
+  saveState();
+  current=0;
+  renderAll();
+  playTone(300,0.12,'sine',0.12);
+});
+
+document.getElementById('soundBtn').addEventListener('click', ()=>{
+  soundOn = !soundOn;
+  document.getElementById('soundBtn').textContent = soundOn ? '🔊' : '🔇';
+  saveState();
+  if(soundOn) playTone(700,0.08,'sine',0.15);
+});
+
+// init
+document.getElementById('soundBtn').textContent = soundOn ? '🔊' : '🔇';
+renderAll();
+</script>
+</body>
+</html>

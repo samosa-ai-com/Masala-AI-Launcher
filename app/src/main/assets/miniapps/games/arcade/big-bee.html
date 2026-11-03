@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Nectar Glide</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;touch-action:none;user-select:none;-webkit-user-select:none}
+html,body{height:100%;overflow:hidden;background:#87CEEB;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{display:flex;flex-direction:column;align-items:center;background:linear-gradient(180deg,#87CEEB 0%,#B0E6FF 45%,#FFE8A0 100%)}
+.topbar{width:100%;max-width:480px;display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,0.92);backdrop-filter:blur(6px);border-bottom:2px solid #FFB84D;z-index:5}
+.stat{display:flex;flex-direction:column;align-items:center;line-height:1}
+.stat b{font-size:18px;color:#2B3A2E}
+.stat span{font-size:10px;letter-spacing:0.08em;color:#6B7A6F;font-weight:700}
+.stat.best b{color:#E67E22}
+.wrap{position:relative;width:100%;max-width:480px;flex:1;display:flex;flex-direction:column;min-height:0}
+canvas{flex:1;width:100%;display:block;background:linear-gradient(180deg,#87D8FF 0%,#C8F0FF 55%,#DFF5A0 78%,#8BC34A 100%);border-left:2px solid rgba(255,255,255,0.6);border-right:2px solid rgba(255,255,255,0.6)}
+.hud-bottom{width:100%;display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(255,255,255,0.92);border-top:2px solid #FFB84D}
+.hud-bottom .hint{font-size:11px;color:#5A6B5E;font-weight:600}
+.btn{border:none;border-radius:999px;padding:10px 18px;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,0.15);transition:transform 0.06s}
+.btn:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,0.15)}
+.btn-primary{background:#FFC93C;color:#3A2A00;border:2px solid #E6A800}
+.btn-dark{background:#2B3A2E;color:#fff}
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(135,206,235,0.55);backdrop-filter:blur(4px);text-align:center;padding:20px;z-index:4}
+.card{background:#fff;border-radius:20px;padding:18px 16px;box-shadow:0 12px 30px rgba(0,0,0,0.18);border:3px solid #FFD166;max-width:340px;width:92%}
+.card h1{font-size:26px;color:#2B3A2E;line-height:1.1}
+.card h1 span{color:#E67E22}
+.card p{font-size:13px;color:#5A6B5E;margin:8px 0;line-height:1.4}
+.badges{display:flex;gap:8px;justify-content:center;margin:10px 0;flex-wrap:wrap}
+.badge{background:#FFF3CD;border:1.5px solid #FFD166;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:700;color:#6B4A00}
+.controls-row{display:flex;gap:8px;justify-content:center;margin-top:10px}
+.kbd{font-size:10px;background:#2B3A2E;color:#fff;padding:4px 7px;border-radius:6px;font-weight:700}
+.hidden{display:none !important}
+.timebar{position:absolute;top:0;left:0;height:4px;background:#FF6B35;transition:width 0.1s linear;z-index:3}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="stat"><span>SCORE</span><b id="scoreEl">0</b></div>
+  <div class="stat"><span>TIME</span><b id="timeEl">60.0</b></div>
+  <div class="stat best"><span>BEST</span><b id="bestEl">0</b></div>
+</div>
+<div class="wrap" id="wrap">
+  <div class="timebar" id="timebar"></div>
+  <canvas id="c"></canvas>
+  <div class="hud-bottom">
+    <div class="hint">Drag to steer • Arrows/WASD</div>
+    <button class="btn btn-dark" id="restartBtn" style="padding:8px 14px;font-size:12px">↻ Restart</button>
+  </div>
+  <!-- Start Overlay -->
+  <div class="overlay" id="startOv">
+    <div class="card">
+      <h1>🐝 Nectar <span>Glide</span></h1>
+      <p>Steer your bee between blooms to sip nectar! Drag anywhere to glide. Each flower gives <b>+10</b> and respawns in the sunny sky.</p>
+      <div class="badges">
+        <div class="badge">⏱ 60s Round</div>
+        <div class="badge">🌸 Respawn Blooms</div>
+        <div class="badge">☁️ Drifting Clouds</div>
+      </div>
+      <button class="btn btn-primary" id="playBtn" style="width:100%;margin-top:6px;font-size:16px">▶ START FORAGING</button>
+      <div class="controls-row">
+        <span class="kbd">DRAG</span><span class="kbd">ARROWS</span><span class="kbd">WASD</span>
+      </div>
+      <p style="font-size:11px;margin-top:8px">Tip: Hold drag for smooth gliding — release to hover!</p>
+    </div>
+  </div>
+  <!-- Game Over Overlay -->
+  <div class="overlay hidden" id="overOv">
+    <div class="card">
+      <h1 id="overTitle">Time's Up!</h1>
+      <p id="overMsg">You sipped 0 blooms!</p>
+      <div class="badges">
+        <div class="badge" id="finalScore">Score: 0</div>
+        <div class="badge" id="finalBest">Best: 0</div>
+      </div>
+      <button class="btn btn-primary" id="againBtn" style="width:100%;margin-top:6px">↻ INSTANT RESTART</button>
+      <p style="font-size:11px;color:#8A9A8E">Best saved locally • Offline ready</p>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('wrap');
+const scoreEl = document.getElementById('scoreEl');
+const timeEl = document.getElementById('timeEl');
+const bestEl = document.getElementById('bestEl');
+const timebar = document.getElementById('timebar');
+const startOv = document.getElementById('startOv');
+const overOv = document.getElementById('overOv');
+const playBtn = document.getElementById('playBtn');
+const againBtn = document.getElementById('againBtn');
+const restartBtn = document.getElementById('restartBtn');
+const overTitle = document.getElementById('overTitle');
+const overMsg = document.getElementById('overMsg');
+const finalScore = document.getElementById('finalScore');
+const finalBest = document.getElementById('finalBest');
+
+const STORAGE_KEY = 'nectarGlide_best_v1';
+let best = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10);
+bestEl.textContent = best;
+
+let W=0,H=0,dpr=1;
+function resize(){
+  const rect = wrap.getBoundingClientRect();
+  // canvas fills flex area
+  W = rect.width;
+  H = wrap.clientHeight - 42; // minus bottom bar approx
+  if(H<300) H=400;
+  dpr = Math.min(window.devicePixelRatio||1, 2);
+  canvas.width = Math.round(W*dpr);
+  canvas.height = Math.round(H*dpr);
+  canvas.style.width = W+'px';
+  canvas.style.height = H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Game state
+const ROUND = 60;
+let score, timeLeft, playing, gameOver;
+let bee, flowers, clouds, particles, keys, pointer;
+
+function initState(){
+  score=0;
+  timeLeft=ROUND;
+  playing=false;
+  gameOver=false;
+  scoreEl.textContent='0';
+  timeEl.textContent=ROUND.toFixed(1);
+  timebar.style.width='100%';
+  timebar.style.background='#4CAF50';
+
+  // Bee: drag steering physics
+  bee = {
+    x: W/2, y: H*0.65,
+    vx:0, vy:0,
+    tx: W/2, ty: H*0.65, // target from drag
+    dragging:false,
+    angle:0,
+    wing:0,
+    radius:14
+  };
+  // Flowers
+  flowers=[];
+  for(let i=0;i<6;i++) spawnFlower(true);
+  // Clouds
+  clouds=[];
+  for(let i=0;i<5;i++){
+    clouds.push({
+      x: Math.random()*W,
+      y: 30 + Math.random()* (H*0.35),
+      s: 0.6 + Math.random()*0.9,
+      speed: 12 + Math.random()*22,
+      puff: 3+Math.floor(Math.random()*2)
+    });
+  }
+  particles=[];
+  keys={};
+  pointer={x:W/2,y:H/2,down:false};
+}
+
+function spawnFlower(initial=false){
+  // avoid spawning too close to bee or other flowers
+  let tries=0, x,y;
+  do{
+    x = 20 + Math.random()*(W-40);
+    y = 60 + Math.random()*(H-120);
+    tries++;
+    if(tries>20) break;
+  } while(flowers.some(f=> Math.hypot(f.x-x,f.y-y)<70) || (!initial && Math.hypot(bee.x-x,bee.y-y)<90));
+  const types = [
+    {petal:'#FF6B9D', center:'#FFD93D'},
+    {petal:'#FF8C42', center:'#FFF176'},
+    {petal:'#9C6BFF', center:'#FFEB3B'},
+    {petal:'#4FC3F7', center:'#FFF59D'},
+    {petal:'#FFD166', center:'#FF6B35'}
+  ];
+  const t = types[Math.floor(Math.random()*types.length)];
+  flowers.push({
+    x,y, r: 18+Math.random()*6,
+    petal:t.petal, center:t.center,
+    rot: Math.random()*Math.PI*2,
+    rotSpeed:(Math.random()-0.5)*0.6,
+    scale:0, // pop-in
+    phase: Math.random()*Math.PI*2
+  });
+}
+
+function startGame(){
+  initState();
+  playing=true;
+  gameOver=false;
+  startOv.classList.add('hidden');
+  overOv.classList.add('hidden');
+  lastT=performance.now();
+}
+
+function endGame(){
+  playing=false;
+  gameOver=true;
+  if(score>best){
+    best=score;
+    localStorage.setItem(STORAGE_KEY, String(best));
+    bestEl.textContent=best;
+    overTitle.textContent='New Best! 🌟';
+    overMsg.textContent=`Amazing! ${score} nectar in 60s — you beat your record!`;
+  } else {
+    overTitle.textContent = score>=50 ? 'Sweet Haul! 🍯' : "Time's Up! ⏰";
+    overMsg.textContent = `You visited ${Math.floor(score/10)} blooms for ${score} nectar.`;
+  }
+  finalScore.textContent='Score: '+score;
+  finalBest.textContent='Best: '+best;
+  overOv.classList.remove('hidden');
+}
+
+// Input: drag steering + keyboard
+function canvasPos(e){
+  const rect=canvas.getBoundingClientRect();
+  const src = e.touches ? e.touches[0] : e;
+  return {x: (src.clientX-rect.left), y: (src.clientY-rect.top)};
+}
+canvas.addEventListener('pointerdown', e=>{
+  e.preventDefault();
+  canvas.setPointerCapture(e.pointerId);
+  const p=canvasPos(e);
+  pointer.down=true; pointer.x=p.x; pointer.y=p.y;
+  bee.dragging=true; bee.tx=p.x; bee.ty=p.y;
+});
+canvas.addEventListener('pointermove', e=>{
+  if(!pointer.down) return;
+  const p=canvasPos(e);
+  pointer.x=p.x; pointer.y=p.y;
+  bee.tx=p.x; bee.ty=p.y;
+});
+canvas.addEventListener('pointerup', e=>{
+  pointer.down=false;
+  bee.dragging=false;
+});
+canvas.addEventListener('pointercancel', ()=>{pointer.down=false;bee.dragging=false;});
+
+// also allow drag from anywhere on wrap for easier phone use
+wrap.addEventListener('touchmove', e=>{ if(pointer.down) e.preventDefault(); }, {passive:false});
+
+window.addEventListener('keydown', e=>{
+  const k=e.key.toLowerCase();
+  keys[k]=true;
+  if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d',' '].includes(k)) e.preventDefault();
+  // instant restart with R
+  if(k==='r'){ startGame(); }
+});
+window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; });
+
+playBtn.addEventListener('click', startGame);
+againBtn.addEventListener('click', startGame);
+restartBtn.addEventListener('click', startGame);
+canvas.addEventListener('click', ()=>{
+  if(!playing && !gameOver && startOv.classList.contains('hidden')===false) return;
+  if(gameOver) startGame();
+});
+
+// Game loop
+let lastT=performance.now();
+function update(dt){
+  // Timer
+  timeLeft -= dt;
+  if(timeLeft<=0){ timeLeft=0; updateHUD(); endGame(); return; }
+  updateHUD();
+
+  // Bee steering physics: spring toward target + keyboard nudge
+  let ax=0, ay=0;
+  if(bee.dragging){
+    // drag force: proportional to distance, with damping
+    const dx = bee.tx - bee.x;
+    const dy = bee.ty - bee.y;
+    // spring constant 0.09, tuned for gentle glide
+    ax += dx * 0.09;
+    ay += dy * 0.09;
+  } else {
+    // slight hover damping when not dragging
+    ax += -bee.vx * 0.02;
+    ay += -bee.vy * 0.02;
+  }
+  // keyboard adds force
+  const kSpeed= 900 * dt; // force scale
+  if(keys['arrowleft']||keys['a']) ax -= kSpeed*0.35;
+  if(keys['arrowright']||keys['d']) ax += kSpeed*0.35;
+  if(keys['arrowup']||keys['w']) ay -= kSpeed*0.35;
+  if(keys['arrowdown']||keys['s']) ay += kSpeed*0.35;
+
+  bee.vx += ax * dt * 60 * 0.08;
+  bee.vy += ay * dt * 60 * 0.08;
+  // friction / air drag
+  bee.vx *= 0.92;
+  bee.vy *= 0.92;
+  // clamp speed
+  const sp = Math.hypot(bee.vx, bee.vy);
+  const maxSp = 6.5;
+  if(sp>maxSp){ bee.vx*=maxSp/sp; bee.vy*=maxSp/sp; }
+  bee.x += bee.vx;
+  bee.y += bee.vy;
+  // bounds with soft bounce
+  if(bee.x<14){bee.x=14;bee.vx*=-0.4}
+  if(bee.x>W-14){bee.x=W-14;bee.vx*=-0.4}
+  if(bee.y<18){bee.y=18;bee.vy*=-0.4}
+  if(bee.y>H-22){bee.y=H-22;bee.vy*=-0.4}
+  // angle follows velocity
+  if(sp>0.5) bee.angle += (Math.atan2(bee.vy, bee.vx) - bee.angle)*0.12;
+  bee.wing += dt*28 + sp*0.6;
+
+  // Flowers: bob + rotate + pop-in + collision
+  for(let i=flowers.length-1;i>=0;i--){
+    const f=flowers[i];
+    f.rot += f.rotSpeed*dt;
+    f.phase += dt*2;
+    if(f.scale<1) f.scale = Math.min(1, f.scale + dt*4);
+    // collision: bee sips nectar
+    const d = Math.hypot(bee.x - f.x, bee.y - f.y);
+    if(d < f.r + bee.radius -2){
+      // score
+      score+=10;
+      scoreEl.textContent=score;
+      // particles burst
+      for(let k=0;k<10;k++){
+        particles.push({
+          x:f.x, y:f.y,
+          vx:(Math.random()-0.5)*140, vy:(Math.random()-0.5)*140 -20,
+          life:0.5+Math.random()*0.4, t:0,
+          c: Math.random()<0.5? f.petal : '#FFF176',
+          r: 2+Math.random()*3
+        });
+      }
+      // nectar +10 popup
+      particles.push({x:f.x, y:f.y-10, vx:0, vy:-40, life:0.7, t:0, text:'+10', c:'#2B3A2E'});
+      // respawn logic: remove and spawn new elsewhere
+      flowers.splice(i,1);
+      spawnFlower();
+    }
+  }
+
+  // Clouds drift: constant horizontal speed, wrap around
+  for(const cl of clouds){
+    cl.x += cl.speed * dt;
+    if(cl.x > W+80) { cl.x = -80; cl.y = 30 + Math.random()*(H*0.32); }
+  }
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.t+=dt;
+    p.x += p.vx*dt;
+    p.y += p.vy*dt;
+    p.vy += 180*dt; // gravity
+    p.vx *= 0.98;
+    if(p.t>p.life) particles.splice(i,1);
+  }
+}
+
+function updateHUD(){
+  timeEl.textContent = timeLeft.toFixed(1);
+  const pct = (timeLeft/ROUND)*100;
+  timebar.style.width = pct+'%';
+  if(pct>50) timebar.style.background='#4CAF50';
+  else if(pct>20) timebar.style.background='#FFC93C';
+  else timebar.style.background='#FF3B30';
+}
+
+function draw(){
+  // clear
+  ctx.clearRect(0,0,W,H);
+  // sky gradient already via canvas bg, but draw subtle vignette
+  // sun
+  ctx.save();
+  ctx.globalAlpha=0.95;
+  ctx.fillStyle='#FFEB3B';
+  ctx.beginPath(); ctx.arc(W-46, 44, 26, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,235,59,0.25)';
+  ctx.beginPath(); ctx.arc(W-46,44,42,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // clouds
+  for(const cl of clouds){
+    ctx.save();
+    ctx.translate(cl.x, cl.y);
+    ctx.scale(cl.s, cl.s);
+    ctx.fillStyle='rgba(255,255,255,0.95)';
+    ctx.shadowColor='rgba(0,0,0,0.08)'; ctx.shadowBlur=8; ctx.shadowOffsetY=4;
+    // puff cluster
+    const puffs = [[0,0,28],[ -22,8,22],[22,8,20],[ -12,-10,18],[14,-8,16]];
+    for(const [px,py,r] of puffs){
+      ctx.beginPath(); ctx.arc(px,py,r,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // distant hills
+  ctx.fillStyle='#AED581';
+  ctx.beginPath();
+  ctx.moveTo(0,H*0.72);
+  ctx.quadraticCurveTo(W*0.25, H*0.66, W*0.5, H*0.71);
+  ctx.quadraticCurveTo(W*0.75, H*0.76, W, H*0.70);
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#8BC34A';
+  ctx.beginPath();
+  ctx.moveTo(0,H*0.78);
+  ctx.quadraticCurveTo(W*0.3, H*0.74, W*0.6, H*0.80);
+  ctx.quadraticCurveTo(W*0.85, H*0.84, W, H*0.78);
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath(); ctx.fill();
+
+  // flowers
+  for(const f of flowers){
+    ctx.save();
+    ctx.translate(f.x, f.y + Math.sin(f.phase)*4);
+    ctx.rotate(f.rot);
+    ctx.scale(f.scale, f.scale);
+    // stem
+    ctx.strokeStyle='#4CAF50'; ctx.lineWidth=4; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(0, f.r+6); ctx.lineTo(0, f.r+22); ctx.stroke();
+    // leaves
+    ctx.fillStyle='#81C784';
+    ctx.beginPath(); ctx.ellipse(-6, f.r+14, 8,4, -0.6,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(6, f.r+14, 8,4, 0.6,0,Math.PI*2); ctx.fill();
+    // petals 5
+    for(let a=0;a<5;a++){
+      const ang = (Math.PI*2/5)*a;
+      ctx.fillStyle=f.petal;
+      ctx.beginPath();
+      ctx.ellipse(Math.cos(ang)*(f.r*0.62), Math.sin(ang)*(f.r*0.62), f.r*0.55, f.r*0.38, ang, 0, Math.PI*2);
+      ctx.fill();
+    }
+    // center
+    ctx.fillStyle=f.center;
+    ctx.beginPath(); ctx.arc(0,0, f.r*0.42,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.7)';
+    ctx.beginPath(); ctx.arc(-3,-3, f.r*0.14,0,Math.PI*2); ctx.fill();
+    // nectar sparkle
+    ctx.fillStyle='rgba(255,255,255,0.9)';
+    ctx.beginPath(); ctx.arc(0,0,2,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // bee shadow
+  ctx.fillStyle='rgba(0,0,0,0.12)';
+  ctx.beginPath(); ctx.ellipse(bee.x, bee.y+18, 14,5,0,0,Math.PI*2); ctx.fill();
+
+  // bee
+  ctx.save();
+  ctx.translate(bee.x, bee.y);
+  ctx.rotate(bee.angle*0.35);
+  // wings flap
+  const flap = Math.sin(bee.wing)*0.9;
+  ctx.fillStyle='rgba(255,255,255,0.85)';
+  ctx.strokeStyle='rgba(0,0,0,0.08)'; ctx.lineWidth=1;
+  // left wing
+  ctx.save(); ctx.rotate(flap*0.6 -0.3);
+  ctx.beginPath(); ctx.ellipse(-6, -6, 14,7, -0.4,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.restore();
+  // right wing
+  ctx.save(); ctx.rotate(-flap*0.6 +0.3);
+  ctx.beginPath(); ctx.ellipse(6, -6, 14,7, 0.4,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.restore();
+  // body
+  ctx.fillStyle='#FFC93C';
+  ctx.strokeStyle='#2B3A2E'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.ellipse(0,0,14,10,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  // stripes
+  ctx.fillStyle='#2B3A2E';
+  ctx.beginPath(); ctx.ellipse(-2,0,3,9,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(4,0,2.5,8,0,0,Math.PI*2); ctx.fill();
+  // head
+  ctx.fillStyle='#2B3A2E';
+  ctx.beginPath(); ctx.arc(11,0,6,0,Math.PI*2); ctx.fill();
+  // eye
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(13,-2,2.2,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(13.6,-2,1,0,Math.PI*2); ctx.fill();
+  // stinger
+  ctx.fillStyle='#2B3A2E'; ctx.beginPath(); ctx.moveTo(-14,0); ctx.lineTo(-18,-2); ctx.lineTo(-18,2); ctx.closePath(); ctx.fill();
+  // antennae
+  ctx.strokeStyle='#2B3A2E'; ctx.lineWidth=1.2; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(10,-4); ctx.quadraticCurveTo(12,-10,14,-12); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(10,4); ctx.quadraticCurveTo(12,10,14,12); ctx.stroke();
+  ctx.fillStyle='#FFC93C'; ctx.beginPath(); ctx.arc(14,-12,2,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(14,12,2,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // particles
+  for(const p of particles){
+    const a = 1 - p.t/p.life;
+    if(p.text){
+      ctx.save();
+      ctx.globalAlpha=a;
+      ctx.fillStyle=p.c;
+      ctx.font='800 14px system-ui';
+      ctx.textAlign='center';
+      ctx.fillText(p.text, p.x, p.y);
+      ctx.restore();
+    } else {
+      ctx.globalAlpha=a;
+      ctx.fillStyle=p.c;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r*a,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+    }
+  }
+
+  // drag line hint when dragging
+  if(bee.dragging && playing){
+    ctx.strokeStyle='rgba(255,255,255,0.7)';
+    ctx.setLineDash([6,6]); ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(bee.x,bee.y); ctx.lineTo(bee.tx,bee.ty); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(255,255,255,0.95)';
+    ctx.beginPath(); ctx.arc(bee.tx,bee.ty,6,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#FFC93C'; ctx.lineWidth=2; ctx.stroke();
+  }
+}
+
+function loop(now){
+  const dt = Math.min(0.033, (now - lastT)/1000);
+  lastT=now;
+  if(playing) update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+initState();
+resize();
+requestAnimationFrame(loop);
+
+// prevent context menu
+canvas.addEventListener('contextmenu', e=>e.preventDefault());
+})();
+</script>
+</body>
+</html>

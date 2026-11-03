@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Path Quiz</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{background:#f8fafc;color:#0f172a;min-height:100vh;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#0f172a;color:#fff;border-bottom:2px solid #000}
+header h1{font-size:13px;letter-spacing:1px}
+header h1 span{color:#38bdf8}
+.tot{background:#fff;color:#0f172a;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:800}
+#levelBar{display:flex;align-items:center;gap:6px;padding:8px 10px;background:#0f172a;border-bottom:1px solid #1e293b;flex-wrap:wrap}
+.navBtn{width:32px;height:32px;border:none;background:#1e293b;color:#fff;border-radius:8px;font-size:16px}
+.lvlBtn{width:28px;height:28px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#cbd5e1;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;position:relative}
+.lvlBtn.active{border-color:#38bdf8;background:#0284c7;color:#fff}
+.lvlBtn.done{border-color:#22c55e}
+.lvlBtn .starMini{position:absolute;bottom:-4px;font-size:7px;color:#facc15}
+#levelInfo{width:100%;display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-top:4px}
+#stats{display:flex;gap:6px;padding:8px 10px;background:#fff;border-bottom:1px solid #e2e8f0}
+.stat{flex:1;background:#f1f5f9;border-radius:10px;padding:6px;text-align:center;border:1px solid #e2e8f0}
+.stat b{display:block;font-size:16px;color:#0f172a}
+.stat span{font-size:10px;color:#64748b;letter-spacing:.5px}
+.stat.timer b{color:#ef4444}
+.stat.timer.warn{background:#fef2f2;border-color:#fecaca}
+#gridWrap{flex:1;display:flex;flex-direction:column;align-items:center;padding:12px;background:#f8fafc;overflow:auto}
+#grid{display:grid;gap:3px;background:#0f172a;padding:6px;border-radius:14px;border:2px solid #0f172a}
+.cell{width:36px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;user-select:none;position:relative;transition:transform .08s}
+.cell.free{background:#ffffff;border:1px solid #e2e8f0;color:#0f172a}
+.cell.blocked{background:#1e1e1e;border:1px solid #000;color:#fff}
+.cell.start{background:#22c55e;color:#fff;border:2px solid #16a34a}
+.cell.finish{background:#ef4444;color:#fff;border:2px solid #dc2626}
+.cell.path{background:#0ea5e9;color:#fff;border:2px solid #0284c7;box-shadow:0 0 6px rgba(14,165,233,.5)}
+.cell.hint{background:#facc15!important;color:#000!important;border-color:#eab308!important}
+.cell.adjacent{outline:2px dashed #38bdf8;outline-offset:-2px}
+.legend{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px;font-size:11px;color:#64748b}
+.legend span{display:flex;align-items:center;gap:4px;background:#fff;padding:4px 8px;border-radius:999px;border:1px solid #e2e8f0}
+#feedback{margin:8px 10px;background:#fff;border-radius:12px;padding:8px;border:1px solid #e2e8f0;text-align:center}
+#feedback h3{font-size:12px;color:#0f172a}
+#feedback p{font-size:11px;color:#64748b;margin-top:4px}
+#controls{display:flex;gap:6px;padding:10px;background:#0f172a;border-top:1px solid #1e293b;flex-wrap:wrap}
+.btn{flex:1;padding:11px 6px;border:none;border-radius:10px;font-weight:800;font-size:12px}
+.btn.sec{background:#1e293b;color:#e2e8f0;border:1px solid #334155}
+.btn.pri{background:#0ea5e9;color:#fff}
+.btn.pri:disabled{opacity:.4}
+.btn.ghost{background:transparent;color:#94a3b8;border:1px solid #334155}
+.btn.warn{background:#ef4444;color:#fff}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:20;padding:20px}
+#modal.show{display:flex}
+.modalBox{background:#fff;border-radius:16px;padding:18px;max-width:340px;width:100%;text-align:center;border:2px solid #0f172a}
+.stars{font-size:26px;letter-spacing:4px;margin:8px 0;color:#facc15}
+</style>
+</head>
+<body>
+<header><h1>◈ PATH <span>QUIZ</span> — SHORTEST ROUTE</h1><div class="tot" id="totalStars">⭐ 0/45</div></header>
+<div id="levelBar">
+<button class="navBtn" id="prevBtn">‹</button>
+<div id="levelGrid" style="display:flex;gap:4px;flex:1;flex-wrap:wrap"></div>
+<button class="navBtn" id="nextBtn">›</button>
+<div id="levelInfo"><span id="levelName">—</span><span id="levelMeta">—</span></div>
+</div>
+<div id="stats">
+<div class="stat"><b id="optimalEl">—</b><span>OPTIMAL</span></div>
+<div class="stat"><b id="stepsEl">0</b><span>YOUR STEPS</span></div>
+<div class="stat timer" id="timerStat"><b id="timerEl">60</b><span>SECONDS</span></div>
+<div class="stat"><b id="bestEl">—</b><span>BEST</span></div>
+</div>
+<div id="gridWrap">
+<div id="grid"></div>
+<div class="legend">
+<span><span style="width:12px;height:12px;background:#22c55e;border-radius:3px;display:inline-block"></span> Start</span>
+<span><span style="width:12px;height:12px;background:#ef4444;border-radius:3px;display:inline-block"></span> Finish</span>
+<span><span style="width:12px;height:12px;background:#1e1e1e;border-radius:3px;display:inline-block"></span> Blocked</span>
+<span><span style="width:12px;height:12px;background:#0ea5e9;border-radius:3px;display:inline-block"></span> Path</span>
+<span>Tap adjacent • Tap path to undo</span>
+</div>
+</div>
+<div id="feedback"><h3 id="fbTitle">Trace the shortest path S → F</h3><p id="fbDesc">Tap adjacent white cells. Step count = cells visited -1. Beat optimal for 3★.</p></div>
+<div id="controls">
+<button class="btn sec" id="undoBtn">UNDO</button>
+<button class="btn sec" id="hintBtn">HINT</button>
+<button class="btn ghost" id="retryBtn">RETRY ↺</button>
+<button class="btn pri" id="submitBtn">SUBMIT ✓</button>
+</div>
+<div id="modal"><div class="modalBox">
+<h2 id="modalTitle">Perfect Route!</h2>
+<div class="stars" id="modalStars">★★★</div>
+<p id="modalMsg" style="color:#64748b;font-size:13px"></p>
+<button class="btn pri" id="modalNext" style="width:100%;margin-top:10px">Next Level</button>
+<button class="btn sec" id="modalClose" style="width:100%;margin-top:6px;background:#f1f5f9;color:#0f172a;border:1px solid #e2e8f0">Stay</button>
+</div></div>
+<script>
+const KEY='pathQuizSave_v1';
+let save=JSON.parse(localStorage.getItem(KEY)||'null')||{levels:{}};
+
+function bfs(w,h,blocked,start,finish){
+ const q=[start], dist=new Map([[start,0]]), prev=new Map();
+ const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+ const idx=(r,c)=>r*w+c;
+ const rc=i=>[Math.floor(i/w), i%w];
+ while(q.length){
+  const cur=q.shift();
+  if(cur===finish) break;
+  const [r,c]=rc(cur);
+  for(const [dr,dc] of dirs){
+   const nr=r+dr,nc=c+dc;
+   if(nr<0||nr>=h||nc<0||nc>=w) continue;
+   const nid=idx(nr,nc);
+   if(blocked.has(nid)) continue;
+   if(dist.has(nid)) continue;
+   dist.set(nid, dist.get(cur)+1);
+   prev.set(nid, cur);
+   q.push(nid);
+  }
+ }
+ if(!dist.has(finish)) return null;
+ // reconstruct
+ let path=[finish], cur=finish;
+ while(cur!==start){ cur=prev.get(cur); path.unshift(cur); }
+ return {dist:dist.get(finish), path};
+}
+
+function generateLevel(id){
+ // size progression 5x5 -> 10x10
+ const sizes=[5,5,6,6,6,7,7,7,8,8,8,9,9,10,10];
+ const w=sizes[id-1], h=sizes[id-1];
+ const blockedCounts=[4,5,6,8,10,12,14,16,18,20,22,26,28,32,34];
+ const targetBlocked=blockedCounts[id-1];
+ const start=0, finish=w*h-1;
+ let blocked, result, attempts=0;
+ do{
+  blocked=new Set();
+  while(blocked.size<targetBlocked){
+   const r=Math.floor(Math.random()*h), c=Math.floor(Math.random()*w);
+   const idx=r*w+c;
+   if(idx===start||idx===finish) continue;
+   blocked.add(idx);
+  }
+  result=bfs(w,h,blocked,start,finish);
+  attempts++;
+  if(attempts>200) break;
+ } while(!result || result.dist < Math.floor((w+h)*1.2) || result.dist > w*h*0.7);
+ return {id,w,h,blocked:[...blocked],start,finish,optimal:result?result.dist:0, path:result?result.path:[]};
+}
+
+// Pre-generate 15 levels deterministically with seed
+const LEVELS=[];
+for(let i=1;i<=15;i++){
+ // use seeded random for consistency per id
+ let seed=i*999;
+ const rnd=()=>{ seed=(seed*1664525+1013904223)%4294967296; return seed/4294967296; };
+ const sizes=[5,5,6,6,6,7,7,7,8,8,8,9,9,10,10];
+ const w=sizes[i-1], h=w;
+ const blockedCounts=[4,5,6,8,10,12,14,16,18,20,22,26,28,32,34];
+ const target=blockedCounts[i-1];
+ const start=0, finish=w*h-1;
+ let blocked, res, tries=0;
+ do{
+  blocked=new Set();
+  while(blocked.size<target){
+   const idx=Math.floor(rnd()*w*h);
+   if(idx===start||idx===finish) continue;
+   blocked.add(idx);
+  }
+  res=bfs(w,h,blocked,start,finish);
+  tries++;
+ } while((!res || res.dist < Math.floor((w+h)*1.1)) && tries<500);
+ LEVELS.push({id:i,w,h,blocked:[...blocked],start,finish,optimal:res?res.dist:0, hintPath:res?res.path:[]});
+}
+LEVELS.forEach(l=>{ if(!save.levels[l.id]) save.levels[l.id]={stars:0,best:null}; });
+function persist(){ localStorage.setItem(KEY, JSON.stringify(save)); }
+
+let curId=1, path=[0], timer=60, timerInt=null, hintOn=false;
+
+function getLevel(id){ return LEVELS.find(l=>l.id===id); }
+
+function loadLevel(id){
+ curId=id;
+ const lvl=getLevel(id);
+ path=[lvl.start];
+ hintOn=false;
+ resetTimer();
+ render();
+}
+
+function resetTimer(){
+ clearInterval(timerInt);
+ timer=60;
+ document.getElementById('timerEl').textContent=timer;
+ document.getElementById('timerStat').classList.remove('warn');
+ timerInt=setInterval(()=>{
+  timer--;
+  document.getElementById('timerEl').textContent=timer;
+  if(timer<=10) document.getElementById('timerStat').classList.add('warn');
+  if(timer<=0){ clearInterval(timerInt); doTimeout(); }
+ },1000);
+}
+function doTimeout(){
+ document.getElementById('fbTitle').textContent='Time up!';
+ document.getElementById('fbDesc').textContent='Tap RETRY for instant retry.';
+ document.getElementById('modalTitle').textContent='Out of Time';
+ document.getElementById('modalStars').textContent='—';
+ document.getElementById('modalMsg').textContent=`Level ${curId} — 60s elapsed. Optimal is ${getLevel(curId).optimal} steps. Retry instantly.`;
+ document.getElementById('modal').classList.add('show');
+}
+
+function neighbors(idx,w,h){
+ const r=Math.floor(idx/w), c=idx%w;
+ const out=[];
+ if(r>0) out.push(idx-w);
+ if(r<h-1) out.push(idx+w);
+ if(c>0) out.push(idx-1);
+ if(c<w-1) out.push(idx+1);
+ return out;
+}
+
+function handleTap(idx){
+ const lvl=getLevel(curId);
+ const blockedSet=new Set(lvl.blocked);
+ if(blockedSet.has(idx)) return;
+ // if tapping on path, truncate
+ const posInPath=path.indexOf(idx);
+ if(posInPath!==-1){
+  // allow undo to that point (tap back)
+  if(posInPath===path.length-1 && path.length>1){
+   // tapping head does nothing
+   return;
+  }
+  if(posInPath < path.length-1){
+   path=path.slice(0,posInPath+1);
+   hintOn=false;
+   render();
+   return;
+  }
+ }
+ // else must be adjacent to head
+ const head=path[path.length-1];
+ if(!neighbors(head,lvl.w,lvl.h).includes(idx)) return;
+ if(path.includes(idx)) return; // no revisiting
+ path.push(idx);
+ hintOn=false;
+ render();
+ // auto-check if reached finish? require submit
+}
+
+function render(){
+ const lvl=getLevel(curId);
+ // level bar
+ const grid=document.getElementById('levelGrid'); grid.innerHTML='';
+ LEVELS.forEach(l=>{
+  const s=save.levels[l.id];
+  const b=document.createElement('button');
+  b.className='lvlBtn '+(l.id===curId?'active ':'')+(s.stars?'done':'');
+  b.textContent=l.id;
+  if(s.stars) { const sm=document.createElement('span'); sm.className='starMini'; sm.textContent='★'.repeat(s.stars); b.appendChild(sm); }
+  b.onclick=()=>loadLevel(l.id);
+  grid.appendChild(b);
+ });
+ document.getElementById('levelName').textContent=`Level ${lvl.id} — ${lvl.w}×${lvl.h}`;
+ document.getElementById('levelMeta').textContent=`Blocked ${lvl.blocked.length} • Optimal ${lvl.optimal}`;
+ document.getElementById('optimalEl').textContent=lvl.optimal;
+ document.getElementById('stepsEl').textContent=Math.max(0,path.length-1);
+ document.getElementById('bestEl').textContent=save.levels[curId].best??'—';
+ document.getElementById('prevBtn').disabled=curId===1;
+ document.getElementById('nextBtn').disabled=curId===LEVELS.length;
+ let total=0; Object.values(save.levels).forEach(v=>total+=v.stars);
+ document.getElementById('totalStars').textContent='⭐ '+total+'/45';
+
+ // grid
+ const g=document.getElementById('grid');
+ g.style.gridTemplateColumns=`repeat(${lvl.w}, 36px)`;
+ g.innerHTML='';
+ const blockedSet=new Set(lvl.blocked);
+ const pathSet=new Set(path);
+ const head=path[path.length-1];
+ const adjSet=new Set(neighbors(head,lvl.w,lvl.h).filter(n=>!blockedSet.has(n) && !pathSet.has(n)));
+ for(let i=0;i<lvl.w*lvl.h;i++){
+  const cell=document.createElement('div');
+  let cls='cell ';
+  if(i===lvl.start) cls+='start';
+  else if(i===lvl.finish) cls+='finish';
+  else if(blockedSet.has(i)) cls+='blocked';
+  else if(pathSet.has(i)) cls+='path';
+  else cls+='free';
+  if(hintOn && lvl.hintPath.includes(i) && !blockedSet.has(i) && i!==lvl.start && i!==lvl.finish) cls+=' hint';
+  if(adjSet.has(i)) cls+=' adjacent';
+  cell.className=cls;
+  if(i===lvl.start) cell.textContent='S';
+  else if(i===lvl.finish) cell.textContent='F';
+  else if(blockedSet.has(i)) cell.textContent='✕';
+  else if(pathSet.has(i)) cell.textContent=path.indexOf(i)+1>9?'•':path.indexOf(i)+1;
+  cell.addEventListener('click',()=>handleTap(i));
+  cell.addEventListener('touchend',e=>{ e.preventDefault(); handleTap(i); },{passive:false});
+  g.appendChild(cell);
+ }
+ // feedback
+ const steps=path.length-1;
+ const atFinish=path[path.length-1]===lvl.finish;
+ if(atFinish){
+  if(steps===lvl.optimal) { document.getElementById('fbTitle').textContent='Optimal! Ready to submit.'; document.getElementById('fbDesc').textContent=`${steps} steps — perfect. Tap SUBMIT for 3★.`; }
+  else if(steps===lvl.optimal+1) { document.getElementById('fbTitle').textContent='Almost optimal.'; document.getElementById('fbDesc').textContent=`${steps} steps (optimal ${lvl.optimal}) — 2★ if submitted.`; }
+  else if(steps<=lvl.optimal+3) { document.getElementById('fbTitle').textContent='Valid route.'; document.getElementById('fbDesc').textContent=`${steps} steps (optimal ${lvl.optimal}) — 1★. Can you trim?`; }
+  else { document.getElementById('fbTitle').textContent='Valid but long.'; document.getElementById('fbDesc').textContent=`${steps} steps vs optimal ${lvl.optimal} — no stars. Undo to shorten.`; }
+ } else {
+  document.getElementById('fbTitle').textContent='Trace S → F orthogonally';
+  document.getElementById('fbDesc').textContent=`${steps} steps so far. Reach F to submit.`;
+ }
+ document.getElementById('undoBtn').disabled=path.length<=1;
+ document.getElementById('submitBtn').disabled=!atFinish;
+}
+
+function submit(){
+ const lvl=getLevel(curId);
+ const steps=path.length-1;
+ if(path[path.length-1]!==lvl.finish) return;
+ clearInterval(timerInt);
+ let stars=0;
+ if(steps===lvl.optimal) stars=3;
+ else if(steps===lvl.optimal+1) stars=2;
+ else if(steps<=lvl.optimal+3) stars=1;
+ else stars=0;
+ const rec=save.levels[curId];
+ if(rec.best==null || steps<rec.best) rec.best=steps;
+ if(stars>rec.stars) rec.stars=stars;
+ persist();
+ document.getElementById('modalTitle').textContent=stars===3?'Perfect Route!':stars===2?'Great!':stars===1?'Valid Route':'Too Long';
+ document.getElementById('modalStars').textContent=stars?'★'.repeat(stars)+'☆'.repeat(3-stars):'—';
+ document.getElementById('modalMsg').textContent=`Level ${curId}: ${steps} steps (optimal ${lvl.optimal}) in ${60-timer}s. Best: ${rec.best}. ${stars===3?'Flawless!':stars?'Keep trimming for 3★.':'Find shorter path.'}`;
+ document.getElementById('modal').classList.add('show');
+ render();
+}
+
+document.getElementById('undoBtn').onclick=()=>{ if(path.length>1){ path.pop(); hintOn=false; render(); } };
+document.getElementById('retryBtn').onclick=()=>loadLevel(curId);
+document.getElementById('hintBtn').onclick=()=>{ hintOn=!hintOn; render(); };
+document.getElementById('submitBtn').onclick=submit;
+document.getElementById('prevBtn').onclick=()=>{ if(curId>1) loadLevel(curId-1); };
+document.getElementById('nextBtn').onclick=()=>{ if(curId<LEVELS.length) loadLevel(curId+1); };
+document.getElementById('modalNext').onclick=()=>{
+ document.getElementById('modal').classList.remove('show');
+ if(curId<LEVELS.length) loadLevel(curId+1);
+ else loadLevel(curId);
+};
+document.getElementById('modalClose').onclick=()=>{
+ document.getElementById('modal').classList.remove('show');
+ resetTimer();
+ render();
+};
+window.addEventListener('keydown',e=>{
+ const lvl=getLevel(curId);
+ const head=path[path.length-1];
+ const w=lvl.w;
+ let t=null;
+ if(e.key==='ArrowUp') t=head-w;
+ if(e.key==='ArrowDown') t=head+w;
+ if(e.key==='ArrowLeft') t=head-1;
+ if(e.key==='ArrowRight') t=head+1;
+ if(t!=null){ e.preventDefault(); handleTap(t); }
+ if(e.key==='z' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); if(path.length>1){ path.pop(); render(); } }
+ if(e.key==='Enter') submit();
+ if(e.key==='r' || e.key==='R') loadLevel(curId);
+});
+
+loadLevel(1);
+</script>
+</body>
+</html>

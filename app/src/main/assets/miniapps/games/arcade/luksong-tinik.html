@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>Tinik Hop</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#0f172a;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+body{display:flex;justify-content:center;background:radial-gradient(1200px 600px at 50% -10%,#1e3a5f 0%,#0f172a 60%)}
+.app{width:100%;max-width:428px;min-width:360px;height:100dvh;display:flex;flex-direction:column;background:#0f172a;position:relative;overflow:hidden;box-shadow:0 0 40px rgba(0,0,0,.5)}
+/* Header */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:rgba(15,23,42,.9);backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,.08);gap:8px;flex-shrink:0}
+.brand{display:flex;align-items:center;gap:8px}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#f59e0b,#ef4444);display:grid;place-items:center;font-size:18px;box-shadow:0 4px 12px rgba(245,158,11,.4)}
+.brand h1{font-size:15px;color:#fff;line-height:1;font-weight:800;letter-spacing:.3px}
+.brand p{font-size:10px;color:#94a3b8;letter-spacing:.6px;text-transform:uppercase}
+.stats{display:flex;gap:8px;align-items:center}
+.stat{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:6px 8px;min-width:54px;text-align:center}
+.stat b{display:block;color:#fff;font-size:14px;line-height:1}
+.stat span{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px}
+.hearts{display:flex;gap:3px;align-items:center}
+.heart{font-size:14px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));transition:.2s}
+.heart.lost{opacity:.25;filter:grayscale(1)}
+/* Canvas wrap */
+.gameWrap{flex:1;position:relative;overflow:hidden;background:linear-gradient(to bottom,#38bdf8 0%,#7dd3fc 18%,#fef08a 22%,#fde68a 100%)}
+canvas{display:block;width:100%;height:100%}
+.hud{position:absolute;left:10px;right:10px;top:10px;display:flex;justify-content:space-between;align-items:center;pointer-events:none}
+.beatBar{flex:1;max-width:220px;height:28px;background:rgba(15,23,42,.85);border-radius:999px;border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;padding:3px 8px;gap:6px}
+.beatBar small{color:#f8fafc;font-size:10px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+.beatTrack{flex:1;height:10px;background:rgba(255,255,255,.15);border-radius:999px;position:relative;overflow:hidden}
+.beatFill{position:absolute;left:0;top:0;bottom:0;width:50%;background:linear-gradient(90deg,#22c55e,#16a34a);border-radius:999px;transition:width .05s}
+.beatDot{position:absolute;top:50%;width:14px;height:14px;background:#fff;border:2px solid #0f172a;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 2px 6px rgba(0,0,0,.3);transition:left .05s linear}
+.levelBadge{background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;font-weight:800;font-size:12px;padding:6px 10px;border-radius:999px;box-shadow:0 4px 12px rgba(239,68,68,.4);border:1px solid rgba(255,255,255,.3)}
+.combo{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);pointer-events:none;text-align:center;opacity:0;transition:.2s}
+.combo.show{opacity:1;transform:translate(-50%,-60%)}
+.combo b{font-size:28px;color:#fff;text-shadow:0 2px 0 #0f172a,0 4px 12px rgba(0,0,0,.5);display:block}
+.combo span{font-size:12px;color:#fef08a;font-weight:700;letter-spacing:.5px;text-shadow:0 1px 4px rgba(0,0,0,.6)}
+/* Controls */
+.controls{padding:10px 12px 12px;background:rgba(15,23,42,.96);border-top:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:8px;flex-shrink:0}
+.jumpBtn{width:100%;height:72px;border-radius:18px;border:none;background:linear-gradient(180deg,#22c55e 0%,#16a34a 100%);color:#fff;font-size:20px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;box-shadow:0 6px 0 #14532d,0 10px 20px rgba(34,197,94,.4);display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;user-select:none;touch-action:manipulation}
+.jumpBtn:active{transform:translateY(4px);box-shadow:0 2px 0 #14532d,0 4px 10px rgba(34,197,94,.3)}
+.jumpBtn small{font-size:11px;opacity:.9;font-weight:700;letter-spacing:.4px}
+.rowBtns{display:flex;gap:8px}
+.sBtn{flex:1;height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.08);color:#e2e8f0;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer}
+.sBtn.primary{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#fde68a}
+.sBtn:active{transform:scale(.98)}
+/* Overlays */
+.overlay{position:absolute;inset:0;background:rgba(15,23,42,.78);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+.card{width:100%;max-width:360px;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.4);max-height:92%;display:flex;flex-direction:column}
+.cardHead{padding:16px 16px 12px;background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;text-align:center;position:relative}
+.cardHead h2{font-size:20px;font-weight:900;letter-spacing:.3px}
+.cardHead p{font-size:12px;color:#94a3b8;margin-top:4px;line-height:1.4}
+.closeX{position:absolute;right:12px;top:12px;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.12);border:none;color:#fff;font-size:16px;display:grid;place-items:center;cursor:pointer}
+.cardBody{padding:14px 16px;overflow:auto;flex:1}
+.tabs{display:flex;gap:6px;margin-bottom:12px;background:#f1f5f9;padding:4px;border-radius:12px}
+.tab{flex:1;padding:8px 6px;border-radius:8px;border:none;background:transparent;font-size:12px;font-weight:800;color:#64748b;cursor:pointer}
+.tab.on{background:#0f172a;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.badgeRow{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.badge{font-size:10px;font-weight:800;letter-spacing:.4px;padding:5px 8px;border-radius:999px;background:#f1f5f9;color:#334155;border:1px solid #e2e8f0}
+.badge.green{background:#dcfce7;color:#166534;border-color:#bbf7d0}
+.badge.amber{background:#fef3c7;color:#92400e;border-color:#fde68a}
+.list{list-style:none;display:flex;flex-direction:column;gap:8px}
+.list li{display:flex;gap:10px;align-items:flex-start;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px}
+.list li i{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:#0f172a;color:#fff;font-size:14px;flex-shrink:0}
+.list li b{font-size:13px;color:#0f172a;display:block}
+.list li span{font-size:11px;color:#64748b;line-height:1.4;display:block;margin-top:2px}
+.tip{background:linear-gradient(135deg,#fef3c7,#fde68a);border:1px solid #f59e0b;border-radius:12px;padding:10px 12px;margin-top:10px}
+.tip b{font-size:11px;color:#92400e;letter-spacing:.4px;text-transform:uppercase}
+.tip p{font-size:11px;color:#78350f;line-height:1.5;margin-top:4px}
+.bigBtn{width:100%;height:52px;border-radius:14px;border:none;background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;font-weight:900;font-size:16px;letter-spacing:.4px;cursor:pointer;box-shadow:0 6px 16px rgba(239,68,68,.35);margin-top:12px}
+.bigBtn:active{transform:scale(.98)}
+.ghostBtn{width:100%;height:44px;border-radius:12px;border:1px solid #e2e8f0;background:#fff;color:#334155;font-weight:700;font-size:13px;cursor:pointer;margin-top:8px}
+.muted{font-size:11px;color:#94a3b8;text-align:center;margin-top:8px;line-height:1.4}
+.hidden{display:none !important}
+.kbd{font-size:10px;background:#0f172a;color:#fff;padding:2px 6px;border-radius:6px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">🎋</div>
+      <div>
+        <h1>TINIK HOP</h1>
+        <p>Stick-Jump Fiesta</p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="scoreEl">0</b><span>Score</span></div>
+      <div class="stat"><b id="bestEl">0</b><span>Best</span></div>
+      <div class="hearts" id="heartsEl"></div>
+    </div>
+  </div>
+
+  <div class="gameWrap" id="gameWrap">
+    <canvas id="c"></canvas>
+
+    <div class="hud">
+      <div class="beatBar">
+        <small>♪ BEAT</small>
+        <div class="beatTrack" id="beatTrack">
+          <div class="beatFill" id="beatFill"></div>
+          <div class="beatDot" id="beatDot"></div>
+        </div>
+      </div>
+      <div class="levelBadge" id="levelEl">LVL 1 • 90 BPM</div>
+    </div>
+
+    <div class="combo" id="comboEl"><b id="comboTxt">PERFECT!</b><span id="comboSub">+1 clearance</span></div>
+
+    <!-- Start overlay -->
+    <div class="overlay" id="startOverlay">
+      <div class="card">
+        <div class="cardHead">
+          <h2>🎉 Tinik Hop Fiesta</h2>
+          <p>Tap to leap as bamboo poles snap open &amp; shut to the rhythm. Don’t get caught!</p>
+        </div>
+        <div class="cardBody">
+          <div class="tabs">
+            <button class="tab on" data-tab="play">How to Play</button>
+            <button class="tab" data-tab="canvas">Canvas</button>
+            <button class="tab" data-tab="mobile">Mobile-First</button>
+          </div>
+
+          <div id="tab-play">
+            <ul class="list">
+              <li><i>🥢</i><div><b>Poles snap on the beat</b><span>Two bamboo poles lie across the street. They <b>open</b> (gap wide) then <b>snap shut</b> (touching) every beat. Watch the beat bar at the top.</span></div></li>
+              <li><i>🦶</i><div><b>Tap to jump at the right moment</b><span>When poles are <b>open</b> you can stand between them. When they <b>close</b> you must be in the air — tap <b>JUMP</b> just before they snap shut.</span></div></li>
+              <li><i>⭐</i><div><b>Score for clean clearances</b><span>Each successful snap = +1. Perfect timing (jump on the beat) = +2 and combo. Miss = lose a heart. 3 hearts total.</span></div></li>
+              <li><i>⚡</i><div><b>Levels quicken</b><span>Every 8 points BPM rises (+8). Poles snap faster, windows get tighter. Survive as long as you can!</span></div></li>
+            </ul>
+            <div class="tip"><b>💡 Rhythm tip</b><p>Listen to the hop “pop” and watch the white dot. Jump when the dot hits the right edge — that’s the snap moment. Early is safer than late.</p></div>
+          </div>
+
+          <div id="tab-canvas" class="hidden">
+            <div class="badgeRow"><span class="badge green">Canvas 2D</span><span class="badge">60 FPS</span><span class="badge">DPR aware</span><span class="badge amber">No images</span></div>
+            <ul class="list">
+              <li><i>🖼️</i><div><b>Single &lt;canvas&gt; render</b><span>All visuals drawn each frame: sky gradient, parallax clouds, building silhouettes, crowd, street, flags, poles, player, particles. No external images — pure shapes for instant load.</span></div></li>
+              <li><i>📐</i><div><b>Responsive sizing</b><span>Canvas size = container size × devicePixelRatio (capped at 2×). Resize handler re-measures on rotate. All positions use relative units (W×H) so art scales 360–428px.</span></div></li>
+              <li><i>🎞️</i><div><b>Game loop</b><span><code>requestAnimationFrame</code> drives update → draw. Pole gap lerps to target gap synced to <code>beatInterval = 60000/BPM</code>. Player uses velocity + gravity for jump arc.</span></div></li>
+              <li><i>🔊</i><div><b>Sound without files</b><span>Web Audio API oscillators generate hop/pop/hit sounds. No MP3s to download — works offline and respects mute toggle.</span></div></li>
+            </ul>
+            <div class="tip"><b>Implementation note</b><p>Collision is checked only at the “snap” instant: if gap &lt; 28px and player is on ground → hit. Otherwise clearance. This keeps rhythm fair and predictable.</p></div>
+          </div>
+
+          <div id="tab-mobile" class="hidden">
+            <div class="badgeRow"><span class="badge green">360–428px</span><span class="badge">Portrait only</span><span class="badge">44px+ targets</span><span class="badge amber">No scroll</span></div>
+            <ul class="list">
+              <li><i>📱</i><div><b>Portrait, no horizontal scroll</b><span>App max-width 428px, min 360px, centered. <code>overflow:hidden</code> on body, flex column layout. Canvas fills remaining height — never wider than viewport.</span></div></li>
+              <li><i>👆</i><div><b>Large touch targets</b><span>Jump button 72px tall, full-width, with 6px press depth. Secondary buttons 44px min. All interactive elements ≥ 44×44px per WCAG.</span></div></li>
+              <li><i>🔤</i><div><b>Readable without zoom</b><span>Base text 13–16px, labels 10–11px uppercase with high contrast. Viewport <code>user-scalable=no</code> prevents accidental zoom; layout uses system fonts.</span></div></li>
+              <li><i>⚙️</i><div><b>Constraints handled</b><span>Touch + keyboard (Space) input, <code>touch-action:manipulation</code> for 300ms delay removal, <code>dvh</code> for mobile browser chrome, localStorage for best score.</span></div></li>
+            </ul>
+          </div>
+
+          <button class="bigBtn" id="playBtn">▶ START FIESTA — TAP TO HOP</button>
+          <div class="muted">Tip: Turn sound on for rhythm cues • Works offline • Best on phone held upright</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause / Game Over overlay -->
+    <div class="overlay hidden" id="overOverlay">
+      <div class="card">
+        <div class="cardHead">
+          <button class="closeX" id="closeOver">✕</button>
+          <h2 id="overTitle">Game Paused</h2>
+          <p id="overSub">Take a breath, then hop again.</p>
+        </div>
+        <div class="cardBody" style="text-align:center">
+          <div style="display:flex;gap:10px;justify-content:center;margin:6px 0 10px">
+            <div class="stat" style="background:#f1f5f9;border-color:#e2e8f0;min-width:80px"><b id="finalScore" style="color:#0f172a">0</b><span>Score</span></div>
+            <div class="stat" style="background:#f1f5f9;border-color:#e2e8f0;min-width:80px"><b id="finalLevel" style="color:#0f172a">1</b><span>Level</span></div>
+            <div class="stat" style="background:#fef3c7;border-color:#fde68a;min-width:80px"><b id="finalBest" style="color:#92400e">0</b><span>Best</span></div>
+          </div>
+          <div id="overMsg" style="font-size:13px;color:#334155;line-height:1.5;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px">You were caught by the poles!</div>
+          <button class="bigBtn" id="retryBtn">↻ PLAY AGAIN</button>
+          <button class="ghostBtn" id="howBtn">📖 How to Play &amp; Tech Notes</button>
+          <div class="muted">Progress saved locally • No data leaves your phone</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="controls">
+    <button class="jumpBtn" id="jumpBtn" aria-label="Jump">🦘 TAP TO JUMP <small>or SPACE</small></button>
+    <div class="rowBtns">
+      <button class="sBtn" id="pauseBtn">⏸ Pause</button>
+      <button class="sBtn" id="soundBtn">🔊 Sound On</button>
+      <button class="sBtn primary" id="helpBtn">❓ Guide</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+const gameWrap=document.getElementById('gameWrap');
+const scoreEl=document.getElementById('scoreEl'), bestEl=document.getElementById('bestEl'), levelEl=document.getElementById('levelEl');
+const heartsEl=document.getElementById('heartsEl'), beatFill=document.getElementById('beatFill'), beatDot=document.getElementById('beatDot');
+const comboEl=document.getElementById('comboEl'), comboTxt=document.getElementById('comboTxt'), comboSub=document.getElementById('comboSub');
+const startOverlay=document.getElementById('startOverlay'), overOverlay=document.getElementById('overOverlay');
+const overTitle=document.getElementById('overTitle'), overSub=document.getElementById('overSub'), overMsg=document.getElementById('overMsg');
+const finalScore=document.getElementById('finalScore'), finalLevel=document.getElementById('finalLevel'), finalBest=document.getElementById('finalBest');
+
+let W=360,H=600,DPR=1, groundY=0;
+let score=0, best=0, lives=3, level=1, bpm=90, beatInterval=666, combo=0;
+let state='idle'; // idle, playing, paused, over
+let soundOn=true;
+let audioCtx=null;
+
+function ensureAudio(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+}
+function tone(freq, dur, type='sine', vol=0.3, slideTo){
+  if(!soundOn||!audioCtx) return;
+  const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+  o.type=type; o.frequency.value=freq;
+  o.connect(g); g.connect(audioCtx.destination);
+  g.gain.value=vol;
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+dur);
+  if(slideTo){ o.frequency.linearRampToValueAtTime(slideTo, audioCtx.currentTime+dur*0.8); }
+  o.start(); o.stop(audioCtx.currentTime+dur);
+}
+function sfxHop(){ ensureAudio(); tone(520,0.12,'sine',0.35, 880); setTimeout(()=>tone(900,0.08,'triangle',0.2),40); }
+function sfxScore(perfect){ ensureAudio(); if(perfect){ tone(600,0.12,'sine',0.3,900); setTimeout(()=>tone(900,0.15,'sine',0.3,1200),90);} else tone(700,0.12,'sine',0.25); }
+function sfxHit(){ ensureAudio(); tone(180,0.25,'square',0.25,80); setTimeout(()=>tone(120,0.2,'sawtooth',0.2),80); }
+function sfxSnap(){ ensureAudio(); tone(300,0.06,'square',0.15, 150); }
+
+best = parseInt(localStorage.getItem('tinikBest')||'0',10);
+bestEl.textContent=best;
+
+function resize(){
+  const rect=gameWrap.getBoundingClientRect();
+  W=Math.round(rect.width);
+  H=Math.round(rect.height);
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  canvas.width=Math.round(W*DPR);
+  canvas.height=Math.round(H*DPR);
+  canvas.style.width=W+'px';
+  canvas.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  groundY=H*0.78;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Hearts
+function renderHearts(){
+  heartsEl.innerHTML='';
+  for(let i=0;i<3;i++){
+    const s=document.createElement('span');
+    s.className='heart'+(i<lives?'':' lost');
+    s.textContent='❤️';
+    heartsEl.appendChild(s);
+  }
+}
+renderHearts();
+
+// Player
+const player={
+  x:0, y:0, vy:0, onGround:true, w:26, h:36,
+  jumpPower:-13.5, gravity:0.72,
+  anim:0, squish:0
+};
+function resetPlayer(){
+  player.x=W*0.5;
+  player.y=groundY;
+  player.vy=0;
+  player.onGround=true;
+  player.anim=0;
+  player.squish=0;
+}
+
+// Poles
+let poleGap=80, targetGap=80, maxGap=110, minGap=0;
+let polePhase=0, prevGap=80, snapCooldown=0;
+let clouds=[], flags=[], particles=[], crowdBob=0;
+
+function initDecor(){
+  clouds=[];
+  for(let i=0;i<5;i++) clouds.push({x:Math.random()*W, y: 30+Math.random()*70, s: 0.4+Math.random()*0.6, w: 60+Math.random()*80, speed: 0.2+Math.random()*0.5});
+  flags=[];
+  const n=10;
+  for(let i=0;i<n;i++) flags.push({x: (W/(n))*i + 10, y: H*0.22, c: i%3===0?'#ef4444':i%3===1?'#f59e0b':'#22c55e'});
+  particles=[];
+}
+initDecor();
+
+function resetGame(){
+  score=0; lives=3; level=1; bpm=90; beatInterval=60000/bpm; combo=0;
+  poleGap=maxGap; targetGap=maxGap; prevGap=maxGap; snapCooldown=0;
+  scoreEl.textContent=score;
+  levelEl.textContent=`LVL ${level} • ${bpm} BPM`;
+  renderHearts();
+  resetPlayer();
+  initDecor();
+  polePhase=0;
+}
+
+let lastTime=performance.now();
+let beatProgress=0;
+let lastSnapCheck=0;
+
+function update(dt){
+  if(state!=='playing') return;
+  const now=performance.now();
+  // beat
+  beatProgress = (now % beatInterval)/beatInterval;
+  // target gap: open for first half, closed second half, with snap
+  // Use smooth snap: open = maxGap, closed = 0
+  const isOpen = beatProgress < 0.5;
+  targetGap = isOpen ? maxGap : minGap;
+  // lerp gap for visual snap animation (fast)
+  const lerpSpeed = isOpen ? 0.18 : 0.32;
+  poleGap += (targetGap - poleGap)*lerpSpeed;
+  // snap sound at transition
+  if(prevGap>40 && poleGap<=40 && snapCooldown<=0){
+    sfxSnap();
+    snapCooldown=200;
+    // check clearance at snap moment
+    const wasAirborne = !player.onGround && player.y < groundY - 12;
+    if(wasAirborne){
+      // success
+      const perfect = Math.abs(beatProgress-0.5) < 0.08 || Math.abs(beatProgress-0.5) > 0.42; // near snap
+      const pts = perfect ? 2 : 1;
+      score += pts;
+      combo++;
+      scoreEl.textContent=score;
+      if(score>best){ best=score; bestEl.textContent=best; localStorage.setItem('tinikBest', best); }
+      // level up
+      if(score%8===0){
+        level++; bpm+=8; beatInterval=60000/bpm;
+        levelEl.textContent=`LVL ${level} • ${bpm} BPM`;
+        showCombo(`LEVEL ${level}!`, `${bpm} BPM — faster!`);
+        // burst
+        for(let i=0;i<12;i++) particles.push({x:player.x, y:player.y-20, vx:(Math.random()-0.5)*6, vy:-Math.random()*5-2, life:1, c: i%2?'#f59e0b':'#22c55e'});
+      } else {
+        showCombo(perfect? 'PERFECT!':'NICE!', `+${pts} clearance${combo>2?` • x${combo} combo`:''}`);
+      }
+      sfxScore(perfect);
+      // particles
+      for(let i=0;i<6;i++) particles.push({x:player.x+(Math.random()-0.5)*20, y:groundY-10, vx:(Math.random()-0.5)*4, vy:-Math.random()*4-1, life:1, c: perfect?'#fde68a':'#86efac'});
+    } else {
+      // hit
+      lives--;
+      combo=0;
+      renderHearts();
+      sfxHit();
+      showCombo('OOPS!', 'Caught! -1 heart');
+      // hit flash
+      player.squish=1;
+      for(let i=0;i<8;i++) particles.push({x:player.x, y:groundY-6, vx:(Math.random()-0.5)*5, vy:-Math.random()*3-1, life:1, c:'#ef4444'});
+      if(lives<=0){
+        gameOver();
+        return;
+      }
+    }
+  }
+  if(snapCooldown>0) snapCooldown-=dt;
+  prevGap=poleGap;
+
+  // player physics
+  if(!player.onGround){
+    player.vy += player.gravity;
+    player.y += player.vy;
+    if(player.y >= groundY){
+      player.y=groundY;
+      player.vy=0;
+      player.onGround=true;
+      player.squish=0.6;
+    }
+  } else {
+    if(player.squish>0) player.squish-=0.08;
+  }
+  player.anim+=dt*0.01;
+
+  // clouds
+  clouds.forEach(c=>{
+    c.x+=c.speed;
+    if(c.x - c.w > W) c.x = -c.w;
+  });
+  crowdBob+=dt*0.005;
+
+  // particles
+  particles.forEach(p=>{
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.25; p.life-=0.02;
+  });
+  particles=particles.filter(p=>p.life>0);
+
+  // beat UI
+  const dotPos = beatProgress*100;
+  beatDot.style.left = dotPos+'%';
+  beatFill.style.width = (isOpen? 100 - beatProgress*100 : (1-beatProgress)*100 )+'%';
+  beatFill.style.background = isOpen ? 'linear-gradient(90deg,#22c55e,#16a34a)' : 'linear-gradient(90deg,#ef4444,#f59e0b)';
+}
+
+function showCombo(title, sub){
+  comboTxt.textContent=title;
+  comboSub.textContent=sub;
+  comboEl.classList.add('show');
+  clearTimeout(showCombo._t);
+  showCombo._t=setTimeout(()=>comboEl.classList.remove('show'), 900);
+}
+
+function draw(){
+  // clear
+  ctx.clearRect(0,0,W,H);
+  // sky
+  const skyGrad=ctx.createLinearGradient(0,0,0,H*0.45);
+  skyGrad.addColorStop(0,'#38bdf8');
+  skyGrad.addColorStop(0.5,'#7dd3fc');
+  skyGrad.addColorStop(1,'#fef9c3');
+  ctx.fillStyle=skyGrad;
+  ctx.fillRect(0,0,W,H*0.45);
+
+  // sun
+  ctx.beginPath();
+  ctx.arc(W*0.82, H*0.08, 28,0,Math.PI*2);
+  ctx.fillStyle='#fde68a';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(W*0.82, H*0.08, 36,0,Math.PI*2);
+  ctx.fillStyle='rgba(253,230,138,.35)';
+  ctx.fill();
+
+  // clouds
+  clouds.forEach(c=>{
+    ctx.fillStyle='rgba(255,255,255,.95)';
+    ctx.beginPath();
+    const y=c.y, w=c.w, h=22*c.s;
+    ctx.ellipse(c.x, y, w*0.5, h,0,0,Math.PI*2);
+    ctx.ellipse(c.x-w*0.25, y+4, w*0.35, h*0.8,0,0,Math.PI*2);
+    ctx.ellipse(c.x+w*0.28, y+3, w*0.32, h*0.75,0,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.5)';
+    ctx.beginPath();
+    ctx.ellipse(c.x, y+8, w*0.45, h*0.5,0,0,Math.PI*2);
+    ctx.fill();
+  });
+
+  // distant buildings
+  ctx.fillStyle='#1e293b';
+  const bH=H*0.18;
+  const bY=H*0.45 - bH;
+  ctx.fillRect(0,bY,W,bH);
+  // windows
+  ctx.fillStyle='#fde68a';
+  for(let x=12;x<W;x+=28){
+    for(let y=bY+12;y<bY+bH-10;y+=18){
+      if(Math.random()>0.3){
+        ctx.fillRect(x, y, 10, 8);
+        ctx.fillStyle='rgba(253,230,138,.5)';
+        ctx.fillRect(x, y+8, 10, 2);
+        ctx.fillStyle='#fde68a';
+      }
+    }
+  }
+  // flags string
+  ctx.strokeStyle='rgba(15,23,42,.6)';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(0, H*0.22);
+  for(let i=0;i<W;i+=20) ctx.quadraticCurveTo(i+10, H*0.22+6, i+20, H*0.22);
+  ctx.stroke();
+  flags.forEach(f=>{
+    ctx.fillStyle=f.c;
+    ctx.beginPath();
+    ctx.moveTo(f.x, H*0.22);
+    ctx.lineTo(f.x+14, H*0.22+10);
+    ctx.lineTo(f.x, H*0.22+18);
+    ctx.fill();
+  });
+
+  // crowd silhouette behind street
+  const crowdY=H*0.45;
+  ctx.fillStyle='#0f172a';
+  ctx.fillRect(0,crowdY,W, H*0.08);
+  // crowd heads bobbing
+  for(let i=0;i<W;i+=18){
+    const bob=Math.sin(crowdBob + i*0.3)*2;
+    ctx.beginPath();
+    ctx.arc(i+9, crowdY+8+bob, 7,0,Math.PI*2);
+    ctx.fillStyle=i%2?'#334155':'#475569';
+    ctx.fill();
+    // body
+    ctx.fillRect(i+2, crowdY+14+bob, 14, 12);
+  }
+  // hands up
+  ctx.fillStyle='#fde68a';
+  for(let i=10;i<W;i+=36){
+    const bob=Math.sin(crowdBob*1.2 + i)*3;
+    ctx.fillRect(i, crowdY-2+bob, 3, 10);
+    ctx.beginPath(); ctx.arc(i+1.5, crowdY-4+bob, 3,0,Math.PI*2); ctx.fill();
+  }
+
+  // street
+  const streetY=groundY+6;
+  ctx.fillStyle='#334155';
+  ctx.fillRect(0, streetY, W, H-streetY);
+  // road lines
+  ctx.fillStyle='#fde68a';
+  for(let x=-20 + (Date.now()*0.05 % 40); x<W; x+=40){
+    ctx.fillRect(x, streetY+18, 20, 4);
+  }
+  // sidewalks
+  ctx.fillStyle='#475569';
+  ctx.fillRect(0, streetY, W, 10);
+  ctx.fillStyle='#64748b';
+  for(let x=0;x<W;x+=16) ctx.fillRect(x, streetY+8, 12, 2);
+
+  // poles - two bamboo bars across street
+  const poleW=W*0.92, poleH=14, poleX=(W-poleW)/2;
+  const gapHalf=poleGap/2;
+  const y1=groundY - gapHalf - poleH/2;
+  const y2=groundY + gapHalf - poleH/2;
+  // shadows
+  ctx.fillStyle='rgba(0,0,0,.25)';
+  ctx.fillRect(poleX, groundY+4, poleW, 6);
+  // pole 1
+  drawPole(poleX, y1, poleW, poleH, 0);
+  // pole 2
+  drawPole(poleX, y2, poleW, poleH, 1);
+  // gap indicator when open
+  if(poleGap>30){
+    ctx.fillStyle='rgba(34,197,94,.18)';
+    ctx.fillRect(poleX, y1+poleH, poleW, poleGap - poleH);
+    ctx.strokeStyle='rgba(34,197,94,.6)';
+    ctx.setLineDash([6,6]);
+    ctx.strokeRect(poleX+4, y1+poleH+2, poleW-8, poleGap - poleH -4);
+    ctx.setLineDash([]);
+    ctx.fillStyle='#16a34a';
+    ctx.font='700 10px system-ui';
+    ctx.textAlign='center';
+    ctx.fillText('SAFE ZONE', W/2, y1+poleH+ poleGap/2 +3);
+  } else {
+    // danger when closed
+    ctx.fillStyle='rgba(239,68,68,.25)';
+    ctx.fillRect(poleX, y1, poleW, poleH*2 + poleGap);
+    ctx.fillStyle='#ef4444';
+    ctx.font='800 10px system-ui';
+    ctx.textAlign='center';
+    ctx.fillText('SNAP!', W/2, y1-6);
+  }
+
+  // player shadow
+  const shadowAlpha = player.onGround ? 0.25 : 0.12 - Math.min(0.1, (groundY-player.y)*0.002);
+  ctx.fillStyle=`rgba(0,0,0,${shadowAlpha})`;
+  ctx.beginPath();
+  ctx.ellipse(player.x, groundY+8, 18, 6,0,0,Math.PI*2);
+  ctx.fill();
+
+  // player
+  drawPlayer(player.x, player.y, player.onGround, player.anim, player.squish);
+
+  // particles
+  particles.forEach(p=>{
+    ctx.globalAlpha=Math.max(0,p.life);
+    ctx.fillStyle=p.c;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3,0,Math.PI*2);
+    ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // vignette
+  ctx.fillStyle='rgba(15,23,42,.08)';
+  ctx.fillRect(0,0,W,4);
+}
+
+function drawPole(x,y,w,h, idx){
+  // bamboo texture
+  const grad=ctx.createLinearGradient(0,y,0,y+h);
+  grad.addColorStop(0,'#a16207');
+  grad.addColorStop(0.3,'#ca8a04');
+  grad.addColorStop(0.5,'#eab308');
+  grad.addColorStop(0.7,'#ca8a04');
+  grad.addColorStop(1,'#854d0e');
+  ctx.fillStyle=grad;
+  ctx.beginPath();
+  ctx.roundRect(x,y,w,h,7);
+  ctx.fill();
+  // segments
+  ctx.fillStyle='rgba(120,53,15,.5)';
+  for(let sx=x+ w*0.18; sx < x+w; sx+= w*0.22){
+    ctx.fillRect(sx, y, 3, h);
+  }
+  // highlight
+  ctx.fillStyle='rgba(255,255,255,.35)';
+  ctx.fillRect(x+4, y+2, w-8, 3);
+  // end caps
+  ctx.fillStyle='#78350f';
+  ctx.beginPath();
+  ctx.roundRect(x-2, y-1, 8, h+2, 4); ctx.fill();
+  ctx.beginPath();
+  ctx.roundRect(x+w-6, y-1, 8, h+2, 4); ctx.fill();
+}
+
+function drawPlayer(cx, cy, onGround, t, squish){
+  ctx.save();
+  ctx.translate(cx, cy);
+  const s = onGround ? 1 - squish*0.15 : 1;
+  const sy = onGround ? 1 + squish*0.25 : 1;
+  ctx.scale(s, sy);
+  // legs
+  const legSwing = onGround ? Math.sin(t*1.2)*6 : 0;
+  ctx.strokeStyle='#1e293b';
+  ctx.lineWidth=4;
+  ctx.lineCap='round';
+  // left leg
+  ctx.beginPath();
+  ctx.moveTo(-6, -6);
+  if(onGround){
+    ctx.lineTo(-8+legSwing*0.3, 4);
+    ctx.lineTo(-10, 8);
+  } else {
+    // tucked when jumping
+    ctx.lineTo(-4, 2);
+    ctx.lineTo(-2, 6);
+  }
+  ctx.stroke();
+  // right leg
+  ctx.beginPath();
+  ctx.moveTo(6, -6);
+  if(onGround){
+    ctx.lineTo(8-legSwing*0.3, 4);
+    ctx.lineTo(10, 8);
+  } else {
+    ctx.lineTo(4, 2);
+    ctx.lineTo(2, 6);
+  }
+  ctx.stroke();
+  // shoes
+  ctx.fillStyle='#ef4444';
+  ctx.beginPath();
+  if(onGround){
+    ctx.ellipse(-10, 9, 7,3,0,0,Math.PI*2);
+    ctx.ellipse(10, 9, 7,3,0,0,Math.PI*2);
+  } else {
+    ctx.ellipse(-2, 7, 6,3,0,0,Math.PI*2);
+    ctx.ellipse(2, 7, 6,3,0,0,Math.PI*2);
+  }
+  ctx.fill();
+  // body
+  ctx.fillStyle='#38bdf8';
+  ctx.beginPath();
+  ctx.roundRect(-12, -28, 24, 22, 8);
+  ctx.fill();
+  ctx.fillStyle='#0ea5e9';
+  ctx.fillRect(-12, -14, 24, 6);
+  // arms
+  ctx.strokeStyle='#fde68a';
+  ctx.lineWidth=4;
+  ctx.beginPath();
+  if(onGround){
+    ctx.moveTo(-12, -22); ctx.lineTo(-18, -12); ctx.lineTo(-16, -6);
+    ctx.moveTo(12, -22); ctx.lineTo(18, -12); ctx.lineTo(16, -6);
+  } else {
+    ctx.moveTo(-12, -22); ctx.lineTo(-16, -28); ctx.lineTo(-14, -32);
+    ctx.moveTo(12, -22); ctx.lineTo(16, -28); ctx.lineTo(14, -32);
+  }
+  ctx.stroke();
+  // hands
+  ctx.fillStyle='#fde68a';
+  ctx.beginPath(); ctx.arc(onGround?-16:-14, onGround?-6:-32, 4,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(onGround?16:14, onGround?-6:-32, 4,0,Math.PI*2); ctx.fill();
+  // head
+  ctx.fillStyle='#fde68a';
+  ctx.beginPath(); ctx.arc(0, -34, 12,0,Math.PI*2); ctx.fill();
+  // hair
+  ctx.fillStyle='#1e293b';
+  ctx.beginPath(); ctx.arc(0, -38, 12, Math.PI, 0); ctx.fill();
+  ctx.beginPath(); ctx.arc(-4, -36, 3,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(4, -36, 3,0,Math.PI*2); ctx.fill();
+  // face
+  ctx.fillStyle='#0f172a';
+  ctx.beginPath(); ctx.arc(-4, -33, 1.5,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(4, -33, 1.5,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#0f172a'; ctx.lineWidth=1.2; ctx.lineCap='round';
+  ctx.beginPath(); ctx.arc(0, -30, 3, 0.2, Math.PI-0.2); ctx.stroke();
+  // blush when jumping
+  if(!onGround){
+    ctx.fillStyle='rgba(239,68,68,.4)';
+    ctx.beginPath(); ctx.arc(-7, -31, 2,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(7, -31, 2,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function loop(now){
+  const dt = Math.min(32, now - lastTime);
+  lastTime=now;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// Input
+function doJump(){
+  if(state!=='playing') return;
+  if(player.onGround){
+    player.onGround=false;
+    player.vy=player.jumpPower;
+    player.squish=0;
+    sfxHop();
+    // haptic
+    if(navigator.vibrate) navigator.vibrate(20);
+  }
+}
+document.getElementById('jumpBtn').addEventListener('touchstart', e=>{ e.preventDefault(); doJump(); }, {passive:false});
+document.getElementById('jumpBtn').addEventListener('click', doJump);
+canvas.addEventListener('touchstart', e=>{ e.preventDefault(); doJump(); }, {passive:false});
+canvas.addEventListener('mousedown', doJump);
+window.addEventListener('keydown', e=>{
+  if(e.code==='Space'){ e.preventDefault(); doJump(); }
+  if(e.code==='KeyP') togglePause();
+});
+
+function togglePause(){
+  if(state==='playing'){
+    state='paused';
+    overTitle.textContent='Paused';
+    overSub.textContent='Fiesta on hold — ready to hop again?';
+    overMsg.textContent=`Score ${score} • Level ${level} • ${bpm} BPM. Tap Resume to continue.`;
+    finalScore.textContent=score; finalLevel.textContent=level; finalBest.textContent=best;
+    overOverlay.classList.remove('hidden');
+    document.getElementById('pauseBtn').textContent='▶ Resume';
+  } else if(state==='paused'){
+    state='playing';
+    overOverlay.classList.add('hidden');
+    document.getElementById('pauseBtn').textContent='⏸ Pause';
+  }
+}
+function gameOver(){
+  state='over';
+  overTitle.textContent= lives<=0 ? 'Caught! 💥' : 'Game Over';
+  overSub.textContent= lives<=0 ? 'The poles snapped shut on you.' : 'Fiesta complete!';
+  overMsg.innerHTML = score>=20 ? `Amazing rhythm! <b>${score} clearances</b> at ${bpm} BPM. You’re a Tinik master!` : score>=10 ? `Good hops! <b>${score} clearances</b> — keep practicing the beat.` : `You scored <b>${score}</b>. Watch the beat dot and jump just before it snaps!`;
+  finalScore.textContent=score; finalLevel.textContent=level; finalBest.textContent=best;
+  overOverlay.classList.remove('hidden');
+  document.getElementById('pauseBtn').textContent='⏸ Pause';
+}
+
+document.getElementById('pauseBtn').addEventListener('click', ()=>{
+  if(state==='idle' || state==='over') return;
+  togglePause();
+});
+document.getElementById('soundBtn').addEventListener('click', ()=>{
+  soundOn=!soundOn;
+  document.getElementById('soundBtn').textContent= soundOn ? '🔊 Sound On' : '🔇 Sound Off';
+  if(soundOn) ensureAudio();
+});
+document.getElementById('helpBtn').addEventListener('click', ()=>{
+  startOverlay.classList.remove('hidden');
+});
+document.getElementById('closeOver').addEventListener('click', ()=>{
+  if(state==='paused'){ togglePause(); } else overOverlay.classList.add('hidden');
+});
+document.getElementById('retryBtn').addEventListener('click', ()=>{
+  overOverlay.classList.add('hidden');
+  resetGame();
+  state='playing';
+  ensureAudio();
+});
+document.getElementById('playBtn').addEventListener('click', ()=>{
+  startOverlay.classList.add('hidden');
+  resetGame();
+  state='playing';
+  ensureAudio();
+});
+document.getElementById('howBtn').addEventListener('click', ()=>{
+  overOverlay.classList.add('hidden');
+  startOverlay.classList.remove('hidden');
+});
+
+// tabs
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    const tab=btn.dataset.tab;
+    document.getElementById('tab-play').classList.toggle('hidden', tab!=='play');
+    document.getElementById('tab-canvas').classList.toggle('hidden', tab!=='canvas');
+    document.getElementById('tab-mobile').classList.toggle('hidden', tab!=='mobile');
+  });
+});
+
+// initial draw
+resetGame();
+draw();
+</script>
+</body>
+</html>

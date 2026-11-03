@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Echo Triangulation</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden;background:#081214}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e6f0f0;line-height:1.5;-webkit-tap-highlight-color:transparent}
+#app{max-width:428px;min-width:360px;margin:0 auto;min-height:100vh;background:linear-gradient(180deg,#0f2427 0%,#0a181a 55%,#081214 100%);display:flex;flex-direction:column;border-left:1px solid #143035;border-right:1px solid #143035}
+header{padding:14px 16px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #1a3336;position:sticky;top:0;background:rgba(10,24,26,0.96);backdrop-filter:blur(8px);z-index:5}
+.brand{display:flex;flex-direction:column;gap:2px}
+.brand h1{font-size:15px;letter-spacing:0.14em;font-weight:800;color:#7ff0e5}
+.brand p{font-size:11px;letter-spacing:0.08em;color:#6a8a8e;font-weight:600}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.badge{font-size:11px;font-weight:800;letter-spacing:0.08em;background:#0e2f33;border:1px solid #1e4a4e;color:#7ff0e5;padding:6px 10px;border-radius:999px}
+.icon-btn{width:48px;height:48px;border-radius:12px;border:1px solid #1e3a3e;background:#0f2427;color:#cfe8ea;display:grid;place-items:center;font-size:18px;cursor:pointer}
+main{flex:1;padding:14px 12px 18px;display:flex;flex-direction:column;gap:12px}
+.card{background:rgba(16,36,39,0.9);border:1px solid #1c3a3e;border-radius:16px;overflow:hidden}
+.card-hd{padding:12px 14px;border-bottom:1px solid #1a3336;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.card-hd h2{font-size:13px;letter-spacing:0.1em;font-weight:800;color:#cfe8ea}
+.card-hd span{font-size:11px;font-weight:700;color:#6a8a8e;letter-spacing:0.06em}
+.card-bd{padding:12px 14px}
+.muted{color:#7a9a9e;font-size:12px}
+.btn{appearance:none;border:1px solid #1e4a4e;background:#0f2a2e;color:#e6f0f0;border-radius:12px;min-height:48px;padding:12px 16px;font-size:14px;font-weight:700;letter-spacing:0.04em;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:1;transition:transform .08s,background .15s,border-color .15s}
+.btn:active{transform:scale(0.98)}
+.btn-primary{background:linear-gradient(180deg,#14b8a6,#0e9a8e);border-color:#14b8a6;color:#04201e}
+.btn-ghost{background:#0f2427}
+.btn-small{min-height:40px;padding:8px 12px;font-size:12px;border-radius:10px;flex:0 0 auto}
+.btn:disabled{opacity:.45;pointer-events:none}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.grid-select{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mission-card{border:1px solid #1c3a3e;background:linear-gradient(180deg,#112a2e,#0f2427);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;cursor:pointer;min-height:118px;position:relative}
+.mission-card.locked{opacity:.45;pointer-events:none}
+.mission-card.active{border-color:#2ec4b6;box-shadow:0 0 0 2px rgba(46,196,182,.18)}
+.mc-top{display:flex;justify-content:space-between;align-items:center}
+.mc-num{font-size:11px;font-weight:800;letter-spacing:0.1em;color:#7ff0e5;background:#0e2f33;border:1px solid #1e4a4e;padding:4px 8px;border-radius:999px}
+.mc-grid{font-size:10px;font-weight:700;color:#6a8a8e;letter-spacing:0.08em}
+.mc-title{font-size:13px;font-weight:800;color:#e6f0f0;line-height:1.2}
+.mc-brief{font-size:11px;color:#7a9a9e;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.stars{color:#ffcc4d;letter-spacing:2px;font-size:13px}
+.stars .off{color:#2a3e42}
+.progress-bar{height:6px;background:#0a1e21;border-radius:999px;overflow:hidden;border:1px solid #143035}
+.progress-fill{height:100%;background:linear-gradient(90deg,#2ec4b6,#7ff0e5);width:0%}
+.kv{display:flex;gap:8px;flex-wrap:wrap}
+.kv span{font-size:11px;font-weight:700;letter-spacing:0.06em;background:#0a1e21;border:1px solid #143035;color:#8fb0b3;padding:6px 10px;border-radius:999px}
+.readings{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.read{border:1px solid #1c3a3e;background:#0a1e21;border-radius:12px;padding:10px;text-align:center}
+.read b{display:block;font-size:11px;letter-spacing:0.08em;color:#6a8a8e}
+.read strong{display:block;font-size:16px;font-weight:800;color:#e6f0f0;margin-top:2px}
+.read em{display:block;font-size:10px;color:#7a9a9e;font-style:normal;margin-top:2px}
+.energy{border:1px solid #1e4a4e;background:linear-gradient(180deg,#0e2f33,#0a1e21);border-radius:12px;padding:12px;display:flex;align-items:center;justify-content:space-between}
+.energy strong{font-size:18px;color:#7ff0e5}
+.energy span{font-size:11px;font-weight:700;letter-spacing:0.08em;color:#6a8a8e}
+.grid-wrap{padding:10px;background:#081214;border-radius:14px;border:1px solid #143035}
+.grid{--n:8;display:grid;gap:6px;touch-action:manipulation}
+.cell{aspect-ratio:1;border-radius:10px;border:1px solid #1a3336;background:#0f2427;color:#8fb0b3;font-weight:700;font-size:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;position:relative;min-height:0;user-select:none}
+.cell:active{transform:scale(0.97)}
+.cell.ridge{background:repeating-linear-gradient(135deg,#132a2e 0 7px,#16363a 7px 14px);border-color:#214a4e;color:#5a7a7e}
+.cell.ridge::after{content:"≋";font-size:14px;opacity:.7}
+.cell.sensor{background:linear-gradient(180deg,#0e3a3e,#0a2e33);border-color:#2ec4b6;color:#7ff0e5;box-shadow:0 0 0 2px rgba(46,196,182,.22), inset 0 1px 0 rgba(255,255,255,.08)}
+.cell.sensor::before{content:"";position:absolute;inset:6px;border:1px dashed rgba(127,240,229,.35);border-radius:8px;pointer-events:none}
+.cell.guess-hint{outline:2px dashed rgba(255,159,28,.6);outline-offset:-2px}
+.log{max-height:132px;overflow:auto;display:flex;flex-direction:column;gap:6px;padding-right:2px}
+.log-entry{font-size:12px;background:#0a1e21;border:1px solid #143035;border-radius:10px;padding:8px 10px;color:#cfe8ea;display:flex;gap:8px;align-items:flex-start}
+.log-entry time{font-size:10px;font-weight:800;letter-spacing:0.06em;color:#5a7a7e;white-space:nowrap;margin-top:1px}
+.legend{display:flex;gap:8px;flex-wrap:wrap}
+.legend span{font-size:11px;font-weight:700;display:flex;align-items:center;gap:6px;color:#7a9a9e}
+.dot{width:12px;height:12px;border-radius:4px;border:1px solid #1a3336;display:inline-block}
+.dot.r{background:repeating-linear-gradient(135deg,#132a2e 0 4px,#16363a 4px 8px)}
+.dot.s{background:#0e3a3e;border-color:#2ec4b6}
+.dot.g{background:#0a1e21;border-color:#ff9f1c}
+.archive{display:flex;gap:8px;align-items:center}
+.archive input{flex:1;min-height:48px;border-radius:12px;border:1px solid #1c3a3e;background:#0a1e21;color:#cfe8ea;padding:12px 12px;font-size:12px;letter-spacing:0.04em}
+.modal{position:fixed;inset:0;background:rgba(2,10,12,.72);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
+.modal.open{display:flex}
+.sheet{width:100%;max-width:420px;background:linear-gradient(180deg,#112a2e,#0a1e21);border:1px solid #1e4a4e;border-radius:18px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.sheet-hd{padding:16px;border-bottom:1px solid #143035;display:flex;justify-content:space-between;align-items:center}
+.sheet-hd h3{font-size:14px;letter-spacing:0.08em;color:#e6f0f0}
+.sheet-bd{padding:16px;display:flex;flex-direction:column;gap:12px}
+.sheet-bd p{font-size:13px;color:#cfe8ea;line-height:1.5}
+.pill{font-size:11px;font-weight:800;letter-spacing:0.08em;background:#0e2f33;border:1px solid #1e4a4e;color:#7ff0e5;padding:6px 10px;border-radius:999px;display:inline-flex}
+.help-list{list-style:none;display:flex;flex-direction:column;gap:8px}
+.help-list li{font-size:12px;color:#a8c4c7;background:#0a1e21;border:1px solid #143035;border-radius:12px;padding:10px 12px}
+.hidden{display:none !important}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <h1>ECHO TRIANGULATION</h1>
+      <p>QUIET SENSOR OPS • 12 MISSIONS</p>
+    </div>
+    <div class="hdr-right">
+      <div class="badge" id="totalStars">★ 0/36</div>
+      <button class="icon-btn" id="helpBtn" aria-label="Help">?</button>
+    </div>
+  </header>
+  <main>
+    <!-- SELECT VIEW -->
+    <section id="selectView" class="card">
+      <div class="card-hd">
+        <h2>MISSION SELECT</h2>
+        <span id="progressText">0/12 COMPLETE</span>
+      </div>
+      <div class="card-bd" style="display:flex;flex-direction:column;gap:12px">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="kv">
+          <span id="kvEnergy">LOW ENERGY = 3★</span>
+          <span>GRID 8×8 → 10×10</span>
+          <span>WARP +1.5 / RIDGE</span>
+        </div>
+        <div id="missionGrid" class="grid-select"></div>
+        <div class="card" style="background:#0a1e21">
+          <div class="card-hd"><h2>ARCHIVE CODES</h2><span>btoa JSON</span></div>
+          <div class="card-bd" style="display:flex;flex-direction:column;gap:10px">
+            <p class="muted">Export progress as a shareable code. Import on another device to restore stars.</p>
+            <div class="archive">
+              <input id="archiveInput" placeholder="Paste code here…">
+              <button class="btn btn-small" id="importBtn">IMPORT</button>
+            </div>
+            <div class="row">
+              <button class="btn btn-ghost" id="exportBtn">EXPORT CODE</button>
+              <button class="btn btn-ghost" id="copyBtn">COPY</button>
+              <button class="btn btn-ghost" id="resetSaveBtn">RESET SAVE</button>
+            </div>
+            <p class="muted" id="archiveMsg"></p>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i class="dot r"></i> Ridge (+1.5 warp)</span>
+          <span><i class="dot s"></i> Sensor</span>
+          <span><i class="dot g"></i> Guess</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- GAME VIEW -->
+    <section id="gameView" class="hidden" style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div class="card-hd">
+          <button class="btn btn-small" id="backBtn">← MISSIONS</button>
+          <span id="missionLabel">MISSION 1 • 8×8</span>
+        </div>
+        <div class="card-bd" style="display:flex;flex-direction:column;gap:10px">
+          <h2 id="missionTitle" style="font-size:16px;color:#e6f0f0;letter-spacing:0.04em">First Light</h2>
+          <p id="missionBrief" class="muted" style="font-size:13px;line-height:1.5"></p>
+          <div class="kv" id="missionMeta"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><h2>SENSOR READINGS</h2><span id="phaseLabel">PLACE 3 SENSORS</span></div>
+        <div class="card-bd" style="display:flex;flex-direction:column;gap:10px">
+          <div class="readings" id="readings">
+            <div class="read"><b>S1</b><strong id="r1">—</strong><em id="r1d">no sensor</em></div>
+            <div class="read"><b>S2</b><strong id="r2">—</strong><em id="r2d">no sensor</em></div>
+            <div class="read"><b>S3</b><strong id="r3">—</strong><em id="r3d">no sensor</em></div>
+          </div>
+          <div class="energy">
+            <div><span>ENERGY = SUM READINGS</span><strong id="energyVal">—</strong></div>
+            <span id="parVal">PAR —</span>
+          </div>
+          <p class="muted" id="readingHint">Warp = Euclidean + ridgeCount×1.5. Lower energy = better placement.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><h2>GRID</h2><span id="gridHint">Tap to place sensors</span></div>
+        <div class="card-bd">
+          <div class="grid-wrap"><div id="grid" class="grid"></div></div>
+          <div style="height:10px"></div>
+          <div class="row">
+            <button class="btn btn-ghost" id="undoBtn">↩ UNDO</button>
+            <button class="btn btn-ghost" id="hintBtn">◐ HINT</button>
+            <button class="btn btn-ghost" id="resetBtn">↺ RESET</button>
+          </div>
+          <p class="muted" id="gridMsg" style="margin-top:8px">Place 3 sensors on clear cells. Ridges block placement. Then tap any clear cell to transmit guess.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><h2>MISSION LOG</h2><span id="logCount">0 entries</span></div>
+        <div class="card-bd"><div id="log" class="log"></div></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- GUESS CONFIRM MODAL -->
+<div id="guessModal" class="modal" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <div class="sheet-hd"><h3>TRANSMIT GUESS?</h3><button class="icon-btn" id="closeGuess" style="width:40px;height:40px">✕</button></div>
+    <div class="sheet-bd">
+      <p id="guessText">Confirm beacon at (x,y)?</p>
+      <div class="energy"><div><span>ENERGY AT GUESS</span><strong id="guessEnergy">—</strong></div><span id="guessPar">PAR —</span></div>
+      <div class="row"><button class="btn btn-ghost" id="cancelGuess">CANCEL</button><button class="btn btn-primary" id="confirmGuess">TRANSMIT</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- RESULT MODAL -->
+<div id="resultModal" class="modal" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <div class="sheet-hd"><h3 id="resultTitle">RESULT</h3><span class="pill" id="resultStars">★☆☆</span></div>
+    <div class="sheet-bd">
+      <p id="resultText"></p>
+      <div class="energy"><div><span>YOUR ENERGY</span><strong id="resultEnergy">—</strong></div><span id="resultPar">PAR —</span></div>
+      <div class="row"><button class="btn btn-ghost" id="retryBtn">RETRY</button><button class="btn btn-primary" id="nextBtn">NEXT MISSION →</button></div>
+      <button class="btn btn-ghost" id="backToSelect">BACK TO MISSIONS</button>
+    </div>
+  </div>
+</div>
+
+<!-- HELP MODAL -->
+<div id="helpModal" class="modal" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <div class="sheet-hd"><h3>HOW TO PLAY</h3><button class="icon-btn" id="closeHelp" style="width:40px;height:40px">✕</button></div>
+    <div class="sheet-bd">
+      <ul class="help-list">
+        <li><b>1. Place 3 sensors</b> — Tap clear cells. Ridges (≋) block placement. Tap a sensor again to remove it.</li>
+        <li><b>2. Read warp</b> — Each sensor shows <b>warped distance = Euclidean + ridgeCount×1.5</b>. RidgeCount = ridges crossed by straight line to beacon.</li>
+        <li><b>3. Minimize energy</b> — Energy = sum of 3 readings. Lower = better triangulation. PAR is target for 3★.</li>
+        <li><b>4. Tap beacon cell</b> — After 3 sensors, tap any clear cell to guess. Correct + low energy = more stars.</li>
+        <li><b>Stars:</b> 1★ correct, 2★ if energy ≤ PAR×1.25, 3★ if energy ≤ PAR. Wrong = 0★.</li>
+        <li><b>Tools:</b> UNDO removes last sensor, HINT reveals quadrant/row, RESET clears. Archive codes save progress via <code>btoa(JSON.stringify(progress))</code> in localStorage.</li>
+      </ul>
+      <div class="row"><button class="btn btn-primary" id="gotIt">GOT IT</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SAVE_KEY='echoTriangulationSave';
+const MISSIONS=[
+  {id:1,title:"First Light",grid:8,beacon:[5,2],ridges:[[2,2],[2,3],[2,4],[3,4]],brief:"Calm sea. One low ridge. Place sensors to triangulate the silent beacon.",par:9.5,h1:"Beacon is in the northern half (y < 4).",h2:"Try sensors close to the beacon but on different sides of the ridge."},
+  {id:2,title:"The Spine",grid:8,beacon:[6,6],ridges:[[3,0],[3,1],[3,2],[3,3],[3,4],[3,5],[3,6],[3,7]],brief:"A long ridge splits the grid. Echoes warp heavily across it.",par:11.0,h1:"Beacon is east of the spine (x > 3).",h2:"Place at least one sensor on the same side as the beacon to cut warp."},
+  {id:3,title:"Hook Point",grid:8,beacon:[1,6],ridges:[[4,4],[5,4],[6,4],[6,5],[6,6],[5,6]],brief:"Hook-shaped ridge creates a shadow zone. Use triangulation around it.",par:10.5,h1:"Beacon is southwest, near the hook's inner curve.",h2:"Sensors at (0,4), (2,7) and (4,6) would give low energy."},
+  {id:4,title:"Crosswind",grid:9,beacon:[7,1],ridges:[[4,0],[4,1],[4,2],[4,3],[4,4],[4,5],[4,6],[4,7],[4,8],[0,4],[1,4],[2,4],[3,4],[5,4],[6,4],[7,4],[8,4]],brief:"Crossing ridges form four quadrants. Beacon hides in one.",par:13.0,h1:"Beacon is northeast quadrant (x>4, y<4).",h2:"Avoid placing sensors across both ridges from the beacon."},
+  {id:5,title:"Twin Peaks",grid:9,beacon:[4,7],ridges:[[2,2],[2,3],[3,2],[3,3],[6,5],[6,6],[7,5],[7,6]],brief:"Two isolated ridge clusters. Warp is local but strong.",par:12.5,h1:"Beacon is south-central, between the peaks' shadows.",h2:"Place sensors in a triangle around (4,7) to minimize ridge crossings."},
+  {id:6,title:"The Canyon",grid:9,beacon:[8,4],ridges:[[5,1],[5,2],[5,3],[5,4],[5,5],[5,6],[5,7],[6,1],[6,7]],brief:"Canyon walls channel echoes. Straight lines lie.",par:14.0,h1:"Beacon is at the canyon mouth, far east.",h2:"One sensor inside the canyon, two outside gives best triangulation."},
+  {id:7,title:"Broken Grid",grid:10,beacon:[2,2],ridges:[[1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[4,5],[4,6],[4,7],[4,8]],brief:"Inverted T ridge divides the 10×10. Old maps are useless.",par:15.5,h1:"Beacon is northwest, above the horizontal ridge.",h2:"Don't cluster all sensors on one side — spread for low energy."},
+  {id:8,title:"Atoll",grid:10,beacon:[5,5],ridges:[[3,3],[4,3],[5,3],[6,3],[7,3],[7,4],[7,5],[7,6],[7,7],[6,7],[5,7],[4,7],[3,7],[3,6],[3,5],[3,4]],brief:"Ring ridge encloses the beacon. Every reading is warped.",par:16.0,h1:"Beacon is inside the ring, center.",h2:"Place sensors just outside the ring on three sides."},
+  {id:9,title:"Scatter",grid:10,beacon:[9,9],ridges:[[1,1],[2,5],[5,2],[6,8],[8,3],[3,8],[7,1],[1,7]],brief:"Scattered ridge cells. Each adds +1.5 to any line crossing it.",par:17.0,h1:"Beacon is southeast corner.",h2:"Check your energy — if >20, you're crossing too many ridges."},
+  {id:10,title:"The Fork",grid:10,beacon:[0,5],ridges:[[4,2],[4,3],[4,4],[4,5],[4,6],[5,3],[6,4],[5,7],[6,8]],brief:"Forked ridge creates three echo corridors.",par:18.0,h1:"Beacon is far west, midline.",h2:"Sensors at (1,2), (1,8) and (3,5) triangulate cleanly."},
+  {id:11,title:"Labyrinth",grid:10,beacon:[8,1],ridges:[[2,0],[2,1],[2,2],[2,3],[2,4],[5,5],[5,6],[5,7],[5,8],[5,9],[7,2],[7,3],[7,4],[7,5],[8,5],[9,5]],brief:"Labyrinth walls. Only precise placement yields 3 stars.",par:19.5,h1:"Beacon is northeast, above the eastern wall.",h2:"Count ridge crossings — each is +1.5 energy."},
+  {id:12,title:"Silent Summit",grid:10,beacon:[5,0],ridges:[[0,3],[1,3],[2,3],[3,3],[4,3],[6,3],[7,3],[8,3],[9,3],[4,6],[5,6],[6,6],[4,7],[6,7]],brief:"Final mission. Two ridge lines guard the summit beacon.",par:20.0,h1:"Beacon is north edge, center top.",h2:"Perfect 3-star needs energy under 20 — stay north of the first ridge."}
+];
+
+let state={progress:Array(12).fill(0).map(()=>({stars:0,bestEnergy:null,completed:false})),totalStars:0};
+let current=null, sensors=[], hintsUsed=0, logEntries=[], pendingGuess=null, history=[];
+
+const $=s=>document.getElementById(s);
+function load(){
+  try{const raw=localStorage.getItem(SAVE_KEY); if(raw){const p=JSON.parse(raw); if(p.progress) state=p;}}catch(e){}
+}
+function save(){ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
+function totalStars(){ return state.progress.reduce((a,b)=>a+b.stars,0); }
+function isUnlocked(id){ if(id===1) return true; return state.progress[id-2].completed; }
+
+function renderSelect(){
+  $('totalStars').textContent='★ '+totalStars()+'/36';
+  const done=state.progress.filter(p=>p.completed).length;
+  $('progressText').textContent=done+'/12 COMPLETE';
+  $('progressFill').style.width=(done/12*100)+'%';
+  const g=$('missionGrid'); g.innerHTML='';
+  MISSIONS.forEach(m=>{
+    const prog=state.progress[m.id-1];
+    const unlocked=isUnlocked(m.id);
+    const el=document.createElement('button');
+    el.className='mission-card'+(unlocked?'':' locked')+(current&&current.id===m.id?' active':'');
+    el.innerHTML=`
+      <div class="mc-top"><span class="mc-num">#${String(m.id).padStart(2,'0')}</span><span class="mc-grid">${m.grid}×${m.grid}</span></div>
+      <div class="mc-title">${m.title}</div>
+      <div class="mc-brief">${m.brief}</div>
+      <div class="stars">${'★'.repeat(prog.stars)}<span class="off">${'★'.repeat(3-prog.stars)}</span></div>
+      <div class="muted" style="font-size:10px">${prog.bestEnergy!==null?'BEST '+prog.bestEnergy.toFixed(1): unlocked?'READY':'LOCKED'}</div>
+    `;
+    el.onclick=()=>{ if(unlocked) startMission(m.id); };
+    g.appendChild(el);
+  });
+}
+
+function startMission(id){
+  current=MISSIONS.find(m=>m.id===id);
+  sensors=[]; hintsUsed=0; logEntries=[]; history=[]; pendingGuess=null;
+  $('selectView').classList.add('hidden');
+  $('gameView').classList.remove('hidden');
+  $('missionLabel').textContent=`MISSION ${id} • ${current.grid}×${current.grid}`;
+  $('missionTitle').textContent=current.title;
+  $('missionBrief').textContent=current.brief;
+  $('missionMeta').innerHTML=`<span>GRID ${current.grid}×${current.grid}</span><span>PAR ${current.par.toFixed(1)}</span><span>BEACON HIDDEN</span>`;
+  $('parVal').textContent='PAR '+current.par.toFixed(1);
+  $('gridMsg').textContent='Place 3 sensors on clear cells. Ridges block placement. Then tap any clear cell to transmit guess.';
+  $('gridHint').textContent='Tap to place sensors';
+  logEntries=[]; addLog('Mission started: '+current.title);
+  addLog('Ridge warp: +1.5 per ridge crossed. Minimize energy.');
+  renderGame();
+  window.scrollTo(0,0);
+}
+
+function ridgeSet(m){ return new Set(m.ridges.map(([x,y])=>x+','+y)); }
+function isRidge(x,y){ return ridgeSet(current).has(x+','+y); }
+
+function renderGame(){
+  renderGrid();
+  updateReadings();
+  renderLog();
+  $('logCount').textContent=logEntries.length+' entries';
+  const need=3-sensors.length;
+  if(sensors.length<3){
+    $('phaseLabel').textContent=`PLACE ${need} MORE`;
+    $('gridHint').textContent=`Place sensor ${sensors.length+1}/3`;
+  } else {
+    $('phaseLabel').textContent='READY TO TRANSMIT';
+    $('gridHint').textContent='Tap beacon cell to guess';
+  }
+  $('undoBtn').disabled=history.length===0;
+  $('hintBtn').disabled=hintsUsed>=2;
+  $('hintBtn').textContent=hintsUsed===0?'◐ HINT (1/2)':hintsUsed===1?'◐ HINT (2/2)':'◐ HINT (0/2)';
+}
+
+function renderGrid(){
+  const gridEl=$('grid');
+  gridEl.style.setProperty('--n', current.grid);
+  gridEl.style.gridTemplateColumns=`repeat(${current.grid},1fr)`;
+  gridEl.innerHTML='';
+  const rSet=ridgeSet(current);
+  for(let y=0;y<current.grid;y++){
+    for(let x=0;x<current.grid;x++){
+      const btn=document.createElement('button');
+      btn.className='cell';
+      btn.dataset.x=x; btn.dataset.y=y;
+      const isR=rSet.has(x+','+y);
+      if(isR) btn.classList.add('ridge');
+      const sIdx=sensors.findIndex(s=>s[0]===x&&s[1]===y);
+      if(sIdx!==-1){
+        btn.classList.add('sensor');
+        btn.innerHTML=`<span style="font-size:13px">⬢</span><span>S${sIdx+1}</span><span style="font-size:9px;opacity:.8">${x},${y}</span>`;
+      } else {
+        if(!isR) btn.innerHTML=`<span style="font-size:9px;opacity:.5">${x},${y}</span>`;
+      }
+      btn.setAttribute('aria-label',`Cell ${x},${y} ${isR?'ridge': sIdx!==-1?'sensor '+ (sIdx+1):'empty'}`);
+      btn.onclick=()=>onCellTap(x,y);
+      gridEl.appendChild(btn);
+    }
+  }
+}
+
+function onCellTap(x,y){
+  if(isRidge(x,y)){
+    addLog(`Ridge at ${x},${y} blocks placement.`);
+    renderLog(); return;
+  }
+  const sIdx=sensors.findIndex(s=>s[0]===x&&s[1]===y);
+  if(sIdx!==-1){
+    // remove sensor
+    sensors.splice(sIdx,1);
+    history.push({type:'remove',x,y});
+    addLog(`Removed sensor at ${x},${y}.`);
+    renderGame(); return;
+  }
+  if(sensors.length<3){
+    sensors.push([x,y]);
+    history.push({type:'place',x,y});
+    addLog(`Placed S${sensors.length} at ${x},${y}.`);
+    renderGame(); return;
+  } else {
+    // guess
+    pendingGuess=[x,y];
+    const e=computeEnergyForGuess(x,y);
+    $('guessText').textContent=`Transmit guess at (${x}, ${y})? Energy will be ${e.toFixed(1)}.`;
+    $('guessEnergy').textContent=e.toFixed(1);
+    $('guessPar').textContent='PAR '+current.par.toFixed(1);
+    $('guessModal').classList.add('open');
+  }
+}
+
+function ridgeCount(sx,sy,bx,by){
+  const rSet=ridgeSet(current);
+  let count=0;
+  let x0=sx,y0=sy,x1=bx,y1=by;
+  let dx=Math.abs(x1-x0), dy=Math.abs(y1-y0);
+  let sxStep=x0<x1?1:-1, syStep=y0<y1?1:-1;
+  let err=dx-dy;
+  let x=x0,y=y0;
+  while(true){
+    if(!(x===x0 && y===y0)){
+      if(rSet.has(x+','+y)) count++;
+    }
+    if(x===x1 && y===y1) break;
+    let e2=2*err;
+    if(e2>-dy){ err-=dy; x+=sxStep; }
+    if(e2<dx){ err+=dx; y+=syStep; }
+  }
+  return count;
+}
+function warped(sx,sy,bx,by){
+  const eu=Math.hypot(sx-bx, sy-by);
+  const rc=ridgeCount(sx,sy,bx,by);
+  return {warped: eu + rc*1.5, eu, rc};
+}
+function computeEnergyForGuess(gx,gy){
+  let sum=0;
+  for(const [sx,sy] of sensors){
+    sum+=warped(sx,sy,gx,gy).warped;
+  }
+  return sum;
+}
+function updateReadings(){
+  const bx=current.beacon[0], by=current.beacon[1];
+  let sum=0;
+  for(let i=0;i<3;i++){
+    const elVal=$('r'+(i+1)), elDet=$('r'+(i+1)+'d');
+    if(i < sensors.length){
+      const [sx,sy]=sensors[i];
+      const w=warped(sx,sy,bx,by);
+      sum+=w.warped;
+      elVal.textContent=w.warped.toFixed(1);
+      elDet.textContent=`${w.eu.toFixed(1)} + ${w.rc}×1.5`;
+      elDet.style.color=w.rc>0?'#ff9f1c':'#7a9a9e';
+    } else {
+      elVal.textContent='—';
+      elDet.textContent='no sensor';
+      elDet.style.color='#7a9a9e';
+    }
+  }
+  $('energyVal').textContent=sensors.length===3? sum.toFixed(1) : '—';
+  $('energyVal').style.color=sensors.length===3? (sum<=current.par?'#7ff0e5': sum<=current.par*1.25?'#ffcc4d':'#ff6b6b'):'#7ff0e5';
+}
+
+function addLog(msg){
+  const t=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  logEntries.unshift({t,msg});
+  if(logEntries.length>30) logEntries.pop();
+}
+function renderLog(){
+  const el=$('log'); el.innerHTML='';
+  logEntries.forEach(e=>{
+    const d=document.createElement('div');
+    d.className='log-entry';
+    d.innerHTML=`<time>${e.t}</time><span>${e.msg}</span>`;
+    el.appendChild(d);
+  });
+  $('logCount').textContent=logEntries.length+' entries';
+}
+
+function showHint(){
+  if(hintsUsed>=2) return;
+  hintsUsed++;
+  const h=hintsUsed===1? current.h1 : current.h2;
+  addLog(`Hint ${hintsUsed}/2: ${h}`);
+  renderLog(); renderGame();
+}
+function undo(){
+  if(history.length===0) return;
+  const last=history.pop();
+  if(last.type==='place'){
+    const idx=sensors.findIndex(s=>s[0]===last.x&&s[1]===last.y);
+    if(idx!==-1) sensors.splice(idx,1);
+    addLog(`Undo: removed sensor at ${last.x},${last.y}.`);
+  } else {
+    sensors.push([last.x,last.y]);
+    addLog(`Undo: restored sensor at ${last.x},${last.y}.`);
+  }
+  renderGame();
+}
+function resetMission(){
+  sensors=[]; history=[]; addLog('Reset sensors.');
+  renderGame();
+}
+function confirmGuessAction(){
+  if(!pendingGuess) return;
+  const [gx,gy]=pendingGuess;
+  $('guessModal').classList.remove('open');
+  const bx=current.beacon[0], by=current.beacon[1];
+  const energy=computeEnergyForGuess(gx,gy);
+  const correct=(gx===bx && gy===by);
+  let stars=0;
+  if(correct){
+    if(energy <= current.par) stars=3;
+    else if(energy <= current.par*1.25) stars=2;
+    else stars=1;
+  }
+  // save progress
+  const prog=state.progress[current.id-1];
+  if(stars>prog.stars) prog.stars=stars;
+  if(prog.bestEnergy===null || energy < prog.bestEnergy) prog.bestEnergy=energy;
+  if(correct) prog.completed=true;
+  // if correct, also mark as completed even if low stars? yes
+  // unlock next automatically via isUnlocked check
+  save();
+  showResult(correct, stars, energy, gx,gy);
+  pendingGuess=null;
+}
+function showResult(correct, stars, energy, gx,gy){
+  const bx=current.beacon[0], by=current.beacon[1];
+  $('resultTitle').textContent=correct?'BEACON LOCATED':'SIGNAL LOST';
+  $('resultStars').textContent='★'.repeat(stars)+'☆'.repeat(3-stars);
+  $('resultEnergy').textContent=energy.toFixed(1);
+  $('resultPar').textContent='PAR '+current.par.toFixed(1);
+  if(correct){
+    const msg=stars===3?`Perfect triangulation! Beacon at (${bx},${by}) with energy ${energy.toFixed(1)} ≤ PAR.`
+      : stars===2?`Beacon at (${bx},${by}) confirmed. Energy ${energy.toFixed(1)} within 25% of PAR — 2★.`
+      :`Beacon found at (${bx},${by}) but energy ${energy.toFixed(1)} was high. Try closer sensors for 3★.`;
+    $('resultText').textContent=msg;
+    $('resultText').style.color='#cfe8ea';
+  } else {
+    $('resultText').textContent=`No beacon at (${gx},${gy}). True beacon was at (${bx},${by}). Energy would have been ${computeEnergyForGuess(bx,by).toFixed(1)} from your sensors.`;
+    $('resultText').style.color='#ff9f1c';
+  }
+  const nextId=current.id<12? current.id+1 : null;
+  const nextBtn=$('nextBtn');
+  if(nextId && correct){
+    nextBtn.style.display='inline-flex';
+    nextBtn.textContent=isUnlocked(nextId)?'NEXT MISSION →':'NEXT MISSION →';
+    nextBtn.onclick=()=>{ $('resultModal').classList.remove('open'); startMission(nextId); };
+  } else if(nextId && !correct){
+    nextBtn.style.display='inline-flex';
+    nextBtn.textContent='TRY AGAIN';
+    nextBtn.onclick=()=>{ $('resultModal').classList.remove('open'); resetMission(); };
+  } else {
+    nextBtn.style.display='none';
+  }
+  $('resultModal').classList.add('open');
+  renderSelect();
+}
+
+function exportCode(){
+  try{
+    const code=btoa(JSON.stringify(state.progress));
+    $('archiveInput').value=code;
+    $('archiveMsg').textContent='Code exported — copy and save it.';
+    if(navigator.clipboard) navigator.clipboard.writeText(code).catch(()=>{});
+  }catch(e){ $('archiveMsg').textContent='Export failed.'; }
+}
+function importCode(){
+  const code=$('archiveInput').value.trim();
+  if(!code){ $('archiveMsg').textContent='Paste a code first.'; return; }
+  try{
+    const prog=JSON.parse(atob(code));
+    if(!Array.isArray(prog) || prog.length!==12) throw new Error('bad');
+    state.progress=prog;
+    save(); renderSelect();
+    $('archiveMsg').textContent='Progress imported!';
+  }catch(e){ $('archiveMsg').textContent='Invalid code.'; }
+}
+
+// events
+$('backBtn').onclick=()=>{ $('gameView').classList.add('hidden'); $('selectView').classList.remove('hidden'); renderSelect(); };
+$('undoBtn').onclick=undo;
+$('hintBtn').onclick=showHint;
+$('resetBtn').onclick=resetMission;
+$('closeGuess').onclick=()=>$('guessModal').classList.remove('open');
+$('cancelGuess').onclick=()=>$('guessModal').classList.remove('open');
+$('confirmGuess').onclick=confirmGuessAction;
+$('retryBtn').onclick=()=>{ $('resultModal').classList.remove('open'); resetMission(); };
+$('backToSelect').onclick=()=>{ $('resultModal').classList.remove('open'); $('gameView').classList.add('hidden'); $('selectView').classList.remove('hidden'); renderSelect(); };
+$('exportBtn').onclick=exportCode;
+$('copyBtn').onclick=()=>{ const v=$('archiveInput').value; if(v && navigator.clipboard) navigator.clipboard.writeText(v).then(()=>$('archiveMsg').textContent='Copied!'); };
+$('importBtn').onclick=importCode;
+$('resetSaveBtn').onclick=()=>{ if(confirm('Reset all progress?')){ state.progress=Array(12).fill(0).map(()=>({stars:0,bestEnergy:null,completed:false})); save(); renderSelect(); $('archiveMsg').textContent='Save reset.'; } };
+$('helpBtn').onclick=()=>$('helpModal').classList.add('open');
+$('closeHelp').onclick=()=>$('helpModal').classList.remove('open');
+$('gotIt').onclick=()=>$('helpModal').classList.remove('open');
+document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
+
+load(); renderSelect();
+</script>
+</body>
+</html>

@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Floaty Ledges</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#FFF8EC;
+  --card:#FFFFFF;
+  --pastel-pink:#FFD6E0;
+  --pastel-blue:#C1E7FF;
+  --pastel-mint:#C9F4AA;
+  --pastel-lav:#DDD6FE;
+  --pastel-peach:#FFE4B5;
+  --ink:#3A2E4A;
+  --muted:#8B7E9E;
+  --accent:#FF8FAB;
+  --accent2:#7CC8FF;
+  --shadow:0 8px 24px rgba(58,46,74,0.12);
+}
+html,body{height:100%;background:var(--bg);color:var(--ink);font-family: ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center}
+.app{
+  width:100%;max-width:428px;min-width:360px;
+  min-height:100dvh;
+  display:flex;flex-direction:column;
+  background:var(--bg);
+  position:relative;
+}
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 14px 10px;
+  background:var(--card);
+  border-bottom:2px solid #F3E8FF;
+  position:sticky;top:0;z-index:5;
+}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{
+  width:36px;height:36px;border-radius:12px;
+  background:linear-gradient(135deg,var(--pastel-pink),var(--pastel-blue));
+  display:grid;place-items:center;
+  font-size:18px;box-shadow:var(--shadow);
+  border:2px solid #fff;
+}
+.brand h1{font-size:16px;line-height:1;font-weight:800;letter-spacing:-0.02em}
+.brand p{font-size:11px;color:var(--muted);font-weight:600;margin-top:2px}
+.scores{display:flex;gap:8px}
+.pill{
+  background:#FFF0F5;border:2px solid #FFD6E0;
+  border-radius:999px;padding:6px 10px;
+  text-align:center;min-width:72px;
+}
+.pill.best{background:#EFF6FF;border-color:#C1E7FF}
+.pill span{display:block;font-size:10px;font-weight:800;letter-spacing:0.08em;color:var(--muted);text-transform:uppercase}
+.pill strong{font-size:15px;font-weight:900;color:var(--ink)}
+.canvas-wrap{
+  position:relative;
+  margin:10px 12px 0;
+  background:linear-gradient(180deg,#E0F2FF 0%, #FFF6E8 55%, #FFE4EC 100%);
+  border-radius:22px;
+  border:3px solid #fff;
+  box-shadow:var(--shadow);
+  overflow:hidden;
+  flex:1;
+  display:flex;
+  min-height:520px;
+}
+canvas{
+  width:100%;height:100%;
+  display:block;
+  touch-action:none;
+}
+.overlay{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:18px;
+  background:linear-gradient(180deg, rgba(255,248,236,0.92) 0%, rgba(255,255,255,0.88) 100%);
+  backdrop-filter: blur(6px);
+  text-align:center;
+  z-index:3;
+}
+.overlay.hidden{display:none}
+.badge{
+  background:var(--card);border:2px solid #F3E8FF;
+  border-radius:999px;padding:6px 12px;
+  font-size:11px;font-weight:800;letter-spacing:0.08em;color:var(--muted);text-transform:uppercase;
+}
+.overlay h2{
+  font-size:28px;font-weight:900;letter-spacing:-0.03em;margin:10px 0 6px;
+  line-height:1;
+}
+.overlay h2 span{background:linear-gradient(90deg,#FF8FAB,#7CC8FF);-webkit-background-clip:text;background-clip:text;color:transparent}
+.overlay p{font-size:14px;color:var(--muted);font-weight:600;line-height:1.4;max-width:300px}
+.hero-preview{
+  width:84px;height:84px;border-radius:24px;
+  background:linear-gradient(135deg,#FFD6E0,#C1E7FF);
+  display:grid;place-items:center;
+  font-size:42px;margin:14px 0 6px;
+  border:3px solid #fff;box-shadow:var(--shadow);
+  animation:float 1.6s ease-in-out infinite;
+}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.btn{
+  appearance:none;border:none;
+  background:linear-gradient(135deg,#FF8FAB,#FF6B8A);
+  color:#fff;font-weight:900;font-size:16px;
+  padding:14px 22px;border-radius:999px;
+  box-shadow:0 8px 16px rgba(255,107,138,0.35);
+  margin-top:14px;cursor:pointer;
+  min-height:48px;min-width:160px;
+  letter-spacing:-0.01em;
+}
+.btn:active{transform:scale(0.98)}
+.btn.secondary{
+  background:#fff;color:var(--ink);
+  border:2px solid #F3E8FF;box-shadow:var(--shadow);
+}
+.hint-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center}
+.hint{
+  background:#fff;border:2px solid #F3E8FF;border-radius:999px;
+  padding:6px 10px;font-size:11px;font-weight:700;color:var(--muted);
+  display:flex;align-items:center;gap:6px;
+}
+.controls{
+  display:grid;grid-template-columns:1fr auto 1fr;
+  gap:12px;align-items:center;
+  padding:12px 12px 14px;
+  background:var(--card);
+  border-top:2px solid #F3E8FF;
+  position:sticky;bottom:0;
+}
+.ctrl{
+  appearance:none;border:none;
+  background:#fff;
+  border:3px solid #F3E8FF;
+  border-radius:20px;
+  height:72px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;
+  font-weight:900;color:var(--ink);
+  box-shadow:var(--shadow);
+  user-select:none;touch-action:none;
+  cursor:pointer;
+}
+.ctrl:active,.ctrl.pressed{
+  background:#FFF0F5;border-color:#FFD6E0;transform:scale(0.97)
+}
+.ctrl span:first-child{font-size:22px;line-height:1}
+.ctrl span:last-child{font-size:10px;letter-spacing:0.08em;color:var(--muted);text-transform:uppercase}
+.ctrl.jump{
+  background:linear-gradient(135deg,#7CC8FF,#A78BFA);
+  border-color:#fff;
+  color:#fff;
+  height:84px;
+  border-radius:24px;
+  box-shadow:0 10px 20px rgba(124,200,255,0.35);
+  min-width:96px;
+}
+.ctrl.jump span:last-child{color:#fff;opacity:0.95}
+.ctrl.jump:active,.ctrl.jump.pressed{transform:scale(0.96);filter:brightness(1.05)}
+.mini-stats{
+  display:flex;gap:8px;justify-content:center;
+  padding:8px 12px 0;
+  font-size:11px;font-weight:800;color:var(--muted);
+}
+.mini-stats b{color:var(--ink)}
+.footer-note{
+  text-align:center;padding:6px 12px 10px;
+  font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.04em;
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">☁️</div>
+      <div>
+        <h1>Floaty Ledges</h1>
+        <p>Pastel Platform Collector</p>
+      </div>
+    </div>
+    <div class="scores">
+      <div class="pill"><span>Score</span><strong id="scoreEl">0</strong></div>
+      <div class="pill best"><span>Best</span><strong id="bestEl">0</strong></div>
+    </div>
+  </div>
+
+  <div class="mini-stats">
+    <span>Orbs <b id="orbsEl">0</b></span> • <span>Height <b id="heightEl">0</b>m</span> • <span id="statusEl">Ready to bounce</span>
+  </div>
+
+  <div class="canvas-wrap" id="wrap">
+    <canvas id="c" width="360" height="640" aria-label="Floaty Ledges game"></canvas>
+
+    <div class="overlay" id="startOverlay">
+      <div class="badge">Mobile-first • 360–428px • No zoom needed</div>
+      <div class="hero-preview">🧚</div>
+      <h2>Guide the <span>bouncing hero</span></h2>
+      <p>Steer with ◀ ▶ and tap <b>JUMP</b> for a boost. Land on pastel ledges, grab glowing orbs, and don’t fall!</p>
+      <button class="btn" id="playBtn">▶ Play Now</button>
+      <div class="hint-row">
+        <div class="hint">🟣 Auto-bounce on ledges</div>
+        <div class="hint">✨ Orbs = +10 (+combo)</div>
+        <div class="hint">💨 Miss = game over</div>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="gameOverOverlay">
+      <div class="badge" id="resultBadge">Game Over</div>
+      <h2 id="resultTitle">So close!</h2>
+      <p id="resultDesc">You fell into the clouds. Collect more orbs next run!</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+        <button class="btn" id="restartBtn">↻ Quick Restart</button>
+        <button class="btn secondary" id="homeBtn">Home</button>
+      </div>
+      <p style="margin-top:10px;font-size:12px" id="resultStats"></p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl" id="leftBtn" aria-label="Move left"><span>◀</span><span>Move</span></button>
+    <button class="ctrl jump" id="jumpBtn" aria-label="Jump"><span>⤴</span><span>Jump</span></button>
+    <button class="ctrl" id="rightBtn" aria-label="Move right"><span>▶</span><span>Move</span></button>
+  </div>
+  <div class="footer-note">Large touch targets • Pastel art • Best score saved on this device</div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('wrap');
+  const scoreEl = document.getElementById('scoreEl');
+  const bestEl = document.getElementById('bestEl');
+  const orbsEl = document.getElementById('orbsEl');
+  const heightEl = document.getElementById('heightEl');
+  const statusEl = document.getElementById('statusEl');
+  const startOverlay = document.getElementById('startOverlay');
+  const gameOverOverlay = document.getElementById('gameOverOverlay');
+  const resultTitle = document.getElementById('resultTitle');
+  const resultDesc = document.getElementById('resultDesc');
+  const resultBadge = document.getElementById('resultBadge');
+  const resultStats = document.getElementById('resultStats');
+
+  const W = 360, H = 640;
+  let dpr = Math.min(window.devicePixelRatio||1, 2);
+  function resizeCanvas(){
+    const rect = wrap.getBoundingClientRect();
+    // keep logical 360x640 but scale canvas buffer for crispness
+    const cssW = rect.width;
+    const cssH = rect.height;
+    // we keep internal 360x640 and scale via CSS, but adjust buffer for DPR
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  // Game state
+  let best = parseInt(localStorage.getItem('floaty_best')||'0',10);
+  bestEl.textContent = best;
+
+  let state = 'start'; // start, playing, over
+  let score = 0, orbs = 0, maxHeight = 0;
+  let combo = 0, comboTimer = 0;
+  let cameraY = 0; // world Y of top of screen (0 at top, negative upward)
+  let hero = {x: W/2, y: H-90, vx:0, vy:0, r:14, onGround:false, facing:1};
+  let platforms = [];
+  let particles = [];
+  let orbsList = [];
+  let keys = {left:false, right:false};
+  let jumpQueued = false;
+  let lastTime = 0;
+  let shake = 0;
+
+  const GRAVITY = 0.42;
+  const FRICTION = 0.88;
+  const MOVE_SPEED = 4.2;
+  const BOUNCE_VY = -10.8;
+  const JUMP_BOOST = -14.5;
+  const SUPER_JUMP = -17.5;
+
+  function rand(a,b){return a + Math.random()*(b-a)}
+  function choice(a){return a[Math.floor(Math.random()*a.length)]}
+
+  function resetWorld(){
+    score = 0; orbs = 0; maxHeight = 0; combo=0; comboTimer=0;
+    cameraY = 0;
+    hero = {x: W/2, y: H-90, vx:0, vy:-8, r:14, onGround:false, facing:1, squish:0};
+    platforms = [];
+    orbsList = [];
+    particles = [];
+    shake = 0;
+
+    // ground
+    platforms.push({x:0, y:H-20, w:W, h:20, type:'ground', color:'#FFD6E0'});
+    // starter platforms
+    let y = H-80;
+    for(let i=0;i<8;i++){
+      y -= rand(55,85);
+      let w = rand(70,110);
+      let x = rand(10, W - w -10);
+      platforms.push({x, y, w, h:14, type:choice(['pink','blue','mint','lav']), color:''});
+    }
+    // ensure first platform under hero
+    platforms.push({x: W/2-50, y: H-60, w:100, h:14, type:'mint'});
+
+    generateUpTo(-600);
+    updateHUD();
+  }
+
+  function platformColor(t){
+    if(t==='ground') return '#FFD6E0';
+    if(t==='pink') return '#FFD6E0';
+    if(t==='blue') return '#C1E7FF';
+    if(t==='mint') return '#C9F4AA';
+    if(t==='lav') return '#DDD6FE';
+    return '#FFE4B5';
+  }
+
+  function generateUpTo(targetY){
+    // targetY is world Y (negative upward)
+    let highest = Math.min(...platforms.map(p=>p.y));
+    while(highest > targetY){
+      highest -= rand(58,88);
+      let w = rand(68,108);
+      let x = rand(8, W - w -8);
+      // avoid too close to previous
+      let type = choice(['pink','blue','mint','lav','peach']);
+      platforms.push({x, y:highest, w, h:14, type});
+      // 70% chance orb
+      if(Math.random()<0.72){
+        orbsList.push({
+          x: x + w/2 + rand(-12,12),
+          y: highest - 22,
+          r:9,
+          taken:false,
+          phase: Math.random()*Math.PI*2,
+          kind: Math.random()<0.15 ? 'star' : 'orb'
+        });
+      }
+      // occasional moving platform
+      if(Math.random()<0.18){
+        platforms[platforms.length-1].moving = true;
+        platforms[platforms.length-1].dir = Math.random()<0.5?1:-1;
+        platforms[platforms.length-1].speed = rand(0.7,1.4);
+      }
+    }
+  }
+
+  function updateHUD(){
+    scoreEl.textContent = Math.floor(score);
+    bestEl.textContent = best;
+    orbsEl.textContent = orbs;
+    heightEl.textContent = Math.floor(maxHeight);
+  }
+
+  function addParticles(x,y, color, n=8){
+    for(let i=0;i<n;i++){
+      particles.push({
+        x, y,
+        vx: rand(-3,3), vy: rand(-4,-0.5),
+        life:1, decay: rand(0.03,0.06),
+        r: rand(2,5), color
+      });
+    }
+  }
+
+  function handleInput(){
+    if(keys.left) hero.vx -= 0.9;
+    if(keys.right) hero.vx += 0.9;
+    hero.vx *= 0.92;
+    hero.vx = Math.max(-MOVE_SPEED, Math.min(MOVE_SPEED, hero.vx));
+    if(hero.vx>0.2) hero.facing=1;
+    if(hero.vx<-0.2) hero.facing=-1;
+  }
+
+  function tryJump(isSuper=false){
+    // jump only if recently on ground or in air with coyote? For floaty feel, allow air jump with reduced power
+    if(hero.onGround){
+      hero.vy = isSuper ? SUPER_JUMP : JUMP_BOOST;
+      hero.onGround=false;
+      hero.squish = 0.35;
+      addParticles(hero.x, hero.y+hero.r, '#7CC8FF', 6);
+      shake = 3;
+    } else {
+      // air boost - smaller
+      if(hero.vy > -2){
+        hero.vy = -11.5;
+        hero.squish = 0.25;
+        addParticles(hero.x, hero.y, '#FFD6E0', 5);
+      }
+    }
+  }
+
+  function update(dt){
+    if(state!=='playing') return;
+
+    handleInput();
+
+    // moving platforms
+    for(let p of platforms){
+      if(p.moving){
+        p.x += p.dir * p.speed;
+        if(p.x < 4 || p.x + p.w > W-4) p.dir *= -1;
+      }
+    }
+
+    // physics
+    hero.vy += GRAVITY;
+    hero.x += hero.vx;
+    hero.y += hero.vy;
+
+    // wall bounce
+    if(hero.x - hero.r < 0){ hero.x = hero.r; hero.vx *= -0.4; }
+    if(hero.x + hero.r > W){ hero.x = W - hero.r; hero.vx *= -0.4; }
+
+    // platform collision (only from above when falling)
+    hero.onGround = false;
+    for(let p of platforms){
+      let px = p.x, py = p.y, pw = p.w, ph = p.h;
+      // hero bottom vs platform top
+      if(hero.vy > 0 &&
+         hero.x + hero.r*0.8 > px &&
+         hero.x - hero.r*0.8 < px+pw &&
+         hero.y + hero.r >= py &&
+         hero.y + hero.r - hero.vy <= py + 4){
+        hero.y = py - hero.r;
+        // bounce
+        let isMoving = p.moving;
+        hero.vy = BOUNCE_VY - (isMoving?1:0);
+        hero.onGround = true;
+        hero.squish = 0.3;
+        // carry with moving platform
+        if(isMoving) hero.x += p.dir * p.speed * 1.2;
+        addParticles(hero.x, hero.y+hero.r, platformColor(p.type), 4);
+        // small score for landing
+        score += 1;
+        break;
+      }
+      // side collision simple
+      if(hero.y + hero.r > py && hero.y - hero.r < py+ph){
+        if(hero.x < px && hero.x + hero.r > px && hero.vx>0){
+          hero.x = px - hero.r; hero.vx = -1;
+        }
+        if(hero.x > px+pw && hero.x - hero.r < px+pw && hero.vx<0){
+          hero.x = px+pw + hero.r; hero.vx = 1;
+        }
+      }
+    }
+
+    // jump queued
+    if(jumpQueued){
+      tryJump(false);
+      jumpQueued=false;
+    }
+
+    // orbs
+    for(let o of orbsList){
+      if(o.taken) continue;
+      o.phase += 0.12;
+      let dy = Math.sin(o.phase)*2;
+      let dx = hero.x - o.x, dy2 = (hero.y - (o.y+dy));
+      let dist = Math.hypot(dx, dy2);
+      if(dist < hero.r + o.r + 4){
+        o.taken = true;
+        orbs++;
+        combo++;
+        comboTimer = 90;
+        let pts = o.kind==='star' ? 25 : 10;
+        // combo bonus
+        if(combo>1) pts += (combo-1)*5;
+        score += pts;
+        addParticles(o.x, o.y, o.kind==='star'?'#FFD166':'#7CC8FF', 10);
+        if(o.kind==='star') shake = 5;
+        // height bonus already
+      }
+    }
+    if(comboTimer>0) comboTimer--;
+    else combo=0;
+
+    // camera follow - keep hero in upper half when going up
+    let targetCam = hero.y - H*0.55;
+    // only move up, but also follow down a bit if falling
+    if(targetCam < cameraY) cameraY += (targetCam - cameraY)*0.12;
+    else if(hero.y > cameraY + H*0.65) cameraY += (hero.y - (cameraY+H*0.65))*0.08;
+
+    // generate more as we go up
+    generateUpTo(cameraY - 200);
+
+    // height score
+    let height = Math.max(0, (H - hero.y));
+    if(height > maxHeight){
+      let diff = height - maxHeight;
+      score += diff*0.15;
+      maxHeight = height;
+    }
+
+    // cull old platforms/orbs below screen
+    platforms = platforms.filter(p=> p.y > cameraY - 100 && p.y < cameraY + H + 200);
+    // keep ground? remove after high
+    if(maxHeight>400) platforms = platforms.filter(p=>p.type!=='ground');
+
+    // particles
+    for(let p of particles){
+      p.x += p.vx; p.y += p.vy; p.vy += 0.18; p.life -= p.decay;
+    }
+    particles = particles.filter(p=>p.life>0);
+
+    // game over - fell below screen
+    if(hero.y > cameraY + H + 40){
+      gameOver();
+    }
+
+    // squish decay
+    hero.squish *= 0.88;
+    if(shake>0) shake *= 0.85;
+
+    updateHUD();
+    if(state==='playing'){
+      statusEl.textContent = combo>1 ? `Combo x${combo}!` : (hero.onGround ? 'Bouncing!' : 'Floating…');
+    }
+  }
+
+  function draw(){
+    // clear
+    ctx.clearRect(0,0,W,H);
+    ctx.save();
+    if(shake>0.5){
+      ctx.translate(rand(-shake,shake), rand(-shake,shake));
+    }
+
+    // background pastel blobs
+    ctx.fillStyle = '#E0F2FF';
+    ctx.fillRect(0,0,W,H);
+    // gradient overlay
+    let g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#E0F2FF');
+    g.addColorStop(0.5,'#FFF6E8');
+    g.addColorStop(1,'#FFE4EC');
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,W,H);
+
+    // clouds
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    drawCloud(40, 80 - cameraY*0.15, 1);
+    drawCloud(260, 140 - cameraY*0.12, 0.8);
+    drawCloud(120, 320 - cameraY*0.1, 0.9);
+    drawCloud(200, 500 - cameraY*0.08, 0.7);
+
+    // platforms
+    for(let p of platforms){
+      let sy = p.y - cameraY;
+      if(sy < -30 || sy > H+30) continue;
+      ctx.save();
+      ctx.translate(p.x, sy);
+      // shadow
+      ctx.fillStyle = 'rgba(58,46,74,0.08)';
+      roundRect(ctx, 2, 4, p.w, p.h, 8); ctx.fill();
+      // body
+      ctx.fillStyle = platformColor(p.type);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      roundRect(ctx, 0, 0, p.w, p.h, 8); ctx.fill(); ctx.stroke();
+      // highlight
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      roundRect(ctx, 2, 2, p.w-4, 4, 4); ctx.fill();
+      if(p.moving){
+        ctx.fillStyle = 'rgba(124,200,255,0.9)';
+        ctx.beginPath(); ctx.arc(p.w/2, p.h/2, 3, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // orbs
+    for(let o of orbsList){
+      if(o.taken) continue;
+      let sy = o.y - cameraY + Math.sin(o.phase)*2;
+      if(sy < -20 || sy > H+20) continue;
+      ctx.save();
+      ctx.translate(o.x, sy);
+      // glow
+      let glow = ctx.createRadialGradient(0,0,2,0,0,18);
+      glow.addColorStop(0, o.kind==='star' ? 'rgba(255,209,102,0.9)' : 'rgba(124,200,255,0.85)');
+      glow.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(0,0,18,0,Math.PI*2); ctx.fill();
+      // orb body
+      ctx.fillStyle = o.kind==='star' ? '#FFD166' : '#7CC8FF';
+      ctx.strokeStyle = '#fff'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(0,0,o.r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      // inner shine
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath(); ctx.arc(-2,-2,3,0,Math.PI*2); ctx.fill();
+      if(o.kind==='star'){
+        ctx.fillStyle='#fff';
+        ctx.font='700 10px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText('★',0,1);
+      }
+      ctx.restore();
+    }
+
+    // hero
+    let hy = hero.y - cameraY;
+    ctx.save();
+    ctx.translate(hero.x, hy);
+    // shadow
+    ctx.fillStyle='rgba(58,46,74,0.12)';
+    ctx.beginPath(); ctx.ellipse(0, 14, 18, 6, 0,0,Math.PI*2); ctx.fill();
+    // squish
+    let s = hero.squish;
+    ctx.scale(1 + s*0.3, 1 - s*0.4);
+    // body
+    ctx.fillStyle='#fff';
+    ctx.strokeStyle='#F3E8FF'; ctx.lineWidth=2;
+    roundRect(ctx, -16, -14, 32, 28, 12); ctx.fill(); ctx.stroke();
+    // face
+    ctx.fillStyle='#3A2E4A';
+    ctx.beginPath(); ctx.arc(-6 + hero.facing*2, -2, 2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(6 + hero.facing*2, -2, 2, 0, Math.PI*2); ctx.fill();
+    // blush
+    ctx.fillStyle='rgba(255,143,171,0.5)';
+    ctx.beginPath(); ctx.arc(-10, 2, 3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(10, 2, 3,0,Math.PI*2); ctx.fill();
+    // smile
+    ctx.strokeStyle='#3A2E4A'; ctx.lineWidth=1.6; ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(0,4,4,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
+    // hair / hat
+    ctx.fillStyle='#FFD6E0';
+    ctx.beginPath(); ctx.arc(0,-14,10, Math.PI, 0); ctx.fill();
+    ctx.fillStyle='#C1E7FF';
+    ctx.beginPath(); ctx.arc(0,-16,4,0,Math.PI*2); ctx.fill();
+    // cape flutter
+    ctx.fillStyle='rgba(201,244,170,0.9)';
+    ctx.beginPath();
+    ctx.moveTo(-12,6); ctx.quadraticCurveTo(-18+hero.vx*2, 10, -10, 14); ctx.lineTo(-6,8); ctx.closePath(); ctx.fill();
+    ctx.restore();
+
+    // particles
+    for(let p of particles){
+      let sy = p.y - cameraY;
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, sy, p.r, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+
+    // top vignette score pop
+    if(combo>1){
+      ctx.fillStyle='#FF6B8A';
+      ctx.font='900 14px system-ui';
+      ctx.textAlign='center';
+      ctx.fillText(`COMBO x${combo}!`, W/2, 22);
+    }
+
+    ctx.restore();
+  }
+
+  function drawCloud(x,y,s){
+    ctx.beginPath();
+    ctx.arc(x, y, 18*s, 0, Math.PI*2);
+    ctx.arc(x+18*s, y-6*s, 14*s, 0, Math.PI*2);
+    ctx.arc(x+32*s, y, 16*s, 0, Math.PI*2);
+    ctx.arc(x+16*s, y+6*s, 20*s, 0, Math.PI*2);
+    ctx.fill();
+  }
+  function roundRect(c,x,y,w,h,r){
+    c.beginPath();
+    c.moveTo(x+r,y);
+    c.arcTo(x+w,y,x+w,y+h,r);
+    c.arcTo(x+w,y+h,x,y+h,r);
+    c.arcTo(x,y+h,x,y,r);
+    c.arcTo(x,y,x+w,y,r);
+    c.closePath();
+  }
+
+  function gameOver(){
+    state='over';
+    let finalScore = Math.floor(score);
+    if(finalScore > best){
+      best = finalScore;
+      localStorage.setItem('floaty_best', best);
+      resultBadge.textContent = 'New Best! 🎉';
+      resultTitle.textContent = 'Pastel Champion!';
+      resultDesc.textContent = 'You set a new best score — the clouds are cheering!';
+    } else {
+      resultBadge.textContent = 'Game Over';
+      if(finalScore < 50){ resultTitle.textContent='Oops, slipped!'; resultDesc.textContent='Try steering earlier and time your JUMP boost.'; }
+      else if(finalScore < 150){ resultTitle.textContent='Nice bounce!'; resultDesc.textContent='You’re getting the float — grab those star orbs for big points.'; }
+      else { resultTitle.textContent='So close!'; resultDesc.textContent='Amazing run — one more try to beat your best?'; }
+    }
+    resultStats.textContent = `Score ${finalScore} • Orbs ${orbs} • Height ${Math.floor(maxHeight)}m • Best ${best}`;
+    gameOverOverlay.classList.remove('hidden');
+    statusEl.textContent = 'Fell — tap Restart';
+    updateHUD();
+  }
+
+  function startGame(){
+    resetWorld();
+    state='playing';
+    startOverlay.classList.add('hidden');
+    gameOverOverlay.classList.add('hidden');
+    statusEl.textContent='Bouncing!';
+    lastTime = performance.now();
+    requestAnimationFrame(loop);
+  }
+
+  function goHome(){
+    state='start';
+    gameOverOverlay.classList.add('hidden');
+    startOverlay.classList.remove('hidden');
+    statusEl.textContent='Ready to bounce';
+    draw();
+  }
+
+  function loop(now){
+    let dt = Math.min(32, now - lastTime)/16.66;
+    lastTime = now;
+    update(dt);
+    draw();
+    if(state==='playing') requestAnimationFrame(loop);
+  }
+
+  // Input bindings
+  function bindHold(btn, key){
+    const down = (e)=>{ e.preventDefault(); keys[key]=true; btn.classList.add('pressed'); };
+    const up = (e)=>{ e.preventDefault(); keys[key]=false; btn.classList.remove('pressed'); };
+    btn.addEventListener('touchstart', down, {passive:false});
+    btn.addEventListener('touchend', up, {passive:false});
+    btn.addEventListener('touchcancel', up, {passive:false});
+    btn.addEventListener('mousedown', down);
+    window.addEventListener('mouseup', up);
+  }
+  bindHold(document.getElementById('leftBtn'),'left');
+  bindHold(document.getElementById('rightBtn'),'right');
+
+  const jumpBtn = document.getElementById('jumpBtn');
+  const doJump = (e)=>{ e.preventDefault(); if(state==='playing'){ jumpQueued=true; jumpBtn.classList.add('pressed'); setTimeout(()=>jumpBtn.classList.remove('pressed'),120);} };
+  jumpBtn.addEventListener('touchstart', doJump, {passive:false});
+  jumpBtn.addEventListener('mousedown', doJump);
+  // also tap canvas to jump
+  canvas.addEventListener('touchstart', (e)=>{
+    if(state!=='playing') return;
+    // if touch is not on controls, treat as jump
+    jumpQueued=true;
+  }, {passive:true});
+
+  // keyboard
+  window.addEventListener('keydown', (e)=>{
+    if(e.code==='ArrowLeft' || e.code==='KeyA') keys.left=true;
+    if(e.code==='ArrowRight' || e.code==='KeyD') keys.right=true;
+    if(e.code==='Space' || e.code==='ArrowUp' || e.code==='KeyW'){
+      e.preventDefault();
+      if(state==='playing') jumpQueued=true;
+      if(state==='start') startGame();
+      if(state==='over') startGame();
+    }
+  });
+  window.addEventListener('keyup', (e)=>{
+    if(e.code==='ArrowLeft' || e.code==='KeyA') keys.left=false;
+    if(e.code==='ArrowRight' || e.code==='KeyD') keys.right=false;
+  });
+
+  document.getElementById('playBtn').addEventListener('click', startGame);
+  document.getElementById('restartBtn').addEventListener('click', startGame);
+  document.getElementById('homeBtn').addEventListener('click', goHome);
+
+  // init draw
+  resetWorld();
+  draw();
+  // prevent scrolling
+  document.body.addEventListener('touchmove', (e)=>{
+    if(e.target.closest('.controls') || e.target.closest('canvas')) e.preventDefault();
+  }, {passive:false});
+})();
+</script>
+</body>
+</html>

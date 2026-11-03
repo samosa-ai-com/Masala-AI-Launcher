@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>Cipher Desk</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--paper:#fdf6e3;--paper2:#f5e6c8;--ink:#1a1a1a;--accent:#c0392b;--accent2:#8e44ad;--desk:#2c1e13;--gold:#d4a017;--muted:#7a6a4f}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family: 'Courier New', Courier, monospace;
+  background: #1a1208;
+  background-image:
+    radial-gradient(ellipse at 20% 10%, #3d2b1a 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 90%, #2c1e13 0%, transparent 50%),
+    linear-gradient(180deg, #2c1e13 0%, #1a1208 100%);
+  color:var(--ink);
+  display:flex;justify-content:center;
+  min-height:100vh;
+}
+.app{
+  width:100%;max-width:428px;min-width:360px;
+  min-height:100vh;
+  background: #1a1208;
+  display:flex;flex-direction:column;
+  position:relative;
+  overflow-x:hidden;
+}
+/* Header */
+.header{
+  background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
+  color:#f5e6c8;
+  padding:10px 12px 8px;
+  border-bottom:3px solid var(--gold);
+  position:sticky;top:0;z-index:20;
+}
+.header-top{
+  display:flex;justify-content:space-between;align-items:center;
+}
+.brand{display:flex;align-items:center;gap:8px}
+.badge{
+  width:36px;height:36px;background:var(--gold);border-radius:50%;
+  display:grid;place-items:center;font-size:18px;border:2px solid #fff3;
+}
+.brand h1{font-size:16px;letter-spacing:2px;line-height:1}
+.brand h1 span{font-size:10px;letter-spacing:3px;color:var(--gold);display:block;font-weight:400}
+.header-stats{
+  display:flex;gap:6px;
+}
+.stat{
+  background:#ffffff0f;border:1px solid #ffffff1a;border-radius:8px;
+  padding:4px 8px;text-align:center;min-width:58px;
+}
+.stat b{font-size:14px;display:block;color:#fff;line-height:1}
+.stat i{font-size:8px;font-style:normal;letter-spacing:1px;color:#c9b896;text-transform:uppercase}
+.timer-wrap{
+  margin-top:8px;background:#0006;border-radius:20px;padding:3px;display:flex;align-items:center;gap:8px;
+}
+.timer-bar{flex:1;height:8px;background:#ffffff1a;border-radius:20px;overflow:hidden;position:relative}
+.timer-fill{height:100%;background:linear-gradient(90deg, #27ae60, #f1c40f, #e74c3c);width:100%;transition:width 0.5s linear;border-radius:20px}
+.timer-text{font-size:12px;font-weight:700;color:#fff;min-width:52px;text-align:right;padding-right:6px}
+.timer-text.warn{color:#ff6b6b;animation:pulse 0.8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+
+/* Paper */
+.paper-area{
+  flex:1;padding:12px 10px 10px;
+  background:
+    radial-gradient(ellipse at 50% 0%, #ffffff08 0%, transparent 70%),
+    linear-gradient(180deg, #2c1e13 0%, #1a1208 100%);
+}
+.paper{
+  background: var(--paper);
+  background-image:
+    linear-gradient(90deg, transparent 39px, #e8c9a0 39px, #e8c9a0 41px, transparent 41px),
+    repeating-linear-gradient(0deg, transparent 0px, transparent 23px, #d5c4a1 24px),
+    radial-gradient(ellipse at 30% 20%, #00000006 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, #8b451308 0%, transparent 40%);
+  border-radius:4px;
+  box-shadow: 0 4px 20px #0008, 0 1px 3px #0006, inset 0 1px 0 #fff8;
+  padding:14px 10px 12px 14px;
+  position:relative;
+  overflow:hidden;
+}
+.paper::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:4px;
+  background: repeating-linear-gradient(90deg, #c0392b 0 8px, transparent 8px 12px);
+  opacity:0.15;
+}
+.case-head{
+  display:flex;justify-content:space-between;align-items:center;
+  border-bottom:2px dashed #c9b896;padding-bottom:6px;margin-bottom:8px;
+}
+.case-head h2{font-size:11px;letter-spacing:2px;color:var(--accent)}
+.case-head span{font-size:10px;background:#1a1a1a;color:var(--gold);padding:2px 6px;border-radius:4px;letter-spacing:1px}
+.quote-hint{font-size:10px;color:var(--muted);font-style:italic;margin-bottom:8px;line-height:1.3}
+.cipher-display{
+  display:flex;flex-wrap:wrap;gap:6px 4px;
+  align-items:flex-start;
+  min-height:110px;
+  padding:4px 0;
+}
+.word-group{display:flex;gap:2px;flex-wrap:nowrap}
+.tile{
+  width:30px;height:46px;
+  background:#fffef8;
+  border:1.5px solid #d5c4a1;
+  border-radius:4px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;
+  cursor:pointer;
+  box-shadow: 0 1px 2px #0001;
+  transition: all 0.15s;
+  user-select:none;
+}
+.tile.cipher-tile:active{transform:scale(0.92)}
+.tile.selected{border-color:var(--accent);background:#fff0f0;box-shadow:0 0 0 2px #c0392b44;transform:translateY(-1px)}
+.tile.solved{border-color:#27ae60;background:#eafaf1}
+.tile.wrong{border-color:#e74c3c;background:#fdedec;animation:shake 0.3s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
+.tile .code{font-size:9px;font-weight:700;color:var(--accent);line-height:1;letter-spacing:0.5px}
+.tile .guess{font-size:16px;font-weight:700;color:#1a1a1a;line-height:1;margin-top:1px;min-height:18px}
+.tile .guess.empty{color:#c9b896;font-size:12px}
+.tile .guess.filled{color:#1a5276}
+.tile.solved .guess{color:#1e8449}
+.tile-punct{
+  width:14px;height:46px;display:grid;place-items:center;
+  font-size:18px;font-weight:700;color:#5d4037;
+}
+.space-gap{width:6px;height:10px}
+
+/* Grids */
+.grids{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.grid-card{
+  background:#fffef8;border:1.5px solid #d5c4a1;border-radius:8px;
+  padding:8px 6px 6px;box-shadow:0 2px 8px #0001;
+}
+.grid-card h3{
+  font-size:9px;letter-spacing:1.5px;color:#5d4037;
+  display:flex;align-items:center;gap:6px;margin-bottom:6px;
+}
+.grid-card h3::after{content:"";flex:1;height:1px;background:#e8dcc0}
+.grid{
+  display:grid;grid-template-columns:repeat(7, 1fr);gap:4px;
+}
+.key-btn{
+  height:42px;border-radius:6px;border:1.5px solid #d5c4a1;
+  background:#fffef8;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;position:relative;transition:all 0.12s;user-select:none;
+}
+.key-btn:active{transform:scale(0.94)}
+.key-btn.coded{border-color:#c9b896}
+.key-btn.coded.selected{border-color:var(--accent);background:#c0392b;color:#fff;box-shadow:0 2px 8px #c0392b44}
+.key-btn.coded.has-guess{border-color:#1a5276;background:#eaf2f8}
+.key-btn.coded.solved{border-color:#27ae60;background:#27ae60;color:#fff}
+.key-btn.plain{background:#1a1a1a;color:#f5e6c8;border-color:#333}
+.key-btn.plain.used{opacity:0.35;pointer-events:none}
+.key-btn.plain:active{background:#333}
+.key-btn b{font-size:13px;line-height:1}
+.key-btn i{font-size:8px;font-style:normal;opacity:0.7;line-height:1;margin-top:1px}
+.key-btn.coded i{color:var(--accent);font-weight:700}
+.key-btn.coded.selected i{color:#fff}
+.key-btn.coded.has-guess i{color:#1a5276}
+.key-btn.coded.solved i{color:#fff}
+.sel-hint{
+  text-align:center;font-size:10px;color:var(--muted);padding:2px;
+  min-height:14px;letter-spacing:0.5px;
+}
+.sel-hint strong{color:var(--accent)}
+
+/* Controls */
+.controls{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px;
+}
+.btn{
+  height:44px;border-radius:8px;border:none;font-family:inherit;font-weight:700;
+  font-size:11px;letter-spacing:1px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;
+  transition:all 0.15s;user-select:none;
+}
+.btn:active{transform:scale(0.96)}
+.btn-hint{background:linear-gradient(180deg, #f39c12, #e67e22);color:#fff;box-shadow:0 2px 0 #a65e13}
+.btn-clear{background:#fffef8;border:1.5px solid #d5c4a1;color:#5d4037}
+.btn-next{background:linear-gradient(180deg, #1a1a1a, #000);color:var(--gold);border:1px solid #d4a01755}
+.btn:disabled{opacity:0.5;pointer-events:none}
+.stats-row{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px;
+}
+.mini-stat{
+  background:#fffef8;border:1px solid #e8dcc0;border-radius:8px;padding:6px;text-align:center;
+}
+.mini-stat b{font-size:14px;display:block;color:#1a1a1a}
+.mini-stat span{font-size:8px;letter-spacing:1px;color:var(--muted);text-transform:uppercase}
+.mini-stat.correct b{color:#27ae60}
+.mini-stat.wrong b{color:#c0392b}
+
+/* Footer */
+.footer{
+  padding:8px 10px 10px;background:#0f0f0f;border-top:1px solid #ffffff0f;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.footer-left{font-size:9px;color:#c9b896;letter-spacing:1px}
+.footer-right{display:flex;gap:6px}
+.icon-btn{
+  width:36px;height:36px;border-radius:50%;border:1px solid #ffffff1a;background:#ffffff0f;
+  display:grid;place-items:center;color:#f5e6c8;font-size:14px;cursor:pointer;
+}
+.icon-btn:active{transform:scale(0.92)}
+
+/* Modal */
+.overlay{
+  position:fixed;inset:0;background:#000a;backdrop-filter:blur(4px);
+  display:none;place-items:center;z-index:50;padding:16px;
+}
+.overlay.open{display:grid}
+.modal{
+  background:var(--paper);border-radius:10px;max-width:400px;width:100%;
+  max-height:85vh;overflow:auto;box-shadow:0 20px 60px #0008;
+  border:2px solid #d5c4a1;
+}
+.modal-head{
+  background:#1a1a1a;color:var(--gold);padding:12px 14px;
+  display:flex;justify-content:space-between;align-items:center;
+  position:sticky;top:0;
+}
+.modal-head h3{font-size:13px;letter-spacing:1.5px}
+.close-btn{background:#ffffff1a;border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px}
+.modal-body{padding:14px;font-size:12px;line-height:1.6;color:#3e2723}
+.modal-body h4{font-size:11px;letter-spacing:1px;color:var(--accent);margin:10px 0 4px}
+.modal-body h4:first-child{margin-top:0}
+.modal-body ul{padding-left:16px;margin:4px 0}
+.modal-body li{margin:2px 0}
+.tag{display:inline-block;background:#1a1a1a;color:var(--gold);font-size:9px;padding:2px 6px;border-radius:4px;letter-spacing:1px;margin:2px 2px 0 0}
+.win-banner{
+  background:linear-gradient(90deg, #27ae60, #1e8449);color:#fff;
+  padding:8px 12px;border-radius:8px;text-align:center;margin:8px 0;
+  font-weight:700;letter-spacing:1px;font-size:12px;display:none;
+}
+.win-banner.show{display:block;animation:pop 0.4s}
+@keyframes pop{0%{transform:scale(0.9);opacity:0}100%{transform:scale(1);opacity:1}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="header">
+    <div class="header-top">
+      <div class="brand">
+        <div class="badge">🕵️</div>
+        <h1>CIPHER DESK <span>DETECTIVE BUREAU • EST. 1947</span></h1>
+      </div>
+      <div class="header-stats">
+        <div class="stat"><b id="sDecoded">0</b><i>Decoded</i></div>
+        <div class="stat"><b id="sScore">0</b><i>Score</i></div>
+      </div>
+    </div>
+    <div class="timer-wrap">
+      <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
+      <div class="timer-text" id="timerText">03:00</div>
+    </div>
+  </header>
+
+  <div class="paper-area">
+    <div class="paper">
+      <div class="case-head">
+        <h2>📋 CASE FILE #<span id="caseNo">001</span></h2>
+        <span id="caseDiff">EASY • 3 WORDS</span>
+      </div>
+      <div class="quote-hint" id="quoteHint">Tap a red coded letter, then tap your guessed plain letter below to crack the cipher.</div>
+      <div class="win-banner" id="winBanner">✓ MESSAGE DECODED — CASE CLOSED</div>
+      <div class="cipher-display" id="cipherDisplay"></div>
+    </div>
+
+    <div class="grids">
+      <div class="grid-card">
+        <h3>🔴 CODED ALPHABET — TAP TO SELECT</h3>
+        <div class="grid" id="codedGrid"></div>
+        <div class="sel-hint" id="selHint">Select a red letter above to decode</div>
+      </div>
+      <div class="grid-card">
+        <h3>🔑 YOUR KEY — TAP TO ASSIGN</h3>
+        <div class="grid" id="plainGrid"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-hint" id="btnHint">💡 HINT</button>
+      <button class="btn btn-clear" id="btnClear">↺ CLEAR</button>
+      <button class="btn btn-next" id="btnNext">NEXT →</button>
+    </div>
+
+    <div class="stats-row">
+      <div class="mini-stat correct"><b id="mCorrect">0</b><span>Correct Picks</span></div>
+      <div class="mini-stat wrong"><b id="mWrong">0</b><span>Wrong Picks</span></div>
+      <div class="mini-stat"><b id="mHints">0</b><span>Hints Used</span></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-left">PERSISTED • SCORE & PROGRESS SAVED</div>
+    <div class="footer-right">
+      <button class="icon-btn" id="btnHelp" title="Guide">?</button>
+      <button class="icon-btn" id="btnReset" title="Reset">↺</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlayHelp">
+  <div class="modal">
+    <div class="modal-head"><h3>FIELD GUIDE & STRUCTURE</h3><button class="close-btn" onclick="closeHelp()">×</button></div>
+    <div class="modal-body">
+      <h4>HOW TO PLAY</h4>
+      <ul>
+        <li><b>1. Select coded:</b> Tap any red letter tile in the message or in the Coded Alphabet grid.</li>
+        <li><b>2. Assign plain:</b> Tap a letter in Your Key (black grid) to map it. All instances update instantly.</li>
+        <li><b>3. Crack it:</b> When every coded letter is correctly mapped, the message auto-solves.</li>
+        <li>Tap another coded letter to change selection. Tap same plain letter again to clear a mapping.</li>
+      </ul>
+      <h4>FEATURES INCLUDED</h4>
+      <ul>
+        <li><span class="tag">TIMER</span> 3-minute race per message. Bar turns red under 30s. Time bonus on solve.</li>
+        <li><span class="tag">HINT</span> Reveals one random unsolved letter. Costs 20 points & counts in stats.</li>
+        <li><span class="tag">TRACKING</span> Correct / Wrong picks counted on every assignment across all messages.</li>
+        <li><span class="tag">PERSIST</span> Messages decoded, total score, picks & hints saved in localStorage.</li>
+        <li><span class="tag">GRIDS</span> Two 7-column letter grids with large 42px touch targets, no horizontal scroll.</li>
+        <li><span class="tag">PAPER LOOK</span> Detective desk with ruled paper, redacted header, case file styling.</li>
+        <li><span class="tag">CLEAR</span> Wipes current mappings without changing the cipher.</li>
+        <li><span class="tag">NEXT</span> Skips to a new scrambled saying (no penalty).</li>
+      </ul>
+      <h4>STRUCTURE</h4>
+      <ul>
+        <li><b>Header:</b> Decoded count, total score, countdown timer.</li>
+        <li><b>Paper:</b> Cipher tiles (code on top, guess below) grouped by word.</li>
+        <li><b>Coded Alphabet:</b> Shows current guess under each cipher letter; green when solved.</li>
+        <li><b>Your Key:</b> Plain A-Z; dims letters already used elsewhere.</li>
+        <li><b>Controls:</b> Hint / Clear / Next + stats row.</li>
+      </ul>
+      <h4>TIPS</h4>
+      <ul>
+        <li>Look for single-letter words → usually A or I.</li>
+        <li>Frequent 3-letter words → THE, AND, YOU.</li>
+        <li>Apostrophes help: DON'T, IT'S.</li>
+      </ul>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn btn-next" style="flex:1" onclick="closeHelp()">START DECODING</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SAYINGS = [
+  "ACTIONS SPEAK LOUDER THAN WORDS",
+  "KNOWLEDGE IS POWER",
+  "TIME FLIES LIKE AN ARROW",
+  "HONESTY IS THE BEST POLICY",
+  "PRACTICE MAKES PERFECT",
+  "THE EARLY BIRD CATCHES THE WORM",
+  "BETTER LATE THAN NEVER",
+  "EVERY CLOUD HAS A SILVER LINING",
+  "FORTUNE FAVORS THE BOLD",
+  "LOOK BEFORE YOU LEAP",
+  "A JOURNEY OF A THOUSAND MILES BEGINS WITH A SINGLE STEP",
+  "TO BE OR NOT TO BE THAT IS THE QUESTION",
+  "THE PEN IS MIGHTIER THAN THE SWORD",
+  "WHEN IN ROME DO AS THE ROMANS DO",
+  "CURIOUSITY KILLED THE CAT",
+  "DON'T COUNT YOUR CHICKENS BEFORE THEY HATCH",
+  "THE TRUTH WILL SET YOU FREE",
+  "ALL THAT GLITTERS IS NOT GOLD",
+  "WHERE THERE IS A WILL THERE IS A WAY",
+  "KEEP YOUR FRIENDS CLOSE AND YOUR ENEMIES CLOSER",
+  "AN APPLE A DAY KEEPS THE DOCTOR AWAY",
+  "YOU CAN'T JUDGE A BOOK BY ITS COVER",
+  "THE SHOW MUST GO ON",
+  "LIFE IS WHAT HAPPENS WHEN YOU'RE BUSY MAKING OTHER PLANS",
+  "NOT ALL THOSE WHO WANDER ARE LOST",
+  "IN THE MIDDLE OF DIFFICULTY LIES OPPORTUNITY",
+  "WHAT YOU SEEK IS SEEKING YOU",
+  "DO OR DO NOT THERE IS NO TRY",
+  "STAY HUNGRY STAY FOOLISH",
+  "THE ONLY LIMIT IS YOUR IMAGINATION"
+];
+
+const LS_KEY = "cipherDetective_v2";
+let state = {
+  decoded:0, score:0, correct:0, wrong:0, hints:0,
+  caseNo:1
+};
+let puzzle = null; // {plain, cipherText, trueMap: cipher->plain, plainToCipher, lettersInPuzzle:Set}
+let userMap = {}; // cipher -> guess plain or null
+let selectedCipher = null;
+let timerSec = 180;
+let timerId = null;
+let hintsThisPuzzle = 0;
+
+function loadState(){
+  try{
+    const s = JSON.parse(localStorage.getItem(LS_KEY));
+    if(s){ state.decoded=s.decoded||0; state.score=s.score||0; state.correct=s.correct||0; state.wrong=s.wrong||0; state.hints=s.hints||0; state.caseNo=s.caseNo||1; }
+  }catch(e){}
+}
+function saveState(){
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+}
+function shuffle(arr){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+function makeCipherMap(){
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  let shuffled;
+  do{
+    shuffled = shuffle(letters);
+  }while(shuffled.some((c,i)=>c===letters[i])); // avoid fixed points for fun
+  const map={}; // plain -> cipher
+  letters.forEach((p,i)=> map[p]=shuffled[i]);
+  return map;
+}
+function createPuzzle(){
+  const plain = SAYINGS[Math.floor(Math.random()*SAYINGS.length)];
+  const p2c = makeCipherMap();
+  const c2p = {};
+  Object.entries(p2c).forEach(([p,c])=> c2p[c]=p);
+  let cipherText="";
+  for(const ch of plain){
+    if(/[A-Z]/.test(ch)) cipherText+= p2c[ch];
+    else cipherText+= ch;
+  }
+  const lettersInPuzzle = new Set();
+  for(const ch of cipherText) if(/[A-Z]/.test(ch)) lettersInPuzzle.add(ch);
+  puzzle = {plain, cipherText, trueMap:c2p, p2c, lettersInPuzzle};
+  userMap={};
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach(c=> userMap[c]=null);
+  selectedCipher = null;
+  hintsThisPuzzle=0;
+  timerSec=180;
+  startTimer();
+  renderAll();
+}
+
+function startTimer(){
+  clearInterval(timerId);
+  updateTimerUI();
+  timerId=setInterval(()=>{
+    timerSec--;
+    updateTimerUI();
+    if(timerSec<=0){
+      clearInterval(timerId);
+      timerSec=0;
+      updateTimerUI();
+      // auto reveal
+      document.getElementById("winBanner").textContent="⏰ TIME'S UP — CASE EXPIRED";
+      document.getElementById("winBanner").style.background="linear-gradient(90deg,#c0392b,#922b21)";
+      document.getElementById("winBanner").classList.add("show");
+      // reveal all
+      for(const c of puzzle.lettersInPuzzle){
+        userMap[c]=puzzle.trueMap[c];
+      }
+      renderAll();
+      setTimeout(()=>{ document.getElementById("winBanner").classList.remove("show"); }, 2500);
+    }
+  },1000);
+}
+function updateTimerUI(){
+  const m = String(Math.floor(timerSec/60)).padStart(2,"0");
+  const s = String(timerSec%60).padStart(2,"0");
+  const el=document.getElementById("timerText");
+  el.textContent=`${m}:${s}`;
+  el.classList.toggle("warn", timerSec<=30 && timerSec>0);
+  const pct = (timerSec/180)*100;
+  document.getElementById("timerFill").style.width = pct+"%";
+  if(timerSec<=30) document.getElementById("timerFill").style.background="#e74c3c";
+  else if(timerSec<=60) document.getElementById("timerFill").style.background="linear-gradient(90deg,#f1c40f,#e67e22)";
+  else document.getElementById("timerFill").style.background="linear-gradient(90deg,#27ae60,#2ecc71)";
+}
+
+function renderAll(){
+  document.getElementById("sDecoded").textContent=state.decoded;
+  document.getElementById("sScore").textContent=state.score;
+  document.getElementById("mCorrect").textContent=state.correct;
+  document.getElementById("mWrong").textContent=state.wrong;
+  document.getElementById("mHints").textContent=state.hints;
+  document.getElementById("caseNo").textContent=String(state.caseNo).padStart(3,"0");
+  const words = puzzle.plain.split(" ");
+  const diffText = puzzle.plain.length<20 ? "EASY" : puzzle.plain.length<35 ? "MEDIUM" : "HARD";
+  document.getElementById("caseDiff").textContent=`${diffText} • ${words.length} WORDS`;
+  renderCipherDisplay();
+  renderGrids();
+  updateSelHint();
+}
+
+function renderCipherDisplay(){
+  const cont=document.getElementById("cipherDisplay");
+  cont.innerHTML="";
+  // Build words to keep together
+  const cipherWords = puzzle.cipherText.split(" ");
+  cipherWords.forEach((w,wi)=>{
+    const wg=document.createElement("div");
+    wg.className="word-group";
+    for(const ch of w){
+      if(/[A-Z]/.test(ch)){
+        const tile=document.createElement("div");
+        const isSel = selectedCipher===ch;
+        const guess = userMap[ch];
+        const truePlain = puzzle.trueMap[ch];
+        const isSolved = guess && guess===truePlain;
+        tile.className="tile cipher-tile"+(isSel?" selected":"")+(isSolved?" solved":"");
+        tile.dataset.cipher=ch;
+        tile.innerHTML=`<span class="code">${ch}</span><span class="guess ${guess?'filled':'empty'}">${guess||'_'}</span>`;
+        tile.onclick=()=>selectCipher(ch);
+        wg.appendChild(tile);
+      } else if(ch==="'"){
+        const p=document.createElement("div");p.className="tile-punct";p.textContent="'";wg.appendChild(p);
+      } else {
+        const p=document.createElement("div");p.className="tile-punct";p.textContent=ch;wg.appendChild(p);
+      }
+    }
+    cont.appendChild(wg);
+    if(wi<cipherWords.length-1){
+      const sp=document.createElement("div");sp.className="space-gap";cont.appendChild(sp);
+    }
+  });
+}
+
+function renderGrids(){
+  const cg=document.getElementById("codedGrid");
+  cg.innerHTML="";
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach(c=>{
+    const btn=document.createElement("button");
+    const guess=userMap[c];
+    const hasGuess=!!guess;
+    const isSel=selectedCipher===c;
+    const truePlain=puzzle.trueMap[c];
+    const isSolved = hasGuess && guess===truePlain && puzzle.lettersInPuzzle.has(c);
+    // only mark solved if in puzzle and correct
+    btn.className="key-btn coded"+(isSel?" selected":"")+(hasGuess?" has-guess":"")+(isSolved?" solved":"");
+    btn.innerHTML=`<b>${c}</b><i>${guess||'·'}</i>`;
+    btn.onclick=()=>selectCipher(c);
+    cg.appendChild(btn);
+  });
+  const pg=document.getElementById("plainGrid");
+  pg.innerHTML="";
+  // which plain letters already used
+  const used = new Set(Object.values(userMap).filter(Boolean));
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach(p=>{
+    const btn=document.createElement("button");
+    const isUsed = used.has(p) && !(selectedCipher && userMap[selectedCipher]===p);
+    btn.className="key-btn plain"+(isUsed?" used":"");
+    btn.innerHTML=`<b>${p}</b>`;
+    btn.onclick=()=>assignPlain(p);
+    pg.appendChild(btn);
+  });
+}
+
+function selectCipher(c){
+  if(selectedCipher===c){
+    // deselect? keep selected
+  }
+  selectedCipher=c;
+  // haptic
+  if(navigator.vibrate) navigator.vibrate(10);
+  renderCipherDisplay();
+  renderGrids();
+  updateSelHint();
+}
+function updateSelHint(){
+  const el=document.getElementById("selHint");
+  if(!selectedCipher) el.innerHTML="Select a red letter above to decode";
+  else {
+    const g=userMap[selectedCipher]||"—";
+    el.innerHTML=`Selected <strong>${selectedCipher}</strong> → ${g} &nbsp;|&nbsp; Now tap a black key to assign`;
+  }
+}
+function assignPlain(p){
+  if(!selectedCipher){
+    // need to select cipher first - flash hint
+    const el=document.getElementById("selHint");
+    el.textContent="⚠️ Tap a red coded letter first!";
+    el.style.color="#c0392b";
+    setTimeout(()=>{el.style.color="";updateSelHint()},1200);
+    if(navigator.vibrate) navigator.vibrate([30,30,30]);
+    return;
+  }
+  const prev = userMap[selectedCipher];
+  // if tapping same plain that is already assigned to this cipher, clear it
+  if(prev===p){
+    userMap[selectedCipher]=null;
+    renderAll();
+    return;
+  }
+  // check if plain already used elsewhere - if so, swap: clear other
+  for(const [c,g] of Object.entries(userMap)){
+    if(g===p && c!==selectedCipher){
+      userMap[c]=null;
+      break;
+    }
+  }
+  userMap[selectedCipher]=p;
+  // track correct/wrong
+  const truePlain = puzzle.trueMap[selectedCipher];
+  // only count if this cipher is part of puzzle? Count all picks but meaningful only for puzzle letters
+  // We'll count all assignments where cipher is in puzzle
+  if(puzzle.lettersInPuzzle.has(selectedCipher)){
+    if(p===truePlain){
+      state.correct++;
+      // small success vibe
+      if(navigator.vibrate) navigator.vibrate(20);
+    } else {
+      state.wrong++;
+      if(navigator.vibrate) navigator.vibrate([20,30,20]);
+      // flash wrong on tiles
+      const tiles=document.querySelectorAll(`.tile[data-cipher="${selectedCipher}"]`);
+      tiles.forEach(t=>{t.classList.add("wrong"); setTimeout(()=>t.classList.remove("wrong"),400)});
+    }
+  } else {
+    // cipher not in puzzle but still counts as pick? Let's not count to avoid noise
+    // but we still track? We'll not count
+  }
+  saveState();
+  renderAll();
+  checkWin();
+  // auto-advance selection to next unsolved cipher in reading order
+  if(!checkWinDone){
+    const unsolved = [...puzzle.lettersInPuzzle].filter(c=> userMap[c]!==puzzle.trueMap[c]);
+    if(unsolved.length){
+      // find next cipher after current in alphabet order that is unsolved
+      // or just keep same? Let's move to next unsolved that appears in text order
+      const order=[];
+      for(const ch of puzzle.cipherText) if(/[A-Z]/.test(ch) && !order.includes(ch)) order.push(ch);
+      const idx=order.indexOf(selectedCipher);
+      for(let i=1;i<order.length;i++){
+        const nxt=order[(idx+i)%order.length];
+        if(userMap[nxt]!==puzzle.trueMap[nxt]){ selectedCipher=nxt; break; }
+      }
+      renderCipherDisplay(); renderGrids(); updateSelHint();
+    }
+  }
+}
+let checkWinDone=false;
+function checkWin(){
+  // win if every cipher letter that appears in puzzle is correctly mapped
+  for(const c of puzzle.lettersInPuzzle){
+    if(userMap[c]!==puzzle.trueMap[c]) return false;
+  }
+  // WIN
+  checkWinDone=true;
+  clearInterval(timerId);
+  state.decoded++;
+  state.caseNo++;
+  // score: base 100 + time bonus (timerSec) + accuracy bonus
+  const timeBonus = Math.floor(timerSec * 0.8);
+  const accBonus = Math.max(0, 50 - hintsThisPuzzle*15);
+  const wrongPenalty = 0; // already tracked
+  const gained = 100 + timeBonus + accBonus;
+  state.score += gained;
+  saveState();
+  document.getElementById("winBanner").textContent=`✓ DECODED! +${gained} PTS • "${puzzle.plain}"`;
+  document.getElementById("winBanner").style.background="linear-gradient(90deg,#27ae60,#1e8449)";
+  document.getElementById("winBanner").classList.add("show");
+  if(navigator.vibrate) navigator.vibrate([30,50,30]);
+  renderAll();
+  setTimeout(()=>{
+    document.getElementById("winBanner").classList.remove("show");
+    checkWinDone=false;
+    createPuzzle();
+  }, 2200);
+  return true;
+}
+
+function doHint(){
+  const unsolved = [...puzzle.lettersInPuzzle].filter(c=> userMap[c]!==puzzle.trueMap[c]);
+  if(!unsolved.length) return;
+  const pick = unsolved[Math.floor(Math.random()*unsolved.length)];
+  const truePlain = puzzle.trueMap[pick];
+  // clear any existing mapping of that plain
+  for(const [c,g] of Object.entries(userMap)) if(g===truePlain) userMap[c]=null;
+  userMap[pick]=truePlain;
+  hintsThisPuzzle++;
+  state.hints++;
+  state.score = Math.max(0, state.score-20);
+  saveState();
+  selectedCipher=pick;
+  if(navigator.vibrate) navigator.vibrate(15);
+  renderAll();
+  checkWin();
+}
+function doClear(){
+  for(const c of Object.keys(userMap)) userMap[c]=null;
+  selectedCipher=null;
+  renderAll();
+}
+function doNext(){
+  state.caseNo++;
+  saveState();
+  createPuzzle();
+}
+function doReset(){
+  if(confirm("Reset all progress? Decoded, score and picks will be cleared.")){
+    state={decoded:0,score:0,correct:0,wrong:0,hints:0,caseNo:1};
+    saveState();
+    createPuzzle();
+  }
+}
+function openHelp(){ document.getElementById("overlayHelp").classList.add("open"); }
+function closeHelp(){ document.getElementById("overlayHelp").classList.remove("open"); }
+
+document.getElementById("btnHint").onclick=doHint;
+document.getElementById("btnClear").onclick=doClear;
+document.getElementById("btnNext").onclick=doNext;
+document.getElementById("btnHelp").onclick=openHelp;
+document.getElementById("btnReset").onclick=doReset;
+document.getElementById("overlayHelp").onclick=(e)=>{ if(e.target.id==="overlayHelp") closeHelp(); };
+
+loadState();
+createPuzzle();
+// show help on first visit
+if(!localStorage.getItem("cipherDetective_seen")){
+  setTimeout(openHelp, 600);
+  localStorage.setItem("cipherDetective_seen","1");
+}
+</script>
+</body>
+</html>

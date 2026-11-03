@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Acceleration Lab</title>
+<style>
+*{box-sizing:border-box}
+:root{--bg:#070b14;--card:#111a2e;--card2:#0f172a;--line:#1e293b;--accent:#38bdf8;--accent2:#a78bfa;--ok:#22c55e;--bad:#ef4444;--text:#e2e8f0;--muted:#94a3b8;--warn:#f59e0b}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;overflow-x:hidden}
+.app{max-width:428px;min-width:360px;margin:0 auto;padding:12px 12px 20px;display:flex;flex-direction:column;gap:12px}
+header{text-align:center;padding:6px 0 0}
+header h1{margin:0;font-size:22px;font-weight:900;letter-spacing:.4px;line-height:1.1}
+header h1 span{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+header p{margin:6px 0 0;color:var(--muted);font-size:12.5px;line-height:1.4}
+.canvas-wrap{background:radial-gradient(700px 320px at 50% 0%,#1e293b 0%,#0f172a 55%,#070b14 100%);border:1px solid var(--line);border-radius:16px;padding:10px 10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.06)}
+.canvas-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.status{display:flex;align-items:center;gap:6px;font-weight:700}
+.dot{width:8px;height:8px;border-radius:50%;background:#334155;box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+.dot.on{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+canvas{width:100%;height:222px;display:block;border-radius:12px;background:#0b1224;border:1px solid #1e293b;touch-action:none}
+.readout{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;position:relative;overflow:hidden}
+.card::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.04),transparent);pointer-events:none}
+.card label{display:block;font-size:10px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);font-weight:700}
+.card .val{margin-top:4px;font-size:20px;font-weight:900;letter-spacing:.2px;line-height:1}
+.card .unit{font-size:11px;color:var(--muted);font-weight:600;margin-left:2px}
+.card.accent{border-color:rgba(56,189,248,.35);background:linear-gradient(180deg,rgba(56,189,248,.12),rgba(17,26,46,1))}
+.card.vel{border-color:rgba(167,139,250,.35);background:linear-gradient(180deg,rgba(167,139,250,.12),rgba(17,26,46,1))}
+.controls{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:12px}
+.ctrl-head{display:flex;justify-content:space-between;align-items:center}
+.ctrl-head h3{margin:0;font-size:13px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.badge{background:#0b1224;border:1px solid var(--line);color:var(--accent);font-weight:900;font-size:18px;padding:4px 10px;border-radius:999px;min-width:86px;text-align:center}
+.slider-wrap{padding:6px 2px 2px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:48px;background:transparent;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:10px;background:#0b1224;border:1px solid var(--line);border-radius:999px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;border-radius:50%;background:var(--accent);border:3px solid #e0f2fe;box-shadow:0 2px 10px rgba(56,189,248,.6);margin-top:-10px}
+input[type=range]::-moz-range-track{height:10px;background:#0b1224;border:1px solid var(--line);border-radius:999px}
+input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:var(--accent);border:3px solid #e0f2fe;box-shadow:0 2px 10px rgba(56,189,248,.6)}
+.scale{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-weight:600;margin-top:-6px;padding:0 4px}
+.btn-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+button{height:52px;border-radius:12px;border:1px solid var(--line);font-weight:900;font-size:14px;letter-spacing:.3px;cursor:pointer;touch-action:manipulation}
+button:active{transform:scale(.98)}
+.btn-start{background:linear-gradient(180deg,#22c55e,#16a34a);color:#052e16;border-color:#15803d;box-shadow:0 6px 16px rgba(34,197,94,.35)}
+.btn-start:disabled{opacity:.45;filter:grayscale(.2)}
+.btn-stop{background:linear-gradient(180deg,#ef4444,#dc2626);color:white;border-color:#b91c1c;box-shadow:0 6px 16px rgba(239,68,68,.3)}
+.btn-stop:disabled{opacity:.4;filter:grayscale(.3)}
+.btn-reset{background:#0b1224;color:var(--text);border-color:var(--line)}
+.hint{font-size:11px;color:var(--muted);text-align:center;line-height:1.4}
+.stats{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.stats-head{display:flex;justify-content:space-between;align-items:center}
+.stats-head h3{margin:0;font-size:13px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.pill{font-size:11px;font-weight:800;background:#0b1224;border:1px solid var(--line);padding:4px 8px;border-radius:999px;color:var(--muted)}
+.best-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.best{ background:#0b1224;border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center}
+.best .k{font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:700}
+.best .v{font-size:16px;font-weight:900;margin-top:2px}
+.best .s{font-size:10px;color:var(--muted)}
+.history{max-height:220px;overflow:auto;border-radius:12px;border:1px solid var(--line);background:#0b1224}
+.hist-head{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);position:sticky;top:0;background:#0b1224}
+.run{display:grid;grid-template-columns:36px 1fr auto;gap:8px;align-items:center;padding:10px;border-bottom:1px solid rgba(30,41,59,.8)}
+.run:last-child{border-bottom:none}
+.run.best-run{background:linear-gradient(90deg,rgba(56,189,248,.08),transparent);border-left:3px solid var(--accent)}
+.num{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#111a2e;border:1px solid var(--line);font-weight:900;font-size:12px;color:var(--muted)}
+.run-main{line-height:1.2}
+.run-main b{font-size:13px}
+.run-main span{font-size:11px;color:var(--muted)}
+.run-side{text-align:right}
+.run-side b{font-size:13px;color:var(--accent)}
+.run-side div{font-size:11px;color:var(--muted)}
+.empty{padding:18px;text-align:center;color:var(--muted);font-size:13px;line-height:1.5}
+.footer{font-size:11px;color:var(--muted);text-align:center;line-height:1.5;padding:2px 8px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><span>ACCELERATION</span> LAB</h1>
+    <p>Set acceleration → Start → watch velocity build. Stop & Reset to compare runs.</p>
+  </header>
+
+  <div class="canvas-wrap">
+    <div class="canvas-head">
+      <div class="status"><span id="dot" class="dot"></span><span id="statusText">READY</span></div>
+      <div id="trackLabel">TRACK 100 m • DARK LAB</div>
+    </div>
+    <canvas id="lab" width="400" height="222" aria-label="Physics track canvas"></canvas>
+  </div>
+
+  <div class="readout">
+    <div class="card"><label>Time</label><div class="val"><span id="tVal">0.00</span><span class="unit">s</span></div></div>
+    <div class="card vel"><label>Velocity</label><div class="val"><span id="vVal">0.0</span><span class="unit">m/s</span></div></div>
+    <div class="card"><label>Distance</label><div class="val"><span id="xVal">0.0</span><span class="unit">m</span></div></div>
+    <div class="card accent"><label>Acceleration</label><div class="val"><span id="aVal">3.0</span><span class="unit">m/s²</span></div></div>
+  </div>
+
+  <div class="controls">
+    <div class="ctrl-head">
+      <h3>Acceleration</h3>
+      <div class="badge"><span id="aBadge">3.0</span> m/s²</div>
+    </div>
+    <div class="slider-wrap">
+      <input id="aSlider" type="range" min="0.5" max="10" step="0.5" value="3" aria-label="Acceleration slider">
+      <div class="scale"><span>0.5 gentle</span><span>5.0</span><span>10.0 rocket</span></div>
+    </div>
+    <div class="btn-row">
+      <button id="startBtn" class="btn-start">▶ START</button>
+      <button id="stopBtn" class="btn-stop" disabled>■ STOP</button>
+      <button id="resetBtn" class="btn-reset">↺ RESET</button>
+    </div>
+    <div class="hint">Tip: higher acceleration = steeper velocity rise. Ball auto-stops at 100 m wall.</div>
+  </div>
+
+  <div class="stats">
+    <div class="stats-head"><h3>Session Best</h3><span class="pill" id="runsPill">0 runs</span></div>
+    <div class="best-grid">
+      <div class="best"><div class="k">Best Velocity</div><div class="v" id="bestV">—</div><div class="s">m/s</div></div>
+      <div class="best"><div class="k">Best Distance</div><div class="v" id="bestX">—</div><div class="s">meters</div></div>
+      <div class="best"><div class="k">Fastest 100m</div><div class="v" id="bestT">—</div><div class="s">seconds</div></div>
+    </div>
+    <div class="history">
+      <div class="hist-head"><span>Run History</span><span id="clearBtn" style="color:var(--accent);cursor:pointer">Clear</span></div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <div class="footer">Physics: v = a·t &nbsp;|&nbsp; x = ½·a·t² &nbsp;|&nbsp; All stats saved in this session (localStorage).<br>Designed for 360–428 px portrait — no zoom needed.</div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('lab');
+  const ctx = canvas.getContext('2d');
+  const aSlider = document.getElementById('aSlider');
+  const aBadge = document.getElementById('aBadge');
+  const aVal = document.getElementById('aVal');
+  const tVal = document.getElementById('tVal');
+  const vVal = document.getElementById('vVal');
+  const xVal = document.getElementById('xVal');
+  const dot = document.getElementById('dot');
+  const statusText = document.getElementById('statusText');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const bestVEl = document.getElementById('bestV');
+  const bestXEl = document.getElementById('bestX');
+  const bestTEl = document.getElementById('bestT');
+  const runsPill = document.getElementById('runsPill');
+  const historyList = document.getElementById('historyList');
+  const clearBtn = document.getElementById('clearBtn');
+
+  const TRACK_M = 100;
+  let a = parseFloat(aSlider.value);
+  let v = 0, x = 0, t = 0;
+  let running = false;
+  let raf = null;
+  let lastTs = null;
+  let trail = [];
+  let runs = [];
+  const STORAGE_KEY = 'accelLab_runs_v1';
+
+  try{
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if(saved) runs = JSON.parse(saved);
+  }catch(e){}
+
+  function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(runs.slice(-20))); }catch(e){} }
+
+  function resize(){
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    draw();
+  }
+
+  function mapX(meters, w){
+    const pad = 18;
+    const usable = w - pad*2;
+    return pad + (Math.max(0,Math.min(1, meters/TRACK_M)) * usable);
+  }
+
+  function draw(){
+    const w = canvas.getBoundingClientRect().width;
+    const h = canvas.getBoundingClientRect().height;
+    ctx.clearRect(0,0,w,h);
+
+    // subtle grid
+    ctx.strokeStyle = 'rgba(30,41,59,0.6)';
+    ctx.lineWidth = 1;
+    for(let i=0;i<w;i+=40){
+      ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,h); ctx.stroke();
+    }
+    for(let j=0;j<h;j+=36){
+      ctx.beginPath(); ctx.moveTo(0,j); ctx.lineTo(w,j); ctx.stroke();
+    }
+
+    // lab glow top
+    const grad = ctx.createRadialGradient(w/2, -20, 20, w/2, -20, 260);
+    grad.addColorStop(0,'rgba(56,189,248,0.18)');
+    grad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,w,h);
+
+    const trackY = h - 56;
+    const trackH = 14;
+    const pad = 18;
+
+    // track shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(pad, trackY+6, w-pad*2, 10);
+
+    // track base
+    const tg = ctx.createLinearGradient(0,trackY,0,trackY+trackH);
+    tg.addColorStop(0,'#1e293b'); tg.addColorStop(1,'#0f172a');
+    ctx.fillStyle = tg;
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if(ctx.roundRect) { ctx.roundRect(pad, trackY, w-pad*2, trackH, 7); ctx.fill(); ctx.stroke(); }
+    else { ctx.fillRect(pad,trackY,w-pad*2,trackH); ctx.strokeRect(pad,trackY,w-pad*2,trackH); }
+
+    // neon line
+    ctx.strokeStyle = running ? 'rgba(56,189,248,0.9)' : 'rgba(148,163,184,0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(pad+6, trackY+trackH/2); ctx.lineTo(w-pad-6, trackY+trackH/2); ctx.stroke();
+    if(running){
+      ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 8; ctx.stroke(); ctx.shadowBlur = 0;
+    }
+
+    // markers every 10m
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '700 10px system-ui';
+    ctx.textAlign = 'center';
+    for(let m=0;m<=TRACK_M;m+=10){
+      const mx = mapX(m,w);
+      const isMajor = m%20===0;
+      ctx.fillStyle = isMajor ? '#e2e8f0' : '#94a3b8';
+      ctx.fillRect(mx-1, trackY- (isMajor?18:10), 2, isMajor?18:10);
+      if(m%20===0 || w>380){
+        ctx.fillText(m+'m', mx, trackY-20);
+      }
+    }
+    // start / finish flags
+    ctx.fillStyle = '#22c55e'; ctx.fillRect(pad, trackY-28, 2, 28);
+    ctx.fillStyle = 'rgba(34,197,94,0.9)'; ctx.fillRect(pad+2, trackY-28, 14, 10);
+    ctx.fillStyle = '#ef4444'; ctx.fillRect(w-pad-2, trackY-28, 2, 28);
+    ctx.fillStyle = 'rgba(239,68,68,0.9)'; ctx.fillRect(w-pad-16, trackY-28, 14, 10);
+    ctx.fillStyle = 'white'; ctx.font='700 7px system-ui'; ctx.fillText('GO', pad+9, trackY-21); ctx.fillText('END', w-pad-9, trackY-21);
+
+    // trail
+    if(trail.length>1){
+      for(let i=0;i<trail.length;i++){
+        const p = trail[i];
+        const alpha = (i+1)/trail.length * 0.35;
+        ctx.fillStyle = `rgba(56,189,248,${alpha})`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    // ball
+    const ballX = mapX(x,w);
+    const ballY = trackY - 14;
+    const r = 13;
+
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(ballX, trackY+trackH+4, r*1.1, 4, 0, 0, Math.PI*2); ctx.fill();
+
+    // ball body
+    const bg = ctx.createRadialGradient(ballX-4, ballY-4, 2, ballX, ballY, r);
+    bg.addColorStop(0,'#e0f2fe'); bg.addColorStop(0.35,'#38bdf8'); bg.addColorStop(1,'#0c4a6e');
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.arc(ballX, ballY, r, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.2; ctx.stroke();
+
+    // highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath(); ctx.arc(ballX-4, ballY-4, 3.2, 0, Math.PI*2); ctx.fill();
+
+    // velocity arrow
+    if(v>0.1){
+      const scale = Math.min(90, v*6); // pixels
+      const ax = ballX + scale;
+      const ay = ballY;
+      ctx.strokeStyle = '#a78bfa';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(ballX+r+2, ay); ctx.lineTo(ax, ay); ctx.stroke();
+      // arrow head
+      ctx.fillStyle = '#a78bfa';
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax-8, ay-5); ctx.lineTo(ax-8, ay+5); ctx.closePath(); ctx.fill();
+      // label
+      ctx.fillStyle = '#ddd6fe';
+      ctx.font = '700 10px system-ui';
+      ctx.textAlign = 'left';
+      ctx.fillText(v.toFixed(1)+' m/s', ax+4, ay-8);
+    }
+
+    // wall impact flash
+    if(x>=TRACK_M-0.01){
+      ctx.fillStyle = 'rgba(239,68,68,0.18)';
+      ctx.fillRect(w-pad-30, 0, 30, h);
+    }
+  }
+
+  function updateReadout(){
+    tVal.textContent = t.toFixed(2);
+    vVal.textContent = v.toFixed(1);
+    xVal.textContent = x.toFixed(1);
+    aVal.textContent = a.toFixed(1);
+    aBadge.textContent = a.toFixed(1);
+  }
+
+  function updateStatus(){
+    if(running){ dot.classList.add('on'); statusText.textContent = 'ROLLING • a='+a.toFixed(1)+' m/s²'; }
+    else if(x>=TRACK_M){ dot.classList.remove('on'); statusText.textContent = 'FINISHED — HIT WALL'; }
+    else if(t>0){ dot.classList.remove('on'); statusText.textContent = 'PAUSED'; }
+    else { dot.classList.remove('on'); statusText.textContent = 'READY'; }
+  }
+
+  function updateButtons(){
+    startBtn.disabled = running;
+    stopBtn.disabled = !running;
+    aSlider.disabled = running;
+    aSlider.style.opacity = running ? '0.6' : '1';
+  }
+
+  function computeBest(){
+    if(runs.length===0){
+      bestVEl.textContent='—'; bestXEl.textContent='—'; bestTEl.textContent='—'; runsPill.textContent='0 runs'; return;
+    }
+    const bestV = Math.max(...runs.map(r=>r.v));
+    const bestX = Math.max(...runs.map(r=>r.x));
+    const finished = runs.filter(r=>r.x>=99.9);
+    const bestT = finished.length ? Math.min(...finished.map(r=>r.t)) : null;
+    bestVEl.textContent = bestV.toFixed(1);
+    bestXEl.textContent = bestX.toFixed(1);
+    bestTEl.textContent = bestT ? bestT.toFixed(2) : '—';
+    runsPill.textContent = runs.length + (runs.length===1?' run':' runs');
+  }
+
+  function renderHistory(){
+    if(runs.length===0){
+      historyList.innerHTML = '<div class="empty">No runs yet.<br>Set acceleration and press <b>START</b> to begin.</div>';
+      return;
+    }
+    const bestV = Math.max(...runs.map(r=>r.v));
+    // show newest first
+    const rev = [...runs].reverse();
+    historyList.innerHTML = rev.map((r, idx)=>{
+      const realIdx = runs.length - idx;
+      const isBest = r.v === bestV;
+      return `<div class="run ${isBest?'best-run':''}">
+        <div class="num">#${realIdx}</div>
+        <div class="run-main"><b>${r.v.toFixed(1)} m/s</b> <span>• ${r.x.toFixed(1)} m in ${r.t.toFixed(2)}s</span><br><span>a=${r.a.toFixed(1)} m/s² ${isBest?'• ⭐ BEST':''}</span></div>
+        <div class="run-side"><b>${r.a.toFixed(1)}</b><div>m/s²</div></div>
+      </div>`;
+    }).join('');
+  }
+
+  function recordRun(){
+    // don't record empty taps
+    if(t<0.05 && x<0.1) return;
+    runs.push({a, v: Number(v.toFixed(2)), x: Number(x.toFixed(1)), t: Number(t.toFixed(2)), ts: Date.now()});
+    if(runs.length>20) runs.shift();
+    save(); computeBest(); renderHistory();
+  }
+
+  function loop(ts){
+    if(!running) return;
+    if(lastTs===null) lastTs = ts;
+    let dt = (ts - lastTs)/1000;
+    lastTs = ts;
+    if(dt>0.05) dt = 0.05; // clamp
+    t += dt;
+    v += a * dt;
+    x += v * dt;
+    // keep trail
+    const w = canvas.getBoundingClientRect().width;
+    const bx = mapX(x,w);
+    const by = canvas.getBoundingClientRect().height - 56 - 14;
+    trail.push({x:bx, y:by});
+    if(trail.length>18) trail.shift();
+
+    if(x >= TRACK_M){
+      x = TRACK_M;
+      updateReadout(); draw(); updateStatus();
+      // auto stop
+      running = false;
+      lastTs = null;
+      updateButtons();
+      recordRun();
+      updateStatus();
+      return;
+    }
+    updateReadout(); draw(); updateStatus();
+    raf = requestAnimationFrame(loop);
+  }
+
+  // events
+  aSlider.addEventListener('input', ()=>{
+    a = parseFloat(aSlider.value);
+    aBadge.textContent = a.toFixed(1);
+    aVal.textContent = a.toFixed(1);
+    if(!running) { updateStatus(); draw(); }
+  });
+
+  startBtn.addEventListener('click', ()=>{
+    if(running) return;
+    a = parseFloat(aSlider.value);
+    v = 0; x = 0; t = 0; trail = []; lastTs = null; running = true;
+    updateReadout(); updateStatus(); updateButtons(); draw();
+    raf = requestAnimationFrame(loop);
+  });
+
+  stopBtn.addEventListener('click', ()=>{
+    if(!running) return;
+    running = false;
+    if(raf) cancelAnimationFrame(raf);
+    lastTs = null;
+    updateButtons(); updateStatus();
+    recordRun();
+  });
+
+  resetBtn.addEventListener('click', ()=>{
+    const wasRunning = running;
+    if(running){
+      running = false;
+      if(raf) cancelAnimationFrame(raf);
+      lastTs = null;
+    }
+    // reset current without auto-recording if it was running and very short? we already handle stop separately
+    // if user hits reset while rolling, treat as abort without record (unless they stopped first)
+    v = 0; x = 0; t = 0; trail = [];
+    updateReadout(); updateStatus(); updateButtons(); draw();
+  });
+
+  clearBtn.addEventListener('click', ()=>{
+    if(!runs.length) return;
+    if(confirm('Clear all runs?')){
+      runs = []; save(); computeBest(); renderHistory();
+    }
+  });
+
+  window.addEventListener('resize', resize);
+  // init
+  resize();
+  updateReadout(); updateStatus(); updateButtons(); computeBest(); renderHistory();
+  draw();
+})();
+</script>
+</body>
+</html>

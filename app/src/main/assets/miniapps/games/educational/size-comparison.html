@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>Bigger Number Blitz</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  background:#0f172a;
+  color:#f1f5f9;
+  display:flex;justify-content:center;
+}
+.app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  height:100dvh;
+  display:flex;flex-direction:column;
+  background:linear-gradient(180deg,#0f172a 0%,#1e293b 100%);
+  position:relative;
+  overflow:hidden;
+}
+header{
+  padding:14px 16px 10px;
+  display:flex;justify-content:space-between;align-items:center;
+  gap:8px;
+}
+.logo{font-weight:800;font-size:18px;letter-spacing:-0.5px}
+.logo span{color:#38bdf8}
+.stats{display:flex;gap:8px}
+.stat{
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:12px;
+  padding:6px 10px;
+  min-width:72px;
+  text-align:center;
+}
+.stat label{display:block;font-size:10px;letter-spacing:0.8px;text-transform:uppercase;opacity:0.7}
+.stat b{font-size:16px;line-height:1}
+.stat.streak b{color:#facc15}
+.progress-wrap{padding:0 16px}
+.progress{height:6px;background:rgba(255,255,255,0.1);border-radius:999px;overflow:hidden}
+.progress i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#38bdf8,#22d3ee);transition:width 0.3s}
+.question{
+  text-align:center;
+  padding:14px 16px 6px;
+  font-size:15px;
+  font-weight:600;
+  letter-spacing:0.2px;
+  color:#e2e8f0;
+}
+.question em{color:#38bdf8;font-style:normal}
+.cards{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  padding:12px 16px 10px;
+  justify-content:center;
+}
+.num-btn{
+  flex:1;
+  max-height:168px;
+  min-height:124px;
+  border-radius:20px;
+  border:2px solid rgba(255,255,255,0.14);
+  background:linear-gradient(180deg,#ffffff 0%,#f1f5f9 100%);
+  color:#0f172a;
+  font-size:48px;
+  font-weight:900;
+  letter-spacing:-1px;
+  display:flex;align-items:center;justify-content:center;
+  position:relative;
+  cursor:pointer;
+  user-select:none;
+  touch-action:manipulation;
+  transition:transform 0.08s, border-color 0.15s, box-shadow 0.15s;
+  box-shadow:0 8px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.8);
+}
+.num-btn:active{transform:scale(0.97)}
+.num-btn.correct{border-color:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,0.25),0 8px 20px rgba(0,0,0,0.25);background:#ecfdf5}
+.num-btn.wrong{border-color:#ef4444;box-shadow:0 0 0 4px rgba(239,68,68,0.25),0 8px 20px rgba(0,0,0,0.25);background:#fef2f2;animation:shake 0.3s}
+.num-btn .hint{
+  position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;
+  background:#0f172a;color:#fff;padding:3px 8px;border-radius:999px;opacity:0.9
+}
+.vs{
+  text-align:center;
+  font-weight:800;
+  font-size:13px;
+  letter-spacing:2px;
+  color:#94a3b8;
+  margin:-2px 0;
+}
+.feedback{
+  min-height:28px;
+  text-align:center;
+  font-size:14px;
+  font-weight:700;
+  padding:0 16px;
+}
+.feedback.ok{color:#4ade80}
+.feedback.bad{color:#f87171}
+.controls{
+  display:flex;gap:10px;
+  padding:10px 16px 12px;
+}
+.btn{
+  flex:1;
+  height:52px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,0.14);
+  font-size:15px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.btn-primary{background:#38bdf8;color:#0f172a;border-color:transparent}
+.btn-ghost{background:rgba(255,255,255,0.08);color:#f1f5f9}
+.btn:active{transform:scale(0.98)}
+.modes{
+  display:flex;gap:8px;padding:0 16px 8px;
+}
+.chip{
+  flex:1;height:36px;border-radius:999px;
+  border:1px solid rgba(255,255,255,0.14);
+  background:rgba(255,255,255,0.06);
+  color:#cbd5e1;font-size:13px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+}
+.chip.active{background:#f1f5f9;color:#0f172a;border-color:#f1f5f9}
+.footer{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:6px 16px 10px;
+  font-size:12px;color:#94a3b8;
+}
+.footer a{color:#7dd3fc;text-decoration:none;font-weight:700}
+.sheet{
+  position:absolute;inset:0;
+  background:rgba(2,6,23,0.6);
+  backdrop-filter:blur(6px);
+  display:none;
+  align-items:flex-end;
+  z-index:10;
+}
+.sheet.open{display:flex}
+.sheet-card{
+  width:100%;
+  max-height:86dvh;
+  background:#f8fafc;
+  color:#0f172a;
+  border-radius:20px 20px 0 0;
+  overflow:auto;
+  padding:16px 16px 20px;
+}
+.sheet-card h2{font-size:18px;margin-bottom:8px}
+.sheet-card h3{font-size:14px;margin:14px 0 6px;color:#0f172a}
+.sheet-card p, .sheet-card li{font-size:13px;line-height:1.5;color:#334155}
+.sheet-card ul{padding-left:18px}
+.sheet-card code{background:#e2e8f0;padding:2px 6px;border-radius:6px;font-size:12px}
+.sheet-card pre{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:12px;overflow:auto;font-size:12px;line-height:1.5;margin:8px 0}
+.close{margin-top:14px;width:100%;height:48px;border-radius:12px;border:0;background:#0f172a;color:#fff;font-weight:800;font-size:15px}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+@keyframes pop{0%{transform:scale(0.9);opacity:0}100%{transform:scale(1);opacity:1}}
+@media (max-height:700px){
+  .num-btn{max-height:140px;min-height:110px;font-size:42px}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="logo">BIGGER<span> BLITZ</span></div>
+    <div class="stats">
+      <div class="stat"><label>Score</label><b id="scoreEl">0</b></div>
+      <div class="stat streak"><label>Streak</label><b id="streakEl">0 🔥</b></div>
+      <div class="stat"><label>Best</label><b id="bestEl">0</b></div>
+    </div>
+  </header>
+
+  <div class="progress-wrap"><div class="progress"><i id="bar"></i></div></div>
+
+  <div class="modes">
+    <button class="chip active" data-mode="endless">Endless</button>
+    <button class="chip" data-mode="rush">30s Rush</button>
+    <button class="chip" data-mode="hard">Hard</button>
+  </div>
+
+  <div class="question">Tap the <em>larger</em> number — fast & accurate!</div>
+
+  <div class="cards">
+    <button class="num-btn" id="btnA" aria-label="Choose top number"><span id="numA">—</span><span class="hint">Tap</span></button>
+    <div class="vs">— VS —</div>
+    <button class="num-btn" id="btnB" aria-label="Choose bottom number"><span id="numB">—</span><span class="hint">Tap</span></button>
+  </div>
+
+  <div class="feedback" id="feedback">Ready? Go!</div>
+
+  <div class="controls">
+    <button class="btn btn-ghost" id="restartBtn">↻ Restart</button>
+    <button class="btn btn-primary" id="howBtn">How it works</button>
+  </div>
+
+  <div class="footer">
+    <span id="timerEl">Endless • No timer</span>
+    <a href="#" id="guideLink">Dev guide</a>
+  </div>
+
+  <div class="sheet" id="sheet">
+    <div class="sheet-card">
+      <h2>How to Play & Build It</h2>
+      <p>This is a <b>mobile-first</b> quiz for 360–428px portrait. Two large buttons, no horizontal scroll, 16px+ text, 52px+ touch targets.</p>
+
+      <h3>1) HTML Structure (what you see)</h3>
+      <pre>&lt;div class="app"&gt;  &lt;!-- max-width:428px, centered --&gt;
+  &lt;header&gt; Score / Streak / Best &lt;/header&gt;
+  &lt;div class="progress"&gt;&lt;i&gt;&lt;/i&gt;&lt;/div&gt;
+  &lt;div class="cards"&gt;
+    &lt;button id="btnA"&gt;&lt;span id="numA"&gt;&lt;/span&gt;&lt;/button&gt;
+    &lt;div class="vs"&gt;VS&lt;/div&gt;
+    &lt;button id="btnB"&gt;&lt;span id="numB"&gt;&lt;/span&gt;&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;div id="feedback"&gt;&lt;/div&gt;
+  &lt;div class="controls"&gt;
+    &lt;button id="restartBtn"&gt;Restart&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+      <ul>
+        <li><code>.app { max-width:428px; min-width:360px; height:100dvh; overflow:hidden }</code> prevents horizontal scroll.</li>
+        <li>Buttons are <code>min-height:124px</code> with <code>touch-action:manipulation</code> for instant taps.</li>
+        <li>All text ≥13px, question 15px, numbers 48px — readable without zoom.</li>
+      </ul>
+
+      <h3>2) JS Logic — Scoring / Streak / Restart</h3>
+      <pre>let score=0, streak=0, best=+localStorage.best||0;
+
+function newRound(){
+  let a = rand(), b = rand();
+  while(b===a) b = rand(); // ensure different
+  numA.textContent=a; numB.textContent=b;
+  // store correct answer
+  correct = a>b ? 'A' : 'B';
+}
+
+function pick(choice){
+  if(choice===correct){
+    score++; streak++;
+    best = Math.max(best,streak);
+    feedback("Correct! +1","ok");
+  } else {
+    streak = 0; // reset streak, keep score
+    feedback("Wrong! Streak reset","bad");
+    // optional: score = Math.max(0,score-1)
+  }
+  save(); updateUI(); newRound();
+}
+
+restartBtn.onclick = () =&gt; {
+  score=0; streak=0;
+  feedback("New streak started!","ok");
+  updateUI(); newRound();
+};</pre>
+      <ul>
+        <li><b>Scoring:</b> +1 per correct tap. Streak increments only on correct.</li>
+        <li><b>Streak:</b> resets to 0 on wrong answer; <code>best</code> saved in <code>localStorage</code>.</li>
+        <li><b>Restart:</b> zeroes <code>score</code> & <code>streak</code>, keeps <code>best</code>, generates new numbers.</li>
+        <li><b>Rush mode:</b> 30s <code>setInterval</code> countdown; when 0, freeze input until Restart.</li>
+      </ul>
+
+      <h3>3) Tips for 360–428px</h3>
+      <ul>
+        <li>Use <code>flex:1</code> + <code>max-height</code> for cards so they fill height without scrolling.</li>
+        <li>Viewport: <code>width=device-width, initial-scale=1, user-scalable=no</code></li>
+        <li>Test at 360px and 428px — no element wider than 100%.</li>
+      </ul>
+      <button class="close" id="closeSheet">Got it — Play!</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const scoreEl = document.getElementById('scoreEl');
+const streakEl = document.getElementById('streakEl');
+const bestEl = document.getElementById('bestEl');
+const numAEl = document.getElementById('numA');
+const numBEl = document.getElementById('numB');
+const btnA = document.getElementById('btnA');
+const btnB = document.getElementById('btnB');
+const feedbackEl = document.getElementById('feedback');
+const bar = document.getElementById('bar');
+const timerEl = document.getElementById('timerEl');
+const restartBtn = document.getElementById('restartBtn');
+
+let score = 0, streak = 0, best = parseInt(localStorage.getItem('blitz_best')||'0',10);
+let correct = 'A';
+let mode = 'endless';
+let timeLeft = 30;
+let timerId = null;
+let locked = false;
+let totalAnswered = 0;
+
+function rand(){
+  if(mode==='hard'){
+    // harder: include negatives, decimals, close values
+    const type = Math.random();
+    if(type < 0.33){
+      // close numbers 1-99
+      const base = Math.floor(Math.random()*80)+10;
+      return Math.random()<0.5 ? base : base + (Math.random()<0.5?1:-1) * (Math.floor(Math.random()*3)+1);
+    } else if(type < 0.66){
+      // negatives
+      return Math.floor(Math.random()*199)-99;
+    } else {
+      // one decimal
+      return Math.round((Math.random()*100 - 20)*10)/10;
+    }
+  }
+  // normal: 0-99
+  return Math.floor(Math.random()*100);
+}
+
+function updateUI(){
+  scoreEl.textContent = score;
+  streakEl.textContent = streak + (streak>=2 ? ' 🔥' : '');
+  bestEl.textContent = best;
+  const pct = Math.min(100, (streak*12) + (score*2));
+  bar.style.width = pct + '%';
+  bar.style.background = streak>=5 ? 'linear-gradient(90deg,#facc15,#f97316)' : 'linear-gradient(90deg,#38bdf8,#22d3ee)';
+  localStorage.setItem('blitz_best', best);
+}
+
+function feedback(msg, cls){
+  feedbackEl.textContent = msg;
+  feedbackEl.className = 'feedback ' + (cls||'');
+}
+
+function newRound(){
+  let a = rand(), b = rand();
+  let guard=0;
+  while(a===b && guard<10){ b = rand(); guard++; }
+  numAEl.textContent = a;
+  numBEl.textContent = b;
+  correct = a > b ? 'A' : 'B';
+  // store values for comparison
+  btnA.dataset.val = a;
+  btnB.dataset.val = b;
+  btnA.classList.remove('correct','wrong');
+  btnB.classList.remove('correct','wrong');
+  locked = false;
+}
+
+function handlePick(choice){
+  if(locked) return;
+  if(timerId && timeLeft<=0) return;
+  locked = true;
+  totalAnswered++;
+  const isCorrect = choice === correct;
+  const pickedBtn = choice==='A' ? btnA : btnB;
+  const otherBtn = choice==='A' ? btnB : btnA;
+
+  if(isCorrect){
+    score++; streak++;
+    if(streak > best) best = streak;
+    pickedBtn.classList.add('correct');
+    feedback(streak>=3 ? `Streak x${streak}! 🔥` : 'Nice! +1', 'ok');
+    if(navigator.vibrate) navigator.vibrate(30);
+  } else {
+    streak = 0;
+    pickedBtn.classList.add('wrong');
+    otherBtn.classList.add('correct');
+    feedback(`Wrong! ${otherBtn.dataset.val} was larger`, 'bad');
+    if(navigator.vibrate) navigator.vibrate([40,30,40]);
+  }
+  updateUI();
+  setTimeout(newRound, 420);
+}
+
+function startTimer(){
+  clearInterval(timerId);
+  if(mode!=='rush'){
+    timerEl.textContent = mode==='hard' ? 'Hard • tricky numbers' : 'Endless • No timer';
+    return;
+  }
+  timeLeft = 30;
+  timerEl.textContent = `⏱ ${timeLeft}s left`;
+  timerId = setInterval(()=>{
+    timeLeft--;
+    timerEl.textContent = `⏱ ${timeLeft}s left`;
+    if(timeLeft<=0){
+      clearInterval(timerId);
+      feedback(`Time! Score ${score} • Best streak ${best}`, 'ok');
+      timerEl.textContent = 'Time up — tap Restart';
+      locked = true;
+    }
+  },1000);
+}
+
+function restart(){
+  score = 0; streak = 0; totalAnswered=0;
+  clearInterval(timerId);
+  startTimer();
+  updateUI();
+  feedback('New streak started! Tap the larger number', 'ok');
+  newRound();
+}
+
+// events
+btnA.addEventListener('click', ()=>handlePick('A'));
+btnB.addEventListener('click', ()=>handlePick('B'));
+btnA.addEventListener('touchstart', e=>{e.preventDefault();},{passive:false});
+btnB.addEventListener('touchstart', e=>{e.preventDefault();},{passive:false});
+
+restartBtn.addEventListener('click', restart);
+
+// mode chips
+document.querySelectorAll('.chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    mode = chip.dataset.mode;
+    restart();
+  });
+});
+
+// sheet
+const sheet = document.getElementById('sheet');
+document.getElementById('howBtn').addEventListener('click', (e)=>{e.preventDefault(); sheet.classList.add('open')});
+document.getElementById('guideLink').addEventListener('click', (e)=>{e.preventDefault(); sheet.classList.add('open')});
+document.getElementById('closeSheet').addEventListener('click', ()=>sheet.classList.remove('open'));
+sheet.addEventListener('click', (e)=>{ if(e.target===sheet) sheet.classList.remove('open') });
+
+// keyboard support
+window.addEventListener('keydown', e=>{
+  if(e.key==='ArrowUp' || e.key==='w' || e.key==='a') handlePick('A');
+  if(e.key==='ArrowDown' || e.key==='s' || e.key==='d') handlePick('B');
+  if(e.key==='r' || e.key==='R') restart();
+});
+
+// init
+updateUI();
+newRound();
+startTimer();
+feedback('Tap the larger number to start!', '');
+</script>
+<script>/*polish-sfx:click blip + persisted mute*/(function(){try{var K='sfxmuted_size-comparison';var muted=false;try{muted=localStorage.getItem(K)==='1'}catch(e){}var ctx=null;function ac(){try{if(!ctx){var A=window.AudioContext||window.webkitAudioContext;if(A)ctx=new A()}if(ctx&&ctx.state==='suspended')ctx.resume()}catch(e){}return ctx}function tone(f0,f1,dur,vol){if(muted)return;var c=ac();if(!c)return;try{var t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(Math.max(f1,1),t+dur);g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+dur+0.03)}catch(e){}}document.addEventListener('pointerdown',function(e){try{var b=e.target&&e.target.closest?e.target.closest('button'):null;if(b&&b.id!=='polishSfx')tone(680,440,0.08,0.07)}catch(x){}},true);var btn=document.createElement('button');btn.id='polishSfx';btn.setAttribute('aria-label','Toggle sound');btn.style.cssText='position:fixed;right:10px;bottom:10px;z-index:99999;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.55);color:#fff;font-size:18px;cursor:pointer;opacity:.85';function paint(){btn.textContent=muted?'\uD83D\uDD07':'\uD83D\uDD0A'}paint();btn.addEventListener('click',function(e){e.stopPropagation();muted=!muted;try{localStorage.setItem(K,muted?'1':'0')}catch(x){}paint();if(!muted)tone(660,880,0.1,0.07)});function mount(){if(!document.getElementById('polishSfx'))document.body.appendChild(btn)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();}catch(e){}})();</script></body>
+</html>

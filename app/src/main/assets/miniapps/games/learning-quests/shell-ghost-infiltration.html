@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Neon Infiltrator</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--cyan:#00ffd0;--pink:#ff2a6d;--purple:#b026ff;--bg:#070b14;--panel:#0f1a2e;--panel2:#0d1b33;--line:rgba(0,255,208,0.18);--text:#c8fff4}
+html,body{height:100%;overflow-x:hidden;background:#050a18}
+body{font-family:'Courier New',Courier,monospace;color:var(--text);display:flex;justify-content:center;background:radial-gradient(ellipse at 50% 0%, #0e2040 0%, #070b14 60%, #050814 100%);-webkit-text-size-adjust:100%}
+#app{width:100%;max-width:428px;min-width:360px;min-height:100vh;display:flex;flex-direction:column;background:linear-gradient(180deg, rgba(15,26,46,0.95) 0%, rgba(7,11,20,1) 100%);border-left:1px solid var(--line);border-right:1px solid var(--line);position:relative;overflow-x:hidden}
+#app::before{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(0,255,208,0.03) 3px);opacity:0.5}
+.scan{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg, transparent, var(--cyan), transparent);opacity:0.6;animation:scan 3s linear infinite;pointer-events:none}
+@keyframes scan{0%{transform:translateY(0)}100%{transform:translateY(100vh)}}
+/* header */
+header{position:relative;z-index:2;padding:10px 12px 8px;border-bottom:1px solid var(--line);background:rgba(10,20,40,0.9);backdrop-filter:blur(6px)}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.brand{display:flex;align-items:center;gap:8px}
+.logo{width:28px;height:28px;border:1px solid var(--cyan);border-radius:6px;display:grid;place-items:center;background:rgba(0,255,208,0.12);box-shadow:0 0 10px rgba(0,255,208,0.4);font-size:14px}
+.brand h1{font-size:13px;letter-spacing:0.12em;color:var(--cyan);text-shadow:0 0 8px rgba(0,255,208,0.8);line-height:1}
+.brand p{font-size:9px;letter-spacing:0.14em;color:rgba(200,255,244,0.6);margin-top:2px}
+.rank-badge{border:1px solid var(--pink);background:rgba(255,42,109,0.12);color:#ffb3c8;padding:6px 8px;border-radius:8px;text-align:center;min-width:78px;box-shadow:0 0 10px rgba(255,42,109,0.25)}
+.rank-badge .lbl{font-size:8px;letter-spacing:0.14em;opacity:0.8}
+.rank-badge .val{font-size:11px;font-weight:700;letter-spacing:0.08em;color:#fff}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.stat{border:1px solid var(--line);background:rgba(0,255,208,0.06);border-radius:8px;padding:6px 8px}
+.stat .k{font-size:8px;letter-spacing:0.12em;opacity:0.7}
+.stat .v{font-size:12px;font-weight:700;color:var(--cyan);margin-top:2px}
+.alert-wrap{margin-top:8px;border:1px solid rgba(255,42,109,0.35);background:rgba(255,42,109,0.08);border-radius:8px;padding:7px 8px}
+.alert-head{display:flex;justify-content:space-between;align-items:center;font-size:9px;letter-spacing:0.12em}
+.alert-head b{color:var(--pink)}
+.bar{height:8px;background:rgba(0,0,0,0.5);border-radius:999px;overflow:hidden;margin-top:6px;border:1px solid rgba(255,255,255,0.08)}
+.fill{height:100%;width:0%;background:linear-gradient(90deg, var(--cyan), #00ff88);transition:width 0.4s ease, background 0.3s;box-shadow:0 0 8px rgba(0,255,208,0.6)}
+.fill.warn{background:linear-gradient(90deg, #ffcc00, #ff8800);box-shadow:0 0 8px rgba(255,170,0,0.6)}
+.fill.danger{background:linear-gradient(90deg, #ff2a6d, #ff0040);box-shadow:0 0 10px rgba(255,42,109,0.8);animation:pulse 0.6s infinite alternate}
+@keyframes pulse{from{opacity:1}to{opacity:0.7}}
+.nodes{display:flex;gap:6px;margin-top:8px}
+.node-dot{flex:1;height:6px;border-radius:999px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.08);position:relative;overflow:hidden}
+.node-dot.active{background:rgba(0,255,208,0.25);border-color:var(--cyan);box-shadow:0 0 6px rgba(0,255,208,0.5)}
+.node-dot.done{background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.node-dot span{position:absolute;inset:0;display:grid;place-items:center;font-size:7px;color:#000;font-weight:800;opacity:0}
+.node-dot.done span{opacity:1}
+/* terminal */
+#term{flex:1;position:relative;z-index:2;display:flex;flex-direction:column;min-height:320px;overflow:hidden}
+#output{flex:1;overflow-y:auto;overflow-x:hidden;padding:10px 12px 6px;font-size:13.5px;line-height:1.5;word-break:break-word;white-space:pre-wrap;scroll-behavior:smooth}
+#output::-webkit-scrollbar{width:6px}
+#output::-webkit-scrollbar-thumb{background:rgba(0,255,208,0.25);border-radius:999px}
+.line{margin:2px 0;word-break:break-word;white-space:pre-wrap}
+.line.input-line{color:#7afff0;opacity:0.9}
+.line.ok{color:#7aff8a}
+.line.warn{color:#ffcc66}
+.line.err{color:#ff6b8a}
+.line.sys{color:#8ab4ff}
+.line.token{color:#00ffd0;background:rgba(0,255,208,0.08);border:1px solid rgba(0,255,208,0.25);padding:6px 8px;border-radius:6px;margin:6px 0;box-shadow:0 0 10px rgba(0,255,208,0.2)}
+.line.dim{opacity:0.6;font-size:12px}
+.prompt{color:var(--cyan);font-weight:700}
+.path{color:var(--pink)}
+.ascii{font-size:10px;line-height:1.2;color:var(--cyan);opacity:0.9;white-space:pre;overflow-x:hidden}
+.input-row{display:flex;align-items:center;gap:6px;padding:8px 10px;background:rgba(13,27,51,0.95);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.input-row .p{font-size:13px;color:var(--cyan);white-space:nowrap;flex-shrink:0}
+#cmd{flex:1;min-width:0;background:rgba(0,0,0,0.35);border:1px solid rgba(0,255,208,0.25);border-radius:8px;color:var(--text);font-family:inherit;font-size:16px;padding:10px 10px;outline:none}
+#cmd:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(0,255,208,0.15)}
+#send{width:44px;height:42px;flex-shrink:0;border-radius:8px;border:1px solid var(--cyan);background:var(--cyan);color:#001412;font-weight:800;font-size:16px;display:grid;place-items:center;box-shadow:0 0 10px rgba(0,255,208,0.5)}
+#send:active{transform:scale(0.96)}
+.quick{position:relative;z-index:2;display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;background:rgba(10,20,40,0.92);border-bottom:1px solid var(--line)}
+.q{flex:1 1 calc(25% - 6px);min-width:72px;min-height:42px;padding:8px 6px;border-radius:8px;border:1px solid rgba(0,255,208,0.28);background:rgba(0,255,208,0.08);color:var(--cyan);font-family:inherit;font-size:12px;font-weight:700;letter-spacing:0.04em;text-align:center;box-shadow:inset 0 0 0 1px rgba(0,255,208,0.05)}
+.q:active{background:rgba(0,255,208,0.18);transform:scale(0.98)}
+.q.pink{border-color:rgba(255,42,109,0.4);color:#ffb3c8;background:rgba(255,42,109,0.1)}
+.q.purple{border-color:rgba(176,38,255,0.4);color:#d8b4ff;background:rgba(176,38,255,0.1)}
+.footer{position:relative;z-index:2;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;background:rgba(7,11,20,0.95);border-top:1px solid var(--line)}
+.footer .hint{font-size:10px;opacity:0.6;line-height:1.3}
+.btn{border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:var(--text);font-family:inherit;font-size:11px;padding:8px 10px;border-radius:8px;min-height:36px}
+.btn:active{transform:scale(0.98)}
+.overlay{position:absolute;inset:0;z-index:5;background:rgba(5,10,24,0.92);display:flex;align-items:center;justify-content:center;padding:20px}
+.card{width:100%;max-width:360px;border:1px solid var(--cyan);border-radius:14px;background:linear-gradient(180deg, #0f1a2e, #0a1428);box-shadow:0 0 30px rgba(0,255,208,0.25), inset 0 0 20px rgba(0,255,208,0.06);padding:16px;text-align:center}
+.card h2{font-size:16px;letter-spacing:0.12em;color:var(--cyan);text-shadow:0 0 10px rgba(0,255,208,0.7)}
+.card p{font-size:12px;line-height:1.5;opacity:0.85;margin-top:8px}
+.card .big{font-size:22px;margin:8px 0;color:#fff;letter-spacing:0.08em}
+.card .row{display:flex;gap:8px;margin-top:12px}
+.card .cta{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--cyan);background:var(--cyan);color:#001412;font-weight:800;font-family:inherit;font-size:13px;letter-spacing:0.06em}
+.card .ghost{flex:1;min-height:44px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:var(--text);font-family:inherit;font-size:13px}
+.kbd{font-size:10px;opacity:0.5;margin-top:6px}
+</style>
+</head>
+<body>
+<div id="app">
+<div class="scan"></div>
+<header>
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">◈</div>
+      <div>
+        <h1>NEON INFILTRATOR</h1>
+        <p>OPERATIVE DECK v5.4</p>
+      </div>
+    </div>
+    <div class="rank-badge">
+      <div class="lbl">RANK</div>
+      <div class="val" id="rankVal">NOVICE</div>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="k">CURRENT NODE</div><div class="v" id="nodeVal">1 / 5 — GATEWAY</div></div>
+    <div class="stat"><div class="k">TOKENS EXTRACTED</div><div class="v" id="tokenVal">0 / 5</div></div>
+  </div>
+  <div class="alert-wrap">
+    <div class="alert-head"><span>◉ ALERT TRACE</span><b id="alertPct">0%</b></div>
+    <div class="bar"><div class="fill" id="alertFill"></div></div>
+    <div class="nodes" id="nodeDots"></div>
+  </div>
+</header>
+
+<div id="term">
+  <div id="output"></div>
+  <div class="input-row">
+    <span class="p" id="prompt">guest@gateway:/$</span>
+    <input id="cmd" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="type command…">
+    <button id="send">↵</button>
+  </div>
+</div>
+
+<div class="quick" id="quick">
+  <button class="q" data-c="ls">ls</button>
+  <button class="q" data-c="cd ">cd</button>
+  <button class="q" data-c="pwd">pwd</button>
+  <button class="q" data-c="cat ">cat</button>
+  <button class="q" data-c="find ">find</button>
+  <button class="q" data-c="grep ">grep</button>
+  <button class="q" data-c="chmod ">chmod</button>
+  <button class="q pink" data-c="sudo ">sudo</button>
+  <button class="q purple" data-c="extract ">extract</button>
+  <button class="q" data-c="clear">clear</button>
+</div>
+
+<div class="footer">
+  <div class="hint">Tap chips to insert • <b>help</b> for commands • <b>extract &lt;file&gt;</b> to steal token</div>
+  <button class="btn" id="resetBtn">RESET</button>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="card" id="card"></div>
+</div>
+</div>
+
+<script>
+const RANKS=['NOVICE','RUNNER','GHOST','SPECTRE','PHANTOM','LEGEND'];
+const NODES=[
+{
+  id:'gateway', name:'GATEWAY', desc:'Perimeter firewall. Low security. Token is exposed.',
+  fs:{
+    '/':{type:'dir', perm:'755', children:{
+      'home':{type:'dir', perm:'755', children:{
+        'guest':{type:'dir', perm:'755', children:{
+          'readme.txt':{type:'file', perm:'644', content:'Welcome operative.\n\nYour objective: extract the token.\n\nTry these:\n  ls\n  cat readme.txt\n  cat token.txt\n  extract token.txt\n\nTokens look like TOKEN-XXXX-XXXX'},
+          'token.txt':{type:'file', perm:'644', content:'TOKEN-GATE-7X9A\n// GATEWAY ACCESS TOKEN //\nUse: extract token.txt', token:true},
+          '.hidden':{type:'file', perm:'644', content:'You found a hidden file. Good instincts.'}
+        }}
+      }},
+      'etc':{type:'dir', perm:'755', children:{
+        'motd':{type:'file', perm:'644', content:'GATEWAY NODE v2.1\nUnauthorized access is logged.\nAlert rises on noisy actions.'},
+        'hosts':{type:'file', perm:'644', content:'127.0.0.1 localhost\n10.0.0.1 gateway.internal'}
+      }},
+      'var':{type:'dir', perm:'755', children:{
+        'log':{type:'dir', perm:'755', children:{
+          'auth.log':{type:'file', perm:'644', content:'[16:50] guest login OK\n[16:51] ls /home/guest\n[16:52] cat readme.txt'}
+        }}
+      }}
+    }}
+  }
+},
+{
+  id:'archive', name:'ARCHIVE', desc:'Cold storage vault. File is locked down (000). Use chmod to unlock.',
+  fs:{
+    '/':{type:'dir', perm:'755', children:{
+      'home':{type:'dir', perm:'755', children:{
+        'archivist':{type:'dir', perm:'755', children:{
+          'notes.txt':{type:'file', perm:'644', content:'ARCHIVE NODE\nThe vault token is locked.\nPermissions: 000 (no access)\nFix it:\n  ls /vault\n  chmod 644 /vault/token.dat\n  cat /vault/token.dat\n  extract /vault/token.dat'},
+          'todo.txt':{type:'file', perm:'644', content:'- rotate logs\n- check vault perms'}
+        }}
+      }},
+      'vault':{type:'dir', perm:'755', children:{
+        'token.dat':{type:'file', perm:'000', content:'TOKEN-ARCH-4K2M\n// ARCHIVE TOKEN //\nYou chmodded it! Now extract it.', token:true},
+        'decoy.txt':{type:'file', perm:'644', content:'This is not the token you are looking for.'},
+        'logs':{type:'dir', perm:'755', children:{
+          'access.log':{type:'file', perm:'644', content:'[03:12] vault sealed\n[03:14] perm set to 000'}
+        }}
+      }},
+      'etc':{type:'dir', perm:'755', children:{
+        'vault.conf':{type:'file', perm:'644', content:'vault_path=/vault\nlockdown=enabled'}
+      }}
+    }}
+  }
+},
+{
+  id:'biolab', name:'BIO-LAB', desc:'Research maze. Token is buried deep. Use find and grep.',
+  fs:{
+    '/':{type:'dir', perm:'755', children:{
+      'lab':{type:'dir', perm:'755', children:{
+        'samples':{type:'dir', perm:'755', children:{
+          'sample_a.txt':{type:'file', perm:'644', content:'Specimen A: stable'},
+          'sample_b.txt':{type:'file', perm:'644', content:'Specimen B: volatile'}
+        }},
+        'research':{type:'dir', perm:'755', children:{
+          'notes.txt':{type:'file', perm:'644', content:'BIO-LAB NODE\nToken is hidden somewhere under /lab/archive\nUse:\n  find /lab -name *.dat\n  grep TOKEN /lab\n  cat <path>\n  extract <path>'}
+        }},
+        'archive':{type:'dir', perm:'755', children:{
+          '2023':{type:'dir', perm:'755', children:{
+            'old.txt':{type:'file', perm:'644', content:'Old research data 2023'},
+            'backup.log':{type:'file', perm:'644', content:'backup complete'}
+          }},
+          '2024':{type:'dir', perm:'755', children:{
+            'project_x':{type:'dir', perm:'755', children:{
+              'sequence.dat':{type:'file', perm:'644', content:'TOKEN-BIO-9P1Q\n// BIO-LAB GENOME TOKEN //\nExtract this file to proceed.', token:true},
+              'decoy.dat':{type:'file', perm:'644', content:'decoy data - not a token'},
+              'readme.md':{type:'file', perm:'644', content:'# Project X\nDeep storage'}
+            }},
+            'project_y':{type:'dir', perm:'755', children:{
+              'notes.txt':{type:'file', perm:'644', content:'Project Y notes'}
+            }}
+          }}
+        }}
+      }},
+      'etc':{type:'dir', perm:'755', children:{
+        'motd':{type:'file', perm:'644', content:'BIO-LAB secure storage'}
+      }}
+    }}
+  }
+},
+{
+  id:'core', name:'CORE', desc:'Mainframe core. Token is encrypted (000). Requires sudo.',
+  fs:{
+    '/':{type:'dir', perm:'755', children:{
+      'core':{type:'dir', perm:'755', children:{
+        'mainframe':{type:'dir', perm:'755', children:{
+          'token.enc':{type:'file', perm:'000', content:'TOKEN-CORE-5T8Z\n// CORE ROOT TOKEN //\nDecrypted via sudo. Now extract it.', token:true},
+          'sys.log':{type:'file', perm:'644', content:'[00:01] core online\n[00:02] encryption active\n[00:03] sudo required for token.enc'},
+          'status.txt':{type:'file', perm:'644', content:'Core temp: nominal\nUse: sudo cat /core/mainframe/token.enc'}
+        }},
+        'secure':{type:'dir', perm:'755', children:{
+          'keys.txt':{type:'file', perm:'644', content:'keys revoked - sudo only'}
+        }}
+      }},
+      'home':{type:'dir', perm:'755', children:{
+        'operator':{type:'dir', perm:'755', children:{
+          'hint.txt':{type:'file', perm:'644', content:'CORE NODE\nFile is locked 000.\nchmod will work but sudo is cleaner (and louder).\nTry:\n  sudo cat /core/mainframe/token.enc\n  extract /core/mainframe/token.enc'}
+        }}
+      }},
+      'etc':{type:'dir', perm:'755', children:{
+        'shadow':{type:'file', perm:'000', content:'root:$6$...:19000:0:99999:7:::'}
+      }}
+    }}
+  }
+},
+{
+  id:'blacksite', name:'BLACKSITE', desc:'Blacksite - final infiltration. Decoys, locks, and traces. Combine all skills.',
+  fs:{
+    '/':{type:'dir', perm:'755', children:{
+      'blacksite':{type:'dir', perm:'755', children:{
+        'level1':{type:'dir', perm:'755', children:{
+          'guard.txt':{type:'file', perm:'644', content:'Patrol route: level1 -> level2'},
+          'access.log':{type:'file', perm:'644', content:'[22:00] guard shift change'}
+        }},
+        'level2':{type:'dir', perm:'755', children:{
+          'vault_a':{type:'dir', perm:'755', children:{
+            'fake_token.txt':{type:'file', perm:'644', content:'TOKEN-FAKE-0000\n// DECOY - extracting this triggers alarm! //', token:false, decoy:true},
+            'note.txt':{type:'file', perm:'644', content:'Not here. Try vault_b.'}
+          }},
+          'vault_b':{type:'dir', perm:'755', children:{
+            'token.final':{type:'file', perm:'000', content:'TOKEN-BLACK-0M3G\n// BLACKSITE OMEGA TOKEN //\nFinal token. Extract it to become LEGEND.', token:true},
+            'manifest.txt':{type:'file', perm:'644', content:'CLASSIFIED\nReal token is token.final (000)\nUse chmod or sudo, then extract.'}
+          }}
+        }},
+        'level3':{type:'dir', perm:'755', children:{
+          'logs':{type:'dir', perm:'755', children:{
+            'trace.log':{type:'file', perm:'644', content:'trace level: high\navoid noisy commands'}
+          }}
+        }}
+      }},
+      'etc':{type:'dir', perm:'755', children:{
+        'hints.txt':{type:'file', perm:'644', content:'BLACKSITE HINTS\n1) grep -r TOKEN /blacksite  -> find tokens\n2) ls -l to see perms (000 = locked)\n3) chmod 644 <file>  OR  sudo cat <file>\n4) extract <file>  (real token only!)\nFake token will spike alert +40%!'}
+      }},
+      'home':{type:'dir', perm:'755', children:{
+        'ghost':{type:'dir', perm:'755', children:{
+          'brief.txt':{type:'file', perm:'644', content:'Final node, operative.\nCombine everything you learned.\nGood luck.'}
+        }}
+      }}
+    }}
+  }
+}
+];
+
+let currentNode=0, cwd='/', alertLevel=0, tokens=0, history=[], histIdx=-1;
+let audioCtx=null;
+
+function save(){ localStorage.setItem('neon_infiltrator_v2', JSON.stringify({currentNode,cwd,alertLevel,tokens})); }
+function load(){
+  try{
+    const d=JSON.parse(localStorage.getItem('neon_infiltrator_v2')||'null');
+    if(d){ currentNode=d.currentNode||0; cwd=d.cwd||'/'; alertLevel=d.alertLevel||0; tokens=d.tokens||0; }
+  }catch(e){}
+}
+
+function ensureAudio(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+}
+function tone(freq,dur,type,vol,slide){
+  ensureAudio();
+  const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+  o.type=type||'sine'; o.frequency.value=freq; g.gain.value=vol||0.18;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start();
+  if(slide) o.frequency.exponentialRampToValueAtTime(slide, audioCtx.currentTime+dur);
+  g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime+dur);
+  o.stop(audioCtx.currentTime+dur);
+}
+function playSuccess(){
+  tone(440,0.14,'square',0.18,880);
+  setTimeout(()=>tone(660,0.14,'square',0.18,1320),120);
+  setTimeout(()=>tone(880,0.35,'sine',0.22),240);
+  setTimeout(()=>tone(1108,0.4,'sine',0.18),380);
+  if(navigator.vibrate) navigator.vibrate(60);
+}
+function playAlarm(){
+  tone(180,0.45,'sawtooth',0.28,90);
+  setTimeout(()=>tone(140,0.45,'sawtooth',0.28,70),320);
+  setTimeout(()=>tone(200,0.3,'square',0.25,100),650);
+  if(navigator.vibrate) navigator.vibrate([120,60,120,60,200]);
+}
+function playKey(){ tone(900,0.06,'square',0.06); }
+function playTick(){ tone(700,0.04,'sine',0.05); }
+
+function getRoot(){ return NODES[currentNode].fs['/']; }
+function resolvePath(p){
+  if(!p || p==='') return cwd;
+  let full = p.startsWith('/') ? p : (cwd==='/'? '/'+p : cwd+'/'+p);
+  let parts=full.split('/').filter(Boolean);
+  let stack=[];
+  for(let part of parts){
+    if(part==='.') continue;
+    if(part==='..') stack.pop();
+    else stack.push(part);
+  }
+  return '/'+stack.join('/');
+}
+function getEntry(path){
+  if(path==='/') return getRoot();
+  let parts=path.split('/').filter(Boolean);
+  let cur=getRoot();
+  for(let part of parts){
+    if(!cur.children || !cur.children[part]) return null;
+    cur=cur.children[part];
+  }
+  return cur;
+}
+function parentPath(path){
+  if(path==='/') return null;
+  let parts=path.split('/').filter(Boolean);
+  parts.pop();
+  return '/'+parts.join('/');
+}
+
+function addAlert(n){
+  alertLevel=Math.min(100, alertLevel+n);
+  updateUI(); save();
+}
+function updateUI(){
+  const node=NODES[currentNode];
+  document.getElementById('nodeVal').textContent=(currentNode+1)+' / 5 — '+node.name;
+  document.getElementById('tokenVal').textContent=tokens+' / 5';
+  document.getElementById('rankVal').textContent=RANKS[Math.min(tokens,5)];
+  document.getElementById('alertPct').textContent=Math.round(alertLevel)+'%';
+  const fill=document.getElementById('alertFill');
+  fill.style.width=alertLevel+'%';
+  fill.className='fill'+(alertLevel>=70?' danger':alertLevel>=35?' warn':'');
+  document.getElementById('prompt').textContent='op@'+node.id+':'+cwd+'$';
+  // dots
+  const dots=document.getElementById('nodeDots');
+  dots.innerHTML='';
+  for(let i=0;i<5;i++){
+    const d=document.createElement('div');
+    d.className='node-dot'+(i<tokens?' done':i===currentNode?' active':'');
+    d.innerHTML='<span>✓</span>';
+    dots.appendChild(d);
+  }
+}
+function print(text, cls){
+  const out=document.getElementById('output');
+  const div=document.createElement('div');
+  div.className='line '+(cls||'');
+  div.textContent=text;
+  out.appendChild(div);
+  out.scrollTop=out.scrollHeight;
+}
+function printHTML(html){
+  const out=document.getElementById('output');
+  const div=document.createElement('div');
+  div.innerHTML=html;
+  out.appendChild(div);
+  out.scrollTop=out.scrollHeight;
+}
+function clearOutput(){
+  document.getElementById('output').innerHTML='';
+}
+
+function showIntro(){
+  clearOutput();
+  const node=NODES[currentNode];
+  printHTML(`<div class="ascii">╔════════════════════════════════════╗
+║  ◈ NEON INFILTRATOR — NODE ${String(currentNode+1).padStart(2,'0')} ║
+║  ${node.name.padEnd(32)} ║
+╚════════════════════════════════════╝</div>`);
+  print(`> Infiltrating ${node.name}... ${node.desc}`, 'sys');
+  print(`> Objective: locate token and run: extract <file>`, 'dim');
+  print(`> Type 'help' for command list. Alert rises on noise.`, 'dim');
+  print('');
+  // auto ls hint
+  print(`$ pwd`, 'input-line');
+  print(cwd);
+  print(`$ ls`, 'input-line');
+  doLs([], false, true);
+}
+
+function doHelp(){
+  print('Available commands:', 'sys');
+  print('  Navigation:  ls [path]  |  cd <path>  |  pwd', 'ok');
+  print('  Reading:     cat <file>  |  less <file>', 'ok');
+  print('  Searching:   find <path> -name <pattern>  |  grep <text> <path>', 'ok');
+  print('  Permission:  chmod 644 <file>  |  chmod +r <file>  |  sudo <cmd>', 'ok');
+  print('  Action:      extract <file>  |  clear  |  status  |  rank', 'ok');
+  print('Examples:', 'dim');
+  print('  find / -name token*', 'dim');
+  print('  grep TOKEN /lab', 'dim');
+  print('  sudo cat /core/mainframe/token.enc', 'dim');
+}
+
+function doLs(args, elevated, silent){
+  let target = args[0] || cwd;
+  // handle ls -l etc
+  if(target.startsWith('-')) target = args[1] || cwd;
+  const path = resolvePath(target);
+  const entry = getEntry(path);
+  if(!entry){ print(`ls: cannot access '${target}': No such file or directory`, 'err'); if(!silent) addAlert(3); return; }
+  if(entry.type==='file'){
+    print(`${entry.perm}  ${path.split('/').pop()}`, 'ok');
+    return;
+  }
+  const children = entry.children || {};
+  const names = Object.keys(children);
+  if(names.length===0){ print('(empty)', 'dim'); return; }
+  // header
+  print(`total ${names.length}  ${path}`, 'dim');
+  for(let name of names.sort()){
+    const e=children[name];
+    const isDir=e.type==='dir';
+    const perm=e.perm||(isDir?'755':'644');
+    const icon=isDir?'📁':'📄';
+    const suffix=isDir?'/':'';
+    const lock=perm==='000'?' 🔒':'';
+    const tokenMark=e.token?' ◉TOKEN':'';
+    print(`${perm} ${isDir?'d':'-'}  ${icon} ${name}${suffix}${lock}${tokenMark}`, isDir?'sys':'');
+  }
+  if(!silent) addAlert(1);
+}
+function doCd(args){
+  if(args.length===0){ cwd='/'; print(cwd); return; }
+  const target=args[0];
+  const path=resolvePath(target);
+  const entry=getEntry(path);
+  if(!entry){ print(`cd: ${target}: No such file or directory`, 'err'); addAlert(3); return; }
+  if(entry.type!=='dir'){ print(`cd: ${target}: Not a directory`, 'err'); addAlert(3); return; }
+  cwd=path;
+  print(cwd, 'ok');
+}
+function doCat(args, elevated){
+  if(args.length===0){ print('cat: missing operand', 'err'); return; }
+  const target=args[0];
+  const path=resolvePath(target);
+  const entry=getEntry(path);
+  if(!entry){ print(`cat: ${target}: No such file or directory`, 'err'); addAlert(3); return; }
+  if(entry.type==='dir'){ print(`cat: ${target}: Is a directory`, 'err'); addAlert(3); return; }
+  if(entry.perm==='000' && !elevated){
+    print(`cat: ${target}: Permission denied (000)`, 'err');
+    print(`hint: chmod 644 ${path}  or  sudo cat ${path}`, 'warn');
+    addAlert(8);
+    return;
+  }
+  print(`── ${path} ──`, 'dim');
+  print(entry.content, 'ok');
+  if(entry.token) print(`→ Token detected! Run: extract ${path}`, 'token');
+  if(!elevated) addAlert(2); else addAlert(4);
+}
+function doFind(args){
+  if(args.length===0){ print('find: missing path', 'err'); return; }
+  // parse: find <path> -name <pattern>
+  let basePath=args[0];
+  let pattern=null;
+  let nameIdx=args.indexOf('-name');
+  if(nameIdx!==-1) pattern=args[nameIdx+1];
+  if(!pattern){ print('find: use: find <path> -name <pattern>  e.g. find / -name token*', 'err'); return; }
+  const base=resolvePath(basePath);
+  const entry=getEntry(base);
+  if(!entry){ print(`find: '${basePath}': No such file or directory`, 'err'); return; }
+  // convert wildcard to regex
+  let regexStr='^'+pattern.replace(/[.+^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'.*').replace(/\?/g,'.')+'$';
+  let regex=new RegExp(regexStr,'i');
+  let results=[];
+  function walk(node, curPath){
+    if(node.type==='file'){
+      const name=curPath.split('/').pop();
+      if(regex.test(name)) results.push(curPath);
+    } else if(node.children){
+      for(let k in node.children){
+        walk(node.children[k], curPath==='/'? '/'+k : curPath+'/'+k);
+      }
+    }
+  }
+  walk(entry, base);
+  if(results.length===0) print(`(no matches for '${pattern}' under ${base})`, 'dim');
+  else {
+    print(`found ${results.length} match(es):`, 'sys');
+    results.forEach(p=>print(p, 'ok'));
+  }
+  addAlert(5);
+}
+function doGrep(args){
+  if(args.length===0){ print('grep: missing pattern', 'err'); return; }
+  let pattern=args[0];
+  let pathArg=args[1] || cwd;
+  // handle grep -r etc
+  if(pattern.startsWith('-')){ pattern=args[1]; pathArg=args[2]||cwd; }
+  if(!pattern){ print('grep: use: grep <text> <path>', 'err'); return; }
+  const base=resolvePath(pathArg);
+  const entry=getEntry(base);
+  if(!entry){ print(`grep: ${pathArg}: No such file or directory`, 'err'); return; }
+  let regex=new RegExp(pattern,'i');
+  let matches=[];
+  function walk(node, curPath){
+    if(node.type==='file'){
+      if(node.content && regex.test(node.content)){
+        // show snippet
+        let lines=node.content.split('\n');
+        lines.forEach((line,i)=>{
+          if(regex.test(line)) matches.push(`${curPath}:${i+1}: ${line.trim().slice(0,80)}`);
+        });
+      }
+    } else if(node.children){
+      for(let k in node.children) walk(node.children[k], curPath==='/'? '/'+k : curPath+'/'+k);
+    }
+  }
+  walk(entry, base);
+  if(matches.length===0) print(`(no matches for '${pattern}' under ${base})`, 'dim');
+  else {
+    print(`matches for '${pattern}':`, 'sys');
+    matches.slice(0,20).forEach(m=>print(m, 'ok'));
+    if(matches.length>20) print(`...and ${matches.length-20} more`, 'dim');
+  }
+  addAlert(5);
+}
+function doChmod(args){
+  if(args.length<2){ print('chmod: use: chmod 644 <file>  or  chmod +r <file>', 'err'); return; }
+  let mode=args[0], target=args[1];
+  const path=resolvePath(target);
+  const entry=getEntry(path);
+  if(!entry){ print(`chmod: cannot access '${target}': No such file or directory`, 'err'); return; }
+  if(entry.type==='dir'){ print(`chmod: ${target}: is a directory (use file path)`, 'warn'); return; }
+  // accept 644, 755, 000, +r, +x etc
+  if(mode==='644' || mode==='+r' || mode==='+rwx' || mode==='755'){
+    entry.perm='644';
+    print(`chmod: permissions of '${path}' changed to 644 (rw-r--r--)`, 'ok');
+    addAlert(4);
+  } else if(mode==='000'){
+    entry.perm='000';
+    print(`chmod: permissions of '${path}' changed to 000`, 'warn');
+    addAlert(2);
+  } else {
+    print(`chmod: invalid mode '${mode}' (try 644 or +r)`, 'err');
+  }
+}
+function doExtract(args, elevated){
+  if(args.length===0){ print('extract: missing file operand', 'err'); print('usage: extract <file>', 'dim'); return; }
+  const target=args[0];
+  const path=resolvePath(target);
+  const entry=getEntry(path);
+  if(!entry){ print(`extract: ${target}: No such file or directory`, 'err'); addAlert(5); return; }
+  if(entry.type==='dir'){ print(`extract: ${target}: Is a directory`, 'err'); return; }
+  if(entry.decoy){
+    print(`⚠️  DECOY TOKEN! Intrusion detected!`, 'err');
+    print(`Alert spike +40%! That was a trap.`, 'warn');
+    addAlert(40);
+    playAlarm();
+    return;
+  }
+  if(!entry.token){
+    print(`extract: ${path}: no token found in file`, 'err');
+    print(`hint: cat the file first to verify it contains TOKEN-`, 'dim');
+    addAlert(6);
+    return;
+  }
+  if(entry.perm==='000' && !elevated){
+    print(`extract: ${path}: Permission denied (000)`, 'err');
+    print(`hint: chmod 644 ${path}  or  sudo extract ${path}`, 'warn');
+    addAlert(8);
+    return;
+  }
+  // success
+  tokens++;
+  playSuccess();
+  printHTML(`<div class="line token">◈ TOKEN EXTRACTED: ${entry.content.split('\n')[0]} ◈</div>`);
+  print(`Node ${NODES[currentNode].name} compromised!`, 'ok');
+  // move to next node
+  if(tokens>=5){
+    save();
+    updateUI();
+    setTimeout(showVictory, 600);
+    return;
+  }
+  currentNode++;
+  cwd='/';
+  alertLevel=Math.max(0, alertLevel-20);
+  save();
+  updateUI();
+  print(`→ Advancing to next node...`, 'sys');
+  setTimeout(()=>{
+    showIntro();
+    print(`Rank upgraded to ${RANKS[tokens]}!`, 'token');
+  }, 800);
+}
+function showStatus(){
+  print(`Node: ${NODES[currentNode].name} (${currentNode+1}/5)`, 'sys');
+  print(`CWD: ${cwd}`, 'sys');
+  print(`Alert: ${Math.round(alertLevel)}%`, alertLevel>=70?'err':alertLevel>=35?'warn':'ok');
+  print(`Tokens: ${tokens}/5  Rank: ${RANKS[tokens]}`, 'ok');
+}
+function showRank(){
+  print(`Operative Rank: ${RANKS[tokens]}`, 'ok');
+  print(`Progress: ${tokens}/5 nodes infiltrated`, 'dim');
+  RANKS.forEach((r,i)=>{
+    const mark=i<=tokens?'●':'○';
+    const cur=i===tokens?' ← current':'';
+    print(`${mark} ${r}${cur}`, i===tokens?'token':'dim');
+  });
+}
+function checkAlert(){
+  if(alertLevel>=100){
+    playAlarm();
+    printHTML(`<div class="line token" style="border-color:#ff2a6d;color:#ff6b8a">🚨 ALARM! TRACE LEVEL 100% — LOCKDOWN INITIATED</div>`);
+    print(`Security sweep in progress... Alert reduced to 75%`, 'warn');
+    alertLevel=75;
+    updateUI(); save();
+  }
+}
+
+function execCommand(raw){
+  raw=raw.trim();
+  if(!raw) return;
+  history.push(raw); histIdx=history.length;
+  print(`$ ${raw}`, 'input-line');
+  let elevated=false;
+  let cmdStr=raw;
+  if(cmdStr.startsWith('sudo ')){
+    elevated=true;
+    cmdStr=cmdStr.slice(5).trim();
+    if(!cmdStr){ print('sudo: missing command', 'err'); return; }
+    addAlert(12);
+    print('[sudo] root privileges granted — trace +12%', 'warn');
+  }
+  let parts=cmdStr.match(/(?:[^\s"]+|"[^"]*")+/g)||[];
+  parts=parts.map(p=>p.replace(/^"|"$/g,''));
+  let cmd=parts[0]||'';
+  let args=parts.slice(1);
+  switch(cmd){
+    case 'help': doHelp(); break;
+    case 'ls': doLs(args, elevated); break;
+    case 'cd': doCd(args); break;
+    case 'pwd': print(cwd, 'ok'); break;
+    case 'cat': doCat(args, elevated); break;
+    case 'less': doCat(args, elevated); break;
+    case 'find': doFind(args); break;
+    case 'grep': doGrep(args); break;
+    case 'chmod': doChmod(args); break;
+    case 'extract': doExtract(args, elevated); break;
+    case 'clear': clearOutput(); break;
+    case 'whoami': print('operative-'+RANKS[tokens].toLowerCase()+'@neon-deck', 'ok'); break;
+    case 'rank': showRank(); break;
+    case 'status': showStatus(); break;
+    case 'sudo': print('usage: sudo <command>', 'err'); break;
+    default:
+      if(cmd) { print(`bash: ${cmd}: command not found. Type 'help'`, 'err'); addAlert(3); }
+  }
+  updateUI();
+  checkAlert();
+  save();
+}
+
+// UI wiring
+const input=document.getElementById('cmd');
+const sendBtn=document.getElementById('send');
+function submit(){
+  const v=input.value;
+  if(!v.trim()) return;
+  playKey();
+  execCommand(v);
+  input.value='';
+  input.focus();
+}
+sendBtn.addEventListener('click', submit);
+input.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); submit(); }
+  else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    if(history.length===0) return;
+    histIdx=Math.max(0, histIdx-1);
+    input.value=history[histIdx]||'';
+    setTimeout(()=>input.setSelectionRange(input.value.length,input.value.length),0);
+    playTick();
+  } else if(e.key==='ArrowDown'){
+    e.preventDefault();
+    if(histIdx>=history.length-1){ histIdx=history.length; input.value=''; }
+    else { histIdx++; input.value=history[histIdx]||''; }
+    playTick();
+  }
+});
+document.getElementById('quick').addEventListener('click', e=>{
+  const b=e.target.closest('.q');
+  if(!b) return;
+  const c=b.dataset.c;
+  input.value+=c;
+  input.focus();
+  playTick();
+});
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(confirm('Reset all progress?')){
+    localStorage.removeItem('neon_infiltrator_v2');
+    currentNode=0; cwd='/'; alertLevel=0; tokens=0; history=[]; histIdx=-1;
+    updateUI(); showOverlayStart(); save();
+  }
+});
+
+// overlays
+function showOverlayStart(){
+  const card=document.getElementById('card');
+  card.innerHTML=`
+    <h2>◈ NEON INFILTRATOR</h2>
+    <p class="big">5-NODE INFILTRATION</p>
+    <p>Type authentic shell commands to explore the filesystem, find tokens, and extract them before the trace hits 100%.</p>
+    <p style="font-size:11px;opacity:0.7;margin-top:8px">Commands: <b>ls</b> <b>cd</b> <b>pwd</b> <b>cat</b> <b>find</b> <b>grep</b> <b>chmod</b> <b>sudo</b> <b>extract</b></p>
+    <div class="row"><button class="cta" id="startBtn">JACK IN — START</button></div>
+    <div class="kbd">Mobile-first • Tap chips for commands • Sounds via Web Audio</div>
+  `;
+  document.getElementById('overlay').style.display='flex';
+  document.getElementById('startBtn').onclick=()=>{
+    document.getElementById('overlay').style.display='none';
+    ensureAudio();
+    showIntro();
+    input.focus();
+  };
+}
+function showVictory(){
+  const card=document.getElementById('card');
+  card.innerHTML=`
+    <h2 style="color:#00ffd0">◈ INFILTRATION COMPLETE</h2>
+    <p class="big" style="color:#fff">RANK: LEGEND</p>
+    <p>All 5 tokens extracted. You ghosted the entire network without burning.</p>
+    <p style="margin-top:8px;font-size:11px;opacity:0.8">Final trace: ${Math.round(alertLevel)}% • Operative status: UNTRACEABLE</p>
+    <div class="row"><button class="cta" id="replayBtn">REPLAY INFILTRATION</button><button class="ghost" id="closeBtn">CLOSE</button></div>
+  `;
+  document.getElementById('overlay').style.display='flex';
+  document.getElementById('replayBtn').onclick=()=>{
+    localStorage.removeItem('neon_infiltrator_v2');
+    currentNode=0; cwd='/'; alertLevel=0; tokens=0; history=[]; histIdx=-1;
+    updateUI(); document.getElementById('overlay').style.display='none'; showIntro(); save();
+  };
+  document.getElementById('closeBtn').onclick=()=>document.getElementById('overlay').style.display='none';
+  playSuccess(); setTimeout(playSuccess,400);
+}
+
+// init
+load();
+updateUI();
+if(tokens>=5){
+  showVictory();
+} else {
+  showOverlayStart();
+  // if returning player, hide overlay after 1s? keep start screen
+  if(currentNode!==0 || tokens!==0){
+    // show resume hint
+    setTimeout(()=>{
+      const c=document.getElementById('card');
+      const extra=document.createElement('p');
+      extra.style.cssText='font-size:11px;margin-top:8px;color:#ffcc66';
+      extra.textContent=`Resuming: Node ${currentNode+1} — ${NODES[currentNode].name} • Tokens ${tokens}/5`;
+      c.appendChild(extra);
+    },100);
+  }
+}
+// prevent zoom on double tap
+document.addEventListener('touchstart', e=>{ if(e.touches.length>1) e.preventDefault(); }, {passive:false});
+</script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LuckyTray — Dice Roller</title>
+<style>
+:root{--bg:#171223;--card:#221b36;--acc:#e879f9;--txt:#f5efff;--mut:#a394c7}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;min-height:100vh}
+.wrap{max-width:480px;margin:0 auto;padding:16px 14px 32px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}
+.sub{color:var(--mut);font-size:13px;margin:2px 0 0}
+#muteBtn{background:var(--card);border:1px solid #3d3260;color:var(--txt);border-radius:12px;min-width:48px;min-height:44px;font-size:18px}
+#sum{font-size:52px;font-weight:800;text-align:center;margin:10px 0 0;font-variant-numeric:tabular-nums}
+#sumLbl{text-align:center;color:var(--mut);font-size:12px;text-transform:uppercase}
+.tray{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;background:var(--card);border:1px solid #3d3260;border-radius:18px;padding:18px 12px;margin:12px 0;min-height:120px}
+.die{width:72px;height:72px;border-radius:16px;background:#f5efff;color:#171223;font-size:38px;font-weight:800;border:0;box-shadow:0 4px 0 #b9a8e0}
+.die:active{transform:translateY(3px);box-shadow:none}
+.die.lucky{background:var(--acc);color:#2b0a33;box-shadow:0 4px 0 #a21caf}
+.die.rolling{animation:shake .3s}
+@keyframes shake{25%{transform:rotate(-12deg)}50%{transform:rotate(10deg)}75%{transform:rotate(-6deg)}}
+#rollBtn{width:100%;min-height:56px;border:0;border-radius:14px;background:var(--acc);color:#2b0a33;font-size:19px;font-weight:800}
+.ctl{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid #3d3260;border-radius:16px;padding:10px 14px;margin:10px 0;font-size:14px}
+.ctl .grow{flex:1}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper button{width:48px;height:48px;border-radius:12px;border:1px solid #3d3260;background:#171223;color:var(--txt);font-size:22px;font-weight:800}
+.stepper b{font-size:20px;min-width:24px;text-align:center}
+#luckyRow{display:flex;gap:6px}
+#luckyRow button{width:44px;height:44px;border-radius:10px;border:1px solid #3d3260;background:#171223;color:var(--txt);font-size:16px;font-weight:700}
+#luckyRow button.on{background:var(--acc);color:#2b0a33;font-weight:800}
+.hist{background:var(--card);border:1px solid #3d3260;border-radius:16px;padding:12px 14px;margin:10px 0;font-size:13px}
+.hist div{display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid #332a52;font-variant-numeric:tabular-nums}
+.hist div:first-child{border-top:0}
+.empty{text-align:center;color:var(--mut);font-size:13px}
+h2{font-size:15px;margin:4px 0 6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div><h1>LuckyTray</h1><p class="sub">Tap dice to roll them</p></div><button id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div id="sum">–</div><div id="sumLbl">Total</div>
+<div class="tray" id="tray"></div>
+<button id="rollBtn">Roll all dice</button>
+<div class="ctl"><span class="grow">Dice on tray (1–6)</span><div class="stepper"><button id="dminus" aria-label="Fewer dice">−</button><b id="dcount">2</b><button id="dplus" aria-label="More dice">+</button></div></div>
+<div class="ctl"><span class="grow">Lucky number</span><div id="luckyRow"></div></div>
+<div class="hist"><h2>Roll history</h2><div id="hist"></div></div>
+</div>
+<script>
+(function(){
+"use strict";
+var KEY="luckytray-v1";
+function storeGet(k,d){try{var x=localStorage.getItem(k);return x==null?d:JSON.parse(x);}catch(e){return d;}}
+function storeSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+var muted=storeGet("muted-dice-tray-x",false);
+if(typeof muted!=="boolean")muted=false;
+var muteBtn=document.getElementById("muteBtn");
+function paintMute(){muteBtn.textContent=muted?"🔇":"🔊";}paintMute();
+var actx=null;
+function beep(f){if(muted)return;try{var C=window.AudioContext||window.webkitAudioContext;if(!C)return;if(!actx)actx=new C();if(actx.state==="suspended")actx.resume();var o=actx.createOscillator(),g=actx.createGain();o.type="triangle";o.frequency.value=f||660;g.gain.value=0.07;o.connect(g);g.connect(actx.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.1);o.stop(actx.currentTime+0.11);}catch(e){}}
+function rattle(){if(muted)return;var seq=[500,380,620,450];seq.forEach(function(f,i){setTimeout(function(){beep(f);},i*55);});}
+muteBtn.addEventListener("click",function(){muted=!muted;storeSet("muted-dice-tray-x",muted);paintMute();beep(720);});
+var st=storeGet(KEY,{count:2,faces:[3,5],lucky:6,hist:[]});
+if(!st||typeof st.count!=="number")st={count:2,faces:[3,5],lucky:6,hist:[]};
+if(!Array.isArray(st.faces))st.faces=[3,5];
+if(!Array.isArray(st.hist))st.hist=[];
+var tray=document.getElementById("tray"),sumEl=document.getElementById("sum"),histEl=document.getElementById("hist");
+function save(){storeSet(KEY,st);}
+function rollOne(){return 1+Math.floor(Math.random()*6);}
+function draw(){
+document.getElementById("dcount").textContent=st.count;
+while(st.faces.length<st.count)st.faces.push(rollOne());
+st.faces=st.faces.slice(0,st.count);
+tray.innerHTML="";
+var total=0;
+st.faces.forEach(function(f,i){
+total+=f;
+var b=document.createElement("button");b.className="die"+(f===st.lucky?" lucky":"");b.textContent=f;
+b.setAttribute("aria-label","Die "+(i+1)+", tap to re-roll");
+b.addEventListener("click",function(){st.faces[i]=rollOne();b.classList.add("rolling");beep(500+st.faces[i]*60);setTimeout(function(){save();draw();},180);});
+tray.appendChild(b);});
+sumEl.textContent=st.faces.length?total:"–";
+var lr=document.getElementById("luckyRow");lr.innerHTML="";
+for(var n=1;n<=6;n++){var lb=document.createElement("button");lb.textContent=n;if(n===st.lucky)lb.classList.add("on");(function(v){lb.addEventListener("click",function(){st.lucky=v;beep(760);save();draw();});})(n);lr.appendChild(lb);}
+histEl.innerHTML="";
+if(!st.hist.length){histEl.innerHTML="<div class='empty'>No rolls yet — shake the tray.</div>";return;}
+st.hist.slice(0,15).forEach(function(h){var d=document.createElement("div");var faces=document.createElement("span");faces.textContent=h.faces.join(" + ");var s=document.createElement("b");s.textContent="= "+h.sum;d.appendChild(faces);d.appendChild(s);histEl.appendChild(d);});
+}
+document.getElementById("rollBtn").addEventListener("click",function(){
+for(var i=0;i<st.faces.length;i++)st.faces[i]=rollOne();
+var dice=tray.querySelectorAll(".die");
+for(var j=0;j<dice.length;j++)dice[j].classList.add("rolling");
+rattle();
+setTimeout(function(){
+var sum=st.faces.reduce(function(a,b){return a+b;},0);
+st.hist.unshift({faces:st.faces.slice(),sum:sum});st.hist=st.hist.slice(0,15);
+save();draw();},220);});
+document.getElementById("dminus").addEventListener("click",function(){if(st.count>1){st.count--;beep(500);save();draw();}});
+document.getElementById("dplus").addEventListener("click",function(){if(st.count<6){st.count++;beep(680);save();draw();}});
+draw();
+})();
+</script>
+</body>
+</html>

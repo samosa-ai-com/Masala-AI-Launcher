@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Void Deck — Starship Noir Dossier</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--navy:#080e1e;--navy2:#0f1c33;--felt:#0e2238;--brass:#c9a86a;--brass2:#8a6d3b;--cyan:#4de8ff;--cyan2:#1fb5cc;--paper:#f5ecd7;--paper2:#e8dcc0;--muted:#8ea0b8;--red:#ff5a5a;--green:#3de68a}
+html,body{background:var(--navy);color:#e6eef8;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;min-height:100vh}
+body{display:flex;justify-content:center}
+.wrap{width:100%;max-width:428px;min-width:360px;background:radial-gradient(120% 80% at 50% 0%,#132a4d 0%,var(--navy) 60%);min-height:100vh;display:flex;flex-direction:column}
+header{padding:12px 14px 10px;background:linear-gradient(180deg,#0f2342,#0a1428);border-bottom:2px solid var(--brass);position:sticky;top:0;z-index:5}
+.hrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.logo{font-weight:900;letter-spacing:.08em;font-size:13px;color:var(--brass)}
+.logo span{color:var(--cyan)}
+.badge{font-size:10px;letter-spacing:.1em;color:var(--navy);background:var(--brass);padding:4px 8px;border-radius:20px;font-weight:800}
+.sub{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.3}
+.stats{display:flex;gap:8px;margin-top:8px}
+.stat{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(201,168,106,.3);border-radius:10px;padding:7px 8px;text-align:center}
+.stat b{color:var(--cyan);font-size:14px}
+.stat span{font-size:10px;color:var(--muted);display:block;letter-spacing:.08em}
+main{flex:1;padding:12px 12px 18px}
+.cardTable{background:linear-gradient(180deg,#0f2a4a 0%,#0c1e36 100%);border:1px solid rgba(201,168,106,.35);border-radius:14px;padding:10px;box-shadow:inset 0 0 0 1px rgba(77,232,255,.08),0 8px 24px rgba(0,0,0,.4)}
+.sectionTitle{font-size:11px;letter-spacing:.12em;color:var(--brass);font-weight:800;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.sectionTitle i{font-style:normal;color:var(--muted);font-weight:600;letter-spacing:.06em;font-size:10px}
+.cases{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.caseBtn{position:relative;background:linear-gradient(180deg,#132a4d,#0e1e38);border:1px solid rgba(201,168,106,.35);border-radius:12px;padding:10px 9px;min-height:92px;text-align:left;cursor:pointer;touch-action:manipulation}
+.caseBtn:disabled{opacity:.45}
+.caseBtn.active{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(77,232,255,.25)}
+.caseBtn .num{font-size:10px;letter-spacing:.1em;color:var(--brass);font-weight:800}
+.caseBtn .name{font-size:12px;font-weight:800;line-height:1.2;margin:4px 0 6px;color:#eaf2ff}
+.caseBtn .meta{font-size:10px;color:var(--muted)}
+.stars{color:var(--brass);letter-spacing:1px;font-size:12px}
+.lock{position:absolute;top:8px;right:8px;font-size:14px}
+.view{display:none}
+.view.on{display:block}
+.evGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.evCard{background:linear-gradient(180deg,#f7efe0,#e8dcc0);color:#1a2332;border:1px solid var(--brass2);border-radius:10px;padding:8px 8px 7px;min-height:96px;cursor:pointer;touch-action:manipulation;position:relative;transition:.15s}
+.evCard.sel{outline:2px solid var(--cyan);outline-offset:1px;transform:translateY(-1px)}
+.evCard.found{opacity:.55;outline:2px solid var(--green)}
+.evCard .eTop{font-size:9px;letter-spacing:.1em;color:#6b5a2a;font-weight:800;display:flex;justify-content:space-between}
+.evCard .eTitle{font-size:11px;font-weight:900;line-height:1.2;margin:4px 0 3px}
+.evCard .eDesc{font-size:10px;line-height:1.3;color:#3a4456}
+.evCard .eIcon{position:absolute;bottom:6px;right:7px;font-size:14px;opacity:.7}
+.actions{display:flex;gap:8px;margin-top:10px}
+.btn{flex:1;min-height:48px;border-radius:10px;border:1px solid var(--brass);font-weight:800;letter-spacing:.06em;font-size:12px;cursor:pointer;touch-action:manipulation}
+.btnPrimary{background:linear-gradient(180deg,var(--brass),#a88a4a);color:#0a0f1e}
+.btnGhost{background:rgba(255,255,255,.06);color:var(--cyan);border-color:rgba(77,232,255,.4)}
+.btn:disabled{opacity:.4}
+.notebook{margin-top:10px;background:var(--paper);color:#1e2a3a;border-radius:10px;border:1px solid var(--brass2);overflow:hidden}
+.nbHead{background:linear-gradient(180deg,#f5ecd7,#e8dcc0);padding:8px 10px;font-size:11px;letter-spacing:.1em;font-weight:900;color:#5a4a1e;border-bottom:1px dashed #b8a47a;display:flex;justify-content:space-between}
+.nbBody{padding:8px 10px;min-height:48px}
+.linkRow{font-size:11px;padding:6px 8px;background:#fff8e6;border:1px solid #d8c99a;border-radius:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.linkRow.ok{border-color:#3de68a;background:#eafff2}
+.hintBar{display:flex;gap:6px;margin-top:8px;align-items:center}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--cyan);border:1px solid #0a0f1e}
+.dot.off{background:transparent;border-color:rgba(255,255,255,.3)}
+.accusation{margin-top:10px;background:rgba(255,255,255,.05);border:1px solid rgba(201,168,106,.3);border-radius:12px;padding:10px}
+.accTitle{font-size:11px;letter-spacing:.1em;color:var(--brass);font-weight:800;margin-bottom:8px}
+.picker{margin-bottom:8px}
+.picker label{font-size:10px;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.opt{padding:8px 10px;min-height:40px;border-radius:20px;border:1px solid rgba(201,168,106,.4);background:rgba(255,255,255,.06);color:#e6eef8;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation}
+.opt.on{background:var(--cyan);color:#0a0f1e;border-color:var(--cyan)}
+.result{margin-top:10px;padding:10px;border-radius:10px;text-align:center;font-weight:800;font-size:13px}
+.result.win{background:linear-gradient(180deg,#0f3a2a,#0a2a1e);border:1px solid var(--green);color:var(--green)}
+.result.lose{background:linear-gradient(180deg,#3a1a1a,#2a0f0f);border:1px solid var(--red);color:var(--red)}
+.small{font-size:10px;color:var(--muted);line-height:1.4;margin-top:6px;text-align:center}
+.footer{padding:10px 12px 14px;text-align:center;font-size:10px;color:var(--muted);letter-spacing:.06em}
+a.link{color:var(--cyan);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<div class="hrow">
+<div class="logo">VOID DECK <span>— NOIR DOSSIER</span></div>
+<div class="badge" id="archiveBadge">VD-000000-00</div>
+</div>
+<div class="sub">Link evidence that explains each other. Then file your triple accusation: <b style="color:var(--cyan)">crewmate + method + motive</b>.</div>
+<div class="stats">
+<div class="stat"><b id="totalStars">0★</b><span>TOTAL STARS</span></div>
+<div class="stat"><b id="casesCleared">0/6</b><span>CASES CLOSED</span></div>
+<div class="stat"><b id="hintInfo">—</b><span>HINT BUDGET</span></div>
+</div>
+</header>
+<main>
+<div class="cardTable" id="caseSelectView">
+<div class="sectionTitle">CASE FILES <i>TAP TO OPEN</i></div>
+<div class="cases" id="casesGrid"></div>
+<div class="small">1★ unlocks next case. 3★ = all links + correct accusation with no hints. False links cost 1 hint.</div>
+</div>
+
+<div class="cardTable view" id="caseView">
+<div class="sectionTitle"><span id="caseTitle">CASE 01</span> <a class="link" href="#" id="backBtn">◀ CASES</a></div>
+<div style="font-size:11px;color:#cfe8ff;line-height:1.4;background:rgba(0,0,0,.25);padding:8px 9px;border-radius:8px;border:1px solid rgba(201,168,106,.25)" id="caseNarr"></div>
+<div class="hintBar">
+<span style="font-size:10px;letter-spacing:.08em;color:var(--brass);font-weight:800">HINT BUDGET</span>
+<span id="hintDots" style="display:flex;gap:5px;margin-left:6px"></span>
+<span style="margin-left:auto;font-size:10px;color:var(--muted)" id="progressTxt">0/3 links</span>
+</div>
+<div style="margin-top:10px" class="sectionTitle">EVIDENCE TABLE <i>PICK 2 → LINK</i></div>
+<div class="evGrid" id="evGrid"></div>
+<div class="actions">
+<button class="btn btnPrimary" id="linkBtn" disabled>LINK EVIDENCE</button>
+<button class="btn btnGhost" id="hintBtn">HINT (3)</button>
+</div>
+<div class="notebook">
+<div class="nbHead"><span>DETECTIVE NOTEBOOK</span><span id="nbCount">0 LINKS</span></div>
+<div class="nbBody" id="nbBody"><div style="font-size:11px;color:#6b5a2a;text-align:center;padding:8px">No links yet — select two cards that explain each other.</div></div>
+</div>
+<div class="accusation" id="accBox">
+<div class="accTitle">TRIPLE ACCUSATION — FILE WHEN READY</div>
+<div class="picker"><label>CREWMATE</label><div class="opts" id="susOpts"></div></div>
+<div class="picker"><label>METHOD</label><div class="opts" id="metOpts"></div></div>
+<div class="picker"><label>MOTIVE</label><div class="opts" id="motOpts"></div></div>
+<button class="btn btnPrimary" id="fileBtn" style="width:100%;margin-top:6px">FILE ACCUSATION</button>
+<div id="resultBox"></div>
+</div>
+</div>
+</main>
+<div class="footer">Starship-noir dossier • Card table & notebook • Persisted on this device • <span id="footerCode">VD-000000-00</span></div>
+</div>
+<script>
+const CASES=[
+{
+ id:1,title:"01 — The Airlock Alibi",narr:"Deck 3 airlock cycled at 02:14 with no EVA logged. Chief Mara found outside, tether cut. Who wanted her gone?",
+ cards:[
+  {t:"Airlock Log 02:14",d:"Manual override from inside. No suit check.",i:"🚪"},
+  {t:"Cut Tether",d:"Clean cut, port-side tool. Not a tear.",i:"🪢"},
+  {t:"Mara's Wrench",d:"Found in locker, wiped clean. Her prints gone.",i:"🔧"},
+  {t:"Port Tool Crib",d:"Cutter #3 missing. Signed to Jax.",i:"🗄️"},
+  {t:"Cam Blackout",d:"02:12-02:16 gap. Power rerouted via galley.",i:"📹"},
+  {t:"Galley Breaker",d:"Tripped manually. Only cook has key.",i:"⚡"},
+  {t:"Jax's Alibi",d:"Claims mess hall till 02:30. No witness.",i:"🗣️"},
+  {t:"Mara's Report",d:"She flagged Jax for smuggling coolant.",i:"📄"}
+ ],
+ links:[[0,4],[1,3],[5,4],[7,1]],
+ sus:["Jax — Deckhand","Lena — Cook","Orin — Engineer","Mara — Victim"],
+ met:["Airlock ejection","Tether cut EVA","Poisoned suit O₂","Staged accident"],
+ mot:["Silence smuggling report","Jealousy over promotion","Debt to syndicate","Fear of mutiny"],
+ ans:{s:0,m:0,mo:0}
+},
+{
+ id:2,title:"02 — Mess Hall Poison",narr:"Navigator Quinn collapsed after broth. Medbay says synthetic neurotoxin. The galley is locked down.",
+ cards:[
+  {t:"Broth Pot",d:"Residue of toxin only in Quinn's bowl.",i:"🍲"},
+  {t:"Spice Rack",d:"Vial of bitter almond oil, unlabeled.",i:"🧪"},
+  {t:"Quinn's Diet Log",d:"Allergic to almonds — crew knew.",i:"📋"},
+  {t:"Lena's Gloves",d:"Latex, almond oil traces inside.",i:"🧤"},
+  {t:"Vent Filter",d:"Toxin dust in vent above Quinn's seat.",i:"🌀"},
+  {t:"Maintenance Hatch",d:"Opened 11:40, Lena's keycard.",i:"🔑"},
+  {t:"Orin's Debt Chip",d:"Quinn held Orin's gambling marker.",i:"💳"},
+  {t:"Orin's Note",d:"'He'll forgive if I do it' — unsent.",i:"✉️"}
+ ],
+ links:[[0,1],[1,3],[2,0],[5,4]],
+ sus:["Lena — Cook","Orin — Engineer","Jax — Deckhand","Sable — Medic"],
+ met:["Poisoned broth","Aerosol vent","Tainted water","Injected"],
+ mot:["Cover debt collection","Revenge for demotion","Orders from syndicate","Mercy killing"],
+ ans:{s:0,m:0,mo:0}
+},
+{
+ id:3,title:"03 — Engine Sabotage",narr:"Jump core overheated. Sabotage or negligence? Engineer Orin was on watch, but logs don't add up.",
+ cards:[
+  {t:"Coolant Valve",d:"Welded shut. Needs torch, not hands.",i:"🔩"},
+  {t:"Torch Log",d:"Checked out to Sable, returned hot.",i:"🔥"},
+  {t:"Orin's Watch Log",d:"Claims valve checked 04:00. Ink still wet.",i:"📓"},
+  {t:"Ink Analysis",d:"Fresh — written after alarm.",i:"🖊️"},
+  {t:"Sable's Med Kit",d:"Burn gel used, fresh wrapper.",i:"🩹"},
+  {t:"Core Temp Graph",d:"Spike at 04:12, valve already shut.",i:"📈"},
+  {t:"Captain's Order",d:"Orin denied shore leave yesterday.",i:"📜"},
+  {t:"Sable's Transfer",d:"Requested off-ship, denied by Orin.",i:"🚀"}
+ ],
+ links:[[0,1],[2,3],[1,4],[5,0]],
+ sus:["Sable — Medic","Orin — Engineer","Lena — Cook","Quinn — Navigator"],
+ met:["Welded coolant valve","Software override","Cut power coupling","Staged negligence"],
+ mot:["Escape denied transfer","Hide smuggling damage","Revenge for denied leave","Prove incompetence"],
+ ans:{s:0,m:0,mo:2}
+},
+{
+ id:4,title:"04 — Cryo Wake",narr:"Passenger in cryo pod 7 woke early, memory wiped. Someone flushed the sedative line.",
+ cards:[
+  {t:"Pod 7 Flush Log",d:"Manual flush 03:33 from medbay terminal.",i:"🧊"},
+  {t:"Medbay Login",d:"Sable logged in 03:31-03:35.",i:"💻"},
+  {t:"Sedative Vial",d:"Empty, prints wiped, in trash.",i:"💉"},
+  {t:"Trash Cam",d:"Sable dumping vial, gloved.",i:"📹"},
+  {t:"Passenger Manifest",d:"Pod 7: witness to syndicate hit.",i:"📄"},
+  {t:"Syndicate Bounty",d:"Ping to ship: 50k for Pod 7.",i:"💰"},
+  {t:"Captain's Safe",d:"Bounty message opened, not reported.",i:"🔒"},
+  {t:"Sable's Comms",d:"'He's awake, what now?' — to captain.",i:"📡"}
+ ],
+ links:[[0,1],[2,3],[4,5],[6,7]],
+ sus:["Sable — Medic","Captain Rho","Lena — Cook","Orin — Engineer"],
+ met:["Flushed sedative line","Cut cryo power","Overdosed sedative","Woke for interrogation"],
+ mot:["Collect syndicate bounty","Protect witness","Follow captain's order","Hide identity"],
+ ans:{s:1,m:0,mo:0}
+},
+{
+ id:5,title:"05 — Signal Ghost",narr:"A ghost signal mimicked distress, luring ship off course. Comms officer Jax swears it wasn't him.",
+ cards:[
+  {t:"Ghost Signal",d:"Mimics old Earth SOS, looped.",i:"📻"},
+  {t:"Jax's Console",d:"Macro for SOS loop, saved yesterday.",i:"⌨️"},
+  {t:"Nav Deviation",d:"Course bent toward asteroid field.",i:"🧭"},
+  {t:"Asteroid Claim",d:"Jax filed claim on field last month.",i:"⛏️"},
+  {t:"Comms Log Wipe",d:"02:00-02:20 wiped, Jax's code.",i:"🧹"},
+  {t:"Quinn's Backup",d:"Secret backup shows Jax at console 02:05.",i:"💾"},
+  {t:"Lena's Debt",d:"Jax owes Lena for coolant.",i:"💳"},
+  {t:"Field Scan",d:"Rich vein where signal pointed.",i:"🔭"}
+ ],
+ links:[[0,1],[2,3],[4,5],[1,7]],
+ sus:["Jax — Deckhand","Quinn — Navigator","Lena — Cook","Orin — Engineer"],
+ met:["Faked distress signal","Wiped nav logs","Spoofed beacon","Rerouted course"],
+ mot:["Claim asteroid fortune","Lure syndicate trap","Test loyalty","Cover smuggling route"],
+ ans:{s:0,m:0,mo:0}
+},
+{
+ id:6,title:"06 — Captain's Log",narr:"Captain Rho found locked in quarters, log deleted. Final entry: 'They're all lying.' Who silenced him?",
+ cards:[
+  {t:"Deleted Log",d:"Recovered fragment: 'Orin knows about coolant.'",i:"📜"},
+  {t:"Coolant Ledger",d:"Orin skimming, captain auditing.",i:"📊"},
+  {t:"Quarters Lock",d:"Overridden from engineering.",i:"🔐"},
+  {t:"Engineering Override",d:"Orin's code at 01:55.",i:"🔧"},
+  {t:"Captain's Tea",d:"Sedative traces, Lena brewed.",i:"🍵"},
+  {t:"Lena's Brew Log",d:"Extra tea 01:40, captain's blend.",i:"📓"},
+  {t:"Sable's Exam",d:"Captain sedated, not dead — staged.",i:"🩺"},
+  {t:"Orin's Threat",d:"'He'll space me if he finds out' — to Sable.",i:"🗣️"}
+ ],
+ links:[[0,1],[2,3],[4,5],[1,7]],
+ sus:["Orin — Engineer","Lena — Cook","Sable — Medic","Jax — Deckhand"],
+ met:["Sedated and locked","Deleted log + staged","Spaced (failed)","Framed another"],
+ mot:["Hide coolant theft","Protect captain from crew","Follow syndicate order","Jealousy"],
+ ans:{s:0,m:0,mo:0}
+}
+];
+
+let save={caseStars:[0,0,0,0,0,0],unlocks:[true,false,false,false,false,false],archiveCode:"VD-000000-00"};
+try{let s=JSON.parse(localStorage.getItem("voidDeckSave")); if(s&&s.caseStars) save=s;}catch(e){}
+function genCode(){
+ let sum=save.caseStars.reduce((a,b)=>a+b,0);
+ let chk=save.caseStars.map(n=>n.toString(36)).join("").padEnd(6,"0").toUpperCase();
+ let tail=(sum*37+save.caseStars[2]*13).toString(16).padStart(2,"0").toUpperCase();
+ return `VD-${chk.slice(0,6)}-${tail}`;
+}
+function persist(){save.archiveCode=genCode();localStorage.setItem("voidDeckSave",JSON.stringify(save));renderHeader();}
+function renderHeader(){
+ let total=save.caseStars.reduce((a,b)=>a+b,0);
+ document.getElementById("totalStars").textContent=total+"★";
+ document.getElementById("casesCleared").textContent=save.caseStars.filter(s=>s>0).length+"/6";
+ document.getElementById("archiveBadge").textContent=save.archiveCode;
+ document.getElementById("footerCode").textContent=save.archiveCode;
+}
+let cur=null, sel=[], found=[], hints=3, hintUsed=0, picks={s:null,m:null,mo:null};
+
+function renderCases(){
+ const g=document.getElementById("casesGrid"); g.innerHTML="";
+ CASES.forEach((c,i)=>{
+  const stars=save.caseStars[i];
+  const unlocked=save.unlocks[i];
+  const btn=document.createElement("button");
+  btn.className="caseBtn"+(cur===i?" active":"");
+  btn.disabled=!unlocked;
+  btn.innerHTML=`<div class="num">CASE ${String(c.id).padStart(2,"0")}</div><div class="name">${c.title.split("—")[1]||c.title}</div><div class="meta">${unlocked? (stars? `<span class="stars">${"★".repeat(stars)}${"☆".repeat(3-stars)}</span>` : "OPEN →") : "LOCKED — need 1★ prior"}</div>${!unlocked?`<span class="lock">🔒</span>`:""}`;
+  btn.onclick=()=>openCase(i);
+  g.appendChild(btn);
+ });
+}
+function openCase(i){
+ cur=i; const c=CASES[i];
+ found=[]; sel=[]; hints=3; hintUsed=0; picks={s:null,m:null,mo:null};
+ document.getElementById("caseSelectView").style.display="none";
+ document.getElementById("caseView").classList.add("on");
+ document.getElementById("caseTitle").textContent=c.title;
+ document.getElementById("caseNarr").textContent=c.narr;
+ document.getElementById("resultBox").innerHTML="";
+ renderEvidence(); renderNotebook(); renderAccusation(); updateHintUI(); updateProgress();
+ renderCases();
+}
+function closeCase(){
+ cur=null;
+ document.getElementById("caseSelectView").style.display="block";
+ document.getElementById("caseView").classList.remove("on");
+ renderCases();
+}
+function renderEvidence(){
+ const g=document.getElementById("evGrid"); g.innerHTML="";
+ const c=CASES[cur];
+ c.cards.forEach((card,idx)=>{
+  const isFound=found.some(f=> (f[0]===idx||f[1]===idx) && found.some(p=> (p[0]===idx&&p[1]===found.find(q=>q.includes(idx))?.[1]) ) );
+  // simpler: check if idx part of any found pair
+  const inFound=found.some(p=>p[0]===idx||p[1]===idx);
+  const d=document.createElement("div");
+  d.className="evCard"+(sel.includes(idx)?" sel":"")+(inFound?" found":"");
+  d.innerHTML=`<div class="eTop"><span>#${String(idx+1).padStart(2,"0")}</span><span>${inFound?"✓ LINKED":"○"}</span></div><div class="eTitle">${card.t}</div><div class="eDesc">${card.d}</div><div class="eIcon">${card.i}</div>`;
+  d.onclick=()=>toggleSel(idx);
+  g.appendChild(d);
+ });
+ updateLinkBtn();
+}
+function toggleSel(idx){
+ if(found.some(p=>p[0]===idx||p[1]===idx)) return;
+ if(sel.includes(idx)) sel=sel.filter(s=>s!==idx);
+ else {
+  if(sel.length>=2) sel.shift();
+  sel.push(idx);
+ }
+ renderEvidence();
+}
+function normalize(a,b){return a<b? [a,b]:[b,a];}
+function isCorrect(a,b){
+ const c=CASES[cur];
+ return c.links.some(l=> (l[0]===a&&l[1]===b)||(l[0]===b&&l[1]===a));
+}
+function updateLinkBtn(){
+ const btn=document.getElementById("linkBtn");
+ btn.disabled=sel.length!==2;
+ btn.textContent=sel.length===2? `LINK #${sel[0]+1} ↔ #${sel[1]+1}` : "LINK EVIDENCE";
+}
+function updateHintUI(){
+ document.getElementById("hintBtn").textContent=`HINT (${hints})`;
+ document.getElementById("hintBtn").disabled=hints<=0;
+ const dots=document.getElementById("hintDots"); dots.innerHTML="";
+ for(let i=0;i<3;i++){const d=document.createElement("span");d.className="dot"+(i<hints?"":" off");dots.appendChild(d);}
+ document.getElementById("hintInfo").textContent=hints+"/3";
+}
+function updateProgress(){
+ const c=CASES[cur];
+ document.getElementById("progressTxt").textContent=`${found.length}/${c.links.length} links`;
+ document.getElementById("nbCount").textContent=`${found.length} LINKS`;
+}
+function renderNotebook(){
+ const nb=document.getElementById("nbBody");
+ if(found.length===0){nb.innerHTML=`<div style="font-size:11px;color:#6b5a2a;text-align:center;padding:8px">No links yet — select two cards that explain each other.</div>`;return;}
+ const c=CASES[cur];
+ nb.innerHTML=found.map(p=>{
+  const a=c.cards[p[0]], b=c.cards[p[1]];
+  return `<div class="linkRow ok"><span><b>#${p[0]+1}</b> ${a.t} <span style="color:var(--cyan2)">↔</span> <b>#${p[1]+1}</b> ${b.t}</span><span>✓</span></div>`;
+ }).join("") + (found.length===c.links.length? `<div style="font-size:10px;color:#1a6b3a;text-align:center;margin-top:6px;font-weight:800">ALL LINKS FOUND — FILE ACCUSATION BELOW</div>`:"");
+}
+function renderAccusation(){
+ const c=CASES[cur];
+ const susEl=document.getElementById("susOpts"); susEl.innerHTML="";
+ c.sus.forEach((s,i)=>{const b=document.createElement("button");b.className="opt"+(picks.s===i?" on":"");b.textContent=s;b.onclick=()=>{picks.s=i;renderAccusation();};susEl.appendChild(b);});
+ const metEl=document.getElementById("metOpts"); metEl.innerHTML="";
+ c.met.forEach((s,i)=>{const b=document.createElement("button");b.className="opt"+(picks.m===i?" on":"");b.textContent=s;b.onclick=()=>{picks.m=i;renderAccusation();};metEl.appendChild(b);});
+ const motEl=document.getElementById("motOpts"); motEl.innerHTML="";
+ c.mot.forEach((s,i)=>{const b=document.createElement("button");b.className="opt"+(picks.mo===i?" on":"");b.textContent=s;b.onclick=()=>{picks.mo=i;renderAccusation();};motEl.appendChild(b);});
+}
+
+document.getElementById("linkBtn").onclick=()=>{
+ if(sel.length!==2) return;
+ const [a,b]=normalize(sel[0],sel[1]);
+ if(found.some(p=>p[0]===a&&p[1]===b)){sel=[];renderEvidence();return;}
+ if(isCorrect(a,b)){
+  found.push([a,b]);
+  sel=[];
+  renderEvidence();renderNotebook();updateProgress();
+  if(navigator.vibrate) navigator.vibrate(30);
+ } else {
+  hints=Math.max(0,hints-1); hintUsed++;
+  sel=[];
+  updateHintUI();renderEvidence();
+  const nb=document.getElementById("nbBody");
+  const msg=document.createElement("div");
+  msg.className="linkRow"; msg.style.borderColor="var(--red)"; msg.style.background="#fff0f0";
+  msg.innerHTML=`<span>✗ #${a+1} ↔ #${b+1} — no direct link</span><span style="color:var(--red)">−1 hint</span>`;
+  nb.prepend(msg);
+  if(navigator.vibrate) navigator.vibrate([40,40,40]);
+  if(hints===0) document.getElementById("hintBtn").disabled=true;
+ }
+};
+document.getElementById("hintBtn").onclick=()=>{
+ if(hints<=0) return;
+ const c=CASES[cur];
+ const remaining=c.links.filter(l=> !found.some(f=>f[0]===l[0]&&f[1]===l[1]));
+ if(remaining.length===0) return;
+ const pick=remaining[0];
+ found.push(pick);
+ hints--; hintUsed++;
+ updateHintUI();renderEvidence();renderNotebook();updateProgress();
+};
+document.getElementById("fileBtn").onclick=()=>{
+ if(picks.s===null||picks.m===null||picks.mo===null){
+  document.getElementById("resultBox").innerHTML=`<div class="result lose">Pick one of each: crewmate, method & motive.</div>`;
+  return;
+ }
+ const c=CASES[cur];
+ const correct = picks.s===c.ans.s && picks.m===c.ans.m && picks.mo===c.ans.mo;
+ const allLinks = found.length===c.links.length;
+ let stars=0;
+ if(correct && allLinks && hintUsed===0) stars=3;
+ else if(correct && allLinks) stars=2;
+ else if(correct) stars=2;
+ else if(allLinks) stars=1;
+ else stars=0;
+ // allow 1 star for partial if at least half links
+ if(stars===0 && found.length>=Math.ceil(c.links.length/2)) stars=1;
+ const prev=save.caseStars[cur];
+ if(stars>prev) save.caseStars[cur]=stars;
+ if(stars>=1 && cur<5) save.unlocks[cur+1]=true;
+ persist();
+ renderCases();
+ let html="";
+ if(stars>0){
+  html=`<div class="result win">${"★".repeat(stars)}${"☆".repeat(3-stars)} CASE CLOSED — ${stars}★<div style="font-size:11px;font-weight:600;margin-top:4px;color:#b8f5d0">${correct?"Accusation correct.":"Accusation off, but links earned credit."} ${allLinks?"All links found.":found.length+"/"+c.links.length+" links."} ${hintUsed?hintUsed+" hint(s) used.":"No hints — perfect."}</div></div>`;
+  if(cur<5) html+=`<div style="margin-top:8px"><button class="btn btnPrimary" style="width:100%" onclick="nextCase()">NEXT CASE →</button></div>`;
+  else html+=`<div style="margin-top:8px;font-size:11px;color:var(--brass);text-align:center">All cases closed. Archive code: <b>${save.archiveCode}</b></div>`;
+ } else {
+  html=`<div class="result lose">CASE OPEN — 0★<div style="font-size:11px;font-weight:600;margin-top:4px;color:#ffb8b8">Need correct accusation or more links. Answer was: ${c.sus[c.ans.s]} / ${c.met[c.ans.m]} / ${c.mot[c.ans.mo]}</div></div><div style="margin-top:8px"><button class="btn btnGhost" style="width:100%" onclick="retryCase()">RETRY CASE</button></div>`;
+ }
+ document.getElementById("resultBox").innerHTML=html;
+ if(navigator.vibrate) navigator.vibrate(correct?[30,40,60]:[60,40,60]);
+};
+window.nextCase=()=>{ if(cur<5) openCase(cur+1); };
+window.retryCase=()=>{ openCase(cur); };
+document.getElementById("backBtn").onclick=(e)=>{e.preventDefault();closeCase();};
+
+renderHeader();renderCases();
+</script>
+</body>
+</html>

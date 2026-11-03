@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Battery Cycle Lab</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0f1419;color:#e8eef4;display:flex;justify-content:center}
+.app{width:100%;max-width:428px;min-height:100vh;background:linear-gradient(180deg,#1a232e 0%,#0f1419 100%);display:flex;flex-direction:column;position:relative;overflow-x:hidden}
+header{background:linear-gradient(180deg,#2a3441 0%,#1e2833 100%);border-bottom:3px solid #0a0e13;box-shadow:0 4px 12px rgba(0,0,0,.5);padding:10px 12px 8px;position:sticky;top:0;z-index:10}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.logo{display:flex;align-items:center;gap:8px}
+.logo-mark{width:36px;height:36px;background:radial-gradient(circle at 30% 30%,#ffd54f,#ff8f00);border-radius:8px;display:grid;place-items:center;font-size:18px;box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 2px 6px rgba(0,0,0,.4);border:1px solid #ffb300}
+.logo h1{font-size:15px;letter-spacing:.06em;font-weight:800;line-height:1}
+.logo h1 span{font-weight:400;font-size:10px;letter-spacing:.12em;color:#8ea0b5;display:block}
+.hdr-actions{display:flex;gap:6px;align-items:center}
+.btn-mini{height:36px;min-width:36px;padding:0 10px;border-radius:8px;border:1px solid #3a4a5e;background:linear-gradient(180deg,#2e3d4f,#1e2a38);color:#cfe0f0;font-size:12px;font-weight:700;cursor:pointer;display:grid;place-items:center}
+.btn-mini:active{transform:scale(.97)}
+.archive-bar{margin-top:8px;background:linear-gradient(180deg,#0d1218,#111a24);border:1px solid #2a3a4e;border-radius:8px;padding:6px 8px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.archive-bar label{font-size:10px;letter-spacing:.1em;color:#7a8da3;font-weight:700}
+.archive-code{font-family:ui-monospace,monospace;font-size:12px;letter-spacing:.08em;color:#ffd54f;background:#1a232e;padding:4px 8px;border-radius:6px;border:1px solid #2a3a4e;flex:1;text-align:center}
+.bench{flex:1;padding:10px 10px 14px;display:flex;flex-direction:column;gap:10px}
+.card{background:linear-gradient(180deg,#1e2b3a 0%,#16202e 100%);border:1px solid #2e4055;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);overflow:hidden}
+.card-hd{padding:8px 10px 6px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,rgba(255,255,255,.06),transparent);border-bottom:1px solid #243447}
+.card-hd h2{font-size:12px;letter-spacing:.08em;color:#a8bdd4}
+.card-hd .pill{font-size:10px;padding:3px 7px;border-radius:20px;background:#0f1a27;border:1px solid #2e4055;color:#8ea0b5}
+.card-bd{padding:10px}
+.grid-contracts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.c-tile{border-radius:10px;padding:8px 6px 7px;text-align:center;cursor:pointer;border:1px solid #2e4055;background:linear-gradient(180deg,#223246,#1a2535);position:relative;min-height:86px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.c-tile.locked{opacity:.45;filter:grayscale(.3)}
+.c-tile.active{border-color:#ffb300;box-shadow:0 0 0 2px rgba(255,179,0,.25)}
+.c-tile .c-num{font-size:10px;letter-spacing:.08em;color:#7a8da3;font-weight:700}
+.c-tile .c-name{font-size:11px;font-weight:800;line-height:1.1;color:#e8eef4}
+.c-tile .stars{font-size:12px;letter-spacing:1px;min-height:14px}
+.c-tile .c-meta{font-size:9px;color:#8ea0b5}
+.progress-row{display:flex;gap:6px;align-items:center;justify-content:space-between;margin-top:6px}
+.progress{flex:1;height:8px;background:#0d1218;border-radius:20px;overflow:hidden;border:1px solid #243447}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,#ffb300,#ffd54f);width:0%}
+.view{display:none;flex-direction:column;gap:10px}
+.view.on{display:flex}
+.contract-head{display:flex;gap:8px;align-items:flex-start}
+.contract-head .icon{width:44px;height:44px;border-radius:10px;background:linear-gradient(180deg,#2a3a4e,#1a2535);border:1px solid #3a4a5e;display:grid;place-items:center;font-size:20px;flex-shrink:0}
+.contract-head h3{font-size:14px;line-height:1.2}
+.contract-head p{font-size:11px;color:#8ea0b5;margin-top:2px;line-height:1.3}
+.goals{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.goal{border-radius:8px;padding:7px 8px;background:#0f1a27;border:1px solid #243447}
+.goal label{font-size:9px;letter-spacing:.08em;color:#7a8da3;font-weight:700;display:block}
+.goal b{font-size:13px;color:#e8eef4}
+.goal.ok{border-color:#2e7d32;background:linear-gradient(180deg,#14301a,#0f1a27)}
+.goal.bad{border-color:#c62828;background:linear-gradient(180deg,#2e1414,#0f1a27)}
+.gauges{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.gauge{background:#0d1218;border:1px solid #243447;border-radius:10px;padding:7px 6px;text-align:center}
+.gauge label{font-size:9px;letter-spacing:.08em;color:#7a8da3;font-weight:700}
+.gauge .val{font-size:16px;font-weight:800;margin:2px 0}
+.gauge .bar{height:6px;background:#1a2535;border-radius:20px;overflow:hidden;border:1px solid #243447}
+.gauge .bar i{display:block;height:100%;width:50%;border-radius:20px;transition:width .3s}
+.gauge .hint{font-size:9px;color:#8ea0b5;margin-top:3px}
+.timeline{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.period{background:#0f1a27;border:1px solid #243447;border-radius:10px;padding:6px 5px 5px;text-align:center}
+.period .p-head{font-size:10px;font-weight:800;letter-spacing:.06em;color:#a8bdd4;display:flex;justify-content:space-between;align-items:center}
+.period .p-head span{font-size:9px;color:#7a8da3}
+.period .demand{font-size:9px;padding:2px 4px;border-radius:4px;margin:4px 0 5px;font-weight:700}
+.d0{background:#1a2535;color:#5a6d85;border:1px solid #243447}
+.d1{background:#1e3a5f;color:#8ec0ff;border:1px solid #2e5a8a}
+.d2{background:#5a1e1e;color:#ffb4a8;border:1px solid #8a2e2e}
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.mbtn{height:38px;border-radius:8px;border:1px solid #2e4055;background:linear-gradient(180deg,#223246,#1a2535);color:#cfe0f0;font-size:10px;font-weight:800;letter-spacing:.04em;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.mbtn small{font-size:8px;opacity:.7;font-weight:600}
+.mbtn.on{border-color:currentColor;box-shadow:0 0 0 2px currentColor inset,0 2px 8px rgba(0,0,0,.4);transform:translateY(-1px)}
+.mbtn:active{transform:scale(.97)}
+.m-CHG{color:#4caf50}.m-RST{color:#42a5f5}.m-LOD{color:#ef5350}.m-BAL{color:#ffca28}
+.canvas-wrap{background:#0a0e13;border-radius:10px;border:1px solid #243447;overflow:hidden;padding:6px 6px 4px}
+.canvas-wrap canvas{width:100%;height:160px;display:block;background:radial-gradient(ellipse at 50% 0%,#16202e 0%,#0a0e13 70%);border-radius:8px}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.legend span{font-size:9px;display:flex;align-items:center;gap:4px;color:#8ea0b5}
+.legend i{width:10px;height:3px;border-radius:2px;display:inline-block}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.btn{height:48px;border-radius:10px;border:1px solid #2e4055;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;letter-spacing:.02em}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:linear-gradient(180deg,#ffb300,#ff8f00);color:#1a1200;border-color:#ffb300;box-shadow:0 3px 10px rgba(255,143,0,.35)}
+.btn-ghost{background:linear-gradient(180deg,#223246,#1a2535);color:#cfe0f0}
+.btn-dark{background:#0f1a27;color:#8ea0b5}
+.btn:disabled{opacity:.45;pointer-events:none}
+.result{border-radius:10px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.result.ok{background:linear-gradient(180deg,#14301a,#0f1a27);border:1px solid #2e7d32}
+.result.bad{background:linear-gradient(180deg,#2e1414,#0f1a27);border:1px solid #8a2e2e}
+.result b{font-size:13px}
+.stars-big{font-size:18px;letter-spacing:2px}
+.help{font-size:11px;line-height:1.4;color:#a8bdd4;background:#0f1a27;border:1px solid #243447;border-radius:10px;padding:8px 10px}
+.help b{color:#ffd54f}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:20;padding:10px}
+.sheet.on{display:flex}
+.sheet-box{width:100%;max-width:428px;background:linear-gradient(180deg,#1e2b3a,#16202e);border:1px solid #2e4055;border-radius:14px 14px 10px 10px;padding:12px;max-height:85vh;overflow:auto}
+.sheet-box h3{font-size:14px;margin-bottom:6px}
+.sheet-box p{font-size:12px;color:#a8bdd4;line-height:1.4}
+.row{display:flex;gap:6px;margin-top:8px}
+.input{flex:1;height:44px;border-radius:8px;border:1px solid #2e4055;background:#0d1218;color:#e8eef4;padding:0 10px;font-size:13px;font-family:ui-monospace,monospace}
+.kbd{font-family:ui-monospace,monospace;font-size:10px;background:#0d1218;border:1px solid #2e4055;padding:2px 5px;border-radius:4px;color:#8ea0b5}
+@media(max-width:360px){.timeline{grid-template-columns:repeat(4,1fr)}.mode-grid{gap:3px}.mbtn{height:36px;font-size:9px}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+<header>
+  <div class="hdr-top">
+    <div class="logo">
+      <div class="logo-mark">◈</div>
+      <h1>BATTERY CYCLE LAB<span>CONTRACT PUZZLE • 12 RUNS</span></h1>
+    </div>
+    <div class="hdr-actions">
+      <button class="btn-mini" id="btnHelp">?</button>
+      <button class="btn-mini" id="btnArchive">⎙</button>
+    </div>
+  </div>
+  <div class="archive-bar">
+    <label>ARCHIVE CODE</label>
+    <div class="archive-code" id="archiveCode">BC-000000000000</div>
+    <button class="btn-mini" id="btnCopyCode" style="height:30px;font-size:10px">COPY</button>
+  </div>
+</header>
+
+<div class="bench">
+  <!-- HOME VIEW -->
+  <div class="view on" id="viewHome">
+    <div class="card">
+      <div class="card-hd"><h2>CONTRACTS</h2><span class="pill" id="progressPill">0/12 • 0★</span></div>
+      <div class="card-bd">
+        <div class="grid-contracts" id="contractGrid"></div>
+        <div class="progress-row">
+          <div class="progress"><i id="progressBar"></i></div>
+          <span class="kvd" style="font-size:10px;color:#7a8da3" id="progressText">0% complete</span>
+        </div>
+      </div>
+    </div>
+    <div class="help">
+      <b>Lab Bench Brief:</b> Assign <span class="kbd">CHG</span> <span class="kbd">RST</span> <span class="kbd">LOD</span> <span class="kbd">BAL</span> across periods to hit <b>Energy</b> & <b>Service</b> goals while keeping <b>Charge</b>, <b>Temp</b> & <b>Health</b> in bounds. Density of demand ramps. Beat the reference solver for 3★.
+    </div>
+    <div class="card">
+      <div class="card-hd"><h2>BENCH STATUS</h2><span class="pill" id="bestPill">BEST —</span></div>
+      <div class="card-bd" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="goal"><label>TOTAL STARS</label><b id="totalStars">0 / 36</b></div>
+        <div class="goal"><label>BEST TIME SCORE</label><b id="bestScore">—</b></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PUZZLE VIEW -->
+  <div class="view" id="viewPuzzle">
+    <button class="btn btn-dark" id="btnBack" style="height:40px">← CONTRACTS</button>
+    <div class="card">
+      <div class="card-bd">
+        <div class="contract-head">
+          <div class="icon" id="cIcon">◈</div>
+          <div>
+            <h3 id="cTitle">Contract 01</h3>
+            <p id="cDesc">—</p>
+          </div>
+          <div style="margin-left:auto;text-align:right">
+            <div style="font-size:10px;color:#7a8da3;font-weight:700;letter-spacing:.06em">DIFFICULTY</div>
+            <div id="cDiff" style="font-size:12px;font-weight:800;color:#ffb300">★☆☆</div>
+          </div>
+        </div>
+        <div class="goals" style="margin-top:8px">
+          <div class="goal" id="goalEnergy"><label>ENERGY GOAL</label><b>—</b></div>
+          <div class="goal" id="goalService"><label>SERVICE GOAL</label><b>—</b></div>
+          <div class="goal"><label>CHARGE BOUNDS</label><b id="goalCharge">—</b></div>
+          <div class="goal"><label>TEMP BOUNDS</label><b id="goalTemp">—</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="gauges">
+      <div class="gauge"><label>CHARGE</label><div class="val" id="gCharge">50%</div><div class="bar"><i id="bCharge" style="background:#4caf50"></i></div><div class="hint" id="hCharge">10–90%</div></div>
+      <div class="gauge"><label>TEMP</label><div class="val" id="gTemp">25°C</div><div class="bar"><i id="bTemp" style="background:#ff8f00"></i></div><div class="hint" id="hTemp">0–55°C</div></div>
+      <div class="gauge"><label>HEALTH</label><div class="val" id="gHealth">100%</div><div class="bar"><i id="bHealth" style="background:#42a5f5"></i></div><div class="hint" id="hHealth">>0%</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><h2>PERIOD ASSIGNMENTS</h2><span class="pill" id="periodPill">8 PERIODS</span></div>
+      <div class="card-bd">
+        <div class="timeline" id="timeline"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><h2>SIMULATION CURVE</h2><span class="pill" id="simPill">IDLE</span></div>
+      <div class="card-bd">
+        <div class="canvas-wrap"><canvas id="simCanvas" width="400" height="160"></canvas>
+          <div class="legend">
+            <span><i style="background:#4caf50"></i> Charge</span>
+            <span><i style="background:#ff8f00"></i> Temp</span>
+            <span><i style="background:#42a5f5"></i> Health</span>
+            <span><i style="background:#8ec0ff;border:1px dashed #8ec0ff"></i> Reference</span>
+            <span><i style="background:#5a1e1e"></i> Demand</span>
+          </div>
+        </div>
+        <div class="result bad" id="resultBox" style="margin-top:8px">
+          <div><b id="resultTitle">Assign modes & simulate</b><div style="font-size:11px;color:#a8bdd4" id="resultSub">Keep curves in bounds to pass.</div></div>
+          <div class="stars-big" id="resultStars">☆☆☆</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="btnSim">▶ SIMULATE</button>
+      <button class="btn btn-ghost" id="btnRef">◈ REFERENCE</button>
+      <button class="btn btn-dark" id="btnReset">↺ RESET</button>
+      <button class="btn btn-ghost" id="btnSubmit">★ SUBMIT</button>
+    </div>
+    <div class="help" id="modeHelp">
+      <b>Modes:</b> <span class="kbd" style="color:#4caf50">CHG +16% +7°C -8E</span> <span class="kbd" style="color:#42a5f5">RST -1% -6°C +1.2H</span> <span class="kbd" style="color:#ef5350">LOD -13% +9°C +14E</span> <span class="kbd" style="color:#ffca28">BAL -5% +2°C +6E +1.5H</span> — LOD meets demand best, BAL is cooler & heals.
+    </div>
+  </div>
+</div>
+
+<!-- SHEETS -->
+<div class="sheet" id="sheetHelp">
+  <div class="sheet-box">
+    <h3>How to Play</h3>
+    <p>Each contract is a battery schedule. You have <b>Charge, Rest, Load, Balancing</b> modes. Drag them across periods (tap to cycle).<br><br>
+    <b>Charge</b> restores energy but heats. <b>Rest</b> cools & heals. <b>Load</b> delivers energy/service but heats & drains. <b>Balancing</b> is a gentle load that heals.<br><br>
+    Goals: hit <b>Energy</b> (total E) and <b>Service</b> (demand met). Stay inside <b>Charge</b> & <b>Temp</b> bounds and keep <b>Health &gt;0</b>. The reference solver shows a feasible curve — beat its score for 3★.<br><br>
+    <b>Stars:</b> 1★ feasible, 2★ goals met, 3★ ≥ reference score. Archive code encodes all stars.</p>
+    <div class="row"><button class="btn btn-primary" style="flex:1" id="btnCloseHelp">GOT IT</button></div>
+  </div>
+</div>
+
+<div class="sheet" id="sheetArchive">
+  <div class="sheet-box">
+    <h3>Archive Code</h3>
+    <p>Your progress is saved locally. Copy this code to restore on another device.</p>
+    <div class="row"><input class="input" id="archiveInput" placeholder="BC-..."><button class="btn btn-ghost" id="btnImport" style="height:44px;padding:0 14px">IMPORT</button></div>
+    <div class="row"><button class="btn btn-primary" style="flex:1" id="btnCloseArchive">CLOSE</button><button class="btn btn-dark" id="btnWipe" style="flex:1">WIPE SAVE</button></div>
+    <p style="margin-top:8px;font-size:10px;color:#7a8da3">Wipe clears localStorage for this lab only.</p>
+  </div>
+</div>
+
+</div>
+<script>
+const MODES={
+  CHG:{key:'CHG',label:'CHARGE',charge:16,temp:7,health:-0.4,energy:-7,color:'#4caf50'},
+  RST:{key:'RST',label:'REST',charge:-1,temp:-6,health:1.2,energy:0,color:'#42a5f5'},
+  LOD:{key:'LOD',label:'LOAD',charge:-13,temp:9,health:-0.7,energy:14,color:'#ef5350'},
+  BAL:{key:'BAL',label:'BALANCE',charge:-5,temp:2,health:1.4,energy:6,color:'#ffca28'}
+};
+const MODE_KEYS=['CHG','RST','LOD','BAL'];
+
+const CONTRACTS=[
+  {id:1,name:'Dawn Charge',icon:'◐',diff:1,periods:6,startCharge:50,startTemp:24,startHealth:100,chargeMin:15,chargeMax:85,tempMin:5,tempMax:50,demand:[0,1,0,1,0,1],energyGoal:18,serviceGoal:4,desc:'Intro run. Learn heat vs charge. Demand is light.'},
+  {id:2,name:'Midday Peak',icon:'◑',diff:1,periods:8,startCharge:55,startTemp:26,startHealth:100,chargeMin:12,chargeMax:88,tempMin:5,tempMax:52,demand:[1,0,1,0,2,0,1,0],energyGoal:26,serviceGoal:6,desc:'One peak at period 5. Rest before it.'},
+  {id:3,name:'Cold Start',icon:'❄',diff:2,periods:8,startCharge:35,startTemp:12,startHealth:100,chargeMin:10,chargeMax:90,tempMin:0,tempMax:48,demand:[1,1,0,1,1,0,1,0],energyGoal:30,serviceGoal:7,desc:'Cold battery. Charge early, but watch temp ceiling.'},
+  {id:4,name:'Heat Wave',icon:'♨',diff:2,periods:8,startCharge:60,startTemp:38,startHealth:98,chargeMin:15,chargeMax:85,tempMin:5,tempMax:45,demand:[0,1,1,0,1,2,0,1],energyGoal:28,serviceGoal:7,desc:'Starts hot. Rest is mandatory. Tight temp cap.'},
+  {id:5,name:'Night Shift',icon:'☾',diff:2,periods:10,startCharge:45,startTemp:22,startHealth:100,chargeMin:10,chargeMax:90,tempMin:0,tempMax:50,demand:[0,0,1,1,0,2,1,0,1,0],energyGoal:34,serviceGoal:8,desc:'Longer horizon. Balance heals over time.'},
+  {id:6,name:'Balancing Act',icon:'◈',diff:3,periods:10,startCharge:50,startTemp:28,startHealth:92,chargeMin:18,chargeMax:82,tempMin:5,tempMax:46,demand:[1,1,1,0,1,1,2,0,1,1],energyGoal:38,serviceGoal:10,desc:'High service need. BAL shines here.'},
+  {id:7,name:'Deep Discharge',icon:'⬇',diff:3,periods:10,startCharge:70,startTemp:30,startHealth:100,chargeMin:8,chargeMax:88,tempMin:5,tempMax:50,demand:[2,0,1,0,2,0,1,1,0,1],energyGoal:42,serviceGoal:9,desc:'Two big peaks. Don’t bottom out charge.'},
+  {id:8,name:'Thermal Run',icon:'⚡',diff:3,periods:12,startCharge:50,startTemp:32,startHealth:95,chargeMin:12,chargeMax:85,tempMin:5,tempMax:44,demand:[1,0,1,2,0,1,1,0,2,0,1,0],energyGoal:44,serviceGoal:11,desc:'12 periods, low temp ceiling. Precision cooling.'},
+  {id:9,name:'Health Check',icon:'♥',diff:3,periods:12,startCharge:55,startTemp:26,startHealth:80,chargeMin:15,chargeMax:85,tempMin:5,tempMax:48,demand:[1,1,0,2,1,0,1,2,0,1,1,0],energyGoal:46,serviceGoal:12,desc:'Low health start. BAL & RST to recover.'},
+  {id:10,name:'Grid Stress',icon:'⬢',diff:4,periods:12,startCharge:48,startTemp:28,startHealth:100,chargeMin:10,chargeMax:90,tempMin:0,tempMax:50,demand:[2,1,0,2,1,2,0,1,2,0,1,1],energyGoal:52,serviceGoal:14,desc:'Relentless demand. Every period counts.'},
+  {id:11,name:'Arctic Load',icon:'⬣',diff:4,periods:12,startCharge:40,startTemp:8,startHealth:100,chargeMin:12,chargeMax:88,tempMin:-5,tempMax:46,demand:[1,2,1,0,2,1,0,2,1,1,0,2],energyGoal:54,serviceGoal:15,desc:'Freezing start, hot finish. Wide temp swing.'},
+  {id:12,name:'Final Cycle',icon:'◎',diff:4,periods:12,startCharge:50,startTemp:30,startHealth:88,chargeMin:15,chargeMax:82,tempMin:5,tempMax:42,demand:[2,1,2,0,2,1,2,0,2,1,0,2],energyGoal:58,serviceGoal:16,desc:'Master contract. Tight bounds, max demand. Beat the solver.'}
+];
+
+const LS_KEY='batteryCycleLab_v1';
+let state={stars:Array(12).fill(0),bestScores:Array(12).fill(0),unlocked:1};
+let curId=1, assignment=[], simResult=null, refResult=null, refAssign=null;
+
+function loadState(){
+  try{const s=JSON.parse(localStorage.getItem(LS_KEY)); if(s&&s.stars) state=s; }catch(e){}
+  // ensure unlocked based on stars
+  let u=1; for(let i=0;i<12;i++){ if(state.stars[i]>0 && i+1>=u) u=i+2; } state.unlocked=Math.max(state.unlocked||1,u); if(state.unlocked>12) state.unlocked=12;
+}
+function saveState(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); updateArchive(); renderHome(); }
+function genCode(){
+  const base=state.stars.join(''); // 12 digits 0-3
+  let hash=0; for(let i=0;i<base.length;i++) hash=(hash*7 + (base.charCodeAt(i)-48+1)*13 + i*11) % 46656;
+  const h=hash.toString(36).toUpperCase().padStart(3,'0');
+  const b=btoa(base).replace(/=/g,'').slice(0,6).toUpperCase().replace(/[^A-Z0-9]/g,'0');
+  return `BC-${base.slice(0,6)}-${base.slice(6,12)}-${h}-${b}`;
+}
+function updateArchive(){
+  const code=genCode();
+  document.getElementById('archiveCode').textContent=code;
+  document.getElementById('archiveInput').value=code;
+}
+function importCode(code){
+  try{
+    code=code.trim().toUpperCase();
+    const parts=code.split('-');
+    if(parts[0]!=='BC') throw 0;
+    let digits='';
+    for(let p of parts.slice(1)){ if(/^[0-3]+$/.test(p)) digits+=p; }
+    if(digits.length<12) throw 0;
+    digits=digits.slice(0,12);
+    const stars=digits.split('').map(n=>parseInt(n,10));
+    if(stars.some(s=>s<0||s>3)) throw 0;
+    state.stars=stars;
+    state.bestScores=state.bestScores||Array(12).fill(0);
+    state.unlocked=1; for(let i=0;i<12;i++) if(stars[i]>0) state.unlocked=Math.max(state.unlocked,i+2);
+    if(state.unlocked>12) state.unlocked=12;
+    saveState();
+    alert('Archive imported: '+stars.reduce((a,b)=>a+b,0)+'★ restored');
+    renderHome();
+  }catch(e){ alert('Invalid archive code'); }
+}
+
+function simulate(contract, assign){
+  let charge=contract.startCharge, temp=contract.startTemp, health=contract.startHealth;
+  const chargeCurve=[charge], tempCurve=[temp], healthCurve=[health];
+  let energy=0, service=0;
+  let violations=[];
+  let score=0;
+  for(let i=0;i<contract.periods;i++){
+    const k=assign[i]||'RST';
+    const m=MODES[k];
+    charge+=m.charge;
+    temp+=m.temp;
+    health+=m.health;
+    // ambient pull to 22C
+    temp += (22 - temp)*0.06;
+    // health clamp
+    if(health>100) health=100;
+    if(health<0) health=0;
+    // charge physical clamp 0-100 but track violation if out of contract bounds
+    let cClamped=Math.max(0,Math.min(100,charge));
+    // if clamped, health penalty
+    if(charge<0||charge>100){ health-=1.5; }
+    charge=cClamped;
+    energy+=m.energy;
+    // service: demand met
+    const d=contract.demand[i]||0;
+    if(d>0){
+      if(k==='LOD') service+= d*2;
+      else if(k==='BAL') service+= d*1;
+      else if(k==='CHG') service+=0;
+      else service+=0;
+    } else {
+      // no demand: LOD is wasteful
+      if(k==='LOD') service-=0.5;
+    }
+    chargeCurve.push(charge);
+    tempCurve.push(temp);
+    healthCurve.push(health);
+    // check bounds after step
+    if(charge < contract.chargeMin - 0.01 || charge > contract.chargeMax + 0.01){
+      violations.push(`P${i+1} charge ${charge.toFixed(1)}% out of ${contract.chargeMin}-${contract.chargeMax}%`);
+    }
+    if(temp < contract.tempMin -0.01 || temp > contract.tempMax +0.01){
+      violations.push(`P${i+1} temp ${temp.toFixed(1)}°C out of ${contract.tempMin}-${contract.tempMax}°C`);
+    }
+    if(health<=0.01) violations.push(`P${i+1} health depleted`);
+  }
+  const feasible=violations.length===0;
+  const energyOk=energy>=contract.energyGoal;
+  const serviceOk=service>=contract.serviceGoal;
+  // score: energy + service*6 + health bonus - temp penalty
+  let tempPenalty=0; for(let t of tempCurve) if(t>40) tempPenalty+=(t-40)*0.3;
+  score = energy*1.2 + service*6 + health*0.4 - tempPenalty;
+  if(!feasible) score-=50;
+  return {chargeCurve,tempCurve,healthCurve,energy,service,violations,feasible,energyOk,serviceOk,score,health:healthCurve[healthCurve.length-1],charge:chargeCurve[chargeCurve.length-1],temp:tempCurve[tempCurve.length-1]};
+}
+
+function solveReference(contract){
+  const n=contract.periods;
+  let best=null, bestAssign=null;
+  // brute force if n<=8
+  if(n<=8){
+    const total=Math.pow(4,n);
+    for(let mask=0; mask<total; mask++){
+      let assign=[]; let tmp=mask;
+      for(let i=0;i<n;i++){ assign.push(MODE_KEYS[tmp%4]); tmp=Math.floor(tmp/4); }
+      const r=simulate(contract, assign);
+      if(!r.feasible) continue;
+      if(!r.energyOk || !r.serviceOk) continue;
+      if(!best || r.score>best.score){ best=r; bestAssign=assign.slice(); }
+    }
+    // if no feasible meeting goals, find best feasible
+    if(!best){
+      for(let mask=0; mask<total; mask++){
+        let assign=[]; let tmp=mask;
+        for(let i=0;i<n;i++){ assign.push(MODE_KEYS[tmp%4]); tmp=Math.floor(tmp/4); }
+        const r=simulate(contract, assign);
+        if(!r.feasible) continue;
+        if(!best || r.score>best.score){ best=r; bestAssign=assign.slice(); }
+      }
+    }
+  } else {
+    // heuristic: random + greedy
+    let tries=25000;
+    for(let t=0;t<tries;t++){
+      let assign=[];
+      for(let i=0;i<n;i++) assign.push(MODE_KEYS[Math.floor(Math.random()*4)]);
+      const r=simulate(contract, assign);
+      if(!best || r.score>best.score){ best=r; bestAssign=assign.slice(); }
+    }
+    // hill climb best
+    if(bestAssign){
+      for(let iter=0; iter<800; iter++){
+        let idx=Math.floor(Math.random()*n);
+        let cur=bestAssign[idx];
+        let cand=MODE_KEYS.filter(k=>k!==cur)[Math.floor(Math.random()*3)];
+        let nxt=bestAssign.slice(); nxt[idx]=cand;
+        const r=simulate(contract,nxt);
+        if(r.score>best.score){ best=r; bestAssign=nxt; }
+      }
+    }
+  }
+  // fallback: all RST
+  if(!best){ bestAssign=Array(n).fill('RST'); best=simulate(contract,bestAssign); }
+  return {assign:bestAssign, result:best};
+}
+
+function starsFor(contract, res, ref){
+  if(!res.feasible) return 0;
+  if(!res.energyOk || !res.serviceOk) return 1;
+  if(ref && res.score >= ref.score - 0.5) return 3;
+  return 2;
+}
+
+function renderHome(){
+  const grid=document.getElementById('contractGrid');
+  grid.innerHTML='';
+  let total=state.stars.reduce((a,b)=>a+b,0);
+  let done=state.stars.filter(s=>s>0).length;
+  CONTRACTS.forEach((c,i)=>{
+    const locked=i+1>state.unlocked;
+    const s=state.stars[i]||0;
+    const starsTxt=s===0?'☆☆☆': '★'.repeat(s)+'☆'.repeat(3-s);
+    const el=document.createElement('div');
+    el.className='c-tile'+(locked?' locked':'')+(curId===c.id?' active':'');
+    el.innerHTML=`<div class="c-num">CONTRACT ${String(c.id).padStart(2,'0')}</div><div style="font-size:18px">${c.icon}</div><div class="c-name">${c.name}</div><div class="stars" style="color:${s? '#ffb300':'#3a4a5e'}">${starsTxt}</div><div class="c-meta">${c.periods}P • ${locked?'LOCKED':'E'+c.energyGoal+' S'+c.serviceGoal}</div>`;
+    if(!locked) el.onclick=()=>openContract(c.id);
+    grid.appendChild(el);
+  });
+  document.getElementById('progressPill').textContent=`${done}/12 • ${total}★`;
+  document.getElementById('progressBar').style.width=(total/36*100)+'%';
+  document.getElementById('progressText').textContent=Math.round(total/36*100)+'% complete';
+  document.getElementById('totalStars').textContent=total+' / 36';
+  const best=Math.max(...state.bestScores);
+  document.getElementById('bestPill').textContent= best? `BEST ${best.toFixed(0)}` : 'BEST —';
+  document.getElementById('bestScore').textContent= best? best.toFixed(0)+' pts' : '—';
+  updateArchive();
+}
+
+function openContract(id){
+  curId=id;
+  const c=CONTRACTS.find(x=>x.id===id);
+  assignment=Array(c.periods).fill('RST');
+  // if we have a reference, clear
+  simResult=null; refResult=null; refAssign=null;
+  document.getElementById('viewHome').classList.remove('on');
+  document.getElementById('viewPuzzle').classList.add('on');
+  document.getElementById('cIcon').textContent=c.icon;
+  document.getElementById('cTitle').textContent=`Contract ${String(c.id).padStart(2,'0')}: ${c.name}`;
+  document.getElementById('cDesc').textContent=c.desc;
+  document.getElementById('cDiff').textContent='★'.repeat(c.diff)+'☆'.repeat(4-c.diff);
+  document.getElementById('goalEnergy').querySelector('b').textContent=c.energyGoal+' E';
+  document.getElementById('goalService').querySelector('b').textContent=c.serviceGoal+' S';
+  document.getElementById('goalCharge').textContent=c.chargeMin+'–'+c.chargeMax+'%';
+  document.getElementById('goalTemp').textContent=c.tempMin+'–'+c.tempMax+'°C';
+  document.getElementById('periodPill').textContent=c.periods+' PERIODS';
+  document.getElementById('hCharge').textContent=c.chargeMin+'–'+c.chargeMax+'%';
+  document.getElementById('hTemp').textContent=c.tempMin+'–'+c.tempMax+'°C';
+  renderTimeline();
+  updateGauges(c.startCharge,c.startTemp,c.startHealth);
+  drawCanvas();
+  updateResult({feasible:false,energy:0,service:0,violations:['Assign modes & simulate'],score:0,energyOk:false,serviceOk:false},0);
+  // precompute reference in background
+  setTimeout(()=>{
+    const sol=solveReference(c);
+    refAssign=sol.assign; refResult=sol.result;
+    document.getElementById('simPill').textContent=`REF ${refResult.score.toFixed(0)} pts`;
+  }, 50);
+  window.scrollTo(0,0);
+}
+
+function renderTimeline(){
+  const c=CONTRACTS.find(x=>x.id===curId);
+  const tl=document.getElementById('timeline');
+  tl.innerHTML='';
+  tl.style.gridTemplateColumns=`repeat(4,1fr)`;
+  if(c.periods===6) tl.style.gridTemplateColumns='repeat(3,1fr)';
+  for(let i=0;i<c.periods;i++){
+    const d=c.demand[i]||0;
+    const dClass=d===0?'d0':d===1?'d1':'d2';
+    const dLabel=d===0?'IDLE':d===1?'DEMAND':'PEAK';
+    const cur=assignment[i];
+    const per=document.createElement('div');
+    per.className='period';
+    per.innerHTML=`<div class="p-head">P${i+1}<span>#${i+1}</span></div><div class="demand ${dClass}">${dLabel}</div><div class="mode-grid"></div>`;
+    const mg=per.querySelector('.mode-grid');
+    MODE_KEYS.forEach(k=>{
+      const m=MODES[k];
+      const btn=document.createElement('button');
+      btn.className='mbtn m-'+k + (cur===k?' on':'');
+      btn.innerHTML=`${m.key}<small>${m.energy>0?'+'+m.energy:m.energy}E</small>`;
+      btn.style.borderColor= cur===k? m.color : '';
+      btn.onclick=()=>{
+        assignment[i]=k;
+        renderTimeline();
+        // live simulate
+        const res=simulate(c, assignment);
+        updateGauges(res.charge,res.temp,res.health);
+        drawCanvas();
+        updateResult(res, starsFor(c,res,refResult));
+      };
+      mg.appendChild(btn);
+    });
+    tl.appendChild(per);
+  }
+}
+
+function updateGauges(charge,temp,health){
+  const c=CONTRACTS.find(x=>x.id===curId);
+  document.getElementById('gCharge').textContent=Math.round(charge)+'%';
+  document.getElementById('gTemp').textContent=Math.round(temp)+'°C';
+  document.getElementById('gHealth').textContent=Math.round(health)+'%';
+  const bC=document.getElementById('bCharge');
+  bC.style.width=Math.max(0,Math.min(100,charge))+'%';
+  bC.style.background= (charge<c.chargeMin||charge>c.chargeMax)? '#ef5350' : '#4caf50';
+  const bT=document.getElementById('bTemp');
+  // temp bar as percent of 0-60
+  bT.style.width=Math.max(0,Math.min(100,temp/60*100))+'%';
+  bT.style.background= (temp<c.tempMin||temp>c.tempMax)? '#ef5350' : '#ff8f00';
+  const bH=document.getElementById('bHealth');
+  bH.style.width=Math.max(0,Math.min(100,health))+'%';
+  bH.style.background= health<30? '#ef5350' : health<60? '#ffca28' : '#42a5f5';
+  document.getElementById('gCharge').style.color=bC.style.background;
+  document.getElementById('gTemp').style.color=bT.style.background;
+}
+
+function updateResult(res, stars){
+  const box=document.getElementById('resultBox');
+  const title=document.getElementById('resultTitle');
+  const sub=document.getElementById('resultSub');
+  const sEl=document.getElementById('resultStars');
+  const c=CONTRACTS.find(x=>x.id===curId);
+  const starTxt= stars===0?'☆☆☆' : '★'.repeat(stars)+'☆'.repeat(3-stars);
+  sEl.textContent=starTxt;
+  sEl.style.color= stars? '#ffb300' : '#3a4a5e';
+  if(!res.feasible){
+    box.className='result bad';
+    title.textContent='Bounds violated';
+    sub.textContent=res.violations[0]||'Out of bounds';
+  } else if(!res.energyOk || !res.serviceOk){
+    box.className='result bad';
+    title.textContent=`Feasible • ${res.energy.toFixed(0)}E / ${c.energyGoal}E • ${res.service.toFixed(0)}S / ${c.serviceGoal}S`;
+    sub.textContent='Hit both goals for 2★';
+  } else {
+    box.className='result ok';
+    const refScore=refResult? refResult.score : 0;
+    const diff=res.score - refScore;
+    title.textContent=`Goals met • ${res.energy.toFixed(0)}E ${res.service.toFixed(0)}S • ${res.score.toFixed(0)} pts`;
+    sub.textContent= diff>=0 ? `★ ${diff>=0?'+'+diff.toFixed(0):diff.toFixed(0)} vs reference • 3★ secured` : `${diff.toFixed(0)} vs reference • beat ${refScore.toFixed(0)} for 3★`;
+  }
+  // update goal cards
+  const eCard=document.getElementById('goalEnergy');
+  const sCard=document.getElementById('goalService');
+  eCard.className='goal'+(res.energyOk?' ok':'')+(res.feasible&&!res.energyOk?' bad':'');
+  sCard.className='goal'+(res.serviceOk?' ok':'')+(res.feasible&&!res.serviceOk?' bad':'');
+  eCard.querySelector('b').textContent=`${res.energy.toFixed(0)} / ${c.energyGoal} E`;
+  sCard.querySelector('b').textContent=`${res.service.toFixed(0)} / ${c.serviceGoal} S`;
+}
+
+function drawCanvas(){
+  const canvas=document.getElementById('simCanvas');
+  const ctx=canvas.getContext('2d');
+  const c=CONTRACTS.find(x=>x.id===curId);
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  // grid
+  ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){ const y=12 + i*(H-24)/4; ctx.beginPath(); ctx.moveTo(36,y); ctx.lineTo(W-8,y); ctx.stroke(); }
+  for(let i=0;i<=c.periods;i++){ const x=36 + i*(W-44)/c.periods; ctx.beginPath(); ctx.moveTo(x,12); ctx.lineTo(x,H-12); ctx.stroke(); }
+  // labels
+  ctx.fillStyle='#7a8da3'; ctx.font='9px system-ui'; ctx.textAlign='right';
+  ctx.fillText('100%',30,16); ctx.fillText('50%',30,H/2+3); ctx.fillText('0%',30,H-10);
+  ctx.textAlign='center'; ctx.fillStyle='#5a6d85';
+  for(let i=0;i<c.periods;i++){ const x=36 + (i+0.5)*(W-44)/c.periods; ctx.fillText('P'+(i+1),x,H-2); }
+  // demand bars
+  for(let i=0;i<c.periods;i++){
+    const d=c.demand[i]||0; if(!d) continue;
+    const x=36 + i*(W-44)/c.periods +2; const w=(W-44)/c.periods -4;
+    const h=d===1? 14 : 22; const y=H-12 - h;
+    ctx.fillStyle=d===1?'rgba(66,165,245,.35)':'rgba(239,83,80,.45)';
+    ctx.strokeStyle=d===1?'#42a5f5':'#ef5350'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.roundRect(x,y,w,h,4); ctx.fill(); ctx.stroke();
+  }
+  // bounds bands for charge
+  const yForCharge=v=> 12 + (100 - v)/100*(H-24);
+  const yForTemp=v=> 12 + (60 - v)/60*(H-24);
+  // charge bounds
+  ctx.fillStyle='rgba(76,175,80,.08)';
+  const yMin=yForCharge(c.chargeMax), yMax=yForCharge(c.chargeMin);
+  ctx.fillRect(36, yMin, W-44, yMax - yMin);
+  ctx.strokeStyle='rgba(76,175,80,.25)'; ctx.setLineDash([4,4]); ctx.strokeRect(36,yMin,W-44,yMax-yMin); ctx.setLineDash([]);
+  // temp bounds as orange dashed lines
+  ctx.strokeStyle='rgba(255,143,0,.35)'; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(36,yForTemp(c.tempMax)); ctx.lineTo(W-8,yForTemp(c.tempMax)); ctx.stroke(); ctx.beginPath(); ctx.moveTo(36,yForTemp(c.tempMin)); ctx.lineTo(W-8,yForTemp(c.tempMin)); ctx.stroke(); ctx.setLineDash([]);
+
+  function drawCurve(curve, color, width, dash){
+    ctx.strokeStyle=color; ctx.lineWidth=width; if(dash) ctx.setLineDash(dash); else ctx.setLineDash([]);
+    ctx.beginPath();
+    for(let i=0;i<curve.length;i++){
+      const x=36 + i*(W-44)/c.periods;
+      const y=12 + (100 - Math.max(0,Math.min(100,curve[i])))/100*(H-24);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+    // dots
+    ctx.fillStyle=color;
+    for(let i=0;i<curve.length;i++){
+      const x=36 + i*(W-44)/c.periods;
+      const y=12 + (100 - Math.max(0,Math.min(100,curve[i])))/100*(H-24);
+      ctx.beginPath(); ctx.arc(x,y,2.2,0,Math.PI*2); ctx.fill();
+    }
+  }
+  function drawTempCurve(curve,color){
+    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.beginPath();
+    for(let i=0;i<curve.length;i++){
+      const x=36 + i*(W-44)/c.periods;
+      const y=12 + (60 - Math.max(0,Math.min(60,curve[i])))/60*(H-24);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+  // reference
+  if(refResult){
+    drawCurve(refResult.chargeCurve,'rgba(142,192,255,.9)',1.5,[5,4]);
+    // temp ref
+    ctx.strokeStyle='rgba(255,213,79,.55)'; ctx.lineWidth=1.2; ctx.setLineDash([5,4]); ctx.beginPath();
+    for(let i=0;i<refResult.tempCurve.length;i++){
+      const x=36 + i*(W-44)/c.periods;
+      const y=12 + (60 - Math.max(0,Math.min(60,refResult.tempCurve[i])))/60*(H-24);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    } ctx.stroke(); ctx.setLineDash([]);
+  }
+  // current sim
+  const curRes=simulate(c, assignment);
+  drawCurve(curRes.chargeCurve,'#4caf50',2.2);
+  drawTempCurve(curRes.tempCurve,'#ff8f00');
+  // health as thin blue
+  ctx.strokeStyle='#42a5f5'; ctx.lineWidth=1.4; ctx.beginPath();
+  for(let i=0;i<curRes.healthCurve.length;i++){
+    const x=36 + i*(W-44)/c.periods;
+    const y=12 + (100 - curRes.healthCurve[i])/100*(H-24);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  } ctx.stroke();
+}
+
+// events
+document.getElementById('btnBack').onclick=()=>{ document.getElementById('viewPuzzle').classList.remove('on'); document.getElementById('viewHome').classList.add('on'); renderHome(); };
+document.getElementById('btnSim').onclick=()=>{
+  const c=CONTRACTS.find(x=>x.id===curId);
+  simResult=simulate(c, assignment);
+  updateGauges(simResult.charge, simResult.temp, simResult.health);
+  drawCanvas();
+  updateResult(simResult, starsFor(c, simResult, refResult));
+  if(navigator.vibrate) navigator.vibrate(simResult.feasible?30: [30,40,30]);
+};
+document.getElementById('btnRef').onclick=()=>{
+  if(!refAssign) return;
+  // toggle show reference apply
+  if(confirm('Apply reference solution to periods?')){
+    assignment=refAssign.slice();
+    renderTimeline();
+    const c=CONTRACTS.find(x=>x.id===curId);
+    const r=simulate(c, assignment);
+    updateGauges(r.charge,r.temp,r.health); drawCanvas(); updateResult(r, starsFor(c,r,refResult));
+  } else {
+    drawCanvas();
+  }
+};
+document.getElementById('btnReset').onclick=()=>{
+  const c=CONTRACTS.find(x=>x.id===curId);
+  assignment=Array(c.periods).fill('RST');
+  renderTimeline(); updateGauges(c.startCharge,c.startTemp,c.startHealth); drawCanvas();
+  updateResult({feasible:false,energy:0,service:0,violations:['Reset — assign modes'],score:0,energyOk:false,serviceOk:false},0);
+};
+document.getElementById('btnSubmit').onclick=()=>{
+  const c=CONTRACTS.find(x=>x.id===curId);
+  const r=simulate(c, assignment);
+  const s=starsFor(c,r,refResult);
+  if(s===0){ alert('Not feasible — fix bounds first.'); return; }
+  const idx=c.id-1;
+  if(s> (state.stars[idx]||0)) state.stars[idx]=s;
+  if(r.score> (state.bestScores[idx]||0)) state.bestScores[idx]=r.score;
+  // unlock next
+  if(s>=1 && state.unlocked===c.id && c.id<12) state.unlocked=c.id+1;
+  saveState();
+  alert(`Contract ${String(c.id).padStart(2,'0')} submitted: ${'★'.repeat(s)}${'☆'.repeat(3-s)} • ${r.score.toFixed(0)} pts${s===3?' — Reference beaten!':''}`);
+  updateResult(r,s);
+  if(navigator.vibrate) navigator.vibrate([20,30,20,30,40]);
+};
+document.getElementById('btnHelp').onclick=()=> document.getElementById('sheetHelp').classList.add('on');
+document.getElementById('btnCloseHelp').onclick=()=> document.getElementById('sheetHelp').classList.remove('on');
+document.getElementById('sheetHelp').onclick=e=>{ if(e.target.id==='sheetHelp') e.currentTarget.classList.remove('on'); };
+document.getElementById('btnArchive').onclick=()=> document.getElementById('sheetArchive').classList.add('on');
+document.getElementById('btnCloseArchive').onclick=()=> document.getElementById('sheetArchive').classList.remove('on');
+document.getElementById('sheetArchive').onclick=e=>{ if(e.target.id==='sheetArchive') e.currentTarget.classList.remove('on'); };
+document.getElementById('btnCopyCode').onclick=()=>{
+  const code=document.getElementById('archiveCode').textContent;
+  navigator.clipboard? navigator.clipboard.writeText(code) : null;
+  const b=document.getElementById('btnCopyCode'); const t=b.textContent; b.textContent='COPIED'; setTimeout(()=>b.textContent=t,1200);
+};
+document.getElementById('btnImport').onclick=()=> importCode(document.getElementById('archiveInput').value);
+document.getElementById('btnWipe').onclick=()=>{
+  if(confirm('Wipe all progress?')){ localStorage.removeItem(LS_KEY); state={stars:Array(12).fill(0),bestScores:Array(12).fill(0),unlocked:1}; renderHome(); document.getElementById('sheetArchive').classList.remove('on'); }
+};
+
+// init
+loadState(); renderHome(); updateArchive();
+</script>
+</body>
+</html>

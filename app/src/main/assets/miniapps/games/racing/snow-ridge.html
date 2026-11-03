@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Alpine Tour Racer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+:root{--bg:#071326;--card:#13233f;--card2:#1a345e;--line:#2a4a7a;--accent:#2ee5ff;--accent2:#7af0ff;--gold:#ffcc33;--silver:#cbd5e1;--bronze:#ff8c42;--snow:#eaf4ff}
+html,body{background:#06101f;color:#fff;overflow-x:hidden}
+body{overscroll-behavior:none}
+#app{max-width:428px;margin:0 auto;min-height:100vh;background:linear-gradient(180deg,#0a1e3a 0%,#071326 60%,#050d1a 100%);display:flex;flex-direction:column;position:relative}
+header{padding:12px 14px 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:5;background:rgba(7,19,38,0.92);backdrop-filter:blur(8px);border-bottom:1px solid #1e3a5f}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#2ee5ff,#6a7bff);display:grid;place-items:center;font-weight:900;color:#06101f}
+.brand h1{font-size:16px;line-height:1;letter-spacing:0.4px}
+.brand p{font-size:11px;opacity:0.75}
+.hdrStats{display:flex;gap:8px}
+.pill{background:#0f2747;border:1px solid #23466f;border-radius:999px;padding:6px 10px;font-size:11px;display:flex;align-items:center;gap:6px}
+.pill b{color:var(--accent)}
+nav{display:flex;gap:8px;padding:10px 12px}
+.tab{flex:1;padding:10px 8px;border-radius:12px;border:1px solid #23466f;background:#0f2747;color:#cfe6ff;font-weight:700;font-size:13px;cursor:pointer}
+.tab.active{background:linear-gradient(180deg,#2ee5ff,#1fb8ff);color:#06101f;border-color:transparent}
+main{flex:1;padding:0 12px 12px}
+.card{background:linear-gradient(180deg,#13233f,#0f2747);border:1px solid #23466f;border-radius:16px;padding:12px}
+h2{font-size:15px;margin-bottom:8px}
+.sub{font-size:12px;opacity:0.8;line-height:1.4;margin-bottom:10px}
+.grid12{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.trackBtn{border-radius:14px;padding:10px 8px;background:linear-gradient(180deg,#1a345e,#12284a);border:1px solid #2a4a7a;cursor:pointer;text-align:left;position:relative;overflow:hidden;min-height:92px}
+.trackBtn.locked{opacity:0.55;filter:grayscale(0.3)}
+.trackBtn .num{font-size:10px;letter-spacing:0.8px;opacity:0.7}
+.trackBtn .name{font-size:12px;font-weight:800;margin:4px 0 2px;line-height:1.1}
+.trackBtn .meta{font-size:10px;opacity:0.8}
+.medalRow{display:flex;gap:4px;margin-top:6px;align-items:center}
+.dot{width:14px;height:14px;border-radius:50%;display:grid;place-items:center;font-size:9px;font-weight:900}
+.dot.gold{background:var(--gold);color:#3a2a00}
+.dot.silver{background:var(--silver);color:#1e293b}
+.dot.bronze{background:var(--bronze);color:#fff}
+.dot.empty{background:#0b1a33;border:1px solid #2a4a7a;color:#5a7190}
+.stars{color:var(--gold);font-size:11px;letter-spacing:1px}
+.garageGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.choice{border-radius:14px;padding:10px;border:1px solid #2a4a7a;background:#0f2747;cursor:pointer}
+.choice.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(46,229,255,0.25);background:linear-gradient(180deg,#14365f,#0f2747)}
+.choice h3{font-size:13px}
+.choice p{font-size:11px;opacity:0.75;margin:4px 0}
+.bars{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.bar{height:6px;background:#0b1a33;border-radius:999px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#2ee5ff,#6a7bff);border-radius:999px}
+.canvasWrap{border-radius:16px;overflow:hidden;border:1px solid #23466f;background:#0a1e3a;position:relative}
+canvas{display:block;width:100%;touch-action:none}
+.hud{position:absolute;left:8px;right:8px;top:8px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+.hudBox{background:rgba(6,16,31,0.85);border:1px solid rgba(46,229,255,0.35);border-radius:12px;padding:6px 8px;min-width:78px}
+.hudBox b{font-size:13px}
+.hudBox span{font-size:10px;opacity:0.8;display:block}
+.boostBar{height:6px;background:#0b1a33;border-radius:999px;overflow:hidden;margin-top:4px}
+.boostBar i{display:block;height:100%;background:linear-gradient(90deg,#ffcc33,#ff6a00);width:50%}
+.controls{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-top:10px}
+.cbtn{height:56px;border-radius:14px;border:1px solid #2a4a7a;background:linear-gradient(180deg,#13233f,#0f2747);color:#eaf4ff;font-weight:800;font-size:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;user-select:none;-webkit-user-select:none;touch-action:none}
+.cbtn:active{transform:scale(0.97);background:linear-gradient(180deg,#1a345e,#14365f);border-color:var(--accent)}
+.cbtn small{font-size:10px;opacity:0.8;font-weight:600}
+.cbtn.boost{background:linear-gradient(180deg,#ffcc33,#ff8c42);color:#2a1800;border-color:#ffcc33}
+.row2{display:flex;gap:8px;margin-top:8px}
+.btn{flex:1;padding:12px;border-radius:12px;border:1px solid #2a4a7a;background:#0f2747;color:#fff;font-weight:800;cursor:pointer}
+.btn.primary{background:linear-gradient(180deg,#2ee5ff,#1fb8ff);color:#06101f;border-color:transparent}
+.btn.ghost{background:transparent}
+.resultStars{font-size:22px;letter-spacing:4px;text-align:center;margin:6px 0}
+.kv{display:flex;justify-content:space-between;font-size:13px;padding:8px 0;border-bottom:1px solid #1e3a5f}
+.kv b{color:var(--accent2)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#0b1a33;border:1px solid #23466f;font-size:12px}
+.notice{font-size:11px;opacity:0.75;line-height:1.4}
+.legend{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.legend span{font-size:10px;padding:5px 8px;border-radius:999px;background:#0b1a33;border:1px solid #23466f}
+@media(min-width:430px){#app{border-left:1px solid #1e3a5f;border-right:1px solid #1e3a5f}}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+<div class="brand">
+<div class="logo">⛷</div>
+<div>
+<h1>ALPINE TOUR</h1>
+<p>12 Snow Lines • Physics Racer</p>
+</div>
+</div>
+<div class="hdrStats">
+<div class="pill">🏆 <b id="hdrMedals">0</b> /36</div>
+<div class="pill">⏱ <b id="hdrBest">--:--</b></div>
+</div>
+</header>
+<nav>
+<button class="tab active" id="tabTour">TOUR</button>
+<button class="tab" id="tabGarage">GARAGE</button>
+<button class="tab" id="tabRace">RACE</button>
+</nav>
+<main>
+<section id="viewTour">
+<div class="card">
+<h2>❄ Tour Calendar — 12 Fixed Lines</h2>
+<p class="sub">Beat the reference time for a medal. Bonus stars: <b>Flags</b> (collect 5), <b>Style</b> (360° spin), <b>Clean</b> (no crash). Unlock next line by finishing.</p>
+<div class="legend"><span>🥇 Gold: beat ref</span><span>🥈 Silver: +2.5s</span><span>🥉 Bronze: +5s</span><span>👻 Ghost line</span></div>
+<div class="grid12" id="tourGrid"></div>
+<div class="row2" style="margin-top:10px">
+<button class="btn ghost" id="btnReset">Reset Progress</button>
+<button class="btn" id="btnStats">View Best Times</button>
+</div>
+<p class="notice" style="margin-top:8px">Rider + Board affect handling, jump, spin & boost. Progress saved locally.</p>
+</div>
+<div class="card" id="bestCard" style="margin-top:10px;display:none">
+<h2>Best Times & Medals</h2>
+<div id="bestList"></div>
+</div>
+</section>
+
+<section id="viewGarage" hidden>
+<div class="card">
+<h2>Rider — Handling Style</h2>
+<p class="sub">Choose who drops in. Affects turn, stability and crash forgiveness.</p>
+<div class="garageGrid" id="riderGrid"></div>
+</div>
+<div class="card" style="margin-top:10px">
+<h2>Board — Ride Character</h2>
+<p class="sub">Board tunes speed, jump, spin rate and boost efficiency.</p>
+<div class="garageGrid" id="boardGrid"></div>
+</div>
+<div class="card" style="margin-top:10px">
+<h2>Current Setup</h2>
+<div id="setupInfo" class="kv" style="border:none"></div>
+<p class="notice">Tip: Agile + Freestyle = easy spins. Power + Speed = fastest but twitchy on landings.</p>
+</div>
+</section>
+
+<section id="viewRace" hidden>
+<div class="canvasWrap">
+<canvas id="c" width="400" height="520"></canvas>
+<div class="hud">
+<div class="hudBox"><span>TIME</span><b id="hudTime">0.00</b><span id="hudDelta" style="color:#7af0ff">vs ref --</span></div>
+<div class="hudBox"><span>SPEED</span><b id="hudSpeed">0</b><span id="hudFlags">Flags 0/5</span></div>
+<div class="hudBox" style="min-width:92px"><span>BOOST</span><b id="hudBoost">100%</b><div class="boostBar"><i id="boostFill"></i></div></div>
+</div>
+<div id="raceMsg" style="position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);background:rgba(6,16,31,0.92);border:1px solid #2ee5ff;color:#eaf4ff;padding:10px 14px;border-radius:12px;font-weight:800;display:none;text-align:center;min-width:180px"></div>
+</div>
+<div class="controls">
+<button class="cbtn" id="bLeft">◀<small>STEER</small></button>
+<button class="cbtn" id="bSpinL">↺<small>SPIN</small></button>
+<button class="cbtn" id="bJump">▲<small>JUMP</small></button>
+<button class="cbtn" id="bSpinR">↻<small>SPIN</small></button>
+<button class="cbtn boost" id="bBoost">⚡<small>BOOST</small></button>
+</div>
+<div class="row2">
+<button class="btn primary" id="btnStart">START / RESTART</button>
+<button class="btn" id="btnGhostToggle">Ghost: ON</button>
+</div>
+<p class="notice" style="text-align:center;margin-top:6px">Hold STEER to carve • Tap JUMP on lip • Hold SPIN in air • BOOST on straights • Land straight!</p>
+</section>
+
+<section id="viewResult" hidden>
+<div class="card" style="text-align:center">
+<h2 id="resTitle">Finished!</h2>
+<div class="resultStars" id="resStars">☆☆☆</div>
+<div id="resMedal" class="badge" style="margin:6px auto">🥇 Gold</div>
+<div style="text-align:left;margin-top:10px">
+<div class="kv"><span>Time</span><b id="resTime">0.00s</b></div>
+<div class="kv"><span>Reference</span><b id="resRef">0.00s</b></div>
+<div class="kv"><span>Flags</span><b id="resFlags">0/5</b></div>
+<div class="kv"><span>Max Spin</span><b id="resSpin">0°</b></div>
+<div class="kv"><span>Crashes</span><b id="resCrash">0</b></div>
+<div class="kv"><span>Best</span><b id="resBest">--</b></div>
+</div>
+<div class="row2" style="margin-top:12px">
+<button class="btn ghost" id="btnAgain">Retry</button>
+<button class="btn primary" id="btnNext">Next Line →</button>
+</div>
+<button class="btn" id="btnToTour" style="margin-top:8px;width:100%">Back to Tour</button>
+</div>
+</section>
+</main>
+</div>
+<script>
+const TRACKS=[
+{name:"Frost Peak",ref:28.5,len:5200,diff:"Easy"},
+{name:"Crystal Ridge",ref:31.0,len:5600,diff:"Easy"},
+{name:"Avalanche Alley",ref:33.2,len:6000,diff:"Medium"},
+{name:"Pine Hollow",ref:35.0,len:6200,diff:"Medium"},
+{name:"Blizzard Bowl",ref:36.8,len:6400,diff:"Medium"},
+{name:"Serac Drop",ref:38.5,len:6800,diff:"Hard"},
+{name:"Whiteout Wall",ref:40.2,len:7000,diff:"Hard"},
+{name:"Glacier Gate",ref:42.0,len:7400,diff:"Hard"},
+{name:"Summit Sprint",ref:44.5,len:7800,diff:"Expert"},
+{name:"Couloir Chaos",ref:46.0,len:8200,diff:"Expert"},
+{name:"North Face",ref:48.5,len:8600,diff:"Expert"},
+{name:"Tour Finale",ref:52.0,len:9200,diff:"Legend"}
+];
+const RIDERS=[
+{id:"agile",name:"Mika — Agile",desc:"Quick turn, forgiving landings",stats:{handling:0.95, stability:0.9, crashSave:0.85, speed:0.92}},
+{id:"balanced",name:"Alex — Balanced",desc:"All-round control",stats:{handling:0.88, stability:0.92, crashSave:0.75, speed:0.96}},
+{id:"power",name:"Jonah — Power",desc:"High speed, needs precision",stats:{handling:0.78, stability:0.85, crashSave:0.6, speed:1.05}}
+];
+const BOARDS=[
+{id:"carve",name:"Carve 158",desc:"Grip & boost",stats:{accel:0.95, jump:0.9, spin:0.85, boost:1.15, top:0.98}},
+{id:"freestyle",name:"Freestyle 152",desc:"Spin & pop",stats:{accel:0.92, jump:1.12, spin:1.25, boost:0.95, top:0.94}},
+{id:"speed",name:"Speed 162",desc:"Top speed",stats:{accel:1.08, jump:0.95, spin:0.9, boost:1.05, top:1.08}}
+];
+
+const LS_KEY="alpineTour_v2";
+let save={
+  best:{}, // trackId -> {time, medal, stars, flags, spin}
+  medals:{},
+  stars:{},
+  unlocked:0,
+  rider:"balanced",
+  board:"carve",
+  ghosts:{}, // trackId -> array of {x,y,t}
+  ghostOn:true
+};
+function loadSave(){
+  try{ const s=JSON.parse(localStorage.getItem(LS_KEY)); if(s){ save={...save,...s}; save.best=s.best||{}; save.medals=s.medals||{}; save.stars=s.stars||{}; save.ghosts=s.ghosts||{}; } }catch(e){}
+}
+function persist(){ localStorage.setItem(LS_KEY, JSON.stringify(save)); updateHeader(); }
+loadSave();
+
+const $=s=>document.getElementById(s);
+const tourGrid=$("tourGrid"), riderGrid=$("riderGrid"), boardGrid=$("boardGrid");
+const c=$("c"), ctx=c.getContext("2d");
+let W=400,H=520;
+function resizeCanvas(){
+  const wrap=c.parentElement;
+  const rect=wrap.getBoundingClientRect();
+  W=Math.max(360, Math.min(428, Math.round(rect.width)));
+  // keep portrait ratio
+  H= Math.round(W*1.32);
+  c.width=W; c.height=H;
+  c.style.height=H+"px";
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+// Generate fixed terrain per track (deterministic)
+function seededRand(seed){ let s=seed%2147483647; return ()=>{ s=(s*16807)%2147483647; return (s-1)/2147483646; }; }
+function genTrackData(id){
+  const t=TRACKS[id];
+  const rand=seededRand(9000+id*1337);
+  const len=t.len;
+  const points=[];
+  const step=18;
+  const count=Math.ceil(len/step)+2;
+  let h= 180 + rand()*40;
+  for(let i=0;i<count;i++){
+    const x=i*step;
+    const progress=x/len;
+    // base downhill slope: higher at start, lower at end
+    const base = 140 + (1-progress)*140 + Math.sin(progress*Math.PI*2)*12;
+    // rollers
+    const roller = Math.sin(progress*18 + id)*18 + Math.sin(progress*34)*10 + (rand()-0.5)*8;
+    // big jumps at fixed positions
+    let jump=0;
+    const jumps=[0.22,0.45,0.68,0.85];
+    for(const j of jumps){
+      const d=Math.abs(progress-j);
+      if(d<0.04) jump += Math.sin((1-d/0.04)*Math.PI)* (28 + id*1.2);
+    }
+    h = base + roller - jump*0.6;
+    // add cliff drop near end for drama
+    if(progress>0.92) h += (progress-0.92)*300;
+    points.push({x, y:h});
+  }
+  // flags
+  const flags=[];
+  for(let i=0;i<5;i++){
+    const fx = len*(0.18 + i*0.16 + (rand()-0.5)*0.04);
+    const fy = interpHeight(points, fx) - 18;
+    flags.push({x:fx, y:fy, got:false});
+  }
+  // gates (visual)
+  const gates=[];
+  for(let i=0;i<8;i++){
+    const gx=len*(0.12+i*0.11);
+    gates.push({x:gx, y:interpHeight(points,gx)});
+  }
+  return {points, flags, gates, len, ref:t.ref};
+}
+function interpHeight(pts, x){
+  const step=18;
+  let idx=Math.floor(x/step);
+  idx=Math.max(0,Math.min(pts.length-2, idx));
+  const a=pts[idx], b=pts[idx+1];
+  const t=(x-a.x)/(b.x-a.x);
+  return a.y + (b.y-a.y)*t;
+}
+function slopeAt(pts,x){
+  const d=8;
+  return (interpHeight(pts,x+d)-interpHeight(pts,x-d))/(2*d);
+}
+const trackCache={};
+function getTrack(id){ if(!trackCache[id]) trackCache[id]=genTrackData(id); return trackCache[id]; }
+
+// UI render
+function medalFor(time, ref){
+  if(time<=ref) return "gold";
+  if(time<=ref+2.5) return "silver";
+  if(time<=ref+5) return "bronze";
+  return "none";
+}
+function starsFor(flags, spinDeg, crashes){
+  let s=0;
+  if(flags>=5) s++;
+  if(spinDeg>=360) s++;
+  if(crashes===0) s++;
+  return s;
+}
+function updateHeader(){
+  let totalStars=0, bestOverall=null;
+  for(let i=0;i<12;i++){ totalStars+= (save.stars[i]||0); if(save.best[i]){ const t=save.best[i].time; if(bestOverall===null||t<bestOverall) bestOverall=t; } }
+  $("hdrMedals").textContent=totalStars;
+  $("hdrBest").textContent= bestOverall? bestOverall.toFixed(2): "--:--";
+}
+function renderTour(){
+  tourGrid.innerHTML="";
+  for(let i=0;i<12;i++){
+    const t=TRACKS[i];
+    const unlocked=i<=save.unlocked;
+    const best=save.best[i];
+    const medal= best? best.medal : "none";
+    const stars= save.stars[i]||0;
+    const btn=document.createElement("button");
+    btn.className="trackBtn"+(unlocked?"":" locked");
+    btn.innerHTML=`
+      <div class="num">#${String(i+1).padStart(2,"0")} • ${t.diff.toUpperCase()}</div>
+      <div class="name">${t.name}</div>
+      <div class="meta">Ref ${t.ref.toFixed(1)}s • ${Math.round(t.len/100)/10}km</div>
+      <div class="medalRow">
+        <span class="dot ${medal==="gold"?"gold":medal==="silver"?"silver":medal==="bronze"?"bronze":"empty"}">${medal==="gold"?"🥇":medal==="silver"?"🥈":medal==="bronze"?"🥉":"•"}</span>
+        <span class="stars">${"★".repeat(stars)}${"☆".repeat(3-stars)}</span>
+        ${best?`<span style="font-size:10px;opacity:0.8;margin-left:auto">${best.time.toFixed(2)}s</span>`:""}
+      </div>
+      ${!unlocked?`<div style="position:absolute;inset:0;display:grid;place-items:center;background:rgba(6,16,31,0.55);font-size:11px;font-weight:800">🔒 LOCKED</div>`:""}
+    `;
+    btn.onclick=()=>{ if(unlocked) selectTrack(i); };
+    tourGrid.appendChild(btn);
+  }
+  // best list
+  const bestCard=$("bestCard"), bestList=$("bestList");
+  let html="";
+  for(let i=0;i<12;i++) if(save.best[i]){
+    const b=save.best[i];
+    html+=`<div class="kv"><span>#${i+1} ${TRACKS[i].name}</span><b>${b.time.toFixed(2)}s • ${b.medal} • ${"★".repeat(b.stars)}${"☆".repeat(3-b.stars)}</b></div>`;
+  }
+  if(html){ bestCard.style.display="block"; bestList.innerHTML=html; } else bestCard.style.display="none";
+}
+function renderGarage(){
+  riderGrid.innerHTML="";
+  RIDERS.forEach(r=>{
+    const active=save.rider===r.id;
+    const d=document.createElement("div");
+    d.className="choice"+(active?" active":"");
+    d.innerHTML=`<h3>${r.name}</h3><p>${r.desc}</p>
+      <div class="bars">
+        <div style="font-size:10px;opacity:0.8">Handling</div><div class="bar"><i style="width:${r.stats.handling*100}%"></i></div>
+        <div style="font-size:10px;opacity:0.8">Stability</div><div class="bar"><i style="width:${r.stats.stability*100}%"></i></div>
+        <div style="font-size:10px;opacity:0.8">Speed</div><div class="bar"><i style="width:${r.stats.speed*100}%"></i></div>
+      </div>`;
+    d.onclick=()=>{ save.rider=r.id; persist(); renderGarage(); renderSetup(); };
+    riderGrid.appendChild(d);
+  });
+  boardGrid.innerHTML="";
+  BOARDS.forEach(b=>{
+    const active=save.board===b.id;
+    const d=document.createElement("div");
+    d.className="choice"+(active?" active":"");
+    d.innerHTML=`<h3>${b.name}</h3><p>${b.desc}</p>
+      <div class="bars">
+        <div style="font-size:10px;opacity:0.8">Jump</div><div class="bar"><i style="width:${b.stats.jump*85}%"></i></div>
+        <div style="font-size:10px;opacity:0.8">Spin</div><div class="bar"><i style="width:${b.stats.spin*80}%"></i></div>
+        <div style="font-size:10px;opacity:0.8">Boost</div><div class="bar"><i style="width:${b.stats.boost*85}%"></i></div>
+      </div>`;
+    d.onclick=()=>{ save.board=b.id; persist(); renderGarage(); renderSetup(); };
+    boardGrid.appendChild(d);
+  });
+}
+function renderSetup(){
+  const r=RIDERS.find(x=>x.id===save.rider), b=BOARDS.find(x=>x.id===save.board);
+  $("setupInfo").innerHTML=`<span>${r.name} + ${b.name}</span><b>${((r.stats.handling*b.stats.accel*100)|0)} PWR</b>`;
+}
+renderTour(); renderGarage(); renderSetup(); updateHeader();
+
+// Navigation
+function showView(v){
+  $("viewTour").hidden=v!=="tour";
+  $("viewGarage").hidden=v!=="garage";
+  $("viewRace").hidden=v!=="race";
+  $("viewResult").hidden=v!=="result";
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  if(v==="tour") $("tabTour").classList.add("active");
+  if(v==="garage") $("tabGarage").classList.add("active");
+  if(v==="race") $("tabRace").classList.add("active");
+  if(v==="result") $("tabRace").classList.add("active");
+  if(v==="race") resizeCanvas();
+}
+$("tabTour").onclick=()=>showView("tour");
+$("tabGarage").onclick=()=>showView("garage");
+$("tabRace").onclick=()=>{ if(currentTrackId!==null) showView("race"); else showView("tour"); };
+$("btnStats").onclick=()=>{ $("bestCard").style.display=$("bestCard").style.display==="none"?"block":"none"; };
+$("btnReset").onclick=()=>{
+  if(confirm("Reset all medals, times and ghosts?")){
+    localStorage.removeItem(LS_KEY);
+    save={best:{},medals:{},stars:{},unlocked:0,rider:"balanced",board:"carve",ghosts:{},ghostOn:true};
+    persist(); renderTour(); renderGarage(); renderSetup();
+  }
+};
+$("btnToTour").onclick=()=>showView("tour");
+$("btnAgain").onclick=()=>{ showView("race"); startRace(currentTrackId); };
+$("btnNext").onclick=()=>{
+  const nxt=currentTrackId+1;
+  if(nxt<12){ selectTrack(nxt); showView("race"); startRace(nxt); } else showView("tour");
+};
+$("btnGhostToggle").onclick=()=>{
+  save.ghostOn=!save.ghostOn; persist();
+  $("btnGhostToggle").textContent="Ghost: "+(save.ghostOn?"ON":"OFF");
+};
+$("btnGhostToggle").textContent="Ghost: "+(save.ghostOn?"ON":"OFF");
+
+// Race state
+let currentTrackId=0;
+let race=null;
+let animId=null;
+let input={left:false,right:false,spinL:false,spinR:false,jump:false,boost:false};
+function selectTrack(id){
+  currentTrackId=id;
+  showView("race");
+  startRace(id);
+}
+
+// Physics & race
+function startRace(id){
+  cancelAnimationFrame(animId);
+  const data=getTrack(id);
+  const riderCfg=RIDERS.find(r=>r.id===save.rider);
+  const boardCfg=BOARDS.find(b=>b.id===save.board);
+  // combined stats
+  const handling = riderCfg.stats.handling * (boardCfg.stats.accel*0.9+0.1);
+  const stability = riderCfg.stats.stability;
+  const crashSave = riderCfg.stats.crashSave;
+  const topSpeed = riderCfg.stats.speed * boardCfg.stats.top;
+  const jumpPow = boardCfg.stats.jump;
+  const spinRate = boardCfg.stats.spin;
+  const boostEff = boardCfg.stats.boost;
+
+  race={
+    id, data, handling, stability, crashSave, topSpeed, jumpPow, spinRate, boostEff,
+    x: 40, y: interpHeight(data.points,40)-18,
+    vx: 2.5, vy:0, angle:0, angVel:0,
+    onGround:true, boost:100, time:0, flags:0, crashes:0, maxSpin:0, totalSpin:0,
+    finished:false, crashedTimer:0, ghost:[], ghostIdx:0,
+    flagStates: data.flags.map(f=>({...f, got:false})),
+    camX:40
+  };
+  // load ghost for display
+  race.ghostData = save.ghosts[id] || null;
+  $("hudTime").textContent="0.00";
+  $("hudSpeed").textContent="0";
+  $("hudFlags").textContent="Flags 0/5";
+  $("hudBoost").textContent="100%";
+  $("boostFill").style.width="100%";
+  $("raceMsg").style.display="none";
+  lastT=performance.now();
+  loop();
+}
+
+let lastT=0;
+function loop(now=performance.now()){
+  animId=requestAnimationFrame(loop);
+  if(!race || race.finished) return;
+  const dt=Math.min(32, now-lastT)/16.666; // normalize to 60fps
+  lastT=now;
+  update(dt);
+  render();
+}
+
+function update(dt){
+  const r=race;
+  const pts=r.data.points;
+  // input handling already via flags
+  const GRAV=0.62;
+  const slope=slopeAt(pts, r.x);
+  const slopeAng=Math.atan(slope);
+
+  if(r.crashedTimer>0){
+    r.crashedTimer-=dt;
+    r.vx*=0.92;
+    r.vy+=GRAV*0.5*dt;
+    r.x+=r.vx*dt*0.5;
+    r.y+=r.vy*dt*0.5;
+    // recover
+    if(r.crashedTimer<=0){ r.angVel=0; r.angle=slopeAng; }
+  } else {
+    if(r.onGround){
+      // downhill acceleration
+      const downhill = Math.sin(slopeAng)*0.55 * r.topSpeed;
+      r.vx += downhill*dt;
+      // friction
+      r.vx *= Math.pow(0.985, dt);
+      // steer
+      if(input.left) { r.vx -= 0.28 * r.handling * dt; r.angle -= 0.03*dt; }
+      if(input.right){ r.vx += 0.28 * r.handling * dt; r.angle += 0.03*dt; }
+      // clamp speed
+      const maxV = 9.5 * r.topSpeed;
+      if(r.vx>maxV) r.vx=maxV;
+      if(r.vx<1.2) r.vx=1.2;
+      // boost
+      if(input.boost && r.boost>0){
+        r.vx += 0.55 * r.boostEff * dt;
+        r.boost=Math.max(0, r.boost-0.9*dt);
+        // particles could be added
+      } else {
+        r.boost=Math.min(100, r.boost+0.18*dt);
+      }
+      // jump
+      if(input.jump){
+        r.vy = -7.8 * r.jumpPow;
+        r.onGround=false;
+        r.angVel*=0.6;
+        input.jump=false;
+      }
+      // align to slope gently
+      r.angle = r.angle*0.88 + slopeAng*0.12;
+      r.angVel*=0.85;
+    } else {
+      // air
+      r.vy += GRAV*dt;
+      r.vx *= Math.pow(0.998, dt);
+      if(input.spinL) r.angVel -= 0.14 * r.spinRate * dt;
+      if(input.spinR) r.angVel += 0.14 * r.spinRate * dt;
+      r.angle += r.angVel*dt;
+      r.totalSpin += Math.abs(r.angVel*dt*57.3);
+      if(Math.abs(r.angVel)>0.02) r.maxSpin = Math.max(r.maxSpin, Math.abs(r.totalSpin));
+      // boost in air weaker
+      if(input.boost && r.boost>0){ r.vx+=0.18*dt; r.boost=Math.max(0,r.boost-0.6*dt); }
+    }
+    r.x += r.vx*dt;
+    r.y += r.vy*dt;
+
+    // terrain collision
+    const groundY=interpHeight(pts, r.x);
+    const riderH=18;
+    if(r.y >= groundY - riderH){
+      // landing
+      const wasAir=!r.onGround;
+      if(wasAir){
+        // check landing angle vs slope
+        const normAngle = ((r.angle % (Math.PI*2))+Math.PI*2)%(Math.PI*2);
+        let deg = normAngle*57.3;
+        if(deg>180) deg=360-deg;
+        // allow 35deg tolerance + stability bonus
+        const tol = 38 + r.stability*18 + r.crashSave*10;
+        const impact = Math.abs(r.vy);
+        if(deg>tol && impact>3){
+          // crash
+          r.crashes++;
+          r.crashedTimer=28;
+          r.vx*=0.45;
+          r.vy=-1;
+          r.angVel*=0.2;
+          showMsg("CRASH! "+Math.round(deg)+"°", 700);
+        } else {
+          // good landing, add small bounce
+          r.vy*= -0.12;
+          if(Math.abs(r.vy)<0.8) r.vy=0;
+          // reward spin
+          if(r.totalSpin>300) showMsg(Math.round(r.totalSpin)+"° SPIN!",600);
+          r.totalSpin=0;
+        }
+      }
+      r.y=groundY - riderH;
+      if(r.crashedTimer<=0){
+        r.vy=0;
+        r.onGround=true;
+        // damp angular
+        r.angVel*=0.5;
+      }
+    } else {
+      r.onGround=false;
+    }
+  }
+
+  // flags
+  r.flagStates.forEach(f=>{
+    if(!f.got && Math.abs(r.x - f.x)<22 && Math.abs(r.y - f.y)<28){
+      f.got=true; r.flags++;
+      showMsg("FLAG!",400);
+    }
+  });
+
+  // time
+  r.time += dt/60;
+  // camera
+  r.camX += (r.x - r.camX)*0.12;
+
+  // finish
+  if(r.x >= r.data.len - 30){
+    finishRace();
+  }
+
+  // HUD
+  $("hudTime").textContent=r.time.toFixed(2);
+  const ref=r.data.ref;
+  const diff=r.time - ref;
+  $("hudDelta").textContent=(diff<=0? "-"+Math.abs(diff).toFixed(2): "+"+diff.toFixed(2))+" vs ref";
+  $("hudDelta").style.color= diff<=0? "#2ee5ff" : "#ff8c42";
+  $("hudSpeed").textContent=Math.round(r.vx*9)+" km/h";
+  $("hudFlags").textContent=`Flags ${r.flags}/5`;
+  $("hudBoost").textContent=Math.round(r.boost)+"%";
+  $("boostFill").style.width=r.boost+"%";
+
+  // record ghost every 3 frames
+  if(!r.finished && (Math.floor(r.time*60)%3===0)){
+    if(!r._lastGhost || Math.abs(r.x - r._lastGhost)>6){
+      r.ghost.push({x:r.x, y:r.y, t:r.time});
+      r._lastGhost=r.x;
+    }
+  }
+}
+
+function showMsg(txt, ms){
+  const el=$("raceMsg");
+  el.textContent=txt;
+  el.style.display="block";
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>el.style.display="none", ms);
+}
+
+function finishRace(){
+  const r=race;
+  if(r.finished) return;
+  r.finished=true;
+  cancelAnimationFrame(animId);
+  const ref=r.data.ref;
+  const medal=medalFor(r.time, ref);
+  const stars=starsFor(r.flags, r.maxSpin, r.crashes);
+  const prev=save.best[r.id];
+  const isBest=!prev || r.time < prev.time;
+  if(isBest){
+    save.best[r.id]={time:r.time, medal, stars, flags:r.flags, spin:Math.round(r.maxSpin)};
+    save.medals[r.id]=medal;
+    save.stars[r.id]=stars;
+    // save ghost if best
+    save.ghosts[r.id]=r.ghost.slice(0,800);
+    if(r.id===save.unlocked && r.id<11) save.unlocked++;
+    persist();
+  } else {
+    // still update stars if higher
+    if(stars > (save.stars[r.id]||0)){ save.stars[r.id]=stars; persist(); }
+  }
+  renderTour(); updateHeader();
+  // show result
+  $("resTitle").textContent= TRACKS[r.id].name+" — Finished";
+  $("resTime").textContent=r.time.toFixed(2)+"s";
+  $("resRef").textContent=ref.toFixed(2)+"s";
+  $("resFlags").textContent=r.flags+"/5";
+  $("resSpin").textContent=Math.round(r.maxSpin)+"°";
+  $("resCrash").textContent=r.crashes;
+  $("resBest").textContent= save.best[r.id].time.toFixed(2)+"s ("+save.best[r.id].medal+")";
+  $("resStars").textContent="★".repeat(stars)+"☆".repeat(3-stars);
+  const medalEl=$("resMedal");
+  medalEl.textContent= medal==="gold"?"🥇 Gold — Beat Ref": medal==="silver"?"🥈 Silver": medal==="bronze"?"🥉 Bronze":"— No Medal";
+  medalEl.style.borderColor= medal==="gold"?"#ffcc33": medal==="silver"?"#cbd5e1": medal==="bronze"?"#ff8c42":"#23466f";
+  $("btnNext").style.display= r.id<11 ? "block":"none";
+  $("btnNext").textContent= r.id<11 ? "Next Line →" : "Tour Complete";
+  showView("result");
+}
+
+// Rendering
+function render(){
+  if(!race) return;
+  const r=race;
+  ctx.clearRect(0,0,W,H);
+  // sky
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,"#0a2a5a"); g.addColorStop(0.45,"#123a6b"); g.addColorStop(1,"#eaf4ff");
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // distant mountains parallax
+  ctx.fillStyle="rgba(255,255,255,0.08)";
+  for(let i=0;i<3;i++){
+    const off=(r.camX*0.08 + i*120)%W;
+    ctx.beginPath();
+    ctx.moveTo(-off, 120+i*18);
+    ctx.lineTo(W*0.3-off, 70+i*10);
+    ctx.lineTo(W*0.6-off, 110+i*12);
+    ctx.lineTo(W-off, 80+i*8);
+    ctx.lineTo(W-off, 140+i*18);
+    ctx.lineTo(-off,140+i*18);
+    ctx.closePath(); ctx.fill();
+  }
+  // camera transform
+  const camX=r.camX;
+  const viewL=camX - W/2, viewR=camX+W/2;
+  // terrain polygon
+  ctx.beginPath();
+  let first=true;
+  for(let x=viewL-20; x<=viewR+20; x+=12){
+    const y=interpHeight(r.data.points, Math.max(0,Math.min(r.data.len,x)));
+    const sx=x - camX + W/2;
+    const sy=y;
+    if(first){ ctx.moveTo(sx,sy); first=false; } else ctx.lineTo(sx,sy);
+  }
+  ctx.lineTo(W+20, H); ctx.lineTo(-20,H); ctx.closePath();
+  ctx.fillStyle="#eaf4ff"; ctx.fill();
+  ctx.strokeStyle="#b9d6ff"; ctx.lineWidth=2; ctx.stroke();
+  // snow texture lines
+  ctx.strokeStyle="rgba(18,58,107,0.08)"; ctx.lineWidth=1;
+  for(let x=viewL; x<viewR; x+=40){
+    const y=interpHeight(r.data.points,x);
+    const sx=x - camX + W/2;
+    ctx.beginPath(); ctx.moveTo(sx,y+6); ctx.lineTo(sx+18,y+10); ctx.stroke();
+  }
+  // gates
+  r.data.gates.forEach(g=>{
+    if(g.x<viewL-40||g.x>viewR+40) return;
+    const sx=g.x - camX + W/2;
+    const gy=interpHeight(r.data.points,g.x);
+    ctx.fillStyle="#ff3b30"; ctx.fillRect(sx-2, gy-38, 4, 38);
+    ctx.fillStyle="#fff"; ctx.fillRect(sx-10, gy-38, 20, 6);
+  });
+  // flags
+  r.flagStates.forEach(f=>{
+    if(f.x<viewL-30||f.x>viewR+30) return;
+    const sx=f.x - camX + W/2;
+    const sy=f.y;
+    if(f.got){
+      ctx.fillStyle="rgba(46,229,255,0.25)"; ctx.beginPath(); ctx.arc(sx,sy,10,0,Math.PI*2); ctx.fill();
+    } else {
+      ctx.fillStyle="#2ee5ff"; ctx.beginPath(); ctx.arc(sx,sy,9,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle="#06101f"; ctx.font="10px system-ui"; ctx.textAlign="center"; ctx.fillText("◆",sx,sy+3);
+    }
+  });
+  // ghost line
+  if(save.ghostOn && r.ghostData){
+    ctx.strokeStyle="rgba(255,204,51,0.55)"; ctx.lineWidth=2; ctx.setLineDash([6,6]);
+    ctx.beginPath();
+    let started=false;
+    r.ghostData.forEach(p=>{
+      if(p.x<viewL-20||p.x>viewR+20) return;
+      const sx=p.x - camX + W/2;
+      const sy=p.y;
+      if(!started){ ctx.moveTo(sx,sy); started=true; } else ctx.lineTo(sx,sy);
+    });
+    ctx.stroke(); ctx.setLineDash([]);
+    // ghost rider dot at same time
+    const t=r.time;
+    let best=null, bestD=1e9;
+    r.ghostData.forEach(p=>{ const d=Math.abs(p.t - t); if(d<bestD){bestD=d; best=p;} });
+    if(best){
+      const sx=best.x - camX + W/2;
+      ctx.fillStyle="rgba(255,204,51,0.9)"; ctx.beginPath(); ctx.arc(sx,best.y,5,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle="#06101f"; ctx.font="7px system-ui"; ctx.textAlign="center"; ctx.fillText("GHOST",sx,best.y-10);
+    }
+  }
+  // rider shadow
+  const rx=W/2, ry=r.y;
+  ctx.fillStyle="rgba(6,16,31,0.18)"; ctx.beginPath(); ctx.ellipse(rx, r.y+14, 18, 6, 0,0,Math.PI*2); ctx.fill();
+  // rider + board
+  ctx.save();
+  ctx.translate(rx, ry);
+  ctx.rotate(r.angle);
+  // board
+  ctx.fillStyle="#0b1a33"; ctx.strokeStyle="#2ee5ff"; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.roundRect(-22,-4,44,8,4); ctx.fill(); ctx.stroke();
+  ctx.fillStyle="#eaf4ff"; ctx.fillRect(-18,-2,36,2);
+  // rider body
+  ctx.fillStyle="#ffcc33"; ctx.beginPath(); ctx.arc(0,-12,9,0,Math.PI*2); ctx.fill(); // helmet
+  ctx.fillStyle="#1fb8ff"; ctx.fillRect(-7,-8,14,14); // jacket
+  ctx.fillStyle="#0f2747"; ctx.fillRect(-6,6,12,10); // pants
+  ctx.fillStyle="#fff"; ctx.fillRect(-9,2,4,6); ctx.fillRect(5,2,4,6); // arms
+  // goggles
+  ctx.fillStyle="#06101f"; ctx.fillRect(-6,-14,12,4);
+  ctx.restore();
+
+  // speed lines when boosting
+  if(input.boost && r.boost>0){
+    ctx.strokeStyle="rgba(255,204,51,0.35)"; ctx.lineWidth=2;
+    for(let i=0;i<4;i++){
+      const y= ry -10 + i*8;
+      ctx.beginPath(); ctx.moveTo(rx-30, y); ctx.lineTo(rx-50, y); ctx.stroke();
+    }
+  }
+  // progress bar bottom
+  const prog=r.x / r.data.len;
+  ctx.fillStyle="rgba(6,16,31,0.85)"; ctx.fillRect(8,H-14,W-16,8);
+  ctx.fillStyle="#2ee5ff"; ctx.fillRect(8,H-14,(W-16)*prog,8);
+  ctx.fillStyle="#fff"; ctx.font="9px system-ui"; ctx.textAlign="center"; ctx.fillText(Math.round(prog*100)+"%", W/2, H-8);
+  // crash overlay
+  if(r.crashedTimer>0){
+    ctx.fillStyle="rgba(255,59,48,0.18)"; ctx.fillRect(0,0,W,H);
+  }
+}
+
+// Input bindings
+function bindBtn(el, key){
+  const set=v=>{ input[key]=v; };
+  el.addEventListener("touchstart", e=>{ e.preventDefault(); set(true); }, {passive:false});
+  el.addEventListener("touchend", e=>{ e.preventDefault(); set(false); }, {passive:false});
+  el.addEventListener("touchcancel", e=>{ e.preventDefault(); set(false); }, {passive:false});
+  el.addEventListener("mousedown", ()=>set(true));
+  el.addEventListener("mouseup", ()=>set(false));
+  el.addEventListener("mouseleave", ()=>set(false));
+}
+bindBtn($("bLeft"),"left");
+bindBtn($("bSpinL"),"spinL");
+bindBtn($("bJump"),"jump");
+bindBtn($("bSpinR"),"spinR");
+bindBtn($("bBoost"),"boost");
+
+// special jump tap (press once)
+$("bJump").addEventListener("touchstart", e=>{ input.jump=true; setTimeout(()=>input.jump=false,120); }, {passive:false});
+$("bJump").addEventListener("mousedown", ()=>{ input.jump=true; setTimeout(()=>input.jump=false,120); });
+
+// keyboard
+window.addEventListener("keydown", e=>{
+  if(e.key==="ArrowLeft"||e.key==="a") input.left=true;
+  if(e.key==="ArrowRight"||e.key==="d") input.right=true;
+  if(e.key===" ") { input.jump=true; }
+  if(e.key==="Shift") input.boost=true;
+  if(e.key==="q") input.spinL=true;
+  if(e.key==="e") input.spinR=true;
+});
+window.addEventListener("keyup", e=>{
+  if(e.key==="ArrowLeft"||e.key==="a") input.left=false;
+  if(e.key==="ArrowRight"||e.key==="d") input.right=false;
+  if(e.key===" ") input.jump=false;
+  if(e.key==="Shift") input.boost=false;
+  if(e.key==="q") input.spinL=false;
+  if(e.key==="e") input.spinR=false;
+});
+
+$("btnStart").onclick=()=>startRace(currentTrackId);
+$("btnStart").ontouchstart=(e)=>{ e.preventDefault(); startRace(currentTrackId); };
+
+// init first track selection
+currentTrackId=0;
+renderTour();
+showView("tour");
+
+// prevent scroll on canvas
+c.addEventListener("touchmove", e=>e.preventDefault(), {passive:false});
+</script>
+</body>
+</html>

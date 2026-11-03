@@ -1,0 +1,154 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Ricochet Range</title><style>*{box-sizing:border-box;margin:0;padding:0}:root{--bg:#0f1419;--card:#1a232e;--card2:#243447;--line:#2e4057;--accent:#38bdf8;--accent2:#facc15;--good:#4ade80;--bad:#f87171;--text:#f0f4f8;--muted:#8a9bb0}html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}body{max-width:428px;margin:0 auto;overflow-x:hidden}.header{position:sticky;top:0;z-index:10;background:rgba(15,20,25,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 12px;display:flex;justify-content:space-between;align-items:center}.brand{display:flex;gap:10px;align-items:center}.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#38bdf8,#0ea5e9);display:grid;place-items:center;font-size:18px}.brand h1{font-size:14px;line-height:1.1}.brand p{font-size:11px;color:var(--muted)}.pill{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}.pill b{color:var(--text)}.wrap{padding:12px}.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}.hudItem{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}.hudItem b{font-size:18px;display:block}.hudItem span{font-size:11px;color:var(--muted)}.gameArea{position:relative;background:linear-gradient(180deg,#1a232e 0%,#0f1419 100%);border:1px solid var(--line);border-radius:16px;overflow:hidden;padding:8px}.gameArea canvas{display:block;width:100%;height:auto;touch-action:none;border-radius:12px;background:radial-gradient(ellipse at 50% 30%,#243447 0%,#0f1419 70%)}.levelBar{display:flex;gap:6px;overflow:auto;padding:6px 0;margin-bottom:8px;scrollbar-width:none}.levelBar::-webkit-scrollbar{display:none}.levelBtn{white-space:nowrap;min-height:36px;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card2);color:var(--muted);font-size:12px;font-weight:700;flex-shrink:0}.levelBtn.active{background:var(--accent);color:#0f1419;border-color:var(--accent)}.levelBtn.done{background:var(--good);color:#0f1419;border-color:var(--good)}.levelBtn.locked{opacity:.5}.controls{display:flex;gap:8px;margin-top:10px}.btn{border:0;border-radius:12px;padding:12px;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center;justify-content:center;flex:1;gap:8px}.btnPrimary{background:linear-gradient(135deg,#38bdf8,#0ea5e9);color:#0f1419}.btnGhost{background:var(--card2);border:1px solid var(--line);color:var(--text)}.tip{font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px;text-align:center;line-height:1.4}.overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(15,20,25,.88);padding:16px;text-align:center;border-radius:16px}.hidden{display:none!important}.shotDot{width:10px;height:10px;border-radius:50%;background:var(--accent);display:inline-block;margin:0 2px}.shotDot.used{background:var(--line)}</style></head><body><header class="header"><div class="brand"><div class="logo">🎯</div><div><h1>Ricochet Range</h1><p>Drag to aim • Bounce to hit</p></div></div><div class="pill">Best <b id="bestEl">—</b></div></header><div class="wrap"><div class="hud"><div class="hudItem"><b id="shotsEl">3</b><span>Shots Left</span></div><div class="hudItem"><b id="levelEl">1/8</b><span>Level</span></div><div class="hudItem"><b id="targetsEl">2</b><span>Targets</span></div></div><div class="levelBar" id="levelBar"></div><div class="gameArea" id="gameArea"><canvas id="cv" width="360" height="440"></canvas><div class="overlay" id="startOverlay"><div><h2 style="font-size:20px">🎯 Clean Range</h2><p style="font-size:13px;color:var(--muted);margin:8px 0">Drag from the cannon to aim — dotted line shows bounces.<br>Hit all <b style="color:#f97316">orange targets</b> within shot limit!<br>Walls ricochet your shot.</p><button class="btn btnPrimary" id="playBtn" style="width:100%">▶ Aim & Fire</button></div></div><div class="overlay hidden" id="overOverlay"><div><h2 id="overTitle">Hit!</h2><p id="overDesc" style="font-size:13px;color:var(--muted);margin:8px 0"></p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0"><div style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px"><b id="overShots" style="font-size:18px;display:block">0</b><span style="font-size:11px;color:var(--muted)">Shots Used</span></div><div style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px"><b id="overEff" style="font-size:18px;display:block">—</b><span style="font-size:11px;color:var(--muted)">Efficiency</span></div></div><button class="btn btnPrimary" id="nextBtn" style="width:100%">Next Room</button><button class="btn btnGhost" id="retryBtn" style="width:100%;margin-top:8px">Retry</button></div></div></div><div style="display:flex;gap:4px;justify-content:center;margin:8px 0" id="shotDots"></div><div class="controls"><button class="btn btnGhost" id="resetBtn">↻ Reset</button><button class="btn btnPrimary" id="clearBtn">Clear Shot</button></div><div class="tip">💡 Drag from cannon — longer drag = more power! Use walls to reach tricky targets.</div></div><script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=360,H=440;
+let level=0,shots=3,shotsUsed=0,targets=[],walls=[],cannon={x:180,y:400},projectile=null,aiming=false,aimStart=null,aimEnd=null,bestEff=localStorage.getItem('ricochet-bestEff')||'—',cleared=JSON.parse(localStorage.getItem('ricochet-cleared')||'[]');
+const LEVELS=[
+{shots:3,targets:[{x:280,y:80},{x:80,y:120}],walls:[{x:0,y:200,x2:200,y2:200}]},
+{shots:3,targets:[{x:300,y:60},{x:60,y:60},{x:180,y:140}],walls:[{x:120,y:180,x2:240,y2:180},{x:0,y:280,x2:140,y2:280}]},
+{shots:4,targets:[{x:320,y:100},{x:40,y:100},{x:180,y:60}],walls:[{x:0,y:160,x2:120,y2:160},{x:240,y:160,x2:360,y2:160},{x:160,y:240,x2:200,y2:320}]},
+{shots:3,targets:[{x:300,y:200},{x:60,y:200}],walls:[{x:100,y:120,x2:260,y2:120},{x:100,y:280,x2:260,y2:280},{x:180,y:120,x2:180,y2:280}]},
+{shots:4,targets:[{x:280,y:80},{x:80,y:280},{x:280,y:280}],walls:[{x:0,y:180,x2:180,y2:180},{x:180,y:260,x2:360,y2:260}]},
+{shots:3,targets:[{x:180,y:80},{x:60,y:160},{x:300,y:160}],walls:[{x:80,y:220,x2:280,y2:220},{x:140,y:120,x2:140,y2:220},{x:220,y:120,x2:220,y2:220}]},
+{shots:5,targets:[{x:320,y:60},{x:40,y:60},{x:320,y:320},{x:40,y:320}],walls:[{x:120,y:140,x2:240,y2:140},{x:120,y:300,x2:240,y2:300},{x:160,y:140,x2:160,y2:300},{x:200,y:140,x2:200,y2:300}]},
+{shots:4,targets:[{x:180,y:60},{x:80,y:120},{x:280,y:120},{x:180,y:200}],walls:[{x:0,y:180,x2:100,y2:180},{x:260,y:180,x2:360,y2:180},{x:120,y:240,x2:240,y2:240}]}
+];
+function save(){localStorage.setItem('ricochet-cleared',JSON.stringify(cleared));localStorage.setItem('ricochet-bestEff',bestEff)}
+function updateHud(){
+document.getElementById('shotsEl').textContent=shots-shotsUsed;
+document.getElementById('levelEl').textContent=(level+1)+'/'+LEVELS.length;
+document.getElementById('targetsEl').textContent=targets.filter(t=>!t.hit).length;
+document.getElementById('bestEl').textContent=bestEff;
+let bar=document.getElementById('levelBar');bar.innerHTML='';
+LEVELS.forEach((l,i)=>{let b=document.createElement('button');b.className='levelBtn'+(i===level?' active':'')+(cleared.includes(i)?' done':'')+(i>0&&!cleared.includes(i-1)?' locked':'');b.textContent=(cleared.includes(i)?'✓ ':'')+'Room '+(i+1);b.onclick=()=>{if(i===0||cleared.includes(i-1)||cleared.includes(i)){level=i;initLevel()}};bar.appendChild(b)});
+let dots=document.getElementById('shotDots');dots.innerHTML='';
+for(let i=0;i<shots;i++){let d=document.createElement('div');d.className='shotDot'+(i<shotsUsed?' used':'');dots.appendChild(d)}
+}
+function initLevel(){
+let lvl=LEVELS[level];
+shots=lvl.shots;shotsUsed=0;
+targets=lvl.targets.map(t=>({...t,hit:false,r:18}));
+walls=lvl.walls.map(w=>({...w}));
+projectile=null;aiming=false;aimStart=null;aimEnd=null;
+updateHud();draw();
+document.getElementById('startOverlay').classList.remove('hidden');
+document.getElementById('overOverlay').classList.add('hidden');
+}
+function draw(){
+ctx.clearRect(0,0,W,H);
+let grad=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,300);
+grad.addColorStop(0,'#243447');grad.addColorStop(1,'#0f1419');
+ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
+// walls
+ctx.strokeStyle='#2e4057';ctx.lineWidth=6;ctx.lineCap='round';
+walls.forEach(w=>{ctx.beginPath();ctx.moveTo(w.x,w.y);ctx.lineTo(w.x2,w.y2);ctx.stroke()});
+// targets
+targets.forEach(t=>{
+if(t.hit){ctx.fillStyle='rgba(74,222,128,.3)';ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,6.28);ctx.fill();return}
+ctx.shadowColor='#f97316';ctx.shadowBlur=12;ctx.fillStyle='#f97316';ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,6.28);ctx.fill();ctx.shadowBlur=0;
+ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(t.x,t.y,t.r*0.5,0,6.28);ctx.fill();
+ctx.fillStyle='#f97316';ctx.beginPath();ctx.arc(t.x,t.y,t.r*0.25,0,6.28);ctx.fill();
+});
+// cannon
+ctx.fillStyle='#38bdf8';ctx.beginPath();ctx.arc(cannon.x,cannon.y,14,0,6.28);ctx.fill();
+ctx.fillStyle='#0f1419';ctx.beginPath();ctx.arc(cannon.x,cannon.y,6,0,6.28);ctx.fill();
+// projectile
+if(projectile){
+ctx.fillStyle='#facc15';ctx.shadowColor='#facc15';ctx.shadowBlur=10;ctx.beginPath();ctx.arc(projectile.x,projectile.y,6,0,6.28);ctx.fill();ctx.shadowBlur=0;
+}
+// aim line
+if(aiming&&aimStart&&aimEnd){
+let dx=aimStart.x-aimEnd.x,dy=aimStart.y-aimEnd.y,dist=Math.hypot(dx,dy),power=Math.min(1,dist/120);
+let vx=dx*0.08*power*8,vy=dy*0.08*power*8;
+let x=cannon.x,y=cannon.y;
+ctx.strokeStyle='rgba(56,189,248,.6)';ctx.setLineDash([4,6]);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y);
+for(let i=0;i<40;i++){
+x+=vx;y+=vy;vx*=0.998;vy*=0.998;
+if(x<0||x>W)vx*=-1;if(y<0||y>H)vy*=-1;
+walls.forEach(w=>{
+if(y>Math.min(w.y,w.y2)-4&&y<Math.max(w.y,w.y2)+4&&x>Math.min(w.x,w.x2)-4&&x<Math.max(w.x,w.x2)+4){
+if(Math.abs(w.y-w.y2)<4)vy*=-1;else vx*=-1;
+}
+});
+if(i%3===0)ctx.lineTo(x,y);
+}
+ctx.stroke();ctx.setLineDash([]);
+ctx.fillStyle='rgba(56,189,248,.8)';ctx.beginPath();ctx.arc(aimEnd.x,aimEnd.y,6,0,6.28);ctx.fill();
+}
+}
+function getPos(e){
+let rect=cv.getBoundingClientRect(),sx=W/rect.width,sy=H/rect.height,t=e.touches?e.touches[0]:e;
+return {x:(t.clientX-rect.left)*sx,y:(t.clientY-rect.top)*sy}
+}
+function fire(){
+if(shotsUsed>=shots)return;
+let dx=aimStart.x-aimEnd.x,dy=aimStart.y-aimEnd.y,dist=Math.hypot(dx,dy),power=Math.min(1,dist/120);
+if(power<0.1)return;
+let vx=dx*0.08*power*8,vy=dy*0.08*power*8;
+projectile={x:cannon.x,y:cannon.y,vx,vy,bounces:0};
+shotsUsed++;updateHud();
+let interval=setInterval(()=>{
+if(!projectile){clearInterval(interval);return}
+projectile.x+=projectile.vx;projectile.y+=projectile.vy;
+projectile.vx*=0.998;projectile.vy*=0.998;
+if(projectile.x<6||projectile.x>W-6){projectile.vx*=-1;projectile.x=Math.max(6,Math.min(W-6,projectile.x));projectile.bounces++}
+if(projectile.y<6||projectile.y>H-6){projectile.vy*=-1;projectile.y=Math.max(6,Math.min(H-6,projectile.y));projectile.bounces++}
+walls.forEach(w=>{
+if(projectile.y>Math.min(w.y,w.y2)-6&&projectile.y<Math.max(w.y,w.y2)+6&&projectile.x>Math.min(w.x,w.x2)-6&&projectile.x<Math.max(w.x,w.x2)+6){
+if(Math.abs(w.y-w.y2)<4)projectile.vy*=-1;else projectile.vx*=-1;
+projectile.bounces++;
+}
+});
+targets.forEach(t=>{
+if(!t.hit&&Math.hypot(projectile.x-t.x,projectile.y-t.y)<t.r+6){
+t.hit=true;if(navigator.vibrate)navigator.vibrate(30);
+}
+});
+if(targets.every(t=>t.hit)){
+clearInterval(interval);projectile=null;
+setTimeout(()=>completeLevel(),300);
+}
+if(projectile&&projectile.bounces>12){
+clearInterval(interval);projectile=null;
+if(targets.every(t=>t.hit))completeLevel();else if(shotsUsed>=shots)failLevel();
+}
+draw();
+},16);
+setTimeout(()=>{
+if(projectile){
+clearInterval(interval);projectile=null;
+if(targets.every(t=>t.hit))completeLevel();else if(shotsUsed>=shots)failLevel();
+}
+},4000);
+}
+function completeLevel(){
+if(!cleared.includes(level))cleared.push(level);
+let eff=((LEVELS[level].shots-shotsUsed+1)/LEVELS[level].shots*100).toFixed(0)+'%';
+if(bestEff==='—'||parseInt(eff)>parseInt(bestEff))bestEff=eff;
+save();
+document.getElementById('overTitle').textContent='Room Cleared! 🎯';
+document.getElementById('overDesc').textContent='All targets hit — clean shooting!';
+document.getElementById('overShots').textContent=shotsUsed+'/'+shots;
+document.getElementById('overEff').textContent=eff;
+document.getElementById('overOverlay').classList.remove('hidden');
+updateHud();
+if(navigator.vibrate)navigator.vibrate(50);
+}
+function failLevel(){
+document.getElementById('overTitle').textContent='Out of Shots! 💥';
+document.getElementById('overDesc').textContent='Not all targets hit — try a different angle!';
+document.getElementById('overShots').textContent=shotsUsed+'/'+shots;
+document.getElementById('overEff').textContent='—';
+document.getElementById('overOverlay').classList.remove('hidden');
+}
+cv.addEventListener('mousedown',e=>{let p=getPos(e);if(Math.hypot(p.x-cannon.x,p.y-cannon.y)<30){aiming=true;aimStart=p;aimEnd=p}});
+window.addEventListener('mousemove',e=>{if(!aiming)return;aimEnd=getPos(e);draw()});
+window.addEventListener('mouseup',e=>{if(!aiming)return;aiming=false;aimEnd=getPos(e);fire();draw()});
+cv.addEventListener('touchstart',e=>{let p=getPos(e);if(Math.hypot(p.x-cannon.x,p.y-cannon.y)<40){aiming=true;aimStart=p;aimEnd=p;e.preventDefault()}},{passive:false});
+cv.addEventListener('touchmove',e=>{if(!aiming)return;aimEnd=getPos(e);draw();e.preventDefault()},{passive:false});
+cv.addEventListener('touchend',e=>{if(!aiming)return;aiming=false;fire();draw();e.preventDefault()},{passive:false});
+document.getElementById('playBtn').onclick=()=>document.getElementById('startOverlay').classList.add('hidden');
+document.getElementById('nextBtn').onclick=()=>{level=Math.min(LEVELS.length-1,level+1);initLevel()};
+document.getElementById('retryBtn').onclick=()=>initLevel();
+document.getElementById('resetBtn').onclick=()=>{cleared=[];bestEff='—';save();level=0;initLevel()};
+document.getElementById('clearBtn').onclick=()=>{projectile=null;draw()};
+initLevel();
+</script></body></html>

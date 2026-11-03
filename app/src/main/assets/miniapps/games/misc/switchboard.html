@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Switchboard Operator</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --wood:#2b1a0e;
+  --wood2:#3d2412;
+  --brass:#c9a227;
+  --brass2:#e8c84a;
+  --cream:#fff8e1;
+  --red:#e53935;
+  --green:#2e7d32;
+  --panel:#1a0f08;
+}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background:#0d0702;
+  color:var(--cream);
+  display:flex;justify-content:center;
+  touch-action:manipulation;
+}
+.app{
+  width:100%;max-width:428px;min-width:360px;
+  min-height:100dvh;
+  background:linear-gradient(180deg,#3d2412 0%,#2b1a0e 40%,#1a0f08 100%);
+  display:flex;flex-direction:column;
+  overflow-x:hidden;
+  position:relative;
+  border-left:2px solid #4a2e14;
+  border-right:2px solid #4a2e14;
+}
+/* Header */
+.header{
+  background:linear-gradient(180deg,#1a0f08,#2b1a0e);
+  border-bottom:3px solid var(--brass);
+  padding:10px 12px 8px;
+  display:flex;flex-direction:column;gap:6px;
+  position:sticky;top:0;z-index:10;
+}
+.brand{
+  display:flex;align-items:center;justify-content:space-between;
+}
+.brand h1{
+  font-size:18px;letter-spacing:1.5px;font-weight:900;
+  color:var(--brass2);text-shadow:0 1px 0 #000;
+  line-height:1;
+}
+.brand h1 span{font-size:10px;display:block;letter-spacing:3px;color:#d7c9a0;font-weight:600;margin-top:2px}
+.header-stats{
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:6px;
+}
+.stat{
+  background:#0f0803;border:1.5px solid #5a3a18;border-radius:10px;
+  padding:6px 4px;text-align:center;
+}
+.stat-label{font-size:10px;letter-spacing:1px;color:#bfae8a;font-weight:700}
+.stat-val{font-size:18px;font-weight:900;color:var(--cream);line-height:1.1}
+.stat-val.small{font-size:14px}
+.lives{display:flex;justify-content:center;gap:3px;margin-top:2px}
+.heart{font-size:16px;filter:drop-shadow(0 1px 1px #000);transition:all .3s}
+.heart.lost{opacity:.2;filter:grayscale(1)}
+.level-badge{
+  background:var(--brass);color:#1a0f08;font-weight:900;
+  padding:2px 8px;border-radius:20px;font-size:12px;
+}
+/* Incoming area */
+.incoming-wrap{
+  padding:10px 12px 8px;
+  background:linear-gradient(180deg,#2b1a0e,#24160a);
+  border-bottom:2px solid #4a2e14;
+}
+.section-title{
+  font-size:11px;letter-spacing:2px;color:var(--brass2);font-weight:800;
+  display:flex;align-items:center;gap:6px;margin-bottom:8px;
+}
+.section-title i{width:8px;height:8px;background:var(--red);border-radius:50%;display:inline-block;box-shadow:0 0 6px var(--red);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.incoming-grid{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;
+}
+.call-slot{
+  height:96px;
+  background:#0f0803;border:2px dashed #5a3a18;border-radius:12px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+}
+.call-slot.empty::after{
+  content:"— EMPTY —";font-size:10px;letter-spacing:1px;color:#6d5a3a;font-weight:700
+}
+.call-card{
+  width:100%;height:100%;
+  background:linear-gradient(180deg,#fff8e1,#ffe9a8);
+  border:2px solid var(--brass);
+  border-radius:10px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:6px 4px;
+  cursor:pointer;
+  position:relative;
+  animation:ringShake .35s infinite;
+  touch-action:manipulation;
+  user-select:none;
+}
+.call-card.selected{
+  outline:3px solid #00e5ff;outline-offset:1px;
+  box-shadow:0 0 12px rgba(0,229,255,.6);
+  transform:scale(1.02);
+}
+.call-card.urgent{border-color:var(--red);background:linear-gradient(180deg,#fff0f0,#ffcccc)}
+@keyframes ringShake{
+  0%,100%{transform:rotate(0)}
+  25%{transform:rotate(-1deg)}
+  75%{transform:rotate(1deg)}
+}
+.call-name{font-size:13px;font-weight:900;color:#1a0f08;line-height:1;text-align:center}
+.call-from{font-size:10px;color:#5a3a18;font-weight:700;margin-top:2px}
+.call-timer-bar{
+  position:absolute;bottom:0;left:0;height:6px;background:var(--green);
+  transition:width .1s linear;border-radius:0 0 8px 8px;
+}
+.call-timer-bar.warn{background:var(--red)}
+.call-icon{font-size:18px;margin-bottom:2px}
+.select-hint{
+  position:absolute;top:3px;right:4px;
+  background:#00e5ff;color:#00363a;font-size:8px;font-weight:900;
+  padding:2px 4px;border-radius:4px;letter-spacing:.5px;
+}
+/* Switchboard */
+.board-wrap{
+  flex:1;
+  padding:12px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.board{
+  background:linear-gradient(180deg,#1e1208,#0f0803);
+  border:2px solid #5a3a18;border-radius:16px;
+  padding:12px;
+  box-shadow:inset 0 2px 8px rgba(0,0,0,.6), 0 4px 12px rgba(0,0,0,.4);
+}
+.board-title{
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;
+}
+.board-title h2{font-size:12px;letter-spacing:1.5px;color:var(--brass2)}
+.lines-info{font-size:11px;color:#bfae8a;font-weight:700}
+.sockets{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+}
+.socket{
+  background:linear-gradient(180deg,#2b1a0e,#1a0f08);
+  border:2px solid #6d4c1e;border-radius:14px;
+  padding:8px 6px 10px;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  cursor:pointer;
+  min-height:102px;
+  position:relative;
+  touch-action:manipulation;
+  transition:all .15s;
+}
+.socket:active{transform:scale(.97)}
+.socket.free{border-color:#4a7c2e;background:linear-gradient(180deg,#1e2f12,#14200c)}
+.socket.free .jack{background:radial-gradient(circle at 30% 30%,#7cb342,#2e7d32);box-shadow:0 0 10px rgba(124,179,66,.5), inset 0 2px 4px rgba(255,255,255,.3)}
+.socket.busy{border-color:#8d1a1a;background:linear-gradient(180deg,#2e0f0f,#1a0808);opacity:.95}
+.socket.busy .jack{background:radial-gradient(circle at 30% 30%,#ef5350,#b71c1c);box-shadow:0 0 8px rgba(229,57,53,.6)}
+.socket.selected-target{outline:3px solid var(--brass2);outline-offset:1px}
+.jack{
+  width:44px;height:44px;border-radius:50%;
+  border:3px solid #1a0f08;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;
+  position:relative;
+}
+.jack::after{
+  content:"";position:absolute;inset:8px;border:2px solid rgba(0,0,0,.3);border-radius:50%;
+}
+.socket-label{font-size:11px;font-weight:900;letter-spacing:1px;color:var(--cream)}
+.socket-status{font-size:10px;font-weight:800;letter-spacing:.8px;padding:2px 6px;border-radius:20px}
+.socket.free .socket-status{background:#2e7d32;color:#c8e6c9}
+.socket.busy .socket-status{background:#b71c1c;color:#ffcdd2}
+.busy-bar{
+  position:absolute;bottom:0;left:0;height:4px;background:var(--brass);border-radius:0 0 12px 12px;transition:width .1s linear;
+}
+.connected-flash{
+  position:absolute;inset:0;background:rgba(201,162,39,.25);border-radius:12px;
+  animation:flash .4s ease-out;pointer-events:none;
+}
+@keyframes flash{0%{opacity:1}100%{opacity:0}}
+/* Controls */
+.controls{
+  display:flex;gap:8px;padding:0 12px 12px;
+}
+.btn{
+  flex:1;min-height:48px;border-radius:12px;border:none;
+  font-size:14px;font-weight:900;letter-spacing:.5px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;
+  touch-action:manipulation;
+}
+.btn-primary{background:linear-gradient(180deg,var(--brass2),var(--brass));color:#1a0f08;border:2px solid #8d6e0a;box-shadow:0 3px 0 #6d5205}
+.btn-primary:active{transform:translateY(2px);box-shadow:0 1px 0 #6d5205}
+.btn-ghost{background:#1a0f08;color:var(--cream);border:2px solid #5a3a18}
+.btn:disabled{opacity:.4;pointer-events:none}
+.hint{
+  text-align:center;font-size:12px;color:#bfae8a;font-weight:600;
+  padding:6px 12px;line-height:1.4;min-height:32px;
+}
+.hint strong{color:var(--brass2)}
+/* Overlays */
+.overlay{
+  position:absolute;inset:0;background:rgba(10,5,0,.88);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:20px;z-index:20;text-align:center;
+  backdrop-filter:blur(2px);
+}
+.overlay h2{font-size:26px;color:var(--brass2);text-shadow:0 2px 0 #000;letter-spacing:1px}
+.overlay p{font-size:14px;color:#e8dcc0;line-height:1.5;margin:10px 0 16px;max-width:320px}
+.badge{
+  background:var(--brass);color:#1a0f08;font-weight:900;padding:6px 12px;border-radius:20px;font-size:13px;margin:6px 0;
+}
+.score-big{font-size:42px;font-weight:900;color:#fff;text-shadow:0 2px 0 #000}
+.howto{
+  background:#1a0f08;border:1.5px solid #5a3a18;border-radius:12px;
+  padding:10px 12px;margin:10px 0;text-align:left;width:100%;max-width:340px;
+}
+.howto li{font-size:12px;color:#d7c9a0;margin:4px 0 4px 16px;line-height:1.4}
+.howto li strong{color:var(--brass2)}
+.toast{
+  position:absolute;left:50%;top:46%;transform:translateX(-50%);
+  background:#1a0f08;color:var(--brass2);border:2px solid var(--brass);
+  padding:8px 14px;border-radius:20px;font-weight:900;font-size:13px;
+  box-shadow:0 4px 12px rgba(0,0,0,.5);z-index:15;
+  animation:toastPop .6s ease-out forwards;pointer-events:none;
+}
+@keyframes toastPop{0%{transform:translateX(-50%) scale(.8);opacity:0}15%{transform:translateX(-50%) scale(1.05);opacity:1}85%{opacity:1}100%{transform:translateX(-50%) translateY(-10px);opacity:0}}
+.cord-svg{
+  position:absolute;inset:0;pointer-events:none;z-index:5;
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="header">
+    <div class="brand">
+      <h1>SWITCHBOARD<span>OPERATOR • EST. 1928</span></h1>
+      <div class="level-badge" id="levelBadge">LVL 1</div>
+    </div>
+    <div class="header-stats">
+      <div class="stat"><div class="stat-label">SCORE</div><div class="stat-val" id="scoreEl">0</div></div>
+      <div class="stat"><div class="stat-label">BEST</div><div class="stat-val small" id="bestEl">0</div></div>
+      <div class="stat"><div class="stat-label">LINES FREE</div><div class="stat-val" id="freeEl">6/6</div></div>
+    </div>
+    <div class="lives" id="livesEl"></div>
+  </header>
+
+  <div class="incoming-wrap">
+    <div class="section-title"><i></i> INCOMING CALLS — TAP TO ANSWER</div>
+    <div class="incoming-grid" id="incomingGrid"></div>
+  </div>
+
+  <div class="board-wrap">
+    <div class="board">
+      <div class="board-title">
+        <h2>☎ SWITCHBOARD</h2>
+        <span class="lines-info" id="linesInfo">6 LINES</span>
+      </div>
+      <div class="sockets" id="socketsEl"></div>
+    </div>
+    <div class="hint" id="hintEl">Tap a <strong>yellow ringing call</strong> above, then tap a <strong>green FREE socket</strong> to connect!</div>
+    <div class="controls">
+      <button class="btn btn-ghost" id="pauseBtn">⏸ PAUSE</button>
+      <button class="btn btn-primary" id="startBtn">▶ START SHIFT</button>
+    </div>
+  </div>
+
+  <!-- Start overlay -->
+  <div class="overlay" id="startOverlay">
+    <h2>☎ SWITCHBOARD</h2>
+    <p>You're the night operator. Calls are ringing in — connect them before they hang up!</p>
+    <div class="badge">6 LINES • 3 MISSES = SHIFT OVER</div>
+    <div class="howto">
+      <ol>
+        <li><strong>Tap a ringing call</strong> (yellow card) to pick it up</li>
+        <li><strong>Tap a green FREE socket</strong> to plug it in</li>
+        <li>Lines stay busy ~3 sec — manage them wisely!</li>
+        <li>Each level gets <strong>faster</strong> — how long can you last?</li>
+      </ol>
+    </div>
+    <button class="btn btn-primary" style="width:100%;max-width:340px;margin-top:8px" id="startOverlayBtn">▶ START SHIFT</button>
+    <p style="font-size:11px;color:#8d7d5a;margin-top:8px">Best: <span id="bestOverlay">0</span> • Tip: quick connects = bonus points!</p>
+  </div>
+
+  <!-- Game over overlay -->
+  <div class="overlay" id="gameOverOverlay" style="display:none">
+    <h2>SHIFT OVER</h2>
+    <div class="score-big" id="finalScore">0</div>
+    <p id="finalMsg">The lines went quiet...</p>
+    <div class="badge" id="newBestBadge" style="display:none">🏆 NEW HIGH SCORE!</div>
+    <div style="display:flex;gap:8px;width:100%;max-width:340px;margin-top:10px">
+      <button class="btn btn-ghost" id="shareBtn" style="flex:1">SHARE</button>
+      <button class="btn btn-primary" id="restartBtn" style="flex:2">↻ PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <!-- Pause overlay -->
+  <div class="overlay" id="pauseOverlay" style="display:none">
+    <h2>PAUSED</h2>
+    <p>Take a breath, operator.</p>
+    <button class="btn btn-primary" id="resumeBtn" style="width:100%;max-width:280px">▶ RESUME</button>
+  </div>
+</div>
+
+<script>
+const NAMES = ["Mabel","Walter","Eleanor","Harold","Betty","Frank","Dorothy","Clarence","Lucille","Arthur","Hazel","Earl","Violet","Stanley","Gladys","Raymond","Irene","Howard","Edna","Milton","Pearl","Leonard","Ruth","Floyd","Agnes","Bernard","Lillian","Norman","Ethel","Herbert"];
+const SURNAMES = ["Parker","Whitman","Cole","Hayes","Bennett","Foster","Graham","Sullivan","Reed","Morgan","Bell","Cooper","Ward","Murphy","Price","Kelly","Ross","Cox","Hughes","Long"];
+const CALL_ICONS = ["☎","📞","☎","📞","☎"];
+
+let score=0, highScore=0, level=1, lives=3;
+let incoming=[null,null,null]; // 3 slots
+let lines=[]; // 6 lines
+let selectedCallIndex=null;
+let gameState='idle'; // idle, playing, paused, over
+let spawnTimer=null, tickTimer=null;
+let spawnInterval=2400, ringTime=4200, busyTime=3000;
+
+const els={
+  score:document.getElementById('scoreEl'),
+  best:document.getElementById('bestEl'),
+  bestOverlay:document.getElementById('bestOverlay'),
+  free:document.getElementById('freeEl'),
+  level:document.getElementById('levelBadge'),
+  lives:document.getElementById('livesEl'),
+  incoming:document.getElementById('incomingGrid'),
+  sockets:document.getElementById('socketsEl'),
+  hint:document.getElementById('hintEl'),
+  linesInfo:document.getElementById('linesInfo'),
+  startOverlay:document.getElementById('startOverlay'),
+  gameOver:document.getElementById('gameOverOverlay'),
+  pauseOverlay:document.getElementById('pauseOverlay'),
+  finalScore:document.getElementById('finalScore'),
+  finalMsg:document.getElementById('finalMsg'),
+  newBest:document.getElementById('newBestBadge'),
+  startBtn:document.getElementById('startBtn'),
+  pauseBtn:document.getElementById('pauseBtn'),
+};
+
+function loadHigh(){
+  try{ highScore=parseInt(localStorage.getItem('switchboardHighScore')||'0',10)||0; }catch(e){highScore=0}
+  els.best.textContent=highScore;
+  els.bestOverlay.textContent=highScore;
+}
+function saveHigh(){
+  try{ localStorage.setItem('switchboardHighScore', String(highScore)); }catch(e){}
+}
+
+function initLines(){
+  lines=Array.from({length:6},(_,i)=>({id:i, busyUntil:0, caller:null}));
+}
+function freeCount(){ return lines.filter(l=>Date.now()>=l.busyUntil).length; }
+
+function renderLives(){
+  els.lives.innerHTML='';
+  for(let i=0;i<3;i++){
+    const s=document.createElement('span');
+    s.className='heart'+(i<lives?'':' lost');
+    s.textContent='❤';
+    els.lives.appendChild(s);
+  }
+}
+function renderStats(){
+  els.score.textContent=score;
+  els.best.textContent=highScore;
+  els.level.textContent='LVL '+level;
+  els.free.textContent=freeCount()+'/6';
+  els.linesInfo.textContent=freeCount()+' FREE • '+(6-freeCount())+' BUSY';
+}
+
+function randomName(){
+  return NAMES[Math.floor(Math.random()*NAMES.length)]+' '+SURNAMES[Math.floor(Math.random()*SURNAMES.length)].charAt(0)+'.';
+}
+
+function renderIncoming(){
+  els.incoming.innerHTML='';
+  incoming.forEach((call,idx)=>{
+    const slot=document.createElement('div');
+    slot.className='call-slot'+(call?'':' empty');
+    if(call){
+      const card=document.createElement('button');
+      card.className='call-card'+(selectedCallIndex===idx?' selected':'')+(call.remaining<1200?' urgent':'');
+      card.style.minHeight='76px';
+      card.setAttribute('aria-label','Call from '+call.name);
+      const pct=Math.max(0, call.remaining/call.total*100);
+      card.innerHTML=`
+        <div class="call-icon">${call.icon}</div>
+        <div class="call-name">${call.name}</div>
+        <div class="call-from">LINE ${call.lineNum}</div>
+        <div class="call-timer-bar ${call.remaining<1200?'warn':''}" style="width:${pct}%"></div>
+        ${selectedCallIndex===idx?'<span class="select-hint">READY</span>':''}
+      `;
+      card.onclick=()=>selectCall(idx);
+      slot.appendChild(card);
+    }
+    els.incoming.appendChild(slot);
+  });
+}
+
+function renderSockets(){
+  els.sockets.innerHTML='';
+  const now=Date.now();
+  lines.forEach((line,idx)=>{
+    const isBusy=now < line.busyUntil;
+    const remaining=isBusy? line.busyUntil-now : 0;
+    const pct=isBusy? (remaining/busyTime*100):0;
+    const div=document.createElement('button');
+    div.className='socket '+(isBusy?'busy':'free');
+    div.setAttribute('aria-label','Line '+(idx+1)+' '+(isBusy?'busy':'free'));
+    div.innerHTML=`
+      <div class="jack">${isBusy?'●':'○'}</div>
+      <div class="socket-label">LINE ${idx+1}</div>
+      <div class="socket-status">${isBusy?'BUSY':'FREE'}</div>
+      ${isBusy?`<div class="busy-bar" style="width:${pct}%"></div>`:''}
+      ${isBusy && line.caller?`<div style="font-size:10px;color:#d7c9a0;font-weight:700;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${line.caller}</div>`:''}
+    `;
+    div.onclick=()=>tapSocket(idx);
+    els.sockets.appendChild(div);
+  });
+}
+
+function selectCall(idx){
+  if(gameState!=='playing') return;
+  const call=incoming[idx];
+  if(!call) return;
+  if(selectedCallIndex===idx){
+    selectedCallIndex=null;
+    els.hint.innerHTML='Selection cleared. Tap a <strong>ringing call</strong> again.';
+  } else {
+    selectedCallIndex=idx;
+    els.hint.innerHTML=`Picked up <strong>${call.name}</strong> — now tap a <strong>green FREE socket</strong>!`;
+    vibrate(30);
+  }
+  renderIncoming();
+}
+
+function tapSocket(idx){
+  if(gameState!=='playing') return;
+  const now=Date.now();
+  const line=lines[idx];
+  if(now < line.busyUntil){
+    toast('Line busy!');
+    vibrate(60);
+    return;
+  }
+  if(selectedCallIndex===null){
+    // if no call selected, try auto-pick the most urgent ringing call
+    let urgentIdx=incoming.findIndex(c=>c);
+    if(urgentIdx!==-1){
+      // find most urgent (lowest remaining)
+      let best=urgentIdx, bestRem=incoming[urgentIdx].remaining;
+      incoming.forEach((c,i)=>{ if(c && c.remaining<bestRem){best=i;bestRem=c.remaining} });
+      selectedCallIndex=best;
+      // proceed to connect
+    } else {
+      toast('No call selected');
+      return;
+    }
+  }
+  const call=incoming[selectedCallIndex];
+  if(!call){ selectedCallIndex=null; renderIncoming(); return; }
+
+  // connect!
+  const bonus=Math.floor(call.remaining/200); // up to ~20
+  const points=100 + bonus + (level-1)*10;
+  score+=points;
+  if(score>highScore){ highScore=score; saveHigh(); }
+
+  // occupy line
+  line.busyUntil=now+busyTime;
+  line.caller=call.name;
+
+  // clear call slot
+  incoming[selectedCallIndex]=null;
+  selectedCallIndex=null;
+
+  // level up check
+  const newLevel=Math.min(10, Math.floor(score/600)+1);
+  if(newLevel!==level){
+    level=newLevel;
+    updateDifficulty();
+    toast('★ LEVEL '+level+' — FASTER!');
+  }
+
+  renderStats(); renderIncoming(); renderSockets();
+  showPoints(points, idx);
+  els.hint.innerHTML=`Connected! <strong>+${points}</strong> — keep going!`;
+  vibrate(40);
+
+  // flash effect
+  const sockEls=document.querySelectorAll('.socket');
+  if(sockEls[idx]){
+    const f=document.createElement('div');
+    f.className='connected-flash';
+    sockEls[idx].appendChild(f);
+    setTimeout(()=>f.remove(),400);
+  }
+}
+
+function showPoints(pts, socketIdx){
+  const t=document.createElement('div');
+  t.className='toast';
+  t.textContent='+'+pts;
+  document.getElementById('app').appendChild(t);
+  setTimeout(()=>t.remove(),700);
+}
+function toast(msg){
+  const t=document.createElement('div');
+  t.className='toast';
+  t.textContent=msg;
+  document.getElementById('app').appendChild(t);
+  setTimeout(()=>t.remove(),800);
+}
+function vibrate(ms){ try{ navigator.vibrate&&navigator.vibrate(ms); }catch(e){} }
+
+function spawnCall(){
+  if(gameState!=='playing') return;
+  const emptyIdx=incoming.findIndex(c=>!c);
+  if(emptyIdx===-1) return; // all slots full, caller gets busy signal (miss not counted until timeout)
+  const name=randomName();
+  incoming[emptyIdx]={
+    name, icon:CALL_ICONS[Math.floor(Math.random()*CALL_ICONS.length)],
+    lineNum: Math.floor(Math.random()*90)+10,
+    remaining:ringTime, total:ringTime,
+    created:Date.now()
+  };
+  renderIncoming();
+  vibrate(20);
+}
+
+function tick(){
+  if(gameState!=='playing') return;
+  let changed=false;
+  const now=Date.now();
+  incoming.forEach((call,idx)=>{
+    if(call){
+      call.remaining-=100;
+      if(call.remaining<=0){
+        // missed
+        incoming[idx]=null;
+        lives--;
+        changed=true;
+        toast('Missed call!');
+        vibrate([60,40,60]);
+        renderLives();
+        if(lives<=0){
+          gameOver();
+          return;
+        } else {
+          els.hint.innerHTML=`<strong>Missed!</strong> ${lives} ${lives===1?'chance':'chances'} left — stay sharp!`;
+        }
+      }
+    }
+  });
+  renderIncoming();
+  renderSockets();
+  renderStats();
+}
+
+function updateDifficulty(){
+  // level 1: 2400ms spawn, 4200 ring, 3000 busy
+  // level 10: 700ms spawn, 1500 ring, 2100 busy
+  spawnInterval=Math.max(700, 2400 - (level-1)*220);
+  ringTime=Math.max(1500, 4200 - (level-1)*320);
+  busyTime=Math.max(1800, 3000 - (level-1)*120);
+  // restart spawn timer with new interval
+  if(spawnTimer){ clearInterval(spawnTimer); spawnTimer=setInterval(spawnCall, spawnInterval); }
+  renderStats();
+}
+
+function startGame(){
+  score=0; level=1; lives=3; selectedCallIndex=null;
+  incoming=[null,null,null];
+  initLines();
+  updateDifficulty();
+  gameState='playing';
+  els.startOverlay.style.display='none';
+  els.gameOver.style.display='none';
+  els.pauseOverlay.style.display='none';
+  els.startBtn.textContent='↻ RESTART';
+  els.pauseBtn.disabled=false;
+  renderLives(); renderStats(); renderIncoming(); renderSockets();
+  els.hint.innerHTML='Shift started! Tap a <strong>yellow call</strong> then a <strong>green socket</strong>.';
+  if(spawnTimer) clearInterval(spawnTimer);
+  if(tickTimer) clearInterval(tickTimer);
+  spawnTimer=setInterval(spawnCall, spawnInterval);
+  tickTimer=setInterval(tick, 100);
+  // initial calls
+  setTimeout(spawnCall, 400);
+  setTimeout(spawnCall, 900);
+}
+
+function gameOver(){
+  gameState='over';
+  clearInterval(spawnTimer); clearInterval(tickTimer);
+  spawnTimer=tickTimer=null;
+  const isNewBest=score>=highScore && score>0;
+  els.finalScore.textContent=score;
+  let msg='';
+  if(score>=2000) msg='Outstanding, operator! The chief is impressed.';
+  else if(score>=1200) msg='Solid shift! You kept the town talking.';
+  else if(score>=600) msg='Not bad — the switchboard got the better of you.';
+  else msg='The lines went quiet... better luck next shift.';
+  els.finalMsg.textContent=msg;
+  els.newBest.style.display=isNewBest && score>0 ? 'block':'none';
+  els.gameOver.style.display='flex';
+  els.pauseBtn.disabled=true;
+  renderStats();
+}
+
+function togglePause(){
+  if(gameState==='playing'){
+    gameState='paused';
+    clearInterval(spawnTimer); clearInterval(tickTimer);
+    spawnTimer=tickTimer=null;
+    els.pauseOverlay.style.display='flex';
+    els.pauseBtn.textContent='▶ RESUME';
+  } else if(gameState==='paused'){
+    resume();
+  }
+}
+function resume(){
+  if(gameState!=='paused') return;
+  gameState='playing';
+  els.pauseOverlay.style.display='none';
+  els.pauseBtn.textContent='⏸ PAUSE';
+  spawnTimer=setInterval(spawnCall, spawnInterval);
+  tickTimer=setInterval(tick, 100);
+}
+
+// events
+document.getElementById('startOverlayBtn').onclick=startGame;
+els.startBtn.onclick=startGame;
+els.pauseBtn.onclick=togglePause;
+document.getElementById('resumeBtn').onclick=resume;
+document.getElementById('restartBtn').onclick=startGame;
+document.getElementById('shareBtn').onclick=()=>{
+  const text=`I scored ${score} on Switchboard Operator! Can you beat it?`;
+  if(navigator.share){ navigator.share({title:'Switchboard Operator', text}).catch(()=>{}); }
+  else if(navigator.clipboard){ navigator.clipboard.writeText(text); toast('Score copied!'); }
+};
+
+loadHigh();
+initLines();
+renderLives(); renderStats(); renderIncoming(); renderSockets();
+els.pauseBtn.disabled=true;
+
+// keyboard for desktop testing
+document.addEventListener('keydown',e=>{
+  if(e.key===' '){ e.preventDefault(); if(gameState==='idle'||gameState==='over') startGame(); else togglePause(); }
+  if(e.key>='1' && e.key<='3'){ const idx=parseInt(e.key)-1; if(incoming[idx]) selectCall(idx); }
+  if(e.key>='4' && e.key<='9'){ const idx=parseInt(e.key)-4; tapSocket(idx); }
+});
+</script>
+</body>
+</html>

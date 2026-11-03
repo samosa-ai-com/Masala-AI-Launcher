@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Shuttle Rally</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  background:#c8e6c9;
+  display:flex;justify-content:center;
+  color:#1b3a1f;
+  -webkit-tap-highlight-color:transparent;
+}
+#app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  background:#f1f8e9;
+  min-height:100vh;
+  display:flex;flex-direction:column;
+  box-shadow:0 8px 32px rgba(0,0,0,.15);
+  position:relative;
+}
+header{
+  background:linear-gradient(180deg,#2e7d32,#1b5e20);
+  color:#fff;
+  padding:10px 14px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:8px;
+}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{
+  width:36px;height:36px;border-radius:10px;
+  background:#fff;color:#2e7d32;display:grid;place-items:center;
+  font-size:20px;font-weight:900;flex-shrink:0;
+  box-shadow:0 2px 8px rgba(0,0,0,.2)
+}
+.brand h1{font-size:16px;line-height:1.1;letter-spacing:.2px}
+.brand p{font-size:11px;opacity:.9;font-weight:600;letter-spacing:.4px}
+.scores{display:flex;gap:8px;align-items:center}
+.pill{
+  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);
+  border-radius:999px;padding:6px 10px;min-width:64px;text-align:center;
+  backdrop-filter:blur(6px)
+}
+.pill b{display:block;font-size:16px;line-height:1}
+.pill span{font-size:10px;letter-spacing:.6px;opacity:.95;font-weight:700}
+.topbar{
+  background:#fff;
+  border-bottom:2px solid #aed581;
+  padding:8px 12px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.rallyBox{
+  display:flex;align-items:center;gap:8px;
+  font-weight:800;
+}
+.rallyNum{
+  background:#ffeb3b;border:2px solid #f9a825;
+  border-radius:12px;padding:4px 10px;min-width:56px;text-align:center;
+  font-size:18px;line-height:1;box-shadow:0 2px 0 #f9a825;
+}
+.rallyLabel{font-size:12px;letter-spacing:.5px;color:#33691e}
+.hint{font-size:11px;color:#558b2f;font-weight:600}
+.btn{
+  appearance:none;border:none;cursor:pointer;
+  border-radius:12px;font-weight:800;letter-spacing:.3px;
+  min-height:48px;min-width:48px;padding:0 16px;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  touch-action:manipulation;user-select:none;
+  transition:transform .08s,filter .15s;
+}
+.btn:active{transform:scale(.97)}
+.btnPrimary{
+  background:linear-gradient(180deg,#43a047,#2e7d32);
+  color:#fff;box-shadow:0 3px 0 #1b5e20,0 6px 16px rgba(46,125,50,.3);
+  border:1px solid #2e7d32;
+}
+.btnGhost{
+  background:#fff;color:#2e7d32;border:2px solid #aed581;
+  box-shadow:0 2px 0 #aed581;
+}
+.canvasWrap{
+  position:relative;
+  background:#81c784;
+  padding:8px 8px 10px;
+  flex:1;
+  display:flex;flex-direction:column;
+}
+.courtFrame{
+  background:#fff;
+  border-radius:18px;
+  padding:8px;
+  box-shadow:0 4px 16px rgba(0,0,0,.12), inset 0 0 0 2px #c5e1a5;
+  flex:1;
+  display:flex;flex-direction:column;
+}
+#gameCanvas{
+  width:100%;
+  height:auto;
+  display:block;
+  border-radius:14px;
+  background:#a5d6a7;
+  touch-action:none;
+  box-shadow:inset 0 0 0 2px #7cb342;
+}
+.controls{
+  display:flex;gap:8px;margin-top:8px;
+}
+.ctrlBtn{
+  flex:1;
+  background:#fff;
+  border:2px solid #aed581;
+  border-radius:14px;
+  min-height:48px;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  font-weight:800;font-size:13px;color:#33691e;
+  box-shadow:0 2px 0 #aed581;
+  user-select:none;touch-action:none;
+}
+.ctrlBtn:active{background:#f1f8e9}
+.dragHint{
+  margin-top:8px;
+  background:linear-gradient(180deg,#fff,#f1f8e9);
+  border:1px solid #c5e1a5;
+  border-radius:12px;
+  padding:8px 10px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  font-size:12px;font-weight:700;color:#33691e;
+}
+.dragHint b{color:#1b5e20}
+.dot{width:8px;height:8px;border-radius:50%;background:#43a047;box-shadow:0 0 0 4px rgba(67,160,71,.2);animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
+.overlay{
+  position:absolute;inset:8px;
+  background:rgba(241,248,233,.92);
+  backdrop-filter:blur(4px);
+  border-radius:14px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:18px;
+  border:2px dashed #aed581;
+}
+.overlay h2{font-size:22px;color:#1b5e20;margin-bottom:6px}
+.overlay p{font-size:13px;line-height:1.4;color:#33691e;max-width:300px}
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:#2e7d32;color:#fff;border-radius:999px;
+  padding:6px 12px;font-size:12px;font-weight:800;letter-spacing:.4px;
+  margin-bottom:10px;
+}
+.statsRow{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap;justify-content:center}
+.stat{
+  background:#fff;border:2px solid #c5e1a5;border-radius:12px;
+  padding:8px 12px;min-width:84px;text-align:center;box-shadow:0 2px 0 #c5e1a5;
+}
+.stat b{display:block;font-size:18px;color:#1b5e20}
+.stat span{font-size:10px;letter-spacing:.6px;color:#558b2f;font-weight:800}
+.footer{
+  padding:8px 12px 14px;
+  background:#fff;
+  border-top:2px solid #c5e1a5;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  font-size:11px;color:#689f38;font-weight:700;
+}
+.footer .mini{opacity:.8}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <div class="logo">🏸</div>
+      <div>
+        <h1>SHUTTLE RALLY</h1>
+        <p>BRIGHT COURT • FLUTTER PHYSICS</p>
+      </div>
+    </div>
+    <div class="scores">
+      <div class="pill"><b id="bestEl">0</b><span>BEST</span></div>
+      <div class="pill"><b id="scoreEl">0</b><span>HITS</span></div>
+    </div>
+  </header>
+
+  <div class="topbar">
+    <div class="rallyBox">
+      <div class="rallyNum" id="rallyEl">0</div>
+      <div>
+        <div class="rallyLabel">RALLY</div>
+        <div class="hint" id="statusEl">Slide racket to play</div>
+      </div>
+    </div>
+    <button class="btn btnPrimary" id="restartBtn" aria-label="Restart game">↻ RESTART</button>
+  </div>
+
+  <div class="canvasWrap">
+    <div class="courtFrame">
+      <canvas id="gameCanvas" width="360" height="560" aria-label="Badminton court"></canvas>
+      <div class="controls">
+        <div class="ctrlBtn" id="leftBtn">◀ SLIDE</div>
+        <div class="ctrlBtn" id="rightBtn">SLIDE ▶</div>
+      </div>
+      <div class="dragHint">
+        <span style="display:flex;align-items:center;gap:8px"><span class="dot"></span> <b>DRAG</b> on court to move racket</span>
+        <span>48px+ touch targets ✓</span>
+      </div>
+    </div>
+
+    <!-- Start overlay -->
+    <div class="overlay" id="startOverlay">
+      <div class="badge">🏸 BREEZY 2D RALLY</div>
+      <h2>Keep the Rally Alive!</h2>
+      <p>Slide your green racket at the bottom to return the fluttering shuttlecock over the net. The computer tracks you — how long can you rally?</p>
+      <div class="statsRow">
+        <div class="stat"><b>DRAG</b><span>MOVE RACKET</span></div>
+        <div class="stat"><b>TAP</b><span>SMASH HIT</span></div>
+        <div class="stat"><b>∞</b><span>FLUTTER ARC</span></div>
+      </div>
+      <button class="btn btnPrimary" id="playBtn" style="min-width:200px;font-size:16px">▶ TAP TO SERVE</button>
+      <p style="margin-top:10px;font-size:11px;opacity:.8">Tip: Hit with racket edges for angled shots!</p>
+    </div>
+
+    <!-- Game over overlay -->
+    <div class="overlay" id="overOverlay" style="display:none">
+      <div class="badge" style="background:#e65100">💥 RALLY ENDED</div>
+      <h2 id="overTitle">Nice Rally!</h2>
+      <p id="overDesc">You kept it going!</p>
+      <div class="statsRow">
+        <div class="stat"><b id="overRally">0</b><span>RALLY HITS</span></div>
+        <div class="stat"><b id="overBest">0</b><span>BEST</span></div>
+        <div class="stat"><b id="overTotal">0</b><span>TOTAL HITS</span></div>
+      </div>
+      <button class="btn btnPrimary" id="againBtn" style="min-width:200px">↻ PLAY AGAIN</button>
+      <button class="btn btnGhost" id="closeOverBtn" style="margin-top:8px;min-width:200px">CONTINUE</button>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>🎯 Score = sustained hits • Net needs height to clear</span>
+    <span class="mini">Offline • 360-428px</span>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const rallyEl = document.getElementById('rallyEl');
+  const scoreEl = document.getElementById('scoreEl');
+  const bestEl = document.getElementById('bestEl');
+  const statusEl = document.getElementById('statusEl');
+  const startOverlay = document.getElementById('startOverlay');
+  const overOverlay = document.getElementById('overOverlay');
+  const overRally = document.getElementById('overRally');
+  const overBest = document.getElementById('overBest');
+  const overTotal = document.getElementById('overTotal');
+  const overTitle = document.getElementById('overTitle');
+  const overDesc = document.getElementById('overDesc');
+
+  const W = 360, H = 560;
+  const NET_Y = 280;
+  const PLAYER_Y = 500;
+  const COMP_Y = 62;
+
+  let playerX = 180, playerVX = 0, playerTargetX = 180;
+  let compX = 180, compVX = 0;
+  let shuttle = {x:180, y:320, vx:0, vy:0, rot:0};
+  let rally = 0, totalHits = 0, best = parseInt(localStorage.getItem('shuttleBest')||'0',10);
+  let isPlaying = false, gameOver = false;
+  let t = 0;
+  let lastHitBy = null;
+  let particles = [];
+  let netShake = 0;
+
+  bestEl.textContent = best;
+
+  function resetRound(serveToPlayer=true){
+    playerX = 180; playerTargetX = 180; playerVX = 0;
+    compX = 180; compVX = 0;
+    shuttle.x = 180;
+    shuttle.y = serveToPlayer ? 180 : 380;
+    shuttle.vx = (Math.random()-0.5)*2.5;
+    shuttle.vy = serveToPlayer ? 3.2 : -3.2;
+    shuttle.rot = 0;
+    netShake = 0;
+  }
+  resetRound(true);
+
+  function startGame(){
+    rally = 0;
+    isPlaying = true;
+    gameOver = false;
+    startOverlay.style.display='none';
+    overOverlay.style.display='none';
+    resetRound(true);
+    statusEl.textContent = 'Rally on! Keep it up';
+    updateHUD();
+  }
+  function endRally(reason){
+    isPlaying = false;
+    gameOver = true;
+    best = Math.max(best, rally);
+    localStorage.setItem('shuttleBest', best);
+    bestEl.textContent = best;
+    overRally.textContent = rally;
+    overBest.textContent = best;
+    overTotal.textContent = totalHits;
+    if(rally >= 20){
+      overTitle.textContent = '🔥 UNSTOPPABLE!';
+      overDesc.textContent = 'Incredible control! The shuttlecock barely touched the ground.';
+    } else if(rally >= 12){
+      overTitle.textContent = '⭐ GREAT RALLY!';
+      overDesc.textContent = 'Smooth slides and perfect timing!';
+    } else if(rally >= 6){
+      overTitle.textContent = 'Nice Rally!';
+      overDesc.textContent = 'You’re getting the flutter timing down.';
+    } else {
+      overTitle.textContent = 'Keep Going!';
+      overDesc.textContent = reason === 'net' ? 'Caught by the net — hit higher to clear it!' : 'Stay under the shuttle and slide to meet it.';
+    }
+    overOverlay.style.display='flex';
+    statusEl.textContent = 'Tap Play Again';
+    if(navigator.vibrate) navigator.vibrate([30,40,30]);
+  }
+
+  function updateHUD(){
+    rallyEl.textContent = rally;
+    scoreEl.textContent = totalHits;
+    bestEl.textContent = best;
+  }
+
+  // Input handling
+  let isDragging = false;
+  function canvasPos(e){
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const scaleY = H / rect.height;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    };
+  }
+  function setPlayerFromEvent(e){
+    const p = canvasPos(e);
+    playerTargetX = Math.max(38, Math.min(322, p.x));
+    // allow slight vertical influence if dragging low half
+    if(p.y > 360){
+      // tap to smash: if shuttle near player, add extra power on next hit
+      if(isPlaying && Math.abs(shuttle.x - playerX) < 60 && shuttle.y > PLAYER_Y - 60 && shuttle.vy > 0){
+        // immediate hit boost
+        shuttle.vy = -8 - Math.random()*1.5;
+        shuttle.vx += (shuttle.x - playerX)*0.22;
+        rally++; totalHits++; lastHitBy='player';
+        updateHUD();
+        spawnParticles(shuttle.x, shuttle.y, '#fff59d');
+        if(navigator.vibrate) navigator.vibrate(15);
+      }
+    }
+  }
+  canvas.addEventListener('pointerdown', (e)=>{
+    e.preventDefault();
+    isDragging = true;
+    canvas.setPointerCapture(e.pointerId);
+    if(!isPlaying && !gameOver){
+      startGame();
+    }
+    setPlayerFromEvent(e);
+  });
+  canvas.addEventListener('pointermove', (e)=>{
+    if(!isDragging) return;
+    e.preventDefault();
+    setPlayerFromEvent(e);
+  });
+  canvas.addEventListener('pointerup', (e)=>{
+    isDragging = false;
+  });
+  canvas.addEventListener('pointercancel', ()=> isDragging=false);
+
+  // Touch buttons for slide
+  const leftBtn = document.getElementById('leftBtn');
+  const rightBtn = document.getElementById('rightBtn');
+  let holdDir = 0;
+  function bindHold(btn, dir){
+    const start = (e)=>{ e.preventDefault(); holdDir = dir; };
+    const end = ()=>{ holdDir = 0; };
+    btn.addEventListener('pointerdown', start);
+    btn.addEventListener('pointerup', end);
+    btn.addEventListener('pointerleave', end);
+    btn.addEventListener('pointercancel', end);
+    btn.addEventListener('touchstart', start, {passive:false});
+    btn.addEventListener('touchend', end);
+  }
+  bindHold(leftBtn, -1);
+  bindHold(rightBtn, 1);
+
+  document.getElementById('playBtn').addEventListener('click', startGame);
+  document.getElementById('againBtn').addEventListener('click', startGame);
+  document.getElementById('closeOverBtn').addEventListener('click', ()=>{
+    overOverlay.style.display='none';
+    startOverlay.style.display='flex';
+    statusEl.textContent='Ready to serve';
+  });
+  document.getElementById('restartBtn').addEventListener('click', ()=>{
+    totalHits = 0;
+    startGame();
+  });
+
+  // Keyboard
+  window.addEventListener('keydown', (e)=>{
+    if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A') playerTargetX = Math.max(38, playerTargetX - 18);
+    if(e.key==='ArrowRight' || e.key==='d' || e.key==='D') playerTargetX = Math.min(322, playerTargetX + 18);
+    if(e.key===' '){
+      e.preventDefault();
+      if(!isPlaying) startGame();
+      else {
+        // smash
+        if(Math.abs(shuttle.x - playerX) < 70 && shuttle.y > PLAYER_Y - 70){
+          shuttle.vy = -9;
+          shuttle.vx += (Math.random()-0.5)*2;
+          rally++; totalHits++; updateHUD();
+        }
+      }
+    }
+    if(e.key==='r' || e.key==='R') startGame();
+  });
+
+  function spawnParticles(x,y,color){
+    for(let i=0;i<6;i++){
+      particles.push({x,y, vx:(Math.random()-0.5)*4, vy:(Math.random()-0.5)*4, life:1, color});
+    }
+  }
+
+  function update(){
+    t++;
+    // hold buttons
+    if(holdDir!==0){
+      playerTargetX = Math.max(38, Math.min(322, playerTargetX + holdDir*5));
+    }
+    // smooth player
+    const prevPX = playerX;
+    playerX += (playerTargetX - playerX) * 0.28;
+    playerVX = playerX - prevPX;
+
+    // AI
+    if(isPlaying){
+      // predict shuttle x a bit ahead
+      let predictX = shuttle.x + shuttle.vx * 14;
+      // add imperfection based on rally
+      let error = (Math.sin(t*0.03 + rally)*12) * Math.min(1, rally/15);
+      if(rally > 10) error += (Math.random()-0.5)*10;
+      let target = predictX + error;
+      target = Math.max(38, Math.min(322, target));
+      // speed limit increases slightly with rally
+      let speed = 3.2 + Math.min(2.5, rally*0.12);
+      // reaction delay when shuttle moving away
+      if(shuttle.vy > 0) speed *= 0.55;
+      let dx = target - compX;
+      compVX = Math.max(-speed, Math.min(speed, dx*0.09));
+      compX += compVX;
+    } else {
+      // idle drift
+      compX += Math.sin(t*0.02)*0.4;
+    }
+
+    if(!isPlaying){
+      // still update particles and net shake decay
+      netShake *= 0.92;
+      return;
+    }
+
+    // Shuttle physics
+    shuttle.vy += 0.19; // gravity
+    // air drag
+    shuttle.vx *= 0.994;
+    shuttle.vy *= 0.994;
+    // flutter wobble
+    shuttle.vx += Math.sin(t*0.07)*0.035 + Math.cos(t*0.11)*0.02;
+    shuttle.vy += Math.cos(t*0.06)*0.015;
+    shuttle.rot += shuttle.vx * 0.04;
+
+    shuttle.x += shuttle.vx;
+    shuttle.y += shuttle.vy;
+
+    // Wall bounce
+    if(shuttle.x < 14){
+      shuttle.x = 14; shuttle.vx *= -0.78;
+      spawnParticles(shuttle.x, shuttle.y, '#aed581');
+    }
+    if(shuttle.x > 346){
+      shuttle.x = 346; shuttle.vx *= -0.78;
+      spawnParticles(shuttle.x, shuttle.y, '#aed581');
+    }
+
+    // Net collision - horizontal net at NET_Y
+    if(shuttle.x > 18 && shuttle.x < 342){
+      // net is 6px thick
+      if(shuttle.y > NET_Y - 4 && shuttle.y < NET_Y + 6){
+        // need enough vertical speed to clear
+        let speed = Math.abs(shuttle.vy);
+        // if moving slowly near net, it catches
+        if(speed < 2.8){
+          // hit net
+          shuttle.y = NET_Y - 6;
+          shuttle.vy = -shuttle.vy * 0.25 - 0.8;
+          shuttle.vx *= 0.6;
+          netShake = 8;
+          spawnParticles(shuttle.x, NET_Y, '#fff');
+          if(navigator.vibrate) navigator.vibrate(25);
+          // if shuttle gets stuck on net twice, end rally
+          if(Math.abs(shuttle.vy) < 1.2){
+            // let it fall, but if it stays, count as net fault after a moment
+            // we don't instant end, let gravity drop it
+          }
+        } else {
+          // clears net, add slight lift
+          netShake = 2;
+        }
+      }
+    }
+    netShake *= 0.88;
+
+    // Racket collisions
+    // Player racket: at PLAYER_Y, width 84, height 18
+    if(shuttle.vy > 0 && shuttle.y > PLAYER_Y - 22 && shuttle.y < PLAYER_Y + 14){
+      if(Math.abs(shuttle.x - playerX) < 44){
+        // hit!
+        let offset = (shuttle.x - playerX) / 44; // -1 to 1
+        shuttle.y = PLAYER_Y - 24;
+        // power based on offset and player movement
+        let power = 6.5 + Math.abs(offset)*1.5 + Math.abs(playerVX)*0.7;
+        shuttle.vy = -power - Math.random()*0.8;
+        shuttle.vx = shuttle.vx*0.5 + offset*4.5 + playerVX*0.9;
+        // clamp vx
+        shuttle.vx = Math.max(-7, Math.min(7, shuttle.vx));
+        rally++; totalHits++; lastHitBy='player';
+        updateHUD();
+        spawnParticles(shuttle.x, shuttle.y, '#ffeb3b');
+        statusEl.textContent = rally>1 ? `Rally x${rally} — keep going!` : 'Nice return!';
+        if(navigator.vibrate) navigator.vibrate(18);
+      }
+    }
+    // Computer racket
+    if(shuttle.vy < 0 && shuttle.y < COMP_Y + 22 && shuttle.y > COMP_Y - 14){
+      if(Math.abs(shuttle.x - compX) < 44){
+        let offset = (shuttle.x - compX)/44;
+        shuttle.y = COMP_Y + 24;
+        let power = 5.8 + Math.random()*1.2;
+        // computer occasionally mis-hits when rally high
+        if(rally>14 && Math.random()<0.08){
+          power *= 0.6;
+          shuttle.vx += (Math.random()-0.5)*6;
+        } else {
+          shuttle.vx = shuttle.vx*0.4 + offset*3.2 + compVX*0.5;
+        }
+        shuttle.vy = power;
+        shuttle.vx = Math.max(-6.5, Math.min(6.5, shuttle.vx));
+        rally++; totalHits++; lastHitBy='comp';
+        updateHUD();
+        spawnParticles(shuttle.x, shuttle.y, '#90caf9');
+        statusEl.textContent = `Rally x${rally}`;
+      }
+    }
+
+    // Ground / out of bounds
+    if(shuttle.y > H - 8){
+      // player side ground
+      if(lastHitBy==='player'){
+        // shouldn't happen because player just hit, but if it falls after hit, it's still player miss
+      }
+      endRally('ground');
+      spawnParticles(shuttle.x, H-12, '#ff8a65');
+    }
+    if(shuttle.y < 6){
+      // computer side ground - computer missed, player gets point but rally continues? For sustained hits, we treat as bonus and reset
+      // To keep "sustained hits" meaning, we give bonus and serve again
+      rally += 1;
+      totalHits += 1;
+      updateHUD();
+      spawnParticles(shuttle.x, 12, '#a5d6a7');
+      // reset shuttle to middle with serve to player
+      shuttle.x = 180 + (Math.random()-0.5)*40;
+      shuttle.y = 120;
+      shuttle.vx = (Math.random()-0.5)*3;
+      shuttle.vy = 3.5;
+      statusEl.textContent = 'Computer missed! Bonus hit';
+      if(navigator.vibrate) navigator.vibrate(20);
+    }
+
+    // particles
+    for(let i=particles.length-1;i>=0;i--){
+      let p = particles[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life -= 0.06;
+      if(p.life<=0) particles.splice(i,1);
+    }
+  }
+
+  function drawCourt(){
+    // base
+    ctx.fillStyle = '#a5d6a7';
+    ctx.fillRect(0,0,W,H);
+    // court zones
+    ctx.fillStyle = '#81c784';
+    ctx.fillRect(8,8,W-16,H-16);
+    // inner court lines
+    ctx.strokeStyle = 'rgba(255,255,255,.95)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(14,14,W-28,H-28);
+    // center service line (vertical)
+    ctx.beginPath();
+    ctx.moveTo(W/2,14); ctx.lineTo(W/2, H-14);
+    ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=1.5; ctx.stroke();
+    // net zone shading
+    ctx.fillStyle = 'rgba(255,255,255,.18)';
+    ctx.fillRect(14, NET_Y-10, W-28, 20);
+    // net
+    ctx.save();
+    ctx.translate(0, NET_Y + (Math.random()-0.5)*netShake*0.3);
+    // posts
+    ctx.fillStyle='#5d4037';
+    ctx.fillRect(10, -14, 6, 28);
+    ctx.fillRect(W-16, -14, 6, 28);
+    // net mesh
+    ctx.strokeStyle='#fff';
+    ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(16,0); ctx.lineTo(W-16,0); ctx.stroke();
+    // vertical mesh
+    ctx.strokeStyle='rgba(255,255,255,.9)';
+    ctx.lineWidth=1;
+    for(let x=24;x<W-24;x+=14){
+      ctx.beginPath(); ctx.moveTo(x,-6); ctx.lineTo(x,6); ctx.stroke();
+    }
+    ctx.strokeStyle='#e0e0e0'; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(16,-6); ctx.lineTo(W-16,-6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(16,6); ctx.lineTo(W-16,6); ctx.stroke();
+    ctx.restore();
+
+    // top / bottom baselines glow
+    ctx.fillStyle='rgba(255,255,255,.12)';
+    ctx.fillRect(14,14,W-28,6);
+    ctx.fillRect(14,H-20,W-28,6);
+  }
+
+  function drawRacket(x,y,isPlayer){
+    ctx.save();
+    ctx.translate(x,y);
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,.12)';
+    ctx.beginPath(); ctx.ellipse(2,4,38,12,0,0,Math.PI*2); ctx.fill();
+    // handle
+    ctx.fillStyle = isPlayer ? '#5d4037' : '#37474f';
+    ctx.fillRect(-4, isPlayer? 10 : -18, 8, 14);
+    // racket head
+    ctx.fillStyle = isPlayer ? '#43a047' : '#1976d2';
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    if(isPlayer){
+      ctx.ellipse(0,0,42,14,0,0,Math.PI*2);
+    } else {
+      ctx.ellipse(0,0,42,14,0,0,Math.PI*2);
+    }
+    ctx.fill(); ctx.stroke();
+    // strings
+    ctx.strokeStyle = 'rgba(255,255,255,.85)';
+    ctx.lineWidth = 1;
+    for(let i=-28;i<=28;i+=14){
+      ctx.beginPath(); ctx.moveTo(i,-10); ctx.lineTo(i,10); ctx.stroke();
+    }
+    for(let j=-8;j<=8;j+=8){
+      ctx.beginPath(); ctx.moveTo(-36,j); ctx.lineTo(36,j); ctx.stroke();
+    }
+    // center dot
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(0,0,3,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawShuttle(){
+    ctx.save();
+    ctx.translate(shuttle.x, shuttle.y);
+    ctx.rotate(shuttle.rot*0.15);
+    // shadow on court
+    let groundDist = (H - shuttle.y)/H;
+    ctx.fillStyle = `rgba(0,0,0,${0.12 + groundDist*0.08})`;
+    ctx.beginPath(); ctx.ellipse(0, 10, 10 - groundDist*4, 4, 0,0,Math.PI*2); ctx.fill();
+
+    // flutter trail
+    ctx.strokeStyle='rgba(255,255,255,.45)';
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(-shuttle.vx*1.2, -shuttle.vy*1.2);
+    ctx.stroke();
+
+    // cork base
+    ctx.fillStyle='#3e2723';
+    ctx.beginPath(); ctx.arc(0,6,6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#8d6e63';
+    ctx.beginPath(); ctx.arc(0,6,4,0,Math.PI*2); ctx.fill();
+    // feathers
+    ctx.fillStyle='#fff';
+    ctx.beginPath();
+    ctx.moveTo(-7,-2); ctx.lineTo(-9,-14); ctx.lineTo(-3,-12); ctx.lineTo(0,-16); ctx.lineTo(3,-12); ctx.lineTo(9,-14); ctx.lineTo(7,-2); ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle='#e0e0e0'; ctx.lineWidth=1; ctx.stroke();
+    // feather lines
+    ctx.strokeStyle='#bdbdbd'; ctx.lineWidth=0.8;
+    ctx.beginPath(); ctx.moveTo(-4,-2); ctx.lineTo(-6,-12); ctx.moveTo(0,-2); ctx.lineTo(0,-15); ctx.moveTo(4,-2); ctx.lineTo(6,-12); ctx.stroke();
+    // cork highlight
+    ctx.fillStyle='rgba(255,255,255,.5)';
+    ctx.beginPath(); ctx.arc(-1.5,4.5,1.5,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawParticles(){
+    for(let p of particles){
+      ctx.globalAlpha = Math.max(0,p.life);
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y, 2.5*p.life,0,Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  function render(){
+    drawCourt();
+    // computer racket
+    drawRacket(compX, COMP_Y, false);
+    // player racket
+    drawRacket(playerX, PLAYER_Y, true);
+    drawShuttle();
+    drawParticles();
+
+    // rally flash
+    if(isPlaying && rally>0){
+      ctx.fillStyle='rgba(255,235,59,.0)';
+      // subtle vignette when rally high
+      if(rally>10){
+        ctx.fillStyle=`rgba(255,235,59,${Math.min(0.12, (rally-10)*0.015)})`;
+        ctx.fillRect(0,0,W,H);
+      }
+    }
+  }
+
+  function loop(){
+    update();
+    render();
+    requestAnimationFrame(loop);
+  }
+  loop();
+
+  // initial HUD
+  updateHUD();
+  // prevent scroll on canvas
+  canvas.addEventListener('touchmove', e=>e.preventDefault(), {passive:false});
+})();
+</script>
+</body>
+</html>

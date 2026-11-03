@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Cave Crawler</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --cave1:#0a0706;
+  --cave2:#1a120e;
+  --cave3:#2a1e14;
+  --rock:#3d2e1f;
+  --rock2:#4a3725;
+  --rock3:#2f2116;
+  --glow:#ff9a3c;
+  --glow2:#ffb86a;
+  --teal:#4ecdc4;
+  --danger:#ff4d6d;
+  --gold:#ffd166;
+}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  background:radial-gradient(ellipse 800px 600px at 50% 0%,#2a1e14 0%,#1a120e 35%,#0a0706 100%);
+  color:#fff;
+  display:flex;justify-content:center;
+  min-height:100vh;min-height:100dvh;
+}
+.app{
+  width:100%;max-width:428px;min-width:360px;
+  min-height:100vh;min-height:100dvh;
+  display:flex;flex-direction:column;
+  position:relative;overflow:hidden;
+  background:
+    radial-gradient(ellipse 600px 400px at 50% -10%,rgba(255,154,60,0.12),transparent 60%),
+    radial-gradient(ellipse 500px 300px at 20% 20%,rgba(255,184,106,0.08),transparent 60%),
+    linear-gradient(180deg,#0f0a08 0%,#1a120e 100%);
+  border-left:1px solid rgba(255,255,255,0.06);
+  border-right:1px solid rgba(255,255,255,0.06);
+}
+.header{
+  position:relative;z-index:2;
+  padding:12px 14px 8px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.4),transparent);
+}
+.top-row{
+  display:flex;justify-content:space-between;align-items:center;gap:8px;
+}
+.logo{
+  font-size:11px;letter-spacing:0.16em;text-transform:uppercase;opacity:0.8;font-weight:800;color:var(--glow2)
+}
+.best-chips{display:flex;gap:6px}
+.chip{
+  font-size:10px;font-weight:800;letter-spacing:0.06em;
+  background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);
+  padding:5px 8px;border-radius:999px;
+}
+.title-row{
+  display:flex;justify-content:space-between;align-items:end;margin-top:6px;
+}
+h1{font-size:20px;font-weight:900;letter-spacing:-0.02em;line-height:1}
+h1 span{color:var(--glow)}
+.subtitle{font-size:11px;opacity:0.7;margin-top:2px}
+.hearts{
+  display:flex;gap:4px;align-items:center;
+  background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.12);
+  padding:6px 10px;border-radius:999px;
+}
+.heart{font-size:16px;transition:all 0.3s}
+.heart.lost{opacity:0.25;filter:grayscale(1);transform:scale(0.8)}
+.stats-grid{
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:8px;margin-top:10px;
+}
+.stat{
+  background:rgba(0,0,0,0.32);backdrop-filter:blur(6px);
+  border:1px solid rgba(255,255,255,0.1);border-radius:12px;
+  padding:8px 8px;text-align:center;
+}
+.stat-label{font-size:9px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.65;font-weight:800}
+.stat-value{font-size:14px;font-weight:900;margin-top:2px;font-variant-numeric:tabular-nums}
+.stat-sub{font-size:10px;opacity:0.6;margin-top:1px}
+.quota-wrap{
+  margin-top:8px;
+  background:rgba(0,0,0,0.32);border:1px solid rgba(255,255,255,0.1);
+  border-radius:12px;padding:8px 10px;
+}
+.quota-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:800}
+.quota-head span:last-child{color:var(--glow2)}
+.bar-track{height:8px;background:rgba(255,255,255,0.12);border-radius:999px;overflow:hidden;margin-top:6px}
+.bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--glow),var(--gold));transition:width 0.4s ease;box-shadow:0 0 8px rgba(255,154,60,0.5)}
+.cave-wrap{
+  position:relative;z-index:2;
+  margin:10px 12px 0;
+  background:linear-gradient(180deg,rgba(0,0,0,0.25),rgba(0,0,0,0.4));
+  border:1px solid rgba(255,255,255,0.1);border-radius:16px;
+  padding:10px;
+  overflow:hidden;
+}
+.cave-wrap::before{
+  content:"";position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 300px 200px at 30% 20%,rgba(255,154,60,0.08),transparent 60%),
+    radial-gradient(ellipse 400px 250px at 70% 80%,rgba(255,107,26,0.06),transparent 60%);
+  pointer-events:none;
+}
+.grid{
+  position:relative;z-index:1;
+  display:grid;grid-template-columns:repeat(6,1fr);
+  gap:6px;
+}
+.cell{
+  aspect-ratio:1;
+  background:linear-gradient(145deg,#3d2e1f 0%,#2f2116 100%);
+  border:1.5px solid #4a3725;
+  border-radius:10px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:18px;font-weight:800;
+  position:relative;overflow:hidden;
+  cursor:pointer;user-select:none;
+  transition:transform 0.08s,border-color 0.2s,box-shadow 0.2s,background 0.2s;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 2px 6px rgba(0,0,0,0.4);
+  min-height:48px;
+}
+.cell:active{transform:scale(0.96)}
+.cell.hidden{
+  background:linear-gradient(145deg,#4a3725 0%,#2f2116 50%,#1f140e 100%);
+  border-color:#5a4430;
+}
+.cell.hidden::before{
+  content:"";position:absolute;inset:0;
+  background:
+    radial-gradient(2px 2px at 20% 30%,rgba(255,255,255,0.08),transparent),
+    radial-gradient(1.5px 1.5px at 70% 60%,rgba(255,255,255,0.06),transparent),
+    radial-gradient(1px 1px at 40% 80%,rgba(255,255,255,0.05),transparent);
+}
+.cell.cracked{
+  background:linear-gradient(145deg,#5a4430 0%,#3d2e1f 100%);
+  border-color:#ff9a3c;
+  border-style:dashed;
+  animation:crackPulse 0.4s;
+}
+@keyframes crackPulse{0%{transform:scale(1)}50%{transform:scale(1.04)}100%{transform:scale(1)}}
+.cell.cracked::after{
+  content:"⚡";position:absolute;font-size:14px;opacity:0.5;top:2px;right:4px;
+}
+.cell.revealed{
+  background:linear-gradient(145deg,#2a1e14 0%,#1f140e 100%);
+  border-color:rgba(255,255,255,0.08);
+}
+.cell.lantern{
+  background:radial-gradient(circle at 50% 50%,#ff9a3c 0%,#ff6b1a 25%,#3d2e1f 65%);
+  border-color:#ffb86a;
+  box-shadow:0 0 14px rgba(255,154,60,0.6),inset 0 0 12px rgba(255,255,255,0.15);
+  animation:flicker 1.6s infinite alternate;
+}
+@keyframes flicker{
+  0%{box-shadow:0 0 12px rgba(255,154,60,0.5),inset 0 0 10px rgba(255,255,255,0.12);filter:brightness(1)}
+  100%{box-shadow:0 0 18px rgba(255,154,60,0.75),inset 0 0 14px rgba(255,255,255,0.18);filter:brightness(1.08)}
+}
+.cell.player{
+  border-color:var(--teal) !important;
+  box-shadow:0 0 12px rgba(78,205,196,0.6),inset 0 0 8px rgba(78,205,196,0.15) !important;
+  transform:scale(1.02);
+  z-index:2;
+}
+.cell.player::before{
+  content:"";position:absolute;inset:-2px;border:2px solid var(--teal);border-radius:10px;pointer-events:none;animation:playerPulse 1.2s infinite;
+}
+@keyframes playerPulse{0%{opacity:0.8;transform:scale(1)}100%{opacity:0;transform:scale(1.08)}}
+.cell.bat-present{
+  background:radial-gradient(circle at 50% 40%,#2a0f1a 0%,#1a0a14 100%) !important;
+  border-color:#ff4d6d !important;
+}
+.cell.mineral{
+  background:radial-gradient(circle at 50% 50%,rgba(255,209,102,0.15),transparent 70%),linear-gradient(145deg,#2a1e14,#1f140e);
+}
+.cell-icon{font-size:20px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5))}
+.cell-label{font-size:8px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;opacity:0.7;margin-top:1px}
+.cell.cracked .cell-label{color:var(--glow2)}
+.adjacent{border-color:rgba(78,205,196,0.5) !important;box-shadow:0 0 8px rgba(78,205,196,0.25)}
+.adjacent.hidden{border-style:solid}
+.legend{
+  position:relative;z-index:2;
+  display:flex;gap:6px;padding:8px 12px 0;flex-wrap:wrap;
+}
+.legend-item{
+  flex:1;min-width:70px;
+  background:rgba(0,0,0,0.28);border:1px solid rgba(255,255,255,0.08);
+  border-radius:10px;padding:6px 8px;text-align:center;
+}
+.legend-item .ico{font-size:14px}
+.legend-item .txt{font-size:9px;font-weight:700;opacity:0.7;margin-top:2px;letter-spacing:0.05em;text-transform:uppercase}
+.controls{
+  position:relative;z-index:2;
+  padding:10px 12px 12px;
+  display:flex;gap:8px;
+}
+.btn{
+  flex:1;min-height:48px;border-radius:12px;border:none;
+  font-size:13px;font-weight:800;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:transform 0.08s,opacity 0.2s;
+  box-shadow:0 4px 12px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.btn:active{transform:scale(0.97)}
+.btn-primary{background:linear-gradient(180deg,#ffb86a,#ff9a3c);color:#2a1200}
+.btn-secondary{background:rgba(0,0,0,0.32);color:#fff;border:1px solid rgba(255,255,255,0.14)}
+.btn:disabled{opacity:0.45;pointer-events:none}
+.toast{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  background:rgba(0,0,0,0.82);border:1px solid rgba(255,255,255,0.15);
+  padding:8px 14px;border-radius:999px;font-size:12px;font-weight:800;
+  z-index:5;pointer-events:none;opacity:0;transition:opacity 0.2s;
+  white-space:nowrap;
+}
+.toast.show{opacity:1}
+.overlay{
+  position:absolute;inset:0;background:rgba(6,4,8,0.78);backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;padding:16px;z-index:10;
+}
+.card{
+  width:100%;max-width:360px;
+  background:linear-gradient(180deg,#1e140e 0%,#0f0a08 100%);
+  border:1px solid rgba(255,154,60,0.2);border-radius:18px;
+  padding:16px;text-align:center;
+  box-shadow:0 16px 40px rgba(0,0,0,0.6);
+}
+.card h2{font-size:18px;font-weight:900;margin-bottom:6px}
+.card p{font-size:12px;line-height:1.5;opacity:0.85;margin-bottom:10px}
+.badge{display:inline-block;background:rgba(255,154,60,0.15);border:1px solid rgba(255,154,60,0.3);border-radius:999px;padding:4px 10px;font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;color:var(--glow2)}
+.big{font-size:26px;font-weight:900;margin:6px 0}
+.grid-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0}
+.mini-cell{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 4px;text-align:center}
+.mini-cell .ico{font-size:16px}
+.mini-cell .txt{font-size:9px;font-weight:700;opacity:0.7;margin-top:2px}
+.btn-full{width:100%;min-height:48px;border:none;border-radius:12px;background:linear-gradient(180deg,#ffb86a,#ff9a3c);color:#2a1200;font-size:15px;font-weight:900;cursor:pointer;margin-top:8px}
+.btn-ghost{width:100%;min-height:42px;margin-top:8px;border:1px solid rgba(255,255,255,0.14);background:transparent;color:#fff;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer}
+.invuln{animation:blink 0.3s infinite alternate}
+@keyframes blink{from{opacity:1}to{opacity:0.5}}
+@media (max-width:380px){
+  .cell{font-size:16px}
+  .cell-icon{font-size:18px}
+  h1{font-size:18px}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="header">
+    <div class="top-row">
+      <div class="logo">⛏️ Cave Crawler</div>
+      <div class="best-chips">
+        <div class="chip" id="bestScoreChip">Best: —</div>
+        <div class="chip" id="bestLevelChip">Lv Best: —</div>
+      </div>
+    </div>
+    <div class="title-row">
+      <div>
+        <h1>TORCHLIT <span>DEPTHS</span></h1>
+        <div class="subtitle">Crack → Mine • Dodge bats • Reach lanterns</div>
+      </div>
+      <div class="hearts" id="heartsEl">
+        <span class="heart" id="h1">❤️</span><span class="heart" id="h2">❤️</span><span class="heart" id="h3">❤️</span>
+      </div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat"><div class="stat-label">Level</div><div class="stat-value" id="levelEl">1</div><div class="stat-sub" id="quotaEl">0 / 8</div></div>
+      <div class="stat"><div class="stat-label">Score</div><div class="stat-value" id="scoreEl">0</div><div class="stat-sub" id="scoreSub">+0 this level</div></div>
+      <div class="stat"><div class="stat-label">Mined</div><div class="stat-value" id="minedEl">0</div><div class="stat-sub">minerals</div></div>
+    </div>
+    <div class="quota-wrap">
+      <div class="quota-head"><span>Level Quota</span><span id="quotaTxt">0 / 8</span></div>
+      <div class="bar-track"><div class="bar-fill" id="quotaBar" style="width:0%"></div></div>
+    </div>
+  </header>
+
+  <div class="cave-wrap" id="caveWrap">
+    <div class="grid" id="grid"></div>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="ico">🪨</div><div class="txt">Tap to crack</div></div>
+    <div class="legend-item"><div class="ico">💎</div><div class="txt">Mine = points</div></div>
+    <div class="legend-item"><div class="ico">🏮</div><div class="txt">Safe zone</div></div>
+    <div class="legend-item"><div class="ico">🦇</div><div class="txt">Avoid bats</div></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-secondary" id="pauseBtn">⏸️ Pause</button>
+    <button class="btn btn-secondary" id="resetBtn">🔄 Reset</button>
+    <button class="btn btn-primary" id="hintBtn">💡 Hint</button>
+  </div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="card">
+      <div class="badge">Torchlit Cave Grid</div>
+      <h2>Grid-Digging Crawler</h2>
+      <p>Tap <b>adjacent cells</b> (up/down/left/right) to <b>crack</b> 🪨 then <b>mine</b> 💎. Fill the quota before bats get you. <b>🏮 Lanterns</b> are safe zones — bats can't hurt you there.</p>
+      <div class="grid-mini">
+        <div class="mini-cell"><div class="ico">🪨 → 💥</div><div class="txt">1st tap cracks</div></div>
+        <div class="mini-cell"><div class="ico">💥 → 💎</div><div class="txt">2nd tap mines</div></div>
+        <div class="mini-cell"><div class="ico">🏮 Safe</div><div class="txt">No bat damage</div></div>
+      </div>
+      <div style="background:rgba(255,154,60,0.08);border:1px solid rgba(255,154,60,0.15);border-radius:10px;padding:8px 10px;text-align:left;font-size:11px;line-height:1.4">
+        <b>How to play:</b> Start on a lantern. Tap a neighboring rock to crack it, tap again to mine and move in. Collect minerals to fill quota. Bats patrol every ~0.8s — stay on lanterns to dodge. You have <b>3 hearts</b>.
+      </div>
+      <button class="btn-full" id="startBtn">START CRAWL ⛏️</button>
+      <button class="btn-ghost" id="guideBtn">📖 Guide & Tips</button>
+      <p style="font-size:10px;opacity:0.5;margin-top:8px">Large tap targets • No horizontal scroll • Best score & level saved</p>
+    </div>
+  </div>
+
+  <div class="overlay" id="guideOverlay" style="display:none">
+    <div class="card">
+      <h2>Guide & Tips</h2>
+      <p style="text-align:left">
+        • <b>Adjacent only:</b> You can only crack/mine the 4 cells next to you.<br>
+        • <b>Crack → Mine:</b> First tap cracks 🪨, second mines and moves you in. Minerals give 10-100 pts.<br>
+        • <b>Bats 🦇:</b> Patrol back-and-forth. If a bat moves onto you (or you onto it) you lose 1 heart — unless you're on 🏮.<br>
+        • <b>Lanterns 🏮:</b> Glowing safe zones. Plan hops between them.<br>
+        • <b>Quota:</b> Level 1 needs 8 minerals, +4 each level. Fill it to level up.<br>
+        • <b>Hearts:</b> 3 total. 1.2s invulnerability after hit.<br>
+        • <b>Hint:</b> Highlights a nearby mineral.
+      </p>
+      <button class="btn-full" id="closeGuideBtn">Got it</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="levelOverlay" style="display:none">
+    <div class="card" id="levelCard"></div>
+  </div>
+
+  <div class="overlay" id="gameOverOverlay" style="display:none">
+    <div class="card" id="gameOverCard"></div>
+  </div>
+</div>
+
+<script>
+const GRID_SIZE = 6;
+const TOTAL = GRID_SIZE * GRID_SIZE;
+const $ = s => document.querySelector(s);
+const gridEl = $('#grid');
+const toastEl = $('#toast');
+
+let grid = [];
+let playerPos = 13;
+let bats = [];
+let hearts = 3;
+let score = 0;
+let level = 1;
+let quota = 8;
+let collected = 0;
+let minedCount = 0;
+let levelScore = 0;
+let playing = false;
+let paused = false;
+let invuln = false;
+let batTimer = null;
+
+let bestScore = 0;
+let bestLevel = 0;
+
+const MINERALS = [
+  {icon:'🪙', name:'Copper', pts:10, color:'#c97a2a'},
+  {icon:'🥈', name:'Silver', pts:20, color:'#a8b0b8'},
+  {icon:'🟡', name:'Gold', pts:50, color:'#ffd166'},
+  {icon:'💎', name:'Gem', pts:100, color:'#4ecdc4'},
+  {icon:'🔮', name:'Crystal', pts:75, color:'#9b59b6'},
+];
+
+function loadBest(){
+  try{
+    bestScore = parseInt(localStorage.getItem('caveCrawler_bestScore')||'0',10)||0;
+    bestLevel = parseInt(localStorage.getItem('caveCrawler_bestLevel')||'0',10)||0;
+  }catch(e){}
+  updateBestUI();
+}
+function saveBest(){
+  try{
+    if(score > bestScore){ bestScore = score; localStorage.setItem('caveCrawler_bestScore', String(bestScore)); }
+    if(level > bestLevel){ bestLevel = level; localStorage.setItem('caveCrawler_bestLevel', String(bestLevel)); }
+  }catch(e){}
+  updateBestUI();
+}
+function updateBestUI(){
+  $('#bestScoreChip').textContent = bestScore ? `Best: ${bestScore}` : 'Best: —';
+  $('#bestLevelChip').textContent = bestLevel ? `Lv Best: ${bestLevel}` : 'Lv Best: —';
+}
+function showToast(msg, ms=1200){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(()=>toastEl.classList.remove('show'), ms);
+}
+function isAdjacent(a,b){
+  const ax = a % GRID_SIZE, ay = Math.floor(a / GRID_SIZE);
+  const bx = b % GRID_SIZE, by = Math.floor(b / GRID_SIZE);
+  return (Math.abs(ax-bx) + Math.abs(ay-by) === 1);
+}
+function getAdjacent(pos){
+  const res=[];
+  const x = pos % GRID_SIZE, y = Math.floor(pos / GRID_SIZE);
+  if(x>0) res.push(pos-1);
+  if(x<GRID_SIZE-1) res.push(pos+1);
+  if(y>0) res.push(pos-GRID_SIZE);
+  if(y<GRID_SIZE-1) res.push(pos+GRID_SIZE);
+  return res;
+}
+function randInt(n){ return Math.floor(Math.random()*n); }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=randInt(i+1); [a[i],a[j]]=[a[j],a[i]] } return a; }
+
+function generateLevel(){
+  grid = Array(TOTAL).fill(null).map(()=>({type:'rock', state:'hidden', mineral:null, isLantern:false}));
+  // place lanterns: 3-4 safe zones
+  const lanternCount = 3 + (level>3?1:0);
+  let lanternPositions = [];
+  // ensure player start is lantern
+  const startCandidates = [0,5,30,35,13,14,19,20];
+  let startPos = startCandidates[randInt(startCandidates.length)];
+  // pick lanterns far apart
+  let available = [...Array(TOTAL).keys()];
+  shuffle(available);
+  lanternPositions.push(startPos);
+  for(let i=0;i<available.length && lanternPositions.length<lanternCount;i++){
+    const p = available[i];
+    if(lanternPositions.includes(p)) continue;
+    // ensure not too close to existing lanterns (distance >2)
+    let ok=true;
+    for(let lp of lanternPositions){
+      const dx=Math.abs((p%GRID_SIZE)-(lp%GRID_SIZE)), dy=Math.abs(Math.floor(p/GRID_SIZE)-Math.floor(lp/GRID_SIZE));
+      if(dx+dy < 3) ok=false;
+    }
+    if(ok) lanternPositions.push(p);
+  }
+  lanternPositions.forEach(p=>{
+    grid[p] = {type:'lantern', state:'revealed', mineral:null, isLantern:true};
+  });
+  playerPos = startPos;
+
+  // place minerals: quota + extra 4-6
+  const mineralCount = quota + 4 + randInt(4);
+  let emptyForMinerals = available.filter(i=>!lanternPositions.includes(i));
+  shuffle(emptyForMinerals);
+  for(let i=0;i<mineralCount && i<emptyForMinerals.length;i++){
+    const p = emptyForMinerals[i];
+    // weighted mineral rarity: more copper, less gem
+    const r = Math.random();
+    let m;
+    if(r<0.4) m=MINERALS[0];
+    else if(r<0.65) m=MINERALS[1];
+    else if(r<0.85) m=MINERALS[2];
+    else if(r<0.95) m=MINERALS[4];
+    else m=MINERALS[3];
+    grid[p] = {type:'mineral', state:'hidden', mineral:m, isLantern:false};
+  }
+  // remaining are rock (hidden)
+  // bats: 2 + floor(level/2)
+  const batCount = Math.min(4, 2 + Math.floor(level/2));
+  bats = [];
+  // create patrol paths: horizontal back-and-forth on random rows
+  for(let b=0;b<batCount;b++){
+    let row = randInt(GRID_SIZE);
+    let colStart = randInt(2);
+    let colEnd = GRID_SIZE-1 - randInt(2);
+    if(colStart>=colEnd) colEnd = colStart+2;
+    let path = [];
+    for(let c=colStart;c<=colEnd;c++) path.push(row*GRID_SIZE + c);
+    // avoid lantern start positions for initial bat pos
+    let pos = path[randInt(path.length)];
+    let attempts=0;
+    while(lanternPositions.includes(pos) && attempts<10){ pos=path[randInt(path.length)]; attempts++; }
+    bats.push({pos, path, dir: Math.random()<0.5?1:-1, idx: path.indexOf(pos)});
+  }
+
+  collected = 0;
+  levelScore = 0;
+  // keep hearts, score, minedCount across levels (hearts persist, score accumulates)
+  updateUI();
+  renderGrid();
+}
+
+function renderGrid(){
+  gridEl.innerHTML='';
+  for(let i=0;i<TOTAL;i++){
+    const cell = grid[i];
+    const div = document.createElement('div');
+    div.className='cell';
+    div.dataset.idx=i;
+    // state classes
+    if(cell.isLantern){
+      div.classList.add('lantern');
+    } else if(cell.state==='hidden'){
+      div.classList.add('hidden');
+    } else if(cell.state==='cracked'){
+      div.classList.add('cracked');
+    } else if(cell.state==='revealed'){
+      div.classList.add('revealed');
+      if(cell.type==='mineral' && cell.mineral) div.classList.add('mineral');
+    }
+    if(i===playerPos) div.classList.add('player');
+    // bat present?
+    const batHere = bats.some(b=>b.pos===i);
+    if(batHere) div.classList.add('bat-present');
+    // adjacent highlight if playing
+    if(playing && !paused && isAdjacent(playerPos,i) && cell.state!=='revealed'){
+      div.classList.add('adjacent');
+    }
+    // content
+    let icon='', label='';
+    if(batHere){
+      icon='🦇';
+      label='Bat';
+    } else if(i===playerPos){
+      icon='⛏️';
+      label='You';
+      if(cell.isLantern) { icon='🏮'; label='Safe'; }
+    } else if(cell.isLantern){
+      icon='🏮';
+      label='Safe';
+    } else if(cell.state==='hidden'){
+      icon='🪨';
+      label='Rock';
+    } else if(cell.state==='cracked'){
+      icon='💥';
+      label='Cracked';
+    } else if(cell.state==='revealed'){
+      if(cell.type==='mineral' && cell.mineral){
+        icon=cell.mineral.icon;
+        label=cell.mineral.name;
+      } else {
+        icon='·';
+        label='Empty';
+      }
+    }
+    div.innerHTML=`<div class="cell-icon">${icon}</div><div class="cell-label">${label}</div>`;
+    div.addEventListener('click', ()=>handleTap(i));
+    div.addEventListener('touchstart', e=>{ e.preventDefault(); handleTap(i); }, {passive:false});
+    gridEl.appendChild(div);
+  }
+  // invuln visual
+  if(invuln){
+    const pCell = gridEl.querySelector(`[data-idx="${playerPos}"]`);
+    if(pCell) pCell.classList.add('invuln');
+  }
+}
+
+function handleTap(idx){
+  if(!playing || paused) return;
+  if(idx===playerPos){
+    showToast('You are here ⛏️');
+    return;
+  }
+  if(!isAdjacent(playerPos, idx)){
+    showToast('Too far! Tap adjacent cells only', 1000);
+    // shake
+    const el = gridEl.querySelector(`[data-idx="${idx}"]`);
+    if(el){ el.animate([{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:250}); }
+    return;
+  }
+  const cell = grid[idx];
+  const batHere = bats.some(b=>b.pos===idx);
+  // if bat on target and not lantern, hitting bat costs heart? Let's allow but warn
+  if(batHere && !cell.isLantern){
+    // moving onto bat = hit
+    takeDamage('Stepped on a bat! 🦇');
+    // knock bat away
+    const bat = bats.find(b=>b.pos===idx);
+    if(bat){
+      // move bat to random adjacent not player
+      const adj = getAdjacent(idx).filter(p=>p!==playerPos && !grid[p].isLantern);
+      if(adj.length) bat.pos = adj[randInt(adj.length)];
+    }
+    renderGrid();
+    return;
+  }
+
+  if(cell.isLantern){
+    // move to lantern
+    playerPos = idx;
+    if(navigator.vibrate) navigator.vibrate(15);
+    showToast('Safe at lantern 🏮', 800);
+    renderGrid();
+    checkBatCollision();
+    return;
+  }
+
+  if(cell.state==='hidden'){
+    // crack it
+    cell.state='cracked';
+    if(navigator.vibrate) navigator.vibrate(20);
+    showToast('Cracked! Tap again to mine', 900);
+    renderGrid();
+  } else if(cell.state==='cracked'){
+    // mine it
+    cell.state='revealed';
+    playerPos = idx;
+    if(navigator.vibrate) navigator.vibrate([20,30]);
+    if(cell.type==='mineral' && cell.mineral){
+      const pts = cell.mineral.pts;
+      score += pts;
+      levelScore += pts;
+      collected++;
+      minedCount++;
+      showToast(`Mined ${cell.mineral.name} +${pts} 💎`, 1000);
+      // clear mineral after collection to avoid re-collect
+      // keep type but mark collected? We'll just keep but not count again
+      // To prevent re-mining same, we set mineral to null after collect? But we already moved, so keep visual but don't recount
+      // Instead we will keep but ensure collected only counts once - we already incremented, and cell is now revealed so won't be mined again
+    } else {
+      showToast('Empty pocket · keep digging', 800);
+    }
+    // after mining, cell becomes empty revealed (if mineral, we show it briefly then it becomes empty? Keep mineral icon for feedback)
+    // For simplicity, after 1s, if it was mineral, turn to empty revealed
+    if(cell.type==='mineral'){
+      setTimeout(()=>{
+        // keep score but visually clear? Let's keep icon for a moment then clear
+        // Actually keep as revealed empty to show visited
+        // We'll just leave it as is but mark as collected so not counted again
+        // To avoid double count, set type to empty after collect
+        if(grid[idx].type==='mineral'){
+          // keep mineral for display but prevent re-score: set a flag
+          grid[idx].collected = true;
+        }
+      }, 100);
+    }
+    updateUI();
+    renderGrid();
+    checkQuota();
+    checkBatCollision();
+  } else if(cell.state==='revealed'){
+    // move onto revealed empty
+    playerPos = idx;
+    if(navigator.vibrate) navigator.vibrate(10);
+    renderGrid();
+    checkBatCollision();
+  }
+}
+
+function takeDamage(reason){
+  if(invuln || !playing) return;
+  hearts = Math.max(0, hearts-1);
+  invuln = true;
+  updateUI();
+  renderGrid();
+  showToast(reason + ` • ${hearts} hearts left`, 1200);
+  if(navigator.vibrate) navigator.vibrate([40,60,40]);
+  // shake player
+  const pEl = gridEl.querySelector(`[data-idx="${playerPos}"]`);
+  if(pEl) pEl.animate([{transform:'translateX(0) scale(1.02)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0) scale(1.02)'}],{duration:350});
+  setTimeout(()=>{ invuln=false; renderGrid(); }, 1200);
+  if(hearts<=0){
+    gameOver();
+  }
+}
+
+function checkBatCollision(){
+  const batHere = bats.some(b=>b.pos===playerPos);
+  const onLantern = grid[playerPos].isLantern;
+  if(batHere && !onLantern){
+    takeDamage('Bat ambush! 🦇');
+  }
+}
+
+function moveBats(){
+  if(!playing || paused) return;
+  bats.forEach(bat=>{
+    // move along path back-and-forth
+    let nextIdx = bat.idx + bat.dir;
+    if(nextIdx < 0 || nextIdx >= bat.path.length){
+      bat.dir *= -1;
+      nextIdx = bat.idx + bat.dir;
+    }
+    bat.idx = nextIdx;
+    bat.pos = bat.path[bat.idx];
+  });
+  renderGrid();
+  // check collision after move
+  const batHere = bats.some(b=>b.pos===playerPos);
+  const onLantern = grid[playerPos].isLantern;
+  if(batHere && !onLantern){
+    takeDamage('Bat patrol hit! 🦇');
+  }
+}
+
+function checkQuota(){
+  if(collected >= quota){
+    levelComplete();
+  }
+}
+
+function levelComplete(){
+  playing=false;
+  clearInterval(batTimer);
+  saveBest();
+  const bonus = hearts*50 + 100;
+  score += bonus;
+  $('#levelCard').innerHTML = `
+    <div class="badge">Level ${level} Complete</div>
+    <h2>Quota Filled! ⛏️</h2>
+    <p>You mined <b>${collected}/${quota}</b> minerals. Bonus <b>+${bonus}</b> for ${hearts} hearts.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0">
+      <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px"><div style="font-size:10px;opacity:0.6;font-weight:800">SCORE</div><div style="font-size:18px;font-weight:900">${score}</div></div>
+      <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px"><div style="font-size:10px;opacity:0.6;font-weight:800">NEXT QUOTA</div><div style="font-size:18px;font-weight:900">${quota+4}</div></div>
+    </div>
+    <button class="btn-full" id="nextLevelBtn">Descend Deeper ↓ Level ${level+1}</button>
+    <button class="btn-ghost" id="stayBtn">Stay & Admire</button>
+  `;
+  $('#levelOverlay').style.display='flex';
+  $('#nextLevelBtn').onclick = ()=>{
+    $('#levelOverlay').style.display='none';
+    level++;
+    quota += 4;
+    // heal 1 heart if not full? No, keep hearts
+    generateLevel();
+    playing=true;
+    startBatTimer();
+    updateUI();
+  };
+  $('#stayBtn').onclick = ()=>{ $('#levelOverlay').style.display='none'; playing=true; startBatTimer(); };
+  updateUI();
+}
+
+function gameOver(){
+  playing=false;
+  clearInterval(batTimer);
+  saveBest();
+  const isBest = score >= bestScore && score>0;
+  $('#gameOverCard').innerHTML = `
+    <div class="badge" style="background:rgba(255,77,109,0.15);border-color:rgba(255,77,109,0.3);color:#ff8a9a">Cave In • Out of Hearts</div>
+    <h2>Game Over</h2>
+    <p>You reached <b>Level ${level}</b> with <b>${score} pts</b> and mined <b>${minedCount}</b> minerals.</p>
+    <div class="big">${score} pts</div>
+    <div style="font-size:11px;opacity:0.7;margin-bottom:8px">${isBest?'🎉 New best score!':`Best: ${bestScore} pts • Lv ${bestLevel}`}</div>
+    <button class="btn-full" id="retryBtn">Try Again ⛏️</button>
+    <button class="btn-ghost" id="closeOverBtn">Close</button>
+  `;
+  $('#gameOverOverlay').style.display='flex';
+  $('#retryBtn').onclick = ()=>{
+    $('#gameOverOverlay').style.display='none';
+    resetGame();
+    startGame();
+  };
+  $('#closeOverBtn').onclick = ()=>{
+    $('#gameOverOverlay').style.display='none';
+    resetGame();
+  };
+}
+
+function updateUI(){
+  $('#levelEl').textContent = level;
+  $('#quotaEl').textContent = `${collected} / ${quota}`;
+  $('#quotaTxt').textContent = `${collected} / ${quota}`;
+  $('#quotaBar').style.width = Math.min(100, (collected/quota*100))+'%';
+  $('#scoreEl').textContent = score;
+  $('#scoreSub').textContent = `+${levelScore} this level`;
+  $('#minedEl').textContent = minedCount;
+  // hearts
+  for(let i=1;i<=3;i++){
+    const h = $('#h'+i);
+    if(i<=hearts){ h.classList.remove('lost'); h.textContent='❤️'; }
+    else { h.classList.add('lost'); h.textContent='🖤'; }
+  }
+}
+
+function startBatTimer(){
+  clearInterval(batTimer);
+  batTimer = setInterval(moveBats, 850);
+}
+
+function resetGame(){
+  hearts=3; score=0; level=1; quota=8; collected=0; minedCount=0; levelScore=0;
+  playing=false; paused=false; invuln=false;
+  clearInterval(batTimer);
+  generateLevel();
+  updateUI();
+}
+
+function startGame(){
+  if(level===1 && score===0 && collected===0){
+    // already generated
+  }
+  playing=true; paused=false;
+  $('#startOverlay').style.display='none';
+  $('#pauseBtn').textContent='⏸️ Pause';
+  startBatTimer();
+  showToast('Tap adjacent rocks to crack → mine!', 1400);
+}
+
+// init
+loadBest();
+generateLevel();
+updateUI();
+
+// events
+$('#startBtn').onclick = startGame;
+$('#guideBtn').onclick = ()=> $('#guideOverlay').style.display='flex';
+$('#closeGuideBtn').onclick = ()=> $('#guideOverlay').style.display='none';
+$('#guideOverlay').onclick = e=>{ if(e.target.id==='guideOverlay') e.currentTarget.style.display='none'; };
+
+$('#pauseBtn').onclick = ()=>{
+  if(!playing && !paused) return;
+  if(paused){
+    paused=false;
+    $('#pauseBtn').textContent='⏸️ Pause';
+    showToast('Resumed');
+  } else {
+    paused=true;
+    $('#pauseBtn').textContent='▶️ Resume';
+    showToast('Paused');
+  }
+};
+$('#resetBtn').onclick = ()=>{
+  if(confirm('Reset cave? Progress lost.')){
+    resetGame();
+    $('#startOverlay').style.display='flex';
+    $('#levelOverlay').style.display='none';
+    $('#gameOverOverlay').style.display='none';
+  }
+};
+$('#hintBtn').onclick = ()=>{
+  if(!playing) return;
+  // find nearest hidden mineral adjacent chain? Simple: highlight a random hidden mineral
+  const candidates = grid.map((c,i)=>({c,i})).filter(o=>o.c.type==='mineral' && o.c.state==='hidden');
+  if(!candidates.length){ showToast('No minerals left — fill quota!'); return; }
+  // find closest to player by Manhattan
+  let best=null, bestDist=999;
+  candidates.forEach(o=>{
+    const d = Math.abs((o.i%GRID_SIZE)-(playerPos%GRID_SIZE)) + Math.abs(Math.floor(o.i/GRID_SIZE)-Math.floor(playerPos/GRID_SIZE));
+    if(d<bestDist){ bestDist=d; best=o; }
+  });
+  if(best){
+    const el = gridEl.querySelector(`[data-idx="${best.i}"]`);
+    if(el){
+      el.animate([{boxShadow:'0 0 0 0 rgba(255,209,102,0.8)'},{boxShadow:'0 0 0 8px rgba(255,209,102,0)'},{boxShadow:'0 0 0 0 rgba(255,209,102,0.8)'}],{duration:900,iterations:2});
+      showToast(`Hint: ${best.c.mineral.name} nearby!`, 1200);
+    }
+  }
+};
+
+// keyboard for testing
+window.addEventListener('keydown', e=>{
+  const adj = getAdjacent(playerPos);
+  if(e.key==='ArrowUp') { const t=playerPos-GRID_SIZE; if(adj.includes(t)) handleTap(t); }
+  if(e.key==='ArrowDown') { const t=playerPos+GRID_SIZE; if(adj.includes(t)) handleTap(t); }
+  if(e.key==='ArrowLeft') { const t=playerPos-1; if(adj.includes(t)) handleTap(t); }
+  if(e.key==='ArrowRight') { const t=playerPos+1; if(adj.includes(t)) handleTap(t); }
+  if(e.key===' ') { e.preventDefault(); if(!playing) startGame(); }
+});
+
+// prevent zoom
+document.addEventListener('touchmove', e=>{ if(e.scale!==1) e.preventDefault(); }, {passive:false});
+let lastTouch=0;
+document.addEventListener('touchend', e=>{
+  const now=Date.now();
+  if(now-lastTouch<300) e.preventDefault();
+  lastTouch=now;
+}, {passive:false});
+</script>
+</body>
+</html>

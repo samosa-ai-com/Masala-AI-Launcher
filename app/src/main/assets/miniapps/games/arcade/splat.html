@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Balloon Carnival Shooter</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow-x:hidden;background:#0f172a;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  body{display:flex;justify-content:center;background:radial-gradient(1200px 600px at 50% -10%, #38bdf8 0%, #0ea5e9 35%, #0f172a 75%)}
+  .wrap{width:100%;max-width:428px;min-width:360px;min-height:100dvh;display:flex;flex-direction:column;background:#fefce8;position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  /* Header */
+  .topbar{background:#ff3b30;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;gap:8px}
+  .brand{font-weight:900;letter-spacing:.5px;font-size:15px;line-height:1;display:flex;align-items:center;gap:8px}
+  .brand .logo{width:28px;height:28px;background:#fff;border-radius:8px;display:grid;place-items:center;font-size:16px}
+  .stats{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .pill{background:rgba(255,255,255,.18);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:6px 10px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:6px;white-space:nowrap}
+  .pill b{font-size:13px}
+  .pill.best{background:#fff;color:#ff3b30}
+  /* HUD */
+  .hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px 12px;background:#fffbeb;border-bottom:3px solid #fde68a}
+  .hud-card{background:#fff;border:2px solid #f59e0b;border-radius:14px;padding:8px 10px;text-align:center;box-shadow:0 4px 0 #f59e0b}
+  .hud-card .label{font-size:10px;font-weight:900;letter-spacing:.8px;color:#92400e;text-transform:uppercase}
+  .hud-card .value{font-size:20px;font-weight:900;color:#1f2937;line-height:1.1}
+  .hud-card.misses{border-color:#ef4444;box-shadow:0 4px 0 #ef4444}
+  .hud-card.misses .value{color:#dc2626}
+  .hud-card.combo{border-color:#8b5cf6;box-shadow:0 4px 0 #8b5cf6;position:relative;overflow:hidden}
+  .hud-card.combo.active{background:#ede9fe;animation:pop .3s}
+  @keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+  .combo-bar{position:absolute;left:0;bottom:0;height:4px;background:#8b5cf6;transition:width .1s linear}
+  /* Stage */
+  .stage-wrap{position:relative;flex:1;display:flex;flex-direction:column;background:#87e1ff;overflow:hidden}
+  canvas{display:block;width:100%;height:auto;touch-action:none;user-select:none;-webkit-user-select:none}
+  /* Inflate meter */
+  .meter{position:absolute;left:12px;right:12px;bottom:86px;background:rgba(255,255,255,.95);border:3px solid #0f172a;border-radius:16px;padding:10px 12px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 20px rgba(0,0,0,.2);transform:translateY(0);transition:opacity .15s, transform .15s}
+  .meter.hidden{opacity:0;pointer-events:none;transform:translateY(10px)}
+  .meter-label{font-size:11px;font-weight:900;letter-spacing:.6px;color:#0f172a;text-transform:uppercase;min-width:64px}
+  .meter-track{flex:1;height:16px;background:#e5e7eb;border-radius:999px;overflow:hidden;border:2px solid #0f172a;position:relative}
+  .meter-fill{height:100%;width:0%;background:linear-gradient(90deg,#22c55e,#eab308,#ef4444);transition:width .05s linear}
+  .meter-fill.pop{background:#ef4444;animation:shake .2s infinite}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
+  .meter-value{font-weight:900;font-size:13px;min-width:44px;text-align:right}
+  .meter-hint{position:absolute;top:-18px;right:0;font-size:10px;font-weight:800;background:#0f172a;color:#fff;padding:2px 6px;border-radius:999px}
+  /* Controls */
+  .controls{padding:10px 12px;background:#fff;display:flex;gap:10px;align-items:center;border-top:3px solid #0f172a}
+  .btn{flex:1;min-height:52px;border-radius:14px;border:3px solid #0f172a;font-weight:900;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 0 #0f172a;transition:transform .05s, box-shadow .05s}
+  .btn:active{transform:translateY(2px);box-shadow:0 2px 0 #0f172a}
+  .btn-primary{background:#22c55e;color:#0f172a}
+  .btn-secondary{background:#fff;color:#0f172a}
+  .btn-danger{background:#ff3b30;color:#fff}
+  .btn:disabled{opacity:.5;pointer-events:none}
+  .hint{padding:8px 12px;background:#0f172a;color:#fde68a;text-align:center;font-size:12px;font-weight:700;letter-spacing:.2px}
+  .hint span{color:#fff}
+  /* Overlays */
+  .overlay{position:absolute;inset:0;background:rgba(15,23,42,.78);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10}
+  .overlay.hidden{display:none}
+  .card{background:#fff;border:4px solid #0f172a;border-radius:20px;padding:18px;max-width:340px;width:100%;box-shadow:0 12px 0 #0f172a;text-align:center}
+  .card h1{font-size:26px;font-weight:1000;color:#0f172a;line-height:1;letter-spacing:-.5px}
+  .card h1 span{color:#ff3b30}
+  .card p{font-size:13px;color:#475569;margin:10px 0 14px;line-height:1.5;font-weight:600}
+  .badge{display:inline-flex;align-items:center;gap:6px;background:#fef08a;border:2px solid #0f172a;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:900;margin-bottom:10px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+  .mini{border:2px solid #e5e7eb;border-radius:12px;padding:10px;background:#f8fafc}
+  .mini .k{font-size:10px;font-weight:900;letter-spacing:.6px;color:#64748b;text-transform:uppercase}
+  .mini .v{font-size:18px;font-weight:900;color:#0f172a}
+  .howto{text-align:left;background:#f1f5f9;border-radius:12px;padding:12px;margin:10px 0;font-size:12px;line-height:1.5;font-weight:600;color:#334155}
+  .howto b{color:#0f172a}
+  .howto li{margin:4px 0}
+  .big-emoji{font-size:42px;margin-bottom:6px}
+  /* Toast */
+  .toast{position:absolute;top:92px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:8px 14px;border-radius:999px;font-weight:900;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;z-index:5;white-space:nowrap;border:2px solid #fff;box-shadow:0 6px 16px rgba(0,0,0,.3)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <div class="topbar">
+    <div class="brand"><div class="logo">🎪</div> BALLOON<br>SHOOTER</div>
+    <div class="stats">
+      <div class="pill">⭐ <b id="scoreTop">0</b></div>
+      <div class="pill best">🏆 <b id="bestTop">0</b></div>
+      <div class="pill">🌊 <b id="waveTop">1</b></div>
+    </div>
+  </div>
+
+  <div class="hud">
+    <div class="hud-card"><div class="label">Score</div><div class="value" id="scoreVal">0</div></div>
+    <div class="hud-card misses"><div class="label">Misses</div><div class="value" id="missVal">0 / 5</div></div>
+    <div class="hud-card combo" id="comboCard"><div class="label">Combo</div><div class="value" id="comboVal">x1</div><div class="combo-bar" id="comboBar" style="width:0%"></div></div>
+  </div>
+
+  <div class="stage-wrap" id="stageWrap">
+    <canvas id="game" width="360" height="560"></canvas>
+
+    <div class="meter hidden" id="meter">
+      <div class="meter-label">Inflate</div>
+      <div class="meter-track"><div class="meter-fill" id="meterFill"></div><div class="meter-hint" id="meterHint">HOLD</div></div>
+      <div class="meter-value" id="meterVal">0%</div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- Start overlay -->
+    <div class="overlay" id="startOverlay">
+      <div class="card">
+        <div class="badge">🎈 CARNIVAL EDITION 🎯</div>
+        <h1>SOAK THE <span>GOOFY BIRDS!</span></h1>
+        <p>Drag to aim, <b>hold to inflate</b> bigger balloons for bigger splashes. Chain soaks for combos!</p>
+        <div class="howto">
+          <b>How to play:</b>
+          <ol style="padding-left:16px">
+            <li>👆 <b>Drag anywhere</b> to aim — red line shows path</li>
+            <li>💧 <b>Hold</b> to inflate — bigger = more points & splash!</li>
+            <li>⚠️ Hold too long (~1.7s) and it <b>POPS!</b> = miss</li>
+            <li>🔥 Hit within 2s for <b>COMBO x2, x3…</b></li>
+            <li>❤️ <b>5 misses</b> ends the round — waves get faster!</li>
+          </ol>
+        </div>
+        <div class="grid2">
+          <div class="mini"><div class="k">Best Score</div><div class="v" id="bestStart">0</div></div>
+          <div class="mini"><div class="k">Last Score</div><div class="v" id="lastStart">—</div></div>
+        </div>
+        <button class="btn btn-primary" id="startBtn" style="width:100%">🎪 START CARNIVAL</button>
+        <div style="margin-top:8px;font-size:11px;font-weight:800;color:#64748b">Large touch targets • No zoom needed • Portrait 360-428px</div>
+      </div>
+    </div>
+
+    <!-- Game over overlay -->
+    <div class="overlay hidden" id="overOverlay">
+      <div class="card">
+        <div class="big-emoji" id="overEmoji">💦</div>
+        <h1 id="overTitle">ROUND OVER!</h1>
+        <p id="overSub">You soaked a lot of birds!</p>
+        <div class="grid2">
+          <div class="mini"><div class="k">Score</div><div class="v" id="overScore">0</div></div>
+          <div class="mini"><div class="k">Best</div><div class="v" id="overBest">0</div></div>
+        </div>
+        <div class="grid2" style="margin-top:0">
+          <div class="mini"><div class="k">Top Combo</div><div class="v" id="overCombo">x1</div></div>
+          <div class="mini"><div class="k">Waves</div><div class="v" id="overWave">1</div></div>
+        </div>
+        <button class="btn btn-primary" id="restartBtn" style="width:100%;margin-top:12px">🔄 PLAY AGAIN</button>
+        <button class="btn btn-secondary" id="menuBtn" style="width:100%;margin-top:8px">🏠 MENU</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-secondary" id="pauseBtn">⏸️ Pause</button>
+    <button class="btn btn-primary" id="shootBtn">🎯 HOLD TO INFLATE</button>
+  </div>
+  <div class="hint">👆 <span>Drag on stage to aim</span> • Hold to grow balloon • Release to launch • Don't over-inflate!</div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('wrap');
+  const scoreTop = document.getElementById('scoreTop');
+  const bestTop = document.getElementById('bestTop');
+  const waveTop = document.getElementById('waveTop');
+  const scoreVal = document.getElementById('scoreVal');
+  const missVal = document.getElementById('missVal');
+  const comboVal = document.getElementById('comboVal');
+  const comboCard = document.getElementById('comboCard');
+  const comboBar = document.getElementById('comboBar');
+  const meter = document.getElementById('meter');
+  const meterFill = document.getElementById('meterFill');
+  const meterVal = document.getElementById('meterVal');
+  const meterHint = document.getElementById('meterHint');
+  const toast = document.getElementById('toast');
+  const startOverlay = document.getElementById('startOverlay');
+  const overOverlay = document.getElementById('overOverlay');
+  const bestStart = document.getElementById('bestStart');
+  const lastStart = document.getElementById('lastStart');
+  const overScore = document.getElementById('overScore');
+  const overBest = document.getElementById('overBest');
+  const overCombo = document.getElementById('overCombo');
+  const overWave = document.getElementById('overWave');
+  const overTitle = document.getElementById('overTitle');
+  const overSub = document.getElementById('overSub');
+  const overEmoji = document.getElementById('overEmoji');
+
+  const W = 360, H = 560;
+  const CANNON_X = W/2, CANNON_Y = H - 46;
+  const MAX_MISSES = 5;
+  const MAX_HOLD = 1700; // ms
+  const COMBO_WINDOW = 2000;
+  const GRAVITY = 980;
+
+  let score=0, best=0, misses=0, wave=1, combo=0, topCombo=0, comboTimer=0;
+  let birds=[], balloons=[], splashes=[], particles=[], confetti=[];
+  let gameState='menu'; // menu, playing, paused, over
+  let isAiming=false, isHolding=false, aimAngle=-Math.PI/2, holdStart=0, holdPower=0;
+  let pointerActive=false, pointerPos={x:CANNON_X,y:CANNON_Y-120};
+  let lastTime=0, waveTime=0, spawnTimer=0, spawnInterval=1100;
+  let raf=0;
+  let lastScore=0;
+
+  // Load best
+  try{
+    best = parseInt(localStorage.getItem('balloon_carnival_best')||'0',10)||0;
+    lastScore = parseInt(localStorage.getItem('balloon_carnival_last')||'0',10)||0;
+  }catch(e){}
+  bestTop.textContent = best;
+  bestStart.textContent = best;
+  lastStart.textContent = lastScore? lastScore : '—';
+
+  function saveBest(){
+    try{
+      localStorage.setItem('balloon_carnival_best', String(best));
+      localStorage.setItem('balloon_carnival_last', String(score));
+    }catch(e){}
+  }
+
+  function showToast(msg, ms=900){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(()=>toast.classList.remove('show'), ms);
+  }
+
+  function resetGame(){
+    score=0; misses=0; wave=1; combo=0; topCombo=0; comboTimer=0;
+    birds=[]; balloons=[]; splashes=[]; particles=[]; confetti=[];
+    waveTime=0; spawnTimer=0; spawnInterval=1100;
+    holdPower=0; isHolding=false; isAiming=false;
+    updateHUD();
+  }
+
+  function updateHUD(){
+    scoreTop.textContent = score;
+    scoreVal.textContent = score;
+    bestTop.textContent = best;
+    waveTop.textContent = wave;
+    missVal.textContent = misses + ' / ' + MAX_MISSES;
+    comboVal.textContent = combo>0 ? 'x'+(combo+1) : 'x1';
+    comboCard.classList.toggle('active', combo>0);
+    if(combo>0){
+      const pct = Math.max(0, (comboTimer/COMBO_WINDOW)*100);
+      comboBar.style.width = pct+'%';
+      comboBar.style.opacity = '1';
+    } else {
+      comboBar.style.width='0%';
+    }
+    // misses color pulse
+    if(misses>=3){
+      missVal.parentElement.style.animation = misses>=4 ? 'shake .3s' : '';
+    }
+  }
+
+  // Bird factory
+  function spawnBird(){
+    const lanes = [90, 150, 210, 270, 330];
+    const y = lanes[Math.floor(Math.random()*lanes.length)] + (Math.random()*20-10);
+    const dir = Math.random()<0.5 ? 1 : -1;
+    const x = dir===1 ? -50 : W+50;
+    const speed = (70 + wave*18 + Math.random()*40) * (wave>4?1.25:1);
+    const type = Math.floor(Math.random()*4);
+    const colors = [
+      {body:'#facc15', belly:'#fef08a', hat:'#ef4444'},
+      {body:'#38bdf8', belly:'#e0f2fe', hat:'#f59e0b'},
+      {body:'#fb7185', belly:'#ffe4e6', hat:'#22c55e'},
+      {body:'#a78bfa', belly:'#ede9fe', hat:'#facc15'},
+    ];
+    birds.push({
+      x, y, baseY:y, dir, speed, type,
+      w: 44, h: 32,
+      bobPhase: Math.random()*Math.PI*2,
+      bobSpeed: 6 + Math.random()*4,
+      waddlePhase: Math.random()*Math.PI*2,
+      hit:false, hitTime:0,
+      colors: colors[type],
+      hatTilt: (Math.random()-.5)*0.3
+    });
+  }
+
+  function launchBalloon(power, angle){
+    // power 0..1
+    const radius = 10 + power*18; // 10 to 28
+    const speed = 380 + power*420; // 380 to 800
+    const vx = Math.cos(angle)*speed;
+    const vy = Math.sin(angle)*speed;
+    // cannon tip
+    const tipDist = 28;
+    const sx = CANNON_X + Math.cos(angle)*tipDist;
+    const sy = CANNON_Y + Math.sin(angle)*tipDist;
+    balloons.push({
+      x:sx, y:sy, vx, vy, r:radius, power,
+      trail:[],
+      life:0,
+      popped:false
+    });
+    // particles at launch
+    for(let i=0;i<6;i++){
+      particles.push({x:sx,y:sy,vx:(Math.random()-.5)*120, vy:(Math.random()-.5)*120, r:2+Math.random()*2, life:0, max:300, color:'#38bdf8'});
+    }
+  }
+
+  function createSplash(x,y, r, color){
+    splashes.push({x,y,r: r*0.6, maxR: r*2.8, life:0, max:420, color});
+    for(let i=0;i<12;i++){
+      const a = (Math.PI*2*i)/12 + Math.random()*0.3;
+      const sp = 80 + Math.random()*180;
+      particles.push({
+        x, y,
+        vx: Math.cos(a)*sp,
+        vy: Math.sin(a)*sp - 60,
+        r: 3+Math.random()*4,
+        life:0, max:500+Math.random()*300,
+        color: Math.random()<0.5 ? '#38bdf8' : '#0ea5e9',
+        gravity: 600
+      });
+    }
+    for(let i=0;i<8;i++){
+      confetti.push({
+        x: x + (Math.random()-.5)*10,
+        y: y + (Math.random()-.5)*10,
+        vx:(Math.random()-.5)*200,
+        vy: -100 - Math.random()*200,
+        r: 4+Math.random()*4,
+        rot: Math.random()*Math.PI,
+        vr:(Math.random()-.5)*8,
+        life:0, max:700+Math.random()*400,
+        color: ['#facc15','#38bdf8','#fb7185','#22c55e','#a78bfa'][Math.floor(Math.random()*5)]
+      });
+    }
+  }
+
+  function handleHit(bird, balloon){
+    const base = 100;
+    const sizeBonus = Math.floor(balloon.power*80); // 0-80
+    const waveBonus = (wave-1)*15;
+    const comboMult = 1 + combo*0.5;
+    const pts = Math.floor((base + sizeBonus + waveBonus) * comboMult);
+    score += pts;
+
+    // combo logic
+    const now = performance.now();
+    if(comboTimer>0) combo++;
+    else combo = combo>0 ? combo : 1; // first combo gives x2
+    // Actually we want combo count = hits in window. Simpler: if within window, increment, else reset to 1
+    // We'll manage via timer: if timer>0 then combo stays, else combo=1
+    // But we already incremented, need to handle correctly
+    // Let's fix: if previous hit was within window, combo++ else combo=1
+    // We'll track lastHitTime
+    comboTimer = COMBO_WINDOW;
+    topCombo = Math.max(topCombo, combo);
+
+    if(score>best){ best=score; saveBest(); }
+
+    createSplash(bird.x, bird.y, balloon.r + 14, bird.colors.body);
+
+    // floating text
+    particles.push({
+      x: bird.x, y: bird.y - 20,
+      vx: 0, vy: -60,
+      r:0, life:0, max:800,
+      text: '+'+pts + (combo>1 ? ' x'+(combo+1)+'!' : ''),
+      color: combo>1 ? '#7c3aed' : '#0f172a',
+      isText:true
+    });
+
+    if(combo>1) showToast('COMBO x'+(combo+1)+'! 🔥', 700);
+
+    // remove bird with animation
+    bird.hit=true;
+    bird.hitTime=0;
+
+    updateHUD();
+  }
+
+  function handleMiss(reason){
+    misses++;
+    combo=0; comboTimer=0;
+    updateHUD();
+    // shake
+    canvas.style.transform='translateX(2px)';
+    setTimeout(()=>canvas.style.transform='',100);
+    if(reason==='pop'){
+      showToast('💥 POP! Too big!', 900);
+      // pop effect at cannon
+      const a = aimAngle;
+      const sx = CANNON_X + Math.cos(a)*28;
+      const sy = CANNON_Y + Math.sin(a)*28;
+      for(let i=0;i<14;i++){
+        particles.push({x:sx,y:sy,vx:(Math.random()-.5)*260, vy:(Math.random()-.5)*260, r:3+Math.random()*3, life:0, max:400, color:'#ef4444'});
+      }
+    } else {
+      showToast('Miss! 💧', 600);
+    }
+    if(misses>=MAX_MISSES){
+      endGame();
+    }
+  }
+
+  function endGame(){
+    gameState='over';
+    saveBest();
+    // update over screen
+    overScore.textContent = score;
+    overBest.textContent = best;
+    overCombo.textContent = 'x'+(topCombo? topCombo+1 : 1);
+    overWave.textContent = wave;
+    if(score>=best && score>0){
+      overTitle.textContent='NEW BEST! 🏆';
+      overSub.textContent='Carnival champion! You soaked them all!';
+      overEmoji.textContent='🏆';
+    } else if(score>600){
+      overTitle.textContent='CARNIVAL STAR! ⭐';
+      overSub.textContent='Amazing aim! The birds are drenched!';
+      overEmoji.textContent='⭐';
+    } else if(score>300){
+      overTitle.textContent='GOOD SOAK! 💦';
+      overSub.textContent='Keep inflating bigger for bigger splashes!';
+      overEmoji.textContent='💦';
+    } else {
+      overTitle.textContent='ROUND OVER!';
+      overSub.textContent='Try bigger balloons & combo chains!';
+      overEmoji.textContent='🎈';
+    }
+    bestStart.textContent = best;
+    lastStart.textContent = score;
+    overOverlay.classList.remove('hidden');
+    meter.classList.add('hidden');
+  }
+
+  // Input handling
+  function getPos(e){
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const scaleY = H / rect.height;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left)*scaleX,
+      y: (clientY - rect.top)*scaleY
+    };
+  }
+
+  function updateAim(pos){
+    pointerPos = pos;
+    const dx = pos.x - CANNON_X;
+    const dy = pos.y - CANNON_Y;
+    let ang = Math.atan2(dy, dx);
+    // clamp to upper hemisphere (don't aim downwards too much)
+    // allow -170deg to -10deg (almost full upper)
+    const deg = ang*180/Math.PI;
+    if(deg> -10 && deg < 90) ang = -10*Math.PI/180;
+    if(deg>90) ang = -170*Math.PI/180;
+    aimAngle = ang;
+  }
+
+  function onPointerDown(e){
+    if(gameState!=='playing') return;
+    e.preventDefault();
+    pointerActive=true;
+    const pos = getPos(e);
+    updateAim(pos);
+    isAiming=true;
+    isHolding=true;
+    holdStart=performance.now();
+    holdPower=0;
+    meter.classList.remove('hidden');
+    canvas.setPointerCapture && e.pointerId && canvas.setPointerCapture(e.pointerId);
+  }
+  function onPointerMove(e){
+    if(!pointerActive || gameState!=='playing') return;
+    e.preventDefault();
+    const pos = getPos(e);
+    updateAim(pos);
+  }
+  function onPointerUp(e){
+    if(!pointerActive) return;
+    e.preventDefault();
+    pointerActive=false;
+    if(gameState!=='playing') return;
+    if(isHolding){
+      // check if popped already handled
+      if(holdPower<1){
+        launchBalloon(holdPower, aimAngle);
+        showToast(holdPower>0.7 ? 'BIG SPLASH! 💦' : 'Splash! 💧', 500);
+      }
+      isHolding=false;
+      isAiming=false;
+      holdPower=0;
+      meter.classList.add('hidden');
+    }
+  }
+
+  // Also handle mouse/touch fallback
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('pointercancel', onPointerUp);
+  canvas.addEventListener('touchstart', onPointerDown, {passive:false});
+  canvas.addEventListener('touchmove', onPointerMove, {passive:false});
+  canvas.addEventListener('touchend', onPointerUp, {passive:false});
+
+  // Shoot button also acts as hold area for accessibility
+  const shootBtn = document.getElementById('shootBtn');
+  shootBtn.addEventListener('pointerdown', (e)=>{
+    if(gameState!=='playing') return;
+    e.preventDefault();
+    // simulate hold at current aim
+    pointerActive=true;
+    isHolding=true;
+    holdStart=performance.now();
+    meter.classList.remove('hidden');
+  });
+  shootBtn.addEventListener('pointerup', (e)=>{
+    e.preventDefault();
+    if(isHolding && gameState==='playing'){
+      if(holdPower<1) launchBalloon(holdPower, aimAngle);
+      isHolding=false; pointerActive=false; meter.classList.add('hidden');
+    }
+  });
+
+  // Game loop
+  function update(dt){
+    if(gameState!=='playing') return;
+
+    const now = performance.now();
+
+    // hold power
+    if(isHolding){
+      const elapsed = now - holdStart;
+      holdPower = Math.min(elapsed / MAX_HOLD, 1);
+      const pct = Math.floor(holdPower*100);
+      meterFill.style.width = pct+'%';
+      meterVal.textContent = pct+'%';
+      if(holdPower>0.85) meterHint.textContent='RELEASE!';
+      else if(holdPower>0.5) meterHint.textContent='BIG!';
+      else meterHint.textContent='HOLD';
+      meterHint.style.background = holdPower>0.85 ? '#ef4444' : '#0f172a';
+      if(holdPower>=1){
+        // pop!
+        isHolding=false;
+        pointerActive=false;
+        meter.classList.add('hidden');
+        handleMiss('pop');
+        // reset hold
+        holdPower=0;
+      }
+    }
+
+    // combo timer
+    if(comboTimer>0){
+      comboTimer -= dt*1000;
+      if(comboTimer<=0){ combo=0; comboTimer=0; updateHUD(); }
+      else {
+        const pct = (comboTimer/COMBO_WINDOW)*100;
+        comboBar.style.width = pct+'%';
+      }
+    }
+
+    // wave progression
+    waveTime += dt;
+    if(waveTime>12){
+      waveTime=0;
+      wave++;
+      spawnInterval = Math.max(380, 1100 - wave*90);
+      showToast('WAVE '+wave+'! Faster! 🌊', 900);
+      updateHUD();
+    }
+
+    // spawn birds
+    spawnTimer += dt*1000;
+    if(spawnTimer>spawnInterval){
+      spawnTimer=0;
+      spawnBird();
+      // occasionally spawn double
+      if(wave>2 && Math.random()<0.35) setTimeout(spawnBird, 180);
+      if(wave>5 && Math.random()<0.25) setTimeout(spawnBird, 320);
+    }
+
+    // update birds
+    for(let i=birds.length-1;i>=0;i--){
+      const b = birds[i];
+      if(b.hit){
+        b.hitTime += dt;
+        b.y += 260*dt; // fall
+        b.x += b.dir*40*dt;
+        // spin
+        b.hatTilt += dt*6;
+        if(b.hitTime>0.6){
+          birds.splice(i,1);
+        }
+        continue;
+      }
+      b.x += b.dir * b.speed * dt;
+      b.baseY += Math.sin(now*0.001* b.bobSpeed + b.bobPhase)*0.02; // tiny drift
+      // waddle bob
+      b.y = b.baseY + Math.sin(now*0.008 + b.waddlePhase)*4;
+      // remove offscreen
+      if((b.dir===1 && b.x>W+60) || (b.dir===-1 && b.x<-60)){
+        birds.splice(i,1);
+      }
+    }
+
+    // update balloons
+    for(let i=balloons.length-1;i>=0;i--){
+      const bl = balloons[i];
+      bl.life += dt;
+      // trail
+      bl.trail.push({x:bl.x, y:bl.y, r:bl.r*0.5, a:0.6});
+      if(bl.trail.length>8) bl.trail.shift();
+      bl.trail.forEach(t=>t.a-=dt*1.2);
+
+      bl.x += bl.vx * dt;
+      bl.y += bl.vy * dt;
+      bl.vy += GRAVITY * dt;
+      // air drag tiny
+      bl.vx *= 0.999;
+
+      // collision with birds
+      let hit=false;
+      for(let j=0;j<birds.length;j++){
+        const bird = birds[j];
+        if(bird.hit) continue;
+        const dx = bl.x - bird.x;
+        const dy = bl.y - bird.y;
+        const dist = Math.hypot(dx,dy);
+        if(dist < bl.r + 22){
+          handleHit(bird, bl);
+          balloons.splice(i,1);
+          hit=true;
+          break;
+        }
+      }
+      if(hit) continue;
+
+      // offscreen miss
+      if(bl.y > H+40 || bl.x < -40 || bl.x > W+40 || bl.life>4){
+        balloons.splice(i,1);
+        if(!hit) handleMiss('offscreen');
+      }
+    }
+
+    // splashes
+    for(let i=splashes.length-1;i>=0;i--){
+      const s=splashes[i];
+      s.life+=dt*1000;
+      s.r += dt*60;
+      if(s.life>=s.max) splashes.splice(i,1);
+    }
+    // particles
+    for(let i=particles.length-1;i>=0;i--){
+      const p=particles[i];
+      p.life+=dt*1000;
+      if(p.isText){
+        p.y += p.vy*dt;
+        p.vy += 40*dt;
+        if(p.life>=p.max) particles.splice(i,1);
+        continue;
+      }
+      p.x += p.vx*dt;
+      p.y += p.vy*dt;
+      if(p.gravity) p.vy += p.gravity*dt;
+      else p.vy += 300*dt;
+      if(p.life>=p.max) particles.splice(i,1);
+    }
+    for(let i=confetti.length-1;i>=0;i--){
+      const c=confetti[i];
+      c.life+=dt*1000;
+      c.x+=c.vx*dt;
+      c.y+=c.vy*dt;
+      c.vy+= 500*dt;
+      c.rot+=c.vr*dt;
+      if(c.life>=c.max) confetti.splice(i,1);
+    }
+  }
+
+  function drawBackground(){
+    // sky
+    const g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#38bdf8');
+    g.addColorStop(0.5,'#7dd3fc');
+    g.addColorStop(1,'#fef9c3');
+    ctx.fillStyle=g;
+    ctx.fillRect(0,0,W,H);
+
+    // clouds
+    ctx.fillStyle='rgba(255,255,255,.9)';
+    drawCloud(40,50, 60,18);
+    drawCloud(260,70, 70,20);
+    drawCloud(140,30, 50,14);
+    drawCloud(200,110, 40,12);
+
+    // distant carnival tents
+    ctx.fillStyle='#fde68a';
+    ctx.beginPath();
+    ctx.moveTo(0,180); ctx.lineTo(40,120); ctx.lineTo(80,180); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#fca5a5';
+    ctx.beginPath();
+    ctx.moveTo(80,180); ctx.lineTo(120,110); ctx.lineTo(160,180); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#86efac';
+    ctx.beginPath();
+    ctx.moveTo(160,180); ctx.lineTo(200,125); ctx.lineTo(240,180); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#c4b5fd';
+    ctx.beginPath();
+    ctx.moveTo(240,180); ctx.lineTo(280,115); ctx.lineTo(320,180); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#fde68a';
+    ctx.beginPath();
+    ctx.moveTo(320,180); ctx.lineTo(360,130); ctx.lineTo(400,180); ctx.closePath(); ctx.fill();
+
+    // stage curtains sides
+    ctx.fillStyle='#ff3b30';
+    ctx.fillRect(0,0,14,H);
+    ctx.fillRect(W-14,0,14,H);
+    // curtain folds
+    ctx.fillStyle='rgba(0,0,0,.12)';
+    for(let x=0;x<14;x+=7){ ctx.fillRect(x,0,3,H); }
+    for(let x=W-14;x<W;x+=7){ ctx.fillRect(x,0,3,H); }
+
+    // bunting
+    ctx.strokeStyle='#0f172a';
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(14,44); ctx.quadraticCurveTo(W/2, 70, W-14,44); ctx.stroke();
+    const buntingColors=['#ff3b30','#facc15','#22c55e','#38bdf8','#a78bfa'];
+    for(let i=0;i<7;i++){
+      const t=i/6;
+      const x=14 + t*(W-28);
+      const y= 44 + Math.sin(t*Math.PI)*18;
+      ctx.fillStyle=buntingColors[i%buntingColors.length];
+      ctx.beginPath();
+      ctx.moveTo(x-10,y-6); ctx.lineTo(x+10,y-6); ctx.lineTo(x,y+10); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='#0f172a'; ctx.lineWidth=1.5; ctx.stroke();
+    }
+
+    // ground
+    ctx.fillStyle='#fde68a';
+    ctx.fillRect(0,H-70,W,70);
+    ctx.fillStyle='#f59e0b';
+    ctx.fillRect(0,H-70,W,6);
+    // wood planks
+    ctx.strokeStyle='rgba(15,23,42,.15)'; ctx.lineWidth=1;
+    for(let y=H-64;y<H;y+=14){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  }
+  function drawCloud(x,y,w,h){
+    ctx.beginPath();
+    ctx.ellipse(x,y,w,h,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(x+18,y-6,w*0.7,h*0.8,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(x-16,y-4,w*0.6,h*0.7,0,0,Math.PI*2); ctx.fill();
+  }
+
+  function drawCannon(){
+    // base
+    ctx.save();
+    ctx.translate(CANNON_X, CANNON_Y);
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,.15)';
+    ctx.beginPath(); ctx.ellipse(0,18,36,10,0,0,Math.PI*2); ctx.fill();
+    // body
+    ctx.fillStyle='#0f172a';
+    ctx.beginPath(); ctx.roundRect(-30,-14,60,28,10); ctx.fill();
+    ctx.fillStyle='#334155';
+    ctx.beginPath(); ctx.roundRect(-26,-10,52,10,6); ctx.fill();
+    // barrel
+    ctx.save();
+    ctx.rotate(aimAngle);
+    ctx.fillStyle='#f59e0b';
+    ctx.beginPath(); ctx.roundRect(0,-10,34,20,8); ctx.fill();
+    ctx.fillStyle='#fde68a';
+    ctx.beginPath(); ctx.roundRect(4,-6,22,12,6); ctx.fill();
+    // tip ring
+    ctx.fillStyle='#0f172a';
+    ctx.beginPath(); ctx.arc(34,0,10,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#38bdf8';
+    ctx.beginPath(); ctx.arc(34,0,7,0,Math.PI*2); ctx.fill();
+    // preview balloon at tip if holding
+    if(isHolding){
+      const r = 10 + holdPower*18;
+      const hue = holdPower>0.85 ? '#ef4444' : holdPower>0.5 ? '#f59e0b' : '#38bdf8';
+      ctx.fillStyle=hue;
+      ctx.beginPath(); ctx.arc(34,0,r,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.85)';
+      ctx.beginPath(); ctx.ellipse(34 - r*0.3, -r*0.3, r*0.35, r*0.25, -0.4,0,Math.PI*2); ctx.fill();
+      // wobble
+      ctx.strokeStyle='rgba(15,23,42,.2)'; ctx.lineWidth=1.5; ctx.stroke();
+      // knot
+      ctx.fillStyle='#0f172a';
+      ctx.beginPath(); ctx.arc(34 - r -2, 0, 3,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+    // wheels
+    ctx.fillStyle='#0f172a';
+    ctx.beginPath(); ctx.arc(-18,14,8,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(18,14,8,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#e5e7eb';
+    ctx.beginPath(); ctx.arc(-18,14,3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(18,14,3,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawAimLine(){
+    if(!isAiming && !isHolding) return;
+    const len = 120;
+    const ex = CANNON_X + Math.cos(aimAngle)*len;
+    const ey = CANNON_Y + Math.sin(aimAngle)*len;
+    ctx.save();
+    ctx.strokeStyle='rgba(239,68,68,.9)';
+    ctx.lineWidth=3;
+    ctx.setLineDash([8,6]);
+    ctx.beginPath(); ctx.moveTo(CANNON_X, CANNON_Y); ctx.lineTo(ex,ey); ctx.stroke();
+    ctx.setLineDash([]);
+    // target
+    ctx.fillStyle='#ef4444';
+    ctx.strokeStyle='#fff';
+    ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(ex,ey,10,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(ex,ey,4,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+    // trajectory dots
+    ctx.fillStyle='rgba(15,23,42,.25)';
+    for(let i=1;i<=4;i++){
+      const t=i/5;
+      const x=CANNON_X + Math.cos(aimAngle)*len*t;
+      const y=CANNON_Y + Math.sin(aimAngle)*len*t;
+      ctx.beginPath(); ctx.arc(x,y,2.5,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawBird(b){
+    ctx.save();
+    ctx.translate(b.x,b.y);
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,.12)';
+    ctx.beginPath(); ctx.ellipse(0,14,18,6,0,0,Math.PI*2); ctx.fill();
+
+    // waddle tilt
+    const waddle = Math.sin(performance.now()*0.01 + b.waddlePhase)*0.12;
+    ctx.rotate(waddle + (b.hit? b.hatTilt : 0));
+
+    // feet
+    ctx.fillStyle='#f59e0b';
+    const footOff = Math.sin(performance.now()*0.015 + b.waddlePhase)*3;
+    ctx.beginPath(); ctx.ellipse(-8+footOff,12,6,3,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(8-footOff,12,6,3,0,0,Math.PI*2); ctx.fill();
+
+    // body
+    ctx.fillStyle=b.colors.body;
+    ctx.strokeStyle='#0f172a'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.ellipse(0,0,22,16,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    // belly
+    ctx.fillStyle=b.colors.belly;
+    ctx.beginPath(); ctx.ellipse(0,4,14,9,0,0,Math.PI*2); ctx.fill();
+    // wing
+    ctx.fillStyle='rgba(0,0,0,.08)';
+    ctx.beginPath(); ctx.ellipse(-6,-2,10,7, -0.3,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#0f172a'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.ellipse(-6,-2,10,7, -0.3,0,Math.PI*2); ctx.stroke();
+
+    // head
+    ctx.fillStyle=b.colors.body;
+    ctx.beginPath(); ctx.arc(14,-6,12,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    // beak
+    ctx.fillStyle='#f59e0b';
+    ctx.strokeStyle='#0f172a'; ctx.lineWidth=1.8;
+    ctx.beginPath(); ctx.moveTo(24,-6); ctx.lineTo(32,-3); ctx.lineTo(24,0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // eye
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(18,-9,5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#0f172a';
+    ctx.beginPath(); ctx.arc(19,-8,2.5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(20,-9.5,1,0,Math.PI*2); ctx.fill();
+    // cheek
+    ctx.fillStyle='rgba(239,68,68,.25)';
+    ctx.beginPath(); ctx.arc(12,-2,3,0,Math.PI*2); ctx.fill();
+
+    // hat
+    ctx.save();
+    ctx.translate(10,-16);
+    ctx.rotate(b.hatTilt);
+    ctx.fillStyle=b.colors.hat;
+    ctx.strokeStyle='#0f172a'; ctx.lineWidth=1.8;
+    ctx.beginPath(); ctx.roundRect(-10,-6,20,8,4); ctx.fill(); ctx.stroke();
+    ctx.fillStyle=b.colors.hat;
+    ctx.beginPath(); ctx.roundRect(-7,-14,14,10,3); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(0,-14,3,0,Math.PI*2); ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // hit X eyes
+    if(b.hit){
+      ctx.strokeStyle='#0f172a'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(15,-11); ctx.lineTo(21,-7); ctx.moveTo(21,-11); ctx.lineTo(15,-7); ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  function drawBalloon(bl){
+    // trail
+    bl.trail.forEach(t=>{
+      ctx.globalAlpha = Math.max(0,t.a);
+      ctx.fillStyle='#38bdf8';
+      ctx.beginPath(); ctx.arc(t.x,t.y,t.r,0,Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha=1;
+    ctx.save();
+    ctx.translate(bl.x, bl.y);
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,.1)';
+    ctx.beginPath(); ctx.ellipse(2,4, bl.r*0.9, bl.r*0.5,0,0,Math.PI*2); ctx.fill();
+    // balloon
+    const grad = ctx.createRadialGradient(-bl.r*0.3,-bl.r*0.3, bl.r*0.2, 0,0, bl.r);
+    grad.addColorStop(0,'#7dd3fc');
+    grad.addColorStop(0.5,'#0ea5e9');
+    grad.addColorStop(1,'#0369a1');
+    ctx.fillStyle=grad;
+    ctx.strokeStyle='#0f172a'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(0,0,bl.r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    // highlight
+    ctx.fillStyle='rgba(255,255,255,.85)';
+    ctx.beginPath(); ctx.ellipse(-bl.r*0.3,-bl.r*0.35, bl.r*0.35, bl.r*0.22, -0.5,0,Math.PI*2); ctx.fill();
+    // knot
+    ctx.fillStyle='#0f172a';
+    ctx.beginPath(); ctx.arc(0, bl.r+2, 3,0,Math.PI*2); ctx.fill();
+    // string
+    ctx.strokeStyle='rgba(15,23,42,.5)'; ctx.lineWidth=1.2;
+    ctx.beginPath();
+    ctx.moveTo(0, bl.r+4);
+    ctx.bezierCurveTo(4, bl.r+10, -4, bl.r+16, 0, bl.r+22);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    drawBackground();
+
+    // birds
+    birds.forEach(drawBird);
+
+    // aim line under balloons
+    drawAimLine();
+
+    // balloons
+    balloons.forEach(drawBalloon);
+
+    // splashes
+    splashes.forEach(s=>{
+      const p = s.life/s.max;
+      ctx.globalAlpha = 1-p;
+      ctx.strokeStyle=s.color;
+      ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.stroke();
+      ctx.fillStyle='rgba(56,189,248,.25)';
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.r*0.7,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+    });
+
+    // particles
+    particles.forEach(p=>{
+      if(p.isText){
+        ctx.globalAlpha = 1 - p.life/p.max;
+        ctx.fillStyle=p.color;
+        ctx.font='900 14px system-ui';
+        ctx.textAlign='center';
+        ctx.strokeStyle='#fff'; ctx.lineWidth=3;
+        ctx.strokeText(p.text, p.x, p.y);
+        ctx.fillText(p.text, p.x, p.y);
+        ctx.globalAlpha=1;
+        return;
+      }
+      const a = 1 - p.life/p.max;
+      ctx.globalAlpha=a;
+      ctx.fillStyle=p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+    });
+    confetti.forEach(c=>{
+      const a=1-c.life/c.max;
+      ctx.globalAlpha=a;
+      ctx.save();
+      ctx.translate(c.x,c.y);
+      ctx.rotate(c.rot);
+      ctx.fillStyle=c.color;
+      ctx.fillRect(-c.r/2,-c.r/2,c.r,c.r*0.6);
+      ctx.restore();
+      ctx.globalAlpha=1;
+    });
+
+    // cannon
+    drawCannon();
+
+    // vignette
+    ctx.fillStyle='rgba(15,23,42,.04)';
+    ctx.fillRect(0,0,W,2);
+  }
+
+  function loop(ts){
+    if(!lastTime) lastTime=ts;
+    const dt = Math.min((ts-lastTime)/1000, 0.033);
+    lastTime=ts;
+    if(gameState==='playing'){
+      update(dt);
+    }
+    draw();
+    raf=requestAnimationFrame(loop);
+  }
+
+  // Buttons
+  document.getElementById('startBtn').addEventListener('click', ()=>{
+    resetGame();
+    gameState='playing';
+    startOverlay.classList.add('hidden');
+    overOverlay.classList.add('hidden');
+    updateHUD();
+    showToast('Wave 1 — Go! 🎪', 800);
+  });
+  document.getElementById('restartBtn').addEventListener('click', ()=>{
+    resetGame();
+    gameState='playing';
+    overOverlay.classList.add('hidden');
+    startOverlay.classList.add('hidden');
+    updateHUD();
+  });
+  document.getElementById('menuBtn').addEventListener('click', ()=>{
+    gameState='menu';
+    overOverlay.classList.add('hidden');
+    startOverlay.classList.remove('hidden');
+    bestStart.textContent=best;
+    lastStart.textContent=score||'—';
+  });
+  document.getElementById('pauseBtn').addEventListener('click', ()=>{
+    if(gameState==='playing'){
+      gameState='paused';
+      document.getElementById('pauseBtn').textContent='▶️ Resume';
+      showToast('Paused',600);
+    } else if(gameState==='paused'){
+      gameState='playing';
+      document.getElementById('pauseBtn').textContent='⏸️ Pause';
+      lastTime=performance.now();
+    }
+  });
+
+  // Handle visibility
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden && gameState==='playing'){
+      gameState='paused';
+      document.getElementById('pauseBtn').textContent='▶️ Resume';
+    }
+  });
+
+  // Init
+  updateHUD();
+  draw();
+  raf=requestAnimationFrame(loop);
+
+  // Resize canvas to fit container width while keeping aspect
+  function fit(){
+    const rect = document.getElementById('stageWrap').getBoundingClientRect();
+    const w = Math.min(rect.width, 428);
+    canvas.style.width = w+'px';
+    canvas.style.height = (w * H / W)+'px';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+})();
+</script>
+</body>
+</html>

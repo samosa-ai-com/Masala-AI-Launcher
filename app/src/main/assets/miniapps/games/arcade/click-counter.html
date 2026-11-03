@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>SMASH TEST</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  background:#0a0a0f;
+  color:#fff;
+  display:flex;
+  justify-content:center;
+  touch-action:manipulation;
+}
+.app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  height:100%;
+  height:100dvh;
+  display:flex;
+  flex-direction:column;
+  background:radial-gradient(120% 80% at 50% 0%, #1e1b4b 0%, #0a0a0f 55%),
+             linear-gradient(180deg, #0a0a0f 0%, #111 100%);
+  position:relative;
+  overflow:hidden;
+}
+/* Header */
+.header{
+  padding:14px 16px 10px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.logo{
+  font-weight:900;
+  font-size:22px;
+  letter-spacing:-0.02em;
+  line-height:1;
+}
+.logo span{color:#ff3b30}
+.logo small{
+  display:block;
+  font-weight:700;
+  font-size:10px;
+  letter-spacing:0.14em;
+  color:#9ca3af;
+  margin-top:2px;
+}
+.best-badge{
+  background:#1f2937;
+  border:1px solid #2a3441;
+  border-radius:999px;
+  padding:8px 14px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:44px;
+}
+.best-badge .crown{font-size:16px}
+.best-badge .label{font-size:10px;letter-spacing:0.1em;color:#9ca3af;font-weight:700}
+.best-badge .val{font-size:16px;font-weight:900;color:#facc15}
+
+/* Stats */
+.stats{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:10px;
+  padding:10px 16px;
+}
+.stat{
+  background:#111827;
+  border:1px solid #1f2937;
+  border-radius:16px;
+  padding:12px 8px;
+  text-align:center;
+}
+.stat .k{font-size:10px;letter-spacing:0.12em;color:#9ca3af;font-weight:800}
+.stat .v{font-size:28px;font-weight:900;line-height:1;margin-top:4px;font-variant-numeric:tabular-nums}
+.stat.time .v{color:#fff}
+.stat.count .v{color:#22c55e}
+.stat.cps .v{color:#38bdf8}
+.stat.active{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,0.2)}
+
+/* Center area */
+.center{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:12px 16px 8px;
+  position:relative;
+}
+.hint{
+  font-size:13px;
+  font-weight:700;
+  color:#d1d5db;
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.1);
+  padding:8px 14px;
+  border-radius:999px;
+  margin-bottom:18px;
+  text-align:center;
+  min-height:36px;
+  display:flex;
+  align-items:center;
+}
+.hint.pulse{animation:pulse 0.6s infinite alternate}
+@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.03)}}
+
+/* Big button */
+.smash-wrap{
+  position:relative;
+  width:260px;
+  height:260px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.smash-btn{
+  width:220px;
+  height:220px;
+  border-radius:50%;
+  border:none;
+  background:radial-gradient(120% 120% at 30% 20%, #ff5a3c 0%, #ff1a1a 55%, #b91c1c 100%);
+  box-shadow:
+    0 18px 0 #7f1d1d,
+    0 24px 30px rgba(0,0,0,0.5),
+    inset 0 6px 12px rgba(255,255,255,0.35),
+    inset 0 -10px 20px rgba(0,0,0,0.25);
+  color:#fff;
+  font-weight:900;
+  cursor:pointer;
+  user-select:none;
+  touch-action:manipulation;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  transition:transform 0.06s, box-shadow 0.06s, filter 0.15s;
+  position:relative;
+  overflow:hidden;
+  outline:none;
+}
+.smash-btn:active{
+  transform:translateY(10px) scale(0.97);
+  box-shadow:
+    0 8px 0 #7f1d1d,
+    0 12px 20px rgba(0,0,0,0.5),
+    inset 0 4px 8px rgba(255,255,255,0.3);
+}
+.smash-btn:disabled{filter:grayscale(0.3) brightness(0.7);cursor:default}
+.smash-btn .big{font-size:42px;line-height:1;letter-spacing:-0.03em;text-shadow:0 2px 0 rgba(0,0,0,0.3)}
+.smash-btn .sub{font-size:12px;letter-spacing:0.14em;opacity:0.95}
+.smash-btn .count-inline{font-size:54px;line-height:1;margin-top:2px}
+.ripple{
+  position:absolute;
+  width:20px;height:20px;
+  background:rgba(255,255,255,0.45);
+  border-radius:50%;
+  pointer-events:none;
+  transform:translate(-50%,-50%) scale(0);
+  animation:ripple 0.45s ease-out forwards;
+}
+@keyframes ripple{to{transform:translate(-50%,-50%) scale(12);opacity:0}}
+
+.progress-ring{
+  position:absolute;
+  inset:0;
+  width:260px;height:260px;
+  transform:rotate(-90deg);
+  pointer-events:none;
+}
+.progress-ring circle{
+  fill:none;
+  stroke:#22c55e;
+  stroke-width:6;
+  stroke-linecap:round;
+  stroke-dasharray: 754;
+  stroke-dashoffset: 754;
+  transition:stroke-dashoffset 0.1s linear;
+  filter:drop-shadow(0 0 6px rgba(34,197,94,0.6));
+}
+
+/* Footer controls */
+.footer{
+  padding:12px 16px 16px;
+  display:flex;
+  gap:10px;
+}
+.btn{
+  flex:1;
+  min-height:48px;
+  border-radius:14px;
+  border:1px solid #2a3441;
+  background:#1f2937;
+  color:#e5e7eb;
+  font-weight:800;
+  font-size:14px;
+  letter-spacing:0.02em;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  cursor:pointer;
+}
+.btn.primary{
+  background:#fff;
+  color:#111;
+  border-color:#fff;
+}
+.btn:active{transform:scale(0.98)}
+.btn small{font-weight:700;opacity:0.7}
+
+/* Game over overlay */
+.overlay{
+  position:absolute;
+  inset:0;
+  background:rgba(5,5,10,0.88);
+  backdrop-filter:blur(8px);
+  display:none;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:20px 16px;
+  z-index:10;
+}
+.overlay.show{display:flex}
+.card{
+  width:100%;
+  max-width:360px;
+  background:#fff;
+  color:#111;
+  border-radius:24px;
+  padding:22px 18px 18px;
+  text-align:center;
+  box-shadow:0 20px 50px rgba(0,0,0,0.5);
+  transform:translateY(12px) scale(0.96);
+  animation:pop 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+@keyframes pop{to{transform:translateY(0) scale(1)}}
+.card .badge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  background:#fef08a;
+  color:#854d0e;
+  font-weight:900;
+  font-size:12px;
+  letter-spacing:0.08em;
+  padding:6px 12px;
+  border-radius:999px;
+  margin-bottom:10px;
+}
+.card h2{font-size:28px;font-weight:900;letter-spacing:-0.02em;line-height:1}
+.card h2 span{color:#ff1a1a}
+.card .score-big{font-size:64px;font-weight:900;line-height:1;margin:10px 0 4px;letter-spacing:-0.04em}
+.card .meta{font-size:13px;color:#6b7280;font-weight:700}
+.card .grid2{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:16px 0;
+}
+.card .grid2 div{
+  background:#f3f4f6;
+  border-radius:14px;
+  padding:12px 8px;
+}
+.card .grid2 .k{font-size:10px;letter-spacing:0.1em;color:#6b7280;font-weight:800}
+.card .grid2 .v{font-size:20px;font-weight:900;margin-top:2px}
+.card .actions{display:flex;gap:10px;margin-top:6px}
+.card .actions button{
+  flex:1;
+  min-height:52px;
+  border-radius:14px;
+  border:none;
+  font-weight:900;
+  font-size:15px;
+  cursor:pointer;
+}
+.card .actions .again{background:#111;color:#fff}
+.card .actions .share{background:#f3f4f6;color:#111}
+
+/* Confetti */
+.confetti{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  overflow:hidden;
+}
+.confetti i{
+  position:absolute;
+  width:10px;height:14px;
+  top:-20px;
+  animation:fall linear forwards;
+}
+@keyframes fall{
+  to{transform:translateY(110vh) rotate(720deg)}
+}
+
+/* Help sheet */
+.help{
+  position:absolute;
+  inset:0;
+  background:rgba(10,10,15,0.96);
+  z-index:20;
+  display:none;
+  flex-direction:column;
+  padding:18px 16px;
+  overflow:auto;
+}
+.help.show{display:flex}
+.help h3{font-size:18px;font-weight:900;margin-bottom:8px}
+.help p, .help li{font-size:13px;line-height:1.5;color:#d1d5db}
+.help ul{padding-left:18px;margin:8px 0}
+.help code{background:#1f2937;padding:2px 6px;border-radius:6px;font-size:12px;color:#facc15}
+.help .close-help{
+  margin-top:14px;
+  min-height:48px;
+  border-radius:14px;
+  border:none;
+  background:#fff;
+  color:#111;
+  font-weight:900;
+  font-size:15px;
+}
+.structure{
+  background:#111827;
+  border:1px solid #1f2937;
+  border-radius:12px;
+  padding:12px;
+  margin:10px 0;
+  font-family:ui-monospace,monospace;
+  font-size:11px;
+  line-height:1.6;
+  color:#9ca3af;
+  white-space:pre;
+  overflow:auto;
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="header">
+    <div class="logo">SMASH<span>TEST</span><small>5-SECOND SPRINT</small></div>
+    <div class="best-badge" id="bestBadge">
+      <span class="crown">👑</span>
+      <div>
+        <div class="label">BEST</div>
+        <div class="val" id="bestVal">0</div>
+      </div>
+    </div>
+  </header>
+
+  <section class="stats">
+    <div class="stat time" id="statTime"><div class="k">TIME</div><div class="v" id="timeVal">5.00</div></div>
+    <div class="stat count" id="statCount"><div class="k">CLICKS</div><div class="v" id="countVal">0</div></div>
+    <div class="stat cps"><div class="k">CPS</div><div class="v" id="cpsVal">0.0</div></div>
+  </section>
+
+  <div class="center">
+    <div class="hint" id="hint">Tap the big button to start → smash for 5s!</div>
+    <div class="smash-wrap">
+      <svg class="progress-ring" viewBox="0 0 260 260"><circle cx="130" cy="130" r="120" id="ring"></circle></svg>
+      <button class="smash-btn" id="smashBtn" aria-label="Smash button">
+        <span class="big" id="btnBig">TAP!</span>
+        <span class="sub" id="btnSub">TO START</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button class="btn" id="resetBtn">↺ Reset Best</button>
+    <button class="btn" id="howBtn">? How it works</button>
+    <button class="btn primary" id="startBtn">▶ Start</button>
+  </div>
+
+  <!-- Game Over -->
+  <div class="overlay" id="overlay">
+    <div class="confetti" id="confetti"></div>
+    <div class="card">
+      <div class="badge" id="cardBadge" style="display:none">🎉 NEW RECORD!</div>
+      <h2 id="cardTitle">TIME'S UP!</h2>
+      <div class="score-big" id="cardScore">0</div>
+      <div class="meta" id="cardMeta">clicks in 5 seconds</div>
+      <div class="grid2">
+        <div><div class="k">BEST</div><div class="v" id="cardBest">0</div></div>
+        <div><div class="k">SPEED</div><div class="v" id="cardCps">0.0 CPS</div></div>
+      </div>
+      <div class="meta" id="cardMsg" style="margin-bottom:4px;color:#111;font-weight:800"></div>
+      <div class="actions">
+        <button class="share" id="closeBtn">Close</button>
+        <button class="again" id="againBtn">Play Again</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help / HTML Structure Guidance -->
+  <div class="help" id="help">
+    <h3>How it works & HTML structure</h3>
+    <p>This is a <b>mobile-first, single-button</b> game. Everything fits 360–428px portrait with no horizontal scroll.</p>
+    <div class="structure">&lt;div class="app"&gt;               // 428px max, centered
+  &lt;header&gt; Best badge + logo
+  &lt;section.stats&gt; Time | Clicks | CPS
+  &lt;div.center&gt;
+    &lt;div.hint&gt; status text
+    &lt;div.smash-wrap&gt;
+      &lt;svg.progress-ring&gt; 5s circle
+      &lt;button.smash-btn&gt; 220px touch target
+  &lt;div.footer&gt; Reset / Help / Start
+  &lt;div.overlay&gt; Game-over summary + confetti
+&lt;/div&gt;</div>
+    <ul>
+      <li><code>.smash-btn</code> is 220px (≥48px target) with <code>touch-action:manipulation</code> to prevent double-tap zoom.</li>
+      <li>Timer uses <code>performance.now()</code> + <code>requestAnimationFrame</code> for accurate 5.00s countdown.</li>
+      <li>Score + best saved in <code>localStorage.smashBest</code> and restored on load.</li>
+      <li>Live stats update on every tap: count + CPS = clicks / elapsed.</li>
+      <li>New record triggers confetti + gold badge + haptics.</li>
+    </ul>
+    <p><b>Tip:</b> Use two thumbs or alternate fingers for max CPS. The button counts <code>pointerdown</code> so it’s instant.</p>
+    <button class="close-help" id="closeHelp">Got it — let's smash!</button>
+  </div>
+</div>
+
+<script>
+const bestVal = document.getElementById('bestVal');
+const timeVal = document.getElementById('timeVal');
+const countVal = document.getElementById('countVal');
+const cpsVal = document.getElementById('cpsVal');
+const hint = document.getElementById('hint');
+const smashBtn = document.getElementById('smashBtn');
+const btnBig = document.getElementById('btnBig');
+const btnSub = document.getElementById('btnSub');
+const ring = document.getElementById('ring');
+const overlay = document.getElementById('overlay');
+const cardScore = document.getElementById('cardScore');
+const cardBest = document.getElementById('cardBest');
+const cardCps = document.getElementById('cardCps');
+const cardBadge = document.getElementById('cardBadge');
+const cardTitle = document.getElementById('cardTitle');
+const cardMsg = document.getElementById('cardMsg');
+const confettiEl = document.getElementById('confetti');
+const statTime = document.getElementById('statTime');
+const statCount = document.getElementById('statCount');
+
+let best = parseInt(localStorage.getItem('smashBest') || '0', 10);
+let score = 0;
+let startTime = 0;
+let raf = null;
+let playing = false;
+let ended = false;
+
+const DURATION = 5000;
+const CIRC = 2 * Math.PI * 120; // 753.98
+ring.style.strokeDasharray = CIRC;
+ring.style.strokeDashoffset = CIRC;
+
+function updateBestUI(){
+  bestVal.textContent = best;
+  cardBest.textContent = best;
+}
+updateBestUI();
+
+function setHint(t, pulse=false){
+  hint.textContent = t;
+  hint.classList.toggle('pulse', pulse);
+}
+
+function resetGameVisual(){
+  score = 0;
+  countVal.textContent = '0';
+  cpsVal.textContent = '0.0';
+  timeVal.textContent = '5.00';
+  ring.style.strokeDashoffset = CIRC;
+  ring.style.stroke = '#22c55e';
+  btnBig.textContent = 'TAP!';
+  btnBig.className = 'big';
+  btnSub.textContent = 'TO START';
+  btnSub.style.display = '';
+  smashBtn.disabled = false;
+  statTime.classList.remove('active');
+  statCount.classList.remove('active');
+  setHint('Tap the big button to start → smash for 5s!');
+}
+
+function startGame(){
+  if(playing) return;
+  playing = true;
+  ended = false;
+  score = 0;
+  startTime = performance.now();
+  overlay.classList.remove('show');
+  confettiEl.innerHTML = '';
+  countVal.textContent = '0';
+  cpsVal.textContent = '0.0';
+  statTime.classList.add('active');
+  statCount.classList.add('active');
+  setHint('SMASH! SMASH! SMASH!', true);
+  btnBig.textContent = '0';
+  btnBig.className = 'count-inline';
+  btnSub.textContent = 'KEEP TAPPING!';
+  // haptic
+  if(navigator.vibrate) navigator.vibrate(20);
+  tick();
+}
+
+function tick(){
+  if(!playing) return;
+  const elapsed = performance.now() - startTime;
+  const remaining = Math.max(0, DURATION - elapsed);
+  const progress = remaining / DURATION;
+  timeVal.textContent = (remaining/1000).toFixed(2);
+  ring.style.strokeDashoffset = CIRC * progress;
+  // color shift near end
+  if(remaining < 1500) ring.style.stroke = '#ef4444';
+  else if(remaining < 3000) ring.style.stroke = '#facc15';
+  else ring.style.stroke = '#22c55e';
+
+  const cps = elapsed > 0 ? (score / (elapsed/1000)) : 0;
+  cpsVal.textContent = cps.toFixed(1);
+
+  if(remaining <= 0){
+    endGame();
+  } else {
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+function endGame(){
+  playing = false;
+  ended = true;
+  cancelAnimationFrame(raf);
+  timeVal.textContent = '0.00';
+  ring.style.strokeDashoffset = '0';
+  const cps = (score / 5).toFixed(1);
+  cpsVal.textContent = cps;
+  statTime.classList.remove('active');
+  statCount.classList.remove('active');
+
+  const isNewRecord = score > best;
+  const isTie = score === best && score !== 0;
+
+  if(isNewRecord){
+    best = score;
+    localStorage.setItem('smashBest', String(best));
+    updateBestUI();
+    if(navigator.vibrate) navigator.vibrate([30,40,60]);
+  } else {
+    if(navigator.vibrate) navigator.vibrate(80);
+  }
+
+  // Fill card
+  cardScore.textContent = score;
+  cardCps.textContent = cps + ' CPS';
+  cardBest.textContent = best;
+  cardBadge.style.display = isNewRecord ? 'inline-flex' : 'none';
+  if(isNewRecord){
+    cardTitle.innerHTML = 'NEW <span>RECORD!</span> 🎉';
+    cardMsg.textContent = score >= 40 ? 'Inhuman speed! 🔥' : score >= 30 ? 'Lightning fingers! ⚡' : 'You beat your best!';
+    launchConfetti();
+  } else if(isTie){
+    cardTitle.textContent = 'SO CLOSE!';
+    cardMsg.textContent = 'You tied your record — one more tap!';
+  } else if(score === 0){
+    cardTitle.textContent = "TIME'S UP!";
+    cardMsg.textContent = 'Tap faster next time!';
+  } else {
+    cardTitle.textContent = "TIME'S UP!";
+    const diff = best - score;
+    cardMsg.textContent = diff === 1 ? 'Just 1 away from your best!' : `${diff} away from your best — you got this!`;
+  }
+
+  btnBig.textContent = score;
+  btnBig.className = 'count-inline';
+  btnSub.textContent = 'TAPS!';
+  smashBtn.disabled = true;
+  setHint(isNewRecord ? '👑 New best! Tap Play Again to beat it!' : 'Nice run! Tap Play Again.');
+
+  overlay.classList.add('show');
+}
+
+function addPoint(e){
+  // prevent mouse after touch double fire
+  if(e) {
+    e.preventDefault();
+  }
+  if(overlay.classList.contains('show') && !playing){
+    // if overlay open, ignore smash
+    return;
+  }
+  if(!playing){
+    // first tap starts game and counts
+    startGame();
+    score = 1;
+  } else {
+    score++;
+  }
+  countVal.textContent = score;
+  btnBig.textContent = score;
+  // ripple
+  const rect = smashBtn.getBoundingClientRect();
+  const x = (e && e.touches && e.touches[0] ? e.touches[0].clientX : (e.clientX || rect.left + rect.width/2)) - rect.left;
+  const y = (e && e.touches && e.touches[0] ? e.touches[0].clientY : (e.clientY || rect.top + rect.height/2)) - rect.top;
+  const r = document.createElement('span');
+  r.className = 'ripple';
+  r.style.left = x + 'px';
+  r.style.top = y + 'px';
+  smashBtn.appendChild(r);
+  setTimeout(()=> r.remove(), 500);
+  // subtle scale bump
+  smashBtn.style.transform = 'translateY(4px) scale(0.98)';
+  setTimeout(()=> smashBtn.style.transform='', 70);
+  if(navigator.vibrate && score % 5 === 0) navigator.vibrate(10);
+}
+
+function launchConfetti(){
+  confettiEl.innerHTML = '';
+  const colors = ['#ff1a1a','#facc15','#22c55e','#38bdf8','#a78bfa','#fb7185'];
+  for(let i=0;i<28;i++){
+    const el = document.createElement('i');
+    el.style.left = (Math.random()*100) + '%';
+    el.style.background = colors[Math.floor(Math.random()*colors.length)];
+    el.style.transform = `rotate(${Math.random()*360}deg)`;
+    el.style.animationDuration = (0.9 + Math.random()*0.9) + 's';
+    el.style.animationDelay = (Math.random()*0.4) + 's';
+    el.style.borderRadius = Math.random()>0.5 ? '50%' : '3px';
+    confettiEl.appendChild(el);
+  }
+}
+
+// Events - use pointerdown for instant response
+smashBtn.addEventListener('pointerdown', addPoint, {passive:false});
+smashBtn.addEventListener('touchstart', (e)=> e.preventDefault(), {passive:false});
+
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  if(overlay.classList.contains('show')){
+    overlay.classList.remove('show');
+    resetGameVisual();
+    setTimeout(startGame, 80);
+  } else if(!playing){
+    startGame();
+  }
+});
+document.getElementById('againBtn').addEventListener('click', ()=>{
+  overlay.classList.remove('show');
+  resetGameVisual();
+  setTimeout(startGame, 120);
+});
+document.getElementById('closeBtn').addEventListener('click', ()=>{
+  overlay.classList.remove('show');
+  resetGameVisual();
+});
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(confirm('Reset your best score?')){
+    best = 0;
+    localStorage.removeItem('smashBest');
+    updateBestUI();
+    resetGameVisual();
+    setHint('Best reset — go set a new record!');
+    if(navigator.vibrate) navigator.vibrate(20);
+  }
+});
+document.getElementById('howBtn').addEventListener('click', ()=> document.getElementById('help').classList.add('show'));
+document.getElementById('closeHelp').addEventListener('click', ()=> document.getElementById('help').classList.remove('show'));
+
+// Keyboard support (space/enter)
+window.addEventListener('keydown', (e)=>{
+  if(e.code==='Space' || e.code==='Enter'){
+    e.preventDefault();
+    if(overlay.classList.contains('show')){
+      document.getElementById('againBtn').click();
+    } else {
+      addPoint(e);
+    }
+  }
+});
+
+// Prevent scrolling/zoom gestures on app
+document.addEventListener('touchmove', (e)=> e.preventDefault(), {passive:false});
+document.addEventListener('contextmenu', e=> e.preventDefault());
+
+resetGameVisual();
+</script>
+</body>
+</html>

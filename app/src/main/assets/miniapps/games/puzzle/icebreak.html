@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Ice Tap Rescue</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#0a1e33;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e6f2ff}
+body{display:flex;justify-content:center}
+#app{width:100%;max-width:428px;min-width:360px;height:100dvh;display:flex;flex-direction:column;background:linear-gradient(180deg,#0f2f57 0%,#0a1e33 55%,#071426 100%);position:relative;overflow:hidden}
+header{padding:10px 14px 8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+h1{font-size:18px;letter-spacing:0.5px;font-weight:800;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.4)}
+h1 span{color:#7dd3ff}
+.badge{font-size:11px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);padding:4px 8px;border-radius:20px;white-space:nowrap}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:0 12px 10px}
+.stat{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px 10px;text-align:center;backdrop-filter:blur(6px)}
+.stat .label{font-size:10px;letter-spacing:.8px;opacity:.7;text-transform:uppercase}
+.stat .val{font-size:16px;font-weight:800;margin-top:2px}
+.stat.best{border-color:rgba(255,215,0,.35);background:rgba(255,215,0,.08)}
+#levelBar{display:flex;align-items:center;justify-content:space-between;padding:0 12px 8px;gap:8px}
+#levelBar .lvl{font-size:13px;font-weight:700}
+#levelBar .progress{flex:1;height:8px;background:rgba(255,255,255,.15);border-radius:20px;overflow:hidden;margin:0 8px}
+#levelBar .fill{height:100%;width:0%;background:linear-gradient(90deg,#7dd3ff,#3b82f6);transition:width .3s}
+.lives{display:flex;gap:4px}
+.heart{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#ff8a8a,#e11d48);border:1px solid rgba(255,255,255,.3);display:grid;place-items:center;font-size:10px}
+.heart.lost{opacity:.25;filter:grayscale(1)}
+#gridWrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 10px 8px;overflow:hidden}
+#grid{display:grid;gap:5px;padding:8px;background:rgba(0,20,50,.35);border-radius:16px;border:1px solid rgba(125,211,255,.18);box-shadow:0 8px 24px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08);touch-action:manipulation}
+.tile{width:100%;aspect-ratio:1;border-radius:10px;position:relative;display:grid;place-items:center;font-size:22px;user-select:none;cursor:pointer;border:2px solid rgba(255,255,255,.55);background:linear-gradient(180deg,#e6f7ff 0%,#bfe8ff 45%,#8ecfff 100%);box-shadow:0 3px 0 #5aa9d6, 0 4px 10px rgba(0,0,0,.25);transition:transform .08s, filter .2s;overflow:hidden}
+.tile:active{transform:scale(.94)}
+.tile.crack1{background:linear-gradient(180deg,#d6efff 0%,#a9d8ff 100%)}
+.tile.crack1::after{content:"";position:absolute;inset:0;background:
+ linear-gradient(28deg, transparent 48%, rgba(0,40,80,.55) 49%, transparent 51%),
+ linear-gradient(115deg, transparent 46%, rgba(0,40,80,.4) 48%, transparent 50%),
+ linear-gradient(90deg, transparent 48%, rgba(0,40,80,.3) 49%, transparent 51%);opacity:.9;pointer-events:none}
+.tile.broken{background:radial-gradient(circle at 50% 40%,#0a3a6b 0%,#082a4d 55%,#061a33 100%);border-color:#1e4a7a;box-shadow:inset 0 4px 12px rgba(0,0,0,.6);transform:none}
+.tile.broken.fish-freed{background:radial-gradient(circle at 50% 45%,#0e4a8a 0%,#0a2f5a 60%,#061a33 100%)}
+.tile .emoji{position:relative;z-index:2;filter:drop-shadow(0 2px 2px rgba(0,0,0,.3));transition:transform .2s}
+.tile.broken .emoji{transform:translateY(6px) scale(.9)}
+.tile.penguin-tile{border-color:#ffd166}
+.crack-ring{position:absolute;inset:-6px;border:2px solid rgba(125,211,255,.9);border-radius:14px;pointer-events:none;animation:ring .45s ease-out forwards}
+@keyframes ring{0%{transform:scale(.7);opacity:1}100%{transform:scale(1.25);opacity:0}}
+.splash{position:absolute;font-size:11px;font-weight:800;pointer-events:none;animation:floatUp .7s ease-out forwards;z-index:5;text-shadow:0 1px 4px rgba(0,0,0,.6)}
+@keyframes floatUp{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-28px);opacity:0}}
+.controls{display:flex;gap:8px;padding:10px 12px 12px}
+.btn{flex:1;padding:12px 10px;border-radius:12px;border:none;font-weight:800;font-size:14px;cursor:pointer;touch-action:manipulation;min-height:48px}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:linear-gradient(180deg,#7dd3ff,#3b82f6);color:#001a33;box-shadow:0 4px 0 #1d4ed8}
+.btn-ghost{background:rgba(255,255,255,.1);color:#e6f2ff;border:1px solid rgba(255,255,255,.18)}
+.btn-small{padding:8px 10px;min-height:40px;font-size:12px;flex:0 0 auto}
+#overlay{position:absolute;inset:0;background:rgba(3,12,28,.78);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}
+.card{width:100%;max-width:360px;background:linear-gradient(180deg,#ffffff 0%,#e6f2ff 100%);color:#0a1e33;border-radius:18px;padding:18px 16px;box-shadow:0 16px 40px rgba(0,0,0,.45);text-align:center}
+.card h2{font-size:20px;margin-bottom:6px}
+.card p{font-size:13px;line-height:1.45;opacity:.8;margin-bottom:10px}
+.rules{text-align:left;background:#0a1e33;color:#dbeafe;border-radius:12px;padding:10px 12px;margin:10px 0;font-size:12.5px;line-height:1.4}
+.rules b{color:#7dd3ff}
+.level-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0}
+.lvlBtn{padding:10px 0;border-radius:10px;border:2px solid #0a1e33;background:#fff;font-weight:800;cursor:pointer;min-height:44px;position:relative}
+.lvlBtn.locked{opacity:.4}
+.lvlBtn.active{border-color:#3b82f6;background:#dbeafe}
+.lvlBtn .bestBadge{position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:9px;background:#facc15;color:#422006;padding:1px 6px;border-radius:20px;white-space:nowrap;font-weight:800}
+.toast{position:absolute;top:62px;left:50%;transform:translateX(-50%);background:#0a1e33;color:#fff;padding:8px 12px;border-radius:20px;font-size:12px;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s;z-index:15;border:1px solid rgba(255,255,255,.15)}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>🧊 ICE <span>TAP</span> RESCUE</h1>
+    <div class="badge" id="bestBadge">BEST —</div>
+  </header>
+  <div class="stats">
+    <div class="stat"><div class="label">Score</div><div class="val" id="scoreVal">0</div></div>
+    <div class="stat"><div class="label">Time</div><div class="val" id="timeVal">0.0s</div></div>
+    <div class="stat best"><div class="label">Best</div><div class="val" id="bestVal">—</div></div>
+  </div>
+  <div id="levelBar">
+    <div class="lvl" id="lvlLabel">Level 1</div>
+    <div class="progress"><div class="fill" id="fill"></div></div>
+    <div class="lives" id="lives"></div>
+  </div>
+  <div id="gridWrap"><div id="grid"></div></div>
+  <div class="controls">
+    <button class="btn btn-ghost" id="levelsBtn">Levels</button>
+    <button class="btn btn-ghost" id="resetBtn">Restart</button>
+    <button class="btn btn-primary" id="nextBtn">Next →</button>
+  </div>
+  <div class="toast" id="toast"></div>
+  <div id="overlay">
+    <div class="card" id="card"></div>
+  </div>
+</div>
+<script>
+const LEVELS=[
+  {rows:5,cols:5,fish:4,penguins:2,name:"Shallow Bay"},
+  {rows:5,cols:6,fish:5,penguins:3,name:"Crackle Cove"},
+  {rows:6,cols:6,fish:6,penguins:3,name:"Frosty Shelf"},
+  {rows:6,cols:7,fish:7,penguins:4,name:"Penguin Pass"},
+  {rows:7,cols:7,fish:8,penguins:5,name:"Glacier Heart"},
+];
+let curLevel=0, board=[], score=0, startTime=0, timer=null, elapsed=0, lives=3, fishTotal=0, fishFreed=0, gameActive=false;
+const gridEl=document.getElementById('grid'), scoreVal=document.getElementById('scoreVal'), timeVal=document.getElementById('timeVal'), bestVal=document.getElementById('bestVal'), bestBadge=document.getElementById('bestBadge'), lvlLabel=document.getElementById('lvlLabel'), fillEl=document.getElementById('fill'), livesEl=document.getElementById('lives'), overlay=document.getElementById('overlay'), card=document.getElementById('card'), toast=document.getElementById('toast');
+
+function getBest(l){ const v=localStorage.getItem('iceTapBest_'+l); return v?parseInt(v,10):null; }
+function setBest(l,s){ const cur=getBest(l); if(cur===null||s>cur){ localStorage.setItem('iceTapBest_'+l,s); return true;} return false; }
+function loadLevelIdx(){ const v=localStorage.getItem('iceTapLevel'); return v?parseInt(v,10):0; }
+function saveLevelIdx(i){ localStorage.setItem('iceTapLevel',i); }
+
+function showToast(msg){
+  toast.textContent=msg; toast.classList.add('show');
+  clearTimeout(showToast._t); showToast._t=setTimeout(()=>toast.classList.remove('show'),1400);
+}
+
+function buildBoard(){
+  const cfg=LEVELS[curLevel];
+  board=[]; fishTotal=cfg.fish; fishFreed=0; lives=3; score=0; elapsed=0;
+  // create empty
+  for(let r=0;r<cfg.rows;r++){ board[r]=[]; for(let c=0;c<cfg.cols;c++) board[r][c]={type:'ice',cracks:0,max:2,broken:false} }
+  // place fish & penguins randomly
+  const positions=[];
+  for(let r=0;r<cfg.rows;r++) for(let c=0;c<cfg.cols;c++) positions.push([r,c]);
+  shuffle(positions);
+  let idx=0;
+  for(let i=0;i<cfg.fish;i++){ const [r,c]=positions[idx++]; board[r][c].type='fish'; }
+  for(let i=0;i<cfg.penguins;i++){ const [r,c]=positions[idx++]; board[r][c].type='penguin'; }
+  renderGrid();
+  updateHUD();
+}
+
+function renderGrid(){
+  const cfg=LEVELS[curLevel];
+  gridEl.style.gridTemplateColumns=`repeat(${cfg.cols}, 1fr)`;
+  // responsive tile size: container width ~ 340-400, gap 5
+  const wrapW=Math.min(400, window.innerWidth-24);
+  const tileW=Math.floor((wrapW - 16 - (cfg.cols-1)*5)/cfg.cols);
+  gridEl.style.width=wrapW+'px';
+  gridEl.innerHTML='';
+  for(let r=0;r<cfg.rows;r++){
+    for(let c=0;c<cfg.cols;c++){
+      const cell=board[r][c];
+      const d=document.createElement('button');
+      d.className='tile';
+      d.setAttribute('aria-label',`row ${r+1} col ${c+1}`);
+      if(cell.broken) d.classList.add('broken');
+      if(cell.cracks===1 && !cell.broken) d.classList.add('crack1');
+      if(cell.type==='penguin' && !cell.broken) d.classList.add('penguin-tile');
+      if(cell.broken && cell.type==='fish') d.classList.add('fish-freed');
+      let emoji='';
+      if(!cell.broken){
+        if(cell.type==='fish') emoji='🐟';
+        else if(cell.type==='penguin') emoji='🐧';
+        else emoji='';
+      } else {
+        if(cell.type==='fish') emoji='💦';
+        else if(cell.type==='penguin') emoji='😢';
+        else emoji='🌊';
+      }
+      d.innerHTML=`<span class="emoji">${emoji}</span>`;
+      if(cell.cracks===1 && !cell.broken){
+        d.innerHTML+=`<span style="position:absolute;bottom:3px;right:4px;font-size:9px;font-weight:800;color:#0a3a6b;z-index:3">CRACKED</span>`;
+      }
+      d.style.width=tileW+'px'; d.style.height=tileW+'px';
+      d.addEventListener('click',()=>handleTap(r,c,d));
+      d.addEventListener('touchstart',()=>{}, {passive:true});
+      gridEl.appendChild(d);
+    }
+  }
+}
+
+function handleTap(r,c,el){
+  if(!gameActive) return;
+  if(board[r][c].broken) { showToast('Already open water!'); return; }
+  // crack center + orthogonal neighbors
+  const targets=[[r,c],[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
+  let any=false;
+  // visual ring
+  const ring=document.createElement('div'); ring.className='crack-ring'; el.appendChild(ring); setTimeout(()=>ring.remove(),500);
+  if(navigator.vibrate) navigator.vibrate(20);
+  targets.forEach(([rr,cc])=>{
+    if(rr<0||cc<0||rr>=board.length||cc>=board[0].length) return;
+    const cell=board[rr][cc];
+    if(cell.broken) return;
+    cell.cracks++;
+    any=true;
+    if(cell.cracks>=cell.max){
+      cell.broken=true;
+      if(cell.type==='fish'){
+        fishFreed++; score+=100;
+        spawnSplash(rr,cc,'+100 🐟','#7dd3ff');
+      } else if(cell.type==='penguin'){
+        lives--; score=Math.max(0,score-150);
+        spawnSplash(rr,cc,'-150 🐧','#ff6b6b');
+        showToast('Penguin fell! -150');
+        if(lives<=0){ endLevel(false); }
+      } else {
+        // empty ice broken is okay but small penalty to discourage random tapping
+        score=Math.max(0,score-5);
+      }
+    } else {
+      // cracked but not broken: small feedback
+      if(cell.type==='penguin' && cell.cracks===1) showToast('Penguin ice cracking! Stop!');
+    }
+  });
+  // time penalty applied continuously, but also small tap cost
+  // re-render
+  renderGrid();
+  updateHUD();
+  checkWin();
+}
+
+function spawnSplash(r,c,text,color){
+  // find tile element position
+  const cfg=LEVELS[curLevel];
+  const idx=r*cfg.cols+c;
+  const tile=gridEl.children[idx];
+  if(!tile) return;
+  const s=document.createElement('div'); s.className='splash'; s.textContent=text; s.style.color=color; s.style.left='50%'; s.style.top='30%'; s.style.transform='translateX(-50%)';
+  tile.appendChild(s); setTimeout(()=>s.remove(),700);
+}
+
+function updateHUD(){
+  const timePenalty=Math.floor(elapsed*1.2);
+  const displayScore=Math.max(0, score - timePenalty);
+  scoreVal.textContent=displayScore;
+  timeVal.textContent=elapsed.toFixed(1)+'s';
+  const best=getBest(curLevel);
+  bestVal.textContent=best!==null?best:'—';
+  bestBadge.textContent= best!==null? `BEST ${best}` : 'BEST —';
+  lvlLabel.textContent=`Level ${curLevel+1} · ${LEVELS[curLevel].name}`;
+  const prog= fishTotal? Math.round(fishFreed/fishTotal*100):0;
+  fillEl.style.width=prog+'%';
+  // lives
+  livesEl.innerHTML='';
+  for(let i=0;i<3;i++){
+    const h=document.createElement('div'); h.className='heart'+(i>=lives?' lost':''); h.textContent=i<lives?'❤':'♡';
+    livesEl.appendChild(h);
+  }
+}
+
+function startTimer(){
+  startTime=performance.now()/1000 - elapsed;
+  clearInterval(timer);
+  timer=setInterval(()=>{
+    elapsed=performance.now()/1000 - startTime;
+    updateHUD();
+  },100);
+}
+function stopTimer(){ clearInterval(timer); timer=null; }
+
+function checkWin(){
+  if(fishFreed>=fishTotal){
+    endLevel(true);
+  }
+}
+function endLevel(won){
+  gameActive=false; stopTimer();
+  const timePenalty=Math.floor(elapsed*1.2);
+  const finalScore=Math.max(0, score - timePenalty);
+  const best=getBest(curLevel);
+  let isNewBest=false;
+  if(won) isNewBest=setBest(curLevel, finalScore);
+  // unlock next level if won
+  if(won && curLevel < LEVELS.length-1){
+    const unlocked=parseInt(localStorage.getItem('iceTapUnlocked')||'0',10);
+    if(curLevel+1>unlocked) localStorage.setItem('iceTapUnlocked', String(curLevel+1));
+  }
+  showEndCard(won, finalScore, timePenalty, isNewBest);
+}
+
+function showEndCard(won, finalScore, penalty, isNewBest){
+  overlay.style.display='flex';
+  if(won){
+    card.innerHTML=`
+      <h2>🎉 Level Cleared!</h2>
+      <p>All fish freed in <b>${elapsed.toFixed(1)}s</b></p>
+      <div class="rules" style="text-align:center">
+        <div style="font-size:22px;font-weight:800;color:#7dd3ff">${finalScore} pts</div>
+        <div style="font-size:11px;opacity:.8">Base ${score} − Time ${penalty} ${isNewBest? '· <b style="color:#facc15">NEW BEST!</b>':''}</div>
+        <div style="margin-top:6px;font-size:11px">Fish ${fishFreed}/${fishTotal} · Lives ${lives}/3</div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="nextLevel()">${curLevel < LEVELS.length-1 ? 'Next Level →' : 'Play Again'}</button>
+      <button class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="showLevelSelect()">Levels</button>
+    `;
+  } else {
+    card.innerHTML=`
+      <h2>💔 Penguins Fell!</h2>
+      <p>You lost all 3 lives. Try a gentler tap pattern.</p>
+      <div class="rules" style="text-align:center">
+        <div style="font-size:18px;font-weight:800">${finalScore} pts</div>
+        <div style="font-size:11px">Fish ${fishFreed}/${fishTotal} rescued</div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="restartLevel()">Retry Level</button>
+      <button class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="showLevelSelect()">Levels</button>
+    `;
+  }
+}
+
+function showIntro(){
+  overlay.style.display='flex';
+  card.innerHTML=`
+    <h2>🧊 How to Play</h2>
+    <div class="rules">
+      <b>Tap ice</b> to crack it. Each tap cracks the tapped tile <b>+ 4 neighbors</b> (up/down/left/right).<br>
+      • Crack <b>twice</b> → ice breaks to water.<br>
+      • Break <b>🐟 fish ice</b> → <b>+100</b> pts & fish freed.<br>
+      • Break <b>🐧 penguin ice</b> → penguin falls, <b>-150</b> pts & lose a life (3 lives).<br>
+      • Empty ice break → <b>-5</b> pts. Time costs <b>-1.2/sec</b>.<br>
+      Free all fish to clear the level!
+    </div>
+    <p style="font-size:11px">Tip: Penguins need 2 cracks to fall — stop after 1 crack near them!</p>
+    <button class="btn btn-primary" style="width:100%" onclick="startLevel()">Start Level ${curLevel+1} →</button>
+    <button class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="showLevelSelect()">Choose Level</button>
+  `;
+}
+function showLevelSelect(){
+  overlay.style.display='flex';
+  const unlocked=parseInt(localStorage.getItem('iceTapUnlocked')||'0',10);
+  let html=`<h2>Select Level</h2><div class="level-grid">`;
+  LEVELS.forEach((lv,i)=>{
+    const best=getBest(i);
+    const locked=i>unlocked;
+    html+=`<button class="lvlBtn ${i===curLevel?'active':''} ${locked?'locked':''}" ${locked?'disabled':''} onclick="pickLevel(${i})">${i+1}<br><span style="font-size:10px">${lv.name.split(' ')[0]}</span>${best!==null?`<span class="bestBadge">★ ${best}</span>`:''}</button>`;
+  });
+  html+=`</div><p style="font-size:11px;opacity:.7">Best scores saved on this device</p><button class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="closeOverlayIfGame()">Close</button>`;
+  card.innerHTML=html;
+}
+function pickLevel(i){
+  curLevel=i; saveLevelIdx(i); buildBoard(); overlay.style.display='none'; showIntro();
+}
+function startLevel(){
+  buildBoard(); overlay.style.display='none'; gameActive=true; startTimer();
+}
+function restartLevel(){ buildBoard(); overlay.style.display='none'; gameActive=true; startTimer(); }
+function nextLevel(){
+  if(curLevel < LEVELS.length-1){ curLevel++; saveLevelIdx(curLevel); }
+  buildBoard(); overlay.style.display='none'; showIntro();
+}
+function closeOverlayIfGame(){
+  if(board.length) { overlay.style.display='none'; if(!gameActive){ gameActive=true; startTimer(); } }
+  else overlay.style.display='flex';
+}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } }
+
+document.getElementById('levelsBtn').addEventListener('click', showLevelSelect);
+document.getElementById('resetBtn').addEventListener('click', ()=>{ if(!board.length) return; restartLevel(); showToast('Level restarted'); });
+document.getElementById('nextBtn').addEventListener('click', ()=>{
+  if(curLevel < LEVELS.length-1){ curLevel++; saveLevelIdx(curLevel); buildBoard(); showIntro(); }
+  else showToast('Last level! Pick a level to replay');
+});
+window.addEventListener('resize', ()=>{ if(board.length) renderGrid(); });
+
+// init
+curLevel=loadLevelIdx();
+if(curLevel>=LEVELS.length) curLevel=0;
+buildBoard();
+showIntro();
+updateHUD();
+
+// expose for inline onclick
+window.startLevel=startLevel; window.restartLevel=restartLevel; window.nextLevel=nextLevel; window.showLevelSelect=showLevelSelect; window.pickLevel=pickLevel; window.closeOverlayIfGame=closeOverlayIfGame;
+</script>
+</body>
+</html>
+

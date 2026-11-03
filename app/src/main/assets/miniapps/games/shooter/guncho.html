@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>Dusty Duel</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#0f0e0a;overflow:hidden;overscroll-behavior:none}
+body{font-family:'Courier New',Courier,monospace;display:flex;justify-content:center;align-items:stretch;color:#f5e6c8}
+#app{width:100%;max-width:428px;min-width:360px;height:100dvh;display:flex;flex-direction:column;background:#1b150e;position:relative;overflow:hidden;border-left:4px solid #2a1f0f;border-right:4px solid #2a1f0f}
+@media(min-width:440px){#app{border:4px solid #2a1f0f;border-radius:18px;height:calc(100dvh - 12px);margin:6px 0;max-height:860px}}
+/* top bar */
+.top{height:52px;background:#2b1d0e;display:flex;align-items:center;justify-content:space-between;padding:0 10px;border-bottom:4px solid #0f0a04;flex-shrink:0}
+.brand{display:flex;align-items:center;gap:8px}
+.logo{width:36px;height:36px;background:#ffcc33;border:3px solid #0f0a04;box-shadow:inset 0 -4px 0 rgba(0,0,0,.25);display:grid;place-items:center;font-weight:900;font-size:14px;color:#3a1f00;line-height:1}
+.logo span{transform:translateY(-1px)}
+.brand h1{font-size:13px;line-height:1;letter-spacing:1px;color:#ffcc33;text-shadow:0 2px 0 #000}
+.brand p{font-size:8px;letter-spacing:1.5px;color:#c9a86a;margin-top:2px}
+.top-right{display:flex;gap:6px;align-items:center}
+.icon-btn{width:38px;height:38px;background:#3d2a12;border:3px solid #0f0a04;border-radius:8px;display:grid;place-items:center;color:#ffcc33;font-size:16px;cursor:pointer;box-shadow:0 3px 0 #0f0a04, inset 0 2px 0 rgba(255,255,255,.15);user-select:none}
+.icon-btn:active{transform:translateY(2px);box-shadow:0 1px 0 #0f0a04}
+.icon-btn.on{background:#ffcc33;color:#3a1f00;border-color:#3a1f00}
+.score-badge{background:#0f0a04;border:2px solid #3d2a12;border-radius:8px;padding:4px 8px;text-align:center;min-width:86px}
+.score-badge .lbl{font-size:7px;letter-spacing:1px;color:#c9a86a}
+.score-badge .val{font-size:13px;font-weight:900;color:#fff;letter-spacing:1px}
+.score-badge .val b{color:#ffcc33}
+/* screen */
+.screen-wrap{padding:10px;background:#0f0a04;flex-shrink:0}
+.bezel{background:#2b1d0e;border:3px solid #000;border-radius:12px;padding:8px;box-shadow:inset 0 4px 0 rgba(0,0,0,.3), 0 2px 0 rgba(255,255,255,.06)}
+.screen{position:relative;background:#d9b56a;border:3px solid #000;border-radius:8px;overflow:hidden;aspect-ratio: 160/128; width:100%}
+canvas{width:100%;height:100%;display:block;image-rendering:pixelated;image-rendering:crisp-edges}
+.scanlines{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(transparent 0 2px, rgba(0,0,0,.07) 2px 4px);mix-blend-mode:multiply}
+.crt{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 40px rgba(0,0,0,.35), inset 0 0 0 2px rgba(255,255,255,.08);border-radius:6px}
+.hud{position:absolute;top:6px;left:6px;right:6px;display:flex;justify-content:space-between;align-items:center;pointer-events:none}
+.hud-pill{background:#0f0a04;color:#ffcc33;border:2px solid #ffcc33;font-size:8px;padding:3px 6px;border-radius:6px;letter-spacing:1px;font-weight:900}
+.hud-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;width:90%}
+.big-text{font-size:22px;font-weight:900;color:#fff;text-shadow:0 3px 0 #000, 0 0 10px rgba(0,0,0,.8);letter-spacing:2px;line-height:1}
+.big-text small{display:block;font-size:9px;letter-spacing:2px;color:#ffcc33;margin-top:4px;text-shadow:0 2px 0 #000}
+.count{font-size:42px;font-weight:900;color:#ffcc33;text-shadow:0 4px 0 #000, 0 0 12px rgba(255,204,51,.6)}
+.tap-hint{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:#ffcc33;color:#3a1f00;font-size:9px;font-weight:900;padding:5px 10px;border:3px solid #000;border-radius:20px;letter-spacing:1px;animation:pulse 1s infinite;pointer-events:none;white-space:nowrap}
+@keyframes pulse{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.05)}}
+/* controls */
+.controls{flex:1;display:flex;align-items:center;justify-content:space-between;padding:12px 14px 10px;gap:12px;background:linear-gradient(#1b150e,#120e08);border-top:4px solid #2a1f0f}
+.dpad-wrap{display:flex;flex-direction:column;align-items:center;gap:6px}
+.dpad-label,.ab-label{font-size:7px;letter-spacing:1.5px;color:#8a6d3b;font-weight:900}
+.dpad{width:132px;height:132px;position:relative;background:#0f0a04;border:3px solid #000;border-radius:18px;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:0;padding:6px;box-shadow:inset 0 4px 0 rgba(255,255,255,.06), 0 4px 0 #000}
+.dpad button{border:none;background:#3d2a12;border-radius:8px;display:grid;place-items:center;color:#ffcc33;font-size:14px;font-weight:900;touch-action:manipulation;user-select:none;position:relative;box-shadow:inset 0 2px 0 rgba(255,255,255,.15), 0 2px 0 #000}
+.dpad button:active,.dpad button.pressed{background:#ffcc33;color:#3a1f00;transform:translateY(1px);box-shadow:inset 0 1px 0 rgba(0,0,0,.2), 0 1px 0 #000}
+.dpad .center{background:#1a1206;border-radius:6px;box-shadow:inset 0 2px 4px rgba(0,0,0,.6);display:grid;place-items:center}
+.dpad .center i{width:10px;height:10px;background:#2b1d0e;border-radius:50%;border:2px solid #000;box-shadow:inset 0 1px 0 rgba(255,255,255,.2)}
+.dpad button svg{width:18px;height:18px;fill:currentColor}
+.ab-group{display:flex;flex-direction:column;align-items:center;gap:8px}
+.ab-pad{display:flex;gap:12px;align-items:center}
+.ab-btn{width:72px;height:72px;border-radius:50%;border:4px solid #000;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900;cursor:pointer;touch-action:manipulation;user-select:none;position:relative;box-shadow:0 5px 0 #000, inset 0 3px 0 rgba(255,255,255,.25)}
+.ab-btn:active,.ab-btn.pressed{transform:translateY(3px);box-shadow:0 2px 0 #000, inset 0 2px 0 rgba(255,255,255,.2)}
+.ab-btn.a{background:#e23a2e;color:#fff}
+.ab-btn.b{background:#2e7de2;color:#fff}
+.ab-btn span{font-size:18px;line-height:1}
+.ab-btn small{font-size:7px;letter-spacing:1px;opacity:.9;margin-top:1px}
+.start-row{width:100%;display:flex;gap:8px;padding:0 14px 12px;background:#120e08}
+.start-btn{flex:1;height:48px;background:#ffcc33;border:3px solid #000;border-radius:12px;font-weight:900;font-size:12px;letter-spacing:1.5px;color:#3a1f00;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 0 #000, inset 0 2px 0 rgba(255,255,255,.4);cursor:pointer;touch-action:manipulation}
+.start-btn:active{transform:translateY(2px);box-shadow:0 2px 0 #000}
+.start-btn.secondary{background:#3d2a12;color:#ffcc33}
+.footer{height:18px;background:#0f0a04;display:flex;align-items:center;justify-content:center;gap:10px;font-size:7px;letter-spacing:1px;color:#6b5430;border-top:2px solid #1a1206}
+.footer b{color:#8a6d3b}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top">
+    <div class="brand">
+      <div class="logo"><span>★</span></div>
+      <div>
+        <h1>DUSTY DUEL</h1>
+        <p>CARTRIDGE #07</p>
+      </div>
+    </div>
+    <div class="score-badge">
+      <div class="lbl">SESSION SCORE</div>
+      <div class="val"><b id="pScore">0</b> — <span id="eScore">0</span></div>
+    </div>
+    <div class="top-right">
+      <button class="icon-btn on" id="soundBtn" aria-label="Sound">♪</button>
+      <button class="icon-btn" id="fsBtn" aria-label="Fullscreen">⛶</button>
+    </div>
+  </div>
+
+  <div class="screen-wrap">
+    <div class="bezel">
+      <div class="screen" id="screen">
+        <canvas id="game" width="160" height="128"></canvas>
+        <div class="scanlines"></div>
+        <div class="crt"></div>
+        <div class="hud">
+          <div class="hud-pill" id="roundPill">ROUND 1</div>
+          <div class="hud-pill" id="modePill">QUICK DRAW</div>
+        </div>
+        <div class="hud-center" id="centerText"></div>
+        <div class="tap-hint" id="tapHint">TAP SCREEN OR PRESS A TO START</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="dpad-wrap">
+      <div class="dpad-label">D-PAD — AIM / DODGE</div>
+      <div class="dpad" id="dpad">
+        <div></div><button data-dir="up" aria-label="Up"><svg viewBox="0 0 24 24"><path d="M12 8l-6 6h12z"/></svg></button><div></div>
+        <button data-dir="left" aria-label="Left"><svg viewBox="0 0 24 24"><path d="M8 12l6-6v12z"/></svg></button><div class="center"><i></i></div><button data-dir="right" aria-label="Right"><svg viewBox="0 0 24 24"><path d="M16 12l-6 6V6z"/></svg></button>
+        <div></div><button data-dir="down" aria-label="Down"><svg viewBox="0 0 24 24"><path d="M12 16l6-6H6z"/></svg></button><div></div>
+      </div>
+    </div>
+    <div class="ab-group">
+      <div class="ab-label">ACTION BUTTONS</div>
+      <div class="ab-pad">
+        <button class="ab-btn b" id="btnB"><span>B</span><small>DODGE</small></button>
+        <button class="ab-btn a" id="btnA"><span>A</span><small>SHOOT</small></button>
+      </div>
+      <div style="font-size:7px;color:#6b5430;letter-spacing:1px;text-align:center;line-height:1.3">HOLD B + D-PAD TO<br>SLIDE • TAP A TO FIRE</div>
+    </div>
+  </div>
+
+  <div class="start-row">
+    <button class="start-btn secondary" id="resetBtn">RESET 0-0</button>
+    <button class="start-btn" id="startBtn">▶ START DUEL</button>
+  </div>
+  <div class="footer"><span>◀ FANTASY CONSOLE ▶</span><b>•</b><span>60 FPS</span><b>•</b><span>PIXEL PERFECT</span></div>
+</div>
+
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const pScoreEl=document.getElementById('pScore');
+const eScoreEl=document.getElementById('eScore');
+const roundPill=document.getElementById('roundPill');
+const modePill=document.getElementById('modePill');
+const centerText=document.getElementById('centerText');
+const tapHint=document.getElementById('tapHint');
+const soundBtn=document.getElementById('soundBtn');
+const fsBtn=document.getElementById('fsBtn');
+const startBtn=document.getElementById('startBtn');
+const resetBtn=document.getElementById('resetBtn');
+const btnA=document.getElementById('btnA');
+const btnB=document.getElementById('btnB');
+const screenEl=document.getElementById('screen');
+
+// audio
+let audioCtx=null, soundOn=true;
+function ensureAudio(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); }
+function beep(freq, dur, type='square', vol=0.3, slideTo){
+  if(!soundOn) return;
+  ensureAudio();
+  const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+  o.type=type; o.frequency.value=freq;
+  o.connect(g); g.connect(audioCtx.destination);
+  g.gain.value=vol;
+  g.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime+dur);
+  if(slideTo) o.frequency.linearRampToValueAtTime(slideTo, audioCtx.currentTime+dur);
+  o.start(); o.stop(audioCtx.currentTime+dur);
+}
+function sfx(name){
+  if(!soundOn) return;
+  if(name==='tick') beep(800,0.08,'square',0.25);
+  if(name==='ready') beep(600,0.12,'square',0.3);
+  if(name==='draw') { beep(300,0.15,'square',0.4); setTimeout(()=>beep(900,0.25,'square',0.4),80); if(navigator.vibrate) navigator.vibrate(40); }
+  if(name==='shoot') { beep(180,0.08,'square',0.5,80); setTimeout(()=>beep(60,0.12,'square',0.3),30); if(navigator.vibrate) navigator.vibrate(20); }
+  if(name==='hit') { beep(120,0.3,'sawtooth',0.4,40); if(navigator.vibrate) navigator.vibrate([30,30,60]); }
+  if(name==='foul') { beep(200,0.4,'sawtooth',0.35,150); beep(150,0.4,'sawtooth',0.35); }
+  if(name==='win') { beep(523,0.12,'square',0.3); setTimeout(()=>beep(659,0.12,'square',0.3),120); setTimeout(()=>beep(784,0.25,'square',0.35),240); }
+  if(name==='lose') { beep(300,0.2,'square',0.3,200); setTimeout(()=>beep(220,0.3,'square',0.3),180); }
+  if(name==='dodge') beep(900,0.06,'square',0.2,1200);
+}
+
+// game state
+let pScore=0, eScore=0, round=1;
+let careerWon=0; try{careerWon=parseInt(localStorage.getItem('guncho-wins')||'0',10)||0;}catch(e){}
+let state='title'; // title, countdown, wait, draw, duel, result
+let countdownVal=3, countdownTimer=0, waitTimer=0, drawTime=0, resultTimer=0;
+let foul=false;
+let bullets=[];
+let particles=[];
+let tumbleX=-20;
+let shake=0;
+
+const player={x:28, y:72, vy:0, aim:0, dodge:0, dodgeDir:0, cooldown:0, alive:true, flash:0};
+const enemy={x:132, y:72, vy:0, aim:0, dodge:0, dodgeDir:0, cooldown:0, alive:true, flash:0, reaction:0, hasShot:false, strafeDir:1, strafeTimer:0};
+
+let keys={up:false,down:false,left:false,right:false, a:false, b:false};
+
+function resetPositions(){
+  player.x=28; player.y=72; player.vy=0; player.aim=0; player.dodge=0; player.cooldown=0; player.alive=true; player.flash=0;
+  enemy.x=132; enemy.y=72; enemy.vy=0; enemy.aim=0; enemy.dodge=0; enemy.cooldown=0; enemy.alive=true; enemy.flash=0; enemy.hasShot=false;
+  enemy.reaction= 180 + Math.random()*220 + (round>3? -30:0); // ms
+  enemy.strafeDir=Math.random()<0.5?1:-1;
+  bullets=[]; particles=[]; foul=false; shake=0; tumbleX=-20;
+}
+
+function setState(s){
+  state=s;
+  if(s==='title'){
+    centerText.innerHTML=`<div class="big-text">DUSTY DUEL<small>FRONTIER SHOWDOWN • 🏆 ${careerWon} WON</small></div>`;
+    tapHint.style.display='block';
+    tapHint.textContent='TAP SCREEN OR PRESS A TO START';
+    startBtn.textContent='▶ START DUEL';
+    modePill.textContent='QUICK DRAW';
+  } else if(s==='countdown'){
+    countdownVal=3; countdownTimer=0;
+    centerText.innerHTML=`<div class="count">${countdownVal}</div>`;
+    tapHint.style.display='none';
+    modePill.textContent='GET READY';
+  } else if(s==='wait'){
+    centerText.innerHTML=`<div class="big-text" style="font-size:14px">STEADY...<small>DON'T SHOOT EARLY!</small></div>`;
+    modePill.textContent='HOLD...';
+  } else if(s==='draw'){
+    centerText.innerHTML=`<div class="big-text" style="color:#ffcc33;font-size:26px">DRAW!<small style="color:#fff">SHOOT NOW!</small></div>`;
+    modePill.textContent='DRAW!';
+    drawTime=performance.now();
+    sfx('draw');
+    shake=6;
+  } else if(s==='duel'){
+    // keep draw text briefly then clear
+  } else if(s==='result'){
+    resultTimer=0;
+    tapHint.style.display='block';
+    tapHint.textContent='TAP A OR SCREEN FOR REMATCH';
+    startBtn.textContent='↻ REMATCH';
+  }
+}
+
+function updateScores(){
+  pScoreEl.textContent=pScore;
+  eScoreEl.textContent=eScore;
+  roundPill.textContent='ROUND '+(pScore+eScore+1);
+}
+
+function startRound(){
+  resetPositions();
+  updateScores();
+  setState('countdown');
+}
+
+function endRound(playerWon, isFoul){
+  if(isFoul){
+    centerText.innerHTML=`<div class="big-text" style="color:#ff6b6b">FOUL!<small>YOU SHOT TOO EARLY</small></div>`;
+    sfx('foul');
+    eScore++;
+  } else if(playerWon){
+    centerText.innerHTML=`<div class="big-text" style="color:#ffcc33">YOU WIN!<small>${(performance.now()-drawTime|0)} MS DRAW</small></div>`;
+    sfx('win');
+    pScore++;
+    careerWon++; try{localStorage.setItem('guncho-wins',String(careerWon));}catch(e){}
+    spawnParticles(enemy.x, enemy.y-6, '#ffcc33');
+  } else {
+    centerText.innerHTML=`<div class="big-text" style="color:#ff6b6b">HIT!<small>RIVAL WAS FASTER</small></div>`;
+    sfx('lose');
+    eScore++;
+    spawnParticles(player.x, player.y-6, '#ff6b6b');
+  }
+  player.alive=false; enemy.alive=false;
+  updateScores();
+  setState('result');
+}
+
+function spawnParticles(x,y,color){
+  for(let i=0;i<12;i++) particles.push({x,y,vx:(Math.random()-0.5)*3, vy:(Math.random()-0.5)*3-1, life:1, color, size:2+Math.random()*2});
+}
+function spawnMuzzle(x,y,dir){
+  for(let i=0;i<4;i++) particles.push({x:x+dir*6,y:y-4+Math.random()*4,vx:dir*(1+Math.random()*2), vy:(Math.random()-0.5)*1.5, life:0.6, color:'#fff', size:1.5});
+}
+
+function tryShoot(who){
+  if(who.cooldown>0 || !who.alive) return;
+  who.cooldown=18; // frames
+  who.flash=4;
+  const dir = who===player ? 1 : -1;
+  const bx = who.x + dir*8;
+  const by = who.y -6 + who.aim*4;
+  bullets.push({x:bx, y:by, vx:dir*5.5, vy: (who.aim*0.6 + (Math.random()-0.5)*0.4), owner:who, life:60});
+  spawnMuzzle(who.x, who.y, dir);
+  sfx('shoot');
+  shake=3;
+}
+
+function handleInput(dt){
+  // movement: dpad up/down moves aim/y, left/right dodge slide
+  const speed= 1.6;
+  let my=0, mx=0;
+  if(keys.up) my-=1;
+  if(keys.down) my+=1;
+  if(keys.left) mx-=1;
+  if(keys.right) mx+=1;
+
+  // player movement only allowed after draw (or wait but limited)
+  if(state==='draw' || state==='duel'){
+    // vertical movement
+    player.vy += my * 0.9;
+    player.vy *= 0.82;
+    player.y += player.vy;
+    player.y = Math.max(48, Math.min(102, player.y));
+    // aim follows vertical offset slightly
+    player.aim += (my*0.12 - player.aim*0.15);
+
+    // dodge slide with B held
+    if(keys.b){
+      player.dodge = Math.max(player.dodge, 8);
+      player.dodgeDir = mx!==0? mx : (player.x<80? -1:1);
+      player.x += player.dodgeDir * 1.8;
+      player.x = Math.max(14, Math.min(62, player.x));
+      if(Math.random()<0.1) sfx('dodge');
+    } else {
+      // spring back to base
+      player.x += (28 - player.x)*0.08;
+    }
+    if(player.dodge>0) player.dodge--;
+  } else if(state==='wait'){
+    // slight fidget allowed but not dodge
+    player.aim += (my*0.05 - player.aim*0.1);
+  }
+
+  // enemy AI
+  if(state==='draw' || state==='duel'){
+    // strafe
+    enemy.strafeTimer -= dt;
+    if(enemy.strafeTimer<=0){ enemy.strafeDir = Math.random()<0.5?1:-1; enemy.strafeTimer= 300+Math.random()*500; }
+    enemy.vy += enemy.strafeDir * 0.15 + (Math.random()-0.5)*0.3;
+    enemy.vy *= 0.88;
+    enemy.y += enemy.vy;
+    enemy.y = Math.max(48, Math.min(102, enemy.y));
+    // aim at player
+    const targetAim = (player.y - enemy.y)/18;
+    enemy.aim += (targetAim - enemy.aim)*0.07;
+
+    // dodge occasionally
+    if(Math.random()<0.015){ enemy.dodge=10; enemy.dodgeDir= Math.random()<0.5?1:-1; }
+    if(enemy.dodge>0){ enemy.x += enemy.dodgeDir*1.2; enemy.dodge--; } else { enemy.x += (132 - enemy.x)*0.06; }
+    enemy.x = Math.max(98, Math.min(146, enemy.x));
+
+    // shooting logic
+    if(!enemy.hasShot && state==='draw'){
+      const elapsed = performance.now() - drawTime;
+      if(elapsed > enemy.reaction){
+        tryShoot(enemy);
+        enemy.hasShot=true;
+      }
+    } else if(state==='duel' && enemy.cooldown<=0 && Math.random()<0.04){
+      tryShoot(enemy);
+    }
+  }
+
+  if(player.cooldown>0) player.cooldown--;
+  if(enemy.cooldown>0) enemy.cooldown--;
+  if(player.flash>0) player.flash--;
+  if(enemy.flash>0) enemy.flash--;
+}
+
+// drawing helpers
+function drawPixelRect(x,y,w,h,col){
+  ctx.fillStyle=col;
+  ctx.fillRect(x|0,y|0,w|0,h|0);
+}
+function drawGunfighter(x,y, facing, isPlayer, aim, flash, dodge){
+  // facing 1 = right, -1 = left
+  ctx.save();
+  ctx.translate(x,y);
+  if(dodge>0) ctx.translate(facing*2,0);
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.25)';
+  ctx.fillRect(-6,10,12,3);
+  // legs
+  ctx.fillStyle=isPlayer?'#2b4a7a':'#7a2b2b';
+  drawPixelRect(-4,4,3,6, isPlayer?'#2b4a7a':'#7a2b2b');
+  drawPixelRect(1,4,3,6, isPlayer?'#1e3355':'#5a1f1f');
+  // body
+  ctx.fillStyle=isPlayer?'#3a6bc5':'#c53a3a';
+  drawPixelRect(-5,-4,10,8, ctx.fillStyle);
+  // belt
+  drawPixelRect(-5,2,10,2,'#3d2a12');
+  drawPixelRect(-1,2,2,2,'#ffcc33');
+  // head
+  drawPixelRect(-4,-10,8,7,'#e8c9a0');
+  // hat
+  ctx.fillStyle=isPlayer?'#1a2a4a':'#3a1a1a';
+  drawPixelRect(-6,-12,12,3, ctx.fillStyle);
+  drawPixelRect(-4,-14,8,3, ctx.fillStyle);
+  // hat band
+  drawPixelRect(-4,-12,8,1,'#ffcc33');
+  // face
+  ctx.fillStyle='#0f0a04';
+  // eyes
+  const eyeX = facing===1?2:-2;
+  drawPixelRect(eyeX-1,-8,1,1,'#0f0a04');
+  drawPixelRect(eyeX+1,-8,1,1,'#0f0a04');
+  // mustache for enemy
+  if(!isPlayer) drawPixelRect(-2,-6,4,1,'#2b1a0a');
+  // arm + gun
+  ctx.fillStyle='#e8c9a0';
+  const armY = -2 + aim*2;
+  drawPixelRect(facing*2, armY, facing*6, 2, '#e8c9a0');
+  // gun
+  ctx.fillStyle='#1a1a1a';
+  drawPixelRect(facing*8, armY, facing*6, 2, '#1a1a1a');
+  drawPixelRect(facing*8, armY+2, 2*facing, 2, '#2a2a2a');
+  // muzzle flash
+  if(flash>0){
+    ctx.fillStyle='#fff';
+    drawPixelRect(facing*14, armY-1, facing*4, 4, '#fff');
+    ctx.fillStyle='#ffcc33';
+    drawPixelRect(facing*15, armY, facing*2, 2, '#ffcc33');
+  }
+  ctx.restore();
+}
+
+function drawBackground(t){
+  // sky
+  const grad=ctx.createLinearGradient(0,0,0,128);
+  grad.addColorStop(0,'#87c4e8');
+  grad.addColorStop(0.5,'#d9e8f5');
+  grad.addColorStop(0.5,'#d9b56a');
+  grad.addColorStop(1,'#b8934a');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,160,128);
+  // sun
+  ctx.fillStyle='#ffcc33';
+  ctx.fillRect(118,12,14,14);
+  ctx.fillStyle='#fff7cc';
+  ctx.fillRect(120,14,6,6);
+  // mountains
+  ctx.fillStyle='#8a6d3b';
+  ctx.beginPath(); ctx.moveTo(0,52); ctx.lineTo(22,32); ctx.lineTo(44,52); ctx.lineTo(68,28); ctx.lineTo(92,52); ctx.lineTo(112,36); ctx.lineTo(136,52); ctx.lineTo(160,38); ctx.lineTo(160,52); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#a08040';
+  ctx.beginPath(); ctx.moveTo(0,52); ctx.lineTo(18,38); ctx.lineTo(36,52); ctx.lineTo(60,34); ctx.lineTo(84,52); ctx.lineTo(108,42); ctx.lineTo(130,52); ctx.lineTo(160,44); ctx.lineTo(160,52); ctx.closePath(); ctx.fill();
+  // buildings
+  ctx.fillStyle='#6b4a1f';
+  drawPixelRect(6,52,28,18,'#6b4a1f');
+  drawPixelRect(8,54,6,6,'#2b1d0e'); drawPixelRect(18,54,6,6,'#2b1d0e'); drawPixelRect(26,54,6,6,'#2b1d0e');
+  drawPixelRect(126,52,28,18,'#6b4a1f');
+  drawPixelRect(128,54,6,6,'#2b1d0e'); drawPixelRect(138,54,6,6,'#2b1d0e'); drawPixelRect(148,54,6,6,'#2b1d0e');
+  // sign
+  ctx.fillStyle='#3d2a12';
+  drawPixelRect(14,46,12,6,'#3d2a12');
+  ctx.fillStyle='#ffcc33'; ctx.font='6px monospace'; ctx.fillText('SALOON',15,50);
+  // ground
+  ctx.fillStyle='#c9a86a';
+  ctx.fillRect(0,70,160,58);
+  // ground texture dots
+  ctx.fillStyle='#b8934a';
+  for(let i=0;i<40;i++){ const x=(i*37 + t*0.02)%160, y=74 + (i*7)%50; ctx.fillRect(x,y,1,1); }
+  // cactus
+  ctx.fillStyle='#2d5a27';
+  drawPixelRect(4,58,4,12,'#2d5a27'); drawPixelRect(2,62,2,4,'#2d5a27'); drawPixelRect(8,64,2,4,'#2d5a27');
+  drawPixelRect(152,60,4,10,'#2d5a27'); drawPixelRect(150,64,2,3,'#2d5a27');
+  // tumbleweed
+  const tx = tumbleX;
+  ctx.fillStyle='#c9a86a';
+  ctx.fillRect(tx, 84, 6,6);
+  ctx.fillStyle='#8a6d3b';
+  ctx.fillRect(tx+1,85,1,1); ctx.fillRect(tx+4,86,1,1); ctx.fillRect(tx+2,88,1,1);
+  // center line dust
+  ctx.fillStyle='rgba(0,0,0,.08)';
+  ctx.fillRect(79,70,2,58);
+}
+
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt=16;
+  // update timers
+  if(state==='countdown'){
+    countdownTimer+=dt;
+    if(countdownTimer>700){
+      countdownTimer=0;
+      countdownVal--;
+      if(countdownVal>0){
+        centerText.innerHTML=`<div class="count">${countdownVal}</div>`;
+        sfx('tick');
+        shake=2;
+      } else {
+        setState('wait');
+        waitTimer= 800 + Math.random()*1400;
+        sfx('ready');
+      }
+    }
+  } else if(state==='wait'){
+    waitTimer-=dt;
+    tumbleX+=0.6;
+    if(tumbleX>170) tumbleX=-10;
+    if(waitTimer<=0){
+      setState('draw');
+      // transition to duel after short display
+      setTimeout(()=>{ if(state==='draw'){ state='duel'; centerText.innerHTML=''; modePill.textContent='DUEL!'; } }, 400);
+    }
+  } else if(state==='duel'){
+    // duel timeout? if no one hits in 4s, it's a draw -> faster next round? treat as enemy win? We'll make it miss
+    // handled by bullets
+  } else if(state==='result'){
+    resultTimer+=dt;
+  }
+
+  handleInput(dt);
+
+  // bullets
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];
+    b.x+=b.vx; b.y+=b.vy; b.life--;
+    // hit check
+    const target = b.owner===player ? enemy : player;
+    const dx = Math.abs(b.x - target.x);
+    const dy = Math.abs(b.y - (target.y-4));
+    if(dx<7 && dy<8 && target.alive){
+      // hit!
+      bullets.splice(i,1);
+      if(b.owner===player) endRound(true,false);
+      else endRound(false,false);
+      continue;
+    }
+    if(b.life<=0 || b.x<-10 || b.x>170) bullets.splice(i,1);
+  }
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.15; p.life-=0.02;
+    if(p.life<=0) particles.splice(i,1);
+  }
+
+  if(shake>0) shake*=0.85, shake-=0.1, shake=Math.max(0,shake);
+
+  // draw
+  ctx.save();
+  if(shake>0.5) ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+  drawBackground(now);
+  // draw fighters
+  drawGunfighter(player.x, player.y, 1, true, player.aim, player.flash, player.dodge);
+  drawGunfighter(enemy.x, enemy.y, -1, false, enemy.aim, enemy.flash, enemy.dodge);
+  // bullets
+  ctx.fillStyle='#1a1a1a';
+  bullets.forEach(b=>{
+    ctx.fillStyle=b.owner===player?'#ffcc33':'#ff6b6b';
+    ctx.fillRect(b.x-1,b.y-1,3,2);
+    ctx.fillStyle='#fff';
+    ctx.fillRect(b.x,b.y,1,1);
+  });
+  // particles
+  particles.forEach(p=>{
+    ctx.globalAlpha=Math.max(0,p.life);
+    ctx.fillStyle=p.color;
+    ctx.fillRect(p.x,p.y,p.size,p.size);
+  });
+  ctx.globalAlpha=1;
+  // crosshair for player when aiming
+  if(state==='draw' || state==='duel'){
+    const cx = 80 + (player.aim*2);
+    const cy = enemy.y -4 + (player.aim*4);
+    ctx.strokeStyle='rgba(255,204,51,.9)';
+    ctx.lineWidth=1;
+    ctx.strokeRect(cx-3, cy-3, 6,6);
+    ctx.fillStyle='#ffcc33';
+    ctx.fillRect(cx, cy-1,1,3); ctx.fillRect(cx-1,cy,3,1);
+  }
+  ctx.restore();
+
+  // foul check visual: if in wait and player shoots
+  // handled in input event
+}
+
+function foulShoot(){
+  if(state==='wait'){
+    sfx('foul');
+    shake=8;
+    endRound(false,true);
+  }
+}
+
+// input wiring
+function pressA(){
+  ensureAudio();
+  if(state==='title' || state==='result'){
+    startRound();
+  } else if(state==='wait'){
+    foulShoot();
+  } else if(state==='draw' || state==='duel'){
+    tryShoot(player);
+  }
+}
+function pressB(){
+  // dodge is handled via hold, but tap gives quick dodge
+  if(state==='draw' || state==='duel'){
+    player.dodge=12;
+    player.dodgeDir= keys.left? -1 : keys.right? 1 : (Math.random()<0.5?1:-1);
+    sfx('dodge');
+  }
+}
+
+btnA.addEventListener('touchstart', e=>{e.preventDefault(); btnA.classList.add('pressed'); pressA();});
+btnA.addEventListener('touchend', e=>{e.preventDefault(); btnA.classList.remove('pressed');});
+btnA.addEventListener('mousedown', e=>{e.preventDefault(); pressA();});
+btnB.addEventListener('touchstart', e=>{e.preventDefault(); btnB.classList.add('pressed'); keys.b=true; pressB();});
+btnB.addEventListener('touchend', e=>{e.preventDefault(); btnB.classList.remove('pressed'); keys.b=false;});
+btnB.addEventListener('mousedown', e=>{e.preventDefault(); keys.b=true; pressB();});
+btnB.addEventListener('mouseup', ()=>keys.b=false);
+
+function bindDir(btn, dir){
+  const down=e=>{e.preventDefault(); btn.classList.add('pressed'); keys[dir]=true;};
+  const up=e=>{e.preventDefault(); btn.classList.remove('pressed'); keys[dir]=false;};
+  btn.addEventListener('touchstart', down, {passive:false});
+  btn.addEventListener('touchend', up, {passive:false});
+  btn.addEventListener('touchcancel', up, {passive:false});
+  btn.addEventListener('mousedown', down);
+  btn.addEventListener('mouseup', up);
+  btn.addEventListener('mouseleave', up);
+}
+document.querySelectorAll('[data-dir]').forEach(b=>bindDir(b, b.dataset.dir));
+
+// keyboard
+window.addEventListener('keydown', e=>{
+  if(e.key==='ArrowUp'||e.key==='w') keys.up=true;
+  if(e.key==='ArrowDown'||e.key==='s') keys.down=true;
+  if(e.key==='ArrowLeft'||e.key==='a') keys.left=true;
+  if(e.key==='ArrowRight'||e.key==='d') keys.right=true;
+  if(e.key===' '||e.key==='Enter'){ pressA(); }
+  if(e.key==='Shift' || e.key==='b') {keys.b=true; pressB();}
+});
+window.addEventListener('keyup', e=>{
+  if(e.key==='ArrowUp'||e.key==='w') keys.up=false;
+  if(e.key==='ArrowDown'||e.key==='s') keys.down=false;
+  if(e.key==='ArrowLeft'||e.key==='a') keys.left=false;
+  if(e.key==='ArrowRight'||e.key==='d') keys.right=false;
+  if(e.key==='Shift' || e.key==='b') keys.b=false;
+});
+
+// screen tap
+screenEl.addEventListener('click', ()=>{
+  if(state==='title' || state==='result') pressA();
+  else if(state==='draw' || state==='duel') pressA();
+  else if(state==='wait') foulShoot();
+});
+screenEl.addEventListener('touchstart', e=>{e.preventDefault(); if(state==='wait') foulShoot(); else pressA();},{passive:false});
+
+// buttons
+startBtn.addEventListener('click', ()=>{ if(state==='title'||state==='result') startRound(); else if(state==='draw'||state==='duel') pressA(); });
+resetBtn.addEventListener('click', ()=>{ pScore=0; eScore=0; round=1; updateScores(); setState('title'); resetPositions(); });
+
+soundBtn.addEventListener('click', ()=>{
+  soundOn=!soundOn;
+  soundBtn.classList.toggle('on', soundOn);
+  soundBtn.textContent=soundOn?'♪':'🔇';
+  if(soundOn) ensureAudio();
+});
+fsBtn.addEventListener('click', async ()=>{
+  try{
+    if(!document.fullscreenElement) await document.documentElement.requestFullscreen();
+    else await document.exitFullscreen();
+  }catch{}
+});
+document.addEventListener('fullscreenchange', ()=>{
+  fsBtn.classList.toggle('on', !!document.fullscreenElement);
+});
+
+// init
+resetPositions();
+setState('title');
+updateScores();
+requestAnimationFrame(loop);
+
+// prevent scrolling
+document.body.addEventListener('touchmove', e=>e.preventDefault(), {passive:false});
+</script>
+</body>
+</html>

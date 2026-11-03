@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Flag Signal Quiz</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;user-select:none;font-family:system-ui,sans-serif}
+body{background:#020617;color:#fff;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:6px}
+h1{font-size:17px;color:#7dd3fc;margin:6px 0 2px;letter-spacing:1px}
+.sub{font-size:11px;opacity:.6;margin-bottom:6px;text-align:center}
+#wrap{position:relative;width:360px;max-width:95vw;height:560px;background:linear-gradient(180deg,#0f172a 0%,#1e3a5f 100%);border-radius:16px;overflow:hidden;border:2px solid #334155;box-shadow:0 8px 32px rgba(0,0,0,.6);display:flex;flex-direction:column}
+#topBar{display:flex;justify-content:space-between;gap:6px;padding:8px;background:rgba(0,0,0,.4)}
+.pill{background:rgba(0,0,0,.5);padding:6px 10px;border-radius:10px;font-size:11px;border:1px solid rgba(255,255,255,.15);text-align:center;min-width:60px}
+.pill b{color:#fde047}
+#timerWrap{height:8px;background:rgba(0,0,0,.5);border-radius:4px;overflow:hidden;margin:0 8px}
+#timerFill{height:100%;width:100%;background:linear-gradient(90deg,#22c55e,#fde047,#ef4444);transition:width .1s}
+#stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;gap:8px;overflow:hidden}
+#sailorBox{width:180px;height:180px;background:radial-gradient(ellipse at 50% 30%,#1e293b,#020617);border-radius:16px;border:2px solid #334155;display:flex;align-items:center;justify-content:center;position:relative}
+#wordDisplay{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.letterBox{width:36px;height:42px;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px}
+.letterBox.filled{background:rgba(34,197,94,.3);border-color:#22c55e}
+.letterBox.current{border-color:#38bdf8;box-shadow:0 0 8px rgba(56,189,248,.5)}
+#keyboard{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:8px;background:rgba(0,0,0,.3);border-radius:12px;width:100%}
+.kbtn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.15);color:#fff;padding:8px 0;border-radius:8px;font-weight:700;font-size:13px}
+.kbtn:active{background:rgba(56,189,248,.4);transform:scale(.95)}
+.kbtn.correct{background:rgba(34,197,94,.5)}
+.kbtn.wrong{background:rgba(239,68,68,.5)}
+#controls{display:flex;gap:8px;padding:8px}
+.btn{flex:1;background:#334155;color:#fff;border:none;padding:10px;border-radius:10px;font-weight:700;font-size:13px}
+.btn.primary{background:#0ea5e9}
+.btn:active{transform:scale(.97)}
+#overlay{position:absolute;inset:0;background:rgba(2,6,23,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center;z-index:10;overflow:auto}
+#overlay h2{font-size:20px;color:#7dd3fc;margin-bottom:6px}
+#overlay p{font-size:13px;opacity:.9;line-height:1.4;max-width:320px}
+#chart{max-height:320px;overflow:auto;width:100%;margin-top:8px;background:rgba(255,255,255,.05);border-radius:12px;padding:8px}
+.chartGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.chartItem{background:rgba(0,0,0,.4);border-radius:8px;padding:6px;display:flex;flex-direction:column;align-items:center;gap:4px;border:1px solid rgba(255,255,255,.1)}
+.chartItem b{font-size:12px;color:#fde047}
+</style>
+</head>
+<body>
+<h1>🚩 FLAG SIGNAL QUIZ</h1>
+<div class="sub">Study the chart • Decode the sailor • Beat the timer</div>
+<div id="wrap">
+<div id="topBar">
+<div class="pill">LEVEL<br><b id="lvlEl">1</b></div>
+<div class="pill">WORD<br><b id="wordEl">1/5</b></div>
+<div class="pill">SCORE<br><b id="scoreEl">0</b></div>
+<div class="pill">BEST<br><b id="bestEl">0</b></div>
+</div>
+<div id="timerWrap"><div id="timerFill"></div></div>
+<div id="stage">
+<div id="sailorBox"><canvas id="sailor" width="180" height="180"></canvas></div>
+<div id="wordDisplay"></div>
+<div style="font-size:11px;opacity:.6;text-align:center">Sailor flashes each letter • Tap chart to study • Type the word</div>
+<div id="keyboard"></div>
+</div>
+<div id="controls">
+<button class="btn" id="chartBtn">📖 Chart</button>
+<button class="btn" id="hintBtn">💡 Hint</button>
+<button class="btn primary" id="nextBtn">Next →</button>
+</div>
+<div id="overlay">
+<div style="font-size:32px">🚩</div>
+<h2>Flag Signal Quiz</h2>
+<p>A sailor flashes <b>two-arm semaphore</b> positions.<br>Decode the word <b>letter by letter</b> before the timer drains!<br>Study the chart, then answer across levels.</p>
+<div id="chart" style="display:none"></div>
+<button class="btn primary" id="playBtn" style="margin-top:12px;padding:12px 24px">START DECODE 🚩</button>
+<p style="font-size:11px;opacity:.5;margin-top:6px">Timer shrinks each level • 5 words per level</p>
+</div>
+</div>
+<script>
+const lvlEl=document.getElementById('lvlEl'),wordEl=document.getElementById('wordEl'),scoreEl=document.getElementById('scoreEl'),bestEl=document.getElementById('bestEl');
+const timerFill=document.getElementById('timerFill'),wordDisplay=document.getElementById('wordDisplay'),keyboard=document.getElementById('keyboard');
+const overlay=document.getElementById('overlay'),playBtn=document.getElementById('playBtn'),chartBtn=document.getElementById('chartBtn'),hintBtn=document.getElementById('hintBtn'),nextBtn=document.getElementById('nextBtn');
+const chartEl=document.getElementById('chart');
+const sailorCanvas=document.getElementById('sailor'),sctx=sailorCanvas.getContext('2d');
+let best=parseInt(localStorage.getItem('flagBest')||'0');bestEl.textContent=best;
+let level=1,wordIdx=0,score=0,currentWord='',currentPos=0,timeLeft=0,timer=null,flashIdx=0,flashTimer=null;
+
+// semaphore mapping: angles from up clockwise: 0=up,45=up-right,90=right,135=down-right,180=down,225=down-left,270=left,315=up-left
+const MAP={
+A:{l:225,r:135},B:{l:270,r:135},C:{l:315,r:135},D:{l:0,r:135},E:{l:45,r:135},F:{l:90,r:135},G:{l:135,r:180},
+H:{l:225,r:180},I:{l:270,r:180},J:{l:0,r:180},K:{l:225,r:45},L:{l:225,r:90},M:{l:225,r:0},N:{l:225,r:315},
+O:{l:270,r:315},P:{l:270,r:0},Q:{l:270,r:45},R:{l:270,r:90},S:{l:315,r:0},T:{l:315,r:45},U:{l:315,r:90},
+V:{l:0,r:45},W:{l:0,r:90},X:{l:0,r:315},Y:{l:45,r:315},Z:{l:90,r:315}
+};
+
+const LEVELS=[
+["CAT","DOG","SUN","SEA","WIND"],
+["SHIP","FLAG","WAVE","PORT","STAR"],
+["SAILOR","BEACON","ANCHOR","LIGHTS","OCEAN"],
+["SIGNAL","VOYAGE","HARBOR","CAPTAIN","DECODE"],
+["SEMAPHORE","LIGHTHOUSE","NAVIGATE","MARITIME","ADVENTURE"]
+];
+
+function angleToXY(angle,len){
+  let rad=(angle-90)*Math.PI/180;
+  return {x:Math.cos(rad)*len, y:Math.sin(rad)*len};
+}
+
+function drawSailor(letter){
+  sctx.clearRect(0,0,180,180);
+  // bg
+  sctx.fillStyle='rgba(255,255,255,0.05)';
+  sctx.beginPath();sctx.arc(90,90,80,0,Math.PI*2);sctx.fill();
+  // body
+  sctx.fillStyle='#e2e8f0';
+  sctx.beginPath();sctx.arc(90,90,18,0,Math.PI*2);sctx.fill();
+  sctx.fillStyle='#0ea5e9';
+  sctx.fillRect(78,108,24,30);
+  // head
+  sctx.fillStyle='#fde68a';
+  sctx.beginPath();sctx.arc(90,70,14,0,Math.PI*2);sctx.fill();
+  sctx.fillStyle='#0f172a';
+  sctx.beginPath();sctx.arc(86,70,2,0,Math.PI*2);sctx.fill();
+  sctx.beginPath();sctx.arc(94,70,2,0,Math.PI*2);sctx.fill();
+  // hat
+  sctx.fillStyle='#1e293b';
+  sctx.fillRect(76,56,28,6);
+  sctx.fillStyle='#38bdf8';
+  sctx.fillRect(76,52,28,8);
+  if(!letter || !MAP[letter]){
+    sctx.fillStyle='#fff';sctx.font='12px system-ui';sctx.textAlign='center';
+    sctx.fillText('Ready',90,150);
+    return;
+  }
+  let m=MAP[letter];
+  // arms
+  let left=angleToXY(m.l,38), right=angleToXY(m.r,38);
+  // left arm (viewer's right)
+  sctx.strokeStyle='#fde047';sctx.lineWidth=6;sctx.lineCap='round';
+  sctx.beginPath();sctx.moveTo(90,90);sctx.lineTo(90+left.x,90+left.y);sctx.stroke();
+  sctx.fillStyle='#ef4444';sctx.beginPath();sctx.arc(90+left.x,90+left.y,8,0,Math.PI*2);sctx.fill();
+  sctx.fillStyle='#fff';sctx.font='8px system-ui';sctx.textAlign='center';sctx.fillText('L',90+left.x,90+left.y+3);
+  // right arm
+  sctx.strokeStyle='#fde047';
+  sctx.beginPath();sctx.moveTo(90,90);sctx.lineTo(90+right.x,90+right.y);sctx.stroke();
+  sctx.fillStyle='#ef4444';sctx.beginPath();sctx.arc(90+right.x,90+right.y,8,0,Math.PI*2);sctx.fill();
+  sctx.fillStyle='#fff';sctx.fillText('R',90+right.x,90+right.y+3);
+  // letter label
+  sctx.fillStyle='rgba(255,255,255,0.9)';sctx.font='bold 14px system-ui';sctx.textAlign='center';
+  sctx.fillText(letter,90,165);
+}
+
+function buildChart(){
+  chartEl.innerHTML='<div class="chartGrid">'+Object.keys(MAP).map(l=>{
+    let m=MAP[l];
+    return `<div class="chartItem"><canvas width="60" height="60" data-letter="${l}"></canvas><b>${l}</b><span style="font-size:9px;opacity:.6">${m.l}° / ${m.r}°</span></div>`;
+  }).join('')+'</div>';
+  chartEl.querySelectorAll('canvas').forEach(cv=>{
+    let l=cv.dataset.letter, m=MAP[l];
+    let c=cv.getContext('2d');
+    c.clearRect(0,0,60,60);
+    c.fillStyle='#0f172a';c.beginPath();c.arc(30,30,28,0,Math.PI*2);c.fill();
+    c.fillStyle='#e2e8f0';c.beginPath();c.arc(30,30,6,0,Math.PI*2);c.fill();
+    let left=angleToXY(m.l,18), right=angleToXY(m.r,18);
+    c.strokeStyle='#fde047';c.lineWidth=3;c.lineCap='round';
+    c.beginPath();c.moveTo(30,30);c.lineTo(30+left.x,30+left.y);c.stroke();
+    c.beginPath();c.moveTo(30,30);c.lineTo(30+right.x,30+right.y);c.stroke();
+    c.fillStyle='#ef4444';c.beginPath();c.arc(30+left.x,30+left.y,4,0,Math.PI*2);c.fill();
+    c.beginPath();c.arc(30+right.x,30+right.y,4,0,Math.PI*2);c.fill();
+  });
+}
+
+function buildKeyboard(){
+  keyboard.innerHTML='';
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(l=>{
+    let b=document.createElement('button');
+    b.className='kbtn';b.textContent=l;
+    b.onclick=()=>guess(l);
+    keyboard.appendChild(b);
+  });
+}
+
+function loadWord(){
+  let words=LEVELS[level-1];
+  currentWord=words[wordIdx];
+  currentPos=0;
+  wordEl.textContent=`${wordIdx+1}/${words.length}`;
+  lvlEl.textContent=level;
+  // build display
+  wordDisplay.innerHTML='';
+  for(let i=0;i<currentWord.length;i++){
+    let d=document.createElement('div');
+    d.className='letterBox'+(i===0?' current':'');
+    d.id='box'+i;
+    d.textContent='';
+    wordDisplay.appendChild(d);
+  }
+  // timer: 25s - level*2
+  timeLeft= Math.max(12, 28 - level*2);
+  let total=timeLeft;
+  clearInterval(timer);
+  timer=setInterval(()=>{
+    timeLeft-=0.1;
+    timerFill.style.width=Math.max(0,timeLeft/total*100)+'%';
+    if(timeLeft<=0){
+      clearInterval(timer);
+      failWord();
+    }
+  },100);
+  // flash sailor through letters
+  flashIdx=0;
+  clearInterval(flashTimer);
+  drawSailor(currentWord[flashIdx]);
+  flashTimer=setInterval(()=>{
+    flashIdx=(flashIdx+1)%currentWord.length;
+    drawSailor(currentWord[flashIdx]);
+  },1200);
+  buildKeyboard();
+}
+
+function guess(l){
+  if(!currentWord) return;
+  let expected=currentWord[currentPos];
+  let box=document.getElementById('box'+currentPos);
+  if(l===expected){
+    box.textContent=l;box.classList.add('filled');box.classList.remove('current');
+    currentPos++;
+    if(currentPos<currentWord.length){
+      document.getElementById('box'+currentPos).classList.add('current');
+    } else {
+      // word complete
+      clearInterval(timer);clearInterval(flashTimer);
+      score+=Math.ceil(timeLeft*2)+currentWord.length*5;
+      scoreEl.textContent=score;
+      if(score>best){best=score;localStorage.setItem('flagBest',best);bestEl.textContent=best;}
+      // highlight
+      drawSailor('✓');
+      setTimeout(nextWord,800);
+    }
+    // feedback
+    let btn=[...keyboard.children].find(b=>b.textContent===l);
+    if(btn){btn.classList.add('correct');setTimeout(()=>btn.classList.remove('correct'),300);}
+    if(navigator.vibrate) navigator.vibrate(20);
+  } else {
+    timeLeft-=2;
+    if(timeLeft<0) timeLeft=0;
+    let btn=[...keyboard.children].find(b=>b.textContent===l);
+    if(btn){btn.classList.add('wrong');setTimeout(()=>btn.classList.remove('wrong'),300);}
+    if(navigator.vibrate) navigator.vibrate([30,20,30]);
+    // shake
+    wordDisplay.animate([{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:200});
+  }
+}
+
+function nextWord(){
+  wordIdx++;
+  if(wordIdx>=LEVELS[level-1].length){
+    // level complete
+    clearInterval(timer);clearInterval(flashTimer);
+    if(level<LEVELS.length){
+      overlay.innerHTML=`<div style="font-size:32px">🎉</div><h2>Level ${level} Complete!</h2><p>Score: ${score}<br>Next: ${LEVELS[level].length} words, faster timer</p><button class="btn primary" id="contBtn" style="margin-top:12px">NEXT LEVEL →</button><button class="btn" id="chartBtn2" style="margin-top:8px">📖 Study Chart</button>`;
+      overlay.style.display='flex';
+      document.getElementById('contBtn').onclick=()=>{level++;wordIdx=0;overlay.style.display='none';loadWord();};
+      document.getElementById('chartBtn2').onclick=()=>{buildChart();chartEl.style.display='block';overlay.innerHTML=`<h2>Semaphore Chart</h2><p>Two-arm positions for each letter</p><div id="chartInner"></div><button class="btn primary" id="backBtn" style="margin-top:12px">Back</button>`;document.getElementById('chartInner').appendChild(chartEl);chartEl.style.display='block';document.getElementById('backBtn').onclick=()=>{overlay.style.display='none';loadWord();};}
+    } else {
+      overlay.innerHTML=`<div style="font-size:32px">🏆</div><h2>All Levels Cleared!</h2><p>Final Score: <b style="color:#fde047">${score}</b><br>Best: ${best}</p><button class="btn primary" id="againBtn" style="margin-top:12px">PLAY AGAIN 🚩</button>`;
+      overlay.style.display='flex';
+      document.getElementById('againBtn').onclick=()=>{level=1;wordIdx=0;score=0;scoreEl.textContent=0;overlay.style.display='none';loadWord();};
+    }
+  } else {
+    loadWord();
+  }
+}
+
+function failWord(){
+  clearInterval(flashTimer);
+  overlay.innerHTML=`<div style="font-size:32px">⏱️</div><h2>Time's Up!</h2><p>Word was <b style="color:#fde047">${currentWord}</b><br>Score: ${score}</p><button class="btn primary" id="retryBtn" style="margin-top:12px">RETRY WORD ↺</button><button class="btn" id="chartBtn3" style="margin-top:8px">📖 Study Chart</button>`;
+  overlay.style.display='flex';
+  document.getElementById('retryBtn').onclick=()=>{overlay.style.display='none';loadWord();};
+  document.getElementById('chartBtn3').onclick=()=>{buildChart();chartEl.style.display='block';overlay.innerHTML=`<h2>Semaphore Chart</h2><div id="chartInner2"></div><button class="btn primary" id="backBtn2" style="margin-top:12px">Back</button>`;document.getElementById('chartInner2').appendChild(chartEl);document.getElementById('backBtn2').onclick=()=>{overlay.style.display='none';loadWord();};}
+}
+
+chartBtn.onclick=()=>{
+  if(chartEl.style.display==='none' || !chartEl.innerHTML){
+    buildChart();chartEl.style.display='block';
+    overlay.innerHTML=`<h2>📖 Two-Arm Code Chart</h2><p>Left arm / Right arm angles from up</p><div id="chartHolder"></div><button class="btn primary" id="closeChart" style="margin-top:12px">Close</button>`;
+    document.getElementById('chartHolder').appendChild(chartEl);
+    overlay.style.display='flex';
+    document.getElementById('closeChart').onclick=()=>overlay.style.display='none';
+  } else {
+    overlay.style.display='flex';
+  }
+};
+hintBtn.onclick=()=>{
+  if(!currentWord) return;
+  let next=currentWord[currentPos];
+  // flash that letter longer
+  drawSailor(next);
+  clearInterval(flashTimer);
+  setTimeout(()=>{
+    flashTimer=setInterval(()=>{flashIdx=(flashIdx+1)%currentWord.length;drawSailor(currentWord[flashIdx]);},1200);
+  },1500);
+  timeLeft-=1;
+};
+nextBtn.onclick=()=>{
+  // skip word (penalty)
+  timeLeft-=3;
+  nextWord();
+};
+
+playBtn.onclick=()=>{
+  overlay.style.display='none';
+  level=1;wordIdx=0;score=0;scoreEl.textContent=0;
+  buildChart();
+  loadWord();
+};
+buildChart();
+drawSailor(null);
+buildKeyboard();
+</script>
+</body>
+</html>

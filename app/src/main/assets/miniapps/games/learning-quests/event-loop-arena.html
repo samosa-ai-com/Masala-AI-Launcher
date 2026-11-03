@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Event Loop Battler</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0A0E1A;
+  --panel:#111827;
+  --card:#0F172A;
+  --line:#1E293B;
+  --neon:#00FF88;
+  --neon2:#38BDF8;
+  --pink:#F472B6;
+  --yellow:#FACC15;
+  --ink:#E2E8F0;
+  --muted:#94A3B8;
+  --radius:16px;
+}
+html,body{height:100%;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;overflow-x:hidden}
+#app{max-width:428px;min-width:360px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;background:radial-gradient(600px 400px at 50% -10%, #0F1E3A 0%, #0A0E1A 60%);overflow-x:hidden;position:relative}
+.topbar{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:rgba(17,24,39,.92);backdrop-filter:blur(10px);border-bottom:2px solid var(--line);position:sticky;top:0;z-index:10}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:.3px}
+.badge{width:36px;height:36px;border-radius:10px;background:var(--neon);color:#001018;display:grid;place-items:center;font-size:16px;font-weight:900;box-shadow:0 0 12px rgba(0,255,136,.5);border:2px solid #001018}
+.pill{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;background:var(--panel);border:2px solid var(--line);border-radius:999px;padding:5px 10px;color:var(--neon)}
+.screen{flex:1;display:none;padding:14px;flex-direction:column;gap:12px}
+.screen.active{display:flex}
+.card{background:linear-gradient(180deg, #111827 0%, #0F172A 100%);border:2px solid var(--line);border-radius:var(--radius);padding:14px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.card.neon{border-color:rgba(0,255,136,.35);box-shadow:0 0 16px rgba(0,255,136,.15), 0 8px 24px rgba(0,0,0,.4)}
+.h1{font-size:22px;font-weight:900;line-height:1.1;letter-spacing:-.3px}
+.h2{font-size:16px;font-weight:900}
+.sub{font-size:13px;color:var(--muted);line-height:1.5;font-weight:500}
+.btn{border:2px solid var(--line);border-radius:14px;min-height:48px;padding:10px 14px;font-weight:900;font-size:15px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform .08s;box-shadow:0 4px 0 #020617}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #020617}
+.btn-primary{background:var(--neon);color:#001018;border-color:#001018;box-shadow:0 4px 0 #001018, 0 0 12px rgba(0,255,136,.4)}
+.btn-ghost{background:transparent;color:var(--ink);border-color:var(--line);box-shadow:0 4px 0 #020617}
+.btn-blue{background:var(--neon2);color:#001018;border-color:#001018;box-shadow:0 4px 0 #001018}
+.btn:disabled{opacity:.45;pointer-events:none}
+.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.hud-item{background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:8px;text-align:center}
+.hud-label{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.hud-val{font-size:18px;font-weight:900;margin-top:2px}
+.code-card{background:#020617;border:2px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:inset 0 0 20px rgba(0,255,136,.06)}
+.code-head{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--panel);border-bottom:2px solid var(--line);font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.code-head span:last-child{color:var(--neon)}
+pre{margin:0;padding:14px;overflow-x:auto;font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-size:13px;line-height:1.6;white-space:pre;max-width:100%}
+.kw{color:var(--pink);font-weight:700}
+.fn{color:var(--neon2)}
+.str{color:var(--neon)}
+.cmt{color:var(--muted);font-style:italic}
+.num{color:var(--yellow)}
+.choices{display:grid;grid-template-columns:1fr;gap:10px}
+.choice{width:100%;min-height:52px;border-radius:12px;border:2px solid var(--line);background:var(--panel);color:var(--ink);font-weight:800;font-size:14px;padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:0 3px 0 #020617;transition:all .12s;text-align:left}
+.choice:active{transform:translateY(2px);box-shadow:0 1px 0 #020617}
+.choice.selected{border-color:var(--neon);background:rgba(0,255,136,.08);box-shadow:0 3px 0 var(--neon), 0 0 12px rgba(0,255,136,.2)}
+.choice.correct{border-color:var(--neon);background:rgba(0,255,136,.15);box-shadow:0 3px 0 var(--neon)}
+.choice.wrong{border-color:#EF4444;background:rgba(239,68,68,.12);box-shadow:0 3px 0 #EF4444}
+.choice-num{width:28px;height:28px;border-radius:8px;background:var(--card);border:2px solid var(--line);display:grid;place-items:center;font-size:12px;font-weight:900;flex-shrink:0}
+.choice.selected .choice-num{background:var(--neon);color:#001018;border-color:#001018}
+.tray{background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:52px}
+.tray-label{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.token{padding:6px 10px;border-radius:999px;background:var(--card);border:2px solid var(--line);font-family:ui-monospace, monospace;font-weight:800;font-size:13px;cursor:pointer}
+.token.picked{background:var(--neon);color:#001018;border-color:#001018}
+.level-map{display:flex;flex-direction:column;gap:10px}
+.level-node{display:flex;align-items:center;gap:12px;padding:10px;background:var(--panel);border:2px solid var(--line);border-radius:14px;cursor:pointer;box-shadow:0 3px 0 #020617}
+.level-node.locked{opacity:.45;cursor:not-allowed}
+.level-node.active{border-color:var(--neon);box-shadow:0 3px 0 var(--neon), 0 0 12px rgba(0,255,136,.2)}
+.level-node.done{border-color:rgba(0,255,136,.4)}
+.level-icon{width:48px;height:48px;border-radius:12px;background:var(--card);border:2px solid var(--line);display:grid;place-items:center;font-size:20px;flex-shrink:0}
+.level-node.active .level-icon{background:var(--neon);color:#001018;border-color:#001018;box-shadow:0 0 10px rgba(0,255,136,.4)}
+.level-info{flex:1}
+.level-title{font-weight:900;font-size:14px}
+.level-desc{font-size:11px;font-weight:700;color:var(--muted);margin-top:2px}
+.level-stars{font-size:12px;margin-top:4px}
+.verdict{border-radius:14px;padding:12px;border:2px solid var(--line);text-align:center}
+.verdict.good{background:rgba(0,255,136,.08);border-color:var(--neon)}
+.verdict.bad{background:rgba(239,68,68,.08);border-color:#EF4444}
+.explain{background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:12px;font-size:13px;line-height:1.5}
+.explain b{color:var(--neon)}
+.progress{height:8px;background:var(--panel);border:2px solid var(--line);border-radius:999px;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:var(--neon);transition:width .3s;box-shadow:0 0 8px rgba(0,255,136,.5)}
+.overlay{position:fixed;inset:0;background:rgba(10,14,26,.7);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
+.overlay.open{display:flex}
+.overlay-card{width:100%;max-width:400px;background:linear-gradient(180deg, #111827, #0F172A);border:3px solid var(--line);border-radius:20px;padding:18px;box-shadow:0 12px 0 #020617;text-align:center}
+.big{font-size:42px;font-weight:900;letter-spacing:-1px}
+.shake{animation:shake .35s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-4px)}}
+.pop{animation:pop .3s}
+@keyframes pop{0%{transform:scale(.9)}50%{transform:scale(1.05)}100%{transform:scale(1)}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="brand"><div class="badge">◈</div> Loop Battler</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="pill" id="bestPill">Best 0</div>
+      <button class="btn btn-ghost" style="min-height:36px;padding:6px 10px;font-size:12px;box-shadow:none" id="btnReset">Reset</button>
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <section class="screen active" id="screenMap">
+    <div class="card neon">
+      <div class="h1">Predict the Output</div>
+      <div class="sub" style="margin-top:6px">Each round shows a snippet with <b style="color:var(--neon)">timers</b>, <b style="color:var(--neon2)">promises</b> & chained handlers. Pick the exact <code style="background:var(--panel);padding:2px 6px;border-radius:6px;border:1px solid var(--line)">console.log</code> order.</div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <span class="pill" style="background:var(--neon);color:#001018;border-color:#001018">Neon terminal</span>
+        <span class="pill">5 levels + boss</span>
+      </div>
+    </div>
+    <div class="level-map" id="levelMap"></div>
+    <div class="card">
+      <div style="font-weight:900;font-size:13px">How the loop works</div>
+      <div class="sub" style="margin-top:6px">Sync → Microtasks (Promises, queueMicrotask) → Macrotasks (setTimeout). Microtasks drain completely before next timer.</div>
+    </div>
+  </section>
+
+  <!-- BATTLE -->
+  <section class="screen" id="screenBattle">
+    <div class="hud">
+      <div class="hud-item"><div class="hud-label">Lives</div><div class="hud-val" id="hudLives">❤️❤️❤️</div></div>
+      <div class="hud-item"><div class="hud-label">Streak</div><div class="hud-val" id="hudStreak">0 🔥</div></div>
+      <div class="hud-item"><div class="hud-label">Score</div><div class="hud-val" id="hudScore">0</div></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="pill" id="battlePill">L1 Q1/4</div>
+      <div style="font-size:11px;font-weight:800;color:var(--muted)" id="battleProgress">Level 1 • Top-to-Bottom</div>
+    </div>
+    <div class="progress"><div class="progress-fill" id="progressFill"></div></div>
+
+    <div class="code-card" id="codeCard">
+      <div class="code-head"><span>▶ snippet.js</span><span id="codeTag">SYNC</span></div>
+      <pre id="codePre"></pre>
+    </div>
+
+    <div style="font-weight:900;font-size:13px">Pick the exact log order:</div>
+    <div class="choices" id="choices"></div>
+
+    <div class="tray" id="tray" style="display:none">
+      <span class="tray-label">Your order:</span>
+      <span id="trayPicks" style="display:flex;gap:6px;flex-wrap:wrap"></span>
+      <button class="btn btn-ghost" style="min-height:32px;padding:4px 10px;font-size:12px;margin-left:auto;box-shadow:none" id="btnClear">Clear</button>
+    </div>
+
+    <button class="btn btn-primary" style="width:100%" id="btnSubmit" disabled>▶ Execute</button>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost" style="flex:1" id="btnQuit">↩ Quit</button>
+      <button class="btn btn-ghost" style="flex:1" id="btnHint">💡 Hint</button>
+    </div>
+  </section>
+
+  <!-- VERDICT -->
+  <section class="screen" id="screenVerdict">
+    <div class="verdict" id="verdictBox"></div>
+    <div class="code-card">
+      <div class="code-head"><span>▶ snippet.js</span><span>Result</span></div>
+      <pre id="verdictCode"></pre>
+    </div>
+    <div class="explain" id="explainBox"></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost" style="flex:1" id="btnVerdictQuit">Map</button>
+      <button class="btn btn-primary" style="flex:1.4" id="btnNext">Next ▶</button>
+    </div>
+  </section>
+</div>
+
+<div class="overlay" id="overlayResult">
+  <div class="overlay-card">
+    <div class="pill" id="resultPill" style="margin:0 auto">Level Complete</div>
+    <div class="big" id="resultStars" style="margin-top:8px">⭐⭐⭐</div>
+    <div class="h1" id="resultTitle" style="margin-top:6px">Flawless!</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px">
+      <div style="background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:8px"><div style="font-size:11px;font-weight:800;color:var(--muted)">Score</div><div style="font-weight:900;font-size:18px" id="resultScore">0</div></div>
+      <div style="background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:8px"><div style="font-size:11px;font-weight:800;color:var(--muted)">Streak</div><div style="font-weight:900;font-size:18px" id="resultStreak">0</div></div>
+      <div style="background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:8px"><div style="font-size:11px;font-weight:800;color:var(--muted)">Lives</div><div style="font-weight:900;font-size:18px" id="resultLives">❤️❤️❤️</div></div>
+    </div>
+    <div class="sub" id="resultMsg" style="margin-top:8px"></div>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="btn btn-ghost" style="flex:1" id="btnResultMap">Map</button>
+      <button class="btn btn-ghost" style="flex:1" id="btnResultReplay">Replay</button>
+      <button class="btn btn-primary" style="flex:1" id="btnResultNext">Next ▶</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const LEVELS = [
+  { id:1, title:"L1: Top-to-Bottom", desc:"Sync only", tag:"SYNC", lives:3 },
+  { id:2, title:"L2: Microtasks", desc:"Promises & queueMicrotask", tag:"MICRO", lives:3 },
+  { id:3, title:"L3: Timers", desc:"setTimeout vs microtasks", tag:"TIMERS", lives:3 },
+  { id:4, title:"L4: Nested Tasks", desc:"Timers inside promises", tag:"NESTED", lives:3 },
+  { id:5, title:"L5: Boss — Chained Handlers", desc:"Mixed nesting • 6 logs", tag:"BOSS", lives:3, boss:true },
+];
+
+const QUESTIONS = [
+  // L1
+  { level:1, code:`console.log('A');\nconsole.log('B');\nconsole.log('C');`, logs:['A','B','C'], options:[['A','B','C'],['A','C','B'],['C','B','A'],['B','A','C']], explain:"Sync runs top-to-bottom. No queues involved — just <b>A → B → C</b>." },
+  { level:1, code:`console.log('1');\nconsole.log('2');\nconsole.log('3');\nconsole.log('4');`, logs:['1','2','3','4'], options:[['1','2','3','4'],['4','3','2','1'],['1','3','2','4'],['2','1','4','3']], explain:"Still sync. The engine executes each line in order." },
+  { level:1, code:`let x = 'X';\nconsole.log(x);\nx = 'Y';\nconsole.log(x);`, logs:['X','Y'], options:[['X','Y'],['Y','X'],['X','X'],['Y','Y']], explain:"Assignments are sync. First log sees <b>X</b>, then <b>Y</b> after reassignment." },
+  { level:1, code:`console.log('start');\nfor(let i=1;i<=3;i++) console.log(i);\nconsole.log('end');`, logs:['start','1','2','3','end'], options:[['start','1','2','3','end'],['1','2','3','start','end'],['start','end','1','2','3'],['start','3','2','1','end']], explain:"Loops are sync. The <b>for</b> completes before <b>end</b>." },
+
+  // L2
+  { level:2, code:`console.log('1');\nPromise.resolve().then(()=> console.log('2'));\nconsole.log('3');`, logs:['1','3','2'], options:[['1','3','2'],['1','2','3'],['2','1','3'],['3','1','2']], explain:"<b>Promise.then</b> is a microtask. Sync <b>1,3</b> first, then microtask <b>2</b>." },
+  { level:2, code:`console.log('A');\nqueueMicrotask(()=> console.log('B'));\nPromise.resolve().then(()=> console.log('C'));\nconsole.log('D');`, logs:['A','D','B','C'], options:[['A','D','B','C'],['A','B','C','D'],['A','D','C','B'],['B','C','A','D']], explain:"Both are microtasks, queued in order. Sync <b>A,D</b> → microtasks <b>B,C</b>." },
+  { level:2, code:`Promise.resolve().then(()=> console.log('1'));\nPromise.resolve().then(()=> console.log('2'));\nconsole.log('3');`, logs:['3','1','2'], options:[['3','1','2'],['1','2','3'],['1','3','2'],['2','1','3']], explain:"Microtasks queue FIFO. <b>3</b> sync first, then <b>1,2</b> in order." },
+  { level:2, code:`console.log('1');\nPromise.resolve().then(()=> {\n  console.log('2');\n  Promise.resolve().then(()=> console.log('3'));\n});\nconsole.log('4');`, logs:['1','4','2','3'], options:[['1','4','2','3'],['1','2','3','4'],['1','2','4','3'],['4','1','2','3']], explain:"Nested microtasks queue after current microtask. <b>1,4</b> sync → <b>2</b> → then <b>3</b>." },
+
+  // L3
+  { level:3, code:`console.log('1');\nsetTimeout(()=> console.log('2'), 0);\nPromise.resolve().then(()=> console.log('3'));\nconsole.log('4');`, logs:['1','4','3','2'], options:[['1','4','3','2'],['1','2','3','4'],['1','4','2','3'],['1','3','4','2']], explain:"Microtasks drain before next macrotask. <b>1,4</b> sync → <b>3</b> micro → <b>2</b> timer." },
+  { level:3, code:`setTimeout(()=> console.log('A'), 0);\nsetTimeout(()=> console.log('B'), 0);\nPromise.resolve().then(()=> console.log('C'));\nconsole.log('D');`, logs:['D','C','A','B'], options:[['D','C','A','B'],['D','A','B','C'],['C','D','A','B'],['A','B','C','D']], explain:"<b>D</b> sync → <b>C</b> micro → timers <b>A,B</b> in order." },
+  { level:3, code:`console.log('1');\nsetTimeout(()=> console.log('2'), 0);\nsetTimeout(()=> console.log('3'), 0);\nPromise.resolve().then(()=> console.log('4'));\nconsole.log('5');`, logs:['1','5','4','2','3'], options:[['1','5','4','2','3'],['1','5','2','3','4'],['1','4','5','2','3'],['5','1','4','2','3']], explain:"Sync <b>1,5</b> → micro <b>4</b> → timers <b>2,3</b> FIFO." },
+  { level:3, code:`Promise.resolve().then(()=> console.log('A'));\nsetTimeout(()=> console.log('B'), 0);\nqueueMicrotask(()=> console.log('C'));\nconsole.log('D');`, logs:['D','A','C','B'], options:[['D','A','C','B'],['D','C','A','B'],['A','C','D','B'],['D','B','A','C']], explain:"All microtasks before timers. <b>D</b> sync → <b>A,C</b> micros → <b>B</b> timer." },
+
+  // L4
+  { level:4, code:`console.log('1');\nsetTimeout(()=> {\n  console.log('2');\n  Promise.resolve().then(()=> console.log('3'));\n}, 0);\nPromise.resolve().then(()=> console.log('4'));\nconsole.log('5');`, logs:['1','5','4','2','3'], options:[['1','5','4','2','3'],['1','5','2','3','4'],['1','4','5','2','3'],['1','5','4','3','2']], explain:"Sync <b>1,5</b> → micro <b>4</b> → timer <b>2</b> → micro inside timer <b>3</b>." },
+  { level:4, code:`setTimeout(()=> console.log('A'), 0);\nPromise.resolve().then(()=> {\n  console.log('B');\n  setTimeout(()=> console.log('C'), 0);\n});\nconsole.log('D');`, logs:['D','B','A','C'], options:[['D','B','A','C'],['D','A','B','C'],['B','D','A','C'],['D','B','C','A']], explain:"<b>D</b> sync → <b>B</b> micro (queues timer C) → timer <b>A</b> → timer <b>C</b>." },
+  { level:4, code:`console.log('1');\nPromise.resolve().then(()=> {\n  console.log('2');\n  setTimeout(()=> console.log('3'), 0);\n  Promise.resolve().then(()=> console.log('4'));\n});\nsetTimeout(()=> console.log('5'), 0);`, logs:['1','2','4','5','3'], options:[['1','2','4','5','3'],['1','2','5','4','3'],['1','2','4','3','5'],['1','5','2','4','3']], explain:"Micro <b>2</b> queues micro <b>4</b> and timer <b>3</b>. Order: <b>1</b> sync → <b>2,4</b> micros → timer <b>5</b> → timer <b>3</b>." },
+  { level:4, code:`setTimeout(()=> {\n  console.log('A');\n  queueMicrotask(()=> console.log('B'));\n}, 0);\nPromise.resolve().then(()=> console.log('C'));\nconsole.log('D');`, logs:['D','C','A','B'], options:[['D','C','A','B'],['D','A','B','C'],['C','D','A','B'],['D','C','B','A']], explain:"<b>D,C</b> first → timer <b>A</b> → micro <b>B</b> inside timer." },
+
+  // L5 Boss
+  { level:5, code:`console.log('1');\nsetTimeout(()=> console.log('2'), 0);\nPromise.resolve().then(()=> {\n  console.log('3');\n  setTimeout(()=> console.log('4'), 0);\n});\nPromise.resolve().then(()=> console.log('5'));\nconsole.log('6');`, logs:['1','6','3','5','2','4'], options:[['1','6','3','5','2','4'],['1','6','5','3','2','4'],['1','3','5','6','2','4'],['1','6','3','5','4','2']], explain:"Boss: Sync <b>1,6</b> → micros <b>3,5</b> (3 queues timer 4) → timers <b>2,4</b>." },
+  { level:5, code:`console.log('A');\nqueueMicrotask(()=> console.log('B'));\nsetTimeout(()=> {\n  console.log('C');\n  Promise.resolve().then(()=> console.log('D'));\n  queueMicrotask(()=> console.log('E'));\n}, 0);\nPromise.resolve().then(()=> console.log('F'));`, logs:['A','B','F','C','D','E'], options:[['A','B','F','C','D','E'],['A','F','B','C','D','E'],['A','B','F','C','E','D'],['A','B','C','D','E','F']], explain:"Sync <b>A</b> → micros <b>B,F</b> → timer <b>C</b> → micros <b>D,E</b> inside timer (promise then before queueMicrotask? Actually both micros, FIFO: D then E)." },
+  { level:5, code:`setTimeout(()=> console.log('1'), 0);\nPromise.resolve().then(()=> {\n  console.log('2');\n  Promise.resolve().then(()=> console.log('3'));\n});\nsetTimeout(()=> {\n  console.log('4');\n  Promise.resolve().then(()=> console.log('5'));\n}, 0);\nconsole.log('6');`, logs:['6','2','3','1','4','5'], options:[['6','2','3','1','4','5'],['6','2','1','3','4','5'],['2','3','6','1','4','5'],['6','2','3','4','5','1']], explain:"Sync <b>6</b> → micros <b>2,3</b> → timer <b>1</b> → timer <b>4</b> → micro <b>5</b>." },
+  { level:5, code:`console.log('1');\nPromise.resolve().then(()=> console.log('2'));\nsetTimeout(()=> {\n  console.log('3');\n  Promise.resolve().then(()=> {\n    console.log('4');\n    setTimeout(()=> console.log('5'), 0);\n  });\n}, 0);\nqueueMicrotask(()=> console.log('6'));`, logs:['1','2','6','3','4','5'], options:[['1','2','6','3','4','5'],['1','6','2','3','4','5'],['1','2','6','4','3','5'],['1','2','3','4','5','6']], explain:"Sync <b>1</b> → micros <b>2,6</b> → timer <b>3</b> → micro <b>4</b> → timer <b>5</b>." },
+];
+
+const STORAGE_KEY="loopBattler_v1";
+let save={v:1, unlocked:1, stars:[0,0,0,0,0], bestScore:0, bestStreak:0};
+let currentLevel=null, queue=[], qIndex=0, lives=3, score=0, streak=0, maxStreak=0, selected=null;
+
+function loadSave(){
+  try{ const r=localStorage.getItem(STORAGE_KEY); if(r){ const p=JSON.parse(r); save.unlocked=p.unlocked||1; save.stars=p.stars||[0,0,0,0,0]; save.bestScore=p.bestScore||0; save.bestStreak=p.bestStreak||0; } }catch(e){}
+}
+function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(save)); document.getElementById('bestPill').textContent='Best '+save.bestScore; }
+loadSave(); persist();
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function renderMap(){
+  const wrap=document.getElementById('levelMap');
+  wrap.innerHTML="";
+  LEVELS.forEach(l=>{
+    const locked=l.id>save.unlocked;
+    const stars=save.stars[l.id-1]||0;
+    const div=document.createElement('div');
+    div.className='level-node'+(locked?' locked':'')+(currentLevel&&currentLevel.id===l.id?' active':'')+(stars?' done':'');
+    div.innerHTML=`
+      <div class="level-icon">${locked?'🔒': l.boss?'👑':'◈'}</div>
+      <div class="level-info">
+        <div class="level-title">${l.title}</div>
+        <div class="level-desc">${l.desc} • ${QUESTIONS.filter(q=>q.level===l.id).length} rounds</div>
+        <div class="level-stars">${stars? '⭐'.repeat(stars)+'☆'.repeat(3-stars) : locked? 'Locked — earn 1⭐ to unlock' : 'Ready to battle'}</div>
+      </div>
+      <div style="font-weight:900">${locked?'':'›'}</div>
+    `;
+    if(!locked) div.onclick=()=> startLevel(l.id);
+    wrap.appendChild(div);
+  });
+}
+
+function startLevel(id){
+  currentLevel=LEVELS.find(l=>l.id===id);
+  queue=QUESTIONS.filter(q=>q.level===id);
+  qIndex=0; lives=currentLevel.lives; score=0; streak=0; maxStreak=0;
+  showQuestion();
+  showScreen('screenBattle');
+}
+
+function showQuestion(){
+  const q=queue[qIndex];
+  document.getElementById('battlePill').textContent=`L${currentLevel.id} Q${qIndex+1}/${queue.length}`;
+  document.getElementById('battleProgress').textContent=currentLevel.title;
+  document.getElementById('codeTag').textContent=currentLevel.tag;
+  document.getElementById('progressFill').style.width=((qIndex)/queue.length*100)+'%';
+  document.getElementById('hudLives').textContent='❤️'.repeat(lives)+'🤍'.repeat(3-lives);
+  document.getElementById('hudStreak').textContent=streak+' 🔥';
+  document.getElementById('hudScore').textContent=score;
+  // code with highlight
+  const highlighted=q.code
+    .replace(/console\.log/g,'<span class="fn">console.log</span>')
+    .replace(/Promise|setTimeout|queueMicrotask|let|for/g,'<span class="kw">$&</span>')
+    .replace(/'[^']*'/g,'<span class="str">$&</span>')
+    .replace(/\/\/.*$/gm,'<span class="cmt">$&</span>');
+  document.getElementById('codePre').innerHTML=highlighted;
+  // choices
+  const choicesEl=document.getElementById('choices');
+  choicesEl.innerHTML="";
+  selected=null;
+  document.getElementById('btnSubmit').disabled=true;
+  q.options.forEach((opt,i)=>{
+    const btn=document.createElement('button');
+    btn.className='choice';
+    btn.innerHTML=`<div class="choice-num">${i+1}</div><div style="flex:1">${opt.join(' → ')}</div>`;
+    btn.onclick=()=>{
+      choicesEl.querySelectorAll('.choice').forEach(c=>c.classList.remove('selected'));
+      btn.classList.add('selected');
+      selected=opt;
+      document.getElementById('btnSubmit').disabled=false;
+    };
+    choicesEl.appendChild(btn);
+  });
+}
+
+function submitAnswer(){
+  if(!selected) return;
+  const q=queue[qIndex];
+  const correct=q.logs;
+  const isCorrect=JSON.stringify(selected)===JSON.stringify(correct);
+  // update score/lives
+  if(isCorrect){
+    streak++; maxStreak=Math.max(maxStreak, streak);
+    score+=100 + streak*20;
+    if(score>save.bestScore) save.bestScore=score;
+    if(streak>save.bestStreak) save.bestStreak=streak;
+    persist();
+  } else {
+    streak=0; lives--;
+  }
+  showVerdict(isCorrect);
+}
+
+function showVerdict(isCorrect){
+  const q=queue[qIndex];
+  const box=document.getElementById('verdictBox');
+  box.className='verdict '+(isCorrect?'good':'bad');
+  box.innerHTML= isCorrect
+    ? `<div style="font-size:28px">✅</div><div style="font-weight:900;font-size:18px;color:var(--neon)">Correct! +${100+streak*20}</div><div style="font-size:13px;font-weight:700;opacity:.8">Streak ${streak} 🔥 • ${q.logs.join(' → ')}</div>`
+    : `<div style="font-size:28px">❌</div><div style="font-weight:900;font-size:18px;color:#EF4444">Miss — lives ${'❤️'.repeat(lives)}${'🤍'.repeat(3-lives)}</div><div style="font-size:13px;font-weight:700;opacity:.8">Correct: <b style="color:var(--neon)">${q.logs.join(' → ')}</b><br>Yours: ${selected.join(' → ')}</div>`;
+  document.getElementById('verdictCode').textContent=q.code + "\n\n// → " + q.logs.join(' → ');
+  document.getElementById('explainBox').innerHTML=`<b>Why?</b> ${q.explain}`;
+  showScreen('screenVerdict');
+  // highlight choices for learning
+  if(!isCorrect && lives<=0){
+    document.getElementById('btnNext').textContent='See Result';
+  } else {
+    document.getElementById('btnNext').textContent= (qIndex===queue.length-1) ? 'See Result' : 'Next ▶';
+  }
+}
+
+function nextStep(){
+  const q=queue[qIndex];
+  // if wrong and no lives, go to result
+  if(lives<=0){
+    showResult(false);
+    return;
+  }
+  if(qIndex < queue.length-1){
+    qIndex++;
+    showQuestion();
+    showScreen('screenBattle');
+  } else {
+    showResult(true);
+  }
+}
+
+function showResult(completed){
+  const total=queue.length;
+  // stars: 3 perfect, 2 one miss, 1 two misses, 0 fail
+  const misses = (currentLevel.lives - lives);
+  let stars=0;
+  if(completed){
+    if(misses===0) stars=3;
+    else if(misses===1) stars=2;
+    else if(misses===2) stars=1;
+    else stars=1;
+  }
+  if(lives<=0) stars=0;
+  // save stars
+  const idx=currentLevel.id-1;
+  if(stars > (save.stars[idx]||0)) save.stars[idx]=stars;
+  if(stars>0 && currentLevel.id < LEVELS.length && save.unlocked < currentLevel.id+1) save.unlocked=currentLevel.id+1;
+  persist();
+  renderMap();
+  document.getElementById('resultPill').textContent= lives<=0 ? 'Level Failed' : stars===3? 'Flawless!' : stars===2? 'Great!' : 'Level Complete';
+  document.getElementById('resultStars').textContent= stars? '⭐'.repeat(stars)+'☆'.repeat(3-stars) : '—';
+  document.getElementById('resultTitle').textContent= lives<=0 ? 'Out of lives!' : `${currentLevel.title} — ${score} pts`;
+  document.getElementById('resultScore').textContent=score;
+  document.getElementById('resultStreak').textContent=maxStreak;
+  document.getElementById('resultLives').textContent='❤️'.repeat(lives)+'🤍'.repeat(3-lives);
+  let msg="";
+  if(lives<=0) msg="The event loop got you! Review microtasks vs timers and try again.";
+  else if(stars===3) msg="Perfect run! Next level unlocked. You're a loop master.";
+  else if(stars===2) msg="One slip — microtasks drain before timers. Next level unlocked!";
+  else msg="Good effort — replay for 3⭐ or continue to next level.";
+  document.getElementById('resultMsg').textContent=msg;
+  document.getElementById('btnResultNext').style.display= (stars>0 && currentLevel.id < LEVELS.length) ? 'inline-flex' : 'none';
+  document.getElementById('overlayResult').classList.add('open');
+}
+
+// events
+document.getElementById('btnSubmit').onclick=submitAnswer;
+document.getElementById('btnNext').onclick=nextStep;
+document.getElementById('btnVerdictQuit').onclick=()=>{ showScreen('screenMap'); renderMap(); };
+document.getElementById('btnQuit').onclick=()=>{ if(confirm('Quit level? Progress lost.')){ showScreen('screenMap'); renderMap(); } };
+document.getElementById('btnHint').onclick=()=>{
+  const q=queue[qIndex];
+  alert('Hint: '+ q.explain.replace(/<[^>]*>/g,''));
+};
+document.getElementById('btnResultMap').onclick=()=>{ document.getElementById('overlayResult').classList.remove('open'); showScreen('screenMap'); renderMap(); };
+document.getElementById('btnResultReplay').onclick=()=>{ document.getElementById('overlayResult').classList.remove('open'); startLevel(currentLevel.id); };
+document.getElementById('btnResultNext').onclick=()=>{
+  const next=LEVELS.find(l=>l.id===currentLevel.id+1);
+  document.getElementById('overlayResult').classList.remove('open');
+  if(next) startLevel(next.id);
+};
+document.getElementById('btnReset').onclick=()=>{
+  if(confirm('Reset all stars and best score?')){
+    localStorage.removeItem(STORAGE_KEY);
+    save={v:1, unlocked:1, stars:[0,0,0,0,0], bestScore:0, bestStreak:0};
+    persist(); renderMap();
+  }
+};
+document.getElementById('overlayResult').addEventListener('click', (e)=>{ if(e.target.id==='overlayResult') e.currentTarget.classList.remove('open'); });
+
+// init
+renderMap();
+</script>
+</body>
+</html>

@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Night Stack - Car Drop Tower</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0e1f;
+  --bg2:#141a33;
+  --accent:#38bdf8;
+  --accent2:#a78bfa;
+  --neon:#facc15;
+  --success:#22c55e;
+  --danger:#ef4444;
+  --text:#e2e8f0;
+  --muted:#64748b;
+}
+body{
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  display:flex;
+  justify-content:center;
+  overflow-x:hidden;
+}
+.app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  background:
+    radial-gradient(ellipse at 30% 0%, rgba(56,189,248,0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 0%, rgba(167,139,250,0.12) 0%, transparent 50%),
+    linear-gradient(180deg, #0a0e1f 0%, #0f172a 40%, #1e1b4b 100%);
+  position:relative;
+}
+header{
+  text-align:center;
+  padding:12px 14px 8px;
+  background:rgba(10,14,31,0.8);
+  backdrop-filter:blur(8px);
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+header h1{
+  font-size:20px;
+  font-weight:900;
+  letter-spacing:-0.5px;
+  color:var(--text);
+}
+header h1 span{
+  background: linear-gradient(135deg, #38bdf8, #a78bfa, #facc15);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+header p{
+  font-size:11px;
+  color:var(--muted);
+  margin-top:2px;
+  font-weight:500;
+}
+.stats{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:8px;
+  padding:10px 12px;
+}
+.stat{
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px;
+  padding:8px 6px;
+  text-align:center;
+  backdrop-filter:blur(4px);
+}
+.stat-label{
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:0.6px;
+  color:var(--muted);
+  font-weight:700;
+}
+.stat-value{
+  font-size:18px;
+  font-weight:800;
+  margin-top:1px;
+}
+.stat-value.accent{color:var(--accent)}
+.stat-value.neon{color:var(--neon)}
+.stat-value.success{color:var(--success)}
+.lives-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 12px 8px;
+  gap:8px;
+}
+.lives{
+  display:flex;
+  gap:6px;
+  align-items:center;
+}
+.heart{
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  background:rgba(239,68,68,0.15);
+  border:1.5px solid rgba(239,68,68,0.3);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:14px;
+  transition:all 0.3s;
+}
+.heart.lost{
+  opacity:0.25;
+  transform:scale(0.85);
+  background:rgba(100,116,139,0.1);
+  border-color:rgba(100,116,139,0.2);
+}
+.level-badge{
+  background: linear-gradient(135deg, #facc15, #f59e0b);
+  color:#0a0e1f;
+  font-size:11px;
+  font-weight:800;
+  padding:6px 10px;
+  border-radius:20px;
+  letter-spacing:0.5px;
+}
+.canvasWrap{
+  flex:1;
+  position:relative;
+  margin:0 12px;
+  background: linear-gradient(180deg, #0f172a 0%, #1e1b4b 50%, #0a0e1f 100%);
+  border-radius:16px;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,0.08);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 24px rgba(0,0,0,0.4);
+  min-height:380px;
+  touch-action:none;
+}
+canvas{
+  display:block;
+  width:100%;
+  height:100%;
+  touch-action:none;
+}
+.tapHint{
+  position:absolute;
+  bottom:14px;
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(0,0,0,0.6);
+  backdrop-filter:blur(6px);
+  color:var(--text);
+  font-size:11px;
+  font-weight:700;
+  padding:6px 12px;
+  border-radius:20px;
+  border:1px solid rgba(255,255,255,0.1);
+  pointer-events:none;
+  opacity:0.9;
+  white-space:nowrap;
+}
+.controls{
+  padding:12px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.btn{
+  border:none;
+  border-radius:14px;
+  padding:16px 12px;
+  font-size:15px;
+  font-weight:800;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+  transition:transform 0.1s, opacity 0.2s;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+}
+.btn:active{transform:scale(0.97)}
+.btn-drop{
+  grid-column:1 / -1;
+  background: linear-gradient(180deg, #38bdf8, #0ea5e9);
+  color:white;
+  font-size:18px;
+  padding:18px;
+  box-shadow: 0 4px 0 #0369a1, 0 6px 16px rgba(56,189,248,0.4);
+  letter-spacing:0.5px;
+}
+.btn-drop:disabled{
+  opacity:0.5;
+  pointer-events:none;
+}
+.btn-secondary{
+  background:rgba(255,255,255,0.08);
+  color:var(--text);
+  border:1px solid rgba(255,255,255,0.1);
+  font-size:13px;
+  padding:13px;
+}
+.perfectFlash{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%) scale(0.8);
+  background: linear-gradient(135deg, #facc15, #f59e0b);
+  color:#0a0e1f;
+  font-size:22px;
+  font-weight:900;
+  padding:10px 18px;
+  border-radius:12px;
+  box-shadow:0 8px 24px rgba(250,204,21,0.5);
+  opacity:0;
+  pointer-events:none;
+  transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  z-index:5;
+  text-align:center;
+  line-height:1;
+}
+.perfectFlash.show{
+  opacity:1;
+  transform:translate(-50%,-50%) scale(1);
+}
+.perfectFlash small{
+  display:block;
+  font-size:11px;
+  font-weight:700;
+  margin-top:2px;
+  opacity:0.8;
+}
+.overlay{
+  position:absolute;
+  inset:0;
+  background:rgba(10,14,31,0.92);
+  backdrop-filter:blur(10px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 0.3s;
+  z-index:10;
+  border-radius:16px;
+}
+.overlay.show{opacity:1; pointer-events:auto}
+.modal{
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:20px;
+  padding:20px 16px;
+  width:100%;
+  max-width:320px;
+  text-align:center;
+  box-shadow:0 20px 40px rgba(0,0,0,0.5);
+  transform:translateY(10px) scale(0.96);
+  transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+.overlay.show .modal{transform:translateY(0) scale(1)}
+.modal-emoji{font-size:42px; margin-bottom:6px}
+.modal h2{font-size:20px; font-weight:900; margin-bottom:4px}
+.modal p{font-size:13px; color:var(--muted); line-height:1.5; margin-bottom:14px}
+.modal-stats{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-bottom:14px;
+}
+.modal-stat{
+  background:rgba(0,0,0,0.3);
+  border-radius:12px;
+  padding:10px;
+  border:1px solid rgba(255,255,255,0.06);
+}
+.modal-stat strong{display:block; font-size:20px; color:var(--neon)}
+.modal-stat span{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; font-weight:700}
+.modal-stat.best strong{color:var(--success)}
+.footer{
+  text-align:center;
+  font-size:10px;
+  color:var(--muted);
+  opacity:0.5;
+  padding:0 12px 10px;
+}
+.shake{animation:shake 0.4s ease}
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-6px)}
+  75%{transform:translateX(6px)}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🌃 NIGHT <span>STACK</span> 🚗</h1>
+    <p>Swinging cars — tap to drop, perfect center = 2× score!</p>
+  </header>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Score</div>
+      <div class="stat-value neon" id="score">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Level</div>
+      <div class="stat-value accent" id="level">1</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Best</div>
+      <div class="stat-value success" id="best">0</div>
+    </div>
+  </div>
+
+  <div class="lives-row">
+    <div class="lives" id="lives"></div>
+    <div class="level-badge" id="levelBadge">LEVEL 1 • 5 to next</div>
+  </div>
+
+  <div class="canvasWrap" id="wrap">
+    <canvas id="c"></canvas>
+    <div class="tapHint" id="tapHint">TAP DROP WHEN ALIGNED ↓</div>
+    <div class="perfectFlash" id="perfectFlash">PERFECT!<small>+ DOUBLE SCORE</small></div>
+    <div class="overlay" id="overlay">
+      <div class="modal">
+        <div class="modal-emoji" id="modalEmoji">💥</div>
+        <h2 id="modalTitle">Game Over</h2>
+        <p id="modalMsg">Tower collapsed!</p>
+        <div class="modal-stats">
+          <div class="modal-stat">
+            <strong id="modalScore">0</strong>
+            <span>Score</span>
+          </div>
+          <div class="modal-stat best">
+            <strong id="modalBest">0</strong>
+            <span>Best</span>
+          </div>
+        </div>
+        <button class="btn btn-drop" id="restartBtn" style="width:100%">▶ PLAY AGAIN</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-secondary" id="pauseBtn">⏸ Pause</button>
+    <button class="btn btn-secondary" id="resetBtn">↻ Restart</button>
+    <button class="btn btn-drop" id="dropBtn">⬇ TAP TO DROP ⬇</button>
+  </div>
+
+  <div class="footer">3 lives • 5 stacks = level up • Perfect center doubles points • Best saves automatically</div>
+</div>
+
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const wrap=document.getElementById('wrap');
+const scoreEl=document.getElementById('score');
+const levelEl=document.getElementById('level');
+const bestEl=document.getElementById('best');
+const livesEl=document.getElementById('lives');
+const levelBadge=document.getElementById('levelBadge');
+const overlay=document.getElementById('overlay');
+const modalScore=document.getElementById('modalScore');
+const modalBest=document.getElementById('modalBest');
+const modalMsg=document.getElementById('modalMsg');
+const modalTitle=document.getElementById('modalTitle');
+const modalEmoji=document.getElementById('modalEmoji');
+const perfectFlash=document.getElementById('perfectFlash');
+const tapHint=document.getElementById('tapHint');
+
+let W=0,H=0,DPR=1;
+let score=0, level=1, lives=3, best=0;
+let tower=[];
+let swinging=null;
+let falling=null;
+let cameraY=0, targetCameraY=0;
+let isPlaying=false, isPaused=false, gameOver=false;
+let stacksInLevel=0;
+let animId=null;
+let lastTime=0;
+
+const CAR_H=28;
+const CAR_W=64;
+const BASE_Y_OFFSET=40;
+const GRAVITY=0.9;
+const PERFECT_THRESH=10; // px center delta
+const PERFECT_OVERLAP=0.92; // 92% overlap
+
+function loadBest(){
+  try{
+    const b=localStorage.getItem('nightStackBest');
+    if(b) best=parseInt(b,10)||0;
+    bestEl.textContent=best;
+  }catch(e){}
+}
+function saveBest(){
+  try{
+    if(score>best){
+      best=score;
+      localStorage.setItem('nightStackBest', String(best));
+      bestEl.textContent=best;
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
+function resize(){
+  const rect=wrap.getBoundingClientRect();
+  W=rect.width;
+  H=rect.height;
+  DPR=Math.min(2, window.devicePixelRatio||1);
+  canvas.width=W*DPR;
+  canvas.height=H*DPR;
+  canvas.style.width=W+'px';
+  canvas.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', ()=>{ resize(); });
+
+function initTower(){
+  tower=[];
+  // base platform
+  const baseW = Math.min(180, W*0.55);
+  const baseH=18;
+  const baseX=(W-baseW)/2;
+  const baseY=H - BASE_Y_OFFSET - baseH;
+  tower.push({x:baseX, y:baseY, w:baseW, h:baseH, color:'#334155', isBase:true});
+}
+
+function createSwinging(){
+  const w = tower.length===1 ? tower[0].w * 0.7 : tower[tower.length-1].w;
+  // clamp width min 36
+  const carW = Math.max(36, Math.min(CAR_W, w));
+  swinging={
+    x:0, y: 60,
+    w:carW, h:CAR_H,
+    dir:1,
+    speed: 2.6 + (level-1)*0.55,
+    color: randomCarColor()
+  };
+}
+
+function randomCarColor(){
+  const colors=[
+    {body:'#38bdf8', cabin:'#0ea5e9', accent:'#facc15'},
+    {body:'#f87171', cabin:'#dc2626', accent:'#fef3c7'},
+    {body:'#a78bfa', cabin:'#7c3aed', accent:'#fde68a'},
+    {body:'#34d399', cabin:'#059669', accent:'#fef08a'},
+    {body:'#fbbf24', cabin:'#d97706', accent:'#e0f2fe'},
+    {body:'#fb7185', cabin:'#e11d48', accent:'#fef9c3'},
+  ];
+  return colors[Math.floor(Math.random()*colors.length)];
+}
+
+function resetGame(){
+  score=0; level=1; lives=3; stacksInLevel=0;
+  cameraY=0; targetCameraY=0;
+  isPlaying=true; isPaused=false; gameOver=false;
+  falling=null;
+  overlay.classList.remove('show');
+  tapHint.style.display='block';
+  initTower();
+  createSwinging();
+  updateHUD();
+  lastTime=performance.now();
+  if(animId) cancelAnimationFrame(animId);
+  animId=requestAnimationFrame(loop);
+}
+
+function updateHUD(){
+  scoreEl.textContent=score;
+  levelEl.textContent=level;
+  bestEl.textContent=best;
+  levelBadge.textContent=`LEVEL ${level} • ${5-stacksInLevel} to next`;
+  // lives
+  livesEl.innerHTML='';
+  for(let i=0;i<3;i++){
+    const h=document.createElement('div');
+    h.className='heart' + (i>=lives?' lost':'');
+    h.textContent= i<lives ? '❤' : '♡';
+    livesEl.appendChild(h);
+  }
+  document.getElementById('dropBtn').disabled = !isPlaying || isPaused || gameOver;
+}
+
+function drop(){
+  if(!isPlaying || isPaused || gameOver || falling || !swinging) return;
+  // create falling copy
+  falling={
+    x: swinging.x,
+    y: swinging.y,
+    w: swinging.w,
+    h: swinging.h,
+    vy:0,
+    ay:GRAVITY,
+    color: swinging.color
+  };
+  swinging=null;
+  if(navigator.vibrate) navigator.vibrate(15);
+}
+
+function loop(now){
+  if(!isPlaying || isPaused || gameOver) return;
+  const dt=Math.min(32, now-lastTime);
+  lastTime=now;
+
+  // update swinging
+  if(swinging){
+    swinging.x += swinging.speed * swinging.dir * (dt/16.6);
+    if(swinging.x <=0){
+      swinging.x=0; swinging.dir=1;
+    } else if(swinging.x + swinging.w >= W){
+      swinging.x=W - swinging.w; swinging.dir=-1;
+    }
+  }
+
+  // update falling
+  if(falling){
+    falling.vy += falling.ay;
+    falling.y += falling.vy;
+    const top = tower[tower.length-1];
+    const landingY = top.y - falling.h;
+    if(falling.y >= landingY){
+      falling.y=landingY;
+      handleLanding();
+    }
+    // if falling goes off bottom (missed completely below base)
+    if(falling && falling.y > H+40){
+      handleMiss();
+    }
+  }
+
+  // camera lerp
+  cameraY += (targetCameraY - cameraY)*0.08;
+
+  draw();
+
+  animId=requestAnimationFrame(loop);
+}
+
+function handleLanding(){
+  const top=tower[tower.length-1];
+  const f=falling;
+  // calculate overlap
+  const left=Math.max(f.x, top.x);
+  const right=Math.min(f.x+f.w, top.x+top.w);
+  const overlap=right-left;
+
+  if(overlap <=0){
+    handleMiss();
+    return;
+  }
+
+  // success - place new block
+  const centerDelta = Math.abs((f.x+f.w/2) - (top.x+top.w/2));
+  const overlapRatio = overlap / f.w;
+  const isPerfect = centerDelta < PERFECT_THRESH && overlapRatio >= PERFECT_OVERLAP;
+
+  let newW, newX;
+  if(isPerfect){
+    // perfect keeps full width and centers on top
+    newW=f.w;
+    newX= top.x + (top.w - newW)/2;
+    score += 20 * level;
+    showPerfect();
+    if(navigator.vibrate) navigator.vibrate([30,20,30]);
+  } else {
+    newW=overlap;
+    newX=left;
+    score += 10 * level;
+    if(navigator.vibrate) navigator.vibrate(20);
+  }
+
+  const newBlock={
+    x:newX, y:f.y, w:newW, h:f.h,
+    color:f.color, isBase:false
+  };
+  tower.push(newBlock);
+  falling=null;
+  stacksInLevel++;
+
+  // level up every 5 stacks
+  if(stacksInLevel>=5){
+    level++;
+    stacksInLevel=0;
+    // speed up next swinging
+  }
+
+  // camera: if top is too high, shift down
+  const topY=tower[tower.length-1].y;
+  if(topY + cameraY < 140){
+    targetCameraY = 140 - topY;
+  }
+
+  // create next swinging with new width
+  createSwinging();
+  // adjust swinging width to new top width (with some challenge: keep same as new block)
+  swinging.w = newW;
+  // ensure within bounds
+  if(swinging.x + swinging.w > W) swinging.x = W - swinging.w;
+
+  updateHUD();
+
+  // check if tower too tall? just keep stacking
+}
+
+function handleMiss(){
+  falling=null;
+  lives--;
+  updateHUD();
+  // shake effect
+  wrap.classList.remove('shake');
+  void wrap.offsetWidth;
+  wrap.classList.add('shake');
+  setTimeout(()=>wrap.classList.remove('shake'),400);
+  if(navigator.vibrate) navigator.vibrate([80,40,80]);
+
+  if(lives<=0){
+    endGame();
+  } else {
+    // continue with next car
+    createSwinging();
+    // keep width as last top width
+    const top=tower[tower.length-1];
+    swinging.w = top.w;
+  }
+}
+
+function showPerfect(){
+  perfectFlash.classList.add('show');
+  setTimeout(()=>perfectFlash.classList.remove('show'), 800);
+}
+
+function endGame(){
+  isPlaying=false;
+  gameOver=true;
+  const isNewBest=saveBest();
+  modalScore.textContent=score;
+  modalBest.textContent=best;
+  if(isNewBest){
+    modalTitle.textContent='New Best! 🎉';
+    modalEmoji.textContent='🏆';
+    modalMsg.textContent=`Amazing! You stacked ${tower.length-1} cars and set a new record!`;
+  } else {
+    modalTitle.textContent='Tower Fallen';
+    modalEmoji.textContent='💥';
+    modalMsg.textContent=`You stacked ${tower.length-1} cars to level ${level}. Best is ${best}.`;
+  }
+  overlay.classList.add('show');
+  tapHint.style.display='none';
+}
+
+function draw(){
+  // clear
+  ctx.clearRect(0,0,W,H);
+
+  // background - night city
+  drawBackground();
+
+  ctx.save();
+  ctx.translate(0, cameraY);
+
+  // draw tower
+  tower.forEach((b,i)=>{
+    drawBlock(b, i===tower.length-1);
+  });
+
+  // guide dashed line for alignment (from top center down)
+  if(swinging && tower.length>0){
+    const top=tower[tower.length-1];
+    const guideX = top.x + top.w/2;
+    ctx.save();
+    ctx.strokeStyle='rgba(250,204,21,0.35)';
+    ctx.setLineDash([6,6]);
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.moveTo(guideX, top.y);
+    ctx.lineTo(guideX, 0);
+    ctx.stroke();
+    ctx.restore();
+    // shadow of swinging on tower top
+    ctx.fillStyle='rgba(0,0,0,0.15)';
+    const shadowW=swinging.w*0.6;
+    const shadowX=swinging.x + swinging.w/2 - shadowW/2;
+    ctx.fillRect(shadowX, top.y-2, shadowW, 3);
+  }
+
+  // draw swinging
+  if(swinging){
+    drawCar(swinging.x, swinging.y, swinging.w, swinging.h, swinging.color, false);
+    // direction arrow
+    ctx.fillStyle='rgba(255,255,255,0.7)';
+    ctx.font='10px sans-serif';
+    ctx.textAlign='center';
+    const arrow = swinging.dir===1 ? '→' : '←';
+    ctx.fillText(arrow, swinging.x+swinging.w/2, swinging.y-8);
+  }
+
+  // draw falling
+  if(falling){
+    drawCar(falling.x, falling.y, falling.w, falling.h, falling.color, true);
+  }
+
+  ctx.restore();
+
+  // vignette
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'rgba(0,0,0,0)');
+  grad.addColorStop(1,'rgba(0,0,0,0.25)');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,H-60,W,60);
+}
+
+function drawBackground(){
+  // stars
+  ctx.fillStyle='#0a0e1f';
+  ctx.fillRect(0,0,W,H);
+  // moon
+  ctx.fillStyle='rgba(254,243,199,0.9)';
+  ctx.beginPath();
+  ctx.arc(W-40, 40, 18, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle='rgba(10,14,31,0.3)';
+  ctx.beginPath();
+  ctx.arc(W-34, 36, 4, 0, Math.PI*2);
+  ctx.fill();
+  // stars
+  ctx.fillStyle='rgba(255,255,255,0.8)';
+  const stars=[[20,30],[60,18],[90,45],[140,22],[180,38],[220,15],[260,30],[300,20],[50,60],[110,70],[170,55],[240,65]];
+  stars.forEach(([x,y])=>{
+    if(x<W){
+      ctx.beginPath();
+      ctx.arc(x%W, y, 1.2, 0, Math.PI*2);
+      ctx.fill();
+    }
+  });
+  // city silhouette
+  ctx.fillStyle='#1e293b';
+  ctx.beginPath();
+  ctx.moveTo(0, H-80);
+  const buildings=[30,50,35,60,40,55,45,30,50,35,60,40];
+  let bx=0;
+  const bw=W/buildings.length;
+  buildings.forEach(h=>{
+    ctx.lineTo(bx, H-80 - h);
+    ctx.lineTo(bx+bw*0.7, H-80 - h);
+    ctx.lineTo(bx+bw*0.7, H-80);
+    bx+=bw;
+  });
+  ctx.lineTo(W, H-80);
+  ctx.lineTo(W, H);
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  ctx.fill();
+  // windows
+  ctx.fillStyle='rgba(250,204,21,0.25)';
+  for(let i=0;i<40;i++){
+    const wx=(i*37)%W;
+    const wy=H-80 - (i*13)%50;
+    if(Math.random()>0.3){
+      ctx.fillRect(wx, wy, 2, 3);
+    }
+  }
+  // neon horizon glow
+  const ng=ctx.createLinearGradient(0,H-80,0,H-60);
+  ng.addColorStop(0,'rgba(56,189,248,0.15)');
+  ng.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=ng;
+  ctx.fillRect(0,H-80,W,20);
+}
+
+function drawBlock(b, isTop){
+  if(b.isBase){
+    // base platform - wooden/metal
+    ctx.fillStyle='#334155';
+    roundRect(b.x, b.y, b.w, b.h, 4);
+    ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.08)';
+    roundRect(b.x, b.y, b.w, 4, 4);
+    ctx.fill();
+    // bolts
+    ctx.fillStyle='#475569';
+    [[6,6],[b.w-10,6]].forEach(([ox,oy])=>{
+      ctx.beginPath();
+      ctx.arc(b.x+ox, b.y+oy, 2.5, 0, Math.PI*2);
+      ctx.fill();
+    });
+    return;
+  }
+  drawCar(b.x, b.y, b.w, b.h, b.color, false, isTop);
+}
+
+function drawCar(x,y,w,h,color, isFalling, isTop){
+  // shadow
+  if(!isFalling){
+    ctx.fillStyle='rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    ctx.ellipse(x+w/2, y+h+2, w*0.4, 3, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+  // body
+  ctx.fillStyle=color.body;
+  roundRect(x, y+6, w, h-10, 6);
+  ctx.fill();
+  // cabin
+  const cabinW=w*0.45;
+  const cabinX=x + w*0.15;
+  ctx.fillStyle=color.cabin;
+  roundRect(cabinX, y+2, cabinW, h*0.55, 4);
+  ctx.fill();
+  // windows
+  ctx.fillStyle='rgba(224,242,254,0.95)';
+  roundRect(cabinX+3, y+5, cabinW-6, h*0.28, 2);
+  ctx.fill();
+  // lights
+  ctx.fillStyle=color.accent;
+  // headlight
+  ctx.beginPath();
+  ctx.arc(x+w-4, y+h*0.45, 3, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle='rgba(250,204,21,0.6)';
+  ctx.beginPath();
+  ctx.arc(x+w-4, y+h*0.45, 5, 0, Math.PI*2);
+  ctx.fill();
+  // taillight
+  ctx.fillStyle='#ef4444';
+  ctx.beginPath();
+  ctx.arc(x+3, y+h*0.45, 2.5, 0, Math.PI*2);
+  ctx.fill();
+  // wheels
+  ctx.fillStyle='#0f172a';
+  const wheelR=5;
+  const wy=y+h-4;
+  [[x+w*0.25, wy],[x+w*0.75, wy]].forEach(([wx,wy])=>{
+    ctx.beginPath();
+    ctx.arc(wx, wy, wheelR, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='#e2e8f0';
+    ctx.beginPath();
+    ctx.arc(wx, wy, 2, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='#0f172a';
+  });
+  // highlight
+  ctx.fillStyle='rgba(255,255,255,0.18)';
+  roundRect(x+2, y+7, w-4, 3, 2);
+  ctx.fill();
+  // perfect indicator on top block
+  if(isTop && !isFalling){
+    ctx.strokeStyle='rgba(250,204,21,0.5)';
+    ctx.lineWidth=1.5;
+    ctx.setLineDash([4,3]);
+    ctx.strokeRect(x-1, y-1, w+2, h+2);
+    ctx.setLineDash([]);
+  }
+}
+
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+// Events
+document.getElementById('dropBtn').addEventListener('click', drop);
+wrap.addEventListener('click', (e)=>{
+  if(e.target.closest('.overlay')) return;
+  drop();
+});
+wrap.addEventListener('touchstart', (e)=>{
+  e.preventDefault();
+  drop();
+}, {passive:false});
+
+document.getElementById('pauseBtn').addEventListener('click', ()=>{
+  if(gameOver) return;
+  isPaused=!isPaused;
+  document.getElementById('pauseBtn').textContent = isPaused ? '▶ Resume' : '⏸ Pause';
+  if(!isPaused){
+    lastTime=performance.now();
+    animId=requestAnimationFrame(loop);
+  }
+});
+document.getElementById('resetBtn').addEventListener('click', resetGame);
+document.getElementById('restartBtn').addEventListener('click', resetGame);
+overlay.addEventListener('click', (e)=>{
+  if(e.target===overlay) {
+    // don't close on overlay click during game over - require button
+  }
+});
+document.addEventListener('keydown', (e)=>{
+  if(e.code==='Space'){
+    e.preventDefault();
+    drop();
+  }
+});
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden && isPlaying && !isPaused){
+    isPaused=true;
+    document.getElementById('pauseBtn').textContent='▶ Resume';
+  }
+});
+
+// Init
+loadBest();
+resize();
+resetGame();
+</script>
+</body>
+</html>

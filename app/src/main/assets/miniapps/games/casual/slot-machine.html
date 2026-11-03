@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Fruity Star Spinner</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:#1a0f2a;color:#ffe8ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow-x:hidden}
+body{overscroll-behavior:none;touch-action:manipulation}
+.app{max-width:428px;min-width:360px;margin:0 auto;min-height:100vh;background:linear-gradient(180deg,#1a0f2a 0%,#2a1a4a 100%);display:flex;flex-direction:column;overflow-x:hidden}
+header{padding:10px 12px;background:rgba(26,15,42,.92);border-bottom:3px solid #ff6f00;position:sticky;top:0;z-index:10;backdrop-filter:blur(8px)}
+.head-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.brand{display:flex;align-items:center;gap:8px}
+.brand-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#ff6f00 0%,#ffb700 100%);display:grid;place-items:center;font-size:18px;border:2px solid #fff;box-shadow:0 0 10px rgba(255,111,0,.5)}
+.brand h1{margin:0;font-size:13px;letter-spacing:.8px;line-height:1}
+.brand p{margin:1px 0 0;font-size:9px;opacity:.7;letter-spacing:.6px;text-transform:uppercase}
+.stats{display:flex;gap:6px;margin-top:8px}
+.stat{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,111,0,.2);border-radius:8px;padding:6px 8px;text-align:center}
+.stat-label{font-size:9px;letter-spacing:.6px;text-transform:uppercase;opacity:.6}
+.stat-value{font-size:14px;font-weight:900;margin-top:2px}
+.stat.score{border-color:#ffb700;background:rgba(255,183,0,.12);color:#ffb700}
+.game-wrap{flex:1;padding:8px 10px 10px;display:flex;flex-direction:column;gap:8px}
+.card{position:relative;background:#2a1a4a;border:3px solid #ff6f00;border-radius:16px;overflow:hidden;box-shadow:0 0 16px rgba(255,111,0,.25);flex:1;min-height:520px;display:flex;flex-direction:column}
+.reels{display:flex;gap:8px;padding:16px;background:rgba(255,111,0,.06);flex:1;align-items:center;justify-content:center}
+.reel{flex:1;aspect-ratio:1;background:#fff;border:3px solid #ff6f00;border-radius:12px;display:grid;place-items:center;font-size:36px;position:relative;overflow:hidden;box-shadow:0 4px 0 #000}
+.reel.spinning{animation:spin 0.3s ease-in-out}
+@keyframes spin{0%{transform:translateY(0)}50%{transform:translateY(-10px)}100%{transform:translateY(0)}}
+.hud{position:absolute;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;align-items:center;z-index:5;pointer-events:none;gap:6px}
+.hud-pill{background:rgba(26,15,42,.88);color:#fff;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800;border:1px solid rgba(255,111,0,.3);display:flex;gap:6px;align-items:center}
+.hud-pill.score{background:linear-gradient(135deg,#ffb700 0%,#ff6f00 100%)}
+.message{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(26,15,42,.92);color:#fff;padding:12px 20px;border-radius:12px;font-size:16px;font-weight:900;letter-spacing:.6px;border:2px solid #fff;z-index:6;pointer-events:none;opacity:0;transition:opacity .2s;text-align:center;max-width:80%}
+.message.show{opacity:1}
+.controls{padding:10px;background:rgba(26,15,42,.92);border-top:3px solid #ff6f00;display:flex;flex-direction:column;gap:8px}
+.btn-row{display:flex;gap:8px}
+.btn{flex:1;min-height:56px;border-radius:12px;border:3px solid #fff;font-weight:900;font-size:14px;letter-spacing:.6px;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 0 #000}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #000}
+.btn-primary{background:linear-gradient(135deg,#ff6f00 0%,#ffb700 100%);color:#1a0f2a;font-size:16px}
+.btn-secondary{background:#fff;color:#1a0f2a}
+.paytable{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;font-size:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,111,0,.2);border-radius:10px;padding:8px}
+.paytable div{display:flex;justify-content:space-between;align-items:center;gap:4px}
+.overlay{position:absolute;inset:0;background:rgba(26,15,42,.82);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center;z-index:8}
+.card2{background:#1a0f2a;color:#ffe8ff;border:2px solid #ff6f00;border-radius:16px;padding:16px;max-width:320px;width:100%;box-shadow:0 12px 32px rgba(0,0,0,.5)}
+.card2 h2{margin:0;font-size:16px}
+.card2 p{margin:6px 0 0;font-size:11px;line-height:1.5;opacity:.85}
+.big{font-size:28px;font-weight:900;margin:8px 0 2px;color:#ffb700}
+.row{display:flex;gap:8px;margin-top:12px}
+.hidden{display:none !important}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="head-top">
+      <div class="brand">
+        <div class="brand-icon">🎰</div>
+        <div><h1>FRUITY STAR</h1><p>Three-Reel Spinner</p></div>
+      </div>
+      <button class="btn btn-secondary" style="min-height:36px;padding:0 12px;font-size:11px" id="btnRestart">↻ RESTART</button>
+    </div>
+    <div class="stats">
+      <div class="stat score"><div class="stat-label">Score</div><div class="stat-value" id="scoreEl">0</div></div>
+      <div class="stat"><div class="stat-label">Spins</div><div class="stat-value" id="spinsEl">0</div></div>
+      <div class="stat"><div class="stat-label">Best</div><div class="stat-value" id="bestEl">0</div></div>
+    </div>
+  </header>
+
+  <div class="game-wrap">
+    <div class="card" id="card">
+      <div class="hud">
+        <div class="hud-pill" id="hudSpins">0 SPINS</div>
+        <div class="hud-pill score" id="hudScore">0 PTS</div>
+        <div class="hud-pill" id="hudBest">BEST 0</div>
+      </div>
+
+      <div class="reels" id="reels">
+        <div class="reel" id="reel1">🍒</div>
+        <div class="reel" id="reel2">🍋</div>
+        <div class="reel" id="reel3">⭐</div>
+      </div>
+      <div class="message" id="message"></div>
+
+      <div class="controls">
+        <div class="paytable">
+          <div><span>🍒🍒🍒 Triple</span><b>100 pts</b></div>
+          <div><span>⭐⭐⭐ Jackpot</span><b>200 pts</b></div>
+          <div><span>🍒🍒 Pair</span><b>15 pts</b></div>
+          <div><span>⭐⭐ Pair</span><b>30 pts</b></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnSpin">🎰 SPIN!</button>
+        </div>
+        <div style="font-size:10px;text-align:center;opacity:.6;letter-spacing:.4px">Tap SPIN or pull down on reels • Big touch-friendly controls</div>
+      </div>
+
+      <div class="overlay" id="startOverlay">
+        <div class="card2">
+          <div style="font-size:32px">🎰</div>
+          <h2>FRUITY STAR SPINNER</h2>
+          <p>Pull to <b>tumble through fruit & star symbols</b>! <b>Three of a kind = Jackpot</b> (100 pts, 200 for ⭐⭐⭐), <b>pair = smaller prize</b> (15 pts, 30 for ⭐⭐). Chase your running score!</p>
+          <div style="background:rgba(255,111,0,.12);border:1px solid rgba(255,111,0,.3);border-radius:10px;padding:8px;margin-top:10px;text-align:left;font-size:11px;line-height:1.4">
+            <b>How to play:</b> Tap <b>SPIN!</b> or <b>pull down</b> on reels • Watch playful messages • Restart anytime
+          </div>
+          <div class="row"><button class="btn btn-primary" id="btnStart">▶️ START SPINNING</button></div>
+          <p style="font-size:10px;margin-top:8px;opacity:.6">Score & best persist</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let best=parseInt(localStorage.getItem('fruity_best')||'0');
+let score=0, spins=0, spinning=false;
+const symbols=['🍒','🍋','🍊','🍉','🍇','⭐'];
+const reels=[document.getElementById('reel1'),document.getElementById('reel2'),document.getElementById('reel3')];
+let messageTimer=0;
+
+function updateHUD(){
+  document.getElementById('scoreEl').textContent=score;
+  document.getElementById('spinsEl').textContent=spins;
+  document.getElementById('bestEl').textContent=best;
+  document.getElementById('hudSpins').textContent=spins+' SPINS';
+  document.getElementById('hudScore').textContent=score+' PTS';
+  document.getElementById('hudBest').textContent='BEST '+best;
+}
+
+function showMessage(text, color){
+  const el=document.getElementById('message');
+  el.textContent=text;
+  el.style.borderColor=color;
+  el.style.color=color;
+  el.classList.add('show');
+  clearTimeout(messageTimer);
+  messageTimer=setTimeout(()=>el.classList.remove('show'),1500);
+}
+
+function spin(){
+  if(spinning) return;
+  spinning=true;
+  spins++;
+  reels.forEach(r=>r.classList.add('spinning'));
+  // animate
+  let count=0;
+  const interval=setInterval(()=>{
+    reels.forEach(r=>r.textContent=symbols[Math.floor(Math.random()*symbols.length)]);
+    count++;
+    if(count>12){
+      clearInterval(interval);
+      reels.forEach(r=>r.classList.remove('spinning'));
+      // final result
+      const result=reels.map(()=>symbols[Math.floor(Math.random()*symbols.length)]);
+      reels.forEach((r,i)=>r.textContent=result[i]);
+      // check win
+      if(result[0]===result[1] && result[1]===result[2]){
+        const isStar=result[0]==='⭐';
+        const pts=isStar?200:100;
+        score+=pts;
+        showMessage(isStar?'🌟 JACKPOT! ⭐⭐⭐ +'+pts:'🎉 TRIPLE! '+result[0]+'×3 +'+pts, '#ffb700');
+      } else if(result[0]===result[1] || result[1]===result[2] || result[0]===result[2]){
+        const hasStar=result.includes('⭐');
+        const pts=hasStar?30:15;
+        score+=pts;
+        showMessage('✨ Nice pair! +'+pts, '#4caf50');
+      } else {
+        const msgs=['So close!','Try again!','Almost!','Keep spinning!','Ooh, next one!'];
+        showMessage(msgs[Math.floor(Math.random()*msgs.length)], '#fff');
+      }
+      if(score>best){ best=score; localStorage.setItem('fruity_best',best); }
+      updateHUD();
+      spinning=false;
+    }
+  },80);
+}
+
+// pull to spin
+let startY=0, pulling=false;
+const reelsEl=document.getElementById('reels');
+reelsEl.addEventListener('touchstart',e=>{ startY=e.touches[0].clientY; pulling=true; },{passive:true});
+reelsEl.addEventListener('touchmove',e=>{
+  if(!pulling) return;
+  const dy=e.touches[0].clientY - startY;
+  if(dy>40) { pulling=false; spin(); }
+},{passive:true});
+reelsEl.addEventListener('touchend',()=>pulling=false);
+reelsEl.addEventListener('click',spin);
+
+document.getElementById('btnSpin').addEventListener('click',spin);
+document.getElementById('btnStart').addEventListener('click',()=>{
+  document.getElementById('startOverlay').classList.add('hidden');
+});
+document.getElementById('btnRestart').addEventListener('click',()=>{
+  score=0; spins=0; updateHUD(); showMessage('🔄 Fresh start!', '#00e5ff');
+  reels[0].textContent='🍒'; reels[1].textContent='🍋'; reels[2].textContent='⭐';
+});
+
+updateHUD();
+</script>
+<script>/*polish-sfx:click blip + persisted mute*/(function(){try{var K='sfxmuted_slot-machine';var muted=false;try{muted=localStorage.getItem(K)==='1'}catch(e){}var ctx=null;function ac(){try{if(!ctx){var A=window.AudioContext||window.webkitAudioContext;if(A)ctx=new A()}if(ctx&&ctx.state==='suspended')ctx.resume()}catch(e){}return ctx}function tone(f0,f1,dur,vol){if(muted)return;var c=ac();if(!c)return;try{var t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(Math.max(f1,1),t+dur);g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+dur+0.03)}catch(e){}}document.addEventListener('pointerdown',function(e){try{var b=e.target&&e.target.closest?e.target.closest('button'):null;if(b&&b.id!=='polishSfx')tone(680,440,0.08,0.07)}catch(x){}},true);var btn=document.createElement('button');btn.id='polishSfx';btn.setAttribute('aria-label','Toggle sound');btn.style.cssText='position:fixed;right:10px;bottom:10px;z-index:99999;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.55);color:#fff;font-size:18px;cursor:pointer;opacity:.85';function paint(){btn.textContent=muted?'\uD83D\uDD07':'\uD83D\uDD0A'}paint();btn.addEventListener('click',function(e){e.stopPropagation();muted=!muted;try{localStorage.setItem(K,muted?'1':'0')}catch(x){}paint();if(!muted)tone(660,880,0.1,0.07)});function mount(){if(!document.getElementById('polishSfx'))document.body.appendChild(btn)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();}catch(e){}})();</script></body>
+</html>

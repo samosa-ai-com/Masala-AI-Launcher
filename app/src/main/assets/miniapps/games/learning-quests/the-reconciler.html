@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Haunted Lists - Spooky Key vs Index</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#080610;color:#f1f5f9;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow-x:hidden}
+.app{max-width:428px;margin:0 auto;min-height:100vh;background:linear-gradient(180deg,#1a1030 0%,#120c24 35%,#080610 100%);position:relative;overflow-x:hidden;border-left:1px solid #2a2040;border-right:1px solid #2a2040}
+header{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;background:rgba(15,10,30,0.9);border-bottom:1px solid #2e2648;position:sticky;top:0;z-index:10;backdrop-filter:blur(6px)}
+.logo{font-weight:900;letter-spacing:0.5px;font-size:15px;line-height:1}
+.logo span{color:#f59e0b}
+.logo small{display:block;font-weight:600;font-size:10px;letter-spacing:1.2px;color:#a78bfa;opacity:0.9}
+.hdr-right{display:flex;gap:8px;align-items:center}
+.icon-btn{width:44px;height:44px;border-radius:12px;border:1px solid #3a2f5a;background:#1e1b2e;color:#f1f5f9;display:grid;place-items:center;font-size:18px;cursor:pointer}
+.stats{margin:10px 12px;background:#1a1630;border:1px solid #2e2648;border-radius:14px;padding:10px 12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.stat{background:#0f0c1e;border:1px solid #2a2040;border-radius:10px;padding:8px;text-align:center}
+.stat b{display:block;font-size:16px;color:#fbbf24}
+.stat span{font-size:10px;letter-spacing:0.8px;color:#a78bfa;text-transform:uppercase}
+.timer-wrap{margin:0 12px;background:#1a1630;border:1px solid #2e2648;border-radius:12px;padding:8px 10px;display:flex;align-items:center;gap:10px}
+.timer-bar{flex:1;height:8px;background:#0f0c1e;border-radius:999px;overflow:hidden;border:1px solid #2a2040}
+.timer-fill{height:100%;width:100%;background:linear-gradient(90deg,#f59e0b,#ef4444);transition:width 1s linear}
+.lives{font-size:18px;letter-spacing:2px}
+.view{padding:12px}
+.chapter-card{background:linear-gradient(180deg,#1e1b2e,#16132a);border:2px solid #3a2f5a;border-radius:16px;padding:14px;margin:10px 0;cursor:pointer;position:relative;overflow:hidden}
+.chapter-card.locked{opacity:0.55;pointer-events:none;border-color:#2a2040}
+.chapter-card.unlocked{border-color:#4c3a7a;box-shadow:0 6px 20px rgba(0,0,0,0.4)}
+.chapter-card.active{border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,0.3)}
+.ch-num{font-size:11px;letter-spacing:1px;color:#a78bfa;text-transform:uppercase}
+.ch-title{font-size:17px;font-weight:800;margin:4px 0 2px}
+.ch-desc{font-size:12px;color:#cbd5e1;line-height:1.4}
+.ch-meta{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.badge{font-size:11px;padding:6px 10px;border-radius:999px;background:#0f0c1e;border:1px solid #2e2648;color:#e2e8f0}
+.badge.gold{background:linear-gradient(90deg,#f59e0b,#fbbf24);color:#1a1200;border-color:#f59e0b;font-weight:800}
+.lock{position:absolute;top:14px;right:14px;font-size:20px}
+.scene-label{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#a78bfa;margin:10px 2px 6px;font-weight:700}
+.mansion{background:radial-gradient(600px 200px at 50% 0%,rgba(167,139,250,0.15),transparent),linear-gradient(180deg,#1e1b2e,#0f0c1e);border:1px solid #2e2648;border-radius:16px;padding:12px;position:relative;overflow:hidden}
+.mansion::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 40px,rgba(255,255,255,0.02) 40px 41px);pointer-events:none}
+.flicker{animation:flicker 2.2s infinite}
+@keyframes flicker{0%,100%{opacity:1}48%{opacity:1}50%{opacity:0.85}52%{opacity:1}90%{opacity:0.97}92%{opacity:0.88}94%{opacity:1}}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.grid.cols2{grid-template-columns:repeat(2,1fr)}
+.grid.cols4{grid-template-columns:repeat(4,1fr)}
+.portrait{background:#0f0c1e;border:2px solid #2e2648;border-radius:14px;padding:8px;text-align:center;position:relative;overflow:hidden}
+.portrait .emoji{font-size:28px;line-height:1;display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6))}
+.portrait .key{font-size:10px;letter-spacing:0.8px;color:#a78bfa;margin-top:4px;font-weight:800}
+.portrait .name{font-size:11px;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.portrait .state{font-size:9px;padding:3px 6px;border-radius:999px;display:inline-block;margin-top:4px;font-weight:700;border:1px solid rgba(255,255,255,0.15)}
+.op-banner{margin:10px 0;background:linear-gradient(90deg,#2a1a00,#1a1030);border:1px solid #f59e0b;border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:center}
+.op-icon{width:44px;height:44px;border-radius:10px;background:#f59e0b;color:#1a1200;display:grid;place-items:center;font-size:20px;flex-shrink:0}
+.op-text{font-size:13px;line-height:1.35}
+.op-text b{color:#fbbf24}
+.question{background:#1a1630;border:1px solid #2e2648;border-radius:12px;padding:10px 12px;text-align:center;margin:10px 0}
+.question b{color:#fbbf24}
+.options{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.opt{border:3px solid #2e2648;background:#0f0c1e;border-radius:16px;padding:8px;cursor:pointer;transition:transform 0.1s, border-color 0.2s;min-height:120px}
+.opt:active{transform:scale(0.98)}
+.opt.correct{border-color:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,0.25)}
+.opt.wrong{border-color:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,0.25)}
+.opt.hint-glow{border-color:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,0.35)}
+.opt-label{font-size:11px;font-weight:800;letter-spacing:0.8px;text-align:center;margin-bottom:6px;color:#e2e8f0}
+.opt .grid{pointer-events:none}
+.btn{width:100%;min-height:48px;border-radius:14px;border:none;font-weight:800;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px}
+.btn-primary{background:linear-gradient(90deg,#f59e0b,#fbbf24);color:#1a1200}
+.btn-ghost{background:#1e1b2e;color:#f1f5f9;border:1px solid #3a2f5a}
+.btn-small{min-height:44px;font-size:13px;padding:10px 12px;border-radius:12px}
+.row{display:flex;gap:10px}
+.row .btn{flex:1}
+.hint-box{margin:8px 0;background:#1a1030;border:1px dashed #a78bfa;border-radius:12px;padding:10px 12px;font-size:12px;line-height:1.5;color:#e2e8f0}
+.explain{margin:10px 0;background:#0f0c1e;border:1px solid #2e2648;border-radius:12px;padding:12px;font-size:12px;line-height:1.6}
+.explain b{color:#a78bfa}
+.guide{margin:12px;background:#0f0c1e;border:1px solid #2e2648;border-radius:16px;overflow:hidden}
+.guide summary{list-style:none;padding:14px 16px;font-weight:800;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.guide summary::-webkit-details-marker{display:none}
+.guide-content{padding:0 16px 16px;font-size:12px;line-height:1.6;color:#cbd5e1}
+.guide-content h4{color:#fbbf24;margin:12px 0 6px}
+.guide-content code{background:#1e1b2e;padding:2px 6px;border-radius:6px;border:1px solid #2e2648;font-size:11px}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#1e1b2e;border:1px solid #3a2f5a;color:#f1f5f9;padding:10px 14px;border-radius:999px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,0.5);z-index:20;display:none}
+.kbd{font-size:10px;padding:2px 6px;border-radius:6px;background:#1e1b2e;border:1px solid #3a2f5a}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="logo">HAUNTED LISTS <span>👻</span><small>SPOOKY KEY vs INDEX</small></div>
+  <div class="hdr-right">
+    <button class="icon-btn" id="soundBtn" aria-label="sound">🔊</button>
+    <button class="icon-btn" id="resetBtn" aria-label="reset">↺</button>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat"><span>Score</span><b id="scoreEl">0</b></div>
+  <div class="stat"><span>Best</span><b id="bestEl">0</b></div>
+  <div class="stat"><span>Level</span><b id="levelEl">1-1</b></div>
+</div>
+
+<div class="timer-wrap" id="timerWrap">
+  <div style="font-size:12px;font-weight:800;letter-spacing:0.6px;color:#fbbf24;white-space:nowrap">⏳ <span id="timeEl">30</span>s</div>
+  <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
+  <div class="lives" id="livesEl">❤️❤️❤️</div>
+</div>
+
+<!-- Chapter Select -->
+<div class="view" id="viewChapters">
+  <div style="padding:4px 2px 6px;display:flex;justify-content:space-between;align-items:center">
+    <div style="font-weight:900;font-size:14px;letter-spacing:0.6px">CHOOSE A HAUNTING</div>
+    <div style="font-size:11px;color:#a78bfa">3 lives • 30s • 3 hints/chapter</div>
+  </div>
+  <div id="chaptersList"></div>
+  <div class="row" style="margin-top:10px">
+    <button class="btn btn-ghost btn-small" id="howBtn">📖 How to Play</button>
+    <button class="btn btn-primary btn-small" id="continueBtn">▶ Continue</button>
+  </div>
+</div>
+
+<!-- Game -->
+<div class="view" id="viewGame" hidden>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:2px 2px 6px">
+    <div style="font-size:12px;font-weight:800;color:#a78bfa;letter-spacing:0.8px" id="chapterTitle">CHAPTER 1</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="badge" id="roundBadge">Round 1/5</span>
+      <button class="badge" id="hintBtn" style="cursor:pointer">💡 Hint <span id="hintCount">3</span></button>
+    </div>
+  </div>
+
+  <div class="scene-label">Before the ritual — identities bound to keys</div>
+  <div class="mansion flicker" id="beforeScene"></div>
+
+  <div class="op-banner">
+    <div class="op-icon" id="opIcon">🕯️</div>
+    <div class="op-text" id="opText">Ritual loading…</div>
+  </div>
+
+  <div class="question" id="questionText">Which gallery shows the <b>TRUE key-matched</b> result? Tap the correct haunting.</div>
+
+  <div class="options" id="options"></div>
+
+  <div id="hintBox" hidden class="hint-box"></div>
+  <div id="feedback" hidden class="explain"></div>
+
+  <div class="row" style="margin-top:10px">
+    <button class="btn btn-ghost" id="quitBtn">✕ Quit</button>
+    <button class="btn btn-primary" id="nextBtn" hidden>Next →</button>
+  </div>
+</div>
+
+<!-- Result -->
+<div class="view" id="viewResult" hidden>
+  <div class="mansion" style="text-align:center;padding:18px">
+    <div style="font-size:36px">🏚️</div>
+    <div style="font-weight:900;font-size:18px;margin-top:6px" id="resultTitle">Chapter Complete!</div>
+    <div style="font-size:13px;color:#cbd5e1;margin-top:6px" id="resultDesc">You survived the haunting.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+      <div class="stat"><span>Score</span><b id="resultScore">0</b></div>
+      <div class="stat"><span>Correct</span><b id="resultCorrect">0/5</b></div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <button class="btn btn-ghost" id="backBtn">⌂ Chapters</button>
+    <button class="btn btn-primary" id="nextChapterBtn">Next Haunting →</button>
+  </div>
+</div>
+
+<details class="guide" id="guide">
+  <summary>📖 Guidance — HTML Structure & Game Logic <span>▼</span></summary>
+  <div class="guide-content">
+    <h4>Goal</h4>
+    <p>Teach <b>key vs index</b> list reconciliation. Each portrait has a <code>key</code> (identity) and <code>state</code> (glow/emoji). Key-matched keeps state with the key; index-matched keeps state at the position.</p>
+    <h4>HTML Structure (single file)</h4>
+    <p><code>&lt;header&gt;</code> stats + sound, <code>.stats</code> score/best/level, <code>.timer-wrap</code> bar, <code>#viewChapters</code> chapter cards, <code>#viewGame</code> mansion + op-banner + options, <code>#viewResult</code> summary, <code>&lt;details.guide&gt;</code> docs. All CSS inline, no external requests. Max-width 428px, no horizontal scroll, 44px+ touch targets.</p>
+    <h4>Game Logic</h4>
+    <p><b>20 puzzles</b> = 4 chapters ×5. Operations: <code>insert</code>, <code>delete</code>, <code>reorder</code>, <code>update</code>. For each puzzle we compute <b>correct</b> (state follows key) and <b>wrong</b> (state stays at index). Wrong visuals = initial visuals by position, not by key. Player picks correct side (randomized). 30s timer, 3 lives/chapter, 3 hints/chapter. Score = 100 + timeBonus + streak. Persist <code>localStorage.hauntedListsSave = {bestScore, unlocked}</code>.</p>
+    <h4>Key vs Index Visual Rule</h4>
+    <p>Insert at pos: wrong = old visuals stay, new key gets old visual. Delete: wrong = first N visuals stay. Reorder: wrong = visuals stay at positions. Update: wrong = new visual applied to position, not key.</p>
+    <h4>Mobile-first</h4>
+    <p>Portrait 360-428px, grid 2-4 cols, large option cards, readable 12-16px text, no zoom needed, no horizontal scroll.</p>
+  </div>
+</details>
+
+<div style="height:12px"></div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const POOL={
+ G1:{key:'G1',name:'Alistair',emoji:'👻',color:'#38bdf8',bg:'#0ea5e9'},
+ G2:{key:'G2',name:'Vlad',emoji:'🧛',color:'#f87171',bg:'#ef4444'},
+ G3:{key:'G3',name:'Mort',emoji:'🧟',color:'#4ade80',bg:'#22c55e'},
+ G4:{key:'G4',name:'Luna',emoji:'🧙',color:'#a78bfa',bg:'#8b5cf6'},
+ G5:{key:'G5',name:'Wraith',emoji:'👹',color:'#fb923c',bg:'#f97316'},
+ G6:{key:'G6',name:'Specter',emoji:'💀',color:'#94a3b8',bg:'#64748b'},
+ G7:{key:'G7',name:'Banshee',emoji:'👁️',color:'#f472b6',bg:'#ec4899'},
+ G8:{key:'G8',name:'Pumpkin',emoji:'🎃',color:'#fbbf24',bg:'#f59e0b'}
+};
+const CHAPTERS=[
+ {title:'Flickering Portraits',desc:'Learn the curse: inserting & deleting shifts positions but keys keep souls.',icon:'🖼️',color:'#f59e0b'},
+ {title:'Vanishing Guests',desc:'Guests vanish. Who keeps their glow? Track identities through deletions & updates.',icon:'👻',color:'#a78bfa'},
+ {title:'Shuffled Séance',desc:'The table spins. Reorder reveals the truth: state must follow the key.',icon:'🌀',color:'#38bdf8'},
+ {title:'Cursed Gallery',desc:'Final trial: mixed rituals, 5 portraits, no mercy. Master key vs index.',icon:'🏚️',color:'#ef4444'}
+];
+const PUZZLES=[
+ // Ch1
+ {c:0, op:{type:'insert',pos:1,newItem:POOL.G5}, initial:[POOL.G1,POOL.G2,POOL.G3], text:'Insert <b>Wraith 👹</b> at position 2 (middle)', hint:'New portrait enters. Key keeps its own glow; index keeps glow at the slot.', explain:'Key-matched: Wraith stays amber, Vlad stays red, Mort stays green. Index-matched incorrectly paints Wraith red.'},
+ {c:0, op:{type:'insert',pos:0,newItem:POOL.G8}, initial:[POOL.G2,POOL.G4,POOL.G1], text:'Insert <b>Pumpkin 🎃</b> at the top (position 1)', hint:'Top insert pushes others down. Watch whose color moves.', explain:'With keys, Pumpkin is amber at top. With index, top slot keeps Vlad’s red.'},
+ {c:0, op:{type:'delete',pos:1}, initial:[POOL.G1,POOL.G2,POOL.G3,POOL.G4], text:'Vanish portrait at position 2 (Vlad)', hint:'Delete leaves a gap. Index reuses the slot’s old glow.', explain:'Key: Luna stays purple. Index: Mort incorrectly turns red at position 2.'},
+ {c:0, op:{type:'delete',pos:2}, initial:[POOL.G5,POOL.G1,POOL.G6], text:'Vanish portrait at position 3 (Specter)', hint:'Last item gone — who keeps their color?', explain:'Key keeps Wraith amber & Alistair blue. Index would shift incorrectly if more items existed.'},
+ {c:0, op:{type:'insert',pos:2,newItem:POOL.G4}, initial:[POOL.G3,POOL.G2,POOL.G1], text:'Insert <b>Luna 🧙</b> at position 3', hint:'Middle insert — track the glow, not the slot.', explain:'Key: Luna purple at pos3, Alistair blue stays with Alistair.'},
+ // Ch2
+ {c:1, op:{type:'delete',pos:2}, initial:[POOL.G1,POOL.G2,POOL.G3,POOL.G4], text:'Vanish portrait at position 3 (Mort)', hint:'Delete in middle — index keeps slot colors.', explain:'Key: Luna purple stays with Luna. Index: Luna would turn green.'},
+ {c:1, op:{type:'update',pos:0,targetKey:'G2',newProps:{emoji:'🤡',color:'#f472b6',name:'Vlad'}}, initial:[POOL.G4,POOL.G1,POOL.G2], text:'Update <b>key G2 (Vlad)</b> to 🤡 pink glow', hint:'Update targets a KEY, not a position. G2 is at position 3, not 1.', explain:'Key: Vlad at pos3 turns pink. Index (wrong) paints Luna at pos1 pink.'},
+ {c:1, op:{type:'insert',pos:2,newItem:POOL.G6}, initial:[POOL.G2,POOL.G3,POOL.G5], text:'Insert <b>Specter 💀</b> at position 3', hint:'Insert — new soul brings its own color.', explain:'Key: Specter gray at pos3. Index: Specter would steal Mort’s green.'},
+ {c:1, op:{type:'delete',pos:0}, initial:[POOL.G1,POOL.G4,POOL.G2,POOL.G3], text:'Vanish portrait at position 1 (Alistair)', hint:'Top delete — everyone shifts up.', explain:'Key: Luna stays purple. Index: Luna would turn blue.'},
+ {c:1, op:{type:'update',pos:1,targetKey:'G4',newProps:{emoji:'👻',color:'#38bdf8',name:'Luna'}}, initial:[POOL.G5,POOL.G2,POOL.G4], text:'Update <b>key G4 (Luna)</b> to 👻 blue', hint:'G4 is at position 3, but spell targets key G4.', explain:'Key: Luna at pos3 turns blue. Index wrong paints Vlad at pos2 blue.'},
+ // Ch3
+ {c:2, op:{type:'reorder',order:[2,0,1]}, initial:[POOL.G1,POOL.G2,POOL.G3], text:'Séance shuffle: order becomes <b>3 → 1 → 2</b>', hint:'Reorder — if glow stays at slot, souls are swapped.', explain:'Key: Mort green moves to top with Mort. Index: top keeps Alistair’s blue but shows Mort.'},
+ {c:2, op:{type:'reorder',order:[3,2,1,0]}, initial:[POOL.G4,POOL.G1,POOL.G2,POOL.G3], text:'Reverse the gallery: <b>4 → 3 → 2 → 1</b>', hint:'Reverse — every position gets a new soul.', explain:'Key: colors travel with keys. Index: colors stay, so Luna purple stays top but now shows Mort.'},
+ {c:2, op:{type:'reorder',order:[1,2,0]}, initial:[POOL.G2,POOL.G5,POOL.G1], text:'Rotate left: <b>2 → 3 → 1</b>', hint:'Rotate — track one soul’s glow.', explain:'Key: Wraith amber moves to top. Index: top stays Vlad red.'},
+ {c:2, op:{type:'reorder',order:[1,0,3,2]}, initial:[POOL.G1,POOL.G2,POOL.G3,POOL.G4], text:'Swap pairs: <b>2↔1, 4↔3</b>', hint:'Pairs swap — index keeps slot glow.', explain:'Key: Vlad red moves to pos1. Index: pos1 stays blue.'},
+ {c:2, op:{type:'reorder',order:[2,0,3,1]}, initial:[POOL.G3,POOL.G1,POOL.G4,POOL.G2], text:'Chaotic shuffle: <b>3 → 1 → 4 → 2</b>', hint:'Chaos — only keys tell truth.', explain:'Key: Luna purple moves to top. Index: top stays Mort green.'},
+ // Ch4
+ {c:3, op:{type:'reorder',order:[4,0,1,3,2]}, initial:[POOL.G1,POOL.G2,POOL.G3,POOL.G4,POOL.G5], text:'Cursed shuffle of 5: <b>5→1→2→4→3</b>', hint:'5 portraits — index would keep 5 slot colors.', explain:'Key: Wraith amber to top. Index: top stays Alistair blue.'},
+ {c:3, op:{type:'insert',pos:1,newItem:POOL.G7}, initial:[POOL.G2,POOL.G4,POOL.G1,POOL.G3], text:'Insert <b>Banshee 👁️</b> at position 2', hint:'Insert in 4-gallery — watch the shift.', explain:'Key: Banshee pink at pos2. Index: Banshee would be Luna purple.'},
+ {c:3, op:{type:'reorder',order:[2,3,0,1]}, initial:[POOL.G5,POOL.G1,POOL.G2,POOL.G6], text:'Séance: <b>3 → 4 → 1 → 2</b>', hint:'Reorder 4 — colors must travel.', explain:'Key: Vlad red to top. Index: top stays Wraith amber.'},
+ {c:3, op:{type:'update',pos:2,targetKey:'G1',newProps:{emoji:'💀',color:'#111827',name:'Alistair'}}, initial:[POOL.G1,POOL.G3,POOL.G2], text:'Curse <b>key G1 (Alistair)</b> to 💀 dark', hint:'G1 is at pos1, but update targets key G1. Pos3 is Vlad.', explain:'Key: Alistair at pos1 turns dark. Index wrong paints Vlad at pos3 dark.'},
+ {c:3, op:{type:'reorder',order:[1,4,0,2,3]}, initial:[POOL.G4,POOL.G2,POOL.G5,POOL.G1,POOL.G3], text:'Final boss: <b>2→5→1→3→4</b> with 5 souls', hint:'Final — trust keys, not positions.', explain:'Key: Vlad red to top with Vlad. Index: top stays Luna purple.'},
+];
+
+let save = JSON.parse(localStorage.getItem('hauntedListsSave')||'{"bestScore":0,"unlocked":1,"chapterBest":[0,0,0,0]}');
+let state={chapter:0,round:0,score:0,lives:3,hints:3,correctCount:0,streak:0,time:30,timer:null,awaiting:false};
+
+const els={
+ score:document.getElementById('scoreEl'),
+ best:document.getElementById('bestEl'),
+ level:document.getElementById('levelEl'),
+ time:document.getElementById('timeEl'),
+ fill:document.getElementById('timerFill'),
+ lives:document.getElementById('livesEl'),
+ chaptersList:document.getElementById('chaptersList'),
+ viewChapters:document.getElementById('viewChapters'),
+ viewGame:document.getElementById('viewGame'),
+ viewResult:document.getElementById('viewResult'),
+ beforeScene:document.getElementById('beforeScene'),
+ opIcon:document.getElementById('opIcon'),
+ opText:document.getElementById('opText'),
+ options:document.getElementById('options'),
+ hintBtn:document.getElementById('hintBtn'),
+ hintCount:document.getElementById('hintCount'),
+ hintBox:document.getElementById('hintBox'),
+ feedback:document.getElementById('feedback'),
+ roundBadge:document.getElementById('roundBadge'),
+ chapterTitle:document.getElementById('chapterTitle'),
+ nextBtn:document.getElementById('nextBtn'),
+ toast:document.getElementById('toast')
+};
+
+function persist(){
+ localStorage.setItem('hauntedListsSave', JSON.stringify(save));
+ els.best.textContent=save.bestScore;
+}
+function toastMsg(m){
+ els.toast.textContent=m;
+ els.toast.style.display='block';
+ setTimeout(()=>els.toast.style.display='none',1800);
+}
+function renderChapters(){
+ els.chaptersList.innerHTML='';
+ CHAPTERS.forEach((ch,i)=>{
+   const locked=i>=save.unlocked;
+   const best=save.chapterBest[i]||0;
+   const div=document.createElement('div');
+   div.className='chapter-card '+(locked?'locked':'unlocked');
+   div.innerHTML=`
+     <div class="ch-num">Chapter ${i+1} • ${locked?'Locked':'Unlocked'}</div>
+     <div class="ch-title">${ch.icon} ${ch.title}</div>
+     <div class="ch-desc">${ch.desc}</div>
+     <div class="ch-meta">
+       <span class="badge">5 puzzles</span>
+       <span class="badge">${best? 'Best '+best : 'Not played'}</span>
+       ${i<save.unlocked && best>=300 ? '<span class="badge gold">✓ Mastered</span>' : ''}
+     </div>
+     <div class="lock">${locked?'🔒':'▶'}</div>
+   `;
+   div.onclick=()=>{ if(!locked) startChapter(i); };
+   els.chaptersList.appendChild(div);
+ });
+ document.getElementById('continueBtn').onclick=()=>{
+   const idx=Math.min(save.unlocked-1,3);
+   startChapter(idx);
+ };
+}
+function portraitHTML(item, visual){
+ const v=visual||item;
+ return `<div class="portrait" style="border-color:${v.color}66;box-shadow:0 0 0 1px ${v.color}33 inset">
+   <span class="emoji">${v.emoji}</span>
+   <div class="key">${item.key}</div>
+   <div class="name">${item.name}</div>
+   <div class="state" style="background:${v.color}22;color:${v.color};border-color:${v.color}55">${v.color===' #111827'?'cursed':v.color}</div>
+ </div>`;
+}
+function gridHTML(items, visuals){
+ const cols=items.length===4?'cols4':items.length===2?'cols2':'';
+ let h=`<div class="grid ${cols}">`;
+ items.forEach((it,i)=>{
+   const vis=visuals? visuals[i] : it;
+   h+=portraitHTML(it, vis);
+ });
+ h+=`</div>`;
+ return h;
+}
+function computeOutcomes(puzzle){
+ const initial=puzzle.initial;
+ const op=puzzle.op;
+ let correctKeys=[];
+ let correctVisuals=[];
+ let wrongVisuals=[];
+ const initialVisuals=initial.map(it=>({emoji:it.emoji,color:it.color,name:it.name,key:it.key}));
+ if(op.type==='insert'){
+   correctKeys=[...initial.slice(0,op.pos), op.newItem, ...initial.slice(op.pos)];
+   correctVisuals=correctKeys.map(k=>({emoji:k.emoji,color:k.color,name:k.name}));
+   // wrong: visuals stay at positions
+   let w=[...initialVisuals.slice(0,op.pos), ...initialVisuals.slice(op.pos), {emoji:op.newItem.emoji,color:op.newItem.color,name:op.newItem.name}];
+   w=w.slice(0,correctKeys.length);
+   wrongVisuals=w;
+ } else if(op.type==='delete'){
+   correctKeys=initial.filter((_,i)=>i!==op.pos);
+   correctVisuals=correctKeys.map(k=>({emoji:k.emoji,color:k.color,name:k.name}));
+   wrongVisuals=initialVisuals.slice(0,correctKeys.length);
+ } else if(op.type==='reorder'){
+   correctKeys=op.order.map(i=>initial[i]);
+   correctVisuals=correctKeys.map(k=>({emoji:k.emoji,color:k.color,name:k.name}));
+   wrongVisuals=initialVisuals.slice(0,correctKeys.length);
+ } else if(op.type==='update'){
+   correctKeys=[...initial];
+   // correct visuals: targetKey gets new
+   correctVisuals=initial.map(it=> it.key===op.targetKey ? {emoji:op.newProps.emoji,color:op.newProps.color,name:op.newProps.name} : {emoji:it.emoji,color:it.color,name:it.name});
+   // wrong visuals: position pos gets new
+   wrongVisuals=initial.map((it,i)=> i===op.pos ? {emoji:op.newProps.emoji,color:op.newProps.color,name:op.newProps.name} : {emoji:it.emoji,color:it.color,name:it.name});
+ }
+ return {correctKeys, correctVisuals, wrongVisuals, initialVisuals};
+}
+
+function startChapter(idx){
+ state.chapter=idx;
+ state.round=0;
+ state.score=0;
+ state.lives=3;
+ state.hints=3;
+ state.correctCount=0;
+ state.streak=0;
+ els.viewChapters.hidden=true;
+ els.viewResult.hidden=true;
+ els.viewGame.hidden=false;
+ els.level.textContent=(idx+1)+'-1';
+ updateStats();
+ startRound();
+}
+function updateStats(){
+ els.score.textContent=state.score;
+ els.best.textContent=save.bestScore;
+ els.lives.textContent='❤️'.repeat(state.lives)+'🖤'.repeat(3-state.lives);
+ els.hintCount.textContent=state.hints;
+ els.hintBtn.disabled=state.hints<=0;
+ els.hintBtn.style.opacity=state.hints<=0?0.5:1;
+}
+function startRound(){
+ const puzzle=PUZZLES.filter(p=>p.c===state.chapter)[state.round];
+ if(!puzzle){ endChapter(); return; }
+ state.time=30;
+ state.awaiting=true;
+ els.feedback.hidden=true;
+ els.hintBox.hidden=true;
+ els.nextBtn.hidden=true;
+ els.roundBadge.textContent=`Round ${state.round+1}/5`;
+ els.chapterTitle.textContent=`${CHAPTERS[state.chapter].icon} ${CHAPTERS[state.chapter].title}`;
+ els.level.textContent=(state.chapter+1)+'-'+(state.round+1);
+ // before scene
+ els.beforeScene.innerHTML=gridHTML(puzzle.initial);
+ els.opText.innerHTML=puzzle.text;
+ els.opIcon.textContent=puzzle.op.type==='insert'?'➕':puzzle.op.type==='delete'?'🗡️':puzzle.op.type==='reorder'?'🌀':'✏️';
+ // compute outcomes
+ const out=computeOutcomes(puzzle);
+ const correctIsA=Math.random()<0.5;
+ const optAKeys=correctIsA? out.correctKeys : out.correctKeys;
+ const optAVis=correctIsA? out.correctVisuals : out.wrongVisuals;
+ const optBKeys=correctIsA? out.correctKeys : out.correctKeys;
+ const optBVis=correctIsA? out.wrongVisuals : out.correctVisuals;
+ // For update, keys same, visuals differ, so above works. For others, keys same order, visuals differ.
+ els.options.innerHTML=`
+   <div class="opt" data-correct="${correctIsA}" id="optA">
+     <div class="opt-label">A — Gallery A</div>
+     ${gridHTML(optAKeys, optAVis)}
+   </div>
+   <div class="opt" data-correct="${!correctIsA}" id="optB">
+     <div class="opt-label">B — Gallery B</div>
+     ${gridHTML(optBKeys, optBVis)}
+   </div>
+ `;
+ document.getElementById('optA').onclick=()=>choose(correctIsA, out, puzzle);
+ document.getElementById('optB').onclick=()=>choose(!correctIsA, out, puzzle);
+ // store for hint
+ els.options.dataset.correctSide=correctIsA?'A':'B';
+ els.options.dataset.explain=puzzle.explain;
+ updateStats();
+ startTimer();
+}
+function startTimer(){
+ clearInterval(state.timer);
+ els.time.textContent=state.time;
+ els.fill.style.width='100%';
+ els.fill.style.background='linear-gradient(90deg,#f59e0b,#fbbf24)';
+ state.timer=setInterval(()=>{
+   state.time--;
+   els.time.textContent=state.time;
+   els.fill.style.width=(state.time/30*100)+'%';
+   if(state.time<=10) els.fill.style.background='linear-gradient(90deg,#ef4444,#f59e0b)';
+   if(state.time<=0){
+     clearInterval(state.timer);
+     if(state.awaiting) choose(false, null, PUZZLES.filter(p=>p.c===state.chapter)[state.round], true);
+   }
+ },1000);
+}
+function choose(isCorrect, out, puzzle, isTimeout=false){
+ if(!state.awaiting) return;
+ state.awaiting=false;
+ clearInterval(state.timer);
+ const opts=document.querySelectorAll('.opt');
+ opts.forEach(o=>o.style.pointerEvents='none');
+ const correctSide=els.options.dataset.correctSide;
+ // mark
+ opts.forEach(o=>{
+   const isC=o.dataset.correct==='true';
+   if(isC) o.classList.add('correct');
+   else if(!isCorrect) o.classList.add('wrong');
+ });
+ if(isTimeout){
+   state.lives--;
+   state.streak=0;
+   els.feedback.hidden=false;
+   els.feedback.innerHTML=`<b>⏳ Time’s up!</b> The mansion flickered too long. Correct was <b>Gallery ${correctSide}</b>.<br>${puzzle.explain}<br><span style="color:#f87171">-1 life</span>`;
+   playTone(180,0.4,0.3);
+ } else if(isCorrect){
+   const bonus=state.time*2;
+   const streakBonus=state.streak*10;
+   const pts=100+bonus+streakBonus;
+   state.score+=pts;
+   state.correctCount++;
+   state.streak++;
+   if(state.score>save.bestScore){ save.bestScore=state.score; persist(); }
+   els.feedback.hidden=false;
+   els.feedback.innerHTML=`<b style="color:#4ade80">✓ Correct!</b> +${pts} pts (100 + ${bonus} time + ${streakBonus} streak)<br>${puzzle.explain}`;
+   playTone(600,0.15,0.2);
+   setTimeout(()=>playTone(800,0.15,0.2),120);
+ } else {
+   state.lives--;
+   state.streak=0;
+   els.feedback.hidden=false;
+   els.feedback.innerHTML=`<b style="color:#f87171">✗ Wrong — index trap!</b> Correct was <b>Gallery ${correctSide}</b>.<br>${puzzle.explain}<br><span style="color:#f87171">-1 life</span>`;
+   playTone(150,0.5,0.3);
+ }
+ updateStats();
+ els.nextBtn.hidden=false;
+ els.nextBtn.textContent=state.lives<=0?'See Fate →':'Next →';
+ if(state.lives<=0){
+   els.nextBtn.textContent='See Fate →';
+ }
+ // haptics
+ if(navigator.vibrate) navigator.vibrate(isCorrect?30:80);
+}
+document.getElementById('nextBtn').onclick=()=>{
+ if(state.lives<=0){ endChapter(); return; }
+ state.round++;
+ if(state.round>=5) endChapter();
+ else startRound();
+};
+document.getElementById('quitBtn').onclick=()=>{
+ clearInterval(state.timer);
+ els.viewGame.hidden=true;
+ els.viewChapters.hidden=false;
+ renderChapters();
+};
+document.getElementById('hintBtn').onclick=()=>{
+ if(state.hints<=0 || !state.awaiting) return;
+ state.hints--;
+ updateStats();
+ const puzzle=PUZZLES.filter(p=>p.c===state.chapter)[state.round];
+ els.hintBox.hidden=false;
+ els.hintBox.innerHTML=`💡 <b>Hint:</b> ${puzzle.hint}<br><span style="color:#fbbf24">Correct gallery glows amber.</span>`;
+ const correctSide=els.options.dataset.correctSide;
+ const el=document.getElementById(correctSide==='A'?'optA':'optB');
+ el.classList.add('hint-glow');
+ playTone(500,0.2,0.15);
+};
+function endChapter(){
+ clearInterval(state.timer);
+ els.viewGame.hidden=true;
+ els.viewResult.hidden=false;
+ const passed=state.correctCount>=3 && state.lives>0;
+ const titleEl=document.getElementById('resultTitle');
+ const descEl=document.getElementById('resultDesc');
+ document.getElementById('resultScore').textContent=state.score;
+ document.getElementById('resultCorrect').textContent=state.correctCount+'/5';
+ if(state.lives<=0){
+   titleEl.textContent='💀 Consumed by the Index Curse';
+   descEl.textContent='You lost all lives. The mansion keeps your soul. Try again — remember: state follows keys.';
+ } else if(passed){
+   titleEl.textContent='🏚️ Haunting Survived!';
+   descEl.textContent=`You mastered ${CHAPTERS[state.chapter].title}. ${state.correctCount>=5?'Perfect!':''} Next haunting unlocked.`;
+   if(save.unlocked===state.chapter+1 && state.chapter<3){
+     save.unlocked++;
+   }
+   // save best
+   if(!save.chapterBest[state.chapter] || state.score>save.chapterBest[state.chapter]) save.chapterBest[state.chapter]=state.score;
+   if(state.score>save.bestScore) save.bestScore=state.score;
+   persist();
+ } else {
+   titleEl.textContent='👻 Almost Escaped';
+   descEl.textContent=`You got ${state.correctCount}/5. Need 3 to unlock next chapter. The mansion offers another chance.`;
+   if(!save.chapterBest[state.chapter] || state.score>save.chapterBest[state.chapter]) save.chapterBest[state.chapter]=state.score;
+   persist();
+ }
+ document.getElementById('nextChapterBtn').textContent= passed && state.chapter<3 ? 'Next Haunting →' : '⌂ Chapters';
+ document.getElementById('nextChapterBtn').onclick=()=>{
+   els.viewResult.hidden=true;
+   if(passed && state.chapter<3){
+     startChapter(state.chapter+1);
+   } else {
+     els.viewChapters.hidden=false;
+     renderChapters();
+   }
+ };
+ document.getElementById('backBtn').onclick=()=>{
+   els.viewResult.hidden=true;
+   els.viewChapters.hidden=false;
+   renderChapters();
+ };
+}
+
+// Sound
+let audioCtx, osc, gain, soundOn=true;
+function ensureAudio(){
+ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+ if(audioCtx.state==='suspended') audioCtx.resume();
+}
+function playTone(freq,dur,vol=0.2){
+ if(!soundOn) return;
+ ensureAudio();
+ const o=audioCtx.createOscillator();
+ const g=audioCtx.createGain();
+ o.type='sine';
+ o.frequency.value=freq;
+ g.gain.value=vol;
+ o.connect(g).connect(audioCtx.destination);
+ o.start();
+ g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+dur);
+ o.stop(audioCtx.currentTime+dur);
+}
+let droneOsc, droneGain;
+function toggleDrone(on){
+ ensureAudio();
+ if(on){
+   if(droneOsc) return;
+   droneOsc=audioCtx.createOscillator();
+   droneGain=audioCtx.createGain();
+   droneOsc.type='triangle';
+   droneOsc.frequency.value=55;
+   droneGain.gain.value=0.02;
+   const filter=audioCtx.createBiquadFilter();
+   filter.type='lowpass'; filter.frequency.value=400;
+   droneOsc.connect(filter).connect(droneGain).connect(audioCtx.destination);
+   droneOsc.start();
+   // subtle wobble
+   setInterval(()=>{ if(droneOsc) droneOsc.frequency.value=55+Math.sin(Date.now()/1000)*3; },100);
+ } else {
+   if(droneOsc){ try{droneOsc.stop()}catch(e){} droneOsc=null; }
+ }
+}
+document.getElementById('soundBtn').onclick=()=>{
+ soundOn=!soundOn;
+ document.getElementById('soundBtn').textContent=soundOn?'🔊':'🔇';
+ if(soundOn) toggleDrone(true); else toggleDrone(false);
+ toastMsg(soundOn?'Sound on':'Sound off');
+};
+document.getElementById('resetBtn').onclick=()=>{
+ if(confirm('Reset best score & unlocked chapters?')){
+   save={bestScore:0,unlocked:1,chapterBest:[0,0,0,0]};
+   persist();
+   renderChapters();
+   toastMsg('Progress reset');
+ }
+};
+document.getElementById('howBtn').onclick=()=>{
+ document.getElementById('guide').open=true;
+ document.getElementById('guide').scrollIntoView({behavior:'smooth'});
+};
+
+// init
+persist();
+renderChapters();
+updateStats();
+// auto drone after first tap
+document.body.addEventListener('click',()=>{ if(soundOn && !droneOsc) toggleDrone(true); },{once:true});
+</script>
+</body>
+</html>

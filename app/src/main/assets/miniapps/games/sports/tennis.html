@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Rally Court</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:#0a2a0a;color:#e6ffe6;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow-x:hidden}
+body{overscroll-behavior:none;touch-action:manipulation}
+.app{max-width:428px;min-width:360px;margin:0 auto;min-height:100vh;background:#0a2a0a;display:flex;flex-direction:column;overflow-x:hidden}
+header{padding:10px 12px;background:#0a2a0a;color:#e6ffe6;border-bottom:3px solid #4caf50;position:sticky;top:0;z-index:10}
+.head-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.brand{display:flex;align-items:center;gap:8px}
+.brand-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#4caf50 0%,#2e7d32 100%);display:grid;place-items:center;font-size:18px;border:2px solid #fff;box-shadow:0 0 10px rgba(76,175,80,.5)}
+.brand h1{margin:0;font-size:13px;letter-spacing:.8px;line-height:1}
+.brand p{margin:1px 0 0;font-size:9px;opacity:.7;letter-spacing:.6px;text-transform:uppercase}
+.stats{display:flex;gap:6px;margin-top:8px}
+.stat{flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(76,175,80,.3);border-radius:8px;padding:6px 8px;text-align:center}
+.stat-label{font-size:9px;letter-spacing:.6px;text-transform:uppercase;opacity:.6}
+.stat-value{font-size:14px;font-weight:900;margin-top:2px}
+.stat.score{border-color:#4caf50;background:rgba(76,175,80,.15);color:#a5d6a7}
+.stat.best{border-color:#ffb700;background:rgba(255,183,0,.15);color:#ffb700}
+.game-wrap{flex:1;padding:8px 10px 10px;display:flex;flex-direction:column;gap:8px}
+.card{position:relative;background:#2e7d32;border:3px solid #fff;border-radius:16px;overflow:hidden;box-shadow:0 0 16px rgba(76,175,80,.3);flex:1;min-height:520px;display:flex;flex-direction:column}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.hud{position:absolute;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;align-items:center;z-index:5;pointer-events:none;gap:6px}
+.hud-pill{background:rgba(10,42,10,.88);color:#fff;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800;border:1px solid rgba(76,175,80,.3);display:flex;gap:6px;align-items:center}
+.hud-pill.score{background:linear-gradient(135deg,#4caf50 0%,#2e7d32 100%)}
+.controls{padding:10px;background:rgba(10,42,10,.92);border-top:3px solid #4caf50;display:flex;flex-direction:column;gap:8px}
+.slide-area{height:80px;background:rgba(255,255,255,.08);border:2px dashed rgba(255,255,255,.3);border-radius:12px;display:grid;place-items:center;font-size:12px;font-weight:800;letter-spacing:.6px;touch-action:none}
+.btn-row{display:flex;gap:8px}
+.btn{flex:1;min-height:48px;border-radius:12px;border:3px solid #fff;font-weight:900;font-size:13px;letter-spacing:.6px;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 0 #000}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #000}
+.btn-primary{background:linear-gradient(135deg,#4caf50 0%,#2e7d32 100%);color:#fff}
+.btn-secondary{background:#fff;color:#0a2a0a}
+.overlay{position:absolute;inset:0;background:rgba(10,42,10,.82);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center;z-index:8}
+.card2{background:#0a2a0a;color:#e6ffe6;border:2px solid #4caf50;border-radius:16px;padding:16px;max-width:320px;width:100%;box-shadow:0 12px 32px rgba(0,0,0,.5)}
+.card2 h2{margin:0;font-size:16px}
+.card2 p{margin:6px 0 0;font-size:11px;line-height:1.5;opacity:.85}
+.big{font-size:32px;font-weight:900;margin:8px 0 2px;color:#4caf50}
+.row{display:flex;gap:8px;margin-top:12px}
+.hidden{display:none !important}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="head-top">
+      <div class="brand">
+        <div class="brand-icon">🏓</div>
+        <div><h1>RALLY COURT</h1><p>Bat & Ball • Split Court</p></div>
+      </div>
+      <button class="btn btn-secondary" style="min-height:36px;padding:0 12px;font-size:11px" id="btnRestart">↻ RESTART</button>
+    </div>
+    <div class="stats">
+      <div class="stat score"><div class="stat-label">Score</div><div class="stat-value" id="scoreEl">0</div></div>
+      <div class="stat"><div class="stat-label">Rally</div><div class="stat-value" id="rallyEl">0</div></div>
+      <div class="stat best"><div class="stat-label">Best</div><div class="stat-value" id="bestEl">0</div></div>
+    </div>
+  </header>
+
+  <div class="game-wrap">
+    <div class="card" id="card">
+      <canvas id="game" width="400" height="520"></canvas>
+      <div class="hud">
+        <div class="hud-pill" id="hudScore">0</div>
+        <div class="hud-pill score" id="hudRally">RALLY 0</div>
+        <div class="hud-pill" id="hudSpeed">1.0x</div>
+      </div>
+
+      <div class="controls">
+        <div class="slide-area" id="slideArea">↕ SLIDE HERE — drag to move paddle</div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnPlay">▶️ PLAY RALLY</button>
+          <button class="btn btn-secondary" id="btnPause">⏸️ Pause</button>
+        </div>
+      </div>
+
+      <div class="overlay" id="startOverlay">
+        <div class="card2">
+          <div style="font-size:32px">🏓</div>
+          <h2>RALLY COURT</h2>
+          <p>Slide your <b>left paddle</b> with <b>finger or mouse</b> to return rallies against the <b>tracking AI</b> on the right. <b>+1 per return</b> — bright green court with net line!</p>
+          <div style="background:rgba(76,175,80,.15);border:1px solid rgba(76,175,80,.3);border-radius:10px;padding:8px;margin-top:10px;text-align:left;font-size:11px;line-height:1.4">
+            <b>Controls:</b> Drag on court or <b>SLIDE HERE</b> pad • Mouse also works • Ball speeds up each rally
+          </div>
+          <div class="row"><button class="btn btn-primary" id="btnStart">▶️ PLAY RALLY</button></div>
+          <p style="font-size:10px;margin-top:8px;opacity:.6">Session score + best persist</p>
+        </div>
+      </div>
+
+      <div class="overlay hidden" id="pauseOverlay">
+        <div class="card2">
+          <h2>Paused</h2>
+          <p>Rally on hold.</p>
+          <div class="row"><button class="btn btn-primary" id="btnResume">▶️ Resume</button><button class="btn btn-secondary" id="btnRestart2">↻ Restart</button></div>
+        </div>
+      </div>
+
+      <div class="overlay hidden" id="overOverlay">
+        <div class="card2">
+          <div style="font-size:32px">💥</div>
+          <h2>Missed!</h2>
+          <div class="big" id="finalScore">0</div>
+          <div style="font-size:11px;opacity:.6">SESSION SCORE • Best: <span id="finalBest">0</span></div>
+          <div class="row"><button class="btn btn-primary" id="btnRetry">🔄 Play Again</button></div>
+          <button class="btn btn-secondary" style="width:100%;margin-top:8px" id="btnMenu">🏠 Menu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const card=document.getElementById('card');
+let W=400,H=520;
+function resize(){
+  const r=card.getBoundingClientRect();
+  W=r.width; H=r.height;
+  canvas.width=W*2; canvas.height=H*2;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  ctx.setTransform(2,0,0,2,0,0);
+}
+resize(); window.addEventListener('resize',resize);
+
+let best=parseInt(localStorage.getItem('rally_best')||'0');
+document.getElementById('bestEl').textContent=best;
+
+let state='start', score=0, rally=0, speed=1;
+let paddleL={x:20,y:H/2,w:12,h:80}, paddleR={x:W-20,y:H/2,w:12,h:80}, ball={x:W/2,y:H/2,vx:3,vy:2,r:8};
+let lastT=0, running=false;
+
+function resetBall(){
+  ball.x=W/2; ball.y=H/2;
+  ball.vx=(Math.random()<0.5?1:-1)*3*speed;
+  ball.vy=(Math.random()*2-1)*2*speed;
+}
+
+function updateHUD(){
+  document.getElementById('scoreEl').textContent=score;
+  document.getElementById('rallyEl').textContent=rally;
+  document.getElementById('bestEl').textContent=best;
+  document.getElementById('hudScore').textContent=score;
+  document.getElementById('hudRally').textContent='RALLY '+rally;
+  document.getElementById('hudSpeed').textContent=speed.toFixed(1)+'x';
+}
+
+function loop(t){
+  if(state!=='playing'){ running=false; return; }
+  running=true;
+  const dt=Math.min(0.033,(t-lastT)/1000);
+  lastT=t;
+  // ball
+  ball.x+=ball.vx; ball.y+=ball.vy;
+  // top/bottom
+  if(ball.y-ball.r<0 || ball.y+ball.r>H){ ball.vy*=-1; ball.y=Math.max(ball.r,Math.min(H-ball.r,ball.y)); }
+  // paddles
+  // AI tracking
+  const target=ball.y;
+  paddleR.y+=(target - paddleR.y)*0.08;
+  paddleR.y=Math.max(paddleR.h/2,Math.min(H-paddleR.h/2,paddleR.y));
+  // collisions
+  if(ball.x-ball.r < paddleL.x+paddleL.w/2 && ball.x+ball.r > paddleL.x-paddleL.w/2 && ball.y > paddleL.y-paddleL.h/2 && ball.y < paddleL.y+paddleL.h/2){
+    ball.vx=Math.abs(ball.vx)*1.02;
+    ball.vy+=(ball.y - paddleL.y)*0.05;
+    ball.x=paddleL.x+paddleL.w/2+ball.r;
+    score++; rally++; speed=Math.min(2.5, 1+rally*0.05);
+    updateHUD();
+  }
+  if(ball.x+ball.r > paddleR.x-paddleR.w/2 && ball.x-ball.r < paddleR.x+paddleR.w/2 && ball.y > paddleR.y-paddleR.h/2 && ball.y < paddleR.y+paddleR.h/2){
+    ball.vx=-Math.abs(ball.vx)*1.02;
+    ball.vy+=(ball.y - paddleR.y)*0.05;
+    ball.x=paddleR.x-paddleR.w/2-ball.r;
+    rally++;
+    speed=Math.min(2.5, 1+rally*0.05);
+    updateHUD();
+  }
+  // miss
+  if(ball.x<-20 || ball.x>W+20){
+    state='over';
+    if(score>best){ best=score; localStorage.setItem('rally_best',best); }
+    document.getElementById('finalScore').textContent=score;
+    document.getElementById('finalBest').textContent=best;
+    document.getElementById('overOverlay').classList.remove('hidden');
+    updateHUD();
+    return;
+  }
+  draw();
+  if(state==='playing') requestAnimationFrame(loop);
+  else running=false;
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // court
+  ctx.fillStyle='#2e7d32'; ctx.fillRect(0,0,W,H);
+  // court lines
+  ctx.strokeStyle='#fff'; ctx.lineWidth=2;
+  ctx.strokeRect(4,4,W-8,H-8);
+  // net line (vertical split)
+  ctx.setLineDash([6,6]); ctx.beginPath(); ctx.moveTo(W/2,4); ctx.lineTo(W/2,H-4); ctx.stroke(); ctx.setLineDash([]);
+  // center circle
+  ctx.beginPath(); ctx.arc(W/2,H/2,40,0,Math.PI*2); ctx.stroke();
+  // paddles
+  ctx.fillStyle='#fff'; ctx.strokeStyle='#0a2a0a'; ctx.lineWidth=1.5;
+  ctx.fillRect(paddleL.x-paddleL.w/2, paddleL.y-paddleL.h/2, paddleL.w, paddleL.h);
+  ctx.strokeRect(paddleL.x-paddleL.w/2, paddleL.y-paddleL.h/2, paddleL.w, paddleL.h);
+  ctx.fillRect(paddleR.x-paddleR.w/2, paddleR.y-paddleR.h/2, paddleR.w, paddleR.h);
+  ctx.strokeRect(paddleR.x-paddleR.w/2, paddleR.y-paddleR.h/2, paddleR.w, paddleR.h);
+  // ball
+  ctx.fillStyle='#ffb700'; ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+}
+
+function startGame(){
+  score=0; rally=0; speed=1;
+  paddleL.y=H/2; paddleR.y=H/2;
+  resetBall();
+  state='playing';
+  document.getElementById('startOverlay').classList.add('hidden');
+  document.getElementById('pauseOverlay').classList.add('hidden');
+  document.getElementById('overOverlay').classList.add('hidden');
+  lastT=performance.now();
+  updateHUD();
+  if(!running) requestAnimationFrame(loop);
+}
+
+// input - slide paddle
+const slideArea=document.getElementById('slideArea');
+function handleMove(clientY){
+  const rect=card.getBoundingClientRect();
+  const y=clientY - rect.top;
+  paddleL.y=Math.max(paddleL.h/2,Math.min(H-paddleL.h/2, y));
+  draw();
+}
+let dragging=false;
+function onDown(e){
+  dragging=true;
+  const y=e.touches? e.touches[0].clientY : e.clientY;
+  handleMove(y);
+}
+function onMove(e){
+  if(!dragging) return;
+  e.preventDefault();
+  const y=e.touches? e.touches[0].clientY : e.clientY;
+  handleMove(y);
+}
+function onUp(){ dragging=false; }
+canvas.addEventListener('touchstart',onDown,{passive:false});
+canvas.addEventListener('touchmove',onMove,{passive:false});
+canvas.addEventListener('touchend',onUp);
+canvas.addEventListener('mousedown',onDown);
+window.addEventListener('mousemove',onMove);
+window.addEventListener('mouseup',onUp);
+slideArea.addEventListener('touchstart',onDown,{passive:false});
+slideArea.addEventListener('touchmove',onMove,{passive:false});
+slideArea.addEventListener('touchend',onUp);
+slideArea.addEventListener('mousedown',onDown);
+
+document.getElementById('btnStart').addEventListener('click',startGame);
+document.getElementById('btnPlay').addEventListener('click',startGame);
+document.getElementById('btnPause').addEventListener('click',()=>{
+  if(state==='playing'){ state='paused'; document.getElementById('pauseOverlay').classList.remove('hidden'); }
+});
+document.getElementById('btnResume').addEventListener('click',()=>{
+  state='playing'; document.getElementById('pauseOverlay').classList.add('hidden'); lastT=performance.now(); if(!running) requestAnimationFrame(loop);
+});
+document.getElementById('btnRestart').addEventListener('click',startGame);
+document.getElementById('btnRestart2').addEventListener('click',startGame);
+document.getElementById('btnRetry').addEventListener('click',startGame);
+document.getElementById('btnMenu').addEventListener('click',()=>{
+  state='start';
+  document.getElementById('overOverlay').classList.add('hidden');
+  document.getElementById('pauseOverlay').classList.add('hidden');
+  document.getElementById('startOverlay').classList.remove('hidden');
+});
+
+updateHUD();
+draw();
+</script>
+</body>
+</html>

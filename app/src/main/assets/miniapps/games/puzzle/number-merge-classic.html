@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>2048 Slide Merge</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#faf8ef;
+  --text:#776e65;
+  --grid:#bbada0;
+  --cell:#cdc1b4;
+  --btn:#8f7a66;
+  --btn2:#f67c5f;
+}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  display:flex;
+  justify-content:center;
+  min-height:100dvh;
+}
+.wrap{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  padding:14px 14px 18px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+.brand h1{
+  font-size:28px;
+  font-weight:800;
+  letter-spacing:-0.5px;
+  color:#776e65;
+  line-height:1;
+}
+.brand p{
+  font-size:13px;
+  color:#8f7a66;
+  margin-top:4px;
+  line-height:1.2;
+}
+.scores{display:flex;gap:8px}
+.score-box{
+  background:var(--grid);
+  color:#fff;
+  min-width:72px;
+  padding:8px 8px 6px;
+  border-radius:8px;
+  text-align:center;
+}
+.score-box .label{font-size:10px;letter-spacing:0.8px;text-transform:uppercase;opacity:0.95;font-weight:700}
+.score-box .val{font-size:18px;font-weight:800;line-height:1.1;margin-top:2px}
+.score-box.best{background:#8f7a66}
+.top-actions{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+.hint{font-size:12.5px;color:#8f7a66;line-height:1.3}
+.btn{
+  appearance:none;
+  border:none;
+  background:var(--btn);
+  color:#f9f6f2;
+  font-weight:700;
+  font-size:14px;
+  padding:12px 18px;
+  border-radius:8px;
+  cursor:pointer;
+  min-height:44px;
+  touch-action:manipulation;
+}
+.btn:active{transform:scale(0.98)}
+.btn.primary{background:var(--btn2)}
+.btn.ghost{background:#eee4da;color:#776e65}
+.btn.small{padding:10px 14px;font-size:13px;min-height:40px}
+.board-wrap{
+  position:relative;
+  background:var(--grid);
+  border-radius:10px;
+  padding:8px;
+  touch-action:none;
+  user-select:none;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:8px;
+  aspect-ratio:1;
+  position:relative;
+}
+.cell{
+  background:var(--cell);
+  border-radius:6px;
+  aspect-ratio:1;
+}
+.tiles{
+  position:absolute;
+  inset:8px;
+  pointer-events:none;
+}
+.tile{
+  position:absolute;
+  width:calc((100% - 24px)/4);
+  height:calc((100% - 24px)/4);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:6px;
+  font-weight:800;
+  font-size:28px;
+  transition: left 110ms ease, top 110ms ease, transform 110ms ease, opacity 110ms ease;
+  will-change:left,top,transform;
+}
+.tile.new{animation:pop 160ms ease}
+.tile.merged{animation:popMerge 180ms ease}
+@keyframes pop{0%{transform:scale(0)}100%{transform:scale(1)}}
+@keyframes popMerge{0%{transform:scale(1)}50%{transform:scale(1.12)}100%{transform:scale(1)}}
+.tile.v2{background:#eee4da;color:#776e65}
+.tile.v4{background:#ede0c8;color:#776e65}
+.tile.v8{background:#f2b179;color:#f9f6f2}
+.tile.v16{background:#f59563;color:#f9f6f2}
+.tile.v32{background:#f67c5f;color:#f9f6f2}
+.tile.v64{background:#f65e3b;color:#f9f6f2}
+.tile.v128{background:#edcf72;color:#f9f6f2;font-size:24px}
+.tile.v256{background:#edcc61;color:#f9f6f2;font-size:24px}
+.tile.v512{background:#edc850;color:#f9f6f2;font-size:24px}
+.tile.v1024{background:#edc53f;color:#f9f6f2;font-size:20px}
+.tile.v2048{background:#edc22e;color:#f9f6f2;font-size:20px;box-shadow:0 0 12px rgba(237,194,46,0.6)}
+.tile.v4096{background:#3c3a32;color:#f9f6f2;font-size:18px}
+.tile.v8192{background:#3c3a32;color:#f9f6f2;font-size:18px}
+.overlay{
+  position:absolute;
+  inset:8px;
+  background:rgba(255,255,255,0.92);
+  border-radius:8px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding:18px;
+  gap:10px;
+  z-index:5;
+}
+.overlay h2{font-size:28px;color:#776e65}
+.overlay p{font-size:14px;color:#8f7a66;max-width:260px;line-height:1.4}
+.overlay .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.hidden{display:none !important}
+.controls{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.dpad{
+  background:#eee4da;
+  border-radius:12px;
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+}
+.dpad-label{font-size:11px;letter-spacing:0.6px;text-transform:uppercase;font-weight:700;color:#8f7a66}
+.dpad-grid{
+  display:grid;
+  grid-template-columns:56px 56px 56px;
+  grid-template-rows:56px 56px 56px;
+  gap:6px;
+}
+.dpad-btn{
+  background:#fff;
+  border:2px solid #bbada0;
+  border-radius:10px;
+  font-size:20px;
+  font-weight:800;
+  color:#776e65;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  touch-action:manipulation;
+  user-select:none;
+  min-width:56px;
+  min-height:56px;
+}
+.dpad-btn:active{background:#f9f6f2;transform:scale(0.96)}
+.dpad-btn.empty{background:transparent;border-color:transparent;pointer-events:none}
+.stats{
+  background:#fff;
+  border:2px solid #eee4da;
+  border-radius:12px;
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  justify-content:center;
+}
+.stat-row{display:flex;justify-content:space-between;align-items:center;font-size:13px}
+.stat-row strong{font-size:16px;color:#776e65}
+.stat-row span{color:#8f7a66;font-weight:600}
+.progress{height:8px;background:#eee4da;border-radius:99px;overflow:hidden}
+.progress i{display:block;height:100%;background:#f67c5f;width:0%;transition:width 300ms ease}
+.howto{
+  background:#fff;
+  border-radius:10px;
+  padding:12px 14px;
+  border:1px solid #eee4da;
+}
+.howto h3{font-size:13px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px}
+.howto p{font-size:12.5px;color:#8f7a66;line-height:1.5}
+.kbd{display:inline-block;background:#eee4da;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;border-bottom:2px solid #bbada0}
+.footer{font-size:11px;color:#a09588;text-align:center;padding:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>2048</h1>
+      <p>Slide &amp; merge to reach <b>2048</b></p>
+    </div>
+    <div class="scores">
+      <div class="score-box"><div class="label">Score</div><div class="val" id="score">0</div></div>
+      <div class="score-box best"><div class="label">Best</div><div class="val" id="best">0</div></div>
+    </div>
+  </header>
+
+  <div class="top-actions">
+    <div class="hint">Swipe on board or use arrows / D-pad. Equal tiles merge.</div>
+    <button class="btn" id="newGameBtn">New Game</button>
+  </div>
+
+  <div class="board-wrap" id="boardWrap">
+    <div class="grid" id="grid">
+      <!-- 16 cells -->
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <div class="tiles" id="tiles"></div>
+    </div>
+    <div class="overlay hidden" id="winOverlay">
+      <h2>You win! 🎉</h2>
+      <p>You reached <b>2048</b>. Keep playing to chase a higher tile, or start fresh.</p>
+      <div class="row">
+        <button class="btn primary" id="keepBtn">Keep playing</button>
+        <button class="btn ghost" id="winNewBtn">New Game</button>
+      </div>
+    </div>
+    <div class="overlay hidden" id="overOverlay">
+      <h2>Game over</h2>
+      <p>No moves left. Try again?</p>
+      <div class="row">
+        <button class="btn primary" id="overNewBtn">New Game</button>
+        <button class="btn ghost" id="undoBtn">Undo move</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="dpad">
+      <div class="dpad-label">Swipe or tap</div>
+      <div class="dpad-grid">
+        <div class="dpad-btn empty"></div>
+        <button class="dpad-btn" data-dir="up" aria-label="Up">▲</button>
+        <div class="dpad-btn empty"></div>
+        <button class="dpad-btn" data-dir="left" aria-label="Left">◀</button>
+        <button class="dpad-btn" data-dir="down" aria-label="Down">▼</button>
+        <button class="dpad-btn" data-dir="right" aria-label="Right">▶</button>
+        <div class="dpad-btn empty"></div>
+        <div class="dpad-btn empty" style="font-size:10px;color:#8f7a66">DRAG<br>BOARD</div>
+        <div class="dpad-btn empty"></div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat-row"><span>Best tile</span><strong id="bestTile">0</strong></div>
+      <div class="stat-row"><span>Moves</span><strong id="moves">0</strong></div>
+      <div class="progress"><i id="progress"></i></div>
+      <div class="stat-row" style="font-size:11px"><span>Progress to 2048</span><span id="progressText">0%</span></div>
+      <button class="btn small ghost" id="undoBtn2" style="width:100%">↩ Undo</button>
+    </div>
+  </div>
+
+  <div class="howto">
+    <h3>How to play</h3>
+    <p><b>Swipe</b> on the board or press <span class="kbd">↑</span> <span class="kbd">↓</span> <span class="kbd">←</span> <span class="kbd">→</span> / <span class="kbd">WASD</span>. All tiles slide. Equal numbers <b>merge and double</b> toward 2048. Win at 2048 — then <b>Keep playing</b> for higher tiles. Game over when stuck with no merges.</p>
+  </div>
+  <div class="footer">Classic minimal styling • smooth slide • saves best score &amp; tile on this phone</div>
+</div>
+
+<script>
+(() => {
+  const SIZE=4, TARGET=2048;
+  const gridEl=document.getElementById('grid');
+  const tilesEl=document.getElementById('tiles');
+  const boardWrap=document.getElementById('boardWrap');
+  const scoreEl=document.getElementById('score');
+  const bestEl=document.getElementById('best');
+  const bestTileEl=document.getElementById('bestTile');
+  const movesEl=document.getElementById('moves');
+  const progressEl=document.getElementById('progress');
+  const progressText=document.getElementById('progressText');
+  const winOverlay=document.getElementById('winOverlay');
+  const overOverlay=document.getElementById('overOverlay');
+
+  let board, score, best, bestTile, moves, won, keepPlaying, over, history;
+  let tileIdCounter=1;
+
+  // tile objects for animation: {id, value, r,c, justMerged, isNew}
+  let tiles=[];
+
+  function loadPersist(){
+    best = parseInt(localStorage.getItem('slide2048_best')||'0',10);
+    bestTile = parseInt(localStorage.getItem('slide2048_bestTile')||'0',10);
+    const saved = localStorage.getItem('slide2048_state');
+    if(saved){
+      try{
+        const s=JSON.parse(saved);
+        if(s.board && s.board.length===4){
+          board=s.board;
+          score=s.score||0;
+          moves=s.moves||0;
+          won=s.won||false;
+          keepPlaying=s.keepPlaying||false;
+          over=s.over||false;
+          // rebuild tiles from board
+          tiles=[];
+          tileIdCounter=1;
+          for(let r=0;r<4;r++) for(let c=0;c<4;c++) if(board[r][c]){
+            tiles.push({id:tileIdCounter++, value:board[r][c], r,c, isNew:false, justMerged:false});
+          }
+          return true;
+        }
+      }catch(e){}
+    }
+    return false;
+  }
+  function savePersist(){
+    localStorage.setItem('slide2048_best', String(best));
+    localStorage.setItem('slide2048_bestTile', String(bestTile));
+    localStorage.setItem('slide2048_state', JSON.stringify({board,score,moves,won,keepPlaying,over}));
+  }
+
+  function emptyBoard(){ return Array.from({length:4},()=>Array(4).fill(0)); }
+
+  function addRandomTile(){
+    const empties=[];
+    for(let r=0;r<4;r++) for(let c=0;c<4;c++) if(board[r][c]===0) empties.push([r,c]);
+    if(!empties.length) return false;
+    const [r,c]=empties[Math.floor(Math.random()*empties.length)];
+    const val = Math.random()<0.9 ? 2 : 4;
+    board[r][c]=val;
+    tiles.push({id:tileIdCounter++, value:val, r,c, isNew:true, justMerged:false});
+    return true;
+  }
+
+  function initNew(){
+    board=emptyBoard();
+    tiles=[];
+    tileIdCounter=1;
+    score=0; moves=0; won=false; keepPlaying=false; over=false;
+    history=[];
+    addRandomTile(); addRandomTile();
+    updateBestTile();
+    savePersist();
+    render();
+  }
+
+  function updateBestTile(){
+    let max=0;
+    for(let r=0;r<4;r++) for(let c=0;c<4;c++) max=Math.max(max, board[r][c]);
+    if(max>bestTile){ bestTile=max; localStorage.setItem('slide2048_bestTile', String(bestTile)); }
+    if(score>best){ best=score; localStorage.setItem('slide2048_best', String(best)); }
+  }
+
+  function canMove(){
+    for(let r=0;r<4;r++) for(let c=0;c<4;c++) if(board[r][c]===0) return true;
+    for(let r=0;r<4;r++) for(let c=0;c<4;c++){
+      const v=board[r][c];
+      if(c<3 && board[r][c+1]===v) return true;
+      if(r<3 && board[r+1][c]===v) return true;
+    }
+    return false;
+  }
+
+  // Core move logic: returns {moved, scoreGain, wonNow}
+  function move(dir){
+    if(over) return {moved:false};
+    // snapshot for undo
+    const prevBoard = board.map(row=>row.slice());
+    const prevTiles = tiles.map(t=>({...t}));
+    const prevScore=score, prevMoves=moves, prevWon=won, prevKeep=keepPlaying, prevOver=over;
+
+    let moved=false;
+    let scoreGain=0;
+    let wonNow=false;
+
+    // We'll rebuild tiles from scratch but track merges for animation
+    // Helper to process a line (array length 4) left-aligned
+    function processLine(line){
+      // line: [0,2,2,4] -> compress -> [2,2,4] -> merge -> [4,4] -> pad -> [4,4,0,0] with score
+      let arr = line.filter(v=>v!==0);
+      let res=[];
+      let gains=0;
+      let mergedFlags=[];
+      for(let i=0;i<arr.length;i++){
+        if(i+1<arr.length && arr[i]===arr[i+1]){
+          const nv=arr[i]*2;
+          res.push(nv);
+          mergedFlags.push(true);
+          gains+=nv;
+          if(nv===TARGET && !won && !keepPlaying) wonNow=true;
+          i++; // skip next
+        } else {
+          res.push(arr[i]);
+          mergedFlags.push(false);
+        }
+      }
+      while(res.length<4){ res.push(0); mergedFlags.push(false); }
+      return {res, gains, mergedFlags};
+    }
+
+    let newBoard=emptyBoard();
+
+    if(dir==='left'){
+      for(let r=0;r<4;r++){
+        const {res,gains}=processLine(board[r]);
+        newBoard[r]=res;
+        scoreGain+=gains;
+      }
+    } else if(dir==='right'){
+      for(let r=0;r<4;r++){
+        const rev=[...board[r]].reverse();
+        const {res,gains}=processLine(rev);
+        newBoard[r]=res.reverse();
+        scoreGain+=gains;
+      }
+    } else if(dir==='up'){
+      for(let c=0;c<4;c++){
+        const col=[board[0][c],board[1][c],board[2][c],board[3][c]];
+        const {res,gains}=processLine(col);
+        for(let r=0;r<4;r++) newBoard[r][c]=res[r];
+        scoreGain+=gains;
+      }
+    } else if(dir==='down'){
+      for(let c=0;c<4;c++){
+        const col=[board[0][c],board[1][c],board[2][c],board[3][c]].reverse();
+        const {res,gains}=processLine(col);
+        const rev=res.reverse();
+        for(let r=0;r<4;r++) newBoard[r][c]=rev[r];
+        scoreGain+=gains;
+      }
+    }
+
+    // check moved
+    for(let r=0;r<4;r++) for(let c=0;c<4;c++) if(newBoard[r][c]!==board[r][c]) moved=true;
+
+    if(!moved) return {moved:false};
+
+    // push history for undo (limit 10)
+    history.push({board:prevBoard, tiles:prevTiles, score:prevScore, moves:prevMoves, won:prevWon, keepPlaying:prevKeep, over:prevOver});
+    if(history.length>10) history.shift();
+
+    board=newBoard;
+    score+=scoreGain;
+    moves++;
+
+    // rebuild tiles for rendering with merge flags
+    // We need to map newBoard to tiles, but we lose identity. For smooth animation we can just recreate tiles with new ids, but mark merged tiles.
+    // To animate slide, we need to know where tiles came from. Simpler: recreate tiles fresh; CSS transition will still animate from old positions if we reuse DOM? We'll just recreate and let them appear at new spots with transition.
+    // Better: rebuild tiles array from newBoard, preserving isNew for added tile later.
+    // For merged tiles, we can flag them to pop.
+    // We need to know which positions are merges: we can detect by comparing processLine mergedFlags.
+    // Instead, we can just flag any tile that resulted from merge by checking if its value could be from merge (but ambiguous). Simpler: flag all tiles that are result of merge via tracking.
+    // We'll rebuild with merge detection: for each line, we know which output indices were merges.
+    // Let's compute merge map for newBoard.
+
+    let mergeMap = Array.from({length:4},()=>Array(4).fill(false));
+    // recompute mergeMap by re-processing lines and marking merged positions
+    if(dir==='left'){
+      for(let r=0;r<4;r++){
+        const {mergedFlags}=processLine(prevBoard[r]); // not correct, need to use original line
+        // Actually we need to know merges in newBoard: we already have mergedFlags for that line's result
+        // So we need to capture it during first pass. Let's redo with capture.
+      }
+    }
+    // Simpler: just mark tiles that are newly doubled and where two equal existed before - we can approximate by checking if tile value >2 and there were two of half before in same line.
+    // For visual polish, we'll just mark tiles that increased due to merge by checking scoreGain>0 and tile value is power that could be merged.
+    // Instead, let's redo move with mergeMap capture properly.
+
+    // Recompute with proper mergeMap capture
+    // We'll redo the move logic to fill mergeMap correctly
+    // Reset board to prevBoard, recompute newBoard2 and mergeMap
+    let newBoard2=emptyBoard();
+    let mergeMap2=Array.from({length:4},()=>Array(4).fill(false));
+    let scoreGain2=0;
+    let wonNow2=false;
+    function processLineWithMap(line){
+      let arr=line.filter(v=>v!==0);
+      let res=[]; let flags=[];
+      let gains=0;
+      for(let i=0;i<arr.length;i++){
+        if(i+1<arr.length && arr[i]===arr[i+1]){
+          const nv=arr[i]*2;
+          res.push(nv); flags.push(true); gains+=nv;
+          if(nv===TARGET && !prevWon && !prevKeep) wonNow2=true;
+          i++;
+        } else { res.push(arr[i]); flags.push(false); }
+      }
+      while(res.length<4){ res.push(0); flags.push(false); }
+      return {res, flags, gains};
+    }
+    if(dir==='left'){
+      for(let r=0;r<4;r++){
+        const {res,flags,gains}=processLineWithMap(prevBoard[r]);
+        newBoard2[r]=res; scoreGain2+=gains;
+        for(let c=0;c<4;c++) mergeMap2[r][c]=flags[c];
+      }
+    } else if(dir==='right'){
+      for(let r=0;r<4;r++){
+        const rev=[...prevBoard[r]].reverse();
+        const {res,flags,gains}=processLineWithMap(rev);
+        const rr=res.reverse(); const ff=flags.reverse();
+        newBoard2[r]=rr; scoreGain2+=gains;
+        for(let c=0;c<4;c++) mergeMap2[r][c]=ff[c];
+      }
+    } else if(dir==='up'){
+      for(let c=0;c<4;c++){
+        const col=[prevBoard[0][c],prevBoard[1][c],prevBoard[2][c],prevBoard[3][c]];
+        const {res,flags,gains}=processLineWithMap(col);
+        for(let r=0;r<4;r++){ newBoard2[r][c]=res[r]; mergeMap2[r][c]=flags[r]; }
+        scoreGain2+=gains;
+      }
+    } else if(dir==='down'){
+      for(let c=0;c<4;c++){
+        const col=[prevBoard[0][c],prevBoard[1][c],prevBoard[2][c],prevBoard[3][c]].reverse();
+        const {res,flags,gains}=processLineWithMap(col);
+        const rr=res.reverse(); const ff=flags.reverse();
+        for(let r=0;r<4;r++){ newBoard2[r][c]=rr[r]; mergeMap2[r][c]=ff[r]; }
+        scoreGain2+=gains;
+      }
+    }
+    // Use newBoard2 (should equal newBoard)
+    board=newBoard2;
+    // score already updated, but ensure consistency
+    // score = prevScore + scoreGain2 (already)
+    wonNow=wonNow2;
+
+    // rebuild tiles
+    tiles=[];
+    for(let r=0;r<4;r++) for(let c=0;c<4;c++) if(board[r][c]!==0){
+      tiles.push({id:tileIdCounter++, value:board[r][c], r,c, isNew:false, justMerged: mergeMap2[r][c]});
+    }
+
+    // add new random tile
+    addRandomTile();
+
+    if(wonNow){ won=true; }
+
+    // check game over
+    if(!canMove()){
+      over=true;
+    }
+
+    updateBestTile();
+    savePersist();
+    return {moved:true, wonNow};
+  }
+
+  function undo(){
+    if(!history.length) return;
+    const h=history.pop();
+    board=h.board; tiles=h.tiles; score=h.score; moves=h.moves; won=h.won; keepPlaying=h.keepPlaying; over=h.over;
+    savePersist();
+    render();
+  }
+
+  function render(){
+    scoreEl.textContent=score;
+    bestEl.textContent=best;
+    bestTileEl.textContent=bestTile||0;
+    movesEl.textContent=moves;
+    // progress to 2048: log scale
+    let maxTile=0;
+    for(let r=0;r<4;r++) for(let c=0;c<4;c++) maxTile=Math.max(maxTile, board[r][c]);
+    let pct=0;
+    if(maxTile>=2){
+      const log = Math.log2(maxTile);
+      const targetLog=Math.log2(TARGET);
+      pct=Math.min(100, Math.round((log/targetLog)*100));
+    }
+    progressEl.style.width=pct+'%';
+    progressText.textContent=pct+'%';
+
+    // render tiles
+    tilesEl.innerHTML='';
+    // compute tile size positioning
+    // tiles container inset 8px, gap 8px, 4 columns
+    // left = c * (tileW + gap), top = r * (tileH + gap)
+    // tileW = (100% - 24px)/4
+    tiles.forEach(t=>{
+      const el=document.createElement('div');
+      el.className='tile v'+t.value + (t.isNew?' new':'') + (t.justMerged?' merged':'');
+      el.textContent=t.value;
+      // position via left/top percentages with calc
+      // Use CSS calc: left = c * (25% + gap?) But easier: use percentage + gap offset via JS measuring?
+      // We'll use absolute with left/top as calc((100% - 24px)/4 * c + 8px*c) etc. But we can compute via style left/top using calc.
+      // Simpler: use left/top as percentages with gap accounted via CSS variable.
+      // We'll set left/top using calc expression.
+      const c=t.c, r=t.r;
+      el.style.left = `calc((100% - 24px)/4 * ${c} + 8px * ${c})`;
+      el.style.top = `calc((100% - 24px)/4 * ${r} + 8px * ${r})`;
+      tilesEl.appendChild(el);
+    });
+
+    // overlays
+    if(won && !keepPlaying){
+      winOverlay.classList.remove('hidden');
+      overOverlay.classList.add('hidden');
+    } else if(over){
+      overOverlay.classList.remove('hidden');
+      winOverlay.classList.add('hidden');
+    } else {
+      winOverlay.classList.add('hidden');
+      overOverlay.classList.add('hidden');
+    }
+
+    // clear isNew/justMerged after animation
+    setTimeout(()=>{
+      tiles.forEach(t=>{ t.isNew=false; t.justMerged=false; });
+    }, 200);
+  }
+
+  // Input handling
+  function handleDir(dir){
+    const res=move(dir);
+    if(res.moved){
+      render();
+      // haptic
+      if(navigator.vibrate) navigator.vibrate(20);
+      if(res.wonNow){
+        // win overlay will show
+      }
+    } else {
+      // no move, maybe shake?
+      boardWrap.animate([{transform:'translateX(0)'},{transform:'translateX(4px)'},{transform:'translateX(-4px)'},{transform:'translateX(0)'}],{duration:120});
+    }
+  }
+
+  // Buttons
+  document.getElementById('newGameBtn').addEventListener('click', ()=>{ initNew(); render(); });
+  document.getElementById('winNewBtn').addEventListener('click', ()=>{ initNew(); render(); });
+  document.getElementById('overNewBtn').addEventListener('click', ()=>{ initNew(); render(); });
+  document.getElementById('keepBtn').addEventListener('click', ()=>{
+    keepPlaying=true; won=false; savePersist(); render();
+  });
+  document.getElementById('undoBtn').addEventListener('click', undo);
+  document.getElementById('undoBtn2').addEventListener('click', undo);
+
+  document.querySelectorAll('.dpad-btn[data-dir]').forEach(b=>{
+    b.addEventListener('click', ()=> handleDir(b.dataset.dir));
+    b.addEventListener('touchstart', (e)=>{ e.preventDefault(); handleDir(b.dataset.dir); }, {passive:false});
+  });
+
+  // Keyboard
+  window.addEventListener('keydown', (e)=>{
+    const k=e.key.toLowerCase();
+    if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(k)){
+      e.preventDefault();
+      if(k==='arrowup'||k==='w') handleDir('up');
+      else if(k==='arrowdown'||k==='s') handleDir('down');
+      else if(k==='arrowleft'||k==='a') handleDir('left');
+      else if(k==='arrowright'||k==='d') handleDir('right');
+    }
+  });
+
+  // Touch swipe on board
+  let sx=0, sy=0;
+  boardWrap.addEventListener('touchstart', (e)=>{
+    if(e.touches.length!==1) return;
+    sx=e.touches[0].clientX; sy=e.touches[0].clientY;
+  }, {passive:true});
+  boardWrap.addEventListener('touchend', (e)=>{
+    if(sx===0 && sy===0) return;
+    const t=e.changedTouches[0];
+    const dx=t.clientX - sx, dy=t.clientY - sy;
+    const ax=Math.abs(dx), ay=Math.abs(dy);
+    const thresh=28;
+    if(Math.max(ax,ay) < thresh){ sx=0; sy=0; return; }
+    if(ax > ay){
+      handleDir(dx>0?'right':'left');
+    } else {
+      handleDir(dy>0?'down':'up');
+    }
+    sx=0; sy=0;
+  }, {passive:true});
+  // also mouse drag for desktop testing
+  let mx=0, my=0, dragging=false;
+  boardWrap.addEventListener('mousedown', e=>{ mx=e.clientX; my=e.clientY; dragging=true; });
+  window.addEventListener('mouseup', e=>{
+    if(!dragging) return;
+    dragging=false;
+    const dx=e.clientX - mx, dy=e.clientY - my;
+    if(Math.max(Math.abs(dx),Math.abs(dy))<28) return;
+    if(Math.abs(dx)>Math.abs(dy)) handleDir(dx>0?'right':'left');
+    else handleDir(dy>0?'down':'up');
+  });
+
+  // Init
+  if(!loadPersist()){
+    best=0; bestTile=0;
+    initNew();
+  } else {
+    history=[];
+    // ensure best vars loaded
+    best = parseInt(localStorage.getItem('slide2048_best')||String(best),10);
+    bestTile = parseInt(localStorage.getItem('slide2048_bestTile')||String(bestTile),10);
+    // if board empty (first load) init
+    if(!board || board.flat().every(v=>v===0)){ initNew(); }
+  }
+  render();
+})();
+</script>
+</body>
+</html>
+

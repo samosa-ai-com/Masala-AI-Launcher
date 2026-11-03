@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Curling House</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f1e2e;--card:#1a2f4a;--card2:#223a5a;--accent:#ff3b30;--accent2:#ffcc02;--ice:#e6f0f7;--ice2:#cfe2f0;--text:#fff;--muted:#8ea6c8;--line:#2a4a73}
+html,body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow-x:hidden}
+body{max-width:428px;margin:0 auto;min-height:100vh;padding-bottom:16px}
+header{padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-badge{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#ff3b30,#ff7a00);display:grid;place-items:center;font-size:18px}
+h1{font-size:18px;line-height:1;letter-spacing:.2px}
+h1 span{font-weight:800}
+.sub{font-size:12px;color:var(--muted);margin-top:2px}
+.icon-btn{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text);display:grid;place-items:center;font-size:18px;cursor:pointer}
+.score-wrap{margin:0 12px;background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.score-top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:10px 12px;gap:8px}
+.team{ text-align:center}
+.team-name{font-size:11px;letter-spacing:.8px;color:var(--muted);font-weight:700;text-transform:uppercase}
+.team-score{font-size:28px;font-weight:900;line-height:1;margin-top:2px}
+.team-score.red{color:#ff5a4a}
+.team-score.yellow{color:#ffcc02}
+.vs{font-size:11px;color:var(--muted);font-weight:700}
+.center-info{text-align:center;min-width:86px}
+.end-badge{background:#0d213a;border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;font-weight:800;display:inline-flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent2);box-shadow:0 0 8px rgba(255,204,2,.6)}
+.hammer{font-size:11px;color:var(--muted);margin-top:6px}
+.hammer b{color:var(--accent2)}
+.turn-bar{background:var(--card2);border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:13px}
+.turn-left{display:flex;align-items:center;gap:8px;font-weight:700}
+.turn-dot{width:10px;height:10px;border-radius:50%;border:2px solid #fff}
+.turn-dot.red{background:#ff3b30}
+.turn-dot.yellow{background:#ffcc02}
+.turn-right{font-size:12px;color:var(--muted);font-weight:600}
+.sheet-wrap{margin:12px 12px 0;background:linear-gradient(180deg,#d9eaf7 0%,#eef6ff 100%);border-radius:18px;padding:10px;border:1px solid #b9d2ea;position:relative;overflow:hidden}
+.sheet-label{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(15,30,46,.88);color:#fff;font-size:11px;font-weight:800;letter-spacing:.6px;padding:5px 10px;border-radius:999px;z-index:2}
+canvas{display:block;width:100%;height:auto;border-radius:12px;background:linear-gradient(180deg,#eaf4ff 0%,#d6e9f8 100%);touch-action:none}
+.controls{margin:12px 12px 0;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
+.ctrl-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.ctrl{ background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px}
+.ctrl-label{font-size:11px;font-weight:800;letter-spacing:.6px;color:var(--muted);text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+.ctrl-label b{color:#fff;font-size:13px}
+input[type=range]{width:100%;margin-top:8px;appearance:none;height:28px;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:8px;background:#0d213a;border-radius:999px;border:1px solid var(--line)}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:28px;height:28px;border-radius:50%;background:#fff;border:3px solid #2a7fff;margin-top:-11px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.power-track::-webkit-slider-runnable-track{background:linear-gradient(90deg,#2ecc71,#ffcc02,#ff3b30)}
+.curl-row{display:flex;gap:8px;margin-top:8px}
+.curl-btn{flex:1;height:44px;border-radius:10px;border:1px solid var(--line);background:#0d213a;color:#fff;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.curl-btn.active{background:#fff;color:#0f1e2e;border-color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.curl-btn.active.left{ background:#ff3b30;color:#fff;border-color:#ff3b30}
+.curl-btn.active.right{ background:#2a7fff;color:#fff;border-color:#2a7fff}
+.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.btn{height:52px;border-radius:14px;border:none;font-weight:900;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.2px}
+.btn:active{transform:scale(.98)}
+.btn-throw{background:linear-gradient(135deg,#ff3b30,#ff6a00);color:#fff;box-shadow:0 6px 16px rgba(255,59,48,.35)}
+.btn-throw:disabled{opacity:.45;filter:grayscale(.3)}
+.btn-sweep{background:#ffcc02;color:#1a1a1a;box-shadow:0 6px 16px rgba(255,204,2,.3);border:2px solid #ffcc02}
+.btn-sweep.active{background:#fff;color:#1a1a1a;animation:pulse 0.6s infinite alternate}
+.btn-sweep:disabled{opacity:.4}
+@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.02)}}
+.btn-ghost{background:transparent;border:1px solid var(--line);color:var(--muted);height:44px;font-size:13px}
+.btn-ghost:active{background:var(--card2)}
+.stones-bar{display:flex;gap:6px;align-items:center;justify-content:center;padding:8px 0 2px;flex-wrap:wrap}
+.stone-mini{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.9);display:grid;place-items:center;font-size:10px;font-weight:900;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.stone-mini.red{background:#ff3b30;color:#fff}
+.stone-mini.yellow{background:#ffcc02;color:#1a1a1a}
+.stone-mini.used{opacity:.25;filter:grayscale(.2)}
+.stone-mini.next{outline:2px solid #fff;outline-offset:2px;transform:scale(1.1)}
+.help{margin:12px 12px 0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.help h3{font-size:13px;margin-bottom:6px}
+.help p{font-size:12.5px;color:var(--muted);line-height:1.5}
+.sweep-hint{margin-top:10px;background:#0d213a;border:1px dashed #2a4a73;border-radius:10px;padding:10px;text-align:center;font-size:12px;color:var(--muted)}
+.sweep-hint b{color:#ffcc02}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#0d213a;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:10;display:none;max-width:90%;text-align:center}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;place-items:center;z-index:20;padding:16px}
+.modal.open{display:grid}
+.modal-card{background:#142a45;border:1px solid var(--line);border-radius:16px;padding:18px;max-width:400px;width:100%;text-align:center}
+.modal-card h2{font-size:18px}
+.modal-card p{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.5}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-badge">🥌</div>
+    <div>
+      <h1><span>CURLING</span> HOUSE</h1>
+      <div class="sub">Slide • Curl • Sweep • Score</div>
+    </div>
+  </div>
+  <button class="icon-btn" id="helpBtn" aria-label="Help">?</button>
+</header>
+
+<div class="score-wrap">
+  <div class="score-top">
+    <div class="team">
+      <div class="team-name">🔴 You</div>
+      <div class="team-score red" id="scoreYou">0</div>
+    </div>
+    <div class="center-info">
+      <div class="end-badge"><span class="dot"></span> END <span id="endNum">1</span>/4</div>
+      <div class="hammer" id="hammerText">Hammer: <b>YOU</b></div>
+      <div class="hammer" id="careerLine">Series: 0W · 0L · 0T</div>
+    </div>
+    <div class="team">
+      <div class="team-name">🟡 CPU</div>
+      <div class="team-score yellow" id="scoreCpu">0</div>
+    </div>
+  </div>
+  <div class="turn-bar">
+    <div class="turn-left"><span class="turn-dot red" id="turnDot"></span> <span id="turnText">Your turn — set aim & throw</span></div>
+    <div class="turn-right" id="stonesLeft">8 stones left</div>
+  </div>
+</div>
+
+<div class="sheet-wrap">
+  <div class="sheet-label" id="sheetLabel">HOUSE • SWEEP TO STRETCH</div>
+  <canvas id="sheet" width="360" height="560"></canvas>
+  <div class="stones-bar" id="stonesBar"></div>
+</div>
+
+<div class="controls">
+  <div class="ctrl-row">
+    <div class="ctrl">
+      <div class="ctrl-label">Aim Angle <b id="angleVal">0°</b></div>
+      <input type="range" id="angle" min="-30" max="30" value="0" step="1">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px"><span>◀ Left</span><span>Right ▶</span></div>
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-label">Power <b id="powerVal">62%</b></div>
+      <input type="range" id="power" class="power-track" min="15" max="100" value="62" step="1">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px"><span>Soft</span><span>Hard</span></div>
+    </div>
+  </div>
+
+  <div class="ctrl">
+    <div class="ctrl-label">Curl (late break) <b id="curlVal">Straight</b></div>
+    <div class="curl-row">
+      <button class="curl-btn" data-curl="-1" id="curlLeft">↩ Left</button>
+      <button class="curl-btn active" data-curl="0" id="curlMid">— Straight</button>
+      <button class="curl-btn" data-curl="1" id="curlRight">Right ↪</button>
+    </div>
+  </div>
+
+  <div class="action-grid">
+    <button class="btn btn-throw" id="throwBtn">🥌 THROW</button>
+    <button class="btn btn-sweep" id="sweepBtn">🧹 HOLD TO SWEEP</button>
+  </div>
+  <div class="sweep-hint">💡 <b>Sweep while stone slides</b> to reduce friction & stretch 15-25% farther. Works on your stones!</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+    <button class="btn btn-ghost" id="resetBtn">↺ New Match</button>
+    <button class="btn btn-ghost" id="nextEndBtn" style="display:none">Next End →</button>
+  </div>
+</div>
+
+<div class="help" id="helpBox" style="display:none">
+  <h3>How to play</h3>
+  <p>• Set <b>Aim</b> (-30° to +30°), <b>Power</b> and <b>Curl</b> then tap <b>THROW</b>.<br>
+  • Curl makes the stone break left/right late in its slide — great for going around guards.<br>
+  • <b>Hold SWEEP</b> while your stone is moving to make it glide farther and straighter.<br>
+  • Each end: 8 stones total (4 per team, alternating). Closest to the button scores. First to win most ends wins the match (4 ends).</p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal" id="endModal">
+  <div class="modal-card">
+    <h2 id="modalTitle">End 1 — You score 2!</h2>
+    <p id="modalText">Two of your stones are closer than CPU's best. Hammer goes to CPU next end.</p>
+    <button class="btn btn-throw" style="width:100%;margin-top:14px" id="modalNext">Continue →</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('sheet');
+const ctx = canvas.getContext('2d');
+const angleInput = document.getElementById('angle');
+const powerInput = document.getElementById('power');
+const angleVal = document.getElementById('angleVal');
+const powerVal = document.getElementById('powerVal');
+const curlVal = document.getElementById('curlVal');
+const throwBtn = document.getElementById('throwBtn');
+const sweepBtn = document.getElementById('sweepBtn');
+const turnDot = document.getElementById('turnDot');
+const turnText = document.getElementById('turnText');
+const stonesLeftEl = document.getElementById('stonesLeft');
+const endNumEl = document.getElementById('endNum');
+const scoreYouEl = document.getElementById('scoreYou');
+const scoreCpuEl = document.getElementById('scoreCpu');
+const hammerText = document.getElementById('hammerText');
+const careerLine = document.getElementById('careerLine');
+const CAREER_KEY = 'curlingHouseCareer';
+let career = {w:0,l:0,t:0};
+try{const c=JSON.parse(localStorage.getItem(CAREER_KEY)||'null');if(c&&typeof c==='object')career={w:c.w|0,l:c.l|0,t:c.t|0};}catch(e){}
+function renderCareer(){if(careerLine)careerLine.textContent=`Series: ${career.w}W · ${career.l}L · ${career.t}T`;}
+function saveCareer(){try{localStorage.setItem(CAREER_KEY,JSON.stringify(career));}catch(e){}renderCareer();}
+const stonesBar = document.getElementById('stonesBar');
+const toastEl = document.getElementById('toast');
+const endModal = document.getElementById('endModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalText = document.getElementById('modalText');
+const sheetLabel = document.getElementById('sheetLabel');
+
+let W=360,H=560, dpr=1;
+let curl = 0;
+let game = {
+  end:1, totalEnds:4,
+  scores:{you:0,cpu:0},
+  hammer:'you', // who throws last
+  turn:'you', // whose turn now
+  stones:[], // all stones on ice
+  throwsThisEnd:0, // 0..8
+  order:[], // sequence of teams for this end
+  isSliding:false,
+  sweeping:false,
+  endOver:false,
+  matchOver:false
+};
+
+const STONE_R = 14;
+const HOUSE = {x:180, y:110, r1:62, r2:42, r3:22, rButton:10};
+
+function resizeCanvas(){
+  const wrap = document.querySelector('.sheet-wrap');
+  const cssW = Math.min(wrap.clientWidth - 20, 428);
+  W = Math.round(cssW);
+  H = Math.round(W * 1.55);
+  dpr = Math.min(window.devicePixelRatio||1, 2);
+  canvas.style.width = W+'px';
+  canvas.style.height = H+'px';
+  canvas.width = Math.round(W*dpr);
+  canvas.height = Math.round(H*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  HOUSE.x = W/2;
+  // keep house y proportional
+  HOUSE.y = 110 * (H/560);
+  draw();
+}
+window.addEventListener('resize', resizeCanvas);
+
+function showToast(msg, ms=2200){
+  toastEl.textContent = msg;
+  toastEl.style.display='block';
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=>toastEl.style.display='none', ms);
+}
+
+function buildOrder(){
+  // Alternate turns, hammer throws last. So if hammer is 'you', order is cpu,you,cpu,you... you last
+  const hammer = game.hammer;
+  const other = hammer==='you' ? 'cpu' : 'you';
+  game.order = [];
+  for(let i=0;i<8;i++){
+    // even indices = other, odd = hammer, but last must be hammer
+    game.order.push(i%2===0 ? other : hammer);
+    // For 8 stones, this gives other,hammer,other,hammer... hammer last if we start with other
+    // Need to ensure correct: if hammer is you, sequence: cpu,you,cpu,you,cpu,you,cpu,you
+  }
+  // Adjust if hammer is cpu, sequence: you,cpu,you,cpu,you,cpu,you,cpu
+}
+
+function updateUI(){
+  endNumEl.textContent = game.end;
+  scoreYouEl.textContent = game.scores.you;
+  scoreCpuEl.textContent = game.scores.cpu;
+  hammerText.innerHTML = `Hammer: <b>${game.hammer==='you'?'YOU':'CPU'}</b>`;
+  renderCareer();
+  const left = 8 - game.throwsThisEnd;
+  stonesLeftEl.textContent = left + ' stones left';
+  if(game.matchOver){
+    turnText.textContent = 'Match over — start new match';
+    turnDot.className='turn-dot red';
+    throwBtn.disabled=true;
+    sweepBtn.disabled=true;
+    return;
+  }
+  if(game.endOver){
+    turnText.textContent = 'End finished — tap Next End';
+    throwBtn.disabled=true;
+    sweepBtn.disabled=true;
+    document.getElementById('nextEndBtn').style.display='block';
+    return;
+  }
+  document.getElementById('nextEndBtn').style.display='none';
+  if(game.isSliding){
+    turnText.textContent = game.sweeping ? '🧹 Sweeping! Stretching slide…' : 'Stone sliding… hold SWEEP!';
+    throwBtn.disabled=true;
+    sweepBtn.disabled=false;
+    sheetLabel.textContent = game.sweeping ? '🧹 SWEEPING — GLIDING FARTHER' : 'HOLD SWEEP TO STRETCH';
+    sheetLabel.style.background = game.sweeping ? '#ffcc02' : 'rgba(15,30,46,.88)';
+    sheetLabel.style.color = game.sweeping ? '#1a1a1a' : '#fff';
+  } else {
+    const isYou = game.turn==='you';
+    turnDot.className = 'turn-dot ' + (isYou?'red':'yellow');
+    turnText.textContent = isYou ? 'Your turn — set aim & throw' : 'CPU thinking…';
+    throwBtn.disabled = !isYou || game.endOver;
+    sweepBtn.disabled = true;
+    sheetLabel.textContent = isYou ? 'YOUR SHOT • AIM & THROW' : 'CPU SHOT';
+    sheetLabel.style.background='rgba(15,30,46,.88)';
+    sheetLabel.style.color='#fff';
+  }
+  // stones bar
+  stonesBar.innerHTML='';
+  for(let i=0;i<8;i++){
+    const team = game.order[i];
+    const used = i < game.throwsThisEnd;
+    const isNext = i===game.throwsThisEnd && !game.endOver;
+    const el=document.createElement('div');
+    el.className='stone-mini '+(team==='you'?'red':'yellow')+(used?' used':'')+(isNext?' next':'');
+    el.textContent = team==='you'?'Y':'C';
+    el.title = team;
+    stonesBar.appendChild(el);
+  }
+  // curl label
+  curlVal.textContent = curl===-1?'Left Hook':curl===1?'Right Hook':'Straight';
+}
+
+function resetMatch(){
+  game.end=1;
+  game.scores={you:0,cpu:0};
+  game.hammer='you';
+  game.matchOver=false;
+  startEnd();
+  showToast('New match — you have hammer first end!');
+}
+function startEnd(){
+  game.stones=[];
+  game.throwsThisEnd=0;
+  game.isSliding=false;
+  game.sweeping=false;
+  game.endOver=false;
+  buildOrder();
+  game.turn = game.order[0];
+  updateUI();
+  draw();
+  if(game.turn==='cpu') setTimeout(cpuThrow, 900);
+}
+
+function getHackPos(){
+  return {x:W/2, y:H-38};
+}
+
+function throwStone(team, angleDeg, power, curlVal){
+  const hack = getHackPos();
+  const rad = angleDeg * Math.PI/180;
+  // power 15-100 maps to speed 3.5 to 9.5
+  const speed = 3.2 + (power/100)*6.8;
+  const vx = Math.sin(rad) * speed;
+  const vy = -Math.cos(rad) * speed;
+  const stone = {
+    x:hack.x, y:hack.y,
+    vx, vy,
+    curl: curlVal, // -1,0,1
+    team,
+    moving:true,
+    speed0:speed,
+    dist:0
+  };
+  game.stones.push(stone);
+  game.isSliding=true;
+  game.throwsThisEnd++;
+  updateUI();
+}
+
+function cpuThrow(){
+  if(game.endOver || game.matchOver || game.isSliding) return;
+  // AI: aim toward button with error, power tuned to reach house
+  // Add some strategy: if opponent has stone close, try to hit or draw
+  const targetX = HOUSE.x + (Math.random()-0.5)*40;
+  const hack = getHackPos();
+  const dx = targetX - hack.x;
+  // angle to reach targetX at house distance
+  const distY = hack.y - HOUSE.y;
+  // approximate angle = atan(dx/distY)
+  let angle = Math.atan2(dx, distY) * 180/Math.PI;
+  angle += (Math.random()-0.5)*10; // error
+  angle = Math.max(-30, Math.min(30, angle));
+  let power = 58 + Math.random()*22; // 58-80
+  // sometimes CPU goes hard to hit
+  if(Math.random()<0.25 && game.stones.length>2) power = 78 + Math.random()*18;
+  let c = 0;
+  if(Math.random()<0.5) c = Math.random()<0.5 ? -1 : 1;
+  if(Math.random()<0.3) c=0;
+  game.turn='cpu';
+  updateUI();
+  throwStone('cpu', angle, power, c);
+  showToast('CPU throws — watch the curl!');
+}
+
+function scoreEnd(){
+  if(game.stones.length===0){
+    return {winner:null, points:0, details:'No stones'};
+  }
+  // distance to button
+  const withDist = game.stones.map(s=>{
+    const dx=s.x-HOUSE.x, dy=s.y-HOUSE.y;
+    return {...s, d: Math.hypot(dx,dy)};
+  }).sort((a,b)=>a.d-b.d);
+  // Only stones inside house count? In curling, only stones in house (within 12ft). We'll use r1 (62) as house radius
+  const inHouse = withDist.filter(s=> s.d <= HOUSE.r1 + STONE_R);
+  if(inHouse.length===0){
+    return {winner:null, points:0, details:'No stones in house — blank end'};
+  }
+  const closest = inHouse[0];
+  const winner = closest.team;
+  const loser = winner==='you'?'cpu':'you';
+  const loserClosest = inHouse.find(s=> s.team===loser);
+  const loserDist = loserClosest ? loserClosest.d : Infinity;
+  let points=0;
+  for(const s of inHouse){
+    if(s.team===winner && s.d < loserDist) points++;
+    else if(s.team===winner && loserDist===Infinity) points++;
+    else break; // sorted, so once we hit loser, stop counting beyond? Actually need to count all winner stones closer than loser
+    // But since sorted, winner stones beyond loserDist should not count
+    if(s.team!==winner) break;
+  }
+  // More accurate: count winner stones with d < loserDist
+  points = inHouse.filter(s=> s.team===winner && s.d < loserDist).length;
+  return {winner, points, details: `${points} point(s)`, sorted:withDist};
+}
+
+function checkEndFinished(){
+  if(game.throwsThisEnd>=8){
+    const result = scoreEnd();
+    game.endOver=true;
+    let title='', text='';
+    if(result.winner===null){
+      title=`End ${game.end} — Blank!`;
+      text=`No stones in the house. Hammer stays with ${game.hammer==='you'?'YOU':'CPU'}.`;
+      // hammer stays
+    } else if(result.winner==='you'){
+      game.scores.you += result.points;
+      title=`End ${game.end} — You score ${result.points}! 🥌`;
+      text=`${result.points} of your stone(s) closest to the button. Hammer goes to CPU.`;
+      game.hammer='cpu';
+    } else {
+      game.scores.cpu += result.points;
+      title=`End ${game.end} — CPU scores ${result.points}`;
+      text=`CPU's stone(s) closer this end. Hammer goes to YOU.`;
+      game.hammer='you';
+    }
+    updateUI();
+    // check match over
+    if(game.end >= game.totalEnds){
+      game.matchOver=true;
+      let matchWinner = game.scores.you > game.scores.cpu ? 'YOU WIN THE MATCH! 🏆' : game.scores.you < game.scores.cpu ? 'CPU WINS THE MATCH' : 'MATCH TIED!';
+      title = `Match Over — ${matchWinner}`;
+      text = `Final: You ${game.scores.you} – ${game.scores.cpu} CPU. ${game.scores.you>game.scores.cpu?'Amazing curling!':'Try again — master the sweep!'}`;
+      if(game.scores.you>game.scores.cpu)career.w++;else if(game.scores.you<game.scores.cpu)career.l++;else career.t++;
+      saveCareer();
+      text += ` Series record: ${career.w}W · ${career.l}L · ${career.t}T.`;
+      modalTitle.textContent = title;
+      modalText.textContent = text;
+      document.getElementById('modalNext').textContent='New Match';
+      endModal.classList.add('open');
+    } else {
+      modalTitle.textContent = title;
+      modalText.textContent = text;
+      document.getElementById('modalNext').textContent='Next End →';
+      endModal.classList.add('open');
+    }
+    // also toast
+    showToast(title, 3000);
+  } else {
+    // next turn
+    game.turn = game.order[game.throwsThisEnd];
+    updateUI();
+    if(game.turn==='cpu'){
+      setTimeout(cpuThrow, 1100);
+    }
+  }
+}
+
+// Physics loop
+function updatePhysics(){
+  if(!game.isSliding) return;
+  let anyMoving=false;
+  const frictionNormal = 0.985;
+  const frictionSweep = 0.9925; // less friction when sweeping
+  const isSweeping = game.sweeping;
+
+  for(const s of game.stones){
+    if(!s.moving) continue;
+    const speed = Math.hypot(s.vx, s.vy);
+    if(speed < 0.12){
+      s.vx=0; s.vy=0; s.moving=false;
+      continue;
+    }
+    anyMoving=true;
+    // friction
+    const f = isSweeping && s.team==='you' ? frictionSweep : frictionNormal;
+    // sweeping also slightly straightens curl
+    let curlEffect = s.curl * 0.055 * (speed/5);
+    // curl increases as stone slows (late break)
+    const slowFactor = 1 - (speed / (s.speed0||6));
+    curlEffect *= (0.6 + slowFactor*1.2);
+    if(isSweeping && s.team==='you'){
+      curlEffect *= 0.55; // sweeping reduces curl
+    }
+    s.vx += curlEffect;
+    // apply friction
+    s.vx *= f;
+    s.vy *= f;
+    // move
+    s.x += s.vx;
+    s.y += s.vy;
+
+    // wall collisions (side boards)
+    if(s.x - STONE_R < 6){
+      s.x = 6 + STONE_R;
+      s.vx *= -0.6;
+    }
+    if(s.x + STONE_R > W-6){
+      s.x = W-6 - STONE_R;
+      s.vx *= -0.6;
+    }
+    // top/bottom out of bounds - stop and stay
+    if(s.y - STONE_R < 4){
+      s.y = 4 + STONE_R;
+      s.vy *= -0.4;
+      s.vx *= 0.7;
+    }
+    if(s.y + STONE_R > H-4){
+      s.y = H-4 - STONE_R;
+      s.vy *= -0.4;
+      s.vx *= 0.7;
+    }
+  }
+
+  // stone-stone collisions
+  for(let i=0;i<game.stones.length;i++){
+    for(let j=i+1;j<game.stones.length;j++){
+      const a=game.stones[i], b=game.stones[j];
+      const dx=b.x-a.x, dy=b.y-a.y;
+      const dist=Math.hypot(dx,dy);
+      const minDist=STONE_R*2;
+      if(dist < minDist && dist>0.1){
+        // push apart
+        const overlap = (minDist - dist)/2;
+        const nx=dx/dist, ny=dy/dist;
+        a.x -= nx*overlap; a.y -= ny*overlap;
+        b.x += nx*overlap; b.y += ny*overlap;
+        // elastic collision along normal
+        const dvx=b.vx-a.vx, dvy=b.vy-a.vy;
+        const dot = dvx*nx + dvy*ny;
+        if(dot < 0){
+          // only if moving toward each other
+          const impulse = dot * 0.85;
+          a.vx += impulse*nx; a.vy += impulse*ny;
+          b.vx -= impulse*nx; b.vy -= impulse*ny;
+          // ensure both are marked moving if impulse significant
+          if(Math.abs(impulse)>0.1){ a.moving=true; b.moving=true; }
+        }
+      }
+    }
+  }
+
+  if(!anyMoving){
+    // all stopped
+    game.isSliding=false;
+    game.sweeping=false;
+    sweepBtn.classList.remove('active');
+    updateUI();
+    draw();
+    setTimeout(checkEndFinished, 400);
+  }
+}
+
+function draw(){
+  // clear
+  ctx.clearRect(0,0,W,H);
+  // ice sheet background with lines
+  // side gutters
+  ctx.fillStyle='#b9d2ea';
+  ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#eaf4ff';
+  ctx.fillRect(6,4,W-12,H-8);
+  // center line
+  ctx.strokeStyle='rgba(42,74,115,.18)';
+  ctx.lineWidth=1;
+  ctx.setLineDash([6,6]);
+  ctx.beginPath();
+  ctx.moveTo(W/2, 4);
+  ctx.lineTo(W/2, H-4);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // hog lines
+  const hogTop = HOUSE.y + 90;
+  const hogBottom = H - 120;
+  ctx.strokeStyle='rgba(255,59,48,.55)';
+  ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(6,hogTop); ctx.lineTo(W-6,hogTop); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(6,hogBottom); ctx.lineTo(W-6,hogBottom); ctx.stroke();
+  ctx.fillStyle='rgba(255,59,48,.55)';
+  ctx.font='700 9px system-ui';
+  ctx.textAlign='center';
+  ctx.fillText('HOG LINE', W/2, hogTop-6);
+  // tee line through house
+  ctx.strokeStyle='rgba(42,74,115,.25)';
+  ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(6, HOUSE.y); ctx.lineTo(W-6, HOUSE.y); ctx.stroke();
+  // house rings
+  // outer 12ft
+  ctx.beginPath(); ctx.arc(HOUSE.x, HOUSE.y, HOUSE.r1, 0, Math.PI*2);
+  ctx.fillStyle='#1e4a8a'; ctx.fill();
+  ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.beginPath(); ctx.arc(HOUSE.x, HOUSE.y, HOUSE.r2, 0, Math.PI*2);
+  ctx.fillStyle='#fff'; ctx.fill();
+  ctx.beginPath(); ctx.arc(HOUSE.x, HOUSE.y, HOUSE.r3, 0, Math.PI*2);
+  ctx.fillStyle='#ff3b30'; ctx.fill();
+  ctx.beginPath(); ctx.arc(HOUSE.x, HOUSE.y, HOUSE.rButton, 0, Math.PI*2);
+  ctx.fillStyle='#fff'; ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,.15)'; ctx.lineWidth=1; ctx.stroke();
+  // button dot
+  ctx.beginPath(); ctx.arc(HOUSE.x, HOUSE.y, 2, 0, Math.PI*2); ctx.fillStyle='#0f1e2e'; ctx.fill();
+  // hack at bottom
+  const hack = getHackPos();
+  ctx.fillStyle='#0f1e2e';
+  ctx.beginPath(); ctx.arc(hack.x, hack.y, 18, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#ff3b30';
+  ctx.beginPath(); ctx.arc(hack.x-7, hack.y, 4, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(hack.x+7, hack.y, 4, 0, Math.PI*2); ctx.fill();
+  // aim line preview if not sliding and it's player's turn
+  if(!game.isSliding && game.turn==='you' && !game.endOver && !game.matchOver){
+    const ang = parseFloat(angleInput.value);
+    const rad = ang*Math.PI/180;
+    const len = 140;
+    const ex = hack.x + Math.sin(rad)*len;
+    const ey = hack.y - Math.cos(rad)*len;
+    ctx.strokeStyle='rgba(255,255,255,.9)';
+    ctx.lineWidth=2;
+    ctx.setLineDash([8,6]);
+    ctx.beginPath(); ctx.moveTo(hack.x, hack.y); ctx.lineTo(ex,ey); ctx.stroke();
+    ctx.setLineDash([]);
+    // curl indicator
+    if(curl!==0){
+      ctx.strokeStyle= curl===-1 ? '#ff3b30' : '#2a7fff';
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      const midX = (hack.x+ex)/2, midY=(hack.y+ey)/2;
+      ctx.moveTo(midX, midY);
+      ctx.quadraticCurveTo(midX + curl*28, midY - 18, ex + curl*10, ey);
+      ctx.stroke();
+      ctx.fillStyle=ctx.strokeStyle;
+      ctx.beginPath(); ctx.arc(ex + curl*10, ey, 4,0,Math.PI*2); ctx.fill();
+    }
+    // power preview dot
+    const p = parseFloat(powerInput.value)/100;
+    const px = hack.x + Math.sin(rad)* (40 + p*90);
+    const py = hack.y - Math.cos(rad)* (40 + p*90);
+    ctx.fillStyle='rgba(255,204,2,.95)';
+    ctx.beginPath(); ctx.arc(px,py,5,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+  }
+
+  // stones
+  for(const s of game.stones){
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,.18)';
+    ctx.beginPath(); ctx.ellipse(s.x, s.y+3, STONE_R+1, STONE_R*0.6, 0,0,Math.PI*2); ctx.fill();
+    // stone body
+    const isYou = s.team==='you';
+    ctx.beginPath(); ctx.arc(s.x, s.y, STONE_R, 0, Math.PI*2);
+    ctx.fillStyle= isYou ? '#ff3b30' : '#ffcc02';
+    ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,.25)'; ctx.lineWidth=1.5; ctx.stroke();
+    // inner granite
+    ctx.beginPath(); ctx.arc(s.x, s.y, STONE_R-3, 0, Math.PI*2);
+    ctx.fillStyle= isYou ? '#ff6b5a' : '#ffe566';
+    ctx.fill();
+    // handle
+    ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, Math.PI*2);
+    ctx.fillStyle= isYou ? '#7a0a00' : '#8a6d00';
+    ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
+    // moving indicator
+    if(s.moving){
+      ctx.strokeStyle='rgba(255,255,255,.85)';
+      ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(s.x, s.y, STONE_R+4, 0, Math.PI*2); ctx.stroke();
+    }
+  }
+
+  // sweeping effect
+  if(game.isSliding && game.sweeping){
+    const movingStone = [...game.stones].reverse().find(s=>s.moving);
+    if(movingStone){
+      ctx.fillStyle='rgba(255,255,255,.35)';
+      for(let i=0;i<3;i++){
+        const ox = (Math.random()-0.5)*18;
+        const oy = (Math.random()-0.5)*10;
+        ctx.beginPath(); ctx.ellipse(movingStone.x+ox, movingStone.y+oy+8, 10, 4, 0,0,Math.PI*2); ctx.fill();
+      }
+      ctx.font='700 10px system-ui';
+      ctx.fillStyle='#ffcc02';
+      ctx.textAlign='center';
+      ctx.fillText('SWEEPING!', movingStone.x, movingStone.y - 22);
+    }
+  }
+}
+
+// controls events
+angleInput.addEventListener('input', ()=>{
+  angleVal.textContent = angleInput.value + '°';
+  draw();
+});
+powerInput.addEventListener('input', ()=>{
+  powerVal.textContent = powerInput.value + '%';
+  draw();
+});
+document.querySelectorAll('.curl-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.curl-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    curl = parseInt(btn.dataset.curl,10);
+    // keep left/right color
+    document.querySelectorAll('.curl-btn').forEach(b=>{
+      b.classList.remove('left','right');
+    });
+    if(curl===-1) btn.classList.add('left');
+    if(curl===1) btn.classList.add('right');
+    updateUI();
+    draw();
+  });
+});
+
+throwBtn.addEventListener('click', ()=>{
+  if(game.isSliding || game.endOver || game.matchOver) return;
+  if(game.turn!=='you'){
+    showToast('Wait for CPU to finish!');
+    return;
+  }
+  const ang = parseFloat(angleInput.value);
+  const pow = parseFloat(powerInput.value);
+  throwStone('you', ang, pow, curl);
+  // haptic
+  if(navigator.vibrate) navigator.vibrate(30);
+});
+
+function setSweeping(on){
+  if(!game.isSliding) return;
+  // only allow sweeping your stones (or any if you want)
+  const hasYourMoving = game.stones.some(s=> s.moving && s.team==='you');
+  // allow sweeping even if CPU stone moving? For fun, allow always but effect only on your stones
+  game.sweeping = on;
+  sweepBtn.classList.toggle('active', on);
+  updateUI();
+}
+sweepBtn.addEventListener('touchstart', e=>{e.preventDefault(); setSweeping(true);});
+sweepBtn.addEventListener('touchend', e=>{e.preventDefault(); setSweeping(false);});
+sweepBtn.addEventListener('mousedown', ()=> setSweeping(true));
+sweepBtn.addEventListener('mouseup', ()=> setSweeping(false));
+sweepBtn.addEventListener('mouseleave', ()=> setSweeping(false));
+
+// keyboard sweep (space)
+window.addEventListener('keydown', e=>{
+  if(e.code==='Space'){ e.preventDefault(); setSweeping(true); }
+});
+window.addEventListener('keyup', e=>{
+  if(e.code==='Space') setSweeping(false);
+});
+
+document.getElementById('resetBtn').addEventListener('click', resetMatch);
+document.getElementById('nextEndBtn').addEventListener('click', ()=>{
+  if(game.matchOver){ resetMatch(); return; }
+  game.end++;
+  startEnd();
+  endModal.classList.remove('open');
+});
+document.getElementById('modalNext').addEventListener('click', ()=>{
+  endModal.classList.remove('open');
+  if(game.matchOver){
+    resetMatch();
+  } else {
+    game.end++;
+    startEnd();
+  }
+});
+document.getElementById('helpBtn').addEventListener('click', ()=>{
+  const box=document.getElementById('helpBox');
+  box.style.display = box.style.display==='none' ? 'block' : 'none';
+});
+
+// init
+resizeCanvas();
+buildOrder();
+updateUI();
+draw();
+
+// game loop
+function loop(){
+  updatePhysics();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+
+// prevent page scroll on canvas touch
+canvas.addEventListener('touchmove', e=> e.preventDefault(), {passive:false});
+</script>
+</body>
+</html>
+

@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Gravity Slingshot: Comet Run</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:#02040a;color:#e6f0ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif;overflow-x:hidden}
+#app{width:100%;max-width:428px;min-width:360px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;background:radial-gradient(ellipse at 50% 0%, #0f2a4a 0%, #071428 45%, #02040a 100%);overflow:hidden;position:relative}
+header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:rgba(0,0,0,0.38);backdrop-filter:blur(10px);border-bottom:1px solid rgba(80,180,255,0.18);gap:8px}
+.hud-left,.hud-right{display:flex;flex-direction:column;gap:2px}
+.hud-center{text-align:center}
+.hud-label{font-size:11px;letter-spacing:0.8px;color:#8ab4d6;text-transform:uppercase;font-weight:700}
+.hud-value{font-size:16px;font-weight:800;color:#7ee8ff;line-height:1}
+.hud-value.score{color:#fff;font-size:18px}
+.lives{display:flex;gap:5px;align-items:center;margin-top:2px}
+.life{width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 30% 30%, #fff, #7ee8ff 35%, #0066ff 100%);box-shadow:0 0 8px rgba(0,229,255,0.9);transition:all .3s}
+.life.lost{background:rgba(255,255,255,0.12);box-shadow:none;transform:scale(0.8)}
+.chain-badge{display:inline-block;background:linear-gradient(180deg,#ffd700,#ff8a00);color:#1a0f00;font-size:12px;font-weight:900;padding:3px 8px;border-radius:20px;box-shadow:0 0 10px rgba(255,215,0,0.6);margin-top:4px}
+#canvasWrap{position:relative;flex:1;display:flex;align-items:center;justify-content:center;background:#02040a;overflow:hidden;min-height:420px}
+canvas{width:100%;height:auto;display:block;max-height:62vh;touch-action:none;background:transparent}
+#popups{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.popup{position:absolute;font-weight:900;font-size:16px;color:#fff;text-shadow:0 0 10px #00e5ff, 0 2px 4px rgba(0,0,0,0.8);animation:pop 0.95s cubic-bezier(0.2,0.8,0.2,1) forwards;white-space:nowrap;transform:translate(-50%,-50%)}
+@keyframes pop{0%{transform:translate(-50%,-50%) scale(0.7);opacity:1}20%{transform:translate(-50%,-60%) scale(1.05);opacity:1}100%{transform:translate(-50%,-90px) scale(1);opacity:0}}
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(2,6,16,0.82);backdrop-filter:blur(6px);padding:16px;z-index:10}
+.card{background:linear-gradient(180deg,#0e2a4a 0%,#0a1e36 100%);border:1px solid rgba(100,200,255,0.28);border-radius:18px;padding:18px;width:100%;max-width:340px;text-align:center;box-shadow:0 12px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06) inset}
+.card h1{margin:0 0 6px;font-size:22px;color:#7ee8ff;letter-spacing:0.3px;line-height:1.1}
+.card h2{margin:0 0 8px;font-size:18px;color:#fff}
+.card p{font-size:14px;line-height:1.45;color:#cfe8ff;margin:7px 0}
+.card .sub{font-size:12px;color:#8ab4d6}
+.badge{display:inline-block;background:rgba(0,229,255,0.15);border:1px solid rgba(0,229,255,0.3);color:#7ee8ff;font-size:11px;font-weight:800;letter-spacing:0.6px;padding:4px 10px;border-radius:20px;margin-bottom:8px}
+.btn{appearance:none;border:none;border-radius:12px;padding:14px 18px;font-size:16px;font-weight:800;min-height:48px;cursor:pointer;width:100%;transition:transform .08s, filter .15s}
+.btn:active{transform:scale(0.98)}
+.btn-primary{background:linear-gradient(180deg,#00d4ff,#0088ff);color:#fff;box-shadow:0 6px 16px rgba(0,140,255,0.4);margin-top:10px}
+.btn-secondary{background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.18);margin-top:8px}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.mini-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0}
+.mini-stat{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:8px}
+.mini-stat b{display:block;font-size:16px;color:#fff}
+.mini-stat span{font-size:11px;color:#8ab4d6;text-transform:uppercase;letter-spacing:0.5px;font-weight:700}
+#controls{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:8px;padding:10px 10px 12px;background:rgba(0,0,0,0.42);border-top:1px solid rgba(80,180,255,0.14);align-items:center}
+.ctrl{appearance:none;border:none;border-radius:14px;min-height:62px;font-size:14px;font-weight:900;letter-spacing:0.6px;color:#fff;background:linear-gradient(180deg,rgba(28,58,90,0.95),rgba(12,32,56,0.95));border:1px solid rgba(100,200,255,0.22);touch-action:none;user-select:none;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 10px rgba(0,0,0,0.3)}
+.ctrl:active{transform:scale(0.96);filter:brightness(1.15)}
+.ctrl.boost{background:linear-gradient(180deg,#ff8a00,#ff3b00);border-color:rgba(255,140,0,0.45);box-shadow:0 4px 14px rgba(255,80,0,0.35);font-size:15px}
+.ctrl span{font-size:18px}
+#aimHint{text-align:center;font-size:12px;font-weight:700;letter-spacing:0.4px;color:#8ab4d6;padding:7px 10px;background:rgba(0,0,0,0.32);border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center}
+#aimHint b{color:#7ee8ff}
+.dot{width:8px;height:8px;border-radius:50%;background:#00e5ff;box-shadow:0 0 8px #00e5ff;display:inline-block;animation:pulseDot 1.2s infinite}
+@keyframes pulseDot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:0.7}}
+.hidden{display:none !important}
+.how-list{text-align:left;background:rgba(255,255,255,0.05);border-radius:12px;padding:10px 12px;margin:10px 0;border:1px solid rgba(255,255,255,0.06)}
+.how-list li{font-size:13px;line-height:1.4;color:#d6eaff;margin:6px 0;list-style:none;display:flex;gap:8px}
+.how-list li i{font-style:normal;min-width:22px;height:22px;background:rgba(0,229,255,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="hud-left">
+      <div class="hud-label">Score</div>
+      <div class="hud-value score" id="scoreEl">0</div>
+      <div class="lives" id="livesEl"><div class="life"></div><div class="life"></div><div class="life"></div></div>
+    </div>
+    <div class="hud-center">
+      <div class="hud-label">Level</div>
+      <div class="hud-value" id="levelEl">1 — Drift</div>
+      <div id="chainEl"></div>
+    </div>
+    <div class="hud-right" style="text-align:right">
+      <div class="hud-label">Best</div>
+      <div class="hud-value" id="bestEl">0</div>
+      <div class="hud-label" style="margin-top:4px;font-size:10px">Gates <b id="gatesEl" style="color:#fff;font-size:12px">0/3</b></div>
+    </div>
+  </header>
+
+  <div id="canvasWrap">
+    <canvas id="c" width="360" height="640"></canvas>
+    <div id="popups"></div>
+    <div id="overlay">
+      <!-- Start Card -->
+      <div class="card" id="startCard">
+        <div class="badge">● GRAVITY SLINGSHOT</div>
+        <h1>Comet Run</h1>
+        <p>Slingshot your glowing comet past heavy planets and through pulsing gates. Chain gates for <b style="color:#ffd700">x2 → x5</b> bonuses!</p>
+        <div class="mini-stats">
+          <div class="mini-stat"><b>3</b><span>Lives</span></div>
+          <div class="mini-stat"><b>∞</b><span>Levels</span></div>
+          <div class="mini-stat"><b>x5</b><span>Max Chain</span></div>
+        </div>
+        <button class="btn btn-primary" id="playBtn">▶ PLAY — SLINGSHOT</button>
+        <button class="btn btn-secondary" id="howBtn">How to Play</button>
+        <p class="sub">Drag back on the comet to aim • Release to launch • Steer with LEFT / RIGHT • BOOST to thrust</p>
+      </div>
+      <!-- How Card -->
+      <div class="card hidden" id="howCard">
+        <h2>How to Fly</h2>
+        <ul class="how-list">
+          <li><i>1</i><span><b>Drag back</b> on the comet — pull opposite to where you want to go, like a slingshot. Longer pull = more power.</span></li>
+          <li><i>2</i><span><b>Release</b> to launch. Planets pull you — use gravity to curve around them.</span></li>
+          <li><i>3</i><span><b>Hold LEFT / RIGHT</b> to steer sideways, <b>BOOST</b> to thrust forward. Chain gates without missing for huge bonuses.</span></li>
+          <li><i>4</i><span>Each level adds planets & stronger pull. Crash = lose a life and respawn. 3 lives total.</span></li>
+        </ul>
+        <button class="btn btn-primary" id="howBackBtn">Got it — Play</button>
+      </div>
+      <!-- Pause Card -->
+      <div class="card hidden" id="pauseCard">
+        <h2>⏸ Paused</h2>
+        <p>Gravity is waiting.</p>
+        <button class="btn btn-primary" id="resumeBtn">Resume</button>
+        <button class="btn btn-secondary" id="restartBtn1">Restart Level</button>
+      </div>
+      <!-- Level Card -->
+      <div class="card hidden" id="levelCard">
+        <div class="badge" id="levelBadge">LEVEL 2</div>
+        <h2 id="levelTitle">Entering Orbit</h2>
+        <p id="levelDesc">More planets. Stronger pull. Stay sharp.</p>
+        <div class="mini-stats">
+          <div class="mini-stat"><b id="lcPlanets">4</b><span>Planets</span></div>
+          <div class="mini-stat"><b id="lcGates">4</b><span>Gates</span></div>
+          <div class="mini-stat"><b id="lcPull">+15%</b><span>Gravity</span></div>
+        </div>
+        <button class="btn btn-primary" id="nextBtn">▶ Launch Next</button>
+      </div>
+      <!-- Crash Card -->
+      <div class="card hidden" id="crashCard">
+        <h2 style="color:#ff6b6b">💥 Crash!</h2>
+        <p>You hit a planet. Respawning…</p>
+        <p class="sub" id="crashLives">2 lives left</p>
+        <button class="btn btn-primary" id="respawnBtn">Respawn Now</button>
+      </div>
+      <!-- Game Over Card -->
+      <div class="card hidden" id="overCard">
+        <h2>Game Over</h2>
+        <p id="overScore">Score 0</p>
+        <p class="sub" id="overBest">Best 0</p>
+        <button class="btn btn-primary" id="againBtn">Play Again</button>
+        <button class="btn btn-secondary" id="shareBtn">Share Score</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <button class="ctrl" id="leftBtn"><span>◀</span> LEFT</button>
+    <button class="ctrl boost" id="boostBtn">● BOOST</button>
+    <button class="ctrl" id="rightBtn">RIGHT <span>▶</span></button>
+  </div>
+  <div id="aimHint"><span><span class="dot"></span> <b id="hintText">Drag back on comet to aim</b></span><span style="opacity:0.9">⏸ <b id="pauseHint" style="text-decoration:underline;cursor:pointer">Pause</b></span></div>
+</div>
+
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const popupsEl=document.getElementById('popups');
+const overlay=document.getElementById('overlay');
+const scoreEl=document.getElementById('scoreEl');
+const levelEl=document.getElementById('levelEl');
+const bestEl=document.getElementById('bestEl');
+const gatesEl=document.getElementById('gatesEl');
+const livesEl=document.getElementById('livesEl');
+const chainEl=document.getElementById('chainEl');
+const hintText=document.getElementById('hintText');
+
+const startCard=document.getElementById('startCard');
+const howCard=document.getElementById('howCard');
+const pauseCard=document.getElementById('pauseCard');
+const levelCard=document.getElementById('levelCard');
+const crashCard=document.getElementById('crashCard');
+const overCard=document.getElementById('overCard');
+
+let W=360, H=640;
+let dpr=Math.min(window.devicePixelRatio||1,2);
+function resize(){
+  dpr=Math.min(window.devicePixelRatio||1,2);
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  canvas.style.width='100%';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Game state
+let level=1, score=0, best=parseInt(localStorage.getItem('cometBest')||'0'), lives=3;
+let planets=[], gates=[], stars=[];
+let comet={x:180,y:560,vx:0,vy:0,r:8,trail:[],invuln:0};
+let launched=false, crashed=false, paused=false, gameStarted=false;
+let chain=0, multiplier=1;
+let G=950;
+let steerPower=0.55, boostPower=0.95;
+let aiming=false, aimVec={x:0,y:0}, aimStart=null;
+let leftHeld=false, rightHeld=false, boostHeld=false;
+let lastTime=0, gateTimer=0;
+let levelNames=['Drift','Orbit','Pull','Vortex','Singularity','Nova','Abyss','Eclipse','Infinity'];
+
+// Audio
+let audioCtx, osc, gain, filter, humOn=false;
+function initAudio(){
+  if(audioCtx) return;
+  try{
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    osc=audioCtx.createOscillator();
+    gain=audioCtx.createGain();
+    filter=audioCtx.createBiquadFilter();
+    osc.type='sawtooth';
+    osc.frequency.value=54;
+    filter.type='lowpass'; filter.frequency.value=900; filter.Q.value=0.7;
+    gain.gain.value=0;
+    osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+    osc.start();
+  }catch(e){}
+}
+function setHum(on){
+  if(!audioCtx) return;
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  humOn=on;
+  try{
+    gain.gain.cancelScheduledValues(audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(on?0.055:0, audioCtx.currentTime+0.35);
+    osc.frequency.linearRampToValueAtTime(on? 62+level*2.5 : 54, audioCtx.currentTime+0.6);
+  }catch(e){}
+}
+function blip(freq){
+  if(!audioCtx) return;
+  try{
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type='sine'; o.frequency.value=freq;
+    g.gain.value=0.18;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+0.22);
+    o.stop(audioCtx.currentTime+0.23);
+  }catch(e){}
+}
+function crashSound(){
+  if(!audioCtx) return;
+  try{
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain(), f=audioCtx.createBiquadFilter();
+    o.type='square'; o.frequency.value=120; f.type='lowpass'; f.frequency.value=600;
+    g.gain.value=0.25; o.connect(f); f.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime+0.35);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+0.4);
+    o.stop(audioCtx.currentTime+0.41);
+  }catch(e){}
+}
+
+// Stars
+function genStars(){
+  stars=[];
+  for(let i=0;i<90;i++) stars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.2+0.3,tw:Math.random()*Math.PI*2, sp:0.5+Math.random()*1.5});
+}
+genStars();
+
+function genLevel(n){
+  planets=[]; gates=[];
+  G=950 + (n-1)*170;
+  const planetCount=Math.min(7, 2+n);
+  const gateCount=Math.min(7, 3+Math.floor(n*0.8));
+  // planets - avoid start area and ensure spacing
+  let attempts=0;
+  while(planets.length<planetCount && attempts<200){
+    attempts++;
+    let x=40+Math.random()*(W-80);
+    let y=80+Math.random()*(H-220);
+    let r=18+Math.random()*16 + Math.min(8, n*1.2);
+    let mass=1.0 + Math.random()*0.7 + n*0.18;
+    // avoid too close to start
+    if(Math.hypot(x-180,y-560)<90) continue;
+    let ok=true;
+    for(let p of planets) if(Math.hypot(x-p.x,y-p.y)< p.r+r+30) ok=false;
+    if(!ok) continue;
+    planets.push({x,y,r,mass,phase:Math.random()*Math.PI*2, hue:200+Math.random()*40});
+  }
+  // gates - create a winding path
+  let gy=100;
+  let gx=180;
+  for(let i=0;i<gateCount;i++){
+    let nx = 60 + Math.random()*(W-120);
+    // ensure not inside planet
+    let tries=0;
+    while(tries<20){
+      let inside=false;
+      for(let p of planets) if(Math.hypot(nx-gy>0?nx:180, gy - p.y) < p.r+38) inside=true;
+      // also check distance to planet
+      for(let p of planets) if(Math.hypot(nx-p.x, gy-p.y) < p.r+36) inside=true;
+      if(!inside) break;
+      nx=60+Math.random()*(W-120);
+      tries++;
+    }
+    gates.push({x:nx,y:gy,r:26,passed:false,idx:i});
+    gy+= (H-200)/gateCount + (Math.random()*20-10);
+    if(gy>520) gy=520;
+  }
+  // sort gates by y top to bottom? Actually player goes up, so top first? Let's make order from bottom to top? Easier: bottom to top sequential
+  gates.sort((a,b)=>b.y-a.y);
+  gates.forEach((g,i)=>g.idx=i);
+}
+
+function resetComet(){
+  comet.x=180; comet.y=560; comet.vx=0; comet.vy=0; comet.trail=[]; comet.invuln=1.2;
+  launched=false; aiming=false; aimVec={x:0,y:0};
+  hintText.textContent='Drag back on comet to aim';
+  hintText.style.color='#7ee8ff';
+}
+
+function updateHUD(){
+  scoreEl.textContent=score;
+  bestEl.textContent=Math.max(best,score);
+  levelEl.textContent=level+' — '+(levelNames[Math.min(level-1, levelNames.length-1)]);
+  gatesEl.textContent=gates.filter(g=>g.passed).length+'/'+gates.length;
+  // lives
+  livesEl.innerHTML='';
+  for(let i=0;i<3;i++){
+    const d=document.createElement('div');
+    d.className='life'+(i<lives?'':' lost');
+    livesEl.appendChild(d);
+  }
+  if(chain>0){
+    multiplier=Math.min(5, 1+chain);
+    // actually chain 1 => x2, chain 2=>x3 etc, cap x5
+    let m=Math.min(5, 1+chain);
+    if(chain>=1) chainEl.innerHTML='<span class="chain-badge">CHAIN x'+m+' • '+chain+' gates</span>';
+    else chainEl.innerHTML='';
+  } else {
+    chainEl.innerHTML='';
+  }
+}
+
+function showCard(which){
+  [startCard,howCard,pauseCard,levelCard,crashCard,overCard].forEach(c=>c.classList.add('hidden'));
+  if(which) which.classList.remove('hidden');
+  overlay.style.display=which?'flex':'none';
+}
+function hideOverlay(){ overlay.style.display='none'; }
+
+function popup(text, wx, wy, color){
+  const wrapRect=document.getElementById('canvasWrap').getBoundingClientRect();
+  const canvasRect=canvas.getBoundingClientRect();
+  // convert world to screen
+  const sx = canvasRect.left - wrapRect.left + (wx/W)*canvasRect.width;
+  const sy = canvasRect.top - wrapRect.top + (wy/H)*canvasRect.height;
+  const el=document.createElement('div');
+  el.className='popup';
+  el.textContent=text;
+  el.style.left=sx+'px';
+  el.style.top=sy+'px';
+  if(color) el.style.color=color;
+  el.style.textShadow=color?`0 0 10px ${color}, 0 2px 6px rgba(0,0,0,0.8)`:'0 0 10px #00e5ff';
+  popupsEl.appendChild(el);
+  setTimeout(()=>el.remove(),950);
+}
+
+function doCrash(){
+  if(comet.invuln>0) return;
+  crashed=true;
+  launched=false;
+  crashSound();
+  setHum(false);
+  lives--;
+  updateHUD();
+  popup('CRASH!', comet.x, comet.y, '#ff6b6b');
+  // shake
+  canvas.style.transform='translateX(2px)';
+  setTimeout(()=>canvas.style.transform='',120);
+  if(lives<=0){
+    setTimeout(()=>{
+      best=Math.max(best,score);
+      localStorage.setItem('cometBest', best);
+      document.getElementById('overScore').textContent='Score '+score+' • Level '+level;
+      document.getElementById('overBest').textContent='Best '+best;
+      showCard(overCard);
+    },600);
+  } else {
+    document.getElementById('crashLives').textContent=lives+' '+(lives===1?'life':'lives')+' left • Chain reset';
+    showCard(crashCard);
+    chain=0; multiplier=1;
+  }
+}
+
+function levelComplete(){
+  best=Math.max(best,score);
+  localStorage.setItem('cometBest', best);
+  // bonus for remaining lives
+  const bonus=lives*100;
+  score+=bonus;
+  if(bonus) popup('+'+bonus+' LIFE BONUS', 180, 200, '#ffd700');
+  updateHUD();
+  setHum(false);
+  launched=false;
+  // prepare next level card
+  document.getElementById('levelBadge').textContent='LEVEL '+(level+1);
+  document.getElementById('levelTitle').textContent=levelNames[Math.min(level, levelNames.length-1)];
+  document.getElementById('lcPlanets').textContent=Math.min(7, 3+level);
+  document.getElementById('lcGates').textContent=Math.min(7, 3+Math.floor((level+1)*0.8));
+  document.getElementById('lcPull').textContent='+'+Math.round((170/950)*100)+'%';
+  document.getElementById('levelDesc').textContent= level>=4 ? 'Gravity is getting angry. Use slingshots!' : 'More planets. Stronger pull. Chain those gates!';
+  showCard(levelCard);
+}
+
+function startLevel(n){
+  level=n;
+  genLevel(level);
+  resetComet();
+  chain=0; multiplier=1;
+  crashed=false; paused=false;
+  updateHUD();
+  hideOverlay();
+  setHum(false);
+  hintText.textContent='Drag back on comet to aim';
+}
+
+function nextLevel(){
+  startLevel(level+1);
+}
+
+// Input - aim
+function getPos(e){
+  const rect=canvas.getBoundingClientRect();
+  const x=(e.clientX-rect.left)/rect.width*W;
+  const y=(e.clientY-rect.top)/rect.height*H;
+  return {x,y};
+}
+canvas.addEventListener('pointerdown', e=>{
+  if(paused||crashed) return;
+  if(!gameStarted) return;
+  if(launched) return;
+  const p=getPos(e);
+  if(Math.hypot(p.x-comet.x, p.y-comet.y)<42){
+    aiming=true;
+    aimStart=p;
+    canvas.setPointerCapture(e.pointerId);
+    hintText.textContent='Pull back… release to launch!';
+    hintText.style.color='#ffd700';
+  }
+});
+canvas.addEventListener('pointermove', e=>{
+  if(!aiming) return;
+  const p=getPos(e);
+  let dx=p.x - comet.x;
+  let dy=p.y - comet.y;
+  // limit pull distance
+  let dist=Math.hypot(dx,dy);
+  const maxPull=70;
+  if(dist>maxPull){ dx=dx/dist*maxPull; dy=dy/dist*maxPull; }
+  aimVec={x:dx,y:dy};
+});
+canvas.addEventListener('pointerup', e=>{
+  if(!aiming) return;
+  aiming=false;
+  const pull=Math.hypot(aimVec.x, aimVec.y);
+  if(pull<8){
+    aimVec={x:0,y:0};
+    hintText.textContent='Drag back on comet to aim';
+    hintText.style.color='#7ee8ff';
+    return;
+  }
+  // launch opposite to pull
+  const power=0.18;
+  comet.vx = -aimVec.x * power * 6;
+  comet.vy = -aimVec.y * power * 6;
+  // clamp
+  const sp=Math.hypot(comet.vx, comet.vy);
+  if(sp>14){ comet.vx*=14/sp; comet.vy*=14/sp; }
+  launched=true;
+  crashed=false;
+  initAudio(); setHum(true);
+  hintText.textContent='Steer with LEFT / RIGHT • BOOST!';
+  hintText.style.color='#8ab4d6';
+  blip(600);
+  canvas.releasePointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointercancel', ()=>{ aiming=false; });
+
+// Controls
+function bindHold(btn, onDown, onUp){
+  btn.addEventListener('pointerdown', e=>{ e.preventDefault(); onDown(); btn.setPointerCapture(e.pointerId); });
+  btn.addEventListener('pointerup', e=>{ onUp(); });
+  btn.addEventListener('pointercancel', onUp);
+  btn.addEventListener('pointerleave', onUp);
+}
+bindHold(document.getElementById('leftBtn'), ()=>leftHeld=true, ()=>leftHeld=false);
+bindHold(document.getElementById('rightBtn'), ()=>rightHeld=true, ()=>rightHeld=false);
+bindHold(document.getElementById('boostBtn'), ()=>boostHeld=true, ()=>boostHeld=false);
+
+// Keyboard
+window.addEventListener('keydown', e=>{
+  if(e.key==='ArrowLeft'||e.key==='a') leftHeld=true;
+  if(e.key==='ArrowRight'||e.key==='d') rightHeld=true;
+  if(e.key===' '||e.key==='ArrowUp'||e.key==='w') boostHeld=true;
+  if(e.key==='p'||e.key==='Escape'){
+    if(gameStarted && !crashed && lives>0){
+      if(paused) resume(); else pause();
+    }
+  }
+});
+window.addEventListener('keyup', e=>{
+  if(e.key==='ArrowLeft'||e.key==='a') leftHeld=false;
+  if(e.key==='ArrowRight'||e.key==='d') rightHeld=false;
+  if(e.key===' '||e.key==='ArrowUp'||e.key==='w') boostHeld=false;
+});
+
+function pause(){
+  if(!gameStarted||crashed) return;
+  paused=true; showCard(pauseCard); setHum(false);
+}
+function resume(){
+  paused=false; hideOverlay(); if(launched) setHum(true);
+}
+document.getElementById('pauseHint').addEventListener('click', ()=>{
+  if(!gameStarted) return;
+  if(paused) resume(); else pause();
+});
+
+// Buttons
+document.getElementById('playBtn').addEventListener('click', ()=>{
+  initAudio();
+  gameStarted=true; level=1; score=0; lives=3;
+  startLevel(1);
+});
+document.getElementById('howBtn').addEventListener('click', ()=>showCard(howCard));
+document.getElementById('howBackBtn').addEventListener('click', ()=>{
+  initAudio();
+  gameStarted=true; level=1; score=0; lives=3;
+  startLevel(1);
+});
+document.getElementById('resumeBtn').addEventListener('click', resume);
+document.getElementById('restartBtn1').addEventListener('click', ()=>{ startLevel(level); });
+document.getElementById('nextBtn').addEventListener('click', nextLevel);
+document.getElementById('respawnBtn').addEventListener('click', ()=>{
+  crashed=false;
+  resetComet();
+  updateHUD();
+  hideOverlay();
+});
+document.getElementById('againBtn').addEventListener('click', ()=>{
+  level=1; score=0; lives=3; startLevel(1);
+});
+document.getElementById('shareBtn').addEventListener('click', ()=>{
+  const text=`I scored ${score} on Comet Run (Level ${level})! Can you beat it?`;
+  if(navigator.share) navigator.share({title:'Comet Run', text}).catch(()=>{});
+  else { navigator.clipboard.writeText(text).then(()=>{ popup('Copied!',180,320,'#7ee8ff'); }); }
+});
+
+// Draw
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // bg gradient already via CSS, but draw subtle vignette stars
+  // stars
+  const t=performance.now()*0.001;
+  for(let s of stars){
+    const tw=0.6+Math.sin(t*s.sp + s.tw)*0.4;
+    ctx.globalAlpha=tw*0.9;
+    ctx.fillStyle='#cfe8ff';
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // planets
+  for(let p of planets){
+    const pulse=1+Math.sin(t*1.6 + p.phase)*0.045;
+    const r=p.r*pulse;
+    // glow
+    ctx.shadowBlur=18; ctx.shadowColor=`hsla(${p.hue}, 90%, 60%, 0.55)`;
+    // body gradient
+    const g=ctx.createRadialGradient(p.x- r*0.3, p.y- r*0.3, r*0.2, p.x, p.y, r);
+    g.addColorStop(0, `hsl(${p.hue} 85% 72%)`);
+    g.addColorStop(0.5, `hsl(${p.hue} 80% 45%)`);
+    g.addColorStop(1, `hsl(${p.hue} 70% 18%)`);
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    // rim highlight
+    ctx.strokeStyle='rgba(255,255,255,0.18)';
+    ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2); ctx.stroke();
+    // gravity ring hint
+    ctx.strokeStyle='rgba(100,200,255,0.07)';
+    ctx.setLineDash([4,6]);
+    ctx.beginPath(); ctx.arc(p.x,p.y,r+18,0,Math.PI*2); ctx.stroke();
+    ctx.setLineDash([]);
+    // mass indicator
+    ctx.fillStyle='rgba(255,255,255,0.85)';
+    ctx.font='700 10px system-ui';
+    ctx.textAlign='center';
+    ctx.fillText('●', p.x, p.y+3);
+  }
+
+  // gates
+  for(let g of gates){
+    const pulse= g.passed ? 0 : 1+Math.sin(t*2.2 + g.idx*0.8)*0.08;
+    const r=g.r*pulse;
+    if(g.passed){
+      // passed - gold check
+      ctx.shadowBlur=14; ctx.shadowColor='rgba(255,215,0,0.7)';
+      ctx.strokeStyle='#ffd700'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(g.x,g.y,g.r,0,Math.PI*2); ctx.stroke();
+      ctx.shadowBlur=0;
+      ctx.fillStyle='rgba(255,215,0,0.18)';
+      ctx.beginPath(); ctx.arc(g.x,g.y,g.r,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ffd700'; ctx.font='900 14px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('✓', g.x, g.y+1);
+    } else {
+      // pulsing cyan gate
+      ctx.shadowBlur=16; ctx.shadowColor='rgba(0,229,255,0.9)';
+      ctx.strokeStyle='#00e5ff'; ctx.lineWidth=3.5;
+      ctx.beginPath(); ctx.arc(g.x,g.y,r,0,Math.PI*2); ctx.stroke();
+      ctx.shadowBlur=0;
+      // inner dashed
+      ctx.strokeStyle='rgba(0,229,255,0.35)'; ctx.lineWidth=1.5; ctx.setLineDash([5,5]);
+      ctx.beginPath(); ctx.arc(g.x,g.y,r-7,0,Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+      // gate number
+      ctx.fillStyle='rgba(0,229,255,0.95)'; ctx.font='800 11px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText((g.idx+1)+'', g.x, g.y- r-10);
+      // arrow direction
+      ctx.fillStyle='rgba(207,232,255,0.9)'; ctx.font='10px system-ui'; ctx.fillText('GATE', g.x, g.y+1);
+    }
+  }
+
+  // aim line
+  if(aiming && !launched){
+    const pull=Math.hypot(aimVec.x, aimVec.y);
+    const power=Math.min(1, pull/70);
+    // line opposite
+    const ax=comet.x - aimVec.x;
+    const ay=comet.y - aimVec.y;
+    // dashed aim line
+    ctx.strokeStyle=`rgba(255,215,0,${0.5+power*0.5})`;
+    ctx.lineWidth=2.5; ctx.setLineDash([6,6]);
+    ctx.beginPath(); ctx.moveTo(comet.x, comet.y); ctx.lineTo(comet.x - aimVec.x*1.6, comet.y - aimVec.y*1.6); ctx.stroke();
+    ctx.setLineDash([]);
+    // power circle
+    ctx.strokeStyle=`rgba(255,255,255,${0.3+power*0.4})`; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(comet.x - aimVec.x, comet.y - aimVec.y, 8+power*10,0,Math.PI*2); ctx.stroke();
+    // arrow head
+    const ang=Math.atan2(-aimVec.y, -aimVec.x);
+    const tx=comet.x - aimVec.x*1.6, ty=comet.y - aimVec.y*1.6;
+    ctx.fillStyle='#ffd700';
+    ctx.beginPath();
+    ctx.moveTo(tx + Math.cos(ang)*10, ty + Math.sin(ang)*10);
+    ctx.lineTo(tx + Math.cos(ang+2.5)*8, ty + Math.sin(ang+2.5)*8);
+    ctx.lineTo(tx + Math.cos(ang-2.5)*8, ty + Math.sin(ang-2.5)*8);
+    ctx.closePath(); ctx.fill();
+    // power text
+    ctx.fillStyle='#fff'; ctx.font='800 11px system-ui'; ctx.textAlign='center';
+    ctx.fillText(Math.round(power*100)+'%', comet.x, comet.y+28);
+  }
+
+  // comet trail
+  for(let i=0;i<comet.trail.length;i++){
+    const p=comet.trail[i];
+    const a=(i+1)/comet.trail.length;
+    ctx.globalAlpha=a*0.55;
+    ctx.fillStyle='#7ee8ff';
+    ctx.shadowBlur=8; ctx.shadowColor='#00e5ff';
+    ctx.beginPath(); ctx.arc(p.x,p.y, 2 + a*3,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+  }
+  ctx.globalAlpha=1;
+
+  // comet
+  const isInvuln = comet.invuln>0 && Math.floor(t*10)%2===0;
+  if(!isInvuln){
+    // glow
+    ctx.shadowBlur=22; ctx.shadowColor='#00e5ff';
+    const cg=ctx.createRadialGradient(comet.x-2, comet.y-2, 2, comet.x, comet.y, comet.r+6);
+    cg.addColorStop(0,'#ffffff');
+    cg.addColorStop(0.35,'#7ee8ff');
+    cg.addColorStop(0.7,'#0099ff');
+    cg.addColorStop(1,'rgba(0,80,255,0)');
+    ctx.fillStyle=cg;
+    ctx.beginPath(); ctx.arc(comet.x, comet.y, comet.r+4,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    // core
+    const core=ctx.createRadialGradient(comet.x-2, comet.y-3, 1, comet.x, comet.y, comet.r);
+    core.addColorStop(0,'#fff'); core.addColorStop(0.5,'#bff0ff'); core.addColorStop(1,'#0088ff');
+    ctx.fillStyle=core;
+    ctx.beginPath(); ctx.arc(comet.x, comet.y, comet.r,0,Math.PI*2); ctx.fill();
+    // highlight
+    ctx.fillStyle='rgba(255,255,255,0.9)';
+    ctx.beginPath(); ctx.arc(comet.x-2.5, comet.y-2.5, 2,0,Math.PI*2); ctx.fill();
+  }
+
+  // velocity vector hint when launched
+  if(launched && !crashed){
+    const sp=Math.hypot(comet.vx, comet.vy);
+    if(sp>0.5){
+      const ang=Math.atan2(comet.vy, comet.vx);
+      ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=1.5; ctx.setLineDash([3,4]);
+      ctx.beginPath(); ctx.moveTo(comet.x, comet.y);
+      ctx.lineTo(comet.x + Math.cos(ang)*22, comet.y + Math.sin(ang)*22); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+}
+
+// Physics
+function update(dt){
+  if(paused||!gameStarted) return;
+  if(comet.invuln>0) comet.invuln-=dt;
+  if(!launched || crashed) return;
+
+  let ax=0, ay=0;
+  for(let p of planets){
+    let dx=p.x - comet.x, dy=p.y - comet.y;
+    let dist=Math.hypot(dx,dy);
+    if(dist < p.r + comet.r -1){
+      doCrash(); return;
+    }
+    // avoid singularity
+    dist=Math.max(dist, p.r+6);
+    let force = G * p.mass / (dist*dist);
+    force=Math.min(force, 900);
+    ax += force * dx/dist * dt;
+    ay += force * dy/dist * dt;
+  }
+  // steering
+  if(leftHeld){
+    let ang=Math.atan2(comet.vy, comet.vx);
+    if(Math.hypot(comet.vx,comet.vy)<1) ang=-Math.PI/2;
+    ax += Math.cos(ang - Math.PI/2)*steerPower;
+    ay += Math.sin(ang - Math.PI/2)*steerPower;
+  }
+  if(rightHeld){
+    let ang=Math.atan2(comet.vy, comet.vx);
+    if(Math.hypot(comet.vx,comet.vy)<1) ang=-Math.PI/2;
+    ax += Math.cos(ang + Math.PI/2)*steerPower;
+    ay += Math.sin(ang + Math.PI/2)*steerPower;
+  }
+  if(boostHeld){
+    let ang=Math.atan2(comet.vy, comet.vx);
+    if(Math.hypot(comet.vx,comet.vy)<2) ang=-Math.PI/2;
+    ax += Math.cos(ang)*boostPower;
+    ay += Math.sin(ang)*boostPower;
+    // boost particles
+    if(Math.random()<0.6){
+      comet.trail.push({x:comet.x - Math.cos(ang)*8, y:comet.y - Math.sin(ang)*8});
+      if(comet.trail.length>20) comet.trail.shift();
+    }
+  }
+
+  comet.vx += ax;
+  comet.vy += ay;
+  comet.vx *= 0.9985;
+  comet.vy *= 0.9985;
+
+  comet.x += comet.vx * dt * 60 * 0.16;
+  comet.y += comet.vy * dt * 60 * 0.16;
+
+  // walls
+  if(comet.x < comet.r){ comet.x=comet.r; comet.vx*=-0.65; blip(300); }
+  if(comet.x > W-comet.r){ comet.x=W-comet.r; comet.vx*=-0.65; blip(300); }
+  if(comet.y < comet.r){ comet.y=comet.r; comet.vy*=-0.65; blip(300); }
+  if(comet.y > H-comet.r){ comet.y=H-comet.r; comet.vy*=-0.65; blip(300); }
+
+  // gates
+  for(let g of gates){
+    if(g.passed) continue;
+    let d=Math.hypot(comet.x-g.x, comet.y-g.y);
+    if(d < g.r){
+      // must be in order? allow any but chain only if sequential
+      let expected = gates.filter(x=>!x.passed).sort((a,b)=>a.idx-b.idx)[0];
+      let isNext = expected && expected.idx===g.idx;
+      g.passed=true;
+      if(isNext){
+        chain++;
+      } else {
+        // out of order breaks chain
+        chain=1;
+      }
+      let m=Math.min(5, 1+chain- (chain>0?0:0));
+      // chain 1 => x2? spec says chaining gate bonuses x2-x5. So first gate x1, second x2...
+      // Let's map: chain=1 => x1, chain=2=>x2 ... chain=5=>x5
+      // But to feel rewarding, show x2 on second gate
+      let mult = Math.min(5, chain===1?1:chain);
+      if(chain>=2) mult= Math.min(5, chain);
+      else mult=1;
+      // Actually simpler: mult = min(5, chain) where chain 1=1, 2=2 etc, but display x2 from 2nd
+      let pts = 150 * mult;
+      score += pts;
+      popup('+'+pts+(mult>1?' x'+mult:''), g.x, g.y, mult>1?'#ffd700':'#7ee8ff');
+      if(mult>1) popup('CHAIN x'+mult+'!', 180, 110, '#ffd700');
+      updateHUD();
+      blip(700+mult*90);
+      gateTimer=0;
+      if(gates.every(x=>x.passed)){
+        levelComplete();
+      }
+      break;
+    }
+  }
+
+  // chain timeout - if no gate for 5s, reset chain? optional
+  gateTimer+=dt;
+  if(gateTimer>5 && chain>0){
+    // keep chain but don't reset aggressively - only reset on crash
+  }
+
+  // trail
+  comet.trail.push({x:comet.x, y:comet.y});
+  if(comet.trail.length>18) comet.trail.shift();
+}
+
+// Loop
+function loop(now){
+  requestAnimationFrame(loop);
+  if(!lastTime) lastTime=now;
+  let dt=(now-lastTime)/1000;
+  dt=Math.min(dt,0.033);
+  lastTime=now;
+  update(dt);
+  draw();
+}
+requestAnimationFrame(loop);
+
+// Init HUD
+bestEl.textContent=best;
+updateHUD();
+showCard(startCard);
+
+// Prevent scroll
+document.body.addEventListener('touchmove', e=>{ if(e.target.closest('#canvasWrap')||e.target.closest('#controls')) e.preventDefault(); }, {passive:false});
+</script>
+</body>
+</html>

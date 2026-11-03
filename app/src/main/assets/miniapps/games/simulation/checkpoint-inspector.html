@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Border Desk: Archive 86</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--desk:#9c8a6b;--desk2:#7a6a4f;--paper:#fdf6e3;--paper2:#f5e6c8;--ink:#1a1a1a;--line:#d8c9a8;--red:#b91c1c;--green:#15803d;--amber:#b45309;--muted:#57534e}
+html,body{height:100%;overflow-x:hidden;background:#3f3526;font-family: ui-monospace, SFMono-Regular, Menlo, monospace;color:var(--ink)}
+body{display:flex;justify-content:center}
+.app{width:100%;max-width:428px;min-height:100vh;background:linear-gradient(180deg,#a9976f 0%,#8b7a55 100%);display:flex;flex-direction:column;position:relative;overflow:hidden}
+.topbar{background:#1c1917;color:#f5f5f4;padding:10px 12px 8px;border-bottom:4px solid #000;position:sticky;top:0;z-index:20}
+.brand{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.brand h1{font-size:13px;letter-spacing:0.12em;line-height:1.1}
+.brand h1 span{color:#facc15}
+.brand small{font-size:10px;opacity:0.8;letter-spacing:0.08em}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-top:8px}
+.stat{background:#292524;border:1px solid #44403c;border-radius:8px;padding:6px 6px;text-align:center}
+.stat b{font-size:13px;display:block;color:#fff}
+.stat i{font-size:9px;font-style:normal;letter-spacing:0.08em;color:#a8a29e}
+.focusDots{display:flex;gap:4px;justify-content:center;margin-top:4px}
+.dot{width:10px;height:10px;border-radius:50%;background:#44403c;border:1px solid #57534e}
+.dot.on{background:#facc15;box-shadow:0 0 6px #facc15}
+.progress{height:6px;background:#292524;border-radius:999px;overflow:hidden;margin-top:8px;border:1px solid #44403c}
+.progress span{display:block;height:100%;background:linear-gradient(90deg,#facc15,#eab308);width:0%}
+.rulebook{margin:8px 12px 0;background:var(--paper);border:2px solid #1c1917;border-radius:10px;overflow:hidden;box-shadow:0 4px 0 rgba(0,0,0,0.25)}
+.rbHead{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#fffbeb;border-bottom:2px dashed #d6c7a1;cursor:pointer;user-select:none}
+.rbHead h2{font-size:12px;letter-spacing:0.08em}
+.rbHead em{font-size:11px;background:#1c1917;color:#fff;padding:4px 8px;border-radius:999px;font-style:normal}
+.rbBody{padding:10px 12px;display:none}
+.rbBody.open{display:block}
+.rbBody h3{font-size:11px;letter-spacing:0.1em;margin-bottom:6px;color:var(--amber)}
+.rbBody ul{list-style:none;display:flex;flex-direction:column;gap:6px}
+.rbBody li{font-size:12px;line-height:1.35;background:#fff;padding:7px 8px;border:1px solid var(--line);border-radius:8px;display:flex;gap:8px;align-items:flex-start}
+.rbBody li::before{content:"▸";color:var(--amber);font-weight:700}
+.tag{font-size:9px;padding:2px 6px;border-radius:999px;background:#1c1917;color:#fff;letter-spacing:0.06em;white-space:nowrap}
+.desk{flex:1;padding:10px 12px 12px;display:flex;flex-direction:column;gap:10px}
+.paper{position:relative;background:var(--paper);border:2px solid #1c1917;border-radius:12px;box-shadow:0 6px 0 rgba(0,0,0,0.3), inset 0 0 0 1px #fff;overflow:hidden}
+.paperHead{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:linear-gradient(180deg,#fffbeb,#fde68a);border-bottom:2px solid #1c1917}
+.paperHead h3{font-size:12px;letter-spacing:0.1em}
+.paperHead span{font-size:10px;background:#fff;border:1px solid #1c1917;padding:3px 7px;border-radius:999px}
+.stampOverlay{position:absolute;inset:0;display:none;place-items:center;background:rgba(253,246,227,0.55);z-index:5;pointer-events:none}
+.stampOverlay.show{display:grid}
+.stamp{font-size:42px;font-weight:900;letter-spacing:0.08em;padding:10px 18px;border:6px solid;transform:rotate(-12deg);background:rgba(255,255,255,0.9);border-radius:8px}
+.stamp.approved{color:var(--green);border-color:var(--green)}
+.stamp.denied{color:var(--red);border-color:var(--red)}
+.fields{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.field{position:relative;background:#fff;border:1.5px solid #1c1917;border-radius:10px;padding:8px 8px 8px 10px;min-height:62px;cursor:pointer;user-select:none;transition:transform 0.08s, box-shadow 0.08s}
+.field:active{transform:scale(0.98)}
+.field.flagged{border-color:var(--amber);background:#fffbeb;box-shadow:0 0 0 2px #facc15 inset}
+.field.revealed{outline:2px dashed #1c1917}
+.field b{font-size:9px;letter-spacing:0.1em;color:var(--muted);display:block;margin-bottom:3px}
+.field strong{font-size:13px;line-height:1.2;display:block;word-break:break-word}
+.field em{font-size:10px;color:#57534e;display:block;margin-top:2px;line-height:1.2}
+.flagBadge{position:absolute;top:-7px;right:-7px;background:#b45309;color:#fff;font-size:9px;padding:3px 6px;border-radius:999px;border:1px solid #1c1917;display:none;letter-spacing:0.06em}
+.field.flagged .flagBadge{display:block}
+.field.full{grid-column:1/-1}
+.photoBox{display:flex;align-items:center;gap:8px}
+.photo{width:44px;height:44px;border:1.5px solid #1c1917;background:#e7e5e4;border-radius:6px;display:grid;place-items:center;font-size:18px;overflow:hidden}
+.photo.missing{background:repeating-linear-gradient(45deg,#e7e5e4,#e7e5e4 6px,#d6d3d1 6px,#d6d3d1 12px);color:#57534e}
+.aids{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px}
+.aid{background:#1c1917;color:#fff;border:2px solid #000;border-radius:10px;padding:8px 4px;text-align:center;cursor:pointer;user-select:none;min-height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.aid:disabled{opacity:0.35;filter:grayscale(1)}
+.aid b{font-size:10px;letter-spacing:0.06em}
+.aid span{font-size:9px;opacity:0.8;line-height:1.1}
+.aid i{font-style:normal;font-size:16px}
+.hint{font-size:11px;background:#fffbeb;border:1px solid #d6c7a1;border-radius:8px;padding:8px 10px;line-height:1.4;color:#44403c}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{border:3px solid #000;border-radius:12px;padding:14px 10px;font-weight:900;font-size:16px;letter-spacing:0.08em;cursor:pointer;min-height:56px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 0 rgba(0,0,0,0.35)}
+.btn:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,0.35)}
+.btnDeny{background:#fef2f2;color:var(--red)}
+.btnApprove{background:#f0fdf4;color:var(--green)}
+.btn:disabled{opacity:0.5}
+.footerBar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;background:#1c1917;color:#a8a29e;border-top:2px solid #000}
+.footerBar button{background:#292524;color:#fff;border:1px solid #44403c;border-radius:8px;padding:8px 10px;font-size:11px;cursor:pointer;min-height:36px}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#1c1917;color:#fff;padding:10px 14px;border-radius:999px;font-size:12px;border:1px solid #44403c;box-shadow:0 8px 20px rgba(0,0,0,0.4);display:none;z-index:30;max-width:90%;text-align:center}
+.toast.show{display:block}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);display:none;place-items:center;padding:16px;z-index:40}
+.overlay.show{display:grid}
+.modal{width:100%;max-width:400px;background:var(--paper);border:3px solid #000;border-radius:14px;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,0.5)}
+.modalHead{padding:14px 16px;background:#1c1917;color:#fff;display:flex;justify-content:space-between;align-items:center}
+.modalHead h2{font-size:13px;letter-spacing:0.1em}
+.modalBody{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.modalBody p{font-size:13px;line-height:1.5}
+.kbd{font-size:11px;background:#fff;border:1px solid #d6c7a1;border-radius:8px;padding:8px 10px}
+.starsRow{display:flex;gap:6px;font-size:18px}
+.star{opacity:0.25}
+.star.on{opacity:1}
+.codeBox{background:#1c1917;color:#facc15;border-radius:10px;padding:12px;text-align:center;letter-spacing:0.12em;font-weight:900;font-size:16px;border:1px solid #44403c}
+.small{font-size:11px;color:#57534e;line-height:1.4}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="brand">
+      <div>
+        <h1>VALDORA <span>BORDER BUREAU</span> — ARCHIVE 86</h1>
+        <small>DEPT. OF ENTRY REVIEW • DESK 3 • PAPER-STAMP PROTOCOL</small>
+      </div>
+      <button id="soundBtn" style="background:#292524;color:#fff;border:1px solid #44403c;border-radius:8px;padding:6px 8px;font-size:11px;min-height:36px;min-width:44px">🔊</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="dayLabel">DAY 1/6</b><i>FILE 1/5</i></div>
+      <div class="stat"><b id="wageLabel">$0</b><i>WAGES</i></div>
+      <div class="stat"><b id="starLabel">0★</b><i>STARS</i></div>
+      <div class="stat"><b id="warnLabel">0/3 ⚠</b><i>WARNINGS</i></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+      <span style="font-size:10px;letter-spacing:0.08em;color:#d6d3d1">FOCUS (DAILY AIDS)</span>
+      <span style="font-size:10px;color:#facc15" id="focusLabel">3 LEFT</span>
+    </div>
+    <div class="focusDots" id="focusDots"></div>
+    <div class="progress"><span id="progressBar"></span></div>
+  </div>
+
+  <div class="rulebook" id="rulebook">
+    <div class="rbHead" id="rbToggle">
+      <h2>📋 DAILY DIRECTIVES</h2>
+      <em id="rbDay">DAY 1</em>
+    </div>
+    <div class="rbBody open" id="rbBody">
+      <h3 id="rbTitle">BASIC ENTRY PROTOCOL</h3>
+      <ul id="rbList"></ul>
+      <div class="small" style="margin-top:8px">Tap any field to <b>FLAG</b> it as doubtful. Flagging correct faults earns bonus pay. Wrong rulings = warnings.</div>
+    </div>
+  </div>
+
+  <div class="desk">
+    <div class="paper" id="paper">
+      <div class="paperHead">
+        <h3 id="fileId">FILE V-001</h3>
+        <span id="fileMeta">NOV 01 1986 • DESK 3</span>
+      </div>
+      <div class="stampOverlay" id="stampOverlay"><div class="stamp" id="stampText">APPROVED</div></div>
+      <div class="fields" id="fields"></div>
+    </div>
+
+    <div class="aids">
+      <button class="aid" id="aidCross"><i>🔍</i><b>CROSS-CHECK</b><span>name match</span></button>
+      <button class="aid" id="aidRuler"><i>📏</i><b>DATE RULER</b><span>expiry check</span></button>
+      <button class="aid" id="aidMag"><i>🔎</i><b>MAGNIFIER</b><span>stamp forge</span></button>
+      <button class="aid" id="aidArchive"><i>☎</i><b>CALL ARCHIVE</b><span>permit verify</span></button>
+    </div>
+
+    <div class="hint" id="hint">Day 1: Check expiry and entry permit. Tap fields you doubt, then stamp.</div>
+
+    <div class="actions">
+      <button class="btn btnDeny" id="denyBtn">✕ DENY</button>
+      <button class="btn btnApprove" id="approveBtn">✓ APPROVE</button>
+    </div>
+  </div>
+
+  <div class="footerBar">
+    <button id="resetBtn">RESET PROGRESS</button>
+    <button id="helpBtn">HOW TO PLAY</button>
+    <button id="archiveBtn">ARCHIVE CODE</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="overlay" id="startOverlay">
+  <div class="modal">
+    <div class="modalHead"><h2>ARCHIVE 86 — BRIEFING</h2><span style="font-size:10px;opacity:0.8">6 DAYS • 30 FILES</span></div>
+    <div class="modalBody">
+      <p><b>You are the desk clerk.</b> Each file must be <b>APPROVED</b> or <b>DENIED</b> under shifting daily rules. Tap any field to <b>FLAG</b> it as doubtful.</p>
+      <div class="kbd">
+        <b>How scoring works:</b><br>
+        • Correct stamp: <b>+$10</b> wages<br>
+        • Correct flag on faulty field: <b>+$3 bonus</b><br>
+        • Wrong stamp: <b>-$5</b> + <b>1 warning</b> (3 warnings = day failed)<br>
+        • Perfect day (no warnings): <b>+1★</b>
+      </div>
+      <p class="small">You have <b>3 Focus</b> per day to spend on aids: Cross-Check, Date Ruler, Magnifier, Call Archive. Use them wisely.</p>
+      <button class="btn btnApprove" id="startBtn" style="width:100%">► START SHIFT — DAY 1</button>
+      <button id="continueBtn" style="display:none;width:100%;background:#fff;border:2px solid #000;border-radius:10px;padding:12px;font-weight:800;cursor:pointer">CONTINUE SAVED SHIFT</button>
+      <div class="small" style="text-align:center">Border-desk paper-stamp look • Progress saves automatically</div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="dayOverlay">
+  <div class="modal">
+    <div class="modalHead"><h2 id="dayTitle">DAY COMPLETE</h2><span id="dayStars" class="starsRow"></span></div>
+    <div class="modalBody" id="dayBody"></div>
+  </div>
+</div>
+
+<div class="overlay" id="helpOverlay">
+  <div class="modal">
+    <div class="modalHead"><h2>HOW TO PLAY</h2><button id="closeHelp" style="background:#fff;color:#000;border:1px solid #000;border-radius:8px;padding:6px 10px;font-weight:800">✕</button></div>
+    <div class="modalBody">
+      <p><b>1.</b> Read <b>Daily Directives</b> — rules stack each day.</p>
+      <p><b>2.</b> Inspect the paper file. Tap any field to <b>FLAG</b> it (orange).</p>
+      <p><b>3.</b> Spend <b>Focus</b> on aids to reveal hidden faults.</p>
+      <p><b>4.</b> Stamp <b>APPROVE</b> only if no rule is broken, else <b>DENY</b>.</p>
+      <div class="kbd">
+        <b>Daily rules summary:</b><br>
+        D1: Passport not expired + Entry Permit for foreigners<br>
+        D2: + Krevia needs Health Clearance + correct date format<br>
+        D3: + Work ≤30 days + Photo required<br>
+        D4: + No entry North Ferran + Name must match<br>
+        D5: + North Ferran allowed ONLY with Asylum Letter<br>
+        D6: + Forged stamps denied (all rules active)
+      </div>
+      <p class="small">Archive Code is generated at the end from your wages & stars. Keep it as proof of service.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY='borderDeskArchive86_v2';
+const CURRENT_DATE=new Date(1986,10,1); // Nov 1 1986
+function parseDMY(s){
+  if(!s||typeof s!=='string') return null;
+  // expect DD/MM/YYYY
+  const m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(!m) return null;
+  const d=parseInt(m[1],10), mo=parseInt(m[2],10)-1, y=parseInt(m[3],10);
+  const dt=new Date(y,mo,d);
+  if(dt.getDate()!==d||dt.getMonth()!==mo||dt.getFullYear()!==y) return null;
+  return dt;
+}
+function isExpired(expiryStr){
+  const dt=parseDMY(expiryStr);
+  if(!dt) return true; // bad format counts as expired/invalid
+  return dt < CURRENT_DATE;
+}
+const ORIGINS=['Valdora','Krevia','North Ferran','South Ferran','Torsen'];
+const FILES_DATA=[
+  // Day1
+  {id:'V-001',name:'ELENA VOSS',dob:'12/04/1988',origin:'Valdora',passportNo:'VD-1001',expiry:'14/11/1987',purpose:'Visit',duration:7,hasPermit:false,permitNo:'',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-002',name:'JONAH KELL',dob:'03/08/1975',origin:'Torsen',passportNo:'TS-4421',expiry:'22/09/1988',purpose:'Visit',duration:10,hasPermit:true,permitNo:'P-2002',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-003',name:'MIRA SOL',dob:'19/11/1990',origin:'South Ferran',passportNo:'SF-8812',expiry:'02/10/1986',purpose:'Transit',duration:2,hasPermit:true,permitNo:'P-2003',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-004',name:'KARL BRENT',dob:'07/07/1969',origin:'Krevia',passportNo:'KV-3109',expiry:'05/12/1987',purpose:'Work',duration:20,hasPermit:false,permitNo:'',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-005',name:'SARA LIND',dob:'25/12/1982',origin:'Torsen',passportNo:'TS-5091',expiry:'18/03/1989',purpose:'Visit',duration:14,hasPermit:true,permitNo:'P-2005',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  // Day2
+  {id:'V-006',name:'IVAN DRAK',dob:'11/02/1978',origin:'Krevia',passportNo:'KV-4420',expiry:'30/11/1987',purpose:'Work',duration:12,hasPermit:true,permitNo:'P-2006',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-007',name:'ANNA KREV',dob:'09/09/1985',origin:'Krevia',passportNo:'KV-7721',expiry:'01/01/1988',purpose:'Visit',duration:5,hasPermit:true,permitNo:'P-2007',hasHealth:true,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-008',name:'TOMAS REED',dob:'1988-04-12',origin:'South Ferran',passportNo:'SF-1029',expiry:'12/12/1987',purpose:'Visit',duration:8,hasPermit:true,permitNo:'P-2008',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:true,permitFake:false},
+  {id:'V-009',name:'LUCIA MORN',dob:'14/06/1991',origin:'Torsen',passportNo:'TS-8832',expiry:'20/10/1987',purpose:'Transit',duration:3,hasPermit:true,permitNo:'P-2009',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-010',name:'PETR VANE',dob:'02/02/1970',origin:'Krevia',passportNo:'KV-0012',expiry:'15/09/1986',purpose:'Visit',duration:6,hasPermit:true,permitNo:'P-2010',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  // Day3
+  {id:'V-011',name:'HELMUT GRAY',dob:'18/03/1972',origin:'Torsen',passportNo:'TS-1122',expiry:'11/11/1987',purpose:'Work',duration:45,hasPermit:true,permitNo:'P-2011',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-012',name:'NADIA FELL',dob:'22/05/1980',origin:'South Ferran',passportNo:'SF-3341',expiry:'09/09/1988',purpose:'Visit',duration:10,hasPermit:true,permitNo:'P-2012',hasHealth:false,hasPhoto:false,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-013',name:'OSCAR FINN',dob:'30/01/1984',origin:'Krevia',passportNo:'KV-9901',expiry:'03/03/1988',purpose:'Work',duration:14,hasPermit:true,permitNo:'P-2013',hasHealth:true,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-014',name:'YARA KLINE',dob:'06/06/1979',origin:'Krevia',passportNo:'KV-5543',expiry:'21/12/1987',purpose:'Work',duration:60,hasPermit:true,permitNo:'P-2014',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-015',name:'BEN CARTER',dob:'13/10/1992',origin:'Valdora',passportNo:'VD-1015',expiry:'05/05/1988',purpose:'Visit',duration:4,hasPermit:false,permitNo:'',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  // Day4
+  {id:'V-016',name:'JESSA NORTH',dob:'04/04/1986',origin:'North Ferran',passportNo:'NF-2001',expiry:'12/12/1987',purpose:'Visit',duration:7,hasPermit:true,permitNo:'P-2016',hasHealth:true,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-017',name:'MARKUS HALE',dob:'17/08/1976',origin:'Torsen',passportNo:'TS-7733',expiry:'19/11/1987',purpose:'Work',duration:20,hasPermit:true,permitNo:'P-2017',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:true,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-018',name:'ELI SORREN',dob:'28/02/1983',origin:'South Ferran',passportNo:'SF-4455',expiry:'08/08/1988',purpose:'Transit',duration:2,hasPermit:true,permitNo:'P-2018',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-019',name:'DARA FENN',dob:'09/12/1974',origin:'North Ferran',passportNo:'NF-2002',expiry:'10/10/1987',purpose:'Work',duration:10,hasPermit:true,permitNo:'P-2019',hasHealth:true,hasPhoto:true,hasAsylum:false,nameMismatch:true,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-020',name:'LENA VOSS',dob:'01/01/1990',origin:'Krevia',passportNo:'KV-8820',expiry:'02/10/1986',purpose:'Visit',duration:5,hasPermit:true,permitNo:'P-2020',hasHealth:true,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  // Day5
+  {id:'V-021',name:'AMINA RAE',dob:'15/03/1981',origin:'North Ferran',passportNo:'NF-3001',expiry:'15/12/1987',purpose:'Refuge',duration:30,hasPermit:false,permitNo:'',hasHealth:false,hasPhoto:true,hasAsylum:true,permitFake:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false},
+  {id:'V-022',name:'KOLIN JAX',dob:'20/07/1973',origin:'North Ferran',passportNo:'NF-3002',expiry:'20/12/1987',purpose:'Visit',duration:7,hasPermit:true,permitNo:'P-2022',hasHealth:true,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-023',name:'BRAN KREV',dob:'11/11/1982',origin:'Krevia',passportNo:'KV-1234',expiry:'11/11/1987',purpose:'Visit',duration:9,hasPermit:true,permitNo:'P-2023',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-024',name:'SOFIA LANE',dob:'05/05/1987',origin:'North Ferran',passportNo:'NF-3003',expiry:'05/06/1988',purpose:'Refuge',duration:14,hasPermit:false,permitNo:'',hasHealth:false,hasPhoto:true,hasAsylum:true,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-025',name:'GIDEON HART',dob:'23/09/1971',origin:'Torsen',passportNo:'TS-9902',expiry:'23/09/1988',purpose:'Work',duration:60,hasPermit:true,permitNo:'P-2025',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  // Day6
+  {id:'V-026',name:'CAL ROURKE',dob:'12/12/1977',origin:'Torsen',passportNo:'TS-6611',expiry:'12/12/1987',purpose:'Visit',duration:10,hasPermit:true,permitNo:'P-2026',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:true,dateFormatBad:false,permitFake:false},
+  {id:'V-027',name:'MARA QUINN',dob:'08/08/1989',origin:'South Ferran',passportNo:'SF-7788',expiry:'08/08/1988',purpose:'Visit',duration:12,hasPermit:true,permitNo:'P-2027',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-028',name:'VIKTOR KANE',dob:'03/03/1968',origin:'Krevia',passportNo:'KV-0009',expiry:'01/09/1986',purpose:'Work',duration:25,hasPermit:true,permitNo:'P-FAKE-28',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:true,dateFormatBad:false,permitFake:true},
+  {id:'V-029',name:'LEA NORTH',dob:'19/04/1984',origin:'North Ferran',passportNo:'NF-4001',expiry:'02/10/1986',purpose:'Refuge',duration:20,hasPermit:false,permitNo:'',hasHealth:false,hasPhoto:true,hasAsylum:true,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+  {id:'V-030',name:'JULIAN WEST',dob:'10/10/1980',origin:'Valdora',passportNo:'VD-1030',expiry:'10/10/1988',purpose:'Visit',duration:5,hasPermit:false,permitNo:'',hasHealth:false,hasPhoto:true,hasAsylum:false,nameMismatch:false,forgedStamp:false,dateFormatBad:false,permitFake:false},
+];
+
+const DAYS=[
+  {n:1,title:'BASIC ENTRY PROTOCOL',rules:['Passport must NOT be expired (check EXPIRY vs 01/11/1986)','All foreigners (non-Valdora) require Entry Permit']},
+  {n:2,title:'HEALTH & FORM PROTOCOL',rules:['All previous rules','Citizens of KREVIA now require Health Clearance','Dates must be DD/MM/YYYY — wrong format = DENY']},
+  {n:3,title:'LABOR & IDENTITY PROTOCOL',rules:['All previous rules','Work visas max 30 days','Photo required on all files']},
+  {n:4,title:'SECURITY ALERT',rules:['All previous rules','NO ENTRY from North Ferran (any purpose)','Name on file must match permit — mismatch = DENY']},
+  {n:5,title:'ASYLUM EXCEPTION',rules:['All previous rules','North Ferran ALLOWED only with Asylum Letter','All other North Ferran = DENY']},
+  {n:6,title:'FINAL AUDIT',rules:['All previous rules active','Forged border stamps = DENY','Supervisor review: 2 warnings = audit fail']},
+];
+
+function evaluate(file, day){
+  let faults=[];
+  // D1
+  if(isExpired(file.expiry)) faults.push({code:'expiry',field:'expiry',reason:'Passport expired'});
+  if(file.origin!=='Valdora' && !file.hasPermit) faults.push({code:'permit',field:'permit',reason:'Missing Entry Permit'});
+  if(file.permitFake) faults.push({code:'permit',field:'permit',reason:'Permit number invalid'});
+  // D2
+  if(day>=2){
+    if(file.origin==='Krevia' && !file.hasHealth) faults.push({code:'health',field:'health',reason:'Krevia requires Health Clearance'});
+    if(file.dateFormatBad) faults.push({code:'dob',field:'dob',reason:'Date format invalid'});
+  }
+  // D3
+  if(day>=3){
+    if(file.purpose==='Work' && file.duration>30) faults.push({code:'duration',field:'duration',reason:'Work duration exceeds 30 days'});
+    if(!file.hasPhoto) faults.push({code:'photo',field:'photo',reason:'Photo missing'});
+  }
+  // D4
+  if(day>=4){
+    if(file.origin==='North Ferran') faults.push({code:'origin',field:'origin',reason:'North Ferran entry suspended'});
+    if(file.nameMismatch) faults.push({code:'name',field:'name',reason:'Name mismatch with permit'});
+  }
+  // D5 exception
+  if(day>=5){
+    if(file.origin==='North Ferran' && file.hasAsylum){
+      faults=faults.filter(f=>f.code!=='origin');
+    }
+  }
+  // D6
+  if(day>=6){
+    if(file.forgedStamp) faults.push({code:'stamp',field:'stamp',reason:'Forged border stamp'});
+  }
+  // deduplicate by code
+  const seen=new Set(); faults=faults.filter(f=>{if(seen.has(f.code)) return false; seen.add(f.code); return true;});
+  return {approve:faults.length===0, faults};
+}
+
+let state={
+  day:1,
+  fileInDay:0,
+  wages:0,
+  stars:0,
+  warnings:0, // per day
+  totalWarnings:0,
+  focus:3,
+  flagged:new Set(),
+  aidsUsed:{cross:false,ruler:false,mag:false,archive:false},
+  history:[], // per file results
+  archiveCode:null,
+  completedDays:0
+};
+
+function load(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return null;
+}
+function save(){
+  const toSave={
+    day:state.day,
+    fileInDay:state.fileInDay,
+    wages:state.wages,
+    stars:state.stars,
+    warnings:state.warnings,
+    totalWarnings:state.totalWarnings,
+    focus:state.focus,
+    completedDays:state.completedDays,
+    archiveCode:state.archiveCode,
+    history:state.history
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+}
+function resetSave(){
+  localStorage.removeItem(STORAGE_KEY);
+  state={day:1,fileInDay:0,wages:0,stars:0,warnings:0,totalWarnings:0,focus:3,flagged:new Set(),aidsUsed:{cross:false,ruler:false,mag:false,archive:false},history:[],archiveCode:null,completedDays:0};
+  renderAll();
+  showStart(true);
+}
+
+function getFileFor(day,fileInDay){
+  const idx=(day-1)*5+fileInDay;
+  return FILES_DATA[idx];
+}
+function currentFile(){
+  return getFileFor(state.day, state.fileInDay);
+}
+
+const els={
+  dayLabel:document.getElementById('dayLabel'),
+  wageLabel:document.getElementById('wageLabel'),
+  starLabel:document.getElementById('starLabel'),
+  warnLabel:document.getElementById('warnLabel'),
+  focusDots:document.getElementById('focusDots'),
+  focusLabel:document.getElementById('focusLabel'),
+  progressBar:document.getElementById('progressBar'),
+  rbDay:document.getElementById('rbDay'),
+  rbTitle:document.getElementById('rbTitle'),
+  rbList:document.getElementById('rbList'),
+  rbBody:document.getElementById('rbBody'),
+  fileId:document.getElementById('fileId'),
+  fileMeta:document.getElementById('fileMeta'),
+  fields:document.getElementById('fields'),
+  hint:document.getElementById('hint'),
+  stampOverlay:document.getElementById('stampOverlay'),
+  stampText:document.getElementById('stampText'),
+  toast:document.getElementById('toast'),
+  startOverlay:document.getElementById('startOverlay'),
+  dayOverlay:document.getElementById('dayOverlay'),
+  helpOverlay:document.getElementById('helpOverlay'),
+};
+
+function showToast(msg, ms=2200){
+  els.toast.textContent=msg;
+  els.toast.classList.add('show');
+  setTimeout(()=>els.toast.classList.remove('show'), ms);
+}
+
+let audioCtx=null, soundOn=true;
+function beep(freq=800, dur=0.12, type='square', vol=0.2){
+  if(!soundOn) return;
+  try{
+    if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type=type; o.frequency.value=freq; g.gain.value=vol;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+dur);
+    o.stop(audioCtx.currentTime+dur);
+  }catch(e){}
+}
+function stampSound(ok){
+  if(ok){ beep(600,0.08,'square',0.25); setTimeout(()=>beep(900,0.12,'square',0.2),80); }
+  else { beep(200,0.2,'sawtooth',0.25); setTimeout(()=>beep(150,0.2,'sawtooth',0.2),120); }
+}
+
+function renderTop(){
+  els.dayLabel.textContent=`DAY ${state.day}/6`;
+  els.dayLabel.nextElementSibling.textContent=`FILE ${state.fileInDay+1}/5`;
+  els.wageLabel.textContent=`$${state.wages}`;
+  els.starLabel.textContent=`${state.stars}★`;
+  els.warnLabel.textContent=`${state.warnings}/3 ⚠`;
+  els.focusLabel.textContent=`${state.focus} LEFT`;
+  els.focusDots.innerHTML='';
+  for(let i=0;i<3;i++){
+    const d=document.createElement('div'); d.className='dot'+(i<state.focus?' on':''); els.focusDots.appendChild(d);
+  }
+  const totalFiles=30;
+  const done=(state.completedDays*5)+state.fileInDay;
+  const pct=Math.round((done/totalFiles)*100);
+  els.progressBar.style.width=pct+'%';
+  // rulebook
+  const dayInfo=DAYS[state.day-1];
+  els.rbDay.textContent=`DAY ${dayInfo.n}`;
+  els.rbTitle.textContent=dayInfo.title;
+  els.rbList.innerHTML='';
+  dayInfo.rules.forEach(r=>{
+    const li=document.createElement('li'); li.textContent=r; els.rbList.appendChild(li);
+  });
+}
+
+function renderFields(){
+  const file=currentFile();
+  if(!file){ els.fields.innerHTML='<div style="padding:20px;text-align:center">No file</div>'; return; }
+  const evalNow=evaluate(file, state.day);
+  // Build fields
+  const fields=[
+    {key:'name',label:'APPLICANT NAME',value:file.name,sub:file.nameMismatch?'⚠ Name on permit differs':'Matches ID'},
+    {key:'dob',label:'DATE OF BIRTH',value:file.dob,sub:file.dateFormatBad?'Format suspect':'DD/MM/YYYY'},
+    {key:'origin',label:'ORIGIN',value:file.origin,sub:file.origin==='North Ferran'?'— Restricted region':file.origin==='Krevia'?'— Health check required from D2':'— Standard'},
+    {key:'passport',label:'PASSPORT NO',value:file.passportNo,sub:`EXPIRY: ${file.expiry}`},
+    {key:'expiry',label:'EXPIRY',value:file.expiry,sub:isExpired(file.expiry)?'✕ EXPIRED vs 01/11/1986':'✓ Valid'},
+    {key:'purpose',label:'PURPOSE',value:file.purpose,sub:`DURATION: ${file.duration} days`},
+    {key:'duration',label:'DURATION',value:file.duration+' days',sub:file.purpose==='Work'&&file.duration>30?'✕ Exceeds 30d (D3+)':'Within limit'},
+    {key:'permit',label:'ENTRY PERMIT',value:file.hasPermit?file.permitNo:'— NONE —',sub:file.permitFake?'✕ Archive: NOT FOUND':file.hasPermit?'✓ On file':'✕ Required for foreigners'},
+    {key:'health',label:'HEALTH CLEARANCE',value:file.hasHealth?'HC-'+file.passportNo:'— NONE —',sub:file.origin==='Krevia'&&!file.hasHealth?'✕ Required for Krevia (D2+)':file.hasHealth?'✓ Cleared':'Not required'},
+    {key:'photo',label:'PHOTO ID',value:file.hasPhoto?'ATTACHED':'MISSING',sub:file.hasPhoto?'✓ Photo present':'✕ Photo required (D3+)',isPhoto:true},
+    {key:'stamp',label:'BORDER STAMP',value:file.forgedStamp?'STAMP-Δ (ink bleed)':'STAMP-✓ (official)',sub:file.forgedStamp?'Suspect forgery':'Official seal'},
+  ];
+  els.fields.innerHTML='';
+  fields.forEach(f=>{
+    const div=document.createElement('div');
+    div.className='field'+(f.key==='name'||f.key==='permit'?' full':'')+(state.flagged.has(f.key)?' flagged':'');
+    if(f.key==='photo' && !file.hasPhoto) div.classList.add('flagged'); // visual hint? no
+    div.dataset.key=f.key;
+    let inner=`<b>${f.label}</b><strong>${f.value}</strong><em>${f.sub}</em><span class="flagBadge">⚑ FLAGGED</span>`;
+    if(f.isPhoto){
+      inner=`<b>${f.label}</b><div class="photoBox"><div class="photo ${file.hasPhoto?'':'missing'}">${file.hasPhoto?'◉':'✕'}</div><div><strong>${f.value}</strong><em>${f.sub}</em></div></div><span class="flagBadge">⚑ FLAGGED</span>`;
+    }
+    div.innerHTML=inner;
+    div.addEventListener('click',()=>toggleFlag(f.key));
+    // aid reveals
+    if(state.aidsUsed.cross && f.key==='name' && file.nameMismatch) div.classList.add('revealed');
+    if(state.aidsUsed.ruler && f.key==='expiry') div.classList.add('revealed');
+    if(state.aidsUsed.mag && f.key==='stamp' && file.forgedStamp) div.classList.add('revealed');
+    if(state.aidsUsed.archive && f.key==='permit') div.classList.add('revealed');
+    els.fields.appendChild(div);
+  });
+  els.fileId.textContent=`FILE ${file.id}`;
+  els.fileMeta.textContent=`NOV 0${state.day} 1986 • DESK 3 • ${file.origin.toUpperCase()}`;
+  // hint
+  const faults=evalNow.faults;
+  if(state.day===1) els.hint.textContent='Day 1: Check EXPIRY vs 01/11/1986 and Entry Permit for foreigners. Tap doubtful fields to flag.';
+  else if(state.day===2) els.hint.textContent='Day 2: Krevia needs Health Clearance. Watch date formats.';
+  else if(state.day===3) els.hint.textContent='Day 3: Work ≤30 days, photo required. Use aids if unsure.';
+  else if(state.day===4) els.hint.textContent='Day 4: North Ferran is BANNED. Name must match permit.';
+  else if(state.day===5) els.hint.textContent='Day 5: North Ferran allowed ONLY with Asylum Letter.';
+  else els.hint.textContent='Day 6: All rules active. Forged stamps are deny. Supervisor is watching.';
+  // aids disabled
+  document.getElementById('aidCross').disabled=state.focus<=0 || state.aidsUsed.cross;
+  document.getElementById('aidRuler').disabled=state.focus<=0 || state.aidsUsed.ruler;
+  document.getElementById('aidMag').disabled=state.focus<=0 || state.aidsUsed.mag;
+  document.getElementById('aidArchive').disabled=state.focus<=0 || state.aidsUsed.archive;
+}
+
+function toggleFlag(key){
+  if(state.flagged.has(key)) state.flagged.delete(key);
+  else state.flagged.add(key);
+  beep(700,0.06,'sine',0.15);
+  renderFields();
+}
+
+function useAid(type){
+  if(state.focus<=0) return;
+  if(state.aidsUsed[type]) return;
+  state.focus--; state.aidsUsed[type]=true;
+  const file=currentFile();
+  let msg='';
+  if(type==='cross'){
+    msg=file.nameMismatch?'Cross-Check: NAME MISMATCH detected — permit name differs.':'Cross-Check: Names match — no issue.';
+  } else if(type==='ruler'){
+    msg=isExpired(file.expiry)?'Date Ruler: PASSPORT EXPIRED vs 01/11/1986.':'Date Ruler: Expiry valid.';
+  } else if(type==='mag'){
+    msg=file.forgedStamp?'Magnifier: Ink bleed — FORGED STAMP.':'Magnifier: Stamp looks official.';
+  } else if(type==='archive'){
+    msg=file.permitFake?'Archive: Permit NOT FOUND — fake number.':!file.hasPermit?'Archive: No permit on record.':`Archive: Permit ${file.permitNo} verified.`;
+  }
+  beep(500,0.1,'triangle',0.2);
+  showToast(msg, 2600);
+  renderAll();
+}
+
+function decide(approve){
+  const file=currentFile();
+  const evalRes=evaluate(file, state.day);
+  const shouldApprove=evalRes.approve;
+  const correct=(approve===shouldApprove);
+  // flag bonus: check if flagged at least one correct fault field when file is invalid, or no flags when valid
+  let flagBonus=0;
+  let flagCorrect=false;
+  if(!shouldApprove){
+    // need to have flagged at least one faulty field
+    const faultyFields=evalRes.faults.map(f=>f.field);
+    for(const f of state.flagged){
+      if(faultyFields.includes(f) || (f==='passport' && faultyFields.includes('expiry'))){
+        flagCorrect=true; break;
+      }
+    }
+    if(flagCorrect) flagBonus=3;
+  } else {
+    // valid file: bonus if no flags or only correct (no false flags)
+    if(state.flagged.size===0) { flagCorrect=true; flagBonus=2; }
+  }
+
+  // stamp animation
+  els.stampText.textContent=approve?'APPROVED':'DENIED';
+  els.stampText.className='stamp '+(approve?'approved':'denied');
+  els.stampOverlay.classList.add('show');
+  stampSound(correct);
+  setTimeout(()=>els.stampOverlay.classList.remove('show'), 900);
+
+  let wageDelta=0, warnDelta=0;
+  if(correct){
+    wageDelta=10+flagBonus;
+    showToast(correct?`✓ Correct! +$${wageDelta}${flagBonus?' (incl. flag bonus)':''}`:`✓ Correct +$${wageDelta}`, 2000);
+  } else {
+    wageDelta=-5;
+    warnDelta=1;
+    showToast(`✕ Wrong ruling — ${evalRes.faults[0]?evalRes.faults[0].reason:'Should be '+(shouldApprove?'APPROVED':'DENIED')} • -$5`, 2600);
+  }
+  state.wages=Math.max(0, state.wages+wageDelta);
+  state.warnings+=warnDelta;
+  state.totalWarnings+=warnDelta;
+
+  state.history.push({day:state.day,file:file.id,decision:approve?'APPROVE':'DENY',correct,flagBonus, faults:evalRes.faults.map(f=>f.code)});
+
+  // check warnings
+  if(state.warnings>=3){
+    // day failed
+    setTimeout(()=>{
+      showDaySummary(true);
+    }, 900);
+    save();
+    return;
+  }
+
+  // advance file
+  state.fileInDay++;
+  state.flagged=new Set();
+  // keep aidsUsed per file? Actually per file? Spec says daily focus on aids. We used per file currently but focus is daily. Keep aidsUsed per file? Better reset per file but focus persists. So reset aidsUsed for next file.
+  state.aidsUsed={cross:false,ruler:false,mag:false,archive:false};
+
+  if(state.fileInDay>=5){
+    // day complete
+    setTimeout(()=>showDaySummary(false), 900);
+  } else {
+    setTimeout(()=>{ renderAll(); save(); }, 900);
+  }
+  save();
+  renderTop();
+}
+
+function showDaySummary(failed){
+  const dayInfo=DAYS[state.day-1];
+  const dayFiles=state.history.filter(h=>h.day===state.day);
+  const correctCount=dayFiles.filter(h=>h.correct).length;
+  const perfect=state.warnings===0 && !failed;
+  let starsEarned=0;
+  if(!failed){
+    starsEarned=1; // completion
+    if(perfect) starsEarned+=1;
+    // flag mastery: at least 3 flag bonuses in day
+    const flagBonuses=dayFiles.filter(h=>h.flagBonus>0).length;
+    if(flagBonuses>=3) starsEarned+=1;
+    state.stars+=starsEarned;
+    state.completedDays=Math.max(state.completedDays, state.day);
+  }
+  // prepare modal
+  const overlay=document.getElementById('dayOverlay');
+  const title=document.getElementById('dayTitle');
+  const starsEl=document.getElementById('dayStars');
+  const body=document.getElementById('dayBody');
+  if(failed){
+    title.textContent=`DAY ${state.day} — SHIFT FAILED`;
+    starsEl.innerHTML='<span style="font-size:12px;color:#fff;background:#b91c1c;padding:4px 8px;border-radius:999px">3 WARNINGS</span>';
+    body.innerHTML=`
+      <p>Supervisor review: <b>too many errors</b>. Your desk is flagged for retraining.</p>
+      <div class="kbd">Correct: ${correctCount}/5 • Warnings: ${state.warnings}/3<br>Wages docked for the day.</div>
+      <p class="small">You keep your wages ($${state.wages}) and stars (${state.stars}★). Retry the day with fresh focus.</p>
+      <button class="btn btnApprove" id="retryBtn" style="width:100%">↻ RETRY DAY ${state.day}</button>
+      <button id="quitBtn" style="width:100%;background:#fff;border:2px solid #000;border-radius:10px;padding:12px;font-weight:800;cursor:pointer">QUIT TO DESK</button>
+    `;
+    body.querySelector('#retryBtn').onclick=()=>{
+      state.warnings=0; state.fileInDay=0; state.focus=3; state.flagged=new Set(); state.aidsUsed={cross:false,ruler:false,mag:false,archive:false};
+      // remove history for this day
+      state.history=state.history.filter(h=>h.day!==state.day);
+      overlay.classList.remove('show');
+      renderAll(); save();
+    };
+    body.querySelector('#quitBtn').onclick=()=>{ overlay.classList.remove('show'); showStart(false); };
+  } else {
+    const isFinal=state.day===6;
+    title.textContent=isFinal?`ARCHIVE COMPLETE`:`DAY ${state.day} COMPLETE`;
+    starsEl.innerHTML='';
+    for(let i=0;i<3;i++){ const s=document.createElement('span'); s.className='star'+(i<starsEarned?' on':''); s.textContent='★'; starsEl.appendChild(s); }
+    const archiveCode=generateArchiveCode();
+    if(isFinal) state.archiveCode=archiveCode;
+    body.innerHTML=`
+      <p>${isFinal?'Final audit passed.':'Shift logged.'} <b>${correctCount}/5 correct</b> • Warnings: ${state.warnings}/3</p>
+      <div class="kbd">
+        Wages: $${state.wages} • Stars: ${state.stars}★<br>
+        ${perfect?'Perfect day bonus! +1★':''} ${starsEarned===3?'• Flag mastery!':''}
+      </div>
+      ${isFinal?`<div class="codeBox">${archiveCode}</div><p class="small">Your Archive Code — proof of service. Persisted on this device. Show it at the bureau.</p>`:''}
+      <div class="starsRow" style="justify-content:center">${'★'.repeat(starsEarned)}<span style="opacity:0.5">${'★'.repeat(3-starsEarned)}</span> <span style="font-size:12px;margin-left:6px">+${starsEarned}★ earned</span></div>
+      ${isFinal?`<button class="btn btnApprove" id="nextBtn" style="width:100%">★ VIEW ARCHIVE CODE</button><button id="replayBtn" style="width:100%;background:#fff;border:2px solid #000;border-radius:10px;padding:12px;font-weight:800;cursor:pointer">REPLAY FROM DAY 1</button>`:`<button class="btn btnApprove" id="nextBtn" style="width:100%">► START DAY ${state.day+1}</button>`}
+    `;
+    body.querySelector('#nextBtn').onclick=()=>{
+      overlay.classList.remove('show');
+      if(isFinal){
+        showArchive();
+      } else {
+        state.day++; state.fileInDay=0; state.warnings=0; state.focus=3; state.flagged=new Set(); state.aidsUsed={cross:false,ruler:false,mag:false,archive:false};
+        renderAll(); save();
+      }
+    };
+    if(isFinal){
+      body.querySelector('#replayBtn').onclick=()=>{
+        overlay.classList.remove('show');
+        state.day=1; state.fileInDay=0; state.warnings=0; state.focus=3; state.flagged=new Set(); state.aidsUsed={cross:false,ruler:false,mag:false,archive:false};
+        // keep wages/stars? replay resets? Let's keep but allow replay
+        renderAll(); save();
+      };
+    }
+  }
+  overlay.classList.add('show');
+  save();
+}
+
+function generateArchiveCode(){
+  const base=`${state.wages}-${state.stars}-${state.totalWarnings}`;
+  let hash=0; for(let i=0;i<base.length;i++) hash=(hash*31+base.charCodeAt(i))%10000;
+  const part1=String(state.wages).padStart(3,'0').slice(-3);
+  const part2=String(state.stars).padStart(2,'0');
+  const part3=String(hash).padStart(4,'0');
+  return `VD-86-${part1}-${part2}-${part3}`;
+}
+
+function showArchive(){
+  const code=state.archiveCode||generateArchiveCode();
+  const overlay=document.getElementById('dayOverlay');
+  document.getElementById('dayTitle').textContent='YOUR ARCHIVE CODE';
+  document.getElementById('dayStars').innerHTML=`<span style="font-size:11px;background:#facc15;color:#000;padding:4px 8px;border-radius:999px;font-weight:800">${state.stars}★ • $${state.wages}</span>`;
+  document.getElementById('dayBody').innerHTML=`
+    <div class="codeBox">${code}</div>
+    <p class="small">Persisted on this device. Copy it for your records. Progress, stars and archive code are saved automatically.</p>
+    <div class="kbd">Days completed: ${state.completedDays}/6<br>Files reviewed: ${state.history.length}/30<br>Total warnings: ${state.totalWarnings}</div>
+    <button class="btn btnApprove" id="closeArchive" style="width:100%">CLOSE</button>
+    <button id="copyCode" style="width:100%;background:#fff;border:2px solid #000;border-radius:10px;padding:12px;font-weight:800;cursor:pointer">COPY CODE</button>
+  `;
+  overlay.classList.add('show');
+  document.getElementById('closeArchive').onclick=()=>overlay.classList.remove('show');
+  document.getElementById('copyCode').onclick=()=>{
+    navigator.clipboard&&navigator.clipboard.writeText(code);
+    showToast('Archive code copied',1500);
+  };
+}
+
+function renderAll(){
+  renderTop();
+  renderFields();
+}
+
+function showStart(force){
+  const saved=load();
+  const overlay=els.startOverlay;
+  const contBtn=document.getElementById('continueBtn');
+  const startBtn=document.getElementById('startBtn');
+  if(saved && saved.day){
+    // restore state
+    state.day=saved.day; state.fileInDay=saved.fileInDay; state.wages=saved.wages; state.stars=saved.stars; state.warnings=saved.warnings||0; state.totalWarnings=saved.totalWarnings||0; state.completedDays=saved.completedDays||0; state.archiveCode=saved.archiveCode||null; state.history=saved.history||[];
+    // focus: if day changed, reset focus else keep? We saved focus? Not in old save, so compute
+    state.focus=saved.focus!==undefined?saved.focus:3;
+    if(state.day>6) state.day=6;
+    startBtn.textContent=`► START SHIFT — DAY ${state.day}`;
+    contBtn.style.display='block';
+    contBtn.textContent=`CONTINUE — DAY ${state.day} FILE ${state.fileInDay+1}/5`;
+    contBtn.onclick=()=>{ overlay.classList.remove('show'); renderAll(); };
+    startBtn.textContent='RESTART FROM DAY 1';
+    startBtn.onclick=()=>{
+      if(confirm('Restart from Day 1? Current progress will be cleared.')){
+        resetSave();
+        overlay.classList.remove('show');
+      }
+    };
+    if(force) overlay.classList.add('show');
+    else if(state.fileInDay===0 && state.day===1 && state.wages===0) overlay.classList.add('show');
+    renderAll();
+  } else {
+    contBtn.style.display='none';
+    startBtn.textContent='► START SHIFT — DAY 1';
+    startBtn.onclick=()=>{ overlay.classList.remove('show'); renderAll(); save(); };
+    overlay.classList.add('show');
+  }
+}
+
+// events
+document.getElementById('rbToggle').addEventListener('click',()=>els.rbBody.classList.toggle('open'));
+document.getElementById('aidCross').addEventListener('click',()=>useAid('cross'));
+document.getElementById('aidRuler').addEventListener('click',()=>useAid('ruler'));
+document.getElementById('aidMag').addEventListener('click',()=>useAid('mag'));
+document.getElementById('aidArchive').addEventListener('click',()=>useAid('archive'));
+document.getElementById('denyBtn').addEventListener('click',()=>decide(false));
+document.getElementById('approveBtn').addEventListener('click',()=>decide(true));
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  if(confirm('Reset all progress, wages, stars and archive code?')) resetSave();
+});
+document.getElementById('helpBtn').addEventListener('click',()=>document.getElementById('helpOverlay').classList.add('show'));
+document.getElementById('closeHelp').addEventListener('click',()=>document.getElementById('helpOverlay').classList.remove('show'));
+document.getElementById('helpOverlay').addEventListener('click',(e)=>{ if(e.target.id==='helpOverlay') e.currentTarget.classList.remove('show'); });
+document.getElementById('archiveBtn').addEventListener('click',()=>{
+  if(state.archiveCode || state.completedDays===6) showArchive();
+  else showToast(`Archive Code unlocks after Day 6 • ${state.completedDays}/6 days done`,2200);
+});
+document.getElementById('soundBtn').addEventListener('click',()=>{
+  soundOn=!soundOn;
+  document.getElementById('soundBtn').textContent=soundOn?'🔊':'🔇';
+  if(soundOn) beep(600,0.08,'sine',0.2);
+});
+document.getElementById('dayOverlay').addEventListener('click',(e)=>{ if(e.target.id==='dayOverlay') e.currentTarget.classList.remove('show'); });
+
+// init
+renderAll();
+showStart(true);
+</script>
+</body>
+</html>

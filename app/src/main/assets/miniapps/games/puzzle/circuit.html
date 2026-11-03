@@ -1,0 +1,158 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Wire Blueprint</title><style>*{box-sizing:border-box;margin:0;padding:0}:root{--bg:#0a1628;--card:#0f2340;--card2:#14365f;--line:#1e4a7a;--accent:#38bdf8;--accent2:#facc15;--good:#4ade80;--bad:#f87171;--text:#e0f2fe;--muted:#7aa8c8}html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}body{max-width:428px;margin:0 auto;overflow-x:hidden}.header{position:sticky;top:0;z-index:10;background:rgba(10,22,40,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 12px;display:flex;justify-content:space-between;align-items:center}.brand{display:flex;gap:10px;align-items:center}.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#38bdf8,#0ea5e9);display:grid;place-items:center;font-size:18px}.brand h1{font-size:14px;line-height:1.1}.brand p{font-size:11px;color:var(--muted)}.pill{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}.pill b{color:var(--text)}.wrap{padding:12px}.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}.hudItem{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}.hudItem b{font-size:18px;display:block}.hudItem span{font-size:11px;color:var(--muted)}.gameArea{position:relative;background:linear-gradient(180deg,#0f2340 0%,#0a1628 100%);border:1px solid var(--line);border-radius:16px;overflow:hidden;padding:12px}.grid{display:grid;gap:4px;justify-content:center;margin:8px 0}.cell{width:64px;height:64px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;position:relative;touch-action:none;user-select:none}.cell:active{transform:scale(.96)}.cell.battery{background:radial-gradient(circle at 30% 30%,#facc15,#eab308);border-color:#facc15}.cell.bulb{background:radial-gradient(circle at 30% 30%,#fef3c7,#f59e0b);border-color:#f59e0b}.cell.bulb.lit{background:radial-gradient(circle at 30% 30%,#fff,#facc15);box-shadow:0 0 16px rgba(250,204,21,.6)}.wire{position:absolute;inset:0;display:grid;place-items:center}.wire i{position:absolute;background:var(--accent);border-radius:2px}.wire i.h{height:6px;width:100%;top:50%;transform:translateY(-50%)}.wire i.v{width:6px;height:100%;left:50%;transform:translateX(-50%)}.wire i.n{width:6px;height:50%;top:0;left:50%;transform:translateX(-50%)}.wire i.e{height:6px;width:50%;right:0;top:50%;transform:translateY(-50%)}.wire i.s{width:6px;height:50%;bottom:0;left:50%;transform:translateX(-50%)}.wire i.w{height:6px;width:50%;left:0;top:50%;transform:translateY(-50%)}.trace{position:absolute;inset:0;pointer-events:none}.trace i{position:absolute;background:var(--good);border-radius:2px;animation:trace .6s ease}.levelBar{display:flex;gap:6px;overflow:auto;padding:6px 0;margin-bottom:8px;scrollbar-width:none}.levelBar::-webkit-scrollbar{display:none}.levelBtn{white-space:nowrap;min-height:36px;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card2);color:var(--muted);font-size:12px;font-weight:700;flex-shrink:0}.levelBtn.active{background:var(--accent);color:#0a1628;border-color:var(--accent)}.levelBtn.done{background:var(--good);color:#0a1628;border-color:var(--good)}.controls{display:flex;gap:8px;margin-top:10px}.btn{border:0;border-radius:12px;padding:12px;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center;justify-content:center;flex:1;gap:8px}.btnPrimary{background:linear-gradient(135deg,#38bdf8,#0ea5e9);color:#0a1628}.btnGhost{background:var(--card2);border:1px solid var(--line);color:var(--text)}.tip{font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px;text-align:center;line-height:1.4}.overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,22,40,.88);padding:16px;text-align:center;border-radius:16px}.hidden{display:none!important}@keyframes trace{0%{opacity:0}100%{opacity:1}}</style></head><body><header class="header"><div class="brand"><div class="logo">🔌</div><div><h1>Wire Blueprint</h1><p>Tap to rotate • Connect all</p></div></div><div class="pill">Best <b id="bestEl">—</b></div></header><div class="wrap"><div class="hud"><div class="hudItem"><b id="movesEl">0</b><span>Moves</span></div><div class="hudItem"><b id="timeEl">0s</b><span>Time</span></div><div class="hudItem"><b id="levelEl">1/6</b><span>Level</span></div></div><div class="levelBar" id="levelBar"></div><div class="gameArea" id="gameArea"><div class="grid" id="grid"></div><div class="overlay" id="startOverlay"><div><h2 style="font-size:20px">📐 Blueprint Wiring</h2><p style="font-size:13px;color:var(--muted);margin:8px 0">Tap cells to <b>rotate wires</b> — connect the <b style="color:#facc15">battery 🔋</b> to every <b style="color:#f59e0b">bulb 💡</b>!<br>Continuous path required.</p><button class="btn btnPrimary" id="playBtn" style="width:100%">▶ Start Wiring</button></div></div><div class="overlay hidden" id="overOverlay"><div><h2 id="overTitle">Circuit Complete!</h2><p id="overDesc" style="font-size:13px;color:var(--muted);margin:8px 0"></p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0"><div style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px"><b id="overMoves" style="font-size:18px;display:block">0</b><span style="font-size:11px;color:var(--muted)">Moves</span></div><div style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px"><b id="overTime" style="font-size:18px;display:block">0s</b><span style="font-size:11px;color:var(--muted)">Time</span></div></div><button class="btn btnPrimary" id="nextBtn" style="width:100%">Next Blueprint</button><button class="btn btnGhost" id="retryBtn" style="width:100%;margin-top:8px">Retry</button></div></div></div><div class="controls"><button class="btn btnGhost" id="resetBtn">↻ Reset</button><button class="btn btnPrimary" id="hintBtn">💡 Hint</button></div><div class="tip">💡 Tap any wire to rotate 90° — build a continuous path from battery to all bulbs!</div></div><script>
+let level=0,moves=0,time=0,timerId=null,playing=false,grid=[],gridSize=4,best=localStorage.getItem('wire-best')||'—',cleared=JSON.parse(localStorage.getItem('wire-cleared')||'[]');
+const LEVELS=[
+{size:4,cells:[
+[{t:'battery',r:0},{t:'h',r:0},{t:'corner',r:0},{t:'bulb',r:0}],
+[{t:'v',r:0},{t:'corner',r:90},{t:'h',r:0},{t:'v',r:0}],
+[{t:'corner',r:180},{t:'h',r:0},{t:'corner',r:270},{t:'bulb',r:0}],
+[{t:'bulb',r:0},{t:'v',r:0},{t:'h',r:0},{t:'corner',r:0}]
+]},
+{size:4,cells:[
+[{t:'battery',r:90},{t:'corner',r:0},{t:'h',r:0},{t:'bulb',r:180}],
+[{t:'v',r:0},{t:'corner',r:180},{t:'corner',r:90},{t:'v',r:0}],
+[{t:'corner',r:0},{t:'h',r:0},{t:'corner',r:270},{t:'bulb',r:90}],
+[{t:'bulb',r:270},{t:'v',r:0},{t:'h',r:0},{t:'corner',r:180}]
+]},
+{size:5,cells:[
+[{t:'battery',r:0},{t:'h',r:90},{t:'corner',r:0},{t:'h',r:0},{t:'bulb',r:0}],
+[{t:'v',r:90},{t:'corner',r:0},{t:'v',r:0},{t:'corner',r:90},{t:'v',r:0}],
+[{t:'corner',r:180},{t:'h',r:0},{t:'corner',r:270},{t:'h',r:0},{t:'bulb',r:0}],
+[{t:'bulb',r:0},{t:'v',r:0},{t:'corner',r:0},{t:'v',r:0},{t:'corner',r:90}],
+[{t:'h',r:0},{t:'corner',r:270},{t:'h',r:0},{t:'corner',r:0},{t:'bulb',r:180}]
+]},
+{size:5,cells:[
+[{t:'battery',r:180},{t:'corner',r:90},{t:'h',r:0},{t:'corner',r:0},{t:'bulb',r:90}],
+[{t:'v',r:0},{t:'corner',r:180},{t:'v',r:0},{t:'corner',r:270},{t:'v',r:0}],
+[{t:'corner',r:0},{t:'h',r:90},{t:'corner',r:0},{t:'h',r:0},{t:'bulb',r:180}],
+[{t:'bulb',r:270},{t:'v',r:0},{t:'corner',r:90},{t:'v',r:0},{t:'corner',r:0}],
+[{t:'h',r:0},{t:'corner',r:270},{t:'h',r:0},{t:'corner',r:180},{t:'bulb',r:0}]
+]},
+{size:6,cells:[
+[{t:'battery',r:0},{t:'h',r:90},{t:'corner',r:0},{t:'h',r:0},{t:'corner',r:90},{t:'bulb',r:0}],
+[{t:'v',r:90},{t:'corner',r:0},{t:'v',r:0},{t:'corner',r:90},{t:'v',r:0},{t:'v',r:0}],
+[{t:'corner',r:180},{t:'h',r:0},{t:'corner',r:270},{t:'h',r:0},{t:'corner',r:0},{t:'bulb',r:0}],
+[{t:'bulb',r:0},{t:'v',r:0},{t:'corner',r:0},{t:'v',r:0},{t:'corner',r:90},{t:'v',r:0}],
+[{t:'h',r:0},{t:'corner',r:270},{t:'h',r:0},{t:'corner',r:0},{t:'h',r:0},{t:'bulb',r:180}],
+[{t:'bulb',r:270},{t:'v',r:0},{t:'h',r:0},{t:'corner',r:180},{t:'v',r:0},{t:'corner',r:0}]
+]},
+{size:6,cells:[
+[{t:'battery',r:90},{t:'corner',r:180},{t:'h',r:0},{t:'corner',r:0},{t:'h',r:90},{t:'bulb',r:180}],
+[{t:'v',r:0},{t:'corner',r:0},{t:'v',r:0},{t:'corner',r:90},{t:'v',r:0},{t:'v',r:0}],
+[{t:'corner',r:0},{t:'h',r:90},{t:'corner',r:270},{t:'h',r:0},{t:'corner',r:0},{t:'bulb',r:90}],
+[{t:'bulb',r:180},{t:'v',r:0},{t:'corner',r:90},{t:'v',r:0},{t:'corner',r:270},{t:'v',r:0}],
+[{t:'h',r:0},{t:'corner',r:270},{t:'h',r:0},{t:'corner',r:0},{t:'h',r:0},{t:'bulb',r:0}],
+[{t:'bulb',r:270},{t:'v',r:0},{t:'h',r:0},{t:'corner',r:180},{t:'v',r:0},{t:'corner',r:90}]
+]}
+];
+function save(){localStorage.setItem('wire-cleared',JSON.stringify(cleared));localStorage.setItem('wire-best',best)}
+function updateHud(){
+document.getElementById('movesEl').textContent=moves;
+document.getElementById('timeEl').textContent=time+'s';
+document.getElementById('levelEl').textContent=(level+1)+'/'+LEVELS.length;
+document.getElementById('bestEl').textContent=best;
+let bar=document.getElementById('levelBar');bar.innerHTML='';
+LEVELS.forEach((l,i)=>{let b=document.createElement('button');b.className='levelBtn'+(i===level?' active':'')+(cleared.includes(i)?' done':'');b.textContent=(cleared.includes(i)?'✓ ':'')+'Plan '+(i+1);b.onclick=()=>{level=i;initLevel()};bar.appendChild(b)});
+}
+function getConnections(type,rot){
+let dirs={h:['w','e'],v:['n','s'],corner:['n','e'],battery:['e'],bulb:['w']}[type]||[];
+let map={n:'e',e:'s',s:'w',w:'n'};
+let r=rot/90;
+for(let i=0;i<r;i++)dirs=dirs.map(d=>map[d]);
+return dirs;
+}
+function initLevel(){
+let lvl=LEVELS[level];
+gridSize=lvl.size;
+grid=lvl.cells.map(row=>row.map(c=>({...c})));
+moves=0;time=0;playing=false;clearInterval(timerId);
+updateHud();render();
+document.getElementById('startOverlay').classList.remove('hidden');
+document.getElementById('overOverlay').classList.add('hidden');
+}
+function render(){
+let g=document.getElementById('grid');
+g.style.gridTemplateColumns=`repeat(${gridSize},64px)`;
+g.innerHTML='';
+for(let y=0;y<gridSize;y++)for(let x=0;x<gridSize;x++){
+let cell=grid[y][x],d=document.createElement('div');
+d.className='cell'+(cell.t==='battery'?' battery':'')+(cell.t==='bulb'?' bulb':'');
+d.innerHTML=cell.t==='battery'?'🔋':cell.t==='bulb'?'💡':'';
+let w=document.createElement('div');w.className='wire';
+let conns=getConnections(cell.t,cell.r);
+conns.forEach(c=>{let i=document.createElement('i');i.className=c;w.appendChild(i)});
+d.appendChild(w);
+d.onclick=()=>rotateCell(x,y);
+g.appendChild(d);
+}
+checkWin();
+}
+function rotateCell(x,y){
+if(!playing){
+playing=true;clearInterval(timerId);timerId=setInterval(()=>{time++;updateHud()},1000);
+document.getElementById('startOverlay').classList.add('hidden');
+}
+grid[y][x].r=(grid[y][x].r+90)%360;
+moves++;updateHud();render();
+if(navigator.vibrate)navigator.vibrate(20);
+}
+function checkWin(){
+let visited=new Set(),queue=[],batteryPos=null,bulbPos=[];
+for(let y=0;y<gridSize;y++)for(let x=0;x<gridSize;x++){
+if(grid[y][x].t==='battery')batteryPos={x,y};
+if(grid[y][x].t==='bulb')bulbPos.push({x,y});
+}
+if(!batteryPos)return;
+queue.push(batteryPos);visited.add(batteryPos.x+','+batteryPos.y);
+while(queue.length){
+let cur=queue.shift(),conns=getConnections(grid[cur.y][cur.x].t,grid[cur.y][cur.x].r);
+let dirs={n:{x:0,y:-1,opp:'s'},e:{x:1,y:0,opp:'w'},s:{x:0,y:1,opp:'n'},w:{x:-1,y:0,opp:'e'}};
+for(let d of conns){
+let nd=dirs[d],nx=cur.x+nd.x,ny=cur.y+nd.y;
+if(nx<0||ny<0||nx>=gridSize||ny>=gridSize)continue;
+let nconns=getConnections(grid[ny][nx].t,grid[ny][nx].r);
+if(nconns.includes(nd.opp)&&!visited.has(nx+','+ny)){
+visited.add(nx+','+ny);queue.push({x:nx,y:ny});
+}
+}
+}
+let allLit=bulbPos.every(p=>visited.has(p.x+','+p.y));
+if(allLit&&playing){
+playing=false;clearInterval(timerId);
+if(!cleared.includes(level))cleared.push(level);
+let score=Math.max(1000 - moves*20 - time*5,100);
+if(best==='—'||score>parseInt(best))best=score;
+save();
+document.getElementById('overTitle').textContent='Circuit Complete! ⚡';
+document.getElementById('overDesc').textContent='All bulbs powered — blueprint solved!';
+document.getElementById('overMoves').textContent=moves;
+document.getElementById('overTime').textContent=time+'s';
+document.getElementById('overOverlay').classList.remove('hidden');
+updateHud();
+// trace animation
+document.querySelectorAll('.cell').forEach((c,i)=>{
+let x=i%gridSize,y=Math.floor(i/gridSize);
+if(visited.has(x+','+y)){
+let t=document.createElement('div');t.className='trace';
+let conns=getConnections(grid[y][x].t,grid[y][x].r);
+conns.forEach(conn=>{let el=document.createElement('i');el.className=conn;el.style.background='var(--good)';t.appendChild(el)});
+c.appendChild(t);
+}
+});
+if(navigator.vibrate)navigator.vibrate([50,30,50]);
+}
+}
+document.getElementById('playBtn').onclick=()=>{
+playing=true;clearInterval(timerId);timerId=setInterval(()=>{time++;updateHud()},1000);
+document.getElementById('startOverlay').classList.add('hidden');
+};
+document.getElementById('nextBtn').onclick=()=>{level=Math.min(LEVELS.length-1,level+1);initLevel()};
+document.getElementById('retryBtn').onclick=()=>initLevel();
+document.getElementById('resetBtn').onclick=()=>{cleared=[];best='—';save();level=0;initLevel()};
+document.getElementById('hintBtn').onclick=()=>{
+let cells=document.querySelectorAll('.cell');
+let idx=Math.floor(Math.random()*cells.length);
+cells[idx].style.outline='2px solid var(--accent)';
+setTimeout(()=>cells[idx].style.outline='',800);
+};
+initLevel();
+</script></body></html>

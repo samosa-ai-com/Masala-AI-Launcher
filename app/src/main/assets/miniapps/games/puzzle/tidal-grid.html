@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Tide Grid — Island Power</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--navy:#0a1e3c;--deep:#0f2f5a;--sea:#123d6b;--teal:#1a8a8a;--aqua:#2ec4b6;--sand:#f4e4bc;--sand2:#e8d5a3;--coral:#ff6b6b;--gold:#ffd166;--lime:#06d6a0;--ink:#0a1e3c}
+html,body{background:#07162e;color:#eaf6ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;min-height:100%}
+body{display:flex;justify-content:center}
+.wrap{width:100%;max-width:428px;min-width:360px;padding:12px 12px 24px}
+header{background:linear-gradient(180deg,#0f2f5a 0%,#0a1e3c 100%);border:1px solid #1e4a7a;border-radius:16px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.hrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.logo{display:flex;align-items:center;gap:10px}
+.badge{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#2ec4b6,#1a8a8a);display:grid;place-items:center;font-size:18px;border:1px solid #3dd9cc}
+h1{font-size:18px;letter-spacing:.4px;line-height:1}
+h1 span{color:#2ec4b6}
+.sub{font-size:11px;opacity:.8;margin-top:2px;letter-spacing:.3px}
+.iconbtn{width:40px;height:40px;border-radius:12px;border:1px solid #2a5a8a;background:#0f2f5a;color:#eaf6ff;display:grid;place-items:center;font-size:16px}
+.iconbtn:active{transform:scale(.97)}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+.stat{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px 10px;text-align:center}
+.stat .k{font-size:10px;letter-spacing:.6px;opacity:.7;text-transform:uppercase}
+.stat .v{font-size:16px;font-weight:800;margin-top:2px}
+.stat .v small{font-weight:600;opacity:.8;font-size:12px}
+.levelbar{display:flex;align-items:center;gap:8px;margin-top:10px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.levelbar::-webkit-scrollbar{display:none}
+.lv{flex:0 0 auto;width:36px;height:36px;border-radius:10px;border:1px solid #2a5a8a;background:#0f2f5a;color:#cfe8ff;display:grid;place-items:center;font-weight:800;font-size:13px;position:relative}
+.lv.active{background:linear-gradient(135deg,#ffd166,#ffb703);color:#0a1e3c;border-color:#ffd166;box-shadow:0 4px 12px rgba(255,209,102,.4)}
+.lv.done::after{content:'★';position:absolute;top:-6px;right:-6px;font-size:10px;background:#06d6a0;color:#07162e;width:16px;height:16px;border-radius:50%;display:grid;place-items:center;border:1px solid #fff}
+.lv.lock{opacity:.4}
+.tidebar{background:linear-gradient(180deg,#0e3a6b,#0a2a4f);border:1px solid #1e4a7a;border-radius:14px;padding:10px;margin-top:12px}
+.tidehead{display:flex;justify-content:space-between;align-items:center}
+.tidehead h2{font-size:12px;letter-spacing:.6px;text-transform:uppercase;opacity:.9}
+.tidehead .hint{font-size:11px;opacity:.7}
+.tides{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+.tide{border-radius:12px;border:1px solid #2a5a8a;background:#0f2f5a;padding:8px 6px;text-align:center;position:relative;overflow:hidden}
+.tide.active{border-color:#2ec4b6;background:linear-gradient(180deg,#134a6b,#0f2f5a);box-shadow:0 0 0 2px rgba(46,196,182,.25) inset}
+.tide .name{font-size:12px;font-weight:800;letter-spacing:.4px}
+.tide .meta{font-size:10px;opacity:.8;margin-top:2px}
+.tide .status{margin-top:6px;font-size:11px;font-weight:700;padding:4px 6px;border-radius:8px}
+.pass{background:rgba(6,214,160,.15);color:#06d6a0;border:1px solid rgba(6,214,160,.4)}
+.fail{background:rgba(255,107,107,.12);color:#ff8a8a;border:1px solid rgba(255,107,107,.35)}
+.neutral{background:rgba(255,255,255,.06);color:#cfe8ff;border:1px solid rgba(255,255,255,.12)}
+.boardwrap{background:linear-gradient(180deg,#f4e4bc 0%,#e8d5a3 100%);border-radius:16px;padding:10px;margin-top:12px;border:1px solid #d9c48a;box-shadow:0 8px 20px rgba(0,0,0,.25)}
+.boardhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.boardhead h3{font-size:13px;color:#0a1e3c;letter-spacing:.4px}
+.boardhead .par{font-size:11px;background:#0a1e3c;color:#ffd166;padding:4px 8px;border-radius:20px;font-weight:700}
+.grid{--n:5;display:grid;grid-template-columns:repeat(var(--n),1fr);gap:6px;background:linear-gradient(180deg,#1a5a8a,#0f3a6b);padding:6px;border-radius:12px;border:1px solid #0a2a4f}
+.cell{aspect-ratio:1;background:linear-gradient(180deg,#f7ecd0,#e8d5a3);border-radius:10px;position:relative;overflow:hidden;border:1px solid #c9b77a;display:grid;place-items:center;touch-action:manipulation;user-select:none}
+.cell.water{background:linear-gradient(180deg,#1a6fa0,#0f3a6b);border-color:#0a2a4f}
+.cell.flooded{opacity:.55;filter:grayscale(.2)}
+.cell.flooded::after{content:'≋';position:absolute;inset:0;display:grid;place-items:center;font-size:22px;color:rgba(255,255,255,.85);background:linear-gradient(180deg,rgba(26,111,160,.55),rgba(15,58,107,.75));}
+.cell.source{background:linear-gradient(180deg,#ffd166,#ffb703);border-color:#e6a800}
+.cell.load{background:linear-gradient(180deg,#ffffff,#e6f0ff);border-color:#8ab4ff}
+.cell:active{transform:scale(.98)}
+.cable{position:absolute;inset:0;display:grid;place-items:center}
+.arm{position:absolute;background:#0a1e3c;border-radius:2px}
+.arm.n{width:6px;height:50%;top:0;left:50%;transform:translateX(-50%)}
+.arm.e{height:6px;width:50%;right:0;top:50%;transform:translateY(-50%)}
+.arm.s{width:6px;height:50%;bottom:0;left:50%;transform:translateX(-50%)}
+.arm.w{height:6px;width:50%;left:0;top:50%;transform:translateY(-50%)}
+.dot{width:14px;height:14px;background:#0a1e3c;border-radius:50%;border:2px solid #ffd166;z-index:2}
+.cell.source .dot{background:#ff6b6b;border-color:#fff;width:16px;height:16px}
+.cell.load .dot{background:#1a8a8a;border-color:#0a1e3c}
+.elev{position:absolute;bottom:3px;right:4px;font-size:8px;font-weight:800;letter-spacing:.4px;padding:2px 4px;border-radius:6px;z-index:3}
+.elev.high{background:#06d6a0;color:#07162e}
+.elev.mid{background:#ffd166;color:#0a1e3c}
+.elev.low{background:#ff6b6b;color:#fff}
+.icon{position:absolute;top:4px;left:50%;transform:translateX(-50%);font-size:14px;z-index:3;line-height:1}
+.floodTag{position:absolute;top:3px;right:3px;font-size:8px;background:rgba(10,30,60,.85);color:#fff;padding:2px 4px;border-radius:6px;z-index:4}
+.controls{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:10px}
+.btn{height:44px;border-radius:12px;border:1px solid #1e4a7a;background:#0f2f5a;color:#eaf6ff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn.primary{background:linear-gradient(135deg,#2ec4b6,#1a8a8a);color:#07162e;border-color:#2ec4b6}
+.btn.gold{background:linear-gradient(135deg,#ffd166,#ffb703);color:#0a1e3c;border-color:#e6a800}
+.btn:disabled{opacity:.45}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.chip{font-size:10px;padding:4px 8px;border-radius:20px;background:rgba(10,30,60,.08);border:1px solid rgba(10,30,60,.12);color:#0a1e3c;font-weight:600}
+.msg{margin-top:10px;background:#0a1e3c;color:#eaf6ff;border:1px solid #1e4a7a;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.4;display:none}
+.msg.show{display:block}
+.stars{color:#ffb703;letter-spacing:2px}
+.archive{margin-top:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px}
+.archive h4{font-size:12px;letter-spacing:.5px;text-transform:uppercase;opacity:.9}
+.archive .row{display:flex;gap:8px;margin-top:8px}
+.input{flex:1;height:40px;border-radius:10px;border:1px solid #2a5a8a;background:#07162e;color:#eaf6ff;padding:0 10px;font-size:12px}
+.small{font-size:11px;opacity:.75;margin-top:6px;line-height:1.4}
+.footer{margin-top:12px;text-align:center;font-size:11px;opacity:.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="hrow">
+      <div class="logo">
+        <div class="badge">≋</div>
+        <div>
+          <h1>TIDE <span>GRID</span></h1>
+          <div class="sub">Island Power Network • Rotate to connect</div>
+        </div>
+      </div>
+      <button class="iconbtn" id="helpBtn" aria-label="Help">?</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="k">Rotations</div><div class="v" id="rotV">0 <small>/ 8 par</small></div></div>
+      <div class="stat"><div class="k">Hints</div><div class="v" id="hintV">0</div></div>
+      <div class="stat"><div class="k">Contract</div><div class="v" id="starV"><span class="stars">☆☆☆</span></div></div>
+    </div>
+    <div class="levelbar" id="levelBar"></div>
+  </header>
+
+  <div class="tidebar">
+    <div class="tidehead"><h2>Tide Preview</h2><div class="hint">Tap to preview • One network must pass all</div></div>
+    <div class="tides">
+      <button class="tide active" data-tide="0"><div class="name">LOW</div><div class="meta" id="meta0">6 loads</div><div class="status neutral" id="status0">—</div></button>
+      <button class="tide" data-tide="1"><div class="name">MID</div><div class="meta" id="meta1">4 loads</div><div class="status neutral" id="status1">—</div></button>
+      <button class="tide" data-tide="2"><div class="name">HIGH</div><div class="meta" id="meta2">2 loads</div><div class="status neutral" id="status2">—</div></button>
+    </div>
+  </div>
+
+  <div class="boardwrap">
+    <div class="boardhead"><h3 id="levelName">Bay 1 — First Light</h3><div class="par" id="parTag">PAR 6</div></div>
+    <div class="grid" id="grid"></div>
+    <div class="legend">
+      <span class="chip">⛯ Source</span><span class="chip">⌂ Load</span><span class="chip" style="background:#06d6a0;color:#07162e">HIGH ground</span><span class="chip" style="background:#ffd166">MID</span><span class="chip" style="background:#ff6b6b;color:#fff">LOW floods first</span>
+    </div>
+    <div class="controls">
+      <button class="btn" id="undoBtn">↩ Undo</button>
+      <button class="btn" id="hintBtn">💡 Hint</button>
+      <button class="btn" id="resetBtn">↺ Reset</button>
+      <button class="btn primary" id="checkBtn">✓ Check</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div class="archive">
+    <h4>Saved Progress + Archive Code</h4>
+    <div class="row">
+      <input class="input" id="codeInput" placeholder="Archive code (tap Export to copy)">
+      <button class="btn gold" id="exportBtn" style="height:40px;padding:0 14px">⎙ Export</button>
+    </div>
+    <div class="row">
+      <button class="btn" id="importBtn" style="flex:1">Import Code</button>
+      <button class="btn" id="wipeBtn" style="flex:1">Wipe Save</button>
+    </div>
+    <div class="small">Progress auto-saves. Contract stars require <b>zero hints</b> and ≤ par rotations. Export copies a code you can paste on another device.</div>
+  </div>
+  <div class="footer">Sea-grid style • Large tap targets • No horizontal scroll • 360–428px portrait</div>
+</div>
+
+<script>
+const LEVELS = [
+  // Level 1 - 4x4 all high
+  {id:1,name:"First Light",size:4,par:6,
+   cells:[
+    [{t:'source',sol:1,e:2},{t:'straight',sol:1,e:2},{t:'tee',sol:1,e:2},{t:'load',sol:2,e:2}],
+    [{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:2}],
+    [{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'corner',sol:0,e:2},{t:'corner',sol:2,e:2}],
+    [{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'load',sol:0,e:2}],
+   ]},
+  {id:2,name:"Crosswind",size:4,par:7,
+   cells:[
+    [{t:'load',sol:1,e:2},{t:'corner',sol:1,e:2},{t:'straight',sol:1,e:2},{t:'load',sol:3,e:2}],
+    [{t:'empty',sol:0,e:2},{t:'corner',sol:3,e:2},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2}],
+    [{t:'source',sol:0,e:2},{t:'tee',sol:0,e:2},{t:'corner',sol:2,e:2},{t:'empty',sol:0,e:2}],
+    [{t:'empty',sol:0,e:2},{t:'straight',sol:0,e:2},{t:'load',sol:0,e:2},{t:'empty',sol:0,e:2}],
+   ]},
+  {id:3,name:"Harbor Bend",size:5,par:9,
+   cells:[
+    [{t:'source',sol:1,e:2},{t:'straight',sol:1,e:2},{t:'corner',sol:1,e:2},{t:'empty',sol:0,e:2},{t:'load',sol:2,e:2}],
+    [{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'straight',sol:0,e:2}],
+    [{t:'empty',sol:0,e:2},{t:'corner',sol:0,e:2},{t:'tee',sol:2,e:2},{t:'corner',sol:3,e:2},{t:'corner',sol:2,e:2}],
+    [{t:'empty',sol:0,e:2},{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2}],
+    [{t:'load',sol:0,e:2},{t:'corner',sol:3,e:2},{t:'straight',sol:1,e:2},{t:'corner',sol:2,e:2},{t:'load',sol:3,e:2}],
+   ]},
+  {id:4,name:"Three Docks",size:5,par:11,
+   cells:[
+    [{t:'load',sol:2,e:2},{t:'corner',sol:2,e:2},{t:'straight',sol:1,e:2},{t:'corner',sol:1,e:2},{t:'load',sol:2,e:2}],
+    [{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'straight',sol:0,e:2}],
+    [{t:'tee',sol:3,e:2},{t:'straight',sol:1,e:2},{t:'source',sol:1,e:2},{t:'straight',sol:1,e:2},{t:'tee',sol:1,e:2}],
+    [{t:'corner',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'corner',sol:3,e:2}],
+    [{t:'load',sol:0,e:2},{t:'straight',sol:1,e:2},{t:'load',sol:0,e:2},{t:'straight',sol:1,e:2},{t:'empty',sol:0,e:2}],
+   ]},
+  // Flooding starts
+  {id:5,name:"Rising Water",size:5,par:10,
+   cells:[
+    [{t:'source',sol:1,e:2},{t:'straight',sol:1,e:2},{t:'corner',sol:1,e:2},{t:'empty',sol:0,e:2},{t:'load',sol:2,e:1}],
+    [{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'straight',sol:0,e:1}],
+    [{t:'load',sol:0,e:2},{t:'corner',sol:0,e:2},{t:'tee',sol:0,e:2},{t:'corner',sol:3,e:2},{t:'corner',sol:2,e:1}],
+    [{t:'empty',sol:0,e:0},{t:'straight',sol:0,e:0},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'empty',sol:0,e:2}],
+    [{t:'load',sol:1,e:0},{t:'straight',sol:1,e:0},{t:'load',sol:3,e:2},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2}],
+   ]},
+  {id:6,name:"Mid-Tide Cut",size:5,par:12,
+   cells:[
+    [{t:'load',sol:2,e:1},{t:'corner',sol:2,e:1},{t:'straight',sol:1,e:2},{t:'corner',sol:1,e:2},{t:'load',sol:2,e:2}],
+    [{t:'straight',sol:0,e:1},{t:'empty',sol:0,e:0},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'straight',sol:0,e:2}],
+    [{t:'source',sol:1,e:2},{t:'tee',sol:0,e:2},{t:'tee',sol:3,e:2},{t:'tee',sol:1,e:2},{t:'corner',sol:2,e:2}],
+    [{t:'empty',sol:0,e:0},{t:'corner',sol:0,e:0},{t:'straight',sol:1,e:0},{t:'corner',sol:3,e:0},{t:'straight',sol:0,e:1}],
+    [{t:'empty',sol:0,e:2},{t:'load',sol:0,e:0},{t:'empty',sol:0,e:2},{t:'load',sol:0,e:1},{t:'empty',sol:0,e:2}],
+   ]},
+  {id:7,name:"Atoll Loop",size:6,par:14,
+   cells:[
+    [{t:'source',sol:1,e:2},{t:'straight',sol:1,e:2},{t:'corner',sol:1,e:2},{t:'empty',sol:0,e:0},{t:'load',sol:2,e:1},{t:'empty',sol:0,e:2}],
+    [{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'straight',sol:0,e:1},{t:'empty',sol:0,e:2}],
+    [{t:'load',sol:1,e:2},{t:'corner',sol:0,e:2},{t:'tee',sol:0,e:2},{t:'corner',sol:3,e:2},{t:'corner',sol:2,e:1},{t:'empty',sol:0,e:2}],
+    [{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'empty',sol:0,e:2},{t:'load',sol:3,e:2}],
+    [{t:'corner',sol:0,e:2},{t:'straight',sol:1,e:0},{t:'corner',sol:2,e:2},{t:'straight',sol:1,e:0},{t:'corner',sol:2,e:0},{t:'straight',sol:0,e:2}],
+    [{t:'load',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'load',sol:0,e:0},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2}],
+   ]},
+  {id:8,name:"Storm Channel",size:6,par:16,
+   cells:[
+    [{t:'load',sol:2,e:1},{t:'corner',sol:2,e:1},{t:'straight',sol:1,e:2},{t:'corner',sol:1,e:2},{t:'load',sol:2,e:2},{t:'empty',sol:0,e:2}],
+    [{t:'straight',sol:0,e:1},{t:'empty',sol:0,e:0},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:2}],
+    [{t:'tee',sol:3,e:2},{t:'straight',sol:1,e:2},{t:'source',sol:0,e:2},{t:'straight',sol:1,e:2},{t:'tee',sol:1,e:2},{t:'corner',sol:1,e:2}],
+    [{t:'corner',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'corner',sol:3,e:2},{t:'straight',sol:0,e:2}],
+    [{t:'load',sol:0,e:0},{t:'straight',sol:1,e:0},{t:'corner',sol:3,e:2},{t:'straight',sol:1,e:0},{t:'load',sol:0,e:1},{t:'corner',sol:2,e:2}],
+    [{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'load',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2}],
+   ]},
+  {id:9,name:"Low Bank",size:6,par:18,
+   cells:[
+    [{t:'source',sol:1,e:2},{t:'straight',sol:1,e:2},{t:'corner',sol:1,e:2},{t:'empty',sol:0,e:0},{t:'load',sol:2,e:0},{t:'load',sol:2,e:1}],
+    [{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'straight',sol:0,e:0},{t:'straight',sol:0,e:1}],
+    [{t:'load',sol:1,e:2},{t:'corner',sol:0,e:2},{t:'tee',sol:2,e:2},{t:'corner',sol:3,e:2},{t:'corner',sol:2,e:0},{t:'corner',sol:2,e:1}],
+    [{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'tee',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'empty',sol:0,e:2},{t:'straight',sol:0,e:1}],
+    [{t:'corner',sol:0,e:2},{t:'straight',sol:1,e:0},{t:'corner',sol:1,e:2},{t:'straight',sol:1,e:0},{t:'corner',sol:2,e:0},{t:'load',sol:3,e:2}],
+    [{t:'load',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'load',sol:0,e:0},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2}],
+   ]},
+  {id:10,name:"High Ground",size:6,par:20,
+   cells:[
+    [{t:'load',sol:2,e:0},{t:'corner',sol:2,e:0},{t:'straight',sol:1,e:2},{t:'corner',sol:1,e:2},{t:'load',sol:2,e:2},{t:'empty',sol:0,e:2}],
+    [{t:'straight',sol:0,e:0},{t:'empty',sol:0,e:0},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:2}],
+    [{t:'source',sol:1,e:2},{t:'tee',sol:0,e:2},{t:'cross',sol:0,e:2},{t:'tee',sol:1,e:2},{t:'tee',sol:1,e:2},{t:'corner',sol:1,e:2}],
+    [{t:'empty',sol:0,e:2},{t:'corner',sol:0,e:0},{t:'straight',sol:0,e:2},{t:'corner',sol:3,e:0},{t:'corner',sol:3,e:1},{t:'straight',sol:0,e:2}],
+    [{t:'load',sol:1,e:2},{t:'straight',sol:1,e:0},{t:'corner',sol:3,e:2},{t:'straight',sol:1,e:0},{t:'load',sol:0,e:1},{t:'corner',sol:2,e:2}],
+    [{t:'empty',sol:0,e:2},{t:'load',sol:0,e:0},{t:'empty',sol:0,e:2},{t:'load',sol:0,e:1},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2}],
+   ]},
+  {id:11,name:"King Tide",size:6,par:22,
+   cells:[
+    [{t:'source',sol:1,e:2},{t:'straight',sol:1,e:2},{t:'corner',sol:1,e:2},{t:'empty',sol:0,e:0},{t:'load',sol:2,e:0},{t:'load',sol:2,e:1}],
+    [{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'straight',sol:0,e:0},{t:'straight',sol:0,e:1}],
+    [{t:'load',sol:1,e:2},{t:'corner',sol:0,e:2},{t:'tee',sol:0,e:2},{t:'corner',sol:3,e:2},{t:'corner',sol:2,e:0},{t:'corner',sol:2,e:1}],
+    [{t:'straight',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'tee',sol:3,e:2},{t:'straight',sol:1,e:0},{t:'corner',sol:3,e:0},{t:'straight',sol:0,e:1}],
+    [{t:'corner',sol:0,e:2},{t:'straight',sol:1,e:0},{t:'corner',sol:2,e:2},{t:'corner',sol:0,e:0},{t:'load',sol:3,e:1},{t:'load',sol:3,e:2}],
+    [{t:'load',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2},{t:'load',sol:1,e:0},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2}],
+   ]},
+  {id:12,name:"Archipelago",size:6,par:24,
+   cells:[
+    [{t:'load',sol:2,e:0},{t:'corner',sol:2,e:0},{t:'straight',sol:1,e:2},{t:'corner',sol:1,e:2},{t:'load',sol:2,e:1},{t:'load',sol:2,e:2}],
+    [{t:'straight',sol:0,e:0},{t:'empty',sol:0,e:0},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:0},{t:'straight',sol:0,e:1},{t:'straight',sol:0,e:2}],
+    [{t:'source',sol:1,e:2},{t:'tee',sol:0,e:2},{t:'cross',sol:0,e:2},{t:'tee',sol:1,e:2},{t:'tee',sol:1,e:2},{t:'corner',sol:1,e:2}],
+    [{t:'empty',sol:0,e:2},{t:'corner',sol:0,e:0},{t:'straight',sol:0,e:2},{t:'corner',sol:3,e:0},{t:'corner',sol:3,e:0},{t:'straight',sol:0,e:2}],
+    [{t:'load',sol:1,e:2},{t:'straight',sol:1,e:0},{t:'corner',sol:3,e:2},{t:'straight',sol:1,e:0},{t:'load',sol:0,e:0},{t:'corner',sol:2,e:1}],
+    [{t:'empty',sol:0,e:2},{t:'load',sol:0,e:0},{t:'empty',sol:0,e:2},{t:'load',sol:0,e:1},{t:'empty',sol:0,e:2},{t:'empty',sol:0,e:2}],
+   ]},
+];
+
+let state = {
+  level:1,
+  rot:[], // 2D current rotations
+  moves:0,
+  hints:0,
+  history:[],
+  tide:0,
+  progress:{} // levelId -> {bestMoves, stars, solved}
+};
+
+const STORAGE_KEY='tidegrid_v1';
+const CODE_PREFIX='TG1-';
+
+function getConnections(type, rot){
+  rot=((rot%4)+4)%4;
+  if(type==='empty') return [];
+  if(type==='straight') return rot%2===0 ? ['n','s'] : ['e','w'];
+  if(type==='corner'){
+    if(rot===0) return ['n','e'];
+    if(rot===1) return ['e','s'];
+    if(rot===2) return ['s','w'];
+    return ['w','n'];
+  }
+  if(type==='tee'){
+    if(rot===0) return ['n','e','s'];
+    if(rot===1) return ['e','s','w'];
+    if(rot===2) return ['s','w','n'];
+    return ['w','n','e'];
+  }
+  if(type==='cross') return ['n','e','s','w'];
+  if(type==='source' || type==='load'){
+    if(rot===0) return ['n'];
+    if(rot===1) return ['e'];
+    if(rot===2) return ['s'];
+    return ['w'];
+  }
+  return [];
+}
+
+function loadStorage(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(raw) {
+      const p=JSON.parse(raw);
+      if(p.progress) state.progress=p.progress;
+      if(p.level) state.level=p.level;
+    }
+  }catch(e){}
+}
+function saveStorage(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({progress:state.progress, level:state.level}));
+}
+function makeArchiveCode(){
+  const data={progress:state.progress, level:state.level, v:1};
+  return CODE_PREFIX + btoa(JSON.stringify(data)).replace(/=+$/,'');
+}
+function tryImportCode(code){
+  code=code.trim();
+  if(code.startsWith(CODE_PREFIX)) code=code.slice(CODE_PREFIX.length);
+  try{
+    // pad base64
+    code=code.replace(/-/g,'+').replace(/_/g,'/');
+    while(code.length%4) code+='=';
+    const obj=JSON.parse(atob(code));
+    if(obj.progress) state.progress=obj.progress;
+    if(obj.level) state.level=obj.level;
+    saveStorage();
+    return true;
+  }catch(e){ return false; }
+}
+
+function currentLevel(){ return LEVELS.find(l=>l.id===state.level); }
+
+function initRotations(){
+  const lv=currentLevel();
+  state.rot = lv.cells.map(row=> row.map(c=>{
+    if(c.t==='empty' || c.t==='cross') return c.sol;
+    // scramble: +1 or +2 or +3
+    let off = (c.sol + 1 + Math.floor(Math.random()*3)) %4;
+    // for straight, ensure different orientation
+    if(c.t==='straight' && off%2===c.sol%2) off=(off+1)%4;
+    return off;
+  }));
+  // For deterministic par, we will compute par as sum of clockwise steps from init to sol
+  // But we want par to match level.par, so we override moves counting to use actual steps
+  // We'll keep init as above and compute par dynamically? Use level.par as target
+  state.moves=0;
+  state.hints=0;
+  state.history=[];
+}
+
+function computeParSteps(){
+  const lv=currentLevel();
+  let sum=0;
+  for(let r=0;r<lv.size;r++) for(let c=0;c<lv.size;c++){
+    const cell=lv.cells[r][c];
+    if(cell.t==='empty' || cell.t==='cross') continue;
+    const cur=state.rot[r][c];
+    const sol=cell.sol;
+    const steps=(sol - cur + 4)%4;
+    // for straight, 2 steps is max meaningful (opposite), but clockwise 2 is same as 2
+    sum+=steps;
+  }
+  return sum;
+}
+
+function isTileActive(r,c,tide){
+  const lv=currentLevel();
+  const cell=lv.cells[r][c];
+  if(cell.t==='empty') return false;
+  return cell.e >= tide;
+}
+function isLoadActive(r,c,tide){
+  const lv=currentLevel();
+  const cell=lv.cells[r][c];
+  if(cell.t!=='load') return false;
+  return cell.e >= tide;
+}
+
+function checkTide(tide){
+  const lv=currentLevel();
+  const n=lv.size;
+  // find sources active
+  let sources=[];
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++){
+    if(lv.cells[r][c].t==='source' && isTileActive(r,c,tide)) sources.push([r,c]);
+  }
+  if(sources.length===0) return {pass:false, reason:'Source flooded'};
+  // BFS
+  const visited=Array.from({length:n},()=>Array(n).fill(false));
+  const q=[...sources];
+  sources.forEach(([r,c])=> visited[r][c]=true);
+  const dirs={n:[-1,0],e:[0,1],s:[1,0],w:[0,-1]};
+  const opp={n:'s',s:'n',e:'w',w:'e'};
+  while(q.length){
+    const [r,c]=q.shift();
+    const cell=lv.cells[r][c];
+    if(!isTileActive(r,c,tide)) continue;
+    const conns=getConnections(cell.t, state.rot[r][c]);
+    for(const d of conns){
+      const [dr,dc]=dirs[d];
+      const nr=r+dr, nc=c+dc;
+      if(nr<0||nr>=n||nc<0||nc>=n) continue;
+      if(!isTileActive(nr,nc,tide)) continue;
+      const ncell=lv.cells[nr][nc];
+      const nconns=getConnections(ncell.t, state.rot[nr][nc]);
+      if(!nconns.includes(opp[d])) continue;
+      if(!visited[nr][nc]){
+        visited[nr][nc]=true;
+        q.push([nr,nc]);
+      }
+    }
+  }
+  // check all active loads visited
+  let activeLoads=0, reached=0;
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++){
+    if(isLoadActive(r,c,tide)){
+      activeLoads++;
+      if(visited[r][c]) reached++;
+    }
+  }
+  if(activeLoads===0) return {pass:true, reached, activeLoads};
+  return {pass: reached===activeLoads, reached, activeLoads};
+}
+
+function checkAllTides(){
+  return [0,1,2].map(t=> checkTide(t));
+}
+
+function renderLevelBar(){
+  const bar=document.getElementById('levelBar');
+  bar.innerHTML='';
+  LEVELS.forEach(lv=>{
+    const b=document.createElement('button');
+    b.className='lv'+(lv.id===state.level?' active':'')+(state.progress[lv.id]?.solved?' done':'')+(lv.id>1 && !state.progress[lv.id-1]?.solved ? ' lock':'');
+    b.textContent=lv.id;
+    b.onclick=()=>{
+      if(lv.id>1 && !state.progress[lv.id-1]?.solved && !state.progress[lv.id]?.solved){
+        showMsg('Complete previous bay to unlock.', 'neutral');
+        return;
+      }
+      state.level=lv.id;
+      initRotations();
+      saveStorage();
+      renderAll();
+    };
+    bar.appendChild(b);
+  });
+}
+
+function renderGrid(){
+  const lv=currentLevel();
+  const grid=document.getElementById('grid');
+  grid.style.setProperty('--n', lv.size);
+  grid.innerHTML='';
+  for(let r=0;r<lv.size;r++){
+    for(let c=0;c<lv.size;c++){
+      const cell=lv.cells[r][c];
+      const curRot=state.rot[r][c];
+      const div=document.createElement('button');
+      div.className='cell';
+      if(cell.t==='empty') div.classList.add('water');
+      if(cell.t==='source') div.classList.add('source');
+      if(cell.t==='load') div.classList.add('load');
+      const active=isTileActive(r,c,state.tide);
+      if(!active && cell.t!=='empty') div.classList.add('flooded');
+      div.setAttribute('aria-label', `${cell.t} ${r},${c}`);
+      // cable
+      if(cell.t!=='empty'){
+        const cable=document.createElement('div');
+        cable.className='cable';
+        const conns=getConnections(cell.t, curRot);
+        conns.forEach(d=>{
+          const arm=document.createElement('div');
+          arm.className='arm '+d;
+          // color by active
+          if(!active) arm.style.background='#5a7a9a';
+          cable.appendChild(arm);
+        });
+        const dot=document.createElement('div');
+        dot.className='dot';
+        if(!active) dot.style.background='#5a7a9a';
+        cable.appendChild(dot);
+        div.appendChild(cable);
+        // icon
+        const ic=document.createElement('div');
+        ic.className='icon';
+        if(cell.t==='source') ic.textContent='⛯';
+        else if(cell.t==='load') ic.textContent='⌂';
+        div.appendChild(ic);
+        // elev badge
+        const eb=document.createElement('div');
+        eb.className='elev '+(cell.e===2?'high':cell.e===1?'mid':'low');
+        eb.textContent=cell.e===2?'HIGH':cell.e===1?'MID':'LOW';
+        div.appendChild(eb);
+        if(!active){
+          const ft=document.createElement('div');
+          ft.className='floodTag';
+          ft.textContent= state.tide===1?'MID tide':'HIGH tide';
+          div.appendChild(ft);
+        }
+        // tap to rotate
+        div.onclick=()=>{
+          if(cell.t==='empty' || cell.t==='cross') return;
+          // push history
+          state.history.push({r,c,prev:curRot});
+          if(state.history.length>100) state.history.shift();
+          state.rot[r][c]=(curRot+1)%4;
+          // for straight, skip duplicate? keep 4 steps for par counting
+          state.moves++;
+          saveStorage();
+          renderAll(false);
+          // haptic
+          if(navigator.vibrate) navigator.vibrate(10);
+        };
+      } else {
+        div.innerHTML='<span style="font-size:18px;opacity:.6">≋</span>';
+      }
+      grid.appendChild(div);
+    }
+  }
+}
+
+function renderTides(){
+  const results=checkAllTides();
+  results.forEach((res,i)=>{
+    const el=document.getElementById('status'+i);
+    const meta=document.getElementById('meta'+i);
+    meta.textContent=`${res.activeLoads} loads • ${res.reached}/${res.activeLoads} linked`;
+    if(res.pass){
+      el.textContent='✓ PASS';
+      el.className='status pass';
+    } else {
+      el.textContent=`✗ ${res.reached}/${res.activeLoads}`;
+      el.className='status fail';
+    }
+  });
+  // highlight active tide button
+  document.querySelectorAll('.tide').forEach(b=>{
+    b.classList.toggle('active', parseInt(b.dataset.tide)===state.tide);
+  });
+}
+
+function renderStats(){
+  const lv=currentLevel();
+  document.getElementById('levelName').textContent=`Bay ${lv.id} — ${lv.name}`;
+  document.getElementById('parTag').textContent=`PAR ${lv.par}`;
+  document.getElementById('rotV').innerHTML=`${state.moves} <small>/ ${lv.par} par</small>`;
+  document.getElementById('hintV').textContent=state.hints;
+  // stars preview
+  let stars=0;
+  const allPass=checkAllTides().every(r=>r.pass);
+  if(allPass){
+    if(state.hints===0){
+      if(state.moves<=lv.par) stars=3;
+      else if(state.moves<=lv.par+3) stars=2;
+      else if(state.moves<=lv.par+6) stars=1;
+    } else {
+      if(state.moves<=lv.par) stars=2;
+      else if(state.moves<=lv.par+4) stars=1;
+    }
+  } else {
+    // preview based on moves
+    if(state.hints===0 && state.moves<=lv.par) stars=3;
+    else if(state.moves<=lv.par+3) stars=2;
+    else stars=1;
+  }
+  const starEl=document.getElementById('starV');
+  starEl.innerHTML=`<span class="stars">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</span> <span style="font-size:11px;opacity:.7">${state.hints>0?'hint used':''}</span>`;
+}
+
+function showMsg(text, type='neutral'){
+  const m=document.getElementById('msg');
+  m.textContent=text;
+  m.className='msg show';
+  m.style.borderColor= type==='pass'?'#06d6a0': type==='fail'?'#ff6b6b':'#1e4a7a';
+  m.style.background= type==='pass'?'#0a2a1e': type==='fail'?'#2a0f1a':'#0a1e3c';
+}
+
+function renderAll(full=true){
+  if(full) renderLevelBar();
+  renderGrid();
+  renderTides();
+  renderStats();
+  document.getElementById('undoBtn').disabled=state.history.length===0;
+}
+
+function doCheck(){
+  const results=checkAllTides();
+  const allPass=results.every(r=>r.pass);
+  const lv=currentLevel();
+  if(allPass){
+    let stars=0;
+    if(state.hints===0){
+      if(state.moves<=lv.par) stars=3;
+      else if(state.moves<=lv.par+3) stars=2;
+      else stars=1;
+    } else {
+      if(state.moves<=lv.par) stars=2;
+      else if(state.moves<=lv.par+4) stars=1;
+      else stars=0;
+    }
+    if(stars===0) stars=1;
+    const prev=state.progress[lv.id];
+    if(!prev || stars>prev.stars || state.moves < prev.bestMoves){
+      state.progress[lv.id]={solved:true, stars, bestMoves:state.moves, hints:state.hints};
+    } else if(!prev?.solved){
+      state.progress[lv.id]={solved:true, stars, bestMoves:state.moves, hints:state.hints};
+    }
+    saveStorage();
+    showMsg(`All tides PASS! ${stars}★ Contract ${state.hints===0?'intact':'broken (hint used)'} • ${state.moves} rotations (par ${lv.par})`, 'pass');
+    renderLevelBar();
+    renderStats();
+    if(lv.id<12 && !state.progress[lv.id+1]){
+      setTimeout(()=>{
+        if(confirm(`Bay ${lv.id} secured! Go to Bay ${lv.id+1}?`)){
+          state.level=lv.id+1;
+          initRotations();
+          saveStorage();
+          renderAll();
+        }
+      },400);
+    }
+  } else {
+    const fails=results.map((r,i)=> r.pass?null:['LOW','MID','HIGH'][i]).filter(Boolean).join(', ');
+    showMsg(`Not yet — failed: ${fails}. Keep rotating. Tide preview shows flooded (dimmed) tiles are inactive.`, 'fail');
+  }
+}
+
+function doHint(){
+  const lv=currentLevel();
+  // find first incorrect tile
+  let candidates=[];
+  for(let r=0;r<lv.size;r++) for(let c=0;c<lv.size;c++){
+    const cell=lv.cells[r][c];
+    if(cell.t==='empty' || cell.t==='cross') continue;
+    if(state.rot[r][c]!==cell.sol) candidates.push({r,c,cell});
+  }
+  if(candidates.length===0){
+    showMsg('All tiles already correct — check your tides!', 'neutral');
+    return;
+  }
+  const pick=candidates[Math.floor(Math.random()*candidates.length)];
+  state.hints++;
+  // show hint: set to correct? Or just highlight? We'll set to correct but count as hint (breaks contract)
+  // To keep zero-hint contract meaningful, hint will auto-correct one tile
+  state.history.push({r:pick.r,c:pick.c,prev:state.rot[pick.r][pick.c]});
+  state.rot[pick.r][pick.c]=pick.cell.sol;
+  state.moves++;
+  saveStorage();
+  renderAll(false);
+  showMsg(`Hint: corrected one cable at row ${pick.r+1}, col ${pick.c+1}. Contract stars now capped at 2★.`, 'neutral');
+}
+
+function doUndo(){
+  if(state.history.length===0) return;
+  const last=state.history.pop();
+  state.rot[last.r][last.c]=last.prev;
+  state.moves=Math.max(0,state.moves-1);
+  renderAll(false);
+}
+function doReset(){
+  const lv=currentLevel();
+  // re-scramble same as init but keep same init pattern? We'll re-init
+  initRotations();
+  saveStorage();
+  renderAll();
+  showMsg('Board reset. Par is '+lv.par+' rotations.', 'neutral');
+}
+
+// events
+document.querySelectorAll('.tide').forEach(b=>{
+  b.addEventListener('click',()=>{
+    state.tide=parseInt(b.dataset.tide);
+    renderAll(false);
+  });
+});
+document.getElementById('checkBtn').addEventListener('click', doCheck);
+document.getElementById('hintBtn').addEventListener('click', doHint);
+document.getElementById('undoBtn').addEventListener('click', doUndo);
+document.getElementById('resetBtn').addEventListener('click', doReset);
+document.getElementById('helpBtn').addEventListener('click', ()=>{
+  showMsg('How to play: Tap cables to rotate 90°. Connect ⛯ Source to all ⌂ Loads. LOW tide: all tiles active. MID: LOW (red) tiles flood. HIGH: LOW+MID flood. One rotation must pass all three tides. Contract stars need 0 hints + ≤ par moves.', 'neutral');
+});
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const code=makeArchiveCode();
+  document.getElementById('codeInput').value=code;
+  navigator.clipboard?.writeText(code);
+  showMsg('Archive code copied! Save it to restore progress.', 'pass');
+});
+document.getElementById('importBtn').addEventListener('click', ()=>{
+  const code=document.getElementById('codeInput').value.trim();
+  if(!code){ showMsg('Paste an archive code first.', 'fail'); return; }
+  if(tryImportCode(code)){
+    // re-init current level rotations? Keep progress, re-render
+    initRotations();
+    renderAll();
+    showMsg('Progress restored from code!', 'pass');
+  } else showMsg('Invalid code.', 'fail');
+});
+document.getElementById('wipeBtn').addEventListener('click', ()=>{
+  if(confirm('Wipe all progress?')){
+    localStorage.removeItem(STORAGE_KEY);
+    state.progress={};
+    state.level=1;
+    initRotations();
+    renderAll();
+    showMsg('Progress wiped.', 'neutral');
+  }
+});
+
+// init
+loadStorage();
+initRotations();
+renderAll();
+</script>
+</body>
+</html>

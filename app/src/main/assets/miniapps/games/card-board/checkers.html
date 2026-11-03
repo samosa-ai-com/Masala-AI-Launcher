@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Draughts 8×8</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1115;
+  --card:#1a1e26;
+  --card2:#242a36;
+  --accent:#ffcc33;
+  --accent2:#4ade80;
+  --red:#ff3b30;
+  --red-dark:#c41e14;
+  --black:#0a0a0f;
+  --light-square:#f5ecd7;
+  --dark-square:#3a4a5c;
+  --dark-square2:#2e3d4f;
+  --text:#f8fafc;
+  --muted:#94a3b8;
+  --border:#2d3548;
+}
+html,body{height:100%}
+body{
+  font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  display:flex;
+  justify-content:center;
+  overflow-x:hidden;
+}
+.app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100dvh;
+  display:flex;
+  flex-direction:column;
+  padding:12px 12px 20px;
+  gap:12px;
+}
+header{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.top-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+.logo{
+  display:flex;align-items:center;gap:8px;
+}
+.logo-mark{
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,#ffcc33,#ff8c33);
+  display:grid;place-items:center;
+  font-weight:900;color:#111;font-size:18px;
+  flex-shrink:0;
+}
+.logo h1{font-size:16px;line-height:1;letter-spacing:0.02em}
+.logo p{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.08em;text-transform:uppercase}
+.scoreboard{
+  display:flex;gap:6px;align-items:center;
+}
+.score-pill{
+  background:var(--card2);
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:6px 10px;
+  display:flex;gap:8px;align-items:center;
+  font-size:12px;font-weight:700;
+}
+.dot{width:10px;height:10px;border-radius:50%;border:2px solid rgba(255,255,255,0.9)}
+.dot.red{background:var(--red)}
+.dot.black{background:#111;border-color:#555}
+.score-pill b{font-size:13px}
+.controls{
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+}
+.mode-toggle{
+  flex:1;
+  display:flex;
+  background:var(--card2);
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:3px;
+  gap:3px;
+  min-width:180px;
+}
+.mode-btn{
+  flex:1;
+  border:none;
+  background:transparent;
+  color:var(--muted);
+  font-weight:800;
+  font-size:12px;
+  padding:8px 6px;
+  border-radius:999px;
+  cursor:pointer;
+  transition:all .15s;
+}
+.mode-btn.active{
+  background:var(--accent);
+  color:#111;
+  box-shadow:0 2px 8px rgba(255,204,51,0.3);
+}
+.btn{
+  border:none;
+  border-radius:999px;
+  padding:9px 14px;
+  font-weight:800;
+  font-size:13px;
+  cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;
+  transition:transform .08s, opacity .15s;
+}
+.btn:active{transform:scale(0.97)}
+.btn-restart{
+  background:#fff;color:#111;
+  border:1px solid #e2e8f0;
+}
+.btn-undo{
+  background:var(--card2);color:var(--text);
+  border:1px solid var(--border);
+}
+.turn-card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:10px 12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.turn-left{display:flex;align-items:center;gap:10px}
+.turn-piece{
+  width:38px;height:38px;border-radius:50%;
+  display:grid;place-items:center;
+  font-size:18px;
+  border:2px solid rgba(255,255,255,0.15);
+  box-shadow:0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+  flex-shrink:0;
+}
+.turn-piece.red{background:radial-gradient(circle at 30% 30%, #ff6b5a, #c41e14);color:#fff}
+.turn-piece.black{background:radial-gradient(circle at 30% 30%, #3a3a44, #0a0a0f);color:#fff;border-color:#555}
+.turn-text{line-height:1.1}
+.turn-text strong{font-size:14px;display:block}
+.turn-text span{font-size:12px;color:var(--muted);font-weight:600}
+.turn-hint{
+  font-size:11px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;
+  padding:6px 10px;border-radius:999px;
+  background:var(--accent2);color:#052e16;
+  white-space:nowrap;
+}
+.turn-hint.capture{background:var(--red);color:#fff;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.board-wrap{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.board-frame{
+  background:#0b0e14;
+  border-radius:14px;
+  padding:8px;
+  border:1px solid #1e293b;
+}
+.board{
+  width:100%;
+  aspect-ratio:1;
+  display:grid;
+  grid-template-columns:repeat(8,1fr);
+  grid-template-rows:repeat(8,1fr);
+  gap:0;
+  border-radius:10px;
+  overflow:hidden;
+  border:2px solid #1e293b;
+  touch-action:manipulation;
+  user-select:none;
+}
+.square{
+  position:relative;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.square.light{background:var(--light-square)}
+.square.dark{background:var(--dark-square)}
+.square.dark:nth-child(16n+2),.square.dark:nth-child(16n+4),.square.dark:nth-child(16n+6),.square.dark:nth-child(16n+8){
+  background:var(--dark-square2)
+}
+.square.selected.dark{outline:inset 0 0 0 3px var(--accent);z-index:1}
+.square.selected.light{outline:inset 0 0 0 3px var(--accent);z-index:1}
+.square.last-move::after{
+  content:"";position:absolute;inset:0;
+  border:3px solid var(--accent2);pointer-events:none;z-index:2;
+}
+.square.hint-slide::before{
+  content:"";width:18px;height:18px;border-radius:50%;
+  background:rgba(74,222,128,0.95);
+  box-shadow:0 0 0 4px rgba(74,222,128,0.25);
+  position:absolute;z-index:3;
+}
+.square.hint-capture::before{
+  content:"";width:22px;height:22px;border-radius:50%;
+  background:rgba(255,59,48,0.95);
+  box-shadow:0 0 0 5px rgba(255,59,48,0.25);
+  position:absolute;z-index:3;
+  border:2px solid #fff;
+}
+.square.hint-capture::after{
+  content:"×";position:absolute;z-index:4;color:#fff;font-weight:900;font-size:14px;line-height:1;
+}
+.piece{
+  width:82%;height:82%;
+  border-radius:50%;
+  display:grid;place-items:center;
+  font-weight:900;
+  font-size:14px;
+  position:relative;
+  z-index:5;
+  transition:transform .12s;
+  box-shadow:0 3px 8px rgba(0,0,0,0.5), inset 0 2px 0 rgba(255,255,255,0.25), inset 0 -2px 4px rgba(0,0,0,0.3);
+  border:2px solid rgba(255,255,255,0.85);
+}
+.piece.red{
+  background:radial-gradient(circle at 32% 28%, #ff7a6b 0%, #ff3b30 35%, #b91c1c 100%);
+  color:#fff;
+  text-shadow:0 1px 2px rgba(0,0,0,0.5);
+}
+.piece.black{
+  background:radial-gradient(circle at 32% 28%, #4b5563 0%, #1f2937 40%, #020617 100%);
+  color:#f8fafc;
+  border-color:#cbd5e1;
+}
+.piece.king::after{
+  content:"♔";
+  position:absolute;
+  font-size:16px;
+  line-height:1;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,0.6));
+}
+.piece.red.king::after{color:#fff}
+.piece.black.king::after{color:#ffcc33}
+.piece.selected{
+  transform:scale(1.08);
+  box-shadow:0 0 0 4px var(--accent), 0 6px 14px rgba(0,0,0,0.5);
+  z-index:6;
+}
+.piece.capturable{
+  opacity:0.95;
+  box-shadow:0 0 0 3px var(--red), 0 3px 8px rgba(0,0,0,0.5);
+}
+.coords{
+  display:flex;justify-content:space-between;
+  font-size:10px;font-weight:700;letter-spacing:0.08em;
+  color:var(--muted);text-transform:uppercase;
+  padding:0 2px;
+}
+.legend{
+  display:flex;gap:8px;flex-wrap:wrap;
+  font-size:11px;font-weight:700;color:var(--muted);
+  align-items:center;
+}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block;border:1px solid rgba(255,255,255,0.5)}
+.legend i.slide{background:var(--accent2)}
+.legend i.capture{background:var(--red)}
+.status{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:10px 12px;
+  font-size:13px;
+  font-weight:600;
+  color:var(--muted);
+  text-align:center;
+  line-height:1.4;
+}
+.status strong{color:var(--text)}
+.overlay{
+  position:fixed;inset:0;
+  background:rgba(2,6,23,0.78);
+  backdrop-filter:blur(6px);
+  display:none;
+  place-items:center;
+  padding:20px;
+  z-index:50;
+}
+.overlay.open{display:grid}
+.modal{
+  width:100%;max-width:360px;
+  background:#fff;
+  color:#0f172a;
+  border-radius:20px;
+  padding:20px;
+  text-align:center;
+  box-shadow:0 20px 50px rgba(0,0,0,0.5);
+}
+.modal h2{font-size:20px;margin-bottom:6px}
+.modal p{font-size:13px;color:#475569;line-height:1.5;margin-bottom:14px}
+.modal .big{font-size:36px;margin-bottom:8px}
+.modal-actions{display:flex;gap:8px}
+.modal-actions .btn{flex:1;justify-content:center;padding:12px}
+.btn-primary{background:#0f172a;color:#fff}
+.btn-ghost{background:#f1f5f9;color:#0f172a;border:1px solid #e2e8f0}
+.footer{
+  text-align:center;
+  font-size:11px;color:var(--muted);font-weight:600;
+  letter-spacing:0.04em;
+  padding:4px;
+}
+@media (max-width:380px){
+  .app{padding:10px 8px 16px}
+  .turn-piece{width:34px;height:34px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="top-row">
+      <div class="logo">
+        <div class="logo-mark">◉</div>
+        <div>
+          <h1>DRAUGHTS 8×8</h1>
+          <p>Classic Checkers</p>
+        </div>
+      </div>
+      <div class="scoreboard">
+        <div class="score-pill" title="Red wins"><span class="dot red"></span> <b id="scoreRed">0</b></div>
+        <div class="score-pill" title="Black wins"><span class="dot black"></span> <b id="scoreBlack">0</b></div>
+        <div class="score-pill" title="Draws">═ <b id="scoreDraw">0</b></div>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="mode-toggle" role="tablist" aria-label="Game mode">
+        <button class="mode-btn active" id="btn2P" onclick="setMode('2p')">👥 2 PLAYERS</button>
+        <button class="mode-btn" id="btnCPU" onclick="setMode('cpu')">🤖 VS CPU</button>
+      </div>
+      <button class="btn btn-undo" onclick="undoMove()" title="Undo last move">↩ Undo</button>
+      <button class="btn btn-restart" onclick="restartGame()">↻ Restart</button>
+    </div>
+  </header>
+
+  <div class="turn-card">
+    <div class="turn-left">
+      <div class="turn-piece red" id="turnPiece">●</div>
+      <div class="turn-text">
+        <strong id="turnTitle">Red to move</strong>
+        <span id="turnSub">Tap a piece to see moves</span>
+      </div>
+    </div>
+    <div class="turn-hint" id="turnHint">YOUR TURN</div>
+  </div>
+
+  <div class="board-wrap">
+    <div class="board-frame">
+      <div class="board" id="board"></div>
+    </div>
+    <div class="coords"><span>A — H</span><span id="moveCount">Move 1</span><span>1 — 8</span></div>
+    <div class="legend">
+      <span><i class="slide"></i> Slide</span>
+      <span><i class="capture"></i> Capture</span>
+      <span>👑 King on far row</span>
+      <span>⚡ Forced capture</span>
+    </div>
+  </div>
+
+  <div class="status" id="status">Red moves first. Dark squares only. Forced captures are enforced — you must jump when you can.</div>
+
+  <div class="footer">High-contrast board • Large touch targets • No zoom needed</div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="big" id="modalIcon">👑</div>
+    <h2 id="modalTitle">Red wins!</h2>
+    <p id="modalDesc">All opponent pieces captured.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Close</button>
+      <button class="btn btn-primary" onclick="restartGame();closeModal()">Play again ↻</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SIZE=8;
+let board=[];
+let turn='red'; // red (light) moves first, black second
+let selected=null; // {r,c}
+let legalMoves=[]; // {from:{r,c}, to:{r,c}, captures:[{r,c}], isCapture}
+let mustContinueFrom=null; // if chaining, only this piece can move
+let history=[];
+let moveNumber=1;
+let scores={red:0, black:0, draw:0};
+let mode='2p'; // '2p' or 'cpu' where cpu is black
+let gameOver=false;
+let lastMove=null;
+
+function initBoard(){
+  board=Array.from({length:SIZE},()=>Array(SIZE).fill(null));
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      if((r+c)%2===1){
+        if(r<3) board[r][c]={color:'black', king:false};
+        else if(r>4) board[r][c]={color:'red', king:false};
+      }
+    }
+  }
+}
+
+function cloneBoard(b){ return b.map(row=>row.map(cell=> cell? {...cell}: null)); }
+
+function inside(r,c){ return r>=0 && r<SIZE && c>=0 && c<SIZE; }
+
+function getMovesForPiece(r,c, boardState){
+  const piece=boardState[r][c];
+  if(!piece) return [];
+  const moves=[];
+  const dirs=[];
+  if(piece.king){
+    dirs.push([-1,-1],[-1,1],[1,-1],[1,1]);
+  } else {
+    const forward = piece.color==='red' ? -1 : 1;
+    dirs.push([forward,-1],[forward,1]);
+  }
+  // slides
+  for(const [dr,dc] of dirs){
+    const nr=r+dr, nc=c+dc;
+    if(inside(nr,nc) && !boardState[nr][nc]){
+      moves.push({from:{r,c}, to:{r:nr,c:nc}, captures:[], isCapture:false});
+    }
+  }
+  // captures
+  for(const [dr,dc] of dirs){
+    const mr=r+dr, mc=c+dc;
+    const nr=r+dr*2, nc=c+dc*2;
+    if(inside(nr,nc) && inside(mr,mc)){
+      const mid=boardState[mr][mc];
+      if(mid && mid.color!==piece.color && !boardState[nr][nc]){
+        moves.push({from:{r,c}, to:{r:nr,c:nc}, captures:[{r:mr,c:mc}], isCapture:true});
+      }
+    }
+  }
+  return moves;
+}
+
+function getAllLegalMoves(color, boardState, mustFrom){
+  let all=[];
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      const p=boardState[r][c];
+      if(p && p.color===color){
+        if(mustFrom && (mustFrom.r!==r || mustFrom.c!==c)) continue;
+        all.push(...getMovesForPiece(r,c, boardState));
+      }
+    }
+  }
+  const captures=all.filter(m=>m.isCapture);
+  if(captures.length>0) return captures;
+  return all;
+}
+
+function hasAnyMove(color){
+  return getAllLegalMoves(color, board).length>0;
+}
+
+function countPieces(color){
+  let n=0;
+  for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++) if(board[r][c] && board[r][c].color===color) n++;
+  return n;
+}
+
+function render(){
+  const el=document.getElementById('board');
+  el.innerHTML='';
+  const hintMap=new Map();
+  for(const m of legalMoves){
+    const key=m.to.r+','+m.to.c;
+    hintMap.set(key, m.isCapture ? 'capture' : 'slide');
+  }
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      const sq=document.createElement('div');
+      sq.className='square '+((r+c)%2===0?'light':'dark');
+      sq.dataset.r=r; sq.dataset.c=c;
+      if(selected && selected.r===r && selected.c===c) sq.classList.add('selected');
+      if(lastMove && ((lastMove.from.r===r && lastMove.from.c===c) || (lastMove.to.r===r && lastMove.to.c===c))) sq.classList.add('last-move');
+      const hint=hintMap.get(r+','+c);
+      if(hint==='slide') sq.classList.add('hint-slide');
+      if(hint==='capture') sq.classList.add('hint-capture');
+      sq.addEventListener('click', ()=>onSquareClick(r,c));
+      const piece=board[r][c];
+      if(piece){
+        const p=document.createElement('div');
+        p.className='piece '+piece.color + (piece.king?' king':'');
+        if(selected && selected.r===r && selected.c===c) p.classList.add('selected');
+        // mark capturable pieces when hinting captures
+        if(legalMoves.some(m=>m.captures.some(cap=>cap.r===r && cap.c===c))) p.classList.add('capturable');
+        p.textContent= piece.king ? '' : '●';
+        // improve contrast: black pieces show white dot, red show white
+        sq.appendChild(p);
+      }
+      el.appendChild(sq);
+    }
+  }
+  // turn card
+  const turnPieceEl=document.getElementById('turnPiece');
+  turnPieceEl.className='turn-piece '+turn;
+  turnPieceEl.textContent= turn==='red' ? '●' : '●';
+  document.getElementById('turnTitle').textContent= turn==='red' ? 'Red to move' : 'Black to move';
+  const sub=document.getElementById('turnSub');
+  const hintEl=document.getElementById('turnHint');
+  if(gameOver){
+    sub.textContent='Game over';
+    hintEl.textContent='FINISHED';
+    hintEl.style.background='#0f172a'; hintEl.style.color='#fff';
+  } else if(mustContinueFrom){
+    sub.textContent='Chain capture — continue jumping!';
+    hintEl.textContent='KEEP JUMPING';
+    hintEl.className='turn-hint capture';
+  } else {
+    const anyCaptures=legalMoves.some(m=>m.isCapture) || getAllLegalMoves(turn, board).some(m=>m.isCapture);
+    // Actually legalMoves already filtered, but if no selection, check global
+    const globalCaptures=getAllLegalMoves(turn, board).some(m=>m.isCapture);
+    if(globalCaptures){
+      sub.textContent='Forced capture available';
+      hintEl.textContent='MUST CAPTURE';
+      hintEl.className='turn-hint capture';
+    } else {
+      sub.textContent= selected ? 'Choose a highlighted square' : 'Tap a piece to see moves';
+      hintEl.textContent='YOUR TURN';
+      hintEl.className='turn-hint';
+      hintEl.style.background=''; hintEl.style.color='';
+    }
+  }
+  document.getElementById('moveCount').textContent='Move '+moveNumber;
+  document.getElementById('scoreRed').textContent=scores.red;
+  document.getElementById('scoreBlack').textContent=scores.black;
+  document.getElementById('scoreDraw').textContent=scores.draw;
+  // status
+  const status=document.getElementById('status');
+  if(gameOver){
+    // keep last status
+  } else if(mustContinueFrom){
+    status.innerHTML='<strong>Chain capture:</strong> you must continue jumping with the same piece.';
+  } else {
+    const redCount=countPieces('red');
+    const blackCount=countPieces('black');
+    status.innerHTML=`<strong>Red ${redCount}</strong> — <strong>Black ${blackCount}</strong> &nbsp;•&nbsp; ${turn==='red'?'Red':'Black'} to play. ${getAllLegalMoves(turn, board).some(m=>m.isCapture)?'<span style="color:#ff3b30;font-weight:800">Forced capture!</span>':''}`;
+  }
+}
+
+function selectPiece(r,c){
+  const piece=board[r][c];
+  if(!piece || piece.color!==turn) return false;
+  if(mustContinueFrom && (mustContinueFrom.r!==r || mustContinueFrom.c!==c)) return false;
+  // if there are forced captures globally, only pieces with captures can be selected
+  const globalMoves=getAllLegalMoves(turn, board, mustContinueFrom);
+  const globalCaptures=globalMoves.some(m=>m.isCapture);
+  const movesForThis=getMovesForPiece(r,c, board);
+  const hasCaptureForThis=movesForThis.some(m=>m.isCapture);
+  if(globalCaptures && !hasCaptureForThis && !mustContinueFrom){
+    // still allow selection but legalMoves will be empty, we show message
+    selected={r,c};
+    legalMoves=[];
+    render();
+    document.getElementById('status').innerHTML='<strong style="color:#ff3b30">You must capture!</strong> Choose a piece that can jump.';
+    return true;
+  }
+  selected={r,c};
+  // legal moves for this piece, filtered by forced capture rule
+  let moves=getMovesForPiece(r,c, board);
+  if(globalCaptures) moves=moves.filter(m=>m.isCapture);
+  // if mustContinueFrom, only captures
+  if(mustContinueFrom) moves=moves.filter(m=>m.isCapture);
+  legalMoves=moves;
+  render();
+  return true;
+}
+
+function onSquareClick(r,c){
+  if(gameOver) return;
+  // if clicking own piece, select it
+  const piece=board[r][c];
+  if(piece && piece.color===turn){
+    selectPiece(r,c);
+    return;
+  }
+  // if clicking a hinted destination
+  const move=legalMoves.find(m=>m.to.r===r && m.to.c===c);
+  if(move && selected){
+    doMove(move);
+    return;
+  }
+  // clicking empty non-hint: deselect if not in chain
+  if(!mustContinueFrom){
+    selected=null;
+    legalMoves=[];
+    render();
+  }
+}
+
+function doMove(move){
+  // save history for undo
+  history.push({
+    board: cloneBoard(board),
+    turn,
+    selected: selected? {...selected}: null,
+    legalMoves: [...legalMoves],
+    mustContinueFrom: mustContinueFrom? {...mustContinueFrom}: null,
+    moveNumber,
+    lastMove: lastMove? {...lastMove, from:{...lastMove.from}, to:{...lastMove.to}}: null,
+    gameOver
+  });
+  const piece=board[move.from.r][move.from.c];
+  board[move.from.r][move.from.c]=null;
+  // remove captured
+  for(const cap of move.captures){
+    board[cap.r][cap.c]=null;
+  }
+  // check crowning
+  let becameKing=false;
+  const kingRow = piece.color==='red' ? 0 : SIZE-1;
+  if(!piece.king && move.to.r===kingRow){
+    piece.king=true;
+    becameKing=true;
+  }
+  board[move.to.r][move.to.c]=piece;
+  lastMove={from:{...move.from}, to:{...move.to}};
+  // check for chain captures (if capture and not just crowned, and further captures available)
+  if(move.isCapture && !becameKing){
+    const further=getMovesForPiece(move.to.r, move.to.c, board).filter(m=>m.isCapture);
+    if(further.length>0){
+      // must continue
+      mustContinueFrom={r:move.to.r, c:move.to.c};
+      selected={r:move.to.r, c:move.to.c};
+      legalMoves=further;
+      render();
+      // if CPU turn and chaining, continue automatically
+      if(mode==='cpu' && turn==='black'){
+        setTimeout(cpuChain, 500);
+      }
+      return;
+    }
+  }
+  // turn ends
+  mustContinueFrom=null;
+  selected=null;
+  legalMoves=[];
+  // check win/draw before switching
+  const opponent = turn==='red' ? 'black' : 'red';
+  const oppCount=countPieces(opponent);
+  const oppMoves=getAllLegalMoves(opponent, board).length;
+  if(oppCount===0){
+    endGame(turn, 'All opponent pieces captured');
+    return;
+  }
+  if(oppMoves===0){
+    endGame(turn, 'Opponent has no legal moves — blocked!');
+    return;
+  }
+  // switch turn
+  turn=opponent;
+  moveNumber++;
+  render();
+  // check draw by move count? simple 40 moves without capture? We'll just check if both have moves
+  // CPU move if needed
+  if(mode==='cpu' && turn==='black' && !gameOver){
+    setTimeout(cpuMove, 400);
+  }
+}
+
+function cpuChain(){
+  if(!mustContinueFrom || gameOver) return;
+  const moves=legalMoves;
+  if(moves.length===0) return;
+  // pick best capture (prefer most captures ahead, prefer kinging)
+  const chosen=pickBestMove(moves);
+  doMove(chosen);
+}
+
+function pickBestMove(moves){
+  // simple heuristic: prefer capture that leads to more captures, then kinging, then center
+  let best=moves[0];
+  let bestScore=-999;
+  for(const m of moves){
+    let score=Math.random()*0.1;
+    // center preference
+    const centerDist=Math.abs(m.to.c-3.5);
+    score += (3.5-centerDist)*0.2;
+    // king row proximity
+    if(m.to.r===0 || m.to.r===7) score+=1;
+    // if capture, bonus
+    if(m.isCapture) score+=2;
+    if(score>bestScore){bestScore=score; best=m;}
+  }
+  return best;
+}
+
+function cpuMove(){
+  if(gameOver || turn!=='black') return;
+  const all=getAllLegalMoves('black', board);
+  if(all.length===0){
+    endGame('red','Black has no moves');
+    return;
+  }
+  // group by from
+  const captures=all.filter(m=>m.isCapture);
+  const candidates=captures.length? captures : all;
+  // pick best
+  const move=pickBestMove(candidates);
+  // select and move with visual
+  selected={r:move.from.r, c:move.from.c};
+  legalMoves=candidates.filter(m=>m.from.r===move.from.r && m.from.c===move.from.c);
+  render();
+  setTimeout(()=>doMove(move), 350);
+}
+
+function endGame(winner, reason){
+  gameOver=true;
+  if(winner==='red') scores.red++;
+  else if(winner==='black') scores.black++;
+  else scores.draw++;
+  render();
+  const icon=winner==='red' ? '🔴' : winner==='black' ? '⚫' : '🤝';
+  const title=winner==='draw' ? 'Draw!' : (winner==='red' ? 'Red wins!' : 'Black wins!');
+  document.getElementById('modalIcon').textContent=icon;
+  document.getElementById('modalTitle').textContent=title;
+  document.getElementById('modalDesc').textContent=reason;
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('status').innerHTML=`<strong>${title}</strong> ${reason}`;
+}
+
+function restartGame(){
+  initBoard();
+  turn='red';
+  selected=null;
+  legalMoves=[];
+  mustContinueFrom=null;
+  history=[];
+  moveNumber=1;
+  gameOver=false;
+  lastMove=null;
+  closeModal();
+  render();
+  // if cpu mode and black starts? No, red always starts, so no immediate cpu
+}
+
+function undoMove(){
+  if(history.length===0) return;
+  if(mustContinueFrom){
+    // allow undo during chain? yes, but reset chain
+  }
+  const prev=history.pop();
+  board=prev.board;
+  turn=prev.turn;
+  selected=prev.selected;
+  legalMoves=prev.legalMoves;
+  mustContinueFrom=prev.mustContinueFrom;
+  moveNumber=prev.moveNumber;
+  lastMove=prev.lastMove;
+  gameOver=prev.gameOver;
+  closeModal();
+  render();
+}
+
+function setMode(m){
+  mode=m;
+  document.getElementById('btn2P').classList.toggle('active', m==='2p');
+  document.getElementById('btnCPU').classList.toggle('active', m==='cpu');
+  restartGame();
+  document.getElementById('status').textContent = m==='cpu' ? 'You are Red. CPU is Black. Red moves first.' : 'Two players on one phone. Red moves first.';
+}
+
+function closeModal(){
+  document.getElementById('overlay').classList.remove('open');
+}
+
+// init
+initBoard();
+render();
+</script>
+</body>
+</html>

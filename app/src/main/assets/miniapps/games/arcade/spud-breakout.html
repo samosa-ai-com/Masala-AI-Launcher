@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Spud Breaker Farm</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--green:#2e7d32;--light:#e8f5e9;--yellow:#ffb300;--brown:#5d4037;--cream:#fff8e1;--accent:#ff6f00;--card:#ffffff;--muted:#6d6d6d}
+html,body{height:100%;background:#1b2a1b;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif;color:#222;overflow-x:hidden}
+.app{max-width:428px;min-width:360px;margin:0 auto;background:var(--cream);min-height:100vh;display:flex;flex-direction:column;position:relative;overflow-x:hidden}
+.topbar{background:linear-gradient(135deg,#2e7d32,#388e3c);color:#fff;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;z-index:20}
+.brand{display:flex;align-items:center;gap:8px;font-weight:900;letter-spacing:.3px}
+.brand .logo{width:36px;height:36px;background:#fff;border-radius:10px;display:grid;place-items:center;font-size:20px;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.brand h1{font-size:16px;line-height:1}
+.brand p{font-size:11px;opacity:.9;font-weight:600}
+.stats{display:flex;gap:8px;align-items:center}
+.pill{background:rgba(255,255,255,.15);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.25);padding:6px 10px;border-radius:999px;display:flex;align-items:center;gap:6px;font-weight:800;font-size:13px;min-height:36px}
+.pill b{color:#ffecb3}
+.tabs{display:flex;gap:6px;padding:8px 8px;background:#fff;border-bottom:2px solid #c8e6c9;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1;min-width:64px;padding:10px 6px;border-radius:12px;border:2px solid #c8e6c9;background:#f1f8e9;font-weight:800;font-size:12px;text-align:center;cursor:pointer;user-select:none;min-height:44px;display:grid;place-items:center}
+.tab.active{background:var(--green);color:#fff;border-color:var(--green);box-shadow:0 4px 10px rgba(46,125,50,.3)}
+.content{flex:1;padding:10px 10px 90px;overflow-y:auto}
+.card{background:var(--card);border-radius:16px;padding:12px;box-shadow:0 4px 14px rgba(0,0,0,.08);border:1px solid #e0e0e0;margin-bottom:10px}
+.card h2{font-size:15px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.card p{font-size:13px;color:var(--muted);line-height:1.4}
+.zone{border-radius:16px;padding:12px;margin-bottom:12px;color:#fff;position:relative;overflow:hidden;border:2px solid rgba(0,0,0,.08)}
+.zone h3{font-size:15px;display:flex;align-items:center;gap:8px}
+.zone small{opacity:.9;font-size:12px}
+.levels{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.lvl{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-weight:900;font-size:14px;border:2px solid rgba(255,255,255,.9);background:rgba(255,255,255,.18);color:#fff;cursor:pointer;user-select:none}
+.lvl.locked{opacity:.45;filter:grayscale(.2)}
+.lvl.done{background:#fff;color:var(--green);border-color:#fff}
+.lvl.boss{width:56px;border-radius:14px;background:linear-gradient(135deg,#ff6f00,#ffb300);color:#fff;border-color:#fff;box-shadow:0 4px 10px rgba(0,0,0,.2)}
+.lvl.current{outline:3px solid #fff;box-shadow:0 0 0 3px rgba(255,255,255,.5)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hero,.shot,.upgrade,.quest{border:2px solid #e0e0e0;border-radius:14px;padding:10px;background:#fff;display:flex;flex-direction:column;gap:6px;min-height:110px}
+.hero.active,.shot.active{border-color:var(--green);box-shadow:0 4px 12px rgba(46,125,50,.15)}
+.hero h4,.shot h4,.upgrade h4{font-size:13px}
+.hero p,.shot p,.upgrade p{font-size:11px;color:var(--muted);line-height:1.3}
+.badge{font-size:10px;font-weight:800;padding:4px 8px;border-radius:999px;background:#e8f5e9;color:var(--green);align-self:flex-start}
+.btn{appearance:none;border:none;border-radius:12px;padding:10px 12px;font-weight:900;font-size:13px;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn-primary{background:var(--green);color:#fff;box-shadow:0 4px 10px rgba(46,125,50,.3)}
+.btn-ghost{background:#f1f8e9;color:var(--green);border:2px solid #c8e6c9}
+.btn-accent{background:linear-gradient(135deg,#ff6f00,#ffb300);color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.progress{height:8px;background:#e0e0e0;border-radius:999px;overflow:hidden}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--green),#66bb6a);width:0%}
+.kv{display:flex;justify-content:space-between;font-size:12px;font-weight:700}
+.canvasWrap{background:linear-gradient(180deg,#a5d6a7 0%,#fff8e1 55%,#d7ccc8 100%);border-radius:16px;overflow:hidden;border:2px solid #a5d6a7;position:relative}
+canvas{display:block;width:100%;height:auto;touch-action:none}
+.hud{display:flex;justify-content:space-between;gap:8px;padding:8px;background:#fff;border-top:2px solid #c8e6c9;font-weight:800;font-size:12px}
+.hud span{background:#f1f8e9;padding:6px 8px;border-radius:999px;border:1px solid #c8e6c9}
+.controls{display:flex;gap:8px;padding:8px}
+.controls .btn{flex:1}
+.dragHint{position:absolute;left:50%;bottom:56px;transform:translateX(-50%);background:rgba(0,0,0,.65);color:#fff;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800;pointer-events:none}
+.overlay{position:absolute;inset:0;background:rgba(27,42,27,.78);display:grid;place-items:center;padding:16px;text-align:center;color:#fff;z-index:5}
+.overlay .box{background:#fff;color:#222;border-radius:16px;padding:14px;max-width:320px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.overlay h3{font-size:16px;margin-bottom:6px}
+.overlay p{font-size:13px;color:#555;margin-bottom:10px}
+.footerNav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:428px;min-width:360px;background:#fff;border-top:2px solid #c8e6c9;display:flex;gap:6px;padding:8px;z-index:10}
+.footerNav .btn{flex:1}
+.small{font-size:11px;color:var(--muted)}
+.tag{font-size:10px;font-weight:900;padding:3px 6px;border-radius:6px;background:#fff3e0;color:#e65100;border:1px solid #ffe0b2}
+.stars{color:#ffb300;letter-spacing:1px}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">🥔</div>
+      <div>
+        <h1>SPUD BREAKER FARM</h1>
+        <p>Harvest Campaign • 6 Zones</p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="pill">🌾 <b id="currency">0</b></div>
+      <div class="pill">⭐ <b id="stars">0</b></div>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="map">🗺️ MAP</div>
+    <div class="tab" data-tab="camp">🏕️ CAMP</div>
+    <div class="tab" data-tab="heroes">🦸 HEROES</div>
+    <div class="tab" data-tab="shots">💥 SHOTS</div>
+    <div class="tab" data-tab="quests">📜 QUESTS</div>
+  </div>
+
+  <div class="content" id="content"></div>
+
+  <div class="footerNav" id="footerNav">
+    <button class="btn btn-ghost" id="btnReset">♻️ Reset</button>
+    <button class="btn btn-primary" id="btnPlay">▶️ PLAY NEXT</button>
+  </div>
+</div>
+
+<!-- Game Modal -->
+<div id="gameModal" style="display:none;position:fixed;inset:0;background:#1b2a1b;z-index:30;overflow:auto">
+  <div style="max-width:428px;min-width:360px;margin:0 auto;background:var(--cream);min-height:100vh;display:flex;flex-direction:column">
+    <div class="topbar">
+      <div class="brand"><div class="logo">🥔</div><div><h1 id="levelTitle">Zone 1-1</h1><p id="levelSub">Sprout Fields</p></div></div>
+      <button class="btn btn-ghost" id="btnExit" style="min-height:36px;padding:6px 10px">✕ Exit</button>
+    </div>
+    <div style="padding:10px">
+      <div class="canvasWrap" id="canvasWrap">
+        <canvas id="gameCanvas" width="360" height="540"></canvas>
+        <div class="dragHint" id="dragHint">👆 Drag to move paddle • Tap 🚀 to launch</div>
+        <div class="overlay" id="overlay" style="display:none"><div class="box" id="overlayBox"></div></div>
+      </div>
+      <div class="hud">
+        <span>❤️ <b id="hudLives">3</b></span>
+        <span>🧱 <b id="hudBricks">0</b></span>
+        <span>🌾 <b id="hudScore">0</b></span>
+        <span>🎯 <b id="hudShot">Classic</b></span>
+      </div>
+      <div class="controls">
+        <button class="btn btn-accent" id="btnLaunch">🚀 LAUNCH</button>
+        <button class="btn btn-ghost" id="btnPause">⏸️ Pause</button>
+      </div>
+      <div class="card">
+        <div class="kv"><span>Touch-drag paddle</span><span class="tag">360–428px portrait</span></div>
+        <div class="small" style="margin-top:6px">Slide your finger anywhere on the field. Paddle follows. Large 48px+ targets, no zoom needed.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ZONES=[
+  {id:1,name:"Sprout Fields",emoji:"🌱",color:"linear-gradient(135deg,#43a047,#81c784)",desc:"Tender sprouts & wooden crates"},
+  {id:2,name:"Corn Maze",emoji:"🌽",color:"linear-gradient(135deg,#f9a825,#ffcc02)",desc:"Golden corn walls"},
+  {id:3,name:"Orchard Hills",emoji:"🍎",color:"linear-gradient(135deg,#e53935,#ff7043)",desc:"Apple barrels & beehives"},
+  {id:4,name:"Pumpkin Patch",emoji:"🎃",color:"linear-gradient(135deg,#ef6c00,#ffb74d)",desc:"Spooky pumpkins at dusk"},
+  {id:5,name:"Barnyard Blitz",emoji:"🐄",color:"linear-gradient(135deg,#6d4c41,#a1887f)",desc:"Hay bales & barn doors"},
+  {id:6,name:"Volcano Barn",emoji:"🌋",color:"linear-gradient(135deg,#4e342e,#ff3d00)",desc:"Molten harvest finale"}
+];
+const HEROES=[
+  {id:"russet",name:"Russet Ranger",emoji:"🥔🦸",cost:0,desc:"+10% paddle width",bonus:{paddle:1.1}},
+  {id:"sweet",name:"Sweet Potato Sage",emoji:"🍠🧙",cost:250,desc:"Slow spud + magnet",bonus:{speed:0.9,magnet:1}},
+  {id:"gold",name:"Yukon Gold",emoji:"🥔👑",cost:500,desc:"+15% harvest coins",bonus:{coins:1.15}},
+  {id:"chip",name:"Chip Chopper",emoji:"🥔🪓",cost:750,desc:"Explosive bricks",bonus:{explode:1}},
+  {id:"mash",name:"Mash Marauder",emoji:"🥔🏴‍☠️",cost:1100,desc:"Double ball chance",bonus:{multiball:.15}},
+  {id:"tater",name:"Tater Titan",emoji:"🥔🤖",cost:1600,desc:"+1 life & fire trail",bonus:{lives:1,fire:1}}
+];
+const SHOTS=[
+  {id:"classic",name:"Classic Spud",emoji:"🥔",cost:0,desc:"Balanced bounce",power:1},
+  {id:"cannon",name:"Corn Cannon",emoji:"🌽",cost:120,desc:"Heavy +1 damage",power:1.2},
+  {id:"apple",name:"Apple Popper",emoji:"🍎",cost:180,desc:"Bouncy, fast",power:1.1},
+  {id:"pumpkin",name:"Pumpkin Smash",emoji:"🎃",cost:260,desc:"Splash damage",power:1.3},
+  {id:"hay",name:"Haymaker",emoji:"🌾",cost:340,desc:"Wide paddle synergy",power:1.15},
+  {id:"milk",name:"Milk Splash",emoji:"🥛",cost:420,desc:"Sticky paddle 3s",power:1.2},
+  {id:"honey",name:"Honey Shot",emoji:"🍯",cost:520,desc:"Slow bricks",power:1.25},
+  {id:"tractor",name:"Tractor Beam",emoji:"🚜",cost:650,desc:"Magnet pull",power:1.3},
+  {id:"pitchfork",name:"Pitchfork Pierce",emoji:"🔱",cost:780,desc:"Pierces 1 brick",power:1.4},
+  {id:"scarecrow",name:"Scarecrow Spin",emoji:"🎩",cost:920,desc:"Curve shot",power:1.35},
+  {id:"barnfire",name:"Barnfire Blaze",emoji:"🔥",cost:1100,desc:"Burn row",power:1.5},
+  {id:"volcano",name:"Volcano Core",emoji:"🌋",cost:1400,desc:"Explode + multiball",power:1.7}
+];
+const UPGRADES=[
+  {id:"paddle",name:"Reinforced Paddle",emoji:"🪵",max:5,cost:150,step:90,desc:"Wider paddle each level"},
+  {id:"bouncy",name:"Bouncy Soil",emoji:"🌱",max:5,cost:180,step:100,desc:"Faster spud speed"},
+  {id:"harvest",name:"Harvest Basket",emoji:"🧺",max:5,cost:200,step:110,desc:"+12% coins per level"},
+  {id:"lives",name:"Farmhouse Hearts",emoji:"❤️",max:3,cost:400,step:250,desc:"+1 starting life"},
+  {id:"magnet",name:"Magnet Fence",emoji:"🧲",max:3,cost:350,step:200,desc:"Paddle magnet range"},
+  {id:"luck",name:"Lucky Clover",emoji:"🍀",max:5,cost:220,step:120,desc:"More drops & crits"}
+];
+const QUESTS=[
+  {id:"q1",name:"First Harvest",emoji:"🌾",goal:1,desc:"Clear any level",reward:50},
+  {id:"q2",name:"Corn Conqueror",emoji:"🌽",goal:5,desc:"Clear 5 levels",reward:120},
+  {id:"q3",name:"Boss Buster",emoji:"👹",goal:1,desc:"Defeat a boss",reward:200},
+  {id:"q4",name:"Coin Collector",emoji:"💰",goal:1000,desc:"Earn 1000 harvest",reward:250},
+  {id:"q5",name:"Hero Recruiter",emoji:"🦸",goal:3,desc:"Recruit 3 heroes",reward:300},
+  {id:"q6",name:"Shot Master",emoji:"💥",goal:6,desc:"Unlock 6 shot types",reward:350}
+];
+
+const SAVE_KEY="spudBreakerFarm_v2";
+let state={
+  currency:120,
+  stars:0,
+  unlocked:{}, // "1-1":true
+  completed:{},
+  starsByLevel:{},
+  heroes:["russet"],
+  activeHero:"russet",
+  shots:["classic"],
+  activeShot:"classic",
+  upgrades:{paddle:0,bouncy:0,harvest:0,lives:0,magnet:0,luck:0},
+  quests:{},
+  totalEarned:0,
+  levelsCleared:0,
+  bossesBeaten:0
+};
+function load(){
+  try{const s=JSON.parse(localStorage.getItem(SAVE_KEY)); if(s) state={...state,...s}; }catch(e){}
+  if(!state.unlocked["1-1"]) state.unlocked["1-1"]=true;
+}
+function save(){ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); updateTopbar(); }
+function updateTopbar(){
+  document.getElementById('currency').textContent=state.currency;
+  document.getElementById('stars').textContent=state.stars;
+}
+
+let currentTab="map";
+function render(){
+  const c=document.getElementById('content');
+  if(currentTab==="map") c.innerHTML=renderMap();
+  else if(currentTab==="camp") c.innerHTML=renderCamp();
+  else if(currentTab==="heroes") c.innerHTML=renderHeroes();
+  else if(currentTab==="shots") c.innerHTML=renderShots();
+  else if(currentTab==="quests") c.innerHTML=renderQuests();
+  bindDynamic();
+  updateTopbar();
+}
+function renderMap(){
+  let html=`<div class="card"><h2>🥔 Spud Breaker Campaign</h2><p>Rebound the bouncing spud through destructible rows. Clear 5 levels per zone, then beat the boss to unlock the next zone. Earn 🌾 harvest to recruit heroes & unlock shots.</p>
+  <div style="margin-top:8px" class="progress"><i style="width:${Math.round((state.levelsCleared/30)*100)}%"></i></div>
+  <div class="kv" style="margin-top:6px"><span>${state.levelsCleared}/30 cleared</span><span>${state.bossesBeaten}/6 bosses</span></div></div>`;
+  ZONES.forEach(z=>{
+    const zoneLevels=[];
+    for(let i=1;i<=5;i++) zoneLevels.push(`${z.id}-${i}`);
+    zoneLevels.push(`${z.id}-B`);
+    html+=`<div class="zone" style="background:${z.color}">
+      <h3>${z.emoji} Zone ${z.id}: ${z.name} ${z.id===6?'• FINAL':''}</h3>
+      <small>${z.desc}</small>
+      <div class="levels">`+
+      zoneLevels.map(l=>{
+        const isBoss=l.endsWith('B');
+        const unlocked=!!state.unlocked[l];
+        const done=!!state.completed[l];
+        const stars=state.starsByLevel[l]||0;
+        const label=isBoss?'👹':l.split('-')[1];
+        return `<div class="lvl ${isBoss?'boss':''} ${!unlocked?'locked':''} ${done?'done':''}" data-level="${l}" title="${l}">${done? '✓' : label}<span style="font-size:8px;position:absolute;margin-top:18px;display:${stars?'block':'none'}" class="stars">${'★'.repeat(stars)}</span></div>`;
+      }).join('')+
+      `</div></div>`;
+  });
+  html+=`<div class="card"><h2>🎮 How to play</h2><p><b>Drag anywhere</b> on the field to move paddle. Tap <b>🚀 LAUNCH</b> to fire. Break all bricks. Don't let spud fall! Bosses move and need 3 hits.</p></div>`;
+  return html;
+}
+function renderCamp(){
+  let html=`<div class="card"><h2>🏕️ Harvest Camp</h2><p>Upgrade between rounds. Persists forever. Costs rise each level.</p></div><div class="grid2">`;
+  UPGRADES.forEach(u=>{
+    const lvl=state.upgrades[u.id]||0;
+    const maxed=lvl>=u.max;
+    const cost = u.cost + lvl*u.step;
+    html+=`<div class="upgrade">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:18px">${u.emoji}</span><span class="badge">Lv ${lvl}/${u.max}</span></div>
+      <h4>${u.name}</h4><p>${u.desc}</p>
+      <div class="progress"><i style="width:${(lvl/u.max)*100}%"></i></div>
+      <button class="btn ${maxed?'btn-ghost':'btn-primary'}" data-upgrade="${u.id}" ${maxed||state.currency<cost?'disabled':''}>${maxed?'MAXED':'⬆️ Upgrade • 🌾 '+cost}</button>
+    </div>`;
+  });
+  html+=`</div>`;
+  return html;
+}
+function renderHeroes(){
+  let html=`<div class="card"><h2>🦸 Hero Spuds</h2><p>Recruit with 🌾. Tap to set active hero. Active bonus applies in every level.</p></div><div class="grid2">`;
+  HEROES.forEach(h=>{
+    const owned=state.heroes.includes(h.id);
+    const active=state.activeHero===h.id;
+    html+=`<div class="hero ${active?'active':''}">
+      <div style="font-size:22px">${h.emoji}</div>
+      <h4>${h.name} ${active?'• ACTIVE':''}</h4><p>${h.desc}</p>
+      ${owned?`<button class="btn ${active?'btn-ghost':'btn-primary'}" data-hero="${h.id}">${active?'✓ Active':'Set Active'}</button>`:`<button class="btn btn-accent" data-buyhero="${h.id}" ${state.currency<h.cost?'disabled':''}>🌾 ${h.cost} Recruit</button>`}
+    </div>`;
+  });
+  html+=`</div>`;
+  return html;
+}
+function renderShots(){
+  let html=`<div class="card"><h2>💥 Shot Types • 12 to unlock</h2><p>Choose your spud shot before battle. Stronger shots = more damage & effects.</p></div><div class="grid2">`;
+  SHOTS.forEach(s=>{
+    const owned=state.shots.includes(s.id);
+    const active=state.activeShot===s.id;
+    html+=`<div class="shot ${active?'active':''}">
+      <div style="display:flex;justify-content:space-between"><span style="font-size:20px">${s.emoji}</span><span class="tag">PWR ${s.power.toFixed(1)}</span></div>
+      <h4>${s.name} ${active?'• EQUIPPED':''}</h4><p>${s.desc}</p>
+      ${owned?`<button class="btn ${active?'btn-ghost':'btn-primary'}" data-shot="${s.id}">${active?'✓ Equipped':'Equip'}</button>`:`<button class="btn btn-accent" data-buyshot="${s.id}" ${state.currency<s.cost?'disabled':''}>🌾 ${s.cost} Unlock</button>`}
+    </div>`;
+  });
+  html+=`</div>`;
+  return html;
+}
+function renderQuests(){
+  let html=`<div class="card"><h2>📜 Quests & Rewards</h2><p>Complete quests to earn bonus 🌾. Progress saves automatically.</p></div>`;
+  QUESTS.forEach(q=>{
+    let prog=0;
+    if(q.id==="q1") prog=Math.min(state.levelsCleared,1);
+    if(q.id==="q2") prog=Math.min(state.levelsCleared,5);
+    if(q.id==="q3") prog=Math.min(state.bossesBeaten,1);
+    if(q.id==="q4") prog=Math.min(state.totalEarned,1000);
+    if(q.id==="q5") prog=Math.min(state.heroes.length,3);
+    if(q.id==="q6") prog=Math.min(state.shots.length,6);
+    const done=prog>=q.goal;
+    const claimed=state.quests[q.id];
+    html+=`<div class="quest" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><b>${q.emoji} ${q.name}</b><span class="badge">${prog}/${q.goal}</span></div>
+      <p>${q.desc} • Reward 🌾 ${q.reward}</p>
+      <div class="progress"><i style="width:${(prog/q.goal)*100}%"></i></div>
+      <button class="btn ${claimed?'btn-ghost': done?'btn-primary':'btn-ghost'}" data-quest="${q.id}" ${!done||claimed?'disabled':''}>${claimed?'✓ Claimed': done?'🎁 Claim':'Locked'}</button>
+    </div>`;
+  });
+  return html;
+}
+function bindDynamic(){
+  document.querySelectorAll('[data-level]').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const lvl=el.dataset.level;
+      if(!state.unlocked[lvl]) return;
+      startLevel(lvl);
+    });
+  });
+  document.querySelectorAll('[data-upgrade]').forEach(b=>b.addEventListener('click',()=>{
+    const id=b.dataset.upgrade;
+    const u=UPGRADES.find(x=>x.id===id);
+    const lvl=state.upgrades[id]||0;
+    const cost=u.cost+lvl*u.step;
+    if(state.currency>=cost && lvl<u.max){ state.currency-=cost; state.upgrades[id]=lvl+1; save(); render(); }
+  }));
+  document.querySelectorAll('[data-buyhero]').forEach(b=>b.addEventListener('click',()=>{
+    const h=HEROES.find(x=>x.id===b.dataset.buyhero);
+    if(state.currency>=h.cost){ state.currency-=h.cost; state.heroes.push(h.id); state.activeHero=h.id; save(); render(); }
+  }));
+  document.querySelectorAll('[data-hero]').forEach(b=>b.addEventListener('click',()=>{ state.activeHero=b.dataset.hero; save(); render(); }));
+  document.querySelectorAll('[data-buyshot]').forEach(b=>b.addEventListener('click',()=>{
+    const s=SHOTS.find(x=>x.id===b.dataset.buyshot);
+    if(state.currency>=s.cost){ state.currency-=s.cost; state.shots.push(s.id); state.activeShot=s.id; save(); render(); }
+  }));
+  document.querySelectorAll('[data-shot]').forEach(b=>b.addEventListener('click',()=>{ state.activeShot=b.dataset.shot; save(); render(); }));
+  document.querySelectorAll('[data-quest]').forEach(b=>b.addEventListener('click',()=>{
+    const q=QUESTS.find(x=>x.id===b.dataset.quest);
+    if(!state.quests[q.id]){ state.quests[q.id]=true; state.currency+=q.reward; state.totalEarned+=q.reward; save(); render(); }
+  }));
+}
+
+// Game engine
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+let game=null;
+let animId=null;
+let paused=false;
+
+function startLevel(levelId){
+  const isBoss=levelId.endsWith('B');
+  const zoneId=parseInt(levelId.split('-')[0]);
+  const zone=ZONES.find(z=>z.id===zoneId);
+  document.getElementById('levelTitle').textContent=isBoss?`BOSS • Zone ${zoneId}`:`Zone ${levelId}`;
+  document.getElementById('levelSub').textContent=zone.name;
+  document.getElementById('gameModal').style.display='block';
+  document.getElementById('overlay').style.display='none';
+  initGame(levelId, zoneId, isBoss);
+  if(animId) cancelAnimationFrame(animId);
+  paused=false;
+  loop();
+}
+function initGame(levelId, zoneId, isBoss){
+  const hero=HEROES.find(h=>h.id===state.activeHero);
+  const shot=SHOTS.find(s=>s.id===state.activeShot);
+  const up=state.upgrades;
+  const paddleW = 80 * (1 + (up.paddle||0)*0.12) * (hero?.bonus.paddle||1);
+  const lives = 3 + (up.lives||0) + (hero?.bonus.lives||0);
+  const harvestMult = 1 + (up.harvest||0)*0.12 * (hero?.bonus.coins?0.15:0) + (hero?.bonus.coins?0.15:0) + (up.harvest? up.harvest*0.12:0);
+  // Build bricks
+  const cols=7, rows= isBoss? 5 : 4 + Math.min(3, zoneId-1) + (levelId.endsWith('5')?1:0);
+  const brickW=44, brickH=18, gap=6, offsetX= (360 - (cols*brickW + (cols-1)*gap))/2, offsetY=50;
+  const bricks=[];
+  const zoneColors=["#81c784","#ffcc02","#ff7043","#ffb74d","#a1887f","#ff3d00"];
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const hp = 1 + Math.floor(zoneId/2) + (r===0?1:0) + (isBoss && r===0?1:0);
+      const isUnbreakable = isBoss && r===0 && c===3;
+      bricks.push({x:offsetX + c*(brickW+gap), y:offsetY + r*(brickH+gap), w:brickW, h:brickH, hp, maxHp:hp, alive:true, color:zoneColors[zoneId-1], boss:isUnbreakable});
+    }
+  }
+  // Boss entity
+  let boss=null;
+  if(isBoss){
+    boss={x:150,y:90,w:60,h:24,hp:3+zoneId, maxHp:3+zoneId, dir:1};
+  }
+  game={
+    levelId, zoneId, isBoss, hero, shot, harvestMult,
+    paddle:{x:140,y:500,w:paddleW,h:12, targetX:140},
+    ball:{x:180,y:480,r:9, vx:0, vy:0, stuck:true, speed: 3.2 + (up.bouncy||0)*0.35 + (zoneId*0.15)},
+    bricks, boss,
+    lives, score:0, coins:0,
+    shotPower: shot.power,
+    magnet: (up.magnet||0)*12 + (hero?.bonus.magnet?18:0),
+    width:360, height:540
+  };
+  updateHUD();
+}
+function updateHUD(){
+  if(!game) return;
+  document.getElementById('hudLives').textContent=game.lives;
+  document.getElementById('hudBricks').textContent=game.bricks.filter(b=>b.alive).length + (game.boss?1:0);
+  document.getElementById('hudScore').textContent=game.score;
+  document.getElementById('hudShot').textContent=game.shot.name;
+}
+function launch(){
+  if(!game || !game.ball.stuck) return;
+  const angle = (Math.random()*0.6 -0.3); // slight random
+  game.ball.vx = Math.sin(angle)*game.ball.speed;
+  game.ball.vy = -game.ball.speed;
+  game.ball.stuck=false;
+  document.getElementById('dragHint').style.display='none';
+}
+function showOverlay(title, msg, buttons){
+  const ov=document.getElementById('overlay');
+  const box=document.getElementById('overlayBox');
+  box.innerHTML=`<h3>${title}</h3><p>${msg}</p><div class="row" style="justify-content:center">${buttons}</div>`;
+  ov.style.display='grid';
+  box.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>b._handler&&b._handler()));
+}
+function hideOverlay(){ document.getElementById('overlay').style.display='none'; }
+
+function loop(){
+  animId=requestAnimationFrame(loop);
+  if(!game || paused) return;
+  update();
+  draw();
+}
+function update(){
+  const g=game;
+  // paddle follow target with smoothing
+  g.paddle.x += (g.paddle.targetX - g.paddle.x)*0.25;
+  g.paddle.x=Math.max(0, Math.min(g.width - g.paddle.w, g.paddle.x));
+  if(g.ball.stuck){
+    g.ball.x = g.paddle.x + g.paddle.w/2;
+    g.ball.y = g.paddle.y - 14;
+    return;
+  }
+  g.ball.x += g.ball.vx;
+  g.ball.y += g.ball.vy;
+
+  // wall collisions
+  if(g.ball.x - g.ball.r <0){ g.ball.x=g.ball.r; g.ball.vx*=-1; }
+  if(g.ball.x + g.ball.r > g.width){ g.ball.x=g.width - g.ball.r; g.ball.vx*=-1; }
+  if(g.ball.y - g.ball.r <0){ g.ball.y=g.ball.r; g.ball.vy*=-1; }
+
+  // paddle collision
+  if(g.ball.y + g.ball.r >= g.paddle.y && g.ball.y - g.ball.r <= g.paddle.y+g.paddle.h && g.ball.x >= g.paddle.x && g.ball.x <= g.paddle.x+g.paddle.w){
+    const hitPos=(g.ball.x - (g.paddle.x+g.paddle.w/2)) / (g.paddle.w/2); // -1 to 1
+    const speed=Math.hypot(g.ball.vx,g.ball.vy) || g.ball.speed;
+    const angle= hitPos * 0.9; // max 52 deg
+    g.ball.vx = Math.sin(angle)*speed;
+    g.ball.vy = -Math.abs(Math.cos(angle)*speed);
+    g.ball.y = g.paddle.y - g.ball.r -1;
+    // magnet effect slight pull
+    if(g.magnet) g.ball.vx *= 0.98;
+    // sticky shot
+    if(g.shot.id==="milk" && Math.random()<0.3){ g.ball.stuck=true; setTimeout(()=>{ if(g.ball.stuck) launch(); }, 600); }
+  }
+  // magnet passive
+  if(g.magnet && g.ball.vy>0 && g.ball.y > g.paddle.y-80){
+    const center=g.paddle.x+g.paddle.w/2;
+    const dx=center - g.ball.x;
+    g.ball.vx += dx*0.0008 * g.magnet;
+  }
+
+  // boss movement & collision
+  if(g.boss){
+    g.boss.x += g.boss.dir*1.2;
+    if(g.boss.x<10 || g.boss.x+g.boss.w>350) g.boss.dir*=-1;
+    // ball vs boss
+    if(g.ball.x+g.ball.r > g.boss.x && g.ball.x-g.ball.r < g.boss.x+g.boss.w && g.ball.y+g.ball.r > g.boss.y && g.ball.y-g.ball.r < g.boss.y+g.boss.h){
+      // bounce
+      const overlapBottom = (g.ball.y < g.boss.y+g.boss.h/2);
+      if(overlapBottom) g.ball.vy*=-1; else g.ball.vx*=-1;
+      g.boss.hp -= g.shotPower;
+      g.score+=25;
+      if(g.boss.hp<=0){
+        g.boss=null;
+        g.score+=100;
+        // clear top row bricks extra reward
+        g.bricks.forEach(b=>{ if(b.y<80) b.alive=false; });
+      }
+      updateHUD();
+    }
+  }
+
+  // brick collisions (AABB)
+  for(const b of g.bricks){
+    if(!b.alive) continue;
+    if(g.ball.x+g.ball.r > b.x && g.ball.x-g.ball.r < b.x+b.w && g.ball.y+g.ball.r > b.y && g.ball.y-g.ball.r < b.y+b.h){
+      // determine side
+      const prevX=g.ball.x - g.ball.vx;
+      const prevY=g.ball.y - g.ball.vy;
+      const hitFromLeft = prevX + g.ball.r <= b.x;
+      const hitFromRight = prevX - g.ball.r >= b.x+b.w;
+      const hitFromTop = prevY + g.ball.r <= b.y;
+      const hitFromBottom = prevY - g.ball.r >= b.y+b.h;
+      if(hitFromLeft || hitFromRight) g.ball.vx*=-1; else g.ball.vy*=-1;
+
+      // damage
+      let dmg=g.shotPower;
+      if(g.shot.id==="pitchfork" && Math.random()<0.5) dmg+=1;
+      if(g.shot.id==="barnfire" && Math.random()<0.25){
+        // burn neighbors
+        g.bricks.forEach(nb=>{ if(nb.alive && Math.abs(nb.y-b.y)<20 && Math.abs(nb.x-b.x)<50) nb.hp-=0.5; });
+      }
+      b.hp -= dmg;
+      if(b.hp<=0){
+        b.alive=false;
+        g.score+=10 + g.zoneId*2;
+        g.coins+= 3 + Math.floor(Math.random()*4);
+        // explode hero
+        if(g.hero?.bonus.explode && Math.random()<0.2){
+          g.bricks.forEach(nb=>{ if(nb.alive && Math.hypot(nb.x-b.x, nb.y-b.y)<60) nb.hp-=1; });
+        }
+        // volcano multiball visual (just extra coins)
+        if(g.shot.id==="volcano" && Math.random()<0.15) g.coins+=5;
+      } else {
+        g.score+=5;
+      }
+      updateHUD();
+      break; // one brick per frame
+    }
+  }
+
+  // fall out
+  if(g.ball.y - g.ball.r > g.height){
+    g.lives--;
+    updateHUD();
+    if(g.lives<=0){
+      paused=true;
+      showOverlay("💔 Harvest Lost", `You ran out of lives.<br>Score ${g.score} • Coins ${g.coins}`, `<button class="btn btn-ghost" id="retryBtn">🔄 Retry</button><button class="btn btn-primary" id="exitBtn2">🏠 Camp</button>`);
+      document.getElementById('retryBtn')._handler=()=>{ hideOverlay(); paused=false; initGame(g.levelId,g.zoneId,g.isBoss); };
+      document.getElementById('exitBtn2')._handler=()=>{ hideOverlay(); closeGame(); };
+    } else {
+      g.ball.stuck=true;
+      g.ball.vx=0; g.ball.vy=0;
+      document.getElementById('dragHint').style.display='block';
+    }
+  }
+
+  // win check
+  const remaining=g.bricks.filter(b=>b.alive).length + (g.boss?1:0);
+  if(remaining===0){
+    paused=true;
+    const earned=Math.floor((g.coins + g.score*0.5) * g.harvestMult);
+    const stars = g.lives===3?3: g.lives===2?2:1;
+    // persist
+    state.currency+=earned;
+    state.totalEarned+=earned;
+    state.stars+=stars;
+    state.completed[g.levelId]=true;
+    state.starsByLevel[g.levelId]=Math.max(state.starsByLevel[g.levelId]||0, stars);
+    state.levelsCleared=Object.keys(state.completed).length;
+    if(g.isBoss) state.bossesBeaten = Object.keys(state.completed).filter(k=>k.endsWith('B')).length;
+    // unlock next
+    unlockNext(g.levelId);
+    save();
+    showOverlay("🌾 Harvest Complete!", `Zone ${g.levelId} cleared!<br>⭐ ${'★'.repeat(stars)} • 🌾 +${earned} harvest<br><small>Shot: ${g.shot.name} • Hero: ${g.hero.name}</small>`, `<button class="btn btn-primary" id="nextBtn">➡️ Continue</button><button class="btn btn-ghost" id="campBtn">🏕️ Camp</button>`);
+    document.getElementById('nextBtn')._handler=()=>{
+      hideOverlay();
+      const nxt=getNextLevel(g.levelId);
+      if(nxt && state.unlocked[nxt]){ initGame(nxt, parseInt(nxt.split('-')[0]), nxt.endsWith('B')); paused=false; document.getElementById('levelTitle').textContent=nxt.endsWith('B')?`BOSS • Zone ${nxt.split('-')[0]}`:`Zone ${nxt}`; document.getElementById('levelSub').textContent=ZONES.find(z=>z.id===parseInt(nxt.split('-')[0])).name; }
+      else { closeGame(); }
+    };
+    document.getElementById('campBtn')._handler=()=>{ hideOverlay(); closeGame(); };
+  }
+}
+function getNextLevel(cur){
+  const [z,l]=cur.split('-');
+  const zone=parseInt(z);
+  if(l==='B'){
+    const nextZone=zone+1;
+    if(nextZone>6) return null;
+    return `${nextZone}-1`;
+  }
+  if(l==='5') return `${z}-B`;
+  return `${z}-${parseInt(l)+1}`;
+}
+function unlockNext(cur){
+  const nxt=getNextLevel(cur);
+  if(nxt) state.unlocked[nxt]=true;
+  // also ensure first of next zone unlocked after boss
+  if(cur.endsWith('B')){
+    const nz=parseInt(cur.split('-')[0])+1;
+    if(nz<=6) state.unlocked[`${nz}-1`]=true;
+  }
+}
+function draw(){
+  const g=game; if(!g) return;
+  ctx.clearRect(0,0,360,540);
+  // background farm stripes
+  ctx.fillStyle="#e8f5e9";
+  ctx.fillRect(0,0,360,540);
+  for(let i=0;i<540;i+=24){ ctx.fillStyle=i%48===0?"#c8e6c9":"#e8f5e9"; ctx.fillRect(0,i,360,12); }
+  // bricks
+  g.bricks.forEach(b=>{
+    if(!b.alive) return;
+    const pct=b.hp/b.maxHp;
+    ctx.fillStyle=b.boss?"#3e2723": b.color;
+    ctx.globalAlpha=0.95;
+    // brick body
+    ctx.fillRect(b.x,b.y,b.w,b.h);
+    // highlight
+    ctx.fillStyle="rgba(255,255,255,.35)";
+    ctx.fillRect(b.x,b.y,b.w,4);
+    // hp bar
+    if(b.maxHp>1){
+      ctx.fillStyle="rgba(0,0,0,.25)";
+      ctx.fillRect(b.x,b.y+b.h-4,b.w,4);
+      ctx.fillStyle="#fff";
+      ctx.fillRect(b.x,b.y+b.h-4,b.w*pct,4);
+    }
+    // crate lines
+    ctx.strokeStyle="rgba(0,0,0,.15)";
+    ctx.strokeRect(b.x,b.y,b.w,b.h);
+    ctx.globalAlpha=1;
+    // icon
+    ctx.font="11px system-ui";
+    ctx.textAlign="center";
+    ctx.fillText(b.boss?"⛔": zoneEmoji(g.zoneId), b.x+b.w/2, b.y+12);
+  });
+  // boss
+  if(g.boss){
+    ctx.fillStyle="#bf360c";
+    ctx.fillRect(g.boss.x,g.boss.y,g.boss.w,g.boss.h);
+    ctx.fillStyle="#ffcc80";
+    ctx.fillRect(g.boss.x,g.boss.y,g.boss.w,6);
+    ctx.fillStyle="#fff";
+    ctx.font="12px system-ui";
+    ctx.textAlign="center";
+    ctx.fillText("👹 BOSS", g.boss.x+g.boss.w/2, g.boss.y+16);
+    // hp
+    const pct=g.boss.hp/g.boss.maxHp;
+    ctx.fillStyle="rgba(0,0,0,.3)";
+    ctx.fillRect(g.boss.x,g.boss.y+g.boss.h-4,g.boss.w,4);
+    ctx.fillStyle="#ffeb3b";
+    ctx.fillRect(g.boss.x,g.boss.y+g.boss.h-4,g.boss.w*pct,4);
+  }
+  // paddle
+  ctx.fillStyle="#5d4037";
+  ctx.beginPath();
+  ctx.roundRect(g.paddle.x,g.paddle.y,g.paddle.w,g.paddle.h,6);
+  ctx.fill();
+  ctx.fillStyle="#8d6e63";
+  ctx.fillRect(g.paddle.x+6,g.paddle.y+2,g.paddle.w-12,4);
+  // magnet glow
+  if(g.magnet){
+    ctx.strokeStyle="rgba(102,187,106,.5)";
+    ctx.lineWidth=2;
+    ctx.strokeRect(g.paddle.x-4,g.paddle.y-4,g.paddle.w+8,g.paddle.h+8);
+  }
+  // ball (spud)
+  ctx.beginPath();
+  ctx.arc(g.ball.x,g.ball.y,g.ball.r,0,Math.PI*2);
+  ctx.fillStyle=g.shot.id==="volcano"?"#ff3d00": g.shot.id==="barnfire"?"#ff6f00": g.shot.id==="honey"?"#ffb300":"#8d6e63";
+  ctx.fill();
+  ctx.strokeStyle="rgba(0,0,0,.2)";
+  ctx.lineWidth=1;
+  ctx.stroke();
+  // spud face
+  ctx.fillStyle="#fff";
+  ctx.beginPath(); ctx.arc(g.ball.x-3,g.ball.y-2,2,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(g.ball.x+3,g.ball.y-2,2,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle="#3e2723";
+  ctx.beginPath(); ctx.arc(g.ball.x-3,g.ball.y-2,1,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(g.ball.x+3,g.ball.y-2,1,0,Math.PI*2); ctx.fill();
+  // trail for fire
+  if(g.hero?.bonus.fire){
+    ctx.fillStyle="rgba(255,111,0,.25)";
+    ctx.beginPath(); ctx.arc(g.ball.x-g.ball.vx*1.5, g.ball.y-g.ball.vy*1.5, 5,0,Math.PI*2); ctx.fill();
+  }
+}
+function zoneEmoji(id){ return ["🌱","🌽","🍎","🎃","🐄","🌋"][id-1]||"🧱"; }
+
+function closeGame(){
+  document.getElementById('gameModal').style.display='none';
+  paused=false;
+  render();
+}
+
+// Input handling - touch drag anywhere on canvas
+const wrap=document.getElementById('canvasWrap');
+function setPaddleFromX(clientX){
+  if(!game) return;
+  const rect=canvas.getBoundingClientRect();
+  const x = (clientX - rect.left) * (360 / rect.width);
+  game.paddle.targetX = x - game.paddle.w/2;
+}
+wrap.addEventListener('touchstart', e=>{
+  const t=e.touches[0]; setPaddleFromX(t.clientX);
+},{passive:true});
+wrap.addEventListener('touchmove', e=>{
+  const t=e.touches[0]; setPaddleFromX(t.clientX); e.preventDefault();
+},{passive:false});
+wrap.addEventListener('mousemove', e=>{ if(e.buttons===1) setPaddleFromX(e.clientX); });
+canvas.addEventListener('click', e=>{ if(game?.ball.stuck) launch(); });
+
+// Buttons
+document.getElementById('btnLaunch').addEventListener('click', launch);
+document.getElementById('btnPause').addEventListener('click', ()=>{
+  paused=!paused;
+  document.getElementById('btnPause').textContent=paused?"▶️ Resume":"⏸️ Pause";
+  if(!paused) loop();
+});
+document.getElementById('btnExit').addEventListener('click', closeGame);
+document.getElementById('btnPlay').addEventListener('click', ()=>{
+  // find first unlocked not completed
+  let next=null;
+  for(let z=1;z<=6;z++){
+    for(let l=1;l<=5;l++){ const id=`${z}-${l}`; if(state.unlocked[id] && !state.completed[id]){ next=id; break; } if(state.unlocked[id] && !next) next=id; }
+    if(next && !state.completed[next]) break;
+    const b=`${z}-B`; if(state.unlocked[b] && !state.completed[b]){ next=b; break; }
+  }
+  if(!next) next="1-1";
+  startLevel(next);
+});
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  if(confirm("Reset all progress, currency and upgrades?")){
+    localStorage.removeItem(SAVE_KEY);
+    state={currency:120,stars:0,unlocked:{"1-1":true},completed:{},starsByLevel:{},heroes:["russet"],activeHero:"russet",shots:["classic"],activeShot:"classic",upgrades:{paddle:0,bouncy:0,harvest:0,lives:0,magnet:0,luck:0},quests:{},totalEarned:0,levelsCleared:0,bossesBeaten:0};
+    save(); render();
+  }
+});
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  currentTab=t.dataset.tab;
+  render();
+}));
+
+// init
+load(); save(); render();
+
+// handle canvas resize to fit container
+function resizeCanvas(){
+  const w=wrap.clientWidth;
+  canvas.style.width=w+"px";
+  canvas.style.height=(w*1.5)+"px";
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+</script>
+</body>
+</html>

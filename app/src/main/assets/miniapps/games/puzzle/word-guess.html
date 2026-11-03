@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Lexicon — Five Letter Deduction</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--green:#6aaa64;--amber:#c9b458;--gray:#787c7e;--border:#d3d6da;--bg:#ffffff;--text:#121213;--key:#d3d6da;--keyText:#121213}
+html,body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;min-height:100vh;overflow-x:hidden}
+body{display:flex;justify-content:center}
+.wrap{width:100%;max-width:428px;min-width:360px;min-height:100vh;display:flex;flex-direction:column;background:#fff}
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);gap:8px}
+.brand{font-weight:900;letter-spacing:.08em;font-size:14px}
+.brand span{font-weight:400;color:var(--gray);font-size:11px;letter-spacing:.06em}
+.hActions{display:flex;gap:6px;align-items:center}
+.iconBtn{width:40px;height:40px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:14px;font-weight:800;cursor:pointer;touch-action:manipulation;display:flex;align-items:center;justify-content:center}
+.toggle{font-size:10px;letter-spacing:.08em;font-weight:800;padding:6px 8px;border-radius:20px;border:1px solid var(--border);background:#fff;cursor:pointer;touch-action:manipulation;min-height:40px}
+.toggle.on{background:var(--text);color:#fff;border-color:var(--text)}
+.boardWrap{flex:1;display:flex;flex-direction:column;align-items:center;padding:12px 12px 6px;gap:8px}
+.board{display:grid;grid-template-rows:repeat(6,1fr);gap:5px;width:100%;max-width:350px}
+.row{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.tile{aspect-ratio:1;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;text-transform:uppercase;background:#fff;transition:transform .1s}
+.tile.filled{border-color:#878a8c;animation:pop .08s}
+.tile.green{background:var(--green);color:#fff;border-color:var(--green)}
+.tile.amber{background:var(--amber);color:#fff;border-color:var(--amber)}
+.tile.gray{background:var(--gray);color:#fff;border-color:var(--gray)}
+.tile.flip{animation:flip .5s ease forwards}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+@keyframes flip{0%{transform:scaleY(1)}50%{transform:scaleY(0)}100%{transform:scaleY(1)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.shake{animation:shake .4s}
+.msg{font-size:12px;font-weight:700;min-height:18px;text-align:center;color:var(--text)}
+.msg.err{color:#c0392b}
+.keyboard{padding:8px 6px 10px;background:#fff;border-top:1px solid #eee;width:100%}
+.kRow{display:flex;gap:5px;justify-content:center;margin-bottom:6px}
+.key{flex:1;max-width:42px;height:48px;border:none;border-radius:4px;background:var(--key);color:var(--keyText);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;user-select:none}
+.key.wide{max-width:64px;font-size:10px;letter-spacing:.06em}
+.key.green{background:var(--green);color:#fff}
+.key.amber{background:var(--amber);color:#fff}
+.key.gray{background:var(--gray);color:#fff}
+.footerBtns{display:flex;gap:8px;padding:0 12px 12px}
+.btn{flex:1;min-height:44px;border-radius:8px;border:1px solid var(--border);background:#fff;font-weight:800;font-size:12px;letter-spacing:.06em;cursor:pointer;touch-action:manipulation}
+.btnPrimary{background:var(--text);color:#fff;border-color:var(--text)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+.overlay.on{display:flex}
+.modal{background:#fff;border-radius:12px;padding:16px;width:100%;max-width:360px;max-height:90vh;overflow:auto}
+.modal h2{font-size:16px;text-align:center;margin-bottom:6px}
+.modal p{font-size:12px;line-height:1.5;color:#444;text-align:center}
+.statsGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+.stat{text-align:center}
+.stat b{font-size:20px;display:block}
+.stat span{font-size:10px;letter-spacing:.08em;color:var(--gray)}
+.dist{margin-top:8px}
+.distRow{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12px}
+.distRow span:first-child{width:14px;text-align:center;font-weight:700}
+.bar{flex:1;height:18px;background:#eee;border-radius:2px;overflow:hidden;display:flex}
+.barFill{background:var(--green);color:#fff;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-size:11px;font-weight:700;min-width:18px}
+.toast{position:fixed;top:56px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:8px 12px;border-radius:20px;font-size:12px;font-weight:700;display:none;z-index:20}
+.toast.on{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<div class="brand">LEXICON <span>5-LETTER</span></div>
+<div class="hActions">
+<button class="toggle" id="hardToggle">HARD OFF</button>
+<button class="iconBtn" id="helpBtn">?</button>
+<button class="iconBtn" id="statsBtn">▣</button>
+</div>
+</header>
+<div class="boardWrap">
+<div class="board" id="board"></div>
+<div class="msg" id="msg"></div>
+</div>
+<div class="keyboard" id="keyboard"></div>
+<div class="footerBtns">
+<button class="btn" id="newBtn">NEW GAME</button>
+<button class="btn btnPrimary" id="shareBtn">SHARE</button>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<div class="overlay" id="statsOverlay">
+<div class="modal">
+<h2>STATISTICS</h2>
+<div class="statsGrid">
+<div class="stat"><b id="sPlayed">0</b><span>Played</span></div>
+<div class="stat"><b id="sWin">0</b><span>Win %</span></div>
+<div class="stat"><b id="sStreak">0</b><span>Streak</span></div>
+<div class="stat"><b id="sMax">0</b><span>Max</span></div>
+</div>
+<div class="dist" id="dist"></div>
+<p style="margin-top:10px;color:var(--gray)">Green = correct place • Amber = wrong place • Gray = not in word. Hard mode forces reuse of hints.</p>
+<button class="btn btnPrimary" style="width:100%;margin-top:12px" id="closeStats">CLOSE</button>
+</div>
+</div>
+
+<div class="overlay" id="helpOverlay">
+<div class="modal">
+<h2>HOW TO PLAY</h2>
+<p>Guess the 5-letter word in 6 tries.<br><br>
+<span style="display:inline-block;background:var(--green);color:#fff;padding:2px 6px;border-radius:3px;font-weight:800">GREEN</span> correct letter & spot<br>
+<span style="display:inline-block;background:var(--amber);color:#fff;padding:2px 6px;border-radius:3px;font-weight:800">AMBER</span> correct letter, wrong spot<br>
+<span style="display:inline-block;background:var(--gray);color:#fff;padding:2px 6px;border-radius:3px;font-weight:800">GRAY</span> not in word<br><br>
+<b>Hard mode:</b> revealed greens must stay, ambers must be reused.<br>
+Use on-screen or physical keyboard.</p>
+<button class="btn btnPrimary" style="width:100%;margin-top:12px" id="closeHelp">PLAY</button>
+</div>
+</div>
+
+<div class="overlay" id="endOverlay">
+<div class="modal" style="text-align:center">
+<h2 id="endTitle">You win!</h2>
+<p id="endMsg"></p>
+<div id="endBoard" style="margin:10px 0;font-size:18px;line-height:1.4"></div>
+<button class="btn btnPrimary" style="width:100%" id="playAgain">PLAY AGAIN</button>
+<button class="btn" style="width:100%;margin-top:8px" id="closeEnd">CLOSE</button>
+</div>
+</div>
+
+<script>
+const WORDS=["ABOUT","ABOVE","ALERT","ARGUE","ARISE","AUDIO","AVOID","BEACH","BEGAN","BEGIN","BEING","BELOW","BENCH","BILLY","BIRTH","BLACK","BLAME","BLANK","BLAST","BLIND","BLOCK","BLOOD","BOARD","BOOST","BOOTH","BOUND","BRAIN","BRAND","BREAD","BREAK","BRICK","BRIEF","BRING","BROAD","BROKE","BROWN","BUILD","BUILT","BUYER","CABLE","CALIF","CARRY","CATCH","CAUSE","CHAIN","CHAIR","CHARM","CHART","CHASE","CHEAP","CHECK","CHEST","CHIEF","CHILD","CHINA","CHOSE","CIVIL","CLAIM","CLASS","CLEAN","CLEAR","CLICK","CLOCK","CLOSE","COACH","COAST","COULD","COUNT","COURT","COVER","CRAFT","CRASH","CRAZY","CROSS","CROWD","CROWN","CRUDE","CURVE","CYCLE","DAILY","DANCE","DATED","DEALT","DEATH","DEBUT","DELAY","DEPTH","DOING","DOUBT","DOZEN","DRAFT","DRAMA","DRANK","DREAM","DRESS","DRILL","DRINK","DRIVE","DROVE","DYING","EAGER","EARLY","EARTH","EIGHT","ELITE","EMPTY","ENEMY","ENJOY","ENTER","ENTRY","EQUAL","ERROR","EVENT","EVERY","EXACT","EXIST","EXTRA","FAITH","FALSE","FAULT","FIBER","FIELD","FIFTH","FIFTY","FIGHT","FINAL","FIRST","FIXED","FLASH","FLEET","FLOOR","FLUID","FOCUS","FORCE","FORTH","FORTY","FORUM","FOUND","FRAME","FRANK","FRAUD","FRESH","FRONT","FRUIT","FULLY","FUNNY","GIANT","GIVEN","GLASS","GLOBE","GOING","GRACE","GRADE","GRAND","GRANT","GRASS","GRAVE","GREAT","GREEN","GROSS","GROUP","GROWN","GUARD","GUESS","GUEST","GUIDE","HAPPY","HARRY","HEART","HEAVY","HENCE","HENRY","HORSE","HOTEL","HOUSE","HUMAN","IDEAL","IMAGE","INDEX","INNER","INPUT","ISSUE","JAPAN","JIMMY","JOINT","JONES","JUDGE","KNOWN","LABEL","LARGE","LASER","LATER","LAUGH","LAYER","LEARN","LEASE","LEAST","LEAVE","LEGAL","LEVEL","LEWIS","LIGHT","LIMIT","LINKS","LIVES","LOCAL","LOOSE","LOWER","LUCKY","LUNCH","LYING","MAGIC","MAJOR","MAKER","MARCH","MARIA","MATCH","MAYBE","MAYOR","MEANT","MEDIA","METAL","MIGHT","MINOR","MINUS","MIXED","MODEL","MONEY","MONTH","MORAL","MOTOR","MOUNT","MOUSE","MOUTH","MOVED","MOVIE","MUSIC","NEEDS","NEVER","NEWLY","NIGHT","NOISE","NORTH","NOTED","NOVEL","NURSE","OCCUR","OCEAN","OFFER","OFTEN","ORDER","OTHER","OUGHT","PAINT","PANEL","PAPER","PARTY","PEACE","PETER","PHASE","PHONE","PHOTO","PIECE","PILOT","PITCH","PLACE","PLAIN","PLANE","PLANT","PLATE","POINT","POUND","POWER","PRESS","PRICE","PRIDE","PRIME","PRINT","PRIOR","PRIZE","PROOF","PROUD","PROVE","QUEEN","QUICK","QUIET","QUITE","RADIO","RAISE","RANGE","RAPID","RATIO","REACH","READY","REALM","REBEL","REFER","RELAX","REPAY","REPLY","RIGHT","RIGID","RIVAL","RIVER","ROBIN","ROGER","ROMAN","ROUGH","ROUND","ROUTE","ROYAL","RURAL","SCALE","SCENE","SCOPE","SCORE","SENSE","SERVE","SEVEN","SHALL","SHAPE","SHARE","SHARP","SHEET","SHELF","SHELL","SHIFT","SHIRT","SHOCK","SHOOT","SHORT","SHOWN","SIGHT","SINCE","SIXTH","SIXTY","SIZED","SKILL","SLEEP","SMALL","SMART","SMILE","SMITH","SMOKE","SOLID","SOLVE","SORRY","SOUND","SOUTH","SPACE","SPARE","SPEAK","SPEED","SPEND","SPENT","SPLIT","SPOKE","SPORT","STAFF","STAGE","STAKE","STAND","START","STATE","STEAM","STEEL","STEEP","STEER","STICK","STILL","STOOD","STOPPED".split(",").filter(w=>w.length===5)];
+// Fallback curated list if above split fails
+const WORD_LIST = WORDS.length>20? WORDS : ["CRANE","SLATE","TRACE","ARISE","ROAST","RAISE","LEAST","SLANT","CRATE","GRAPE","HEART","BEACH","VOICE","MUSIC","LIGHT","HOUSE","WATER","PLANT","SMART","BRAVE","CLOUD","STORM","BEACH","WORLD","POWER","MONEY","HEART","DREAM","SMILE","GRACE","PEACE","HAPPY","MAGIC","OCEAN","RIVER","MOUNT","FOREST","DESERT","PLANET","GALAXY","ROCKET","PUZZLE","LETTER","ORANGE","PURPLE","YELLOW","GARDEN","BRIDGE","CASTLE","JUNGLE","ISLAND","MARKET","GOLDEN","SILVER","BRIGHT","FANCY","QUICK","JOLLY","WITTY","CHARM","GLORY","HONOR","PRIDE","SUGAR","HONEY","MAPLE","OLIVE","PEACH","MANGO","LEMON","APPLE","GRAPE","BERRY","CHERRY","COCOA","SPICE","SUGAR","FROST","SNOWY","SUNNY","RAINY","WINDY","STORM","CLOUD","BEACH","WAVES","TIDES","CORAL","PEARL","SHELL","OCEAN","WHALE","SHARK","EAGLE","TIGER","PANDA","KOALA","ZEBRA","HORSE","SHEEP","GOOSE","DUCKY","EAGLE","HAWKS","CROWS","ROBIN","SPARK","FLAME","BLAZE","EMBER","TORCH","LIGHT","SHINE","GLOOM","SHADE","NIGHT","DAWN","DUSK","NOON","MORNING".split(",").filter(w=>w.length===5).map(w=>w.trim().toUpperCase())];
+
+let answer="", row=0, col=0, boardState=[], evals=[], gameOver=false;
+let save={gamesPlayed:0,wins:0,currentStreak:0,maxStreak:0,guessDistribution:[0,0,0,0,0,0],hardMode:false};
+try{let s=JSON.parse(localStorage.getItem("lexiconSave")); if(s) save={...save,...s};}catch(e){}
+function persist(){localStorage.setItem("lexiconSave",JSON.stringify(save));}
+function pickWord(){return WORD_LIST[Math.floor(Math.random()*WORD_LIST.length)];}
+function initBoard(){
+ const b=document.getElementById("board"); b.innerHTML="";
+ boardState=Array.from({length:6},()=>Array(5).fill(""));
+ evals=Array.from({length:6},()=>Array(5).fill(""));
+ for(let r=0;r<6;r++){
+  const rowEl=document.createElement("div"); rowEl.className="row"; rowEl.id="row"+r;
+  for(let c=0;c<5;c++){const t=document.createElement("div"); t.className="tile"; t.id=`t-${r}-${c}`; rowEl.appendChild(t);}
+  b.appendChild(rowEl);
+ }
+}
+function renderKeyboard(){
+ const layout=[["Q","W","E","R","T","Y","U","I","O","P"],["A","S","D","F","G","H","J","K","L"],["ENTER","Z","X","C","V","B","N","M","BACK"]];
+ const kb=document.getElementById("keyboard"); kb.innerHTML="";
+ layout.forEach(r=>{
+  const row=document.createElement("div"); row.className="kRow";
+  r.forEach(k=>{
+   const btn=document.createElement("button"); btn.className="key"+(k.length>1?" wide":""); btn.textContent=k==="BACK"?"⌫":k; btn.dataset.key=k;
+   btn.onclick=()=>handleKey(k);
+   row.appendChild(btn);
+  });
+  kb.appendChild(row);
+ });
+}
+function updateKeyboardColors(){
+ const priority={gray:1,amber:2,green:3};
+ const best={};
+ for(let r=0;r<6;r++) for(let c=0;c<5;c++){
+  const ch=boardState[r][c]; const ev=evals[r][c]; if(!ch||!ev) continue;
+  if(!best[ch] || priority[ev] > priority[best[ch]]) best[ch]=ev;
+ }
+ document.querySelectorAll(".key").forEach(k=>{
+  const ch=k.dataset.key; if(ch.length!==1) return;
+  k.classList.remove("green","amber","gray");
+  if(best[ch]) k.classList.add(best[ch]);
+ });
+}
+function showToast(t,ms=1400){const el=document.getElementById("toast"); el.textContent=t; el.classList.add("on"); setTimeout(()=>el.classList.remove("on"),ms);}
+function showMsg(t,isErr){const m=document.getElementById("msg"); m.textContent=t; m.className="msg"+(isErr?" err":""); if(t) setTimeout(()=>{m.textContent="";},1800);}
+function evaluateGuess(guess, ans){
+ const res=Array(5).fill("gray"); const ansArr=ans.split(""); const gArr=guess.split("");
+ const used=Array(5).fill(false);
+ for(let i=0;i<5;i++) if(gArr[i]===ansArr[i]){res[i]="green"; used[i]=true;}
+ for(let i=0;i<5;i++) if(res[i]!=="green"){
+  for(let j=0;j<5;j++) if(!used[j] && gArr[i]===ansArr[j]){res[i]="amber"; used[j]=true; break;}
+ }
+ return res;
+}
+function checkHardMode(guess){
+ if(!save.hardMode) return null;
+ // collect required greens and ambers from previous evals
+ const requiredGreens=Array(5).fill(null);
+ const requiredCounts={};
+ for(let r=0;r<row;r++){
+  for(let c=0;c<5;c++){
+   const ev=evals[r][c]; const ch=boardState[r][c];
+   if(ev==="green") requiredGreens[c]=ch;
+   if(ev==="amber"||ev==="green"){
+    requiredCounts[ch]=(requiredCounts[ch]||0)+1;
+    // Actually need to count distinct required letters: count max needed
+   }
+  }
+  // For amber, we need to ensure letter appears somewhere
+ }
+ // Greens must stay
+ for(let c=0;c<5;c++) if(requiredGreens[c] && guess[c]!==requiredGreens[c]) return `Hard mode: ${requiredGreens[c]} must be in position ${c+1}`;
+ // Ambers must be present: build required letter multiset from previous greens+ambers
+ const need={};
+ for(let r=0;r<row;r++) for(let c=0;c<5;c++) if(evals[r][c]==="green"||evals[r][c]==="amber"){
+  const ch=boardState[r][c]; need[ch]=(need[ch]||0)+1;
+ }
+ // But duplicates: need max count across rows? Use max per letter
+ // Simplify: ensure guess contains at least as many of each required letter as max seen in any single prior guess's greens+ambers
+ // We'll compute max needed per letter
+ const maxNeed={};
+ for(let r=0;r<row;r++){
+  const cnt={};
+  for(let c=0;c<5;c++) if(evals[r][c]==="green"||evals[r][c]==="amber") cnt[boardState[r][c]]=(cnt[boardState[r][c]]||0)+1;
+  for(let k in cnt) maxNeed[k]=Math.max(maxNeed[k]||0,cnt[k]);
+ }
+ for(let k in maxNeed){
+  const have=(guess.split("").filter(ch=>ch===k).length);
+  if(have < maxNeed[k]) return `Hard mode: must include ${k}`;
+ }
+ return null;
+}
+function handleKey(k){
+ if(gameOver) return;
+ if(k==="ENTER") submitRow();
+ else if(k==="BACK") deleteChar();
+ else if(/^[A-Z]$/.test(k)) addChar(k);
+}
+function addChar(ch){
+ if(row>=6||col>=5) return;
+ boardState[row][col]=ch;
+ const t=document.getElementById(`t-${row}-${col}`); t.textContent=ch; t.classList.add("filled");
+ col++;
+}
+function deleteChar(){
+ if(col===0) return;
+ col--; boardState[row][col]="";
+ const t=document.getElementById(`t-${row}-${col}`); t.textContent=""; t.classList.remove("filled");
+}
+function submitRow(){
+ if(col<5){showMsg("Not enough letters",true); shakeRow(); return;}
+ const guess=boardState[row].join("");
+ const hardErr=checkHardMode(guess);
+ if(hardErr){showMsg(hardErr,true); shakeRow(); return;}
+ const res=evaluateGuess(guess, answer);
+ evals[row]=res;
+ animateRow(row,res,()=>{
+  updateKeyboardColors();
+  if(guess===answer){ finishGame(true); }
+  else if(row===5){ finishGame(false); }
+  else { row++; col=0; }
+ });
+}
+function shakeRow(){
+ const r=document.getElementById("row"+row); r.classList.add("shake"); setTimeout(()=>r.classList.remove("shake"),400);
+}
+function animateRow(r,res,cb){
+ let delay=0;
+ for(let c=0;c<5;c++){
+  const t=document.getElementById(`t-${r}-${c}`);
+  setTimeout(()=>{
+   t.classList.add("flip");
+   setTimeout(()=>{
+    t.classList.remove("flip");
+    t.classList.add(res[c]);
+   },250);
+  }, c*110);
+ }
+ setTimeout(cb, 5*110+550);
+}
+function finishGame(won){
+ gameOver=true;
+ save.gamesPlayed++;
+ if(won){ save.wins++; save.currentStreak++; save.maxStreak=Math.max(save.maxStreak, save.currentStreak); save.guessDistribution[row]++; }
+ else { save.currentStreak=0; }
+ persist(); renderStats();
+ const title=won? "Brilliant!" : "Game over";
+ const msg=won? `You got it in ${row+1}/6` : `Answer was ${answer}`;
+ document.getElementById("endTitle").textContent=title;
+ document.getElementById("endMsg").textContent=msg;
+ // build emoji board
+ let emoji="";
+ for(let r=0;r<=row;r++){
+  for(let c=0;c<5;c++){
+   const ev=evals[r][c]; emoji+= ev==="green"?"🟩":ev==="amber"?"🟨":"⬜";
+  }
+  emoji+="<br>";
+ }
+ document.getElementById("endBoard").innerHTML=emoji;
+ document.getElementById("endOverlay").classList.add("on");
+}
+function renderStats(){
+ document.getElementById("sPlayed").textContent=save.gamesPlayed;
+ document.getElementById("sWin").textContent= save.gamesPlayed? Math.round(save.wins/save.gamesPlayed*100):0;
+ document.getElementById("sStreak").textContent=save.currentStreak;
+ document.getElementById("sMax").textContent=save.maxStreak;
+ const dist=document.getElementById("dist"); dist.innerHTML="";
+ const max=Math.max(1,...save.guessDistribution);
+ save.guessDistribution.forEach((v,i)=>{
+  const row=document.createElement("div"); row.className="distRow";
+  row.innerHTML=`<span>${i+1}</span><div class="bar"><div class="barFill" style="width:${v? (v/max*100):8}%">${v||""}</div></div>`;
+  dist.appendChild(row);
+ });
+}
+function newGame(){
+ answer=pickWord(); row=0; col=0; gameOver=false;
+ initBoard(); updateKeyboardColors();
+ document.getElementById("msg").textContent="";
+ document.getElementById("endOverlay").classList.remove("on");
+}
+document.getElementById("hardToggle").onclick=()=>{
+ save.hardMode=!save.hardMode; persist();
+ document.getElementById("hardToggle").textContent= save.hardMode? "HARD ON":"HARD OFF";
+ document.getElementById("hardToggle").classList.toggle("on", save.hardMode);
+ showToast(save.hardMode? "Hard mode on":"Hard mode off");
+};
+document.getElementById("statsBtn").onclick=()=>{renderStats(); document.getElementById("statsOverlay").classList.add("on");};
+document.getElementById("closeStats").onclick=()=>document.getElementById("statsOverlay").classList.remove("on");
+document.getElementById("statsOverlay").onclick=(e)=>{if(e.target.id==="statsOverlay") e.currentTarget.classList.remove("on");};
+document.getElementById("helpBtn").onclick=()=>document.getElementById("helpOverlay").classList.add("on");
+document.getElementById("closeHelp").onclick=()=>document.getElementById("helpOverlay").classList.remove("on");
+document.getElementById("helpOverlay").onclick=(e)=>{if(e.target.id==="helpOverlay") e.currentTarget.classList.remove("on");};
+document.getElementById("newBtn").onclick=newGame;
+document.getElementById("playAgain").onclick=newGame;
+document.getElementById("closeEnd").onclick=()=>document.getElementById("endOverlay").classList.remove("on");
+document.getElementById("endOverlay").onclick=(e)=>{if(e.target.id==="endOverlay") e.currentTarget.classList.remove("on");};
+document.getElementById("shareBtn").onclick=()=>{
+ if(!gameOver){showToast("Finish a game to share"); return;}
+ let text=`Lexicon ${gameOver? (boardState[row].join("")===answer? row+1+"/6" : "X/6") : ""} ${save.hardMode?"*":""}\n`;
+ for(let r=0;r<=row;r++){
+  for(let c=0;c<5;c++){const ev=evals[r][c]; text+= ev==="green"?"🟩":ev==="amber"?"🟨":"⬜";}
+  text+="\n";
+ }
+ if(navigator.clipboard) navigator.clipboard.writeText(text).then(()=>showToast("Copied to clipboard"));
+ else showToast(text);
+};
+document.addEventListener("keydown",e=>{
+ if(e.key==="Enter") handleKey("ENTER");
+ else if(e.key==="Backspace") handleKey("BACK");
+ else if(/^[a-zA-Z]$/.test(e.key)) handleKey(e.key.toUpperCase());
+});
+// init
+document.getElementById("hardToggle").textContent= save.hardMode? "HARD ON":"HARD OFF";
+document.getElementById("hardToggle").classList.toggle("on", save.hardMode);
+initBoard(); renderKeyboard(); renderStats();
+newGame();
+</script>
+</body>
+</html>

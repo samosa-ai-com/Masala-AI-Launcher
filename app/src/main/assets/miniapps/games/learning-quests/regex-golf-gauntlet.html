@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Pattern Golf — Night Fairway</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#050d08;--fair1:#0a1f14;--fair2:#0d2618;--neon:#2aff7a;--neon2:#7affb0;--amber:#ffcc33;--red:#ff4d6a;--card:#0f2a1c;--muted:#8ab89a;--boss:#ffcc33}
+html,body{height:100%;background:var(--bg);color:#e0ffe8;font-family:ui-monospace,Menlo,Consolas,monospace;overflow-x:hidden}
+body{display:flex;justify-content:center}
+.app{width:100%;max-width:428px;min-width:360px;min-height:100vh;display:flex;flex-direction:column;background:
+repeating-linear-gradient(90deg, var(--fair1) 0 28px, var(--fair2) 28px 56px),
+radial-gradient(600px 400px at 50% -10%, #143d24 0%, transparent 70%);
+position:relative;overflow:hidden}
+.app::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg, rgba(0,0,0,0.35), transparent 30%, rgba(0,0,0,0.5));pointer-events:none}
+header{position:relative;z-index:2;padding:14px 14px 10px;display:flex;flex-direction:column;gap:10px;background:rgba(0,16,8,0.85);backdrop-filter:blur(6px);border-bottom:2px solid rgba(42,255,122,0.25)}
+.topbar{display:flex;justify-content:space-between;align-items:center}
+.logo{display:flex;align-items:center;gap:8px}
+.logo-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#0a2a18,#1a5c2e);border:1.5px solid var(--neon);display:grid;place-items:center;font-weight:900;color:var(--neon);box-shadow:0 0 12px rgba(42,255,122,0.4)}
+.logo h1{font-size:15px;letter-spacing:0.08em;line-height:1}
+.logo h1 span{color:var(--neon);font-size:11px;display:block;letter-spacing:0.18em;opacity:0.9}
+.stats{display:flex;gap:8px}
+.stat{flex:1;background:rgba(15,42,28,0.9);border:1px solid rgba(42,255,122,0.2);border-radius:12px;padding:7px 8px;text-align:center;min-width:0}
+.stat label{font-size:9px;letter-spacing:0.14em;color:var(--muted);display:block}
+.stat b{font-size:14px;color:#fff}
+.stat b small{font-size:10px;color:var(--muted)}
+.hearts{font-size:13px;letter-spacing:2px}
+.progress{height:6px;background:rgba(255,255,255,0.08);border-radius:99px;overflow:hidden}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--neon),#7affb0);width:0%;transition:width .4s}
+.view{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:12px;gap:12px;overflow-y:auto;overflow-x:hidden}
+.card{background:rgba(15,42,28,0.92);border:1px solid rgba(42,255,122,0.18);border-radius:16px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.35)}
+.card h2{font-size:13px;letter-spacing:0.12em;color:var(--neon2);margin-bottom:8px}
+.map-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.hole-tile{position:relative;background:linear-gradient(180deg,#0f2a1c,#0a1f14);border:1.5px solid rgba(42,255,122,0.18);border-radius:14px;padding:10px 8px;text-align:center;cursor:pointer;min-height:92px;display:flex;flex-direction:column;justify-content:center;gap:4px;transition:transform .08s, border-color .2s}
+.hole-tile:active{transform:scale(0.97)}
+.hole-tile.unlocked{border-color:rgba(42,255,122,0.45);box-shadow:0 0 10px rgba(42,255,122,0.15)}
+.hole-tile.boss{border-color:var(--boss);background:linear-gradient(180deg,#2a2410,#1f1a0a)}
+.hole-tile.locked{opacity:0.45;filter:grayscale(0.4)}
+.hole-tile .num{font-size:11px;color:var(--muted);letter-spacing:0.1em}
+.hole-tile .name{font-size:11px;font-weight:800;line-height:1.1;color:#fff;min-height:22px}
+.hole-tile .par{font-size:10px;color:var(--neon2)}
+.hole-tile .best{font-size:9px;color:var(--amber);min-height:12px}
+.badge{position:absolute;top:-6px;right:-6px;background:var(--boss);color:#000;font-size:8px;font-weight:900;padding:3px 6px;border-radius:99px;letter-spacing:0.08em}
+.hole-view{display:none;flex-direction:column;gap:12px}
+.hole-view.active{display:flex}
+.terminal{background:#001008;border:2px solid var(--neon);border-radius:14px;padding:10px;box-shadow:0 0 18px rgba(42,255,122,0.25), inset 0 0 12px rgba(42,255,122,0.08)}
+.term-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:10px;letter-spacing:0.14em;color:var(--neon2)}
+.term-head span{opacity:0.9}
+.par-badge{background:var(--neon);color:#001008;font-weight:900;padding:4px 8px;border-radius:99px;font-size:11px}
+.input-row{display:flex;align-items:center;gap:8px;background:#000e06;border:1px solid rgba(42,255,122,0.3);border-radius:10px;padding:8px 10px}
+.input-row span{color:var(--neon);font-weight:900}
+.input-row input{flex:1;background:transparent;border:none;outline:none;color:var(--neon);font-family:inherit;font-size:18px;letter-spacing:0.04em;min-width:0}
+.input-row input::placeholder{color:rgba(42,255,122,0.35)}
+.live{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.live-box{background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:8px}
+.live-box h4{font-size:9px;letter-spacing:0.12em;color:var(--muted);margin-bottom:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:11px;padding:5px 7px;border-radius:99px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.06);color:#d0e8d6}
+.chip.ok{background:rgba(42,255,122,0.18);border-color:rgba(42,255,122,0.5);color:#b8ffd0}
+.chip.bad{background:rgba(255,77,106,0.18);border-color:rgba(255,77,106,0.5);color:#ffb3c0;text-decoration:line-through}
+.meter{height:6px;background:rgba(255,255,255,0.08);border-radius:99px;overflow:hidden;margin-top:6px}
+.meter i{display:block;height:100%;width:0%;transition:width .3s}
+.meter.wanted i{background:var(--neon)}
+.meter.rejected i{background:var(--red)}
+.status-line{margin-top:8px;font-size:11px;min-height:16px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.status-line b{color:#fff}
+.hints{display:flex;gap:8px}
+.hint-btn{flex:1;min-height:44px;border-radius:12px;border:1.5px solid rgba(42,255,122,0.25);background:rgba(15,42,28,0.9);color:#c8f5c8;font-family:inherit;font-size:11px;font-weight:800;letter-spacing:0.06em;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.hint-btn:active{transform:scale(0.98)}
+.hint-btn.used{opacity:0.45;pointer-events:none}
+.hint-btn small{font-size:9px;color:var(--muted);font-weight:600}
+.hint-reveal{font-size:11px;color:var(--amber);background:rgba(255,204,51,0.08);border:1px dashed rgba(255,204,51,0.4);border-radius:10px;padding:8px;display:none}
+.hint-reveal.show{display:block}
+.kbd{display:flex;flex-wrap:wrap;gap:6px}
+.kbd button{min-width:44px;min-height:44px;padding:0 10px;border-radius:10px;border:1px solid rgba(42,255,122,0.25);background:#0a1f14;color:var(--neon2);font-family:inherit;font-weight:800;font-size:14px;cursor:pointer}
+.kbd button.wide{min-width:68px}
+.kbd button:active{background:var(--neon);color:#001008}
+.actions{display:flex;gap:8px}
+.btn{flex:1;min-height:48px;border-radius:12px;border:none;font-family:inherit;font-weight:900;letter-spacing:0.08em;cursor:pointer;font-size:13px}
+.btn-primary{background:linear-gradient(180deg,var(--neon),#1ec85a);color:#001008;box-shadow:0 6px 16px rgba(42,255,122,0.35)}
+.btn-ghost{background:rgba(255,255,255,0.06);color:#d0e8d6;border:1.5px solid rgba(255,255,255,0.12)}
+.btn:active{transform:scale(0.98)}
+.result{border-radius:12px;padding:10px;text-align:center;font-size:12px;display:none}
+.result.show{display:block}
+.result.good{background:rgba(42,255,122,0.12);border:1px solid rgba(42,255,122,0.4);color:#b8ffd0}
+.result.bad{background:rgba(255,77,106,0.12);border:1px solid rgba(255,77,106,0.4);color:#ffb3c0}
+.streak-pop{position:fixed;left:50%;top:18%;transform:translateX(-50%);background:#001008;border:1.5px solid var(--amber);color:var(--amber);padding:10px 14px;border-radius:99px;font-weight:900;letter-spacing:0.08em;box-shadow:0 8px 24px rgba(0,0,0,0.5);z-index:99;display:none}
+.nav{display:flex;gap:8px}
+.nav .btn{font-size:11px;min-height:40px}
+.footer{position:relative;z-index:2;padding:8px 12px 14px;text-align:center;font-size:9px;letter-spacing:0.12em;color:rgba(200,245,200,0.5)}
+@media (max-width:380px){.map-grid{gap:6px}.hole-tile{min-height:86px}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+<header>
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-mark">⛳</div>
+      <h1>PATTERN GOLF<span>NIGHT FAIRWAY • REGEX</span></h1>
+    </div>
+    <div style="text-align:right">
+      <div class="hearts" id="hearts">♥♥♥</div>
+      <div style="font-size:9px;letter-spacing:0.12em;color:var(--muted)">LIVES</div>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><label>STREAK</label><b id="streak">0 <small>🔥</small></b></div>
+    <div class="stat"><label>UNLOCKED</label><b id="unlocked">1 / 18</b></div>
+    <div class="stat"><label>BEST</label><b id="best">—</b></div>
+  </div>
+  <div class="progress"><i id="prog"></i></div>
+</header>
+
+<div class="view" id="mapView">
+  <div class="card">
+    <h2>⛳ COURSE MAP — TAP A HOLE</h2>
+    <div class="map-grid" id="grid"></div>
+  </div>
+  <div class="card" style="display:flex;gap:8px;align-items:center">
+    <div style="flex:1">
+      <div style="font-size:11px;font-weight:900;letter-spacing:0.08em;color:var(--neon2)">HOW TO PLAY</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.4;margin-top:4px">Type the <b style="color:#fff">shortest regex</b> that matches <b style="color:var(--neon)">all WANTED</b> and <b style="color:var(--red)">none REJECTED</b>. Beat <b style="color:var(--amber)">PAR</b> (fewest chars) for birdie. Live engine checks as you type.</div>
+    </div>
+    <button class="btn btn-ghost" style="min-width:88px;min-height:44px" onclick="resetProgress()">RESET</button>
+  </div>
+  <div class="card">
+    <h2>LEGEND</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--muted)">
+      <span style="background:rgba(42,255,122,0.15);border:1px solid rgba(42,255,122,0.3);padding:4px 8px;border-radius:99px">● PAR = target length</span>
+      <span style="background:rgba(255,204,51,0.12);border:1px solid rgba(255,204,51,0.4);padding:4px 8px;border-radius:99px">★ BOSS HOLE</span>
+      <span style="background:rgba(255,77,106,0.12);border:1px solid rgba(255,77,106,0.3);padding:4px 8px;border-radius:99px">♥ Lives on fail</span>
+    </div>
+  </div>
+</div>
+
+<div class="view hole-view" id="holeView">
+  <div class="nav">
+    <button class="btn btn-ghost" onclick="showMap()">← COURSE</button>
+    <button class="btn btn-ghost" onclick="prevHole()">‹ PREV</button>
+    <button class="btn btn-ghost" onclick="nextHole()">NEXT ›</button>
+  </div>
+
+  <div class="card" id="holeCard">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div>
+        <div style="font-size:10px;letter-spacing:0.14em;color:var(--muted)" id="holeMeta">HOLE 1 • PAR 3</div>
+        <div style="font-size:16px;font-weight:900;color:#fff" id="holeName">Tee One</div>
+        <div style="font-size:11px;color:var(--muted)" id="holeDesc"></div>
+      </div>
+      <div style="text-align:right">
+        <div class="par-badge" id="parBadge">PAR 3</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px" id="lenInfo">0 chars</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="terminal">
+    <div class="term-head"><span>▶ PATTERN INPUT — LIVE ENGINE</span><span id="engineState">IDLE</span></div>
+    <div class="input-row">
+      <span>/</span><input id="patternInput" placeholder="type regex…" autocomplete="off" autocorrect="off" spellcheck="false"><span>/</span>
+    </div>
+    <div class="live">
+      <div class="live-box">
+        <h4>WANTED <b id="wantedCount" style="color:var(--neon)">0/0</b></h4>
+        <div class="chips" id="wantedChips"></div>
+        <div class="meter wanted"><i id="wantedMeter"></i></div>
+      </div>
+      <div class="live-box">
+        <h4>REJECTED <b id="rejectedCount" style="color:var(--red)">0/0</b></h4>
+        <div class="chips" id="rejectedChips"></div>
+        <div class="meter rejected"><i id="rejectedMeter"></i></div>
+      </div>
+    </div>
+    <div class="status-line"><span id="statusLeft">Type to test…</span><b id="statusRight"></b></div>
+    <div class="result" id="resultBox"></div>
+  </div>
+
+  <div class="card">
+    <h2>💡 HINTS — TAP TO REVEAL (+1 stroke penalty)</h2>
+    <div class="hints">
+      <button class="hint-btn" id="hintLetter" onclick="useHint('letter')">LETTER<small id="hintLetterCost">-1 life if used</small></button>
+      <button class="hint-btn" id="hintAnchor" onclick="useHint('anchor')">ANCHOR<small>^ $ hint</small></button>
+      <button class="hint-btn" id="hintClass" onclick="useHint('class')">CLASS<small>[ ] \d \w</small></button>
+    </div>
+    <div class="hint-reveal" id="hintReveal"></div>
+  </div>
+
+  <div class="card">
+    <h2>⌨️ REGEX KEYPAD</h2>
+    <div class="kbd" id="kbd">
+      <button onclick="insertAt('^')">^</button><button onclick="insertAt('$')">$</button><button onclick="insertAt('.')">.</button><button onclick="insertAt('*')">*</button><button onclick="insertAt('+')">+</button><button onclick="insertAt('?')">?</button>
+      <button onclick="insertAt('[')">[</button><button onclick="insertAt(']')">]</button><button onclick="insertAt('(')">(</button><button onclick="insertAt(')')">)</button><button onclick="insertAt('|')">|</button><button onclick="insertAt('\\')">\</button>
+      <button onclick="insertAt('\\d')">\d</button><button onclick="insertAt('\\w')">\w</button><button onclick="insertAt('\\s')">\s</button><button onclick="insertAt('{')">{</button><button onclick="insertAt('}')">}</button><button onclick="insertAt(',')">,</button>
+      <button class="wide" onclick="insertAt('.*')">.*</button><button class="wide" onclick="insertAt('.+')">.+</button><button class="wide" onclick="backspace()">⌫</button><button class="wide" onclick="clearInput()">CLR</button>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-ghost" onclick="clearInput()">RESET</button>
+    <button class="btn btn-primary" onclick="submitPattern()">⛳ SUBMIT — JUDGE</button>
+  </div>
+</div>
+
+<div class="streak-pop" id="streakPop">🔥 STREAK x2!</div>
+<div class="footer">NIGHT FAIRWAY • TERMINAL INPUT • PERSISTED IN LOCALSTORAGE</div>
+</div>
+
+<script>
+// ===== HOLES DATA =====
+const HOLES = [
+  {id:1, name:"Tee One", par:2, wanted:["cat","car","cap","cab"], rejected:["dog","bat","rat","mat"], desc:"All winners start with ca — keep it tiny.", hintLetter:"Wanted share prefix 'ca' — just type ca", hintAnchor:"No anchor needed, prefix is enough", hintClass:"No class needed, literal letters win", boss:false},
+  {id:2, name:"Bunker Class", par:7, wanted:["cat","cot","cut"], rejected:["cet","cit","c9t","c t"], desc:"Dot would hit rejects — use a class.", hintLetter:"Middle letter is a, o or u", hintAnchor:"No anchors, just the 3-letter word", hintClass:"Try c[auc]t or c[auo]t — class with allowed letters", boss:false},
+  {id:3, name:"Anchor Approach", par:4, wanted:["apple","apply"], rejected:["pineapple","applesauce","snapple"], desc:"'app' alone hits rejects — anchor it.", hintLetter:"Wanted start with app", hintAnchor:"Use ^ to lock start: ^app", hintClass:"No class, anchor does the work", boss:false},
+  {id:4, name:"Digit Fairway", par:8, wanted:["file1","file2","file9"], rejected:["fileX","file","file10","file_"], desc:"Only single digit 0-9 after file.", hintLetter:"Prefix is file", hintAnchor:"End matters — avoid file10", hintClass:"Use [0-9] or \\d : file[0-9] or file\\d", boss:false},
+  {id:5, name:"Plus Power", par:3, wanted:["aa","aaa","aaaa","aaaaa"], rejected:["a","b","ab","ba"], desc:"At least two a's, nothing else.", hintLetter:"Only letter a", hintAnchor:"Lock both ends: ^ and $", hintClass:"Quantifier + means 1+ : aa+ or a{2,}", boss:false},
+  {id:6, name:"Colour Trap ★", par:8, wanted:["color","colour"], rejected:["colur","coloor","colorr","colouur"], desc:"BOSS: u is optional. One pattern for both.", hintLetter:"Starts col, ends r", hintAnchor:"No anchors needed", hintClass:"Optional quantifier ? : colou?r", boss:true},
+  {id:7, name:"Dot Danger", par:3, wanted:["cat","cbt","cct"], rejected:["ca","catt","cc","dog"], desc:"Exactly 3 chars, c _ t", hintLetter:"c at start, t at end", hintAnchor:"Use ^ and $ to fix length: ^c.t$", hintClass:"Dot . = any one char", boss:false},
+  {id:8, name:"Star Stretch", par:4, wanted:["ab","acb","accb","acccb"], rejected:["abx","ac","accc","acbca"], desc:"a, then any c's, then b", hintLetter:"a … b", hintAnchor:"Lock ends: ^a.*b$ but tighter", hintClass:"c* = zero or more c : ac*b", boss:false},
+  {id:9, name:"End Zone", par:4, wanted:["test","best","nest"], rejected:["testing","attest","testy","contest"], desc:"Must end with est, exactly.", hintLetter:"Ends with est", hintAnchor:"$ locks end: est$ with ^", hintClass:"Try ^.*est$ or ^...t$ but shortest is ...est? Actually ^.*est$ is 7, better ^..st$? Shortest valid is est$ (4)", boss:false},
+  {id:10, name:"Alternation Alley", par:9, wanted:["cat","dog"], rejected:["pig","cow","catalog","dogma"], desc:"Only cat or dog, nothing longer.", hintLetter:"Two words only", hintAnchor:"Both anchors: ^(cat|dog)$", hintClass:"Alternation | inside group ( )", boss:false},
+  {id:11, name:"Group Green", par:5, wanted:["ab","abab","ababab"], rejected:["a","b","aba","ababa","abb"], desc:"Repeating ab, at least once.", hintLetter:"Only ab repeats", hintAnchor:"^ and $ to forbid partial", hintClass:"Group (ab)+", boss:false},
+  {id:12, name:"Inbox Boss ★", par:12, wanted:["a@b.co","hi@yo.io","x@y.z"], rejected:["@b.co","a@b","a@b.c0m!","ab.co"], desc:"BOSS: simple email — chars @ chars . chars", hintLetter:"Structure: _@_._", hintAnchor:"Lock full string: ^...$", hintClass:"Use \\w or [^@]+ : ^\\w+@\\w+\\.\\w+$", boss:true},
+  {id:13, name:"No Digits", par:5, wanted:["abc","xyz","hello"], rejected:["a1c","x2z","hell0","123"], desc:"Letters only, no digits anywhere.", hintLetter:"Only a-z", hintAnchor:"^[^0-9]+$ or ^[a-z]+$", hintClass:"Negated class [^0-9] or [a-z]", boss:false},
+  {id:14, name:"Triple Tap", par:4, wanted:["aaa","bbb","ccc"], rejected:["aa","aaaa","ab","aab","bb"], desc:"Exactly three same letters.", hintLetter:"Three repeats", hintAnchor:"^...$ helps", hintClass:"Backref not needed — try ^(aaa|bbb|ccc)$ or ^(.)\\1\\1$ but shortest is (aaa|bbb|ccc) with anchors", boss:false},
+  {id:15, name:"Word Wall", par:6, wanted:["hi","hey","hello"], rejected:["hi!","hey!","hello!"," hi"], desc:"Only those words, no punctuation.", hintLetter:"h start", hintAnchor:"^(hi|hey|hello)$", hintClass:"Alternation again", boss:false},
+  {id:16, name:"A to Z", par:6, wanted:["abcz","axyz","az"], rejected:["az1","a z","bz","azz"], desc:"Starts a, ends z, anything between.", hintLetter:"a … z", hintAnchor:"^a.*z$", hintClass:".* = anything", boss:false},
+  {id:17, name:"Escape Hatch", par:7, wanted:["a+b","a*b","a?b"], rejected:["ab","aab","abb","a b"], desc:"a, then literal + * or ?, then b — escape!", hintLetter:"Middle is symbol", hintAnchor:"No anchors", hintClass:"Escape: a[+*?]b or a\\+b etc — class easiest", boss:false},
+  {id:18, name:"Final Boss ★", par:10, wanted:["2026-01-01","1999-12-31","2000-06-15"], rejected:["2026/01/01","26-01-01","2026-1-1","2026-01-011"], desc:"FINAL BOSS: YYYY-MM-DD, strict.", hintLetter:"Digits and dashes", hintAnchor:"^ and $ required", hintClass:"\\d{4}-\\d{2}-\\d{2} — quantifiers with braces", boss:true},
+];
+
+// ===== STATE + PERSISTENCE via localStorage =====
+const LS_KEY="patternGolf_nightFairway_v2";
+let state = {
+  unlocked:1,
+  bestScores:{}, // id -> strokes
+  lives:3,
+  streak:0,
+  hintsUsed:{}, // id -> {letter,anchor,class}
+  currentHole:1
+};
+function loadState(){
+  try{
+    const raw=localStorage.getItem(LS_KEY);
+    if(raw){ const p=JSON.parse(raw); state={...state,...p}; }
+  }catch(e){}
+  if(state.lives<=0) state.lives=3;
+}
+function saveState(){
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+}
+function resetProgress(){
+  if(!confirm("Reset all progress?")) return;
+  localStorage.removeItem(LS_KEY);
+  state={unlocked:1,bestScores:{},lives:3,streak:0,hintsUsed:{},currentHole:1};
+  saveState(); renderAll(); showMap();
+}
+
+// ===== REGEX ENGINE (live) =====
+function testPattern(pattern, hole){
+  if(!pattern) return {valid:false, error:"Empty", wantedMatches:[], rejectedMatches:[]};
+  let re;
+  try{ re=new RegExp(pattern); }catch(e){ return {valid:false, error:e.message, wantedMatches:[], rejectedMatches:[]}; }
+  const wantedMatches = hole.wanted.map(w=> re.test(w));
+  const rejectedMatches = hole.rejected.map(r=> re.test(r));
+  const allWanted = wantedMatches.every(Boolean);
+  const noRejected = rejectedMatches.every(v=>!v);
+  return {valid: allWanted && noRejected, allWanted, noRejected, wantedMatches, rejectedMatches, error:null, re};
+}
+
+// ===== PAR CALCULATION =====
+function scoreFor(strokes, par){
+  const diff = strokes - par;
+  if(diff <= -2) return {label:"EAGLE! 🦅", cls:"good"};
+  if(diff === -1) return {label:"BIRDIE! 🐦", cls:"good"};
+  if(diff === 0) return {label:"PAR ✅", cls:"good"};
+  if(diff === 1) return {label:"BOGEY", cls:"bad"};
+  return {label:"DOUBLE BOGEY", cls:"bad"};
+}
+
+// ===== RENDER =====
+function renderAll(){
+  document.getElementById('streak').innerHTML = state.streak + ' <small>🔥</small>';
+  document.getElementById('unlocked').textContent = state.unlocked + ' / ' + HOLES.length;
+  const bestVals = Object.values(state.bestScores);
+  document.getElementById('best').textContent = bestVals.length ? Math.min(...bestVals) + ' best' : '—';
+  document.getElementById('hearts').textContent = '♥'.repeat(state.lives) + '♡'.repeat(Math.max(0,3-state.lives));
+  document.getElementById('hearts').style.color = state.lives===1 ? 'var(--red)' : 'var(--neon)';
+  document.getElementById('prog').style.width = (state.unlocked/HOLES.length*100)+'%';
+  const grid=document.getElementById('grid');
+  grid.innerHTML='';
+  HOLES.forEach(h=>{
+    const unlocked = h.id <= state.unlocked;
+    const best = state.bestScores[h.id];
+    const div=document.createElement('div');
+    div.className='hole-tile ' + (unlocked?'unlocked':'locked') + (h.boss?' boss':'');
+    div.onclick=()=> unlocked ? openHole(h.id) : shakeLocked(div);
+    div.innerHTML = `
+      ${h.boss?'<span class="badge">BOSS</span>':''}
+      <div class="num">HOLE ${h.id}</div>
+      <div class="name">${h.name}</div>
+      <div class="par">PAR ${h.par}</div>
+      <div class="best">${best!=null? '★ '+best+' strokes' : (unlocked?'—':'🔒')}</div>
+    `;
+    grid.appendChild(div);
+  });
+}
+function shakeLocked(el){
+  el.animate([{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:250});
+}
+
+let currentHoleId=1;
+function openHole(id){
+  currentHoleId=id;
+  state.currentHole=id;
+  saveState();
+  document.getElementById('mapView').style.display='none';
+  document.getElementById('holeView').classList.add('active');
+  const h=HOLES.find(x=>x.id===id);
+  document.getElementById('holeMeta').textContent = `HOLE ${h.id} • PAR ${h.par} ${h.boss?'• BOSS ★':''}`;
+  document.getElementById('holeName').textContent = h.name;
+  document.getElementById('holeDesc').textContent = h.desc;
+  document.getElementById('parBadge').textContent = 'PAR '+h.par;
+  document.getElementById('parBadge').style.background = h.boss ? 'var(--boss)' : 'var(--neon)';
+  // reset input
+  const inp=document.getElementById('patternInput');
+  inp.value='';
+  document.getElementById('hintReveal').className='hint-reveal';
+  document.getElementById('hintReveal').textContent='';
+  ['letter','anchor','class'].forEach(k=>{
+    const btn=document.getElementById('hint'+k[0].toUpperCase()+k.slice(1));
+    const used = state.hintsUsed[id] && state.hintsUsed[id][k];
+    btn.classList.toggle('used', !!used);
+  });
+  document.getElementById('resultBox').className='result';
+  document.getElementById('resultBox').style.display='none';
+  updateLive();
+  setTimeout(()=>inp.focus(),100);
+}
+function showMap(){
+  document.getElementById('holeView').classList.remove('active');
+  document.getElementById('mapView').style.display='flex';
+  renderAll();
+}
+function prevHole(){ if(currentHoleId>1) openHole(currentHoleId-1); }
+function nextHole(){ if(currentHoleId<HOLES.length) openHole(currentHoleId+1); else showMap(); }
+
+// ===== LIVE ENGINE UI =====
+function updateLive(){
+  const h=HOLES.find(x=>x.id===currentHoleId);
+  const pat=document.getElementById('patternInput').value;
+  document.getElementById('lenInfo').textContent = pat.length + ' chars' + (pat.length? ` • vs PAR ${h.par}`:'');
+  const res=testPattern(pat,h);
+  // chips
+  const wChips=document.getElementById('wantedChips');
+  const rChips=document.getElementById('rejectedChips');
+  wChips.innerHTML=''; rChips.innerHTML='';
+  h.wanted.forEach((w,i)=>{
+    const ok = res.wantedMatches[i];
+    const d=document.createElement('span');
+    d.className='chip '+(pat? (ok?'ok':'') : '');
+    d.textContent=w;
+    wChips.appendChild(d);
+  });
+  h.rejected.forEach((w,i)=>{
+    const bad = res.rejectedMatches[i];
+    const d=document.createElement('span');
+    d.className='chip '+(pat? (bad?'bad':'ok') : '');
+    d.textContent=w;
+    rChips.appendChild(d);
+  });
+  const wCount = res.wantedMatches.filter(Boolean).length;
+  const rBad = res.rejectedMatches.filter(Boolean).length;
+  document.getElementById('wantedCount').textContent = wCount + '/' + h.wanted.length;
+  document.getElementById('rejectedCount').textContent = (h.rejected.length - rBad) + '/' + h.rejected.length + ' safe';
+  document.getElementById('wantedMeter').style.width = (wCount/h.wanted.length*100)+'%';
+  document.getElementById('rejectedMeter').style.width = ((h.rejected.length - rBad)/h.rejected.length*100)+'%';
+  document.getElementById('rejectedMeter').style.background = rBad? 'var(--red)' : 'var(--neon)';
+  const left=document.getElementById('statusLeft');
+  const right=document.getElementById('statusRight');
+  const eng=document.getElementById('engineState');
+  if(!pat){ left.textContent='Type to test…'; right.textContent=''; eng.textContent='IDLE'; eng.style.color='var(--muted)'; return; }
+  if(res.error){ left.textContent='⚠ '+res.error; left.style.color='var(--red)'; eng.textContent='ERROR'; eng.style.color='var(--red)'; right.textContent=''; return; }
+  left.style.color='var(--muted)';
+  if(res.valid){
+    left.textContent='✓ Valid — ready to submit!';
+    left.style.color='var(--neon)';
+    const strokes=pat.length;
+    const sc=scoreFor(strokes,h.par);
+    right.textContent = strokes + ' strokes → ' + sc.label;
+    right.style.color = sc.cls==='good' ? 'var(--neon)' : 'var(--amber)';
+    eng.textContent='VALID'; eng.style.color='var(--neon)';
+  } else {
+    if(!res.allWanted) left.textContent='✗ Missing some WANTED';
+    else if(!res.noRejected) left.textContent='✗ Hits REJECTED';
+    else left.textContent='✗ Not valid';
+    right.textContent = pat.length + ' chars';
+    eng.textContent='TESTING'; eng.style.color='var(--amber)';
+  }
+}
+
+// ===== HINTS =====
+function useHint(type){
+  const h=HOLES.find(x=>x.id===currentHoleId);
+  const key=type;
+  if(!state.hintsUsed[currentHoleId]) state.hintsUsed[currentHoleId]={};
+  if(state.hintsUsed[currentHoleId][key]) return;
+  state.hintsUsed[currentHoleId][key]=true;
+  saveState();
+  document.getElementById('hint'+key[0].toUpperCase()+key.slice(1)).classList.add('used');
+  const reveal=document.getElementById('hintReveal');
+  let text='';
+  if(type==='letter') text='🔤 LETTER: '+h.hintLetter;
+  if(type==='anchor') text='⚓ ANCHOR: '+h.hintAnchor;
+  if(type==='class') text='🧩 CLASS: '+h.hintClass;
+  reveal.textContent=text + '  (+1 stroke penalty applied on submit)';
+  reveal.className='hint-reveal show';
+}
+
+// ===== SUBMIT + LIVES + STREAKS + BOSS =====
+function submitPattern(){
+  const h=HOLES.find(x=>x.id===currentHoleId);
+  const pat=document.getElementById('patternInput').value.trim();
+  const res=testPattern(pat,h);
+  const box=document.getElementById('resultBox');
+  box.style.display='block';
+  if(!pat){ box.className='result show bad'; box.textContent='Enter a pattern first.'; return; }
+  if(res.error){ box.className='result show bad'; box.textContent='Regex error: '+res.error; loseLife(); return; }
+  if(!res.valid){
+    box.className='result show bad';
+    box.textContent = !res.allWanted ? 'Failed: not all WANTED matched.' : 'Failed: matched a REJECTED word.';
+    loseLife();
+    return;
+  }
+  // valid
+  let strokes=pat.length;
+  // hint penalty
+  const hints = state.hintsUsed[currentHoleId] ? Object.values(state.hintsUsed[currentHoleId]).filter(Boolean).length : 0;
+  strokes += hints; // +1 per hint
+  const sc=scoreFor(strokes, h.par);
+  const isUnderPar = strokes <= h.par;
+  // best score
+  const prevBest = state.bestScores[h.id];
+  if(prevBest==null || strokes < prevBest) state.bestScores[h.id]=strokes;
+  // unlock next
+  if(h.id === state.unlocked && h.id < HOLES.length){
+    state.unlocked = h.id + 1;
+    // boss reward: extra life
+    if(h.boss) { state.lives = Math.min(3, state.lives+1); }
+  }
+  // streak
+  if(isUnderPar){
+    state.streak += 1;
+    if(state.streak>=2) showStreakPop(state.streak);
+    // streak bonus: every 3 streak restore life
+    if(state.streak % 3 === 0) state.lives = Math.min(3, state.lives+1);
+  } else {
+    state.streak = 0;
+  }
+  saveState();
+  box.className='result show ' + (sc.cls==='good'?'good':'bad');
+  box.innerHTML = `<b>${sc.label}</b> — ${strokes} strokes (pattern ${pat.length} + ${hints} hint penalty) vs PAR ${h.par}<br><span style="font-size:11px;opacity:0.9">Pattern: <code>/${pat}/</code></span><br><button onclick="nextHole()" style="margin-top:8px;min-height:40px;padding:0 14px;border-radius:99px;border:none;background:${sc.cls==='good'?'var(--neon)':'#fff'};color:#001008;font-weight:900;cursor:pointer">${h.id===HOLES.length?'🏆 COURSE COMPLETE':'NEXT HOLE →'}</button>`;
+  renderAll();
+  if(h.id===HOLES.length && isUnderPar){
+    setTimeout(()=>{ alert('🏆 You conquered Night Fairway! Final best: '+strokes+' strokes on final boss.'); },300);
+  }
+}
+function loseLife(){
+  state.lives -=1;
+  if(state.lives<0) state.lives=0;
+  saveState(); renderAll();
+  if(state.lives===0){
+    setTimeout(()=>{
+      if(confirm('💔 Out of lives! Reset lives and try again? (streak reset)')){
+        state.lives=3; state.streak=0; saveState(); renderAll();
+      }
+    },200);
+  } else {
+    navigator.vibrate && navigator.vibrate(120);
+  }
+}
+function showStreakPop(n){
+  const el=document.getElementById('streakPop');
+  el.textContent='🔥 STREAK x'+n+'! '+(n>=3?'LIFE BONUS!':'');
+  el.style.display='block';
+  setTimeout(()=>el.style.display='none',1600);
+}
+
+// ===== KEYPAD HELPERS =====
+function insertAt(txt){
+  const inp=document.getElementById('patternInput');
+  const s=inp.selectionStart, e=inp.selectionEnd;
+  const v=inp.value;
+  inp.value = v.slice(0,s) + txt + v.slice(e);
+  inp.selectionStart = inp.selectionEnd = s + txt.length;
+  inp.focus(); updateLive();
+}
+function backspace(){
+  const inp=document.getElementById('patternInput');
+  const s=inp.selectionStart, e=inp.selectionEnd;
+  if(s!==e){ insertAt(''); return; }
+  if(s>0){ inp.value = inp.value.slice(0,s-1)+inp.value.slice(s); inp.selectionStart=inp.selectionEnd=s-1; inp.focus(); updateLive(); }
+}
+function clearInput(){ document.getElementById('patternInput').value=''; updateLive(); document.getElementById('patternInput').focus(); }
+
+// ===== INIT =====
+loadState();
+renderAll();
+document.getElementById('patternInput').addEventListener('input', updateLive);
+document.getElementById('patternInput').addEventListener('keydown', e=>{ if(e.key==='Enter') submitPattern(); });
+// open last hole if in progress
+if(state.currentHole && state.currentHole<=state.unlocked) { /* stay on map */ }
+
+</script>
+</body>
+</html>

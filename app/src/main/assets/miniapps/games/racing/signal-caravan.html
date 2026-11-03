@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Caravan Escort: 12 Routes</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#050a14;color:#e6edf3;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow-x:hidden;-webkit-text-size-adjust:100%}
+#app{max-width:428px;min-width:360px;margin:0 auto;min-height:100vh;background:#0a1222;display:flex;flex-direction:column;position:relative;overflow-x:hidden;border-left:1px solid #0f1e33;border-right:1px solid #0f1e33}
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#0f1e33;border-bottom:1px solid #1e3a5f;gap:8px}
+.brand{display:flex;flex-direction:column}
+.brand h1{margin:0;font-size:15px;letter-spacing:0.08em;font-weight:900;line-height:1}
+.brand p{margin:2px 0 0;font-size:11px;opacity:0.75;letter-spacing:0.04em}
+.hdr-actions{display:flex;gap:8px;align-items:center}
+.icon-btn{min-width:44px;min-height:44px;border-radius:12px;border:1px solid #1e3a5f;background:#11233d;color:#e6edf3;font-weight:800;font-size:13px;padding:0 10px}
+#hud{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 12px;background:#0d1b2a;border-bottom:1px solid #1e3a5f}
+.hud-card{background:#11233d;border:1px solid #1e3a5f;border-radius:12px;padding:7px 8px}
+.hud-label{font-size:10px;letter-spacing:0.08em;opacity:0.7;text-transform:uppercase;font-weight:700}
+.hud-row{display:flex;justify-content:space-between;align-items:center;margin-top:2px}
+.hud-value{font-size:14px;font-weight:800}
+.hud-sub{font-size:11px;opacity:0.8}
+.bar{height:8px;background:#070d1a;border-radius:999px;overflow:hidden;margin-top:5px;border:1px solid #1e3a5f}
+.bar-fill{height:100%;border-radius:999px;transition:width .2s}
+.bar-shield{background:linear-gradient(90deg,#2a7fff,#5ec8ff)}
+.bar-hull{background:linear-gradient(90deg,#ff6b35,#ffcc33)}
+.bar-route{background:linear-gradient(90deg,#2ecc71,#7af0a8)}
+#canvasWrap{position:relative;width:100%;height:520px;background:radial-gradient(ellipse at 50% 0%, #14325a 0%, #0a1222 55%, #070d1a 100%);overflow:hidden;border-bottom:1px solid #1e3a5f}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(5,10,20,0.92);padding:18px;text-align:center;z-index:5}
+.hidden{display:none !important}
+.card-panel{background:#0f1e33;border:1px solid #1e3a5f;border-radius:16px;padding:14px;width:100%;max-width:340px}
+.title{font-size:18px;font-weight:900;margin:0 0 6px;letter-spacing:0.02em}
+.subtitle{font-size:13px;opacity:0.8;margin:0 0 12px;line-height:1.4}
+.btn{appearance:none;border:none;border-radius:12px;padding:12px 16px;font-weight:800;font-size:15px;min-height:48px;cursor:pointer;touch-action:manipulation;width:100%}
+.btn-primary{background:#2a7fff;color:#fff;box-shadow:0 6px 16px rgba(42,127,255,0.35)}
+.btn-ghost{background:#11233d;color:#e6edf3;border:1px solid #1e3a5f}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.btn-small{padding:10px 12px;min-height:44px;font-size:14px}
+.badge{display:inline-flex;align-items:center;gap:6px;background:#11233d;border:1px solid #1e3a5f;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:700}
+.stars{color:#ffcc33;letter-spacing:1px}
+#controls{display:grid;grid-template-columns:72px 1fr 72px;gap:8px;padding:10px 12px;background:#0f1e33;border-top:1px solid #1e3a5f;align-items:center}
+.move-btn{height:64px;border-radius:14px;background:#11233d;border:1px solid #1e3a5f;color:#e6edf3;font-size:22px;font-weight:900;min-width:64px}
+.move-btn:active{background:#1a3358}
+.abilities{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn-ability{background:#11233d;border:1px solid #1e3a5f;color:#e6edf3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:64px;border-radius:14px;padding:6px 4px;touch-action:manipulation}
+.btn-ability:active{transform:scale(0.98)}
+.btn-ability:disabled{opacity:0.38}
+.ability-name{font-size:12px;font-weight:800;letter-spacing:0.04em}
+.ability-cost{font-size:11px;opacity:0.75;font-weight:700}
+.ability-icon{font-size:16px}
+#menu{position:absolute;inset:0;background:#070d1a;z-index:10;overflow-y:auto;padding:12px 12px 20px}
+.menu-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.menu-top h2{margin:0;font-size:16px;font-weight:900;letter-spacing:0.04em}
+.route-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.route-card{background:#11233d;border:1px solid #1e3a5f;border-radius:14px;padding:10px;text-align:left;min-height:108px;position:relative;overflow:hidden}
+.route-card.locked{opacity:0.45}
+.route-card.active{border-color:#2a7fff;box-shadow:0 0 0 2px rgba(42,127,255,0.25) inset}
+.route-num{font-size:10px;letter-spacing:0.08em;opacity:0.7;font-weight:800}
+.route-name{font-weight:900;font-size:13px;margin-top:2px;line-height:1.2}
+.route-meta{font-size:11px;opacity:0.75;margin-top:6px;line-height:1.3}
+.route-stars{margin-top:6px;font-size:12px}
+.route-best{font-size:10px;opacity:0.7;margin-top:4px}
+.archive-box{margin-top:14px;background:#0f1e33;border:1px solid #1e3a5f;border-radius:14px;padding:12px}
+.archive-box h3{margin:0 0 6px;font-size:13px;font-weight:900}
+.archive-box p{margin:0 0 10px;font-size:12px;opacity:0.8;line-height:1.4}
+.archive-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kbd-hint{font-size:11px;opacity:0.6;text-align:center;margin-top:8px}
+.toast{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:#11233d;border:1px solid #1e3a5f;color:#e6edf3;padding:8px 12px;border-radius:999px;font-size:12px;font-weight:700;z-index:6;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <h1>CARAVAN ESCORT</h1>
+      <p>12 ROUTES • SHIELDED CONVOY</p>
+    </div>
+    <div class="hdr-actions">
+      <div class="badge"><span>★</span><span id="totalStars">0</span><span style="opacity:0.6">/36</span></div>
+      <button class="icon-btn" id="pauseBtn" aria-label="Pause">⏸</button>
+    </div>
+  </header>
+
+  <div id="hud">
+    <div class="hud-card">
+      <div class="hud-label">Shield & Hull</div>
+      <div class="hud-row"><span class="hud-value" id="shieldVal">100</span><span class="hud-sub" id="hullVal">100 HP</span></div>
+      <div class="bar"><div class="bar-fill bar-shield" id="shieldBar" style="width:100%"></div></div>
+      <div class="bar"><div class="bar-fill bar-hull" id="hullBar" style="width:100%"></div></div>
+    </div>
+    <div class="hud-card">
+      <div class="hud-label">Route Progress</div>
+      <div class="hud-row"><span class="hud-value" id="routeName">—</span><span class="hud-sub" id="partsVal">◈ 0</span></div>
+      <div class="bar"><div class="bar-fill bar-route" id="routeBar" style="width:0%"></div></div>
+      <div class="hud-row" style="margin-top:4px"><span class="hud-sub" id="waveVal">Wave 0/0</span><span class="hud-sub" id="scoreVal">0 pts</span></div>
+    </div>
+  </div>
+
+  <div id="canvasWrap">
+    <canvas id="c" width="360" height="520"></canvas>
+    <div id="toast" class="toast hidden">Beacon deployed</div>
+
+    <div id="startOverlay" class="overlay">
+      <div class="card-panel">
+        <p class="title">Guide the Caravan</p>
+        <p class="subtitle">Drag on the road to slide the shielded caravan. Auto-pulse fires upward. Spend <b>◈ spare parts</b> on Repairs, Sweeps, Beacons & Scans to survive raider waves.</p>
+        <button class="btn btn-primary" id="playBtn">ENTER DEPOT</button>
+        <p class="kbd-hint">Tip: Hold ◀︎ ▶︎ or drag. Large buttons for thumbs.</p>
+      </div>
+    </div>
+
+    <div id="pauseOverlay" class="overlay hidden">
+      <div class="card-panel">
+        <p class="title">Paused</p>
+        <p class="subtitle" id="pauseInfo">Route paused. Your shield holds.</p>
+        <button class="btn btn-primary" id="resumeBtn">RESUME</button>
+        <div class="btn-row">
+          <button class="btn btn-ghost btn-small" id="restartBtn">Restart</button>
+          <button class="btn btn-ghost btn-small" id="toMenuBtn">Depot</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="endOverlay" class="overlay hidden">
+      <div class="card-panel">
+        <p class="title" id="endTitle">Route Complete</p>
+        <p class="subtitle" id="endSub">You escorted the caravan through.</p>
+        <div class="badge" style="margin:0 auto"><span class="stars" id="endStars">★★★</span><span id="endScore">0 pts</span></div>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn btn-ghost btn-small" id="endRetry">Retry</button>
+          <button class="btn btn-primary btn-small" id="endNext">Next Route</button>
+        </div>
+        <button class="btn btn-ghost" style="margin-top:8px" id="endMenu">Back to Depot</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <button class="move-btn" id="leftBtn" aria-label="Move left">◀︎</button>
+    <div class="abilities">
+      <button class="btn-ability" id="btnRepair"><span class="ability-icon">🔧</span><span class="ability-name">REPAIR</span><span class="ability-cost">◈ 15 • +30 shield</span></button>
+      <button class="btn-ability" id="btnSweep"><span class="ability-icon">💥</span><span class="ability-name">SWEEP</span><span class="ability-cost">◈ 20 • blast</span></button>
+      <button class="btn-ability" id="btnBeacon"><span class="ability-icon">📡</span><span class="ability-name">BEACON</span><span class="ability-cost">◈ 25 • drone 8s</span></button>
+      <button class="btn-ability" id="btnScan"><span class="ability-icon">🔍</span><span class="ability-name">SCAN</span><span class="ability-cost">◈ 10 • slow</span></button>
+    </div>
+    <button class="move-btn" id="rightBtn" aria-label="Move right">▶︎</button>
+  </div>
+
+  <div id="menu">
+    <div class="menu-top">
+      <h2>DEPOT — 12 ROUTES</h2>
+      <span class="badge">◈ <span id="menuParts">0</span> parts</span>
+    </div>
+    <p class="subtitle" style="margin:0">Complete a route to unlock the next. Earn up to 3★ per route. Best scores persist. Drag caravan on road, use big ability buttons.</p>
+    <div class="route-grid" id="routeGrid"></div>
+
+    <div class="archive-box">
+      <h3>Archive & Progress</h3>
+      <p>Stars and bests save on this device. Export an archive to keep or move it. Import restores it.</p>
+      <div class="archive-actions">
+        <button class="btn btn-ghost btn-small" id="exportBtn">Export Archive</button>
+        <button class="btn btn-ghost btn-small" id="importBtn">Import Archive</button>
+      </div>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn btn-ghost btn-small" id="resetBtn">Reset Progress</button>
+        <button class="btn btn-ghost btn-small" id="howBtn">How to Play</button>
+      </div>
+      <input type="file" id="fileInput" accept=".json,application/json" class="hidden">
+      <p class="kbd-hint">Mobile-first: 360–428px, no horizontal scroll, 44px+ targets.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+const ROUTES=[
+  {name:"Dust Trail", dist:1600, waves:3, speed:1.0, hp:1.0, reward:40, desc:"Calm flats • learn to slide"},
+  {name:"Canyon Pass", dist:1800, waves:4, speed:1.15, hp:1.1, reward:55, desc:"Narrow walls • ambushes"},
+  {name:"Salt Flats", dist:2000, waves:4, speed:1.25, hp:1.15, reward:65, desc:"Open glare • fast raiders"},
+  {name:"Ridge Road", dist:2200, waves:5, speed:1.35, hp:1.2, reward:75, desc:"High winds • sweep timing"},
+  {name:"Ashen Way", dist:2400, waves:5, speed:1.45, hp:1.3, reward:85, desc:"Ash storms • low visibility"},
+  {name:"Night Corridor", dist:2600, waves:6, speed:1.55, hp:1.35, reward:95, desc:"Dark run • beacon shines"},
+  {name:"Storm Front", dist:2800, waves:6, speed:1.65, hp:1.45, reward:105, desc:"Lightning • scan to slow"},
+  {name:"Iron Gorge", dist:3000, waves:7, speed:1.75, hp:1.55, reward:115, desc:"Heavy armor • repair often"},
+  {name:"Wreck Fields", dist:3200, waves:7, speed:1.85, hp:1.65, reward:125, desc:"Debris • tight dodges"},
+  {name:"Obsidian Run", dist:3400, waves:8, speed:1.95, hp:1.75, reward:135, desc:"Black glass • relentless"},
+  {name:"Void Crossing", dist:3600, waves:8, speed:2.05, hp:1.85, reward:145, desc:"No cover • all tools needed"},
+  {name:"Titan's Gate", dist:4000, waves:9, speed:2.2, hp:2.0, reward:180, desc:"Final escort • legend run"}
+];
+const SAVE_KEY='caravan_escort_v1';
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const totalStarsEl=document.getElementById('totalStars');
+const menuPartsEl=document.getElementById('menuParts');
+const routeGrid=document.getElementById('routeGrid');
+const menuEl=document.getElementById('menu');
+const startOverlay=document.getElementById('startOverlay');
+const pauseOverlay=document.getElementById('pauseOverlay');
+const endOverlay=document.getElementById('endOverlay');
+const shieldBar=document.getElementById('shieldBar');
+const hullBar=document.getElementById('hullBar');
+const routeBar=document.getElementById('routeBar');
+const shieldVal=document.getElementById('shieldVal');
+const hullVal=document.getElementById('hullVal');
+const partsVal=document.getElementById('partsVal');
+const routeNameEl=document.getElementById('routeName');
+const waveVal=document.getElementById('waveVal');
+const scoreVal=document.getElementById('scoreVal');
+const toastEl=document.getElementById('toast');
+
+let save=loadSave();
+let state='menu'; // menu, playing, paused, ended
+let currentRoute=0;
+let caravan={x:180,y:452,shield:100,hull:100,maxShield:100,maxHull:100,targetX:180};
+let raiders=[], bullets=[], enemyBullets=[], particles=[], beacons=[], pickups=[];
+let parts=0, score=0, distance=0, wave=1, spawnTimer=0, fireTimer=0, scanTimer=0, slowFactor=1, enemyFireTimer=0;
+let animId=null, lastT=0, moveLeft=false, moveRight=false, isDragging=false;
+let routeBestScore=0;
+
+function loadSave(){
+  try{
+    const raw=localStorage.getItem(SAVE_KEY);
+    if(raw){ const p=JSON.parse(raw); if(p && p.routes && p.routes.length===12) return p; }
+  }catch(e){}
+  return {parts:0, routes: ROUTES.map((_,i)=>({bestStars:0,bestScore:0,completed:false,unlocked:i===0}))};
+}
+function saveSave(){
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }catch(e){}
+}
+function totalStars(){
+  return save.routes.reduce((a,r)=>a+r.bestStars,0);
+}
+function showToast(msg){
+  toastEl.textContent=msg;
+  toastEl.classList.remove('hidden');
+  clearTimeout(showToast._t);
+  showToast._t=setTimeout(()=>toastEl.classList.add('hidden'),1400);
+}
+function buildMenu(){
+  routeGrid.innerHTML='';
+  save.routes.forEach((r,i)=>{
+    const def=ROUTES[i];
+    const card=document.createElement('button');
+    card.className='route-card'+(r.unlocked?'':' locked')+(i===currentRoute && r.unlocked?' active':'');
+    card.innerHTML=`
+      <div class="route-num">ROUTE ${String(i+1).padStart(2,'0')} ${r.unlocked?'':'• LOCKED'}</div>
+      <div class="route-name">${def.name}</div>
+      <div class="route-meta">${def.desc}<br>${def.dist} m • ${def.waves} waves</div>
+      <div class="route-stars stars">${'★'.repeat(r.bestStars)}<span style="opacity:0.3">${'★'.repeat(3-r.bestStars)}</span></div>
+      <div class="route-best">Best: ${r.bestScore} pts • ${r.completed?'CLEARED':'—'}</div>
+    `;
+    card.onclick=()=>{
+      if(!r.unlocked){ showToast('Complete previous route to unlock'); return; }
+      currentRoute=i;
+      buildMenu();
+      startRoute(i);
+    };
+    routeGrid.appendChild(card);
+  });
+  totalStarsEl.textContent=totalStars();
+  menuPartsEl.textContent=save.parts;
+}
+function resetRunVars(){
+  caravan={x:180,y:452,shield:100,hull:100,maxShield:100,maxHull:100,targetX:180};
+  raiders=[]; bullets=[]; enemyBullets=[]; particles=[]; beacons=[]; pickups=[];
+  parts=12; score=0; distance=0; wave=1; spawnTimer=18; fireTimer=0; scanTimer=0; slowFactor=1; enemyFireTimer=40;
+  routeBestScore=save.routes[currentRoute].bestScore;
+}
+function startRoute(idx){
+  currentRoute=idx;
+  resetRunVars();
+  state='playing';
+  menuEl.classList.add('hidden');
+  startOverlay.classList.add('hidden');
+  pauseOverlay.classList.add('hidden');
+  endOverlay.classList.add('hidden');
+  routeNameEl.textContent=ROUTES[idx].name.toUpperCase();
+  lastT=performance.now();
+  cancelAnimationFrame(animId);
+  animId=requestAnimationFrame(loop);
+  showToast('Route '+(idx+1)+': '+ROUTES[idx].name);
+}
+function pauseGame(){
+  if(state!=='playing') return;
+  state='paused';
+  pauseOverlay.classList.remove('hidden');
+  cancelAnimationFrame(animId);
+}
+function resumeGame(){
+  if(state!=='paused') return;
+  state='playing';
+  pauseOverlay.classList.add('hidden');
+  lastT=performance.now();
+  animId=requestAnimationFrame(loop);
+}
+function toMenu(){
+  state='menu';
+  cancelAnimationFrame(animId);
+  pauseOverlay.classList.add('hidden');
+  endOverlay.classList.add('hidden');
+  menuEl.classList.remove('hidden');
+  buildMenu();
+  drawStatic();
+}
+function winRoute(){
+  state='ended';
+  cancelAnimationFrame(animId);
+  const hullPct=caravan.hull;
+  const timeBonus=Math.max(0, 800 - Math.floor(distance/5));
+  const finalScore=score + Math.floor(caravan.shield*2) + Math.floor(caravan.hull*3) + timeBonus;
+  let stars=1;
+  if(hullPct>=45 && finalScore>=900) stars=2;
+  if(hullPct>=75 && finalScore>=1500) stars=3;
+  // persist
+  const rec=save.routes[currentRoute];
+  let isNewBest=false;
+  if(finalScore>rec.bestScore){ rec.bestScore=finalScore; isNewBest=true; }
+  if(stars>rec.bestStars){ rec.bestStars=stars; isNewBest=true; }
+  rec.completed=true;
+  // unlock next
+  if(currentRoute<11 && !save.routes[currentRoute+1].unlocked){
+    save.routes[currentRoute+1].unlocked=true;
+    showToast('Unlocked: '+ROUTES[currentRoute+1].name);
+  }
+  // reward parts
+  const reward=ROUTES[currentRoute].reward + stars*10;
+  save.parts+=reward;
+  saveSave();
+  buildMenu();
+  document.getElementById('endTitle').textContent='ROUTE SECURED';
+  document.getElementById('endSub').textContent=`Caravan delivered. +◈ ${reward} parts${isNewBest?' • New best!':''}`;
+  document.getElementById('endStars').textContent='★'.repeat(stars)+'☆'.repeat(3-stars);
+  document.getElementById('endScore').textContent=` ${finalScore} pts`;
+  document.getElementById('endNext').style.display=currentRoute<11?'block':'none';
+  endOverlay.classList.remove('hidden');
+}
+function loseRoute(){
+  state='ended';
+  cancelAnimationFrame(animId);
+  const finalScore=score + Math.floor(distance/4);
+  const rec=save.routes[currentRoute];
+  if(finalScore>rec.bestScore){ rec.bestScore=finalScore; saveSave(); }
+  buildMenu();
+  document.getElementById('endTitle').textContent='CONVOY LOST';
+  document.getElementById('endSub').textContent='Hull breached. Spend parts on repairs & sweeps earlier.';
+  document.getElementById('endStars').textContent='☆☆☆';
+  document.getElementById('endScore').textContent=` ${finalScore} pts`;
+  document.getElementById('endNext').style.display='none';
+  endOverlay.classList.remove('hidden');
+}
+function loop(t){
+  if(state!=='playing') return;
+  const dt=Math.min(33, t-lastT)/16.66;
+  lastT=t;
+  update(dt);
+  draw();
+  animId=requestAnimationFrame(loop);
+}
+function dist2(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); }
+function spawnRaider(){
+  const def=ROUTES[currentRoute];
+  const side=Math.random();
+  let x,y,vx,vy,hp;
+  hp=Math.floor(30*def.hp + wave*6);
+  if(side<0.7){
+    x= 30 + Math.random()*300;
+    y=-18;
+    vx=(Math.random()-0.5)*0.6;
+    vy=1.2*def.speed + Math.random()*0.7 + wave*0.12;
+  } else if(side<0.85){
+    x=-14; y= 80+Math.random()*220; vx=1.0*def.speed; vy=0.6*def.speed;
+  } else {
+    x=374; y= 80+Math.random()*220; vx=-1.0*def.speed; vy=0.6*def.speed;
+  }
+  const type=Math.random()<0.18?'heavy':'light';
+  raiders.push({x,y,vx,vy,hp,maxHp:hp,type,dead:false,fireCd: 60+Math.random()*60});
+}
+function createExplosion(x,y,color){
+  for(let i=0;i<10;i++){
+    particles.push({x,y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:18+Math.random()*12,color:color||'#ffcc33',size:2+Math.random()*2});
+  }
+}
+function damageCaravan(d){
+  if(caravan.shield>0){
+    caravan.shield-=d;
+    if(caravan.shield<0){ caravan.hull+=caravan.shield; caravan.shield=0; }
+  } else caravan.hull-=d;
+  caravan.hull=Math.max(0,caravan.hull);
+  caravan.shield=Math.max(0,caravan.shield);
+  createExplosion(caravan.x, caravan.y-8, '#5ec8ff');
+  if(caravan.hull<=0) loseRoute();
+}
+function update(dt){
+  const def=ROUTES[currentRoute];
+  // movement input
+  if(moveLeft) caravan.targetX-=4.2*dt;
+  if(moveRight) caravan.targetX+=4.2*dt;
+  caravan.targetX=Math.max(22, Math.min(338, caravan.targetX));
+  caravan.x += (caravan.targetX - caravan.x)*0.22*dt;
+  // distance & wave
+  distance+=1.35*dt* (1 + def.speed*0.08);
+  const waveProgress= distance / def.dist;
+  const targetWave= Math.min(def.waves, Math.floor(waveProgress*def.waves)+1);
+  if(targetWave>wave){ wave=targetWave; showToast('Wave '+wave+'/'+def.waves); spawnTimer=6; }
+  // spawn
+  spawnTimer-=dt;
+  const spawnRate= Math.max(8, 28 - def.speed*4 - wave*1.2);
+  if(spawnTimer<=0){
+    const count= wave>=6?2:1;
+    for(let i=0;i<count;i++) spawnRaider();
+    spawnTimer=spawnRate + Math.random()*6;
+  }
+  // raiders update
+  raiders.forEach(r=>{
+    r.x+=r.vx*dt*slowFactor;
+    r.y+=r.vy*dt*slowFactor;
+    // homing slight
+    r.vx += (caravan.x - r.x)*0.00018*dt;
+    r.vx=Math.max(-1.8,Math.min(1.8,r.vx));
+    if(r.y>560) r.dead=true;
+    if(dist2(r,caravan)<20){
+      damageCaravan(r.type==='heavy'?18:10);
+      r.dead=true;
+      createExplosion(r.x,r.y,'#ff6b35');
+    }
+    // enemy fire
+    r.fireCd-=dt;
+    if(r.fireCd<=0 && r.y>20 && r.y<420 && Math.abs(r.x-caravan.x)<110){
+      enemyBullets.push({x:r.x,y:r.y+10,vy:3.2*slowFactor,dead:false});
+      r.fireCd= 70+Math.random()*50;
+    }
+  });
+  // player bullets
+  fireTimer-=dt;
+  if(fireTimer<=0){
+    bullets.push({x:caravan.x-6,y:caravan.y-16,vy:7,dead:false});
+    bullets.push({x:caravan.x+6,y:caravan.y-16,vy:7,dead:false});
+    fireTimer=11;
+  }
+  bullets.forEach(b=>{
+    b.y-=b.vy*dt;
+    if(b.y<-10) b.dead=true;
+    raiders.forEach(r=>{
+      if(!r.dead && !b.dead && dist2(b,r)<16){
+        r.hp-=26;
+        b.dead=true;
+        if(r.hp<=0){
+          r.dead=true; score+=120; parts+=2;
+          createExplosion(r.x,r.y, r.type==='heavy'?'#ff6b35':'#ffcc33');
+          if(Math.random()<0.22) pickups.push({x:r.x,y:r.y,vy:1.1,dead:false});
+        } else {
+          particles.push({x:r.x,y:r.y,vx:(Math.random()-0.5)*2,vy:-1,life:8,color:'#fff',size:1.5});
+        }
+      }
+    });
+  });
+  // enemy bullets
+  enemyBullets.forEach(b=>{
+    b.y+=b.vy*dt;
+    if(b.y>540) b.dead=true;
+    if(!b.dead && dist2(b,caravan)<14){
+      b.dead=true;
+      damageCaravan(9);
+      // shield flash
+      particles.push({x:caravan.x,y:caravan.y-6,vx:0,vy:-1,life:10,color:'#5ec8ff',size:3});
+    }
+  });
+  // beacons (drones)
+  beacons.forEach(d=>{
+    d.t-=dt;
+    if(d.t<=0) d.dead=true;
+    d.a+=0.12*dt;
+    d.x=caravan.x + Math.cos(d.a)*d.r;
+    d.y=caravan.y - 38 + Math.sin(d.a)*10;
+    d.fire-=dt;
+    if(d.fire<=0){
+      // find nearest raider
+      let best=null, bestD=999;
+      raiders.forEach(r=>{ const dd=dist2(d,r); if(dd<bestD){bestD=dd; best=r;} });
+      if(best && bestD<160){
+        const ang=Math.atan2(best.y-d.y, best.x-d.x);
+        bullets.push({x:d.x,y:d.y,vy:7,dead:false, vx: Math.cos(ang)*4});
+        // custom bullet with vx
+        const last=bullets[bullets.length-1];
+        last.vx=Math.cos(ang)*4; last.vy=Math.sin(ang)*4;
+        // override update for drone bullets: they move both axes
+        last.isDrone=true;
+      }
+      d.fire=9;
+    }
+  });
+  // drone bullets extra movement
+  bullets.forEach(b=>{
+    if(b.isDrone){
+      b.x+=b.vx*dt;
+      b.y+=b.vy*dt;
+    }
+  });
+  // pickups
+  pickups.forEach(p=>{
+    p.y+=p.vy*dt;
+    if(p.y>540) p.dead=true;
+    if(dist2(p,caravan)<18){ parts+=6; score+=40; p.dead=true; showToast('+◈ 6 parts'); }
+  });
+  // particles
+  particles.forEach(p=>{
+    p.x+=p.vx*dt*0.9;
+    p.y+=p.vy*dt*0.9;
+    p.vy+=0.08*dt;
+    p.life-=dt;
+    if(p.life<=0) p.dead=true;
+  });
+  // scan slow
+  if(scanTimer>0){ scanTimer-=dt; slowFactor=0.45; if(scanTimer<=0) slowFactor=1; }
+  // win check
+  if(distance>=def.dist) winRoute();
+  // cleanup
+  raiders=raiders.filter(r=>!r.dead);
+  bullets=bullets.filter(b=>!b.dead);
+  enemyBullets=enemyBullets.filter(b=>!b.dead);
+  particles=particles.filter(p=>!p.dead);
+  beacons=beacons.filter(b=>!b.dead);
+  pickups=pickups.filter(p=>!p.dead);
+  updateHUD();
+}
+function updateHUD(){
+  const def=ROUTES[currentRoute];
+  shieldBar.style.width=Math.max(0,caravan.shield)+'%';
+  hullBar.style.width=Math.max(0,caravan.hull)+'%';
+  shieldVal.textContent=Math.round(caravan.shield);
+  hullVal.textContent=Math.round(caravan.hull)+' HP';
+  partsVal.textContent='◈ '+parts;
+  routeBar.style.width=Math.min(100, (distance/def.dist)*100)+'%';
+  waveVal.textContent='Wave '+wave+'/'+def.waves;
+  scoreVal.textContent=score+' pts';
+  // ability affordability
+  document.getElementById('btnRepair').disabled= parts<15 || caravan.shield>=100;
+  document.getElementById('btnSweep').disabled= parts<20;
+  document.getElementById('btnBeacon').disabled= parts<25;
+  document.getElementById('btnScan').disabled= parts<10;
+}
+function draw(){
+  // clear
+  ctx.clearRect(0,0,360,520);
+  // road
+  // asphalt
+  ctx.fillStyle='#0e1e36';
+  ctx.fillRect(18,0,324,520);
+  // lane markers scrolling
+  ctx.strokeStyle='rgba(255,255,255,0.18)';
+  ctx.setLineDash([14,14]);
+  ctx.lineWidth=2;
+  const off= (distance*2)%28;
+  ctx.beginPath();
+  ctx.moveTo(120, -off); ctx.lineTo(120, 520);
+  ctx.moveTo(240, -off); ctx.lineTo(240, 520);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // side terrain
+  ctx.fillStyle='#07101f';
+  ctx.fillRect(0,0,18,520);
+  ctx.fillRect(342,0,18,520);
+  // scan effect
+  if(scanTimer>0){
+    ctx.fillStyle='rgba(42,127,255,0.08)';
+    ctx.fillRect(18,0,324,520);
+    ctx.strokeStyle='rgba(90,200,255,0.5)';
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    const sy= (520 - (scanTimer*40)%520);
+    ctx.moveTo(18,sy); ctx.lineTo(342,sy); ctx.stroke();
+  }
+  // pickups
+  pickups.forEach(p=>{
+    ctx.fillStyle='#ffcc33';
+    ctx.beginPath(); ctx.arc(p.x,p.y,6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#0a1222'; ctx.font='700 9px system-ui'; ctx.textAlign='center'; ctx.fillText('◈',p.x,p.y+3);
+  });
+  // raiders
+  raiders.forEach(r=>{
+    ctx.save();
+    ctx.translate(r.x,r.y);
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(0,6,12,6,0,0,Math.PI*2); ctx.fill();
+    // body
+    const isHeavy=r.type==='heavy';
+    ctx.fillStyle=isHeavy?'#ff3b30':'#ff6b35';
+    ctx.beginPath();
+    if(isHeavy){
+      ctx.roundRect(-14,-10,28,20,4); ctx.fill();
+      ctx.fillStyle='#7a0a0a'; ctx.fillRect(-10,-6,20,4);
+    } else {
+      ctx.moveTo(0,-12); ctx.lineTo(12,8); ctx.lineTo(0,6); ctx.lineTo(-12,8); ctx.closePath(); ctx.fill();
+    }
+    // hp bar
+    ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(-12,-16,24,4);
+    ctx.fillStyle='#2ecc71'; ctx.fillRect(-12,-16,24*(r.hp/r.maxHp),4);
+    ctx.restore();
+  });
+  // enemy bullets
+  ctx.fillStyle='#ff6b35';
+  enemyBullets.forEach(b=>{
+    ctx.beginPath(); ctx.arc(b.x,b.y,3.5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,107,53,0.35)'; ctx.beginPath(); ctx.arc(b.x,b.y,7,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#ff6b35';
+  });
+  // player bullets
+  ctx.fillStyle='#5ec8ff';
+  bullets.forEach(b=>{
+    ctx.beginPath(); ctx.arc(b.x,b.y,3,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(94,200,255,0.35)'; ctx.beginPath(); ctx.arc(b.x,b.y,6,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#5ec8ff';
+  });
+  // beacons
+  beacons.forEach(d=>{
+    ctx.fillStyle='#2a7fff';
+    ctx.beginPath(); ctx.arc(d.x,d.y,7,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(42,127,255,0.5)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(d.x,d.y,12,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.font='700 8px system-ui'; ctx.textAlign='center'; ctx.fillText('◉',d.x,d.y+3);
+  });
+  // caravan
+  ctx.save();
+  ctx.translate(caravan.x, caravan.y);
+  // shield bubble
+  if(caravan.shield>0){
+    const a= 0.18 + (caravan.shield/100)*0.22;
+    ctx.fillStyle=`rgba(94,200,255,${a})`;
+    ctx.strokeStyle='rgba(94,200,255,0.9)';
+    ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.ellipse(0,-4,26,22,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  }
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(0,12,18,7,0,0,Math.PI*2); ctx.fill();
+  // hull
+  ctx.fillStyle='#e6edf3';
+  ctx.beginPath(); ctx.roundRect(-16,-10,32,18,5); ctx.fill();
+  ctx.fillStyle='#2a7fff'; ctx.fillRect(-12,-6,24,4);
+  ctx.fillStyle='#0a1222'; ctx.beginPath(); ctx.arc(0,-2,5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#ffcc33'; ctx.font='700 7px system-ui'; ctx.textAlign='center'; ctx.fillText('CARAVAN',0,6);
+  ctx.restore();
+  // particles
+  particles.forEach(p=>{
+    ctx.globalAlpha=Math.max(0, p.life/18);
+    ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+  });
+  // vignette
+  const g=ctx.createLinearGradient(0,0,0,520);
+  g.addColorStop(0,'rgba(0,0,0,0.18)'); g.addColorStop(0.5,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.35)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,360,520);
+}
+function drawStatic(){
+  ctx.clearRect(0,0,360,520);
+  ctx.fillStyle='#0e1e36'; ctx.fillRect(18,0,324,520);
+  ctx.fillStyle='rgba(255,255,255,0.08)';
+  for(let y=-20;y<520;y+=28){ ctx.fillRect(119,y,2,14); ctx.fillRect(239,y,2,14); }
+  ctx.fillStyle='#07101f'; ctx.fillRect(0,0,18,520); ctx.fillRect(342,0,18,520);
+  ctx.fillStyle='rgba(230,237,243,0.9)'; ctx.font='900 14px system-ui'; ctx.textAlign='center';
+  ctx.fillText('DEPOT STANDBY',180,250);
+  ctx.font='600 11px system-ui'; ctx.fillStyle='rgba(230,237,243,0.6)';
+  ctx.fillText('Select a route to launch escort',180,268);
+}
+
+// Abilities
+function doRepair(){
+  if(parts<15 || caravan.shield>=100) return;
+  parts-=15; caravan.shield=Math.min(100, caravan.shield+30);
+  createExplosion(caravan.x, caravan.y-10, '#2ecc71');
+  showToast('Repaired +30 shield');
+  updateHUD();
+}
+function doSweep(){
+  if(parts<20) return;
+  parts-=20;
+  let hit=0;
+  raiders.forEach(r=>{
+    if(dist2(r,caravan)<110){ r.hp-=55; hit++; if(r.hp<=0){ r.dead=true; score+=120; parts+=1; createExplosion(r.x,r.y,'#ffcc33'); } }
+  });
+  // blast ring
+  for(let i=0;i<16;i++) particles.push({x:caravan.x,y:caravan.y-6,vx:Math.cos(i/16*Math.PI*2)*3,vy:Math.sin(i/16*Math.PI*2)*3,life:14,color:'#ffcc33',size:2.5});
+  showToast(hit?`Sweep hit ${hit}`:'Sweep — no targets');
+  updateHUD();
+}
+function doBeacon(){
+  if(parts<25) return;
+  parts-=25;
+  beacons.push({x:caravan.x,y:caravan.y-30,a:0,r:28,t:480,fire:6,dead:false});
+  showToast('Beacon drone 8s');
+  updateHUD();
+}
+function doScan(){
+  if(parts<10) return;
+  parts-=10;
+  scanTimer=180; // ~3s at 60fps scaled
+  // reveal: damage all slightly and show wave
+  raiders.forEach(r=> r.hp-=8);
+  showToast('Scan: raiders slowed');
+  updateHUD();
+}
+
+// Input
+function bind(){
+  document.getElementById('playBtn').onclick=()=>{ menuEl.classList.remove('hidden'); startOverlay.classList.add('hidden'); buildMenu(); drawStatic(); };
+  document.getElementById('pauseBtn').onclick=()=>{ if(state==='playing') pauseGame(); else if(state==='paused') resumeGame(); else if(state==='menu'){ showToast('Open a route first'); } };
+  document.getElementById('resumeBtn').onclick=resumeGame;
+  document.getElementById('restartBtn').onclick=()=>startRoute(currentRoute);
+  document.getElementById('toMenuBtn').onclick=toMenu;
+  document.getElementById('endRetry').onclick=()=>startRoute(currentRoute);
+  document.getElementById('endMenu').onclick=toMenu;
+  document.getElementById('endNext').onclick=()=>{
+    if(currentRoute<11) startRoute(currentRoute+1); else toMenu();
+  };
+  document.getElementById('btnRepair').onclick=doRepair;
+  document.getElementById('btnSweep').onclick=doSweep;
+  document.getElementById('btnBeacon').onclick=doBeacon;
+  document.getElementById('btnScan').onclick=doScan;
+
+  // move buttons
+  const lb=document.getElementById('leftBtn'), rb=document.getElementById('rightBtn');
+  const hold=(el, flag)=> {
+    const onDown=(e)=>{ e.preventDefault(); if(flag==='left') moveLeft=true; else moveRight=true; };
+    const onUp=()=>{ if(flag==='left') moveLeft=false; else moveRight=false; };
+    el.addEventListener('touchstart', onDown, {passive:false});
+    el.addEventListener('touchend', onUp);
+    el.addEventListener('touchcancel', onUp);
+    el.addEventListener('mousedown', onDown);
+    window.addEventListener('mouseup', onUp);
+  };
+  hold(lb,'left'); hold(rb,'right');
+
+  // drag on canvas
+  canvas.addEventListener('touchstart', e=>{
+    if(state!=='playing') return;
+    isDragging=true;
+    const t=e.touches[0];
+    const rect=canvas.getBoundingClientRect();
+    const x=(t.clientX-rect.left)/rect.width*360;
+    caravan.targetX=x;
+  }, {passive:true});
+  canvas.addEventListener('touchmove', e=>{
+    if(!isDragging || state!=='playing') return;
+    const t=e.touches[0];
+    const rect=canvas.getBoundingClientRect();
+    const x=(t.clientX-rect.left)/rect.width*360;
+    caravan.targetX=x;
+  }, {passive:true});
+  canvas.addEventListener('touchend', ()=> isDragging=false);
+  canvas.addEventListener('mousedown', e=>{
+    if(state!=='playing') return;
+    isDragging=true;
+    const rect=canvas.getBoundingClientRect();
+    const x=(e.clientX-rect.left)/rect.width*360;
+    caravan.targetX=x;
+  });
+  window.addEventListener('mousemove', e=>{
+    if(!isDragging || state!=='playing') return;
+    const rect=canvas.getBoundingClientRect();
+    const x=(e.clientX-rect.left)/rect.width*360;
+    caravan.targetX=x;
+  });
+  window.addEventListener('mouseup', ()=> isDragging=false);
+
+  // keyboard
+  window.addEventListener('keydown', e=>{
+    if(e.key==='ArrowLeft' || e.key==='a') moveLeft=true;
+    if(e.key==='ArrowRight' || e.key==='d') moveRight=true;
+    if(e.key==='p' || e.key==='Escape'){ if(state==='playing') pauseGame(); else if(state==='paused') resumeGame(); }
+    if(e.key==='1') doRepair();
+    if(e.key==='2') doSweep();
+    if(e.key==='3') doBeacon();
+    if(e.key==='4') doScan();
+    if(e.key===' ') { e.preventDefault(); doSweep(); }
+  });
+  window.addEventListener('keyup', e=>{
+    if(e.key==='ArrowLeft' || e.key==='a') moveLeft=false;
+    if(e.key==='ArrowRight' || e.key==='d') moveRight=false;
+  });
+
+  // archive
+  document.getElementById('exportBtn').onclick=()=>{
+    const data=JSON.stringify(save,null,2);
+    const blob=new Blob([data],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download='caravan-escort-archive.json'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    showToast('Archive exported');
+  };
+  document.getElementById('importBtn').onclick=()=> document.getElementById('fileInput').click();
+  document.getElementById('fileInput').onchange=(e)=>{
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>{
+      try{
+        const obj=JSON.parse(r.result);
+        if(!obj.routes || obj.routes.length!==12) throw new Error('bad');
+        save=obj; saveSave(); buildMenu(); showToast('Archive imported');
+      }catch(err){ showToast('Import failed'); }
+    };
+    r.readAsText(f);
+    e.target.value='';
+  };
+  document.getElementById('resetBtn').onclick=()=>{
+    if(confirm('Reset all stars and unlocks?')){
+      localStorage.removeItem(SAVE_KEY);
+      save=loadSave(); buildMenu(); showToast('Progress reset');
+    }
+  };
+  document.getElementById('howBtn').onclick=()=>{
+    alert('CARAVAN ESCORT\\n\\n• Drag on road or hold ◀︎ ▶︎ to slide caravan\\n• Auto-fire pulses upward\\n• Collect ◈ from raiders\\n• REPAIR (15) restores shield\\n• SWEEP (20) blast nearby\\n• BEACON (25) drone 8s\\n• SCAN (10) slows raiders\\n• Survive distance to clear route\\n• 3★ for high hull + score\\n• Pause anytime, archive exportable');
+  };
+}
+bind();
+buildMenu();
+drawStatic();
+updateHUD();
+})();
+</script>
+</body>
+</html>

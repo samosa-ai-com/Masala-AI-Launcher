@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Rail Dispatch - Switchyard Shift</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0A1220;
+  --panel:#13233E;
+  --card:#1B2F52;
+  --card2:#223A63;
+  --line:#2A4A7A;
+  --text:#EAF0FF;
+  --muted:#9AB0D0;
+  --blue:#2E86DE;
+  --amber:#F39C12;
+  --green:#1ABC6B;
+  --red:#E74C3C;
+  --gold:#FFD166;
+  --radius:14px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow-x:hidden}
+body{max-width:428px;margin:0 auto;min-width:360px;overflow-x:hidden}
+button{font-family:inherit}
+.app{min-height:100dvh;display:flex;flex-direction:column;overflow-x:hidden}
+header{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,#0F1E36 0%,#0A1220 100%);border-bottom:1px solid #1E3358;padding:10px 12px 8px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{display:flex;align-items:center;gap:8px}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#2E86DE,#1ABC6B);display:grid;place-items:center;font-weight:900;font-size:18px;box-shadow:0 4px 12px rgba(46,134,222,.4)}
+.brand h1{font-size:15px;letter-spacing:.08em;line-height:1}
+.brand h1 span{color:var(--gold)}
+.brand p{font-size:10px;color:var(--muted);letter-spacing:.12em}
+.hud{display:flex;gap:6px;align-items:center}
+.hud-box{background:var(--panel);border:1px solid #24406A;border-radius:10px;padding:6px 8px;min-width:68px;text-align:center}
+.hud-box .k{font-size:9px;letter-spacing:.1em;color:var(--muted)}
+.hud-box .v{font-size:15px;font-weight:800}
+.hud-box.clock{border-color:#3A5A8A;min-width:74px}
+.hud-box.score{border-color:#2E86DE}
+.icon-btn{width:44px;height:44px;border-radius:10px;border:1px solid #2A4A7A;background:var(--panel);color:var(--text);display:grid;place-items:center;font-size:18px}
+.progress{height:6px;background:#0E1A30;border-radius:999px;overflow:hidden;margin-top:8px;border:1px solid #1E3358}
+.progress i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#2E86DE,#1ABC6B);transition:width .3s}
+main{flex:1;padding:12px;display:flex;flex-direction:column;gap:12px;overflow-x:hidden}
+.view{display:flex;flex-direction:column;gap:12px}
+.card{background:var(--panel);border:1px solid #1E3358;border-radius:var(--radius);padding:12px}
+.card h2{font-size:13px;letter-spacing:.1em;color:var(--muted);margin-bottom:8px}
+.lobby-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lobby-head h2{margin:0}
+.pill{font-size:11px;background:#0E1A30;border:1px solid #24406A;padding:6px 10px;border-radius:999px;color:var(--muted)}
+.grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+@media(max-width:380px){ .grid{grid-template-columns:repeat(2,1fr)} }
+.tcard{background:var(--card);border:1px solid #2A4A7A;border-radius:12px;padding:10px;position:relative;overflow:hidden;min-height:96px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;transition:transform .1s}
+.tcard:active{transform:scale(.98)}
+.tcard.locked{opacity:.55;filter:grayscale(.3)}
+.tcard.active{outline:2px solid var(--gold);box-shadow:0 6px 18px rgba(255,209,102,.25)}
+.tcard .num{font-size:10px;letter-spacing:.12em;color:var(--muted)}
+.tcard .name{font-size:12px;font-weight:800;line-height:1.2;margin:4px 0}
+.tcard .meta{font-size:10px;color:var(--muted)}
+.tcard .stars{font-size:12px;letter-spacing:1px}
+.tcard .best{font-size:10px;color:var(--gold);font-weight:700}
+.tcard .lock{position:absolute;top:8px;right:8px;font-size:14px}
+.tcard .colorbar{position:absolute;left:0;top:0;bottom:0;width:4px}
+.btn{border:none;border-radius:12px;padding:12px 14px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:48px}
+.btn-primary{background:linear-gradient(135deg,#2E86DE,#1ABC6B);color:#fff;box-shadow:0 6px 16px rgba(46,134,222,.35);width:100%}
+.btn-ghost{background:var(--card);border:1px solid #2A4A7A;color:var(--text)}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.5;pointer-events:none}
+.how{font-size:12px;line-height:1.5;color:#C8D6EE}
+.how b{color:#fff}
+.legend{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.legend span{font-size:11px;padding:6px 8px;border-radius:999px;border:1px solid #2A4A7A;background:#0E1A30;display:flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:50%}
+.yard-wrap{display:flex;flex-direction:column;gap:10px}
+.inbound{position:relative;height:64px;background:linear-gradient(180deg,#0E1E38,#0B162C);border:1px solid #24406A;border-radius:12px;overflow:hidden;display:flex;align-items:center;padding:0 8px}
+.inbound .label{font-size:10px;letter-spacing:.12em;color:var(--muted);position:absolute;top:6px;left:10px;z-index:1}
+.inbound .rail{position:absolute;left:8px;right:8px;top:50%;height:4px;background:repeating-linear-gradient(90deg,#3A4A6A 0 10px,transparent 10px 16px);border-radius:2px;transform:translateY(-50%)}
+.inbound .train{position:absolute;top:50%;transform:translateY(-50%);width:86px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:4px;font-size:11px;font-weight:900;color:#fff;border:2px solid rgba(255,255,255,.9);box-shadow:0 6px 14px rgba(0,0,0,.45);z-index:2;transition:left .12s linear, transform .2s, opacity .2s;user-select:none;touch-action:manipulation}
+.train.selected{outline:3px solid var(--gold);outline-offset:1px;transform:translateY(-50%) scale(1.05);z-index:5}
+.train.held{opacity:.75;filter:saturate(.7)}
+.train .ico{font-size:14px}
+.tracks{display:flex;flex-direction:column;gap:8px}
+.track{position:relative;height:54px;background:var(--card);border:1px solid #2A4A7A;border-radius:12px;display:flex;align-items:center;padding:0 10px;cursor:pointer;overflow:hidden;touch-action:manipulation}
+.track:active{transform:scale(.99)}
+.track .tlabel{font-size:11px;font-weight:800;letter-spacing:.08em;display:flex;align-items:center;gap:8px;z-index:1;min-width:90px}
+.track .tlabel i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.track .rail2{position:absolute;left:110px;right:12px;top:50%;height:6px;background:#0E1A30;border-radius:999px;transform:translateY(-50%);overflow:hidden;border:1px solid #1E3358}
+.track .rail2::after{content:"";position:absolute;left:0;right:0;top:50%;height:2px;background:repeating-linear-gradient(90deg,transparent 0 8px,rgba(255,255,255,.25) 8px 14px);transform:translateY(-50%)}
+.track .fill{position:absolute;left:0;top:0;bottom:0;width:0%;opacity:.18}
+.track[data-color="blue"] .fill{background:var(--blue)}
+.track[data-color="amber"] .fill{background:var(--amber)}
+.track[data-color="green"] .fill{background:var(--green)}
+.track[data-color="red"] .fill{background:var(--red)}
+.signal{width:22px;height:22px;border-radius:50%;border:2px solid #fff;display:grid;place-items:center;font-size:10px;box-shadow:0 2px 8px rgba(0,0,0,.4);flex-shrink:0}
+.signal.on{background:#1ABC6B;box-shadow:0 0 10px rgba(26,188,107,.7)}
+.signal.off{background:#E74C3C;box-shadow:0 0 10px rgba(231,76,60,.6)}
+.signal small{font-size:8px;font-weight:900;color:#fff}
+.next-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.next-card{min-width:86px;flex:1;background:#0E1A30;border:1px solid #24406A;border-radius:10px;padding:8px;display:flex;align-items:center;gap:8px}
+.next-card .mini{width:36px;height:28px;border-radius:6px;display:grid;place-items:center;color:#fff;font-size:14px;font-weight:800}
+.next-card .txt{font-size:11px;line-height:1.2}
+.next-card .txt b{font-size:12px}
+.controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.cbtn{border-radius:12px;border:1px solid #2A4A7A;background:var(--card);color:var(--text);padding:10px 6px;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-weight:800;font-size:12px;touch-action:manipulation}
+.cbtn:active{transform:scale(.97)}
+.cbtn .big{font-size:18px}
+.cbtn.hold{border-color:#3A5A8A}
+.cbtn.route{background:linear-gradient(135deg,#2E86DE,#1ABC6B);border:none;color:#fff}
+.cbtn.estop{background:#2A0F14;border-color:#7A1F2A;color:#FFB3B8}
+.cbtn:disabled{opacity:.45}
+.signal-board{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.sbtn{background:#0E1A30;border:1px solid #24406A;border-radius:12px;padding:8px 4px;min-height:62px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;font-weight:800;color:var(--text);touch-action:manipulation}
+.sbtn .lamp{width:28px;height:28px;border-radius:50%;border:2px solid #fff;display:grid;place-items:center;font-size:12px}
+.sbtn.on{border-color:#1ABC6B;background:rgba(26,188,107,.12)}
+.sbtn.off{border-color:#E74C3C;background:rgba(231,76,60,.12)}
+.log{max-height:132px;overflow:auto;background:#0B162C;border:1px solid #1E3358;border-radius:12px;padding:8px}
+.log h3{font-size:11px;letter-spacing:.1em;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between}
+.log ul{list-style:none;display:flex;flex-direction:column;gap:4px}
+.log li{font-size:11px;padding:6px 8px;border-radius:8px;background:#0E1E38;border-left:3px solid #2A4A7A;display:flex;justify-content:space-between;gap:8px}
+.log li.good{border-left-color:var(--green);background:rgba(26,188,107,.12)}
+.log li.bad{border-left-color:var(--red);background:rgba(231,76,60,.12)}
+.log li.info{border-left-color:var(--blue)}
+.overlay{position:fixed;inset:0;background:rgba(5,10,20,.72);backdrop-filter:blur(6px);display:none;place-items:center;z-index:50;padding:16px}
+.overlay.open{display:grid}
+.modal{width:100%;max-width:400px;background:linear-gradient(180deg,#13233E,#0E1A30);border:1px solid #2A4A7A;border-radius:16px;padding:16px;box-shadow:0 20px 40px rgba(0,0,0,.5)}
+.modal h3{font-size:16px;margin-bottom:6px}
+.modal p{font-size:12px;color:var(--muted);line-height:1.5}
+.stars-big{font-size:28px;letter-spacing:4px;text-align:center;margin:10px 0}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.stat{background:#0B162C;border:1px solid #1E3358;border-radius:10px;padding:10px;text-align:center}
+.stat .k{font-size:10px;color:var(--muted);letter-spacing:.08em}
+.stat .v{font-size:18px;font-weight:900}
+.row2{display:flex;gap:8px;margin-top:10px}
+.row2 .btn{flex:1}
+.badge{font-size:10px;padding:4px 8px;border-radius:999px;background:var(--gold);color:#1A1200;font-weight:900}
+.hint{font-size:11px;color:var(--muted);text-align:center;margin-top:6px}
+.cooldown{font-size:9px;color:var(--gold)}
+.selected-bar{background:linear-gradient(90deg,#1B2F52,#223A63);border:1px solid #2A4A7A;border-radius:12px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:48px}
+.selected-bar .left{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800}
+.selected-bar .right{font-size:11px;color:var(--muted)}
+.empty{font-size:12px;color:var(--muted);text-align:center;padding:10px}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">◉</div>
+      <div>
+        <h1>RAIL <span>DISPATCH</span></h1>
+        <p>SWITCHYARD SHIFT</p>
+      </div>
+    </div>
+    <div class="hud">
+      <div class="hud-box clock"><div class="k">SHIFT CLOCK</div><div class="v" id="clock">--:--</div></div>
+      <div class="hud-box score"><div class="k">SCORE</div><div class="v" id="score">0</div></div>
+      <button class="icon-btn" id="pauseBtn" aria-label="Pause">⏸</button>
+    </div>
+  </div>
+  <div class="progress"><i id="progress"></i></div>
+</header>
+
+<main>
+  <!-- LOBBY -->
+  <section id="viewLobby" class="view">
+    <div class="card">
+      <div class="lobby-head">
+        <h2>12 TIMETABLES</h2>
+        <span class="pill" id="unlockedPill">1 / 12 UNLOCKED</span>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-ghost" id="resetBtn" style="flex:1">Reset Progress</button>
+        <button class="btn btn-ghost" id="howBtn" style="flex:1">How to Play</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>HOW TO PLAY</h2>
+      <div class="how">
+        <b>Route 4 train types to their color lines:</b> <span style="color:var(--blue)">● Passenger → BLUE</span> • <span style="color:var(--amber)">● Freight → AMBER</span> • <span style="color:var(--green)">● Mail → GREEN</span> • <span style="color:var(--red)">● Medical → RED</span> (priority +150 pts).<br>
+        Tap an incoming train to select it, then tap its color track or color button to <b>ROUTE</b>. Use <b>Signals</b> to open/close lines (red blocks routing). <b>HOLD</b> freezes one train 5s. <b>E-STOP</b> freezes all 3s (−50 pts, once per shift). Beat the shift clock for stars!
+      </div>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--blue)"></i> Passenger 100</span>
+        <span><i class="dot" style="background:var(--amber)"></i> Freight 80</span>
+        <span><i class="dot" style="background:var(--green)"></i> Mail 90</span>
+        <span><i class="dot" style="background:var(--red)"></i> Medical 150</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- GAME -->
+  <section id="viewGame" class="view" style="display:none">
+    <div class="card" style="padding:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:12px;font-weight:800;letter-spacing:.08em"><span id="shiftName">SHIFT 1</span> <span class="badge" id="shiftTarget">TARGET 400</span></div>
+        <button class="btn btn-ghost" id="quitBtn" style="min-height:36px;padding:6px 10px;font-size:12px">Exit Shift</button>
+      </div>
+      <div class="next-row" id="nextRow" style="margin-top:8px"></div>
+    </div>
+
+    <div class="yard-wrap">
+      <div class="inbound" id="inbound">
+        <div class="label">INBOUND ▸ JUNCTION</div>
+        <div class="rail"></div>
+        <!-- trains injected here -->
+      </div>
+      <div class="selected-bar" id="selectedBar">
+        <div class="left" id="selLeft">No train selected — tap a train</div>
+        <div class="right" id="selRight">Select to route</div>
+      </div>
+      <div class="tracks" id="tracks">
+        <!-- tracks injected -->
+      </div>
+    </div>
+
+    <div class="card" style="padding:10px">
+      <h2>SIGNAL BOARD — TAP TO TOGGLE</h2>
+      <div class="signal-board" id="signalBoard"></div>
+      <div class="hint">Green = open • Red = closed (blocks routing to that line)</div>
+    </div>
+
+    <div class="controls">
+      <button class="cbtn hold" id="holdBtn"><span class="big">⏸</span>HOLD<span class="cooldown" id="holdCd"></span></button>
+      <button class="cbtn route" id="routeBtn"><span class="big">➤</span>ROUTE</button>
+      <button class="cbtn estop" id="estopBtn"><span class="big">⛔</span>E-STOP<span class="cooldown" id="estopCd">-50 PTS</span></button>
+    </div>
+
+    <div class="card" style="padding:10px">
+      <h2>ROUTE PAD — TAP COLOR TO DISPATCH</h2>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="routePad"></div>
+    </div>
+
+    <div class="log">
+      <h3><span>DISPATCH LOG</span><span id="logCount">0 events</span></h3>
+      <ul id="logList"></ul>
+    </div>
+  </section>
+</main>
+</div>
+
+<!-- OVERLAYS -->
+<div class="overlay" id="pauseOverlay">
+  <div class="modal">
+    <h3>Shift Paused</h3>
+    <p>Take a breath, dispatcher. The yard is holding.</p>
+    <div class="row2">
+      <button class="btn btn-ghost" id="resumeBtn">Resume</button>
+      <button class="btn btn-primary" id="resume2Btn">Back to Yard</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="endOverlay">
+  <div class="modal">
+    <h3 id="endTitle">Shift Complete</h3>
+    <p id="endDesc">Great work on the switchyard.</p>
+    <div class="stars-big" id="endStars">☆☆☆</div>
+    <div class="stats">
+      <div class="stat"><div class="k">SCORE</div><div class="v" id="endScore">0</div></div>
+      <div class="stat"><div class="k">TARGET</div><div class="v" id="endTarget">0</div></div>
+      <div class="stat"><div class="k">ROUTED</div><div class="v" id="endRouted">0</div></div>
+      <div class="stat"><div class="k">MISSED</div><div class="v" id="endMissed">0</div></div>
+    </div>
+    <div class="row2">
+      <button class="btn btn-ghost" id="retryBtn">Retry</button>
+      <button class="btn btn-primary" id="nextBtn">Continue</button>
+    </div>
+    <button class="btn btn-ghost" id="lobbyBtn" style="width:100%;margin-top:8px">Back to Timetables</button>
+  </div>
+</div>
+
+<div class="overlay" id="howOverlay">
+  <div class="modal">
+    <h3>How to Dispatch</h3>
+    <p style="margin:8px 0">
+      1. Trains enter on the <b>INBOUND</b> track and move toward the junction.<br>
+      2. Tap a train to <b>select</b> it (gold outline).<br>
+      3. Check its color stripe — that is its home line.<br>
+      4. Make sure that line's <b>signal is GREEN</b>, then tap the <b>color track</b> or <b>ROUTE PAD</b> to dispatch.<br>
+      5. Correct = +points, Wrong = −50, Missed = −75.<br>
+      6. <b>HOLD</b> pauses one train 5s (8s cooldown). <b>E-STOP</b> pauses all 3s (−50, once per shift).<br>
+      7. Beat the clock to earn stars and unlock the next timetable.
+    </p>
+    <button class="btn btn-primary" id="closeHow">Got it</button>
+  </div>
+</div>
+
+<script>
+const TRAIN_TYPES = {
+  passenger:{label:'PASSENGER', color:'blue', bg:'#2E86DE', points:100, speed:1.0, icon:'🚆'},
+  freight:{label:'FREIGHT', color:'amber', bg:'#E67E22', points:80, speed:0.72, icon:'🚂'},
+  mail:{label:'MAIL', color:'green', bg:'#1ABC6B', points:90, speed:1.15, icon:'✉️'},
+  medical:{label:'MEDICAL', color:'red', bg:'#E74C3C', points:150, speed:1.35, icon:'🚑'}
+};
+const COLORS = ['blue','amber','green','red'];
+const COLOR_LABEL = {blue:'BLUE', amber:'AMBER', green:'GREEN', red:'RED'};
+const COLOR_BG = {blue:'#2E86DE', amber:'#F39C12', green:'#1ABC6B', red:'#E74C3C'};
+
+const TIMETABLES = [
+  {id:1, name:'Yard Intro', duration:90, spawn:3200, mix:{passenger:0.6, freight:0.2, mail:0.15, medical:0.05}, target:400, desc:'Learn the ropes'},
+  {id:2, name:'Freight Rush', duration:90, spawn:3000, mix:{passenger:0.2, freight:0.6, mail:0.15, medical:0.05}, target:500, desc:'Heavy freight'},
+  {id:3, name:'Mail Run', duration:100, spawn:2800, mix:{passenger:0.2, freight:0.2, mail:0.5, medical:0.1}, target:600, desc:'Mail must fly'},
+  {id:4, name:'Medical Priority', duration:100, spawn:2700, mix:{passenger:0.25, freight:0.25, mail:0.2, medical:0.3}, target:700, desc:'Medical priority'},
+  {id:5, name:'Mixed Traffic', duration:110, spawn:2600, mix:{passenger:0.25, freight:0.25, mail:0.25, medical:0.25}, target:800, desc:'Balanced flow'},
+  {id:6, name:'Night Shift', duration:120, spawn:2400, mix:{passenger:0.3, freight:0.3, mail:0.2, medical:0.2}, target:900, desc:'Faster spawns'},
+  {id:7, name:'Express Lane', duration:120, spawn:2200, mix:{passenger:0.35, freight:0.15, mail:0.3, medical:0.2}, target:1000, desc:'Express pressure'},
+  {id:8, name:'Storm Delay', duration:130, spawn:2100, mix:{passenger:0.25, freight:0.35, mail:0.2, medical:0.2}, target:1100, desc:'Storm chaos'},
+  {id:9, name:'Cross-Country', duration:140, spawn:2000, mix:{passenger:0.25, freight:0.25, mail:0.25, medical:0.25}, target:1200, desc:'Long haul'},
+  {id:10, name:'Golden Hour', duration:150, spawn:1900, mix:{passenger:0.3, freight:0.2, mail:0.25, medical:0.25}, target:1300, desc:'Peak hour'},
+  {id:11, name:'All Aboard', duration:160, spawn:1800, mix:{passenger:0.3, freight:0.3, mail:0.2, medical:0.2}, target:1500, desc:'Full yard'},
+  {id:12, name:'Master Dispatch', duration:180, spawn:1650, mix:{passenger:0.25, freight:0.25, mail:0.25, medical:0.25}, target:1800, desc:'Master test'},
+];
+
+let store = {unlocked:1, stars:{}, best:{}};
+try{
+  const s=JSON.parse(localStorage.getItem('railDispatch_v2')||'null');
+  if(s){ store=s; }
+}catch(e){}
+
+function saveStore(){
+  localStorage.setItem('railDispatch_v2', JSON.stringify(store));
+}
+
+let state = {
+  tid:null, timeLeft:0, score:0, routed:0, missed:0, wrong:0,
+  trains:[], selected:null, signals:{blue:true, amber:true, green:true, red:true},
+  holdUntil:0, holdCdUntil:0, estopUsed:false, estopUntil:0,
+  timer:null, spawnTimer:null, moveTimer:null, paused:false, running:false,
+  log:[]
+};
+
+const els = {
+  grid:document.getElementById('grid'),
+  unlockedPill:document.getElementById('unlockedPill'),
+  viewLobby:document.getElementById('viewLobby'),
+  viewGame:document.getElementById('viewGame'),
+  clock:document.getElementById('clock'),
+  score:document.getElementById('score'),
+  progress:document.getElementById('progress'),
+  inbound:document.getElementById('inbound'),
+  tracks:document.getElementById('tracks'),
+  signalBoard:document.getElementById('signalBoard'),
+  routePad:document.getElementById('routePad'),
+  nextRow:document.getElementById('nextRow'),
+  selectedBar:document.getElementById('selectedBar'),
+  selLeft:document.getElementById('selLeft'),
+  selRight:document.getElementById('selRight'),
+  logList:document.getElementById('logList'),
+  logCount:document.getElementById('logCount'),
+  shiftName:document.getElementById('shiftName'),
+  shiftTarget:document.getElementById('shiftTarget'),
+  holdBtn:document.getElementById('holdBtn'),
+  routeBtn:document.getElementById('routeBtn'),
+  estopBtn:document.getElementById('estopBtn'),
+  holdCd:document.getElementById('holdCd'),
+  estopCd:document.getElementById('estopCd'),
+  pauseOverlay:document.getElementById('pauseOverlay'),
+  endOverlay:document.getElementById('endOverlay'),
+  howOverlay:document.getElementById('howOverlay'),
+};
+
+function formatTime(s){
+  const m=Math.floor(s/60), sec=s%60;
+  return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+}
+
+function pickType(mix){
+  const r=Math.random(); let acc=0;
+  for(const k of ['passenger','freight','mail','medical']){
+    acc+=mix[k]||0;
+    if(r<acc) return k;
+  }
+  return 'passenger';
+}
+
+function renderLobby(){
+  els.grid.innerHTML='';
+  TIMETABLES.forEach(t=>{
+    const unlocked = t.id <= store.unlocked;
+    const stars = store.stars[t.id]||0;
+    const best = store.best[t.id]||0;
+    const div=document.createElement('div');
+    div.className='tcard'+(unlocked?'':' locked')+(state.tid===t.id?' active':'');
+    div.innerHTML=`
+      <div class="colorbar" style="background:${COLOR_BG[Object.keys(TRAIN_TYPES)[(t.id-1)%4]]||'#2E86DE'}"></div>
+      <div>
+        <div class="num">TIMETABLE ${String(t.id).padStart(2,'0')} • ${t.duration}s</div>
+        <div class="name">${t.name}</div>
+        <div class="meta">${t.desc}</div>
+      </div>
+      <div>
+        <div class="stars">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</div>
+        <div class="best">${best?best+' PTS':''} ${unlocked?'':'🔒 LOCKED'}</div>
+        <div class="meta">TARGET ${t.target}</div>
+      </div>
+      ${unlocked?'':'<div class="lock">🔒</div>'}
+    `;
+    div.onclick=()=>{ if(!unlocked) return; startShift(t.id); };
+    els.grid.appendChild(div);
+  });
+  els.unlockedPill.textContent = `${store.unlocked} / 12 UNLOCKED`;
+}
+
+function renderTracks(){
+  els.tracks.innerHTML='';
+  COLORS.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='track';
+    d.dataset.color=c;
+    d.innerHTML=`
+      <div class="fill"></div>
+      <div class="tlabel"><span class="signal ${state.signals[c]?'on':'off'}" data-s="${c}">${state.signals[c]?'●':'■'}</span> <i style="background:${COLOR_BG[c]}"></i> ${COLOR_LABEL[c]} LINE</div>
+      <div class="rail2"></div>
+    `;
+    d.onclick=()=> attemptRoute(c);
+    els.tracks.appendChild(d);
+  });
+}
+
+function renderSignalBoard(){
+  els.signalBoard.innerHTML='';
+  COLORS.forEach(c=>{
+    const b=document.createElement('button');
+    b.className='sbtn '+(state.signals[c]?'on':'off');
+    b.innerHTML=`<div class="lamp" style="background:${state.signals[c]?'#1ABC6B':'#E74C3C'}">${state.signals[c]?'✓':'✕'}</div><div>${COLOR_LABEL[c]}</div><div style="font-size:9px;color:${state.signals[c]?'#1ABC6B':'#E74C3C'}">${state.signals[c]?'OPEN':'CLOSED'}</div>`;
+    b.onclick=()=> toggleSignal(c);
+    els.signalBoard.appendChild(b);
+  });
+}
+
+function renderRoutePad(){
+  els.routePad.innerHTML='';
+  COLORS.forEach(c=>{
+    const b=document.createElement('button');
+    b.className='btn';
+    b.style.background=COLOR_BG[c];
+    b.style.color='#fff';
+    b.style.minHeight='52px';
+    b.style.fontSize='13px';
+    b.innerHTML=`${COLOR_LABEL[c]}`;
+    b.onclick=()=> attemptRoute(c);
+    els.routePad.appendChild(b);
+  });
+}
+
+function renderNext(){
+  // show next 2 pending types as preview
+  const upcoming = state.trains.slice(0,2);
+  if(upcoming.length===0){
+    els.nextRow.innerHTML='<div class="empty">No trains inbound — stand by</div>';
+    return;
+  }
+  els.nextRow.innerHTML='';
+  upcoming.forEach(t=>{
+    const tt=TRAIN_TYPES[t.type];
+    const card=document.createElement('div');
+    card.className='next-card';
+    card.innerHTML=`<div class="mini" style="background:${tt.bg}">${tt.icon}</div><div class="txt"><b>${tt.label}</b><br><span style="color:${COLOR_BG[tt.color]}">→ ${COLOR_LABEL[tt.color]}</span> • ${tt.points} pts</div>`;
+    els.nextRow.appendChild(card);
+  });
+  const info=document.createElement('div');
+  info.style.fontSize='10px'; info.style.color='var(--muted)'; info.textContent=`${state.trains.length} on approach`;
+  els.nextRow.appendChild(info);
+}
+
+function updateSelectedBar(){
+  if(!state.selected){
+    els.selLeft.textContent='No train selected — tap a train';
+    els.selRight.textContent='Select to route';
+    els.routeBtn.disabled=true;
+    els.holdBtn.disabled=true;
+    return;
+  }
+  const t=state.trains.find(x=>x.id===state.selected);
+  if(!t){ state.selected=null; updateSelectedBar(); return; }
+  const tt=TRAIN_TYPES[t.type];
+  els.selLeft.innerHTML=`<span style="width:28px;height:22px;border-radius:6px;background:${tt.bg};display:grid;place-items:center;color:#fff;font-size:12px">${tt.icon}</span> ${tt.label} → <span style="color:${COLOR_BG[tt.color]}">${COLOR_LABEL[tt.color]}</span>`;
+  els.selRight.textContent=`Pos ${Math.round(t.pos)}% • ${tt.points} pts`;
+  els.routeBtn.disabled=false;
+  els.holdBtn.disabled = Date.now() < state.holdCdUntil;
+}
+
+function addLog(msg, type='info'){
+  const time = formatTime(state.timeLeft);
+  state.log.unshift({msg,type,time});
+  if(state.log.length>20) state.log.pop();
+  renderLog();
+}
+function renderLog(){
+  els.logList.innerHTML='';
+  state.log.slice(0,6).forEach(e=>{
+    const li=document.createElement('li');
+    li.className=e.type;
+    li.innerHTML=`<span>${e.time} — ${e.msg}</span>`;
+    els.logList.appendChild(li);
+  });
+  els.logCount.textContent = `${state.log.length} events`;
+}
+
+function toggleSignal(c){
+  state.signals[c]=!state.signals[c];
+  renderTracks(); renderSignalBoard();
+  addLog(`Signal ${COLOR_LABEL[c]} ${state.signals[c]?'OPENED':'CLOSED'}`, 'info');
+  try{navigator.vibrate(20)}catch(e){}
+}
+
+function selectTrain(id){
+  state.selected=id;
+  document.querySelectorAll('.train').forEach(el=> el.classList.toggle('selected', el.dataset.id===id));
+  updateSelectedBar();
+  try{navigator.vibrate(15)}catch(e){}
+}
+
+function spawnTrain(){
+  if(!state.running || state.paused) return;
+  const tt = TIMETABLES.find(x=>x.id===state.tid);
+  const type = pickType(tt.mix);
+  const id='t'+Date.now()+Math.random().toString(36).slice(2,5);
+  const train={id, type, pos:0, heldUntil:0, spawnAt:Date.now()};
+  state.trains.push(train);
+  createTrainEl(train);
+  renderNext();
+  updateSelectedBar();
+}
+
+function createTrainEl(train){
+  const tt=TRAIN_TYPES[train.type];
+  const el=document.createElement('div');
+  el.className='train';
+  el.dataset.id=train.id;
+  el.style.background=tt.bg;
+  el.style.left='0%';
+  el.innerHTML=`<span class="ico">${tt.icon}</span> ${tt.label.slice(0,3)} <span style="width:8px;height:8px;border-radius:50%;background:${COLOR_BG[tt.color]};border:1px solid #fff;display:inline-block"></span>`;
+  el.onclick=(e)=>{ e.stopPropagation(); selectTrain(train.id); };
+  // touch
+  el.ontouchstart=(e)=>{ e.stopPropagation(); selectTrain(train.id); };
+  els.inbound.appendChild(el);
+  // auto-select first train if none selected
+  if(!state.selected) selectTrain(train.id);
+}
+
+function attemptRoute(color){
+  if(!state.selected){
+    addLog('No train selected', 'bad');
+    return;
+  }
+  const train = state.trains.find(t=>t.id===state.selected);
+  if(!train) return;
+  const tt=TRAIN_TYPES[train.type];
+  // check signal
+  if(!state.signals[color]){
+    addLog(`Blocked — ${COLOR_LABEL[color]} signal RED`, 'bad');
+    shakeTrack(color);
+    try{navigator.vibrate([30,40,30])}catch(e){}
+    return;
+  }
+  // check correctness
+  if(tt.color===color){
+    // success
+    const bonus = (train.type==='medical' && Date.now()-train.spawnAt < 3000) ? 50 : 0;
+    const pts = tt.points + bonus;
+    state.score += pts;
+    state.routed++;
+    addLog(`${tt.label} → ${COLOR_LABEL[color]} +${pts}${bonus?' (priority bonus!)':''}`, 'good');
+    animateRouted(train.id, color, true);
+    removeTrain(train.id);
+    try{navigator.vibrate(40)}catch(e){}
+  } else {
+    state.score = Math.max(0, state.score - 50);
+    state.wrong++;
+    addLog(`WRONG LINE! ${tt.label} → ${COLOR_LABEL[color]} −50`, 'bad');
+    animateRouted(train.id, color, false);
+    removeTrain(train.id);
+    try{navigator.vibrate([50,30,50])}catch(e){}
+  }
+  updateHUD();
+  renderNext();
+  state.selected=null;
+  updateSelectedBar();
+}
+
+function shakeTrack(color){
+  const el=document.querySelector(`.track[data-color="${color}"]`);
+  if(!el) return;
+  el.animate([{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:220});
+}
+
+function animateRouted(id, color, ok){
+  const el=document.querySelector(`.train[data-id="${id}"]`);
+  if(!el) return;
+  el.style.transition='all .35s ease';
+  el.style.left='92%';
+  el.style.opacity='0';
+  el.style.transform='translateY(-50%) scale(.9)';
+  // flash track
+  const track=document.querySelector(`.track[data-color="${color}"]`);
+  if(track){
+    const fill=track.querySelector('.fill');
+    fill.style.width='100%';
+    fill.style.opacity= ok ? '.35' : '.25';
+    fill.style.background= ok ? COLOR_BG[color] : '#E74C3C';
+    setTimeout(()=>{ fill.style.width='0%'; }, 400);
+  }
+}
+
+function removeTrain(id){
+  state.trains = state.trains.filter(t=>t.id!==id);
+  const el=document.querySelector(`.train[data-id="${id}"]`);
+  if(el) setTimeout(()=> el.remove(), 360);
+  if(state.selected===id) state.selected=null;
+}
+
+function doHold(){
+  if(!state.selected) { addLog('Select a train to HOLD', 'bad'); return; }
+  if(Date.now() < state.holdCdUntil){ addLog('HOLD cooling down', 'bad'); return; }
+  const t=state.trains.find(x=>x.id===state.selected);
+  if(!t) return;
+  t.heldUntil = Date.now()+5000;
+  state.holdCdUntil = Date.now()+8000;
+  addLog(`HOLD ${TRAIN_TYPES[t.type].label} 5s`, 'info');
+  const el=document.querySelector(`.train[data-id="${t.id}"]`);
+  if(el){ el.classList.add('held'); el.innerHTML+= ' ⏸'; }
+  try{navigator.vibrate(30)}catch(e){}
+  updateSelectedBar();
+}
+
+function doEStop(){
+  if(state.estopUsed){ addLog('E-STOP already used', 'bad'); return; }
+  state.estopUsed=true;
+  state.estopUntil=Date.now()+3000;
+  state.score=Math.max(0, state.score-50);
+  addLog('EMERGENCY STOP — all trains frozen 3s −50', 'bad');
+  els.estopBtn.disabled=true;
+  els.estopCd.textContent='USED';
+  updateHUD();
+  try{navigator.vibrate([60,40,60])}catch(e){}
+  // visual
+  els.inbound.style.outline='2px solid #E74C3C';
+  setTimeout(()=> els.inbound.style.outline='none', 3000);
+}
+
+function doRouteBtn(){
+  if(!state.selected){ addLog('Select a train first', 'bad'); return; }
+  const t=state.trains.find(x=>x.id===state.selected);
+  if(!t) return;
+  const tt=TRAIN_TYPES[t.type];
+  attemptRoute(tt.color);
+}
+
+function updateHUD(){
+  els.score.textContent=state.score;
+  els.clock.textContent=formatTime(state.timeLeft);
+  const tt=TIMETABLES.find(x=>x.id===state.tid);
+  if(tt){
+    const pct = ((tt.duration - state.timeLeft)/tt.duration)*100;
+    els.progress.style.width = pct+'%';
+  }
+  // cooldown texts
+  if(Date.now() < state.holdCdUntil){
+    const s=Math.ceil((state.holdCdUntil-Date.now())/1000);
+    els.holdCd.textContent=s+'s';
+    els.holdBtn.disabled=true;
+  } else {
+    els.holdCd.textContent='';
+    els.holdBtn.disabled = !state.selected;
+  }
+  if(state.estopUsed){
+    els.estopBtn.disabled=true;
+  }
+}
+
+function gameTick(){
+  if(!state.running || state.paused) return;
+  // move trains
+  const now=Date.now();
+  const frozen = now < state.estopUntil;
+  state.trains.forEach(t=>{
+    if(frozen) return;
+    if(now < t.heldUntil) return;
+    const tt=TRAIN_TYPES[t.type];
+    t.pos += tt.speed * 0.9; // tuned
+    const el=document.querySelector(`.train[data-id="${t.id}"]`);
+    if(el){
+      // clamp 0-92%
+      const left = Math.min(92, t.pos);
+      el.style.left = left+'%';
+      if(now < t.heldUntil) el.classList.add('held'); else el.classList.remove('held');
+    }
+    // auto-miss at 92%
+    if(t.pos >= 92){
+      state.missed++;
+      state.score=Math.max(0, state.score-75);
+      addLog(`${TRAIN_TYPES[t.type].label} MISSED −75`, 'bad');
+      removeTrain(t.id);
+      updateHUD();
+      renderNext();
+    }
+  });
+  updateHUD();
+}
+
+function startShift(id){
+  const tt=TIMETABLES.find(x=>x.id===id);
+  if(!tt) return;
+  state.tid=id;
+  state.timeLeft=tt.duration;
+  state.score=0; state.routed=0; state.missed=0; state.wrong=0;
+  state.trains=[]; state.selected=null; state.signals={blue:true, amber:true, green:true, red:true};
+  state.holdUntil=0; state.holdCdUntil=0; state.estopUsed=false; state.estopUntil=0;
+  state.log=[]; state.paused=false; state.running=true;
+  els.viewLobby.style.display='none';
+  els.viewGame.style.display='flex';
+  els.shiftName.textContent=`SHIFT ${String(id).padStart(2,'0')} — ${tt.name.toUpperCase()}`;
+  els.shiftTarget.textContent=`TARGET ${tt.target}`;
+  els.inbound.innerHTML='<div class="label">INBOUND ▸ JUNCTION</div><div class="rail"></div>';
+  renderTracks(); renderSignalBoard(); renderRoutePad(); renderLog(); updateSelectedBar(); updateHUD();
+  addLog(`Shift ${id} started — target ${tt.target} pts`, 'info');
+  // timers
+  clearInterval(state.timer); clearInterval(state.spawnTimer); clearInterval(state.moveTimer);
+  state.timer=setInterval(()=>{
+    if(state.paused) return;
+    state.timeLeft--;
+    if(state.timeLeft<=0){ endShift(); }
+    updateHUD();
+  },1000);
+  state.spawnTimer=setInterval(spawnTrain, tt.spawn);
+  state.moveTimer=setInterval(gameTick, 90);
+  // spawn first quickly
+  setTimeout(spawnTrain, 600);
+  renderLobby();
+}
+
+function endShift(){
+  clearInterval(state.timer); clearInterval(state.spawnTimer); clearInterval(state.moveTimer);
+  state.running=false;
+  const tt=TIMETABLES.find(x=>x.id===state.tid);
+  const pct = tt.target ? (state.score/tt.target)*100 : 0;
+  let stars=0;
+  if(pct>=60) stars=1;
+  if(pct>=80) stars=2;
+  if(pct>=100) stars=3;
+  // persist
+  const prevStars=store.stars[tt.id]||0;
+  if(stars>prevStars) store.stars[tt.id]=stars;
+  const prevBest=store.best[tt.id]||0;
+  if(state.score>prevBest) store.best[tt.id]=state.score;
+  if(stars>0 && tt.id===store.unlocked && store.unlocked<12) store.unlocked++;
+  // if perfect but already unlocked, ensure next unlocked
+  saveStore();
+  // show modal
+  document.getElementById('endTitle').textContent = stars===3 ? 'Perfect Dispatch!' : stars>0 ? 'Shift Complete' : 'Shift Over';
+  document.getElementById('endDesc').textContent = stars===3 ? 'Flawless yard control. You earned 3 stars!' : stars===2 ? 'Strong work, dispatcher.' : stars===1 ? 'You passed — next timetable unlocked.' : 'Missed target. Try again to unlock next shift.';
+  document.getElementById('endStars').textContent = '★'.repeat(stars) + '☆'.repeat(3-stars);
+  document.getElementById('endScore').textContent=state.score;
+  document.getElementById('endTarget').textContent=tt.target;
+  document.getElementById('endRouted').textContent=state.routed;
+  document.getElementById('endMissed').textContent=state.missed;
+  const nextBtn=document.getElementById('nextBtn');
+  if(tt.id<12 && store.unlocked>tt.id){
+    nextBtn.textContent='Next Timetable';
+    nextBtn.onclick=()=>{ els.endOverlay.classList.remove('open'); startShift(tt.id+1); };
+  } else if(stars===0){
+    nextBtn.textContent='Retry';
+    nextBtn.onclick=()=>{ els.endOverlay.classList.remove('open'); startShift(tt.id); };
+  } else {
+    nextBtn.textContent='Continue';
+    nextBtn.onclick=()=>{ els.endOverlay.classList.remove('open'); showLobby(); };
+  }
+  document.getElementById('retryBtn').onclick=()=>{ els.endOverlay.classList.remove('open'); startShift(tt.id); };
+  els.endOverlay.classList.add('open');
+  renderLobby();
+}
+
+function showLobby(){
+  clearInterval(state.timer); clearInterval(state.spawnTimer); clearInterval(state.moveTimer);
+  state.running=false; state.paused=false;
+  els.viewGame.style.display='none';
+  els.viewLobby.style.display='flex';
+  els.pauseOverlay.classList.remove('open');
+  els.endOverlay.classList.remove('open');
+  renderLobby();
+  els.clock.textContent='--:--';
+  els.progress.style.width='0%';
+  els.score.textContent='0';
+}
+
+// events
+document.getElementById('pauseBtn').onclick=()=>{
+  if(!state.running) return;
+  state.paused=true;
+  els.pauseOverlay.classList.add('open');
+};
+document.getElementById('resumeBtn').onclick=()=>{ state.paused=false; els.pauseOverlay.classList.remove('open'); };
+document.getElementById('resume2Btn').onclick=()=>{ state.paused=false; els.pauseOverlay.classList.remove('open'); };
+document.getElementById('quitBtn').onclick=showLobby;
+document.getElementById('lobbyBtn').onclick=showLobby;
+document.getElementById('retryBtn').onclick=()=>{};
+document.getElementById('resetBtn').onclick=()=>{
+  if(confirm('Reset all progress?')){
+    store={unlocked:1, stars:{}, best:{}};
+    saveStore(); renderLobby();
+  }
+};
+document.getElementById('howBtn').onclick=()=> els.howOverlay.classList.add('open');
+document.getElementById('closeHow').onclick=()=> els.howOverlay.classList.remove('open');
+els.howOverlay.onclick=(e)=>{ if(e.target===els.howOverlay) els.howOverlay.classList.remove('open'); };
+els.pauseOverlay.onclick=(e)=>{ if(e.target===els.pauseOverlay) { state.paused=false; els.pauseOverlay.classList.remove('open'); } };
+els.endOverlay.onclick=(e)=>{ if(e.target===els.endOverlay) els.endOverlay.classList.remove('open'); };
+document.getElementById('holdBtn').onclick=doHold;
+document.getElementById('estopBtn').onclick=doEStop;
+document.getElementById('routeBtn').onclick=doRouteBtn;
+els.inbound.onclick=()=>{ /* deselect */ };
+
+// init
+renderTracks(); renderSignalBoard(); renderRoutePad(); renderLobby(); renderLog();
+updateHUD();
+</script>
+</body>
+</html>

@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Neon Event Pinball</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#070a14;
+  --cab:#0f1430;
+  --cab2:#151b45;
+  --neon-cyan:#00f0ff;
+  --neon-pink:#ff2a6d;
+  --neon-yellow:#ffe600;
+  --neon-green:#00ff88;
+  --neon-purple:#b537f2;
+  --text:#e6f1ff;
+  --muted:#8a9bb5;
+  --line:#1e2a5a;
+}
+html,body{height:100%;background:#050716;color:var(--text);font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center;background:radial-gradient(ellipse at top, #1a1f5a 0%, #070a14 60%, #02030a 100%)}
+.cabinet{
+  width:100%;max-width:428px;min-width:360px;
+  min-height:100vh;
+  background:linear-gradient(180deg, #0d1233 0%, #0a0f2a 100%);
+  border-left:3px solid #1a2460;
+  border-right:3px solid #1a2460;
+  box-shadow:0 0 40px rgba(0,240,255,0.15), inset 0 0 80px rgba(0,0,0,0.5);
+  display:flex;flex-direction:column;
+  position:relative;
+  overflow:hidden;
+}
+/* Top marquee */
+.marquee{
+  background:linear-gradient(90deg, #0f1430, #1a1f5a, #0f1430);
+  border-bottom:2px solid var(--neon-cyan);
+  padding:10px 12px 8px;
+  text-align:center;
+  position:relative;
+  box-shadow:0 4px 20px rgba(0,240,255,0.3);
+}
+.marquee h1{
+  font-size:18px;letter-spacing:3px;font-weight:900;
+  color:#fff;text-shadow:0 0 8px var(--neon-cyan), 0 0 20px var(--neon-cyan);
+  line-height:1;
+}
+.marquee h1 span{color:var(--neon-pink);text-shadow:0 0 8px var(--neon-pink)}
+.marquee p{font-size:10px;letter-spacing:2px;color:var(--neon-cyan);opacity:0.9;margin-top:4px;font-weight:600}
+.score-bar{
+  display:flex;gap:8px;padding:8px 10px;background:#070a1a;border-bottom:1px solid var(--line);
+}
+.score-box{
+  flex:1;background:#02030a;border:1px solid #1e2a5a;border-radius:8px;padding:6px 8px;text-align:center;
+  box-shadow:inset 0 2px 8px rgba(0,0,0,0.8);
+}
+.score-box label{font-size:9px;letter-spacing:1.5px;color:var(--muted);display:block;font-weight:700}
+.score-box .val{font-size:16px;font-weight:900;color:var(--neon-yellow);text-shadow:0 0 6px rgba(255,230,0,0.6);font-variant-numeric:tabular-nums}
+.score-box.high .val{color:var(--neon-cyan)}
+.score-box.lvl .val{color:var(--neon-green)}
+
+/* Table selector */
+.table-nav{
+  display:flex;gap:6px;padding:10px;background:#0a0f2a;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line)
+}
+.table-nav::-webkit-scrollbar{display:none}
+.tbtn{
+  flex:0 0 auto;min-width:68px;padding:8px 6px;border-radius:10px;
+  border:1.5px solid #1e2a5a;background:#0f1430;color:var(--muted);
+  font-size:11px;font-weight:800;letter-spacing:0.5px;text-align:center;cursor:pointer;
+  transition:all 0.2s;position:relative;
+}
+.tbtn .num{font-size:14px;display:block;color:#fff}
+.tbtn.active{background:linear-gradient(180deg, #1a2a6a, #0f1430);border-color:var(--neon-cyan);color:var(--neon-cyan);box-shadow:0 0 12px rgba(0,240,255,0.4)}
+.tbtn.unlocked{border-color:#2a3a7a;color:#cbd5ff}
+.tbtn.locked{opacity:0.45;pointer-events:none}
+.tbtn.done{border-color:var(--neon-green);color:var(--neon-green)}
+.tbtn.done::after{content:'✓';position:absolute;top:-6px;right:-6px;background:var(--neon-green);color:#000;font-size:10px;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;line-height:16px;text-align:center}
+
+/* Mission */
+.mission{
+  margin:10px 10px 0;background:linear-gradient(135deg, #0f1430 0%, #1a1440 100%);
+  border:1px solid #2a2a6a;border-radius:12px;padding:10px 12px;position:relative;overflow:hidden;
+}
+.mission::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--neon-yellow)}
+.mission h3{font-size:11px;letter-spacing:1.5px;color:var(--neon-yellow);margin-bottom:4px}
+.mission p{font-size:13px;line-height:1.4;color:#d0dcff}
+.mission .hint{margin-top:6px;font-size:11px;color:var(--muted);background:rgba(0,0,0,0.3);padding:6px 8px;border-radius:6px;border-left:2px solid var(--neon-cyan)}
+.mission .target-tag{display:inline-block;margin-top:6px;background:var(--neon-pink);color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:20px;letter-spacing:1px}
+
+/* Controls */
+.controls{
+  padding:10px;display:flex;flex-direction:column;gap:8px;
+}
+.mode-row{display:flex;gap:8px}
+.mode-btn{
+  flex:1;height:48px;border-radius:10px;border:2px solid #1e2a5a;background:#0f1430;color:#fff;
+  font-size:12px;font-weight:800;letter-spacing:1px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:all 0.15s;
+}
+.mode-btn.active-capture{background:linear-gradient(180deg, #003a4a, #001a2a);border-color:var(--neon-cyan);color:var(--neon-cyan);box-shadow:0 0 12px rgba(0,240,255,0.35)}
+.mode-btn.active-bubble{background:linear-gradient(180deg, #4a003a, #2a001a);border-color:var(--neon-pink);color:var(--neon-pink);box-shadow:0 0 12px rgba(255,42,109,0.35)}
+.mode-btn.active-stop{background:linear-gradient(180deg, #4a2a00, #2a1a00);border-color:var(--neon-yellow);color:var(--neon-yellow);box-shadow:0 0 12px rgba(255,230,0,0.35)}
+.mode-btn.active-prevent{background:linear-gradient(180deg, #2a004a, #1a002a);border-color:var(--neon-purple);color:var(--neon-purple);box-shadow:0 0 12px rgba(181,55,242,0.35)}
+.mode-btn span.icon{font-size:16px}
+.flipper-row{display:flex;gap:8px}
+.flipper-row .mode-btn{height:44px;font-size:11px}
+.launch-btn{
+  height:56px;border-radius:14px;border:none;background:linear-gradient(180deg, #ff2a6d 0%, #c00040 100%);
+  color:#fff;font-size:15px;font-weight:900;letter-spacing:2px;cursor:pointer;
+  box-shadow:0 6px 0 #80002a, 0 0 20px rgba(255,42,109,0.5);transition:all 0.1s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.launch-btn:active{transform:translateY(4px);box-shadow:0 2px 0 #80002a, 0 0 20px rgba(255,42,109,0.5)}
+.launch-btn:disabled{opacity:0.5;pointer-events:none}
+.launch-btn.launching{background:linear-gradient(180deg, #00c0ff 0%, #0060a0 100%);box-shadow:0 6px 0 #004070, 0 0 20px rgba(0,240,255,0.5)}
+
+/* Playfield */
+.playfield{
+  margin:0 10px;background:radial-gradient(ellipse at center, #0a1430 0%, #050a1a 100%);
+  border:1.5px solid #1e2a5a;border-radius:14px;padding:12px 8px 10px;position:relative;overflow:hidden;
+  box-shadow:inset 0 0 30px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(0,240,255,0.1);
+  min-height:280px;
+}
+.playfield::before{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(0deg, transparent, transparent 20px, rgba(0,240,255,0.02) 20px, rgba(0,240,255,0.02) 21px);
+  pointer-events:none;
+}
+.pf-label{position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:9px;letter-spacing:2px;color:var(--neon-cyan);opacity:0.7;font-weight:700;background:#050a1a;padding:2px 8px;border-radius:20px;border:1px solid rgba(0,240,255,0.2)}
+.tree{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;z-index:1;padding-top:18px}
+.level{display:flex;gap:8px;justify-content:center;align-items:center;position:relative}
+.level::before{content:'';position:absolute;top:-8px;left:50%;width:1px;height:8px;background:rgba(0,240,255,0.2);transform:translateX(-50%)}
+.node{
+  min-width:72px;max-width:110px;padding:8px 6px;border-radius:10px;
+  background:linear-gradient(180deg, #151b45, #0f1430);
+  border:1.5px solid #2a3a7a;color:#cbd5ff;text-align:center;cursor:pointer;
+  position:relative;transition:all 0.2s;user-select:none;
+  box-shadow:0 2px 8px rgba(0,0,0,0.4);
+}
+.node .nlabel{font-size:11px;font-weight:800;letter-spacing:0.5px;line-height:1.1}
+.node .nsub{font-size:8px;color:var(--muted);margin-top:2px;letter-spacing:0.5px}
+.node.target{border-color:var(--neon-yellow);background:linear-gradient(180deg, #3a3000, #1a1500);color:var(--neon-yellow);box-shadow:0 0 12px rgba(255,230,0,0.3)}
+.node.trap{border-color:#5a1a2a;background:linear-gradient(180deg, #2a0a14, #1a050a);color:#ff6b8a}
+.node.root{border-color:var(--neon-cyan);background:linear-gradient(180deg, #0a2a3a, #0a1a2a)}
+.node.active-cap{border-color:var(--neon-cyan) !important;box-shadow:0 0 16px var(--neon-cyan), inset 0 0 10px rgba(0,240,255,0.2);transform:scale(1.05);z-index:2}
+.node.active-bub{border-color:var(--neon-pink) !important;box-shadow:0 0 16px var(--neon-pink), inset 0 0 10px rgba(255,42,109,0.2);transform:scale(1.05);z-index:2}
+.node.has-cap::after{content:'C';position:absolute;top:-7px;left:-7px;width:18px;height:18px;background:var(--neon-cyan);color:#000;font-size:10px;font-weight:900;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid #fff}
+.node.has-bub::before{content:'B';position:absolute;top:-7px;right:-7px;width:18px;height:18px;background:var(--neon-pink);color:#fff;font-size:10px;font-weight:900;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid #fff}
+.node.has-both::after{content:'C';}
+.node.has-both::before{content:'B';}
+.node.has-stop{outline:2px dashed var(--neon-yellow);outline-offset:2px}
+.node.has-prevent{outline:2px dashed var(--neon-purple);outline-offset:2px}
+.node .badges{display:flex;gap:3px;justify-content:center;margin-top:4px;flex-wrap:wrap}
+.badge{font-size:8px;font-weight:800;padding:2px 5px;border-radius:20px;letter-spacing:0.5px}
+.badge.cap{background:var(--neon-cyan);color:#000}
+.badge.bub{background:var(--neon-pink);color:#fff}
+.badge.stop{background:var(--neon-yellow);color:#000}
+.badge.prevent{background:var(--neon-purple);color:#fff}
+.badge.count{background:#fff;color:#000;border:1px solid var(--neon-pink)}
+.connector{width:2px;height:10px;background:linear-gradient(180deg, rgba(0,240,255,0.5), rgba(255,42,109,0.5));margin:0 auto}
+.branch-line{display:flex;justify-content:center;gap:20px;position:relative;height:14px}
+.branch-line::before{content:'';position:absolute;top:0;left:25%;right:25%;height:2px;background:rgba(0,240,255,0.3)}
+.branch-line i{width:2px;height:14px;background:rgba(0,240,255,0.3);display:block}
+.ball{
+  position:absolute;width:18px;height:18px;border-radius:50%;
+  background:radial-gradient(circle at 30% 30%, #fff, #ff2a6d 40%, #80002a 100%);
+  box-shadow:0 0 12px var(--neon-pink), 0 0 24px rgba(255,42,109,0.5);
+  z-index:10;pointer-events:none;transition:all 0.42s cubic-bezier(0.34,1.56,0.64,1);
+  border:1.5px solid #fff;
+}
+.ball.trail{box-shadow:0 0 12px var(--neon-cyan), 0 0 24px rgba(0,240,255,0.5);background:radial-gradient(circle at 30% 30%, #fff, #00f0ff 40%, #004a5a 100%)}
+
+/* Telemetry */
+.telemetry{
+  margin:10px 10px 0;background:#02030a;border:1px solid #1e2a5a;border-radius:10px;overflow:hidden;
+}
+.telemetry header{
+  display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#0a0f2a;border-bottom:1px solid #1e2a5a;
+}
+.telemetry header h4{font-size:10px;letter-spacing:1.5px;color:var(--neon-green)}
+.telemetry header button{font-size:10px;background:transparent;border:1px solid #2a3a7a;color:var(--muted);padding:3px 8px;border-radius:6px;cursor:pointer}
+.log{
+  height:110px;overflow-y:auto;padding:6px 8px;font-family: 'Courier New', monospace;font-size:11px;line-height:1.5;
+  scrollbar-width:thin;scrollbar-color:#1e2a5a transparent;
+}
+.log::-webkit-scrollbar{width:4px}
+.log::-webkit-scrollbar-thumb{background:#1e2a5a;border-radius:4px}
+.log-entry{padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;gap:6px}
+.log-entry .phase{font-weight:800;min-width:62px}
+.log-entry.capture .phase{color:var(--neon-cyan)}
+.log-entry.bubble .phase{color:var(--neon-pink)}
+.log-entry.stop .phase{color:var(--neon-yellow)}
+.log-entry.prevent .phase{color:var(--neon-purple)}
+.log-entry.default .phase{color:var(--neon-green)}
+.log-entry.trap .phase{color:#ff6b8a}
+.log-entry.win{color:var(--neon-yellow);font-weight:800;background:rgba(255,230,0,0.08);border-radius:4px;padding:4px 6px;margin-top:4px}
+.log-entry.fail{color:#ff6b8a;font-weight:700;background:rgba(255,42,109,0.08);border-radius:4px;padding:4px 6px;margin-top:4px}
+
+/* Legend */
+.legend{display:flex;gap:6px;padding:8px 10px;flex-wrap:wrap;justify-content:center}
+.legend span{font-size:10px;padding:4px 8px;border-radius:20px;border:1px solid #1e2a5a;background:#0a0f2a;color:var(--muted);display:flex;align-items:center;gap:4px}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.legend i.cap{background:var(--neon-cyan)}
+.legend i.bub{background:var(--neon-pink)}
+.legend i.stop{background:var(--neon-yellow)}
+.legend i.prevent{background:var(--neon-purple)}
+
+/* Footer */
+.footer{padding:8px 10px 14px;display:flex;gap:8px}
+.footer button{flex:1;height:40px;border-radius:8px;border:1px solid #1e2a5a;background:#0f1430;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer}
+.footer button:active{background:#1a2460;color:#fff}
+
+/* Toast */
+.toast{
+  position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(80px);
+  background:#0f1430;border:1px solid var(--neon-cyan);color:#fff;padding:10px 16px;border-radius:10px;
+  font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,0.6), 0 0 16px rgba(0,240,255,0.3);
+  transition:transform 0.3s;z-index:100;max-width:90%;text-align:center;pointer-events:none;
+}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.win-overlay{
+  position:absolute;inset:0;background:rgba(5,7,20,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:20;border-radius:14px;text-align:center;padding:20px;
+}
+.win-overlay h2{font-size:22px;color:var(--neon-yellow);text-shadow:0 0 12px var(--neon-yellow);letter-spacing:2px}
+.win-overlay p{font-size:13px;color:#fff;margin-top:8px;line-height:1.4}
+.win-overlay button{margin-top:14px;height:44px;padding:0 20px;border-radius:10px;border:none;background:var(--neon-cyan);color:#000;font-weight:900;letter-spacing:1px;cursor:pointer;box-shadow:0 0 16px rgba(0,240,255,0.5)}
+</style>
+</head>
+<body>
+<div class="cabinet" id="cabinet">
+  <div class="marquee">
+    <h1>NEON <span>EVENT</span> PINBALL</h1>
+    <p>PROPAGATION ARCADE • CAPTURE → TARGET → BUBBLE</p>
+  </div>
+  <div class="score-bar">
+    <div class="score-box"><label>SCORE</label><div class="val" id="scoreVal">0000</div></div>
+    <div class="score-box high"><label>HIGH SCORE</label><div class="val" id="highVal">0000</div></div>
+    <div class="score-box lvl"><label>TABLE</label><div class="val" id="tableVal">1 / 5</div></div>
+  </div>
+  <div class="table-nav" id="tableNav"></div>
+  <div class="mission" id="mission"></div>
+  <div class="controls">
+    <div class="mode-row">
+      <button class="mode-btn" id="btnCapture" onclick="setListenerMode('capture')"><span class="icon">⬇</span> CAPTURE</button>
+      <button class="mode-btn active-bubble" id="btnBubble" onclick="setListenerMode('bubble')"><span class="icon">⬆</span> BUBBLE</button>
+    </div>
+    <div class="flipper-row">
+      <button class="mode-btn" id="btnStop" onclick="setFlipperMode('stop')"><span class="icon">🛑</span> STOP-PROP</button>
+      <button class="mode-btn" id="btnPrevent" onclick="setFlipperMode('prevent')"><span class="icon">⛔</span> PREVENT-DEFAULT</button>
+      <button class="mode-btn" id="btnListen" onclick="setFlipperMode('listen')" style="flex:0.7">🎯 LISTEN</button>
+    </div>
+    <button class="launch-btn" id="launchBtn" onclick="launchBall()">● LAUNCH BALL ●</button>
+  </div>
+  <div class="playfield" id="playfield">
+    <div class="pf-label">NODE TREE • TAP NODES TO WIRE</div>
+    <div class="tree" id="tree"></div>
+    <div id="winOverlayHost"></div>
+  </div>
+  <div class="telemetry">
+    <header><h4>◉ TELEMETRY LOG</h4><button onclick="clearLog()">CLEAR</button></header>
+    <div class="log" id="log"></div>
+  </div>
+  <div class="legend">
+    <span><i class="cap"></i> Capture (down)</span>
+    <span><i class="bub"></i> Bubble (up)</span>
+    <span><i class="stop"></i> stopPropagation</span>
+    <span><i class="prevent"></i> preventDefault</span>
+  </div>
+  <div class="footer">
+    <button onclick="resetTable()">RESET TABLE</button>
+    <button onclick="resetAll()">RESET ALL PROGRESS</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const TABLES = [
+  {
+    id:1, name:'BUBBLE RUN', sub:'Bubble Basics', diff:'★☆☆',
+    targetId:'TGT',
+    mission:'Wire every node on the path with <b>BUBBLE</b> listeners. The ball bubbles from TARGET back to ROOT.',
+    hint:'💡 Tap each node while <b>BUBBLE</b> is active. Then LAUNCH.',
+    tree:{id:'ROOT', label:'ROOT', sub:'document', children:[
+      {id:'A', label:'A', sub:'section', children:[
+        {id:'B', label:'B', sub:'article', children:[
+          {id:'TGT', label:'TARGET', sub:'button • GOAL', children:[]}
+        ]}
+      ]}
+    ]},
+    trapIds:[],
+    winCheck:(log, state)=>{
+      const path=['ROOT','A','B','TGT'];
+      const ok = path.every(id=> state.listeners[id]?.bubble);
+      return {ok, reason: ok ? 'All bubble listeners firing in order!' : 'Missing bubble listener on '+path.find(id=>!state.listeners[id]?.bubble)}
+    }
+  },
+  {
+    id:2, name:'CAPTURE CASCADE', sub:'Capture First', diff:'★★☆',
+    targetId:'TGT',
+    mission:'Use <b>CAPTURE</b> on ROOT + A (downward phase) and <b>BUBBLE</b> on B + TARGET (upward phase). Order matters!',
+    hint:'💡 Switch between CAPTURE and BUBBLE modes. Capture fires top→down, bubble fires bottom→up.',
+    tree:{id:'ROOT', label:'ROOT', sub:'document', children:[
+      {id:'A', label:'A', sub:'section', children:[
+        {id:'B', label:'B', sub:'article', children:[
+          {id:'TGT', label:'TARGET', sub:'button • GOAL', children:[]}
+        ]}
+      ]}
+    ]},
+    trapIds:[],
+    winCheck:(log, state)=>{
+      const needCap=['ROOT','A'], needBub=['B','TGT'];
+      const capOk=needCap.every(id=>state.listeners[id]?.capture);
+      const bubOk=needBub.every(id=>state.listeners[id]?.bubble);
+      if(!capOk) return {ok:false, reason:'ROOT and A need CAPTURE listeners'};
+      if(!bubOk) return {ok:false, reason:'B and TARGET need BUBBLE listeners'};
+      // check log order: capture before bubble
+      const capIdx=log.findIndex(e=>e.phase==='capture');
+      const bubIdx=log.findIndex(e=>e.phase==='bubble');
+      if(capIdx!==-1 && bubIdx!==-1 && capIdx > bubIdx) return {ok:false, reason:'Capture must fire before bubble!'};
+      return {ok:true, reason:'Perfect capture→bubble cascade!'}
+    }
+  },
+  {
+    id:3, name:'BRANCH BLOCK', sub:'Stop Propagation', diff:'★★☆',
+    targetId:'TGT',
+    mission:'Ball forks at ROOT. Left branch is a <b>TRAP</b> that steals the ball. Attach <b>STOP-PROP</b> flipper on LEFT to block it, and BUBBLE listeners on the right path.',
+    hint:'💡 Tap LISTEN → BUBBLE and wire RIGHT path, then switch to STOP-PROP and tap LEFT.',
+    tree:{id:'ROOT', label:'ROOT', sub:'fork', children:[
+      {id:'LEFT', label:'LEFT', sub:'TRAP • div', children:[
+        {id:'L1', label:'L1', sub:'trap', children:[]}
+      ]},
+      {id:'RIGHT', label:'RIGHT', sub:'safe • section', children:[
+        {id:'R1', label:'R1', sub:'article', children:[
+          {id:'TGT', label:'TARGET', sub:'button • GOAL', children:[]}
+        ]}
+      ]}
+    ]},
+    trapIds:['LEFT','L1'],
+    winCheck:(log, state)=>{
+      const path=['ROOT','RIGHT','R1','TGT'];
+      const pathOk=path.every(id=>state.listeners[id]?.bubble || state.listeners[id]?.capture);
+      // require at least bubble on RIGHT path
+      const bubOk=['RIGHT','R1','TGT'].every(id=>state.listeners[id]?.bubble);
+      if(!bubOk) return {ok:false, reason:'RIGHT → R1 → TARGET need BUBBLE listeners'};
+      if(!state.flippers['LEFT']?.stop) return {ok:false, reason:'LEFT trap needs STOP-PROP flipper!'};
+      const hadTrap=log.some(e=>e.type==='trap');
+      if(hadTrap) return {ok:false, reason:'Ball hit trap! STOP-PROP not active'};
+      return {ok:true, reason:'Trap blocked, ball reached TARGET!'}
+    }
+  },
+  {
+    id:4, name:'DEFAULT DENIED', sub:'Prevent Default', diff:'★★★',
+    targetId:'TGT',
+    mission:'TARGET has a default action (form submit) that resets the score. Add <b>2 listeners</b> on TARGET (double-tap) and fire <b>PREVENT-DEFAULT</b> flipper to cancel it.',
+    hint:'💡 Double-tap TARGET in LISTEN mode to stack 2 listeners, then add PREVENT-DEFAULT flipper on TARGET.',
+    tree:{id:'ROOT', label:'ROOT', sub:'document', children:[
+      {id:'A', label:'A', sub:'form', children:[
+        {id:'TGT', label:'TARGET', sub:'submit • GOAL', children:[]}
+      ]}
+    ]},
+    trapIds:[],
+    hasDefault:true,
+    winCheck:(log, state)=>{
+      const tgt=state.listeners['TGT'];
+      if(!tgt?.bubble && !tgt?.capture) return {ok:false, reason:'TARGET needs listeners'};
+      if((tgt?.count||0) < 2) return {ok:false, reason:'TARGET needs 2 listeners (double-tap)!'};
+      if(!state.flippers['TGT']?.prevent) return {ok:false, reason:'TARGET needs PREVENT-DEFAULT flipper'};
+      const prevented=log.some(e=>e.type==='prevent');
+      if(!prevented) return {ok:false, reason:'Default not prevented'};
+      return {ok:true, reason:'Default cancelled, double listeners fired!'}
+    }
+  },
+  {
+    id:5, name:'NEON FINALE', sub:'Jackpot', diff:'★★★★',
+    targetId:'TGT',
+    mission:'<b>JACKPOT TABLE:</b> Two traps (TRAP1, TRAP2) guard the jackpot. CAPTURE on ROOT, BUBBLE on MID→M1→TARGET, STOP both traps, PREVENT default on TARGET.',
+    hint:'💡 Combine everything: capture, bubble, stopPropagation ×2, preventDefault. Watch telemetry order!',
+    tree:{id:'ROOT', label:'ROOT', sub:'document', children:[
+      {id:'TRAP1', label:'TRAP1', sub:'TRAP • aside', children:[
+        {id:'T1A', label:'T1A', sub:'trap', children:[]}
+      ]},
+      {id:'MID', label:'MID', sub:'safe • main', children:[
+        {id:'M1', label:'M1', sub:'section', children:[
+          {id:'TGT', label:'TARGET', sub:'JACKPOT • GOAL', children:[]}
+        ]}
+      ]},
+      {id:'TRAP2', label:'TRAP2', sub:'TRAP • nav', children:[
+        {id:'T2A', label:'T2A', sub:'trap', children:[]}
+      ]}
+    ]},
+    trapIds:['TRAP1','T1A','TRAP2','T2A'],
+    hasDefault:true,
+    winCheck:(log, state)=>{
+      if(!state.listeners['ROOT']?.capture) return {ok:false, reason:'ROOT needs CAPTURE'};
+      if(!['MID','M1','TGT'].every(id=>state.listeners[id]?.bubble)) return {ok:false, reason:'MID → M1 → TARGET need BUBBLE'};
+      if(!state.flippers['TRAP1']?.stop || !state.flippers['TRAP2']?.stop) return {ok:false, reason:'Both TRAP1 and TRAP2 need STOP-PROP'};
+      if(!state.flippers['TGT']?.prevent) return {ok:false, reason:'TARGET needs PREVENT-DEFAULT'};
+      if(log.some(e=>e.type==='trap')) return {ok:false, reason:'Ball hit a trap!'};
+      return {ok:true, reason:'JACKPOT! All phases mastered!'}
+    }
+  }
+];
+
+let currentTable = 1;
+let listenerMode = 'bubble'; // capture | bubble
+let flipperMode = 'listen'; // listen | stop | prevent
+let isLaunching = false;
+let appState = {score:0, high:0, unlocked:1, completed:[], tablesState:{}};
+
+function loadState(){
+  try{
+    const s=JSON.parse(localStorage.getItem('neonPinball')||'null');
+    if(s){ appState=s; if(!appState.tablesState) appState.tablesState={}; }
+  }catch(e){}
+  // ensure tablesState entries
+  TABLES.forEach(t=>{
+    if(!appState.tablesState[t.id]) appState.tablesState[t.id]={listeners:{}, flippers:{}};
+  });
+}
+function saveState(){
+  appState.high=Math.max(appState.high, appState.score);
+  localStorage.setItem('neonPinball', JSON.stringify(appState));
+}
+function getTableState(id){
+  if(!appState.tablesState[id]) appState.tablesState[id]={listeners:{}, flippers:{}};
+  return appState.tablesState[id];
+}
+
+function renderNav(){
+  const nav=document.getElementById('tableNav');
+  nav.innerHTML='';
+  TABLES.forEach(t=>{
+    const btn=document.createElement('button');
+    btn.className='tbtn';
+    if(t.id===currentTable) btn.classList.add('active');
+    if(appState.completed.includes(t.id)) btn.classList.add('done');
+    if(t.id>appState.unlocked) btn.classList.add('locked');
+    else if(t.id!==currentTable) btn.classList.add('unlocked');
+    btn.innerHTML=`<span class="num">${t.id}</span>${t.name}<br><small style="font-size:9px;opacity:0.7">${t.diff}</small>`;
+    btn.onclick=()=>{ if(t.id<=appState.unlocked) switchTable(t.id); };
+    nav.appendChild(btn);
+  });
+  document.getElementById('tableVal').textContent=currentTable+' / 5';
+}
+function renderMission(){
+  const t=TABLES[currentTable-1];
+  const m=document.getElementById('mission');
+  m.innerHTML=`<h3>TABLE ${t.id} — ${t.name} <span style="color:var(--muted);font-weight:400">• ${t.sub}</span></h3><p>${t.mission}</p><div class="hint">${t.hint}</div><span class="target-tag">◎ TARGET: ${t.targetId}</span>`;
+}
+function setListenerMode(mode){
+  listenerMode=mode;
+  flipperMode='listen';
+  updateModeUI();
+  toast(mode==='capture' ? '⬇ CAPTURE mode: tap nodes to add capture listeners' : '⬆ BUBBLE mode: tap nodes to add bubble listeners');
+}
+function setFlipperMode(mode){
+  flipperMode=mode;
+  updateModeUI();
+  if(mode==='stop') toast('🛑 STOP-PROP mode: tap a trap node to block propagation');
+  else if(mode==='prevent') toast('⛔ PREVENT-DEFAULT mode: tap TARGET to cancel default');
+  else toast('🎯 LISTEN mode: tap nodes to wire listeners');
+}
+function updateModeUI(){
+  document.getElementById('btnCapture').className='mode-btn'+(flipperMode==='listen' && listenerMode==='capture' ? ' active-capture' : '');
+  document.getElementById('btnBubble').className='mode-btn'+(flipperMode==='listen' && listenerMode==='bubble' ? ' active-bubble' : '');
+  document.getElementById('btnStop').className='mode-btn'+(flipperMode==='stop' ? ' active-stop' : '');
+  document.getElementById('btnPrevent').className='mode-btn'+(flipperMode==='prevent' ? ' active-prevent' : '');
+  document.getElementById('btnListen').className='mode-btn'+(flipperMode==='listen' ? ' active-bubble' : '');
+  document.getElementById('btnListen').style.borderColor = flipperMode==='listen' ? 'var(--neon-green)' : '';
+  document.getElementById('btnListen').style.color = flipperMode==='listen' ? 'var(--neon-green)' : '';
+  document.getElementById('btnListen').style.boxShadow = flipperMode==='listen' ? '0 0 12px rgba(0,255,136,0.3)' : '';
+}
+function findPath(node, targetId, path=[]){
+  path.push(node);
+  if(node.id===targetId) return [...path];
+  for(let c of (node.children||[])){
+    const res=findPath(c, targetId, path);
+    if(res) return res;
+  }
+  path.pop();
+  return null;
+}
+function collectAllNodes(node, arr=[]){
+  arr.push(node);
+  (node.children||[]).forEach(c=>collectAllNodes(c,arr));
+  return arr;
+}
+function renderTree(){
+  const t=TABLES[currentTable-1];
+  const state=getTableState(t.id);
+  const treeEl=document.getElementById('tree');
+  treeEl.innerHTML='';
+  // Build levels via BFS
+  let levels=[];
+  let queue=[{node:t.tree, depth:0}];
+  let maxDepth=0;
+  while(queue.length){
+    const {node, depth}=queue.shift();
+    if(!levels[depth]) levels[depth]=[];
+    levels[depth].push(node);
+    maxDepth=Math.max(maxDepth, depth);
+    (node.children||[]).forEach(c=>queue.push({node:c, depth:depth+1}));
+  }
+  levels.forEach((levelNodes, depth)=>{
+    const levelDiv=document.createElement('div');
+    levelDiv.className='level';
+    levelNodes.forEach(n=>{
+      const isTarget=n.id===t.targetId;
+      const isTrap=t.trapIds.includes(n.id);
+      const isRoot=n.id==='ROOT';
+      const div=document.createElement('div');
+      div.className='node'+(isTarget?' target':'')+(isTrap?' trap':'')+(isRoot?' root':'');
+      div.dataset.id=n.id;
+      const lst=state.listeners[n.id];
+      const flp=state.flippers[n.id];
+      if(lst?.capture) div.classList.add('has-cap');
+      if(lst?.bubble) div.classList.add('has-bub');
+      if(lst?.capture && lst?.bubble) div.classList.add('has-both');
+      if(flp?.stop) div.classList.add('has-stop');
+      if(flp?.prevent) div.classList.add('has-prevent');
+      let badges='';
+      if(lst?.capture) badges+=`<span class="badge cap">CAPTURE</span>`;
+      if(lst?.bubble) badges+=`<span class="badge bub">BUBBLE</span>`;
+      if(lst?.count>1) badges+=`<span class="badge count">×${lst.count}</span>`;
+      if(flp?.stop) badges+=`<span class="badge stop">STOP</span>`;
+      if(flp?.prevent) badges+=`<span class="badge prevent">PREVENT</span>`;
+      div.innerHTML=`<div class="nlabel">${n.label}</div><div class="nsub">${n.sub}</div>${badges?`<div class="badges">${badges}</div>`:''}`;
+      div.onclick=()=>onNodeTap(n.id);
+      levelDiv.appendChild(div);
+    });
+    treeEl.appendChild(levelDiv);
+    if(depth < levels.length-1){
+      const conn=document.createElement('div');
+      conn.className='connector';
+      treeEl.appendChild(conn);
+      // branch lines if next level has multiple nodes
+      if(levels[depth+1].length>1){
+        const bl=document.createElement('div');
+        bl.className='branch-line';
+        levels[depth+1].forEach(()=>{ const i=document.createElement('i'); bl.appendChild(i); });
+        treeEl.appendChild(bl);
+      }
+    }
+  });
+  updateScores();
+}
+function onNodeTap(nodeId){
+  if(isLaunching) return;
+  const t=TABLES[currentTable-1];
+  const state=getTableState(currentTable);
+  if(flipperMode==='stop'){
+    if(!state.flippers[nodeId]) state.flippers[nodeId]={};
+    state.flippers[nodeId].stop=!state.flippers[nodeId].stop;
+    if(state.flippers[nodeId].stop) toast(`🛑 STOP-PROP armed on ${nodeId}`);
+    else toast(`STOP-PROP removed from ${nodeId}`);
+    // if both false clean
+    if(!state.flippers[nodeId].stop && !state.flippers[nodeId].prevent) delete state.flippers[nodeId];
+  } else if(flipperMode==='prevent'){
+    if(!state.flippers[nodeId]) state.flippers[nodeId]={};
+    state.flippers[nodeId].prevent=!state.flippers[nodeId].prevent;
+    if(state.flippers[nodeId].prevent) toast(`⛔ PREVENT-DEFAULT armed on ${nodeId}`);
+    else toast(`PREVENT removed from ${nodeId}`);
+    if(!state.flippers[nodeId].stop && !state.flippers[nodeId].prevent) delete state.flippers[nodeId];
+  } else {
+    // listen mode
+    if(!state.listeners[nodeId]) state.listeners[nodeId]={capture:false,bubble:false,count:0};
+    const lst=state.listeners[nodeId];
+    if(listenerMode==='capture'){
+      lst.capture=!lst.capture;
+      if(lst.capture){ lst.count=(lst.count||0)+1; toast(`⬇ CAPTURE listener added on ${nodeId}`); }
+      else toast(`CAPTURE removed from ${nodeId}`);
+    } else {
+      // bubble: support double-tap stacking for table 4
+      if(lst.bubble){
+        // second tap increments count
+        lst.count=(lst.count||1)+1;
+        if(lst.count>3) lst.count=3;
+        toast(`⬆ BUBBLE listener ×${lst.count} on ${nodeId}`);
+      } else {
+        lst.bubble=true;
+        lst.count=(lst.count||0)+1;
+        if(lst.count<1) lst.count=1;
+        toast(`⬆ BUBBLE listener added on ${nodeId}`);
+      }
+      // allow toggle off on third tap? keep simple: long press to remove? We'll add double-tap to remove via extra logic: if count>=2 and already bubble, next tap removes? Instead we keep stacking, reset will clear.
+      // To allow removal, if user taps again quickly we stack, but we need a way to remove: if they tap capture then bubble? We'll allow removal by tapping same mode again when count==1 -> remove
+      // Actually implement: if already bubble and count==1, second tap stacks to 2, third tap removes
+      if(lst.bubble && lst.count===3){
+        // remove
+        lst.bubble=false; lst.capture=false; lst.count=0;
+        delete state.listeners[nodeId];
+        toast(`Listeners cleared on ${nodeId}`);
+      }
+    }
+    // clean if both false
+    if(lst && !lst.capture && !lst.bubble){
+      delete state.listeners[nodeId];
+    }
+  }
+  saveState();
+  renderTree();
+  renderNav();
+}
+function updateScores(){
+  document.getElementById('scoreVal').textContent=String(appState.score).padStart(4,'0');
+  document.getElementById('highVal').textContent=String(appState.high).padStart(4,'0');
+}
+function clearLog(){
+  document.getElementById('log').innerHTML='';
+}
+function addLog(phase, msg, cls){
+  const log=document.getElementById('log');
+  const div=document.createElement('div');
+  div.className='log-entry '+cls;
+  div.innerHTML=`<span class="phase">${phase}</span><span>${msg}</span>`;
+  log.appendChild(div);
+  log.scrollTop=log.scrollHeight;
+}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function switchTable(id){
+  currentTable=id;
+  renderNav();
+  renderMission();
+  renderTree();
+  clearLog();
+  addLog('SYS', `Table ${id} loaded — ${TABLES[id-1].name}`, 'default');
+  document.getElementById('winOverlayHost').innerHTML='';
+  updateModeUI();
+}
+function resetTable(){
+  appState.tablesState[currentTable]={listeners:{}, flippers:{}};
+  saveState();
+  renderTree();
+  clearLog();
+  addLog('SYS', 'Table reset — rewire nodes', 'default');
+  document.getElementById('winOverlayHost').innerHTML='';
+  toast('Table reset');
+}
+function resetAll(){
+  if(!confirm('Reset all progress and high score?')) return;
+  appState={score:0, high:0, unlocked:1, completed:[], tablesState:{}};
+  TABLES.forEach(t=>appState.tablesState[t.id]={listeners:{}, flippers:{}});
+  saveState();
+  currentTable=1;
+  switchTable(1);
+  renderNav();
+  updateScores();
+  toast('All progress reset');
+}
+
+async function launchBall(){
+  if(isLaunching) return;
+  isLaunching=true;
+  const btn=document.getElementById('launchBtn');
+  btn.classList.add('launching');
+  btn.textContent='● BALL IN PLAY ●';
+  btn.disabled=true;
+  clearLog();
+  const t=TABLES[currentTable-1];
+  const state=getTableState(currentTable);
+  const path=findPath(t.tree, t.targetId);
+  if(!path){ addLog('ERR','No path to target','fail'); isLaunching=false; btn.classList.remove('launching'); btn.textContent='● LAUNCH BALL ●'; btn.disabled=false; return; }
+  const pathIds=path.map(n=>n.id);
+  // Build log entries for animation
+  let entries=[];
+  // Capture phase: root -> target
+  path.forEach(node=>{
+    const lst=state.listeners[node.id];
+    if(lst?.capture){
+      entries.push({phase:'⬇ CAPTURE', msg:`${node.id} captured event`, cls:'capture', nodeId:node.id, type:'capture'});
+    }
+  });
+  // At target: check default
+  if(t.hasDefault){
+    const flp=state.flippers[t.targetId];
+    if(flp?.prevent){
+      entries.push({phase:'⛔ PREVENT', msg:`${t.targetId} preventDefault() — default cancelled`, cls:'prevent', nodeId:t.targetId, type:'prevent'});
+    } else {
+      entries.push({phase:'⚡ DEFAULT', msg:`${t.targetId} defaultAction fired! (form submit)`, cls:'default', nodeId:t.targetId, type:'default'});
+    }
+  }
+  // Bubble phase: target -> root
+  let stopped=false;
+  let stopNode=null;
+  // Check if any trap has stop — if not, inject trap entries
+  let trapBlocked=true;
+  if(t.trapIds.length){
+    // For each trap group, need stop on parent trap
+    // Simplify: need STOP on each top-level trap id that is direct child of root and is trap
+    const topTraps = t.tree.children.filter(c=> t.trapIds.includes(c.id)).map(c=>c.id);
+    for(let trapId of topTraps){
+      if(!state.flippers[trapId]?.stop){
+        trapBlocked=false;
+        entries.splice(1,0,{phase:'💥 TRAP', msg:`Ball diverted to ${trapId} trap!`, cls:'trap', nodeId:trapId, type:'trap'});
+      }
+    }
+  }
+  // Bubble entries
+  for(let i=path.length-1; i>=0; i--){
+    const node=path[i];
+    if(stopped) break;
+    const lst=state.listeners[node.id];
+    // check stopPropagation flipper on this node during bubble
+    const flp=state.flippers[node.id];
+    if(lst?.bubble){
+      // handle multiple listeners (count)
+      const count = lst.count || 1;
+      for(let c=0;c<count;c++){
+        entries.push({phase:'⬆ BUBBLE', msg:`${node.id} bubbled event${count>1?` [listener ${c+1}]`:''}`, cls:'bubble', nodeId:node.id, type:'bubble'});
+      }
+      // if this node has stop flipper, stop after it
+      if(flp?.stop){
+        entries.push({phase:'🛑 STOP', msg:`${node.id} stopPropagation() — propagation halted`, cls:'stop', nodeId:node.id, type:'stop'});
+        stopped=true;
+        stopNode=node.id;
+      }
+    } else {
+      // even if no bubble listener, stop flipper still matters if propagation would pass through?
+      // For teaching, only stop if listener exists
+    }
+  }
+
+  // Animate ball moving along path
+  const playfield=document.getElementById('playfield');
+  // Remove old ball
+  const oldBall=document.getElementById('ball');
+  if(oldBall) oldBall.remove();
+  const ball=document.createElement('div');
+  ball.id='ball';
+  ball.className='ball';
+  playfield.appendChild(ball);
+
+  // Position ball at start (ROOT)
+  function getNodeEl(id){
+    return document.querySelector(`.node[data-id="${id}"]`);
+  }
+  function positionBall(nodeId, isBubble){
+    const el=getNodeEl(nodeId);
+    if(!el) return;
+    const pfRect=playfield.getBoundingClientRect();
+    const elRect=el.getBoundingClientRect();
+    const x = elRect.left + elRect.width/2 - pfRect.left - 9;
+    const y = elRect.top + elRect.height/2 - pfRect.top - 9;
+    ball.style.left=x+'px';
+    ball.style.top=y+'px';
+    ball.className = isBubble ? 'ball' : 'ball trail';
+  }
+  // Highlight helpers
+  function highlight(nodeId, cls){
+    document.querySelectorAll('.node').forEach(n=>{ n.classList.remove('active-cap','active-bub'); });
+    const el=getNodeEl(nodeId);
+    if(el) el.classList.add(cls);
+  }
+
+  // Play entries sequentially
+  let idx=0;
+  // First position at ROOT
+  positionBall(path[0].id, false);
+  await new Promise(r=>setTimeout(r, 300));
+
+  for(let e of entries){
+    highlight(e.nodeId, e.cls==='capture' ? 'active-cap' : e.cls==='bubble' ? 'active-bub' : e.cls==='stop' ? 'active-bub' : e.cls==='prevent' ? 'active-cap' : 'active-bub');
+    positionBall(e.nodeId, e.cls==='bubble' || e.cls==='stop');
+    addLog(e.phase, e.msg, e.cls);
+    // small score tick
+    if(e.cls==='capture' || e.cls==='bubble') appState.score+=10;
+    updateScores();
+    await new Promise(r=>setTimeout(r, 420));
+  }
+
+  // Check win
+  const result=t.winCheck(entries, state);
+  if(result.ok && trapBlocked){
+    // success
+    const bonus = t.id===5 ? 1000 : 500;
+    appState.score+=bonus;
+    if(!appState.completed.includes(t.id)) appState.completed.push(t.id);
+    if(t.id < 5 && appState.unlocked < t.id+1) appState.unlocked = t.id+1;
+    saveState();
+    updateScores();
+    renderNav();
+    addLog('★ WIN', result.reason + ` +${bonus} pts`, 'win');
+    // show overlay
+    const host=document.getElementById('winOverlayHost');
+    host.innerHTML=`<div class="win-overlay"><h2>TABLE ${t.id} CLEARED!</h2><p>${result.reason}</p><p style="color:var(--neon-cyan);font-size:12px;margin-top:6px">Score +${bonus} • High ${appState.high}</p><button onclick="nextTable()">${t.id<5 ? 'NEXT TABLE →' : 'PLAY AGAIN'}</button></div>`;
+    toast(`★ Table ${t.id} cleared! +${bonus}`);
+    // confetti effect via log
+    if(t.id===5){
+      addLog('🏆 JACKPOT', 'You mastered event propagation!', 'win');
+    }
+  } else {
+    const reason = !trapBlocked ? 'Ball hit trap! Add STOP-PROP on trap nodes.' : result.reason;
+    addLog('✖ FAIL', reason, 'fail');
+    toast('✖ '+reason);
+  }
+
+  // cleanup highlight after delay
+  setTimeout(()=>{
+    document.querySelectorAll('.node').forEach(n=>n.classList.remove('active-cap','active-bub'));
+  }, 800);
+
+  isLaunching=false;
+  btn.classList.remove('launching');
+  btn.textContent='● LAUNCH BALL ●';
+  btn.disabled=false;
+  saveState();
+}
+function nextTable(){
+  document.getElementById('winOverlayHost').innerHTML='';
+  if(currentTable < 5){
+    switchTable(currentTable+1);
+  } else {
+    // replay finale
+    clearLog();
+    addLog('SYS','Neon Finale replay — try for higher score!','default');
+  }
+}
+
+// Init
+loadState();
+renderNav();
+renderMission();
+renderTree();
+updateModeUI();
+clearLog();
+addLog('SYS','Welcome to Neon Event Pinball — wire the tree and launch!', 'default');
+addLog('SYS','Capture = ⬇ down to target, Bubble = ⬆ up to root', 'default');
+updateScores();
+</script>
+</body>
+</html>

@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Herd Guide - Lure Rush</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  background:#0c1710;
+  color:#e8f5e9;
+  display:flex;justify-content:center;
+  overscroll-behavior:none;
+  touch-action:none;
+}
+.app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100vh;
+  min-height:100dvh;
+  background:linear-gradient(180deg,#1b3320 0%,#122116 100%);
+  display:flex;flex-direction:column;
+  position:relative;
+  overflow:hidden;
+  border-left:1px solid #2a4a30;
+  border-right:1px solid #2a4a30;
+}
+.header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px 8px;
+  background:rgba(0,0,0,0.25);
+  border-bottom:2px solid #2e5a36;
+  gap:8px;
+}
+.logo{
+  font-weight:900;letter-spacing:0.5px;font-size:18px;line-height:1;
+  text-transform:uppercase;
+}
+.logo span{color:#7ee787}
+.hud{
+  display:flex;gap:8px;flex:1;justify-content:flex-end;
+}
+.hud-box{
+  background:#0f2214;
+  border:1.5px solid #3a6b42;
+  border-radius:12px;
+  padding:6px 10px;
+  min-width:72px;
+  text-align:center;
+}
+.hud-label{font-size:10px;letter-spacing:0.8px;opacity:0.8;text-transform:uppercase;font-weight:700}
+.hud-value{font-size:18px;font-weight:900;line-height:1.1}
+.hud-value.time{color:#ffdf5c}
+.hud-value.score{color:#7ee787}
+.game-wrap{
+  position:relative;
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  background:#14331c;
+  overflow:hidden;
+}
+canvas{
+  display:block;
+  width:100%;
+  height:100%;
+  touch-action:none;
+}
+.overlay{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:20px 18px;
+  background:radial-gradient(ellipse at center, rgba(20,50,28,0.92) 0%, rgba(8,20,12,0.96) 70%);
+  text-align:center;
+  z-index:5;
+}
+.overlay.hidden{display:none}
+.badge{
+  background:#ffdf5c;color:#1a2e05;
+  font-weight:900;font-size:12px;letter-spacing:1px;
+  padding:6px 12px;border-radius:999px;
+  text-transform:uppercase;margin-bottom:12px;
+}
+h1{
+  font-size:32px;line-height:0.95;font-weight:900;
+  text-transform:uppercase;letter-spacing:-0.5px;
+  margin-bottom:8px;
+}
+h1 em{color:#7ee787;font-style:normal}
+.subtitle{
+  font-size:15px;line-height:1.4;opacity:0.9;max-width:320px;margin-bottom:16px;
+}
+.instructions{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+  width:100%;max-width:340px;margin-bottom:18px;
+}
+.inst{
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:14px;padding:10px 10px;
+  text-align:left;
+}
+.inst-icon{font-size:20px;margin-bottom:4px}
+.inst-title{font-weight:800;font-size:13px;margin-bottom:2px}
+.inst-desc{font-size:12px;opacity:0.85;line-height:1.3}
+.btn-primary{
+  appearance:none;border:none;
+  background:linear-gradient(180deg,#7ee787 0%,#4ac26a 100%);
+  color:#0a1a0f;
+  font-weight:900;font-size:18px;letter-spacing:0.5px;
+  padding:16px 28px;border-radius:16px;
+  min-height:56px;min-width:200px;
+  box-shadow:0 6px 0 #2a6b36, 0 8px 20px rgba(0,0,0,0.3);
+  cursor:pointer;
+  text-transform:uppercase;
+  touch-action:manipulation;
+}
+.btn-primary:active{transform:translateY(3px);box-shadow:0 3px 0 #2a6b36}
+.btn-secondary{
+  appearance:none;border:2px solid #4a7a52;
+  background:rgba(255,255,255,0.08);color:#e8f5e9;
+  font-weight:800;font-size:15px;
+  padding:12px 20px;border-radius:12px;
+  min-height:48px;min-width:140px;
+  cursor:pointer;
+}
+.stats-row{
+  display:flex;gap:12px;margin:14px 0 16px;
+}
+.stat{
+  background:#0f2214;border:1.5px solid #3a6b42;border-radius:14px;
+  padding:10px 16px;min-width:90px;
+}
+.stat-label{font-size:11px;opacity:0.7;text-transform:uppercase;letter-spacing:0.6px;font-weight:700}
+.stat-value{font-size:22px;font-weight:900}
+.footer-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px;
+  background:rgba(0,0,0,0.3);
+  border-top:2px solid #2e5a36;
+  gap:10px;
+}
+.legend{display:flex;gap:10px;align-items:center;font-size:12px;font-weight:700}
+.dot{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,0.9);display:inline-block}
+.dot.herd{background:#f5e6c8}
+.dot.stray{background:#ff4d4d}
+.dot.lure{background:#7ee787;box-shadow:0 0 8px #7ee787}
+.hint{font-size:12px;opacity:0.8;text-align:right;line-height:1.3}
+.pause-btn{
+  background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.2);
+  color:#fff;border-radius:12px;padding:8px 12px;font-weight:800;font-size:13px;
+  min-height:44px;min-width:44px;
+}
+.gate-label{
+  position:absolute;bottom:42px;left:50%;transform:translateX(-50%);
+  background:#2ecc71;color:#0a1a0f;font-weight:900;font-size:11px;letter-spacing:1px;
+  padding:4px 10px;border-radius:999px;pointer-events:none;
+  border:2px solid #fff;z-index:2;
+}
+.lure-hint{
+  position:absolute;top:56px;left:50%;transform:translateX(-50%);
+  background:rgba(126,231,135,0.15);border:1px solid rgba(126,231,135,0.5);
+  color:#c8f5cc;font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px;
+  pointer-events:none;z-index:2;backdrop-filter:blur(4px);
+}
+@media (max-height:700px){
+  h1{font-size:26px}
+  .subtitle{font-size:14px;margin-bottom:12px}
+  .instructions{margin-bottom:12px}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="logo">HERD<br><span>GUIDE</span></div>
+    <div class="hud">
+      <div class="hud-box"><div class="hud-label">Score</div><div class="hud-value score" id="scoreEl">0</div></div>
+      <div class="hud-box"><div class="hud-label">Time</div><div class="hud-value time" id="timeEl">45</div></div>
+      <div class="hud-box"><div class="hud-label">Best</div><div class="hud-value" id="bestEl">0</div></div>
+    </div>
+    <button class="pause-btn" id="pauseBtn" aria-label="Pause">⏸</button>
+  </div>
+
+  <div class="game-wrap" id="gameWrap">
+    <canvas id="gameCanvas" width="400" height="640"></canvas>
+    <div class="gate-label">⬇ HOME GATE ⬇</div>
+    <div class="lure-hint" id="lureHint">● DRAG TO MOVE LURE</div>
+
+    <!-- Start Screen -->
+    <div class="overlay" id="startScreen">
+      <div class="badge">⚡ Lure Rush • 45s Challenge</div>
+      <h1>STEER THE<br><em>HERD HOME</em></h1>
+      <p class="subtitle">Slide the glowing lure zone to guide charging animals through the gate. Dodge the red strays!</p>
+      <div class="instructions">
+        <div class="inst"><div class="inst-icon">🧲</div><div class="inst-title">Drag Lure</div><div class="inst-desc">Touch & slide anywhere to move the green lure</div></div>
+        <div class="inst"><div class="inst-icon">🐑</div><div class="inst-title">Herd = +10</div><div class="inst-desc">Cream animals guided through gate score</div></div>
+        <div class="inst"><div class="inst-icon">🐺</div><div class="inst-title">Stray = -5</div><div class="inst-desc">Red strays stun your lure — avoid!</div></div>
+        <div class="inst"><div class="inst-icon">⏱</div><div class="inst-title">Beat Clock</div><div class="inst-desc">45 seconds to save as many as you can</div></div>
+      </div>
+      <button class="btn-primary" id="playBtn">▶ START RUN</button>
+      <p style="margin-top:12px;font-size:12px;opacity:0.7">Tip: Keep lure near gate to funnel the herd</p>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div class="overlay hidden" id="gameOverScreen">
+      <div class="badge" id="resultBadge">🏁 TIME'S UP</div>
+      <h1 id="resultTitle">RUN<br><em>COMPLETE</em></h1>
+      <p class="subtitle" id="resultSubtitle">You guided the herd home!</p>
+      <div class="stats-row">
+        <div class="stat"><div class="stat-label">Score</div><div class="stat-value" id="finalScore">0</div></div>
+        <div class="stat"><div class="stat-label">Saved</div><div class="stat-value" id="finalSaved">0</div></div>
+        <div class="stat"><div class="stat-label">Best</div><div class="stat-value" id="finalBest">0</div></div>
+      </div>
+      <button class="btn-primary" id="replayBtn">↻ PLAY AGAIN</button>
+      <button class="btn-secondary" id="menuBtn" style="margin-top:10px">Menu</button>
+    </div>
+
+    <!-- Pause Screen -->
+    <div class="overlay hidden" id="pauseScreen">
+      <h1>PAUSED</h1>
+      <p class="subtitle">Take a breath, herder</p>
+      <button class="btn-primary" id="resumeBtn">▶ RESUME</button>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <div class="legend">
+      <span><i class="dot herd"></i> Herd</span>
+      <span><i class="dot stray"></i> Stray</span>
+      <span><i class="dot lure"></i> Lure</span>
+    </div>
+    <div class="hint">Drag anywhere<br>to steer</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('gameWrap');
+  const scoreEl = document.getElementById('scoreEl');
+  const timeEl = document.getElementById('timeEl');
+  const bestEl = document.getElementById('bestEl');
+  const startScreen = document.getElementById('startScreen');
+  const gameOverScreen = document.getElementById('gameOverScreen');
+  const pauseScreen = document.getElementById('pauseScreen');
+  const playBtn = document.getElementById('playBtn');
+  const replayBtn = document.getElementById('replayBtn');
+  const menuBtn = document.getElementById('menuBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const resumeBtn = document.getElementById('resumeBtn');
+  const lureHint = document.getElementById('lureHint');
+
+  let W=400, H=640, dpr=1;
+  let score=0, saved=0, timeLeft=45, best=0;
+  let gameState='start'; // start, playing, paused, over
+  let animals=[], particles=[], lureStun=0;
+  let lure={x:200,y:480,tx:200,ty:480,r:48,active:false};
+  let spawnTimer=0, spawnInterval=700;
+  let timerInterval=null;
+  let lastTime=0;
+
+  try{ best = parseInt(localStorage.getItem('herdGuideBest')||'0'); }catch(e){}
+  bestEl.textContent = best;
+
+  function resize(){
+    const rect = wrap.getBoundingClientRect();
+    W = rect.width;
+    H = rect.height;
+    dpr = Math.min(window.devicePixelRatio||1, 2);
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W+'px';
+    canvas.style.height = H+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    // keep lure in bounds
+    lure.x = Math.max(lure.r, Math.min(W-lure.r, lure.x));
+    lure.y = Math.max(80, Math.min(H-60, lure.y));
+    lure.tx = lure.x; lure.ty = lure.y;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const gateW = () => Math.min(160, W*0.42);
+  const gateX = () => W/2 - gateW()/2;
+  const gateY = () => H - 38;
+
+  function resetGame(){
+    score=0; saved=0; timeLeft=45;
+    animals=[]; particles=[]; lureStun=0;
+    lure.x=W/2; lure.y=H*0.62; lure.tx=W/2; lure.ty=H*0.62;
+    spawnTimer=0; spawnInterval=700;
+    scoreEl.textContent='0';
+    timeEl.textContent='45';
+    timeEl.style.color='#ffdf5c';
+  }
+
+  function startGame(){
+    resetGame();
+    gameState='playing';
+    startScreen.classList.add('hidden');
+    gameOverScreen.classList.add('hidden');
+    pauseScreen.classList.add('hidden');
+    lureHint.style.display='block';
+    setTimeout(()=>{ if(gameState==='playing') lureHint.style.display='none'; }, 3000);
+    startTimer();
+    lastTime=performance.now();
+    requestAnimationFrame(loop);
+  }
+
+  function startTimer(){
+    clearInterval(timerInterval);
+    timerInterval = setInterval(()=>{
+      if(gameState!=='playing') return;
+      timeLeft--;
+      timeEl.textContent=timeLeft;
+      if(timeLeft<=10) timeEl.style.color='#ff6b6b';
+      else timeEl.style.color='#ffdf5c';
+      if(timeLeft<=0){
+        timeLeft=0;
+        endGame();
+      }
+    },1000);
+  }
+
+  function endGame(){
+    gameState='over';
+    clearInterval(timerInterval);
+    if(score>best){
+      best=score;
+      try{ localStorage.setItem('herdGuideBest', best); }catch(e){}
+      bestEl.textContent=best;
+    }
+    document.getElementById('finalScore').textContent=score;
+    document.getElementById('finalSaved').textContent=saved;
+    document.getElementById('finalBest').textContent=best;
+    const badge=document.getElementById('resultBadge');
+    const title=document.getElementById('resultTitle');
+    const sub=document.getElementById('resultSubtitle');
+    if(score>=120){ badge.textContent='🏆 LEGENDARY HERDER'; title.innerHTML='INCREDIBLE<br><em>RUN!</em>'; sub.textContent='The herd is safe thanks to you!'; }
+    else if(score>=70){ badge.textContent='⭐ GREAT JOB'; title.innerHTML='WELL<br><em>DONE!</em>'; sub.textContent='Strong guiding — keep it up!'; }
+    else if(score>=30){ badge.textContent='👍 NICE TRY'; title.innerHTML='GOOD<br><em>EFFORT</em>'; sub.textContent='You saved '+saved+' animals!'; }
+    else { badge.textContent='🏁 TIME\'S UP'; title.innerHTML='RUN<br><em>COMPLETE</em>'; sub.textContent='Every animal counts — try again!'; }
+    gameOverScreen.classList.remove('hidden');
+  }
+
+  function togglePause(){
+    if(gameState==='playing'){
+      gameState='paused';
+      pauseScreen.classList.remove('hidden');
+      clearInterval(timerInterval);
+    } else if(gameState==='paused'){
+      gameState='playing';
+      pauseScreen.classList.add('hidden');
+      startTimer();
+      lastTime=performance.now();
+      requestAnimationFrame(loop);
+    }
+  }
+
+  // Input handling - drag anywhere
+  function getPos(e){
+    const rect=canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return {x: (t.clientX - rect.left), y: (t.clientY - rect.top)};
+  }
+  function onPointerDown(e){
+    if(gameState!=='playing') return;
+    e.preventDefault();
+    const p=getPos(e);
+    lure.tx=p.x; lure.ty=p.y; lure.active=true;
+    lureHint.style.display='none';
+  }
+  function onPointerMove(e){
+    if(!lure.active || gameState!=='playing') return;
+    e.preventDefault();
+    const p=getPos(e);
+    lure.tx=p.x; lure.ty=p.y;
+  }
+  function onPointerUp(){
+    lure.active=false;
+  }
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('touchstart', onPointerDown, {passive:false});
+  canvas.addEventListener('touchmove', onPointerMove, {passive:false});
+  window.addEventListener('touchend', onPointerUp);
+
+  // Also allow dragging on whole wrap for larger target
+  wrap.addEventListener('pointerdown', (e)=>{
+    if(e.target.closest('button') || e.target.closest('.overlay')) return;
+    onPointerDown(e);
+  });
+
+  playBtn.addEventListener('click', startGame);
+  replayBtn.addEventListener('click', startGame);
+  menuBtn.addEventListener('click', ()=>{
+    gameState='start';
+    gameOverScreen.classList.add('hidden');
+    pauseScreen.classList.add('hidden');
+    startScreen.classList.remove('hidden');
+    clearInterval(timerInterval);
+  });
+  pauseBtn.addEventListener('click', togglePause);
+  resumeBtn.addEventListener('click', togglePause);
+
+  function spawnAnimal(){
+    const isStray = Math.random() < 0.28;
+    const x = 20 + Math.random()*(W-40);
+    const y = -20 - Math.random()*40;
+    const speed = 0.9 + Math.random()*1.1 + (45-timeLeft)*0.02;
+    animals.push({
+      x, y,
+      vx: (Math.random()-0.5)*0.8,
+      vy: speed,
+      type: isStray ? 'stray' : 'herd',
+      r: isStray ? 16 : 14,
+      wobble: Math.random()*Math.PI*2,
+      wobbleSpeed: 0.08 + Math.random()*0.06,
+      rotation: 0
+    });
+  }
+
+  function addParticles(x,y,color,count=8){
+    for(let i=0;i<count;i++){
+      particles.push({
+        x, y,
+        vx:(Math.random()-0.5)*6,
+        vy:(Math.random()-0.5)*6 -1,
+        life:1, decay:0.04+Math.random()*0.03,
+        r:2+Math.random()*3,
+        color
+      });
+    }
+  }
+
+  function update(dt){
+    // lure follow with easing, stunned slows
+    const ease = lureStun>0 ? 0.04 : 0.18;
+    lure.x += (lure.tx - lure.x)*ease;
+    lure.y += (lure.ty - lure.y)*ease;
+    // clamp
+    lure.x = Math.max(lure.r*0.6, Math.min(W - lure.r*0.6, lure.x));
+    lure.y = Math.max(70, Math.min(H-50, lure.y));
+    if(lureStun>0) lureStun -= dt;
+
+    // spawn
+    spawnTimer += dt;
+    // difficulty ramp
+    spawnInterval = Math.max(380, 700 - (45-timeLeft)*8);
+    if(spawnTimer > spawnInterval){
+      spawnTimer=0;
+      spawnAnimal();
+      if(Math.random()<0.35) spawnAnimal(); // double spawn sometimes
+    }
+
+    // update animals
+    const gx=gateX(), gw=gateW(), gy=gateY();
+    for(let i=animals.length-1;i>=0;i--){
+      const a=animals[i];
+      a.wobble += a.wobbleSpeed;
+      // attraction to lure
+      const dx = lure.x - a.x;
+      const dy = lure.y - a.y;
+      const dist = Math.hypot(dx,dy);
+      const attractRadius = 170;
+      if(dist < attractRadius && dist>5){
+        const force = (1 - dist/attractRadius) * (a.type==='herd' ? 0.14 : 0.07);
+        // strays less attracted, more erratic
+        if(a.type==='stray' && Math.random()<0.02) {
+          a.vx += (Math.random()-0.5)*1.2;
+        } else {
+          a.vx += (dx/dist)*force * (dt/16);
+          a.vy += (dy/dist)*force * (dt/16);
+        }
+      }
+      // base drift + wobble
+      a.vx += Math.sin(a.wobble)*0.015;
+      a.vy += 0.015;
+      // friction
+      a.vx *= 0.985;
+      a.vy = Math.min(a.vy, 3.2);
+      a.vx = Math.max(-2.5, Math.min(2.5, a.vx));
+      a.x += a.vx * (dt/16);
+      a.y += a.vy * (dt/16);
+      a.rotation = Math.atan2(a.vy, a.vx);
+
+      // wall bounce
+      if(a.x < a.r){ a.x=a.r; a.vx*=-0.6; }
+      if(a.x > W-a.r){ a.x=W-a.r; a.vx*=-0.6; }
+
+      // check gate scoring
+      if(a.y > gy - 6 && a.y < gy + 22){
+        if(a.x > gx && a.x < gx+gw){
+          // through gate
+          if(a.type==='herd'){
+            score+=10; saved++;
+            scoreEl.textContent=score;
+            addParticles(a.x, gy, '#7ee787', 10);
+            // haptic
+            if(navigator.vibrate) navigator.vibrate(30);
+          } else {
+            score=Math.max(0, score-5);
+            scoreEl.textContent=score;
+            addParticles(a.x, gy, '#ff4d4d', 8);
+            lureStun=900;
+            if(navigator.vibrate) navigator.vibrate([40,30,40]);
+          }
+          animals.splice(i,1);
+          continue;
+        }
+      }
+      // missed - off bottom outside gate
+      if(a.y > H+30){
+        animals.splice(i,1);
+        continue;
+      }
+      // stray collision with lure stuns
+      if(a.type==='stray' && dist < lure.r*0.7 + a.r){
+        lureStun=800;
+        score=Math.max(0, score-2);
+        scoreEl.textContent=score;
+        addParticles(lure.x, lure.y, '#ff6b6b', 6);
+        // knock stray away
+        a.vx += (a.x - lure.x)*0.08;
+        a.vy -= 1.2;
+        if(navigator.vibrate) navigator.vibrate(50);
+      }
+    }
+
+    // particles
+    for(let i=particles.length-1;i>=0;i--){
+      const p=particles[i];
+      p.x+=p.vx*(dt/16); p.y+=p.vy*(dt/16);
+      p.vy+=0.18;
+      p.vx*=0.98;
+      p.life-=p.decay*(dt/16);
+      if(p.life<=0) particles.splice(i,1);
+    }
+  }
+
+  function draw(){
+    // background field
+    ctx.clearRect(0,0,W,H);
+    // grass
+    const grad=ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0,'#1a4a24');
+    grad.addColorStop(0.5,'#14331c');
+    grad.addColorStop(1,'#0f2a14');
+    ctx.fillStyle=grad;
+    ctx.fillRect(0,0,W,H);
+    // field lines
+    ctx.strokeStyle='rgba(255,255,255,0.06)';
+    ctx.lineWidth=1;
+    for(let y=80;y<H;y+=40){
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    }
+    for(let x=0;x<W;x+=40){
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+    // side fences
+    ctx.fillStyle='#2b1d0e';
+    ctx.fillRect(0,0,8,H);
+    ctx.fillRect(W-8,0,8,H);
+    ctx.fillStyle='#3d2b16';
+    for(let y=20;y<H;y+=28){
+      ctx.fillRect(0,y,8,14);
+      ctx.fillRect(W-8,y,8,14);
+    }
+    // gate area
+    const gx=gateX(), gw=gateW(), gy=gateY();
+    // gate glow
+    ctx.fillStyle='rgba(46,204,113,0.18)';
+    ctx.fillRect(gx-10, gy-30, gw+20, 50);
+    // gate posts
+    ctx.fillStyle='#f5e6c8';
+    ctx.fillRect(gx-6, gy-18, 6, 36);
+    ctx.fillRect(gx+gw, gy-18, 6, 36);
+    // gate bar
+    ctx.fillStyle='#2ecc71';
+    ctx.fillRect(gx, gy, gw, 10);
+    ctx.fillStyle='#fff';
+    ctx.fillRect(gx, gy+4, gw, 2);
+    // gate opening shadow
+    ctx.fillStyle='rgba(0,0,0,0.35)';
+    ctx.fillRect(gx, gy+10, gw, 28);
+
+    // lure zone
+    const lureAlpha = lureStun>0 ? 0.35 : 1;
+    ctx.globalAlpha=lureAlpha;
+    // outer pulse
+    const pulse = (Date.now()%1000)/1000;
+    ctx.beginPath();
+    ctx.arc(lure.x, lure.y, lure.r + pulse*10, 0, Math.PI*2);
+    ctx.fillStyle='rgba(126,231,135,0.12)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(lure.x, lure.y, lure.r, 0, Math.PI*2);
+    ctx.fillStyle= lureStun>0 ? 'rgba(255,80,80,0.22)' : 'rgba(126,231,135,0.22)';
+    ctx.fill();
+    ctx.strokeStyle= lureStun>0 ? 'rgba(255,80,80,0.9)' : 'rgba(126,231,135,0.95)';
+    ctx.lineWidth=2.5;
+    ctx.setLineDash(lureStun>0 ? [6,6] : []);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // inner dot
+    ctx.beginPath();
+    ctx.arc(lure.x, lure.y, 7, 0, Math.PI*2);
+    ctx.fillStyle= lureStun>0 ? '#ff6b6b' : '#7ee787';
+    ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+    // lure icon
+    ctx.fillStyle='#0a1a0f';
+    ctx.font='bold 10px system-ui';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(lureStun>0 ? '!' : 'LURE', lure.x, lure.y+0.5);
+    ctx.globalAlpha=1;
+
+    // animals
+    animals.forEach(a=>{
+      ctx.save();
+      ctx.translate(a.x, a.y);
+      ctx.rotate(a.rotation*0.15);
+      if(a.type==='herd'){
+        // shadow
+        ctx.fillStyle='rgba(0,0,0,0.25)';
+        ctx.beginPath(); ctx.ellipse(0,6, a.r*0.9, a.r*0.5, 0,0,Math.PI*2); ctx.fill();
+        // body
+        ctx.fillStyle='#f5e6c8';
+        ctx.beginPath(); ctx.ellipse(0,0, a.r, a.r*0.85, 0,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle='#d8c9a8'; ctx.lineWidth=1.2; ctx.stroke();
+        // head
+        ctx.fillStyle='#f5e6c8';
+        ctx.beginPath(); ctx.ellipse(a.r*0.55, -2, 7,6, 0,0,Math.PI*2); ctx.fill();
+        // ears
+        ctx.fillStyle='#c9b896';
+        ctx.beginPath(); ctx.ellipse(a.r*0.5, -7, 3,2, -0.3,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(a.r*0.5, 3, 3,2, 0.3,0,Math.PI*2); ctx.fill();
+        // face
+        ctx.fillStyle='#3d2b16';
+        ctx.beginPath(); ctx.arc(a.r*0.75, -2, 1.2,0,Math.PI*2); ctx.fill();
+        // wool texture
+        ctx.fillStyle='rgba(0,0,0,0.06)';
+        ctx.beginPath(); ctx.arc(-2,-3,2,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(2,2,1.5,0,Math.PI*2); ctx.fill();
+      } else {
+        // stray - wolf/coyote
+        ctx.fillStyle='rgba(0,0,0,0.3)';
+        ctx.beginPath(); ctx.ellipse(0,7, a.r*0.9, a.r*0.45,0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#c0392b';
+        ctx.beginPath(); ctx.ellipse(0,0, a.r, a.r*0.8,0,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle='#7a1f16'; ctx.lineWidth=1.3; ctx.stroke();
+        // snout
+        ctx.fillStyle='#e74c3c';
+        ctx.beginPath(); ctx.ellipse(a.r*0.6,0,6,5,0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#1a0a08';
+        ctx.beginPath(); ctx.arc(a.r*0.85,0,1.8,0,Math.PI*2); ctx.fill();
+        // ears pointy
+        ctx.fillStyle='#7a1f16';
+        ctx.beginPath(); ctx.moveTo(a.r*0.2,-8); ctx.lineTo(a.r*0.0,-13); ctx.lineTo(a.r*0.5,-9); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(a.r*0.2,8); ctx.lineTo(a.r*0.0,13); ctx.lineTo(a.r*0.5,9); ctx.fill();
+        // eyes
+        ctx.fillStyle='#ffdf5c';
+        ctx.beginPath(); ctx.arc(a.r*0.3,-4,1.6,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(a.r*0.3,4,1.6,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(a.r*0.35,-4,0.7,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(a.r*0.35,4,0.7,0,Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    });
+
+    // particles
+    particles.forEach(p=>{
+      ctx.globalAlpha=Math.max(0,p.life);
+      ctx.fillStyle=p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha=1;
+
+    // top vignette
+    const vg=ctx.createLinearGradient(0,0,0,80);
+    vg.addColorStop(0,'rgba(0,0,0,0.35)'); vg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=vg; ctx.fillRect(0,0,W,80);
+  }
+
+  function loop(now){
+    if(gameState!=='playing') return;
+    const dt = Math.min(32, now - lastTime);
+    lastTime=now;
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // initial draw
+  draw();
+  // draw idle animals for start screen preview
+  function idleDraw(){
+    if(gameState!=='start') return;
+    draw();
+    requestAnimationFrame(idleDraw);
+  }
+  idleDraw();
+
+  // keyboard for testing
+  window.addEventListener('keydown', e=>{
+    if(e.code==='Space'){
+      if(gameState==='start') startGame();
+      else if(gameState==='playing') togglePause();
+      else if(gameState==='paused') togglePause();
+    }
+  });
+})();
+</script>
+</body>
+</html>
+

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Rope Walk</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;touch-action:none;user-select:none;font-family:system-ui,sans-serif}
+body{background:#020617;color:#fff;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:6px}
+h1{font-size:17px;color:#7dd3fc;margin:6px 0 2px;letter-spacing:1px}
+.sub{font-size:11px;opacity:.6;margin-bottom:6px;text-align:center}
+#wrap{position:relative;width:360px;max-width:95vw;height:560px;background:linear-gradient(180deg,#0f172a 0%,#1e3a5f 45%,#334155 100%);border-radius:16px;overflow:hidden;border:2px solid #334155;box-shadow:0 8px 32px rgba(0,0,0,.6)}
+canvas{display:block;width:100%;height:100%}
+#ui{position:absolute;top:0;left:0;right:0;padding:8px;display:flex;justify-content:space-between;gap:6px;pointer-events:none}
+.pill{background:rgba(0,0,0,.6);backdrop-filter:blur(6px);padding:6px 10px;border-radius:10px;font-size:11px;border:1px solid rgba(255,255,255,.15);text-align:center;min-width:62px}
+.pill b{color:#fde047}
+#balanceWrap{position:absolute;bottom:90px;left:12px;right:12px;height:18px;background:rgba(0,0,0,.5);border-radius:10px;border:2px solid rgba(255,255,255,.2);overflow:hidden;pointer-events:none}
+#balanceBar{position:absolute;top:0;bottom:0;width:4px;background:#22c55e;left:50%;transform:translateX(-50%);transition:background .2s}
+#balanceFill{position:absolute;top:0;bottom:0;background:linear-gradient(90deg,#ef4444,#fde047,#22c55e,#fde047,#ef4444);opacity:.5;left:0;right:0}
+#balanceCenter{position:absolute;top:0;bottom:0;left:50%;width:2px;background:#fff;transform:translateX(-50%)}
+#windInd{position:absolute;top:58px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.6);padding:6px 12px;border-radius:20px;font-size:12px;border:1px solid rgba(255,255,255,.15);pointer-events:none;display:flex;align-items:center;gap:6px}
+#controls{position:absolute;bottom:0;left:0;right:0;height:80px;display:flex;gap:8px;padding:8px;background:linear-gradient(0deg,rgba(0,0,0,.6),transparent);pointer-events:auto}
+.cbtn{flex:1;border-radius:14px;border:2px solid rgba(255,255,255,.25);background:rgba(255,255,255,.15);color:#fff;font-weight:800;font-size:20px;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.cbtn:active{transform:scale(.97);background:rgba(255,255,255,.3)}
+.cbtn.step{background:rgba(34,197,94,.35);border-color:#22c55e}
+#overlay{position:absolute;inset:0;background:rgba(2,6,23,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;z-index:10}
+#overlay h2{font-size:22px;color:#7dd3fc;margin-bottom:6px}
+#overlay p{font-size:13px;opacity:.9;line-height:1.5;max-width:300px}
+.btn{margin-top:14px;background:#0ea5e9;color:#fff;border:none;padding:12px 24px;border-radius:12px;font-weight:800;font-size:15px}
+.btn:active{transform:scale(.97)}
+</style>
+</head>
+<body>
+<h1>🎪 ROPE WALK</h1>
+<div class="sub">Nudge balance • Step steadily • Grab bonuses • Don't fall!</div>
+<div id="wrap">
+<canvas id="c" width="360" height="560"></canvas>
+<div id="ui">
+<div class="pill">DISTANCE<br><b id="distEl">0 m</b></div>
+<div class="pill">BONUS<br><b id="bonusEl">0</b></div>
+<div class="pill">BEST<br><b id="bestEl">0 m</b></div>
+</div>
+<div id="windInd">💨 <span id="windText">Calm</span> <span id="windArrow">→</span></div>
+<div id="balanceWrap"><div id="balanceFill"></div><div id="balanceBar"></div><div id="balanceCenter"></div></div>
+<div id="controls">
+<button class="cbtn" id="leftBtn">◀</button>
+<button class="cbtn step" id="stepBtn">👣 STEP</button>
+<button class="cbtn" id="rightBtn">▶</button>
+</div>
+<div id="overlay">
+<div style="font-size:36px">🎪</div>
+<h2>High Rope Walk</h2>
+<p>Cross the high rope while <b style="color:#7dd3fc">gusts push you sideways</b>!<br>
+<b>◀ ▶</b> or <b>tilt/drag</b> to nudge balance back to center.<br>
+Tap <b style="color:#22c55e">👣 STEP</b> steadily — rushing wobbles you!<br>
+Grab <b style="color:#fde047">⭐ bonuses</b> for extra points.</p>
+<p style="font-size:11px;opacity:.6;margin-top:8px">Wind gets stronger every 100m • Stay centered to survive</p>
+<button class="btn" id="playBtn">WALK THE ROPE 🎪</button>
+</div>
+</div>
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+const distEl=document.getElementById('distEl'),bonusEl=document.getElementById('bonusEl'),bestEl=document.getElementById('bestEl');
+const windText=document.getElementById('windText'),windArrow=document.getElementById('windArrow');
+const balanceBar=document.getElementById('balanceBar'),overlay=document.getElementById('overlay'),playBtn=document.getElementById('playBtn');
+const leftBtn=document.getElementById('leftBtn'),rightBtn=document.getElementById('rightBtn'),stepBtn=document.getElementById('stepBtn');
+let best=parseInt(localStorage.getItem('ropeBest')||'0');bestEl.textContent=best+'m';
+let running=false,balance=0,balanceVel=0,distance=0,bonus=0,windForce=0,windDir=1,windTimer=0,stepCooldown=0,falling=false,fallY=0;
+let bonuses=[],particles=[],keys={left:false,right:false},tilt=0,lastTime=0,level=1;
+
+function reset(){
+  balance=0;balanceVel=0;distance=0;bonus=0;windForce=0;windDir=1;windTimer=0;stepCooldown=0;falling=false;fallY=0;level=1;
+  bonuses=[];particles=[];
+  for(let i=0;i<5;i++) bonuses.push({x: (Math.random()-0.5)*0.6, dist: 20+i*30+Math.random()*20, collected:false});
+  distEl.textContent='0m';bonusEl.textContent='0';
+  windText.textContent='Calm';windArrow.textContent='→';
+}
+
+function spawnBonus(dist){
+  bonuses.push({x:(Math.random()-0.5)*0.7, dist: dist+40+Math.random()*30, collected:false});
+}
+
+function update(dt){
+  if(!running) return;
+  if(falling){
+    fallY+=400*dt;
+    if(fallY>600) gameOver();
+    return;
+  }
+  // wind gusts
+  windTimer-=dt;
+  if(windTimer<=0){
+    windTimer=1.2+Math.random()*1.8;
+    // stronger wind with distance
+    let strength=0.8 + distance*0.008 + level*0.3;
+    windForce=(Math.random()-0.5)*strength;
+    windDir=windForce>0?1:-1;
+    if(Math.abs(windForce)>1.2){
+      windText.textContent=Math.abs(windForce)>2?'GALE!':Math.abs(windForce)>1.5?'Strong Gust':'Gust';
+      windArrow.textContent=windDir>0?'→→':'←←';
+      windArrow.style.color=windDir>0?'#f87171':'#7dd3fc';
+    } else {
+      windText.textContent='Breeze';
+      windArrow.textContent=windDir>0?'→':'←';
+      windArrow.style.color='#fff';
+    }
+    // level up every 100m
+    level=Math.floor(distance/100)+1;
+  }
+  // apply wind to balance
+  balanceVel+=windForce*dt*1.2;
+  // player input
+  let input=0;
+  if(keys.left) input-=1;
+  if(keys.right) input+=1;
+  input+=tilt*1.2;
+  balanceVel+=input*dt*8;
+  // friction/damping - harder when walking fast
+  balanceVel*=0.92;
+  balance+=balanceVel*dt*1.5;
+  // clamp and check fall
+  if(Math.abs(balance)>1){
+    falling=true;fallY=0;
+    if(navigator.vibrate) navigator.vibrate([80,40,80]);
+  }
+  // balance bar visual
+  let pct=(balance+1)/2*100;
+  balanceBar.style.left=pct+'%';
+  if(Math.abs(balance)>0.7) balanceBar.style.background='#ef4444';
+  else if(Math.abs(balance)>0.4) balanceBar.style.background='#fde047';
+  else balanceBar.style.background='#22c55e';
+
+  // stepping
+  stepCooldown-=dt;
+  // auto slow drift forward if balanced
+  if(Math.abs(balance)<0.3 && stepCooldown<=0){
+    distance+=dt*4; // slow auto
+  }
+
+  // bonuses
+  bonuses.forEach(b=>{
+    if(b.collected) return;
+    if(Math.abs(distance - b.dist)<2 && Math.abs(balance - b.x)<0.25){
+      b.collected=true;bonus+=10;
+      bonusEl.textContent=bonus;
+      for(let k=0;k<8;k++) particles.push({x:180+b.x*80,y:280, vx:(Math.random()-0.5)*80, vy:(Math.random()-0.5)*80, life:0.5,max:0.5,color:'#fde047'});
+      if(navigator.vibrate) navigator.vibrate(20);
+    }
+  });
+  // spawn new bonuses
+  let maxDist=Math.max(...bonuses.map(b=>b.dist),0);
+  if(distance+80>maxDist) spawnBonus(maxDist);
+  // cleanup old
+  bonuses=bonuses.filter(b=> b.dist > distance-20);
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    let p=particles[i];
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=120*dt; p.life-=dt;
+    if(p.life<=0) particles.splice(i,1);
+  }
+
+  distEl.textContent=Math.floor(distance)+'m';
+}
+
+function doStep(){
+  if(!running||falling) return;
+  if(stepCooldown>0) {
+    // rushing penalty
+    balanceVel+=(Math.random()-0.5)*2;
+    return;
+  }
+  // step adds distance, but wobbles if not centered
+  let wobble=Math.abs(balance)*0.8;
+  balanceVel+=(Math.random()-0.5)*wobble;
+  distance+=3+Math.random()*2;
+  stepCooldown=0.25;
+  // footstep particles
+  particles.push({x:180,y:320, vx:(Math.random()-0.5)*20, vy:-20, life:0.3,max:0.3,color:'#fff'});
+  if(navigator.vibrate) navigator.vibrate(10);
+}
+
+function draw(){
+  ctx.clearRect(0,0,360,560);
+  // sky
+  let grad=ctx.createLinearGradient(0,0,0,560);
+  grad.addColorStop(0,'#0f172a');grad.addColorStop(0.5,'#1e3a5f');grad.addColorStop(1,'#475569');
+  ctx.fillStyle=grad;ctx.fillRect(0,0,360,560);
+  // distant city
+  ctx.fillStyle='rgba(0,0,0,0.3)';
+  for(let i=0;i<12;i++){
+    let x=i*32, h=40+Math.sin(i*1.3)*20;
+    ctx.fillRect(x, 380-h, 22, h);
+    ctx.fillStyle='rgba(253,224,71,0.6)';
+    if(i%2===0) ctx.fillRect(x+6,380-h+8,4,4);
+    ctx.fillStyle='rgba(0,0,0,0.3)';
+  }
+  // rope perspective
+  ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;
+  for(let i=0;i<8;i++){
+    let y=360+i*18;
+    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(360,y);ctx.stroke();
+  }
+  // main rope
+  ctx.strokeStyle='#e2e8f0';ctx.lineWidth=4;ctx.beginPath();
+  ctx.moveTo(0,360);ctx.lineTo(360,360);ctx.stroke();
+  ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.beginPath();
+  ctx.moveTo(0,360);ctx.lineTo(360,360);ctx.stroke();
+
+  // wind lines
+  if(Math.abs(windForce)>0.5){
+    ctx.strokeStyle=windDir>0?'rgba(125,211,252,0.4)':'rgba(248,113,113,0.4)';
+    ctx.lineWidth=2;
+    for(let i=0;i<3;i++){
+      let y=200+ i*40 + (Date.now()*0.2)%40;
+      let xoff=(Date.now()*0.3*windDir)%360;
+      ctx.beginPath();
+      ctx.moveTo((xoff+360)%360, y);
+      ctx.lineTo((xoff+20*windDir+360)%360, y);
+      ctx.stroke();
+    }
+  }
+
+  // bonuses on rope
+  bonuses.forEach(b=>{
+    if(b.collected) return;
+    let rel=b.dist - distance;
+    if(rel<-10||rel>80) return;
+    let y=360 - rel*2; // perspective: further = higher
+    let x=180 + b.x*80 * (1 - rel*0.005);
+    let scale=1 - rel*0.008;
+    if(scale<0.3) scale=0.3;
+    ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);
+    ctx.fillStyle='#fde047';ctx.font='18px system-ui';ctx.textAlign='center';
+    ctx.fillText('⭐',0,6);
+    ctx.restore();
+  });
+
+  // player
+  let px=180 + balance*80;
+  let py=falling? 360+fallY : 360;
+  ctx.save();
+  ctx.translate(px,py);
+  if(falling) ctx.rotate(fallY*0.02);
+  // pole
+  ctx.strokeStyle='#fbbf24';ctx.lineWidth=6;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(-50,-18);ctx.lineTo(50,-18);ctx.stroke();
+  ctx.fillStyle='#92400e';ctx.beginPath();ctx.arc(-50,-18,5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(50,-18,5,0,Math.PI*2);ctx.fill();
+  // legs on rope
+  ctx.strokeStyle='#1e293b';ctx.lineWidth=4;
+  ctx.beginPath();ctx.moveTo(-6,0);ctx.lineTo(-4,12);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(6,0);ctx.lineTo(4,12);ctx.stroke();
+  // body
+  ctx.fillStyle='#0ea5e9';ctx.beginPath();ctx.roundRect(-10,-28,20,28,6);ctx.fill();
+  // arms holding pole
+  ctx.fillStyle='#fde68a';
+  ctx.beginPath();ctx.ellipse(-12,-18,6,4,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(12,-18,6,4,0,0,Math.PI*2);ctx.fill();
+  // head
+  ctx.fillStyle='#fde68a';ctx.beginPath();ctx.arc(0,-32,10,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#0f172a';ctx.beginPath();ctx.arc(-3,-32,1.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(3,-32,1.5,0,Math.PI*2);ctx.fill();
+  // hat
+  ctx.fillStyle='#ef4444';ctx.beginPath();ctx.arc(0,-38,10,Math.PI,0);ctx.fill();
+  ctx.restore();
+
+  // particles
+  particles.forEach(p=>{
+    ctx.globalAlpha=p.life/p.max;
+    ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // distance markers
+  ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='10px system-ui';ctx.textAlign='center';
+  for(let d=Math.floor(distance/10)*10; d<distance+80; d+=10){
+    let rel=d-distance;
+    if(rel<0||rel>80) continue;
+    let y=360 - rel*2;
+    ctx.fillText(d+'m', 30, y+3);
+  }
+}
+
+function gameOver(){
+  running=false;
+  let total=Math.floor(distance)+bonus;
+  if(total>best){best=total;localStorage.setItem('ropeBest',best);bestEl.textContent=best+'m';}
+  overlay.innerHTML=`<div style="font-size:36px">💥</div><h2>Fell!</h2><p>Distance: <b style="color:#7dd3fc">${Math.floor(distance)}m</b> + Bonus ${bonus} = <b style="color:#fde047">${total}m</b><br>Best: ${best}m • Level ${level} wind</p><button class="btn" id="againBtn" style="margin-top:14px">WALK AGAIN 🎪</button>`;
+  overlay.style.display='flex';
+  document.getElementById('againBtn').onclick=startGame;
+}
+
+function startGame(){
+  reset();running=true;overlay.style.display='none';lastTime=0;requestAnimationFrame(loop);
+}
+
+function loop(t){
+  if(!lastTime) lastTime=t;
+  let dt=Math.min(0.033,(t-lastTime)/1000);
+  lastTime=t;
+  update(dt);draw();
+  if(running) requestAnimationFrame(loop);
+}
+
+// controls
+leftBtn.addEventListener('touchstart',e=>{e.preventDefault();keys.left=true});
+leftBtn.addEventListener('touchend',e=>{e.preventDefault();keys.left=false});
+leftBtn.addEventListener('mousedown',()=>keys.left=true);
+leftBtn.addEventListener('mouseup',()=>keys.left=false);
+leftBtn.addEventListener('mouseleave',()=>keys.left=false);
+rightBtn.addEventListener('touchstart',e=>{e.preventDefault();keys.right=true});
+rightBtn.addEventListener('touchend',e=>{e.preventDefault();keys.right=false});
+rightBtn.addEventListener('mousedown',()=>keys.right=true);
+rightBtn.addEventListener('mouseup',()=>keys.right=false);
+rightBtn.addEventListener('mouseleave',()=>keys.right=false);
+stepBtn.addEventListener('touchstart',e=>{e.preventDefault();doStep()});
+stepBtn.addEventListener('mousedown',doStep);
+canvas.addEventListener('pointerdown',e=>{
+  let r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*360;
+  if(x<120) keys.left=true; else if(x>240) keys.right=true; else doStep();
+});
+canvas.addEventListener('pointerup',()=>{keys.left=false;keys.right=false});
+canvas.addEventListener('pointercancel',()=>{keys.left=false;keys.right=false});
+addEventListener('keydown',e=>{
+  if(e.code==='ArrowLeft'||e.code==='KeyA') keys.left=true;
+  if(e.code==='ArrowRight'||e.code==='KeyD') keys.right=true;
+  if(e.code==='Space'||e.code==='ArrowUp'){e.preventDefault();doStep();}
+});
+addEventListener('keyup',e=>{
+  if(e.code==='ArrowLeft'||e.code==='KeyA') keys.left=false;
+  if(e.code==='ArrowRight'||e.code==='KeyD') keys.right=false;
+});
+if(window.DeviceOrientationEvent){
+  window.addEventListener('deviceorientation',e=>{
+    if(e.gamma!==null) tilt=Math.max(-1,Math.min(1,e.gamma/20));
+  });
+}
+
+playBtn.onclick=startGame;
+draw();
+</script>
+</body>
+</html>
