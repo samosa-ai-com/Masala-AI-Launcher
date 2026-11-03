@@ -29,6 +29,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -304,14 +307,20 @@ private fun MediaNote(note: String) {
 @Composable
 private fun TimerRow(component: WidgetComponent.Timer, widgetId: String, storage: Map<String, String>, source: WidgetSource, showLabel: Boolean = true) {
     val deadline = storage[component.key]?.toLongOrNull()
-    val now = System.currentTimeMillis()
-    val left = if (deadline == null) null else (deadline - now).coerceAtLeast(0)
-    // While running, the line ticks once a second; a finished timer goes quiet.
-    if (left != null && left > 0) {
-        LaunchedEffect(deadline) {
-            delay(left.coerceAtMost(3_600_000L))
+    // The shown time has to be state, not a clock read: composition only redraws when state
+    // changes, so a bare System.currentTimeMillis() left the digits frozen until something else
+    // refreshed the card (seen as a half-minute jump). The effect below advances it every second
+    // while the timer runs, and settles once it is done.
+    var now by remember(deadline) { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(deadline) {
+        if (deadline == null) return@LaunchedEffect
+        while (deadline > System.currentTimeMillis()) {
+            now = System.currentTimeMillis()
+            delay(1_000)
         }
+        now = System.currentTimeMillis()
     }
+    val left = if (deadline == null) null else (deadline - now).coerceAtLeast(0)
     val running = left != null && left > 0
     // The time as the card's hero, the action as one round accent button beside it.
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
