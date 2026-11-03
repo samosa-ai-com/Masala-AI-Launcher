@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Gavel Duel</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f0e1a;--card:#1c1b2e;--card2:#25243d;--gold:#f5c542;--gold2:#e8a317;--teal:#2ec4b6;--rose:#ff5a79;--muted:#9aa0b8;--line:#2e2d4a}
+html,body{background:var(--bg);color:#fff;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow-x:hidden}
+body{max-width:428px;margin:0 auto;min-height:100vh;position:relative}
+button{font-family:inherit}
+.topbar{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,#1a1930 0%,#141326 100%);border-bottom:1px solid var(--line);padding:10px 12px 8px}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand h1{font-size:18px;letter-spacing:0.5px;font-weight:900;line-height:1}
+.brand h1 span{color:var(--gold)}
+.brand p{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+.iconBtn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:#fff;display:grid;place-items:center;font-size:16px;cursor:pointer}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 10px;text-align:center}
+.stat label{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block}
+.stat strong{font-size:16px;font-weight:800;display:block;margin-top:2px}
+.stat.purse strong{color:var(--gold)}
+.stat.profit strong{color:var(--teal)}
+.stat.lot strong{color:#fff}
+.progress{height:6px;background:#1a1930;border-radius:999px;overflow:hidden;margin-top:10px;border:1px solid var(--line)}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));width:0%;transition:width .4s}
+.wrap{padding:12px 12px 18px}
+.lotCard{background:linear-gradient(180deg,#23224a 0%,#1c1b2e 100%);border:1px solid var(--line);border-radius:20px;overflow:hidden;position:relative}
+.lotImage{height:148px;background:radial-gradient(600px 200px at 50% 0%,rgba(245,197,66,.25),transparent 70%),linear-gradient(180deg,#2a2950,#1a1930);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.lotImage .emoji{font-size:72px;filter:drop-shadow(0 8px 18px rgba(0,0,0,.5));animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.badge{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.15);color:#fff;font-size:11px;font-weight:700;padding:6px 10px;border-radius:999px}
+.badge.right{left:auto;right:10px;background:var(--gold);color:#1a1200;border:none}
+.lotBody{padding:12px 14px 14px}
+.lotBody h2{font-size:18px;font-weight:900;line-height:1.1}
+.lotBody .era{font-size:11px;color:var(--gold);font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-top:4px}
+.lotBody .story{font-size:13px;color:#d6d9e8;line-height:1.45;margin-top:8px;min-height:38px}
+.estimateRow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.estBox{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.estBox label{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.estBox strong{font-size:14px;font-weight:800;display:block;margin-top:2px}
+.estBox.true{position:relative;overflow:hidden}
+.estBox.true.revealed{background:linear-gradient(135deg,#1e3a3a,#1c2a4a);border-color:var(--teal)}
+.estBox.true .hide{filter:blur(6px);user-select:none}
+.hammerBar{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hammerLeft label{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.hammerLeft strong{font-size:22px;font-weight:900;color:var(--gold);display:block;line-height:1}
+.hammerLeft span{font-size:11px;color:var(--muted)}
+.hammerRight{text-align:right;min-width:110px}
+.hammerRight label{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.hammerRight strong{font-size:13px;font-weight:800;display:block;margin-top:2px}
+.hammerAnim{width:44px;height:44px;border-radius:12px;background:var(--card2);border:1px solid var(--line);display:grid;place-items:center;font-size:22px;transition:transform .15s}
+.hammerAnim.hit{animation:hammerHit .45s ease}
+@keyframes hammerHit{0%{transform:rotate(0)}20%{transform:rotate(-18deg) scale(1.05)}40%{transform:rotate(12deg)}100%{transform:rotate(0)}}
+.rivals{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.rival{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 12px;position:relative;overflow:hidden}
+.rival.folded{opacity:.55;filter:grayscale(.3)}
+.rival.leading{border-color:var(--gold);box-shadow:0 0 0 2px rgba(245,197,66,.15)}
+.rival .rHead{display:flex;align-items:center;gap:8px}
+.avatar{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;font-size:18px;font-weight:900}
+.rival:nth-child(1) .avatar{background:linear-gradient(135deg,#ff7a45,#ff3b6b);color:#fff}
+.rival:nth-child(2) .avatar{background:linear-gradient(135deg,#4facfe,#6a5af9);color:#fff}
+.rival strong{font-size:13px;font-weight:800}
+.rival span{font-size:11px;color:var(--muted);display:block}
+.rival .status{margin-top:8px;font-size:11px;font-weight:800;padding:6px 8px;border-radius:999px;text-align:center;border:1px solid var(--line);background:var(--card2)}
+.rival .status.bidding{color:var(--gold);border-color:rgba(245,197,66,.4);background:rgba(245,197,66,.12)}
+.rival .status.out{color:var(--rose)}
+.rival .status.win{color:var(--teal);border-color:rgba(46,196,182,.4);background:rgba(46,196,182,.12)}
+.log{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.logHead{padding:10px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
+.logHead h3{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.logHead span{font-size:11px;color:var(--muted)}
+.logBody{max-height:110px;overflow:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px}
+.logItem{font-size:12px;line-height:1.3;padding:6px 8px;border-radius:10px;background:var(--card2);border:1px solid transparent;display:flex;justify-content:space-between;gap:8px}
+.logItem.me{border-color:rgba(245,197,66,.25);background:rgba(245,197,66,.08)}
+.logItem.rival{border-color:rgba(120,130,255,.15)}
+.controls{margin-top:12px;background:linear-gradient(180deg,#1e1d35,#18172c);border:1px solid var(--line);border-radius:20px;padding:12px}
+.controls h3{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:center}
+.raiseGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.raiseBtn{height:56px;border-radius:14px;border:1px solid var(--line);background:var(--card2);color:#fff;font-weight:900;font-size:16px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;gap:2px;transition:transform .08s, border-color .15s}
+.raiseBtn:active{transform:scale(.97)}
+.raiseBtn:disabled{opacity:.35;cursor:not-allowed}
+.raiseBtn.primary{background:linear-gradient(180deg,#f5c542,#e8a317);color:#1a1200;border-color:#f5c542;box-shadow:0 6px 16px rgba(245,197,66,.25)}
+.raiseBtn small{font-size:10px;font-weight:700;opacity:.8;letter-spacing:.5px}
+.passBtn{margin-top:10px;width:100%;height:56px;border-radius:14px;border:1px solid rgba(255,90,121,.35);background:rgba(255,90,121,.08);color:#ff8fa3;font-weight:900;font-size:15px;letter-spacing:.5px;cursor:pointer}
+.passBtn:active{transform:scale(.98)}
+.hint{font-size:11px;color:var(--muted);text-align:center;margin-top:8px;line-height:1.4}
+.overlay{position:fixed;inset:0;background:rgba(6,6,14,.72);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+.overlay.show{display:flex}
+.modal{width:100%;max-width:400px;background:linear-gradient(180deg,#24234a,#1a1930);border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);animation:pop .35s ease}
+@keyframes pop{0%{transform:scale(.92);opacity:0}100%{transform:scale(1);opacity:1}}
+.modalHead{padding:16px 16px 12px;text-align:center;border-bottom:1px solid var(--line)}
+.modalHead .bigEmoji{font-size:42px}
+.modalHead h2{font-size:20px;font-weight:900;margin-top:6px}
+.modalHead p{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
+.modalBody{padding:14px 16px}
+.resultGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.resultBox{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:10px 12px;text-align:center}
+.resultBox label{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.resultBox strong{font-size:16px;font-weight:900;display:block;margin-top:2px}
+.resultBox.profitPos strong{color:var(--teal)}
+.resultBox.profitNeg strong{color:var(--rose)}
+.verdict{margin-top:12px;padding:12px;border-radius:14px;text-align:center;font-weight:800;font-size:13px;line-height:1.4}
+.verdict.win{background:rgba(46,196,182,.12);border:1px solid rgba(46,196,182,.3);color:#7ee8df}
+.verdict.lose{background:rgba(255,90,121,.1);border:1px solid rgba(255,90,121,.25);color:#ff9aab}
+.verdict.pass{background:rgba(154,160,184,.08);border:1px solid var(--line);color:var(--muted)}
+.modalActions{padding:12px 16px 16px;display:grid;gap:10px}
+.btnPrimary{height:52px;border-radius:14px;border:none;background:linear-gradient(180deg,#f5c542,#e8a317);color:#1a1200;font-weight:900;font-size:15px;cursor:pointer}
+.btnGhost{height:48px;border-radius:14px;border:1px solid var(--line);background:var(--card2);color:#fff;font-weight:800;font-size:14px;cursor:pointer}
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:60;display:none}
+.confetti.show{display:block}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#1e1d35;border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:999px;font-size:12px;font-weight:700;z-index:70;display:none;max-width:90%;text-align:center}
+.toast.show{display:block;animation:toastIn .3s ease}
+@keyframes toastIn{from{transform:translateX(-50%) translateY(10px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
+.helpList{list-style:none;display:grid;gap:10px}
+.helpList li{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:10px 12px;font-size:12px;line-height:1.5;color:#d6d9e8}
+.helpList li strong{color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">
+    <div>
+      <h1>GAVEL <span>DUEL</span></h1>
+      <p>Turn-based auction • 8 lots</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="iconBtn" id="soundBtn" aria-label="Sound">🔊</button>
+      <button class="iconBtn" id="helpBtn" aria-label="Help">?</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat purse"><label>Purse</label><strong id="purseEl">$5,000</strong></div>
+    <div class="stat profit"><label>Profit</label><strong id="profitEl">+$0</strong></div>
+    <div class="stat lot"><label>Lot</label><strong id="lotEl">1 / 8</strong></div>
+  </div>
+  <div class="progress"><i id="progressEl"></i></div>
+</div>
+
+<div class="wrap">
+  <div class="lotCard" id="lotCard">
+    <div class="lotImage">
+      <span class="badge" id="lotBadge">LOT 1 • ESTIMATE</span>
+      <span class="badge right" id="openingBadge">Opens $240</span>
+      <div class="emoji" id="lotEmoji">⌚</div>
+    </div>
+    <div class="lotBody">
+      <h2 id="lotName">Victorian Pocket Watch</h2>
+      <div class="era" id="lotEra">London, 1892 • Silver & Enamel</div>
+      <div class="story" id="lotStory">A railway conductor's watch, ticking perfectly after 130 years. Collectors whisper about its hidden service marks.</div>
+      <div class="estimateRow">
+        <div class="estBox"><label>Estimate</label><strong id="estEl">$400 – $600</strong></div>
+        <div class="estBox true" id="trueBox"><label>True Value</label><strong id="trueEl" class="hide">$???</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hammerBar">
+    <div class="hammerLeft">
+      <label>Current Bid</label>
+      <strong id="bidEl">$240</strong>
+      <span id="leaderEl">No bids yet</span>
+    </div>
+    <div class="hammerAnim" id="hammerIcon">🔨</div>
+    <div class="hammerRight">
+      <label>Hammer</label>
+      <strong id="hammerEl">Bidding open</strong>
+      <span id="hammerSub" style="font-size:10px;color:var(--muted)">Raise or pass</span>
+    </div>
+  </div>
+
+  <div class="rivals">
+    <div class="rival" id="rival0">
+      <div class="rHead"><div class="avatar">V</div><div><strong>Victor Sterling</strong><span>Aggressive bluffer</span></div></div>
+      <div class="status" id="r0Status">Watching…</div>
+    </div>
+    <div class="rival" id="rival1">
+      <div class="rHead"><div class="avatar">S</div><div><strong>Silas Crowe</strong><span>Cautious sniper</span></div></div>
+      <div class="status" id="r1Status">Watching…</div>
+    </div>
+  </div>
+
+  <div class="log">
+    <div class="logHead"><h3>Bidding History</h3><span id="logCount">0 bids</span></div>
+    <div class="logBody" id="logBody"></div>
+  </div>
+
+  <div class="controls">
+    <h3>Your Move — Tap to Raise</h3>
+    <div class="raiseGrid">
+      <button class="raiseBtn" data-inc="50">+$50<small>SAFE</small></button>
+      <button class="raiseBtn" data-inc="100">+$100<small>QUICK</small></button>
+      <button class="raiseBtn" data-inc="250">+$250<small>BOLD</small></button>
+      <button class="raiseBtn primary" data-inc="500">+$500<small>SHOCK</small></button>
+    </div>
+    <button class="passBtn" id="passBtn">✕ PASS / FOLD THIS LOT</button>
+    <div class="hint" id="hintEl">You can afford up to <b>$5,000</b>. Overpay and profit turns red. Win when both rivals fold.</div>
+  </div>
+</div>
+
+<canvas class="confetti" id="confetti"></canvas>
+<div class="toast" id="toast"></div>
+
+<!-- Result Overlay -->
+<div class="overlay" id="resultOverlay">
+  <div class="modal">
+    <div class="modalHead">
+      <div class="bigEmoji" id="resultEmoji">🎉</div>
+      <h2 id="resultTitle">BARGAIN!</h2>
+      <p id="resultSub">You stole it below true value.</p>
+    </div>
+    <div class="modalBody">
+      <div class="resultGrid">
+        <div class="resultBox"><label>Hammer Price</label><strong id="resPaid">$0</strong></div>
+        <div class="resultBox"><label>True Value</label><strong id="resTrue">$0</strong></div>
+        <div class="resultBox profitPos" id="resProfitBox"><label>Profit</label><strong id="resProfit">+$0</strong></div>
+        <div class="resultBox"><label>Purse Left</label><strong id="resPurse">$0</strong></div>
+      </div>
+      <div class="verdict" id="verdictEl"></div>
+    </div>
+    <div class="modalActions">
+      <button class="btnPrimary" id="nextBtn">Next Lot →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Game Over -->
+<div class="overlay" id="gameOverlay">
+  <div class="modal">
+    <div class="modalHead">
+      <div class="bigEmoji">🏆</div>
+      <h2 id="gameTitle">Auction Closed</h2>
+      <p id="gameSub">The gavel has fallen for the last time.</p>
+    </div>
+    <div class="modalBody">
+      <div class="resultGrid">
+        <div class="resultBox"><label>Lots Won</label><strong id="finalWon">0 / 8</strong></div>
+        <div class="resultBox"><label>Spent</label><strong id="finalSpent">$0</strong></div>
+        <div class="resultBox profitPos"><label>Total Profit</label><strong id="finalProfit">+$0</strong></div>
+        <div class="resultBox"><label>Final Purse</label><strong id="finalPurse">$0</strong></div>
+      </div>
+      <div class="verdict" id="finalVerdict"></div>
+    </div>
+    <div class="modalActions">
+      <button class="btnPrimary" id="restartBtn">Play Again</button>
+      <button class="btnGhost" id="shareBtn">Share Score</button>
+    </div>
+  </div>
+</div>
+
+<!-- Help -->
+<div class="overlay" id="helpOverlay">
+  <div class="modal">
+    <div class="modalHead">
+      <div class="bigEmoji">📜</div>
+      <h2>How to Duel</h2>
+      <p>Outwit two rivals with a fixed purse. Every antique hides its true value.</p>
+    </div>
+    <div class="modalBody">
+      <ul class="helpList">
+        <li><strong>1. Read the estimate</strong> — True value is hidden until the hammer falls. Some lots are traps, some are bargains.</li>
+        <li><strong>2. Raise or Pass</strong> — Tap +$50 / $100 / $250 / $500 to raise. Pass folds you out of this lot.</li>
+        <li><strong>3. Rivals react</strong> — Victor bluffs often, Silas only bids when he loves it. Watch their status.</li>
+        <li><strong>4. Win the lot</strong> — When both rivals fold, you pay the hammer price. Profit = True Value − Paid.</li>
+        <li><strong>5. Don't overpay</strong> — Overpaying cuts profit and drains your $5,000 purse. You can't bid what you can't afford.</li>
+        <li><strong>6. Hammer drama</strong> — If no one raises, the hammer creeps: <em>Going once → Going twice → Sold!</em> with sound & haptics.</li>
+      </ul>
+    </div>
+    <div class="modalActions">
+      <button class="btnPrimary" id="closeHelp">Got it — Let's Bid!</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const lots = [
+  {name:"Victorian Pocket Watch", era:"London, 1892 • Silver & Enamel", emoji:"⌚", story:"Railway conductor's watch, ticking perfectly after 130 years. Service marks hint at royal provenance.", estLow:400, estHigh:600, trueVal:750, open:240},
+  {name:"Ming-Style Celadon Vase", era:"Jingdezhen, 18th C. • Porcelain", emoji:"🏺", story:"Exquisite crackle glaze. The auctioneer calls it 'museum quality' — but the base feels oddly light.", estLow:800, estHigh:1200, trueVal:520, open:480},
+  {name:"Art Deco Bronze Lamp", era:"Paris, 1928 • Bronze & Glass", emoji:"🪔", story:"A dancer frozen in bronze. One collector already left the room — did they know something?", estLow:300, estHigh:500, trueVal:920, open:180},
+  {name:"Farmhouse Grandfather Clock", era:"Pennsylvania, 1840 • Oak", emoji:"🕰️", story:"Chimes on the hour, a little flat. Charming, but every farmhouse had one.", estLow:200, estHigh:350, trueVal:260, open:120},
+  {name:"Gilded Baroque Mirror", era:"Venice, 1710 • Giltwood", emoji:"🪞", story:"Gold leaf still blinding. Provenance papers from a palazzo fire — if you believe them.", estLow:1000, estHigh:1500, trueVal:1850, open:600},
+  {name:"Samurai Tanto Dagger", era:"Edo Period • Steel & Ray Skin", emoji:"🗡️", story:"Short blade, long story. The hamon is beautiful, but the polish looks recent.", estLow:600, estHigh:900, trueVal:380, open:360},
+  {name:"Tiffany Stained Glass Panel", era:"New York, 1905 • Leaded Glass", emoji:"🪟", story:"Dragonflies in amber and teal. Tiffany Studios stamp on the edge — faint but there.", estLow:700, estHigh:1000, trueVal:1350, open:420},
+  {name:"Roman Coin Chest", era:"Rome, 120 AD • Cedar & Iron", emoji:"⚱️", story:"A legionary's pay chest, coins still inside. The lock is sprung, the mystery isn't.", estLow:500, estHigh:800, trueVal:1100, open:300},
+];
+
+const rivalsData = [
+  {name:"Victor Sterling", short:"Victor", bluff:0.35, aggression:0.75},
+  {name:"Silas Crowe", short:"Silas", bluff:0.08, aggression:0.45}
+];
+
+let idx=0, purse=5000, totalProfit=0, lotsWon=0, totalSpent=0;
+let currentBid=0, leader=null, hammerStep=0, playerActive=true, rivalActive=[true,true], rivalVals=[0,0], log=[], soundOn=true;
+let busy=false;
+
+const $ = s=>document.getElementById(s);
+const fmt = n => (n<0?"-$":"$")+Math.abs(n).toLocaleString();
+const fmtP = n => (n>=0?"+":"-")+"$"+Math.abs(n).toLocaleString();
+
+let audioCtx=null;
+function ensureAudio(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); }
+function tone(freq, dur, type='sine', vol=0.18, slideTo){
+  if(!soundOn) return;
+  try{ ensureAudio(); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type=type; o.frequency.value=freq; o.connect(g); g.connect(audioCtx.destination); g.gain.value=vol; if(slideTo){ o.frequency.linearRampToValueAtTime(slideTo, audioCtx.currentTime+dur); } o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+dur); o.stop(audioCtx.currentTime+dur+0.05);}catch(e){}
+}
+function sfxRaise(){ tone(520,0.12,'sine',0.2,780); setTimeout(()=>tone(880,0.12,'sine',0.15),90)}
+function sfxPass(){ tone(180,0.2,'triangle',0.15,120)}
+function sfxFold(){ tone(220,0.25,'sine',0.12,160)}
+function sfxGavel(){ tone(90,0.18,'square',0.25); setTimeout(()=>tone(60,0.3,'square',0.22),120); if(navigator.vibrate) navigator.vibrate(40)}
+function sfxWin(){ [0,1,2,3].forEach(i=>setTimeout(()=>tone(440+ i*110,0.18,'sine',0.18), i*110)); }
+function sfxLose(){ tone(220,0.35,'sawtooth',0.14,150); setTimeout(()=>tone(180,0.35,'sawtooth',0.12),180)}
+function sfxBargain(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>tone(f,0.22,'sine',0.16), i*90))}
+
+function showToast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+function updateStats(){
+  $('purseEl').textContent=fmt(purse);
+  $('profitEl').textContent=fmtP(totalProfit);
+  $('profitEl').style.color = totalProfit>=0 ? 'var(--teal)' : 'var(--rose)';
+  $('lotEl').textContent=(idx+1)+' / '+lots.length;
+  $('progressEl').style.width=((idx)/lots.length*100)+'%';
+  $('hintEl').innerHTML=`You can afford up to <b>${fmt(purse)}</b>. Overpay and profit turns red. Win when both rivals fold.`;
+  document.querySelectorAll('.raiseBtn').forEach(b=>{
+    const inc=parseInt(b.dataset.inc);
+    b.disabled = !playerActive || busy || currentBid+inc > purse;
+  });
+  $('passBtn').disabled = !playerActive || busy;
+}
+
+function renderLot(){
+  const lot=lots[idx];
+  $('lotName').textContent=lot.name;
+  $('lotEra').textContent=lot.era;
+  $('lotEmoji').textContent=lot.emoji;
+  $('lotStory').textContent=lot.story;
+  $('estEl').textContent=`$${lot.estLow.toLocaleString()} – $${lot.estHigh.toLocaleString()}`;
+  $('lotBadge').textContent=`LOT ${idx+1} • ESTIMATE`;
+  $('openingBadge').textContent=`Opens ${fmt(lot.open)}`;
+  $('trueEl').textContent='$???';
+  $('trueEl').classList.add('hide');
+  $('trueBox').classList.remove('revealed');
+  currentBid=lot.open;
+  leader=null;
+  hammerStep=0;
+  playerActive=true;
+  rivalActive=[true,true];
+  // rival private valuations: trueVal * (0.8 to 1.3) with personality
+  rivalVals = rivalsData.map((r,i)=>{
+    let base = lot.trueVal * (0.82 + Math.random()*0.48);
+    if(r.aggression>0.6) base *= 1.08;
+    if(r.aggression<0.5) base *= 0.92;
+    return Math.round(base/10)*10;
+  });
+  log=[];
+  updateHammer();
+  updateRivals();
+  renderLog();
+  updateStats();
+  $('hammerIcon').classList.remove('hit');
+}
+
+function updateHammer(){
+  $('bidEl').textContent=fmt(currentBid);
+  if(!leader) $('leaderEl').textContent='Opening bid';
+  else if(leader==='You') $('leaderEl').textContent='You lead';
+  else $('leaderEl').textContent=leader+' leads';
+  const steps=['Bidding open','Going once…','Going twice…','Sold!'];
+  $('hammerEl').textContent=steps[hammerStep]||steps[0];
+  $('hammerSub').textContent = hammerStep===0 ? 'Raise or pass' : hammerStep===1 ? 'One more chance' : hammerStep===2 ? 'Last call!' : '';
+  if(hammerStep>0) $('hammerIcon').classList.add('hit');
+  else $('hammerIcon').classList.remove('hit');
+}
+
+function updateRivals(){
+  rivalsData.forEach((r,i)=>{
+    const el=$('r'+i+'Status');
+    const card=document.getElementById('rival'+i);
+    card.classList.remove('leading','folded');
+    if(!rivalActive[i]){ el.textContent='Folded ✕'; el.className='status out'; card.classList.add('folded'); }
+    else if(leader===r.short){ el.textContent='Leading ★'; el.className='status win'; card.classList.add('leading'); }
+    else if(busy){ el.textContent='Thinking…'; el.className='status bidding'; }
+    else { el.textContent='Watching…'; el.className='status'; }
+  });
+}
+
+function renderLog(){
+  const body=$('logBody');
+  body.innerHTML='';
+  if(log.length===0){ body.innerHTML='<div style="font-size:12px;color:var(--muted);text-align:center;padding:10px">No bids yet — make the first move.</div>'; $('logCount').textContent='0 bids'; return; }
+  log.forEach(e=>{
+    const d=document.createElement('div');
+    d.className='logItem '+(e.who==='You'?'me':'rival');
+    d.innerHTML=`<span>${e.text}</span><b>${fmt(e.bid)}</b>`;
+    body.appendChild(d);
+  });
+  $('logCount').textContent=log.length+' bid'+(log.length>1?'s':'');
+  body.scrollTop=body.scrollHeight;
+}
+
+function addLog(who,text,bid){
+  log.push({who,text,bid});
+  renderLog();
+}
+
+async function rivalsTurn(){
+  busy=true; updateStats(); updateRivals();
+  await new Promise(r=>setTimeout(r, 650));
+  let anyRaise=false;
+  for(let i=0;i<2;i++){
+    if(!rivalActive[i]) continue;
+    // decide
+    const val=rivalVals[i];
+    const gap = val - currentBid;
+    const r=rivalsData[i];
+    let willRaise=false;
+    let inc=50;
+    if(gap <= 0){
+      // over valuation - maybe bluff once
+      if(Math.random() < r.bluff && hammerStep===0 && currentBid < purse+600){
+        willRaise=true; inc = [50,100][Math.floor(Math.random()*2)];
+      } else {
+        // fold
+        rivalActive[i]=false;
+        addLog(r.short, `${r.short} folds`, currentBid);
+        sfxFold();
+        continue;
+      }
+    } else {
+      // gap positive
+      let prob = 0.55 + (gap>300?0.25:0) + (r.aggression*0.2);
+      if(leader==='You' && gap>150) prob+=0.15;
+      if(Math.random() < prob){
+        willRaise=true;
+        if(gap>600) inc=250;
+        else if(gap>300) inc=100;
+        else inc=50;
+        if(Math.random()<0.12) inc=500; // shock
+      } else {
+        // pass this round (not fold permanently, just check)
+        // In auction, passing means not raising now, but hammer will advance
+        // We'll treat as not raising this cycle
+        continue;
+      }
+    }
+    if(willRaise){
+      // ensure not exceeding their own limit too much
+      if(currentBid+inc > val+400 && Math.random()>0.3){
+        // they would overpay too much, fold instead
+        rivalActive[i]=false;
+        addLog(r.short, `${r.short} folds`, currentBid);
+        sfxFold();
+        continue;
+      }
+      currentBid+=inc;
+      leader=r.short;
+      anyRaise=true;
+      hammerStep=0;
+      addLog(r.short, `${r.short} raises +${fmt(inc).replace('$','')}`, currentBid);
+      sfxRaise();
+      updateHammer();
+      updateRivals();
+      await new Promise(r=>setTimeout(r, 500));
+    }
+  }
+
+  if(!anyRaise){
+    // no one raised this cycle
+    if(!playerActive){
+      // player already folded, let rivals auto-finish
+      await autoFinishRivals();
+      return;
+    }
+    // if player is leader and both rivals didn't raise, hammer advances
+    if(leader==='You'){
+      // check if rivals are still active but chose not to raise -> they are effectively passing
+      // if both rivals folded, win immediately
+      const stillActive = rivalActive.filter(Boolean).length;
+      if(stillActive===0){
+        hammerStep=3; updateHammer(); sfxGavel(); await new Promise(r=>setTimeout(r,400)); resolveLot(true);
+        return;
+      }
+      hammerStep++;
+      updateHammer();
+      if(hammerStep===1){ tone(300,0.18,'sine',0.15); showToast('Going once…'); }
+      if(hammerStep===2){ tone(260,0.22,'sine',0.15); showToast('Going twice…'); }
+      if(hammerStep>=3){
+        sfxGavel();
+        await new Promise(r=>setTimeout(r,400));
+        resolveLot(true);
+        return;
+      }
+    } else if(leader && leader!=='You'){
+      // rival leads, player gets chance to respond - hammer doesn't advance yet, just show going once
+      hammerStep = Math.min(hammerStep+1,2);
+      updateHammer();
+    } else {
+      // no leader yet (opening bid) - no hammer advance, just waiting for player
+      hammerStep=0; updateHammer();
+    }
+  } else {
+    // someone raised, reset hammer
+    hammerStep=0; updateHammer();
+  }
+
+  busy=false; updateStats(); updateRivals();
+  // if player folded earlier, already handled
+  // check if player can't afford any raise but is not leader -> they must pass
+}
+
+async function autoFinishRivals(){
+  // player folded, rivals battle to conclusion
+  let rounds=0;
+  while(rivalActive.filter(Boolean).length>1 && rounds<8){
+    rounds++;
+    let raised=false;
+    for(let i=0;i<2;i++){
+      if(!rivalActive[i]) continue;
+      const val=rivalVals[i];
+      if(currentBid >= val){
+        if(Math.random()<0.7){ rivalActive[i]=false; addLog(rivalsData[i].short, `${rivalsData[i].short} folds`, currentBid); }
+        continue;
+      }
+      if(Math.random()<0.6){
+        const inc = currentBid < val-400 ? 250 : currentBid < val-150 ? 100 : 50;
+        currentBid+=inc; leader=rivalsData[i].short; raised=true;
+        addLog(leader, `${leader} raises +${inc}`, currentBid);
+        updateHammer(); await new Promise(r=>setTimeout(r,400));
+      }
+    }
+    if(!raised) break;
+  }
+  // determine winner among rivals
+  if(rivalActive.filter(Boolean).length===1){
+    leader = rivalsData[rivalActive.findIndex(Boolean)].short;
+  } else if(leader && leader!=='You'){
+    // keep leader
+  } else {
+    // no one wanted it, pick highest valuation
+    const idxMax = rivalVals[0]>rivalVals[1]?0:1;
+    if(rivalActive[idxMax]) leader=rivalsData[idxMax].short;
+  }
+  hammerStep=3; updateHammer(); sfxGavel(); await new Promise(r=>setTimeout(r,500));
+  resolveLot(false);
+}
+
+function resolveLot(playerWon){
+  const lot=lots[idx];
+  $('trueEl').textContent=fmt(lot.trueVal);
+  $('trueEl').classList.remove('hide');
+  $('trueBox').classList.add('revealed');
+  let profit=0, verdict='', title='', sub='', emoji='';
+  if(playerWon){
+    // player pays
+    purse -= currentBid;
+    totalSpent += currentBid;
+    profit = lot.trueVal - currentBid;
+    totalProfit += profit;
+    lotsWon++;
+    if(profit>200){ title='BARGAIN!'; sub='You stole it below true value.'; emoji='🎉'; verdict=`Brilliant eye! You paid ${fmt(currentBid)} for a ${fmt(lot.trueVal)} treasure. Profit ${fmtP(profit)}.`; sfxBargain(); launchConfetti(); }
+    else if(profit>=0){ title='WINNER!'; sub='Hammer falls in your favour.'; emoji='🔨'; verdict=`Sold to you for ${fmt(currentBid)}. True value ${fmt(lot.trueVal)} — profit ${fmtP(profit)}.`; sfxWin(); launchConfetti(false); }
+    else { title='OVERPAID'; sub='You won, but the price stings.'; emoji='😬'; verdict=`You paid ${fmt(currentBid)} for a ${fmt(lot.trueVal)} piece. Loss ${fmtP(profit)} — the room felt it.`; sfxLose(); }
+    $('verdictEl').className='verdict '+(profit>=0?'win':'lose');
+  } else {
+    // player didn't win
+    if(!playerActive){
+      title='YOU FOLDED'; sub=`Lot went to ${leader} for ${fmt(currentBid)}.`; emoji='🙈';
+      verdict=`You sat out. True value was ${fmt(lot.trueVal)} — ${lot.trueVal>currentBid ? 'that was a bargain you missed!' : 'good fold, it was overpriced.'}`;
+    } else {
+      // shouldn't happen, but treat as outbid
+      title='OUTBID'; sub=`${leader} took it for ${fmt(currentBid)}.`; emoji='😤';
+      verdict=`True value ${fmt(lot.trueVal)}. You saved your purse.`;
+    }
+    $('verdictEl').className='verdict pass';
+    sfxLose();
+  }
+  $('resultEmoji').textContent=emoji;
+  $('resultTitle').textContent=title;
+  $('resultSub').textContent=sub;
+  $('resPaid').textContent= playerWon ? fmt(currentBid) : fmt(currentBid);
+  $('resTrue').textContent=fmt(lot.trueVal);
+  $('resProfit').textContent= playerWon ? fmtP(profit) : '—';
+  $('resProfitBox').className='resultBox '+(profit>=0?'profitPos':'profitNeg');
+  $('resPurse').textContent=fmt(purse);
+  $('verdictEl').textContent=verdict;
+  $('resultOverlay').classList.add('show');
+  updateStats();
+}
+
+function nextLot(){
+  $('resultOverlay').classList.remove('show');
+  idx++;
+  if(idx>=lots.length){
+    showFinal();
+    return;
+  }
+  if(purse<=0){
+    showToast('Purse empty — auction ends early');
+    showFinal();
+    return;
+  }
+  renderLot();
+}
+
+function showFinal(){
+  $('finalWon').textContent=lotsWon+' / '+lots.length;
+  $('finalSpent').textContent=fmt(totalSpent);
+  $('finalProfit').textContent=fmtP(totalProfit);
+  $('finalPurse').textContent=fmt(purse);
+  let v='';
+  if(totalProfit>1500) v='🏆 Master Dealer! You read every tell and cleaned up.';
+  else if(totalProfit>500) v='✨ Sharp eye — solid profit in a tough room.';
+  else if(totalProfit>=0) v='👍 Broke even. The house respects your discipline.';
+  else v='💸 Tough day on the floor. Those traps got you — try again?';
+  $('finalVerdict').textContent=v;
+  $('finalVerdict').className='verdict '+(totalProfit>=0?'win':'lose');
+  $('gameTitle').textContent = totalProfit>0 ? 'You Beat the House!' : 'Auction Closed';
+  $('gameOverlay').classList.add('show');
+  if(totalProfit>500) launchConfetti(true);
+}
+
+function launchConfetti(big=false){
+  const c=$('confetti'), ctx=c.getContext('2d');
+  c.width=innerWidth; c.height=innerHeight;
+  c.classList.add('show');
+  const n= big? 120: 70;
+  const parts=[...Array(n)].map(()=>({
+    x: Math.random()*c.width, y: -10 - Math.random()*80,
+    vx: (Math.random()-0.5)*6, vy: 2+Math.random()*5,
+    r: 4+Math.random()*6, col: ['#f5c542','#2ec4b6','#ff5a79','#6a5af9','#fff'][Math.floor(Math.random()*5)],
+    rot: Math.random()*360, vr: (Math.random()-0.5)*12
+  }));
+  let t=0;
+  (function anim(){
+    t++; ctx.clearRect(0,0,c.width,c.height);
+    parts.forEach(p=>{
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.12; p.rot+=p.vr;
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot*Math.PI/180);
+      ctx.fillStyle=p.col; ctx.fillRect(-p.r/2,-p.r/2,p.r,p.r*0.6);
+      ctx.restore();
+    });
+    if(t<140) requestAnimationFrame(anim); else { c.classList.remove('show'); ctx.clearRect(0,0,c.width,c.height); }
+  })();
+}
+
+// Events
+document.querySelectorAll('.raiseBtn').forEach(b=>{
+  b.addEventListener('click', async ()=>{
+    if(b.disabled) return;
+    const inc=parseInt(b.dataset.inc);
+    if(currentBid+inc > purse){ showToast("Can't afford that raise"); tone(120,0.2,'square',0.15); return; }
+    currentBid+=inc; leader='You'; hammerStep=0;
+    addLog('You', `You raise +${inc}`, currentBid);
+    sfxRaise();
+    updateHammer(); updateStats();
+    $('hammerIcon').classList.remove('hit'); void $('hammerIcon').offsetWidth; $('hammerIcon').classList.add('hit');
+    await rivalsTurn();
+  });
+});
+$('passBtn').addEventListener('click', async ()=>{
+  if(!playerActive || busy) return;
+  playerActive=false;
+  addLog('You','You fold', currentBid);
+  sfxPass();
+  updateRivals(); updateStats();
+  busy=true;
+  await autoFinishRivals();
+});
+
+$('nextBtn').addEventListener('click', nextLot);
+$('restartBtn').addEventListener('click', ()=>{
+  idx=0; purse=5000; totalProfit=0; lotsWon=0; totalSpent=0;
+  $('gameOverlay').classList.remove('show');
+  renderLot();
+  showToast('New auction — good luck!');
+});
+$('shareBtn').addEventListener('click', async ()=>{
+  const text=`Gavel Duel: Won ${lotsWon}/8 lots, profit ${fmtP(totalProfit)}, purse ${fmt(purse)} left. Can you beat the house?`;
+  try{ await navigator.clipboard.writeText(text); showToast('Score copied!'); }catch{ showToast(text); }
+});
+$('soundBtn').addEventListener('click', ()=>{
+  soundOn=!soundOn;
+  $('soundBtn').textContent=soundOn?'🔊':'🔇';
+  showToast(soundOn?'Sound on':'Sound off');
+  if(soundOn) ensureAudio();
+});
+$('helpBtn').addEventListener('click', ()=> $('helpOverlay').classList.add('show'));
+$('closeHelp').addEventListener('click', ()=> $('helpOverlay').classList.remove('show'));
+$('helpOverlay').addEventListener('click', e=>{ if(e.target===$('helpOverlay')) $('helpOverlay').classList.remove('show'); });
+$('resultOverlay').addEventListener('click', e=>{ if(e.target===$('resultOverlay')){} });
+$('gameOverlay').addEventListener('click', e=>{ if(e.target===$('gameOverlay')){} });
+
+// init
+renderLot();
+</script>
+</body>
+</html>

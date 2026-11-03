@@ -1,0 +1,70 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Fossil Dig</title><style>*{box-sizing:border-box;margin:0;padding:0}:root{--bg:#0f0e0a;--card:#1c1a14;--card2:#25211a;--line:#3a3528;--accent:#d4a574;--bad:#f87171;--text:#f5f0e1;--muted:#9a9588}html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}body{max-width:428px;margin:0 auto;overflow-x:hidden}.header{position:sticky;top:0;z-index:10;background:rgba(15,14,10,.94);border-bottom:1px solid var(--line);padding:10px 12px;display:flex;justify-content:space-between;align-items:center}.brand{display:flex;gap:10px;align-items:center}.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#d4a574,#8b9a6b);display:grid;place-items:center}.brand h1{font-size:14px}.brand p{font-size:11px;color:var(--muted)}.pill{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}.pill b{color:var(--text)}.wrap{padding:12px}.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}.hudItem{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}.hudItem b{font-size:16px;display:block}.hudItem span{font-size:11px;color:var(--muted)}.canvasWrap{position:relative;background:#1c1a14;border:1px solid var(--line);border-radius:16px;padding:8px}canvas{display:block;width:100%;touch-action:none;border-radius:12px}.specBar{display:flex;gap:6px;overflow:auto;padding:6px 0;margin-bottom:8px}.specBtn{white-space:nowrap;min-height:36px;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card2);color:var(--muted);font-size:12px;font-weight:700}.specBtn.active{background:var(--accent);color:#0f0e0a}.specBtn.locked{opacity:.5}.progress{height:10px;background:#0f0e0a;border-radius:999px;overflow:hidden;border:1px solid var(--line);margin:8px 0}.progress i{display:block;height:100%;background:linear-gradient(90deg,#d4a574,#facc15,#4ade80);width:0%;transition:width .3s}.controls{display:flex;gap:8px;margin-top:10px}.btn{border:0;border-radius:12px;padding:12px;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center;justify-content:center;flex:1}.btnPrimary{background:linear-gradient(135deg,#d4a574,#b8935f);color:#0f0e0a}.btnGhost{background:var(--card2);border:1px solid var(--line);color:var(--text)}.tip{font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px;text-align:center}.overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(15,14,10,.82);padding:16px;text-align:center;border-radius:16px}.hidden{display:none!important}.lives{display:flex;gap:4px;justify-content:center;margin:6px 0}.life{width:22px;height:22px;border-radius:50%;background:var(--bad);display:grid;place-items:center;font-size:12px;color:#fff}.life.lost{background:var(--line);color:var(--muted)}</style></head><body><header class="header"><div class="brand"><div class="logo">🦴</div><div><h1>Fossil Dig</h1><p>Brush slowly • Reveal</p></div></div><div class="pill">Best <b id="bestEl">0%</b></div></header><div class="wrap"><div class="hud"><div class="hudItem"><b id="progressEl">0%</b><span>Revealed</span></div><div class="hudItem"><b id="livesEl">3</b><span>Lives</span></div><div class="hudItem"><b id="unlockedEl">1/6</b><span>Unlocked</span></div></div><div class="specBar" id="specBar"></div><div class="canvasWrap"><canvas id="cv" width="360" height="360"></canvas><canvas id="dirt" width="360" height="360" style="position:absolute;left:8px;top:8px;width:calc(100% - 16px);height:calc(100% - 16px);border-radius:12px"></canvas><div class="overlay" id="startOverlay"><div><h2>🏛️ Museum Dig</h2><p style="font-size:13px;color:var(--muted);margin:8px 0">Brush <b>slowly</b> over dirt.<br>Scrub too fast = damage!</p><button class="btn btnPrimary" id="startBtn" style="width:100%">🔍 Start Dig</button></div></div><div class="overlay hidden" id="winOverlay"><div><h2 id="winTitle">Revealed!</h2><p id="winDesc" style="font-size:13px;color:var(--muted);margin:8px 0"></p><div class="lives" id="winLives"></div><button class="btn btnPrimary" id="nextBtn" style="width:100%">Next Fossil</button><button class="btn btnGhost" id="retryBtn" style="width:100%;margin-top:8px">Retry</button></div></div></div><div class="progress"><i id="progressBar"></i></div><div class="lives" id="livesDisplay"></div><div class="controls"><button class="btn btnGhost" id="resetBtn">Reset</button><button class="btn btnPrimary" id="newBtn">New Fossil</button></div><div class="tip">Brush slowly — fast scrubbing cracks the fossil! Unlock all 6.</div><div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px"><h3 style="font-size:13px;margin-bottom:6px">Collection</h3><div id="collectionEl" style="font-size:12px;color:var(--muted);line-height:1.5"></div></div></div><script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),dirt=document.getElementById('dirt'),dctx=dirt.getContext('2d'),W=360,H=360;
+const SPECIMENS=[
+{name:'Ammonite',desc:'Jurassic • 150M years',draw:(c,x,y,s)=>{c.strokeStyle='#5a4a2a';c.lineWidth=3;c.beginPath();for(let a=0;a<6.28;a+=0.12){let r=s*(0.2+a*0.12);c.lineTo(x+Math.cos(a)*r,y+Math.sin(a)*r)}c.stroke();c.fillStyle='rgba(212,165,116,.25)';c.fill()}},
+{name:'Trilobite',desc:'Cambrian • 500M years',draw:(c,x,y,s)=>{c.fillStyle='#6b5a3a';c.beginPath();c.ellipse(x,y,s*0.6,s*0.35,0,0,6.28);c.fill();c.strokeStyle='#3a2a0a';c.lineWidth=2;c.stroke();for(let i=-2;i<=2;i++){c.beginPath();c.moveTo(x+i*12,y-s*0.2);c.lineTo(x+i*12,y+s*0.2);c.stroke()}}},
+{name:'Fern',desc:'Carboniferous • 300M years',draw:(c,x,y,s)=>{c.strokeStyle='#4a6a3a';c.lineWidth=2;c.beginPath();c.moveTo(x,y+s*0.5);c.lineTo(x,y-s*0.5);c.stroke();for(let i=-4;i<=4;i++){let yy=y+i*14;c.beginPath();c.moveTo(x,yy);c.lineTo(x-20,yy-8);c.moveTo(x,yy);c.lineTo(x+20,yy-8);c.stroke()}}},
+{name:'T-Rex Tooth',desc:'Cretaceous • 68M years',draw:(c,x,y,s)=>{c.fillStyle='#5a4a2a';c.beginPath();c.moveTo(x,y-s*0.5);c.lineTo(x-s*0.3,y+s*0.4);c.lineTo(x+s*0.3,y+s*0.4);c.closePath();c.fill();c.strokeStyle='#3a2a0a';c.lineWidth=2;c.stroke()}},
+{name:'Starfish',desc:'Ordovician • 450M years',draw:(c,x,y,s)=>{c.fillStyle='#8b6a4a';for(let i=0;i<5;i++){let a=i*1.256-1.57;c.beginPath();c.moveTo(x,y);c.lineTo(x+Math.cos(a)*s*0.5,y+Math.sin(a)*s*0.5);c.lineTo(x+Math.cos(a+0.3)*s*0.2,y+Math.sin(a+0.3)*s*0.2);c.closePath();c.fill()}}},
+{name:'Dragonfly',desc:'Permian • 280M years',draw:(c,x,y,s)=>{c.strokeStyle='#4a5a4a';c.lineWidth=2;c.beginPath();c.ellipse(x,y,s*0.4,s*0.15,0,0,6.28);c.stroke();c.beginPath();c.ellipse(x-s*0.3,y,s*0.3,s*0.12,0.3,0,6.28);c.ellipse(x+s*0.3,y,s*0.3,s*0.12,-0.3,0,6.28);c.stroke()}}
+];
+let currentIdx=0,lives=3,progress=0,best=parseInt(localStorage.getItem('fossil-best')||'0',10),unlocked=JSON.parse(localStorage.getItem('fossil-unlocked')||'[0]'),isBrushing=false,lastX=0,lastY=0,lastT=0,cooldown=0;
+function save(){localStorage.setItem('fossil-best',best);localStorage.setItem('fossil-unlocked',JSON.stringify(unlocked))}
+function updateHud(){
+document.getElementById('bestEl').textContent=best+'%';
+document.getElementById('progressEl').textContent=Math.round(progress)+'%';
+document.getElementById('livesEl').textContent=lives;
+document.getElementById('unlockedEl').textContent=unlocked.length+'/6';
+document.getElementById('progressBar').style.width=progress+'%';
+let ld=document.getElementById('livesDisplay');ld.innerHTML='';for(let i=0;i<3;i++){let d=document.createElement('div');d.className='life'+(i>=lives?' lost':'');d.textContent=i<lives?'♥':'♡';ld.appendChild(d)}
+let ce=document.getElementById('collectionEl');ce.innerHTML=SPECIMENS.map((s,i)=>`${unlocked.includes(i)?'✅':'🔒'} <b style="color:${unlocked.includes(i)?'var(--text)':'var(--muted)'}">${s.name}</b> — ${s.desc}`).join('<br>')
+}
+function buildBar(){
+let bar=document.getElementById('specBar');bar.innerHTML='';
+SPECIMENS.forEach((s,i)=>{let b=document.createElement('button');b.className='specBtn'+(i===currentIdx?' active':'')+(unlocked.includes(i)?'':' locked');b.textContent=(unlocked.includes(i)?'':'🔒 ')+s.name;b.onclick=()=>{if(!unlocked.includes(i))return;currentIdx=i;initDig()};bar.appendChild(b)})
+}
+function drawFossil(){
+ctx.clearRect(0,0,W,H);ctx.fillStyle='#e8dcc0';ctx.fillRect(0,0,W,H);
+ctx.strokeStyle='rgba(0,0,0,.06)';for(let x=0;x<W;x+=36){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=0;y<H;y+=36){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+let s=SPECIMENS[currentIdx];ctx.save();ctx.translate(W/2,H/2);s.draw(ctx,0,0,80);ctx.restore();
+ctx.fillStyle='rgba(0,0,0,.6)';ctx.font='700 12px system-ui';ctx.textAlign='center';ctx.fillText(s.name.toUpperCase(),W/2,H-20);ctx.font='11px system-ui';ctx.fillText(s.desc,W/2,H-8)
+}
+function initDirt(){
+dctx.clearRect(0,0,W,H);dctx.fillStyle='#8b7355';dctx.fillRect(0,0,W,H);
+dctx.fillStyle='rgba(0,0,0,.08)';for(let i=0;i<400;i++){let x=Math.random()*W,y=Math.random()*H,r=Math.random()*2+1;dctx.beginPath();dctx.arc(x,y,r,0,6.28);dctx.fill()}
+dctx.fillStyle='rgba(255,255,255,.06)';for(let i=0;i<200;i++){let x=Math.random()*W,y=Math.random()*H,r=Math.random()*1.5;dctx.beginPath();dctx.arc(x,y,r,0,6.28);dctx.fill()}
+dctx.strokeStyle='rgba(0,0,0,.15)';dctx.lineWidth=2;dctx.strokeRect(0,0,W,H)
+}
+function initDig(){lives=3;progress=0;drawFossil();initDirt();updateHud();buildBar();document.getElementById('startOverlay').classList.remove('hidden');document.getElementById('winOverlay').classList.add('hidden')}
+function getPos(e){let r=dirt.getBoundingClientRect(),sx=W/r.width,sy=H/r.height,t=e.touches?e.touches[0]:e;return {x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sy}}
+function brush(x,y){dctx.globalCompositeOperation='destination-out';dctx.beginPath();dctx.arc(x,y,18,0,6.28);dctx.fill();dctx.globalCompositeOperation='source-over';dctx.globalCompositeOperation='destination-out';dctx.beginPath();dctx.arc(x,y,12,0,6.28);dctx.fill();dctx.globalCompositeOperation='source-over'}
+function checkProgress(){
+let d=dctx.getImageData(0,0,W,H).data,trans=0,total=W*H;
+for(let i=3;i<d.length;i+=16)if(d[i]<10)trans++;
+progress=(trans/(total/4))*100;if(progress>100)progress=100;updateHud();
+if(progress>=82){
+if(progress>best){best=Math.round(progress);save()}
+if(!unlocked.includes(currentIdx))unlocked.push(currentIdx);
+let nxt=(currentIdx+1)%SPECIMENS.length;if(!unlocked.includes(nxt))unlocked.push(nxt);save();
+document.getElementById('winTitle').textContent='Fossil Revealed!';document.getElementById('winDesc').textContent=SPECIMENS[currentIdx].name+' • '+Math.round(progress)+'% revealed';
+let wl=document.getElementById('winLives');wl.innerHTML='';for(let i=0;i<3;i++){let di=document.createElement('div');di.className='life'+(i>=lives?' lost':'');di.textContent=i<lives?'♥':'♡';wl.appendChild(di)}
+document.getElementById('winOverlay').classList.remove('hidden');updateHud();buildBar()
+}}
+function handleMove(e){
+if(!isBrushing)return;e.preventDefault();
+let p=getPos(e),now=performance.now(),dx=p.x-lastX,dy=p.y-lastY,dist=Math.hypot(dx,dy),dt=now-lastT,speed=dt>0?dist/dt:0;
+if(speed>0.9&&cooldown<=0){lives--;cooldown=500;if(navigator.vibrate)navigator.vibrate(100);dirt.style.filter='brightness(1.5) sepia(1) hue-rotate(-20deg)';setTimeout(()=>dirt.style.filter='',200);updateHud();if(lives<=0){document.getElementById('winTitle').textContent='Fossil Damaged!';document.getElementById('winDesc').textContent='Too much scrubbing — '+SPECIMENS[currentIdx].name+' cracked';document.getElementById('winOverlay').classList.remove('hidden');isBrushing=false;return}}
+if(cooldown>0)cooldown-=dt;
+brush(p.x,p.y);lastX=p.x;lastY=p.y;lastT=now;if(Math.random()<0.15)checkProgress()
+}
+function handleStart(e){isBrushing=true;document.getElementById('startOverlay').classList.add('hidden');let p=getPos(e);lastX=p.x;lastY=p.y;lastT=performance.now();brush(p.x,p.y)}
+dirt.addEventListener('mousedown',handleStart);dirt.addEventListener('touchstart',handleStart,{passive:false});
+window.addEventListener('mousemove',handleMove);window.addEventListener('touchmove',handleMove,{passive:false});
+window.addEventListener('mouseup',()=>{isBrushing=false;checkProgress()});window.addEventListener('touchend',()=>{isBrushing=false;checkProgress()});
+document.getElementById('startBtn').onclick=()=>document.getElementById('startOverlay').classList.add('hidden');
+document.getElementById('nextBtn').onclick=()=>{currentIdx=(currentIdx+1)%SPECIMENS.length;initDig()};
+document.getElementById('retryBtn').onclick=()=>initDig();
+document.getElementById('resetBtn').onclick=()=>initDig();
+document.getElementById('newBtn').onclick=()=>{let pool=unlocked;currentIdx=pool[Math.floor(Math.random()*pool.length)];initDig()};
+initDig();
+</script></body></html>

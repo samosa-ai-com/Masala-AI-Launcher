@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Lantern Sequence - Festival Memory</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0a1e;
+  --bg2:#1e1433;
+  --card:#241a3d;
+  --card2:#2d204d;
+  --border:#3d2e66;
+  --text:#fff8e7;
+  --muted:#c9b8e8;
+  --accent:#ffb347;
+  --accent2:#ff6b6b;
+  --gold:#ffd93d;
+  --success:#4ade80;
+}
+html,body{height:100%}
+body{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  background:radial-gradient(120% 80% at 50% 0%, #2d1b5e 0%, #1a1030 45%, #0f0a1e 100%);
+  color:var(--text);
+  display:flex;
+  justify-content:center;
+  min-height:100dvh;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+}
+.wrap{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100dvh;
+  display:flex;
+  flex-direction:column;
+  padding:12px 12px 16px;
+  position:relative;
+  overflow-x:hidden;
+}
+/* stars */
+.wrap::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 20% 15%, #fff 100%, transparent 0),
+    radial-gradient(1px 1px at 45% 8%, #ffd93d 100%, transparent 0),
+    radial-gradient(1.2px 1.2px at 75% 12%, #fff 100%, transparent 0),
+    radial-gradient(1px 1px at 85% 25%, #ffb347 100%, transparent 0),
+    radial-gradient(1px 1px at 10% 30%, #fff 100%, transparent 0),
+    radial-gradient(1.3px 1.3px at 60% 18%, #fff 100%, transparent 0);
+  opacity:.5;
+  pointer-events:none;
+}
+header{
+  position:relative;
+  background:linear-gradient(180deg, #2d204d 0%, #241a3d 100%);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:14px 14px 12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08);
+}
+.top-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+h1{
+  font-size:19px;
+  font-weight:900;
+  letter-spacing:-.02em;
+  line-height:1;
+}
+h1 span{color:var(--accent)}
+.sub{
+  font-size:11px;
+  color:var(--muted);
+  font-weight:700;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  margin-top:4px;
+}
+.badge{
+  background:linear-gradient(135deg, #ffb347, #ff6b6b);
+  color:#1a1030;
+  font-size:11px;
+  font-weight:900;
+  padding:7px 12px;
+  border-radius:999px;
+  white-space:nowrap;
+  box-shadow:0 4px 12px rgba(255,107,107,.3);
+}
+.stats{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr 1fr;
+  gap:7px;
+  margin-top:12px;
+}
+.stat{
+  background:rgba(0,0,0,.25);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:12px;
+  padding:8px 4px;
+  text-align:center;
+}
+.stat-label{font-size:9px;font-weight:800;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+.stat-value{font-size:17px;font-weight:900;margin-top:2px;line-height:1}
+.stat-value.small{font-size:13px}
+.stat-value.accent{color:var(--gold)}
+.controls{
+  display:flex;
+  gap:8px;
+  margin-top:12px;
+}
+.btn{
+  flex:1;
+  appearance:none;
+  border:none;
+  border-radius:12px;
+  padding:13px 10px;
+  font-size:14px;
+  font-weight:900;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  min-height:48px;
+  transition:transform .08s, filter .15s, opacity .15s;
+}
+.btn:active{transform:scale(.97)}
+.btn-primary{
+  background:linear-gradient(135deg, #ffb347 0%, #ff8e53 100%);
+  color:#1a1030;
+  box-shadow:0 6px 16px rgba(255,179,71,.35);
+}
+.btn-secondary{
+  background:rgba(255,255,255,.08);
+  color:var(--text);
+  border:1.5px solid rgba(255,255,255,.15);
+}
+.btn:disabled{opacity:.45;pointer-events:none}
+.btn-replay{
+  background:rgba(255,217,61,.12);
+  border:1.5px solid rgba(255,217,61,.3);
+  color:var(--gold);
+}
+.hint{
+  text-align:center;
+  font-size:11px;
+  color:var(--muted);
+  margin-top:8px;
+  font-weight:600;
+  line-height:1.4;
+}
+.board-card{
+  position:relative;
+  margin-top:12px;
+  background:linear-gradient(180deg, #2d204d 0%, #1e1433 100%);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:14px;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);
+  flex:1;
+  display:flex;
+  flex-direction:column;
+}
+.status-bar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  background:rgba(0,0,0,.25);
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:12px;
+  padding:10px 12px;
+}
+.status-text{font-size:14px;font-weight:800}
+.status-sub{font-size:11px;color:var(--muted);font-weight:600;margin-top:2px}
+.dot{
+  width:10px;height:10px;border-radius:50%;
+  background:var(--muted);
+  box-shadow:0 0 0 4px rgba(201,184,232,.15);
+  flex-shrink:0;
+}
+.dot.watch{background:#ffd93d;box-shadow:0 0 10px #ffd93d, 0 0 0 4px rgba(255,217,61,.2)}
+.dot.play{background:#4ade80;box-shadow:0 0 10px #4ade80, 0 0 0 4px rgba(74,222,128,.2)}
+.dot.fail{background:#ff6b6b;box-shadow:0 0 10px #ff6b6b, 0 0 0 4px rgba(255,107,107,.2)}
+
+.lantern-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-top:14px;
+}
+.lantern{
+  position:relative;
+  aspect-ratio:1;
+  min-height:110px;
+  border-radius:20px;
+  border:2px solid rgba(255,255,255,.12);
+  cursor:pointer;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding:10px;
+  transition:transform .12s, filter .15s, box-shadow .15s, border-color .15s;
+  overflow:hidden;
+  touch-action:manipulation;
+}
+.lantern::before{
+  content:"";
+  position:absolute;
+  top:8px;left:50%;transform:translateX(-50%);
+  width:36px;height:8px;
+  background:linear-gradient(180deg, #3d2e66, #2d204d);
+  border-radius:4px;
+  border:1px solid rgba(255,255,255,.1);
+}
+.lantern::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:20px;
+  background:radial-gradient(80% 60% at 50% 30%, rgba(255,255,255,.18), transparent 60%);
+  pointer-events:none;
+}
+.lantern:active{transform:scale(.96)}
+.lantern.active{
+  transform:scale(1.03);
+  filter:brightness(1.25);
+  border-color:rgba(255,255,255,.4);
+}
+.lantern-icon{font-size:42px;filter:drop-shadow(0 4px 8px rgba(0,0,0,.3));line-height:1}
+.lantern-label{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;opacity:.9}
+.lantern-key{
+  position:absolute;
+  bottom:8px;right:8px;
+  width:22px;height:22px;
+  background:rgba(0,0,0,.35);
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:900;
+}
+.l1{background:radial-gradient(120% 100% at 50% 20%, #ff8a8a 0%, #e84c4c 55%, #b91c1c 100%);box-shadow:0 6px 16px rgba(232,76,76,.35), inset 0 1px 0 rgba(255,255,255,.25)}
+.l1.active{box-shadow:0 0 24px #ff6b6b, 0 0 48px rgba(255,107,107,.5), 0 6px 16px rgba(232,76,76,.4)}
+.l2{background:radial-gradient(120% 100% at 50% 20%, #ffe88a 0%, #f5c518 55%, #b45309 100%);box-shadow:0 6px 16px rgba(245,197,24,.35), inset 0 1px 0 rgba(255,255,255,.3)}
+.l2.active{box-shadow:0 0 24px #ffd93d, 0 0 48px rgba(255,217,61,.5), 0 6px 16px rgba(245,197,24,.4)}
+.l3{background:radial-gradient(120% 100% at 50% 20%, #ffb88a 0%, #f97316 55%, #9a3412 100%);box-shadow:0 6px 16px rgba(249,115,22,.35), inset 0 1px 0 rgba(255,255,255,.25)}
+.l3.active{box-shadow:0 0 24px #ff8e53, 0 0 48px rgba(255,142,83,.5), 0 6px 16px rgba(249,115,22,.4)}
+.l4{background:radial-gradient(120% 100% at 50% 20%, #f0a0c0 0%, #ec4899 55%, #9d174d 100%);box-shadow:0 6px 16px rgba(236,72,153,.35), inset 0 1px 0 rgba(255,255,255,.25)}
+.l4.active{box-shadow:0 0 24px #ff6b9d, 0 0 48px rgba(255,107,157,.5), 0 6px 16px rgba(236,72,153,.4)}
+
+.progress{
+  margin-top:12px;
+  height:6px;
+  background:rgba(0,0,0,.3);
+  border-radius:999px;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.06);
+}
+.progress-fill{height:100%;background:linear-gradient(90deg, #ffb347, #ffd93d);width:0%;transition:width .3s}
+.legend{
+  display:flex;
+  gap:6px;
+  justify-content:center;
+  flex-wrap:wrap;
+  margin-top:10px;
+}
+.legend span{
+  font-size:10px;
+  font-weight:700;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.08);
+  padding:4px 8px;
+  border-radius:999px;
+  color:var(--muted);
+}
+.overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(10,6,20,.65);
+  backdrop-filter:blur(6px);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  z-index:20;
+}
+.overlay.show{display:flex}
+.modal{
+  background:linear-gradient(180deg, #2d204d, #1e1433);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:20px;
+  width:100%;
+  max-width:360px;
+  text-align:center;
+  box-shadow:0 20px 40px rgba(0,0,0,.5);
+  animation:pop .25s ease;
+}
+@keyframes pop{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-icon{font-size:42px;margin-bottom:8px}
+.modal h2{font-size:22px;font-weight:900;margin-bottom:4px}
+.modal p{font-size:13px;color:var(--muted);font-weight:600;line-height:1.5;margin-bottom:14px}
+.modal-stats{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:8px;
+  margin-bottom:14px;
+}
+.modal-stat{
+  background:rgba(0,0,0,.25);
+  border-radius:12px;
+  padding:10px 4px;
+  border:1px solid rgba(255,255,255,.06);
+}
+.modal-stat b{display:block;font-size:18px}
+.modal-stat span{font-size:9px;font-weight:800;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top-row">
+      <div>
+        <h1><span>LANTERN</span> SEQUENCE</h1>
+        <div class="sub">🏮 Night Festival • Memory • Tones</div>
+      </div>
+      <div class="badge" id="bestBadge">BEST —</div>
+    </div>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Round</div>
+        <div class="stat-value" id="roundEl">1</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Score</div>
+        <div class="stat-value accent" id="scoreEl">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Streak</div>
+        <div class="stat-value" id="streakEl">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Best</div>
+        <div class="stat-value small" id="bestEl">—</div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn btn-primary" id="startBtn">▶ Start Festival</button>
+      <button class="btn btn-replay" id="replayBtn" disabled>↻ Replay -15</button>
+    </div>
+    <div class="hint">Watch the glow + tone, then replay the growing order • Tap or press <b>1-4</b></div>
+  </header>
+
+  <div class="board-card">
+    <div class="status-bar">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="dot" id="dot"></div>
+        <div>
+          <div class="status-text" id="statusText">Press Start Festival</div>
+          <div class="status-sub" id="statusSub">4 lanterns • Each round adds 1 step</div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--muted);text-transform:uppercase">Progress</div>
+        <div style="font-size:13px;font-weight:900" id="progressText">0 / 0</div>
+      </div>
+    </div>
+
+    <div class="lantern-grid" id="grid">
+      <button class="lantern l1" data-i="0" aria-label="Red lantern 1">
+        <div class="lantern-icon">🏮</div>
+        <div class="lantern-label" style="color:#fff">Akari</div>
+        <div class="lantern-key">1</div>
+      </button>
+      <button class="lantern l2" data-i="1" aria-label="Gold lantern 2">
+        <div class="lantern-icon">🏮</div>
+        <div class="lantern-label" style="color:#1a1030">Hikari</div>
+        <div class="lantern-key" style="color:#1a1030;background:rgba(255,255,255,.6)">2</div>
+      </button>
+      <button class="lantern l3" data-i="2" aria-label="Orange lantern 3">
+        <div class="lantern-icon">🏮</div>
+        <div class="lantern-label" style="color:#fff">Kaen</div>
+        <div class="lantern-key">3</div>
+      </button>
+      <button class="lantern l4" data-i="3" aria-label="Pink lantern 4">
+        <div class="lantern-icon">🏮</div>
+        <div class="lantern-label" style="color:#fff">Yume</div>
+        <div class="lantern-key">4</div>
+      </button>
+    </div>
+
+    <div class="progress"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="legend">
+      <span>🔊 Tones on</span><span>Tap or 1-4 keys</span><span>Replay costs 15 pts</span>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-icon" id="modalIcon">🏮</div>
+    <h2 id="modalTitle">Festival Complete</h2>
+    <p id="modalMsg">You remembered the sequence!</p>
+    <div class="modal-stats">
+      <div class="modal-stat"><b id="mScore">0</b><span>Score</span></div>
+      <div class="modal-stat"><b id="mRound">1</b><span>Round</span></div>
+      <div class="modal-stat"><b id="mStreak">0</b><span>Best Streak</span></div>
+    </div>
+    <button class="btn btn-primary" style="width:100%" id="modalPlay">▶ Play Again</button>
+    <div style="margin-top:8px;font-size:11px;color:var(--muted);font-weight:700">Warm night-festival • 4 tones • Growing sequence</div>
+  </div>
+</div>
+
+<script>
+const freqs=[261.63,329.63,392.00,523.25]; // C4 E4 G4 C5
+let audioCtx=null;
+function ensureAudio(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+}
+function playTone(idx, duration=420){
+  ensureAudio();
+  const osc=audioCtx.createOscillator();
+  const gain=audioCtx.createGain();
+  const filter=audioCtx.createBiquadFilter();
+  filter.type='lowpass'; filter.frequency.value=1800;
+  osc.type='sine';
+  osc.frequency.value=freqs[idx];
+  // warm envelope
+  gain.gain.setValueAtTime(0, audioCtx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.35, audioCtx.currentTime+0.02);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime+duration/1000);
+  osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime+duration/1000);
+}
+function playFail(){
+  ensureAudio();
+  [180,140].forEach((f,i)=>{
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.frequency.value=f; o.type='sawtooth';
+    g.gain.setValueAtTime(0, audioCtx.currentTime+i*0.12);
+    g.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime+i*0.12+0.02);
+    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime+i*0.12+0.25);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(audioCtx.currentTime+i*0.12); o.stop(audioCtx.currentTime+i*0.12+0.25);
+  });
+}
+function playSuccess(){
+  ensureAudio();
+  [523.25,659.25,783.99].forEach((f,i)=>{
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.frequency.value=f; o.type='sine';
+    g.gain.setValueAtTime(0, audioCtx.currentTime+i*0.08);
+    g.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime+i*0.08+0.02);
+    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime+i*0.08+0.3);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(audioCtx.currentTime+i*0.08); o.stop(audioCtx.currentTime+i*0.08+0.3);
+  });
+}
+
+let sequence=[], playerIdx=0, round=1, score=0, streak=0, bestStreak=0, bestScore=0;
+let isShowing=false, isPlayerTurn=false, gameActive=false;
+
+const roundEl=document.getElementById('roundEl');
+const scoreEl=document.getElementById('scoreEl');
+const streakEl=document.getElementById('streakEl');
+const bestEl=document.getElementById('bestEl');
+const bestBadge=document.getElementById('bestBadge');
+const statusText=document.getElementById('statusText');
+const statusSub=document.getElementById('statusSub');
+const dot=document.getElementById('dot');
+const progressFill=document.getElementById('progressFill');
+const progressText=document.getElementById('progressText');
+const startBtn=document.getElementById('startBtn');
+const replayBtn=document.getElementById('replayBtn');
+const overlay=document.getElementById('overlay');
+
+function loadBest(){
+  const v=localStorage.getItem('lanternBest');
+  if(v){
+    try{
+      const o=JSON.parse(v);
+      bestScore=o.score||0;
+      bestEl.textContent=bestScore;
+      bestBadge.textContent=`BEST ${bestScore}`;
+    }catch{}
+  } else {
+    bestEl.textContent='—';
+    bestBadge.textContent='BEST —';
+  }
+}
+loadBest();
+
+function saveBest(){
+  if(score>bestScore){
+    bestScore=score;
+    localStorage.setItem('lanternBest', JSON.stringify({score:bestScore, round, date:Date.now()}));
+    loadBest();
+  }
+  // also track best streak
+  const s=localStorage.getItem('lanternStreakBest');
+  const prev=s?parseInt(s):0;
+  if(bestStreak>prev) localStorage.setItem('lanternStreakBest', bestStreak);
+}
+
+function updateHUD(){
+  roundEl.textContent=round;
+  scoreEl.textContent=score;
+  streakEl.textContent=streak;
+  progressText.textContent=`${playerIdx} / ${sequence.length}`;
+  const pct= sequence.length? (playerIdx/sequence.length*100):0;
+  progressFill.style.width=pct+'%';
+  replayBtn.disabled = !gameActive || isShowing || !isPlayerTurn || score<15;
+  replayBtn.style.opacity = replayBtn.disabled? .45:1;
+}
+
+function setStatus(state, text, sub){
+  statusText.textContent=text;
+  statusSub.textContent=sub;
+  dot.className='dot '+state;
+}
+
+function flash(idx, duration=520){
+  const el=document.querySelector(`.lantern[data-i="${idx}"]`);
+  el.classList.add('active');
+  playTone(idx, duration-80);
+  if(navigator.vibrate) navigator.vibrate(30);
+  setTimeout(()=> el.classList.remove('active'), duration-80);
+}
+
+async function showSequence(){
+  isShowing=true; isPlayerTurn=false; playerIdx=0;
+  updateHUD();
+  setStatus('watch','Watch & listen…',`Round ${round} • ${sequence.length} steps`);
+  startBtn.disabled=true;
+  // small pause before start
+  await wait(600);
+  for(let i=0;i<sequence.length;i++){
+    if(!gameActive) return;
+    const idx=sequence[i];
+    flash(idx, 560);
+    await wait(720);
+  }
+  isShowing=false; isPlayerTurn=true;
+  setStatus('play','Your turn — replay the order',`Tap lanterns or press 1-4 • ${sequence.length} steps`);
+  updateHUD();
+}
+
+function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+function startGame(){
+  ensureAudio();
+  sequence=[]; round=1; score=0; streak=0; bestStreak=Math.max(bestStreak, streak);
+  gameActive=true; playerIdx=0;
+  hideModal();
+  startBtn.textContent='● Playing…';
+  startBtn.disabled=true;
+  nextRound();
+}
+
+function nextRound(){
+  // add one random step
+  sequence.push(Math.floor(Math.random()*4));
+  updateHUD();
+  showSequence();
+}
+
+function handleInput(idx){
+  if(!gameActive || isShowing || !isPlayerTurn) return;
+  ensureAudio();
+  flash(idx, 380);
+  // check
+  if(idx===sequence[playerIdx]){
+    playerIdx++;
+    updateHUD();
+    if(playerIdx===sequence.length){
+      // round complete
+      isPlayerTurn=false;
+      const base=round*10;
+      const bonus=streak*5;
+      const earned=base+bonus;
+      score+=earned;
+      streak++; bestStreak=Math.max(bestStreak, streak);
+      saveBest();
+      setStatus('play',`Perfect! +${earned} pts`, `Streak ${streak} • Next round in a moment`);
+      playSuccess();
+      if(navigator.vibrate) navigator.vibrate(50);
+      updateHUD();
+      round++;
+      setTimeout(()=>{ if(gameActive) nextRound(); }, 900);
+    }
+  } else {
+    // fail
+    isPlayerTurn=false; gameActive=false;
+    streak=0;
+    playFail();
+    if(navigator.vibrate) navigator.vibrate([60,40,80]);
+    setStatus('fail','Sequence broken',`You reached round ${round} • Score ${score}`);
+    startBtn.textContent='▶ Start Festival';
+    startBtn.disabled=false;
+    saveBest();
+    showModal(false);
+  }
+}
+
+function doReplay(){
+  if(score<15 || isShowing || !isPlayerTurn) return;
+  score=Math.max(0, score-15);
+  playerIdx=0;
+  updateHUD();
+  setStatus('watch','Replaying… -15 pts',`Listen again • ${sequence.length} steps`);
+  isPlayerTurn=false;
+  showSequence();
+}
+
+function showModal(isWin){
+  document.getElementById('mScore').textContent=score;
+  document.getElementById('mRound').textContent=round;
+  document.getElementById('mStreak').textContent=bestStreak;
+  document.getElementById('modalTitle').textContent= isWin? 'Festival Complete!' : 'Lanterns Fade…';
+  document.getElementById('modalMsg').textContent= isWin? 'Incredible memory!' : `The sequence broke on round ${round}. Your streak and best are saved.`;
+  document.getElementById('modalIcon').textContent= isWin? '🏆':'🏮';
+  overlay.classList.add('show');
+}
+function hideModal(){ overlay.classList.remove('show'); }
+
+// events
+document.querySelectorAll('.lantern').forEach(el=>{
+  el.addEventListener('click', ()=> handleInput(parseInt(el.dataset.i)));
+  el.addEventListener('touchstart', e=>{ e.preventDefault(); }, {passive:false});
+});
+startBtn.addEventListener('click', startGame);
+replayBtn.addEventListener('click', doReplay);
+document.getElementById('modalPlay').addEventListener('click', ()=>{ hideModal(); startGame(); });
+overlay.addEventListener('click', e=>{ if(e.target===overlay) hideModal(); });
+
+window.addEventListener('keydown', e=>{
+  if(e.key>='1' && e.key<='4'){
+    const idx=parseInt(e.key)-1;
+    // visual feedback even if not player turn? only handle if active
+    handleInput(idx);
+    // also flash for feedback if not active? no
+  }
+  if(e.key===' ' || e.key==='Enter'){
+    if(!gameActive) startGame();
+  }
+  if(e.key.toLowerCase()==='r' && !replayBtn.disabled) doReplay();
+});
+
+// initial state
+setStatus('','Press Start Festival','4 lanterns • Each round adds 1 step');
+updateHUD();
+</script>
+</body>
+</html>

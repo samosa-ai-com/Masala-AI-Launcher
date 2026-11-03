@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Sky Meadow Archery</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden;background:#87ceeb}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1a2a1a;-webkit-tap-highlight-color:transparent}
+.app{max-width:428px;min-width:360px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:linear-gradient(180deg,#87ceeb 0%,#a8d8f0 30%,#c8e8a0 70%,#7ab86f 100%);padding:10px 12px 14px;gap:10px}
+.header{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.92);border:1px solid rgba(0,0,0,0.08);border-radius:14px;padding:10px 12px;box-shadow:0 4px 16px rgba(0,0,0,0.1)}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#2d6a4f,#95d5b2);display:grid;place-items:center;font-weight:900;color:#fff;box-shadow:0 4px 12px rgba(45,106,79,0.3)}
+.brand h1{font-size:15px;letter-spacing:0.05em;line-height:1}
+.brand p{font-size:11px;opacity:0.7;letter-spacing:0.04em}
+.stats{display:flex;gap:8px}
+.stat{background:#1a2a1a;color:#fff;border-radius:10px;padding:6px 8px;min-width:58px;text-align:center}
+.stat .k{font-size:10px;letter-spacing:0.08em;opacity:0.7}
+.stat .v{font-size:14px;font-weight:800;line-height:1.1}
+.stat.best{background:#fff;color:#1a2a1a;border:1px solid rgba(0,0,0,0.12)}
+.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.hud .card{background:rgba(255,255,255,0.95);border:1px solid rgba(0,0,0,0.06);border-radius:12px;padding:8px 10px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.hud .card .label{font-size:10px;letter-spacing:0.08em;opacity:0.6}
+.hud .card .value{font-size:17px;font-weight:900}
+.hud .card.arrows{border-color:rgba(45,106,79,0.2)}
+.hud .card.level{border-color:rgba(255,165,0,0.25)}
+.arena{position:relative;background:linear-gradient(180deg,#87ceeb 0%,#b0e0e6 40%,#c8e8a0 100%);border:1px solid rgba(0,0,0,0.1);border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.15)}
+.arena-top{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(255,255,255,0.92);border-bottom:1px solid rgba(0,0,0,0.08);font-size:12px;letter-spacing:0.04em}
+.arena-top b{color:#2d6a4f}
+.canvas-wrap{position:relative;width:100%;aspect-ratio:360/520;max-height:520px;background:linear-gradient(180deg,#87ceeb 0%,#a8d8f0 35%,#d4e8b0 65%,#8bc48a 100%);touch-action:none;user-select:none;overflow:hidden}
+canvas{width:100%;height:100%;display:block}
+.hint{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:rgba(26,42,26,0.85);color:#fff;font-size:12px;letter-spacing:0.04em;padding:7px 12px;border-radius:999px;pointer-events:none;text-align:center;white-space:nowrap}
+.toast{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);background:rgba(26,42,26,0.92);color:#fff;padding:10px 14px;border-radius:12px;font-weight:800;letter-spacing:0.04em;opacity:0;pointer-events:none;transition:opacity 0.2s,transform 0.2s;text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,-50%) scale(1.02)}
+.bar{height:6px;background:rgba(0,0,0,0.08);border-radius:999px;overflow:hidden}
+.bar>i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#2d6a4f,#95d5b2);transition:width 0.3s}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{appearance:none;border:none;border-radius:14px;padding:14px 14px;font-size:15px;font-weight:800;letter-spacing:0.03em;min-height:48px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:transform 0.06s,opacity 0.15s}
+.btn:active{transform:scale(0.98)}
+.btn-primary{background:linear-gradient(135deg,#2d6a4f,#40916c);color:#fff;box-shadow:0 8px 20px rgba(45,106,79,0.35)}
+.btn-ghost{background:#fff;color:#1a2a1a;border:1px solid rgba(0,0,0,0.12)}
+.btn-wide{grid-column:1/-1}
+.aim-controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.aim-controls button{min-height:48px;font-size:14px}
+.footer{font-size:11px;opacity:0.6;text-align:center;letter-spacing:0.03em;padding:2px 6px}
+.modal{position:fixed;inset:0;background:rgba(26,42,26,0.55);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
+.modal.open{display:flex}
+.modal-card{width:100%;max-width:360px;background:#fff;border-radius:18px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,0.25);text-align:center}
+.modal-card h2{font-size:20px;letter-spacing:0.04em;margin-bottom:6px;color:#1a2a1a}
+.modal-card p{font-size:14px;opacity:0.8;line-height:1.5;margin-bottom:12px}
+.badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#d8f3dc;border:1px solid #b7e4c7;font-size:12px;letter-spacing:0.04em;margin-bottom:10px;color:#1b4332}
+.kbd{font-family:ui-monospace,monospace;background:#f1f5f9;border:1px solid #cbd5e1;border-bottom-width:2px;padding:2px 6px;border-radius:6px;font-size:12px}
+.wind-indicator{display:flex;align-items:center;gap:6px;font-size:11px}
+.wind-arrow{width:20px;height:20px;display:grid;place-items:center;background:rgba(45,106,79,0.15);border-radius:50%;font-size:12px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="brand">
+      <div class="logo">🏹</div>
+      <div>
+        <h1>MEADOW ARCHERY</h1>
+        <p>SKY • AIM • LOOSE</p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat best"><div class="k">BEST</div><div class="v" id="bestVal">0</div></div>
+      <div class="stat"><div class="k">ARROWS</div><div class="v" id="arrowsVal">10</div></div>
+    </div>
+  </div>
+
+  <div class="hud">
+    <div class="card"><div class="label">SCORE</div><div class="value" id="scoreVal">0</div></div>
+    <div class="card level"><div class="label">LEVEL</div><div class="value" id="levelVal">1</div></div>
+    <div class="card arrows"><div class="label">WIND</div><div class="value" id="windVal" style="font-size:13px">—</div></div>
+  </div>
+
+  <div class="arena">
+    <div class="arena-top">
+      <span>ROUND <b id="roundVal">1/1</b></span>
+      <div class="wind-indicator"><span class="wind-arrow" id="windArrow">→</span><span id="windText">Calm</span></div>
+      <span id="accuracyVal">—</span>
+    </div>
+    <div class="canvas-wrap" id="wrap">
+      <canvas id="game" width="360" height="520"></canvas>
+      <div class="hint" id="hint">DRAG TO AIM • RELEASE TO LOOSE</div>
+      <div class="toast" id="toast"></div>
+    </div>
+    <div style="padding:8px 10px;background:rgba(255,255,255,0.92);border-top:1px solid rgba(0,0,0,0.08)">
+      <div class="bar"><i id="progressBar"></i></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;opacity:0.6;margin-top:4px"><span>Arrows used</span><span id="progressText">0/10</span></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-primary" id="startBtn">▶ START ROUND</button>
+    <button class="btn btn-ghost" id="aimBtn">🎯 STEADY AIM</button>
+    <div class="aim-controls">
+      <button class="btn btn-ghost" id="leftBtn">◀ NUDGE</button>
+      <button class="btn btn-primary" id="shootBtn" style="min-height:56px">🏹 LOOSE!</button>
+      <button class="btn btn-ghost" id="rightBtn">NUDGE ▶</button>
+    </div>
+    <button class="btn btn-ghost btn-wide" id="resetBtn">↻ NEW ROUND</button>
+  </div>
+  <div class="footer">Drag on target to aim — crosshair drifts with wind & breath. Center = 100pts, outer rings less. Hit birds for +50 bonus! 10 arrows per round.</div>
+</div>
+
+<div class="modal open" id="introModal">
+  <div class="modal-card">
+    <div class="badge">SKY-MEADOW • 360–428px PORTRAIT</div>
+    <h2>AIM FOR THE BULLSEYE</h2>
+    <p>Drag to aim your bow — the crosshair drifts with wind and your breathing. Release to loose your arrow!</p>
+    <p style="font-size:13px"><b>Scoring:</b> Gold 100 • Red 80 • Blue 60 • Black 40 • White 20 • Miss 0<br><b>Birds:</b> +50 bonus each!<br>10 arrows per round • Level up = stronger wind + smaller target</p>
+    <p><span class="kbd">Drag</span> to aim • <span class="kbd">Steady Aim</span> slows drift • <span class="kbd">Nudge</span> fine-tunes</p>
+    <button class="btn btn-primary btn-wide" id="playBtn">🏹 START SHOOTING</button>
+    <button class="btn btn-ghost btn-wide" id="howBtn" style="margin-top:8px">HOW TO PLAY</button>
+  </div>
+</div>
+
+<div class="modal" id="overModal">
+  <div class="modal-card">
+    <h2 id="overTitle">ROUND COMPLETE</h2>
+    <p id="overDesc"></p>
+    <div style="display:flex;gap:8px;justify-content:center;margin:8px 0 12px">
+      <div class="stat" style="background:#f1f5f9;color:#1a2a1a;border:1px solid #e2e8f0"><div class="k">SCORE</div><div class="v" id="overScore">0</div></div>
+      <div class="stat" style="background:#1a2a1a"><div class="k">BEST</div><div class="v" id="overBest">0</div></div>
+      <div class="stat best"><div class="k">LEVEL</div><div class="v" id="overLevel">1</div></div>
+    </div>
+    <button class="btn btn-primary btn-wide" id="againBtn">🏹 SHOOT AGAIN</button>
+  </div>
+</div>
+
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const wrap=document.getElementById('wrap');
+const scoreVal=document.getElementById('scoreVal');
+const levelVal=document.getElementById('levelVal');
+const windVal=document.getElementById('windVal');
+const arrowsVal=document.getElementById('arrowsVal');
+const bestVal=document.getElementById('bestVal');
+const roundVal=document.getElementById('roundVal');
+const accuracyVal=document.getElementById('accuracyVal');
+const progressBar=document.getElementById('progressBar');
+const progressText=document.getElementById('progressText');
+const windArrow=document.getElementById('windArrow');
+const windText=document.getElementById('windText');
+const toast=document.getElementById('toast');
+const hint=document.getElementById('hint');
+const introModal=document.getElementById('introModal');
+const overModal=document.getElementById('overModal');
+
+let score=0, best=0, level=1, arrows=10, arrowsUsed=0, round=1;
+let crosshairX=180, crosshairY=260, targetX=180, targetY=220;
+let driftX=0, driftY=0, windStrength=0, windDir=1, isAiming=false, aimSteady=false;
+let birds=[], arrowsFired=[], hitMarks=[], gameRunning=false, raf=null, lastTime=0;
+let targetRadius=70, birdTimer=0, driftPhase=0;
+
+function loadBest(){
+  try{ best=parseInt(localStorage.getItem('archeryBest')||'0',10)||0; }catch(e){best=0}
+  bestVal.textContent=best;
+}
+function saveBest(){
+  if(score>best){ best=score; try{localStorage.setItem('archeryBest', String(best));}catch(e){} bestVal.textContent=best; }
+}
+function updateHUD(){
+  scoreVal.textContent=score;
+  levelVal.textContent=level;
+  arrowsVal.textContent=arrows;
+  roundVal.textContent=round+'/∞';
+  progressBar.style.width=(arrowsUsed/10*100)+'%';
+  progressText.textContent=arrowsUsed+'/10';
+  const windLabels=['Calm','Light','Breeze','Gusty','Strong'];
+  const idx=Math.min(4, Math.floor(Math.abs(windStrength)*4));
+  windText.textContent=windLabels[idx];
+  windVal.textContent=(windStrength>0?'+':'')+windStrength.toFixed(1);
+  windArrow.textContent= windStrength>0.1 ? '→' : windStrength<-0.1 ? '←' : '○';
+  windArrow.style.background= Math.abs(windStrength)>0.5 ? 'rgba(239,68,68,0.2)' : 'rgba(45,106,79,0.15)';
+}
+function showToast(msg,color){
+  toast.textContent=msg;
+  toast.style.background=color||'rgba(26,42,26,0.92)';
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'),900);
+}
+function resetRound(){
+  arrows=10; arrowsUsed=0; birds=[]; arrowsFired=[]; hitMarks=[];
+  targetRadius=Math.max(45, 70 - (level-1)*6);
+  windStrength=(Math.random()-0.5)*0.8 + (level-1)*0.15;
+  windDir=Math.random()>0.5?1:-1;
+  windStrength*=windDir;
+  crosshairX=180; crosshairY=260;
+  updateHUD();
+  draw();
+}
+function startGame(){
+  if(gameRunning) return;
+  gameRunning=true;
+  resetRound();
+  score=0; level=1; round=1;
+  introModal.classList.remove('open');
+  overModal.classList.remove('open');
+  hint.style.display='none';
+  document.getElementById('startBtn').textContent='● SHOOTING';
+  lastTime=performance.now();
+  loop(lastTime);
+}
+function endRound(){
+  gameRunning=false; cancelAnimationFrame(raf);
+  saveBest();
+  document.getElementById('overTitle').textContent= arrowsUsed>=10 ? 'ROUND COMPLETE' : 'ROUND OVER';
+  document.getElementById('overDesc').textContent=`You scored ${score} points with ${arrowsUsed} arrows. Level ${level} reached!`;
+  document.getElementById('overScore').textContent=score;
+  document.getElementById('overBest').textContent=best;
+  document.getElementById('overLevel').textContent=level;
+  overModal.classList.add('open');
+  document.getElementById('startBtn').textContent='▶ START ROUND';
+}
+function nextLevel(){
+  level++; round++;
+  showToast('LEVEL '+level+' • WIND STRONGER!', '#f59e0b');
+  resetRound();
+  updateHUD();
+}
+
+// Input handling
+let dragging=false, dragStartX=0, dragStartY=0, aimOffsetX=0, aimOffsetY=0;
+function getPos(e){
+  const rect=wrap.getBoundingClientRect();
+  const x=( (e.touches?e.touches[0].clientX:e.clientX) - rect.left)/rect.width*360;
+  const y=( (e.touches?e.touches[0].clientY:e.clientY) - rect.top)/rect.height*520;
+  return {x,y};
+}
+wrap.addEventListener('pointerdown', (e)=>{
+  if(!gameRunning) return;
+  dragging=true; isAiming=true;
+  const p=getPos(e);
+  dragStartX=p.x; dragStartY=p.y;
+  aimOffsetX=crosshairX - p.x;
+  aimOffsetY=crosshairY - p.y;
+  wrap.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+wrap.addEventListener('pointermove', (e)=>{
+  if(!dragging) return;
+  const p=getPos(e);
+  crosshairX = p.x + aimOffsetX;
+  crosshairY = p.y + aimOffsetY;
+  crosshairX=Math.max(20,Math.min(340,crosshairX));
+  crosshairY=Math.max(40,Math.min(480,crosshairY));
+  e.preventDefault();
+});
+wrap.addEventListener('pointerup', (e)=>{
+  if(!dragging) return;
+  dragging=false; isAiming=false;
+  shootArrow();
+});
+wrap.addEventListener('pointercancel', ()=>{ dragging=false; isAiming=false; });
+wrap.addEventListener('pointerleave', ()=>{ if(dragging){ dragging=false; isAiming=false; } });
+
+document.getElementById('leftBtn').addEventListener('click', ()=>{ crosshairX-=12; crosshairX=Math.max(20,crosshairX); });
+document.getElementById('rightBtn').addEventListener('click', ()=>{ crosshairX+=12; crosshairX=Math.min(340,crosshairX); });
+document.getElementById('shootBtn').addEventListener('click', ()=>{ if(gameRunning && arrows>0) shootArrow(); });
+document.getElementById('aimBtn').addEventListener('click', ()=>{
+  aimSteady=!aimSteady;
+  document.getElementById('aimBtn').textContent= aimSteady ? '✓ STEADY ON' : '🎯 STEADY AIM';
+  document.getElementById('aimBtn').style.background= aimSteady ? '#2d6a4f' : '#fff';
+  document.getElementById('aimBtn').style.color= aimSteady ? '#fff' : '#1a2a1a';
+  showToast(aimSteady ? 'Steady aim: drift halved' : 'Steady aim off', aimSteady?'#2d6a4f':'#6b7280');
+});
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('resetBtn').addEventListener('click', ()=>{ if(gameRunning) resetRound(); else startGame(); });
+document.getElementById('playBtn').addEventListener('click', startGame);
+document.getElementById('againBtn').addEventListener('click', ()=>{ overModal.classList.remove('open'); startGame(); });
+document.getElementById('howBtn').addEventListener('click', ()=>alert('HOW TO PLAY:\n• Drag on the target to aim — crosshair drifts with wind & breathing.\n• Release to loose arrow (or tap LOOSE! button).\n• Gold center = 100pts, Red 80, Blue 60, Black 40, White 20.\n• Hit passing birds for +50 bonus!\n• 10 arrows per round, then level up with stronger wind.'));
+
+function shootArrow(){
+  if(arrows<=0) return;
+  arrows--; arrowsUsed++;
+  // Calculate hit position with some spread based on drift and wind
+  const spread = aimSteady ? 3 : 8 + Math.abs(windStrength)*6;
+  const hitX = crosshairX + (Math.random()-0.5)*spread + windStrength*4;
+  const hitY = crosshairY + (Math.random()-0.5)*spread;
+  
+  // Check bird hit first
+  let birdHit=null;
+  for(let b of birds){
+    const dx=hitX - b.x, dy=hitY - b.y;
+    if(Math.sqrt(dx*dx+dy*dy) < 22){
+      birdHit=b; break;
+    }
+  }
+  if(birdHit){
+    score+=50;
+    showToast('BIRD! +50', '#f59e0b');
+    birds=birds.filter(b=>b!==birdHit);
+    hitMarks.push({x:hitX,y:hitY,score:50,type:'bird',life:1.2});
+    if(navigator.vibrate) navigator.vibrate(20);
+  } else {
+    // Check target hit
+    const dx=hitX - targetX, dy=hitY - targetY;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    let pts=0, label='';
+    if(dist < targetRadius*0.2){ pts=100; label='BULLSEYE!'; }
+    else if(dist < targetRadius*0.4){ pts=80; label='RED!'; }
+    else if(dist < targetRadius*0.6){ pts=60; label='BLUE!'; }
+    else if(dist < targetRadius*0.8){ pts=40; label='BLACK!'; }
+    else if(dist < targetRadius){ pts=20; label='WHITE!'; }
+    else { pts=0; label='MISS!'; }
+    // Level multiplier
+    pts = Math.round(pts * (1 + (level-1)*0.15));
+    score+=pts;
+    if(pts>0) showToast(label+' +'+pts, pts>=80?'#2d6a4f':pts>=40?'#0ea5e9':'#6b7280');
+    else showToast('MISS!', '#ef4444');
+    hitMarks.push({x:hitX,y:hitY,score:pts,type:pts>0?'hit':'miss',life:1.2});
+    accuracyVal.textContent= pts>0 ? label : 'MISS';
+    if(navigator.vibrate) navigator.vibrate(pts>=80?30:12);
+  }
+  saveBest();
+  updateHUD();
+  arrowsFired.push({x:hitX,y:hitY,life:0.6});
+  
+  if(arrows<=0){
+    setTimeout(()=>{
+      if(arrowsUsed>=10) nextLevel();
+    },800);
+  }
+}
+
+function update(dt){
+  driftPhase += dt*0.001;
+  // Drift simulation: breathing + wind
+  const breathX = Math.sin(driftPhase*0.8)* (aimSteady?2:5);
+  const breathY = Math.cos(driftPhase*1.1)* (aimSteady?1.5:4);
+  const windDrift = windStrength * 8 * (aimSteady?0.5:1);
+  if(!dragging){
+    crosshairX += (breathX + windDrift)* dt*0.02;
+    crosshairY += breathY * dt*0.02;
+    // Keep in bounds with soft clamp
+    crosshairX = Math.max(30, Math.min(330, crosshairX));
+    crosshairY = Math.max(60, Math.min(460, crosshairY));
+    // Add slight random walk
+    crosshairX += (Math.random()-0.5)*0.8;
+    crosshairY += (Math.random()-0.5)*0.8;
+  }
+  // Birds
+  birdTimer += dt;
+  if(birdTimer > 1800 - level*120){
+    birdTimer=0;
+    if(Math.random()<0.7){
+      const y= 80 + Math.random()*180;
+      const dir=Math.random()>0.5?1:-1;
+      birds.push({x: dir>0?-20:380, y:y, vx: dir*(1.2 + level*0.3 + Math.random()*0.8), wing:0});
+    }
+  }
+  for(let b of birds) { b.x+=b.vx*dt*0.06; b.wing+=dt*0.02; }
+  birds=birds.filter(b=>b.x>-30 && b.x<390);
+  // Hit marks fade
+  for(let h of hitMarks) h.life-=dt*0.001;
+  hitMarks=hitMarks.filter(h=>h.life>0);
+  for(let a of arrowsFired) a.life-=dt*0.001;
+  arrowsFired=arrowsFired.filter(a=>a.life>0);
+}
+
+function drawTarget(){
+  const x=targetX, y=targetY, r=targetRadius;
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.15)';
+  ctx.beginPath(); ctx.ellipse(x, y+ r+8, r*0.9, 8,0,0,Math.PI*2); ctx.fill();
+  // Stand
+  ctx.fillStyle='#8b7355'; ctx.fillRect(x-4, y+r, 8, 520-y-r);
+  ctx.fillStyle='#a0826d'; ctx.fillRect(x-30, 500, 60, 8);
+  // Rings from outer to inner
+  const rings=[
+    {r:1.0, c:'#ffffff', s:'#e5e7eb'},
+    {r:0.8, c:'#1f2937', s:'#111827'},
+    {r:0.6, c:'#3b82f6', s:'#1d4ed8'},
+    {r:0.4, c:'#ef4444', s:'#b91c1c'},
+    {r:0.2, c:'#facc15', s:'#eab308'},
+  ];
+  for(let ring of rings){
+    ctx.fillStyle=ring.c;
+    ctx.strokeStyle=ring.s;
+    ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(x,y, r*ring.r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  }
+  // Center dot
+  ctx.fillStyle='#facc15'; ctx.beginPath(); ctx.arc(x,y, r*0.08,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.arc(x,y, r*0.08,0,Math.PI*2); ctx.stroke();
+}
+function drawBird(b){
+  const x=b.x, y=b.y;
+  ctx.save();
+  ctx.translate(x,y);
+  if(b.vx<0) ctx.scale(-1,1);
+  // Body
+  ctx.fillStyle='#f59e0b';
+  ctx.beginPath(); ctx.ellipse(0,0,14,7,0,0,Math.PI*2); ctx.fill();
+  // Head
+  ctx.fillStyle='#fbbf24'; ctx.beginPath(); ctx.arc(10, -2, 6,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#1f2937'; ctx.beginPath(); ctx.arc(12,-3,1.5,0,Math.PI*2); ctx.fill();
+  // Beak
+  ctx.fillStyle='#f97316'; ctx.beginPath(); ctx.moveTo(16,-2); ctx.lineTo(20,0); ctx.lineTo(16,2); ctx.fill();
+  // Wings flapping
+  const flap=Math.sin(b.wing)*0.6;
+  ctx.fillStyle='#d97706';
+  ctx.beginPath(); ctx.ellipse(-2, flap*6, 10,4, flap*0.5,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-2, -flap*6, 10,4, -flap*0.5,0,Math.PI*2); ctx.fill();
+  // Tail
+  ctx.fillStyle='#92400e'; ctx.beginPath(); ctx.moveTo(-12,0); ctx.lineTo(-18,-4); ctx.lineTo(-18,4); ctx.fill();
+  ctx.restore();
+}
+function drawCrosshair(){
+  const x=crosshairX, y=crosshairY;
+  ctx.strokeStyle= isAiming ? '#ef4444' : '#1f2937';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  // Horizontal
+  ctx.moveTo(x-18,y); ctx.lineTo(x-6,y);
+  ctx.moveTo(x+6,y); ctx.lineTo(x+18,y);
+  // Vertical
+  ctx.moveTo(x,y-18); ctx.lineTo(x,y-6);
+  ctx.moveTo(x,y+6); ctx.lineTo(x,y+18);
+  ctx.stroke();
+  // Center dot
+  ctx.fillStyle= isAiming ? '#ef4444' : '#facc15';
+  ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=1; ctx.stroke();
+  // Outer circle when steady
+  if(aimSteady){
+    ctx.strokeStyle='rgba(45,106,79,0.5)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.arc(x,y,22,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+  }
+}
+function draw(){
+  ctx.clearRect(0,0,360,520);
+  // Sky gradient
+  const g=ctx.createLinearGradient(0,0,0,520);
+  g.addColorStop(0,'#87ceeb'); g.addColorStop(0.4,'#b0e0e6'); g.addColorStop(0.65,'#d4e8b0'); g.addColorStop(1,'#7ab86f');
+  ctx.fillStyle=g; ctx.fillRect(0,0,360,520);
+  // Clouds
+  ctx.fillStyle='rgba(255,255,255,0.85)';
+  for(let i=0;i<3;i++){
+    const cx= (60 + i*110 + driftPhase*10)%360;
+    const cy= 50 + i*18;
+    ctx.beginPath(); ctx.arc(cx,cy,18,0,Math.PI*2); ctx.arc(cx+16,cy+4,14,0,Math.PI*2); ctx.arc(cx-14,cy+6,12,0,Math.PI*2); ctx.fill();
+  }
+  // Hills
+  ctx.fillStyle='#8bc48a'; ctx.beginPath(); ctx.moveTo(0,380); ctx.quadraticCurveTo(90,340,180,380); ctx.quadraticCurveTo(270,420,360,360); ctx.lineTo(360,520); ctx.lineTo(0,520); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#7ab86f'; ctx.beginPath(); ctx.moveTo(0,420); ctx.quadraticCurveTo(120,390,240,430); ctx.lineTo(360,400); ctx.lineTo(360,520); ctx.lineTo(0,520); ctx.closePath(); ctx.fill();
+  // Flowers
+  ctx.fillStyle='rgba(255,255,255,0.6)';
+  for(let i=0;i<8;i++){ const fx=(i*45+20)%360, fy=460+Math.sin(i)*10; ctx.beginPath(); ctx.arc(fx,fy,2,0,Math.PI*2); ctx.fill(); }
+  // Target
+  drawTarget();
+  // Birds
+  for(let b of birds) drawBird(b);
+  // Hit marks
+  for(let h of hitMarks){
+    ctx.globalAlpha=Math.max(0,h.life);
+    if(h.type==='bird'){
+      ctx.fillStyle='#f59e0b'; ctx.font='bold 14px system-ui'; ctx.textAlign='center'; ctx.fillText('+50', h.x, h.y-14);
+    } else {
+      ctx.fillStyle= h.score>=80 ? '#2d6a4f' : h.score>=40 ? '#1d4ed8' : h.score>0 ? '#6b7280' : '#ef4444';
+      ctx.beginPath(); ctx.arc(h.x,h.y,4,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=3;
+      ctx.font='bold 12px system-ui'; ctx.textAlign='center'; ctx.strokeText(h.score, h.x, h.y-10); ctx.fillText(h.score, h.x, h.y-10);
+    }
+  }
+  ctx.globalAlpha=1;
+  // Arrows stuck
+  for(let a of arrowsFired){
+    ctx.globalAlpha=Math.max(0,a.life*1.5);
+    ctx.fillStyle='#78350f'; ctx.fillRect(a.x-1, a.y-8, 2, 16);
+    ctx.fillStyle='#ef4444'; ctx.beginPath(); ctx.moveTo(a.x, a.y-10); ctx.lineTo(a.x-5,a.y-6); ctx.lineTo(a.x+5,a.y-6); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  // Crosshair
+  drawCrosshair();
+  // Wind line
+  if(Math.abs(windStrength)>0.2){
+    ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1; ctx.setLineDash([5,5]);
+    const wx=crosshairX, wy=crosshairY;
+    ctx.beginPath(); ctx.moveTo(wx-30*windStrength, wy); ctx.lineTo(wx+30*windStrength, wy); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='10px system-ui'; ctx.textAlign='center';
+    ctx.fillText(windStrength>0?'→ wind':'← wind', wx, wy-26);
+  }
+}
+
+function loop(now){
+  if(!gameRunning) return;
+  const dt=Math.min(32, now-lastTime); lastTime=now;
+  update(dt);
+  draw();
+  raf=requestAnimationFrame(loop);
+}
+
+loadBest();
+resetRound();
+updateHUD();
+draw();
+</script>
+</body>
+</html>

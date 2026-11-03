@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Well Escape</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#06120d;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#wrap{width:100%;max-width:428px;min-width:360px;height:100vh;height:100dvh;margin:0 auto;background:#0f2a1c;display:flex;flex-direction:column;position:relative;overflow:hidden;box-shadow:0 0 30px rgba(0,0,0,.6)}
+header{height:56px;background:linear-gradient(180deg,#1e3d2a,#143021);border-bottom:3px solid #2d5a3a;display:flex;align-items:center;justify-content:space-between;padding:0 12px;color:#e8f5e9;flex-shrink:0}
+.hud-left,.hud-right{display:flex;gap:8px;align-items:center}
+.badge{background:rgba(0,0,0,.35);border:1px solid #3a6b4a;border-radius:10px;padding:4px 8px;font-size:13px;font-weight:700;min-width:52px;text-align:center}
+.badge span{font-size:11px;opacity:.8;display:block;line-height:1}
+.badge b{font-size:14px;color:#a8e6a0}
+.hearts{font-size:16px;letter-spacing:1px}
+#canvasBox{flex:1;position:relative;background:#0a1f14;overflow:hidden}
+canvas{width:100%;height:100%;display:block;touch-action:none}
+#overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at center, rgba(10,40,25,.92) 0%, rgba(5,18,12,.96) 70%);padding:20px;text-align:center;z-index:5}
+#overlay.hidden{display:none}
+.logo{font-size:32px;font-weight:900;letter-spacing:1px;color:#c8f0c0;text-shadow:0 3px 0 #1a3d1a,0 0 12px rgba(120,220,120,.5);line-height:1}
+.logo small{display:block;font-size:13px;font-weight:600;letter-spacing:3px;color:#7fbf7a;margin-top:4px}
+.card{background:rgba(255,255,255,.08);border:1px solid rgba(120,180,120,.3);border-radius:16px;padding:14px 16px;margin:14px 0;width:100%;max-width:320px;backdrop-filter:blur(4px)}
+.card p{font-size:13px;line-height:1.4;color:#d6ecd2}
+.btn{appearance:none;border:none;background:linear-gradient(180deg,#4caf50,#2e7d32);color:white;font-weight:800;font-size:16px;padding:12px 22px;border-radius:12px;box-shadow:0 4px 0 #1b4d1e,0 6px 12px rgba(0,0,0,.3);cursor:pointer;min-height:48px;min-width:140px}
+.btn:active{transform:translateY(2px);box-shadow:0 2px 0 #1b4d1e}
+.btn.secondary{background:linear-gradient(180deg,#5d6b5a,#3a4438);box-shadow:0 4px 0 #222,0 6px 12px rgba(0,0,0,.3)}
+.row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.kbd{font-size:11px;background:rgba(0,0,0,.4);border:1px solid #4a7a5a;border-radius:6px;padding:2px 6px;color:#b8d8b0}
+#controls{height:112px;background:linear-gradient(180deg,#142e1e,#0d2116);border-top:3px solid #2d5a3a;display:flex;align-items:center;justify-content:space-between;padding:8px 10px 10px;gap:10px;flex-shrink:0}
+.dpad{display:flex;gap:10px}
+.cbtn{width:72px;height:72px;border-radius:18px;border:2px solid #3a6b4a;background:linear-gradient(180deg,#2a4a32,#1a2e1e);color:#c8f0c0;font-size:26px;font-weight:900;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;touch-action:none;box-shadow:0 4px 0 #0f1f14,0 4px 10px rgba(0,0,0,.3)}
+.cbtn:active,.cbtn.held{background:linear-gradient(180deg,#3a6b4a,#2a4a32);transform:translateY(2px);box-shadow:0 2px 0 #0f1f14}
+.cbtn.jump{width:96px;height:72px;background:linear-gradient(180deg,#66bb6a,#2e7d32);border-color:#81c784;color:white;font-size:15px;flex-direction:column;gap:2px}
+.cbtn.jump span{font-size:10px;letter-spacing:1px}
+.hint{position:absolute;bottom:118px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);color:#c8e6c9;font-size:11px;padding:4px 8px;border-radius:20px;border:1px solid rgba(120,180,120,.3);pointer-events:none;white-space:nowrap}
+.waterWarn{position:absolute;top:62px;left:50%;transform:translateX(-50%);background:linear-gradient(90deg,#0288d1,#00bcd4);color:white;font-size:12px;font-weight:800;padding:4px 10px;border-radius:20px;opacity:0;transition:.3s;pointer-events:none}
+.waterWarn.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <header>
+    <div class="hud-left">
+      <div class="badge"><span>SCORE</span><b id="scoreEl">0</b></div>
+      <div class="badge"><span>BEST</span><b id="bestEl">0</b></div>
+    </div>
+    <div class="hud-right">
+      <div class="hearts" id="heartsEl">❤❤❤</div>
+      <div class="badge"><span>LEVEL</span><b id="levelEl">1</b></div>
+    </div>
+  </header>
+  <div id="canvasBox">
+    <canvas id="c" width="360" height="640"></canvas>
+    <div class="waterWarn" id="warnEl">▲ WATER RISING ▲</div>
+    <div class="hint">ARROWS + SPACE • or use buttons below</div>
+    <div id="overlay">
+      <div class="logo">WELL ESCAPE<small>MOSSY STONE WELL</small></div>
+      <div class="card">
+        <p><b style="color:#a8e6a0">Climb before the water gets you!</b><br>
+        Hop ledge to ledge, dodge bats & spikes. Each level the water rises faster.</p>
+        <p style="margin-top:8px;font-size:12px;opacity:.9">◀ ▶ Move &nbsp; ⏺ JUMP &nbsp; • Tap left/right to steer</p>
+      </div>
+      <button class="btn" id="playBtn">▶ PLAY</button>
+      <div class="row">
+        <span class="kbd">← → Move</span><span class="kbd">SPACE Jump</span><span class="kbd">P Pause</span>
+      </div>
+      <p id="overText" style="margin-top:10px;font-size:13px;color:#ffcc80;min-height:18px"></p>
+    </div>
+  </div>
+  <div id="controls">
+    <div class="dpad">
+      <button class="cbtn" id="leftBtn" aria-label="Left">◀</button>
+      <button class="cbtn" id="rightBtn" aria-label="Right">▶</button>
+    </div>
+    <button class="cbtn jump" id="jumpBtn" aria-label="Jump">▲<span>JUMP</span></button>
+  </div>
+</div>
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const W=360,H=640;
+const scoreEl=document.getElementById('scoreEl'), bestEl=document.getElementById('bestEl'), levelEl=document.getElementById('levelEl'), heartsEl=document.getElementById('heartsEl');
+const overlay=document.getElementById('overlay'), playBtn=document.getElementById('playBtn'), overText=document.getElementById('overText'), warnEl=document.getElementById('warnEl');
+
+let best=parseInt(localStorage.getItem('wellEscapeBest')||'0');
+bestEl.textContent=best;
+
+const GRAVITY=0.58, JUMP_V=-11.8, MOVE_SPEED=3.6, FRICTION=0.82;
+let player, platforms, bats, particles, waterY, waterSpeed, cameraY, targetCamY, score, level, lives, maxY, invincible, gameState='menu', lastGenY, shake=0;
+
+function resetGame(){
+  player={x:166,y:520,w:18,h:26,vx:0,vy:0,onGround:false,dir:1};
+  platforms=[]; bats=[]; particles=[];
+  waterY=720; waterSpeed=0.75;
+  cameraY=0; targetCamY=0;
+  score=0; level=1; lives=3; maxY=player.y; invincible=0; lastGenY=520; shake=0;
+  genInitial();
+  updateHUD();
+}
+
+function genInitial(){
+  platforms.push({x:120,y:560,w:120,h:14,type:'mossy',timer:0});
+  let y=470;
+  for(let i=0;i<45;i++){
+    addPlatform(y);
+    y-= 68 + Math.random()*42;
+  }
+  lastGenY=y;
+}
+function addPlatform(y){
+  let w= 62 + Math.random()*58;
+  let x= 18 + Math.random()*(W-36-w);
+  let r=Math.random();
+  let type='normal';
+  if(r>0.88) type='spiked';
+  else if(r>0.78) type='crumble';
+  else if(r>0.60) type='mossy';
+  platforms.push({x,y,w,h:12,type,timer:0,phase:Math.random()*6});
+  if(Math.random()<0.28){
+    let bx= 20+Math.random()*(W-40);
+    bats.push({x:bx,y:y-18,w:26,h:14,vx:(Math.random()<0.5?1:-1)*(1.1+Math.random()*0.7),ox:bx,range:50+Math.random()*40,wing:Math.random()*6});
+  }
+}
+function ensureGen(){
+  while(lastGenY > player.y - 900){
+    lastGenY -= 68 + Math.random()*42;
+    addPlatform(lastGenY);
+  }
+}
+
+function updateHUD(){
+  scoreEl.textContent=score;
+  bestEl.textContent=best;
+  levelEl.textContent=level;
+  heartsEl.textContent='❤'.repeat(lives) + '♡'.repeat(Math.max(0,3-lives));
+  if(lives<=1) heartsEl.style.color='#ff5252'; else heartsEl.style.color='#ff8a80';
+}
+
+let keys={};
+window.addEventListener('keydown',e=>{
+  if(['ArrowLeft','ArrowRight',' ','ArrowUp','p','P'].includes(e.key)) e.preventDefault();
+  keys[e.key.toLowerCase()]=true;
+  if(e.code==='Space' || e.key==='ArrowUp' || e.key==='w') tryJump();
+  if(e.key==='p' || e.key==='P') togglePause();
+});
+window.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
+
+let leftHeld=false,rightHeld=false;
+function bindHold(btn, get, set){
+  const onDown=e=>{e.preventDefault(); set(true); btn.classList.add('held');};
+  const onUp=e=>{e.preventDefault(); set(false); btn.classList.remove('held');};
+  btn.addEventListener('pointerdown',onDown);
+  btn.addEventListener('pointerup',onUp);
+  btn.addEventListener('pointercancel',onUp);
+  btn.addEventListener('pointerleave',onUp);
+}
+bindHold(document.getElementById('leftBtn'),()=>leftHeld,v=>leftHeld=v);
+bindHold(document.getElementById('rightBtn'),()=>rightHeld,v=>rightHeld=v);
+const jumpBtn=document.getElementById('jumpBtn');
+jumpBtn.addEventListener('pointerdown',e=>{e.preventDefault(); tryJump();});
+jumpBtn.addEventListener('touchstart',e=>{e.preventDefault(); tryJump();},{passive:false});
+
+// canvas tap to move
+let canvasTouchX=null;
+canvas.addEventListener('pointerdown',e=>{
+  const rect=canvas.getBoundingClientRect();
+  const x=(e.clientX-rect.left)/rect.width * W;
+  canvasTouchX=x;
+  if(x < W/2) leftHeld=true; else rightHeld=true;
+});
+canvas.addEventListener('pointermove',e=>{
+  if(canvasTouchX===null) return;
+  const rect=canvas.getBoundingClientRect();
+  const x=(e.clientX-rect.left)/rect.width * W;
+  leftHeld = x < W/2 -10;
+  rightHeld = x > W/2 +10;
+});
+function clearTouchMove(){
+  canvasTouchX=null;
+  // keep button holds? only clear if not button held
+  // we track separately: if touch was on canvas, clear both
+  // but buttons have their own handlers, so we need to not override
+  // simple: if no button is actively held via pointer, clear
+  // We'll just clear if the active pointer is canvas
+  // For simplicity, clear both when canvas pointer up, but button holds will re-assert on next frame if still down
+  // So delay a bit
+  setTimeout(()=>{
+    if(!document.getElementById('leftBtn').classList.contains('held')) leftHeld=false;
+    if(!document.getElementById('rightBtn').classList.contains('held')) rightHeld=false;
+  },30);
+}
+canvas.addEventListener('pointerup',clearTouchMove);
+canvas.addEventListener('pointercancel',clearTouchMove);
+canvas.addEventListener('pointerleave',clearTouchMove);
+
+function tryJump(){
+  if(gameState!=='playing') return;
+  if(player.onGround){
+    player.vy=JUMP_V;
+    player.onGround=false;
+    spawnParticles(player.x+player.w/2, player.y+player.h, 6, '#a8e6a0');
+    shake=2;
+  }
+}
+function togglePause(){
+  if(gameState==='playing'){ gameState='paused'; overlay.classList.remove('hidden'); playBtn.textContent='▶ RESUME'; overText.textContent='Paused — press P or tap Resume'; }
+  else if(gameState==='paused'){ overlay.classList.add('hidden'); gameState='playing'; }
+}
+playBtn.addEventListener('click',()=>{
+  if(gameState==='menu' || gameState==='gameover'){
+    resetGame(); gameState='playing'; overlay.classList.add('hidden'); playBtn.textContent='▶ PLAY';
+    overText.textContent='';
+  } else if(gameState==='paused'){
+    overlay.classList.add('hidden'); gameState='playing';
+  } else if(gameState==='playing'){
+    togglePause();
+  }
+});
+
+function loseLife(reason){
+  if(invincible>0) return;
+  lives--; shake=8; spawnParticles(player.x+9, player.y+10, 10, '#ff5252');
+  invincible=90;
+  if(lives<=0){
+    gameState='gameover';
+    overlay.classList.remove('hidden');
+    playBtn.textContent='↻ RETRY';
+    overText.textContent= reason + ' — Score '+score+' (Best '+best+')';
+    if(score>best){ best=score; localStorage.setItem('wellEscapeBest',best); }
+    updateHUD();
+  } else {
+    player.vy=-7;
+    // lift a bit above water if drowned
+    if(reason.includes('Water')){ player.y = waterY - 60; player.vy=-9; }
+    updateHUD();
+  }
+}
+
+function spawnParticles(x,y,n,color){
+  for(let i=0;i<n;i++) particles.push({x,y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4-1,life:18+Math.random()*12,color, r:2+Math.random()*2});
+}
+
+function update(){
+  if(gameState!=='playing') return;
+  // input
+  let move=0;
+  if(keys['arrowleft']||keys['a']||leftHeld) move-=1;
+  if(keys['arrowright']||keys['d']||rightHeld) move+=1;
+  if(move!==0){
+    player.vx += move*0.9;
+    player.dir = move>0?1:-1;
+  } else {
+    player.vx *= FRICTION;
+  }
+  player.vx = Math.max(-MOVE_SPEED, Math.min(MOVE_SPEED, player.vx));
+  // gravity
+  player.vy += GRAVITY;
+  if(player.vy>10) player.vy=10;
+  player.x += player.vx;
+  player.y += player.vy;
+
+  // wall clamp
+  if(player.x<18){ player.x=18; player.vx=0; }
+  if(player.x+player.w>W-18){ player.x=W-18-player.w; player.vx=0; }
+
+  // platform collisions
+  player.onGround=false;
+  for(let p of platforms){
+    if(p.timer<0) continue; // gone
+    // only when falling
+    if(player.vy>=0){
+      let px=p.x, py=p.y, pw=p.w, ph=p.h;
+      let nextBottom = player.y + player.h;
+      let prevBottom = nextBottom - player.vy;
+      if(player.x+player.w>px && player.x<px+pw && nextBottom>=py && nextBottom<=py+ph+6 && prevBottom<=py){
+        // landed
+        if(p.type==='spiked'){
+          loseLife('Spikes!');
+          // bounce
+          player.y=py - player.h;
+          player.vy=-6;
+        } else {
+          player.y=py - player.h;
+          player.vy=0;
+          player.onGround=true;
+          if(p.type==='crumble' && p.timer===0){
+            p.timer=1; // start crumbling
+          }
+          if(p.type==='mossy'){
+            // slight extra bounce handled by normal
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  // crumble logic
+  for(let p of platforms){
+    if(p.timer>0){
+      p.timer++;
+      if(p.timer>35) p.timer=-1; // gone
+    }
+  }
+
+  // bats
+  for(let b of bats){
+    b.x += b.vx;
+    b.wing+=0.35;
+    if(b.x < b.ox - b.range || b.x > b.ox + b.range) b.vx*=-1;
+    // collision with player
+    if(invincible<=0){
+      if(player.x < b.x+b.w && player.x+player.w > b.x && player.y < b.y+b.h && player.y+player.h > b.y){
+        loseLife('Bat hit!');
+        player.vx = b.vx*1.5;
+        player.vy=-6;
+      }
+    }
+  }
+
+  // water rise
+  level = Math.floor(score/350)+1;
+  waterSpeed = 0.65 + level*0.28 + score*0.0004;
+  waterY -= waterSpeed;
+  // water catches player
+  if(player.y + player.h > waterY -2){
+    loseLife('Water!');
+  }
+  // fell too far below camera?
+  if(player.y > cameraY + H + 40){
+    loseLife('Fell!');
+  }
+
+  // score = height climbed
+  if(player.y < maxY) maxY=player.y;
+  let newScore = Math.max(0, Math.floor((520 - maxY)*1.2));
+  if(newScore!==score){ score=newScore; if(score>best){best=score; localStorage.setItem('wellEscapeBest',best);} updateHUD(); }
+
+  // camera follow
+  targetCamY = player.y - H*0.62;
+  // don't go below start
+  if(targetCamY > 80) targetCamY=80;
+  cameraY += (targetCamY - cameraY)*0.09;
+
+  // warn when water close
+  let distToWater = (waterY - (cameraY+H));
+  if(distToWater < 120 && distToWater > -200) warnEl.classList.add('show'); else warnEl.classList.remove('show');
+
+  ensureGen();
+  // cull old platforms far below water
+  platforms = platforms.filter(p=> p.y < waterY+200 && p.y > cameraY-200);
+  bats = bats.filter(b=> b.y > cameraY-100 && b.y < waterY+100);
+
+  if(invincible>0) invincible--;
+  if(shake>0) shake*=0.85, shake-=0.1, shake=Math.max(0,shake);
+
+  // particles
+  for(let pt of particles){ pt.x+=pt.vx; pt.y+=pt.vy; pt.vy+=0.2; pt.life--; }
+  particles=particles.filter(p=>p.life>0);
+}
+
+function drawStoneWall(x,w){
+  // vertical wall with bricks
+  ctx.fillStyle='#2b3a2e';
+  ctx.fillRect(x, cameraY-100, w, H+400);
+  // bricks
+  ctx.strokeStyle='rgba(0,0,0,.25)';
+  ctx.lineWidth=1;
+  for(let y=Math.floor(cameraY/20)*20-40; y<cameraY+H+200; y+=20){
+    let offset = (Math.floor(y/20)%2)*10;
+    for(let bx=x-10+offset; bx<x+w; bx+=40){
+      ctx.strokeRect(bx, y, 38, 18);
+    }
+  }
+  // moss splotches
+  ctx.fillStyle='rgba(60,120,60,.35)';
+  for(let i=0;i<6;i++){
+    let my = cameraY + (i*130 + (x*7)%50) % (H+200) -20;
+    ctx.beginPath(); ctx.ellipse(x+w/2, my, 10, 14, 0,0,Math.PI*2); ctx.fill();
+  }
+  // inner highlight
+  ctx.fillStyle='rgba(180,220,160,.08)';
+  ctx.fillRect(x+w-4, cameraY-100, 4, H+400);
+}
+
+function draw(){
+  ctx.save();
+  if(shake>0) ctx.translate((Math.random()-0.5)*shake*2, (Math.random()-0.5)*shake*2);
+  // bg
+  let grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'#0b2a18'); grad.addColorStop(1,'#0a1f14');
+  ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
+
+  ctx.save();
+  ctx.translate(0, -cameraY);
+
+  // walls
+  drawStoneWall(0,18);
+  drawStoneWall(W-18,18);
+
+  // platforms
+  for(let p of platforms){
+    if(p.timer<0) continue;
+    let alpha = p.timer>0 ? 1 - (p.timer/35)*0.7 : 1;
+    ctx.globalAlpha=alpha;
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,.3)';
+    ctx.fillRect(p.x+2, p.y+4, p.w, p.h);
+    // stone
+    let base = p.type==='mossy' ? '#4a5a3a' : p.type==='crumble' ? '#6b5a3a' : p.type==='spiked' ? '#5a3a3a' : '#5a4e3a';
+    ctx.fillStyle=base;
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    // top moss/edge
+    if(p.type==='mossy'){
+      ctx.fillStyle='#3d7a33'; ctx.fillRect(p.x, p.y, p.w, 4);
+      ctx.fillStyle='#6fbf5a'; ctx.fillRect(p.x+4, p.y+1, p.w-8, 1);
+    } else if(p.type==='spiked'){
+      ctx.fillStyle='#2a2a2a';
+      // spikes
+      let spikes=Math.floor(p.w/12);
+      for(let s=0;s<spikes;s++){
+        let sx=p.x+6+s*12;
+        ctx.beginPath(); ctx.moveTo(sx, p.y); ctx.lineTo(sx+6, p.y-10); ctx.lineTo(sx+12, p.y); ctx.closePath(); ctx.fill();
+      }
+      ctx.fillStyle='#ff5252'; ctx.fillRect(p.x, p.y, p.w, 2);
+    } else {
+      ctx.fillStyle='#8a7a5a'; ctx.fillRect(p.x, p.y, p.w, 2);
+    }
+    // brick lines
+    ctx.strokeStyle='rgba(0,0,0,.2)'; ctx.strokeRect(p.x, p.y, p.w, p.h);
+    if(p.timer>0){
+      // cracks
+      ctx.strokeStyle='rgba(0,0,0,.5)'; ctx.beginPath();
+      ctx.moveTo(p.x+p.w/2, p.y); ctx.lineTo(p.x+p.w/2+ (p.timer%2?4:-4), p.y+p.h); ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // bats
+  for(let b of bats){
+    let flap=Math.sin(b.wing)*8;
+    ctx.fillStyle='#1a1a1a';
+    // wings
+    ctx.beginPath();
+    ctx.ellipse(b.x+4, b.y+7, 10, 5+flap*0.2, -0.3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(b.x+b.w-4, b.y+7, 10, 5+flap*0.2, 0.3,0,Math.PI*2); ctx.fill();
+    // body
+    ctx.fillStyle='#2b2b2b';
+    ctx.beginPath(); ctx.ellipse(b.x+b.w/2, b.y+7, 7,5,0,0,Math.PI*2); ctx.fill();
+    // eyes
+    ctx.fillStyle='#ff3b30'; ctx.beginPath(); ctx.arc(b.x+10, b.y+5,1.2,0,Math.PI*2); ctx.arc(b.x+16, b.y+5,1.2,0,Math.PI*2); ctx.fill();
+  }
+
+  // player
+  ctx.save();
+  let px=player.x, py=player.y;
+  if(invincible>0 && Math.floor(invincible/4)%2===0) ctx.globalAlpha=0.4;
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px+9, py+26, 8,3,0,0,Math.PI*2); ctx.fill();
+  // legs
+  ctx.fillStyle='#2e4a2e'; ctx.fillRect(px+3, py+18, 5,8); ctx.fillRect(px+10, py+18,5,8);
+  // body
+  ctx.fillStyle='#4caf50'; ctx.fillRect(px+2, py+8, 14,10);
+  // backpack
+  ctx.fillStyle='#3a2a1a'; ctx.fillRect(px+12, py+9,4,7);
+  // head
+  ctx.fillStyle='#ffcc9a'; ctx.fillRect(px+4, py+1,10,8);
+  // cap
+  ctx.fillStyle='#ff6f00'; ctx.fillRect(px+3, py+0,12,3);
+  // face dir
+  ctx.fillStyle='#000'; ctx.fillRect(px+(player.dir>0?10:4), py+4,2,2);
+  ctx.restore();
+
+  // particles
+  for(let pt of particles){
+    ctx.globalAlpha=Math.max(0,pt.life/20);
+    ctx.fillStyle=pt.color; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.r,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // water
+  let waterTop = waterY;
+  ctx.fillStyle='#0a4a6a';
+  ctx.fillRect(18, waterTop, W-36, H+400);
+  // wave top
+  ctx.fillStyle='#1aa0d0';
+  ctx.beginPath();
+  ctx.moveTo(18, waterTop);
+  for(let x=18;x<=W-18;x+=6){
+    let wy = waterTop + Math.sin((x+Date.now()*0.005))*4 + Math.cos((x*0.5+Date.now()*0.003))*2;
+    ctx.lineTo(x, wy);
+  }
+  ctx.lineTo(W-18, waterTop+12); ctx.lineTo(18, waterTop+12); ctx.closePath(); ctx.fill();
+  // foam
+  ctx.fillStyle='rgba(255,255,255,.6)';
+  for(let x=22;x<W-18;x+=28){
+    let fx = x + Math.sin(Date.now()*0.004 + x)*3;
+    ctx.fillRect(fx, waterTop-2, 10,2);
+  }
+  // depth gradient
+  let wg=ctx.createLinearGradient(0,waterTop,0,waterTop+120);
+  wg.addColorStop(0,'rgba(0,180,220,.0)'); wg.addColorStop(1,'rgba(0,40,80,.6)');
+  ctx.fillStyle=wg; ctx.fillRect(18, waterTop, W-36, 120);
+
+  ctx.restore(); // camera
+
+  // vignette
+  ctx.fillStyle='rgba(0,0,0,.18)'; ctx.fillRect(0,0,W,18); ctx.fillRect(0,H-18,W,18);
+  ctx.restore();
+}
+
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+resetGame();
+loop();
+
+// handle visibility pause
+document.addEventListener('visibilitychange',()=>{ if(document.hidden && gameState==='playing') togglePause(); });
+</script>
+</body>
+</html>

@@ -6,46 +6,34 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RectF
 import com.samosaai.masala.core.tool.ActionResult
 import com.samosaai.masala.core.tool.Produced
 import com.samosaai.masala.core.tool.ToolFiles
 import com.samosaai.masala.llm.AiSettingsStore
+import com.samosaai.masala.tools.sam.Cutout
+import com.samosaai.masala.tools.sam.MaskCodec
+import com.samosaai.masala.tools.sam.MaskDraw
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import kotlinx.serialization.json.buildJsonArray
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 /**
  * SAM 3.1 segmentation (plan `docs/plans/media-tools.md`): sends an image + a
  * short noun phrase to `POST {base}/responses` (`model: "sam-3.1"`, same Bearer
- * key as everything else) and returns an annotated PNG (boxes drawn) plus a
- * JSON summary. Boxes are parsed from the wire format; mask payloads are
- * counted and kept in the raw text file, pixel-mask raster overlay is follow-up.
+ * key as everything else) and returns an annotated PNG (each object's decoded
+ * mask painted as a tinted overlay with an edge outline, plus a very faint box),
+ * one transparent-background cutout PNG per segmented object, plus a JSON
+ * summary. A record whose mask fails to decode falls back to its box so the
+ * run still produces something.
  */
 class SamSegmentTool(
     private val context: Context,
     private val settings: AiSettingsStore,
     private val resolver: ToolFiles,
 ) {
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
-    private val http = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(300, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
-        .build()
-
     data class Box(val x1: Int, val y1: Int, val x2: Int, val y2: Int)
 
     suspend fun segment(pathOrUrl: String, prompt: String): ActionResult =
@@ -67,31 +55,53 @@ class SamSegmentTool(
                 return@withContext ActionResult.error(it.message ?: "Segmentation failed.")
             }
             val boxes = parseBoxes(text)
-            val maskCount = MASK_RE.findAll(text).count()
+            val maskCount = SamShared.countMasks(text)
+            val records = SamShared.parseRecords(text)
             val dir = File(context.filesDir, "generated").apply { mkdirs() }
             val stamp = System.currentTimeMillis()
             File(dir, "segment-$stamp.txt").writeText(text.take(200_000))
-            val annotated = runCatching { drawBoxes(pathOrUrl, boxes) }.getOrNull()
+            val decoded = records.map { r ->
+                runCatching { MaskCodec.decodeMask(r.maskHeight, r.maskWidth, r.maskPayload) }.getOrNull()
+            }
+            val annotated = runCatching { drawOverlay(pathOrUrl, records, decoded) }.getOrNull()
             val annotatedPath = annotated?.let {
                 val f = File(dir, "segment-$stamp.png")
                 f.outputStream().use { out -> it.compress(Bitmap.CompressFormat.PNG, 100, out) }
                 if (it != null && !it.isRecycled()) it.recycle()
                 f.absolutePath
             }
+            // One cutout PNG per successfully decoded object: the source pixels
+            // under its mask on a transparent background, ~1px feathered edge.
+            val cutouts = runCatching { buildCutouts(pathOrUrl, records, decoded, dir, stamp) }.getOrDefault(emptyList())
+            val maskOk = decoded.count { it != null }
             val summary = buildString {
-                append("Found ${boxes.size} match${if (boxes.size == 1) "" else "es"} for '$phrase'")
-                if (maskCount > 0) append(" ($maskCount masks)")
+                append("Found ${records.size} object${if (records.size == 1) "" else "s"} for '$phrase'")
+                if (records.isNotEmpty()) {
+                    append(" (masks ${records.map { "${it.maskHeight}x${it.maskWidth}" }.distinct().joinToString(", ")})")
+                } else if (maskCount > 0 || boxes.isNotEmpty()) {
+                    append(" (${boxes.size} boxes, $maskCount masks, unparsed)")
+                }
                 append(".")
-                boxes.take(5).forEachIndexed { i, b ->
-                    append(" #${i + 1} [${b.x1},${b.y1},${b.x2},${b.y2}]")
+                if (annotatedPath != null) append(" Overlay saved.")
+                if (cutouts.isNotEmpty()) {
+                    append(" ${cutouts.size} cutout${if (cutouts.size == 1) "" else "s"} saved (one per object, transparent background).")
+                }
+                if (maskOk < records.size && records.isNotEmpty()) {
+                    append(" ${records.size - maskOk} mask${if (records.size - maskOk == 1) "" else "s"} didn't decode — box shown instead.")
+                }
+                records.take(5).forEachIndexed { i, r ->
+                    val b = r.box
+                    append(" #${r.id} [${b.x1},${b.y1},${b.x2},${b.y2}]")
+                    if (decoded.getOrNull(i) != null) append(" mask ${r.maskHeight}x${r.maskWidth}")
                 }
             }
             ActionResult.ok(
                 summary,
                 produced = listOfNotNull(
                     annotatedPath?.let { Produced("segmentation", "$phrase (${boxes.size})".take(80), it) },
-                    Produced("file", "segment-$stamp.txt", File(dir, "segment-$stamp.txt").absolutePath),
-                ),
+                ) + cutouts.mapIndexed { n, path ->
+                    Produced("image", "cutout ${n + 1}: $phrase".take(80), path)
+                } + Produced("file", "segment-$stamp.txt", File(dir, "segment-$stamp.txt").absolutePath),
             )
         }
 
@@ -126,93 +136,143 @@ class SamSegmentTool(
         return "data:image/jpeg;base64,$b64"
     }
 
-    private fun callSam(baseUrl: String, apiKey: String, model: String, imageUrl: String, phrase: String): String {
-        val body = buildJsonObject {
-            put("model", model)
-            putJsonArray("input") {
-                addJsonObject {
-                    put("type", "message")
-                    put("role", "user")
-                    putJsonArray("content") {
-                        addJsonObject {
-                            put("type", "input_text")
-                            put("text", phrase)
-                        }
-                        addJsonObject {
-                            put("type", "input_image")
-                            put("image_url", imageUrl)
-                        }
-                    }
-                }
-            }
-            put("stream", false)
-        }.toString().toRequestBody("application/json".toMediaType())
-        val req = Request.Builder()
-            .url(baseUrl.trimEnd('/') + "/responses")
-            .post(body)
-            .apply { if (apiKey.isNotBlank()) header("Authorization", "Bearer $apiKey") }
-            .build()
-        http.newCall(req).execute().use { response ->
-            val text = response.body?.string().orEmpty()
-            if (!response.isSuccessful) {
-                val detail = runCatching {
-                    json.parseToJsonElement(text).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
-                }.getOrNull()
-                throw IllegalStateException("HTTP ${response.code}: ${(detail ?: text).take(300)}")
-            }
-            val output = json.parseToJsonElement(text).jsonObject["output"]?.jsonArray
-                ?: throw IllegalStateException("The model returned nothing usable.")
-            val sb = StringBuilder()
-            for (item in output) {
-                val content = item.jsonObject["content"]?.jsonArray ?: continue
-                for (part in content) {
-                    part.jsonObject["text"]?.jsonPrimitive?.content?.let { sb.append(it) }
-                }
-            }
-            return sb.toString()
+    private fun callSam(baseUrl: String, apiKey: String, model: String, imageUrl: String, phrase: String): String =
+        SamShared.postResponses(
+            baseUrl, apiKey, model,
+            buildJsonArray {
+                add(SamShared.textPart(phrase))
+                add(SamShared.imagePart(imageUrl))
+            },
+        )
+
+    /** Decodes the local source image, or null for remote/data URLs and unreadable files. */
+    private fun loadSourceBitmap(pathOrUrl: String): Bitmap? {
+        val t = pathOrUrl.trim()
+        if (t.startsWith("http") || t.startsWith("data:")) return null
+        val file = resolveLocal(t) ?: when (val r = resolver.resolveForRead(t)) {
+            is ToolFiles.ResolveResult.Ok -> r.file
+            else -> return null
         }
+        return BitmapFactory.decodeFile(file.absolutePath)
     }
 
-    private fun drawBoxes(pathOrUrl: String, boxes: List<Box>): Bitmap? {
-        val t = pathOrUrl.trim()
-        src@ fun srcOf(): Bitmap? {
-            if (t.startsWith("http") || t.startsWith("data:")) return null
-            val file = resolveLocal(t) ?: when (val r = resolver.resolveForRead(t)) {
-                is ToolFiles.ResolveResult.Ok -> r.file
-                else -> return null
-            }
-            return BitmapFactory.decodeFile(file.absolutePath)
+    /**
+     * One transparent-background cutout PNG per successfully decoded object
+     * (none when objects overlap heavily is not special-cased: per-object
+     * files compose the same scene, and each stays individually shareable).
+     * Returns the saved absolute paths in record order.
+     */
+    private fun buildCutouts(
+        pathOrUrl: String,
+        records: List<SamShared.SamRecord>,
+        decoded: List<ByteArray?>,
+        dir: File,
+        stamp: Long,
+    ): List<String> {
+        val src = loadSourceBitmap(pathOrUrl) ?: return emptyList()
+        val srcArgb = src.copy(Bitmap.Config.ARGB_8888, false)
+        if (src !== srcArgb && !src.isRecycled()) src.recycle()
+        val w = srcArgb.width
+        val h = srcArgb.height
+        val pixels = IntArray(w * h)
+        srcArgb.getPixels(pixels, 0, w, 0, 0, w, h)
+        if (!srcArgb.isRecycled()) srcArgb.recycle()
+        val out = mutableListOf<String>()
+        records.forEachIndexed { i, r ->
+            val raster = decoded.getOrNull(i) ?: return@forEachIndexed
+            if (raster.size != r.maskHeight * r.maskWidth) return@forEachIndexed
+            val s = SamShared.scaleBox(r.box, w, h)
+            val cut = Cutout.applyCutout(
+                pixels, w, h, raster, r.maskWidth, r.maskHeight,
+                s[0].coerceIn(0f, w.toFloat()), s[1].coerceIn(0f, h.toFloat()),
+                s[2].coerceIn(0f, w.toFloat()), s[3].coerceIn(0f, h.toFloat()),
+            )
+            if (cut.none { ((it ushr 24) and 0xFF) != 0 }) return@forEachIndexed
+            val bmp = Bitmap.createBitmap(cut, w, h, Bitmap.Config.ARGB_8888)
+            val f = File(dir, "segment-$stamp-cutout-${i + 1}.png")
+            f.outputStream().use { o -> bmp.compress(Bitmap.CompressFormat.PNG, 100, o) }
+            if (!bmp.isRecycled()) bmp.recycle()
+            out.add(f.absolutePath)
         }
-        val src = srcOf() ?: return null
+        return out
+    }
+
+    /**
+     * Paints each decoded mask over the source image: a semi-transparent fill
+     * in a per-object hue plus a thin opaque outline on the mask edge, with a
+     * very faint box underneath. Records whose mask failed to decode fall back
+     * to a plain red box. Mask rasters are box-local (their H×W tracks the box
+     * size), so each one is stretched onto its box rect, which is mapped from
+     * source pixels via the frame size the record reports (`w`/`h`).
+     */
+    private fun drawOverlay(
+        pathOrUrl: String,
+        records: List<SamShared.SamRecord>,
+        decoded: List<ByteArray?>,
+    ): Bitmap? {
+        val src = loadSourceBitmap(pathOrUrl) ?: return null
         val bmp = src.copy(Bitmap.Config.ARGB_8888, true)
         if (src !== bmp && !src.isRecycled()) src.recycle()
         val canvas = Canvas(bmp)
-        val paint = Paint().apply {
+        val faintBox = Paint().apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = maxOf(2f, bmp.width / 400f)
+            alpha = 48
+        }
+        val fallbackBox = Paint().apply {
             color = Color.RED
             style = Paint.Style.STROKE
             strokeWidth = maxOf(3f, bmp.width / 200f)
         }
-        // Wire-format boxes are in the model's working resolution; the overlay scales
-        // them onto the source bitmap by matching the max box edge to the bitmap edge.
-        val maxEdge = boxes.flatMap { listOf(it.x2, it.y2) }.maxOrNull() ?: 0
-        val scale = if (maxEdge > 0) maxOf(bmp.width, bmp.height) / maxEdge.toFloat() else 1f
-        for (b in boxes) {
-            canvas.drawRect(b.x1 * scale, b.y1 * scale, b.x2 * scale, b.y2 * scale, paint)
+        records.forEachIndexed { i, r ->
+            val s = SamShared.scaleBox(r.box, bmp.width, bmp.height)
+            val left = s[0].coerceIn(0f, bmp.width.toFloat())
+            val top = s[1].coerceIn(0f, bmp.height.toFloat())
+            val right = s[2].coerceIn(0f, bmp.width.toFloat())
+            val bottom = s[3].coerceIn(0f, bmp.height.toFloat())
+            if (right <= left || bottom <= top) return@forEachIndexed
+            val raster = decoded.getOrNull(i)
+            if (raster == null || raster.size != r.maskHeight * r.maskWidth) {
+                canvas.drawRect(left, top, right, bottom, fallbackBox)
+                return@forEachIndexed
+            }
+            canvas.drawRect(left, top, right, bottom, faintBox)
+            val fill = MaskDraw.fillFor(i)
+            val edge = MaskDraw.edgeFor(i)
+            val dst = RectF(left, top, right, bottom)
+            drawMaskFill(canvas, raster, r.maskWidth, r.maskHeight, dst, fill)
+            drawMaskEdge(canvas, raster, r.maskWidth, r.maskHeight, dst, edge)
         }
         return bmp
     }
 
+    /** Stretches the binary raster onto [dst] as one filtered bitmap draw. */
+    private fun drawMaskFill(
+        canvas: Canvas,
+        raster: ByteArray,
+        w: Int,
+        h: Int,
+        dst: RectF,
+        fill: Int,
+    ) = MaskDraw.fillOn(canvas, raster, w, h, dst, fill)
+
+    /** Thin outline: strokes the scaled cell of every set pixel touching an unset one. */
+    private fun drawMaskEdge(
+        canvas: Canvas,
+        raster: ByteArray,
+        w: Int,
+        h: Int,
+        dst: RectF,
+        edge: Int,
+    ) {
+        val cellW = dst.width() / w
+        val cellH = dst.height() / h
+        MaskDraw.edgeOn(canvas, raster, w, h, dst, edge, maxOf(2f, minOf(cellW, cellH) / 2f))
+    }
+
     companion object {
-        private val BOX_RE = Regex("<\\|box;x1=(\\d+);y1=(\\d+);x2=(\\d+);y2=(\\d+);")
-        private val MASK_RE = Regex("<\\|mask;")
-
         fun parseBoxes(wire: String): List<Box> =
-            BOX_RE.findAll(wire).map {
-                Box(it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), it.groupValues[4].toInt())
-            }.toList()
-
-        private fun kotlinx.serialization.json.JsonArrayBuilder.addJsonObject(block: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit) {
-            add(buildJsonObject(block))
-        }
+            SamShared.parseRichBoxes(wire).map { Box(it.x1, it.y1, it.x2, it.y2) }
     }
 }

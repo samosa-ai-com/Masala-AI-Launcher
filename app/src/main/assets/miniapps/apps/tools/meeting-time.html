@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SyncHour Meeting Time</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#101826;color:#edf2fb}
+.wrap{max-width:430px;margin:0 auto;padding:16px 16px 40px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:22px;margin:0}
+.mutebtn{min-width:44px;min-height:44px;border-radius:12px;border:1px solid #2b3a55;background:#1a2438;color:#fff;font-size:19px;cursor:pointer}
+.card{background:#1a2438;border:1px solid #2b3a55;border-radius:16px;padding:14px;margin:12px 0}
+label{font-size:13px;opacity:.85}
+input,select{width:100%;min-height:48px;border-radius:12px;border:1px solid #2b3a55;background:#101826;color:#fff;font-size:16px;padding:0 12px;margin:4px 0 8px}
+.row2{display:flex;gap:8px}.row2 div{flex:1;min-width:0}
+.meet{background:#0e1626;border:1px solid #2b3a55;border-radius:16px;padding:16px;margin:12px 0;text-align:center}
+.meet .t{font-size:44px;font-weight:800;font-variant-numeric:tabular-nums}
+.meet .d{font-size:14px;opacity:.8}
+.city{display:flex;align-items:center;justify-content:space-between;background:#0e1626;border:1px solid #2b3a55;border-radius:12px;padding:12px 14px;margin:8px 0}
+.city b{font-size:17px}
+.city .lt{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.city small{display:block;font-size:12px;opacity:.7}
+.city .edit{min-width:44px;min-height:44px;border-radius:10px;border:1px solid #2b3a55;background:transparent;color:#93c5fd;font-size:16px;cursor:pointer}
+.daytag{font-size:11px;font-weight:800;border-radius:7px;padding:2px 8px;background:#1e3a5f;color:#bfdbfe;margin-left:6px}
+.note{font-size:12px;opacity:.65;text-align:center}
+button.big{width:100%;min-height:50px;border-radius:13px;border:none;background:#3b82f6;color:#fff;font-size:16px;font-weight:800;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>SyncHour Meet</h1><button class="mutebtn" id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="card">
+<div class="row2">
+<div><label for="dateIn">Meeting date</label><input id="dateIn" type="date"></div>
+<div><label for="hourIn">Your hour (24h)</label><input id="hourIn" type="number" min="0" max="23" value="10"></div>
+</div>
+<div class="row2">
+<div><label for="minIn">Minute</label><input id="minIn" type="number" min="0" max="59" value="0"></div>
+<div><label for="homeSel">Your city</label><select id="homeSel"></select></div>
+</div>
+<button class="big" id="showBtn">Show world times</button>
+</div>
+<div class="meet"><div class="t" id="homeTime">–</div><div class="d" id="homeDate"></div></div>
+<div id="list"></div>
+<div class="card">
+<h2 style="font-size:15px;margin:0 0 6px">Edit a saved city</h2>
+<div class="row2">
+<div><label for="eName">Name</label><input id="eName" maxlength="24"></div>
+<div><label for="eOff">UTC offset</label><select id="eOff"></select></div>
+</div>
+<button class="big" id="saveCityBtn">Save city</button>
+</div>
+<p class="note">Fixed UTC offsets you set yourself — no network needed. Daylight saving is not auto-applied; adjust offsets when clocks change.</p>
+</div>
+<script>
+(function(){
+"use strict";
+var K="meeting-time-v1",MK="meeting-time-mute";
+var DEF=[{name:"New York",off:-5},{name:"London",off:0},{name:"Mumbai",off:5.5},{name:"Tokyo",off:9}];
+var store=null;try{store=JSON.parse(localStorage.getItem(K)||"null");}catch(e){store=null;}
+if(!store||!Array.isArray(store.cities)||store.cities.length!==4)store={cities:DEF,home:0,hour:10,min:0,date:new Date().toISOString().slice(0,10)};
+var muted=localStorage.getItem(MK)==="1",AC=null;
+function click(){if(muted)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume();var o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.frequency.value=700;var t=AC.currentTime;g.gain.setValueAtTime(0.07,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.07);o.start(t);o.stop(t+0.07);}catch(e){}}
+function save(){localStorage.setItem(K,JSON.stringify(store));}
+var muteBtn=document.getElementById("muteBtn");
+muteBtn.textContent=muted?"🔇":"🔊";
+muteBtn.addEventListener("click",function(){muted=!muted;localStorage.setItem(MK,muted?"1":"0");muteBtn.textContent=muted?"🔇":"🔊";click();});
+var dateIn=document.getElementById("dateIn"),hourIn=document.getElementById("hourIn"),minIn=document.getElementById("minIn"),homeSel=document.getElementById("homeSel");
+var eName=document.getElementById("eName"),eOff=document.getElementById("eOff"),editIdx=0;
+var offs=[];for(var h=-12;h<=14;h++){offs.push(h);if(h<14)offs.push(h+0.5);}
+var eOffHTML=offs.map(function(o){var s=(o>=0?"+":"")+o;return '<option value="'+o+'">UTC'+s+"</option>";}).join("");
+eOff.innerHTML=eOffHTML;
+function refreshSels(){
+homeSel.innerHTML="";store.cities.forEach(function(c,i){var o=document.createElement("option");o.value=i;o.textContent=c.name+" (UTC"+(c.off>=0?"+":"")+c.off+")";homeSel.appendChild(o);});
+homeSel.value=store.home;
+}
+function fmtT(mins){mins=((mins%1440)+1440)%1440;return String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");}
+function render(){
+refreshSels();
+dateIn.value=store.date;hourIn.value=store.hour;minIn.value=store.min;
+var home=store.cities[store.home];
+var baseMin=store.hour*60+store.min;
+document.getElementById("homeTime").textContent=fmtT(baseMin);
+document.getElementById("homeDate").textContent=home.name+" · "+new Date(store.date+"T12:00:00").toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"});
+var list=document.getElementById("list");list.innerHTML="";
+store.cities.forEach(function(c,i){
+if(i===store.home)return;
+var d=document.createElement("div");d.className="city";
+var l=document.createElement("div");var b=document.createElement("b");b.textContent=c.name;var sm=document.createElement("small");sm.textContent="UTC"+(c.off>=0?"+":"")+c.off;l.appendChild(b);l.appendChild(sm);
+var r=document.createElement("div");var t=document.createElement("span");t.className="lt";
+var diffMin=Math.round((c.off-home.off)*60);
+var dayShift=baseMin+diffMin;var tag="";
+if(dayShift<0)tag=" −1d";else if(dayShift>=1440)tag=" +1d";
+t.textContent=fmtT(dayShift);
+if(tag){var tg=document.createElement("span");tg.className="daytag";tg.textContent=tag.trim();t.appendChild(tg);}
+var eb=document.createElement("button");eb.className="edit";eb.textContent="✎";eb.setAttribute("aria-label","Edit "+c.name);
+eb.addEventListener("click",(function(idx){return function(){click();editIdx=idx;eName.value=store.cities[idx].name;eOff.value=String(store.cities[idx].off);eName.focus();};})(i));
+r.appendChild(t);r.appendChild(eb);
+d.appendChild(l);d.appendChild(r);list.appendChild(d);
+});
+}
+document.getElementById("showBtn").addEventListener("click",function(){click();store.hour=Math.min(23,Math.max(0,+hourIn.value||0));store.min=Math.min(59,Math.max(0,+minIn.value||0));store.home=+homeSel.value||0;store.date=dateIn.value||store.date;save();render();});
+document.getElementById("saveCityBtn").addEventListener("click",function(){
+var n=eName.value.trim();if(!n&&editIdx===store.home){alert("Pick a city with the pencil icon first.");return;}
+click();
+if(n)store.cities[editIdx].name=n.slice(0,24);
+store.cities[editIdx].off=+eOff.value;save();render();
+});
+editIdx=0;eName.value=store.cities[0].name;eOff.value=String(store.cities[0].off);
+render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SplitSecond — Stopwatch &amp; Laps</title>
+<style>
+:root{--bg:#0e1420;--card:#182233;--acc:#38e1a8;--txt:#eef4f1;--mut:#8fa0b3}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;min-height:100vh}
+.wrap{max-width:480px;margin:0 auto;padding:16px 14px 32px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}
+.sub{color:var(--mut);font-size:13px;margin:2px 0 0}
+#muteBtn{background:var(--card);border:1px solid #2b3a52;color:var(--txt);border-radius:12px;min-width:48px;min-height:44px;font-size:18px}
+.clock{background:var(--card);border:1px solid #2b3a52;border-radius:18px;text-align:center;padding:26px 10px;margin:14px 0}
+#face{font-size:52px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:1px}
+#state{color:var(--acc);font-size:13px;margin-top:6px}
+.row{display:flex;gap:10px;margin:10px 0}
+button.act{flex:1;min-height:52px;border-radius:14px;border:0;font-size:17px;font-weight:700;color:#08130d}
+#startBtn{background:var(--acc)}
+#startBtn.pause{background:#ffcf4d}
+#lapBtn{background:#2b3a52;color:var(--txt)}
+#resetBtn{background:#3a2430;color:#ff9aa8}
+button.act:disabled{opacity:.4}
+table{width:100%;border-collapse:collapse;background:var(--card);border-radius:14px;overflow:hidden;font-size:14px}
+th,td{padding:10px 8px;text-align:center;font-variant-numeric:tabular-nums}
+th{color:var(--mut);font-size:12px;text-transform:uppercase}
+tr+tr td{border-top:1px solid #26344c}
+td.best{color:var(--acc);font-weight:700}
+.empty{text-align:center;color:var(--mut);padding:22px;font-size:14px}
+.foot{color:var(--mut);font-size:12px;text-align:center;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div><h1>SplitSecond</h1><p class="sub">Stopwatch with lap table</p></div><button id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="clock"><div id="face">00:00.000</div><div id="state">Ready</div></div>
+<div class="row"><button class="act" id="startBtn">Start</button><button class="act" id="lapBtn" disabled>Lap</button><button class="act" id="resetBtn">Reset</button></div>
+<table id="lapTable"><thead><tr><th>#</th><th>Lap</th><th>Total</th></tr></thead><tbody id="laps"></tbody></table>
+<div class="empty" id="emptyMsg">No laps yet — press Lap while running.</div>
+<p class="foot">Keeps true time in background using wall-clock math.</p>
+</div>
+<script>
+(function(){
+"use strict";
+var KEY="splitsecond-v1";
+var store={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+var muted=store.get("muted-stopwatch-laps",false);
+var muteBtn=document.getElementById("muteBtn");
+function paintMute(){muteBtn.textContent=muted?"🔇":"🔊";}
+paintMute();
+var actx=null;
+function beep(f){if(muted)return;try{var C=window.AudioContext||window.webkitAudioContext;if(!C)return;if(!actx)actx=new C();if(actx.state==="suspended")actx.resume();var o=actx.createOscillator(),g=actx.createGain();o.type="sine";o.frequency.value=f||660;g.gain.value=0.06;o.connect(g);g.connect(actx.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.09);o.stop(actx.currentTime+0.1);}catch(e){}}
+muteBtn.addEventListener("click",function(){muted=!muted;store.set("muted-stopwatch-laps",muted);paintMute();beep(720);});
+var st=store.get(KEY,{running:false,acc:0,t0:0,laps:[]});
+if(typeof st.acc!=="number")st.acc=0;
+if(!Array.isArray(st.laps))st.laps=[];
+var face=document.getElementById("face"),stateEl=document.getElementById("state"),
+startBtn=document.getElementById("startBtn"),lapBtn=document.getElementById("lapBtn"),
+resetBtn=document.getElementById("resetBtn"),tbody=document.getElementById("laps"),
+emptyMsg=document.getElementById("emptyMsg");
+function now(){return Date.now();}
+function elapsed(){return st.acc+(st.running?now()-st.t0:0);}
+function fmt(ms){if(ms<0)ms=0;var m=Math.floor(ms/60000),s=Math.floor(ms%60000/1000),x=Math.floor(ms%1000);function p(n,l){n=String(n);while(n.length<l)n="0"+n;return n;}return p(m,2)+":"+p(s,2)+"."+p(x,3);}
+function save(){store.set(KEY,st);}
+function renderLaps(){tbody.innerHTML="";var best=Infinity,i;for(i=0;i<st.laps.length;i++){if(st.laps[i].lap<best)best=st.laps[i].lap;}for(i=0;i<st.laps.length;i++){var L=st.laps[i];var tr=document.createElement("tr");var cls=L.lap===best?"best":"";tr.innerHTML="<td>"+(i+1)+"</td><td class='"+cls+"'>"+fmt(L.lap)+"</td><td>"+fmt(L.total)+"</td>";tbody.appendChild(tr);}emptyMsg.style.display=st.laps.length?"none":"block";}
+function tick(){face.textContent=fmt(elapsed());}
+setInterval(tick,31);tick();renderLaps();
+function paintRun(){startBtn.textContent=st.running?"Pause":"Start";startBtn.className="act"+(st.running?" pause":"");lapBtn.disabled=!st.running;stateEl.textContent=st.running?"Running…":"Ready";}
+paintRun();
+startBtn.addEventListener("click",function(){beep(st.running?440:760);if(st.running){st.acc=elapsed();st.running=false;}else{st.t0=now();st.running=true;}save();paintRun();tick();});
+lapBtn.addEventListener("click",function(){if(!st.running)return;beep(880);var t=elapsed();var prev=st.laps.length?st.laps[st.laps.length-1].total:0;st.laps.push({lap:t-prev,total:t});save();renderLaps();});
+resetBtn.addEventListener("click",function(){beep(330);if(st.laps.length||st.acc>0||st.running){if(!window.confirm("Reset the stopwatch and clear all laps?"))return;}st.running=false;st.acc=0;st.laps=[];save();paintRun();tick();renderLaps();});
+})();
+</script>
+</body>
+</html>

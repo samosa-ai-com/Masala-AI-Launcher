@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Orchard Boomerang Dash</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#87c86b;display:flex;justify-content:center;-webkit-tap-highlight-color:transparent}
+.app{width:100%;max-width:428px;min-width:360px;min-height:100vh;background:linear-gradient(180deg,#7ec8ff 0%,#a8ddff 18%,#c8e8a0 32%,#a8d46e 55%,#8bc34a 100%);display:flex;flex-direction:column;position:relative;overflow:hidden}
+.header{padding:12px 16px 8px;text-align:center;position:relative}
+.header h1{font-size:22px;font-weight:900;color:#2e4a0a;letter-spacing:0.5px;text-shadow:0 2px 0 #fff8,0 3px 6px #0002;line-height:1.1}
+.header h1 span{font-size:24px}
+.sub{font-size:11px;color:#3a5a0a;font-weight:700;margin-top:3px;opacity:0.9}
+.best-badge{position:absolute;right:10px;top:10px;background:#fff;border:2px solid #ffb300;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:800;color:#6a3a00;box-shadow:0 2px 8px #0001}
+.best-badge b{color:#e68a00}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 12px}
+.stat{background:#fffef5;border:2px solid #c8e8a0;border-radius:14px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 6px #0001}
+.stat-label{font-size:10px;font-weight:800;color:#5a7a2a;letter-spacing:0.6px;text-transform:uppercase}
+.stat-val{font-size:17px;font-weight:900;color:#2e3a0a}
+.stat-val.lives{font-size:15px;letter-spacing:1px}
+.stat-val.time{color:#0a7a2a}
+.stat-val.time.warn{color:#d11a1a;animation:pulse 0.6s infinite alternate}
+@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.08)}}
+.combo-bar{margin:0 12px;background:#2e4a0a;color:#e8ffb0;border-radius:999px;padding:6px 12px;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800;min-height:32px}
+.combo-bar span:last-child{color:#ffd54f}
+.level-info{text-align:center;font-size:11px;font-weight:800;color:#2e4a0a;background:#fff7;margin:6px 12px 0;border-radius:999px;padding:4px}
+.orchard-wrap{flex:1;padding:8px 12px 0;position:relative;display:flex;flex-direction:column}
+.steal-alert{position:absolute;top:6px;left:50%;transform:translateX(-50%);background:#d11a1a;color:#fff;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:900;box-shadow:0 4px 12px #0003;z-index:5;display:none;align-items:center;gap:6px;animation:alertPop 0.3s}
+.steal-alert.show{display:flex}
+@keyframes alertPop{from{transform:translateX(-50%) scale(0.8)}to{transform:translateX(-50%) scale(1)}}
+.trees{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;position:relative}
+.tree{position:relative;background:radial-gradient(ellipse at 50% 30%,#7bc47a 0%,#5aa83a 45%,#3d7a1e 100%);border-radius:24px 24px 18px 18px;border:2px solid #3d6a1a;box-shadow:inset 0 6px 12px #fff4,0 4px 10px #0002;padding:10px 6px 14px;min-height:148px;display:flex;flex-direction:column;align-items:center}
+.tree::after{content:"";position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);width:22px;height:28px;background:linear-gradient(180deg,#8d6e3a,#5d4030);border-radius:4px;box-shadow:0 2px 6px #0002}
+.tree-label{font-size:9px;font-weight:800;color:#fff;text-shadow:0 1px 2px #0005;opacity:0.9;margin-bottom:4px}
+.slots{display:flex;flex-direction:column;gap:8px;width:100%;align-items:center}
+.slot{position:relative;width:62px;height:62px;background:radial-gradient(ellipse at 50% 30%,#fff8,#0000 70%), linear-gradient(180deg,#6a9a2a,#4a7a1a);border-radius:50%;border:2px solid #3d6a1a;box-shadow:inset 0 3px 6px #fff5,0 2px 6px #0002;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;user-select:none}
+.slot:active{transform:scale(0.96)}
+.slot.empty{background:linear-gradient(180deg,#7ab84a,#5a8a2a);opacity:0.85}
+.slot.empty::after{content:"🍃";font-size:18px;opacity:0.5}
+.branch{position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:44px;height:6px;background:#5d4030;border-radius:999px;opacity:0.9}
+.fruit{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;animation:bob 1.2s ease-in-out infinite alternate;z-index:2}
+@keyframes bob{from{transform:translateY(0)}to{transform:translateY(-3px)}}
+.fruit-emoji{font-size:30px;line-height:1;filter:drop-shadow(0 3px 4px #0003)}
+.fruit-label{font-size:8px;font-weight:900;background:#fff;padding:1px 5px;border-radius:999px;border:1px solid #0001;color:#2e4a0a;margin-top:1px;box-shadow:0 1px 3px #0002}
+.bird{position:absolute;top:-14px;right:-6px;font-size:22px;filter:drop-shadow(0 2px 4px #0003);animation:swoop 0.6s ease-in-out infinite alternate;z-index:3}
+@keyframes swoop{from{transform:translateY(0) rotate(-6deg)}to{transform:translateY(4px) rotate(6deg)}}
+.progress{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:48px;height:5px;background:#0003;border-radius:999px;overflow:hidden;z-index:4}
+.progress-bar{height:100%;background:linear-gradient(90deg,#4caf50,#8bc34a);width:100%;transition:width 0.1s linear}
+.progress-bar.warn{background:linear-gradient(90deg,#ff9800,#ff5722)}
+.progress-bar.danger{background:linear-gradient(90deg,#d32f2f,#ff1744);animation:blink 0.3s infinite alternate}
+@keyframes blink{from{opacity:1}to{opacity:0.6}}
+.ground{margin-top:14px;background:linear-gradient(180deg,#a8d46e 0%,#8bc34a 40%,#7ab83a 100%);border:3px solid #5a8a2a;border-radius:18px;padding:10px 12px 12px;box-shadow:inset 0 4px 10px #fff3,0 4px 12px #0002;position:relative;min-height:110px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ground::before{content:"";position:absolute;top:6px;left:12px;right:12px;height:8px;background:repeating-linear-gradient(90deg,#7ab83a 0 12px,#8bc34a 12px 24px);border-radius:999px;opacity:0.5}
+.player-area{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;z-index:2}
+.player{font-size:36px;filter:drop-shadow(0 3px 6px #0003);line-height:1}
+.catch-zone{position:relative;width:72px;height:72px;border-radius:50%;background:radial-gradient(circle at 50% 40%,#fff 0%,#ffe9a8 50%,#ffb300 100%);border:3px solid #e68a00;box-shadow:0 4px 12px #0002, inset 0 3px 8px #fff8;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;transition:transform 0.1s}
+.catch-zone:active{transform:scale(0.96)}
+.catch-zone.active{animation:catchPulse 0.5s infinite alternate;border-color:#2e7d32;box-shadow:0 0 0 4px #4caf5040,0 4px 12px #0002}
+.catch-zone.perfect{animation:perfectPulse 0.3s infinite alternate;border-color:#ffd700;box-shadow:0 0 0 6px #ffd70060,0 4px 16px #0003}
+@keyframes catchPulse{from{transform:scale(1);box-shadow:0 0 0 4px #4caf5040}to{transform:scale(1.05);box-shadow:0 0 0 8px #4caf5020}}
+@keyframes perfectPulse{from{transform:scale(1.05);box-shadow:0 0 0 6px #ffd70060}to{transform:scale(1.12);box-shadow:0 0 0 10px #ffd70030}}
+.catch-label{font-size:9px;font-weight:900;color:#6a3a00;text-align:center;line-height:1.1}
+.catch-ring{position:absolute;inset:-6px;border:3px solid #4caf50;border-radius:50%;pointer-events:none;opacity:0}
+.catch-zone.active .catch-ring{animation:ringShrink 0.8s linear infinite;opacity:1}
+@keyframes ringShrink{from{transform:scale(1.3);opacity:0.8}to{transform:scale(0.85);opacity:0}}
+.projectile{position:absolute;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:28px;filter:drop-shadow(0 3px 6px #0004);pointer-events:none;z-index:10;will-change:transform}
+.float{position:absolute;left:50%;top:20%;transform:translateX(-50%);font-size:15px;font-weight:900;color:#fff;text-shadow:0 1px 0 #000,0 2px 6px #0005;pointer-events:none;animation:floatUp 0.9s ease-out forwards;z-index:12;white-space:nowrap}
+.float.good{color:#1b5e20;text-shadow:0 1px 0 #fff,0 2px 6px #0003}
+.float.bad{color:#d11a1a}
+.float.bonus{color:#e68a00;background:#fff;padding:2px 8px;border-radius:999px;font-size:12px;box-shadow:0 2px 8px #0002;text-shadow:none}
+.float.steal{color:#fff;background:#d11a1a;padding:3px 10px;border-radius:999px;font-size:11px;box-shadow:0 2px 8px #0003}
+@keyframes floatUp{0%{transform:translateX(-50%) translateY(0) scale(1);opacity:1}100%{transform:translateX(-50%) translateY(-44px) scale(1.08);opacity:0}}
+.controls{display:flex;gap:8px;padding:10px 12px}
+.btn{flex:1;min-height:48px;border:none;border-radius:14px;font-size:14px;font-weight:900;cursor:pointer;touch-action:manipulation;box-shadow:0 3px 8px #0002;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-primary{background:linear-gradient(180deg,#ff8a2a,#e86a00);color:#fff;border:2px solid #c95a00}
+.btn-primary:active{transform:scale(0.98)}
+.btn-secondary{background:#fff;color:#2e4a0a;border:2px solid #c8e8a0}
+.btn:disabled{opacity:0.5;pointer-events:none}
+.hint{text-align:center;font-size:11px;font-weight:700;color:#2e4a0a;padding:0 12px 4px;line-height:1.4;opacity:0.9}
+.legend{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:6px 12px 10px}
+.legend span{background:#fff;border:1px solid #c8e8a0;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:700;color:#2e4a0a;display:flex;align-items:center;gap:4px}
+.legend i{font-style:normal;font-size:14px}
+.overlay{position:absolute;inset:0;background:#0006;backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:20}
+.card{background:#fffef5;border:3px solid #ffb300;border-radius:20px;padding:18px 16px;text-align:center;width:100%;max-width:340px;box-shadow:0 12px 32px #0003}
+.card h2{font-size:20px;color:#2e4a0a;margin-bottom:6px}
+.card p{font-size:13px;color:#3a5a0a;line-height:1.5;margin-bottom:10px}
+.card .big{font-size:34px;font-weight:900;color:#e68a00;margin:6px 0}
+.card .row{display:flex;gap:8px;margin-top:10px}
+.shake{animation:screenShake 0.35s}
+@keyframes screenShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <h1><span>🌳</span> ORCHARD BOOMERANG <span>🪃</span></h1>
+    <div class="sub">Throw, hit fruit & catch the return!</div>
+    <div class="best-badge">BEST <b id="bestVal">0</b> ⭐</div>
+  </div>
+  <div class="stats">
+    <div class="stat"><span class="stat-label">Score</span><span class="stat-val" id="scoreVal">0</span></div>
+    <div class="stat"><span class="stat-label">Time</span><span class="stat-val time" id="timeVal">60s</span></div>
+    <div class="stat"><span class="stat-label">Lives</span><span class="stat-val lives" id="livesVal">❤️❤️❤️</span></div>
+    <div class="stat"><span class="stat-label">Level</span><span class="stat-val" id="levelVal">1</span></div>
+  </div>
+  <div class="combo-bar" id="comboBar"><span>COMBO <span id="comboVal">x1</span></span><span id="comboInfo">Catch rhythm!</span></div>
+  <div class="level-info" id="levelInfo">Level 1 — Gentle breeze</div>
+
+  <div class="orchard-wrap" id="orchard">
+    <div class="steal-alert" id="stealAlert">🦅 BIRD STEALING! TAP FRUIT!</div>
+    <div class="trees" id="trees"></div>
+    <div class="ground">
+      <div class="player-area">
+        <div class="player" id="player">🧑‍🌾</div>
+        <div class="catch-zone" id="catchZone">
+          <div class="catch-ring"></div>
+          <div class="catch-label" id="catchLabel">TAP<br>FRUIT<br>TO THROW</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-primary" id="startBtn">▶ START HARVEST</button>
+    <button class="btn btn-secondary" id="pauseBtn" disabled>⏸ PAUSE</button>
+    <button class="btn btn-secondary" id="resetBtn">↻ RESET</button>
+  </div>
+  <div class="hint">💡 Tap hanging fruit to throw 🪃 — hit before birds steal! Tap catch zone on return for PERFECT bonus!</div>
+  <div class="legend">
+    <span><i>🍎</i>10</span><span><i>🍊</i>15</span><span><i>🍋</i>12</span><span><i>🍑</i>18</span><span><i>🍒</i>20</span><span><i>🦅</i>+20</span><span><i>🪃</i>catch +15</span>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="card" id="card">
+      <h2>🌳 Orchard Alert!</h2>
+      <p>Birds swoop to steal hanging fruit! Tap a fruit to throw your boomerang — it arcs out and back.</p>
+      <p style="font-size:12px;background:#fff3d6;padding:8px;border-radius:10px;border:1px dashed #ffb300">Hit fruit before timer runs out!<br>Catch the return in the <b style="color:#2e7d32">GREEN</b> window for <b>+15 × combo</b> (up to 5×)!<br>60s • 3 lives • Level up every 120 pts</p>
+      <div class="row"><button class="btn btn-primary" style="flex:1" id="playBtn">🪃 START THROWING</button></div>
+      <p style="margin-top:8px;font-size:11px;opacity:0.7">Best score saved on this phone</p>
+    </div>
+  </div>
+</div>
+<script>
+const treesEl=document.getElementById('trees');
+const orchardEl=document.getElementById('orchard');
+const scoreVal=document.getElementById('scoreVal');
+const bestVal=document.getElementById('bestVal');
+const livesVal=document.getElementById('livesVal');
+const timeVal=document.getElementById('timeVal');
+const levelVal=document.getElementById('levelVal');
+const levelInfo=document.getElementById('levelInfo');
+const comboVal=document.getElementById('comboVal');
+const comboInfo=document.getElementById('comboInfo');
+const comboBar=document.getElementById('comboBar');
+const stealAlert=document.getElementById('stealAlert');
+const catchZone=document.getElementById('catchZone');
+const catchLabel=document.getElementById('catchLabel');
+const overlay=document.getElementById('overlay');
+const card=document.getElementById('card');
+const startBtn=document.getElementById('startBtn');
+const pauseBtn=document.getElementById('pauseBtn');
+const resetBtn=document.getElementById('resetBtn');
+const playBtn=document.getElementById('playBtn');
+const appEl=document.getElementById('app');
+
+const FRUITS=[
+  {emoji:'🍎',label:'APPLE',pts:10},
+  {emoji:'🍊',label:'ORANGE',pts:15},
+  {emoji:'🍋',label:'LEMON',pts:12},
+  {emoji:'🍑',label:'PEACH',pts:18},
+  {emoji:'🍒',label:'CHERRY',pts:20},
+  {emoji:'🍐',label:'PEAR',pts:14},
+];
+
+let score=0,best=0,lives=3,level=1,timeLeft=60,combo=0,maxCombo=0;
+let gameState='idle',isThrowing=false,throwProgress=0,throwRAF=null;
+let spawnTimer=null,countdownTimer=null;
+let fruits=new Map(); // slotIdx -> {fruit, birdTimeout, stealTimeout, progressRAF, el, birdEl, barEl, startTime, duration}
+let stealAlertTimeout=null;
+
+try{best=parseInt(localStorage.getItem('orchardBest')||'0')||0}catch(e){}
+bestVal.textContent=best;
+
+function buildTrees(){
+  treesEl.innerHTML='';
+  for(let t=0;t<3;t++){
+    const tree=document.createElement('div');
+    tree.className='tree';
+    tree.innerHTML=`<div class="tree-label">TREE ${t+1}</div><div class="slots" id="tree-${t}"></div>`;
+    treesEl.appendChild(tree);
+  }
+  // 9 slots total, 3 per tree
+  for(let i=0;i<9;i++){
+    const treeIdx=Math.floor(i/3);
+    const container=document.getElementById(`tree-${treeIdx}`);
+    const slot=document.createElement('button');
+    slot.className='slot empty';
+    slot.setAttribute('aria-label','Fruit slot '+(i+1));
+    slot.dataset.idx=i;
+    slot.innerHTML='<div class="branch"></div>';
+    slot.addEventListener('click',()=>handleSlotTap(i));
+    container.appendChild(slot);
+  }
+}
+buildTrees();
+function slots(){return [...document.querySelectorAll('.slot')]}
+
+function updateUI(){
+  scoreVal.textContent=score;
+  livesVal.textContent='❤️'.repeat(lives)+'🤍'.repeat(3-lives);
+  levelVal.textContent=level;
+  timeVal.textContent=timeLeft+'s';
+  timeVal.classList.toggle('warn', timeLeft<=10 && gameState==='playing');
+  let mult=Math.min(5,1+Math.floor(combo/3));
+  comboVal.textContent='x'+mult;
+  if(combo>=3) comboInfo.textContent= combo>=9?'🔥 BLAZING!':combo>=6?'⚡ ON FIRE!':'✨ COMBO!';
+  else comboInfo.textContent='Catch rhythm!';
+  comboBar.style.background= combo>=6?'#b71c1c':combo>=3?'#e65100':'#2e4a0a';
+  levelInfo.textContent=`Level ${level} — ${level===1?'Gentle breeze':level===2?'Birds awaken':level>=5?'🦅 Flock frenzy!':'Wind picks up!'}`;
+  if(score>best){best=score;bestVal.textContent=best;try{localStorage.setItem('orchardBest',best)}catch(e){}}
+}
+
+function getMult(){return Math.min(5,1+Math.floor(combo/3))}
+
+function showFloat(targetEl,text,cls){
+  const f=document.createElement('div');
+  f.className='float '+cls;
+  f.textContent=text;
+  // if targetEl is slot, append to it, else to orchard
+  (targetEl||orchardEl).appendChild(f);
+  setTimeout(()=>f.remove(),900);
+}
+function shake(){appEl.classList.remove('shake');void appEl.offsetWidth;appEl.classList.add('shake');if(navigator.vibrate) navigator.vibrate(80)}
+
+function pickFruit(){return FRUITS[Math.floor(Math.random()*FRUITS.length)]}
+
+function spawnFruit(){
+  if(gameState!=='playing') return;
+  const available=slots().map((_,i)=>i).filter(i=>!fruits.has(i));
+  if(available.length===0) return;
+  const idx=available[Math.floor(Math.random()*available.length)];
+  const fruit=pickFruit();
+  const slot=slots()[idx];
+  slot.classList.remove('empty');
+  const fEl=document.createElement('div');
+  fEl.className='fruit';
+  fEl.innerHTML=`<div class="fruit-emoji">${fruit.emoji}</div><div class="fruit-label">${fruit.label}</div>`;
+  const prog=document.createElement('div');
+  prog.className='progress';
+  const bar=document.createElement('div');
+  bar.className='progress-bar';
+  prog.appendChild(bar);
+  slot.appendChild(fEl);
+  slot.appendChild(prog);
+
+  const stealDuration=Math.max(1400,3200-level*180);
+  const birdDelay=Math.max(800,2200-level*120);
+  const startTime=Date.now();
+  let birdEl=null;
+
+  const birdTimeout=setTimeout(()=>{
+    if(!fruits.has(idx)) return;
+    birdEl=document.createElement('div');
+    birdEl.className='bird';
+    birdEl.textContent='🦅';
+    slot.appendChild(birdEl);
+    const data=fruits.get(idx);
+    if(data) data.birdEl=birdEl;
+    // steal alert
+    stealAlert.classList.add('show');
+    clearTimeout(stealAlertTimeout);
+    stealAlertTimeout=setTimeout(()=>stealAlert.classList.remove('show'),1200);
+    if(navigator.vibrate) navigator.vibrate(40);
+  },birdDelay);
+
+  const stealTimeout=setTimeout(()=>{
+    if(!fruits.has(idx)) return;
+    // stolen
+    const data=fruits.get(idx);
+    if(data){
+      cancelAnimationFrame(data.progressRAF);
+      fEl.remove(); prog.remove(); if(data.birdEl) data.birdEl.remove();
+    }
+    fruits.delete(idx);
+    slot.classList.add('empty');
+    score=Math.max(0,score-10);
+    lives--;
+    combo=0;
+    showFloat(slot,'STOLEN -10','steal');
+    shake();
+    updateUI();
+    if(lives<=0) endGame('🦅 Birds stole everything!');
+  },stealDuration);
+
+  // progress bar RAF
+  function updateBar(){
+    if(!fruits.has(idx)) return;
+    const elapsed=Date.now()-startTime;
+    const pct=Math.max(0,1-elapsed/stealDuration);
+    bar.style.width=(pct*100)+'%';
+    if(pct<0.3) bar.className='progress-bar danger';
+    else if(pct<0.6) bar.className='progress-bar warn';
+    if(pct>0) fruits.get(idx).progressRAF=requestAnimationFrame(updateBar);
+  }
+  const progressRAF=requestAnimationFrame(updateBar);
+
+  fruits.set(idx,{fruit, birdTimeout, stealTimeout, progressRAF, el:fEl, birdEl, barEl:bar, progEl:prog, startTime, duration:stealDuration, slot});
+}
+
+function scheduleSpawn(){
+  if(gameState!=='playing') return;
+  const base=Math.max(500,1100-level*70);
+  const jitter=Math.random()*400;
+  spawnTimer=setTimeout(()=>{
+    spawnFruit();
+    if(level>=3 && Math.random()<0.3) setTimeout(spawnFruit,180);
+    scheduleSpawn();
+  }, base+jitter);
+}
+
+function handleSlotTap(idx){
+  if(gameState!=='playing') return;
+  if(isThrowing) return; // one throw at a time for rhythm
+  const data=fruits.get(idx);
+  if(!data) return; // empty slot
+  throwTo(idx);
+}
+
+function throwTo(idx){
+  const slot=slots()[idx];
+  const data=fruits.get(idx);
+  if(!data) return;
+  isThrowing=true;
+  throwProgress=0;
+  catchZone.classList.remove('active','perfect');
+  catchLabel.innerHTML='WATCH<br>RETURN!';
+  // create projectile
+  const proj=document.createElement('div');
+  proj.className='projectile';
+  proj.textContent='🪃';
+  orchardEl.appendChild(proj);
+
+  const orchardRect=orchardEl.getBoundingClientRect();
+  const playerRect=catchZone.getBoundingClientRect();
+  const slotRect=slot.getBoundingClientRect();
+  const startX=playerRect.left+playerRect.width/2 - orchardRect.left;
+  const startY=playerRect.top+playerRect.height/2 - orchardRect.top;
+  const targetX=slotRect.left+slotRect.width/2 - orchardRect.left;
+  const targetY=slotRect.top+slotRect.height/2 - orchardRect.top;
+
+  let hit=false;
+  const duration=820;
+  const startTime=performance.now();
+
+  function frame(now){
+    const elapsed=now-startTime;
+    let t=Math.min(1,elapsed/duration);
+    throwProgress=t;
+    // catch zone states
+    if(t>=0.75 && t<1){
+      catchZone.classList.add('active');
+      if(t>=0.88 && t<=0.98){
+        catchZone.classList.add('perfect');
+        catchLabel.innerHTML='TAP!<br>PERFECT!';
+        catchLabel.style.color='#2e7d32';
+      } else {
+        catchZone.classList.remove('perfect');
+        catchLabel.innerHTML='TAP<br>NOW!';
+        catchLabel.style.color='#e68a00';
+      }
+    }
+
+    // two-phase lerp with arc
+    let x,y;
+    if(t<0.5){
+      const p=t/0.5;
+      x=startX + (targetX-startX)*p;
+      y=startY + (targetY-startY)*p;
+    } else {
+      const p=(t-0.5)/0.5;
+      x=targetX + (startX-targetX)*p;
+      y=targetY + (startY-targetY)*p;
+    }
+    const arc=80*Math.sin(Math.PI*t);
+    y-=arc;
+    const spin=720*t;
+    proj.style.left=(x-18)+'px';
+    proj.style.top=(y-18)+'px';
+    proj.style.transform=`rotate(${spin}deg)`;
+
+    // collision check
+    if(!hit && t>0.15 && t<0.65){
+      const dx=x-targetX, dy=(y-targetY);
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<34){
+        hit=true;
+        // hit fruit
+        const d=fruits.get(idx);
+        if(d){
+          clearTimeout(d.birdTimeout);
+          clearTimeout(d.stealTimeout);
+          cancelAnimationFrame(d.progressRAF);
+          const hadBird=!!d.birdEl;
+          d.el.remove(); d.progEl.remove(); if(d.birdEl) d.birdEl.remove();
+          fruits.delete(idx);
+          slots()[idx].classList.add('empty');
+          const mult=getMult();
+          const pts=d.fruit.pts*mult;
+          score+=pts;
+          combo++; maxCombo=Math.max(maxCombo,combo);
+          showFloat(slot,`+${pts}`,'good');
+          if(hadBird){
+            const bpts=20*mult;
+            score+=bpts;
+            showFloat(slot,`BIRD +${bpts}!`,'bonus');
+            shake();
+          }
+          if(navigator.vibrate) navigator.vibrate(25);
+          const newLevel=Math.floor(score/120)+1;
+          if(newLevel!==level){level=newLevel; showFloat(slot,`LEVEL ${level}!`,'good')}
+          updateUI();
+        }
+      }
+    }
+
+    if(t<1){
+      throwRAF=requestAnimationFrame(frame);
+    } else {
+      // finished return
+      proj.remove();
+      isThrowing=false;
+      throwProgress=0;
+      catchZone.classList.remove('active','perfect');
+      catchLabel.innerHTML='TAP<br>FRUIT<br>TO THROW';
+      catchLabel.style.color='#6a3a00';
+      // if missed catch window (no tap), reset combo
+      // we handle catch via tap handler; if we reach here without catch, it's a miss if we had a hit
+      if(hit){
+        // check if catch was missed - we track via flag
+        if(!proj.dataset.caught){
+          // missed catch
+          combo=0;
+          showFloat(catchZone,'MISSED CATCH!','steal');
+          updateUI();
+        }
+      } else {
+        // missed fruit entirely (threw but no hit? shouldn't happen but handle)
+        // fruit still there, no penalty
+      }
+    }
+  }
+  throwRAF=requestAnimationFrame(frame);
+  // store proj for catch handler
+  proj.dataset.caught='';
+  // attach catch handler for this throw
+  const catchHandler=()=>{
+    if(!isThrowing) return;
+    if(throwProgress<0.75) return; // too early
+    // prevent double
+    if(proj.dataset.caught==='1') return;
+    proj.dataset.caught='1';
+    let bonus=0, msg='';
+    if(throwProgress>=0.88 && throwProgress<=0.98){
+      bonus=15*getMult();
+      msg=`PERFECT +${bonus}!`;
+      combo++; maxCombo=Math.max(maxCombo,combo);
+      showFloat(catchZone,msg,'bonus');
+      if(navigator.vibrate) navigator.vibrate([30,20,30]);
+    } else if(throwProgress>=0.75){
+      bonus=5*getMult();
+      msg=`CATCH +${bonus}`;
+      combo++; maxCombo=Math.max(maxCombo,combo);
+      showFloat(catchZone,msg,'good');
+      if(navigator.vibrate) navigator.vibrate(20);
+    } else {
+      return;
+    }
+    score+=bonus;
+    const newLevel=Math.floor(score/120)+1;
+    if(newLevel!==level){level=newLevel; showFloat(catchZone,`LEVEL ${level}!`,'good')}
+    updateUI();
+    // visual feedback
+    catchZone.style.transform='scale(1.15)';
+    setTimeout(()=>catchZone.style.transform='',150);
+  };
+  // temporary listener
+  catchZone.addEventListener('click', catchHandler, {once:false});
+  // remove listener after throw ends
+  setTimeout(()=>catchZone.removeEventListener('click',catchHandler), 900);
+  // also allow tapping catch zone via touch
+  catchZone.onclick=catchHandler;
+}
+
+function startCountdown(){
+  clearInterval(countdownTimer);
+  countdownTimer=setInterval(()=>{
+    if(gameState!=='playing') return;
+    timeLeft--;
+    updateUI();
+    if(timeLeft<=0) endGame('⏰ Harvest time over!');
+  },1000);
+}
+
+function startGame(){
+  score=0; lives=3; level=1; timeLeft=60; combo=0; maxCombo=0;
+  fruits.forEach(d=>{clearTimeout(d.birdTimeout);clearTimeout(d.stealTimeout);cancelAnimationFrame(d.progressRAF);d.el.remove();d.progEl.remove();if(d.birdEl)d.birdEl.remove()});
+  fruits.clear();
+  slots().forEach(s=>{s.classList.add('empty');[...s.querySelectorAll('.fruit,.progress,.bird')].forEach(e=>e.remove())});
+  if(throwRAF) cancelAnimationFrame(throwRAF);
+  [...orchardEl.querySelectorAll('.projectile,.float')].forEach(e=>e.remove());
+  isThrowing=false; throwProgress=0;
+  gameState='playing';
+  overlay.style.display='none';
+  startBtn.textContent='⏸ PAUSE';
+  startBtn.disabled=false;
+  pauseBtn.disabled=false;
+  pauseBtn.textContent='⏸ PAUSE';
+  catchLabel.innerHTML='TAP<br>FRUIT<br>TO THROW';
+  updateUI();
+  scheduleSpawn();
+  startCountdown();
+  // initial fruits
+  setTimeout(spawnFruit,400);
+  setTimeout(spawnFruit,900);
+}
+
+function pauseGame(){
+  if(gameState==='playing'){
+    gameState='paused';
+    clearTimeout(spawnTimer);
+    clearInterval(countdownTimer);
+    if(throwRAF) cancelAnimationFrame(throwRAF);
+    fruits.forEach(d=>{clearTimeout(d.birdTimeout);clearTimeout(d.stealTimeout);cancelAnimationFrame(d.progressRAF)});
+    overlay.style.display='flex';
+    card.innerHTML=`<h2>⏸️ Paused</h2><p>Orchard waits — birds are circling!</p><div class="big">${score} pts</div><p>Level ${level} • ${timeLeft}s left • ${lives} lives</p><div class="row"><button class="btn btn-primary" style="flex:1" onclick="resumeGame()">▶ RESUME</button><button class="btn btn-secondary" style="flex:1" onclick="resetGame()">↻ RESTART</button></div>`;
+    startBtn.textContent='▶ RESUME';
+    pauseBtn.textContent='▶ RESUME';
+  } else if(gameState==='paused') resumeGame();
+}
+window.resumeGame=()=>{
+  if(gameState!=='paused') return;
+  gameState='playing';
+  overlay.style.display='none';
+  startBtn.textContent='⏸ PAUSE';
+  pauseBtn.textContent='⏸ PAUSE';
+  // restart progress bars
+  fruits.forEach((d,idx)=>{
+    const elapsed=Date.now()-d.startTime;
+    const remaining=Math.max(0,d.duration-elapsed);
+    d.stealTimeout=setTimeout(()=>{
+      if(!fruits.has(idx)) return;
+      const data=fruits.get(idx);
+      if(data){cancelAnimationFrame(data.progressRAF);data.el.remove();data.progEl.remove();if(data.birdEl)data.birdEl.remove()}
+      fruits.delete(idx);slots()[idx].classList.add('empty');
+      score=Math.max(0,score-10);lives--;combo=0;showFloat(slots()[idx],'STOLEN -10','steal');shake();updateUI();if(lives<=0) endGame('🦅 Birds stole everything!');
+    },remaining);
+    const birdRemaining=Math.max(0,(d.startTime+Math.max(800,2200-level*120))-Date.now());
+    if(!d.birdEl && birdRemaining>0){
+      d.birdTimeout=setTimeout(()=>{
+        if(!fruits.has(idx)) return;
+        const b=document.createElement('div');b.className='bird';b.textContent='🦅';slots()[idx].appendChild(b);d.birdEl=b;
+        stealAlert.classList.add('show');clearTimeout(stealAlertTimeout);stealAlertTimeout=setTimeout(()=>stealAlert.classList.remove('show'),1200);
+      },birdRemaining);
+    }
+    function upd(){
+      if(!fruits.has(idx)) return;
+      const e=Date.now()-d.startTime;
+      const pct=Math.max(0,1-e/d.duration);
+      d.barEl.style.width=(pct*100)+'%';
+      if(pct<0.3) d.barEl.className='progress-bar danger';
+      else if(pct<0.6) d.barEl.className='progress-bar warn';
+      if(pct>0) d.progressRAF=requestAnimationFrame(upd);
+    }
+    d.progressRAF=requestAnimationFrame(upd);
+  });
+  scheduleSpawn();
+  startCountdown();
+};
+window.resetGame=()=>{
+  clearTimeout(spawnTimer);clearInterval(countdownTimer);
+  if(throwRAF) cancelAnimationFrame(throwRAF);
+  fruits.forEach(d=>{clearTimeout(d.birdTimeout);clearTimeout(d.stealTimeout);cancelAnimationFrame(d.progressRAF);d.el.remove();d.progEl.remove();if(d.birdEl)d.birdEl.remove()});
+  fruits.clear();
+  slots().forEach(s=>{s.classList.add('empty');[...s.querySelectorAll('.fruit,.progress,.bird')].forEach(e=>e.remove())});
+  [...orchardEl.querySelectorAll('.projectile,.float')].forEach(e=>e.remove());
+  isThrowing=false;gameState='idle';score=0;lives=3;level=1;timeLeft=60;combo=0;
+  updateUI();
+  overlay.style.display='flex';
+  card.innerHTML=`<h2>🌳 Orchard Alert!</h2><p>Birds swoop to steal hanging fruit! Tap a fruit to throw your boomerang — it arcs out and back.</p><p style="font-size:12px;background:#fff3d6;padding:8px;border-radius:10px;border:1px dashed #ffb300">Hit fruit before timer runs out!<br>Catch the return in the <b style="color:#2e7d32">GREEN</b> window for <b>+15 × combo</b> (up to 5×)!<br>60s • 3 lives • Level up every 120 pts</p><div class="row"><button class="btn btn-primary" style="flex:1" id="playBtn2">🪃 START THROWING</button></div><p style="margin-top:8px;font-size:11px;opacity:0.7">Best: ${best} ⭐</p>`;
+  document.getElementById('playBtn2').addEventListener('click',startGame);
+  startBtn.textContent='▶ START HARVEST';
+  pauseBtn.textContent='⏸ PAUSE';
+  pauseBtn.disabled=true;
+  catchLabel.innerHTML='TAP<br>FRUIT<br>TO THROW';
+  stealAlert.classList.remove('show');
+};
+
+function endGame(reason){
+  gameState='over';
+  clearTimeout(spawnTimer);clearInterval(countdownTimer);
+  if(throwRAF) cancelAnimationFrame(throwRAF);
+  fruits.forEach(d=>{clearTimeout(d.birdTimeout);clearTimeout(d.stealTimeout);cancelAnimationFrame(d.progressRAF)});
+  const isNewBest=score===best && score>0;
+  overlay.style.display='flex';
+  card.innerHTML=`<h2>${lives<=0?'💔 Harvest Lost':'🌳 Harvest Done!'}</h2><p>${reason}</p><div class="big">${score} pts</div><p>Level ${level} • Best combo x${Math.min(5,1+Math.floor(maxCombo/3))} • Streak ${maxCombo}</p>${isNewBest?'<p style="background:#ffe9a8;padding:6px;border-radius:999px;font-weight:900;color:#6a3a00">🎉 NEW BEST! 🎉</p>':`<p style="font-size:12px">Best: <b>${best}</b> ⭐</p>`}<div class="row"><button class="btn btn-primary" style="flex:1" onclick="startGame()">↻ PLAY AGAIN</button><button class="btn btn-secondary" style="flex:1" onclick="resetGame()">HOME</button></div>`;
+  startBtn.textContent='▶ PLAY AGAIN';
+  pauseBtn.disabled=true;
+  updateUI();
+}
+
+startBtn.addEventListener('click',()=>{if(gameState==='idle'||gameState==='over') startGame(); else if(gameState==='playing') pauseGame(); else if(gameState==='paused') resumeGame()});
+pauseBtn.addEventListener('click',pauseGame);
+resetBtn.addEventListener('click',()=>resetGame());
+playBtn.addEventListener('click',startGame);
+catchZone.addEventListener('click',()=>{
+  if(!isThrowing && gameState==='playing'){
+    showFloat(catchZone,'TAP A FRUIT!','steal');
+  }
+});
+updateUI();
+</script>
+</body>
+</html>
+

@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Odd One Out — Critter Crowd</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;touch-action:none}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:#1a1430;color:#fff;display:flex;justify-content:center;align-items:stretch}
+#wrap{width:100%;max-width:440px;height:100%;display:flex;flex-direction:column;background:linear-gradient(180deg,#2a1f4d 0%,#1a1430 55%,#0f0c1f 100%);position:relative;overflow:hidden}
+header{padding:10px 12px 8px;display:flex;justify-content:space-between;align-items:center;gap:8px;background:rgba(255,255,255,0.07);backdrop-filter:blur(6px);border-bottom:1px solid rgba(255,255,255,0.12)}
+h1{font-size:15px;letter-spacing:0.6px;font-weight:900;line-height:1}
+h1 span{color:#ffd166}
+.sub{font-size:10px;opacity:0.8;letter-spacing:0.4px}
+.hdrBtns{display:flex;gap:6px}
+.btn{border:none;border-radius:10px;padding:8px 10px;font-weight:800;font-size:12px;cursor:pointer;touch-action:none}
+.btn:active{transform:scale(0.97)}
+.btnRestart{background:#ffd166;color:#1a1430}
+.btnHelp{background:rgba(255,255,255,0.14);color:#fff;border:1px solid rgba(255,255,255,0.18)}
+#hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:8px 10px}
+.card{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:7px 8px;text-align:center}
+.card b{display:block;font-size:11px;opacity:0.75;letter-spacing:0.5px}
+.card strong{font-size:16px;line-height:1}
+.card small{font-size:10px;opacity:0.7}
+#hud2{display:flex;gap:6px;padding:0 10px 8px}
+.pill{flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:999px;padding:6px 8px;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800}
+.pill i{font-style:normal;opacity:0.8;font-size:10px;letter-spacing:0.5px}
+#timerWrap{height:8px;margin:0 10px 8px;background:rgba(255,255,255,0.12);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.1)}
+#timerBar{height:100%;width:100%;background:linear-gradient(90deg,#06d6a0,#ffd166,#ef476f);transition:width 0.2s linear}
+#canvasBox{flex:1;position:relative;margin:0 10px 10px;background:radial-gradient(ellipse at 50% 0%, #3a2a6a 0%, #241a45 45%, #1a1430 100%);border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.14);box-shadow:0 10px 30px rgba(0,0,0,0.35)}
+canvas{width:100%;height:100%;display:block;touch-action:none;cursor:none}
+#hint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:rgba(0,0,0,0.55);color:#fff;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.3px;pointer-events:none;border:1px solid rgba(255,255,255,0.15);white-space:nowrap}
+#overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;text-align:center;background:rgba(15,12,31,0.88);backdrop-filter:blur(4px)}
+#overlay h2{font-size:26px;line-height:1;margin-bottom:6px}
+#overlay p{font-size:13px;opacity:0.9;line-height:1.4;max-width:320px}
+.bigBtn{margin-top:14px;background:linear-gradient(180deg,#ffd166,#ffb703);color:#1a1430;border:none;border-radius:14px;padding:14px 18px;font-weight:900;font-size:16px;letter-spacing:0.4px;cursor:pointer;box-shadow:0 8px 18px rgba(0,0,0,0.3);touch-action:none;width:100%;max-width:300px}
+.bigBtn:active{transform:scale(0.98)}
+.ghostBtn{margin-top:10px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.18);border-radius:12px;padding:10px 14px;font-weight:800;font-size:13px;cursor:pointer;touch-action:none}
+.kbd{margin-top:10px;font-size:11px;opacity:0.7;line-height:1.4}
+.lives{letter-spacing:2px}
+.flash{animation:flash 0.35s}
+@keyframes flash{0%{filter:brightness(1.6)}100%{filter:brightness(1)}}
+.shake{animation:shake 0.35s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <header>
+    <div>
+      <h1>🔍 ODD <span>ONE OUT</span></h1>
+      <div class="sub">CRITTER CROWD • FIND THE STANDOUT</div>
+    </div>
+    <div class="hdrBtns">
+      <button class="btn btnHelp" id="helpBtn">?</button>
+      <button class="btn btnRestart" id="restartBtn">↻ RESTART</button>
+    </div>
+  </header>
+
+  <div id="hud">
+    <div class="card"><b>SCORE</b><strong id="scoreEl">0</strong><small>BEST <span id="bestScoreEl">0</span></small></div>
+    <div class="card"><b>LEVEL</b><strong id="levelEl">1</strong><small>BEST LVL <span id="bestLevelEl">1</span></small></div>
+    <div class="card"><b>LIVES</b><strong class="lives" id="livesEl">♥♥♥</strong><small id="comboEl">Find the odd eyes/mouth/spots/antennae</small></div>
+  </div>
+  <div id="hud2">
+    <div class="pill"><i>⏱ TIME</i><span id="timeEl">30.0s</span></div>
+    <div class="pill"><i>🔎 LENS</i><span id="lensEl">ON</span></div>
+    <div class="pill"><i>👾 CROWD</i><span id="crowdEl">16</span></div>
+  </div>
+  <div id="timerWrap"><div id="timerBar"></div></div>
+
+  <div id="canvasBox">
+    <canvas id="c" width="400" height="600"></canvas>
+    <div id="hint">Drag to scan • Tap the odd one • Wrong tap = -1 ♥</div>
+    <div id="overlay">
+      <h2 id="ovTitle">Find the Odd Critter!</h2>
+      <p id="ovDesc">A crowd of cute critters hides <b>one standout</b> with different <b>eyes, mouth, spots or antennae</b>. Scan with the magnifier lens and tap it before time runs out. 3 lives — wrong tap costs a life!</p>
+      <button class="bigBtn" id="playBtn">▶ START HUNT</button>
+      <button class="ghostBtn" id="howBtn">How to play</button>
+      <div class="kbd">Touch: drag lens & tap • Mouse: move & click • Keys: <b>Arrows/WASD</b> move lens, <b>Enter/Space</b> tap, <b>R</b> restart, <b>L</b> toggle lens</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const wrap=document.getElementById('wrap');
+const box=document.getElementById('canvasBox');
+const scoreEl=document.getElementById('scoreEl');
+const levelEl=document.getElementById('levelEl');
+const livesEl=document.getElementById('livesEl');
+const bestScoreEl=document.getElementById('bestScoreEl');
+const bestLevelEl=document.getElementById('bestLevelEl');
+const timeEl=document.getElementById('timeEl');
+const timerBar=document.getElementById('timerBar');
+const crowdEl=document.getElementById('crowdEl');
+const lensEl=document.getElementById('lensEl');
+const overlay=document.getElementById('overlay');
+const ovTitle=document.getElementById('ovTitle');
+const ovDesc=document.getElementById('ovDesc');
+const playBtn=document.getElementById('playBtn');
+const howBtn=document.getElementById('howBtn');
+
+const LS_BEST_SCORE='oddOne_bestScore_v2';
+const LS_BEST_LEVEL='oddOne_bestLevel_v2';
+
+let W=0,H=0,dpr=1;
+let level=1, score=0, lives=3, bestScore=0, bestLevel=1;
+let timeLeft=30, timeMax=30, timerId=null;
+let critters=[], oddIndex=-1, oddFeature='';
+let pointer={x:200,y:300,active:true};
+let lensOn=true;
+let gameState='menu'; // menu, playing, levelClear, gameOver, help
+let particles=[];
+let shakeUntil=0;
+let lastTapWrongUntil=0;
+
+const LENS_R=78;
+const ZOOM=1.75;
+
+const BODY_COLORS=['#ffbe0b','#fb5607','#ff006e','#8338ec','#06d6a0','#118ab2'];
+const EYE_TYPES=['round','sleepy','star','wink'];
+const MOUTH_TYPES=['smile','open','wiggle','frown'];
+const ANT_TYPES=['none','straight','curly','double'];
+
+function loadBest(){
+  bestScore=parseInt(localStorage.getItem(LS_BEST_SCORE)||'0',10)||0;
+  bestLevel=parseInt(localStorage.getItem(LS_BEST_LEVEL)||'1',10)||1;
+  bestScoreEl.textContent=bestScore;
+  bestLevelEl.textContent=bestLevel;
+}
+function saveBest(){
+  if(score>bestScore){bestScore=score; localStorage.setItem(LS_BEST_SCORE, bestScore);}
+  if(level>bestLevel){bestLevel=level; localStorage.setItem(LS_BEST_LEVEL, bestLevel);}
+  bestScoreEl.textContent=bestScore;
+  bestLevelEl.textContent=bestLevel;
+}
+
+function resize(){
+  const rect=box.getBoundingClientRect();
+  dpr=Math.min(2, window.devicePixelRatio||1);
+  W=rect.width; H=rect.height;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  if(!pointer.active){pointer.x=W/2; pointer.y=H/2;}
+}
+window.addEventListener('resize', resize);
+
+function rand(a,b){return a+Math.random()*(b-a)}
+function pick(arr){return arr[Math.floor(Math.random()*arr.length)]}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+
+function makeBaseFeatures(){
+  return {
+    bodyColor: pick(BODY_COLORS),
+    eye: pick(EYE_TYPES),
+    mouth: pick(MOUTH_TYPES),
+    spots: Math.floor(rand(0,3)), // 0-2
+    antenna: pick(ANT_TYPES),
+    eyeColor: Math.random()<0.5 ? '#1a1430' : '#2b2d42'
+  };
+}
+function cloneFeatures(f){return JSON.parse(JSON.stringify(f));}
+
+function generateLevel(){
+  const count = Math.min(32, 12 + level*2 + Math.floor(level/2)*2);
+  const sizeBase = clamp(52 - level*1.2, 30, 52);
+  crowdEl.textContent=count;
+  const base=makeBaseFeatures();
+  const featuresList=[];
+  // choose odd feature type
+  const types=['eye','mouth','spots','antenna'];
+  // weight to ensure variety
+  oddFeature=pick(types);
+  // ensure odd is actually different
+  let oddFeat=cloneFeatures(base);
+  if(oddFeature==='eye'){
+    let opts=EYE_TYPES.filter(t=>t!==base.eye);
+    oddFeat.eye=pick(opts);
+    // sometimes also eye color diff for extra subtle
+    if(Math.random()<0.3) oddFeat.eyeColor = base.eyeColor==='#1a1430' ? '#ff006e' : '#1a1430';
+  } else if(oddFeature==='mouth'){
+    let opts=MOUTH_TYPES.filter(t=>t!==base.mouth);
+    oddFeat.mouth=pick(opts);
+  } else if(oddFeature==='spots'){
+    // spots diff by 1-2
+    let opts=[0,1,2,3].filter(n=>n!==base.spots);
+    oddFeat.spots=pick(opts);
+  } else if(oddFeature==='antenna'){
+    let opts=ANT_TYPES.filter(t=>t!==base.antenna);
+    oddFeat.antenna=pick(opts);
+  }
+
+  // layout grid with jitter
+  const cols = W < 360 ? 4 : 5;
+  const rows = Math.ceil(count/cols);
+  const padX=14, padY=14;
+  const cellW=(W - padX*2)/cols;
+  const cellH=(H - 40 - padY*2)/rows;
+  const positions=[];
+  for(let i=0;i<count;i++){
+    const col=i%cols, row=Math.floor(i/cols);
+    const cx=padX + col*cellW + cellW/2 + rand(-cellW*0.18, cellW*0.18);
+    const cy=padY + 18 + row*cellH + cellH/2 + rand(-cellH*0.18, cellH*0.18);
+    positions.push({x:clamp(cx, 22, W-22), y:clamp(cy, 22, H-22)});
+  }
+  // shuffle positions
+  for(let i=positions.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [positions[i],positions[j]]=[positions[j],positions[i]];}
+
+  critters=[];
+  oddIndex=Math.floor(Math.random()*count);
+  for(let i=0;i<count;i++){
+    const f = i===oddIndex ? oddFeat : cloneFeatures(base);
+    // add tiny random hue variation to non-odd to make harder at high levels
+    if(i!==oddIndex && level>3 && Math.random()<0.25){
+      // slight body color variation not counted as odd
+      f.bodyColor = BODY_COLORS[(BODY_COLORS.indexOf(base.bodyColor)+ (Math.random()<0.5?1:2))%BODY_COLORS.length];
+      // but revert if it would confuse oddFeature spots/antenna etc? keep
+      if(oddFeature!=='spots' && oddFeature!=='antenna') f.bodyColor=base.bodyColor;
+    }
+    critters.push({
+      x:positions[i].x,
+      y:positions[i].y,
+      r:sizeBase/2,
+      size:sizeBase,
+      f:f,
+      isOdd:i===oddIndex,
+      bob: rand(0, Math.PI*2),
+      bobSpeed: rand(0.8,1.6)
+    });
+  }
+  // time
+  timeMax = Math.max(12, 30 - level*1.4);
+  timeLeft=timeMax;
+  updateHud();
+}
+
+function updateHud(){
+  scoreEl.textContent=score;
+  levelEl.textContent=level;
+  livesEl.textContent='♥'.repeat(lives) + '♡'.repeat(3-lives);
+  livesEl.style.color = lives===1 ? '#ef476f' : lives===2 ? '#ffd166' : '#06d6a0';
+  crowdEl.textContent=critters.length||0;
+  lensEl.textContent=lensOn ? 'ON' : 'OFF';
+  lensEl.style.color=lensOn ? '#06d6a0' : '#ef476f';
+}
+
+function startGame(){
+  level=1; score=0; lives=3;
+  generateLevel();
+  gameState='playing';
+  overlay.style.display='none';
+  startTimer();
+  pointer.active=true;
+  if(W===0) resize();
+  pointer.x=W/2; pointer.y=H/2;
+  updateHud();
+}
+function startTimer(){
+  clearInterval(timerId);
+  timerId=setInterval(()=>{
+    if(gameState!=='playing') return;
+    timeLeft-=0.1;
+    if(timeLeft<=0){
+      timeLeft=0;
+      onTimeOut();
+    }
+    renderTimer();
+  },100);
+}
+function renderTimer(){
+  timeEl.textContent=timeLeft.toFixed(1)+'s';
+  const pct=clamp(timeLeft/timeMax,0,1)*100;
+  timerBar.style.width=pct+'%';
+  if(pct<30) timerBar.style.background='#ef476f';
+  else if(pct<60) timerBar.style.background='linear-gradient(90deg,#ffd166,#ef476f)';
+  else timerBar.style.background='linear-gradient(90deg,#06d6a0,#ffd166)';
+}
+function onTimeOut(){
+  lives--;
+  updateHud();
+  shakeUntil=performance.now()+400;
+  lastTapWrongUntil=performance.now()+600;
+  if(lives<=0){
+    gameOver('Time\'s up!');
+  } else {
+    // retry same level with new layout
+    timeLeft=timeMax;
+    generateLevel();
+    // flash
+    box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake');
+    setTimeout(()=>box.classList.remove('shake'),400);
+  }
+}
+function onWrongTap(){
+  lives--;
+  updateHud();
+  shakeUntil=performance.now()+350;
+  lastTapWrongUntil=performance.now()+500;
+  box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake');
+  setTimeout(()=>box.classList.remove('shake'),400);
+  if(navigator.vibrate) navigator.vibrate(80);
+  if(lives<=0){
+    gameOver('Out of lives!');
+  }
+}
+function onCorrectTap(c){
+  const bonus=Math.floor(timeLeft*6);
+  const pts=100*level + bonus;
+  score+=pts;
+  saveBest();
+  // particles
+  for(let i=0;i<22;i++) particles.push({
+    x:c.x, y:c.y, vx:rand(-6,6), vy:rand(-7,-1), life:1, dec:rand(0.02,0.04), r:rand(3,6), col:pick(['#ffd166','#06d6a0','#ffbe0b','#ff006e','#8338ec'])
+  });
+  if(navigator.vibrate) navigator.vibrate([30,40,30]);
+  // level clear
+  gameState='levelClear';
+  clearInterval(timerId);
+  ovTitle.textContent='★ Found it! +'+pts;
+  ovDesc.innerHTML=`You spotted the odd <b>${oddFeature}</b>! Time bonus <b>+${bonus}</b>. <br>Level <b>${level}</b> cleared — crowd gets bigger & trickier.`;
+  playBtn.textContent='▶ NEXT LEVEL';
+  overlay.style.display='flex';
+  updateHud();
+}
+
+function gameOver(reason){
+  gameState='gameOver';
+  clearInterval(timerId);
+  saveBest();
+  ovTitle.textContent='Game Over';
+  ovDesc.innerHTML=`${reason}<br>Score <b>${score}</b> • Reached Level <b>${level}</b><br>Best Score <b>${bestScore}</b> • Best Level <b>${bestLevel}</b>`;
+  playBtn.textContent='↻ PLAY AGAIN';
+  overlay.style.display='flex';
+}
+
+function nextLevel(){
+  level++;
+  generateLevel();
+  gameState='playing';
+  overlay.style.display='none';
+  startTimer();
+  updateHud();
+}
+
+// Drawing critters
+function drawCritter(g, c, scale=1){
+  const x=c.x, y=c.y, s=c.size*scale;
+  const r=s/2;
+  // bob
+  const bobY = Math.sin(performance.now()*0.001*c.bobSpeed + c.bob)*2*scale;
+  const yy=y+bobY;
+  // shadow
+  g.fillStyle='rgba(0,0,0,0.18)';
+  g.beginPath(); g.ellipse(x, yy+r*0.85, r*0.9, r*0.32, 0,0,Math.PI*2); g.fill();
+  // body
+  g.fillStyle=c.f.bodyColor;
+  g.strokeStyle='rgba(0,0,0,0.18)';
+  g.lineWidth=2*scale;
+  g.beginPath();
+  // rounded body
+  const bx=x, by=yy;
+  g.beginPath();
+  g.arc(bx, by, r, 0, Math.PI*2);
+  g.fill(); g.stroke();
+  // belly
+  g.fillStyle='rgba(255,255,255,0.92)';
+  g.beginPath(); g.ellipse(bx, by+r*0.22, r*0.62, r*0.48, 0,0,Math.PI*2); g.fill();
+  // spots
+  if(c.f.spots>0){
+    g.fillStyle='rgba(0,0,0,0.14)';
+    const spotsPos=[[-r*0.35,-r*0.15],[r*0.3,-r*0.2],[0,r*0.05]];
+    for(let i=0;i<c.f.spots && i<3;i++){
+      g.beginPath(); g.arc(bx+spotsPos[i][0], by+spotsPos[i][1], r*0.14,0,Math.PI*2); g.fill();
+    }
+    if(c.f.spots===3){
+      g.beginPath(); g.arc(bx+r*0.15, by+r*0.35, r*0.11,0,Math.PI*2); g.fill();
+    }
+  }
+  // antennae
+  g.strokeStyle='#1a1430';
+  g.lineWidth=2.2*scale;
+  g.lineCap='round';
+  if(c.f.antenna==='straight'){
+    g.beginPath(); g.moveTo(bx, by-r*0.95); g.lineTo(bx, by-r*1.35); g.stroke();
+    g.fillStyle='#ffd166'; g.beginPath(); g.arc(bx, by-r*1.42, r*0.14,0,Math.PI*2); g.fill(); g.stroke();
+  } else if(c.f.antenna==='curly'){
+    g.beginPath(); g.moveTo(bx, by-r*0.95);
+    g.quadraticCurveTo(bx+r*0.35, by-r*1.2, bx+r*0.15, by-r*1.45); g.stroke();
+    g.fillStyle='#06d6a0'; g.beginPath(); g.arc(bx+r*0.15, by-r*1.52, r*0.13,0,Math.PI*2); g.fill(); g.stroke();
+  } else if(c.f.antenna==='double'){
+    g.beginPath(); g.moveTo(bx-r*0.18, by-r*0.92); g.lineTo(bx-r*0.32, by-r*1.32); g.stroke();
+    g.beginPath(); g.moveTo(bx+r*0.18, by-r*0.92); g.lineTo(bx+r*0.32, by-r*1.32); g.stroke();
+    g.fillStyle='#ff006e';
+    g.beginPath(); g.arc(bx-r*0.32, by-r*1.38, r*0.11,0,Math.PI*2); g.fill(); g.stroke();
+    g.beginPath(); g.arc(bx+r*0.32, by-r*1.38, r*0.11,0,Math.PI*2); g.fill(); g.stroke();
+  }
+  // eyes
+  const eyeY=by - r*0.18;
+  const eyeGap=r*0.42;
+  function drawEye(ex, type){
+    g.fillStyle='#fff';
+    g.strokeStyle='rgba(0,0,0,0.2)'; g.lineWidth=1.4*scale;
+    if(type==='round'){
+      g.beginPath(); g.arc(ex, eyeY, r*0.22,0,Math.PI*2); g.fill(); g.stroke();
+      g.fillStyle=c.f.eyeColor; g.beginPath(); g.arc(ex, eyeY, r*0.12,0,Math.PI*2); g.fill();
+      g.fillStyle='#fff'; g.beginPath(); g.arc(ex+r*0.04, eyeY-r*0.04, r*0.04,0,Math.PI*2); g.fill();
+    } else if(type==='sleepy'){
+      g.beginPath(); g.ellipse(ex, eyeY, r*0.22, r*0.14,0,0,Math.PI*2); g.fill(); g.stroke();
+      g.fillStyle=c.f.eyeColor; g.beginPath(); g.arc(ex, eyeY, r*0.09,0,Math.PI*2); g.fill();
+      g.strokeStyle='#1a1430'; g.lineWidth=1.6*scale; g.beginPath(); g.moveTo(ex-r*0.18, eyeY-0.02); g.lineTo(ex+r*0.18, eyeY-0.02); g.stroke();
+    } else if(type==='star'){
+      g.beginPath(); g.arc(ex, eyeY, r*0.22,0,Math.PI*2); g.fill(); g.stroke();
+      g.fillStyle='#ffd166';
+      // star pupil
+      g.beginPath();
+      for(let i=0;i<5;i++){
+        const ang=(i*144-90)*Math.PI/180;
+        const px=ex+Math.cos(ang)*r*0.11, py=eyeY+Math.sin(ang)*r*0.11;
+        if(i===0) g.moveTo(px,py); else g.lineTo(px,py);
+      }
+      g.closePath(); g.fill();
+    } else if(type==='wink'){
+      // one eye wink is handled by caller: we draw wink as line
+      g.strokeStyle='#1a1430'; g.lineWidth=2*scale; g.lineCap='round';
+      g.beginPath(); g.moveTo(ex-r*0.16, eyeY); g.quadraticCurveTo(ex, eyeY+r*0.08, ex+r*0.16, eyeY); g.stroke();
+      // no white fill
+      return;
+    }
+  }
+  // handle wink special: left eye round, right eye wink
+  if(c.f.eye==='wink'){
+    drawEye(bx-eyeGap, 'round');
+    drawEye(bx+eyeGap, 'wink');
+  } else {
+    drawEye(bx-eyeGap, c.f.eye);
+    drawEye(bx+eyeGap, c.f.eye);
+  }
+  // mouth
+  g.strokeStyle='#1a1430'; g.lineWidth=1.8*scale; g.lineCap='round'; g.fillStyle='#1a1430';
+  const mx=bx, my=by+r*0.32;
+  if(c.f.mouth==='smile'){
+    g.beginPath(); g.arc(mx, my, r*0.18, 0.15*Math.PI, 0.85*Math.PI); g.stroke();
+  } else if(c.f.mouth==='open'){
+    g.beginPath(); g.ellipse(mx, my+0.02, r*0.14, r*0.16,0,0,Math.PI*2); g.fill();
+    g.fillStyle='#ff8fa3'; g.beginPath(); g.ellipse(mx, my+0.06, r*0.07, r*0.05,0,0,Math.PI*2); g.fill();
+  } else if(c.f.mouth==='wiggle'){
+    g.beginPath(); g.moveTo(mx-r*0.18, my); g.quadraticCurveTo(mx-r*0.06, my+r*0.1, mx, my); g.quadraticCurveTo(mx+r*0.06, my-r*0.1, mx+r*0.18, my); g.stroke();
+  } else if(c.f.mouth==='frown'){
+    g.beginPath(); g.arc(mx, my+0.08, r*0.16, 1.15*Math.PI, 1.85*Math.PI); g.stroke();
+  }
+  // highlight on body
+  g.fillStyle='rgba(255,255,255,0.18)';
+  g.beginPath(); g.ellipse(bx-r*0.22, by-r*0.28, r*0.18, r*0.12, -0.6,0,Math.PI*2); g.fill();
+}
+
+function drawBackground(){
+  // subtle grid dots
+  ctx.fillStyle='rgba(255,255,255,0.04)';
+  for(let x=12;x<W;x+=28) for(let y=12;y<H;y+=28){
+    ctx.beginPath(); ctx.arc(x,y,1,0,Math.PI*2); ctx.fill();
+  }
+  // vignette
+  const g=ctx.createRadialGradient(W/2,H/2, Math.min(W,H)*0.3, W/2,H/2, Math.max(W,H));
+  g.addColorStop(0,'rgba(255,255,255,0)');
+  g.addColorStop(1,'rgba(0,0,0,0.22)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // shake offset
+  ctx.save();
+  if(performance.now()<shakeUntil){
+    const s=(shakeUntil-performance.now())/400;
+    ctx.translate(rand(-4,4)*s, rand(-2,2)*s);
+  }
+  drawBackground();
+  // draw critters normal
+  critters.forEach(c=> drawCritter(ctx,c,1));
+
+  // wrong tap flash overlay
+  if(performance.now()<lastTapWrongUntil){
+    ctx.fillStyle='rgba(239,71,111,'+ (0.12*(1-(performance.now()- (lastTapWrongUntil-500))/500))+')';
+    ctx.fillRect(0,0,W,H);
+  }
+
+  // magnifier
+  if(pointer.active && lensOn && gameState==='playing'){
+    const R=LENS_R;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(pointer.x, pointer.y, R,0,Math.PI*2); ctx.clip();
+    // zoomed scene
+    ctx.translate(pointer.x, pointer.y);
+    ctx.scale(ZOOM, ZOOM);
+    ctx.translate(-pointer.x, -pointer.y);
+    // need to redraw background and critters zoomed
+    // fill lens bg slightly brighter
+    ctx.fillStyle='#2f245e';
+    ctx.fillRect(pointer.x-R*1.2, pointer.y-R*1.2, R*2.4, R*2.4);
+    drawBackground();
+    critters.forEach(c=> drawCritter(ctx,c,1));
+    ctx.restore();
+    // lens border
+    ctx.beginPath(); ctx.arc(pointer.x, pointer.y, R,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,255,255,0.95)'; ctx.lineWidth=3; ctx.stroke();
+    ctx.beginPath(); ctx.arc(pointer.x, pointer.y, R+6,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,209,102,0.9)'; ctx.lineWidth=2; ctx.stroke();
+    // handle
+    ctx.fillStyle='rgba(255,209,102,0.95)';
+    ctx.strokeStyle='rgba(26,20,48,0.9)'; ctx.lineWidth=2;
+    ctx.beginPath();
+    const hx=pointer.x + R*0.72, hy=pointer.y + R*0.72;
+    ctx.ellipse(hx, hy, 14, 6, Math.PI/4,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    // glare
+    ctx.fillStyle='rgba(255,255,255,0.55)';
+    ctx.beginPath(); ctx.arc(pointer.x - R*0.28, pointer.y - R*0.28, R*0.14,0,Math.PI*2); ctx.fill();
+  }
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.35; p.life-=p.dec;
+    if(p.life<=0){particles.splice(i,1); continue;}
+    ctx.globalAlpha=clamp(p.life,0,1);
+    ctx.fillStyle=p.col;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  ctx.restore();
+
+  requestAnimationFrame(draw);
+}
+
+// Input
+function canvasPos(e){
+  const rect=canvas.getBoundingClientRect();
+  const t=e.touches ? e.touches[0] : e;
+  return {x:(t.clientX-rect.left), y:(t.clientY-rect.top)};
+}
+function movePointer(x,y){
+  pointer.x=clamp(x, 0, W);
+  pointer.y=clamp(y, 0, H);
+  pointer.active=true;
+}
+function handleTap(x,y){
+  if(gameState!=='playing') return;
+  // hit test
+  let hit=null, bestDist=Infinity;
+  for(let c of critters){
+    const dx=x-c.x, dy=y-c.y;
+    const d=Math.hypot(dx,dy);
+    if(d < c.r+8 && d<bestDist){bestDist=d; hit=c;}
+  }
+  if(!hit) return; // tap empty does nothing
+  if(hit.isOdd){
+    onCorrectTap(hit);
+  } else {
+    onWrongTap();
+    // brief highlight wrong
+    hit._wrongUntil=performance.now()+400;
+  }
+}
+
+canvas.addEventListener('pointerdown', e=>{
+  e.preventDefault();
+  const p=canvasPos(e);
+  movePointer(p.x,p.y);
+  handleTap(p.x,p.y);
+  canvas.setPointerCapture(e.pointerId);
+},{passive:false});
+canvas.addEventListener('pointermove', e=>{
+  if(e.buttons===0 && e.pointerType==='mouse'){
+    const p=canvasPos(e); movePointer(p.x,p.y);
+  } else if(e.pointerType!=='mouse' || e.buttons===1){
+    const p=canvasPos(e); movePointer(p.x,p.y);
+  }
+});
+canvas.addEventListener('pointerup', e=>{});
+canvas.addEventListener('touchstart', e=>{
+  e.preventDefault();
+  const p=canvasPos(e); movePointer(p.x,p.y); handleTap(p.x,p.y);
+},{passive:false});
+canvas.addEventListener('touchmove', e=>{
+  e.preventDefault();
+  const p=canvasPos(e); movePointer(p.x,p.y);
+},{passive:false});
+
+// keyboard
+window.addEventListener('keydown', e=>{
+  const step=14;
+  if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A'){ movePointer(pointer.x-step, pointer.y); e.preventDefault(); }
+  else if(e.key==='ArrowRight' || e.key==='d' || e.key==='D'){ movePointer(pointer.x+step, pointer.y); e.preventDefault(); }
+  else if(e.key==='ArrowUp' || e.key==='w' || e.key==='W'){ movePointer(pointer.x, pointer.y-step); e.preventDefault(); }
+  else if(e.key==='ArrowDown' || e.key==='s' || e.key==='S'){ movePointer(pointer.x, pointer.y+step); e.preventDefault(); }
+  else if(e.key==='Enter' || e.key===' '){ handleTap(pointer.x, pointer.y); e.preventDefault(); }
+  else if(e.key==='r' || e.key==='R'){ doRestart(); }
+  else if(e.key==='l' || e.key==='L'){ lensOn=!lensOn; updateHud(); }
+});
+
+function doRestart(){
+  clearInterval(timerId);
+  level=1; score=0; lives=3;
+  generateLevel();
+  gameState='playing';
+  overlay.style.display='none';
+  startTimer();
+  updateHud();
+  pointer.x=W/2; pointer.y=H/2;
+}
+document.getElementById('restartBtn').addEventListener('click', doRestart);
+playBtn.addEventListener('click', ()=>{
+  if(gameState==='levelClear'){ nextLevel(); }
+  else if(gameState==='gameOver' || gameState==='menu'){ startGame(); }
+  else if(gameState==='help'){ overlay.style.display='none'; gameState='menu'; ovTitle.textContent='Find the Odd Critter!'; ovDesc.innerHTML='A crowd of cute critters hides <b>one standout</b> with different <b>eyes, mouth, spots or antennae</b>. Scan with the magnifier lens and tap it before time runs out. 3 lives — wrong tap costs a life!'; playBtn.textContent='▶ START HUNT'; howBtn.style.display=''; }
+});
+howBtn.addEventListener('click', ()=>{
+  gameState='help';
+  ovTitle.textContent='How to Play';
+  ovDesc.innerHTML=`<b>Goal:</b> Find the ONE critter with different <b>eyes, mouth, spots or antennae</b>.<br><br><b>Controls:</b> Drag to move magnifier lens (1.75× zoom) • Tap critter to guess • Wrong = -1 ♥ • Time runs out = -1 ♥<br><br><b>Scoring:</b> 100×Level + time bonus. Levels add more critters & less time.<br><br><b>Tip:</b> Scan row by row. Odd antennae & spots are sneakiest!`;
+  playBtn.textContent='Got it';
+  howBtn.style.display='none';
+  overlay.style.display='flex';
+});
+document.getElementById('helpBtn').addEventListener('click', ()=>{
+  if(overlay.style.display==='none'){
+    gameState='help';
+    ovTitle.textContent='How to Play';
+    ovDesc.innerHTML=`<b>Goal:</b> Find the ONE critter with different <b>eyes, mouth, spots or antennae</b>.<br><br><b>Controls:</b> Drag to move magnifier lens (1.75× zoom) • Tap critter to guess • Wrong = -1 ♥ • Time runs out = -1 ♥<br><br><b>Scoring:</b> 100×Level + time bonus. Levels add more critters & less time.<br><br><b>Tip:</b> Scan row by row. Odd antennae & spots are sneakiest!`;
+    playBtn.textContent='Got it';
+    howBtn.style.display='none';
+    overlay.style.display='flex';
+  } else {
+    overlay.style.display='none';
+    gameState='menu';
+    ovTitle.textContent='Find the Odd Critter!';
+    ovDesc.innerHTML='A crowd of cute critters hides <b>one standout</b> with different <b>eyes, mouth, spots or antennae</b>. Scan with the magnifier lens and tap it before time runs out. 3 lives — wrong tap costs a life!';
+    playBtn.textContent='▶ START HUNT';
+    howBtn.style.display='';
+  }
+});
+
+// init
+loadBest();
+resize();
+generateLevel();
+updateHud();
+renderTimer();
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

@@ -83,6 +83,11 @@ object MasalaTools {
                 val prompt = it.string("prompt") ?: return@FunctionTool missing("prompt")
                 SamSegmentTool(app, host().aiSettings, files).segment(path, prompt)
             },
+            FunctionTool(Defs.segmentVideo, READ_ONLY, usesNetwork = true) {
+                val path = it.string("path") ?: return@FunctionTool missing("path")
+                val prompt = it.string("prompt") ?: return@FunctionTool missing("prompt")
+                SegmentVideoTool(app, host().aiSettings, files).segment(path, prompt, it.int("max_frames"), it.string("mode"))
+            },
             FunctionTool(Defs.speakText, CHANGES_SOMETHING) {
                 val text = it.string("text") ?: return@FunctionTool missing("text")
                 SpeakTool(app, host().aiSettings, (app as com.samosaai.masala.MasalaApp).ttsEngine()).speak(text, it.string("voice"))

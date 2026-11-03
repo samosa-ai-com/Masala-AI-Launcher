@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Sky Striker Formation</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  background:#87CEEB;
+  background:linear-gradient(180deg,#4FC3F7 0%,#81D4FA 35%,#B3E5FC 65%,#E1F5FE 100%);
+  display:flex;justify-content:center;align-items:flex-start;
+  color:#0D2A54;
+}
+.app{
+  width:100%;max-width:428px;min-width:360px;
+  height:100dvh;max-height:900px;
+  display:flex;flex-direction:column;
+  background:linear-gradient(180deg,#4FC3F7 0%,#87D6FB 45%,#C8EFFF 100%);
+  position:relative;overflow:hidden;
+}
+.cloud{position:absolute;background:#fff;border-radius:50px;opacity:0.9;pointer-events:none}
+.cloud::after,.cloud::before{content:"";position:absolute;background:#fff;border-radius:50%}
+.c1{width:90px;height:28px;top:18px;left:12px}
+.c1::before{width:40px;height:40px;left:12px;top:-14px}
+.c1::after{width:55px;height:32px;left:32px;top:-10px}
+.c2{width:70px;height:22px;top:42px;right:18px;opacity:0.85}
+.c2::before{width:32px;height:32px;left:10px;top:-12px}
+.c2::after{width:38px;height:26px;left:26px;top:-8px}
+.c3{width:60px;height:20px;top:78px;left:42%;opacity:0.7}
+.c3::before{width:28px;height:28px;left:8px;top:-10px}
+.c3::after{width:30px;height:22px;left:22px;top:-6px}
+
+/* header */
+.topbar{
+  position:relative;z-index:5;
+  background:rgba(255,255,255,0.92);
+  backdrop-filter:blur(6px);
+  border-bottom:3px solid #0D2A54;
+  padding:8px 10px 8px;
+  display:flex;flex-direction:column;gap:6px;
+}
+.brand{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.logo{
+  display:flex;align-items:center;gap:8px;font-weight:900;letter-spacing:0.5px;
+  font-size:16px;line-height:1;
+}
+.logo-badge{
+  width:34px;height:34px;border-radius:10px;
+  background:#FF6F00;color:#fff;display:grid;place-items:center;
+  font-size:18px;border:2px solid #0D2A54;box-shadow:0 2px 0 #0D2A54;
+}
+.logo small{display:block;font-size:10px;font-weight:700;letter-spacing:1px;color:#1565C0;margin-top:2px}
+.stats{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;
+}
+.stat{
+  background:#0D2A54;color:#fff;border-radius:12px;padding:6px 8px;text-align:center;
+  border:2px solid #0D2A54;min-height:44px;display:flex;flex-direction:column;justify-content:center;
+}
+.stat span{font-size:10px;letter-spacing:0.8px;opacity:0.85;font-weight:700}
+.stat b{font-size:16px;line-height:1.1}
+.stat.best{background:#FFD600;color:#0D2A54;border-color:#0D2A54}
+.stat.best b{color:#0D2A54}
+.rowPoints{
+  display:flex;gap:6px;justify-content:center;flex-wrap:wrap;
+  font-size:11px;font-weight:800;
+}
+.pill{padding:3px 8px;border-radius:20px;border:2px solid #0D2A54;background:#fff;display:flex;align-items:center;gap:4px}
+.pill i{width:10px;height:10px;border-radius:50%;display:inline-block;border:1px solid #0D2A54}
+.pill.r1 i{background:#FF3B30}
+.pill.r2 i{background:#FF9500}
+.pill.r3 i{background:#34C759}
+
+/* canvas area */
+.stageWrap{
+  flex:1;position:relative;z-index:2;
+  display:flex;flex-direction:column;
+  padding:8px 10px 6px;
+  gap:6px;overflow:hidden;
+}
+.canvasCard{
+  flex:1;background:linear-gradient(180deg,#B3E5FC 0%,#E1F5FE 55%,#FFF8E1 100%);
+  border:3px solid #0D2A54;border-radius:18px;overflow:hidden;
+  position:relative;box-shadow:0 6px 0 rgba(13,42,84,0.25);
+  display:flex;flex-direction:column;
+}
+canvas{
+  width:100%;height:100%;display:block;
+  touch-action:none;
+}
+.hudLine{
+  position:absolute;left:0;right:0;bottom:56px;height:2px;
+  background:repeating-linear-gradient(90deg,#FF3B30 0 10px,transparent 10px 16px);
+  opacity:0.9;pointer-events:none;z-index:3;
+}
+.hudLine::after{
+  content:"DEFENSE LINE";position:absolute;right:8px;top:-14px;
+  font-size:8px;font-weight:900;letter-spacing:1px;background:#FF3B30;color:#fff;
+  padding:2px 6px;border-radius:6px;
+}
+.overlay{
+  position:absolute;inset:0;display:grid;place-items:center;
+  background:rgba(13,42,84,0.55);backdrop-filter:blur(2px);
+  z-index:10;padding:16px;
+}
+.card{
+  background:#fff;border:3px solid #0D2A54;border-radius:18px;
+  padding:16px 14px;width:100%;max-width:320px;text-align:center;
+  box-shadow:0 8px 0 #0D2A54;
+}
+.card h1{font-size:22px;line-height:1.1;color:#0D2A54}
+.card h1 span{color:#FF6F00}
+.card p{font-size:13px;line-height:1.4;color:#334155;margin:8px 0 12px}
+.btnPrimary{
+  width:100%;padding:14px 16px;border-radius:14px;
+  border:3px solid #0D2A54;background:#FFD600;color:#0D2A54;
+  font-weight:900;font-size:16px;letter-spacing:0.5px;
+  box-shadow:0 4px 0 #0D2A54;cursor:pointer;
+}
+.btnPrimary:active{transform:translateY(2px);box-shadow:0 2px 0 #0D2A54}
+.btnRow{display:flex;gap:8px;margin-top:10px}
+.btnGhost{
+  flex:1;padding:12px 8px;border-radius:12px;border:2px solid #0D2A54;
+  background:#fff;color:#0D2A54;font-weight:800;font-size:13px;cursor:pointer;
+}
+.btnGhost:active{transform:scale(0.98)}
+.badgeRow{display:flex;gap:6px;justify-content:center;margin:8px 0 0;flex-wrap:wrap}
+.miniBadge{font-size:11px;font-weight:800;background:#E1F5FE;border:1px solid #0D2A54;border-radius:20px;padding:4px 8px}
+
+/* controls */
+.controls{
+  position:relative;z-index:5;
+  background:rgba(255,255,255,0.96);border-top:3px solid #0D2A54;
+  padding:8px 10px 10px;display:flex;flex-direction:column;gap:8px;
+}
+.moveRow{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;
+}
+.ctrlBtn{
+  height:56px;border-radius:16px;border:3px solid #0D2A54;
+  background:#fff;color:#0D2A54;font-weight:900;font-size:22px;
+  display:grid;place-items:center;cursor:pointer;
+  box-shadow:0 4px 0 #0D2A54;user-select:none;touch-action:none;
+}
+.ctrlBtn:active{transform:translateY(2px);box-shadow:0 2px 0 #0D2A54}
+.ctrlBtn.fire{
+  background:#FF3B30;color:#fff;font-size:15px;letter-spacing:0.6px;
+}
+.ctrlBtn.fire span{font-size:18px}
+.ctrlBtn.left{background:#E3F2FD}
+.ctrlBtn.right{background:#E3F2FD}
+.actionRow{display:flex;gap:8px}
+.actionRow button{
+  flex:1;height:44px;border-radius:12px;border:2px solid #0D2A54;
+  background:#fff;font-weight:800;font-size:13px;cursor:pointer;
+}
+.actionRow button.primary{background:#0D2A54;color:#fff}
+.actionRow button:active{transform:scale(0.98)}
+.hint{font-size:11px;text-align:center;color:#0D2A54;opacity:0.7;font-weight:600}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">
+        <div class="logo-badge">✈</div>
+        <div>SKY STRIKER<small>FORMATION SHOOTER</small></div>
+      </div>
+      <div style="font-size:11px;font-weight:800;background:#0D2A54;color:#fff;padding:6px 10px;border-radius:20px;white-space:nowrap" id="levelBadge">WAVE 1</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span>SCORE</span><b id="scoreEl">0</b></div>
+      <div class="stat best"><span>BEST</span><b id="bestEl">0</b></div>
+      <div class="stat"><span>LEFT</span><b id="leftEl">24</b></div>
+    </div>
+    <div class="rowPoints">
+      <div class="pill r1"><i></i> TOP 30pts</div>
+      <div class="pill r2"><i></i> MID 20pts</div>
+      <div class="pill r3"><i></i> LOW 10pts</div>
+    </div>
+  </div>
+
+  <div class="stageWrap">
+    <div class="canvasCard" id="canvasCard">
+      <canvas id="c" width="400" height="520" aria-label="Game field"></canvas>
+      <div class="hudLine"></div>
+      <div class="overlay" id="overlay">
+        <div class="card" id="card">
+          <h1>☀️ SKY <span>STRIKER</span></h1>
+          <p>Slide along the bottom and blast the 3-row formation before they breach your line!</p>
+          <div class="badgeRow">
+            <span class="miniBadge">◀ ▶ Move</span><span class="miniBadge">● FIRE</span><span class="miniBadge">Clear = Win</span>
+          </div>
+          <button class="btnPrimary" id="playBtn">▶ PLAY WAVE 1</button>
+          <div class="btnRow">
+            <button class="btnGhost" id="howBtn">HOW TO PLAY</button>
+            <button class="btnGhost" id="soundBtn">🔊 SOUND ON</button>
+          </div>
+          <p style="font-size:11px;margin-top:10px;opacity:0.7">Tip: Hold arrows to slide. Tap FIRE rapidly!</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="moveRow">
+      <button class="ctrlBtn left" id="leftBtn" aria-label="Move left">◀</button>
+      <button class="ctrlBtn fire" id="fireBtn" aria-label="Fire"><span>●</span> FIRE</button>
+      <button class="ctrlBtn right" id="rightBtn" aria-label="Move right">▶</button>
+    </div>
+    <div class="actionRow">
+      <button id="pauseBtn">⏸ PAUSE</button>
+      <button id="restartBtn" class="primary">↻ RESTART</button>
+    </div>
+    <div class="hint">Arrows / A-D to move • SPACE / FIRE to shoot • P to pause</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const cardEl = document.getElementById('canvasCard');
+  const overlay = document.getElementById('overlay');
+  const card = document.getElementById('card');
+  const playBtn = document.getElementById('playBtn');
+  const howBtn = document.getElementById('howBtn');
+  const soundBtn = document.getElementById('soundBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const leftBtn = document.getElementById('leftBtn');
+  const rightBtn = document.getElementById('rightBtn');
+  const fireBtn = document.getElementById('fireBtn');
+  const scoreEl = document.getElementById('scoreEl');
+  const bestEl = document.getElementById('bestEl');
+  const leftEl = document.getElementById('leftEl');
+  const levelBadge = document.getElementById('levelBadge');
+
+  // responsive canvas
+  function resizeCanvas(){
+    const rect = cardEl.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    const w = Math.round(rect.width - 6); // border
+    const h = Math.round(rect.height - 6);
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    // store logical size
+    canvas._w = w;
+    canvas._h = h;
+  }
+
+  // game state
+  let W=360, H=520;
+  let score=0, best=0, wave=1;
+  let running=false, paused=false, gameOver=false, won=false;
+  let striker = {x:0,y:0,w:52,h:18,speed:5.2};
+  let bullets=[], particles=[], enemyBullets=[];
+  let fliers=[], dir=1, stepDownTimer=0;
+  let keys={left:false,right:false,fire:false};
+  let lastShot=0, shootCooldown=170;
+  let formationSpeed=0.55, dropSpeed=0.18;
+  let soundOn=true;
+  let audioCtx=null;
+
+  try{ best = parseInt(localStorage.getItem('skyStrikerBest')||'0',10)||0; }catch(e){}
+  bestEl.textContent = best;
+
+  function ensureAudio(){
+    if(!soundOn) return null;
+    if(!audioCtx){
+      try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ audioCtx=null; }
+    }
+    if(audioCtx && audioCtx.state==='suspended') audioCtx.resume();
+    return audioCtx;
+  }
+  function beep(freq, dur, type='square', vol=0.18, slideTo){
+    const ac = ensureAudio(); if(!ac) return;
+    const o = ac.createOscillator(), g=ac.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.value=vol;
+    o.connect(g); g.connect(ac.destination);
+    o.start();
+    if(slideTo){ o.frequency.linearRampToValueAtTime(slideTo, ac.currentTime+dur/1000); }
+    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+dur/1000);
+    o.stop(ac.currentTime+dur/1000+0.02);
+  }
+  const sfx={
+    shoot(){ beep(880,90,'square',0.16, 1200); },
+    hit(){ beep(220,120,'sawtooth',0.2, 80); setTimeout(()=>beep(440,80,'square',0.12),60); },
+    win(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,220,'sine',0.2), i*140)); },
+    lose(){ beep(180,400,'sawtooth',0.22, 60); setTimeout(()=>beep(120,500,'square',0.18),250); },
+    move(){ beep(300,40,'sine',0.06); }
+  };
+
+  function resetWave(){
+    resizeCanvas();
+    W = canvas._w; H = canvas._h;
+    striker.w = Math.max(48, Math.min(60, W*0.14));
+    striker.h = 18;
+    striker.x = W/2 - striker.w/2;
+    striker.y = H - 38;
+    bullets=[]; particles=[]; enemyBullets=[];
+    fliers=[];
+    dir=1;
+    // 3 rows x 8 cols = 24
+    const cols=8, rows=3;
+    const padX = 10, padY = 18;
+    const availW = W - padX*2;
+    const gapX = availW / cols;
+    const gapY = 38;
+    const startY = 22;
+    const startX = padX + gapX/2;
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        const x = startX + c*gapX;
+        const y = startY + r*gapY;
+        fliers.push({
+          x,y, w:28, h:20, alive:true,
+          row:r, // 0 top, 1 mid, 2 low
+          bob: Math.random()*Math.PI*2,
+          wing: Math.random()*Math.PI
+        });
+      }
+    }
+    formationSpeed = 0.55 + (wave-1)*0.18;
+    dropSpeed = 0.18 + (wave-1)*0.07;
+    shootCooldown = Math.max(110, 170 - (wave-1)*12);
+    updateHUD();
+  }
+
+  function updateHUD(){
+    scoreEl.textContent = score;
+    bestEl.textContent = best;
+    const alive = fliers.filter(f=>f.alive).length;
+    leftEl.textContent = alive;
+    levelBadge.textContent = 'WAVE ' + wave;
+  }
+
+  function showOverlay(html, showPlay=true){
+    card.innerHTML = html;
+    overlay.style.display='grid';
+    if(showPlay){
+      // re-bind buttons inside card if needed
+      const pb = card.querySelector('#playBtn');
+      if(pb) pb.addEventListener('click', startGame);
+      const hb = card.querySelector('#howBtn');
+      if(hb) hb.addEventListener('click', showHow);
+      const sb = card.querySelector('#soundBtn');
+      if(sb) sb.addEventListener('click', toggleSound);
+    }
+  }
+  function hideOverlay(){ overlay.style.display='none'; }
+
+  function showHow(){
+    showOverlay(`
+      <h1>HOW TO PLAY</h1>
+      <p style="text-align:left">
+        <b>Goal:</b> Clear all 24 fliers before they reach the red <b>DEFENSE LINE</b>.<br><br>
+        <b>Controls:</b> Hold <b>◀ ▶</b> to slide. Tap <b>FIRE</b> to shoot upward.<br>
+        <b>Points:</b> Top row <span style="color:#FF3B30">● 30</span> • Mid <span style="color:#FF9500">● 20</span> • Low <span style="color:#34C759">● 10</span><br>
+        <b>Lose:</b> Any flier touches your line.<br>
+        <b>Win:</b> Clear the formation — next wave gets faster!
+      </p>
+      <button class="btnPrimary" id="playBtn">▶ GOT IT — PLAY</button>
+      <div class="btnRow"><button class="btnGhost" id="soundBtn">${soundOn?'🔊 SOUND ON':'🔇 SOUND OFF'}</button></div>
+    `);
+    card.querySelector('#playBtn').addEventListener('click', startGame);
+    card.querySelector('#soundBtn').addEventListener('click', toggleSound);
+  }
+
+  function toggleSound(){
+    soundOn=!soundOn;
+    soundBtn.textContent = soundOn ? '🔊 SOUND ON' : '🔇 SOUND OFF';
+    // also update overlay button if present
+    const ob = card.querySelector('#soundBtn');
+    if(ob) ob.textContent = soundOn ? '🔊 SOUND ON' : '🔇 SOUND OFF';
+    if(soundOn) ensureAudio();
+  }
+
+  function startGame(){
+    if(running && !gameOver && !won) { hideOverlay(); paused=false; pauseBtn.textContent='⏸ PAUSE'; return; }
+    // if gameOver/won and pressing play, continue wave or restart
+    if(gameOver){
+      score=0; wave=1;
+    } else if(won){
+      wave++;
+    } else if(!running){
+      // first start
+      score=0; wave=1;
+    }
+    resetWave();
+    running=true; paused=false; gameOver=false; won=false;
+    hideOverlay();
+    pauseBtn.textContent='⏸ PAUSE';
+    lastShot=0;
+    requestAnimationFrame(loop);
+  }
+
+  function restart(){
+    score=0; wave=1;
+    resetWave();
+    running=true; paused=false; gameOver=false; won=false;
+    hideOverlay();
+    pauseBtn.textContent='⏸ PAUSE';
+  }
+
+  function togglePause(){
+    if(!running || gameOver || won) return;
+    paused=!paused;
+    pauseBtn.textContent = paused ? '▶ RESUME' : '⏸ PAUSE';
+    if(paused){
+      showOverlay(`
+        <h1>⏸ PAUSED</h1>
+        <p>Formation holding position.</p>
+        <button class="btnPrimary" id="playBtn">▶ RESUME</button>
+        <div class="btnRow"><button class="btnGhost" id="restartBtn2">↻ RESTART</button><button class="btnGhost" id="soundBtn">${soundOn?'🔊 SOUND ON':'🔇 SOUND OFF'}</button></div>
+      `);
+      card.querySelector('#playBtn').addEventListener('click', ()=>{ hideOverlay(); paused=false; pauseBtn.textContent='⏸ PAUSE'; requestAnimationFrame(loop); });
+      card.querySelector('#restartBtn2').addEventListener('click', ()=>{ restart(); });
+      card.querySelector('#soundBtn').addEventListener('click', toggleSound);
+    } else {
+      hideOverlay();
+      requestAnimationFrame(loop);
+    }
+  }
+
+  // input
+  function setKey(k,v){ keys[k]=v; }
+  window.addEventListener('keydown', e=>{
+    if(e.code==='ArrowLeft' || e.code==='KeyA'){ setKey('left',true); e.preventDefault(); }
+    if(e.code==='ArrowRight' || e.code==='KeyD'){ setKey('right',true); e.preventDefault(); }
+    if(e.code==='Space'){ setKey('fire',true); e.preventDefault(); }
+    if(e.code==='KeyP'){ togglePause(); }
+  });
+  window.addEventListener('keyup', e=>{
+    if(e.code==='ArrowLeft' || e.code==='KeyA') setKey('left',false);
+    if(e.code==='ArrowRight' || e.code==='KeyD') setKey('right',false);
+    if(e.code==='Space') setKey('fire',false);
+  });
+
+  function bindHold(btn, key){
+    const down = (e)=>{ e.preventDefault(); setKey(key,true); btn.setPointerCapture && e.pointerId && btn.setPointerCapture(e.pointerId); };
+    const up = (e)=>{ e.preventDefault(); setKey(key,false); };
+    btn.addEventListener('pointerdown', down);
+    btn.addEventListener('pointerup', up);
+    btn.addEventListener('pointercancel', up);
+    btn.addEventListener('pointerleave', up);
+    // touch fallback
+    btn.addEventListener('touchstart', down, {passive:false});
+    btn.addEventListener('touchend', up, {passive:false});
+  }
+  bindHold(leftBtn,'left');
+  bindHold(rightBtn,'right');
+  // fire button: hold to auto-fire
+  fireBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); setKey('fire',true); });
+  fireBtn.addEventListener('pointerup', e=>{ e.preventDefault(); setKey('fire',false); });
+  fireBtn.addEventListener('pointercancel', e=>{ setKey('fire',false); });
+  fireBtn.addEventListener('touchstart', e=>{ e.preventDefault(); setKey('fire',true); }, {passive:false});
+  fireBtn.addEventListener('touchend', e=>{ e.preventDefault(); setKey('fire',false); }, {passive:false});
+
+  // also allow tapping canvas to fire/move
+  canvas.addEventListener('pointerdown', e=>{
+    if(!running || paused) return;
+    const rect=canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left);
+    if(x < W/3) { setKey('left',true); setTimeout(()=>setKey('left',false),120); striker.x = Math.max(4, x - striker.w/2); }
+    else if(x > W*2/3) { setKey('right',true); setTimeout(()=>setKey('right',false),120); striker.x = Math.min(W-striker.w-4, x - striker.w/2); }
+    else { tryShoot(); }
+  });
+
+  playBtn.addEventListener('click', startGame);
+  howBtn.addEventListener('click', showHow);
+  soundBtn.addEventListener('click', toggleSound);
+  pauseBtn.addEventListener('click', togglePause);
+  restartBtn.addEventListener('click', restart);
+
+  function tryShoot(){
+    const now = performance.now();
+    if(now - lastShot < shootCooldown) return;
+    lastShot = now;
+    bullets.push({x: striker.x + striker.w/2 -2, y: striker.y - 8, w:4, h:12, vy:-7.5});
+    sfx.shoot();
+    // haptic
+    if(navigator.vibrate) navigator.vibrate(12);
+  }
+
+  function spawnParticles(x,y,color,count=8){
+    for(let i=0;i<count;i++){
+      particles.push({
+        x,y, vx:(Math.random()-0.5)*5, vy:(Math.random()-0.5)*5 -1,
+        life:1, decay:0.04+Math.random()*0.04, r:2+Math.random()*3, color
+      });
+    }
+  }
+
+  function update(){
+    if(!running || paused || gameOver || won) return;
+    W = canvas._w; H = canvas._h;
+
+    // striker movement
+    if(keys.left) striker.x -= striker.speed;
+    if(keys.right) striker.x += striker.speed;
+    striker.x = Math.max(4, Math.min(W - striker.w -4, striker.x));
+    if(keys.fire) tryShoot();
+
+    // bullets
+    for(let i=bullets.length-1;i>=0;i--){
+      const b=bullets[i];
+      b.y += b.vy;
+      if(b.y < -20) bullets.splice(i,1);
+    }
+
+    // formation movement: horizontal drift + slow descent
+    let minX=Infinity, maxX=-Infinity;
+    fliers.forEach(f=>{ if(f.alive){ minX=Math.min(minX,f.x); maxX=Math.max(maxX,f.x); }});
+    if(minX!==Infinity){
+      if(maxX > W - 18) dir=-1;
+      if(minX < 18) dir=1;
+    }
+    fliers.forEach(f=>{
+      if(!f.alive) return;
+      f.x += dir * formationSpeed;
+      f.y += dropSpeed * 0.35; // constant slow descent
+      f.bob += 0.08;
+      f.wing += 0.22;
+    });
+    // occasional step down when hitting edge (classic)
+    if(maxX > W - 18 || minX < 18){
+      // already flipped dir, add extra drop
+      fliers.forEach(f=>{ if(f.alive) f.y += 6; });
+      sfx.move();
+    }
+
+    // collisions bullet vs flier
+    for(let i=bullets.length-1;i>=0;i--){
+      const b=bullets[i];
+      for(let f of fliers){
+        if(!f.alive) continue;
+        if(b.x < f.x + f.w/2 + 10 && b.x + b.w > f.x - f.w/2 -10 && b.y < f.y + f.h/2 +8 && b.y + b.h > f.y - f.h/2 -8){
+          f.alive=false;
+          bullets.splice(i,1);
+          const pts = f.row===0?30 : f.row===1?20 : 10;
+          score += pts;
+          if(score>best){ best=score; try{localStorage.setItem('skyStrikerBest', best);}catch(e){} }
+          updateHUD();
+          const col = f.row===0?'#FF3B30': f.row===1?'#FF9500':'#34C759';
+          spawnParticles(f.x, f.y, col, 10);
+          sfx.hit();
+          if(navigator.vibrate) navigator.vibrate(18);
+          break;
+        }
+      }
+    }
+
+    // particles
+    for(let i=particles.length-1;i>=0;i--){
+      const p=particles[i];
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.18; p.life-=p.decay;
+      if(p.life<=0) particles.splice(i,1);
+    }
+
+    // win check
+    const alive = fliers.filter(f=>f.alive).length;
+    if(alive===0){
+      won=true; running=false;
+      sfx.win();
+      if(navigator.vibrate) navigator.vibrate([30,40,30,60,80]);
+      showOverlay(`
+        <h1>🎉 WAVE ${wave} CLEARED!</h1>
+        <p>You blasted all 24 fliers!<br><b style="font-size:18px;color:#0D2A54">${score} pts</b> • Best ${best}</p>
+        <div class="badgeRow"><span class="miniBadge">Next wave faster!</span><span class="miniBadge">+${wave*50} bonus</span></div>
+        <button class="btnPrimary" id="playBtn">▶ NEXT WAVE →</button>
+        <div class="btnRow"><button class="btnGhost" id="restartBtn2">↻ RESTART</button><button class="btnGhost" id="soundBtn">${soundOn?'🔊 SOUND ON':'🔇 SOUND OFF'}</button></div>
+      `);
+      score += wave*50; // bonus
+      if(score>best){ best=score; try{localStorage.setItem('skyStrikerBest',best);}catch(e){} }
+      updateHUD();
+      card.querySelector('#playBtn').addEventListener('click', startGame);
+      card.querySelector('#restartBtn2').addEventListener('click', restart);
+      card.querySelector('#soundBtn').addEventListener('click', toggleSound);
+      return;
+    }
+
+    // lose check: any flier reaches defense line
+    const defenseY = H - 56;
+    for(let f of fliers){
+      if(!f.alive) continue;
+      if(f.y + f.h/2 >= defenseY){
+        gameOver=true; running=false;
+        sfx.lose();
+        if(navigator.vibrate) navigator.vibrate([80,40,120]);
+        showOverlay(`
+          <h1>💥 BREACH!</h1>
+          <p>Fliers reached your line.<br><b style="font-size:18px;color:#FF3B30">${score} pts</b> • Best ${best} • Wave ${wave}</p>
+          <button class="btnPrimary" id="playBtn">↻ TRY AGAIN</button>
+          <div class="btnRow"><button class="btnGhost" id="howBtn2">HOW TO PLAY</button><button class="btnGhost" id="soundBtn">${soundOn?'🔊 SOUND ON':'🔇 SOUND OFF'}</button></div>
+        `);
+        card.querySelector('#playBtn').addEventListener('click', restart);
+        card.querySelector('#howBtn2').addEventListener('click', showHow);
+        card.querySelector('#soundBtn').addEventListener('click', toggleSound);
+        break;
+      }
+    }
+  }
+
+  function draw(){
+    W = canvas._w; H = canvas._h;
+    ctx.clearRect(0,0,W,H);
+
+    // sky gradient already via CSS, but draw subtle horizon
+    // sun
+    ctx.save();
+    ctx.globalAlpha=0.95;
+    ctx.fillStyle='#FFD600';
+    ctx.beginPath(); ctx.arc(W-38, 28, 18, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#FF6F00'; ctx.lineWidth=2; ctx.stroke();
+    // sun rays
+    ctx.strokeStyle='rgba(255,214,0,0.5)'; ctx.lineWidth=2;
+    for(let a=0;a<8;a++){ const ang=a*Math.PI/4; ctx.beginPath(); ctx.moveTo(W-38+Math.cos(ang)*22, 28+Math.sin(ang)*22); ctx.lineTo(W-38+Math.cos(ang)*28, 28+Math.sin(ang)*28); ctx.stroke(); }
+    ctx.restore();
+
+    // distant hills
+    ctx.fillStyle='rgba(76,175,80,0.18)';
+    ctx.beginPath(); ctx.moveTo(0,H-90); ctx.quadraticCurveTo(W*0.3,H-120,W*0.6,H-95); ctx.quadraticCurveTo(W*0.85,H-80,W,H-100); ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='rgba(76,175,80,0.12)';
+    ctx.beginPath(); ctx.moveTo(0,H-70); ctx.quadraticCurveTo(W*0.4,H-100,W,H-75); ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath(); ctx.fill();
+
+    // fliers
+    fliers.forEach(f=>{
+      if(!f.alive) return;
+      const cx=f.x, cy=f.y + Math.sin(f.bob)*2;
+      ctx.save();
+      ctx.translate(cx,cy);
+      // shadow
+      ctx.fillStyle='rgba(13,42,84,0.12)';
+      ctx.beginPath(); ctx.ellipse(2,10,14,4,0,0,Math.PI*2); ctx.fill();
+      // body color by row
+      let body = f.row===0 ? '#FF3B30' : f.row===1 ? '#FF9500' : '#34C759';
+      let wingCol = f.row===0 ? '#B71C1C' : f.row===1 ? '#E65100' : '#1B5E20';
+      // wings flap
+      const flap = Math.sin(f.wing)*4;
+      // left wing
+      ctx.fillStyle=wingCol;
+      ctx.beginPath(); ctx.moveTo(-6,0); ctx.lineTo(-16, -2+flap*0.3); ctx.lineTo(-14,4); ctx.lineTo(-4,2); ctx.closePath(); ctx.fill();
+      // right wing
+      ctx.beginPath(); ctx.moveTo(6,0); ctx.lineTo(16, -2-flap*0.3); ctx.lineTo(14,4); ctx.lineTo(4,2); ctx.closePath(); ctx.fill();
+      // body
+      ctx.fillStyle=body;
+      ctx.strokeStyle='#0D2A54'; ctx.lineWidth=1.6;
+      ctx.beginPath(); ctx.ellipse(0,0,12,9,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      // cockpit
+      ctx.fillStyle='#E1F5FE'; ctx.beginPath(); ctx.ellipse(0,-2,6,4,0,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#0D2A54'; ctx.lineWidth=1; ctx.stroke();
+      // eye
+      ctx.fillStyle='#0D2A54'; ctx.beginPath(); ctx.arc(2,-2,1.2,0,Math.PI*2); ctx.fill();
+      // stripe
+      ctx.fillStyle='#fff'; ctx.fillRect(-8,2,16,2);
+      // row indicator dot
+      ctx.fillStyle='#fff'; ctx.strokeStyle='#0D2A54'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.arc(0,6,2.2,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle=body; ctx.beginPath(); ctx.arc(0,6,1,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    });
+
+    // bullets
+    ctx.fillStyle='#0D2A54';
+    bullets.forEach(b=>{
+      ctx.fillStyle='#FF3B30'; ctx.strokeStyle='#0D2A54'; ctx.lineWidth=1.2;
+      // bullet with trail
+      ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#FFD600'; ctx.fillRect(b.x+1, b.y+b.h-3, 2, 3);
+    });
+
+    // particles
+    particles.forEach(p=>{
+      ctx.globalAlpha = Math.max(0,p.life);
+      ctx.fillStyle=p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha=1;
+
+    // striker
+    ctx.save();
+    ctx.translate(striker.x, striker.y);
+    // shadow
+    ctx.fillStyle='rgba(13,42,84,0.18)'; ctx.beginPath(); ctx.ellipse(striker.w/2, striker.h+6, striker.w*0.4, 4,0,0,Math.PI*2); ctx.fill();
+    // base
+    ctx.fillStyle='#0D2A54'; ctx.strokeStyle='#0D2A54'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.roundRect(0, 6, striker.w, striker.h, 6); ctx.fill();
+    // cannon
+    ctx.fillStyle='#FFD600'; ctx.strokeStyle='#0D2A54'; ctx.lineWidth=1.8;
+    ctx.beginPath(); ctx.roundRect(striker.w/2-7, -6, 14, 14, 4); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#0D2A54'; ctx.beginPath(); ctx.arc(striker.w/2, 1, 3,0,Math.PI*2); ctx.fill();
+    // side fins
+    ctx.fillStyle='#4FC3F7'; ctx.beginPath(); ctx.moveTo(4,6); ctx.lineTo(-2,14); ctx.lineTo(10,14); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(striker.w-4,6); ctx.lineTo(striker.w+2,14); ctx.lineTo(striker.w-10,14); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // highlight
+    ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.fillRect(6,8, striker.w-12, 3);
+    ctx.restore();
+
+    // defense line glow
+    const dy = H - 56;
+    ctx.fillStyle='rgba(255,59,48,0.12)'; ctx.fillRect(0, dy, W, H-dy);
+    ctx.strokeStyle='#FF3B30'; ctx.setLineDash([10,8]); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,dy); ctx.lineTo(W,dy); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  function loop(){
+    update();
+    draw();
+    if(running && !paused && !gameOver && !won) requestAnimationFrame(loop);
+  }
+
+  // init
+  resizeCanvas();
+  resetWave();
+  draw();
+  window.addEventListener('resize', ()=>{ resizeCanvas(); draw(); });
+  // prevent scroll on buttons
+  document.addEventListener('touchmove', e=>{ if(e.target.closest('.ctrlBtn, canvas')) e.preventDefault(); }, {passive:false});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Souk Surge — Market Trader</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;touch-action:none;user-select:none}
+body{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
+  background:#1a1207;
+  color:#1a1207;
+  display:flex;justify-content:center;
+}
+#wrap{
+  width:100%;max-width:440px;height:100dvh;
+  display:flex;flex-direction:column;
+  background:linear-gradient(180deg,#2d1b0e 0%,#3a2410 18%,#4a2e14 100%);
+  position:relative;overflow:hidden;
+}
+#bgCanvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.9}
+.topbar{
+  position:relative;z-index:2;
+  background:linear-gradient(180deg,#fff7e6 0%,#ffedd5 100%);
+  border-bottom:3px solid #d97706;
+  padding:10px 12px 8px;
+  box-shadow:0 4px 18px rgba(0,0,0,.35);
+}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand h1{font-size:18px;letter-spacing:.04em;font-weight:900;color:#7c2d12;line-height:1}
+.brand h1 span{color:#d97706}
+.brand small{font-size:10px;letter-spacing:.12em;color:#92400e;font-weight:700}
+.pill{font-size:10px;font-weight:800;letter-spacing:.08em;background:#7c2d12;color:#ffedd5;padding:6px 8px;border-radius:999px;border:1px solid #a16207}
+.stats{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px;
+}
+.stat{
+  background:#1a1207;color:#ffedd5;border-radius:12px;padding:7px 8px;text-align:center;
+  border:1px solid #44403c;position:relative;overflow:hidden;
+}
+.stat b{display:block;font-size:13px;line-height:1}
+.stat i{font-style:normal;font-size:9px;letter-spacing:.1em;opacity:.8;font-weight:700}
+.stat.cash{background:linear-gradient(180deg,#065f46,#022c22);border-color:#10b981}
+.stat.profit{background:linear-gradient(180deg,#7c2d12,#431407);border-color:#f59e0b}
+.stat.profit.pos{background:linear-gradient(180deg,#065f46,#022c22);border-color:#10b981}
+.timerRow{display:flex;align-items:center;gap:8px;margin-top:8px}
+.timerBar{flex:1;height:10px;background:#1a1207;border-radius:999px;overflow:hidden;border:1px solid #44403c;padding:2px}
+.timerFill{height:100%;border-radius:999px;background:linear-gradient(90deg,#f59e0b,#ef4444);width:100%;transition:width .3s linear}
+.timeTxt{font-size:12px;font-weight:900;color:#7c2d12;background:#ffedd5;border:1px solid #d97706;padding:4px 8px;border-radius:999px;min-width:58px;text-align:center}
+.rolls{font-size:11px;font-weight:800;color:#fff7e6;background:#92400e;border-radius:999px;padding:4px 8px;border:1px solid #f59e0b}
+.market{
+  position:relative;z-index:2;flex:1;overflow:auto;padding:10px 10px 6px;
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start;
+}
+.card{
+  background:linear-gradient(180deg,#fffbeb 0%,#ffedd5 100%);
+  border-radius:16px;padding:10px 9px 9px;
+  border:2px solid #d97706;box-shadow:0 6px 14px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.8);
+  display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden;
+}
+.card::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:6px;background:var(--accent);
+  opacity:.95;
+}
+.cardHead{display:flex;align-items:center;gap:8px;margin-top:2px}
+.icon{
+  width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+  font-size:18px;font-weight:900;color:#fff;flex-shrink:0;
+  border:2px solid rgba(0,0,0,.15);box-shadow:inset 0 2px 6px rgba(255,255,255,.4);
+}
+.meta{flex:1;min-width:0}
+.meta h3{font-size:13px;font-weight:900;letter-spacing:.02em;color:#431407;line-height:1}
+.meta p{font-size:10px;font-weight:700;letter-spacing:.06em;color:#92400e}
+.priceRow{display:flex;align-items:baseline;gap:4px;justify-content:flex-end;text-align:right}
+.price{font-size:18px;font-weight:900;color:#1a1207;line-height:1}
+.trend{font-size:11px;font-weight:900}
+.trend.up{color:#059669}
+.trend.down{color:#dc2626}
+.trend.flat{color:#78716c}
+.badge{font-size:9px;font-weight:900;letter-spacing:.08em;padding:4px 6px;border-radius:999px;border:1px solid transparent;display:inline-block}
+.badge.surplus{background:#dcfce7;color:#065f46;border-color:#86efac}
+.badge.volatile{background:#fef9c3;color:#854d0e;border-color:#fde047}
+.badge.high{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+.owned{font-size:11px;font-weight:700;color:#44403c;background:#fff7e6;border:1px dashed #d6c7a8;border-radius:10px;padding:6px 7px;display:flex;justify-content:space-between;align-items:center}
+.owned b{color:#7c2d12}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.btn{
+  appearance:none;border:none;border-radius:12px;padding:10px 6px;font-size:12px;font-weight:900;letter-spacing:.06em;
+  touch-action:none;cursor:pointer;transition:transform .06s, filter .15s, opacity .15s;
+  box-shadow:0 3px 0 rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.5);
+}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.25)}
+.btn:disabled{opacity:.45;transform:none;box-shadow:none;cursor:not-allowed}
+.buy{background:linear-gradient(180deg,#10b981,#047857);color:#fff;border:1px solid #065f46}
+.sell{background:linear-gradient(180deg,#fff,#e7e5e4);color:#44403c;border:1px solid #a8a29e}
+.card.selected{outline:3px solid #0d9488;outline-offset:1px}
+.controls{
+  position:relative;z-index:2;
+  background:linear-gradient(180deg,#fff7e6,#ffedd5);
+  border-top:3px solid #d97706;
+  padding:8px 10px 10px;
+  display:grid;gap:8px;
+  box-shadow:0 -6px 18px rgba(0,0,0,.25);
+}
+.mainBtns{display:grid;grid-template-columns:1.35fr .85fr;gap:8px}
+.bigBtn{
+  appearance:none;border:none;border-radius:14px;padding:14px 10px;font-weight:900;letter-spacing:.06em;
+  touch-action:none;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.6);
+  transition:transform .06s;
+}
+.bigBtn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.3)}
+#rollBtn{background:linear-gradient(180deg,#f59e0b,#d97706);color:#fff;border:2px solid #7c2d12;font-size:15px}
+#rollBtn small{display:block;font-size:10px;opacity:.9;letter-spacing:.08em}
+#bankBtn{background:linear-gradient(180deg,#0d9488,#0f766e);color:#fff;border:2px solid #042f2e;font-size:13px}
+.subRow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.miniBtn{
+  appearance:none;border:1px solid #d6c7a8;background:#fff;border-radius:10px;padding:8px 6px;
+  font-size:11px;font-weight:800;letter-spacing:.05em;color:#44403c;touch-action:none;cursor:pointer;
+}
+.miniBtn:active{transform:scale(.97)}
+.help{font-size:10px;line-height:1.4;color:#57534e;text-align:center;font-weight:600}
+.help b{color:#7c2d12}
+.overlay{
+  position:absolute;inset:0;z-index:10;display:none;place-items:center;
+  background:rgba(26,18,7,.72);backdrop-filter:blur(4px);padding:18px;
+}
+.overlay.show{display:grid}
+.modal{
+  width:100%;max-width:360px;background:linear-gradient(180deg,#fffbeb,#ffedd5);
+  border:3px solid #d97706;border-radius:18px;padding:16px 14px;text-align:center;
+  box-shadow:0 18px 40px rgba(0,0,0,.45);
+}
+.modal h2{font-size:20px;font-weight:900;color:#7c2d12}
+.modal p{font-size:13px;color:#44403c;margin:8px 0;line-height:1.45;font-weight:600}
+.modal .big{font-size:28px;font-weight:900;color:#065f46}
+.modal .big.neg{color:#991b1b}
+.modalBtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.flash{animation:flash .45s ease}
+@keyframes flash{0%{transform:scale(1)}30%{transform:scale(1.03)}100%{transform:scale(1)}}
+.confetti{position:absolute;pointer-events:none;width:8px;height:8px;border-radius:2px}
+</style>
+</head>
+<body>
+<div id="wrap">
+<canvas id="bgCanvas" width="440" height="800"></canvas>
+
+<div class="topbar">
+  <div class="brand">
+    <div>
+      <h1>SOUK <span>SURGE</span></h1>
+      <small>BUY LOW • SELL HIGH • BANK FAST</small>
+    </div>
+    <div class="pill" id="bestPill">BEST $0</div>
+  </div>
+  <div class="stats">
+    <div class="stat cash"><i>CASH</i><b id="cashEl">$1,000</b></div>
+    <div class="stat profit" id="profitStat"><i>PROFIT</i><b id="profitEl">+$0</b></div>
+    <div class="stat"><i>LEVEL</i><b id="levelEl">1</b></div>
+  </div>
+  <div class="timerRow">
+    <div class="timerBar"><div class="timerFill" id="timerFill"></div></div>
+    <div class="timeTxt" id="timeEl">60.0s</div>
+    <div class="rolls" id="rollsEl">12 ROLLS</div>
+  </div>
+</div>
+
+<div class="market" id="market"></div>
+
+<div class="controls">
+  <div class="mainBtns">
+    <button class="bigBtn" id="rollBtn" touch-action="none">🎲 ROLL MARKET <small id="rollSub">NEW PRICES • -1 ROLL</small></button>
+    <button class="bigBtn" id="bankBtn" touch-action="none">💰 BANK<br><small style="font-size:10px">LOCK PROFIT</small></button>
+  </div>
+  <div class="subRow">
+    <button class="miniBtn" id="restartBtn">↻ RESTART</button>
+    <button class="miniBtn" id="howBtn">? HOW TO PLAY</button>
+    <button class="miniBtn" id="maxBtn">⚡ SELL ALL</button>
+  </div>
+  <div class="help"><b>Drag:</b> tap BUY/SELL • <b>Keys:</b> 1-4 select • B buy • S sell • Space roll • Enter bank • R restart</div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal" id="modalBox"></div>
+</div>
+
+</div>
+<script>
+const GOODS=[
+  {id:0,name:'DATES',sub:'Oasis Harvest',base:42,accent:'#d97706',iconBg:'linear-gradient(180deg,#f59e0b,#92400e)',icon:'◒'},
+  {id:1,name:'SAFFRON',sub:'Spice Vault',base:128,accent:'#dc2626',iconBg:'linear-gradient(180deg,#f87171,#991b1b)',icon:'✦'},
+  {id:2,name:'SILK',sub:'Weaver Row',base:205,accent:'#7c3aed',iconBg:'linear-gradient(180deg,#a78bfa,#5b21b6)',icon:'⬢'},
+  {id:3,name:'COPPER',sub:'Smith Alley',base:76,accent:'#0d9488',iconBg:'linear-gradient(180deg,#2dd4bf,#0f766e)',icon:'⬣'}
+];
+const START_CASH=1000;
+const MAX_ROLLS=12;
+const ROUND_TIME=60;
+const STORAGE_BEST='souk_bestProfit_v1';
+const STORAGE_BEST_LEVEL='souk_bestLevel_v1';
+
+let state={
+  cash:START_CASH,
+  inv:[0,0,0,0],
+  prices:[0,0,0,0],
+  prev:[0,0,0,0],
+  states:['','','',''],
+  rolls:MAX_ROLLS,
+  time:ROUND_TIME,
+  profit:0,
+  best:0,
+  bestLevel:1,
+  level:1,
+  selected:0,
+  running:true,
+  timer:null
+};
+
+const marketEl=document.getElementById('market');
+const cashEl=document.getElementById('cashEl');
+const profitEl=document.getElementById('profitEl');
+const profitStat=document.getElementById('profitStat');
+const levelEl=document.getElementById('levelEl');
+const timeEl=document.getElementById('timeEl');
+const timerFill=document.getElementById('timerFill');
+const rollsEl=document.getElementById('rollsEl');
+const bestPill=document.getElementById('bestPill');
+const overlay=document.getElementById('overlay');
+const modalBox=document.getElementById('modalBox');
+
+function loadBest(){
+  try{
+    state.best=parseInt(localStorage.getItem(STORAGE_BEST)||'0',10)||0;
+    state.bestLevel=parseInt(localStorage.getItem(STORAGE_BEST_LEVEL)||'1',10)||1;
+  }catch(e){}
+  bestPill.textContent='BEST $'+state.best.toLocaleString();
+}
+function saveBest(){
+  if(state.profit>state.best){
+    state.best=state.profit;
+    try{localStorage.setItem(STORAGE_BEST,String(state.best))}catch(e){}
+    bestPill.textContent='BEST $'+state.best.toLocaleString();
+  }
+  if(state.level>state.bestLevel){
+    state.bestLevel=state.level;
+    try{localStorage.setItem(STORAGE_BEST_LEVEL,String(state.bestLevel))}catch(e){}
+  }
+}
+
+function priceFor(base, st){
+  let mult=1, jitter=(Math.random()-0.5)*0.12;
+  if(st==='surplus') mult=0.52 + Math.random()*0.28;
+  else if(st==='volatile') mult=0.85 + Math.random()*0.55;
+  else if(st==='high') mult=1.55 + Math.random()*0.65;
+  let p=Math.round(base*mult*(1+jitter));
+  return Math.max(8,p);
+}
+function pickState(){
+  const r=Math.random();
+  if(r<0.34) return 'surplus';
+  if(r<0.74) return 'volatile';
+  return 'high';
+}
+function stateLabel(s){
+  if(s==='surplus') return 'SURPLUS';
+  if(s==='volatile') return 'VOLATILE';
+  return 'HIGH DEMAND';
+}
+function stateClass(s){
+  if(s==='surplus') return 'surplus';
+  if(s==='volatile') return 'volatile';
+  return 'high';
+}
+
+function generatePrices(isFirst){
+  for(let i=0;i<4;i++){
+    state.prev[i]=state.prices[i]||GOODS[i].base;
+    let st=pickState();
+    // avoid same high streak too often for tension
+    if(!isFirst && Math.random()<0.18) st=state.states[i];
+    state.states[i]=st;
+    state.prices[i]=priceFor(GOODS[i].base,st);
+  }
+}
+
+function inventoryValue(){
+  let v=0;
+  for(let i=0;i<4;i++) v+= state.inv[i]*state.prices[i];
+  return v;
+}
+function calcProfit(){
+  return (state.cash - START_CASH) + inventoryValue();
+}
+
+function renderMarket(){
+  marketEl.innerHTML='';
+  for(let i=0;i<4;i++){
+    const g=GOODS[i];
+    const price=state.prices[i];
+    const prev=state.prev[i];
+    const st=state.states[i];
+    const trend = price>prev ? 'up' : price<prev ? 'down' : 'flat';
+    const arrow = trend==='up' ? '▲' : trend==='down' ? '▼' : '—';
+    const owned=state.inv[i];
+    const val=owned*price;
+    const canBuy= state.cash>=price && state.running;
+    const canSell= owned>0 && state.running;
+    const card=document.createElement('div');
+    card.className='card'+(state.selected===i?' selected':'');
+    card.style.setProperty('--accent',g.accent);
+    card.innerHTML=`
+      <div class="cardHead">
+        <div class="icon" style="background:${g.iconBg}">${g.icon}</div>
+        <div class="meta">
+          <h3>${g.name}</h3>
+          <p>${g.sub}</p>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+        <span class="badge ${stateClass(st)}">${stateLabel(st)}</span>
+        <div class="priceRow"><span class="price">$${price}</span><span class="trend ${trend}">${arrow}</span></div>
+      </div>
+      <div class="owned"><span>Owned <b>${owned}</b></span><span>${owned? '$'+val.toLocaleString() : '—'}</span></div>
+      <div class="actions">
+        <button class="btn buy" data-buy="${i}" ${canBuy?'':'disabled'}>BUY</button>
+        <button class="btn sell" data-sell="${i}" ${canSell?'':'disabled'}>SELL</button>
+      </div>
+    `;
+    card.addEventListener('click',(e)=>{
+      if(e.target.closest('button')) return;
+      state.selected=i;
+      renderMarket();
+    });
+    marketEl.appendChild(card);
+  }
+  // attach buy/sell
+  marketEl.querySelectorAll('[data-buy]').forEach(b=>{
+    b.addEventListener('click',()=>buy(parseInt(b.dataset.buy,10)));
+    b.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
+  });
+  marketEl.querySelectorAll('[data-sell]').forEach(b=>{
+    b.addEventListener('click',()=>sell(parseInt(b.dataset.sell,10)));
+    b.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
+  });
+}
+
+function updateHUD(){
+  cashEl.textContent='$'+state.cash.toLocaleString();
+  state.profit=calcProfit();
+  const sign=state.profit>=0?'+':'';
+  profitEl.textContent=sign+'$'+state.profit.toLocaleString();
+  profitStat.classList.toggle('pos',state.profit>=0);
+  profitStat.classList.toggle('neg',state.profit<0);
+  levelEl.textContent=state.level;
+  rollsEl.textContent=state.rolls+' ROLLS';
+  timeEl.textContent=state.time.toFixed(1)+'s';
+  const pct=Math.max(0,state.time/ROUND_TIME*100);
+  timerFill.style.width=pct+'%';
+  if(pct<30) timerFill.style.background='linear-gradient(90deg,#ef4444,#991b1b)';
+  else if(pct<60) timerFill.style.background='linear-gradient(90deg,#f59e0b,#ef4444)';
+  else timerFill.style.background='linear-gradient(90deg,#10b981,#f59e0b)';
+  document.getElementById('rollBtn').disabled = !state.running || state.rolls<=0;
+  document.getElementById('bankBtn').disabled = !state.running;
+  bestPill.textContent='BEST $'+state.best.toLocaleString();
+}
+
+function buy(i){
+  if(!state.running) return;
+  const p=state.prices[i];
+  if(state.cash < p) {shake(i); return;}
+  state.cash-=p;
+  state.inv[i]++;
+  // level up on smart buy? level = floor(profit/300)+1
+  const newLevel=Math.max(1, Math.floor(Math.max(0,calcProfit())/400)+1);
+  if(newLevel!==state.level){
+    state.level=newLevel;
+    burstConfetti();
+  }
+  updateHUD();
+  renderMarket();
+  pulseCard(i,'buy');
+}
+function sell(i){
+  if(!state.running) return;
+  if(state.inv[i]<=0){shake(i);return;}
+  const p=state.prices[i];
+  state.inv[i]--;
+  state.cash+=p;
+  const newLevel=Math.max(1, Math.floor(Math.max(0,calcProfit())/400)+1);
+  if(newLevel!==state.level){
+    state.level=newLevel;
+    burstConfetti();
+  }
+  updateHUD();
+  renderMarket();
+  pulseCard(i,'sell');
+}
+function sellAll(){
+  if(!state.running) return;
+  let sold=false;
+  for(let i=0;i<4;i++){
+    if(state.inv[i]>0){
+      state.cash+= state.inv[i]*state.prices[i];
+      state.inv[i]=0;
+      sold=true;
+    }
+  }
+  if(sold){
+    updateHUD();renderMarket();burstConfetti();
+  }
+}
+function shake(i){
+  const cards=marketEl.children;
+  if(cards[i]){cards[i].classList.remove('flash');void cards[i].offsetWidth;cards[i].classList.add('flash');}
+}
+function pulseCard(i,type){
+  const cards=marketEl.children;
+  if(!cards[i]) return;
+  cards[i].style.filter= type==='buy' ? 'brightness(1.08)' : 'brightness(1.05)';
+  setTimeout(()=>cards[i]&&(cards[i].style.filter=''),180);
+}
+
+function rollMarket(){
+  if(!state.running || state.rolls<=0) return;
+  state.rolls--;
+  generatePrices(false);
+  updateHUD();
+  renderMarket();
+  // visual roll feedback
+  marketEl.style.transform='scale(.98)';
+  setTimeout(()=>marketEl.style.transform='',120);
+  if(state.rolls===0){
+    document.getElementById('rollSub').textContent='NO ROLLS LEFT';
+  }
+}
+
+function bankProfit(){
+  if(!state.running) return;
+  endGame(false);
+}
+function endGame(isTimeout){
+  state.running=false;
+  clearInterval(state.timer);
+  state.profit=calcProfit();
+  saveBest();
+  updateHUD();
+  const isWin=state.profit>0;
+  const title=isTimeout? 'TIME UP!' : 'PROFIT BANKED!';
+  const msg=isWin ? `You turned $${START_CASH.toLocaleString()} into <b>$${(START_CASH+state.profit).toLocaleString()}</b> in the souk.` : `Market closed. You finished with <b>$${(START_CASH+state.profit).toLocaleString()}</b>. Buy low, sell high next time!`;
+  modalBox.innerHTML=`
+    <h2>${title}</h2>
+    <p>${msg}</p>
+    <div class="big ${isWin?'':'neg'}">${state.profit>=0?'+':''}$${state.profit.toLocaleString()}</div>
+    <p style="font-size:11px;letter-spacing:.08em;font-weight:800;color:#92400e">LEVEL ${state.level} • BEST $${state.best.toLocaleString()} • BEST LVL ${state.bestLevel}</p>
+    <div class="modalBtns">
+      <button class="bigBtn" id="againBtn" style="background:linear-gradient(180deg,#f59e0b,#d97706);color:#fff;border:2px solid #7c2d12">↻ PLAY AGAIN</button>
+      <button class="bigBtn" id="closeBtn" style="background:#fff;color:#44403c;border:2px solid #d6c7a8">CLOSE</button>
+    </div>
+    <p style="margin-top:8px;font-size:10px;color:#78716c">Tip: Watch for SURPLUS (buy) → HIGH DEMAND (sell). Limited rolls — make each count!</p>
+  `;
+  overlay.classList.add('show');
+  document.getElementById('againBtn').onclick=()=>{overlay.classList.remove('show');restart();};
+  document.getElementById('closeBtn').onclick=()=>overlay.classList.remove('show');
+  burstConfetti(isWin?18:8);
+}
+
+function showHow(){
+  modalBox.innerHTML=`
+    <h2>HOW TO PLAY</h2>
+    <p><b>4 goods</b> swing each roll: <span style="background:#dcfce7;padding:2px 6px;border-radius:999px;border:1px solid #86efac;font-size:11px">SURPLUS = cheap</span> → <span style="background:#fef9c3;padding:2px 6px;border-radius:999px;border:1px solid #fde047;font-size:11px">VOLATILE</span> → <span style="background:#fee2e2;padding:2px 6px;border-radius:999px;border:1px solid #fca5a5;font-size:11px">HIGH DEMAND = pricey</span></p>
+    <p>Tap <b>BUY</b> low, <b>ROLL MARKET</b> (costs 1 roll), then <b>SELL</b> high. You have <b>${MAX_ROLLS} rolls</b> and <b>${ROUND_TIME}s</b>.</p>
+    <p>Profit = Cash + Inventory Value − $1,000 start. Tap <b>BANK</b> anytime to lock it. Level up every $400 profit.</p>
+    <div class="modalBtns" style="grid-template-columns:1fr">
+      <button class="bigBtn" id="gotBtn" style="background:linear-gradient(180deg,#0d9488,#0f766e);color:#fff;border:2px solid #042f2e">GOT IT — TRADE!</button>
+    </div>
+  `;
+  overlay.classList.add('show');
+  document.getElementById('gotBtn').onclick=()=>overlay.classList.remove('show');
+}
+
+function restart(){
+  clearInterval(state.timer);
+  state.cash=START_CASH;
+  state.inv=[0,0,0,0];
+  state.rolls=MAX_ROLLS;
+  state.time=ROUND_TIME;
+  state.level=1;
+  state.selected=0;
+  state.running=true;
+  document.getElementById('rollSub').textContent='NEW PRICES • -1 ROLL';
+  generatePrices(true);
+  updateHUD();
+  renderMarket();
+  startTimer();
+  overlay.classList.remove('show');
+}
+function startTimer(){
+  clearInterval(state.timer);
+  state.timer=setInterval(()=>{
+    if(!state.running) return;
+    state.time-=0.1;
+    if(state.time<=0){
+      state.time=0;
+      updateHUD();
+      endGame(true);
+    } else {
+      updateHUD();
+    }
+  },100);
+}
+
+// controls
+document.getElementById('rollBtn').addEventListener('click',rollMarket);
+document.getElementById('bankBtn').addEventListener('click',bankProfit);
+document.getElementById('restartBtn').addEventListener('click',restart);
+document.getElementById('howBtn').addEventListener('click',showHow);
+document.getElementById('maxBtn').addEventListener('click',sellAll);
+overlay.addEventListener('click',(e)=>{ if(e.target===overlay) overlay.classList.remove('show'); });
+
+// keyboard
+window.addEventListener('keydown',(e)=>{
+  const k=e.key.toLowerCase();
+  if(k==='r'){ e.preventDefault(); restart(); return; }
+  if(k===' '){ e.preventDefault(); rollMarket(); return; }
+  if(k==='enter'){ e.preventDefault(); bankProfit(); return; }
+  if(k>='1' && k<='4'){ state.selected=parseInt(k,10)-1; renderMarket(); return; }
+  if(k==='b'){ buy(state.selected); return; }
+  if(k==='s'){ sell(state.selected); return; }
+  if(k==='m'){ sellAll(); return; }
+  if(k==='arrowleft' || k==='arrowright'){
+    state.selected=(state.selected + (k==='arrowright'?1:3))%4;
+    renderMarket();
+  }
+});
+
+// bg canvas lanterns
+const bg=document.getElementById('bgCanvas');
+const bctx=bg.getContext('2d');
+let lanterns=[];
+function resizeBg(){
+  const r=document.getElementById('wrap').getBoundingClientRect();
+  bg.width=r.width*devicePixelRatio;
+  bg.height=r.height*devicePixelRatio;
+  bctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  initLanterns();
+}
+function initLanterns(){
+  lanterns=[];
+  for(let i=0;i<14;i++){
+    lanterns.push({
+      x:Math.random()*440, y:Math.random()*800,
+      s: 18+Math.random()*28,
+      vx:(Math.random()-0.5)*6,
+      vy: -4 - Math.random()*8,
+      hue: 28+Math.random()*18,
+      a:0.18+Math.random()*0.22
+    });
+  }
+}
+function drawBg(){
+  const w=440, h=800;
+  bctx.clearRect(0,0,w,h);
+  // string lights
+  bctx.strokeStyle='rgba(245,158,11,.35)';
+  bctx.lineWidth=1.2;
+  bctx.beginPath();
+  for(let x=0;x<w;x+=18){
+    const y= 42 + Math.sin(x*0.04)*6;
+    bctx.moveTo(x,y); bctx.lineTo(x+9,y+4);
+  }
+  bctx.stroke();
+  // lanterns
+  lanterns.forEach(l=>{
+    l.x+= l.vx*0.016; l.y+= l.vy*0.016;
+    if(l.y < -40){ l.y= h+20; l.x=Math.random()*w; }
+    if(l.x< -20) l.x=w+20; if(l.x>w+20) l.x=-20;
+    bctx.fillStyle=`hsla(${l.hue}, 92%, 58%, ${l.a})`;
+    bctx.shadowColor=`hsla(${l.hue}, 92%, 58%, .9)`;
+    bctx.shadowBlur=14;
+    bctx.beginPath();
+    bctx.ellipse(l.x,l.y,l.s*0.55,l.s*0.72,0,0,Math.PI*2);
+    bctx.fill();
+    bctx.shadowBlur=0;
+    // glow dot
+    bctx.fillStyle=`hsla(${l.hue},100%,70%,.95)`;
+    bctx.beginPath(); bctx.arc(l.x,l.y-2,2.2,0,Math.PI*2); bctx.fill();
+  });
+  requestAnimationFrame(drawBg);
+}
+function burstConfetti(n=12){
+  const wrap=document.getElementById('wrap');
+  for(let i=0;i<n;i++){
+    const c=document.createElement('div');
+    c.className='confetti';
+    c.style.left=(50 + (Math.random()-0.5)*60)+'%';
+    c.style.top='42%';
+    c.style.background=['#f59e0b','#10b981','#ef4444','#a78bfa','#f97316'][i%5];
+    c.style.transform=`rotate(${Math.random()*360}deg)`;
+    wrap.appendChild(c);
+    const dx=(Math.random()-0.5)*220, dy= 80+Math.random()*180;
+    c.animate([
+      {transform:`translate(0,0) rotate(0deg)`, opacity:1},
+      {transform:`translate(${dx}px, ${dy}px) rotate(${360+Math.random()*360}deg)`, opacity:0}
+    ],{duration:700+Math.random()*400, easing:'cubic-bezier(.2,.6,.3,1)'}).onfinish=()=>c.remove();
+  }
+}
+
+// init
+loadBest();
+generatePrices(true);
+renderMarket();
+updateHUD();
+resizeBg();
+drawBg();
+startTimer();
+window.addEventListener('resize',resizeBg);
+</script>
+</body>
+</html>

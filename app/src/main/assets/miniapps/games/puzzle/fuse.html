@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Bomb Wire Quiz</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bunker1:#0a0e14;
+  --bunker2:#141a22;
+  --bunker3:#1e252f;
+  --concrete:#2a333f;
+  --alarm:#ff1a1a;
+  --alarm2:#ff4d4d;
+  --gold:#ffb84d;
+  --teal:#4ecdc4;
+  --green:#2ecc71;
+}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  background:radial-gradient(ellipse 800px 600px at 50% 0%,#1e252f 0%,#0a0e14 60%,#020408 100%);
+  color:#fff;
+  display:flex;justify-content:center;
+  min-height:100vh;min-height:100dvh;
+}
+.app{
+  width:100%;max-width:428px;min-width:360px;
+  min-height:100vh;min-height:100dvh;
+  display:flex;flex-direction:column;
+  position:relative;overflow:hidden;
+  background:
+    radial-gradient(ellipse 600px 400px at 50% -10%,rgba(255,26,26,0.08),transparent 60%),
+    radial-gradient(ellipse 500px 300px at 20% 30%,rgba(255,184,77,0.04),transparent 60%),
+    linear-gradient(180deg,#141a22 0%,#0a0e14 100%);
+  border-left:1px solid rgba(255,255,255,0.06);
+  border-right:1px solid rgba(255,255,255,0.06);
+}
+.app::before{
+  content:"";position:absolute;inset:0;
+  background:
+    repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(255,255,255,0.015) 2px,rgba(255,255,255,0.015) 3px),
+    repeating-linear-gradient(90deg,transparent,transparent 40px,rgba(255,255,255,0.01) 40px,rgba(255,255,255,0.01) 41px);
+  pointer-events:none;
+}
+.header{
+  position:relative;z-index:2;
+  padding:10px 14px 8px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.5),transparent);
+  border-bottom:1px solid rgba(255,26,26,0.15);
+}
+.top-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.logo{font-size:11px;letter-spacing:0.14em;text-transform:uppercase;opacity:0.9;font-weight:800;color:var(--alarm2)}
+.chip{
+  font-size:10px;font-weight:800;letter-spacing:0.05em;
+  background:rgba(0,0,0,0.4);border:1px solid rgba(255,26,26,0.25);
+  padding:5px 8px;border-radius:999px;color:var(--gold);
+}
+.title-row{display:flex;justify-content:space-between;align-items:end;margin-top:6px}
+h1{font-size:19px;font-weight:900;letter-spacing:-0.02em;line-height:1}
+h1 span{color:var(--alarm2)}
+.subtitle{font-size:11px;opacity:0.65;margin-top:2px}
+.hearts{
+  display:flex;gap:3px;align-items:center;
+  background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);
+  padding:6px 10px;border-radius:999px;
+}
+.heart{font-size:15px;transition:all 0.3s}
+.heart.lost{opacity:0.25;filter:grayscale(1);transform:scale(0.85)}
+.stats{
+  position:relative;z-index:2;
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:8px;padding:8px 12px 0;
+}
+.stat{
+  background:rgba(0,0,0,0.35);backdrop-filter:blur(6px);
+  border:1px solid rgba(255,255,255,0.08);border-radius:12px;
+  padding:7px 6px;text-align:center;
+}
+.stat-label{font-size:9px;letter-spacing:0.1em;text-transform:uppercase;opacity:0.6;font-weight:800}
+.stat-value{font-size:14px;font-weight:900;margin-top:1px;font-variant-numeric:tabular-nums}
+.stat-sub{font-size:10px;opacity:0.55}
+.timer-wrap{
+  position:relative;z-index:2;
+  margin:8px 12px 0;
+  background:rgba(0,0,0,0.4);border:1px solid rgba(255,26,26,0.2);
+  border-radius:12px;padding:8px 10px;
+}
+.timer-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:800}
+.timer-head span:last-child{color:var(--alarm2);font-variant-numeric:tabular-nums}
+.bar-track{height:8px;background:rgba(255,255,255,0.1);border-radius:999px;overflow:hidden;margin-top:6px}
+.bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--green),var(--gold),var(--alarm));transition:width 0.1s linear,background 0.3s}
+.bar-fill.warn{background:linear-gradient(90deg,var(--gold),var(--alarm));animation:pulse 0.5s infinite alternate}
+.bar-fill.danger{background:var(--alarm);animation:pulse 0.3s infinite alternate}
+@keyframes pulse{from{opacity:0.9}to{opacity:1;filter:brightness(1.2)}}
+.bomb-wrap{
+  position:relative;z-index:2;
+  margin:10px 12px 0;
+  background:linear-gradient(145deg,#1e252f 0%,#141a22 100%);
+  border:1px solid rgba(255,255,255,0.08);border-radius:14px;
+  padding:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.bomb-header{
+  display:flex;justify-content:space-between;align-items:center;
+  background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);
+  border-radius:10px;padding:8px 10px;margin-bottom:10px;
+}
+.bomb-title{font-size:11px;font-weight:800;letter-spacing:0.08em;opacity:0.7}
+.bomb-timer{
+  font-size:18px;font-weight:900;font-variant-numeric:tabular-nums;
+  color:var(--alarm2);text-shadow:0 0 8px rgba(255,26,26,0.5);
+  background:rgba(0,0,0,0.5);padding:4px 8px;border-radius:6px;
+  border:1px solid rgba(255,26,26,0.3);
+  min-width:70px;text-align:center;
+}
+.clue-box{
+  background:linear-gradient(145deg,rgba(255,26,26,0.08),rgba(0,0,0,0.3));
+  border:1px solid rgba(255,26,26,0.2);border-radius:10px;
+  padding:10px 12px;margin-bottom:12px;
+  text-align:center;
+  position:relative;overflow:hidden;
+}
+.clue-box::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--alarm),transparent);
+  animation:scan 2s infinite;
+}
+@keyframes scan{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.clue-label{font-size:9px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.6;font-weight:800;margin-bottom:4px}
+.clue-text{font-size:14px;font-weight:900;line-height:1.3;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,0.5)}
+.clue-text span{color:var(--gold)}
+.wires{
+  display:flex;flex-direction:column;gap:8px;
+}
+.wire-btn{
+  position:relative;
+  width:100%;min-height:56px;
+  border:none;border-radius:12px;
+  display:flex;align-items:center;gap:12px;
+  padding:0 14px;
+  cursor:pointer;
+  transition:transform 0.08s,filter 0.15s,opacity 0.2s,box-shadow 0.2s;
+  box-shadow:0 4px 12px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.15);
+  overflow:hidden;
+  user-select:none;touch-action:manipulation;
+}
+.wire-btn:active{transform:scale(0.98)}
+.wire-btn:disabled{opacity:0.5;pointer-events:none}
+.wire-btn.cut{pointer-events:none;filter:brightness(0.7)}
+.wire-btn.wrong{animation:shake 0.4s}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+.wire-color{
+  width:48px;height:28px;border-radius:999px;
+  border:2px solid rgba(0,0,0,0.2);
+  box-shadow:inset 0 2px 4px rgba(255,255,255,0.3),0 2px 6px rgba(0,0,0,0.3);
+  position:relative;flex-shrink:0;
+}
+.wire-color::before{
+  content:"";position:absolute;inset:4px 6px auto 6px;height:2px;
+  background:rgba(255,255,255,0.4);border-radius:1px;
+}
+.wire-color::after{
+  content:"";position:absolute;left:-6px;top:50%;transform:translateY(-50%);
+  width:8px;height:12px;background:#2a333f;border:1px solid rgba(0,0,0,0.3);border-radius:2px;
+}
+.wire-info{flex:1;text-align:left}
+.wire-name{font-size:13px;font-weight:900;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.5)}
+.wire-desc{font-size:10px;opacity:0.7;font-weight:600;margin-top:1px}
+.wire-cut{
+  width:32px;height:32px;border-radius:50%;
+  background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;flex-shrink:0;
+}
+.wire-btn.cut .wire-cut{background:var(--green);border-color:rgba(255,255,255,0.3)}
+.wire-btn.wrong .wire-cut{background:var(--alarm);border-color:rgba(255,255,255,0.3)}
+.controls{
+  position:relative;z-index:2;
+  padding:10px 12px 12px;
+  display:flex;gap:8px;
+}
+.btn{
+  flex:1;min-height:44px;border-radius:10px;border:none;
+  font-size:12px;font-weight:800;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:transform 0.08s,opacity 0.2s;
+  box-shadow:0 4px 12px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.btn:active{transform:scale(0.97)}
+.btn-primary{background:linear-gradient(180deg,var(--gold),#ff8c1a);color:#1a0f00}
+.btn-secondary{background:rgba(0,0,0,0.35);color:#fff;border:1px solid rgba(255,255,255,0.12)}
+.toast{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  background:rgba(0,0,0,0.85);border:1px solid rgba(255,255,255,0.15);
+  padding:8px 14px;border-radius:999px;font-size:12px;font-weight:800;
+  z-index:5;pointer-events:none;opacity:0;transition:opacity 0.2s;
+  white-space:nowrap;
+}
+.toast.show{opacity:1}
+.overlay{
+  position:absolute;inset:0;background:rgba(2,6,12,0.85);backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;padding:16px;z-index:10;
+}
+.card{
+  width:100%;max-width:360px;
+  background:linear-gradient(180deg,#1e252f 0%,#0a0e14 100%);
+  border:1px solid rgba(255,26,26,0.2);border-radius:18px;
+  padding:16px;text-align:center;
+  box-shadow:0 16px 40px rgba(0,0,0,0.6);
+}
+.card h2{font-size:18px;font-weight:900;margin-bottom:6px}
+.card p{font-size:12px;line-height:1.5;opacity:0.85;margin-bottom:10px}
+.badge{display:inline-block;background:rgba(255,26,26,0.15);border:1px solid rgba(255,26,26,0.3);border-radius:999px;padding:4px 10px;font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;color:var(--alarm2)}
+.big{font-size:26px;font-weight:900;margin:6px 0;color:var(--gold)}
+.btn-full{width:100%;min-height:48px;border:none;border-radius:12px;background:linear-gradient(180deg,var(--gold),#ff8c1a);color:#1a0f00;font-size:15px;font-weight:900;cursor:pointer;margin-top:8px}
+.btn-ghost{width:100%;min-height:42px;margin-top:8px;border:1px solid rgba(255,255,255,0.14);background:transparent;color:#fff;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer}
+@media (max-width:380px){
+  h1{font-size:17px}
+  .wire-btn{min-height:52px}
+  .wire-color{width:42px;height:24px}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="header">
+    <div class="top-row">
+      <div class="logo">⚠️ Dark Bunker • Bomb Wire Quiz</div>
+      <div class="chip" id="bestChip">Best: —</div>
+    </div>
+    <div class="title-row">
+      <div>
+        <h1>BOMB <span>WIRE</span> QUIZ</h1>
+        <div class="subtitle">Read clue • Cut right wire • Survive</div>
+      </div>
+      <div class="hearts" id="heartsEl">
+        <span class="heart" id="h1">❤️</span><span class="heart" id="h2">❤️</span><span class="heart" id="h3">❤️</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Level</div><div class="stat-value" id="levelEl">1</div><div class="stat-sub" id="levelSub">3 wires</div></div>
+    <div class="stat"><div class="stat-label">Score</div><div class="stat-value" id="scoreEl">0</div><div class="stat-sub" id="scoreSub">+0 next</div></div>
+    <div class="stat"><div class="stat-label">Best</div><div class="stat-value" id="bestEl">—</div><div class="stat-sub">all time</div></div>
+  </div>
+
+  <div class="timer-wrap">
+    <div class="timer-head"><span>⏱️ Time to cut</span><span id="timeEl">8.0s</span></div>
+    <div class="bar-track"><div class="bar-fill" id="timeBar" style="width:100%"></div></div>
+  </div>
+
+  <div class="bomb-wrap">
+    <div class="bomb-header">
+      <div class="bomb-title">● ARMED • HANDLE WITH CARE</div>
+      <div class="bomb-timer" id="bombTimer">08.0</div>
+    </div>
+    <div class="clue-box">
+      <div class="clue-label">Intel Clue</div>
+      <div class="clue-text" id="clueEl">—</div>
+    </div>
+    <div class="wires" id="wiresEl"></div>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-secondary" id="pauseBtn">⏸️ Pause</button>
+    <button class="btn btn-secondary" id="resetBtn">🔄 Reset</button>
+    <button class="btn btn-primary" id="hintBtn">💡 Hint</button>
+  </div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="card">
+      <div class="badge">Tense Dark-Bunker • Rising Pace</div>
+      <h2>Bomb Wire Quiz</h2>
+      <p>Each level shows <b>colored wires</b> + a text clue <b>naming or excluding colors</b>.<br>Tap the <b>right wire</b> to score — <b>wrong cut = -1 heart</b>. You have <b>3 hearts</b>, pace gets faster every level.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:10px 0">
+        <div style="background:rgba(46,204,113,0.12);border:1px solid rgba(46,204,113,0.25);border-radius:10px;padding:8px"><div style="font-size:14px">✂️</div><div style="font-size:9px;font-weight:800;opacity:0.7;margin-top:2px">CUT RIGHT</div></div>
+        <div style="background:rgba(255,26,26,0.12);border:1px solid rgba(255,26,26,0.25);border-radius:10px;padding:8px"><div style="font-size:14px">❤️</div><div style="font-size:9px;font-weight:800;opacity:0.7;margin-top:2px">3 HEARTS</div></div>
+        <div style="background:rgba(255,184,77,0.12);border:1px solid rgba(255,184,77,0.25);border-radius:10px;padding:8px"><div style="font-size:14px">⏱️</div><div style="font-size:9px;font-weight:800;opacity:0.7;margin-top:2px">RISING PACE</div></div>
+      </div>
+      <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:8px 10px;text-align:left;font-size:11px;line-height:1.4;margin-bottom:10px">
+        <b>Clues like:</b> “CUT THE RED WIRE” or “EVERY WIRE EXCEPT BLUE IS TRAPPED — CUT BLUE” or “DO NOT CUT GREEN”. Read carefully — one wrong cut costs a heart!
+      </div>
+      <button class="btn-full" id="startBtn">DEFUSE START ⚠️</button>
+      <button class="btn-ghost" id="howBtn">📖 How to Play</button>
+      <p style="font-size:10px;opacity:0.5;margin-top:8px">Large tap targets • No horizontal scroll • Best score saved</p>
+    </div>
+  </div>
+
+  <div class="overlay" id="howOverlay" style="display:none">
+    <div class="card">
+      <h2>How to Play</h2>
+      <p style="text-align:left">
+        • <b>Wires:</b> 3-6 colored wires per level. One is correct.<br>
+        • <b>Clues:</b> Either <b>name</b> the correct color (“CUT RED”) or <b>exclude</b> others (“ALL EXCEPT BLUE ARE TRAPPED”).<br>
+        • <b>Tap to cut:</b> Right wire = +100 pts + time bonus, next level. Wrong = -1 heart.<br>
+        • <b>Timer:</b> Starts at 8.0s, -0.3s per level (min 2.5s). Timeout = -1 heart.<br>
+        • <b>Hearts:</b> 3 total. Game over at 0.<br>
+        • <b>Hint:</b> Highlights clue keywords (3s cooldown).
+      </p>
+      <button class="btn-full" id="closeHowBtn">Got it</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="levelOverlay" style="display:none">
+    <div class="card" id="levelCard"></div>
+  </div>
+
+  <div class="overlay" id="gameOverOverlay" style="display:none">
+    <div class="card" id="gameOverCard"></div>
+  </div>
+</div>
+
+<script>
+const COLORS = [
+  {name:'RED', hex:'#e74c3c', bg:'linear-gradient(180deg,#ff6b6b,#c0392b)'},
+  {name:'BLUE', hex:'#3498db', bg:'linear-gradient(180deg,#5dade2,#2471a3)'},
+  {name:'GREEN', hex:'#2ecc71', bg:'linear-gradient(180deg,#58d68d,#1e8449)'},
+  {name:'YELLOW', hex:'#f1c40f', bg:'linear-gradient(180deg,#f7dc6f,#b7950b)'},
+  {name:'WHITE', hex:'#ecf0f1', bg:'linear-gradient(180deg,#ffffff,#bdc3c7)'},
+  {name:'BLACK', hex:'#2c3e50', bg:'linear-gradient(180deg,#5d6d7e,#1a252f)'},
+  {name:'ORANGE', hex:'#e67e22', bg:'linear-gradient(180deg,#f0a050,#a65d00)'},
+  {name:'PURPLE', hex:'#9b59b6', bg:'linear-gradient(180deg,#bb8fce,#6c3483)'},
+];
+
+const $ = s => document.querySelector(s);
+let level=1, score=0, best=0, hearts=3;
+let wires=[], correctIdx=0, clueText='';
+let timeLeft=8, timeMax=8, timerId=null;
+let playing=false, paused=false;
+let hintCooldown=0;
+
+function loadBest(){
+  try{ best=parseInt(localStorage.getItem('bombWire_bestScore')||'0',10)||0; }catch(e){}
+  updateBestUI();
+}
+function saveBest(){
+  try{ if(score>best){ best=score; localStorage.setItem('bombWire_bestScore', String(best)); } }catch(e){}
+  updateBestUI();
+}
+function updateBestUI(){
+  $('#bestEl').textContent = best ? best : '—';
+  $('#bestChip').textContent = best ? `Best: ${best}` : 'Best: —';
+}
+function showToast(msg, ms=1200){
+  const t=$('#toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), ms);
+}
+function updateUI(){
+  $('#levelEl').textContent=level;
+  $('#levelSub').textContent=`${wires.length} wires`;
+  $('#scoreEl').textContent=score;
+  $('#scoreSub').textContent= `+${100+Math.round(timeLeft*10)} next`;
+  for(let i=1;i<=3;i++){
+    const h=$('#h'+i);
+    if(i<=hearts){ h.classList.remove('lost'); h.textContent='❤️'; }
+    else { h.classList.add('lost'); h.textContent='🖤'; }
+  }
+  $('#timeEl').textContent=timeLeft.toFixed(1)+'s';
+  $('#bombTimer').textContent=timeLeft.toFixed(1);
+  const pct=(timeLeft/timeMax*100);
+  const bar=$('#timeBar');
+  bar.style.width=pct+'%';
+  bar.className='bar-fill' + (pct<30?' danger':pct<50?' warn':'');
+  if(timeLeft<3) $('#bombTimer').style.color='var(--alarm)';
+  else if(timeLeft<5) $('#bombTimer').style.color='var(--gold)';
+  else $('#bombTimer').style.color='var(--alarm2)';
+}
+function randInt(n){ return Math.floor(Math.random()*n); }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=randInt(i+1); [a[i],a[j]]=[a[j],a[i]] } return a; }
+
+function generateLevel(){
+  const wireCount = Math.min(6, 3 + Math.floor((level-1)/2));
+  // pick distinct colors for wires
+  let pool=[...COLORS];
+  shuffle(pool);
+  wires = pool.slice(0,wireCount).map(c=>({...c}));
+  // pick correct index
+  correctIdx = randInt(wireCount);
+  const correctColor = wires[correctIdx].name;
+
+  // generate clue
+  const clueType = randInt(4); // 0 direct, 1 exclusion, 2 negative, 3 trap
+  let clue='';
+  if(clueType===0){
+    // Direct: CUT THE RED WIRE
+    clue = `CUT THE <span>${correctColor}</span> WIRE`;
+  } else if(clueType===1){
+    // Exclusion: EVERY WIRE EXCEPT [CORRECT] IS TRAPPED
+    clue = `EVERY WIRE EXCEPT <span>${correctColor}</span> IS TRAPPED — CUT <span>${correctColor}</span>`;
+  } else if(clueType===2){
+    // DO NOT CUT others: DO NOT CUT BLUE, GREEN — CUT RED
+    let others = wires.filter((w,i)=>i!==correctIdx).map(w=>w.name);
+    // pick 1-2 others to mention
+    shuffle(others);
+    const mention = others.slice(0, Math.min(2, others.length)).join(', ');
+    clue = `DO NOT CUT <span>${mention}</span> — CUT <span>${correctColor}</span>`;
+  } else {
+    // TRAP: THE BLUE WIRE IS TRAPPED — CUT RED (if multiple, pick one trapped)
+    let otherIdx = (correctIdx+1)%wireCount;
+    const trappedColor = wires[otherIdx].name;
+    if(trappedColor===correctColor){
+      clue = `CUT THE <span>${correctColor}</span> WIRE`;
+    } else {
+      clue = `THE <span>${trappedColor}</span> WIRE IS TRAPPED — CUT <span>${correctColor}</span>`;
+    }
+  }
+  clueText=clue;
+  $('#clueEl').innerHTML=clue;
+
+  // timer: 8.0 - (level-1)*0.3, min 2.5
+  timeMax = Math.max(2.5, 8 - (level-1)*0.3);
+  timeLeft=timeMax;
+
+  renderWires();
+  updateUI();
+  startTimer();
+}
+function renderWires(){
+  const el=$('#wiresEl');
+  el.innerHTML='';
+  wires.forEach((w,i)=>{
+    const btn=document.createElement('button');
+    btn.className='wire-btn';
+    btn.dataset.idx=i;
+    btn.style.background=w.bg;
+    btn.innerHTML=`
+      <div class="wire-color" style="background:${w.bg}"></div>
+      <div class="wire-info">
+        <div class="wire-name">${w.name}</div>
+        <div class="wire-desc">Tap to cut • Wire ${i+1}</div>
+      </div>
+      <div class="wire-cut">✂️</div>
+    `;
+    btn.addEventListener('click', ()=>handleCut(i));
+    btn.addEventListener('touchstart', e=>{ e.preventDefault(); handleCut(i); }, {passive:false});
+    el.appendChild(btn);
+  });
+}
+function startTimer(){
+  clearInterval(timerId);
+  timerId=setInterval(()=>{
+    if(!playing || paused) return;
+    timeLeft-=0.1;
+    if(timeLeft<=0){
+      timeLeft=0;
+      updateUI();
+      clearInterval(timerId);
+      handleTimeout();
+    } else {
+      updateUI();
+    }
+  },100);
+}
+function handleCut(idx){
+  if(!playing || paused) return;
+  clearInterval(timerId);
+  const btns=document.querySelectorAll('.wire-btn');
+  const isCorrect = idx===correctIdx;
+  const btn=btns[idx];
+
+  if(isCorrect){
+    btn.classList.add('cut');
+    btn.querySelector('.wire-cut').textContent='✓';
+    const bonus=Math.round(timeLeft*10);
+    const pts=100+bonus;
+    score+=pts;
+    saveBest();
+    showToast(`Correct! +${pts} pts`, 1000);
+    if(navigator.vibrate) navigator.vibrate(20);
+    updateUI();
+    setTimeout(()=>{
+      level++;
+      if(level%5===0){
+        showLevelUp();
+      } else {
+        generateLevel();
+      }
+    }, 700);
+  } else {
+    btn.classList.add('wrong');
+    btn.querySelector('.wire-cut').textContent='✕';
+    // highlight correct
+    btns[correctIdx].style.boxShadow='0 0 0 3px var(--green),0 4px 12px rgba(0,0,0,0.3)';
+    hearts--;
+    updateUI();
+    showToast(`Wrong! Was ${wires[correctIdx].name} — -1 heart`, 1200);
+    if(navigator.vibrate) navigator.vibrate([40,60,40]);
+    if(hearts<=0){
+      setTimeout(gameOver, 800);
+    } else {
+      setTimeout(()=>{
+        level++;
+        generateLevel();
+      }, 1000);
+    }
+  }
+}
+function handleTimeout(){
+  hearts--;
+  updateUI();
+  showToast('Time out! -1 heart ⏱️', 1200);
+  if(navigator.vibrate) navigator.vibrate([30,50,30]);
+  // flash
+  document.querySelector('.bomb-wrap').animate([{background:'rgba(255,26,26,0.2)'},{background:'transparent'}],{duration:400});
+  if(hearts<=0){
+    setTimeout(gameOver, 800);
+  } else {
+    setTimeout(()=>{
+      level++;
+      generateLevel();
+    }, 1000);
+  }
+}
+function showLevelUp(){
+  $('#levelCard').innerHTML=`
+    <div class="badge">Level ${level} Reached</div>
+    <h2>Pace Increasing! ⏱️</h2>
+    <p>Timer now <b>${timeMax.toFixed(1)}s</b> — stay sharp!</p>
+    <div class="big">Level ${level}</div>
+    <button class="btn-full" id="continueBtn">Continue Defusal</button>
+  `;
+  $('#levelOverlay').style.display='flex';
+  $('#continueBtn').onclick=()=>{
+    $('#levelOverlay').style.display='none';
+    generateLevel();
+  };
+}
+function gameOver(){
+  playing=false;
+  clearInterval(timerId);
+  saveBest();
+  const isBest=score===best && score>0;
+  $('#gameOverCard').innerHTML=`
+    <div class="badge" style="background:rgba(255,26,26,0.15);border-color:rgba(255,26,26,0.3);color:#ff8a8a">Detonation • Out of Hearts</div>
+    <h2>Bomb Defusal Failed</h2>
+    <p>Reached <b>Level ${level}</b> with <b>${score} pts</b></p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0">
+      <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px"><div style="font-size:10px;opacity:0.6;font-weight:800">SCORE</div><div style="font-size:18px;font-weight:900;color:var(--gold)">${score}</div></div>
+      <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px"><div style="font-size:10px;opacity:0.6;font-weight:800">BEST</div><div style="font-size:18px;font-weight:900">${best}</div></div>
+    </div>
+    <div style="font-size:11px;opacity:0.7;margin-bottom:8px">${isBest?'🎉 New best score!':`Best: ${best} pts`}</div>
+    <button class="btn-full" id="retryBtn">Try Again ⚠️</button>
+    <button class="btn-ghost" id="closeOverBtn">Close</button>
+  `;
+  $('#gameOverOverlay').style.display='flex';
+  $('#retryBtn').onclick=()=>{ $('#gameOverOverlay').style.display='none'; resetGame(); startGame(); };
+  $('#closeOverBtn').onclick=()=>{ $('#gameOverOverlay').style.display='none'; resetGame(); };
+}
+function resetGame(){
+  level=1; score=0; hearts=3;
+  clearInterval(timerId);
+  playing=false; paused=false;
+  $('#pauseBtn').textContent='⏸️ Pause';
+  updateUI();
+}
+function startGame(){
+  resetGame();
+  playing=true; paused=false;
+  $('#startOverlay').style.display='none';
+  $('#gameOverOverlay').style.display='none';
+  $('#levelOverlay').style.display='none';
+  generateLevel();
+  showToast('Read clue, cut the right wire!', 1200);
+}
+
+// events
+$('#startBtn').onclick=startGame;
+$('#howBtn').onclick=()=> $('#howOverlay').style.display='flex';
+$('#closeHowBtn').onclick=()=> $('#howOverlay').style.display='none';
+$('#howOverlay').onclick=e=>{ if(e.target.id==='howOverlay') e.currentTarget.style.display='none'; };
+
+$('#pauseBtn').onclick=()=>{
+  if(!playing) return;
+  if(paused){
+    paused=false;
+    $('#pauseBtn').textContent='⏸️ Pause';
+    showToast('Resumed');
+  } else {
+    paused=true;
+    $('#pauseBtn').textContent='▶️ Resume';
+    showToast('Paused');
+  }
+};
+$('#resetBtn').onclick=()=>{
+  if(confirm('Reset defusal? Progress lost.')){
+    clearInterval(timerId);
+    resetGame();
+    $('#startOverlay').style.display='flex';
+  }
+};
+$('#hintBtn').onclick=()=>{
+  if(!playing) return;
+  if(hintCooldown>0){ showToast(`Hint cooldown ${hintCooldown}s`,800); return; }
+  // highlight clue keywords
+  const clueEl=$('#clueEl');
+  clueEl.animate([{background:'rgba(255,184,77,0.2)'},{background:'transparent'}],{duration:800});
+  clueEl.style.textShadow='0 0 8px rgba(255,184,77,0.8)';
+  setTimeout(()=>clueEl.style.textShadow='',800);
+  showToast('Hint: Look for the highlighted color!', 1000);
+  hintCooldown=3;
+  const hintInt=setInterval(()=>{
+    hintCooldown--;
+    if(hintCooldown<=0) clearInterval(hintInt);
+  },1000);
+};
+
+loadBest();
+updateUI();
+
+// prevent zoom
+document.addEventListener('touchmove', e=>{ if(e.scale!==1) e.preventDefault(); }, {passive:false});
+let lastTouch=0;
+document.addEventListener('touchend', e=>{
+  const now=Date.now();
+  if(now-lastTouch<300) e.preventDefault();
+  lastTouch=now;
+}, {passive:false});
+</script>
+</body>
+</html>

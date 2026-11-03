@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Cube Volume Quiz</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{background:#f8fafc;color:#0f172a;min-height:100vh;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#0f172a;color:#fff}
+header h1{font-size:13px;letter-spacing:1px}
+header h1 span{color:#38bdf8}
+.tot{background:#fff;color:#0f172a;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:800}
+#stats{display:flex;gap:6px;padding:8px 10px;background:#fff;border-bottom:1px solid #e2e8f0}
+.stat{flex:1;background:#f1f5f9;border-radius:10px;padding:6px;text-align:center;border:1px solid #e2e8f0}
+.stat b{display:block;font-size:16px;color:#0f172a}
+.stat span{font-size:10px;color:#64748b}
+.stat.timer b{color:#ef4444}
+.stat.timer.warn{background:#fef2f2;border-color:#fecaca}
+#main{flex:1;display:flex;flex-direction:column;align-items:center;padding:14px;gap:12px;background:#f8fafc;overflow:auto}
+.cubeCard{background:#fff;border:2px solid #0f172a;border-radius:16px;padding:16px;width:min(360px,100%);text-align:center;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.cubeVis{width:120px;height:120px;margin:0 auto 10px;position:relative;perspective:400px}
+.cube{width:80px;height:80px;position:absolute;left:20px;top:20px;transform-style:preserve-3d;transform:rotateX(-20deg) rotateY(-30deg)}
+.face{position:absolute;width:80px;height:80px;border:2px solid #0f172a;display:flex;align-items:center;justify-content:center;font-size:10px;color:#64748b;background:rgba(56,189,248,.15)}
+.face.front{transform:translateZ(40px);background:#fff}
+.face.back{transform:rotateY(180deg) translateZ(40px);background:#f1f5f9}
+.face.right{transform:rotateY(90deg) translateZ(40px);background:#e0f2fe}
+.face.left{transform:rotateY(-90deg) translateZ(40px);background:#e0f2fe}
+.face.top{transform:rotateX(90deg) translateZ(40px);background:#bae6fd}
+.face.bottom{transform:rotateX(-90deg) translateZ(40px);background:#bae6fd}
+.sideLabel{font-size:28px;font-weight:900;color:#0f172a;letter-spacing:1px}
+.sideLabel span{color:#38bdf8}
+.question{font-size:14px;color:#334155;margin-top:6px}
+.question b{color:#0f172a}
+#answerBox{width:min(360px,100%);background:#0f172a;border-radius:14px;padding:10px;display:flex;align-items:center;gap:8px}
+#answerInput{flex:1;background:#fff;border:none;border-radius:10px;padding:14px 12px;font-size:22px;font-weight:800;text-align:center;letter-spacing:1px;color:#0f172a;outline:none}
+#answerInput::placeholder{color:#94a3b8;font-weight:600;font-size:16px}
+#submitBtn{padding:14px 16px;background:#38bdf8;color:#0f172a;border:none;border-radius:10px;font-weight:900;font-size:14px}
+#feedback{width:min(360px,100%);border-radius:12px;padding:10px;text-align:center;font-size:13px;font-weight:700;min-height:40px;display:flex;align-items:center;justify-content:center}
+#feedback.correct{background:#dcfce7;color:#166534;border:1px solid #86efac}
+#feedback.wrong{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+#feedback.neutral{background:#fff;color:#64748b;border:1px solid #e2e8f0}
+#keypad{width:min(360px,100%);display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.kbtn{padding:16px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;font-size:20px;font-weight:800;color:#0f172a}
+.kbtn:active{background:#f1f5f9;transform:scale(.97)}
+.kbtn.action{background:#0f172a;color:#fff}
+.kbtn.clear{background:#fef2f2;color:#ef4444;border-color:#fecaca}
+#controls{display:flex;gap:6px;padding:10px;background:#0f172a}
+.cbtn{flex:1;padding:12px;border:none;border-radius:10px;font-weight:800;font-size:12px}
+.cbtn.sec{background:#1e293b;color:#e2e8f0;border:1px solid #334155}
+.cbtn.pri{background:#38bdf8;color:#0f172a}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:20;padding:20px}
+#modal.show{display:flex}
+.modalBox{background:#fff;border-radius:16px;padding:18px;max-width:340px;width:100%;text-align:center;border:2px solid #0f172a}
+.stars{font-size:26px;letter-spacing:4px;margin:8px 0;color:#facc15}
+</style>
+</head>
+<body>
+<header><h1>◈ CUBE <span>VOLUME</span> QUIZ</h1><div class="tot" id="totalBest">BEST 0</div></header>
+<div id="stats">
+<div class="stat"><b id="scoreEl">0</b><span>SCORE</span></div>
+<div class="stat"><b id="streakEl">0</b><span>STREAK</span></div>
+<div class="stat timer" id="timerStat"><b id="timerEl">60</b><span>SECONDS</span></div>
+<div class="stat"><b id="roundEl">1</b><span>ROUND</span></div>
+</div>
+<div id="main">
+<div class="cubeCard">
+<div class="cubeVis"><div class="cube"><div class="face front">s</div><div class="face back"></div><div class="face right"></div><div class="face left"></div><div class="face top"></div><div class="face bottom"></div></div></div>
+<div class="sideLabel">s = <span id="sideEl">5</span></div>
+<div class="question">What is the volume? <b>V = s³</b></div>
+<div style="font-size:11px;color:#64748b;margin-top:4px">Type the exact volume</div>
+</div>
+<div id="answerBox">
+<input id="answerInput" type="text" inputmode="numeric" placeholder="Enter volume" autocomplete="off">
+<button id="submitBtn">ENTER ↵</button>
+</div>
+<div id="feedback" class="neutral">60 seconds — as many exact hits as you can!</div>
+<div id="keypad">
+<button class="kbtn" data-k="1">1</button><button class="kbtn" data-k="2">2</button><button class="kbtn" data-k="3">3</button>
+<button class="kbtn" data-k="4">4</button><button class="kbtn" data-k="5">5</button><button class="kbtn" data-k="6">6</button>
+<button class="kbtn" data-k="7">7</button><button class="kbtn" data-k="8">8</button><button class="kbtn" data-k="9">9</button>
+<button class="kbtn clear" data-k="clear">⌫</button><button class="kbtn" data-k="0">0</button><button class="kbtn action" data-k="enter">↵</button>
+</div>
+</div>
+<div id="controls">
+<button class="cbtn sec" id="retryBtn">REPLAY ↺</button>
+<button class="cbtn pri" id="startBtn">START 60S</button>
+</div>
+<div id="modal"><div class="modalBox">
+<h2 id="modalTitle">Time Up!</h2>
+<div class="stars" id="modalStars">★★★</div>
+<p id="modalMsg" style="color:#64748b;font-size:13px"></p>
+<button class="cbtn pri" id="modalReplay" style="width:100%;margin-top:10px;background:#0f172a;color:#fff">REPLAY INSTANTLY</button>
+<button class="cbtn sec" id="modalClose" style="width:100%;margin-top:6px;background:#f1f5f9;color:#0f172a;border:1px solid #e2e8f0">Close</button>
+</div></div>
+<script>
+const KEY='cubeVolumeBest_v1';
+let best=parseInt(localStorage.getItem(KEY)||'0',10);
+document.getElementById('totalBest').textContent='BEST '+best;
+
+let side=5, volume=125, score=0, streak=0, round=1, timer=60, timerInt=null, running=false;
+
+function randSide(){
+ // 2-20, weighted to smaller for speed but include larger for challenge
+ const r=Math.random();
+ if(r<0.5) return 2+Math.floor(Math.random()*9); // 2-10
+ if(r<0.8) return 11+Math.floor(Math.random()*5); // 11-15
+ return 16+Math.floor(Math.random()*5); // 16-20
+}
+function newRound(){
+ side=randSide();
+ volume=side*side*side;
+ document.getElementById('sideEl').textContent=side;
+ document.getElementById('roundEl').textContent=round;
+ document.getElementById('answerInput').value='';
+ document.getElementById('answerInput').focus();
+}
+function updateHUD(){
+ document.getElementById('scoreEl').textContent=score;
+ document.getElementById('streakEl').textContent=streak;
+ document.getElementById('timerEl').textContent=timer;
+ if(timer<=10) document.getElementById('timerStat').classList.add('warn');
+ else document.getElementById('timerStat').classList.remove('warn');
+}
+function startGame(){
+ score=0; streak=0; round=1; timer=60; running=true;
+ document.getElementById('startBtn').textContent='RUNNING…';
+ document.getElementById('startBtn').disabled=true;
+ document.getElementById('feedback').className='neutral';
+ document.getElementById('feedback').textContent='Go! Type s³ and hit Enter.';
+ newRound(); updateHUD();
+ clearInterval(timerInt);
+ timerInt=setInterval(()=>{
+  timer--;
+  updateHUD();
+  if(timer<=0){ endGame(); }
+ },1000);
+}
+function endGame(){
+ running=false;
+ clearInterval(timerInt);
+ document.getElementById('startBtn').textContent='START 60S';
+ document.getElementById('startBtn').disabled=false;
+ if(score>best){ best=score; localStorage.setItem(KEY,String(best)); document.getElementById('totalBest').textContent='BEST '+best; }
+ let stars=0;
+ if(score>=15) stars=3;
+ else if(score>=8) stars=2;
+ else if(score>=3) stars=1;
+ document.getElementById('modalTitle').textContent='Time Up!';
+ document.getElementById('modalStars').textContent=stars?'★'.repeat(stars)+'☆'.repeat(3-stars):'—';
+ document.getElementById('modalMsg').textContent=`Score ${score} exact hits in 60s. Best: ${best}. ${stars===3?'Cube master!':stars===2?'Sharp!':stars===1?'Keep practicing.':'Try again!'}`;
+ document.getElementById('modal').classList.add('show');
+}
+function submit(){
+ if(!running) { startGame(); return; }
+ const val=document.getElementById('answerInput').value.trim();
+ if(!val) return;
+ const num=parseInt(val,10);
+ const fb=document.getElementById('feedback');
+ if(num===volume){
+  streak++;
+  let pts=1;
+  if(streak>=3) pts=2;
+  if(streak>=5) pts=3;
+  score+=pts;
+  fb.className='correct';
+  fb.textContent=`✓ ${side}³ = ${volume} — +${pts} ${streak>=3?'🔥 streak x'+streak:''}`;
+  round++;
+  newRound();
+ } else {
+  streak=0;
+  fb.className='wrong';
+  fb.textContent=`✕ ${side}³ = ${volume}, you typed ${num} — try next!`;
+  round++;
+  newRound();
+ }
+ updateHUD();
+}
+
+document.getElementById('submitBtn').onclick=submit;
+document.getElementById('answerInput').addEventListener('keydown',e=>{
+ if(e.key==='Enter'){ e.preventDefault(); submit(); }
+});
+document.getElementById('startBtn').onclick=startGame;
+document.getElementById('retryBtn').onclick=startGame;
+document.getElementById('modalReplay').onclick=()=>{ document.getElementById('modal').classList.remove('show'); startGame(); };
+document.getElementById('modalClose').onclick=()=>document.getElementById('modal').classList.remove('show');
+document.querySelectorAll('.kbtn').forEach(b=>{
+ b.addEventListener('click',()=>{
+  const k=b.dataset.k;
+  const inp=document.getElementById('answerInput');
+  if(k==='clear'){ inp.value=inp.value.slice(0,-1); }
+  else if(k==='enter'){ submit(); }
+  else { inp.value+=k; }
+  inp.focus();
+ });
+});
+
+// init
+newRound(); updateHUD();
+</script>
+</body>
+</html>

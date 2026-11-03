@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bookmark Reading Log</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#170f09;color:#f7ecdd}
+.wrap{max-width:430px;margin:0 auto;padding:16px 16px 40px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:22px;margin:0}
+.mutebtn{min-width:44px;min-height:44px;border-radius:12px;background:#2a1c11;color:#fff;font-size:19px;cursor:pointer;border:1px solid #4a3826}
+.streak{background:#2a1c11;border:1px solid #4a3826;border-radius:16px;padding:14px;margin:12px 0;text-align:center;font-size:15px}
+.streak b{font-size:26px;color:#fbbf24}
+.card{background:#2a1c11;border:1px solid #4a3826;border-radius:16px;padding:14px;margin:12px 0}
+label{font-size:13px;opacity:.85}
+input{width:100%;min-height:48px;border-radius:12px;border:1px solid #4a3826;background:#170f09;color:#fff;font-size:16px;padding:0 12px;margin:4px 0 8px}
+.row2{display:flex;gap:8px}.row2 div{flex:1;min-width:0}
+button.add{width:100%;min-height:52px;border-radius:14px;border:none;background:#f59e0b;color:#2a1a05;font-size:17px;font-weight:800;cursor:pointer}
+.book{background:#170f09;border:1px solid #4a3826;border-radius:12px;padding:12px;margin:8px 0}
+.book .top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.book b{font-size:16px}
+.bar{height:12px;border-radius:7px;background:#2a1c11;border:1px solid #4a3826;margin:8px 0;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#f59e0b,#fde68a)}
+.pct{font-size:13px;opacity:.85}
+.logrow{display:flex;gap:8px;margin-top:8px}
+.logrow input{flex:1;margin:0}
+.logrow button{flex:1;min-height:48px;border-radius:12px;border:none;background:#d97706;color:#fff;font-size:15px;font-weight:700;cursor:pointer}
+.fin{margin-top:6px;font-size:13px;color:#4ade80;font-weight:700}
+.del{min-width:44px;min-height:44px;border-radius:10px;border:1px solid #5b2323;background:transparent;color:#f87171;font-size:16px;cursor:pointer}
+.shelf{font-size:14px}
+.shelf li{margin:6px 0;list-style:none}
+.shelf ul{padding:0;margin:6px 0}
+.empty{text-align:center;opacity:.65;padding:14px;font-size:14px}
+h2{font-size:16px;margin:4px 0 8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>Bookmark Log</h1><button class="mutebtn" id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="streak" id="streak">🔥 <b>0</b> day streak</div>
+<div class="card">
+<h2>Add a book</h2>
+<label for="titleIn">Title</label><input id="titleIn" maxlength="40" placeholder="e.g. The Salt Path">
+<div class="row2">
+<div><label for="totalIn">Total pages</label><input id="totalIn" type="number" min="1" value="300"></div>
+<div><label for="curIn">Starting page</label><input id="curIn" type="number" min="0" value="0"></div>
+</div>
+<button class="add" id="addBtn">Add book</button>
+</div>
+<div class="card"><h2>Currently reading</h2><div id="reading"></div></div>
+<div class="card shelf"><h2>Finished shelf 🏆</h2><ul id="shelf"></ul></div>
+</div>
+<script>
+(function(){
+"use strict";
+var K="reading-log-v1",MK="reading-log-mute";
+var store={books:[],days:{}};try{var s=JSON.parse(localStorage.getItem(K)||"{}");if(Array.isArray(s.books))store.books=s.books;if(s.days)store.days=s.days;}catch(e){}
+var muted=localStorage.getItem(MK)==="1",AC=null;
+var muteBtn=document.getElementById("muteBtn");
+function click(f){if(muted)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume();var o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.frequency.value=f||700;var t=AC.currentTime;g.gain.setValueAtTime(0.07,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.07);o.start(t);o.stop(t+0.07);}catch(e){}}
+function save(){localStorage.setItem(K,JSON.stringify(store));}
+muteBtn.textContent=muted?"🔇":"🔊";
+muteBtn.addEventListener("click",function(){muted=!muted;localStorage.setItem(MK,muted?"1":"0");muteBtn.textContent=muted?"🔇":"🔊";click(700);});
+function todayStr(){return new Date().toISOString().slice(0,10);}
+function streak(){var n=0,d=new Date();if(!store.days[d.toISOString().slice(0,10)])d.setDate(d.getDate()-1);while(store.days[d.toISOString().slice(0,10)]){n++;d.setDate(d.getDate()-1);}return n;}
+function render(){
+var st=streak();
+document.getElementById("streak").innerHTML="🔥 <b>"+st+"</b> day streak · "+Object.keys(store.days).length+" active days";
+var reading=document.getElementById("reading");
+var cur=store.books.filter(function(b){return b.cur<b.total;});
+reading.innerHTML=cur.length?"":'<div class="empty">Nothing in progress. Add a book above.</div>';
+cur.forEach(function(b){
+var idx=store.books.indexOf(b);
+var pct=Math.min(100,Math.round(b.cur/b.total*100));
+var d=document.createElement("div");d.className="book";
+var t=document.createElement("div");t.className="top";
+var nm=document.createElement("b");nm.textContent=b.title;t.appendChild(nm);
+var del=document.createElement("button");del.className="del";del.textContent="✕";del.setAttribute("aria-label","Remove book");
+del.addEventListener("click",function(){if(confirm("Remove "+store.books[idx].title+"?")){click(440);store.books.splice(idx,1);save();render();}});
+t.appendChild(del);d.appendChild(t);
+var bar=document.createElement("div");bar.className="bar";var fill=document.createElement("i");fill.style.width=pct+"%";bar.appendChild(fill);d.appendChild(bar);
+var p=document.createElement("div");p.className="pct";p.textContent="Page "+b.cur+" of "+b.total+" · "+pct+"%";d.appendChild(p);
+var row=document.createElement("div");row.className="logrow";
+var inp=document.createElement("input");inp.type="number";inp.min="1";inp.placeholder="Pages read";inp.setAttribute("aria-label","Pages read");
+var btn=document.createElement("button");btn.textContent="Log pages";
+btn.addEventListener("click",function(){
+var n=+inp.value;if(!(n>0)){alert("Enter pages read.");return;}
+click(880);store.books[idx].cur=Math.min(store.books[idx].total,store.books[idx].cur+n);
+store.days[todayStr()]=true;save();render();
+});
+row.appendChild(inp);row.appendChild(btn);d.appendChild(row);
+if(store.books[idx].cur>=store.books[idx].total){var f=document.createElement("div");f.className="fin";f.textContent="Finished! Moved to your shelf.";d.appendChild(f);}
+reading.appendChild(d);
+});
+var shelf=document.getElementById("shelf");
+var done=store.books.filter(function(b){return b.cur>=b.total;});
+shelf.innerHTML=done.length?"":"<li style='opacity:.6'>No finished books yet — finish one to claim your trophy.</li>";
+done.forEach(function(b){
+var li=document.createElement("li");li.textContent="🏆 "+b.title+" ("+b.total+" pages)";shelf.appendChild(li);
+});
+}
+document.getElementById("addBtn").addEventListener("click",function(){
+var t=document.getElementById("titleIn").value.trim();
+if(!t){alert("Enter a book title.");return;}
+var total=Math.max(1,+document.getElementById("totalIn").value||300);
+var cur=Math.min(total,Math.max(0,+document.getElementById("curIn").value||0));
+click(880);store.books.push({title:t.slice(0,40),total:total,cur:cur});
+document.getElementById("titleIn").value="";save();render();
+});
+render();
+})();
+</script>
+</body>
+</html>

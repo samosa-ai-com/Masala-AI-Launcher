@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Blackout Memory Match</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0a0e1a;display:flex;justify-content:center;-webkit-tap-highlight-color:transparent}
+.app{width:100%;max-width:428px;min-width:360px;min-height:100vh;background:radial-gradient(ellipse at 50% 0%,#1a233a 0%,#0f1420 40%,#080a12 100%);display:flex;flex-direction:column;position:relative;overflow:hidden}
+.app::before{content:"";position:absolute;top:0;left:0;right:0;height:180px;background:radial-gradient(ellipse at 70% 20%,#ffd70015 0%,transparent 50%),radial-gradient(ellipse at 20% 30%,#4a6fa515 0%,transparent 40%);pointer-events:none}
+.stars{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.stars::before{content:"✦ ✧ ✦  ✧  ✦ ✧  ✦   ✧ ✦  ✧ ✦ ✧  ✦  ✧ ✦ ✦  ✧  ✦ ✧ ✦  ✧ ✦ ✧  ✦ ✧";position:absolute;top:12px;left:0;right:0;text-align:center;font-size:10px;color:#fff;opacity:0.15;letter-spacing:4px;white-space:nowrap}
+.header{padding:12px 16px 8px;text-align:center;position:relative;z-index:2}
+.header h1{font-size:19px;font-weight:900;color:#e8e8ff;letter-spacing:1px;text-shadow:0 0 12px #6a7bff60,0 2px 4px #0008;line-height:1.1}
+.header h1 span{color:#ffd700;text-shadow:0 0 10px #ffd70080}
+.sub{font-size:10px;color:#a0a8c0;letter-spacing:1px;margin-top:4px;font-weight:600}
+.best-badge{position:absolute;right:10px;top:10px;background:#1a233a;border:1px solid #6a7bff40;color:#a0a8ff;padding:4px 8px;border-radius:8px;font-size:10px;font-weight:800;box-shadow:0 2px 8px #0004}
+.best-badge b{color:#ffd700}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:8px 12px;position:relative;z-index:2}
+.stat{background:#1a233a;border:1px solid #6a7bff20;border-radius:10px;padding:6px 8px;text-align:center;box-shadow:0 2px 8px #0003}
+.stat-label{font-size:9px;color:#a0a8c0;letter-spacing:0.8px;font-weight:800}
+.stat-val{font-size:16px;font-weight:900;color:#e8e8ff;text-shadow:0 0 6px #6a7bff40}
+.stat-val.score{color:#ffd700;text-shadow:0 0 6px #ffd70040}
+.stat-val.streak{color:#6a7bff}
+.preview-bar{margin:0 12px;height:10px;background:#0f1420;border:1px solid #6a7bff30;border-radius:999px;overflow:hidden;position:relative;z-index:2}
+.preview-fill{height:100%;background:linear-gradient(90deg,#ffd700,#ffaa00);width:100%;transition:width 0.1s linear;box-shadow:0 0 8px #ffd70060}
+.preview-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;text-shadow:0 1px 2px #000;letter-spacing:0.5px}
+.blackout-banner{margin:8px 12px;background:linear-gradient(90deg,#1a0a1a,#2a0a2a);border:1px solid #ff1744;color:#ff6b6b;padding:8px 12px;border-radius:10px;text-align:center;font-size:12px;font-weight:900;letter-spacing:1px;box-shadow:0 0 12px #ff174430;display:none;position:relative;z-index:2;animation:bannerPulse 1s infinite alternate}
+.blackout-banner.show{display:block}
+@keyframes bannerPulse{from{box-shadow:0 0 12px #ff174430}to{box-shadow:0 0 20px #ff174460}}
+.grid-wrap{flex:1;padding:10px 12px;display:flex;flex-direction:column;align-items:center;position:relative;z-index:2}
+.grid{display:grid;gap:8px;width:100%;max-width:360px;transition:all 0.3s}
+.card{position:relative;aspect-ratio:1;min-height:56px;background:linear-gradient(180deg,#1e2a4a,#0f1420);border:2px solid #6a7bff30;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:28px;cursor:pointer;touch-action:manipulation;box-shadow:0 3px 10px #0004,inset 0 1px 4px #fff1;transition:all 0.3s;transform-style:preserve-3d;user-select:none}
+.card.flipped{background:linear-gradient(180deg,#fff,#e8e8ff);border-color:#6a7bff;color:#1a233a;transform:rotateY(0);box-shadow:0 4px 12px #0003,0 0 12px #6a7bff30}
+.card.matched{background:linear-gradient(180deg,#ffd700,#ffaa00);border-color:#ffd700;color:#1a0a00;box-shadow:0 0 16px #ffd70080,0 4px 12px #0003;transform:scale(1.02)}
+.card.matched::after{content:"✓";position:absolute;top:4px;right:6px;font-size:10px;color:#1a0a00;font-weight:900}
+.card.blackout{background:linear-gradient(180deg,#0a0e1a,#05070f);border-color:#ff174430;color:transparent;box-shadow:inset 0 2px 8px #0008}
+.card.blackout.flipped{background:linear-gradient(180deg,#1e2a4a,#0f1420);border-color:#6a7bff60;color:#e8e8ff}
+.card:active{transform:scale(0.96)}
+.card-back{font-size:16px;color:#6a7bff60}
+.controls{display:flex;gap:8px;padding:10px 12px;position:relative;z-index:2}
+.btn{flex:1;min-height:48px;border:none;border-radius:12px;font-size:13px;font-weight:900;cursor:pointer;touch-action:manipulation;box-shadow:0 3px 8px #0003;display:flex;align-items:center;justify-content:center;gap:6px;letter-spacing:0.3px}
+.btn-primary{background:linear-gradient(180deg,#6a7bff,#4a5bd0);color:#fff;border:1px solid #6a7bff;box-shadow:0 0 12px #6a7bff40}
+.btn-primary:active{transform:scale(0.98)}
+.btn-secondary{background:#1a233a;color:#a0a8ff;border:1px solid #6a7bff30}
+.btn-hint{background:linear-gradient(180deg,#ffd700,#ffaa00);color:#1a0a00;border:1px solid #ffd700}
+.btn:disabled{opacity:0.5;pointer-events:none}
+.hint{text-align:center;font-size:10px;color:#a0a8c0;padding:0 12px 6px;line-height:1.4;position:relative;z-index:2}
+.feedback{margin:0 12px;min-height:32px;background:#1a233a;border:1px solid #6a7bff20;border-radius:10px;padding:8px 12px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;text-align:center;position:relative;z-index:2}
+.feedback.good{color:#6a7bff;border-color:#6a7bff;background:#6a7bff10;box-shadow:0 0 8px #6a7bff20}
+.feedback.bad{color:#ff6b6b;border-color:#ff1744;background:#ff174410}
+.feedback.bonus{color:#ffd700;border-color:#ffd700;background:#ffd70010;box-shadow:0 0 8px #ffd70020}
+.overlay{position:absolute;inset:0;background:#000a;backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:20}
+.card-modal{background:#0f1420;border:1px solid #6a7bff40;border-radius:16px;padding:18px 16px;text-align:center;width:100%;max-width:340px;box-shadow:0 0 24px #6a7bff20,0 12px 32px #0008}
+.card-modal h2{font-size:18px;color:#e8e8ff;text-shadow:0 0 8px #6a7bff60;margin-bottom:8px}
+.card-modal p{font-size:12px;color:#a0a8c0;line-height:1.5;margin-bottom:10px}
+.card-modal .big{font-size:32px;font-weight:900;color:#ffd700;text-shadow:0 0 12px #ffd70060;margin:8px 0}
+.card-modal .row{display:flex;gap:8px;margin-top:12px}
+.shake{animation:screenShake 0.35s}
+@keyframes screenShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+.float{position:absolute;left:50%;top:30%;transform:translateX(-50%);font-size:14px;font-weight:900;color:#fff;text-shadow:0 1px 0 #000,0 2px 6px #0005;pointer-events:none;animation:floatUp 0.9s ease-out forwards;z-index:12;white-space:nowrap}
+.float.good{color:#6a7bff}
+.float.bad{color:#ff6b6b}
+.float.bonus{color:#ffd700;background:#1a233a;padding:2px 8px;border-radius:999px;font-size:12px;box-shadow:0 2px 8px #0003}
+@keyframes floatUp{0%{transform:translateX(-50%) translateY(0) scale(1);opacity:1}100%{transform:translateX(-50%) translateY(-44px) scale(1.08);opacity:0}}
+.confetti{position:absolute;width:8px;height:8px;pointer-events:none;z-index:15;animation:confettiFall 1s ease-out forwards}
+@keyframes confettiFall{0%{transform:translateY(0) rotate(0) scale(1);opacity:1}100%{transform:translateY(120px) rotate(720deg) scale(0.5);opacity:0}}
+.vignette{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 40%,#0008 100%);pointer-events:none;opacity:0;transition:opacity 0.5s;z-index:1}
+.vignette.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="stars"></div>
+  <div class="vignette" id="vignette"></div>
+  <div class="header">
+    <h1>◢ BLACKOUT <span>MATCH</span> ◣</h1>
+    <div class="sub">MOODY NIGHT — MEMORIZE BEFORE DARK</div>
+    <div class="best-badge">BEST R<b id="bestRound">0</b> • <b id="bestScore">0</b> PTS</div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-label">ROUND</div><div class="stat-val" id="roundVal">1</div></div>
+    <div class="stat"><div class="stat-label">SCORE</div><div class="stat-val score" id="scoreVal">0</div></div>
+    <div class="stat"><div class="stat-label">STREAK</div><div class="stat-val streak" id="streakVal">0</div></div>
+  </div>
+  <div class="preview-bar" id="previewBar"><div class="preview-fill" id="previewFill"></div><div class="preview-label" id="previewLabel">☀ LIGHTS ON — MEMORIZE!</div></div>
+  <div class="blackout-banner" id="blackoutBanner">🌑 BLACKOUT! PLAY FROM MEMORY 🌑</div>
+
+  <div class="grid-wrap">
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="feedback" id="feedback">Memorize the cards before blackout!</div>
+
+  <div class="controls">
+    <button class="btn btn-hint" id="hintBtn">💡 HINT (-30)</button>
+    <button class="btn btn-primary" id="startBtn">▶ START ROUND</button>
+    <button class="btn btn-secondary" id="resetBtn">↻ RESET</button>
+  </div>
+  <div class="hint">💡 Lights on 3s preview → Blackout! Matched pairs stay lit as anchors • Hint reveals a pair (3/round)</div>
+
+  <div class="overlay" id="overlay">
+    <div class="card-modal" id="cardModal">
+      <h2>🌙 Welcome to the Night</h2>
+      <p>Flip pairs to match symbols. After preview, <b style="color:#ff6b6b">lights go out</b> — hidden cards force you to play from memory!</p>
+      <p style="font-size:11px;background:#6a7bff10;padding:8px;border-radius:8px;border:1px solid #6a7bff20">Grid grows each round: 3×2 → 4×3 → 4×4 → 5×4 → 6×4 → 6×5<br>Match = +100 + streak×12 • Miss = -10 • Round clear = +300 + time bonus<br>Best round & score saved</p>
+      <div class="row"><button class="btn btn-primary" style="flex:1" id="playBtn">🌙 ENTER THE NIGHT</button></div>
+      <p style="margin-top:8px;font-size:10px;opacity:0.6">Moody night visuals • Round-clear fanfare</p>
+    </div>
+  </div>
+</div>
+<script>
+const gridEl=document.getElementById('grid');
+const roundVal=document.getElementById('roundVal');
+const scoreVal=document.getElementById('scoreVal');
+const streakVal=document.getElementById('streakVal');
+const bestRoundEl=document.getElementById('bestRound');
+const bestScoreEl=document.getElementById('bestScore');
+const previewBar=document.getElementById('previewBar');
+const previewFill=document.getElementById('previewFill');
+const previewLabel=document.getElementById('previewLabel');
+const blackoutBanner=document.getElementById('blackoutBanner');
+const vignette=document.getElementById('vignette');
+const feedbackEl=document.getElementById('feedback');
+const hintBtn=document.getElementById('hintBtn');
+const startBtn=document.getElementById('startBtn');
+const resetBtn=document.getElementById('resetBtn');
+const playBtn=document.getElementById('playBtn');
+const overlay=document.getElementById('overlay');
+const cardModal=document.getElementById('cardModal');
+const appEl=document.getElementById('app');
+
+let round=1, score=0, bestRound=0, bestScore=0, streak=0, maxStreak=0;
+let gameState='idle', cards=[], flipped=[], matched=[], canFlip=false, hintCount=0;
+let previewTimer=null, previewDur=3000, roundStartTime=0;
+
+const SYMBOLS=['🌙','⭐','🌟','🌲','🦉','🍄','🔮','🌊','🍂','🦊','🌸','🎃','🌌','🕯️','🦇','🌾','🍁','🌼','🐺','🦌','🌿','🍃','🌺','🌻','🌹','🌷','🍀','🌴','🌵','🎋'];
+
+try{
+  bestRound=parseInt(localStorage.getItem('blackoutBestRound')||'0')||0;
+  bestScore=parseInt(localStorage.getItem('blackoutBestScore')||'0')||0;
+}catch(e){}
+bestRoundEl.textContent=bestRound;
+bestScoreEl.textContent=bestScore;
+
+function getLevel(r){
+  const presets=[
+    {cols:3,rows:2,pairs:3},
+    {cols:4,rows:3,pairs:6},
+    {cols:4,rows:4,pairs:8},
+    {cols:5,rows:4,pairs:10},
+    {cols:6,rows:4,pairs:12},
+    {cols:6,rows:5,pairs:15},
+  ];
+  if(r<=presets.length) return presets[r-1];
+  const base=presets[presets.length-1];
+  const extra=Math.floor((r-presets.length)/1.5);
+  const cols=Math.min(6, base.cols+extra);
+  const rows=Math.min(6, base.rows+extra);
+  let pairs=Math.floor(cols*rows/2);
+  if((cols*rows)%2!==0) pairs=Math.floor(cols*rows/2);
+  return {cols,rows,pairs};
+}
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+function generateCards(pairs){
+  const syms=shuffle([...SYMBOLS]).slice(0,pairs);
+  const deck=[];
+  syms.forEach(s=>{deck.push(s);deck.push(s)});
+  return shuffle(deck);
+}
+
+function buildGrid(){
+  const level=getLevel(round);
+  gridEl.style.gridTemplateColumns=`repeat(${level.cols},1fr)`;
+  gridEl.innerHTML='';
+  cards.forEach((sym,idx)=>{
+    const c=document.createElement('button');
+    c.className='card';
+    c.dataset.idx=idx;
+    c.setAttribute('aria-label','Card '+(idx+1));
+    c.innerHTML='<span class="card-back">?</span>';
+    c.addEventListener('click',()=>handleFlip(idx));
+    gridEl.appendChild(c);
+  });
+  // font size scaling
+  const total=level.cols*level.rows;
+  const size= total>20?22: total>12?26:28;
+  gridEl.querySelectorAll('.card').forEach(c=>c.style.fontSize=size+'px');
+}
+
+function updateUI(){
+  roundVal.textContent=round;
+  scoreVal.textContent=score;
+  streakVal.textContent=streak;
+  if(round>bestRound){bestRound=round;bestRoundEl.textContent=bestRound;try{localStorage.setItem('blackoutBestRound',bestRound)}catch(e){}}
+  if(score>bestScore){bestScore=score;bestScoreEl.textContent=bestScore;try{localStorage.setItem('blackoutBestScore',bestScore)}catch(e){}}
+  hintBtn.disabled=hintCount>=3 || gameState!=='playing' || !canFlip;
+  hintBtn.textContent=`💡 HINT (-30) ${3-hintCount} left`;
+}
+
+function showFeedback(msg,type){
+  feedbackEl.textContent=msg;
+  feedbackEl.className='feedback '+(type||'');
+  if(type==='bad'){appEl.classList.remove('shake');void appEl.offsetWidth;appEl.classList.add('shake');if(navigator.vibrate) navigator.vibrate(60)}
+  else if(type==='good'||type==='bonus'){if(navigator.vibrate) navigator.vibrate(25)}
+}
+
+function showFloat(text,cls,parent){
+  const p=parent||gridEl;
+  const f=document.createElement('div');
+  f.className='float '+cls;
+  f.textContent=text;
+  p.appendChild(f);
+  setTimeout(()=>f.remove(),900);
+}
+
+function confettiBurst(){
+  for(let i=0;i<20;i++){
+    const c=document.createElement('div');
+    c.className='confetti';
+    c.style.left=(15+Math.random()*70)+'%';
+    c.style.top='45%';
+    c.style.background=['#ffd700','#6a7bff','#ff6b6b','#4caf50','#ff9800'][Math.floor(Math.random()*5)];
+    c.style.animationDelay=(Math.random()*0.3)+'s';
+    gridEl.appendChild(c);
+    setTimeout(()=>c.remove(),1200);
+  }
+}
+
+function playFanfare(){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const notes=[261.63,329.63,392,523.25];
+    notes.forEach((freq,i)=>{
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type='triangle'; o.frequency.value=freq;
+      g.gain.setValueAtTime(0.3, ctx.currentTime+i*0.12);
+      g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+i*0.12+0.4);
+      o.connect(g).connect(ctx.destination);
+      o.start(ctx.currentTime+i*0.12); o.stop(ctx.currentTime+i*0.12+0.4);
+    });
+  }catch(e){}
+}
+
+function startRound(){
+  const level=getLevel(round);
+  cards=generateCards(level.pairs);
+  flipped=[]; matched=[]; canFlip=false; hintCount=0;
+  gameState='playing';
+  roundStartTime=Date.now();
+  buildGrid();
+  updateUI();
+  startBtn.textContent='⏸ PAUSE';
+  previewBar.style.display='block';
+  blackoutBanner.classList.remove('show');
+  vignette.classList.remove('show');
+  previewLabel.textContent='☀ LIGHTS ON — MEMORIZE!';
+  previewFill.style.width='100%';
+  previewFill.style.background='linear-gradient(90deg,#ffd700,#ffaa00)';
+  // show all flipped
+  gridEl.querySelectorAll('.card').forEach((c,i)=>{
+    c.classList.add('flipped');
+    c.innerHTML=cards[i];
+  });
+  showFeedback(`Round ${round} — Memorize ${level.pairs} pairs!`, 'good');
+  // preview countdown
+  let elapsed=0;
+  const interval=50;
+  previewTimer=setInterval(()=>{
+    elapsed+=interval;
+    const pct=Math.max(0,1-elapsed/previewDur);
+    previewFill.style.width=(pct*100)+'%';
+    if(pct<=0){
+      clearInterval(previewTimer);
+      blackout();
+    }
+  },interval);
+}
+
+function blackout(){
+  // flip all back
+  gridEl.querySelectorAll('.card').forEach(c=>{
+    c.classList.remove('flipped');
+    c.innerHTML='<span class="card-back">?</span>';
+  });
+  previewLabel.textContent='🌑 BLACKOUT! PLAY FROM MEMORY';
+  previewFill.style.width='100%';
+  previewFill.style.background='linear-gradient(90deg,#ff1744,#d50000)';
+  blackoutBanner.classList.add('show');
+  vignette.classList.add('show');
+  appEl.classList.remove('shake');void appEl.offsetWidth;appEl.classList.add('shake');
+  if(navigator.vibrate) navigator.vibrate([60,30,60]);
+  showFeedback('🌑 BLACKOUT! Find pairs from memory', 'bad');
+  canFlip=true;
+  updateUI();
+  // hide preview bar after 2s
+  setTimeout(()=>{
+    previewBar.style.display='none';
+    blackoutBanner.classList.remove('show');
+  },2000);
+}
+
+function handleFlip(idx){
+  if(!canFlip || gameState!=='playing') return;
+  if(flipped.includes(idx) || matched.includes(idx)) return;
+  if(flipped.length>=2) return;
+  const cardEl=gridEl.children[idx];
+  cardEl.classList.add('flipped');
+  cardEl.innerHTML=cards[idx];
+  // if blackout, add blackout flipped style
+  if(vignette.classList.contains('show')) cardEl.classList.add('blackout');
+  flipped.push(idx);
+  if(flipped.length===2){
+    canFlip=false;
+    setTimeout(checkMatch,600);
+  }
+}
+
+function checkMatch(){
+  const [a,b]=flipped;
+  const symA=cards[a], symB=cards[b];
+  const elA=gridEl.children[a], elB=gridEl.children[b];
+  if(symA===symB){
+    // match
+    matched.push(a,b);
+    elA.classList.add('matched');
+    elB.classList.add('matched');
+    const pts=100+streak*12;
+    score+=pts;
+    streak++; maxStreak=Math.max(maxStreak,streak);
+    showFloat(`+${pts}`, 'good', elA);
+    showFeedback(`✓ MATCH! +${pts} (streak x${streak})`, streak>=3?'bonus':'good');
+    if(navigator.vibrate) navigator.vibrate(30);
+    flipped=[];
+    canFlip=true;
+    updateUI();
+    // check round clear
+    if(matched.length===cards.length){
+      const timeBonus=Math.max(0, 300 - Math.floor((Date.now()-roundStartTime)/100));
+      score+=300+timeBonus;
+      showFeedback(`🎉 ROUND CLEAR! +${300+timeBonus} bonus`, 'bonus');
+      confettiBurst();
+      playFanfare();
+      if(navigator.vibrate) navigator.vibrate([40,30,40,30,60]);
+      updateUI();
+      canFlip=false;
+      setTimeout(()=>{
+        round++;
+        startRound();
+      },1800);
+    }
+  } else {
+    // mismatch
+    score=Math.max(0,score-10);
+    streak=0;
+    showFloat('-10', 'bad', elA);
+    showFeedback('✗ No match — try again', 'bad');
+    if(navigator.vibrate) navigator.vibrate(60);
+    updateUI();
+    setTimeout(()=>{
+      elA.classList.remove('flipped','blackout');
+      elB.classList.remove('flipped','blackout');
+      elA.innerHTML='<span class="card-back">?</span>';
+      elB.innerHTML='<span class="card-back">?</span>';
+      flipped=[];
+      canFlip=true;
+    },700);
+  }
+}
+
+function hint(){
+  if(hintCount>=3 || !canFlip) return;
+  // find unmatched pair
+  const unmatched=cards.map((s,i)=>({s,i})).filter(x=>!matched.includes(x.i));
+  const groups={};
+  unmatched.forEach(x=>{if(!groups[x.s]) groups[x.s]=[]; groups[x.s].push(x.i)});
+  const pairKey=Object.keys(groups).find(k=>groups[k].length===2);
+  if(!pairKey) return;
+  const [i1,i2]=groups[pairKey];
+  hintCount++;
+  score=Math.max(0,score-30);
+  // briefly show
+  [i1,i2].forEach(idx=>{
+    const el=gridEl.children[idx];
+    el.classList.add('flipped');
+    el.innerHTML=cards[idx];
+    el.style.boxShadow='0 0 16px #ffd700';
+  });
+  showFeedback(`💡 Hint: ${pairKey} pair revealed! -30`, 'bonus');
+  updateUI();
+  setTimeout(()=>{
+    [i1,i2].forEach(idx=>{
+      if(!matched.includes(idx) && !flipped.includes(idx)){
+        const el=gridEl.children[idx];
+        el.classList.remove('flipped');
+        el.innerHTML='<span class="card-back">?</span>';
+        el.style.boxShadow='';
+      }
+    });
+  },900);
+}
+
+function startGame(){
+  round=1; score=0; streak=0; maxStreak=0;
+  gameState='playing';
+  overlay.style.display='none';
+  startRound();
+}
+function pauseGame(){
+  if(gameState==='playing'){
+    gameState='paused';
+    clearInterval(previewTimer);
+    canFlip=false;
+    overlay.style.display='flex';
+    cardModal.innerHTML=`<h2>⏸ Paused</h2><p>Night is waiting — Round ${round} • ${score} pts • Streak ${streak}</p><div class="row"><button class="btn btn-primary" style="flex:1" onclick="resumeGame()">▶ RESUME</button><button class="btn btn-secondary" style="flex:1" onclick="resetGame()">↻ RESET</button></div>`;
+    startBtn.textContent='▶ RESUME';
+  } else if(gameState==='paused'){
+    resumeGame();
+  }
+}
+window.resumeGame=()=>{
+  if(gameState!=='paused') return;
+  gameState='playing';
+  overlay.style.display='none';
+  startBtn.textContent='⏸ PAUSE';
+  canFlip=true;
+  // if still in preview, restart preview timer? simplified: go to blackout
+  if(previewBar.style.display!=='none' && !vignette.classList.contains('show')){
+    // resume preview
+    let elapsed=previewDur*(1-parseFloat(previewFill.style.width)/100);
+    previewTimer=setInterval(()=>{
+      elapsed+=50;
+      const pct=Math.max(0,1-elapsed/previewDur);
+      previewFill.style.width=(pct*100)+'%';
+      if(pct<=0){clearInterval(previewTimer);blackout()}
+    },50);
+  }
+};
+window.resetGame=()=>{
+  clearInterval(previewTimer);
+  round=1; score=0; streak=0; maxStreak=0; flipped=[]; matched=[]; canFlip=false; hintCount=0; gameState='idle';
+  gridEl.innerHTML='';
+  previewBar.style.display='block';
+  previewFill.style.width='100%';
+  previewFill.style.background='linear-gradient(90deg,#ffd700,#ffaa00)';
+  previewLabel.textContent='☀ LIGHTS ON — MEMORIZE!';
+  blackoutBanner.classList.remove('show');
+  vignette.classList.remove('show');
+  feedbackEl.textContent='Memorize the cards before blackout!';
+  feedbackEl.className='feedback';
+  updateUI();
+  overlay.style.display='flex';
+  cardModal.innerHTML=`<h2>🌙 Welcome to the Night</h2><p>Flip pairs to match symbols. After preview, <b style="color:#ff6b6b">lights go out</b> — hidden cards force you to play from memory!</p><p style="font-size:11px;background:#6a7bff10;padding:8px;border-radius:8px;border:1px solid #6a7bff20">Grid grows each round: 3×2 → 4×3 → 4×4 → 5×4 → 6×4 → 6×5<br>Match = +100 + streak×12 • Miss = -10 • Round clear = +300 + time bonus<br>Best round & score saved</p><div class="row"><button class="btn btn-primary" style="flex:1" id="playBtn2">🌙 ENTER THE NIGHT</button></div><p style="margin-top:8px;font-size:10px;opacity:0.6">Best: Round ${bestRound} • ${bestScore} pts</p>`;
+  document.getElementById('playBtn2').addEventListener('click', startGame);
+  startBtn.textContent='▶ START ROUND';
+};
+
+hintBtn.addEventListener('click', hint);
+startBtn.addEventListener('click', ()=>{
+  if(gameState==='idle') startGame();
+  else if(gameState==='playing') pauseGame();
+  else if(gameState==='paused') resumeGame();
+});
+resetBtn.addEventListener('click', resetGame);
+playBtn.addEventListener('click', startGame);
+
+updateUI();
+</script>
+</body>
+</html>
+

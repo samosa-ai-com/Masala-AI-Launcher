@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Carnival Toss Park Pop</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:#0a3d1f;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center;min-height:100vh}
+.app{width:100%;max-width:428px;min-width:360px;background:#0e6a32;min-height:100vh;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.topbar{background:#fff8e1;border-bottom:4px solid #ffb703;padding:10px 12px 8px;display:flex;flex-direction:column;gap:8px}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.logo{display:flex;align-items:center;gap:8px}
+.logo-badge{width:38px;height:38px;background:#0e6a32;border:3px solid #ffb703;border-radius:10px;display:grid;place-items:center;font-size:20px;transform:rotate(-3deg)}
+.logo h1{margin:0;font-size:18px;line-height:1;color:#0a3d1f;letter-spacing:0.5px;font-weight:900;text-transform:uppercase}
+.logo h1 span{color:#d90429}
+.sub{font-size:11px;color:#5a3e00;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;margin-top:2px}
+.score-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.stat{background:#0e6a32;border:2px solid #ffb703;border-radius:12px;padding:7px 6px;text-align:center;color:#fff;position:relative;overflow:hidden}
+.stat::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,0.12),transparent);pointer-events:none}
+.stat-label{font-size:10px;letter-spacing:0.8px;text-transform:uppercase;opacity:0.9;font-weight:800}
+.stat-val{font-size:20px;font-weight:900;line-height:1;margin-top:2px}
+.stat-val.score{color:#ffd60a;text-shadow:0 1px 0 #000}
+.stat-val.time{color:#fff}
+.stat-val.best{color:#a8e6a0}
+.bunting-wrap{background:#0e6a32;padding:0 0 6px;position:relative}
+.bunting{display:flex;justify-content:center;gap:0;padding:0 8px}
+.flag{width:28px;height:18px;clip-path:polygon(0 0,100% 0,50% 100%);margin:0 -1px}
+.flag:nth-child(1){background:#e63946}
+.flag:nth-child(2){background:#ffd60a}
+.flag:nth-child(3){background:#fff8e1}
+.flag:nth-child(4){background:#219ebc}
+.flag:nth-child(5){background:#e63946}
+.flag:nth-child(6){background:#ffd60a}
+.flag:nth-child(7){background:#fff8e1}
+.flag:nth-child(8){background:#219ebc}
+.flag:nth-child(9){background:#e63946}
+.flag:nth-child(10){background:#ffd60a}
+.flag:nth-child(11){background:#fff8e1}
+.flag:nth-child(12){background:#219ebc}
+.field-wrap{padding:10px 12px 12px;background:linear-gradient(180deg,#0e6a32 0%,#0a5c2e 100%);flex:1;display:flex;flex-direction:column;gap:10px}
+.field{position:relative;width:100%;height:420px;background:
+ radial-gradient(circle at 20% 20%,rgba(255,255,255,0.12) 0 2px,transparent 3px),
+ radial-gradient(circle at 80% 30%,rgba(255,255,255,0.10) 0 2px,transparent 3px),
+ radial-gradient(circle at 50% 80%,rgba(255,255,255,0.08) 0 2px,transparent 3px),
+ linear-gradient(180deg,#2a9d5c 0%,#1a8a4a 45%,#0f7a3d 100%);
+border:4px solid #ffb703;border-radius:18px;overflow:hidden;box-shadow:inset 0 0 0 3px #fff8e1, 0 8px 18px rgba(0,0,0,0.35);touch-action:manipulation}
+.field::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 18px,rgba(255,255,255,0.04) 18px 19px);pointer-events:none}
+.field::after{content:"POP!";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-8deg);font-size:64px;font-weight:900;color:rgba(255,255,255,0.07);letter-spacing:4px;pointer-events:none}
+.grass{position:absolute;bottom:0;left:0;right:0;height:22px;background:repeating-linear-gradient(90deg,#0a5c2e 0 10px,#0e6a32 10px 20px);border-top:3px solid #ffb703;opacity:0.9}
+.target{position:absolute;width:72px;height:72px;border-radius:50%;border:3px solid #fff;box-shadow:0 4px 10px rgba(0,0,0,0.35), inset 0 2px 0 rgba(255,255,255,0.6);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;user-select:none;touch-action:manipulation;transition:transform 0.12s ease, filter 0.12s;will-change:transform,left,top}
+.target:active{transform:scale(0.92)}
+.target-emoji{font-size:30px;line-height:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.4))}
+.target-points{font-size:11px;font-weight:900;color:#fff;background:rgba(0,0,0,0.55);padding:1px 6px;border-radius:20px;margin-top:2px;line-height:1.2;letter-spacing:0.3px}
+.target.pop{animation:pop 0.32s ease}
+@keyframes pop{0%{transform:scale(1)}30%{transform:scale(1.25) rotate(4deg)}100%{transform:scale(1)}}
+.target.hit{animation:hit 0.28s ease}
+@keyframes hit{0%{transform:scale(1)}50%{transform:scale(0.85)}100%{transform:scale(1)}}
+.floating{position:absolute;left:50%;top:0;transform:translateX(-50%);font-weight:900;font-size:18px;color:#ffd60a;text-shadow:0 2px 0 #000,0 0 8px rgba(255,214,10,0.8);pointer-events:none;animation:floatUp 0.7s ease forwards;z-index:5}
+@keyframes floatUp{0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}100%{opacity:0;transform:translateX(-50%) translateY(-42px) scale(1.15)}}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 2px}
+.btn{height:48px;border-radius:14px;border:3px solid #ffb703;font-size:16px;font-weight:900;letter-spacing:0.4px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;touch-action:manipulation;user-select:none}
+.btn:active{transform:scale(0.98)}
+.btn-primary{background:#e63946;color:#fff;box-shadow:0 4px 0 #9d0208}
+.btn-secondary{background:#fff8e1;color:#0a3d1f;box-shadow:0 4px 0 #c9a700}
+.btn:disabled{opacity:0.55;pointer-events:none}
+.hint{color:#fff8e1;text-align:center;font-size:13px;font-weight:700;line-height:1.3;padding:2px 6px;background:rgba(0,0,0,0.18);border-radius:10px;border:1px dashed rgba(255,183,3,0.6)}
+.overlay{position:absolute;inset:0;background:rgba(10,61,31,0.88);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+.card{background:#fff8e1;border:4px solid #ffb703;border-radius:18px;padding:16px 14px;width:100%;max-width:340px;text-align:center;box-shadow:0 10px 24px rgba(0,0,0,0.4)}
+.card h2{margin:0 0 6px;font-size:22px;color:#0a3d1f;font-weight:900;text-transform:uppercase;letter-spacing:0.5px}
+.card p{margin:0 0 12px;font-size:14px;color:#5a3e00;line-height:1.4;font-weight:600}
+.badges{display:flex;justify-content:center;gap:8px;margin:10px 0 14px;flex-wrap:wrap}
+.badge{width:56px;height:56px;border-radius:50%;border:3px solid #fff;display:grid;place-items:center;font-size:26px;box-shadow:0 3px 8px rgba(0,0,0,0.25)}
+.badge small{display:block;font-size:10px;font-weight:900;color:#fff;background:rgba(0,0,0,0.6);padding:1px 5px;border-radius:10px;margin-top:1px}
+.card .btn{width:100%;height:52px;font-size:17px;margin-top:4px}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.mini-stat{background:#0e6a32;color:#fff;border-radius:12px;padding:8px;border:2px solid #ffb703}
+.mini-stat div:first-child{font-size:10px;letter-spacing:0.7px;text-transform:uppercase;opacity:0.9;font-weight:800}
+.mini-stat div:last-child{font-size:18px;font-weight:900;margin-top:2px}
+.confetti{position:absolute;width:8px;height:8px;pointer-events:none;z-index:6;animation:conf 0.6s ease forwards}
+@keyframes conf{0%{transform:translateY(0) rotate(0deg);opacity:1}100%{transform:translateY(80px) rotate(180deg);opacity:0}}
+.footer{padding:8px 12px 12px;text-align:center;color:rgba(255,248,225,0.85);font-size:11px;font-weight:700;letter-spacing:0.4px}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">
+        <div class="logo-badge">🎪</div>
+        <div>
+          <h1>Carnival <span>Toss</span></h1>
+          <div class="sub">Park-Green Prize Pop • Tap to Score</div>
+        </div>
+      </div>
+      <div style="font-size:20px">🎯</div>
+    </div>
+    <div class="score-row">
+      <div class="stat"><div class="stat-label">Score</div><div class="stat-val score" id="scoreVal">0</div></div>
+      <div class="stat"><div class="stat-label">Time</div><div class="stat-val time" id="timeVal">30s</div></div>
+      <div class="stat"><div class="stat-label">Best</div><div class="stat-val best" id="bestVal">0</div></div>
+    </div>
+  </div>
+  <div class="bunting-wrap"><div class="bunting"><div class="flag"></div><div class="flag"></div><div class="flag"></div><div class="flag"></div><div class="flag"></div><div class="flag"></div><div class="flag"></div><div class="flag"></div><div class="flag"></div><div class="flag"></div><div class="flag"></div><div class="flag"></div></div></div>
+  <div class="field-wrap">
+    <div class="field" id="field">
+      <div class="grass"></div>
+    </div>
+    <div class="controls">
+      <button class="btn btn-primary" id="restartBtn">↻ Restart</button>
+      <button class="btn btn-secondary" id="pauseBtn">⏸ Pause</button>
+    </div>
+    <div class="hint">Tap any prize — it scores and instantly reshuffles to a new spot! Different prizes = different points.</div>
+  </div>
+  <div class="footer">Large 72px targets • No zoom needed • 360–428px portrait perfect</div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="card">
+      <h2>🎪 Step Right Up!</h2>
+      <p>Prize targets pop up around the field.<br>Tap fast — each hit scores and reshuffles!</p>
+      <div class="badges">
+        <div class="badge" style="background:#ffbe0b">🧸<small>+10</small></div>
+        <div class="badge" style="background:#fb5607">🦆<small>+20</small></div>
+        <div class="badge" style="background:#8338ec">⭐<small>+30</small></div>
+      </div>
+      <div class="stats-grid">
+        <div class="mini-stat"><div>Best Score</div><div id="cardBest">0</div></div>
+        <div class="mini-stat"><div>Last Score</div><div id="cardLast">—</div></div>
+      </div>
+      <button class="btn btn-primary" id="playBtn">▶ Play 30s Round</button>
+      <p style="font-size:11px;margin-top:8px;opacity:0.8">Tip: Use two thumbs for faster taps!</p>
+    </div>
+  </div>
+
+  <div class="overlay" id="endOverlay" style="display:none">
+    <div class="card">
+      <h2 id="endTitle">Time's Up!</h2>
+      <p id="endMsg">Great tossing!</p>
+      <div class="stats-grid">
+        <div class="mini-stat"><div>Score</div><div id="endScore">0</div></div>
+        <div class="mini-stat"><div>Best</div><div id="endBest">0</div></div>
+      </div>
+      <button class="btn btn-primary" id="againBtn">↻ Play Again</button>
+      <button class="btn btn-secondary" id="homeBtn" style="margin-top:8px;height:46px">⌂ Menu</button>
+    </div>
+  </div>
+</div>
+<script>
+const field=document.getElementById('field');
+const scoreVal=document.getElementById('scoreVal');
+const timeVal=document.getElementById('timeVal');
+const bestVal=document.getElementById('bestVal');
+const startOverlay=document.getElementById('startOverlay');
+const endOverlay=document.getElementById('endOverlay');
+const playBtn=document.getElementById('playBtn');
+const againBtn=document.getElementById('againBtn');
+const homeBtn=document.getElementById('homeBtn');
+const restartBtn=document.getElementById('restartBtn');
+const pauseBtn=document.getElementById('pauseBtn');
+const cardBest=document.getElementById('cardBest');
+const cardLast=document.getElementById('cardLast');
+const endScore=document.getElementById('endScore');
+const endBest=document.getElementById('endBest');
+const endTitle=document.getElementById('endTitle');
+const endMsg=document.getElementById('endMsg');
+
+const PRIZES=[
+  {emoji:'🧸', points:10, bg:'#ffbe0b', border:'#ff9f1c'},
+  {emoji:'🦆', points:20, bg:'#fb5607', border:'#ff7b00'},
+  {emoji:'⭐', points:30, bg:'#8338ec', border:'#5a189a'},
+  {emoji:'🎈', points:15, bg:'#06d6a0', border:'#118ab2'},
+  {emoji:'🍭', points:25, bg:'#ef476f', border:'#d90429'}
+];
+
+let score=0, best=parseInt(localStorage.getItem('carnivalBest')||'0',10), last=parseInt(localStorage.getItem('carnivalLast')||'0',10);
+let timeLeft=30, timer=null, playing=false, paused=false;
+let targets=[];
+
+function updateHUD(){
+  scoreVal.textContent=score;
+  timeVal.textContent=timeLeft+'s';
+  bestVal.textContent=best;
+  cardBest.textContent=best;
+  cardLast.textContent= last ? last : '—';
+  if(timeLeft<=10) timeVal.style.color='#ff6b6b'; else timeVal.style.color='#fff';
+}
+
+function randPos(){
+  const fw=field.clientWidth, fh=field.clientHeight;
+  const size=72, pad=6, grassH=22;
+  const x=Math.floor(Math.random()*(fw - size - pad*2)) + pad;
+  const y=Math.floor(Math.random()*(fh - size - grassH - pad*2)) + pad;
+  return {x,y};
+}
+
+function nonOverlappingPos(existing){
+  for(let tries=0; tries<30; tries++){
+    const p=randPos();
+    let ok=true;
+    for(const e of existing){
+      const dx=(e.x - p.x), dy=(e.y - p.y);
+      if(Math.hypot(dx,dy) < 78) { ok=false; break; }
+    }
+    if(ok) return p;
+  }
+  return randPos();
+}
+
+function createTarget(prize, pos){
+  const el=document.createElement('button');
+  el.className='target';
+  el.style.left=pos.x+'px';
+  el.style.top=pos.y+'px';
+  el.style.background=prize.bg;
+  el.style.borderColor='#fff';
+  el.setAttribute('aria-label','Prize '+prize.emoji+' '+prize.points+' points');
+  el.innerHTML=`<span class="target-emoji">${prize.emoji}</span><span class="target-points">+${prize.points}</span>`;
+  el._prize=prize;
+  el._pos=pos;
+  el.addEventListener('click', onHit);
+  el.addEventListener('touchstart', (e)=>{e.preventDefault(); onHit.call(el,e)}, {passive:false});
+  return el;
+}
+
+function spawnTargets(){
+  field.querySelectorAll('.target').forEach(n=>n.remove());
+  targets=[];
+  const count=3;
+  const used=[];
+  for(let i=0;i<count;i++){
+    const prize=PRIZES[Math.floor(Math.random()*PRIZES.length)];
+    const pos=nonOverlappingPos(used);
+    used.push(pos);
+    const el=createTarget(prize,pos);
+    field.appendChild(el);
+    targets.push(el);
+    // entrance pop
+    el.classList.add('pop');
+    setTimeout(()=>el.classList.remove('pop'),320);
+  }
+}
+
+function reshuffleOne(el){
+  const others=targets.filter(t=>t!==el).map(t=>t._pos);
+  const newPrize=PRIZES[Math.floor(Math.random()*PRIZES.length)];
+  const newPos=nonOverlappingPos(others);
+  el._prize=newPrize;
+  el._pos=newPos;
+  el.style.background=newPrize.bg;
+  el.querySelector('.target-emoji').textContent=newPrize.emoji;
+  el.querySelector('.target-points').textContent='+'+newPrize.points;
+  el.style.left=newPos.x+'px';
+  el.style.top=newPos.y+'px';
+  el.classList.remove('pop');
+  void el.offsetWidth;
+  el.classList.add('pop');
+  setTimeout(()=>el.classList.remove('pop'),320);
+}
+
+function showFloating(el, pts){
+  const f=document.createElement('div');
+  f.className='floating';
+  f.textContent='+'+pts;
+  f.style.left=(el._pos.x + 36)+'px';
+  f.style.top=(el._pos.y + 8)+'px';
+  field.appendChild(f);
+  setTimeout(()=>f.remove(),700);
+}
+
+function burstConfetti(x,y){
+  const colors=['#ffb703','#e63946','#fff8e1','#06d6a0','#8338ec'];
+  for(let i=0;i<6;i++){
+    const c=document.createElement('div');
+    c.className='confetti';
+    c.style.left=(x+36 + (Math.random()*20-10))+'px';
+    c.style.top=(y+36)+'px';
+    c.style.background=colors[Math.floor(Math.random()*colors.length)];
+    c.style.transform=`rotate(${Math.random()*360}deg)`;
+    c.style.borderRadius=Math.random()>0.5?'50%':'2px';
+    field.appendChild(c);
+    setTimeout(()=>c.remove(),600);
+  }
+}
+
+let audioCtx=null;
+function ensureAudio(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+}
+function tone(freq, dur, type='sine', gain=0.18){
+  try{
+    ensureAudio();
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.value=gain;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+dur);
+    o.stop(audioCtx.currentTime+dur);
+  }catch(e){}
+}
+function hitSound(pts){
+  if(pts>=30) { tone(880,0.12,'square',0.16); setTimeout(()=>tone(1100,0.12,'square',0.14),90); }
+  else if(pts>=20) { tone(660,0.14,'triangle',0.18); }
+  else { tone(520,0.12,'sine',0.18); }
+}
+function endSound(win){
+  if(win){ tone(523,0.18,'sine',0.2); setTimeout(()=>tone(659,0.18,'sine',0.2),140); setTimeout(()=>tone(784,0.28,'sine',0.22),280); }
+  else { tone(220,0.3,'sawtooth',0.15); setTimeout(()=>tone(180,0.4,'sawtooth',0.12),200); }
+}
+
+function onHit(e){
+  if(!playing || paused) return;
+  const el=this;
+  const pts=el._prize.points;
+  score+=pts;
+  updateHUD();
+  hitSound(pts);
+  if(navigator.vibrate) navigator.vibrate(20);
+  el.classList.add('hit');
+  showFloating(el, pts);
+  burstConfetti(el._pos.x, el._pos.y);
+  setTimeout(()=>el.classList.remove('hit'),280);
+  // reshuffle this one after tiny delay for feedback
+  setTimeout(()=>reshuffleOne(el),120);
+}
+
+function startTimer(){
+  clearInterval(timer);
+  timer=setInterval(()=>{
+    if(paused) return;
+    timeLeft--;
+    updateHUD();
+    if(timeLeft<=0){
+      clearInterval(timer);
+      finishGame();
+    } else if(timeLeft<=5){
+      tone(900,0.08,'square',0.08);
+    }
+  },1000);
+}
+
+function startGame(){
+  score=0; timeLeft=30; playing=true; paused=false;
+  pauseBtn.textContent='⏸ Pause';
+  updateHUD();
+  spawnTargets();
+  startOverlay.style.display='none';
+  endOverlay.style.display='none';
+  startTimer();
+  ensureAudio();
+}
+
+function finishGame(){
+  playing=false;
+  clearInterval(timer);
+  last=score;
+  localStorage.setItem('carnivalLast', String(last));
+  let isBest=false;
+  if(score>best){ best=score; localStorage.setItem('carnivalBest', String(best)); isBest=true; }
+  updateHUD();
+  endScore.textContent=score;
+  endBest.textContent=best;
+  if(isBest){ endTitle.textContent='🎉 New Best!'; endMsg.textContent='You topped the carnival leaderboard!'; endSound(true); }
+  else if(score>=200){ endTitle.textContent='🌟 Carnival Star!'; endMsg.textContent='Amazing tossing — crowd goes wild!'; endSound(true); }
+  else if(score>=100){ endTitle.textContent="Time's Up!"; endMsg.textContent='Great hustle — try to beat '+best+'!'; endSound(false); }
+  else { endTitle.textContent="Time's Up!"; endMsg.textContent='Nice try — tap faster next round!'; endSound(false); }
+  endOverlay.style.display='flex';
+  if(navigator.vibrate) navigator.vibrate([30,40,30]);
+}
+
+function goMenu(){
+  clearInterval(timer);
+  playing=false; paused=false;
+  timeLeft=30;
+  updateHUD();
+  endOverlay.style.display='none';
+  startOverlay.style.display='flex';
+  // reset field preview
+  spawnTargets();
+}
+
+playBtn.addEventListener('click', startGame);
+againBtn.addEventListener('click', startGame);
+homeBtn.addEventListener('click', goMenu);
+restartBtn.addEventListener('click', ()=>{
+  if(playing) startGame(); else goMenu();
+});
+pauseBtn.addEventListener('click', ()=>{
+  if(!playing) return;
+  paused=!paused;
+  pauseBtn.textContent= paused ? '▶ Resume' : '⏸ Pause';
+  if(paused) tone(400,0.12,'sine',0.12); else tone(600,0.12,'sine',0.12);
+});
+
+// initial
+updateHUD();
+spawnTargets();
+// prevent double-tap zoom on field
+field.addEventListener('touchend', e=>e.preventDefault(), {passive:false});
+</script>
+</body>
+</html>

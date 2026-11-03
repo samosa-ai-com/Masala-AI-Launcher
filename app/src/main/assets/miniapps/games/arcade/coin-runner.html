@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Sky Brick Hop</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden;background:#87CEEB;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif;color:#1a1a2e}
+body{display:flex;justify-content:center;background:radial-gradient(900px 600px at 50% -10%, #a8e0ff 0%, #87CEEB 50%, #6ec1e8 100%)}
+.app{width:100%;max-width:428px;min-height:100dvh;display:flex;flex-direction:column;position:relative;overflow:hidden;background:#87CEEB;border-left:1px solid rgba(0,0,0,0.08);border-right:1px solid rgba(0,0,0,0.08)}
+header{padding:10px 12px 8px;display:flex;justify-content:space-between;align-items:center;gap:8px;background:rgba(255,255,255,0.85);backdrop-filter:blur(8px);border-bottom:2px solid #d94e2b}
+.logo{display:flex;align-items:center;gap:8px}
+.logo-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#FF6B35,#d94e2b);display:grid;place-items:center;font-size:18px;box-shadow:0 3px 10px rgba(217,78,43,0.4);border:2px solid #fff}
+.logo h1{font-size:13px;letter-spacing:0.06em;font-weight:900;line-height:1;color:#1a1a2e}
+.logo p{font-size:9px;letter-spacing:0.1em;color:#7a829e;font-weight:800}
+.hud{display:flex;gap:6px}
+.pill{background:#fff;border:2px solid #d94e2b;padding:5px 8px;border-radius:999px;text-align:center;min-width:56px;box-shadow:0 2px 6px rgba(0,0,0,0.08)}
+.pill span{font-size:8px;letter-spacing:0.08em;color:#7a829e;display:block;font-weight:800}
+.pill strong{font-size:13px;color:#1a1a2e}
+.pill.coins strong{color:#d94e2b}
+.pill.best strong{color:#7B61FF}
+.game-wrap{flex:1;padding:8px 10px;display:flex;flex-direction:column;gap:8px;min-height:0}
+.game-card{position:relative;background:linear-gradient(180deg, #87CEEB 0%, #a8e0ff 40%, #c8eaff 70%, #e0f2ff 100%);border:3px solid #d94e2b;border-radius:16px;overflow:hidden;flex:1;min-height:380px;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.6)}
+.game-top{padding:6px 10px;display:flex;justify-content:space-between;align-items:center;font-size:9px;letter-spacing:0.08em;color:#fff;font-weight:800;background:#d94e2b}
+.game-top .live{display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:#FFD93D;box-shadow:0 0 8px #FFD93D;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+canvas{width:100%;height:100%;display:block;flex:1;touch-action:none}
+.controls{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;align-items:end;padding:8px 10px;pointer-events:none;z-index:3}
+.pad-group{display:flex;gap:8px;pointer-events:auto}
+.pad-btn{width:62px;height:62px;border-radius:16px;background:rgba(255,255,255,0.92);border:3px solid #d94e2b;display:grid;place-items:center;font-size:22px;box-shadow:0 4px 12px rgba(0,0,0,0.15);cursor:pointer;user-select:none;touch-action:manipulation}
+.pad-btn:active{transform:scale(0.94);background:#fff}
+.pad-btn.jump{width:72px;height:72px;background:linear-gradient(135deg,#FFD93D,#FF6B35);border-color:#d94e2b;font-size:26px}
+.hud-bar{position:absolute;top:32px;left:0;right:0;display:flex;justify-content:space-between;padding:6px 10px;pointer-events:none;z-index:3}
+.hud-box{background:rgba(255,255,255,0.92);border:2px solid #d94e2b;padding:5px 8px;border-radius:10px;text-align:center;min-width:64px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.hud-box span{font-size:8px;letter-spacing:0.06em;color:#7a829e;display:block;font-weight:800}
+.hud-box strong{font-size:14px;color:#1a1a2e}
+.info-bar{padding:8px 12px;background:#fff;border:2px solid #d94e2b;border-radius:12px;display:flex;justify-content:space-between;align-items:center}
+.info-bar b{font-size:11px;letter-spacing:0.06em;color:#1a1a2e}
+.info-bar span{font-size:11px;font-weight:800;color:#d94e2b}
+.btn{height:44px;border-radius:12px;border:2px solid #d94e2b;background:#fff;color:#1a1a2e;font-weight:800;font-size:12px;letter-spacing:0.04em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+.btn.primary{background:linear-gradient(135deg,#FFD93D,#FF6B35);color:#1a0f00;border-color:#d94e2b;box-shadow:0 4px 12px rgba(217,78,43,0.3)}
+.btn:active{transform:scale(0.98)}
+.overlay{position:absolute;inset:0;background:rgba(135,206,235,0.88);backdrop-filter:blur(10px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;z-index:10}
+.overlay h2{font-size:24px;letter-spacing:0.02em;margin-bottom:6px;color:#1a1a2e;text-shadow:0 2px 0 #fff}
+.overlay p{color:#2a3a4a;font-size:12px;line-height:1.5;max-width:300px;margin-bottom:10px;font-weight:600}
+.overlay .big{font-size:38px;font-weight:900;color:#d94e2b;margin:6px 0;text-shadow:0 2px 0 #fff}
+.badge-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:8px 0}
+.mini-badge{background:#fff;border:2px solid #d94e2b;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800;box-shadow:0 2px 6px rgba(0,0,0,0.08)}
+.mini-badge b{color:#d94e2b}
+.hint{font-size:10px;letter-spacing:0.06em;color:#5a6a7a;margin-top:6px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+<div class="logo"><div class="logo-mark">🧱</div><div><h1>SKY HOP</h1><p>BRICK RUN</p></div></div>
+<div class="hud">
+<div class="pill coins"><span>COINS</span><strong id="coinsEl">0/10</strong></div>
+<div class="pill best"><span>BEST</span><strong id="bestEl">—</strong></div>
+</div>
+</header>
+
+<div class="game-wrap">
+<div class="game-card" id="gameCard">
+<div class="game-top"><span class="live"><span class="dot"></span> SKY WORLD 1-1</span><span id="scoreLabel">SCORE 0</span></div>
+<canvas id="c" width="400" height="420"></canvas>
+<div class="hud-bar">
+<div class="hud-box"><span>COINS</span><strong id="hudCoins">0/10</strong></div>
+<div class="hud-box"><span>SCORE</span><strong id="hudScore">0</strong></div>
+</div>
+<div class="controls">
+<div class="pad-group">
+<div class="pad-btn" id="leftBtn">◀</div>
+<div class="pad-btn" id="rightBtn">▶</div>
+</div>
+<div class="pad-group">
+<div class="pad-btn jump" id="jumpBtn">⤒</div>
+</div>
+</div>
+
+<div class="overlay" id="startOverlay">
+<h2 style="color:#d94e2b">SKY BRICK HOP!</h2>
+<p>Hop across <b>floating brick platforms</b> and collect all <b style="color:#d94e2b">10 coins</b>! Don't fall — a fall costs the run!</p>
+<div class="badge-row">
+<div class="mini-badge">🪙 10 coins</div>
+<div class="mini-badge">🧱 Brick style</div>
+<div class="mini-badge">🎮 Arrows + tap</div>
+</div>
+<button class="btn primary" style="min-width:160px;height:44px;margin-top:8px" id="playBtn">▶ START RUN</button>
+<div class="hint">Use ◀ ▶ to move, ⤒ to jump • Collect all 10 to win!</div>
+</div>
+
+<div class="overlay" id="winOverlay" style="display:none">
+<h2 style="color:#00C851">YOU WIN! 🎉</h2>
+<div class="big" id="winScore">1000</div>
+<p id="winMsg">All 10 coins collected!</p>
+<div class="badge-row">
+<div class="mini-badge">COINS <b id="winCoins">10/10</b></div>
+<div class="mini-badge">SCORE <b id="winScore2">1000</b></div>
+<div class="mini-badge">BEST <b id="winBest">1000</b></div>
+</div>
+<button class="btn primary" style="min-width:160px;height:44px;margin-top:10px" id="againBtn">↻ PLAY AGAIN</button>
+<button class="btn" style="min-width:160px;margin-top:8px" id="shareBtn">SHARE SCORE</button>
+</div>
+
+<div class="overlay" id="loseOverlay" style="display:none">
+<h2 style="color:#d94e2b">FELL! 💥</h2>
+<p>You fell off the platforms. Try again!</p>
+<div class="badge-row">
+<div class="mini-badge">COINS <b id="loseCoins">0/10</b></div>
+<div class="mini-badge">SCORE <b id="loseScore">0</b></div>
+</div>
+<button class="btn primary" style="min-width:160px;height:44px;margin-top:10px" id="retryBtn">↻ TRY AGAIN</button>
+</div>
+</div>
+
+<div class="info-bar">
+<b>🎯 Collect all 10 coins to win!</b><span id="infoCoins">0/10</span>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+const coinsEl=document.getElementById('coinsEl'), bestEl=document.getElementById('bestEl'), hudCoins=document.getElementById('hudCoins'), hudScore=document.getElementById('hudScore'), scoreLabel=document.getElementById('scoreLabel'), infoCoins=document.getElementById('infoCoins');
+const startOverlay=document.getElementById('startOverlay'), winOverlay=document.getElementById('winOverlay'), loseOverlay=document.getElementById('loseOverlay');
+
+let best=0, score=0, coins=0, isPlaying=false, keys={}, touchLeft=false, touchRight=false;
+let player, platforms=[], coinObjs=[], particles=[], camera={x:0,y:0}, levelW=1200, levelH=480;
+let audioCtx=null;
+
+function loadBest(){ try{ best=parseInt(localStorage.getItem('skyHopBest')||'0'); if(best) bestEl.textContent=best; }catch(e){} }
+loadBest();
+function saveBest(){ try{ localStorage.setItem('skyHopBest', String(best)); }catch(e){} }
+function ensureAudio(){ if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}} if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume(); }
+function beep(f,d,v,t){ if(!audioCtx) return; const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type=t||'sine'; o.frequency.value=f; g.gain.value=v||0.15; o.connect(g); g.connect(audioCtx.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+d); o.stop(audioCtx.currentTime+d); }
+
+function resizeCanvas(){
+  const rect=canvas.getBoundingClientRect();
+  const dpr=Math.min(2, window.devicePixelRatio||1);
+  canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function createLevel(){
+  platforms=[];
+  coinObjs=[];
+  // ground
+  platforms.push({x:0,y:420,w:1200,h:60, type:'ground'});
+  // floating platforms - designed to be hop-able
+  const plats=[
+    {x:80,y:340,w:120,h:16},{x:240,y:300,w:100,h:16},{x:380,y:260,w:110,h:16},{x:540,y:220,w:100,h:16},{x:680,y:280,w:120,h:16},
+    {x:820,y:240,w:100,h:16},{x:960,y:200,w:110,h:16},{x:1080,y:260,w:90,h:16},
+    {x:160,y:200,w:80,h:16},{x:440,y:160,w:90,h:16},{x:760,y:160,w:80,h:16}
+  ];
+  plats.forEach(p=> platforms.push({...p, type:'brick'}));
+  // coins - 10 coins on platforms
+  const coinPos=[
+    {x:130,y:310},{x:285,y:270},{x:430,y:230},{x:585,y:190},{x:735,y:250},
+    {x:865,y:210},{x:1010,y:170},{x:190,y:170},{x:480,y:130},{x:790,y:130}
+  ];
+  coinPos.forEach((c,i)=> coinObjs.push({x:c.x,y:c.y,r:10,collected:false, phase:Math.random()*Math.PI*2, id:i}));
+  player={x:40,y:380,w:22,h:28,vx:0,vy:0,onGround:false, facing:1};
+  coins=0; score=0; camera.x=0;
+  updateHUD();
+}
+
+function updateHUD(){
+  coinsEl.textContent=coins+'/10'; hudCoins.textContent=coins+'/10'; infoCoins.textContent=coins+'/10';
+  hudScore.textContent=score; scoreLabel.textContent='SCORE '+score;
+  if(best) bestEl.textContent=best;
+}
+
+function startGame(){
+  ensureAudio();
+  createLevel();
+  isPlaying=true;
+  startOverlay.style.display='none'; winOverlay.style.display='none'; loseOverlay.style.display='none';
+  lastTime=performance.now();
+  requestAnimationFrame(loop);
+  beep(440,0.12,0.15,'sine');
+}
+
+function winGame(){
+  isPlaying=false;
+  score+=500; // win bonus
+  if(score>best){ best=score; saveBest(); }
+  document.getElementById('winScore').textContent=score;
+  document.getElementById('winScore2').textContent=score;
+  document.getElementById('winCoins').textContent=coins+'/10';
+  document.getElementById('winBest').textContent=best;
+  winOverlay.style.display='flex';
+  beep(880,0.2,0.18,'sine'); setTimeout(()=>beep(1100,0.3,0.15,'sine'),150);
+  if(navigator.vibrate) navigator.vibrate([40,30,60]);
+}
+function loseGame(){
+  isPlaying=false;
+  document.getElementById('loseCoins').textContent=coins+'/10';
+  document.getElementById('loseScore').textContent=score;
+  loseOverlay.style.display='flex';
+  beep(150,0.4,0.2,'sawtooth');
+  if(navigator.vibrate) navigator.vibrate([60,30,60]);
+}
+
+let lastTime=0;
+function loop(now){
+  if(!isPlaying) return;
+  const dt=Math.min(0.033, (now-lastTime)/1000);
+  lastTime=now;
+  update(dt);
+  draw(now);
+  if(isPlaying) requestAnimationFrame(loop);
+}
+
+function update(dt){
+  const gravity=0.85, jumpVel=-13, moveSpeed=3.2, friction=0.82;
+  // input
+  let move=0;
+  if(keys['ArrowLeft']||keys['a']||touchLeft) move=-1;
+  if(keys['ArrowRight']||keys['d']||touchRight) move=1;
+  if(move!==0) player.facing=move;
+
+  player.vx+= move*moveSpeed*0.25;
+  player.vx*=friction;
+  if(Math.abs(player.vx)<0.05) player.vx=0;
+  if(Math.abs(player.vx)>4) player.vx=Math.sign(player.vx)*4;
+
+  player.vy+=gravity;
+  if(player.vy>12) player.vy=12;
+
+  // horizontal move
+  player.x+=player.vx;
+  // clamp level bounds
+  if(player.x<0) player.x=0;
+  if(player.x+player.w>levelW) player.x=levelW-player.w;
+
+  // horizontal collision
+  for(const p of platforms){
+    if(player.x+player.w>p.x && player.x<p.x+p.w && player.y+player.h>p.y && player.y<p.y+p.h){
+      if(player.vx>0) player.x=p.x-player.w;
+      else if(player.vx<0) player.x=p.x+p.w;
+      player.vx=0;
+    }
+  }
+
+  // vertical move
+  player.y+=player.vy;
+  player.onGround=false;
+  for(const p of platforms){
+    if(player.x+player.w>p.x && player.x<p.x+p.w && player.y+player.h>p.y && player.y<p.y+p.h){
+      if(player.vy>0){
+        player.y=p.y-player.h;
+        player.vy=0;
+        player.onGround=true;
+      } else if(player.vy<0){
+        player.y=p.y+p.h;
+        player.vy=0;
+      }
+    }
+  }
+
+  // coins
+  coinObjs.forEach(c=>{
+    if(c.collected) return;
+    c.phase+=0.08;
+    const dx=(player.x+player.w/2)-(c.x), dy=(player.y+player.h/2)-c.y;
+    if(Math.hypot(dx,dy)<22){
+      c.collected=true;
+      coins++; score+=100;
+      updateHUD();
+      ensureAudio(); beep(880,0.12,0.18,'sine'); setTimeout(()=>beep(1100,0.08,0.12,'sine'),80);
+      if(navigator.vibrate) navigator.vibrate(20);
+      for(let i=0;i<6;i++) particles.push({x:c.x,y:c.y,vx:(Math.random()-0.5)*4,vy:-2-Math.random()*3,life:1,decay:0.05,color:'#FFD93D',size:3});
+      if(coins>=10) setTimeout(winGame, 300);
+    }
+  });
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.15; p.life-=p.decay;
+    if(p.life<=0) particles.splice(i,1);
+  }
+
+  // camera follow
+  const viewW=canvas.getBoundingClientRect().width;
+  const targetCamX=player.x - viewW*0.35;
+  camera.x += (targetCamX - camera.x)*0.08;
+  camera.x=Math.max(0, Math.min(levelW-viewW, camera.x));
+
+  // fall check
+  if(player.y>500){
+    loseGame();
+  }
+}
+
+function draw(now){
+  const w=canvas.getBoundingClientRect().width, h=canvas.getBoundingClientRect().height;
+  ctx.clearRect(0,0,w,h);
+  ctx.save();
+  ctx.translate(-camera.x,0);
+
+  // sky
+  const grad=ctx.createLinearGradient(0,0,0,h);
+  grad.addColorStop(0,'#87CEEB'); grad.addColorStop(0.5,'#a8e0ff'); grad.addColorStop(1,'#c8eaff');
+  ctx.fillStyle=grad; ctx.fillRect(camera.x,0,w,h);
+
+  // clouds
+  ctx.fillStyle='rgba(255,255,255,0.9)';
+  const cloudX=[100,350,600,850,1050];
+  cloudX.forEach((cx,i)=>{
+    const cy=60+Math.sin(now*0.0005+i)*8;
+    ctx.beginPath(); ctx.ellipse(cx,cy,30,14,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx+18,cy-6,22,10,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx-16,cy-4,18,9,0,0,Math.PI*2); ctx.fill();
+  });
+
+  // platforms
+  platforms.forEach(p=>{
+    if(p.type==='ground'){
+      // ground with grass
+      ctx.fillStyle='#5a9a3a'; ctx.fillRect(p.x,p.y,p.w,12);
+      ctx.fillStyle='#8B4513'; ctx.fillRect(p.x,p.y+12,p.w,p.h-12);
+      ctx.fillStyle='#a0522d'; 
+      for(let i=0;i<p.w;i+=20){
+        ctx.fillRect(p.x+i,p.y+12,10,8);
+      }
+      // grass blades
+      ctx.fillStyle='#7bc67a';
+      for(let i=0;i<p.w;i+=16){
+        ctx.beginPath(); ctx.moveTo(p.x+i,p.y); ctx.lineTo(p.x+i+4,p.y-6); ctx.lineTo(p.x+i+8,p.y); ctx.fill();
+      }
+    } else {
+      // brick platform
+      ctx.fillStyle='#d94e2b'; ctx.strokeStyle='#8b2e14'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.roundRect(p.x,p.y,p.w,p.h,4); ctx.fill(); ctx.stroke();
+      // brick lines
+      ctx.strokeStyle='rgba(0,0,0,0.15)'; ctx.lineWidth=1;
+      ctx.beginPath();
+      for(let bx=p.x+20; bx<p.x+p.w; bx+=20) { ctx.moveTo(bx,p.y); ctx.lineTo(bx,p.y+p.h); }
+      ctx.moveTo(p.x,p.y+p.h/2); ctx.lineTo(p.x+p.w,p.y+p.h/2);
+      ctx.stroke();
+      // highlight
+      ctx.fillStyle='rgba(255,255,255,0.2)'; ctx.fillRect(p.x,p.y,p.w,4);
+    }
+  });
+
+  // coins
+  coinObjs.forEach(c=>{
+    if(c.collected) return;
+    const bob=Math.sin(c.phase)*4;
+    ctx.save();
+    ctx.translate(c.x,c.y+bob);
+    ctx.shadowColor='#FFD93D'; ctx.shadowBlur=8;
+    ctx.fillStyle='#FFD93D'; ctx.strokeStyle='#b8860b'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(0,0,c.r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.font='900 10px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('$',0,1);
+    ctx.shadowBlur=0;
+    ctx.restore();
+  });
+
+  // player
+  ctx.save();
+  ctx.translate(player.x+player.w/2, player.y+player.h/2);
+  ctx.scale(player.facing,1);
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(0,14,8,3,0,0,Math.PI*2); ctx.fill();
+  // body
+  ctx.fillStyle='#FF6B35'; ctx.beginPath(); ctx.roundRect(-8,-10,16,14,4); ctx.fill();
+  ctx.fillStyle='#d94e2b'; ctx.fillRect(-8,-2,16,3);
+  // head
+  ctx.fillStyle='#ffcc99'; ctx.beginPath(); ctx.arc(0,-14,8,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#3e2723'; ctx.beginPath(); ctx.arc(0,-18,8,0,Math.PI,true); ctx.fill();
+  // eyes
+  ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(-3,-14,1.5,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(3,-14,1.5,0,Math.PI*2); ctx.fill();
+  // cap
+  ctx.fillStyle='#d94e2b'; ctx.beginPath(); ctx.ellipse(0,-18,9,4,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#FFD93D'; ctx.fillRect(-2,-20,4,4);
+  // legs
+  ctx.fillStyle='#1a237e'; ctx.fillRect(-6,4,5,8); ctx.fillRect(1,4,5,8);
+  ctx.fillStyle='#fff'; ctx.fillRect(-6,10,5,2); ctx.fillRect(1,10,5,2);
+  ctx.fillStyle='#d94e2b'; ctx.fillRect(-7,12,6,2); ctx.fillRect(1,12,6,2);
+  ctx.restore();
+
+  // particles
+  particles.forEach(p=>{
+    ctx.globalAlpha=p.life;
+    ctx.fillStyle=p.color; ctx.shadowColor=p.color; ctx.shadowBlur=6;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1; ctx.shadowBlur=0;
+
+  ctx.restore();
+
+  // vignette
+  ctx.fillStyle='rgba(0,0,0,0.04)'; ctx.fillRect(0,h-40,w,40);
+}
+
+function doJump(){
+  if(!isPlaying) return;
+  if(player.onGround){
+    player.vy=-13;
+    player.onGround=false;
+    ensureAudio(); beep(520,0.1,0.15,'sine');
+    if(navigator.vibrate) navigator.vibrate(15);
+  }
+}
+
+// input
+document.addEventListener('keydown', e=>{
+  keys[e.key]=true;
+  if(e.key===' '||e.key==='ArrowUp'||e.key==='w'){ e.preventDefault(); doJump(); }
+});
+document.addEventListener('keyup', e=> keys[e.key]=false);
+
+function bindPad(btn, onDown, onUp){
+  btn.addEventListener('pointerdown', e=>{ e.preventDefault(); onDown(); });
+  btn.addEventListener('pointerup', e=>{ e.preventDefault(); onUp(); });
+  btn.addEventListener('pointerleave', onUp);
+  btn.addEventListener('touchstart', e=>{ e.preventDefault(); onDown(); }, {passive:false});
+  btn.addEventListener('touchend', e=>{ e.preventDefault(); onUp(); }, {passive:false});
+}
+bindPad(document.getElementById('leftBtn'), ()=>touchLeft=true, ()=>touchLeft=false);
+bindPad(document.getElementById('rightBtn'), ()=>touchRight=true, ()=>touchRight=false);
+bindPad(document.getElementById('jumpBtn'), ()=>doJump(), ()=>{});
+
+document.getElementById('playBtn').addEventListener('click', startGame);
+document.getElementById('againBtn').addEventListener('click', startGame);
+document.getElementById('retryBtn').addEventListener('click', startGame);
+document.getElementById('shareBtn').addEventListener('click', ()=>{
+  const text=`Sky Brick Hop: ${score} pts, ${coins}/10 coins! Can you collect them all? 🧱`;
+  if(navigator.share) navigator.share({title:'Sky Brick Hop', text});
+  else navigator.clipboard.writeText(text).then(()=>{ const b=document.getElementById('shareBtn'); const o=b.textContent; b.textContent='COPIED!'; setTimeout(()=>b.textContent=o,1500); });
+});
+
+// init
+createLevel(); draw(performance.now());
+</script>
+</body>
+</html>

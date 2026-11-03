@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Flash Recall — Symbol Memory</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f6f7f9;--card:#ffffff;--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#111827;--ok:#059669;--bad:#dc2626;--chip:#f3f4f6}
+html,body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;min-height:100%}
+body{display:flex;justify-content:center}
+.wrap{width:100%;max-width:428px;min-width:360px;padding:12px 12px 20px}
+header{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.topline{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:800;font-size:16px}
+h1{font-size:16px;letter-spacing:.2px;line-height:1}
+h1 span{font-weight:400;color:var(--muted)}
+.sub{font-size:11px;color:var(--muted);margin-top:2px}
+.iconbtn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;font-size:16px}
+.stats3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
+.stat{background:var(--chip);border:1px solid var(--line);border-radius:12px;padding:8px 10px;text-align:center}
+.stat .k{font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.stat .v{font-size:18px;font-weight:800;margin-top:2px}
+.stat .v small{font-size:11px;font-weight:600;color:var(--muted)}
+.controlsTop{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.chip{height:36px;padding:0 12px;border-radius:20px;border:1px solid var(--line);background:var(--chip);font-size:13px;font-weight:600}
+.chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 4px 16px rgba(0,0,0,.06);position:relative;overflow:hidden;min-height:220px}
+.cardTop{display:flex;justify-content:space-between;align-items:center}
+.pill{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:6px 10px;border-radius:20px;background:var(--chip);border:1px solid var(--line);color:var(--muted)}
+.stage{margin-top:14px;text-align:center;padding:12px 0;min-height:120px;display:grid;place-items:center}
+.flashRow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.sym{width:56px;height:56px;border-radius:14px;background:var(--chip);border:1px solid var(--line);display:grid;place-items:center;font-size:26px;font-weight:800;transition:all .15s}
+.sym.big{width:64px;height:64px;font-size:30px}
+.sym.active{background:var(--ink);color:#fff;border-color:var(--ink);transform:scale(1.05)}
+.sym.ok{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}
+.sym.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+.prompt{font-size:13px;color:var(--muted);font-weight:600;margin-top:8px}
+.inputRow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px;min-height:48px}
+.dot{width:44px;height:44px;border-radius:12px;border:1px dashed var(--line);background:var(--chip);display:grid;place-items:center;font-size:20px}
+.dot.filled{background:#fff;border-style:solid}
+.dot.ok{border-color:#a7f3d0;background:#ecfdf5}
+.dot.bad{border-color:#fecaca;background:#fef2f2}
+.pad{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:14px}
+.pbtn{height:56px;border-radius:12px;border:1px solid var(--line);background:#fff;font-size:24px;font-weight:700;display:grid;place-items:center}
+.pbtn:active{transform:scale(.97);background:var(--chip)}
+.pbtn:disabled{opacity:.4}
+.actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
+.btn{height:44px;border-radius:12px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn:disabled{opacity:.45}
+.splits{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;margin-top:12px;box-shadow:0 2px 12px rgba(0,0,0,.04)}
+.splits h3{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.splitGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.split{background:var(--chip);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.split .k{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);font-weight:700}
+.split .v{font-size:16px;font-weight:800;margin-top:2px}
+.footer{text-align:center;font-size:11px;color:var(--muted);margin-top:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="topline">
+      <div class="brand">
+        <div class="logo">◈</div>
+        <div>
+          <h1>FLASH RECALL <span>• Symbol Memory</span></h1>
+          <div class="sub">Watch briefly → tap back in order • Minimal flashcard</div>
+        </div>
+      </div>
+      <button class="iconbtn" id="helpBtn">?</button>
+    </div>
+    <div class="stats3">
+      <div class="stat"><div class="k">Score</div><div class="v" id="scoreV">0</div></div>
+      <div class="stat"><div class="k">Streak</div><div class="v" id="streakV">0</div></div>
+      <div class="stat"><div class="k">Best</div><div class="v" id="bestV">0</div></div>
+    </div>
+    <div class="controlsTop" id="lenChips">
+      <button class="chip" data-len="3">3 symbols</button>
+      <button class="chip active" data-len="4">4 symbols</button>
+      <button class="chip" data-len="5">5 symbols</button>
+      <button class="chip" data-len="6">6 symbols</button>
+      <button class="chip" data-len="auto">Auto ↗</button>
+    </div>
+    <div class="controlsTop" id="speedChips">
+      <button class="chip active" data-speed="900">Normal</button>
+      <button class="chip" data-speed="600">Fast</button>
+      <button class="chip" data-speed="1200">Slow</button>
+    </div>
+  </header>
+
+  <div class="card" id="card">
+    <div class="cardTop">
+      <div class="pill" id="pill">Ready</div>
+      <div class="pill" id="roundPill">Round 1</div>
+    </div>
+    <div class="stage" id="stage">
+      <div class="flashRow" id="flashRow"></div>
+      <div class="prompt" id="prompt">Tap Start to begin</div>
+      <div class="inputRow" id="inputRow"></div>
+    </div>
+    <div class="pad" id="pad"></div>
+    <div class="actions">
+      <button class="btn" id="restartBtn">↻ Restart</button>
+      <button class="btn primary" id="startBtn">▶ Start</button>
+      <button class="btn" id="showBtn" disabled>👁 Show</button>
+    </div>
+  </div>
+
+  <div class="splits">
+    <h3>Session</h3>
+    <div class="splitGrid">
+      <div class="split"><div class="k">Accuracy</div><div class="v" id="accV">—</div></div>
+      <div class="split"><div class="k">Avg time</div><div class="v" id="avgV">—</div></div>
+      <div class="split"><div class="k">Rounds</div><div class="v" id="roundsV">0</div></div>
+      <div class="split"><div class="k">Level</div><div class="v" id="levelV">4</div></div>
+    </div>
+  </div>
+  <div class="footer">Minimal flashcard • 44px+ targets • 360–428px portrait • No horizontal scroll</div>
+</div>
+
+<script>
+const SYMBOLS=[
+  {id:'a', char:'●', label:'Circle'},
+  {id:'b', char:'▲', label:'Triangle'},
+  {id:'c', char:'■', label:'Square'},
+  {id:'d', char:'★', label:'Star'},
+  {id:'e', char:'◆', label:'Diamond'},
+  {id:'f', char:'♥', label:'Heart'},
+  {id:'g', char:'⬢', label:'Hex'},
+  {id:'h', char:'✦', label:'Spark'},
+];
+let state={
+  len:4, auto:false, speed:900,
+  score:0, streak:0, best:0,
+  rounds:0, correctRounds:0,
+  times:[],
+  target:[], input:[], phase:'idle', // idle, showing, input, feedback
+  round:1
+};
+const STORAGE_KEY='flashrecall_v1';
+function save(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({len:state.len, auto:state.auto, speed:state.speed, best:state.best}));
+}
+function load(){
+  try{
+    const p=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');
+    if(p.len) state.len=p.len;
+    if(p.auto) state.auto=p.auto;
+    if(p.speed) state.speed=p.speed;
+    if(p.best) state.best=p.best;
+  }catch(e){}
+}
+function randomSeq(n){
+  const arr=[];
+  for(let i=0;i<n;i++) arr.push(SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)].id);
+  return arr;
+}
+function getLen(){
+  if(!state.auto) return state.len;
+  // auto: start 3, +1 every 3 correct rounds up to 6
+  return Math.min(6, 3 + Math.floor(state.correctRounds/3));
+}
+function renderChips(){
+  document.querySelectorAll('#lenChips .chip').forEach(c=>{
+    const isAuto = c.dataset.len==='auto';
+    const active = isAuto ? state.auto : (!state.auto && parseInt(c.dataset.len)===state.len);
+    c.classList.toggle('active', active);
+  });
+  document.querySelectorAll('#speedChips .chip').forEach(c=>{
+    c.classList.toggle('active', parseInt(c.dataset.speed)===state.speed);
+  });
+  document.getElementById('levelV').textContent= getLen();
+}
+function renderPad(){
+  const pad=document.getElementById('pad');
+  pad.innerHTML='';
+  SYMBOLS.forEach(s=>{
+    const b=document.createElement('button');
+    b.className='pbtn';
+    b.textContent=s.char;
+    b.setAttribute('aria-label', s.label);
+    b.disabled = state.phase!=='input';
+    b.onclick=()=> tapSymbol(s.id);
+    pad.appendChild(b);
+  });
+}
+function renderStats(){
+  document.getElementById('scoreV').textContent=state.score;
+  document.getElementById('streakV').textContent=state.streak;
+  document.getElementById('bestV').textContent=state.best;
+  const acc = state.rounds? Math.round(state.correctRounds/state.rounds*100) : 0;
+  document.getElementById('accV').textContent= state.rounds? acc+'%' : '—';
+  document.getElementById('roundsV').textContent= state.rounds;
+  const avg = state.times.length? (state.times.reduce((a,b)=>a+b,0)/state.times.length).toFixed(1)+'s' : '—';
+  document.getElementById('avgV').textContent= avg;
+  document.getElementById('roundPill').textContent='Round '+state.round;
+}
+function renderInputDots(){
+  const row=document.getElementById('inputRow');
+  row.innerHTML='';
+  const n=getLen();
+  for(let i=0;i<n;i++){
+    const d=document.createElement('div');
+    d.className='dot';
+    if(i < state.input.length){
+      d.classList.add('filled');
+      const sym=SYMBOLS.find(s=>s.id===state.input[i]);
+      d.textContent=sym.char;
+      // instant scoring color
+      if(state.target[i]===state.input[i]) d.classList.add('ok');
+      else d.classList.add('bad');
+    }
+    row.appendChild(d);
+  }
+}
+function showFlash(){
+  const row=document.getElementById('flashRow');
+  row.innerHTML='';
+  state.target.forEach(id=>{
+    const s=SYMBOLS.find(x=>x.id===id);
+    const div=document.createElement('div');
+    div.className='sym big';
+    div.textContent=s.char;
+    row.appendChild(div);
+  });
+}
+function clearFlash(){
+  document.getElementById('flashRow').innerHTML='';
+}
+async function startRound(){
+  const n=getLen();
+  state.target=randomSeq(n);
+  state.input=[];
+  state.phase='showing';
+  document.getElementById('pill').textContent='Watch…';
+  document.getElementById('prompt').textContent='Memorize the sequence';
+  document.getElementById('showBtn').disabled=true;
+  renderPad(); renderInputDots();
+  showFlash();
+  // show duration: speed per symbol + base
+  const showTime = state.speed * 0.9 * n + 400;
+  await new Promise(r=>setTimeout(r, showTime));
+  // brief blank
+  clearFlash();
+  await new Promise(r=>setTimeout(r, 300));
+  // input phase
+  state.phase='input';
+  state._inputStart=performance.now();
+  document.getElementById('pill').textContent='Your turn';
+  document.getElementById('prompt').textContent='Tap symbols back in order';
+  document.getElementById('showBtn').disabled=false;
+  renderPad();
+}
+function tapSymbol(id){
+  if(state.phase!=='input') return;
+  state.input.push(id);
+  renderInputDots();
+  // instant scoring per tap
+  const idx=state.input.length-1;
+  const correct = state.target[idx]===id;
+  if(!correct){
+    // haptic
+    if(navigator.vibrate) navigator.vibrate(30);
+  } else {
+    if(navigator.vibrate) navigator.vibrate(10);
+  }
+  // check complete
+  if(state.input.length===state.target.length){
+    finishRound();
+  }
+}
+function finishRound(){
+  const time=(performance.now()-state._inputStart)/1000;
+  state.times.push(time);
+  state.rounds++;
+  const allCorrect = state.input.every((v,i)=> v===state.target[i]);
+  if(allCorrect){
+    state.score += 10 + (state.speed===600?5:0) + getLen()*2;
+    state.streak++;
+    state.best=Math.max(state.best, state.streak);
+    state.correctRounds++;
+    document.getElementById('pill').textContent='✓ Correct!';
+    document.getElementById('prompt').textContent=`${time.toFixed(1)}s • +${10+getLen()*2} pts`;
+    document.getElementById('pill').style.background='#ecfdf5';
+    document.getElementById('pill').style.color='#065f46';
+  } else {
+    state.score=Math.max(0, state.score-5);
+    state.streak=0;
+    document.getElementById('pill').textContent='✗ Try again';
+    document.getElementById('prompt').textContent=`Was: ${state.target.map(id=>SYMBOLS.find(s=>s.id===id).char).join(' ')}`;
+    document.getElementById('pill').style.background='#fef2f2';
+    document.getElementById('pill').style.color='#991b1b';
+  }
+  state.phase='feedback';
+  renderPad(); renderStats(); save();
+  document.getElementById('showBtn').disabled=true;
+  // auto next after delay
+  setTimeout(()=>{
+    document.getElementById('pill').style.background='';
+    document.getElementById('pill').style.color='';
+    state.round++;
+    startRound();
+  }, 1400);
+}
+function restart(){
+  state.score=0; state.streak=0; state.rounds=0; state.correctRounds=0; state.times=[]; state.round=1;
+  state.phase='idle';
+  document.getElementById('pill').textContent='Ready';
+  document.getElementById('prompt').textContent='Tap Start to begin';
+  document.getElementById('pill').style.background=''; document.getElementById('pill').style.color='';
+  clearFlash(); state.input=[]; renderInputDots(); renderPad(); renderStats();
+  document.getElementById('showBtn').disabled=true;
+}
+
+// events
+document.getElementById('lenChips').addEventListener('click', e=>{
+  const b=e.target.closest('.chip'); if(!b) return;
+  if(b.dataset.len==='auto'){ state.auto=true; }
+  else { state.auto=false; state.len=parseInt(b.dataset.len); }
+  save(); renderChips();
+});
+document.getElementById('speedChips').addEventListener('click', e=>{
+  const b=e.target.closest('.chip'); if(!b) return;
+  state.speed=parseInt(b.dataset.speed); save(); renderChips();
+});
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  if(state.phase==='showing' || state.phase==='input') return;
+  state.round=1; startRound(); renderStats();
+});
+document.getElementById('restartBtn').addEventListener('click', restart);
+document.getElementById('showBtn').addEventListener('click', ()=>{
+  if(state.phase!=='input') return;
+  // show again briefly as hint (costs streak)
+  state.phase='showing';
+  showFlash();
+  setTimeout(()=>{
+    clearFlash();
+    state.phase='input';
+    renderPad();
+  }, 800);
+});
+document.getElementById('helpBtn').addEventListener('click', ()=>{
+  alert('How to play:\n• Tap Start — a short symbol string flashes briefly.\n• Tap the symbols back in the same order.\n• Instant scoring: dots turn green/red per tap.\n• Auto length levels up from 3→6 as you improve.\n• Restart resets score and round.');
+});
+load(); renderChips(); renderPad(); renderInputDots(); renderStats();
+</script>
+</body>
+</html>

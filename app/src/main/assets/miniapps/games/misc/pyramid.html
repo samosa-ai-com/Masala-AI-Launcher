@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Pyramid Duel</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg1:#1a0f2e;
+  --bg2:#3d1f4a;
+  --bg3:#7a3a2e;
+  --bg4:#c86b3c;
+  --bg5:#e9a86a;
+  --sand:#d9b18e;
+  --sand2:#c19a6b;
+  --sand3:#a67c52;
+  --stone:#e8d5b5;
+  --stone2:#d4b896;
+  --stone3:#b89a6f;
+  --accent:#ff7e5f;
+  --accent2:#ffb86a;
+  --teal:#4ecdc4;
+  --danger:#ff4d6d;
+}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  background:linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 18%,var(--bg3) 42%,var(--bg4) 68%,var(--bg5) 100%);
+  color:#fff;
+  display:flex;justify-content:center;
+  min-height:100vh;
+  min-height:100dvh;
+}
+.app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100vh;
+  min-height:100dvh;
+  display:flex;flex-direction:column;
+  position:relative;
+  overflow:hidden;
+  background:
+    radial-gradient(ellipse 800px 400px at 50% -10%,rgba(255,255,255,0.12),transparent 60%),
+    radial-gradient(ellipse 600px 300px at 20% 15%,rgba(255,184,106,0.18),transparent 60%),
+    radial-gradient(ellipse 500px 250px at 80% 20%,rgba(255,126,95,0.15),transparent 60%);
+}
+.app::before{
+  content:"";
+  position:absolute;inset:0;
+  background:
+    radial-gradient(1.5px 1.5px at 15% 12%,rgba(255,255,255,0.9),transparent),
+    radial-gradient(1px 1px at 35% 8%,rgba(255,255,255,0.7),transparent),
+    radial-gradient(1.2px 1.2px at 65% 10%,rgba(255,255,255,0.8),transparent),
+    radial-gradient(1px 1px at 85% 14%,rgba(255,255,255,0.6),transparent),
+    radial-gradient(1.3px 1.3px at 50% 6%,rgba(255,255,255,0.9),transparent),
+    radial-gradient(1px 1px at 25% 18%,rgba(255,255,255,0.5),transparent);
+  pointer-events:none;opacity:0.9;
+}
+.header{
+  position:relative;z-index:2;
+  padding:14px 16px 10px;
+  text-align:center;
+}
+.logo{
+  font-size:11px;letter-spacing:0.18em;text-transform:uppercase;opacity:0.85;font-weight:700;
+}
+.title{
+  font-size:22px;font-weight:900;letter-spacing:-0.02em;line-height:1;
+  text-shadow:0 2px 12px rgba(0,0,0,0.4);
+  margin:4px 0 2px;
+}
+.subtitle{font-size:12px;opacity:0.75;font-weight:500}
+.stats-bar{
+  position:relative;z-index:2;
+  display:flex;gap:8px;padding:10px 12px;
+}
+.stat-card{
+  flex:1;background:rgba(0,0,0,0.28);backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,0.12);border-radius:14px;
+  padding:8px 10px;text-align:center;
+}
+.stat-label{font-size:10px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.7;font-weight:700}
+.stat-value{font-size:15px;font-weight:800;margin-top:2px}
+.stat-sub{font-size:11px;opacity:0.7;margin-top:1px}
+.round-bar{
+  position:relative;z-index:2;
+  margin:0 12px;
+  background:rgba(0,0,0,0.32);border:1px solid rgba(255,255,255,0.14);
+  border-radius:12px;padding:10px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.round-info{font-size:13px;font-weight:800}
+.round-dots{display:flex;gap:6px;align-items:center}
+.dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.25);border:1px solid rgba(255,255,255,0.3)}
+.dot.won-player{background:var(--teal);box-shadow:0 0 8px rgba(78,205,196,0.7);border-color:rgba(255,255,255,0.6)}
+.dot.won-rival{background:var(--danger);box-shadow:0 0 8px rgba(255,77,109,0.7);border-color:rgba(255,255,255,0.6)}
+.vs{font-size:11px;opacity:0.6;font-weight:700;margin:0 4px}
+.best-row{
+  position:relative;z-index:2;
+  display:flex;gap:8px;padding:8px 12px 0;
+  font-size:11px;
+}
+.best-chip{
+  flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);
+  border-radius:999px;padding:6px 10px;text-align:center;font-weight:600;
+}
+.arena-wrap{
+  position:relative;z-index:2;
+  flex:1;
+  margin:10px 12px 0;
+  background:linear-gradient(180deg,rgba(0,0,0,0.18),rgba(0,0,0,0.32));
+  border:1px solid rgba(255,255,255,0.14);
+  border-radius:18px;
+  overflow:hidden;
+  display:flex;flex-direction:column;
+  min-height:340px;
+}
+.arena-labels{
+  display:flex;justify-content:space-between;
+  padding:10px 12px 6px;
+  font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;
+}
+.label-player{color:var(--teal)}
+.label-rival{color:var(--accent2)}
+.arena{
+  flex:1;
+  display:flex;
+  gap:8px;
+  padding:6px 10px 10px;
+  position:relative;
+  user-select:none;
+}
+.pyramid-side{
+  flex:1;
+  display:flex;flex-direction:column;
+  align-items:center;
+  justify-content:flex-end;
+  gap:6px;
+  position:relative;
+  padding-bottom:6px;
+}
+.pyramid-side::after{
+  content:"";
+  position:absolute;bottom:0;left:8%;right:8%;height:8px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.35),transparent);
+  border-radius:50%;
+  filter:blur(2px);
+}
+.counters{
+  width:100%;
+  background:rgba(0,0,0,0.28);border:1px solid rgba(255,255,255,0.1);
+  border-radius:10px;padding:6px 8px;
+  display:flex;flex-direction:column;gap:4px;
+}
+.counter-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700}
+.counter-row span:last-child{font-variant-numeric:tabular-nums}
+.bar-track{height:6px;background:rgba(255,255,255,0.15);border-radius:999px;overflow:hidden}
+.bar-fill{height:100%;border-radius:999px;transition:width 0.35s ease,background 0.3s}
+.bar-fill.build{background:linear-gradient(90deg,var(--teal),#7ef0e6)}
+.bar-fill.stability{background:linear-gradient(90deg,#ffb86a,#ff7e5f)}
+.bar-fill.stability.low{background:linear-gradient(90deg,#ff4d6d,#ff8a5b)}
+.bar-fill.stability.critical{background:linear-gradient(90deg,#ff1a4a,#ff4d6d);animation:pulse 0.6s infinite alternate}
+@keyframes pulse{from{opacity:0.9}to{opacity:1;filter:brightness(1.2)}}
+.pyramid{
+  width:100%;
+  max-width:160px;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:8px 0 4px;
+  min-height:110px;
+  justify-content:flex-end;
+  transition:transform 0.2s;
+}
+.pyramid.shake{animation:shake 0.35s}
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-4px) rotate(-0.5deg)}
+  40%{transform:translateX(4px) rotate(0.5deg)}
+  60%{transform:translateX(-3px)}
+  80%{transform:translateX(3px)}
+}
+.pyramid.toppled{animation:topple 0.7s forwards}
+@keyframes topple{
+  0%{transform:translateY(0) rotate(0)}
+  30%{transform:translateY(-6px) rotate(-2deg)}
+  100%{transform:translateY(12px) rotate(-8deg);opacity:0.6}
+}
+.layer{display:flex;gap:3px;justify-content:center}
+.stone{
+  width:34px;height:22px;
+  background:linear-gradient(180deg,var(--stone) 0%,var(--stone2) 55%,var(--stone3) 100%);
+  border:1px solid rgba(0,0,0,0.18);
+  border-radius:4px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.7),0 2px 4px rgba(0,0,0,0.25);
+  position:relative;
+  opacity:0;transform:translateY(8px) scale(0.9);
+  transition:opacity 0.35s,transform 0.35s;
+}
+.stone::after{
+  content:"";position:absolute;inset:2px 3px auto 3px;height:1px;background:rgba(255,255,255,0.5);border-radius:1px;
+}
+.stone.placed{opacity:1;transform:translateY(0) scale(1)}
+.stone.falling{animation:fall 0.5s forwards}
+@keyframes fall{
+  0%{transform:translateY(0) rotate(0);opacity:1}
+  100%{transform:translateY(18px) rotate(12deg);opacity:0}
+}
+.layer-1 .stone{width:36px}
+.layer-2 .stone{width:34px}
+.layer-3 .stone{width:32px}
+.layer-4 .stone{width:30px}
+.tap-zones{
+  position:absolute;inset:0;
+  display:flex;
+}
+.tap-zone{
+  flex:1;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+  padding-bottom:8px;
+  cursor:pointer;
+}
+.tap-zone:active{background:rgba(255,255,255,0.04)}
+.tap-hint{
+  font-size:10px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;
+  background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.15);
+  padding:4px 8px;border-radius:999px;
+  pointer-events:none;
+}
+.tap-zone.left .tap-hint{color:var(--teal)}
+.tap-zone.right .tap-hint{color:var(--accent2)}
+.projectile{
+  position:absolute;width:10px;height:10px;
+  background:radial-gradient(circle at 30% 30%,#fff,#ffb86a 40%,#c86b3c 70%);
+  border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4);
+  pointer-events:none;z-index:5;
+}
+.controls{
+  position:relative;z-index:2;
+  padding:10px 12px 12px;
+  display:flex;gap:10px;
+}
+.btn{
+  flex:1;
+  min-height:64px;
+  border:none;border-radius:16px;
+  font-size:15px;font-weight:900;letter-spacing:0.02em;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  cursor:pointer;
+  transition:transform 0.08s,filter 0.15s,opacity 0.2s;
+  box-shadow:0 6px 16px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.3);
+  user-select:none;
+  -webkit-user-select:none;
+  touch-action:manipulation;
+}
+.btn:active{transform:scale(0.97)}
+.btn:disabled{opacity:0.5;pointer-events:none}
+.btn-build{
+  background:linear-gradient(180deg,#4ecdc4 0%,#2fb8af 100%);
+  color:#0a2e2b;
+}
+.btn-hurl{
+  background:linear-gradient(180deg,#ffb86a 0%,#ff7e5f 100%);
+  color:#3a1a0a;
+}
+.btn small{font-size:11px;font-weight:700;opacity:0.8;letter-spacing:0.06em;text-transform:uppercase}
+.center-actions{
+  position:relative;z-index:2;
+  padding:0 12px 14px;
+  display:flex;gap:8px;
+}
+.btn-secondary{
+  flex:1;min-height:44px;border-radius:12px;
+  border:1px solid rgba(255,255,255,0.18);
+  background:rgba(0,0,0,0.28);color:#fff;
+  font-size:13px;font-weight:700;
+  cursor:pointer;
+}
+.btn-secondary:active{transform:scale(0.98)}
+.overlay{
+  position:absolute;inset:0;
+  background:rgba(10,6,20,0.72);backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+  z-index:10;
+}
+.card{
+  width:100%;max-width:360px;
+  background:linear-gradient(180deg,#2a1a3a 0%,#1e122e 100%);
+  border:1px solid rgba(255,255,255,0.14);
+  border-radius:20px;
+  padding:18px 16px;
+  text-align:center;
+  box-shadow:0 16px 40px rgba(0,0,0,0.5);
+}
+.card h2{font-size:20px;font-weight:900;margin-bottom:6px}
+.card p{font-size:13px;line-height:1.5;opacity:0.85;margin-bottom:12px}
+.card .big{font-size:28px;font-weight:900;margin:6px 0}
+.badge{
+  display:inline-block;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.12);
+  border-radius:999px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px;
+}
+.btn-primary{
+  width:100%;min-height:52px;border:none;border-radius:14px;
+  background:linear-gradient(180deg,#ffb86a,#ff7e5f);color:#3a1a0a;
+  font-size:16px;font-weight:900;cursor:pointer;
+  box-shadow:0 6px 16px rgba(0,0,0,0.3);
+}
+.btn-primary:active{transform:scale(0.98)}
+.btn-ghost{
+  width:100%;min-height:44px;margin-top:8px;
+  border:1px solid rgba(255,255,255,0.15);background:transparent;color:#fff;
+  border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;
+}
+.toast{
+  position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);
+  background:rgba(0,0,0,0.75);border:1px solid rgba(255,255,255,0.15);
+  padding:8px 14px;border-radius:999px;
+  font-size:13px;font-weight:800;z-index:6;
+  pointer-events:none;opacity:0;transition:opacity 0.2s;
+}
+.toast.show{opacity:1}
+.dunes{
+  position:absolute;bottom:0;left:0;right:0;height:70px;
+  background:
+    radial-gradient(ellipse 400px 80px at 20% 100%,rgba(201,107,60,0.9),transparent 70%),
+    radial-gradient(ellipse 500px 90px at 70% 100%,rgba(233,168,106,0.85),transparent 70%),
+    radial-gradient(ellipse 600px 60px at 50% 100%,rgba(0,0,0,0.25),transparent 70%);
+  pointer-events:none;opacity:0.9;
+}
+@media (max-width:380px){
+  .title{font-size:20px}
+  .stone{height:20px}
+  .layer-1 .stone{width:32px}
+  .layer-2 .stone{width:30px}
+  .layer-3 .stone{width:28px}
+  .layer-4 .stone{width:26px}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="dunes"></div>
+  <header class="header">
+    <div class="logo">Desert Dusk • Build vs Topple</div>
+    <div class="title">PYRAMID DUEL</div>
+    <div class="subtitle">Stack to 10 stones or topple the rival — first to 2 rounds</div>
+  </header>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">You</div>
+      <div class="stat-value" id="playerRoundsEl">0 Rounds</div>
+      <div class="stat-sub" id="playerStonesEl">0 / 10 stones</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Rival</div>
+      <div class="stat-value" id="rivalRoundsEl">0 Rounds</div>
+      <div class="stat-sub" id="rivalStonesEl">0 / 10 stones</div>
+    </div>
+  </div>
+
+  <div class="round-bar">
+    <div class="round-info" id="roundInfo">Round 1 • First to 2</div>
+    <div class="round-dots" id="roundDots">
+      <div class="dot" id="dotP1"></div>
+      <div class="dot" id="dotP2"></div>
+      <div class="vs">VS</div>
+      <div class="dot" id="dotR1"></div>
+      <div class="dot" id="dotR2"></div>
+    </div>
+  </div>
+
+  <div class="best-row">
+    <div class="best-chip" id="bestWinsChip">Best: —</div>
+    <div class="best-chip" id="bestTimeChip">Fastest: —</div>
+  </div>
+
+  <div class="arena-wrap" id="arenaWrap">
+    <div class="arena-labels">
+      <span class="label-player">◀ Your Pyramid</span>
+      <span class="label-rival">Rival Pyramid ▶</span>
+    </div>
+    <div class="arena" id="arena">
+      <div class="pyramid-side" id="playerSide">
+        <div class="counters">
+          <div class="counter-row"><span>Stones</span><span id="pStonesTxt">0/10</span></div>
+          <div class="bar-track"><div class="bar-fill build" id="pBuildBar" style="width:0%"></div></div>
+          <div class="counter-row"><span>Stability</span><span id="pStabTxt">10/10</span></div>
+          <div class="bar-track"><div class="bar-fill stability" id="pStabBar" style="width:100%"></div></div>
+        </div>
+        <div class="pyramid" id="playerPyramid">
+          <div class="layer layer-1"><div class="stone" data-idx="9"></div></div>
+          <div class="layer layer-2"><div class="stone" data-idx="7"></div><div class="stone" data-idx="8"></div></div>
+          <div class="layer layer-3"><div class="stone" data-idx="4"></div><div class="stone" data-idx="5"></div><div class="stone" data-idx="6"></div></div>
+          <div class="layer layer-4"><div class="stone" data-idx="0"></div><div class="stone" data-idx="1"></div><div class="stone" data-idx="2"></div><div class="stone" data-idx="3"></div></div>
+        </div>
+      </div>
+      <div class="pyramid-side" id="rivalSide">
+        <div class="counters">
+          <div class="counter-row"><span>Stones</span><span id="rStonesTxt">0/10</span></div>
+          <div class="bar-track"><div class="bar-fill build" id="rBuildBar" style="width:0%"></div></div>
+          <div class="counter-row"><span>Stability</span><span id="rStabTxt">10/10</span></div>
+          <div class="bar-track"><div class="bar-fill stability" id="rStabBar" style="width:100%"></div></div>
+        </div>
+        <div class="pyramid" id="rivalPyramid">
+          <div class="layer layer-1"><div class="stone" data-idx="9"></div></div>
+          <div class="layer layer-2"><div class="stone" data-idx="7"></div><div class="stone" data-idx="8"></div></div>
+          <div class="layer layer-3"><div class="stone" data-idx="4"></div><div class="stone" data-idx="5"></div><div class="stone" data-idx="6"></div></div>
+          <div class="layer layer-4"><div class="stone" data-idx="0"></div><div class="stone" data-idx="1"></div><div class="stone" data-idx="2"></div><div class="stone" data-idx="3"></div></div>
+        </div>
+      </div>
+      <div class="tap-zones" id="tapZones">
+        <div class="tap-zone left" id="tapLeft"><span class="tap-hint">TAP LEFT • BUILD</span></div>
+        <div class="tap-zone right" id="tapRight"><span class="tap-hint">TAP RIGHT • HURL</span></div>
+      </div>
+      <div class="toast" id="toast"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-build" id="buildBtn" aria-label="Build stone">
+      <span>◧ BUILD</span>
+      <small>Stack +1 stone</small>
+    </button>
+    <button class="btn btn-hurl" id="hurlBtn" aria-label="Hurl stone">
+      <span>HURL ➤</span>
+      <small>Damage rival</small>
+    </button>
+  </div>
+
+  <div class="center-actions">
+    <button class="btn-secondary" id="pauseBtn">Pause</button>
+    <button class="btn-secondary" id="resetBtn">Reset Match</button>
+  </div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="card">
+      <div class="badge">Desert-Dusk Duel</div>
+      <h2>Build vs Topple</h2>
+      <p><b>Left half / BUILD</b> stacks your stepped pyramid (4-3-2-1) to <b>10 stones</b>.<br><b>Right half / HURL</b> hurls stones to drain rival stability.<br>Win a round by <b>completing first</b> or <b>toppling</b> the rival. First to <b>2 rounds</b> wins the duel.</p>
+      <div style="display:flex;gap:8px;margin:8px 0 12px">
+        <div style="flex:1;background:rgba(78,205,196,0.15);border:1px solid rgba(78,205,196,0.3);border-radius:12px;padding:8px">
+          <div style="font-size:11px;opacity:0.8;font-weight:700">YOUR PYRAMID</div>
+          <div style="font-size:12px;font-weight:800;margin-top:2px">4 • 3 • 2 • 1 = 10</div>
+        </div>
+        <div style="flex:1;background:rgba(255,184,106,0.15);border:1px solid rgba(255,184,106,0.3);border-radius:12px;padding:8px">
+          <div style="font-size:11px;opacity:0.8;font-weight:700">RIVAL STABILITY</div>
+          <div style="font-size:12px;font-weight:800;margin-top:2px">10 → 0 = Topple</div>
+        </div>
+      </div>
+      <button class="btn-primary" id="startBtn">START DUEL</button>
+      <button class="btn-ghost" id="howBtn">How to play</button>
+      <p style="font-size:11px;opacity:0.6;margin-top:10px">Large tap targets • No horizontal scroll • Best results saved on this device</p>
+    </div>
+  </div>
+
+  <div class="overlay" id="roundOverlay" style="display:none">
+    <div class="card" id="roundCard"></div>
+  </div>
+
+  <div class="overlay" id="winOverlay" style="display:none">
+    <div class="card" id="winCard"></div>
+  </div>
+
+  <div class="overlay" id="howOverlay" style="display:none">
+    <div class="card">
+      <h2>How to Play</h2>
+      <p style="text-align:left">
+        • <b>BUILD (left):</b> Each tap adds 1 stone to your pyramid. Fill all 10 to win the round.<br>
+        • <b>HURL (right):</b> Each tap throws a stone at the rival. Each hit -1 stability (10→0). At 0 they topple and you win the round.<br>
+        • <b>Rival</b> does the same to you — watch your stability!<br>
+        • <b>First to 2 rounds</b> wins the match. Fastest wins are saved.<br>
+        • Tip: If rival is close to 10, hurl to stop them. If you're close, keep building.
+      </p>
+      <button class="btn-primary" id="closeHowBtn">Got it</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const playerPyramid = $('#playerPyramid');
+const rivalPyramid = $('#rivalPyramid');
+const pBuildBar = $('#pBuildBar');
+const rBuildBar = $('#rBuildBar');
+const pStabBar = $('#pStabBar');
+const rStabBar = $('#rStabBar');
+const pStonesTxt = $('#pStonesTxt');
+const rStonesTxt = $('#rStonesTxt');
+const pStabTxt = $('#pStabTxt');
+const rStabTxt = $('#rStabTxt');
+const playerRoundsEl = $('#playerRoundsEl');
+const rivalRoundsEl = $('#rivalRoundsEl');
+const playerStonesEl = $('#playerStonesEl');
+const rivalStonesEl = $('#rivalStonesEl');
+const roundInfo = $('#roundInfo');
+const toast = $('#toast');
+const arena = $('#arena');
+const startOverlay = $('#startOverlay');
+const roundOverlay = $('#roundOverlay');
+const winOverlay = $('#winOverlay');
+const howOverlay = $('#howOverlay');
+
+let pBuild=0, rBuild=0, pStab=10, rStab=10;
+let pRounds=0, rRounds=0, roundNum=1;
+let playing=false, paused=false;
+let rivalTimer=null;
+let matchStart=0;
+let bestWins=0, bestTime=null;
+
+function loadBest(){
+  try{
+    bestWins = parseInt(localStorage.getItem('pyramidDuel_bestWins')||'0',10)||0;
+    const bt = localStorage.getItem('pyramidDuel_bestTime');
+    bestTime = bt ? parseInt(bt,10) : null;
+  }catch(e){}
+  updateBestUI();
+}
+function saveBest(won, timeMs){
+  try{
+    if(won){
+      if(timeMs && (bestTime===null || timeMs < bestTime)){
+        bestTime = timeMs;
+        localStorage.setItem('pyramidDuel_bestTime', String(timeMs));
+      }
+      // best wins is max rounds won in a match? Actually first to 2, so wins is 2. But we track fastest. Also track total matches won.
+      const totalWins = parseInt(localStorage.getItem('pyramidDuel_totalWins')||'0',10)||0;
+      localStorage.setItem('pyramidDuel_totalWins', String(totalWins+1));
+      bestWins = totalWins+1;
+      localStorage.setItem('pyramidDuel_bestWins', String(bestWins));
+    }
+  }catch(e){}
+  updateBestUI();
+}
+function updateBestUI(){
+  const totalWins = (()=>{try{return parseInt(localStorage.getItem('pyramidDuel_totalWins')||'0',10)||0}catch(e){return 0}})();
+  $('#bestWinsChip').textContent = totalWins ? `Wins: ${totalWins}` : 'Best: —';
+  if(bestTime){
+    const s = (bestTime/1000).toFixed(1);
+    $('#bestTimeChip').textContent = `Fastest: ${s}s`;
+  } else {
+    $('#bestTimeChip').textContent = 'Fastest: —';
+  }
+}
+function formatTime(ms){
+  return (ms/1000).toFixed(1)+'s';
+}
+function showToast(msg, ms=900){
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'), ms);
+}
+function updateUI(){
+  pStonesTxt.textContent = `${pBuild}/10`;
+  rStonesTxt.textContent = `${rBuild}/10`;
+  pStabTxt.textContent = `${Math.max(0,pStab)}/10`;
+  rStabTxt.textContent = `${Math.max(0,rStab)}/10`;
+  playerStonesEl.textContent = `${pBuild} / 10 stones`;
+  rivalStonesEl.textContent = `${rBuild} / 10 stones`;
+  playerRoundsEl.textContent = `${pRounds} Rounds`;
+  rivalRoundsEl.textContent = `${rRounds} Rounds`;
+  pBuildBar.style.width = (pBuild*10)+'%';
+  rBuildBar.style.width = (rBuild*10)+'%';
+  pStabBar.style.width = Math.max(0,pStab*10)+'%';
+  rStabBar.style.width = Math.max(0,rStab*10)+'%';
+  pStabBar.className = 'bar-fill stability' + (pStab<=3?' critical':pStab<=5?' low':'');
+  rStabBar.className = 'bar-fill stability' + (rStab<=3?' critical':rStab<=5?' low':'');
+  roundInfo.textContent = `Round ${roundNum} • First to 2`;
+  // dots
+  $('#dotP1').className = 'dot' + (pRounds>=1?' won-player':'');
+  $('#dotP2').className = 'dot' + (pRounds>=2?' won-player':'');
+  $('#dotR1').className = 'dot' + (rRounds>=1?' won-rival':'');
+  $('#dotR2').className = 'dot' + (rRounds>=2?' won-rival':'');
+  // pyramid stones
+  renderPyramid(playerPyramid, pBuild);
+  renderPyramid(rivalPyramid, rBuild);
+}
+function renderPyramid(el, count){
+  const stones = el.querySelectorAll('.stone');
+  stones.forEach(s=>{
+    const idx = parseInt(s.dataset.idx,10);
+    if(idx < count) s.classList.add('placed');
+    else s.classList.remove('placed');
+    s.classList.remove('falling');
+  });
+}
+function shake(el){
+  el.classList.remove('shake');
+  void el.offsetWidth;
+  el.classList.add('shake');
+  setTimeout(()=>el.classList.remove('shake'),400);
+}
+function projectile(fromLeft){
+  const rect = arena.getBoundingClientRect();
+  const p = document.createElement('div');
+  p.className='projectile';
+  arena.appendChild(p);
+  const startX = fromLeft ? rect.width*0.25 : rect.width*0.75;
+  const endX = fromLeft ? rect.width*0.75 : rect.width*0.25;
+  const startY = rect.height*0.55;
+  const endY = rect.height*0.45;
+  p.style.left = startX+'px';
+  p.style.top = startY+'px';
+  p.animate([
+    {left:startX+'px', top:startY+'px', transform:'scale(1)'},
+    {left:(startX+endX)/2+'px', top:(startY+endY)/2 - 30 +'px', transform:'scale(1.1)'},
+    {left:endX+'px', top:endY+'px', transform:'scale(0.9)'}
+  ],{duration:320,easing:'cubic-bezier(.3,.7,.6,1)'}).onfinish=()=>p.remove();
+  setTimeout(()=>{if(p.parentNode) p.remove()},400);
+}
+function checkWin(){
+  if(!playing) return;
+  // player win conditions
+  if(pBuild>=10 || rStab<=0){
+    const reason = pBuild>=10 ? 'Pyramid Complete!' : 'Rival Toppled!';
+    winRound('player', reason);
+    return;
+  }
+  if(rBuild>=10 || pStab<=0){
+    const reason = rBuild>=10 ? 'Rival Completed!' : 'You Toppled!';
+    winRound('rival', reason);
+    return;
+  }
+}
+function winRound(winner, reason){
+  playing=false;
+  clearInterval(rivalTimer);
+  rivalTimer=null;
+  if(winner==='player'){
+    pRounds++;
+    // topple animation for rival if stability win
+    if(rStab<=0){
+      rivalPyramid.classList.add('toppled');
+      // make stones fall
+      rivalPyramid.querySelectorAll('.stone.placed').forEach((s,i)=>{
+        setTimeout(()=>s.classList.add('falling'), i*40);
+      });
+    }
+  } else {
+    rRounds++;
+    if(pStab<=0){
+      playerPyramid.classList.add('toppled');
+      playerPyramid.querySelectorAll('.stone.placed').forEach((s,i)=>{
+        setTimeout(()=>s.classList.add('falling'), i*40);
+      });
+    }
+  }
+  updateUI();
+  // check match win
+  if(pRounds>=2 || rRounds>=2){
+    setTimeout(()=>endMatch(winner), 900);
+  } else {
+    setTimeout(()=>showRoundInterstitial(winner, reason), 800);
+  }
+}
+function showRoundInterstitial(winner, reason){
+  const isPlayer = winner==='player';
+  roundOverlay.style.display='flex';
+  $('#roundCard').innerHTML = `
+    <div class="badge" style="background:${isPlayer?'rgba(78,205,196,0.2)':'rgba(255,77,109,0.2)'};border-color:${isPlayer?'rgba(78,205,196,0.4)':'rgba(255,77,109,0.4)'}">${isPlayer?'You won the round':'Rival won the round'}</div>
+    <h2>${reason}</h2>
+    <p>${isPlayer?'Your pyramid stands tall.':'The rival struck hard.'} Score <b>${pRounds} - ${rRounds}</b></p>
+    <div class="big">${pRounds} : ${rRounds}</div>
+    <button class="btn-primary" id="nextRoundBtn">Next Round • ${roundNum+1}</button>
+  `;
+  $('#nextRoundBtn').onclick = ()=>{
+    roundOverlay.style.display='none';
+    nextRound();
+  };
+}
+function nextRound(){
+  roundNum++;
+  pBuild=0; rBuild=0; pStab=10; rStab=10;
+  playerPyramid.classList.remove('toppled');
+  rivalPyramid.classList.remove('toppled');
+  playerPyramid.querySelectorAll('.stone').forEach(s=>s.classList.remove('falling'));
+  rivalPyramid.querySelectorAll('.stone').forEach(s=>s.classList.remove('falling'));
+  playing=true; paused=false;
+  $('#pauseBtn').textContent='Pause';
+  updateUI();
+  startRival();
+}
+function endMatch(winner){
+  const isPlayer = winner==='player';
+  const elapsed = Date.now() - matchStart;
+  if(isPlayer) saveBest(true, elapsed);
+  else saveBest(false, null);
+  winOverlay.style.display='flex';
+  const timeStr = formatTime(elapsed);
+  $('#winCard').innerHTML = `
+    <div class="badge" style="background:${isPlayer?'rgba(78,205,196,0.2)':'rgba(255,77,109,0.2)'}">${isPlayer?'Victory':'Defeat'}</div>
+    <h2>${isPlayer?'Duel Won!':'Duel Lost'}</h2>
+    <p>${isPlayer?`You claimed 2 rounds in <b>${timeStr}</b>. Your pyramid endures the dusk.`:`Rival took 2 rounds in <b>${timeStr}</b>. Rebuild and try again.`}</p>
+    <div style="display:flex;gap:8px;margin:10px 0">
+      <div style="flex:1;background:rgba(255,255,255,0.07);border-radius:12px;padding:10px">
+        <div style="font-size:11px;opacity:0.7;font-weight:700">FINAL SCORE</div>
+        <div style="font-size:18px;font-weight:900">${pRounds} : ${rRounds}</div>
+      </div>
+      <div style="flex:1;background:rgba(255,255,255,0.07);border-radius:12px;padding:10px">
+        <div style="font-size:11px;opacity:0.7;font-weight:700">TIME</div>
+        <div style="font-size:18px;font-weight:900">${timeStr}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;opacity:0.6;margin-bottom:10px">Best: ${localStorage.getItem('pyramidDuel_totalWins')||0} wins • Fastest ${bestTime?formatTime(bestTime):'—'}</div>
+    <button class="btn-primary" id="againBtn">${isPlayer?'Play Again':'Revenge'}</button>
+    <button class="btn-ghost" id="closeWinBtn">Close</button>
+  `;
+  $('#againBtn').onclick = ()=>{ winOverlay.style.display='none'; resetMatch(); startMatch(); };
+  $('#closeWinBtn').onclick = ()=>{ winOverlay.style.display='none'; resetMatch(); };
+}
+function resetMatch(){
+  pBuild=0; rBuild=0; pStab=10; rStab=10; pRounds=0; rRounds=0; roundNum=1;
+  playing=false; paused=false;
+  clearInterval(rivalTimer); rivalTimer=null;
+  playerPyramid.classList.remove('toppled','shake');
+  rivalPyramid.classList.remove('toppled','shake');
+  updateUI();
+  startOverlay.style.display='flex';
+}
+function startMatch(){
+  pBuild=0; rBuild=0; pStab=10; rStab=10; pRounds=0; rRounds=0; roundNum=1;
+  playing=true; paused=false;
+  matchStart = Date.now();
+  startOverlay.style.display='none';
+  roundOverlay.style.display='none';
+  winOverlay.style.display='none';
+  playerPyramid.classList.remove('toppled');
+  rivalPyramid.classList.remove('toppled');
+  updateUI();
+  startRival();
+  showToast('Build left, Hurl right!');
+}
+function startRival(){
+  clearInterval(rivalTimer);
+  rivalTimer = setInterval(()=>{
+    if(!playing || paused) return;
+    // rival AI
+    // if rival close to win, build; if player close, hurl
+    let doBuild;
+    if(rBuild>=8) doBuild=true; // finish
+    else if(pBuild>=8) doBuild=false; // try to stop player
+    else if(rStab<=3) doBuild = Math.random()<0.3; // low stability, try to hurl defensively? actually hurl
+    else if(pStab<=3) doBuild=false; // almost toppled, finish him
+    else doBuild = Math.random()<0.58;
+    if(doBuild){
+      rBuild = Math.min(10, rBuild+1);
+      // small visual
+      if(Math.random()<0.3) projectile(false);
+      updateUI();
+      checkWin();
+    } else {
+      // hurl at player
+      projectile(false);
+      setTimeout(()=>{
+        if(!playing) return;
+        pStab = Math.max(0, pStab-1);
+        // 12% double damage
+        if(Math.random()<0.12) pStab = Math.max(0, pStab-1);
+        shake(playerPyramid);
+        showToast('Rival hits! -1 stability',600);
+        updateUI();
+        checkWin();
+      }, 280);
+    }
+  }, 720);
+}
+function playerBuildAction(){
+  if(!playing || paused) return;
+  if(pBuild>=10) return;
+  pBuild++;
+  // haptic
+  if(navigator.vibrate) navigator.vibrate(20);
+  // visual
+  updateUI();
+  // little pop
+  const stones = playerPyramid.querySelectorAll('.stone');
+  const last = stones[pBuild-1];
+  if(last){
+    last.animate([{transform:'scale(0.8)'},{transform:'scale(1.08)'},{transform:'scale(1)'}],{duration:220});
+  }
+  showToast('+1 stone',500);
+  checkWin();
+}
+function playerHurlAction(){
+  if(!playing || paused) return;
+  if(rStab<=0) return;
+  projectile(true);
+  if(navigator.vibrate) navigator.vibrate([20,30,20]);
+  setTimeout(()=>{
+    if(!playing) return;
+    rStab = Math.max(0, rStab-1);
+    if(Math.random()<0.15){ rStab = Math.max(0, rStab-1); showToast('Critical hit! -2',700); }
+    else showToast('Hit! -1 stability',600);
+    shake(rivalPyramid);
+    updateUI();
+    checkWin();
+  }, 300);
+}
+
+// events
+$('#buildBtn').addEventListener('click', playerBuildAction);
+$('#hurlBtn').addEventListener('click', playerHurlAction);
+$('#tapLeft').addEventListener('click', playerBuildAction);
+$('#tapRight').addEventListener('click', playerHurlAction);
+// also touch for faster response
+$('#tapLeft').addEventListener('touchstart', e=>{e.preventDefault(); playerBuildAction();},{passive:false});
+$('#tapRight').addEventListener('touchstart', e=>{e.preventDefault(); playerHurlAction();},{passive:false});
+$('#buildBtn').addEventListener('touchstart', e=>{e.preventDefault(); playerBuildAction();},{passive:false});
+$('#hurlBtn').addEventListener('touchstart', e=>{e.preventDefault(); playerHurlAction();},{passive:false});
+
+$('#startBtn').onclick = startMatch;
+$('#howBtn').onclick = ()=> howOverlay.style.display='flex';
+$('#closeHowBtn').onclick = ()=> howOverlay.style.display='none';
+howOverlay.onclick = e=>{ if(e.target===howOverlay) howOverlay.style.display='none'; };
+
+$('#pauseBtn').onclick = ()=>{
+  if(!playing && !paused) return;
+  if(paused){
+    paused=false;
+    $('#pauseBtn').textContent='Pause';
+    showToast('Resumed');
+  } else {
+    paused=true;
+    $('#pauseBtn').textContent='Resume';
+    showToast('Paused');
+  }
+};
+$('#resetBtn').onclick = ()=>{
+  clearInterval(rivalTimer);
+  resetMatch();
+};
+
+// keyboard for desktop testing
+window.addEventListener('keydown', e=>{
+  if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A') playerBuildAction();
+  if(e.key==='ArrowRight' || e.key==='d' || e.key==='D') playerHurlAction();
+  if(e.key===' ') { e.preventDefault(); if(!playing) startMatch(); }
+});
+
+loadBest();
+updateUI();
+
+// prevent double-tap zoom
+document.addEventListener('touchmove', e=>{ if(e.scale!==1) e.preventDefault(); },{passive:false});
+let lastTouch=0;
+document.addEventListener('touchend', e=>{
+  const now=Date.now();
+  if(now-lastTouch<300) e.preventDefault();
+  lastTouch=now;
+},{passive:false});
+</script>
+</body>
+</html>

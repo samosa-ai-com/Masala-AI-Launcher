@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Clockwork Event Loop</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family: ui-sans-system, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background:
+    radial-gradient(ellipse at 50% 0%, #4a3520 0%, #1a1207 55%, #0d0a04 100%);
+  color:#f5e6c8;
+  display:flex;justify-content:center;
+  font-size:16px;
+  -webkit-text-size-adjust:100%;
+}
+.wrap{
+  width:100%;max-width:428px;min-width:360px;
+  min-height:100vh;
+  display:flex;flex-direction:column;
+  padding:10px 12px 14px;
+  gap:10px;
+}
+header{
+  background: linear-gradient(180deg, #3d2b1f 0%, #2a1e14 100%);
+  border:1.5px solid #b08d57;
+  border-radius:14px;
+  padding:10px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{
+  width:42px;height:42px;border-radius:50%;
+  background: radial-gradient(circle at 30% 30%, #ffe9a8, #c9a86a 55%, #7a5a2a 100%);
+  border:2px solid #5a3e1b;
+  display:grid;place-items:center;
+  box-shadow: inset 0 1px 3px rgba(255,255,255,0.6), 0 2px 6px rgba(0,0,0,0.4);
+  position:relative;
+}
+.logo::after{
+  content:'';position:absolute;inset:-4px;border-radius:50%;border:2px dashed #b08d57;opacity:0.5;
+}
+.logo span{font-size:20px}
+.brand h1{font-size:13px;letter-spacing:0.14em;color:#ffd78a;line-height:1}
+.brand h1 b{display:block;font-size:15px;letter-spacing:0.08em;color:#fff3d0}
+.sub{font-size:11px;color:#c9b48f}
+.hdr-right{text-align:right}
+.rank-badge{
+  background: linear-gradient(180deg, #ffd78a, #b08d57);
+  color:#2c1e0f;font-weight:800;font-size:11px;
+  padding:4px 8px;border-radius:999px;border:1px solid #5a3e1b;
+}
+.progress{font-size:11px;color:#e8d5b0;margin-top:4px}
+.dots{display:flex;gap:5px;justify-content:flex-end;margin-top:6px}
+.dot{width:10px;height:10px;border-radius:50%;border:1.5px solid #b08d57;background:rgba(0,0,0,0.3)}
+.dot.done{background:#ffd78a;box-shadow:0 0 6px #ffd78a}
+.dot.active{background:#fff3d0;box-shadow:0 0 8px #fff3d0;transform:scale(1.15)}
+
+.card{
+  background: linear-gradient(180deg, #2e2116 0%, #1e150e 100%);
+  border:1.5px solid #8c6a3c;
+  border-radius:14px;
+  overflow:hidden;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.45);
+}
+.card-head{
+  padding:10px 12px 8px;
+  display:flex;justify-content:space-between;align-items:center;
+  border-bottom:1px solid rgba(176,141,87,0.25);
+  background: linear-gradient(180deg, rgba(255,215,138,0.08), transparent);
+}
+.card-head h2{font-size:14px;color:#ffd78a;letter-spacing:0.06em}
+.stars{color:#ffd78a;font-size:12px;letter-spacing:1px}
+.card-body{padding:10px 12px 12px}
+.desc{font-size:13px;line-height:1.45;color:#e8d5b0}
+.code-wrap{
+  margin-top:10px;
+  background:#0f0b06;
+  border:1px solid #5a3e1b;
+  border-radius:10px;
+  padding:10px 10px;
+  position:relative;
+  overflow:hidden;
+}
+.code-wrap::before{
+  content:'◆ CODE SCROLL ◆';
+  position:absolute;top:0;left:0;right:0;
+  font-size:9px;letter-spacing:0.12em;text-align:center;
+  color:#8c6a3c;background:rgba(176,141,87,0.12);
+  padding:3px 0;border-bottom:1px solid rgba(176,141,87,0.2);
+}
+.code{
+  margin-top:14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size:13px;line-height:1.5;
+  color:#f5e6c8;
+  white-space:pre-wrap;word-break:break-word;
+}
+.code .kw{color:#ffd78a}
+.code .fn{color:#8ec8ff}
+.code .str{color:#a8e6a0}
+.code .cmt{color:#8c7a5a;font-style:italic}
+
+.section-title{
+  font-size:11px;letter-spacing:0.14em;color:#c9b48f;
+  display:flex;align-items:center;gap:8px;margin:2px 0 8px;
+}
+.section-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg, rgba(176,141,87,0.4), transparent)}
+.section-title span{white-space:nowrap}
+
+.inventory{
+  background: linear-gradient(180deg, #2e2116, #1e150e);
+  border:1.5px solid #8c6a3c;
+  border-radius:14px;
+  padding:10px 10px 12px;
+}
+.tray{
+  display:flex;flex-wrap:wrap;gap:10px;justify-content:center;
+  min-height:72px;
+}
+.gear{
+  width:78px;height:78px;border-radius:50%;
+  background: radial-gradient(circle at 32% 28%, #ffe9a8 0%, #d8b87a 38%, #b08d57 62%, #7a5a2a 100%);
+  border:2.5px solid #5a3e1b;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;
+  box-shadow: inset 0 2px 4px rgba(255,255,255,0.55), inset 0 -3px 6px rgba(0,0,0,0.35), 0 4px 10px rgba(0,0,0,0.45);
+  touch-action:none;
+  user-select:none;
+  cursor:grab;
+  flex-shrink:0;
+}
+.gear:active{cursor:grabbing}
+.gear::before{
+  content:'';position:absolute;inset:-5px;border-radius:50%;
+  border:3px dashed #8c6a3c;opacity:0.45;pointer-events:none;
+}
+.gear.spin{animation:spin 0.6s linear infinite}
+.gear.spin::before{animation:spin 0.6s linear infinite reverse}
+@keyframes spin{to{transform:rotate(360deg)}}
+.gear .g-label{font-weight:900;font-size:20px;color:#2c1e0f;line-height:1}
+.gear .g-sub{font-size:9px;font-weight:800;letter-spacing:0.06em;color:#4a3520;background:rgba(255,255,255,0.55);padding:1px 5px;border-radius:999px;margin-top:2px}
+.gear .g-type{
+  position:absolute;top:-6px;right:-4px;
+  font-size:8px;font-weight:800;letter-spacing:0.06em;
+  padding:3px 6px;border-radius:999px;border:1px solid #2c1e0f;
+  color:#fff;
+}
+.t-SYNC{background:#2e7d32}
+.t-MICRO{background:#6a1b9a}
+.t-TIMER{background:#b85c00}
+.gear.used{opacity:0.35;filter:grayscale(0.4);pointer-events:none}
+.gear.dragging{opacity:0.9;z-index:50;transform:scale(1.08);box-shadow:0 10px 20px rgba(0,0,0,0.6)}
+
+.mechanism{
+  background: linear-gradient(180deg, #2e2116, #1e150e);
+  border:1.5px solid #8c6a3c;
+  border-radius:14px;
+  padding:10px 10px 12px;
+}
+.slots{display:flex;flex-direction:column;gap:8px}
+.slot{
+  min-height:64px;
+  border:2px dashed rgba(176,141,87,0.55);
+  border-radius:12px;
+  background: rgba(0,0,0,0.28);
+  display:flex;align-items:center;gap:10px;
+  padding:8px 10px;
+  transition: all 0.18s;
+}
+.slot.filled{border-style:solid;border-color:#b08d57;background: linear-gradient(180deg, #3d2b1f, #2a1e14);box-shadow:inset 0 1px 0 rgba(255,255,255,0.08)}
+.slot.drag-over{border-color:#ffd78a;background:rgba(255,215,138,0.12);transform:scale(1.01)}
+.slot.correct{border-color:#4caf50;box-shadow:0 0 10px rgba(76,175,80,0.5)}
+.slot.wrong{border-color:#e53935;box-shadow:0 0 10px rgba(229,57,53,0.5);animation:shake 0.35s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.num{
+  width:34px;height:34px;border-radius:50%;
+  background: linear-gradient(180deg, #ffd78a, #b08d57);
+  color:#2c1e0f;font-weight:900;font-size:14px;
+  display:grid;place-items:center;flex-shrink:0;
+  border:1.5px solid #5a3e1b;
+  box-shadow: inset 0 1px 2px rgba(255,255,255,0.6);
+}
+.slot-empty{font-size:12px;color:#8c7a5a;letter-spacing:0.06em}
+.slot .gear{width:56px;height:56px}
+.slot .gear .g-label{font-size:16px}
+.slot-info{flex:1;min-width:0}
+.slot-info .s-label{font-size:13px;font-weight:700;color:#fff3d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot-info .s-meta{font-size:11px;color:#c9b48f}
+.remove-btn{
+  width:36px;height:36px;border-radius:50%;
+  background:rgba(0,0,0,0.35);border:1px solid #8c6a3c;color:#c9b48f;
+  display:grid;place-items:center;font-size:16px;flex-shrink:0;
+}
+
+.controls{
+  display:flex;gap:8px;
+}
+.btn{
+  flex:1;height:48px;border-radius:12px;
+  border:1.5px solid #5a3e1b;
+  font-weight:800;font-size:13px;letter-spacing:0.06em;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  cursor:pointer;user-select:none;
+  touch-action:manipulation;
+}
+.btn-primary{
+  background: linear-gradient(180deg, #ffd78a 0%, #c9a86a 55%, #8c6a3c 100%);
+  color:#2c1e0f;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+.btn-primary:active{transform:scale(0.98)}
+.btn-primary:disabled{opacity:0.45;filter:grayscale(0.3)}
+.btn-ghost{
+  background: linear-gradient(180deg, #3d2b1f, #2a1e14);
+  color:#e8d5b0;border-color:#8c6a3c;
+}
+.btn-ghost:active{transform:scale(0.98)}
+.hint-btn{flex:0 0 48px;width:48px}
+
+.result{
+  background: linear-gradient(180deg, #1e150e, #0f0b06);
+  border:1.5px solid #8c6a3c;
+  border-radius:14px;
+  padding:12px;
+  display:none;
+}
+.result.show{display:block}
+.result h3{font-size:13px;color:#ffd78a;letter-spacing:0.06em;margin-bottom:8px}
+.trace{display:flex;flex-direction:column;gap:6px}
+.step{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.04);border:1px solid rgba(176,141,87,0.2);
+  border-radius:10px;padding:8px 10px;
+}
+.step .step-num{width:26px;height:26px;border-radius:50%;background:#3d2b1f;border:1px solid #b08d57;color:#ffd78a;display:grid;place-items:center;font-size:12px;font-weight:800;flex-shrink:0}
+.step .step-text{font-size:13px;color:#f5e6c8;flex:1}
+.step .step-why{font-size:11px;color:#c9b48f}
+.step.ok{border-color:rgba(76,175,80,0.5);background:rgba(76,175,80,0.08)}
+.step.bad{border-color:rgba(229,57,53,0.5);background:rgba(229,57,53,0.08)}
+.explain{
+  margin-top:10px;
+  background:rgba(176,141,87,0.1);border:1px solid rgba(176,141,87,0.25);
+  border-radius:10px;padding:10px;
+  font-size:12px;line-height:1.5;color:#e8d5b0;
+}
+.explain b{color:#ffd78a}
+
+.footer{
+  text-align:center;font-size:11px;color:#8c7a5a;padding:4px 0 2px;
+}
+.ghost{
+  position:fixed;pointer-events:none;z-index:9999;
+  width:78px;height:78px;border-radius:50%;
+  background: radial-gradient(circle at 32% 28%, #ffe9a8, #d8b87a 38%, #b08d57 62%, #7a5a2a);
+  border:2.5px solid #5a3e1b;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-shadow:0 10px 20px rgba(0,0,0,0.6);
+  transform:translate(-50%,-50%);
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <div class="brand">
+      <div class="logo"><span>⚙</span></div>
+      <div>
+        <h1>CLOCKWORK<b>EVENT LOOP</b></h1>
+        <div class="sub">Predict the print order</div>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <div class="rank-badge" id="rankBadge">APPRENTICE</div>
+      <div class="progress" id="progressText">Commission 1 / 6</div>
+      <div class="dots" id="dots"></div>
+    </div>
+  </header>
+
+  <div class="card" id="commissionCard">
+    <div class="card-head">
+      <h2 id="cTitle">Commission I</h2>
+      <div class="stars" id="cStars">★☆☆</div>
+    </div>
+    <div class="card-body">
+      <div class="desc" id="cDesc"></div>
+      <div class="code-wrap"><pre class="code" id="cCode"></pre></div>
+    </div>
+  </div>
+
+  <div class="inventory">
+    <div class="section-title"><span>◈ PARTS BIN — TAP OR DRAG GEARS</span></div>
+    <div class="tray" id="tray"></div>
+  </div>
+
+  <div class="mechanism">
+    <div class="section-title"><span>⬢ SEQUENCE MECHANISM</span> <span id="slotHint" style="font-size:10px;color:#8c7a5a;letter-spacing:0">FILL IN ORDER</span></div>
+    <div class="slots" id="slots"></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-ghost hint-btn" id="hintBtn" title="Hint">💡</button>
+    <button class="btn btn-ghost" id="resetBtn">↺ RESET</button>
+    <button class="btn btn-primary" id="runBtn">⚙ WIND & RUN</button>
+  </div>
+
+  <div class="result" id="resultBox">
+    <h3 id="resultTitle">Result</h3>
+    <div class="trace" id="trace"></div>
+    <div class="explain" id="explain"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-ghost" id="retryBtn" style="flex:1;height:44px">RETRY</button>
+      <button class="btn btn-primary" id="nextBtn" style="flex:1;height:44px">NEXT COMMISSION →</button>
+    </div>
+  </div>
+
+  <div class="footer">Brass Clockwork • Call Stack → Microtasks → Timers • 16px+ • No scroll</div>
+</div>
+
+<script>
+const COMMISSIONS = [
+  {
+    title:"Commission I — The Main Spring",
+    stars:"★☆☆",
+    desc:"All synchronous. The call stack runs top-to-bottom. Drag the gears in the order they print.",
+    code:"console.log('A');\nconsole.log('B');\nconsole.log('C');",
+    parts:[
+      {id:'A', label:'A', sub:"log('A')", type:'SYNC', snippet:"console.log('A')"},
+      {id:'B', label:'B', sub:"log('B')", type:'SYNC', snippet:"console.log('B')"},
+      {id:'C', label:'C', sub:"log('C')", type:'SYNC', snippet:"console.log('C')"},
+    ],
+    answer:['A','B','C'],
+    explain:"<b>Call Stack only:</b> Each <code>console.log</code> pushes onto the stack and prints immediately. No queues involved. Order is exactly A → B → C."
+  },
+  {
+    title:"Commission II — Microtask Escapement",
+    stars:"★☆☆",
+    desc:"<code>Promise.then</code> queues a <b>microtask</b>. Microtasks run after the stack empties, before timers.",
+    code:"console.log('A');\nPromise.resolve().then(()=> console.log('B'));\nconsole.log('C');",
+    parts:[
+      {id:'A', label:'A', sub:"log('A')", type:'SYNC', snippet:"console.log('A')"},
+      {id:'B', label:'B', sub:"then B", type:'MICRO', snippet:"Promise.then → B"},
+      {id:'C', label:'C', sub:"log('C')", type:'SYNC', snippet:"console.log('C')"},
+    ],
+    answer:['A','C','B'],
+    explain:"<b>Stack → Microtask:</b> A and C are sync and print first. B is queued as a microtask and runs only after the stack is empty. So A → C → <b>B</b>."
+  },
+  {
+    title:"Commission III — Timer Pendulum",
+    stars:"★★☆",
+    desc:"<code>setTimeout(...,0)</code> queues a <b>timer (macrotask)</b>. Timers wait until stack + microtasks finish.",
+    code:"console.log('A');\nsetTimeout(()=> console.log('B'), 0);\nconsole.log('C');",
+    parts:[
+      {id:'A', label:'A', sub:"log('A')", type:'SYNC', snippet:"console.log('A')"},
+      {id:'B', label:'B', sub:"timer B", type:'TIMER', snippet:"setTimeout → B"},
+      {id:'C', label:'C', sub:"log('C')", type:'SYNC', snippet:"console.log('C')"},
+    ],
+    answer:['A','C','B'],
+    explain:"<b>Stack → Timer:</b> A, C sync first. B is a timer task — even with 0ms it waits for the stack to clear. A → C → <b>B</b>."
+  },
+  {
+    title:"Commission IV — Micro vs Timer Duel",
+    stars:"★★☆",
+    desc:"Microtasks always beat timers. Predict: which prints first — the Promise or the timeout?",
+    code:"console.log('A');\nsetTimeout(()=> console.log('B'), 0);\nPromise.resolve().then(()=> console.log('C'));\nconsole.log('D');",
+    parts:[
+      {id:'A', label:'A', sub:"log('A')", type:'SYNC', snippet:"console.log('A')"},
+      {id:'B', label:'B', sub:"timer B", type:'TIMER', snippet:"setTimeout → B"},
+      {id:'C', label:'C', sub:"then C", type:'MICRO', snippet:"Promise.then → C"},
+      {id:'D', label:'D', sub:"log('D')", type:'SYNC', snippet:"console.log('D')"},
+    ],
+    answer:['A','D','C','B'],
+    explain:"<b>Stack → Micro → Timer:</b> Sync A, D first. Then microtask queue drains (C), then timer queue (B). Order: A → D → <b>C</b> → <b>B</b>."
+  },
+  {
+    title:"Commission V — Nested Microtasks",
+    stars:"★★★",
+    desc:"A microtask can queue another microtask. The queue drains completely before any timer fires.",
+    code:"console.log('A');\nPromise.resolve().then(()=>{\n  console.log('B');\n  queueMicrotask(()=> console.log('C'));\n});\nsetTimeout(()=> console.log('D'), 0);\nconsole.log('E');",
+    parts:[
+      {id:'A', label:'A', sub:"log('A')", type:'SYNC', snippet:"console.log('A')"},
+      {id:'B', label:'B', sub:"then B", type:'MICRO', snippet:"Promise.then → B"},
+      {id:'C', label:'C', sub:"micro C", type:'MICRO', snippet:"queueMicrotask → C"},
+      {id:'D', label:'D', sub:"timer D", type:'TIMER', snippet:"setTimeout → D"},
+      {id:'E', label:'E', sub:"log('E')", type:'SYNC', snippet:"console.log('E')"},
+    ],
+    answer:['A','E','B','C','D'],
+    explain:"<b>Nested drain:</b> Sync A, E. Microtask B runs and queues C — C is still a microtask, so it runs before timers. Finally timer D. A → E → B → C → D."
+  },
+  {
+    title:"Commission VI — Async/Await Chronometer",
+    stars:"★★★",
+    desc:"<code>await</code> pauses the async function; the code after <code>await</code> becomes a microtask.",
+    code:"console.log('A');\nasync function f(){\n  console.log('B');\n  await null;\n  console.log('C');\n}\nf();\nsetTimeout(()=> console.log('D'), 0);\nconsole.log('E');",
+    parts:[
+      {id:'A', label:'A', sub:"log('A')", type:'SYNC', snippet:"console.log('A')"},
+      {id:'B', label:'B', sub:"async B", type:'SYNC', snippet:"async f() → B"},
+      {id:'C', label:'C', sub:"await→C", type:'MICRO', snippet:"await → C (micro)"},
+      {id:'D', label:'D', sub:"timer D", type:'TIMER', snippet:"setTimeout → D"},
+      {id:'E', label:'E', sub:"log('E')", type:'SYNC', snippet:"console.log('E')"},
+    ],
+    answer:['A','B','E','C','D'],
+    explain:"<b>await = microtask:</b> A sync, then f() runs sync until <code>await</code> (B). E sync. The continuation C is queued as microtask, runs before timer D. A → B → E → C → D."
+  }
+];
+
+const RANKS = ["APPRENTICE","JOURNEYMAN","ARTIFICER","HOROLOGIST","MASTER","GRANDMASTER"];
+
+let idx = 0;
+let placed = []; // array length = parts.length, each entry partId or null
+let completed = JSON.parse(localStorage.getItem('clockwork_completed')||'[]');
+let hintUsed = false;
+
+const els = {
+  rankBadge: document.getElementById('rankBadge'),
+  progressText: document.getElementById('progressText'),
+  dots: document.getElementById('dots'),
+  cTitle: document.getElementById('cTitle'),
+  cStars: document.getElementById('cStars'),
+  cDesc: document.getElementById('cDesc'),
+  cCode: document.getElementById('cCode'),
+  tray: document.getElementById('tray'),
+  slots: document.getElementById('slots'),
+  runBtn: document.getElementById('runBtn'),
+  resetBtn: document.getElementById('resetBtn'),
+  hintBtn: document.getElementById('hintBtn'),
+  resultBox: document.getElementById('resultBox'),
+  resultTitle: document.getElementById('resultTitle'),
+  trace: document.getElementById('trace'),
+  explain: document.getElementById('explain'),
+  nextBtn: document.getElementById('nextBtn'),
+  retryBtn: document.getElementById('retryBtn'),
+};
+
+function save(){ localStorage.setItem('clockwork_completed', JSON.stringify(completed)); }
+
+function renderDots(){
+  els.dots.innerHTML='';
+  COMMISSIONS.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='dot'+(completed.includes(i)?' done':'')+(i===idx?' active':'');
+    d.onclick=()=>{ idx=i; loadCommission(); };
+    d.style.cursor='pointer';
+    els.dots.appendChild(d);
+  });
+}
+
+function loadCommission(){
+  const c = COMMISSIONS[idx];
+  placed = Array(c.parts.length).fill(null);
+  hintUsed=false;
+  els.cTitle.textContent = c.title;
+  els.cStars.textContent = c.stars;
+  els.cDesc.innerHTML = c.desc;
+  // syntax highlight simple
+  let codeHtml = c.code.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  codeHtml = codeHtml
+    .replace(/console\.log/g,'<span class="kw">console.log</span>')
+    .replace(/Promise|queueMicrotask|setTimeout|async|await|function/g,'<span class="fn">$&</span>')
+    .replace(/'([A-E])'/g,"'<span class=str>$1</span>'")
+    .replace(/\/\/.*/g,'<span class=cmt>$&</span>');
+  els.cCode.innerHTML = codeHtml;
+  els.progressText.textContent = `Commission ${idx+1} / ${COMMISSIONS.length}`;
+  const rankIdx = Math.min(Math.floor(completed.length), RANKS.length-1);
+  // if current completed includes idx, rank higher
+  let rank = RANKS[Math.min(completed.length, RANKS.length-1)];
+  els.rankBadge.textContent = rank;
+  renderDots();
+  renderAll();
+  els.resultBox.classList.remove('show');
+  els.runBtn.disabled=false;
+  els.runBtn.textContent='⚙ WIND & RUN';
+}
+
+function getPartById(id){
+  return COMMISSIONS[idx].parts.find(p=>p.id===id);
+}
+function isPlaced(id){
+  return placed.includes(id);
+}
+
+function renderAll(){
+  renderTray();
+  renderSlots();
+  updateRunState();
+}
+function renderTray(){
+  const c = COMMISSIONS[idx];
+  els.tray.innerHTML='';
+  c.parts.forEach(p=>{
+    if(isPlaced(p.id)) return;
+    const g = makeGearEl(p);
+    g.dataset.id=p.id;
+    g.addEventListener('pointerdown', onGearPointerDown);
+    g.addEventListener('click', ()=> placeNext(p.id));
+    els.tray.appendChild(g);
+  });
+  if(els.tray.children.length===0){
+    const empty=document.createElement('div');
+    empty.style.cssText='font-size:12px;color:#8c7a5a;padding:10px';
+    empty.textContent='All parts placed — arrange the mechanism below.';
+    els.tray.appendChild(empty);
+  }
+}
+function renderSlots(){
+  const c = COMMISSIONS[idx];
+  els.slots.innerHTML='';
+  for(let i=0;i<c.parts.length;i++){
+    const slot=document.createElement('div');
+    slot.className='slot'+(placed[i]?' filled':'');
+    slot.dataset.index=i;
+    slot.addEventListener('dragover', e=>e.preventDefault());
+    slot.addEventListener('dragenter', ()=>slot.classList.add('drag-over'));
+    slot.addEventListener('dragleave', ()=>slot.classList.remove('drag-over'));
+    slot.addEventListener('drop', onSlotDrop);
+    // pointer drop target
+    slot.addEventListener('pointerup', onSlotPointerUp);
+
+    const num=document.createElement('div');
+    num.className='num'; num.textContent=i+1;
+    slot.appendChild(num);
+
+    if(placed[i]){
+      const p=getPartById(placed[i]);
+      const g=makeGearEl(p, true);
+      g.dataset.id=p.id;
+      g.dataset.slot=i;
+      g.addEventListener('pointerdown', onGearPointerDown);
+      // clicking gear in slot removes it
+      g.addEventListener('click', (e)=>{ e.stopPropagation(); removeFromSlot(i); });
+      slot.appendChild(g);
+      const info=document.createElement('div');
+      info.className='slot-info';
+      info.innerHTML=`<div class="s-label">${p.snippet}</div><div class="s-meta">${p.type} • prints “${p.label}”</div>`;
+      slot.appendChild(info);
+      const rm=document.createElement('button');
+      rm.className='remove-btn'; rm.textContent='×';
+      rm.onclick=()=>removeFromSlot(i);
+      slot.appendChild(rm);
+    } else {
+      const ph=document.createElement('div');
+      ph.className='slot-empty';
+      ph.textContent='DROP GEAR HERE — TAP A PART ABOVE';
+      slot.appendChild(ph);
+      slot.onclick=()=>{
+        // if tray has selection? just do nothing, tap gear handles
+      };
+    }
+    els.slots.appendChild(slot);
+  }
+}
+function makeGearEl(p, small=false){
+  const d=document.createElement('div');
+  d.className='gear';
+  d.draggable=true;
+  d.innerHTML=`<div class="g-label">${p.label}</div><div class="g-sub">${p.sub}</div><div class="g-type t-${p.type}">${p.type}</div>`;
+  d.addEventListener('dragstart', e=>{
+    e.dataTransfer.setData('text/plain', p.id);
+    e.dataTransfer.effectAllowed='move';
+  });
+  return d;
+}
+function placeNext(partId){
+  const emptyIdx = placed.indexOf(null);
+  if(emptyIdx===-1) return;
+  placed[emptyIdx]=partId;
+  renderAll();
+  vibrate(20);
+}
+function removeFromSlot(i){
+  placed[i]=null;
+  renderAll();
+  vibrate(15);
+}
+function updateRunState(){
+  const filled = placed.every(v=>v!==null);
+  els.runBtn.disabled = !filled;
+  els.runBtn.style.opacity = filled? '1':'0.55';
+}
+
+// Drag & drop handlers
+function onSlotDrop(e){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const partId = e.dataTransfer.getData('text/plain');
+  if(!partId) return;
+  const idxSlot = parseInt(e.currentTarget.dataset.index,10);
+  // if part already placed elsewhere, remove it
+  const prev = placed.indexOf(partId);
+  if(prev!==-1) placed[prev]=null;
+  placed[idxSlot]=partId;
+  renderAll();
+}
+
+// Pointer drag (touch)
+let drag = null;
+let ghost = null;
+function onGearPointerDown(e){
+  if(e.button!==0 && e.pointerType==='mouse') return;
+  const gear = e.currentTarget;
+  const partId = gear.dataset.id;
+  if(!partId) return;
+  // prevent click after drag
+  drag = {partId, startX:e.clientX, startY:e.clientY, moved:false, sourceSlot: gear.dataset.slot};
+  gear.setPointerCapture(e.pointerId);
+  const move = (ev)=>{
+    if(!drag) return;
+    const dx = ev.clientX - drag.startX;
+    const dy = ev.clientY - drag.startY;
+    if(!drag.moved && Math.hypot(dx,dy) < 8) return;
+    if(!drag.moved){
+      drag.moved=true;
+      ghost=document.createElement('div');
+      ghost.className='ghost';
+      const p=getPartById(drag.partId);
+      ghost.innerHTML=`<div style="font-weight:900;font-size:20px;color:#2c1e0f">${p.label}</div><div style="font-size:9px;font-weight:800;background:rgba(255,255,255,0.6);padding:1px 5px;border-radius:999px">${p.sub}</div>`;
+      document.body.appendChild(ghost);
+      gear.style.opacity='0.3';
+    }
+    if(ghost){
+      ghost.style.left=ev.clientX+'px';
+      ghost.style.top=ev.clientY+'px';
+    }
+    // highlight slot under finger
+    document.querySelectorAll('.slot').forEach(s=>s.classList.remove('drag-over'));
+    const el = document.elementFromPoint(ev.clientX, ev.clientY);
+    const slot = el && el.closest('.slot');
+    if(slot) slot.classList.add('drag-over');
+  };
+  const up = (ev)=>{
+    gear.removeEventListener('pointermove', move);
+    gear.removeEventListener('pointerup', up);
+    gear.removeEventListener('pointercancel', up);
+    gear.style.opacity='';
+    if(ghost){ ghost.remove(); ghost=null; }
+    document.querySelectorAll('.slot').forEach(s=>s.classList.remove('drag-over'));
+    if(drag && drag.moved){
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const slot = el && el.closest('.slot');
+      const trayEl = el && el.closest('#tray');
+      if(slot){
+        const sIdx=parseInt(slot.dataset.index,10);
+        const prev=placed.indexOf(drag.partId);
+        if(prev!==-1) placed[prev]=null;
+        placed[sIdx]=drag.partId;
+        renderAll();
+        vibrate(20);
+      } else if(trayEl || el && el.closest('.inventory')){
+        // dropped back to tray
+        const prev=placed.indexOf(drag.partId);
+        if(prev!==-1){ placed[prev]=null; renderAll(); }
+      }
+      // prevent click
+      setTimeout(()=>{ if(drag) drag=null; }, 50);
+      e.preventDefault();
+      e.stopPropagation();
+    } else {
+      drag=null;
+    }
+  };
+  gear.addEventListener('pointermove', move);
+  gear.addEventListener('pointerup', up);
+  gear.addEventListener('pointercancel', up);
+}
+function onSlotPointerUp(e){
+  // handled in drag up
+}
+
+function vibrate(ms){
+  try{ navigator.vibrate && navigator.vibrate(ms); }catch{}
+}
+
+// Wind & Run
+els.runBtn.addEventListener('click', run);
+els.resetBtn.addEventListener('click', ()=>{
+  placed = Array(COMMISSIONS[idx].parts.length).fill(null);
+  els.resultBox.classList.remove('show');
+  renderAll();
+});
+els.hintBtn.addEventListener('click', ()=>{
+  const c=COMMISSIONS[idx];
+  // highlight first wrong or give textual hint
+  if(hintUsed){
+    alert(c.explain.replace(/<[^>]+>/g,''));
+    return;
+  }
+  hintUsed=true;
+  // place one correct gear if empty, else hint
+  const answer=c.answer;
+  // find first empty or wrong
+  for(let i=0;i<placed.length;i++){
+    if(placed[i]!==answer[i]){
+      // if empty, fill it
+      if(placed[i]===null){
+        placed[i]=answer[i];
+        renderAll();
+        vibrate(30);
+        break;
+      } else {
+        // highlight correct
+        const slotEls=document.querySelectorAll('.slot');
+        slotEls[i].style.outline='2px solid #ffd78a';
+        setTimeout(()=>slotEls[i].style.outline='',1200);
+        break;
+      }
+    }
+  }
+  if(placed.every((v,i)=>v===answer[i])){
+    // all correct now
+  }
+});
+els.retryBtn.addEventListener('click', ()=>{
+  placed = Array(COMMISSIONS[idx].parts.length).fill(null);
+  els.resultBox.classList.remove('show');
+  renderAll();
+  window.scrollTo({top:0, behavior:'smooth'});
+});
+els.nextBtn.addEventListener('click', ()=>{
+  if(idx < COMMISSIONS.length-1){
+    idx++;
+    loadCommission();
+    window.scrollTo({top:0, behavior:'smooth'});
+  } else {
+    alert('You have mastered all commissions! Grandmaster rank achieved.');
+  }
+});
+
+function run(){
+  if(placed.some(v=>v===null)) return;
+  const c=COMMISSIONS[idx];
+  const answer=c.answer;
+  // wind animation
+  els.runBtn.disabled=true;
+  els.runBtn.textContent='⏳ WINDING...';
+  document.querySelectorAll('.gear').forEach(g=>g.classList.add('spin'));
+  // sound tick via Web Audio
+  playTickSequence(placed.length);
+  setTimeout(()=>{
+    document.querySelectorAll('.gear').forEach(g=>g.classList.remove('spin'));
+    // evaluate
+    let correctCount=0;
+    const slotEls=document.querySelectorAll('.slot');
+    slotEls.forEach((s,i)=>{
+      s.classList.remove('correct','wrong');
+      if(placed[i]===answer[i]){
+        s.classList.add('correct'); correctCount++;
+      } else {
+        s.classList.add('wrong');
+      }
+    });
+    const perfect = correctCount===answer.length;
+    showResult(perfect, correctCount);
+    els.runBtn.textContent='⚙ WIND & RUN';
+    els.runBtn.disabled=false;
+    if(perfect && !completed.includes(idx)){
+      completed.push(idx);
+      save();
+      renderDots();
+      const rankIdx=Math.min(completed.length, RANKS.length-1);
+      els.rankBadge.textContent=RANKS[rankIdx];
+      playSuccess();
+      vibrate([30,40,30]);
+    } else if(!perfect){
+      playFail();
+      vibrate([50,30,50]);
+    }
+  }, 900);
+}
+
+function showResult(perfect, correctCount){
+  const c=COMMISSIONS[idx];
+  els.resultBox.classList.add('show');
+  els.resultTitle.textContent = perfect ? `✓ PERFECT — ${correctCount}/${c.answer.length} GEARS ALIGNED` : `✗ MISALIGNED — ${correctCount}/${c.answer.length} CORRECT`;
+  els.resultTitle.style.color = perfect ? '#a8e6a0' : '#ff8a80';
+  // trace
+  els.trace.innerHTML='';
+  c.answer.forEach((id,i)=>{
+    const p=getPartById(id);
+    const userId=placed[i];
+    const userP=userId?getPartById(userId):null;
+    const ok = userId===id;
+    const step=document.createElement('div');
+    step.className='step '+(ok?'ok':'bad');
+    const why = p.type==='SYNC' ? 'Call stack (sync)' : p.type==='MICRO' ? 'Microtask queue' : 'Timer queue';
+    step.innerHTML=`<div class="step-num">${i+1}</div>
+      <div style="flex:1">
+        <div class="step-text">${ok?'✓':'✗'} Expected <b>${p.label}</b> <span style="opacity:0.7">(${p.snippet})</span> — <span class="step-why">${why}</span></div>
+        ${!ok && userP ? `<div style="font-size:11px;color:#ff8a80;margin-top:2px">You placed ${userP.label} (${userP.snippet}) here</div>`:''}
+      </div>
+      <div style="font-size:10px;font-weight:800;padding:3px 6px;border-radius:999px;background:${p.type==='SYNC'?'#2e7d32':p.type==='MICRO'?'#6a1b9a':'#b85c00'};color:#fff">${p.type}</div>`;
+    els.trace.appendChild(step);
+  });
+  els.explain.innerHTML = c.explain + (perfect ? `<br><br><b style="color:#a8e6a0">Commission complete!</b> Tap NEXT to advance.` : `<br><br><b>Tip:</b> Remember: <b>Sync → Microtasks → Timers</b>. Microtasks drain fully before any timer.`);
+  els.nextBtn.style.display = perfect ? 'flex' : 'none';
+  if(perfect && idx===COMMISSIONS.length-1){
+    els.nextBtn.textContent='★ MASTERED';
+    els.nextBtn.style.display='flex';
+  } else if(perfect){
+    els.nextBtn.textContent='NEXT COMMISSION →';
+  }
+  els.resultBox.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+// Web Audio ticks
+let audioCtx=null;
+function ensureAudio(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+}
+function tone(freq, dur, vol=0.2, type='sine', when=0){
+  ensureAudio();
+  const o=audioCtx.createOscillator();
+  const g=audioCtx.createGain();
+  o.type=type; o.frequency.value=freq;
+  g.gain.value=vol;
+  o.connect(g); g.connect(audioCtx.destination);
+  const t=audioCtx.currentTime+when;
+  o.start(t); g.gain.exponentialRampToValueAtTime(0.0001, t+dur); o.stop(t+dur);
+}
+function playTickSequence(n){
+  ensureAudio();
+  for(let i=0;i<n;i++){
+    tone(900+i*80, 0.12, 0.18, 'square', i*0.12);
+  }
+}
+function playSuccess(){
+  ensureAudio();
+  [0,0.12,0.24,0.36].forEach((d,i)=> tone([523,659,784,1046][i],0.25,0.22,'sine',d));
+}
+function playFail(){
+  ensureAudio();
+  tone(180,0.35,0.25,'sawtooth',0); tone(140,0.35,0.25,'sawtooth',0.18);
+}
+
+// init
+loadCommission();
+</script>
+</body>
+</html>

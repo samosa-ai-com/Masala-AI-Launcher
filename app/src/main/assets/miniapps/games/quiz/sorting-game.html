@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sort Sprint</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f1218;--card:#1a1f2e;--card2:#232a3d;--line:#2c344d;--accent:#38bdf8;--good:#4ade80;--bad:#f87171;--warn:#facc15;--text:#eef0ff;--muted:#8e94b8}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{max-width:428px;margin:0 auto;overflow-x:hidden}
+button{font:inherit}
+.header{position:sticky;top:0;z-index:10;background:rgba(15,18,24,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#38bdf8,#6366f1);display:grid;place-items:center;font-size:18px}
+.brand h1{font-size:14px;line-height:1.1}
+.brand p{font-size:11px;color:var(--muted)}
+.pill{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.pill b{color:var(--text)}
+.wrap{padding:12px 12px 18px}
+.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
+.hudItem{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.hudItem b{font-size:18px;display:block}
+.hudItem span{font-size:11px;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;padding:14px}
+.deckBar{display:flex;gap:6px;overflow:auto;padding-bottom:6px;margin-bottom:10px}
+.deckBtn{white-space:nowrap;min-height:36px;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card2);color:var(--muted);font-size:12px;font-weight:700}
+.deckBtn.active{background:var(--accent);color:#0a0f1e;border-color:var(--accent)}
+.itemCard{min-height:140px;background:var(--card2);border:2px solid var(--line);border-radius:16px;display:grid;place-items:center;text-align:center;padding:16px;margin:12px 0;transition:transform .15s, border-color .15s}
+.itemCard.correct{border-color:var(--good);transform:scale(1.02)}
+.itemCard.wrong{border-color:var(--bad);transform:scale(.98)}
+.itemCard .emoji{font-size:48px}
+.itemCard .word{font-size:20px;font-weight:800;margin-top:6px}
+.itemCard .hint{font-size:12px;color:var(--muted);margin-top:4px}
+.bins{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bin{min-height:64px;border-radius:14px;border:2px solid var(--line);background:var(--card2);color:var(--text);font-weight:700;font-size:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:8px}
+.bin small{font-size:11px;color:var(--muted);font-weight:600}
+.bin:active{transform:scale(.97)}
+.bin.good{border-color:var(--good);background:rgba(74,222,128,.12)}
+.bin.bad{border-color:var(--bad);background:rgba(248,113,113,.12)}
+.progress{height:8px;background:#0f1218;border-radius:999px;overflow:hidden;border:1px solid var(--line);margin:10px 0}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,#38bdf8,#4ade80);width:0%;transition:width .3s}
+.controls{display:flex;gap:8px;margin-top:10px}
+.btn{border:0;border-radius:12px;padding:12px 14px;font-weight:700;font-size:14px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:1}
+.btnPrimary{background:linear-gradient(135deg,#38bdf8,#6366f1);color:#0a0f1e}
+.btnGhost{background:var(--card2);border:1px solid var(--line);color:var(--text)}
+.overlay{position:fixed;inset:0;background:rgba(15,18,24,.78);display:none;place-items:center;z-index:20;padding:16px}
+.overlay.open{display:grid}
+.modalCard{width:100%;max-width:360px;background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;text-align:center}
+.modalCard .body{padding:16px}
+.hidden{display:none !important}
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="brand">
+    <div class="logo">🗂️</div>
+    <div>
+      <h1>Sort Sprint</h1>
+      <p>Tap the right bin • Fast!</p>
+    </div>
+  </div>
+  <div class="pill">Best <b id="bestEl">0</b></div>
+</header>
+
+<div class="wrap">
+  <div class="hud">
+    <div class="hudItem"><b id="scoreEl">0</b><span>Score</span></div>
+    <div class="hudItem"><b id="streakEl">0</b><span>Streak</span></div>
+    <div class="hudItem"><b id="timerEl">30</b><span>Seconds</span></div>
+  </div>
+
+  <div class="deckBar" id="deckBar"></div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="font-size:14px" id="deckTitle">Grocery</h2>
+      <span style="font-size:12px;color:var(--muted)" id="progressText">0 / 0</span>
+    </div>
+    <div class="progress"><i id="progressBar"></i></div>
+
+    <div class="itemCard" id="itemCard">
+      <div>
+        <div class="emoji" id="itemEmoji">👋</div>
+        <div class="word" id="itemWord">Tap START</div>
+        <div class="hint" id="itemHint">Sort as fast as you can</div>
+      </div>
+    </div>
+
+    <div class="bins" id="binsEl"></div>
+
+    <div class="controls">
+      <button class="btn btnGhost" id="restartBtn">↻ Restart</button>
+      <button class="btn btnPrimary" id="startBtn">▶ Start</button>
+    </div>
+  </div>
+
+  <div style="font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px;line-height:1.4;text-align:center">
+    💡 One item at a time — tap the correct bin. <b style="color:var(--good)">+10</b> per correct, streak bonus, <b style="color:var(--bad)">-5</b> for miss. 30 seconds!
+  </div>
+</div>
+
+<div class="overlay" id="winOverlay">
+  <div class="modalCard">
+    <div style="height:6px;background:linear-gradient(90deg,#38bdf8,#4ade80,#facc15)"></div>
+    <div class="body">
+      <div style="font-size:32px" id="winEmoji">🎉</div>
+      <h3 style="font-size:18px;margin-top:6px" id="winTitle">Time's Up!</h3>
+      <p style="font-size:13px;color:var(--muted);margin-top:4px" id="winDesc">You scored 0</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0">
+        <div style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px"><b id="winScore" style="font-size:18px;display:block">0</b><span style="font-size:11px;color:var(--muted)">Score</span></div>
+        <div style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px"><b id="winBest" style="font-size:18px;display:block">0</b><span style="font-size:11px;color:var(--muted)">Best</span></div>
+      </div>
+      <button class="btn btnPrimary" style="width:100%;min-height:52px" id="playAgainBtn">↻ Play Again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DECKS={
+  Grocery:{bins:['Produce','Dairy','Bakery','Meat'], items:[
+    {w:'Apple',e:'🍎',b:'Produce'},{w:'Milk',e:'🥛',b:'Dairy'},{w:'Bread',e:'🍞',b:'Bakery'},{w:'Steak',e:'🥩',b:'Meat'},
+    {w:'Banana',e:'🍌',b:'Produce'},{w:'Cheese',e:'🧀',b:'Dairy'},{w:'Croissant',e:'🥐',b:'Bakery'},{w:'Chicken',e:'🍗',b:'Meat'},
+    {w:'Carrot',e:'🥕',b:'Produce'},{w:'Yogurt',e:'🥣',b:'Dairy'},{w:'Bagel',e:'🥯',b:'Bakery'},{w:'Bacon',e:'🥓',b:'Meat'},
+    {w:'Grapes',e:'🍇',b:'Produce'},{w:'Butter',e:'🧈',b:'Dairy'},{w:'Pretzel',e:'🥨',b:'Bakery'},{w:'Sausage',e:'🌭',b:'Meat'}
+  ]},
+  Habitat:{bins:['Ocean','Desert','Forest','Arctic'], items:[
+    {w:'Shark',e:'🦈',b:'Ocean'},{w:'Cactus',e:'🌵',b:'Desert'},{w:'Deer',e:'🦌',b:'Forest'},{w:'Penguin',e:'🐧',b:'Arctic'},
+    {w:'Whale',e:'🐋',b:'Ocean'},{w:'Camel',e:'🐪',b:'Desert'},{w:'Owl',e:'🦉',b:'Forest'},{w:'Polar Bear',e:'🐻‍❄️',b:'Arctic'},
+    {w:'Octopus',e:'🐙',b:'Ocean'},{w:'Scorpion',e:'🦂',b:'Desert'},{w:'Fox',e:'🦊',b:'Forest'},{w:'Seal',e:'🦭',b:'Arctic'}
+  ]},
+  Recycle:{bins:['Paper','Plastic','Glass','Compost'], items:[
+    {w:'Newspaper',e:'📰',b:'Paper'},{w:'Bottle',e:'🧴',b:'Plastic'},{w:'Jar',e:'🫙',b:'Glass'},{w:'Banana Peel',e:'🍌',b:'Compost'},
+    {w:'Cardboard',e:'📦',b:'Paper'},{w:'Bag',e:'🛍️',b:'Plastic'},{w:'Wine Glass',e:'🍷',b:'Glass'},{w:'Apple Core',e:'🍎',b:'Compost'},
+    {w:'Magazine',e:'📚',b:'Paper'},{w:'Straw',e:'🥤',b:'Plastic'},{w:'Mirror',e:'🪞',b:'Glass'},{w:'Leaves',e:'🍂',b:'Compost'}
+  ]},
+  Mood:{bins:['Happy','Calm','Energetic','Focused'], items:[
+    {w:'Laughing',e:'😂',b:'Happy'},{w:'Meditating',e:'🧘',b:'Calm'},{w:'Running',e:'🏃',b:'Energetic'},{w:'Reading',e:'📖',b:'Focused'},
+    {w:'Celebrating',e:'🎉',b:'Happy'},{w:'Sleeping',e:'😴',b:'Calm'},{w:'Dancing',e:'💃',b:'Energetic'},{w:'Coding',e:'💻',b:'Focused'},
+    {w:'Smiling',e:'😊',b:'Happy'},{w:'Breathing',e:'🌿',b:'Calm'},{w:'Jumping',e:'🤸',b:'Energetic'},{w:'Studying',e:'📝',b:'Focused'}
+  ]}
+};
+
+let deckName='Grocery', queue=[], current=null, score=0, streak=0, best=parseInt(localStorage.getItem('sort-best')||'0',10), timer=30, timerId=null, playing=false, total=0;
+
+function updateBest(){ document.getElementById('bestEl').textContent=best; }
+updateBest();
+
+function buildDeckBar(){
+  const bar=document.getElementById('deckBar');
+  bar.innerHTML='';
+  Object.keys(DECKS).forEach(name=>{
+    const btn=document.createElement('button');
+    btn.className='deckBtn'+(name===deckName?' active':'');
+    btn.textContent=name;
+    btn.onclick=()=>{ deckName=name; buildDeckBar(); buildBins(); resetGame(); };
+    bar.appendChild(btn);
+  });
+}
+function buildBins(){
+  const bins=DECKS[deckName].bins;
+  document.getElementById('deckTitle').textContent=deckName;
+  const el=document.getElementById('binsEl');
+  el.innerHTML='';
+  bins.forEach(b=>{
+    const btn=document.createElement('button');
+    btn.className='bin';
+    btn.innerHTML=`${b}<small>Tap</small>`;
+    btn.onclick=()=>choose(b, btn);
+    el.appendChild(btn);
+  });
+}
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function nextItem(){
+  if(!queue.length) queue=shuffle([...DECKS[deckName].items]);
+  current=queue.pop();
+  total++;
+  document.getElementById('itemEmoji').textContent=current.e;
+  document.getElementById('itemWord').textContent=current.w;
+  document.getElementById('itemHint').textContent='Sort into: '+DECKS[deckName].bins.join(' • ');
+  document.getElementById('progressText').textContent=total+' sorted';
+  document.getElementById('progressBar').style.width=Math.min(100, total*4)+'%';
+}
+
+function choose(bin, btnEl){
+  if(!playing || !current) return;
+  const correct = bin===current.b;
+  const card=document.getElementById('itemCard');
+  if(correct){
+    streak++;
+    let pts=10;
+    if(streak>=3) pts+=5;
+    if(streak>=5) pts+=5;
+    score+=pts;
+    card.classList.add('correct');
+    btnEl.classList.add('good');
+    setTimeout(()=>{ card.classList.remove('correct'); btnEl.classList.remove('good'); },200);
+  } else {
+    streak=0;
+    score=Math.max(0, score-5);
+    card.classList.add('wrong');
+    btnEl.classList.add('bad');
+    setTimeout(()=>{ card.classList.remove('wrong'); btnEl.classList.remove('bad'); },300);
+    if(navigator.vibrate) navigator.vibrate(80);
+  }
+  document.getElementById('scoreEl').textContent=score;
+  document.getElementById('streakEl').textContent=streak;
+  nextItem();
+}
+
+function startGame(){
+  playing=true; score=0; streak=0; total=0; timer=30;
+  queue=shuffle([...DECKS[deckName].items]);
+  document.getElementById('scoreEl').textContent=0;
+  document.getElementById('streakEl').textContent=0;
+  document.getElementById('timerEl').textContent=30;
+  document.getElementById('winOverlay').classList.remove('open');
+  document.getElementById('startBtn').textContent='⏸ Pause';
+  nextItem();
+  clearInterval(timerId);
+  timerId=setInterval(()=>{
+    if(!playing) return;
+    timer--;
+    document.getElementById('timerEl').textContent=timer;
+    if(timer<=0) endGame();
+  },1000);
+}
+
+function endGame(){
+  playing=false;
+  clearInterval(timerId);
+  if(score>best){ best=score; localStorage.setItem('sort-best', best); updateBest(); }
+  document.getElementById('winScore').textContent=score;
+  document.getElementById('winBest').textContent=best;
+  document.getElementById('winDesc').textContent=`Sorted ${total} items in 30s`;
+  document.getElementById('winEmoji').textContent= score>=100?'🏆': score>=50?'🎉':'👍';
+  document.getElementById('winTitle').textContent= score>=100?'Amazing!': score>=50?'Great Job!':'Time\'s Up!';
+  document.getElementById('winOverlay').classList.add('open');
+  document.getElementById('startBtn').textContent='▶ Start';
+}
+
+function resetGame(){
+  playing=false; clearInterval(timerId);
+  score=0; streak=0; total=0; timer=30;
+  document.getElementById('scoreEl').textContent=0;
+  document.getElementById('streakEl').textContent=0;
+  document.getElementById('timerEl').textContent=30;
+  document.getElementById('progressBar').style.width='0%';
+  document.getElementById('progressText').textContent='0 / 0';
+  document.getElementById('itemEmoji').textContent='👋';
+  document.getElementById('itemWord').textContent='Tap START';
+  document.getElementById('itemHint').textContent='Sort as fast as you can';
+  document.getElementById('startBtn').textContent='▶ Start';
+  document.getElementById('winOverlay').classList.remove('open');
+}
+
+document.getElementById('startBtn').onclick=()=>{
+  if(playing){ playing=false; document.getElementById('startBtn').textContent='▶ Resume'; clearInterval(timerId); }
+  else if(timer===30 && score===0) startGame();
+  else { playing=true; document.getElementById('startBtn').textContent='⏸ Pause'; timerId=setInterval(()=>{ if(!playing) return; timer--; document.getElementById('timerEl').textContent=timer; if(timer<=0) endGame(); },1000); }
+};
+document.getElementById('restartBtn').onclick=resetGame;
+document.getElementById('playAgainBtn').onclick=startGame;
+document.getElementById('winOverlay').addEventListener('click', e=>{ if(e.target.id==='winOverlay') e.currentTarget.classList.remove('open'); });
+
+buildDeckBar(); buildBins();
+</script>
+</body>
+</html>

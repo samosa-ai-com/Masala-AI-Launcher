@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Cave Descent</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#0b0f14;color:#e8eef6;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center;background:radial-gradient(1200px 600px at 50% -10%, #1a2a3a 0%, #0b0f14 55%, #070a0e 100%)}
+.wrap{width:100%;max-width:428px;min-width:360px;min-height:100vh;display:flex;flex-direction:column;background:#0e141c;position:relative;overflow:hidden;box-shadow:0 0 40px rgba(0,0,0,.6)}
+.hud{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:linear-gradient(180deg,#16202e,#0f1824);border-bottom:2px solid #1e2f45;flex-shrink:0}
+.hud-left,.hud-right{display:flex;align-items:center;gap:8px}
+.pill{background:#0b1220;border:1px solid #24344d;border-radius:999px;padding:6px 10px;font-size:13px;font-weight:700;letter-spacing:.2px;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.pill b{color:#7ec8ff}
+.hearts{display:flex;gap:4px}
+.heart{width:18px;height:18px;border-radius:4px;background:linear-gradient(180deg,#ff5a5a,#c81e1e);display:grid;place-items:center;font-size:11px;box-shadow:0 2px 6px rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.15)}
+.heart.off{background:#1a2535;border-color:#24344d;opacity:.5}
+.heart.hit{animation:hit .35s}
+@keyframes hit{0%{transform:scale(1.3)}100%{transform:scale(1)}}
+.canvas-box{position:relative;flex:1;display:flex;align-items:center;justify-content:center;background:#0a0f18;padding:6px 8px 8px}
+.canvas-frame{position:relative;width:100%;aspect-ratio:400/700;max-height:calc(100vh - 56px - 96px - 12px);background:#0a0f18;border-radius:16px;overflow:hidden;border:1px solid #1e2f45;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04), 0 10px 30px rgba(0,0,0,.5)}
+canvas{width:100%;height:100%;display:block;touch-action:none}
+.top-danger{position:absolute;left:0;right:0;top:0;height:10px;background:linear-gradient(90deg,#ff2b2b,#ff6b2b);box-shadow:0 4px 12px rgba(255,43,43,.6);z-index:2;pointer-events:none}
+.top-danger::after{content:"▲ DANGER — KEEP DESCENDING ▲";position:absolute;left:50%;top:14px;transform:translateX(-50%);font-size:9px;letter-spacing:1.2px;font-weight:800;color:#ffb3b3;white-space:nowrap;background:rgba(40,10,10,.9);padding:2px 8px;border-radius:999px;border:1px solid rgba(255,80,80,.5)}
+.controls{height:96px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:10px;background:linear-gradient(180deg,#0f1824,#0b1220);border-top:2px solid #1e2f45;flex-shrink:0}
+.btn{border:none;border-radius:16px;background:linear-gradient(180deg,#1e2f4a,#16233a);border:1px solid #2a4060;color:#dbe8ff;font-weight:800;font-size:18px;letter-spacing:.4px;display:flex;align-items:center;justify-content:center;gap:8px;user-select:none;touch-action:none;box-shadow:0 6px 16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08);min-height:72px}
+.btn:active{transform:scale(.97);background:linear-gradient(180deg,#243a5e,#1a2c4a)}
+.btn.jump{background:linear-gradient(180deg,#ffcc33,#ff9f0a);color:#1a1200;border-color:#ffbf1a;box-shadow:0 6px 16px rgba(255,159,10,.35), inset 0 1px 0 rgba(255,255,255,.6);font-size:20px}
+.btn.jump:active{background:linear-gradient(180deg,#ffd84d,#ffb11a)}
+.btn small{font-size:11px;opacity:.7;font-weight:700}
+.overlay{position:absolute;inset:0;background:rgba(6,10,16,.78);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+.card{width:100%;max-width:360px;background:linear-gradient(180deg,#14202f,#0f1826);border:1px solid #2a4060;border-radius:20px;padding:18px 16px;box-shadow:0 20px 50px rgba(0,0,0,.6);text-align:center}
+.logo{font-size:28px;font-weight:900;letter-spacing:.6px;line-height:1}
+.logo span{background:linear-gradient(90deg,#7ec8ff,#a8ffce);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{font-size:13px;color:#9fb3cc;margin-top:6px;line-height:1.4}
+.badges{display:flex;gap:8px;justify-content:center;margin:12px 0;flex-wrap:wrap}
+.badge{font-size:11px;font-weight:800;letter-spacing:.6px;padding:6px 10px;border-radius:999px;background:#0b1220;border:1px solid #24344d;color:#b9cce6}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:14px 0}
+.stat{background:#0b1220;border:1px solid #1e2f45;border-radius:14px;padding:10px 6px}
+.stat b{display:block;font-size:18px;color:#fff}
+.stat span{font-size:10px;letter-spacing:.8px;color:#8aa0bd;font-weight:800}
+.row{display:flex;gap:10px;margin-top:12px}
+.cta{flex:1;border:none;border-radius:14px;padding:14px 12px;font-weight:900;font-size:15px;letter-spacing:.3px;cursor:pointer}
+.cta.primary{background:linear-gradient(180deg,#2af598,#009efd);color:#001018;box-shadow:0 8px 20px rgba(0,180,220,.35)}
+.cta.ghost{background:#0b1220;color:#cfe0ff;border:1px solid #2a4060}
+.how{text-align:left;background:#0b1220;border:1px solid #1e2f45;border-radius:14px;padding:12px;margin-top:12px}
+.how h4{font-size:12px;letter-spacing:.8px;color:#7ec8ff;margin-bottom:6px}
+.how ul{margin-left:16px;font-size:12px;line-height:1.5;color:#b9cce6}
+.how li{margin:2px 0}
+.verdict{margin-top:10px;font-size:12px;font-weight:800;letter-spacing:.4px;padding:8px 10px;border-radius:999px;background:rgba(126,200,255,.12);border:1px solid rgba(126,200,255,.25);color:#cfe8ff}
+.hidden{display:none !important}
+.kbd{font-size:10px;background:#0b1220;border:1px solid #2a4060;border-bottom-width:2px;padding:2px 6px;border-radius:6px;color:#9fb3cc}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <div class="hud">
+    <div class="hud-left">
+      <div class="pill">⛏ <b id="depth">0</b> m</div>
+      <div class="pill">💎 <b id="gems">0</b></div>
+    </div>
+    <div class="hud-right">
+      <div class="hearts" id="hearts"></div>
+      <div class="pill">★ <b id="score">0</b></div>
+    </div>
+  </div>
+
+  <div class="canvas-box">
+    <div class="canvas-frame" id="frame">
+      <div class="top-danger" id="dangerBar"></div>
+      <canvas id="c" width="400" height="700"></canvas>
+
+      <!-- Menu -->
+      <div class="overlay" id="menu">
+        <div class="card">
+          <div class="logo">⛏ CAVE <span>DESCENT</span></div>
+          <div class="sub">Auto-scrolling descent. Run, jump ledges, grab gems, dodge bats & falling spikes. Don't get crushed!</div>
+          <div class="badges"><span class="badge">3 LIVES</span><span class="badge">DEPTH ×10 + GEMS ×120</span><span class="badge">PORTRAIT ONLY</span></div>
+          <div class="stats">
+            <div class="stat"><b id="bestDepth">0m</b><span>BEST DEPTH</span></div>
+            <div class="stat"><b id="bestScore">0</b><span>BEST SCORE</span></div>
+            <div class="stat"><b id="bestGems">0</b><span>BEST GEMS</span></div>
+          </div>
+          <div class="row"><button class="cta primary" id="playBtn">▶ PLAY DESCENT</button><button class="cta ghost" id="howBtn">HOW TO</button></div>
+          <div class="how hidden" id="howBox">
+            <h4>CONTROLS & TIPS</h4>
+            <ul>
+              <li><b>Hold ◀ ▶</b> to run — large 72px touch targets</li>
+              <li><b>Tap JUMP</b> — hold for higher jump. Coyote time + buffer helps at edges</li>
+              <li>Red bar at top is the cave closing in — keep moving down!</li>
+              <li>💎 gems = 120 pts • Depth = 10 pts per meter • Crumble ledges collapse!</li>
+              <li>Bats patrol, spikes fall faster as you go deeper</li>
+            </ul>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:#6e85a6">Tip: Use <span class="kbd">A</span> <span class="kbd">D</span> <span class="kbd">SPACE</span> on keyboard too</div>
+        </div>
+      </div>
+
+      <!-- Game Over -->
+      <div class="overlay hidden" id="over">
+        <div class="card">
+          <div style="font-size:13px;letter-spacing:1px;font-weight:800;color:#ff6b6b">▮ GAME OVER ▮</div>
+          <div class="logo" style="font-size:22px;margin-top:6px">DESCENT ENDED</div>
+          <div class="stats">
+            <div class="stat"><b id="oDepth">0m</b><span>DEPTH</span></div>
+            <div class="stat"><b id="oGems">0</b><span>GEMS</span></div>
+            <div class="stat"><b id="oScore">0</b><span>SCORE</span></div>
+          </div>
+          <div class="verdict" id="verdict">Nice run!</div>
+          <div class="row"><button class="cta primary" id="retryBtn">↻ TRY AGAIN</button><button class="cta ghost" id="menuBtn">MENU</button></div>
+          <div style="margin-top:10px;font-size:11px;color:#8aa0bd">Best: <b id="oBest" style="color:#fff">0</b> • Depth formula: Depth×10 + Gems×120</div>
+        </div>
+      </div>
+
+      <!-- Pause -->
+      <div class="overlay hidden" id="pause">
+        <div class="card">
+          <div style="font-weight:900;letter-spacing:.6px">⏸ PAUSED</div>
+          <div class="sub">Take a breath. The cave waits.</div>
+          <div class="row"><button class="cta primary" id="resumeBtn">▶ RESUME</button><button class="cta ghost" id="quitBtn">QUIT</button></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="leftBtn" aria-label="Move left">◀ <small>RUN</small></button>
+    <button class="btn jump" id="jumpBtn" aria-label="Jump">▲ JUMP</button>
+    <button class="btn" id="rightBtn" aria-label="Move right"><small>RUN</small> ▶</button>
+  </div>
+</div>
+
+<script>
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+const W=400, H=700;
+const depthEl=document.getElementById('depth'), gemsEl=document.getElementById('gems'), scoreEl=document.getElementById('score'), heartsEl=document.getElementById('hearts');
+const menu=document.getElementById('menu'), over=document.getElementById('over'), pauseEl=document.getElementById('pause');
+const oDepth=document.getElementById('oDepth'), oGems=document.getElementById('oGems'), oScore=document.getElementById('oScore'), verdict=document.getElementById('verdict'), oBest=document.getElementById('oBest');
+const bestDepthEl=document.getElementById('bestDepth'), bestScoreEl=document.getElementById('bestScore'), bestGemsEl=document.getElementById('bestGems');
+
+let state='menu'; // menu, playing, paused, over
+let cameraY=0, scrollSpeed=1.45, depth=0, gemsCollected=0, score=0, lives=3;
+let player, platforms=[], gems=[], bats=[], spikes=[], particles=[], stalactites=[];
+let nextGenY=0, spikeTimer=0, shake=0, invuln=0;
+let leftHeld=false, rightHeld=false, jumpHeld=false, jumpBuffer=0, coyote=0;
+let lastTime=0, rafId=null;
+
+const GRAV=0.62, MOVE=3.7, JUMP=-11.2, JUMP_HOLD_LIFT=-0.42, FRICTION=0.82;
+const PLAYER_W=22, PLAYER_H=28;
+
+function loadBests(){
+  return {
+    d: parseInt(localStorage.getItem('cave_best_depth')||'0'),
+    s: parseInt(localStorage.getItem('cave_best_score')||'0'),
+    g: parseInt(localStorage.getItem('cave_best_gems')||'0')
+  };
+}
+function saveBests(){
+  const b=loadBests();
+  if(depth>b.d) localStorage.setItem('cave_best_depth', depth);
+  if(score>b.s) localStorage.setItem('cave_best_score', score);
+  if(gemsCollected>b.g) localStorage.setItem('cave_best_gems', gemsCollected);
+  updateBestUI();
+}
+function updateBestUI(){
+  const b=loadBests();
+  bestDepthEl.textContent=b.d+'m';
+  bestScoreEl.textContent=b.s;
+  bestGemsEl.textContent=b.g;
+}
+updateBestUI();
+
+function resetGame(){
+  cameraY=0; scrollSpeed=1.45; depth=0; gemsCollected=0; score=0; lives=3; invuln=0; shake=0;
+  platforms=[]; gems=[]; bats=[]; spikes=[]; particles=[]; stalactites=[];
+  nextGenY=120;
+  // stalactites decor
+  for(let i=0;i<12;i++) stalactites.push({x: Math.random()*W, y: -200 + Math.random()*1200, w: 8+Math.random()*18, h: 18+Math.random()*40});
+  // starting platforms
+  platforms.push({x:140,y:620,w:120,h:14,type:'normal',timer:0,broken:false});
+  platforms.push({x:40,y:520,w:100,h:14,type:'normal',timer:0,broken:false});
+  platforms.push({x:240,y:480,w:110,h:14,type:'normal',timer:0,broken:false});
+  platforms.push({x:120,y:380,w:90,h:14,type:'crumble',timer:0,broken:false});
+  player={x:190,y:580,w:PLAYER_W,h:PLAYER_H,vx:0,vy:0,onGround:false,dir:1};
+  nextGenY=360;
+  ensureContent(true);
+  updateHUD();
+}
+
+function ensureContent(initial=false){
+  // generate ahead of camera
+  let guard=0;
+  while(nextGenY < cameraY + H + 700 && guard<30){
+    guard++;
+    const gapY = 55 + Math.random()*70;
+    const y = nextGenY + gapY;
+    const w = 68 + Math.random()*95;
+    const x = 12 + Math.random()*(W - w - 24);
+    const roll=Math.random();
+    let type='normal';
+    if(roll<0.14) type='crumble';
+    else if(roll<0.18) type='bouncy';
+    platforms.push({x,y,w,h:14,type,timer:0,broken:false,phase:Math.random()*Math.PI*2});
+    // gem
+    if(Math.random()<0.52){
+      gems.push({x: x + w/2 -10 + (Math.random()*20-10), y: y-30, w:18,h:18, collected:false, bob:Math.random()*6.28, t:0});
+    }
+    // bat
+    if(Math.random()<0.28){
+      const bx = x + w + 12 + Math.random()*40;
+      const by = y - 70 - Math.random()*40;
+      bats.push({x:bx, y:by, w:32,h:18, dir: Math.random()<0.5?1:-1, speed: 1.2+Math.random()*1.1, range: 50+Math.random()*70, baseX:bx, baseY:by, alive:true, bob:Math.random()*6});
+    }
+    // occasional extra floating gem
+    if(Math.random()<0.12){
+      gems.push({x: 20+Math.random()*(W-40), y: y-90, w:18,h:18, collected:false, bob:Math.random()*6, t:0});
+    }
+    nextGenY=y;
+  }
+}
+
+function updateHUD(){
+  depthEl.textContent=depth;
+  gemsEl.textContent=gemsCollected;
+  scoreEl.textContent=score;
+  heartsEl.innerHTML='';
+  for(let i=0;i<3;i++){
+    const h=document.createElement('div');
+    h.className='heart'+(i<lives?'':' off')+(invuln>0 && i===lives-1 ?' hit':'');
+    h.textContent=i<lives?'♥':'♡';
+    heartsEl.appendChild(h);
+  }
+}
+
+function damage(reason){
+  if(invuln>0 || state!=='playing') return;
+  lives--;
+  invuln=90; // frames
+  shake=12;
+  spawnParticles(player.x+player.w/2, player.y+player.h/2, 14, '#ff5a5a');
+  if(navigator.vibrate) navigator.vibrate(120);
+  updateHUD();
+  if(lives<=0){
+    gameOver();
+  } else {
+    // knockback up a bit
+    player.vy=-6;
+    // push player down a bit to avoid instant re-hit
+    player.y+=18;
+  }
+}
+
+function gameOver(){
+  state='over';
+  saveBests();
+  const b=loadBests();
+  oDepth.textContent=depth+'m';
+  oGems.textContent=gemsCollected;
+  oScore.textContent=score;
+  oBest.textContent=b.s;
+  let v='Keep digging — the depths remember you.';
+  if(score>=8000) v='🏆 LEGEND OF THE DEEP — unstoppable!';
+  else if(score>=5000) v='💎 Cave Master — gem hunter supreme!';
+  else if(score>=3000) v='⛏ Seasoned Explorer — solid descent!';
+  else if(score>=1500) v='🔦 Brave Delver — you’re getting there!';
+  else if(depth>=400) v='🦇 Bat-dodger — nice evasion!';
+  verdict.textContent=v;
+  over.classList.remove('hidden');
+  if(navigator.vibrate) navigator.vibrate([80,40,120]);
+}
+
+function spawnParticles(x,y,n,color){
+  for(let i=0;i<n;i++){
+    particles.push({x,y,vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6 -2, life:18+Math.random()*18, max:18+Math.random()*18, color, r:2+Math.random()*3});
+  }
+}
+
+function rectsOverlap(a,b){
+  return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+}
+
+function update(dt){
+  if(state!=='playing') return;
+  // scroll
+  scrollSpeed = 1.45 + depth*0.0022 + Math.min(2.2, gemsCollected*0.02);
+  cameraY += scrollSpeed;
+  depth = Math.floor(cameraY/10);
+  score = depth*10 + gemsCollected*120;
+
+  // timers
+  if(jumpBuffer>0) jumpBuffer--;
+  if(coyote>0) coyote--;
+  if(invuln>0) invuln--;
+  if(shake>0) shake*=0.88, shake=Math.max(0,shake-0.2);
+
+  // input
+  let moveDir=0;
+  if(leftHeld) moveDir-=1;
+  if(rightHeld) moveDir+=1;
+  player.vx += moveDir * 0.95;
+  player.vx *= FRICTION;
+  // clamp
+  if(Math.abs(player.vx)<0.08) player.vx=0;
+  player.vx = Math.max(-MOVE, Math.min(MOVE, player.vx));
+  if(moveDir!==0) player.dir=moveDir;
+
+  // jump logic
+  if(jumpBuffer>0 && (player.onGround || coyote>0)){
+    player.vy=JUMP;
+    player.onGround=false;
+    coyote=0; jumpBuffer=0;
+    spawnParticles(player.x+player.w/2, player.y+player.h, 6, '#a8ffce');
+    if(navigator.vibrate) navigator.vibrate(30);
+  }
+  if(jumpHeld && player.vy<0){
+    player.vy += JUMP_HOLD_LIFT; // variable height
+  }
+
+  // gravity
+  player.vy += GRAV;
+  if(player.vy>10) player.vy=10;
+
+  // horizontal move
+  player.x += player.vx;
+  if(player.x<6) player.x=6, player.vx=0;
+  if(player.x+player.w>W-6) player.x=W-6-player.w, player.vx=0;
+
+  // vertical move with platform collision (top only)
+  let nextY = player.y + player.vy;
+  let wasOnGround = player.onGround;
+  player.onGround=false;
+
+  // check platforms for landing
+  if(player.vy>=0){
+    for(const p of platforms){
+      if(p.broken) continue;
+      // AABB x overlap
+      if(player.x + player.w > p.x && player.x < p.x + p.w){
+        const prevBottom = player.y + player.h;
+        const nextBottom = nextY + player.h;
+        if(prevBottom <= p.y + 6 && nextBottom >= p.y && nextBottom <= p.y + 18){
+          // land
+          nextY = p.y - player.h;
+          player.vy=0;
+          player.onGround=true;
+          coyote=8;
+          // platform effects
+          if(p.type==='crumble'){
+            p.timer++;
+            if(p.timer>18) { p.broken=true; spawnParticles(p.x+p.w/2, p.y, 10, '#8a6a3a'); }
+          } else if(p.type==='bouncy'){
+            player.vy=-13.5;
+            spawnParticles(p.x+p.w/2, p.y, 8, '#7ec8ff');
+            if(navigator.vibrate) navigator.vibrate(40);
+          }
+          break;
+        }
+      }
+    }
+  }
+  player.y = nextY;
+
+  // if walked off platform
+  if(wasOnGround && !player.onGround && player.vy>=0) coyote=6;
+
+  // gems
+  for(const g of gems){
+    if(g.collected) continue;
+    g.t+=0.12;
+    // bob
+    const gy = g.y + Math.sin(g.t+g.bob)*4;
+    const rect={x:g.x,y:gy,w:g.w,h:g.h};
+    if(rectsOverlap(player, rect)){
+      g.collected=true;
+      gemsCollected++;
+      score+=120;
+      spawnParticles(g.x+9,g.y+9,10,'#ffd23f');
+      if(navigator.vibrate) navigator.vibrate(20);
+    }
+  }
+
+  // bats
+  for(const b of bats){
+    if(!b.alive) continue;
+    b.x += b.dir * b.speed;
+    b.y = b.baseY + Math.sin(performance.now()*0.003 + b.bob)*10;
+    if(b.x < b.baseX - b.range) b.dir=1;
+    if(b.x > b.baseX + b.range) b.dir=-1;
+    // collision
+    const br={x:b.x,y:b.y,w:b.w,h:b.h};
+    if(rectsOverlap(player, br) && invuln<=0){
+      // stomp? if falling onto bat
+      if(player.vy>2 && player.y+player.h < b.y+12){
+        b.alive=false;
+        player.vy=-8;
+        spawnParticles(b.x+16,b.y+9,12,'#7ec8ff');
+        gemsCollected+=1; // bonus
+      } else {
+        damage('bat');
+      }
+    }
+  }
+
+  // spikes falling
+  spikeTimer--;
+  const spikeRate = Math.max(28, 70 - depth*0.06);
+  if(spikeTimer<=0){
+    spikeTimer=spikeRate;
+    if(Math.random()<0.85){
+      const sx = 14 + Math.random()*(W-28);
+      spikes.push({x:sx, y: cameraY - 30, w:14,h:22, vy: 2.5 + Math.random()*2 + depth*0.004, rot: Math.random()*Math.PI});
+    }
+  }
+  for(let i=spikes.length-1;i>=0;i--){
+    const s=spikes[i];
+    s.vy+=0.18;
+    s.y+=s.vy;
+    s.rot+=0.12;
+    if(s.y > cameraY + H + 60) spikes.splice(i,1);
+    else if(rectsOverlap(player, {x:s.x,y:s.y,w:s.w,h:s.h}) && invuln<=0){
+      damage('spike');
+      spikes.splice(i,1);
+    }
+  }
+
+  // top danger crush
+  const topKill = cameraY + 56;
+  if(player.y < topKill){
+    damage('crush');
+    // push down
+    player.y = topKill + 8;
+    player.vy=2;
+  }
+  // fell into abyss (too slow, fell below screen)
+  if(player.y > cameraY + H + 40){
+    damage('fall');
+    // respawn near camera center
+    player.y = cameraY + H*0.45;
+    player.x = W/2 - player.w/2;
+    player.vy=0;
+  }
+
+  // clean up old platforms/gems/bats behind camera
+  const cutoff = cameraY - 120;
+  platforms = platforms.filter(p=> p.y > cutoff || p.y < cameraY+H+800);
+  // keep only not too far behind
+  platforms = platforms.filter(p=> p.y > cutoff);
+  gems = gems.filter(g=> !g.collected && g.y > cutoff);
+  bats = bats.filter(b=> b.baseY > cutoff -100);
+
+  ensureContent();
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.22; p.life--;
+    if(p.life<=0) particles.splice(i,1);
+  }
+
+  updateHUD();
+}
+
+function draw(){
+  // clear
+  ctx.save();
+  if(shake>0.5){
+    ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+  }
+  // background gradient
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'#0a121e');
+  grad.addColorStop(0.5,'#0e1a2a');
+  grad.addColorStop(1,'#0a0f18');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,W,H);
+
+  // cave walls vignette
+  ctx.fillStyle='rgba(0,0,0,.35)';
+  ctx.beginPath();
+  ctx.moveTo(0,0); ctx.lineTo(18,0); ctx.lineTo(12,H); ctx.lineTo(0,H); ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(W,0); ctx.lineTo(W-18,0); ctx.lineTo(W-12,H); ctx.lineTo(W,H); ctx.closePath(); ctx.fill();
+
+  // stalactites decor (parallax)
+  ctx.fillStyle='rgba(30,45,70,.9)';
+  for(const s of stalactites){
+    const sy = s.y - cameraY*0.3;
+    if(sy<-60 || sy>H+60) continue;
+    ctx.beginPath();
+    ctx.moveTo(s.x, sy);
+    ctx.lineTo(s.x - s.w/2, sy);
+    ctx.lineTo(s.x, sy + s.h);
+    ctx.lineTo(s.x + s.w/2, sy);
+    ctx.closePath(); ctx.fill();
+  }
+
+  // grid depth markers
+  ctx.strokeStyle='rgba(126,200,255,.07)';
+  ctx.lineWidth=1;
+  for(let y= - (cameraY%80); y<H; y+=80){
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    ctx.fillStyle='rgba(126,200,255,.18)';
+    ctx.font='700 9px system-ui';
+    ctx.fillText((Math.floor((cameraY+y)/10))+'m', W-34, y-4);
+  }
+
+  // platforms
+  for(const p of platforms){
+    const sy = p.y - cameraY;
+    if(sy<-30 || sy>H+30) continue;
+    if(p.broken) continue;
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,.35)';
+    ctx.fillRect(p.x+2, sy+4, p.w, p.h);
+    // body
+    let col1='#3a2a12', col2='#8a6a3a', edge='#c9a86a';
+    if(p.type==='crumble'){ col1='#4a3a1a'; col2='#7a5a2a'; edge='#b89a5a'; if(p.timer>0) ctx.globalAlpha=1 - p.timer/22; }
+    if(p.type==='bouncy'){ col1='#0e3a5a'; col2='#2a7ab5'; edge='#7ec8ff'; }
+    const g=ctx.createLinearGradient(p.x,sy,p.x,sy+p.h);
+    g.addColorStop(0,col2); g.addColorStop(1,col1);
+    ctx.fillStyle=g;
+    ctx.beginPath();
+    ctx.roundRect(p.x, sy, p.w, p.h, 6);
+    ctx.fill();
+    ctx.strokeStyle=edge;
+    ctx.lineWidth=1.2;
+    ctx.stroke();
+    // cracks for crumble
+    if(p.type==='crumble'){
+      ctx.strokeStyle='rgba(0,0,0,.35)';
+      ctx.beginPath();
+      ctx.moveTo(p.x+8, sy+5); ctx.lineTo(p.x+p.w-8, sy+9);
+      ctx.moveTo(p.x+12, sy+9); ctx.lineTo(p.x+p.w-12, sy+5);
+      ctx.stroke();
+    }
+    if(p.type==='bouncy'){
+      ctx.fillStyle='rgba(126,200,255,.9)';
+      ctx.font='700 10px system-ui';
+      ctx.fillText('BOUNCE', p.x+p.w/2-18, sy+10);
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // gems
+  for(const g of gems){
+    if(g.collected) continue;
+    const sy = g.y - cameraY + Math.sin(g.t+g.bob)*4;
+    if(sy<-30 || sy>H+30) continue;
+    // glow
+    ctx.fillStyle='rgba(255,210,63,.25)';
+    ctx.beginPath(); ctx.arc(g.x+9, sy+9, 14, 0, Math.PI*2); ctx.fill();
+    // gem shape
+    ctx.fillStyle='#ffd23f';
+    ctx.strokeStyle='#ff9f0a';
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.moveTo(g.x+9, sy+2); ctx.lineTo(g.x+16, sy+9); ctx.lineTo(g.x+9, sy+16); ctx.lineTo(g.x+2, sy+9); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(g.x+6, sy+6, 2.2, 0, Math.PI*2); ctx.fill();
+  }
+
+  // bats
+  for(const b of bats){
+    if(!b.alive) continue;
+    const sy = b.y - cameraY;
+    if(sy<-40 || sy>H+40) continue;
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,.25)';
+    ctx.beginPath(); ctx.ellipse(b.x+16, sy+14, 14, 4, 0,0,Math.PI*2); ctx.fill();
+    // body
+    ctx.fillStyle='#1a2332';
+    ctx.strokeStyle='#2a3a55';
+    ctx.lineWidth=1;
+    ctx.beginPath(); ctx.ellipse(b.x+16, sy+9, 9, 6, 0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    // wings flap
+    const flap = Math.sin(performance.now()*0.02 + b.bob)*0.6;
+    ctx.fillStyle='#0f1826';
+    ctx.beginPath();
+    ctx.moveTo(b.x+7, sy+8);
+    ctx.quadraticCurveTo(b.x-2, sy+2+flap*6, b.x+4, sy+2);
+    ctx.quadraticCurveTo(b.x+7, sy+6, b.x+7, sy+8);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(b.x+25, sy+8);
+    ctx.quadraticCurveTo(b.x+34, sy+2+flap*6, b.x+28, sy+2);
+    ctx.quadraticCurveTo(b.x+25, sy+6, b.x+25, sy+8);
+    ctx.fill();
+    // eyes
+    ctx.fillStyle='#ff3b3b';
+    ctx.beginPath(); ctx.arc(b.x+13, sy+7, 1.6,0,Math.PI*2); ctx.arc(b.x+19, sy+7,1.6,0,Math.PI*2); ctx.fill();
+  }
+
+  // spikes
+  for(const s of spikes){
+    const sy = s.y - cameraY;
+    if(sy<-40 || sy>H+40) continue;
+    ctx.save();
+    ctx.translate(s.x+7, sy+11);
+    ctx.rotate(s.rot);
+    ctx.fillStyle='#cbd5e1';
+    ctx.strokeStyle='#334155';
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(0,-10); ctx.lineTo(6,10); ctx.lineTo(-6,10); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+    // trail
+    ctx.fillStyle='rgba(203,213,225,.25)';
+    ctx.fillRect(s.x+5, sy-8, 4, 8);
+  }
+
+  // player
+  const py = player.y - cameraY;
+  if(py>-40 && py<H+40){
+    // invuln blink
+    if(invuln<=0 || Math.floor(invuln/6)%2===0){
+      // shadow
+      ctx.fillStyle='rgba(0,0,0,.35)';
+      ctx.beginPath(); ctx.ellipse(player.x+player.w/2, py+player.h+4, 10, 3, 0,0,Math.PI*2); ctx.fill();
+      // body
+      const px=player.x;
+      // legs
+      ctx.fillStyle='#1e2f4a';
+      ctx.fillRect(px+4, py+18, 6, 8);
+      ctx.fillRect(px+12, py+18, 6, 8);
+      // torso
+      ctx.fillStyle= invuln>0 ? '#7ec8ff' : '#ffcc33';
+      ctx.beginPath(); ctx.roundRect(px+2, py+6, player.w-4, 14, 4); ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,.25)'; ctx.lineWidth=1; ctx.stroke();
+      // head
+      ctx.fillStyle='#ffdbac';
+      ctx.beginPath(); ctx.arc(px+player.w/2, py+6, 8, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,.2)'; ctx.stroke();
+      // helmet light
+      ctx.fillStyle='#ffd23f';
+      ctx.beginPath(); ctx.arc(px+player.w/2 + player.dir*2, py+1, 3, 0, Math.PI*2); ctx.fill();
+      // light cone
+      ctx.fillStyle='rgba(255,210,63,.08)';
+      ctx.beginPath();
+      ctx.moveTo(px+player.w/2, py+2);
+      ctx.lineTo(px+player.w/2 -18, py-18);
+      ctx.lineTo(px+player.w/2 +18, py-18);
+      ctx.closePath(); ctx.fill();
+      // direction indicator
+      ctx.fillStyle='rgba(0,0,0,.5)';
+      ctx.font='700 8px system-ui';
+      ctx.fillText(player.dir>0?'▶':'◀', px+player.w/2-4, py+14);
+    }
+    // shield ring when invuln
+    if(invuln>0){
+      ctx.strokeStyle='rgba(126,200,255,.6)';
+      ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(player.x+player.w/2, py+player.h/2, 18+ Math.sin(performance.now()*0.02)*2, 0, Math.PI*2); ctx.stroke();
+    }
+  }
+
+  // particles
+  for(const p of particles){
+    const sy = p.y - cameraY;
+    ctx.globalAlpha = p.life/p.max;
+    ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x, sy, p.r, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // top danger overlay gradient
+  const dgrad=ctx.createLinearGradient(0,0,0,70);
+  dgrad.addColorStop(0,'rgba(255,43,43,.55)');
+  dgrad.addColorStop(1,'rgba(255,43,43,0)');
+  ctx.fillStyle=dgrad;
+  ctx.fillRect(0,0,W,70);
+
+  ctx.restore();
+}
+
+function loop(t){
+  rafId=requestAnimationFrame(loop);
+  const dt=Math.min(32, t-lastTime);
+  lastTime=t;
+  if(state==='playing') update(dt);
+  draw();
+}
+rafId=requestAnimationFrame(loop);
+
+// Input helpers
+function bindHold(el, onDown, onUp){
+  const start=(e)=>{ e.preventDefault(); onDown(); };
+  const end=(e)=>{ e.preventDefault(); onUp(); };
+  el.addEventListener('touchstart', start, {passive:false});
+  el.addEventListener('touchend', end, {passive:false});
+  el.addEventListener('touchcancel', end, {passive:false});
+  el.addEventListener('mousedown', start);
+  window.addEventListener('mouseup', onUp);
+}
+bindHold(document.getElementById('leftBtn'), ()=>leftHeld=true, ()=>leftHeld=false);
+bindHold(document.getElementById('rightBtn'), ()=>rightHeld=true, ()=>rightHeld=false);
+const jumpBtn=document.getElementById('jumpBtn');
+function pressJump(){ jumpBuffer=10; jumpHeld=true; }
+function releaseJump(){ jumpHeld=false; }
+jumpBtn.addEventListener('touchstart', (e)=>{e.preventDefault(); pressJump();}, {passive:false});
+jumpBtn.addEventListener('touchend', (e)=>{e.preventDefault(); releaseJump();}, {passive:false});
+jumpBtn.addEventListener('touchcancel', (e)=>{e.preventDefault(); releaseJump();}, {passive:false});
+jumpBtn.addEventListener('mousedown', (e)=>{e.preventDefault(); pressJump();});
+window.addEventListener('mouseup', releaseJump);
+
+// keyboard
+window.addEventListener('keydown', (e)=>{
+  if(e.code==='ArrowLeft' || e.code==='KeyA') leftHeld=true;
+  if(e.code==='ArrowRight' || e.code==='KeyD') rightHeld=true;
+  if(e.code==='Space' || e.code==='ArrowUp' || e.code==='KeyW'){ if(!e.repeat) pressJump(); e.preventDefault(); }
+  if(e.code==='KeyP' && state==='playing'){ state='paused'; pauseEl.classList.remove('hidden'); }
+  if(e.code==='Escape' && state==='paused'){ state='playing'; pauseEl.classList.add('hidden'); }
+});
+window.addEventListener('keyup', (e)=>{
+  if(e.code==='ArrowLeft' || e.code==='KeyA') leftHeld=false;
+  if(e.code==='ArrowRight' || e.code==='KeyD') rightHeld=false;
+  if(e.code==='Space' || e.code==='ArrowUp' || e.code==='KeyW') releaseJump();
+});
+
+// canvas swipe to move
+let touchId=null;
+canvas.addEventListener('touchstart', (e)=>{
+  if(state!=='playing') return;
+  const t=e.touches[0];
+  if(!t) return;
+  const rect=canvas.getBoundingClientRect();
+  const x=(t.clientX-rect.left)/rect.width * W;
+  if(x < W*0.33) leftHeld=true;
+  else if(x > W*0.66) rightHeld=true;
+  // tap upper half = jump
+  if(t.clientY - rect.top < rect.height*0.55) pressJump();
+}, {passive:false});
+canvas.addEventListener('touchend', (e)=>{
+  leftHeld=false; rightHeld=false; releaseJump();
+}, {passive:false});
+
+// buttons
+document.getElementById('playBtn').addEventListener('click', ()=>{
+  resetGame();
+  state='playing';
+  menu.classList.add('hidden');
+  over.classList.add('hidden');
+  pauseEl.classList.add('hidden');
+});
+document.getElementById('howBtn').addEventListener('click', ()=>{
+  document.getElementById('howBox').classList.toggle('hidden');
+});
+document.getElementById('retryBtn').addEventListener('click', ()=>{
+  resetGame();
+  state='playing';
+  over.classList.add('hidden');
+});
+document.getElementById('menuBtn').addEventListener('click', ()=>{
+  state='menu';
+  over.classList.add('hidden');
+  pauseEl.classList.add('hidden');
+  menu.classList.remove('hidden');
+  updateBestUI();
+});
+document.getElementById('resumeBtn').addEventListener('click', ()=>{
+  state='playing';
+  pauseEl.classList.add('hidden');
+});
+document.getElementById('quitBtn').addEventListener('click', ()=>{
+  state='menu';
+  pauseEl.classList.add('hidden');
+  menu.classList.remove('hidden');
+});
+
+// pause when hidden
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden && state==='playing'){ state='paused'; pauseEl.classList.remove('hidden'); }
+});
+
+// initial draw
+resetGame();
+draw();
+updateBestUI();
+
+// prevent scroll
+document.body.addEventListener('touchmove', (e)=>{
+  if(e.target.closest('.canvas-frame') || e.target.closest('.controls')) e.preventDefault();
+}, {passive:false});
+</script>
+</body>
+</html>

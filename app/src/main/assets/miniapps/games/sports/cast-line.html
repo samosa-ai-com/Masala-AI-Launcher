@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Lake Cast</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden;background:#0f2a3a;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+body{display:flex;justify-content:center;background:radial-gradient(1200px 600px at 50% -10%, #2a6a8a 0%, #0f2a3a 55%, #081a26 100%)}
+.app{width:100%;max-width:428px;min-width:360px;height:100dvh;max-height:900px;display:flex;flex-direction:column;background:linear-gradient(180deg,#87c4e6 0%,#a8d8f0 18%,#d6ecf7 32%,#7fb8d6 33%,#4a90b8 45%,#1e5a7a 100%);position:relative;overflow:hidden;box-shadow:0 0 40px rgba(0,0,0,.4)}
+/* Header */
+.header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px 8px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:2px solid rgba(0,0,0,.08);gap:8px;z-index:5}
+.hbox{flex:1;background:#0f2a3a;color:#fff;border-radius:12px;padding:7px 8px;text-align:center;min-width:0}
+.hbox .label{font-size:10px;letter-spacing:.08em;opacity:.7;font-weight:700}
+.hbox .val{font-size:18px;font-weight:800;line-height:1.1}
+.hbox.best{background:#fff;color:#0f2a3a;border:2px solid #0f2a3a}
+.hbox.best .val{color:#d48a00}
+.timerBox{flex:0 0 78px;background:#fff;border:2px solid #0f2a3a;border-radius:12px;padding:6px;text-align:center}
+.timerBox .label{font-size:10px;font-weight:800;letter-spacing:.08em;color:#0f2a3a}
+.timerBox .val{font-size:20px;font-weight:900;color:#0f2a3a}
+.timerBox.low{animation:pulse 0.6s infinite alternate;border-color:#e63946}
+.timerBox.low .val{color:#e63946}
+@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.04)}}
+
+/* Lake scene */
+.scene{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
+.sky{height:34%;position:relative;background:linear-gradient(180deg,#6bb6e0 0%,#a9d9f3 70%,#d4ecf8 100%);overflow:hidden}
+.mountains{position:absolute;bottom:0;left:-10%;right:-10%;height:58%;background:
+  radial-gradient(ellipse 180px 90px at 15% 100%, #3a6b7a 0%, transparent 70%),
+  radial-gradient(ellipse 220px 110px at 45% 100%, #2f5d6e 0%, transparent 70%),
+  radial-gradient(ellipse 200px 100px at 78% 100%, #3a6b7a 0%, transparent 70%),
+  radial-gradient(ellipse 260px 120px at 92% 100%, #2f5d6e 0%, transparent 70%);
+opacity:.9}
+.cloud{position:absolute;background:#fff;border-radius:20px;opacity:.85}
+.cloud1{width:70px;height:18px;top:18%;left:12%;box-shadow:20px -6px 0 -2px #fff, 35px 2px 0 -4px #fff}
+.cloud2{width:55px;height:14px;top:28%;right:18%;box-shadow:15px -5px 0 -2px #fff, 28px 1px 0 -3px #fff}
+.sun{position:absolute;top:14%;right:14%;width:36px;height:36px;background:radial-gradient(circle at 30% 30%, #fff8c0, #ffcc33 60%, #ff9a00);border-radius:50%;box-shadow:0 0 18px rgba(255,204,51,.6)}
+.lakeWrap{flex:1;position:relative;background:linear-gradient(180deg,#5fb3d9 0%,#2a7aa3 18%,#1a5a7e 45%,#123a52 100%);overflow:hidden}
+.waterShine{position:absolute;top:0;left:0;right:0;height:18px;background:linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);opacity:.6}
+.lily{position:absolute;background:radial-gradient(circle at 30% 30%, #4caf6a, #2d6a3f);border-radius:50%;box-shadow:inset 0 2px 4px rgba(255,255,255,.3)}
+.lily::after{content:'';position:absolute;top:50%;left:50%;width:0;height:0;border-left:10px solid transparent;border-right:2px solid transparent;border-top:10px solid #123a52;transform:translate(-2px,-5px) rotate(25deg)}
+.lily1{width:34px;height:20px;top:18%;left:14%;transform:rotate(-12deg)}
+.lily2{width:28px;height:16px;top:32%;right:20%;transform:rotate(18deg)}
+.lily3{width:22px;height:13px;top:55%;left:22%}
+.lily4{width:30px;height:18px;top:68%;right:14%;transform:rotate(-8deg)}
+.rodLine{position:absolute;top:0;left:50%;width:2px;background:rgba(255,255,255,.9);transform-origin:top center;transition:height .35s ease;z-index:2;box-shadow:0 0 4px rgba(255,255,255,.6)}
+.bobber{position:absolute;width:18px;height:26px;left:50%;transform:translateX(-50%);z-index:3;transition:top .35s ease, left .35s ease;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}
+.bobberBody{width:14px;height:18px;background:linear-gradient(180deg,#ff3b30 0%,#ff3b30 50%,#fff 50%,#fff 100%);border:1.5px solid #0f2a3a;border-radius:50% / 60%;margin:0 auto;position:relative}
+.bobberTip{width:2px;height:8px;background:#0f2a3a;margin:0 auto;border-radius:1px}
+.bobber.waiting{animation:float 1.6s ease-in-out infinite}
+.bobber.tugging{animation:tug 0.18s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(4px)}}
+@keyframes tug{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(10px)}}
+.ripple{position:absolute;left:50%;transform:translateX(-50%);border:1.5px solid rgba(255,255,255,.7);border-radius:50%;pointer-events:none;opacity:0}
+.ripple.show{animation:ripple 1s ease-out}
+@keyframes ripple{0%{width:10px;height:6px;opacity:.8}100%{width:80px;height:24px;opacity:0}}
+.splash{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:28px;pointer-events:none;opacity:0}
+.splash.show{animation:splash 0.6s ease-out}
+@keyframes splash{0%{opacity:1;transform:translate(-50%,-50%) scale(.5)}100%{opacity:0;transform:translate(-50%,-70%) scale(1.4)}}
+.castArc{position:absolute;top:0;left:50%;width:2px;height:0;background:linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.9) 100%);transform-origin:top;pointer-events:none;z-index:2}
+
+/* Status text */
+.statusBar{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(15,42,58,.92);color:#fff;padding:7px 14px;border-radius:20px;font-size:13px;font-weight:700;letter-spacing:.02em;z-index:4;white-space:nowrap;max-width:92%;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.statusBar.hook{ background:#e63946; animation:hookPulse .4s infinite alternate; font-size:15px; padding:8px 18px}
+@keyframes hookPulse{from{transform:translateX(-50%) scale(1)}to{transform:translateX(-50%) scale(1.06)}}
+.statusBar.catch{background:#2a9d8f}
+.statusBar.snap{background:#e63946}
+
+/* Meters area */
+.meters{position:absolute;bottom:0;left:0;right:0;display:flex;gap:8px;padding:8px 10px;background:linear-gradient(180deg, transparent 0%, rgba(15,42,58,.85) 100%);z-index:4;align-items:end}
+.meter{flex:1;background:rgba(255,255,255,.95);border-radius:12px;padding:8px 10px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.meterLabel{font-size:10px;font-weight:800;letter-spacing:.08em;color:#0f2a3a;display:flex;justify-content:space-between;align-items:center}
+.meterLabel span:last-child{font-size:11px}
+.track{height:14px;background:#e6eef3;border-radius:8px;overflow:hidden;position:relative;margin-top:6px;border:1px solid rgba(0,0,0,.08)}
+.fill{height:100%;width:0%;border-radius:8px;transition:width .08s linear}
+.fill.power{background:linear-gradient(90deg,#2a9d8f,#4cc9b0)}
+.fill.power.high{background:linear-gradient(90deg,#f4a261,#e76f51)}
+.fill.power.max{background:linear-gradient(90deg,#e63946,#ff6b6b)}
+.fill.tension{background:linear-gradient(90deg,#2a9d8f 0%,#2a9d8f 60%,#e9c46a 60%,#e9c46a 85%,#e63946 85%)}
+.tensionMarker{position:absolute;top:0;bottom:0;width:2px;background:#0f2a3a;transition:left .08s linear}
+.tensionZones{position:absolute;inset:0;display:flex}
+.tensionZones div{flex:1}
+.tensionZones div:nth-child(1){background:rgba(42,157,143,.18)}
+.tensionZones div:nth-child(2){background:rgba(233,196,106,.22)}
+.tensionZones div:nth-child(3){background:rgba(230,57,70,.18)}
+.distanceMeter .track{height:10px}
+.distanceFill{height:100%;background:linear-gradient(90deg,#2a9d8f,#4cc9b0);width:100%;transition:width .15s linear}
+
+/* Controls */
+.controls{background:#0f2a3a;padding:10px 12px 14px;display:flex;flex-direction:column;gap:8px;z-index:5}
+.mainBtn{width:100%;height:64px;border:none;border-radius:16px;font-size:18px;font-weight:900;letter-spacing:.02em;cursor:pointer;touch-action:manipulation;user-select:none;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 0 rgba(0,0,0,.25), 0 6px 16px rgba(0,0,0,.2);transition:transform .06s, box-shadow .06s, filter .15s}
+.mainBtn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.25)}
+.mainBtn:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:0 4px 0 rgba(0,0,0,.15)}
+.btn-cast{background:linear-gradient(180deg,#4cc9f0,#2a9d8f);color:#fff;border:2px solid rgba(255,255,255,.3)}
+.btn-cast.holding{background:linear-gradient(180deg,#ffbe0b,#fb5607);color:#fff;animation:holdShake .15s infinite}
+@keyframes holdShake{0%,100%{transform:translateY(0)}50%{transform:translateY(1px)}}
+.btn-hook{background:linear-gradient(180deg,#ff6b6b,#e63946);color:#fff;font-size:20px;border:2px solid #fff;animation:hookBtnPulse .5s infinite alternate}
+@keyframes hookBtnPulse{from{transform:scale(1)}to{transform:scale(1.02)}}
+.btn-reel{background:linear-gradient(180deg,#4cc9f0,#0077b6);color:#fff;border:2px solid rgba(255,255,255,.25)}
+.btn-reel.holding{background:linear-gradient(180deg,#90e0ef,#0096c7)}
+.btn-reel.snapDanger{background:linear-gradient(180deg,#ff6b6b,#c1121f);animation:shake .12s infinite}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
+.row{display:flex;gap:8px}
+.smallBtn{flex:1;height:44px;border:none;border-radius:12px;font-size:13px;font-weight:800;cursor:pointer;touch-action:manipulation;background:#1e3a4d;color:#a8d8f0;border:1px solid rgba(255,255,255,.15)}
+.smallBtn:active{background:#2a4a5e}
+.smallBtn.primary{background:#fff;color:#0f2a3a}
+.log{height:38px;background:rgba(255,255,255,.08);border-radius:10px;display:flex;align-items:center;gap:6px;padding:0 10px;overflow:hidden}
+.logDot{width:8px;height:8px;border-radius:50%;background:#4cc9b0;flex-shrink:0}
+.logText{font-size:12px;color:#d6ecf7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.logText b{color:#fff}
+.speciesGrid{display:flex;gap:6px;overflow-x:auto;padding:2px 0;scrollbar-width:none}
+.speciesGrid::-webkit-scrollbar{display:none}
+.speciesChip{flex:0 0 auto;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);color:#d6ecf7;border-radius:20px;padding:5px 9px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px}
+.speciesChip i{font-style:normal;font-size:13px}
+
+/* Overlays */
+.overlay{position:absolute;inset:0;background:rgba(8,26,38,.88);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:10;text-align:center;color:#fff}
+.overlay h1{font-size:28px;font-weight:900;letter-spacing:-.02em;margin-bottom:6px}
+.overlay h1 span{color:#4cc9f0}
+.overlay p{font-size:13px;opacity:.85;line-height:1.5;max-width:320px;margin-bottom:14px}
+.badge{background:#fff;color:#0f2a3a;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:800;margin-bottom:12px}
+.stats{display:flex;gap:10px;margin:10px 0 14px}
+.stat{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:10px 14px;min-width:86px}
+.stat .n{font-size:22px;font-weight:900}
+.stat .l{font-size:10px;letter-spacing:.08em;opacity:.7;font-weight:700}
+.startBtn{height:52px;padding:0 28px;border:none;border-radius:14px;background:linear-gradient(180deg,#4cc9f0,#2a9d8f);color:#fff;font-size:16px;font-weight:900;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.25);touch-action:manipulation}
+.startBtn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.25)}
+.hint{font-size:11px;opacity:.6;margin-top:10px}
+.fishCard{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%) scale(.9);background:#fff;border-radius:16px;padding:14px 16px;box-shadow:0 12px 32px rgba(0,0,0,.35);z-index:6;opacity:0;pointer-events:none;transition:all .35s cubic-bezier(.34,1.56,.64,1);text-align:center;min-width:180px}
+.fishCard.show{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto}
+.fishCard .emoji{font-size:36px}
+.fishCard .name{font-size:16px;font-weight:900;color:#0f2a3a;margin-top:4px}
+.fishCard .pts{font-size:13px;font-weight:800;color:#2a9d8f}
+.fishCard .dist{font-size:11px;color:#5a7a8a;font-weight:600}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="hbox"><div class="label">SCORE</div><div class="val" id="scoreEl">0</div></div>
+    <div class="timerBox" id="timerBox"><div class="label">TIME</div><div class="val" id="timerEl">2:00</div></div>
+    <div class="hbox best"><div class="label">BEST</div><div class="val" id="bestEl">0</div></div>
+  </div>
+
+  <div class="scene" id="scene">
+    <div class="sky">
+      <div class="sun"></div>
+      <div class="cloud cloud1"></div>
+      <div class="cloud cloud2"></div>
+      <div class="mountains"></div>
+    </div>
+    <div class="lakeWrap" id="lakeWrap">
+      <div class="waterShine"></div>
+      <div class="lily lily1"></div><div class="lily lily2"></div><div class="lily lily3"></div><div class="lily lily4"></div>
+      <div class="rodLine" id="rodLine"></div>
+      <div class="bobber" id="bobber" style="top:18%">
+        <div class="bobberTip"></div><div class="bobberBody"></div>
+      </div>
+      <div class="ripple" id="ripple"></div>
+      <div class="splash" id="splash">💦</div>
+      <div class="statusBar" id="statusBar">Hold CAST to charge</div>
+
+      <div class="meters">
+        <div class="meter" id="powerMeter">
+          <div class="meterLabel"><span>POWER</span><span id="powerPct">0%</span></div>
+          <div class="track"><div class="fill power" id="powerFill"></div></div>
+        </div>
+        <div class="meter" id="tensionMeter" style="display:none">
+          <div class="meterLabel"><span>TENSION</span><span id="tensionPct">0%</span></div>
+          <div class="track" style="height:16px">
+            <div class="tensionZones"><div></div><div></div><div></div></div>
+            <div class="fill tension" id="tensionFill" style="position:absolute;inset:0;width:0%"></div>
+            <div class="tensionMarker" id="tensionMarker" style="left:0%"></div>
+          </div>
+        </div>
+        <div class="meter distanceMeter" id="distanceMeter" style="display:none">
+          <div class="meterLabel"><span>DISTANCE</span><span id="distVal">0m</span></div>
+          <div class="track"><div class="distanceFill" id="distFill"></div></div>
+        </div>
+      </div>
+
+      <div class="fishCard" id="fishCard">
+        <div class="emoji" id="cardEmoji">🐟</div>
+        <div class="name" id="cardName">Bass</div>
+        <div class="pts" id="cardPts">+25 pts</div>
+        <div class="dist" id="cardDist">Cast 42m • Perfect!</div>
+      </div>
+    </div>
+
+    <!-- Start overlay -->
+    <div class="overlay" id="startOverlay">
+      <div class="badge">🎣 2-MINUTE LAKE CAST</div>
+      <h1>Lake <span>Cast</span></h1>
+      <p>Hold to charge your cast — farther water hides rarer fish. Wait for the tug, tap <b>HOOK!</b> instantly, then hold <b>REEL</b> while keeping tension out of the red.</p>
+      <div class="stats">
+        <div class="stat"><div class="n" id="overlayBest">0</div><div class="l">BEST SCORE</div></div>
+        <div class="stat"><div class="n">5</div><div class="l">SPECIES</div></div>
+        <div class="stat"><div class="n">2:00</div><div class="l">ON CLOCK</div></div>
+      </div>
+      <button class="startBtn" id="startBtn">START FISHING →</button>
+      <div class="hint">Hold CAST → Release → Wait → HOOK! → Hold REEL</div>
+      <div class="speciesGrid" style="margin-top:12px">
+        <div class="speciesChip"><i>🐟</i> Bluegill 10</div>
+        <div class="speciesChip"><i>🐠</i> Bass 25</div>
+        <div class="speciesChip"><i>🎣</i> Trout 30</div>
+        <div class="speciesChip"><i>🦈</i> Pike 50</div>
+        <div class="speciesChip"><i>✨</i> Golden Carp 100</div>
+      </div>
+    </div>
+
+    <!-- Game over overlay -->
+    <div class="overlay" id="overOverlay" style="display:none">
+      <div class="badge" id="overBadge">⏰ TIME'S UP</div>
+      <h1 id="overTitle">Nice haul!</h1>
+      <p id="overDesc">You landed some beauties.</p>
+      <div class="stats">
+        <div class="stat"><div class="n" id="overScore">0</div><div class="l">SCORE</div></div>
+        <div class="stat"><div class="n" id="overCatches">0</div><div class="l">CATCHES</div></div>
+        <div class="stat"><div class="n" id="overBest">0</div><div class="l">BEST</div></div>
+      </div>
+      <button class="startBtn" id="restartBtn">CAST AGAIN →</button>
+      <div class="hint">Tip: 70-90% power reaches the deep water where Pike & Golden Carp lurk</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="mainBtn btn-cast" id="mainBtn">🎣 HOLD TO CAST</button>
+    <div class="row">
+      <button class="smallBtn" id="recastBtn" style="display:none">↩︎ RECAST</button>
+      <button class="smallBtn" id="pauseBtn">⏸︎ PAUSE</button>
+      <button class="smallBtn primary" id="howBtn">HOW TO PLAY</button>
+    </div>
+    <div class="log" id="log"><div class="logDot" id="logDot"></div><div class="logText" id="logText">Welcome to the lake — calm water, hungry fish.</div></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.getElementById(s);
+const scoreEl = $('scoreEl'), bestEl = $('bestEl'), timerEl = $('timerEl'), timerBox = $('timerBox');
+const bobber = $('bobber'), rodLine = $('rodLine'), ripple = $('ripple'), splash = $('splash');
+const statusBar = $('statusBar'), powerFill = $('powerFill'), powerPct = $('powerPct'), powerMeter = $('powerMeter');
+const tensionMeter = $('tensionMeter'), tensionFill = $('tensionFill'), tensionMarker = $('tensionMarker'), tensionPct = $('tensionPct');
+const distanceMeter = $('distanceMeter'), distFill = $('distFill'), distVal = $('distVal');
+const mainBtn = $('mainBtn'), recastBtn = $('recastBtn'), pauseBtn = $('pauseBtn'), howBtn = $('howBtn');
+const logText = $('logText'), logDot = $('logDot');
+const startOverlay = $('startOverlay'), overOverlay = $('overOverlay');
+const fishCard = $('fishCard'), cardEmoji = $('cardEmoji'), cardName = $('cardName'), cardPts = $('cardPts'), cardDist = $('cardDist');
+
+const SPECIES = [
+  {name:'Bluegill', emoji:'🐟', points:10, pull:18, weight:40, color:'#4cc9f0'},
+  {name:'Bass', emoji:'🐠', points:25, pull:28, weight:30, color:'#2a9d8f'},
+  {name:'Trout', emoji:'🎣', points:30, pull:34, weight:18, color:'#e9c46a'},
+  {name:'Pike', emoji:'🦈', points:50, pull:44, weight:9, color:'#e76f51'},
+  {name:'Golden Carp', emoji:'✨', points:100, pull:52, weight:3, color:'#ffb703'}
+];
+
+let best = parseInt(localStorage.getItem('lakeCastBest')||'0',10);
+bestEl.textContent = best;
+$('overlayBest').textContent = best;
+
+let state = 'idle'; // idle, charging, casting, waiting, tugging, fighting, paused, over
+let score = 0, catches = 0, timeLeft = 120, timerId = null, prevState = null;
+let power = 0, powerDir = 1, chargeId = null;
+let castDistance = 0; // 0-100
+let tension = 0, fishDist = 100, currentFish = null;
+let fightId = null, tugTimeout = null, waitTimeout = null, snapHold = 0;
+let isHolding = false, reelHolding = false;
+let lastTugTime = 0;
+
+function setLog(msg, dotColor){
+  logText.innerHTML = msg;
+  if(dotColor) logDot.style.background = dotColor;
+}
+function setStatus(msg, cls){
+  statusBar.textContent = msg;
+  statusBar.className = 'statusBar' + (cls ? ' '+cls : '');
+}
+function updateTimer(){
+  const m = Math.floor(timeLeft/60), s = timeLeft%60;
+  timerEl.textContent = m+':'+String(s).padStart(2,'0');
+  timerBox.classList.toggle('low', timeLeft<=20 && timeLeft>0 && state!=='over' && state!=='idle');
+}
+function pickFish(distance){
+  // farther casts boost rare odds
+  const boost = distance/100; // 0-1
+  let pool = SPECIES.map(sp=>{
+    let w = sp.weight;
+    if(sp.name==='Pike') w += boost*18;
+    if(sp.name==='Golden Carp') w += boost*12;
+    if(sp.name==='Bluegill') w -= boost*12;
+    return {...sp, w: Math.max(1,w)};
+  });
+  const total = pool.reduce((a,b)=>a+b.w,0);
+  let r = Math.random()*total;
+  for(let sp of pool){ r-=sp.w; if(r<=0) return {...sp}; }
+  return {...pool[0]};
+}
+
+function resetMeters(){
+  power = 0; updatePower();
+  tension = 0; updateTension();
+  fishDist = 100; updateDistance();
+}
+
+function updatePower(){
+  const pct = Math.round(power);
+  powerPct.textContent = pct+'%';
+  powerFill.style.width = pct+'%';
+  powerFill.className = 'fill power' + (pct>85 ? ' max' : pct>60 ? ' high' : '');
+}
+function updateTension(){
+  const pct = Math.round(tension);
+  tensionPct.textContent = pct+'%';
+  tensionFill.style.width = pct+'%';
+  tensionMarker.style.left = pct+'%';
+  if(pct>85) tensionPct.style.color = '#e63946';
+  else if(pct>60) tensionPct.style.color = '#d48a00';
+  else tensionPct.style.color = '#2a9d8f';
+}
+function updateDistance(){
+  const pct = Math.max(0, Math.min(100, fishDist));
+  distFill.style.width = pct+'%';
+  // distance in meters: castDistance maps to 8-65m
+  const meters = Math.round(8 + castDistance*0.57);
+  const remain = Math.round(pct/100 * meters);
+  distVal.textContent = remain + 'm';
+  if(pct<30) distFill.style.background = '#e63946';
+  else if(pct<60) distFill.style.background = '#e9c46a';
+  else distFill.style.background = 'linear-gradient(90deg,#2a9d8f,#4cc9b0)';
+}
+
+function setBobberByDistance(dist){
+  // dist 0-100 maps to top 18% to 78% and slight x offset for perspective
+  const top = 18 + dist*0.58; // 18% to 76%
+  const xJitter = (Math.random()-0.5)*6;
+  bobber.style.top = top + '%';
+  bobber.style.left = `calc(50% + ${xJitter}px)`;
+  rodLine.style.height = top + '%';
+  rodLine.style.left = '50%';
+  rodLine.style.transform = `translateX(-50%) rotate(${ (dist-50)*0.06 }deg)`;
+}
+
+function startGame(){
+  score=0; catches=0; timeLeft=120; state='ready';
+  scoreEl.textContent='0';
+  startOverlay.style.display='none';
+  overOverlay.style.display='none';
+  resetMeters();
+  powerMeter.style.display='';
+  tensionMeter.style.display='none';
+  distanceMeter.style.display='none';
+  mainBtn.style.display='';
+  mainBtn.textContent='🎣 HOLD TO CAST';
+  mainBtn.className='mainBtn btn-cast';
+  recastBtn.style.display='none';
+  pauseBtn.textContent='⏸︎ PAUSE';
+  setBobberByDistance(0);
+  bobber.className='bobber';
+  setStatus('Hold CAST to charge');
+  setLog('Game on — charge your cast!', '#4cc9f0');
+  updateTimer();
+  clearInterval(timerId);
+  timerId = setInterval(()=>{
+    if(state==='paused' || state==='idle' || state==='over') return;
+    timeLeft--;
+    updateTimer();
+    if(timeLeft<=0){ endGame(); }
+  },1000);
+}
+
+function endGame(){
+  clearInterval(timerId); clearTimeout(tugTimeout); clearTimeout(waitTimeout); clearInterval(fightId); clearInterval(chargeId);
+  state='over';
+  timerBox.classList.remove('low');
+  const isNewBest = score > best;
+  if(isNewBest){ best = score; localStorage.setItem('lakeCastBest', String(best)); bestEl.textContent=best; }
+  $('overScore').textContent = score;
+  $('overCatches').textContent = catches;
+  $('overBest').textContent = best;
+  $('overBadge').textContent = isNewBest ? '🏆 NEW BEST!' : (score>=150 ? '🌟 GREAT HAUL' : '⏰ TIME\'S UP');
+  $('overTitle').textContent = isNewBest ? 'New Record!' : (catches===0 ? 'The fish were shy' : 'Nice haul!');
+  $('overDesc').textContent = isNewBest ? `You beat your best with ${score} points!` : `You caught ${catches} fish for ${score} points.`;
+  overOverlay.style.display='flex';
+  mainBtn.style.display='none';
+  setStatus(isNewBest ? '🏆 New best score!' : 'Game over — cast again?', isNewBest?'catch':'snap');
+}
+
+function beginCharge(){
+  if(state!=='ready' && state!=='waiting' && state!=='idle') return;
+  // if waiting, allow recast by charging again
+  clearTimeout(waitTimeout); clearTimeout(tugTimeout);
+  state='charging';
+  power=0; powerDir=1;
+  mainBtn.classList.add('holding');
+  mainBtn.textContent='⚡ CHARGING… RELEASE TO CAST';
+  setStatus('Hold… release to cast!');
+  setLog('Charging… release at 70-90% for deep water!', '#ffbe0b');
+  powerMeter.style.display='';
+  tensionMeter.style.display='none';
+  distanceMeter.style.display='none';
+  bobber.className='bobber';
+  clearInterval(chargeId);
+  chargeId = setInterval(()=>{
+    power += powerDir * 2.2; // ~1.5s to 100
+    if(power>=100){ power=100; powerDir=-1; }
+    if(power<=0){ power=0; powerDir=1; }
+    updatePower();
+  },16);
+}
+
+function releaseCast(){
+  if(state!=='charging') return;
+  clearInterval(chargeId);
+  mainBtn.classList.remove('holding');
+  const finalPower = power;
+  castDistance = finalPower; // 0-100
+  state='casting';
+  mainBtn.disabled=true;
+  mainBtn.textContent='↗︎ CASTING…';
+  setStatus(`Cast ${Math.round(8+castDistance*0.57)}m — watching bobber…`);
+  setLog(`Cast ${Math.round(8+castDistance*0.57)}m — wait for the tug!`, '#4cc9f0');
+  // animate bobber
+  setBobberByDistance(castDistance);
+  ripple.classList.remove('show'); void ripple.offsetWidth; ripple.style.top = (18+castDistance*0.58)+'%'; ripple.classList.add('show');
+  splash.classList.remove('show');
+  // after cast animation, go waiting
+  setTimeout(()=>{
+    if(state!=='casting') return;
+    state='waiting';
+    mainBtn.disabled=false;
+    mainBtn.textContent='🎣 HOLD TO RECAST';
+    mainBtn.className='mainBtn btn-cast';
+    bobber.className='bobber waiting';
+    powerMeter.style.display='none';
+    setStatus('Waiting for a bite…');
+    // random wait 1.2-3.8s
+    const wait = 1200 + Math.random()*2600;
+    waitTimeout = setTimeout(()=> triggerTug(), wait);
+  }, 420);
+}
+
+function triggerTug(){
+  if(state!=='waiting') return;
+  state='tugging';
+  lastTugTime = Date.now();
+  bobber.className='bobber tugging';
+  setStatus('TUG! TAP HOOK NOW!', 'hook');
+  setLog('TUG! Tap HOOK! now!', '#e63946');
+  mainBtn.textContent='🪝 TAP HOOK!';
+  mainBtn.className='mainBtn btn-hook';
+  // haptic
+  if(navigator.vibrate) navigator.vibrate(80);
+  // miss window 1.1s
+  tugTimeout = setTimeout(()=>{
+    if(state!=='tugging') return;
+    state='waiting';
+    bobber.className='bobber waiting';
+    setStatus('Missed! Waiting again…');
+    setLog('Missed the tug — stay ready!', '#e9c46a');
+    mainBtn.textContent='🎣 HOLD TO RECAST';
+    mainBtn.className='mainBtn btn-cast';
+    // re-wait
+    waitTimeout = setTimeout(()=> triggerTug(), 900 + Math.random()*1800);
+  }, 1100);
+}
+
+function hookFish(){
+  if(state!=='tugging') return;
+  clearTimeout(tugTimeout);
+  currentFish = pickFish(castDistance);
+  state='fighting';
+  tension = 28 + Math.random()*18;
+  fishDist = 100;
+  snapHold = 0;
+  bobber.className='bobber tugging';
+  setStatus(`Hooked ${currentFish.name}! Hold REEL — manage tension!`);
+  setLog(`Hooked <b>${currentFish.emoji} ${currentFish.name}</b> — keep tension out of red!`, currentFish.color);
+  mainBtn.textContent='↻ HOLD TO REEL';
+  mainBtn.className='mainBtn btn-reel';
+  powerMeter.style.display='none';
+  tensionMeter.style.display='';
+  distanceMeter.style.display='';
+  recastBtn.style.display='none';
+  updateTension(); updateDistance();
+  if(navigator.vibrate) navigator.vibrate([40,30,40]);
+  // fight loop 60fps
+  let t=0;
+  clearInterval(fightId);
+  fightId = setInterval(()=>{
+    if(state!=='fighting') return;
+    t+=0.16;
+    // fish pull varies
+    const pull = currentFish.pull * (0.55 + Math.random()*0.45) + Math.sin(t*1.7)*6 + Math.sin(t*0.9)*4;
+    if(reelHolding || isHolding){
+      // reeling increases tension but reduces distance
+      tension += 1.9 + pull*0.018;
+      fishDist -= 0.85 + (castDistance/100)*0.25; // farther casts slightly harder
+      // occasional surge
+      if(Math.random()<0.04) tension += 8;
+    } else {
+      tension -= 1.35;
+      fishDist += 0.22; // fish regains line
+      tension += pull*0.012;
+    }
+    // natural tension drift
+    tension += (pull - 30)*0.02;
+    tension = Math.max(0, Math.min(100, tension));
+    fishDist = Math.max(0, Math.min(100, fishDist));
+    updateTension(); updateDistance();
+
+    // visual bobber shake intensity based on tension
+    if(tension>75) bobber.style.transform = `translateX(-50%) translateY(${Math.sin(t*12)*3}px)`;
+    else bobber.style.transform = `translateX(-50%)`;
+
+    // snap check: hold >=100 for 380ms
+    if(tension>=99){
+      snapHold += 16;
+      mainBtn.classList.add('snapDanger');
+      setStatus('LINE ABOUT TO SNAP! RELEASE!');
+      if(snapHold>380){
+        doSnap();
+        return;
+      }
+    } else {
+      snapHold = 0;
+      mainBtn.classList.remove('snapDanger');
+      if(state==='fighting') setStatus(`Fighting ${currentFish.name} — ${Math.round(100-fishDist)}% in`);
+    }
+    // catch
+    if(fishDist<=0){
+      doCatch();
+    }
+    // escape if too long without progress (14s)
+    if(Date.now() - lastTugTime > 14000){
+      doEscape();
+    }
+  },16);
+}
+
+function doCatch(){
+  clearInterval(fightId);
+  catches++; score += currentFish.points;
+  // bonus for perfect cast distance (70-90)
+  let bonus = 0;
+  if(castDistance>=70 && castDistance<=90) bonus = 5;
+  if(bonus) score+=bonus;
+  scoreEl.textContent = score;
+  if(score>best){ best=score; localStorage.setItem('lakeCastBest', String(best)); bestEl.textContent=best; $('overlayBest').textContent=best; }
+  // card
+  cardEmoji.textContent = currentFish.emoji;
+  cardName.textContent = currentFish.name;
+  cardPts.textContent = `+${currentFish.points}${bonus?` +${bonus} deep water bonus`:''} pts`;
+  cardDist.textContent = `Cast ${Math.round(8+castDistance*0.57)}m • ${castDistance>=70&&castDistance<=90?'Deep water!':'Nice cast'}`;
+  fishCard.classList.add('show');
+  splash.textContent='✨'; splash.style.top = bobber.style.top; splash.classList.remove('show'); void splash.offsetWidth; splash.classList.add('show');
+  setStatus(`Caught ${currentFish.name}! +${currentFish.points+bonus}`, 'catch');
+  setLog(`Caught <b>${currentFish.emoji} ${currentFish.name}</b> for ${currentFish.points+bonus} pts!`, '#2a9d8f');
+  if(navigator.vibrate) navigator.vibrate([30,40,60]);
+  mainBtn.textContent='🎣 HOLD TO CAST';
+  mainBtn.className='mainBtn btn-cast';
+  mainBtn.classList.remove('snapDanger');
+  bobber.className='bobber';
+  // auto hide card and reset to ready after 1.2s
+  setTimeout(()=>{
+    fishCard.classList.remove('show');
+    if(state==='over') return;
+    state='ready';
+    tensionMeter.style.display='none';
+    distanceMeter.style.display='none';
+    powerMeter.style.display='';
+    power=0; updatePower();
+    setBobberByDistance(0);
+    setStatus('Nice catch! Cast again');
+  }, 1200);
+}
+
+function doSnap(){
+  clearInterval(fightId);
+  fishCard.classList.remove('show');
+  splash.textContent='💥'; splash.style.top = bobber.style.top; splash.classList.remove('show'); void splash.offsetWidth; splash.classList.add('show');
+  setStatus('SNAP! Line broke — recast', 'snap');
+  setLog(`<b>SNAP!</b> ${currentFish.name} broke the line — ease tension!`, '#e63946');
+  if(navigator.vibrate) navigator.vibrate([80,60,80]);
+  mainBtn.textContent='🎣 HOLD TO CAST';
+  mainBtn.className='mainBtn btn-cast';
+  mainBtn.classList.remove('snapDanger');
+  bobber.className='bobber';
+  state='ready';
+  tensionMeter.style.display='none';
+  distanceMeter.style.display='none';
+  powerMeter.style.display='';
+  power=0; updatePower();
+  setBobberByDistance(0);
+}
+
+function doEscape(){
+  clearInterval(fightId);
+  setStatus('It got away… recast', 'snap');
+  setLog(`${currentFish.emoji} ${currentFish.name} escaped — reel faster!`, '#e9c46a');
+  mainBtn.textContent='🎣 HOLD TO CAST';
+  mainBtn.className='mainBtn btn-cast';
+  mainBtn.classList.remove('snapDanger');
+  bobber.className='bobber';
+  state='ready';
+  tensionMeter.style.display='none';
+  distanceMeter.style.display='none';
+  powerMeter.style.display='';
+  power=0; updatePower();
+  setBobberByDistance(0);
+}
+
+// Input handling
+function onPointerDown(e){
+  e.preventDefault();
+  isHolding = true;
+  if(state==='ready' || state==='waiting'){
+    beginCharge();
+  } else if(state==='fighting'){
+    reelHolding = true;
+    mainBtn.classList.add('holding');
+  }
+}
+function onPointerUp(e){
+  e.preventDefault();
+  isHolding = false;
+  if(state==='charging'){
+    releaseCast();
+  } else if(state==='tugging'){
+    // tapping hook button while tugging = hook
+    // but pointer up on mainBtn should also hook if in tugging
+    hookFish();
+  } else if(state==='fighting'){
+    reelHolding = false;
+    mainBtn.classList.remove('holding');
+  }
+}
+function onPointerCancel(){ isHolding=false; reelHolding=false; mainBtn.classList.remove('holding','snapDanger'); if(state==='charging') releaseCast(); }
+
+mainBtn.addEventListener('pointerdown', (e)=>{
+  if(state==='tugging'){ e.preventDefault(); hookFish(); return; }
+  onPointerDown(e);
+});
+mainBtn.addEventListener('pointerup', onPointerUp);
+mainBtn.addEventListener('pointercancel', onPointerCancel);
+mainBtn.addEventListener('pointerleave', ()=>{
+  if(state==='fighting'){ reelHolding=false; mainBtn.classList.remove('holding'); }
+});
+
+// Also allow tap anywhere on lake to hook when tugging
+$('lakeWrap').addEventListener('pointerdown', (e)=>{
+  if(state==='tugging'){ e.preventDefault(); hookFish(); }
+});
+
+// Prevent context menu / selection
+document.addEventListener('contextmenu', e=>e.preventDefault());
+document.addEventListener('selectstart', e=>e.preventDefault());
+
+// Buttons
+$('startBtn').addEventListener('click', startGame);
+$('restartBtn').addEventListener('click', startGame);
+recastBtn.addEventListener('click', ()=>{
+  if(state==='waiting' || state==='ready'){
+    clearTimeout(waitTimeout); clearTimeout(tugTimeout);
+    state='ready';
+    setBobberByDistance(0);
+    bobber.className='bobber';
+    setStatus('Hold CAST to charge');
+    setLog('Recast — try deeper water!', '#4cc9f0');
+  }
+});
+pauseBtn.addEventListener('click', ()=>{
+  if(state==='over' || state==='idle') return;
+  if(state==='paused'){
+    state=prevState||'ready';
+    pauseBtn.textContent='⏸︎ PAUSE';
+    setStatus('Resumed — keep fishing!');
+    setLog('Resumed', '#4cc9f0');
+    // resume timer
+    clearInterval(timerId);
+    timerId = setInterval(()=>{
+      if(state==='paused'||state==='idle'||state==='over') return;
+      timeLeft--; updateTimer(); if(timeLeft<=0) endGame();
+    },1000);
+    // resume fight if needed
+    if(state==='fighting'){
+      // restart fight loop? already running but paused via state check
+    }
+  } else {
+    prevState=state;
+    state='paused';
+    pauseBtn.textContent='▶︎ RESUME';
+    setStatus('Paused');
+    setLog('Paused', '#e9c46a');
+    clearInterval(timerId);
+  }
+});
+howBtn.addEventListener('click', ()=>{
+  if(overOverlay.style.display!=='none') return;
+  startOverlay.style.display='flex';
+  $('overlayBest').textContent = best;
+});
+
+// Keyboard for desktop testing
+document.addEventListener('keydown', e=>{
+  if(e.code==='Space'){
+    e.preventDefault();
+    if(state==='idle' || state==='over'){ startGame(); return; }
+    if(state==='tugging'){ hookFish(); return; }
+    if(state==='ready' || state==='waiting') beginCharge();
+    if(state==='fighting') { reelHolding=true; mainBtn.classList.add('holding'); }
+  }
+});
+document.addEventListener('keyup', e=>{
+  if(e.code==='Space'){
+    e.preventDefault();
+    if(state==='charging') releaseCast();
+    if(state==='fighting'){ reelHolding=false; mainBtn.classList.remove('holding'); }
+  }
+});
+
+// Init
+updatePower(); updateTension(); updateDistance(); updateTimer();
+setBobberByDistance(0);
+</script>
+</body>
+</html>

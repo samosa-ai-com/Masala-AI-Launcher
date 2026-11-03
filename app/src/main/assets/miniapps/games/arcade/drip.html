@@ -1,0 +1,110 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Pipe Yard Catch</title><style>*{box-sizing:border-box;margin:0;padding:0}:root{--bg:#0f1419;--card:#1a232e;--card2:#243447;--line:#2e4057;--accent:#38bdf8;--accent2:#facc15;--good:#4ade80;--bad:#f87171;--text:#f0f4f8;--muted:#8a9bb0}html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}body{max-width:428px;margin:0 auto;overflow-x:hidden}.header{position:sticky;top:0;z-index:10;background:rgba(15,20,25,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 12px;display:flex;justify-content:space-between;align-items:center}.brand{display:flex;gap:10px;align-items:center}.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#38bdf8,#0ea5e9);display:grid;place-items:center;font-size:18px}.brand h1{font-size:14px;line-height:1.1}.brand p{font-size:11px;color:var(--muted)}.pill{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}.pill b{color:var(--text)}.wrap{padding:12px}.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}.hudItem{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}.hudItem b{font-size:18px;display:block}.hudItem span{font-size:11px;color:var(--muted)}.gameArea{position:relative;background:linear-gradient(180deg,#1a232e 0%,#0f1419 100%);border:1px solid var(--line);border-radius:16px;overflow:hidden;padding:8px}.gameArea canvas{display:block;width:100%;height:auto;touch-action:none;border-radius:12px;background:linear-gradient(180deg,#243447 0%,#0f1419 100%)}.fillBar{height:12px;background:#0f1419;border-radius:999px;overflow:hidden;border:1px solid var(--line);margin:8px 0}.fillBar i{display:block;height:100%;background:linear-gradient(90deg,#38bdf8,#4ade80);width:0%;transition:width .2s}.levelBanner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--accent);color:#0f1419;padding:12px 20px;border-radius:12px;font-weight:800;font-size:16px;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:banner .8s ease;pointer-events:none}.controls{display:flex;gap:8px;margin-top:10px}.btn{border:0;border-radius:12px;padding:12px;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center;justify-content:center;flex:1;gap:8px}.btnPrimary{background:linear-gradient(135deg,#38bdf8,#0ea5e9);color:#0f1419}.btnGhost{background:var(--card2);border:1px solid var(--line);color:var(--text)}.tip{font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px;text-align:center;line-height:1.4}.overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(15,20,25,.88);padding:16px;text-align:center;border-radius:16px}.hidden{display:none!important}@keyframes banner{0%{transform:translate(-50%,-50%) scale(.8);opacity:0}50%{transform:translate(-50%,-50%) scale(1.05);opacity:1}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}.splash{position:absolute;width:6px;height:6px;background:var(--accent);border-radius:50%;pointer-events:none;animation:splash .5s ease-out forwards}@keyframes splash{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0}}</style></head><body><header class="header"><div class="brand"><div class="logo">🪣</div><div><h1>Pipe Yard Catch</h1><p>Drag bucket • Catch drops</p></div></div><div class="pill">Best <b id="bestEl">0</b></div></header><div class="wrap"><div class="hud"><div class="hudItem"><b id="scoreEl">0</b><span>Score</span></div><div class="hudItem"><b id="levelEl">1</b><span>Level</span></div><div class="hudItem"><b id="livesEl">❤️❤️❤️</b><span>Lives</span></div></div><div class="gameArea" id="gameArea"><canvas id="cv" width="360" height="440"></canvas><div class="overlay" id="startOverlay"><div><h2 style="font-size:20px">🌧️ Rainy Pipe Yard</h2><p style="font-size:13px;color:var(--muted);margin:8px 0">Drag the bucket to catch <b style="color:#38bdf8">💧 blue drops</b> — fill to 100% to level up!<br>Dodge <b style="color:#f87171">🛢️ oil sludge</b> — costs a life!</p><button class="btn btnPrimary" id="playBtn" style="width:100%">▶ Start Catching</button></div></div><div class="overlay hidden" id="overOverlay"><div><h2 id="overTitle">Yard Flooded!</h2><p id="overDesc" style="font-size:13px;color:var(--muted);margin:8px 0"></p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0"><div style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px"><b id="overScore" style="font-size:18px;display:block">0</b><span style="font-size:11px;color:var(--muted)">Score</span></div><div style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px"><b id="overLevel" style="font-size:18px;display:block">1</b><span style="font-size:11px;color:var(--muted)">Level</span></div></div><button class="btn btnPrimary" id="againBtn" style="width:100%">↻ Play Again</button></div></div></div><div class="fillBar"><i id="fillBar"></i></div><div class="controls"><button class="btn btnGhost" id="leftBtn">◀</button><button class="btn btnGhost" id="rightBtn">▶</button><button class="btn btnPrimary" id="pauseBtn">⏸ Pause</button></div><div class="tip">💡 Drag anywhere on the yard — bucket follows your finger! Catch blue, dodge black.</div></div><script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=360,H=440;
+let score=0,level=1,lives=3,fill=0,best=parseInt(localStorage.getItem('pipe-best')||'0',10),bestLevel=parseInt(localStorage.getItem('pipe-bestLevel')||'1',10),playing=false,paused=false,bucket={x:W/2,y:H-30,w:60,h:20},drops=[],particles=[],animId=null,spawnTimer=0,speed=1.5;
+function save(){localStorage.setItem('pipe-best',best);localStorage.setItem('pipe-bestLevel',bestLevel)}
+function updateHud(){
+document.getElementById('scoreEl').textContent=score;
+document.getElementById('levelEl').textContent=level;
+document.getElementById('livesEl').textContent='❤️'.repeat(lives)+'🖤'.repeat(3-lives);
+document.getElementById('bestEl').textContent=best;
+document.getElementById('fillBar').style.width=fill+'%';
+}
+function spawnDrop(){
+let isOil=Math.random()<0.25;
+drops.push({x:Math.random()*(W-20)+10,y:-20,vy:speed+Math.random()*1.5,isOil,r:12+Math.random()*4});
+}
+function draw(){
+ctx.clearRect(0,0,W,H);
+// rainy bg
+let grad=ctx.createLinearGradient(0,0,0,H);
+grad.addColorStop(0,'#243447');grad.addColorStop(1,'#0f1419');
+ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
+// pipes
+ctx.fillStyle='#2e4057';ctx.fillRect(0,40,W,8);ctx.fillRect(0,80,W,8);
+ctx.fillStyle='#1a232e';for(let i=0;i<W;i+=40){ctx.fillRect(i,40,4,48);ctx.fillRect(i,80,4,48)}
+// drops
+drops.forEach(d=>{
+ctx.shadowColor=d.isOil?'#f87171':'#38bdf8';ctx.shadowBlur=8;
+ctx.fillStyle=d.isOil?'#1f2937':'#38bdf8';
+ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,6.28);ctx.fill();ctx.shadowBlur=0;
+ctx.fillStyle=d.isOil?'#f87171':'#fff';ctx.font='12px system-ui';ctx.textAlign='center';ctx.fillText(d.isOil?'🛢️':'💧',d.x,d.y+4);
+});
+// bucket
+ctx.fillStyle='#facc15';ctx.fillRect(bucket.x-bucket.w/2,bucket.y-bucket.h/2,bucket.w,bucket.h);
+ctx.fillStyle='#eab308';ctx.fillRect(bucket.x-bucket.w/2,bucket.y-bucket.h/2,bucket.w,4);
+ctx.strokeStyle='#a16207';ctx.lineWidth=2;ctx.strokeRect(bucket.x-bucket.w/2,bucket.y-bucket.h/2,bucket.w,bucket.h);
+// particles
+particles.forEach(p=>{
+ctx.fillStyle=p.color;ctx.globalAlpha=p.alpha;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.28);ctx.fill();ctx.globalAlpha=1;
+});
+}
+function update(){
+if(!playing||paused)return;
+spawnTimer++;
+if(spawnTimer>30-Math.min(20,level*2)){spawnDrop();spawnTimer=0}
+drops.forEach((d,i)=>{
+d.y+=d.vy;
+if(d.y>bucket.y-bucket.h/2&&d.y<bucket.y+bucket.h/2&&d.x>bucket.x-bucket.w/2&&d.x<bucket.x+bucket.w/2){
+if(d.isOil){
+lives--;if(navigator.vibrate)navigator.vibrate([80,40,80]);
+for(let k=0;k<8;k++)particles.push({x:d.x,y:d.y,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6,r:3,color:'#f87171',alpha:1});
+if(lives<=0){playing=false;cancelAnimationFrame(animId);endGame()}
+}else{
+score+=10;fill+=8;if(navigator.vibrate)navigator.vibrate(20);
+for(let k=0;k<6;k++)particles.push({x:d.x,y:d.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,r:2,color:'#38bdf8',alpha:1});
+if(fill>=100){levelUp()}
+}
+drops.splice(i,1);
+}else if(d.y>H+20){
+drops.splice(i,1);
+}
+});
+particles.forEach((p,i)=>{
+p.x+=p.vx;p.y+=p.vy;p.vy+=0.2;p.alpha-=0.02;
+if(p.alpha<=0)particles.splice(i,1);
+});
+updateHud();draw();
+animId=requestAnimationFrame(update);
+}
+function levelUp(){
+fill=0;level++;speed+=0.3;score+=50;
+if(level>bestLevel){bestLevel=level;save()}
+let banner=document.createElement('div');banner.className='levelBanner';banner.textContent='LEVEL '+level+'! 🎉';
+document.getElementById('gameArea').appendChild(banner);
+setTimeout(()=>banner.remove(),1200);
+if(navigator.vibrate)navigator.vibrate(50);
+}
+function endGame(){
+if(score>best){best=score;save()}
+document.getElementById('overScore').textContent=score;
+document.getElementById('overLevel').textContent=level;
+document.getElementById('overDesc').textContent='Caught '+score+' drops — yard flooded!';
+document.getElementById('overOverlay').classList.remove('hidden');
+updateHud();
+}
+function startGame(){
+playing=true;paused=false;score=0;level=1;lives=3;fill=0;speed=1.5;drops=[];particles=[];bucket.x=W/2;
+document.getElementById('startOverlay').classList.add('hidden');
+document.getElementById('overOverlay').classList.add('hidden');
+updateHud();update();
+}
+function getPos(e){
+let rect=cv.getBoundingClientRect(),sx=W/rect.width,t=e.touches?e.touches[0]:e;
+return {x:(t.clientX-rect.left)*sx}
+}
+cv.addEventListener('mousedown',e=>{if(!playing)return;let p=getPos(e);bucket.x=Math.max(bucket.w/2,Math.min(W-bucket.w/2,p.x))});
+cv.addEventListener('mousemove',e=>{if(!playing||e.buttons!==1)return;let p=getPos(e);bucket.x=Math.max(bucket.w/2,Math.min(W-bucket.w/2,p.x))});
+cv.addEventListener('touchstart',e=>{if(!playing)return;let p=getPos(e);bucket.x=Math.max(bucket.w/2,Math.min(W-bucket.w/2,p.x));e.preventDefault()},{passive:false});
+cv.addEventListener('touchmove',e=>{if(!playing)return;let p=getPos(e);bucket.x=Math.max(bucket.w/2,Math.min(W-bucket.w/2,p.x));e.preventDefault()},{passive:false});
+document.getElementById('playBtn').onclick=startGame;
+document.getElementById('againBtn').onclick=startGame;
+document.getElementById('leftBtn').onpointerdown=()=>{if(!playing)return;bucket.x=Math.max(bucket.w/2,bucket.x-20)};
+document.getElementById('rightBtn').onpointerdown=()=>{if(!playing)return;bucket.x=Math.min(W-bucket.w/2,bucket.x+20)};
+document.getElementById('pauseBtn').onclick=()=>{
+if(!playing)return;
+paused=!paused;
+document.getElementById('pauseBtn').textContent=paused?'▶ Resume':'⏸ Pause';
+if(!paused)update();
+};
+updateHud();draw();
+</script></body></html>

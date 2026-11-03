@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Graveyard Branches</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#050a14;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif;color:#e8eef6;overflow:hidden}
+body{display:flex;justify-content:center;background:radial-gradient(ellipse at 50% -10%, #1e2a44 0%, #0a0f1a 55%, #05070d 100%)}
+.app{width:100%;max-width:428px;min-width:360px;height:100dvh;background:linear-gradient(180deg,#0d1424 0%,#0a0f1a 40%,#070b14 100%);display:flex;flex-direction:column;overflow:hidden;position:relative;border-left:1px solid #1e2a44;border-right:1px solid #1e2a44}
+.header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(0,0,0,0.35);backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0}
+.logo{display:flex;align-items:center;gap:8px}
+.logoMark{width:32px;height:32px;border-radius:8px;background:radial-gradient(circle at 30% 30%, #f0e6a0, #8a7a2e);display:grid;place-items:center;font-size:18px;box-shadow:0 0 12px rgba(240,230,160,0.4)}
+.logoText{line-height:1}
+.logoText b{font-size:14px;letter-spacing:0.08em;color:#f0e6a0;display:block}
+.logoText span{font-size:10px;letter-spacing:0.12em;color:#8a9bb5;text-transform:uppercase}
+.headerRight{display:flex;align-items:center;gap:8px}
+.scoreBox{text-align:right;line-height:1.1}
+.scoreBox small{font-size:10px;color:#8a9bb5;letter-spacing:0.08em;text-transform:uppercase}
+.scoreBox div{font-size:14px;font-weight:800;color:#fff}
+.scoreBox div em{font-style:normal;color:#f0e6a0}
+.iconBtn{width:40px;height:40px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);color:#e8eef6;display:grid;place-items:center;font-size:18px;cursor:pointer;flex-shrink:0}
+.iconBtn:active{transform:scale(0.96)}
+.moonBar{height:42px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:linear-gradient(90deg, rgba(240,230,160,0.08), transparent, rgba(120,160,255,0.08));border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0;position:relative;overflow:hidden}
+.moonBar::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 20% 50%, rgba(240,230,160,0.15) 0%, transparent 60%)}
+.moon{width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #fffbe6 0%, #f0e6a0 45%, #c9b86a 100%);box-shadow:0 0 18px rgba(240,230,160,0.6), 0 0 40px rgba(240,230,160,0.25);position:relative;z-index:1}
+.moonBarText{font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#8a9bb5;z-index:1}
+.stars{font-size:10px;letter-spacing:4px;opacity:0.5;z-index:1}
+.levelCard{margin:10px 12px 0;background:linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:12px 14px;flex-shrink:0}
+.levelTop{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.levelTitle{font-size:13px;font-weight:800;letter-spacing:0.06em;color:#f0e6a0;text-transform:uppercase}
+.levelBadge{font-size:11px;font-weight:700;background:rgba(240,230,160,0.15);color:#f0e6a0;border:1px solid rgba(240,230,160,0.25);padding:3px 8px;border-radius:20px}
+.levelRule{font-size:12px;line-height:1.4;color:#b8c6de;background:rgba(0,0,0,0.25);border-radius:8px;padding:8px 10px;border-left:3px solid #f0e6a0}
+.progressWrap{height:6px;background:rgba(255,255,255,0.08);margin:10px 12px 0;border-radius:10px;overflow:hidden;flex-shrink:0}
+.progressBar{height:100%;width:0%;background:linear-gradient(90deg, #f0e6a0, #c9b86a);border-radius:10px;transition:width 0.4s ease}
+.treeStage{flex:1;position:relative;overflow:hidden;margin:8px 12px 0;background:radial-gradient(ellipse at 50% 100%, rgba(30,42,68,0.5) 0%, transparent 70%);border-radius:16px;border:1px solid rgba(255,255,255,0.06)}
+.treeSVG{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.branchNode{position:absolute;transform:translate(-50%,-50%);width:148px;min-height:64px;background:rgba(14,22,38,0.92);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;gap:4px;box-shadow:0 4px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);transition:transform 0.15s, border-color 0.15s, box-shadow 0.15s;touch-action:manipulation}
+.branchNode:active{transform:translate(-50%,-50%) scale(0.97)}
+.branchNode.selected{border-color:#f0e6a0;box-shadow:0 0 0 2px rgba(240,230,160,0.3), 0 8px 24px rgba(0,0,0,0.6)}
+.branchNode.solved{opacity:0.45;pointer-events:none;border-color:rgba(100,200,120,0.5);background:rgba(20,40,25,0.9)}
+.branchNode.solved::after{content:"✓ RESOLVED";position:absolute;top:-8px;right:8px;font-size:9px;font-weight:800;letter-spacing:0.08em;background:#2a6b3a;color:#fff;padding:2px 6px;border-radius:20px}
+.branchHead{display:flex;align-items:center;gap:6px}
+.branchIcon{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:14px;flex-shrink:0;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08)}
+.branchName{font-size:11px;font-weight:800;letter-spacing:0.04em;color:#e8eef6;line-height:1.1;word-break:break-word}
+.branchState{font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:3px 6px;border-radius:6px;display:inline-block;align-self:flex-start}
+.state-merged-quiet{background:rgba(100,200,120,0.18);color:#7ed48a;border:1px solid rgba(100,200,120,0.3)}
+.state-drifting-behind{background:rgba(240,180,60,0.18);color:#f0c86a;border:1px solid rgba(240,180,60,0.3)}
+.state-abandoned{background:rgba(220,80,80,0.18);color:#e88a8a;border:1px solid rgba(220,80,80,0.3)}
+.branchDesc{font-size:10px;line-height:1.3;color:#8a9bb5}
+.scarTag{font-size:9px;font-weight:800;letter-spacing:0.08em;color:#ff9a7a;background:rgba(255,120,80,0.15);border:1px solid rgba(255,120,80,0.3);padding:2px 5px;border-radius:4px;align-self:flex-start}
+.controls{padding:10px 12px 14px;display:flex;gap:8px;flex-shrink:0;background:linear-gradient(180deg, transparent, rgba(0,0,0,0.4))}
+.btn{flex:1;height:48px;border-radius:12px;border:none;font-size:13px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.btnPrimary{background:linear-gradient(180deg, #f0e6a0, #c9b86a);color:#1a1600;box-shadow:0 4px 12px rgba(240,230,160,0.3)}
+.btnPrimary:disabled{opacity:0.4;cursor:not-allowed;box-shadow:none}
+.btnGhost{background:rgba(255,255,255,0.06);color:#e8eef6;border:1px solid rgba(255,255,255,0.12)}
+.btn:active{transform:scale(0.98)}
+.toast{position:absolute;left:50%;top:46%;transform:translateX(-50%) translateY(10px);background:rgba(10,15,26,0.95);border:1px solid rgba(255,255,255,0.12);color:#fff;padding:10px 14px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,0.5);opacity:0;pointer-events:none;transition:all 0.25s;z-index:20;text-align:center;max-width:80%}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(180deg, #141e32, #0e1626);border-top:1px solid rgba(240,230,160,0.2);border-radius:18px 18px 0 0;padding:14px 14px 18px;transform:translateY(110%);transition:transform 0.32s cubic-bezier(0.32,0.72,0,1);z-index:15;box-shadow:0 -12px 40px rgba(0,0,0,0.6)}
+.sheet.open{transform:translateY(0)}
+.sheetHandle{width:36px;height:4px;background:rgba(255,255,255,0.2);border-radius:10px;margin:0 auto 12px}
+.sheetTitle{font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#f0e6a0;margin-bottom:2px}
+.sheetSub{font-size:12px;color:#8a9bb5;margin-bottom:12px;line-height:1.4}
+.sheetActions{display:flex;flex-direction:column;gap:8px}
+.actionBtn{height:56px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:#e8eef6;display:flex;align-items:center;gap:12px;padding:0 14px;cursor:pointer;text-align:left}
+.actionBtn:active{transform:scale(0.98);background:rgba(255,255,255,0.08)}
+.actionBtn b{font-size:13px;font-weight:800;letter-spacing:0.04em}
+.actionBtn span{font-size:11px;color:#8a9bb5;display:block}
+.actionIcon{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:18px;flex-shrink:0}
+.act-fold{background:rgba(100,200,120,0.15);border:1px solid rgba(100,200,120,0.25)}
+.act-replay{background:rgba(240,180,60,0.15);border:1px solid rgba(240,180,60,0.25)}
+.act-prune{background:rgba(220,80,80,0.15);border:1px solid rgba(220,80,80,0.25)}
+.modal{position:absolute;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(6px);display:none;place-items:center;padding:16px;z-index:30}
+.modal.open{display:grid}
+.book{width:100%;max-width:360px;max-height:82dvh;overflow:auto;background:linear-gradient(180deg, #fdf6e3, #f5e6c8);color:#2b2114;border-radius:14px;border:1px solid #d9c9a0;box-shadow:0 16px 40px rgba(0,0,0,0.5);padding:16px}
+.book h2{font-size:16px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:#5a3e1b;margin-bottom:4px}
+.book h3{font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#8a6a2e;margin:14px 0 6px;border-bottom:1px solid #d9c9a0;padding-bottom:4px}
+.book p, .book li{font-size:12px;line-height:1.5;color:#4a3720}
+.book ul{padding-left:16px;margin:6px 0}
+.book li{margin:4px 0}
+.tag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;padding:2px 6px;border-radius:4px;margin-right:4px;vertical-align:middle}
+.tag-q{background:#d4edda;color:#1b4d2a;border:1px solid #a3d9b1}
+.tag-d{background:#fff3cd;color:#664d03;border:1px solid #ffec99}
+.tag-a{background:#f8d7da;color:#58151c;border:1px solid #f1aeb5}
+.tag-scar{background:#ffddd2;color:#7a2e1a;border:1px solid #ffb4a0}
+.closeBook{margin-top:14px;width:100%;height:44px;border-radius:10px;border:none;background:#5a3e1b;color:#fdf6e3;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer}
+.fog{position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(180deg, transparent, rgba(180,200,220,0.08));pointer-events:none}
+.grave{position:absolute;bottom:14px;width:18px;height:22px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:4px 4px 0 0;pointer-events:none}
+.grave::after{content:"†";position:absolute;top:2px;left:50%;transform:translateX(-50%);font-size:8px;color:rgba(255,255,255,0.15)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="logo">
+      <div class="logoMark">🌳</div>
+      <div class="logoText"><b>GRAVEYARD</b><span>Branches • v1.0</span></div>
+    </div>
+    <div class="headerRight">
+      <div class="scoreBox"><small>Score • Best <em id="bestEl">0</em></small><div id="scoreEl">0</div></div>
+      <button class="iconBtn" id="muteBtn" aria-label="Mute">🔊</button>
+      <button class="iconBtn" id="guideBtn" aria-label="Guide">📖</button>
+    </div>
+  </div>
+
+  <div class="moonBar">
+    <div class="moon"></div>
+    <div class="moonBarText" id="moonText">Moonlit • All Hallows</div>
+    <div class="stars">✦ ✦ ✦</div>
+  </div>
+
+  <div class="levelCard">
+    <div class="levelTop">
+      <div class="levelTitle" id="levelTitle">Level 1: First Burial</div>
+      <div class="levelBadge" id="levelBadge">1 / 4</div>
+    </div>
+    <div class="levelRule" id="levelRule">Field Guide: <b>merged-quiet</b> → Fold-In, <b>drifting-behind</b> → Replay, <b>abandoned</b> → Prune</div>
+  </div>
+
+  <div class="progressWrap"><div class="progressBar" id="progressBar"></div></div>
+
+  <div class="treeStage" id="treeStage">
+    <!-- SVG tree -->
+    <svg class="treeSVG" viewBox="0 0 400 520" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <!-- ground -->
+      <ellipse cx="200" cy="500" rx="160" ry="18" fill="rgba(255,255,255,0.04)"/>
+      <!-- trunk -->
+      <path d="M200 500 C 190 420, 185 360, 200 280 C 215 360, 210 420, 200 500 Z" fill="#1a2332" stroke="#2a3a52" stroke-width="2"/>
+      <path d="M200 280 C 200 280, 140 240, 90 210 C 110 230, 150 260, 200 285" fill="none" stroke="#2a3a52" stroke-width="8" stroke-linecap="round"/>
+      <path d="M200 300 C 200 300, 260 260, 310 220 C 290 240, 250 280, 200 305" fill="none" stroke="#2a3a52" stroke-width="8" stroke-linecap="round"/>
+      <path d="M200 340 C 200 340, 130 310, 80 270 C 105 290, 145 325, 200 345" fill="none" stroke="#2a3a52" stroke-width="7" stroke-linecap="round"/>
+      <path d="M200 360 C 200 360, 270 330, 320 280 C 295 305, 250 345, 200 365" fill="none" stroke="#2a3a52" stroke-width="7" stroke-linecap="round"/>
+      <path d="M200 400 C 200 400, 150 380, 110 340 C 135 360, 165 385, 200 405" fill="none" stroke="#2a3a52" stroke-width="6" stroke-linecap="round"/>
+      <path d="M200 420 C 200 420, 250 400, 290 360 C 265 385, 225 410, 200 425" fill="none" stroke="#2a3a52" stroke-width="6" stroke-linecap="round"/>
+      <!-- trunk texture -->
+      <path d="M195 480 Q200 400 198 320" stroke="rgba(255,255,255,0.06)" stroke-width="1.5" fill="none"/>
+      <path d="M205 470 Q202 390 206 330" stroke="rgba(0,0,0,0.3)" stroke-width="1" fill="none"/>
+      <!-- eyes -->
+      <circle cx="188" cy="310" r="3" fill="#f0e6a0" opacity="0.9"><animate attributeName="opacity" values="0.9;0.2;0.9" dur="4s" repeatCount="indefinite"/></circle>
+      <circle cx="212" cy="312" r="3" fill="#f0e6a0" opacity="0.9"><animate attributeName="opacity" values="0.9;0.2;0.9" dur="4s" repeatCount="indefinite"/></circle>
+    </svg>
+    <div class="fog"></div>
+    <div class="grave" style="left:18%"></div>
+    <div class="grave" style="left:32%;height:18px;opacity:0.7"></div>
+    <div class="grave" style="left:68%;height:20px"></div>
+    <div class="grave" style="left:82%;height:16px;opacity:0.6"></div>
+    <!-- branch nodes injected here -->
+  </div>
+
+  <div class="controls">
+    <button class="btn btnGhost" id="resetBtn">↺ Reset</button>
+    <button class="btn btnPrimary" id="nextBtn" disabled>Next Rite →</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="sheet" id="sheet">
+    <div class="sheetHandle"></div>
+    <div class="sheetTitle" id="sheetTitle">Choose a rite</div>
+    <div class="sheetSub" id="sheetSub">Pick the correct version-control rite for this branch omen.</div>
+    <div class="sheetActions">
+      <button class="actionBtn" data-act="fold-in"><div class="actionIcon act-fold">🌿</div><div><b>Fold-In</b><span>Merge branch into trunk (git merge)</span></div></button>
+      <button class="actionBtn" data-act="replay"><div class="actionIcon act-replay">🌀</div><div><b>Replay</b><span>Replay commits on trunk tip (git rebase)</span></div></button>
+      <button class="actionBtn" data-act="prune"><div class="actionIcon act-prune">✂️</div><div><b>Prune</b><span>Delete abandoned branch (git branch -d)</span></div></button>
+    </div>
+  </div>
+
+  <div class="modal" id="guideModal">
+    <div class="book">
+      <h2>📖 Field Guide of Rites</h2>
+      <p style="font-style:italic;color:#6b5a3a">Kept by the Graveyard Keeper. Read before you cut.</p>
+      
+      <h3>🌙 The Three Omens</h3>
+      <ul>
+        <li><span class="tag tag-q">merged-quiet</span> Branch is complete, tests pass, ready to join trunk. <b>Rite: Fold-In</b> (merge). The branch becomes part of history.</li>
+        <li><span class="tag tag-d">drifting-behind</span> Trunk moved ahead — branch is behind by commits. <b>Rite: Replay</b> (rebase) to replay its commits on the new tip. Never Fold a drifter or you summon conflicts!</li>
+        <li><span class="tag tag-a">abandoned</span> No commits, no keeper, forgotten experiment. <b>Rite: Prune</b> (delete) to clear the graveyard.</li>
+      </ul>
+
+      <h3>🩸 Scar Rule (Level 3+)</h3>
+      <p>A <span class="tag tag-scar">scar</span> means the branch was <b>already folded</b> into trunk — you can see the bark healed over. Even if it says <span class="tag tag-q">merged-quiet</span>, the correct rite is <b>Prune</b>, not Fold-In. Folding twice angers the tree.</p>
+
+      <h3>🎮 How to Play</h3>
+      <ul>
+        <li>Tap a branch on the gnarled tree to open its rite menu.</li>
+        <li>Choose <b>Fold-In / Replay / Prune</b> according to the omen + scar.</li>
+        <li>Correct: <b>+100</b> points. Wrong: <b>-30</b> and the branch shudders.</li>
+        <li>Clear all branches to unlock <b>Next Rite</b>. Time bonus on completion!</li>
+        <li>Scars appear from Level 3 — always check bark first!</li>
+      </ul>
+
+      <h3>🔊 Git → Graveyard</h3>
+      <ul>
+        <li><b>Fold-In</b> = <code>git merge feature</code> — creates a merge commit</li>
+        <li><b>Replay</b> = <code>git rebase main</code> — replays commits cleanly</li>
+        <li><b>Prune</b> = <code>git branch -d feature</code> — deletes the branch</li>
+      </ul>
+      <p style="margin-top:10px;font-size:11px;color:#8a6a2e">Tip: In real git, rebase rewrites history — only replay branches you haven't shared. The graveyard forgives; your teammates may not.</p>
+
+      <button class="closeBook" id="closeGuide">Close Guide</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const LEVELS = [
+  {
+    title: "Level 1: First Burial",
+    rule: "Field Guide: <b>merged-quiet</b> → Fold-In &nbsp;|&nbsp; <b>drifting-behind</b> → Replay &nbsp;|&nbsp; <b>abandoned</b> → Prune",
+    branches: [
+      {id:"b1", name:"whispering-willow", state:"merged-quiet", correct:"fold-in", desc:"Ready to join trunk", x:14, y:22, scar:false},
+      {id:"b2", name:"hollow-elm", state:"drifting-behind", correct:"replay", desc:"3 commits behind trunk", x:78, y:18, scar:false},
+      {id:"b3", name:"weeping-yew", state:"abandoned", correct:"prune", desc:"No keeper, no commits", x:16, y:58, scar:false},
+      {id:"b4", name:"bone-ash", state:"merged-quiet", correct:"fold-in", desc:"Quiet and complete", x:80, y:52, scar:false},
+    ]
+  },
+  {
+    title: "Level 2: Drifting Souls",
+    rule: "Rule: Trunk advanced! <b>Drifters must Replay</b> — never Fold a drifter or you summon conflicts.",
+    branches: [
+      {id:"b1", name:"night-thorn", state:"drifting-behind", correct:"replay", desc:"5 commits behind main", x:12, y:20, scar:false},
+      {id:"b2", name:"pale-birch", state:"merged-quiet", correct:"fold-in", desc:"Tests green, ready", x:82, y:24, scar:false},
+      {id:"b3", name:"dusk-hawthorn", state:"drifting-behind", correct:"replay", desc:"Trunk moved, replay needed", x:18, y:54, scar:false},
+      {id:"b4", name:"ashen-root", state:"abandoned", correct:"prune", desc:"Forgotten experiment", x:76, y:56, scar:false},
+      {id:"b5", name:"gloom-oak", state:"merged-quiet", correct:"fold-in", desc:"Approved by keeper", x:50, y:12, scar:false},
+    ]
+  },
+  {
+    title: "Level 3: Scarred Bark",
+    rule: "Rule: <b>Scar = already folded!</b> Scarred merged-quiet → <b>Prune</b>, not Fold-In.",
+    branches: [
+      {id:"b1", name:"scarred-willow", state:"merged-quiet", correct:"prune", desc:"Bark healed — already in trunk", x:14, y:20, scar:true},
+      {id:"b2", name:"fresh-elm", state:"merged-quiet", correct:"fold-in", desc:"No scar, ready to fold", x:80, y:18, scar:false},
+      {id:"b3", name:"drifting-yew", state:"drifting-behind", correct:"replay", desc:"Behind by 4, needs replay", x:16, y:56, scar:false},
+      {id:"b4", name:"lost-ash", state:"abandoned", correct:"prune", desc:"Abandoned long ago", x:78, y:54, scar:false},
+      {id:"b5", name:"scarred-thorn", state:"merged-quiet", correct:"prune", desc:"Scarred — already merged", x:50, y:10, scar:true},
+    ]
+  },
+  {
+    title: "Level 4: Keeper's Trial",
+    rule: "Master Rule: <b>Check scar first, then omen.</b> All rites combined. Prove you are Keeper.",
+    branches: [
+      {id:"b1", name:"eternal-oak", state:"merged-quiet", correct:"fold-in", desc:"Clean, no scar, ready", x:12, y:18, scar:false},
+      {id:"b2", name:"scarred-birch", state:"merged-quiet", correct:"prune", desc:"Scarred — already folded", x:82, y:20, scar:true},
+      {id:"b3", name:"wandering-elm", state:"drifting-behind", correct:"replay", desc:"Drifting, needs replay", x:14, y:56, scar:false},
+      {id:"b4", name:"hollow-grave", state:"abandoned", correct:"prune", desc:"No soul remains", x:80, y:56, scar:false},
+      {id:"b5", name:"moon-thorn", state:"drifting-behind", correct:"replay", desc:"Fell behind trunk", x:50, y:12, scar:false},
+      {id:"b6", name:"scarred-ash", state:"merged-quiet", correct:"prune", desc:"Healed scar — prune it", x:50, y:68, scar:true},
+    ]
+  }
+];
+
+const els = {
+  score: document.getElementById('scoreEl'),
+  best: document.getElementById('bestEl'),
+  levelTitle: document.getElementById('levelTitle'),
+  levelBadge: document.getElementById('levelBadge'),
+  levelRule: document.getElementById('levelRule'),
+  progressBar: document.getElementById('progressBar'),
+  treeStage: document.getElementById('treeStage'),
+  toast: document.getElementById('toast'),
+  sheet: document.getElementById('sheet'),
+  sheetTitle: document.getElementById('sheetTitle'),
+  sheetSub: document.getElementById('sheetSub'),
+  nextBtn: document.getElementById('nextBtn'),
+  resetBtn: document.getElementById('resetBtn'),
+  muteBtn: document.getElementById('muteBtn'),
+  guideBtn: document.getElementById('guideBtn'),
+  guideModal: document.getElementById('guideModal'),
+  closeGuide: document.getElementById('closeGuide'),
+  moonText: document.getElementById('moonText'),
+};
+
+let state = {
+  levelIndex: 0,
+  score: 0,
+  best: 0,
+  muted: false,
+  solved: new Set(),
+  selectedId: null,
+  startTime: Date.now()
+};
+
+// persistence
+try{
+  state.best = parseInt(localStorage.getItem('graveyardBestScore')||'0',10)||0;
+  state.muted = localStorage.getItem('graveyardMute')==='1';
+  const savedLevel = parseInt(localStorage.getItem('graveyardLevel')||'0',10);
+  if(savedLevel>=0 && savedLevel<LEVELS.length) state.levelIndex = savedLevel;
+}catch(e){}
+
+els.best.textContent = state.best;
+updateMuteIcon();
+
+let audioCtx=null, masterGain=null, droneOsc1=null, droneOsc2=null, lfo=null;
+
+function ensureAudio(){
+  if(audioCtx) return;
+  try{
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0;
+    masterGain.connect(audioCtx.destination);
+    // drone
+    droneOsc1 = audioCtx.createOscillator();
+    droneOsc1.type='sawtooth'; droneOsc1.frequency.value=55;
+    const g1 = audioCtx.createGain(); g1.gain.value=0.12;
+    const filt = audioCtx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=700;
+    droneOsc1.connect(g1); g1.connect(filt); filt.connect(masterGain);
+    droneOsc1.start();
+    droneOsc2 = audioCtx.createOscillator();
+    droneOsc2.type='triangle'; droneOsc2.frequency.value=110.25;
+    const g2 = audioCtx.createGain(); g2.gain.value=0.08;
+    droneOsc2.connect(g2); g2.connect(masterGain);
+    droneOsc2.start();
+    // tremolo
+    lfo = audioCtx.createOscillator(); lfo.frequency.value=0.6;
+    const lfoGain = audioCtx.createGain(); lfoGain.gain.value=0.04;
+    lfo.connect(lfoGain); lfoGain.connect(masterGain.gain);
+    lfo.start();
+  }catch(e){}
+}
+function startDrone(){
+  if(state.muted) return;
+  ensureAudio();
+  if(!audioCtx) return;
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  try{ masterGain.gain.cancelScheduledValues(audioCtx.currentTime); masterGain.gain.linearRampToValueAtTime(0.18, audioCtx.currentTime+1.2);}catch(e){}
+}
+function stopDrone(){
+  if(!masterGain||!audioCtx) return;
+  try{ masterGain.gain.cancelScheduledValues(audioCtx.currentTime); masterGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime+0.6);}catch(e){}
+}
+function blip(type){
+  if(state.muted) return;
+  ensureAudio();
+  if(!audioCtx) return;
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.connect(g); g.connect(audioCtx.destination);
+  if(type==='good'){
+    o.frequency.value=880; g.gain.value=0.25;
+    o.frequency.linearRampToValueAtTime(1320, audioCtx.currentTime+0.18);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+0.35);
+    o.start(); o.stop(audioCtx.currentTime+0.36);
+  } else if(type==='bad'){
+    o.frequency.value=180; o.type='sawtooth'; g.gain.value=0.3;
+    o.frequency.linearRampToValueAtTime(90, audioCtx.currentTime+0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+0.3);
+    o.start(); o.stop(audioCtx.currentTime+0.31);
+  } else if(type==='click'){
+    o.frequency.value=600; g.gain.value=0.15;
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+0.12);
+    o.start(); o.stop(audioCtx.currentTime+0.13);
+  }
+}
+
+function showToast(msg, good){
+  els.toast.textContent = msg;
+  els.toast.style.borderColor = good ? 'rgba(100,200,120,0.4)' : 'rgba(220,80,80,0.4)';
+  els.toast.style.background = good ? 'rgba(20,40,25,0.95)' : 'rgba(40,15,15,0.95)';
+  els.toast.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=> els.toast.classList.remove('show'), 1800);
+}
+
+function updateMuteIcon(){
+  els.muteBtn.textContent = state.muted ? '🔇' : '🔊';
+}
+
+function saveBest(){
+  if(state.score > state.best){
+    state.best = state.score;
+    els.best.textContent = state.best;
+    try{ localStorage.setItem('graveyardBestScore', String(state.best)); }catch(e){}
+  }
+}
+
+function renderLevel(){
+  const lvl = LEVELS[state.levelIndex];
+  els.levelTitle.textContent = lvl.title;
+  els.levelBadge.textContent = (state.levelIndex+1)+' / '+LEVELS.length;
+  els.levelRule.innerHTML = lvl.rule;
+  els.moonText.textContent = state.levelIndex===3 ? 'Blood Moon • Final Rite' : 'Moonlit • All Hallows';
+  state.solved.clear();
+  state.selectedId=null;
+  els.sheet.classList.remove('open');
+  // remove old nodes
+  [...els.treeStage.querySelectorAll('.branchNode')].forEach(n=>n.remove());
+  lvl.branches.forEach(b=>{
+    const node = document.createElement('div');
+    node.className='branchNode';
+    node.dataset.id=b.id;
+    node.style.left=b.x+'%';
+    node.style.top=b.y+'%';
+    const stateClass = 'state-'+b.state;
+    const icon = b.state==='merged-quiet' ? '🌿' : b.state==='drifting-behind' ? '🌀' : '💀';
+    node.innerHTML = `
+      <div class="branchHead"><div class="branchIcon">${icon}</div><div class="branchName">${b.name}</div></div>
+      <div class="branchState ${stateClass}">${b.state}</div>
+      ${b.scar ? '<div class="scarTag">🩸 scarred bark</div>' : ''}
+      <div class="branchDesc">${b.desc}</div>
+    `;
+    node.addEventListener('click', ()=> selectBranch(b.id));
+    els.treeStage.appendChild(node);
+  });
+  updateProgress();
+  state.startTime = Date.now();
+  try{ localStorage.setItem('graveyardLevel', String(state.levelIndex)); }catch(e){}
+}
+
+function selectBranch(id){
+  const lvl = LEVELS[state.levelIndex];
+  const b = lvl.branches.find(x=>x.id===id);
+  if(!b || state.solved.has(id)) return;
+  state.selectedId=id;
+  [...els.treeStage.querySelectorAll('.branchNode')].forEach(n=>{
+    n.classList.toggle('selected', n.dataset.id===id);
+  });
+  els.sheetTitle.textContent = b.name + (b.scar ? ' — scarred' : '');
+  els.sheetSub.textContent = `Omen: ${b.state}${b.scar ? ' + scarred bark' : ''} • ${b.desc}. Choose the rite.`;
+  els.sheet.classList.add('open');
+  blip('click');
+  startDrone();
+}
+
+function doAction(act){
+  if(!state.selectedId) return;
+  const lvl = LEVELS[state.levelIndex];
+  const b = lvl.branches.find(x=>x.id===state.selectedId);
+  if(!b) return;
+  const isCorrect = act===b.correct;
+  const node = els.treeStage.querySelector(`.branchNode[data-id="${state.selectedId}"]`);
+  if(isCorrect){
+    state.score += 100;
+    els.score.textContent = state.score;
+    saveBest();
+    state.solved.add(state.selectedId);
+    if(node){ node.classList.add('solved'); node.classList.remove('selected'); }
+    showToast(`✓ ${act} correct! +100`, true);
+    blip('good');
+    // little puff
+    node.style.transform='translate(-50%,-50%) scale(1.08)';
+    setTimeout(()=> node.style.transform='translate(-50%,-50%)', 200);
+  } else {
+    state.score = Math.max(0, state.score-30);
+    els.score.textContent = state.score;
+    showToast(`✗ Wrong! ${b.correct} was needed. -30`, false);
+    blip('bad');
+    if(node){
+      node.animate([{transform:'translate(-50%,-50%) translateX(0)'},{transform:'translate(-50%,-50%) translateX(-6px)'},{transform:'translate(-50%,-50%) translateX(6px)'},{transform:'translate(-50%,-50%) translateX(0)'}],{duration:300});
+    }
+  }
+  els.sheet.classList.remove('open');
+  state.selectedId=null;
+  updateProgress();
+  if(state.solved.size===lvl.branches.length){
+    const elapsed = Math.round((Date.now()-state.startTime)/1000);
+    const bonus = Math.max(0, 80 - elapsed*2);
+    if(bonus>0){ state.score+=bonus; els.score.textContent=state.score; saveBest(); }
+    setTimeout(()=>{
+      showToast(`🌕 Rite complete! ${bonus>0? '+'+bonus+' time bonus':''} Next rite unlocked.`, true);
+      blip('good');
+    }, 400);
+  }
+}
+
+function updateProgress(){
+  const lvl = LEVELS[state.levelIndex];
+  const pct = lvl.branches.length ? (state.solved.size/lvl.branches.length)*100 : 0;
+  els.progressBar.style.width = pct+'%';
+  els.nextBtn.disabled = state.solved.size !== lvl.branches.length;
+  if(state.solved.size===lvl.branches.length && state.levelIndex===LEVELS.length-1){
+    els.nextBtn.textContent='Keeper Crowned 👑';
+  } else if(state.solved.size===lvl.branches.length){
+    els.nextBtn.textContent='Next Rite →';
+  } else {
+    els.nextBtn.textContent=`${state.solved.size}/${lvl.branches.length} branches`;
+  }
+}
+
+// events
+els.treeStage.addEventListener('click', (e)=>{
+  if(e.target===els.treeStage || e.target.closest('.treeSVG') || e.target.closest('.fog')){
+    els.sheet.classList.remove('open');
+    [...els.treeStage.querySelectorAll('.branchNode')].forEach(n=>n.classList.remove('selected'));
+    state.selectedId=null;
+  }
+});
+document.querySelectorAll('.actionBtn').forEach(btn=>{
+  btn.addEventListener('click', ()=> doAction(btn.dataset.act));
+});
+els.nextBtn.addEventListener('click', ()=>{
+  if(els.nextBtn.disabled) return;
+  if(state.levelIndex < LEVELS.length-1){
+    state.levelIndex++;
+    renderLevel();
+    showToast('Entering '+LEVELS[state.levelIndex].title, true);
+    blip('good');
+  } else {
+    showToast('👑 You are the Keeper! Score '+state.score+' • Best '+state.best, true);
+    // confetti-ish
+    els.treeStage.animate([{filter:'brightness(1)'},{filter:'brightness(1.4)'},{filter:'brightness(1)'}],{duration:800});
+  }
+});
+els.resetBtn.addEventListener('click', ()=>{
+  state.score=0; els.score.textContent=0;
+  renderLevel();
+  showToast('Graveyard reset', true);
+  blip('click');
+});
+els.muteBtn.addEventListener('click', ()=>{
+  state.muted=!state.muted;
+  updateMuteIcon();
+  try{ localStorage.setItem('graveyardMute', state.muted?'1':'0'); }catch(e){}
+  if(state.muted) stopDrone(); else startDrone();
+  showToast(state.muted?'🔇 Drone silenced':'🔊 Drone awakened', true);
+});
+els.guideBtn.addEventListener('click', ()=> els.guideModal.classList.add('open'));
+els.closeGuide.addEventListener('click', ()=> els.guideModal.classList.remove('open'));
+els.guideModal.addEventListener('click', (e)=>{ if(e.target===els.guideModal) els.guideModal.classList.remove('open'); });
+
+// first interaction starts audio
+document.addEventListener('click', function initAudioOnce(){
+  ensureAudio();
+  document.removeEventListener('click', initAudioOnce);
+}, {once:true});
+
+// init
+renderLevel();
+els.score.textContent = state.score;
+</script>
+</body>
+</html>

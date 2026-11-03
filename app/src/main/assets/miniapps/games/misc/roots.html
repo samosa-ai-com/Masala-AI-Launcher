@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Root Grow</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;touch-action:none;user-select:none;font-family:system-ui,sans-serif}
+body{background:#1a1207;color:#fff;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:6px}
+h1{font-size:17px;color:#86efac;margin:6px 0 2px;letter-spacing:1px}
+.sub{font-size:11px;opacity:.6;margin-bottom:6px;text-align:center}
+#wrap{position:relative;width:360px;max-width:95vw;height:560px;background:linear-gradient(180deg,#3d2817 0%,#5a3a1a 20%,#2c1810 100%);border-radius:16px;overflow:hidden;border:2px solid #5a3a1a;box-shadow:0 8px 32px rgba(0,0,0,.6)}
+canvas{display:block;width:100%;height:100%}
+#ui{position:absolute;top:0;left:0;right:0;padding:8px;display:flex;justify-content:space-between;gap:6px;pointer-events:none}
+.pill{background:rgba(0,0,0,.6);backdrop-filter:blur(6px);padding:6px 10px;border-radius:10px;font-size:11px;border:1px solid rgba(255,255,255,.15);text-align:center;min-width:62px}
+.pill b{color:#86efac}
+.pill.energy b{color:#fde047}
+#energyWrap{position:absolute;top:56px;left:12px;right:12px;height:14px;background:rgba(0,0,0,.5);border-radius:8px;border:2px solid rgba(255,255,255,.2);overflow:hidden;pointer-events:none}
+#energyFill{height:100%;width:100%;background:linear-gradient(90deg,#22c55e,#86efac);transition:width .2s,background .2s}
+#controls{position:absolute;bottom:0;left:0;right:0;height:80px;display:flex;gap:8px;padding:8px;background:linear-gradient(0deg,rgba(0,0,0,.6),transparent);pointer-events:auto}
+.cbtn{flex:1;border-radius:14px;border:2px solid rgba(255,255,255,.25);background:rgba(255,255,255,.15);color:#fff;font-weight:800;font-size:20px;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.cbtn:active{transform:scale(.97);background:rgba(255,255,255,.3)}
+.cbtn.grow{background:rgba(34,197,94,.35);border-color:#22c55e}
+#overlay{position:absolute;inset:0;background:rgba(26,18,7,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;z-index:10}
+#overlay h2{font-size:22px;color:#86efac;margin-bottom:6px}
+#overlay p{font-size:13px;opacity:.9;line-height:1.5;max-width:300px}
+.btn{margin-top:14px;background:#22c55e;color:#fff;border:none;padding:12px 24px;border-radius:12px;font-weight:800;font-size:15px}
+.btn:active{transform:scale(.97)}
+</style>
+</head>
+<body>
+<h1>🌱 ROOT GROW</h1>
+<div class="sub">Steer down • Spend energy to stretch • Drink water • Avoid toxins</div>
+<div id="wrap">
+<canvas id="c" width="360" height="560"></canvas>
+<div id="ui">
+<div class="pill">DEPTH<br><b id="depthEl">0 m</b></div>
+<div class="pill">WATER<br><b id="waterEl">0</b></div>
+<div class="pill">BEST<br><b id="bestEl">0 m</b></div>
+</div>
+<div id="energyWrap"><div id="energyFill"></div></div>
+<div id="controls">
+<button class="cbtn" id="leftBtn">◀</button>
+<button class="cbtn grow" id="growBtn">🌱 GROW</button>
+<button class="cbtn" id="rightBtn">▶</button>
+</div>
+<div id="overlay">
+<div style="font-size:36px">🌱</div>
+<h2>Root Grow</h2>
+<p>Steer your tendril down through soil!<br>
+<b>◀ ▶</b> or <b>drag/tilt</b> to steer, <b style="color:#22c55e">GROW</b> to stretch.<br>
+Each stretch costs <b style="color:#fde047">energy</b> — absorb <b style="color:#38bdf8">💧 water pockets</b> to keep growing.<br>
+Avoid <b style="color:#a78bfa">☠️ toxic patches</b>!</p>
+<p style="font-size:11px;opacity:.6;margin-top:8px">Deeper = more toxins • Branching roots at depth</p>
+<button class="btn" id="playBtn">GROW ROOTS 🌱</button>
+</div>
+</div>
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+const depthEl=document.getElementById('depthEl'),waterEl=document.getElementById('waterEl'),bestEl=document.getElementById('bestEl');
+const energyFill=document.getElementById('energyFill'),overlay=document.getElementById('overlay'),playBtn=document.getElementById('playBtn');
+const leftBtn=document.getElementById('leftBtn'),rightBtn=document.getElementById('rightBtn'),growBtn=document.getElementById('growBtn');
+let best=parseInt(localStorage.getItem('rootBest')||'0');bestEl.textContent=best+'m';
+let running=false,energy=100,depth=0,water=0,root=[],branches=[],waters=[],toxins=[],particles=[],keys={left:false,right:false},tilt=0,lastTime=0,cameraY=0,steer=0;
+
+function reset(){
+  energy=100;depth=0;water=0;root=[{x:180,y:40}];branches=[];waters=[];toxins=[];particles=[];cameraY=0;steer=0;
+  for(let i=0;i<8;i++) spawnWater(80+i*60);
+  for(let i=0;i<6;i++) spawnToxin(100+i*70);
+  depthEl.textContent='0m';waterEl.textContent='0';updateEnergy();
+}
+
+function spawnWater(y){
+  waters.push({x:30+Math.random()*300,y, r:14+Math.random()*8, collected:false});
+}
+function spawnToxin(y){
+  toxins.push({x:30+Math.random()*300,y, r:18+Math.random()*10, w:30+Math.random()*20, h:18+Math.random()*12});
+}
+
+function updateEnergy(){
+  energyFill.style.width=Math.max(0,energy)+'%';
+  if(energy<30) energyFill.style.background='linear-gradient(90deg,#ef4444,#f87171)';
+  else if(energy<60) energyFill.style.background='linear-gradient(90deg,#f59e0b,#fde047)';
+  else energyFill.style.background='linear-gradient(90deg,#22c55e,#86efac)';
+}
+
+function growStep(){
+  if(!running||energy<=0) return;
+  let tip=root[root.length-1];
+  // steer input
+  let input=0;
+  if(keys.left) input-=1;
+  if(keys.right) input+=1;
+  input+=tilt*1.2;
+  steer+=input*0.15;
+  steer*=0.85;
+  let nx=tip.x + steer*8 + (Math.random()-0.5)*2;
+  let ny=tip.y + 8 + Math.random()*4;
+  nx=Math.max(12,Math.min(348,nx));
+  root.push({x:nx,y:ny});
+  depth=Math.max(depth, Math.floor((ny-40)/4));
+  depthEl.textContent=depth+'m';
+  energy-=0.7;
+  if(energy<0) energy=0;
+  updateEnergy();
+  // camera follow
+  let targetCam=ny-280;
+  if(targetCam>cameraY) cameraY+=(targetCam-cameraY)*0.08;
+  // check water
+  for(let w of waters){
+    if(w.collected) continue;
+    let dx=nx-w.x, dy=ny-w.y;
+    if(Math.sqrt(dx*dx+dy*dy)<w.r+6){
+      w.collected=true;water++;waterEl.textContent=water;
+      energy=Math.min(100,energy+28);
+      updateEnergy();
+      for(let k=0;k<10;k++) particles.push({x:w.x,y:w.y, vx:(Math.random()-0.5)*60, vy:(Math.random()-0.5)*60, life:0.6,max:0.6,color:'#38bdf8'});
+      if(navigator.vibrate) navigator.vibrate(20);
+    }
+  }
+  // check toxins
+  for(let t of toxins){
+    let dx=Math.abs(nx-t.x), dy=Math.abs(ny-t.y);
+    if(dx<t.w/2+6 && dy<t.h/2+6){
+      energy-=18;
+      if(energy<0) energy=0;
+      updateEnergy();
+      for(let k=0;k<8;k++) particles.push({x:t.x,y:t.y, vx:(Math.random()-0.5)*50, vy:(Math.random()-0.5)*50, life:0.5,max:0.5,color:'#a78bfa'});
+      if(navigator.vibrate) navigator.vibrate([30,20,30]);
+      // push away
+      steer+= (nx<t.x?-1:1)*0.5;
+      break;
+    }
+  }
+  // spawn ahead
+  let maxY=Math.max(...root.map(r=>r.y),...waters.map(w=>w.y),...toxins.map(t=>t.y));
+  if(ny+200>maxY){
+    if(Math.random()<0.6) spawnWater(maxY+40+Math.random()*40);
+    if(Math.random()<0.5) spawnToxin(maxY+50+Math.random()*30);
+  }
+  // branch occasionally at depth
+  if(depth>30 && root.length%40===0 && Math.random()<0.4){
+    let bx=tip.x, by=tip.y;
+    let branch=[];
+    for(let i=0;i<12;i++){
+      branch.push({x:bx+(Math.random()-0.5)*4, y:by+i*6});
+    }
+    branches.push(branch);
+  }
+  if(energy<=0) gameOver();
+}
+
+function update(dt){
+  if(!running) return;
+  // auto grow slowly if holding grow
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    let p=particles[i];
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt;
+    if(p.life<=0) particles.splice(i,1);
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,360,560);
+  // soil layers
+  let grad=ctx.createLinearGradient(0,0,0,560);
+  grad.addColorStop(0,'#5a3a1a');grad.addColorStop(0.3,'#3d2817');grad.addColorStop(1,'#1a1207');
+  ctx.fillStyle=grad;ctx.fillRect(0,0,360,560);
+  // soil texture
+  ctx.fillStyle='rgba(0,0,0,0.15)';
+  for(let i=0;i<60;i++){
+    let x=(i*53)%360, y=(i*37 - cameraY*0.5)%560;
+    if(y<0) y+=560;
+    ctx.beginPath();ctx.arc(x,y,1.5,0,Math.PI*2);ctx.fill();
+  }
+  // depth markers
+  ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='10px system-ui';ctx.textAlign='left';
+  for(let d=Math.floor(cameraY/40)*10; d<cameraY+600; d+=20){
+    let y=d*4+40 - cameraY;
+    if(y<0||y>560) continue;
+    ctx.fillText(d+'m', 6, y);
+    ctx.fillRect(0,y,360,0.5);
+  }
+  // toxins
+  toxins.forEach(t=>{
+    let y=t.y - cameraY;
+    if(y<-30||y>590) return;
+    ctx.fillStyle='rgba(167,139,250,0.35)';
+    ctx.beginPath();ctx.ellipse(t.x,y,t.w/2,t.h/2,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='rgba(167,139,250,0.6)';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.fillStyle='#a78bfa';ctx.font='12px system-ui';ctx.textAlign='center';
+    ctx.fillText('☠️',t.x,y+4);
+  });
+  // waters
+  waters.forEach(w=>{
+    if(w.collected) return;
+    let y=w.y - cameraY;
+    if(y<-30||y>590) return;
+    // glow
+    let g=ctx.createRadialGradient(w.x,y,w.r-4,w.x,y,w.r+10);
+    g.addColorStop(0,'rgba(56,189,248,0.5)');g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(w.x,y,w.r+10,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#0ea5e9';ctx.beginPath();ctx.arc(w.x,y,w.r,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.beginPath();ctx.arc(w.x-4,y-4,w.r*0.4,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.font='12px system-ui';ctx.textAlign='center';
+    ctx.fillText('💧',w.x,y+4);
+  });
+  // branches
+  ctx.strokeStyle='rgba(134,239,172,0.5)';ctx.lineWidth=3;ctx.lineCap='round';
+  branches.forEach(b=>{
+    ctx.beginPath();
+    b.forEach((pt,i)=>{
+      let y=pt.y - cameraY;
+      if(i===0) ctx.moveTo(pt.x,y); else ctx.lineTo(pt.x,y);
+    });
+    ctx.stroke();
+  });
+  // main root
+  if(root.length>1){
+    ctx.strokeStyle='#86efac';ctx.lineWidth=5;ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.beginPath();
+    root.forEach((pt,i)=>{
+      let y=pt.y - cameraY;
+      if(i===0) ctx.moveTo(pt.x,y); else ctx.lineTo(pt.x,y);
+    });
+    ctx.stroke();
+    // inner highlight
+    ctx.strokeStyle='#bbf7d0';ctx.lineWidth=2;
+    ctx.beginPath();
+    root.forEach((pt,i)=>{
+      let y=pt.y - cameraY;
+      if(i===0) ctx.moveTo(pt.x,y); else ctx.lineTo(pt.x,y);
+    });
+    ctx.stroke();
+  }
+  // tip
+  if(root.length){
+    let tip=root[root.length-1];
+    let y=tip.y - cameraY;
+    ctx.fillStyle='#22c55e';ctx.beginPath();ctx.arc(tip.x,y,7,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(tip.x-2,y-2,2,0,Math.PI*2);ctx.fill();
+  }
+  // particles
+  particles.forEach(p=>{
+    ctx.globalAlpha=p.life/p.max;
+    ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x, p.y - cameraY, 3,0,Math.PI*2);ctx.fill();
+  });
+  ctx.globalAlpha=1;
+}
+
+function gameOver(){
+  running=false;
+  if(depth>best){best=depth;localStorage.setItem('rootBest',best);bestEl.textContent=best+'m';}
+  overlay.innerHTML=`<div style="font-size:36px">🥀</div><h2>Withered!</h2><p>Depth: <b style="color:#86efac">${depth}m</b> • Water: ${water}<br>Best: ${best}m</p><button class="btn" id="againBtn" style="margin-top:14px">GROW AGAIN 🌱</button>`;
+  overlay.style.display='flex';
+  document.getElementById('againBtn').onclick=startGame;
+}
+
+function startGame(){
+  reset();running=true;overlay.style.display='none';lastTime=0;requestAnimationFrame(loop);
+}
+
+function loop(t){
+  if(!lastTime) lastTime=t;
+  let dt=Math.min(0.033,(t-lastTime)/1000);
+  lastTime=t;
+  update(dt);draw();
+  if(running) requestAnimationFrame(loop);
+}
+
+// controls
+let growHeld=false, growInterval=null;
+function startGrow(){growHeld=true;growStep();growInterval=setInterval(()=>{if(growHeld) growStep();},80);}
+function stopGrow(){growHeld=false;clearInterval(growInterval);}
+growBtn.addEventListener('touchstart',e=>{e.preventDefault();startGrow()});
+growBtn.addEventListener('touchend',e=>{e.preventDefault();stopGrow()});
+growBtn.addEventListener('mousedown',startGrow);
+growBtn.addEventListener('mouseup',stopGrow);
+growBtn.addEventListener('mouseleave',stopGrow);
+leftBtn.addEventListener('touchstart',e=>{e.preventDefault();keys.left=true});
+leftBtn.addEventListener('touchend',e=>{e.preventDefault();keys.left=false});
+leftBtn.addEventListener('mousedown',()=>keys.left=true);
+leftBtn.addEventListener('mouseup',()=>keys.left=false);
+leftBtn.addEventListener('mouseleave',()=>keys.left=false);
+rightBtn.addEventListener('touchstart',e=>{e.preventDefault();keys.right=true});
+rightBtn.addEventListener('touchend',e=>{e.preventDefault();keys.right=false});
+rightBtn.addEventListener('mousedown',()=>keys.right=true);
+rightBtn.addEventListener('mouseup',()=>keys.right=false);
+rightBtn.addEventListener('mouseleave',()=>keys.right=false);
+canvas.addEventListener('pointerdown',e=>{
+  let r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*360;
+  if(x<120) keys.left=true; else if(x>240) keys.right=true; else startGrow();
+});
+canvas.addEventListener('pointerup',()=>{keys.left=false;keys.right=false;stopGrow()});
+canvas.addEventListener('pointercancel',()=>{keys.left=false;keys.right=false;stopGrow()});
+addEventListener('keydown',e=>{
+  if(e.code==='ArrowLeft'||e.code==='KeyA') keys.left=true;
+  if(e.code==='ArrowRight'||e.code==='KeyD') keys.right=true;
+  if(e.code==='Space'){e.preventDefault();growStep();}
+});
+addEventListener('keyup',e=>{
+  if(e.code==='ArrowLeft'||e.code==='KeyA') keys.left=false;
+  if(e.code==='ArrowRight'||e.code==='KeyD') keys.right=false;
+});
+if(window.DeviceOrientationEvent){
+  window.addEventListener('deviceorientation',e=>{
+    if(e.gamma!==null) tilt=Math.max(-1,Math.min(1,e.gamma/20));
+  });
+}
+
+playBtn.onclick=startGame;
+draw();
+</script>
+</body>
+</html>

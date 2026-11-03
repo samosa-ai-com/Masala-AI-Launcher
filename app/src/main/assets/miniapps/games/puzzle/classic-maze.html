@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Neon Maze Escape</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:#050a1a;color:#e6f4ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center;min-height:100vh}
+.app{width:100%;max-width:428px;min-width:360px;min-height:100vh;background:radial-gradient(ellipse at 20% 0%, #0e2450 0%, #070d26 45%, #050a1a 100%);display:flex;flex-direction:column;gap:10px;padding:10px 12px 18px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;background:linear-gradient(180deg, rgba(0,240,255,0.14), rgba(0,240,255,0.06));border:1px solid rgba(0,240,255,0.28);border-radius:16px;box-shadow:0 0 18px rgba(0,240,255,0.18), inset 0 1px 0 rgba(255,255,255,0.08)}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:10px;background:radial-gradient(circle at 30% 30%, #7afcff, #00d5ff 55%, #0066ff 100%);box-shadow:0 0 14px #00e5ff, 0 0 28px rgba(0,229,255,0.5);display:grid;place-items:center;font-size:18px}
+.brand h1{margin:0;font-size:15px;letter-spacing:0.08em;font-weight:800;line-height:1}
+.brand p{margin:2px 0 0;font-size:11px;opacity:0.85;letter-spacing:0.06em}
+.best-badge{text-align:right;min-width:86px}
+.best-badge .lbl{font-size:10px;letter-spacing:0.12em;opacity:0.8}
+.best-badge .val{font-size:13px;font-weight:800;color:#7afcff;text-shadow:0 0 8px rgba(0,229,255,0.8)}
+.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.hud .card{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);border-radius:14px;padding:8px 10px;text-align:center;backdrop-filter:blur(6px)}
+.hud .k{font-size:10px;letter-spacing:0.12em;opacity:0.75}
+.hud .v{font-size:16px;font-weight:800;margin-top:2px}
+.hud .v.lvl{color:#7afcff;text-shadow:0 0 10px rgba(0,229,255,0.7)}
+.hud .v.score{color:#ffe27a;text-shadow:0 0 10px rgba(255,226,122,0.6)}
+.hud .v.inv{color:#ffcc00}
+.canvas-wrap{position:relative;width:100%;aspect-ratio:1/1;background:#070b18;border-radius:18px;border:2px solid rgba(0,240,255,0.55);box-shadow:0 0 22px rgba(0,240,255,0.28), inset 0 0 30px rgba(0,240,255,0.06);overflow:hidden;touch-action:none}
+canvas{width:100%;height:100%;display:block}
+.banner{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(5,10,26,0.92);border:1px solid rgba(0,240,255,0.6);border-radius:14px;padding:14px 16px;min-width:72%;text-align:center;box-shadow:0 0 24px rgba(0,240,255,0.35);pointer-events:none;opacity:0;transition:opacity 0.2s, transform 0.2s}
+.banner.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.banner .t1{font-size:13px;letter-spacing:0.14em;font-weight:800;color:#7afcff;text-shadow:0 0 10px #00e5ff}
+.banner .t2{font-size:18px;font-weight:900;margin-top:4px;letter-spacing:0.04em}
+.banner.level{border-color:#00ff88;box-shadow:0 0 24px rgba(0,255,136,0.35)}
+.banner.level .t1{color:#00ff88;text-shadow:0 0 10px #00ff88}
+.caught{position:absolute;inset:0;display:grid;place-items:center;background:rgba(40,0,10,0.55);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity 0.25s}
+.caught.show{opacity:1;pointer-events:auto}
+.caught-card{background:linear-gradient(180deg, #1a0a14, #0f0510);border:1px solid rgba(255,42,74,0.7);border-radius:16px;padding:16px 14px;width:84%;text-align:center;box-shadow:0 0 26px rgba(255,42,74,0.45)}
+.caught-card h2{margin:0;font-size:20px;letter-spacing:0.12em;color:#ff2a4a;text-shadow:0 0 12px rgba(255,42,74,0.9)}
+.caught-card p{margin:6px 0 0;font-size:13px;opacity:0.9;line-height:1.4}
+.caught-card .row{display:flex;gap:8px;margin-top:12px}
+.btn{flex:1;min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.08);color:#fff;font-weight:800;font-size:14px;letter-spacing:0.04em}
+.btn.primary{background:linear-gradient(180deg, #00e5ff, #0090ff);border-color:rgba(0,229,255,0.6);color:#001018;box-shadow:0 0 14px rgba(0,229,255,0.5)}
+.btn.danger{background:linear-gradient(180deg, #ff3b5a, #c80024);border-color:rgba(255,59,90,0.6);box-shadow:0 0 14px rgba(255,59,90,0.4)}
+.controls{display:grid;grid-template-columns:56px 56px 56px;justify-content:center;gap:8px;padding:6px 0 2px}
+.cbtn{width:56px;height:56px;border-radius:14px;background:rgba(255,255,255,0.07);border:1px solid rgba(0,240,255,0.28);color:#e6f4ff;font-size:22px;font-weight:800;display:grid;place-items:center;box-shadow:0 0 12px rgba(0,240,255,0.15), inset 0 1px 0 rgba(255,255,255,0.08);user-select:none}
+.cbtn:active{transform:scale(0.96);background:rgba(0,240,255,0.18)}
+.cbtn.empty{background:transparent;border-color:transparent;box-shadow:none;pointer-events:none}
+.legend{display:flex;justify-content:space-between;gap:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:8px 10px;font-size:11px;line-height:1.4}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:6px;box-shadow:0 0 8px currentColor}
+.footer{display:flex;gap:8px}
+.footer .btn{font-size:13px}
+.hint{font-size:11px;opacity:0.75;text-align:center;line-height:1.4;padding:2px 4px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">◉</div>
+      <div>
+        <h1>NEON MAZE</h1>
+        <p>ESCAPE PROTOCOL</p>
+      </div>
+    </div>
+    <div class="best-badge">
+      <div class="lbl">BEST LEVEL</div>
+      <div class="val" id="bestLevel">—</div>
+      <div class="lbl" style="margin-top:4px">BEST SCORE</div>
+      <div class="val" id="bestScore">—</div>
+    </div>
+  </div>
+
+  <div class="hud">
+    <div class="card"><div class="k">LEVEL</div><div class="v lvl" id="hudLevel">1</div></div>
+    <div class="card"><div class="k">SCORE</div><div class="v score" id="hudScore">0</div></div>
+    <div class="card"><div class="k">SHIELD</div><div class="v inv" id="hudInv">—</div></div>
+  </div>
+
+  <div class="canvas-wrap" id="wrap">
+    <canvas id="c" width="360" height="360"></canvas>
+    <div class="banner" id="banner"><div class="t1" id="bannerT1">LEVEL COMPLETE</div><div class="t2" id="bannerT2">ENTERING SECTOR 2</div></div>
+    <div class="caught" id="caught">
+      <div class="caught-card">
+        <h2>⚠ CAUGHT!</h2>
+        <p id="caughtText">A chaser intercepted your orb.<br>Level 1 — Score 0</p>
+        <div class="row">
+          <button class="btn danger" id="retryBtn">RETRY LEVEL</button>
+          <button class="btn primary" id="restartBtn">RESTART</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls" aria-label="D-pad">
+    <div class="cbtn empty"></div>
+    <button class="cbtn" id="upBtn" aria-label="Up">▲</button>
+    <div class="cbtn empty"></div>
+    <button class="cbtn" id="leftBtn" aria-label="Left">◀</button>
+    <button class="cbtn" id="downBtn" aria-label="Down">▼</button>
+    <button class="cbtn" id="rightBtn" aria-label="Right">▶</button>
+  </div>
+
+  <div class="legend">
+    <div><span class="dot" style="background:#00e5ff;color:#00e5ff"></span>You &nbsp; <span class="dot" style="background:#ff2a4a;color:#ff2a4a"></span>Chaser &nbsp; <span class="dot" style="background:#ffcc00;color:#ffcc00"></span>Shield</div>
+    <div><span class="dot" style="background:#00ff88;color:#00ff88"></span>Exit</div>
+  </div>
+
+  <div class="footer">
+    <button class="btn" id="newGameBtn">NEW GAME</button>
+    <button class="btn" id="helpBtn">HOW TO PLAY</button>
+  </div>
+  <div class="hint">Swipe on the maze or use ▲◀▼▶ / WASD. Grab ◆ for 5s invulnerability — then you can ram chasers. Maze grows every level.</div>
+</div>
+
+<script>
+const STORAGE_KEY='neonMazeBest_v2';
+let bestScore=0, bestLevel=0;
+try{
+  const s=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');
+  bestScore=s.bestScore||0; bestLevel=s.bestLevel||0;
+}catch(e){}
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const wrap=document.getElementById('wrap');
+const hudLevel=document.getElementById('hudLevel');
+const hudScore=document.getElementById('hudScore');
+const hudInv=document.getElementById('hudInv');
+const bestLevelEl=document.getElementById('bestLevel');
+const bestScoreEl=document.getElementById('bestScore');
+const banner=document.getElementById('banner');
+const bannerT1=document.getElementById('bannerT1');
+const bannerT2=document.getElementById('bannerT2');
+const caught=document.getElementById('caught');
+const caughtText=document.getElementById('caughtText');
+
+let level=1, score=0, cols=9, rows=9, maze=[], player={x:0,y:0}, exit={x:0,y:0}, chasers=[], pickups=[], invulnTimer=0, moveCount=0, gameOver=false;
+let chaserTick=null, invulnTick=null, bannerTimer=null;
+
+function saveBest(){
+  if(score>bestScore) bestScore=score;
+  if(level>bestLevel) bestLevel=level;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({bestScore,bestLevel}));
+  renderBest();
+}
+function renderBest(){
+  bestLevelEl.textContent= bestLevel? 'Lv '+bestLevel : '—';
+  bestScoreEl.textContent= bestScore? bestScore.toLocaleString() : '—';
+}
+function updateHUD(){
+  hudLevel.textContent=level;
+  hudScore.textContent=score;
+  hudInv.textContent= invulnTimer>0 ? invulnTimer+'s' : '—';
+  hudInv.style.color= invulnTimer>0 ? '#ffcc00' : '#e6f4ff';
+  hudInv.style.textShadow= invulnTimer>0 ? '0 0 10px rgba(255,204,0,0.8)' : 'none';
+}
+
+function createMaze(w,h){
+  const grid=Array.from({length:h},(_,y)=> Array.from({length:w},(_,x)=> ({x,y,walls:{top:true,right:true,bottom:true,left:true},visited:false})));
+  const stack=[];
+  let cur=grid[0][0];
+  cur.visited=true;
+  stack.push(cur);
+  const dirs=[{dx:0,dy:-1,wall:'top',opp:'bottom'},{dx:1,dy:0,wall:'right',opp:'left'},{dx:0,dy:1,wall:'bottom',opp:'top'},{dx:-1,dy:0,wall:'left',opp:'right'}];
+  while(stack.length){
+    cur=stack[stack.length-1];
+    const neighbors=[];
+    for(const d of dirs){
+      const nx=cur.x+d.dx, ny=cur.y+d.dy;
+      if(nx>=0&&nx<w&&ny>=0&&ny<h && !grid[ny][nx].visited) neighbors.push({cell:grid[ny][nx],dir:d});
+    }
+    if(neighbors.length){
+      const pick=neighbors[Math.floor(Math.random()*neighbors.length)];
+      cur.walls[pick.dir.wall]=false;
+      pick.cell.walls[pick.dir.opp]=false;
+      pick.cell.visited=true;
+      stack.push(pick.cell);
+    } else stack.pop();
+  }
+  return grid;
+}
+function canMove(x,y,dx,dy){
+  if(x+dx<0||x+dx>=cols||y+dy<0||y+dy>=rows) return false;
+  const cell=maze[y][x];
+  if(dx===1) return !cell.walls.right;
+  if(dx===-1) return !cell.walls.left;
+  if(dy===1) return !cell.walls.bottom;
+  if(dy===-1) return !cell.walls.top;
+  return false;
+}
+function bfs(sx,sy,tx,ty){
+  const q=[{x:sx,y:sy,path:[{x:sx,y:sy}]}];
+  const vis=Array.from({length:rows},()=>Array(cols).fill(false));
+  vis[sy][sx]=true;
+  const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+  while(q.length){
+    const cur=q.shift();
+    if(cur.x===tx&&cur.y===ty) return cur.path;
+    for(const [dx,dy] of dirs){
+      const nx=cur.x+dx, ny=cur.y+dy;
+      if(nx<0||nx>=cols||ny<0||ny>=rows) continue;
+      if(vis[ny][nx]) continue;
+      if(!canMove(cur.x,cur.y,dx,dy)) continue;
+      vis[ny][nx]=true;
+      q.push({x:nx,y:ny,path:[...cur.path,{x:nx,y:ny}]});
+    }
+  }
+  return null;
+}
+function randEmpty(exclude){
+  let tries=0;
+  while(tries<200){
+    const x=Math.floor(Math.random()*cols), y=Math.floor(Math.random()*rows);
+    if(exclude.some(e=>e.x===x&&e.y===y)) {tries++; continue;}
+    if(x===0&&y===0) {tries++; continue;}
+    if(x===exit.x&&y===exit.y) {tries++; continue;}
+    return {x,y};
+  }
+  return {x:cols-1,y:rows-1};
+}
+
+function initLevel(isNewGame){
+  if(isNewGame){ level=1; score=0; }
+  cols= Math.min(21, 7 + level*2); // 9,11,13...
+  if(cols%2===0) cols++;
+  rows=cols;
+  maze=createMaze(cols,rows);
+  player={x:0,y:0};
+  exit={x:cols-1,y:rows-1};
+  moveCount=0;
+  // chasers
+  const chaserCount=Math.min(4, 1+Math.floor(level/1.5));
+  chasers=[];
+  for(let i=0;i<chaserCount;i++){
+    const p=randEmpty([player,exit,...chasers,...pickups]);
+    chasers.push({x:p.x,y:p.y,spawnX:p.x,spawnY:p.y,stunned:0});
+  }
+  // pickups
+  const pickupCount= level===1?1 : (level%2===0?2:1);
+  pickups=[];
+  for(let i=0;i<pickupCount;i++){
+    const p=randEmpty([player,exit,...chasers,...pickups]);
+    pickups.push(p);
+  }
+  gameOver=false;
+  caught.classList.remove('show');
+  startTimers();
+  updateHUD();
+  draw();
+  if(!isNewGame) showLevelBanner(false);
+}
+function startTimers(){
+  stopTimers();
+  const speed=Math.max(160, 420 - level*28);
+  chaserTick=setInterval(moveChasers, speed);
+  invulnTick=setInterval(()=>{
+    if(invulnTimer>0){
+      invulnTimer--;
+      updateHUD();
+      if(invulnTimer===0) draw();
+    }
+  },1000);
+}
+function stopTimers(){ if(chaserTick) clearInterval(chaserTick); if(invulnTick) clearInterval(invulnTick); chaserTick=null; invulnTick=null; }
+
+function showBanner(t1,t2, isLevel){
+  bannerT1.textContent=t1; bannerT2.textContent=t2;
+  banner.classList.toggle('level', !!isLevel);
+  banner.classList.add('show');
+  clearTimeout(bannerTimer);
+  bannerTimer=setTimeout(()=> banner.classList.remove('show'), 1100);
+}
+function showLevelBanner(isCaught){
+  if(isCaught) return;
+  showBanner('SECTOR '+level, cols+'×'+rows+' MAZE • '+(chasers.length)+' CHASER'+(chasers.length>1?'S':''), true);
+}
+function triggerCaught(){
+  gameOver=true;
+  stopTimers();
+  saveBest();
+  caughtText.innerHTML=`A chaser intercepted your orb.<br>Level ${level} — Score ${score.toLocaleString()}<br><span style="opacity:0.7;font-size:11px">Best Lv ${bestLevel||level} • ${bestScore.toLocaleString()}</span>`;
+  caught.classList.add('show');
+  // haptic
+  try{ navigator.vibrate && navigator.vibrate([80,40,80]); }catch(e){}
+}
+
+function checkPickup(){
+  const idx=pickups.findIndex(p=>p.x===player.x&&p.y===player.y);
+  if(idx!==-1){
+    pickups.splice(idx,1);
+    invulnTimer=5;
+    score+=50;
+    updateHUD();
+    showBanner('SHIELD ACTIVE','5s INVULNERABLE — RAM THEM!', false);
+    try{ navigator.vibrate && navigator.vibrate(40);}catch(e){}
+  }
+}
+function checkExit(){
+  if(player.x===exit.x && player.y===exit.y){
+    const bonus=Math.max(10, 60 - moveCount*1.5 |0);
+    score+= 100*level + bonus;
+    saveBest();
+    showBanner('SECTOR CLEARED','+'+(100*level)+' +'+bonus+' BONUS', true);
+    stopTimers();
+    setTimeout(()=>{
+      level++;
+      initLevel(false);
+    }, 900);
+  }
+}
+function checkCaught(){
+  for(const ch of chasers){
+    if(ch.x===player.x && ch.y===player.y){
+      if(invulnTimer>0){
+        score+=100;
+        ch.stunned=3;
+        ch.x=ch.spawnX; ch.y=ch.spawnY;
+        updateHUD();
+        showBanner('CHASER SMASHED','+100 — SHIELD HELD', false);
+        try{ navigator.vibrate && navigator.vibrate(30);}catch(e){}
+      } else {
+        triggerCaught();
+      }
+      break;
+    }
+  }
+}
+function tryMove(dx,dy){
+  if(gameOver) return;
+  if(!canMove(player.x,player.y,dx,dy)){
+    // bump feedback
+    try{ navigator.vibrate && navigator.vibrate(15);}catch(e){}
+    return;
+  }
+  player.x+=dx; player.y+=dy;
+  moveCount++;
+  checkPickup();
+  checkExit();
+  if(!gameOver) checkCaught();
+  draw();
+}
+function moveChasers(){
+  if(gameOver) return;
+  for(const ch of chasers){
+    if(ch.stunned>0){ ch.stunned--; continue; }
+    if(invulnTimer>0){
+      // flee: pick neighbor farthest from player
+      let best=null, bestLen=-1;
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+        if(!canMove(ch.x,ch.y,dx,dy)) continue;
+        const nx=ch.x+dx, ny=ch.y+dy;
+        const path=bfs(nx,ny, player.x, player.y);
+        const len= path? path.length : 999;
+        if(len>bestLen){ bestLen=len; best={x:nx,y:ny}; }
+      }
+      if(best){ ch.x=best.x; ch.y=best.y; }
+    } else {
+      const path=bfs(ch.x,ch.y, player.x, player.y);
+      if(path && path.length>1){ ch.x=path[1].x; ch.y=path[1].y; }
+    }
+  }
+  checkCaught();
+  draw();
+}
+
+function draw(){
+  const dpr=window.devicePixelRatio||1;
+  // keep canvas logical 360
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,360,360);
+  ctx.fillStyle='#070b18';
+  ctx.fillRect(0,0,360,360);
+  const cw=360/cols, ch=360/rows;
+
+  // subtle grid glow
+  ctx.fillStyle='rgba(0,240,255,0.03)';
+  for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) if((x+y)%2===0) ctx.fillRect(x*cw,y*ch,cw,ch);
+
+  // walls neon
+  ctx.strokeStyle='#00f0ff';
+  ctx.lineWidth=2.2;
+  ctx.shadowBlur=10;
+  ctx.shadowColor='#00f0ff';
+  ctx.beginPath();
+  for(let y=0;y<rows;y++){
+    for(let x=0;x<cols;x++){
+      const cell=maze[y][x];
+      const px=x*cw, py=y*ch;
+      if(cell.walls.top){ ctx.moveTo(px,py); ctx.lineTo(px+cw,py); }
+      if(cell.walls.left){ ctx.moveTo(px,py); ctx.lineTo(px,py+ch); }
+      if(cell.walls.right){ ctx.moveTo(px+cw,py); ctx.lineTo(px+cw,py+ch); }
+      if(cell.walls.bottom){ ctx.moveTo(px,py+ch); ctx.lineTo(px+cw,py+ch); }
+    }
+  }
+  ctx.stroke();
+  ctx.shadowBlur=0;
+  // outer border stronger
+  ctx.strokeStyle='rgba(0,240,255,0.9)';
+  ctx.lineWidth=2.5;
+  ctx.strokeRect(0.5,0.5,359,359);
+
+  // exit
+  const ex=exit.x*cw, ey=exit.y*ch;
+  ctx.fillStyle='#00ff88';
+  ctx.shadowBlur=18;
+  ctx.shadowColor='#00ff88';
+  // rounded rect fallback
+  const r=7;
+  ctx.beginPath();
+  if(ctx.roundRect){
+    ctx.roundRect(ex+2, ey+2, cw-4, ch-4, r);
+  } else {
+    ctx.rect(ex+2, ey+2, cw-4, ch-4);
+  }
+  ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#002a14';
+  ctx.font=`${Math.min(cw,ch)*0.42}px system-ui`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('◉', ex+cw/2, ey+ch/2+1);
+  ctx.fillStyle='rgba(0,0,0,0.35)';
+  ctx.font=`${Math.min(cw,ch)*0.18}px system-ui`;
+  ctx.fillText('EXIT', ex+cw/2, ey+ch/2+ Math.min(cw,ch)*0.32);
+
+  // pickups
+  const now=Date.now();
+  pickups.forEach(p=>{
+    const px=p.x*cw+cw/2, py=p.y*ch+ch/2;
+    const pulse= 0.85 + 0.15*Math.sin(now/280 + p.x*0.7);
+    ctx.fillStyle='#ffcc00';
+    ctx.shadowBlur=14;
+    ctx.shadowColor='#ffcc00';
+    ctx.beginPath();
+    ctx.arc(px,py, Math.min(cw,ch)*0.22 * pulse, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#1a1200';
+    ctx.font=`${Math.min(cw,ch)*0.34}px system-ui`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('◆', px, py+1);
+    ctx.strokeStyle=`rgba(255,204,0,${0.45+0.25*Math.sin(now/380)})`;
+    ctx.lineWidth=1.6;
+    ctx.beginPath();
+    ctx.arc(px,py, Math.min(cw,ch)*0.34, 0, Math.PI*2);
+    ctx.stroke();
+  });
+
+  // chasers
+  chasers.forEach(ch=>{
+    const cx=ch.x*cw+cw/2, cy=ch.y*ch+ch/2;
+    const stunned=ch.stunned>0;
+    const fleeing= invulnTimer>0 && !stunned;
+    let col= stunned ? '#4a4e5a' : (fleeing ? '#c27cff' : '#ff2a4a');
+    ctx.fillStyle=col;
+    ctx.shadowBlur= stunned?0:16;
+    ctx.shadowColor=col;
+    ctx.beginPath();
+    ctx.arc(cx,cy, Math.min(cw,ch)*0.28, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur=0;
+    if(!stunned){
+      // eyes
+      ctx.fillStyle='#fff';
+      ctx.beginPath();
+      ctx.arc(cx- Math.min(cw,ch)*0.09, cy- Math.min(cw,ch)*0.06, Math.min(cw,ch)*0.07, 0, Math.PI*2);
+      ctx.arc(cx+ Math.min(cw,ch)*0.09, cy- Math.min(cw,ch)*0.06, Math.min(cw,ch)*0.07, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle='#0a0a0a';
+      ctx.beginPath();
+      const lookX= fleeing ? -1 : (player.x>ch.x?1: player.x<ch.x?-1:0);
+      ctx.arc(cx- Math.min(cw,ch)*0.09 + lookX*1.2, cy- Math.min(cw,ch)*0.06, Math.min(cw,ch)*0.035, 0, Math.PI*2);
+      ctx.arc(cx+ Math.min(cw,ch)*0.09 + lookX*1.2, cy- Math.min(cw,ch)*0.06, Math.min(cw,ch)*0.035, 0, Math.PI*2);
+      ctx.fill();
+      if(fleeing){
+        ctx.fillStyle='rgba(255,255,255,0.9)';
+        ctx.font=`${Math.min(cw,ch)*0.22}px system-ui`;
+        ctx.fillText('!!', cx, cy+ Math.min(cw,ch)*0.22);
+      }
+    } else {
+      ctx.fillStyle='rgba(255,255,255,0.7)';
+      ctx.font=`${Math.min(cw,ch)*0.28}px system-ui`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('×', cx, cy+1);
+    }
+  });
+
+  // player orb
+  const px=player.x*cw+cw/2, py=player.y*ch+ch/2;
+  const orbCol= invulnTimer>0 ? '#ffffff' : '#00e5ff';
+  ctx.fillStyle=orbCol;
+  ctx.shadowBlur=20;
+  ctx.shadowColor= invulnTimer>0 ? '#ffcc00' : '#00e5ff';
+  ctx.beginPath();
+  ctx.arc(px,py, Math.min(cw,ch)*0.30, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur=0;
+  // inner highlight
+  ctx.fillStyle='rgba(255,255,255,0.92)';
+  ctx.beginPath();
+  ctx.arc(px- Math.min(cw,ch)*0.08, py- Math.min(cw,ch)*0.10, Math.min(cw,ch)*0.08, 0, Math.PI*2);
+  ctx.fill();
+  if(invulnTimer>0){
+    ctx.strokeStyle='rgba(255,204,0,0.95)';
+    ctx.lineWidth=2.6;
+    ctx.beginPath();
+    ctx.arc(px,py, Math.min(cw,ch)*0.40, 0, Math.PI*2);
+    ctx.stroke();
+    // rotating dash
+    ctx.strokeStyle='rgba(255,255,255,0.9)';
+    ctx.lineWidth=1.4;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath();
+    ctx.arc(px,py, Math.min(cw,ch)*0.46, now/600, now/600+ Math.PI*1.6);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+// controls
+document.getElementById('upBtn').addEventListener('click',()=>tryMove(0,-1));
+document.getElementById('downBtn').addEventListener('click',()=>tryMove(0,1));
+document.getElementById('leftBtn').addEventListener('click',()=>tryMove(-1,0));
+document.getElementById('rightBtn').addEventListener('click',()=>tryMove(1,0));
+document.getElementById('newGameBtn').addEventListener('click',()=>{
+  invulnTimer=0;
+  initLevel(true);
+  showBanner('NEW RUN','SECTOR 1 — GOOD LUCK', true);
+});
+document.getElementById('retryBtn').addEventListener('click',()=>{
+  invulnTimer=0;
+  // retry same level: regenerate same size
+  cols= Math.min(21, 7 + level*2); if(cols%2===0) cols++; rows=cols;
+  maze=createMaze(cols,rows);
+  player={x:0,y:0}; exit={x:cols-1,y:rows-1}; moveCount=0;
+  const chaserCount=Math.min(4, 1+Math.floor(level/1.5));
+  chasers=[]; pickups=[];
+  for(let i=0;i<chaserCount;i++){ const p=randEmpty([player,exit,...chasers,...pickups]); chasers.push({x:p.x,y:p.y,spawnX:p.x,spawnY:p.y,stunned:0}); }
+  const pickupCount= level===1?1 : (level%2===0?2:1);
+  for(let i=0;i<pickupCount;i++){ const p=randEmpty([player,exit,...chasers,...pickups]); pickups.push(p); }
+  gameOver=false; caught.classList.remove('show'); startTimers(); updateHUD(); draw(); showBanner('RETRY','SECTOR '+level, true);
+});
+document.getElementById('restartBtn').addEventListener('click',()=>{
+  invulnTimer=0; initLevel(true); showBanner('RESTART','SECTOR 1', true);
+});
+document.getElementById('helpBtn').addEventListener('click',()=>{
+  showBanner('HOW TO PLAY','Swipe or arrows to move • ◆ = 5s shield • Reach green EXIT', false);
+  setTimeout(()=>{ banner.classList.remove('show'); }, 2200);
+});
+
+// keyboard
+window.addEventListener('keydown',e=>{
+  if(e.key==='ArrowUp' || e.key==='w' || e.key==='W') { e.preventDefault(); tryMove(0,-1); }
+  if(e.key==='ArrowDown' || e.key==='s' || e.key==='S') { e.preventDefault(); tryMove(0,1); }
+  if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A') { e.preventDefault(); tryMove(-1,0); }
+  if(e.key==='ArrowRight' || e.key==='d' || e.key==='D') { e.preventDefault(); tryMove(1,0); }
+});
+// swipe
+let sx=0, sy=0;
+wrap.addEventListener('touchstart',e=>{
+  const t=e.touches[0]; sx=t.clientX; sy=t.clientY;
+},{passive:true});
+wrap.addEventListener('touchend',e=>{
+  const t=e.changedTouches[0]; const dx=t.clientX-sx, dy=t.clientY-sy;
+  if(Math.max(Math.abs(dx),Math.abs(dy))<28) return;
+  if(Math.abs(dx)>Math.abs(dy)) tryMove(dx>0?1:-1,0); else tryMove(0, dy>0?1:-1);
+},{passive:true});
+// prevent scroll on canvas drag
+wrap.addEventListener('touchmove',e=>{ if(gameOver) return; e.preventDefault(); },{passive:false});
+
+// init
+renderBest();
+initLevel(true);
+showBanner('NEON MAZE','SWIPE OR TAP ARROWS TO ESCAPE', true);
+</script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SproutPal Plant Watering</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#0c1a10;color:#e9f7ee}
+.wrap{max-width:430px;margin:0 auto;padding:16px 16px 40px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:22px;margin:0}
+.mutebtn{min-width:44px;min-height:44px;border-radius:12px;border:1px solid #24402e;background:#132619;color:#fff;font-size:19px;cursor:pointer}
+.summary{background:#132619;border:1px solid #24402e;border-radius:16px;padding:14px;margin:12px 0;font-size:15px}
+.addcard{background:#132619;border:1px solid #24402e;border-radius:16px;padding:14px;margin:12px 0}
+label{font-size:13px;opacity:.85}
+input{width:100%;min-height:48px;border-radius:12px;border:1px solid #24402e;background:#0c1a10;color:#fff;font-size:16px;padding:0 12px;margin:4px 0 8px}
+.row2{display:flex;gap:8px}.row2 div{flex:1}
+button.add{width:100%;min-height:52px;border-radius:14px;border:none;background:#4ade80;color:#052e16;font-size:17px;font-weight:800;cursor:pointer}
+.plant{background:#132619;border:1px solid #24402e;border-radius:16px;padding:14px;margin:10px 0}
+.plant .top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.plant b{font-size:18px}
+.badge{font-size:12px;font-weight:800;border-radius:9px;padding:4px 10px}
+.ok{background:#123a24;color:#4ade80}
+.due{background:#3a2c12;color:#fbbf24}
+.late{background:#3a1512;color:#f87171}
+.meta{font-size:13px;opacity:.8;margin:6px 0 10px}
+.actions{display:flex;gap:8px}
+.water{flex:1;min-height:48px;border-radius:12px;border:none;background:#22c55e;color:#052e16;font-size:16px;font-weight:800;cursor:pointer}
+.del{min-width:48px;min-height:48px;border-radius:12px;border:1px solid #5b2323;background:transparent;color:#f87171;font-size:16px;cursor:pointer}
+.empty{text-align:center;opacity:.65;padding:20px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>SproutPal Plants</h1><button class="mutebtn" id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="summary" id="summary"></div>
+<div class="addcard">
+<label for="nameIn">Plant name</label><input id="nameIn" maxlength="30" placeholder="e.g. Basil">
+<div class="row2"><div><label for="intIn">Water every (days)</label><input id="intIn" type="number" min="1" max="90" value="3"></div>
+<div><label for="lastIn">Last watered</label><input id="lastIn" type="date"></div></div>
+<button class="add" id="addBtn">Add plant</button>
+</div>
+<div id="list"></div>
+</div>
+<script>
+(function(){
+"use strict";
+var K="plant-watering-v1",MK="plant-watering-mute";
+var plants=[];try{plants=JSON.parse(localStorage.getItem(K)||"[]");if(!Array.isArray(plants))plants=[];}catch(e){plants=[];}
+var muted=localStorage.getItem(MK)==="1",AC=null;
+var list=document.getElementById("list"),summary=document.getElementById("summary"),muteBtn=document.getElementById("muteBtn");
+var nameIn=document.getElementById("nameIn"),intIn=document.getElementById("intIn"),lastIn=document.getElementById("lastIn");
+lastIn.value=new Date().toISOString().slice(0,10);
+function click(f){if(muted)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume();var o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.frequency.value=f||700;var t=AC.currentTime;g.gain.setValueAtTime(0.07,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.07);o.start(t);o.stop(t+0.07);}catch(e){}}
+function save(){localStorage.setItem(K,JSON.stringify(plants));}
+muteBtn.textContent=muted?"🔇":"🔊";
+muteBtn.addEventListener("click",function(){muted=!muted;localStorage.setItem(MK,muted?"1":"0");muteBtn.textContent=muted?"🔇":"🔊";click(700);});
+function todayStr(){return new Date().toISOString().slice(0,10);}
+function dayDiff(a,b){return Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/86400000);}
+function fmtD(d){return new Date(d+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});}
+function render(){
+var t=todayStr(),dueN=0,lateN=0;
+list.innerHTML=plants.length?"":'<div class="empty">No plants yet. Add your first green friend above.</div>';
+plants.forEach(function(p,idx){
+var next=new Date(p.last+"T12:00:00");next.setDate(next.getDate()+p.interval);
+var nextStr=next.getFullYear()+"-"+String(next.getMonth()+1).padStart(2,"0")+"-"+String(next.getDate()).padStart(2,"0");
+var diff=dayDiff(t,nextStr);
+var cls,txt;if(diff<0){cls="late";txt="OVERDUE "+(-diff)+"d";lateN++;}else if(diff===0){cls="due";txt="DUE TODAY";dueN++;}else{cls="ok";txt="in "+diff+"d";}
+var card=document.createElement("div");card.className="plant";
+var top=document.createElement("div");top.className="top";
+var nm=document.createElement("b");nm.textContent="🪴 "+p.name;top.appendChild(nm);
+var badge=document.createElement("span");badge.className="badge "+cls;badge.textContent=txt;top.appendChild(badge);
+card.appendChild(top);
+var meta=document.createElement("div");meta.className="meta";meta.textContent="Every "+p.interval+" days · last watered "+fmtD(p.last)+" · next "+fmtD(nextStr);card.appendChild(meta);
+var acts=document.createElement("div");acts.className="actions";
+var w=document.createElement("button");w.className="water";w.textContent="💧 Water now";
+w.addEventListener("click",function(){click(880);plants[idx].last=todayStr();save();render();});
+var del=document.createElement("button");del.className="del";del.textContent="✕";del.setAttribute("aria-label","Remove plant");
+del.addEventListener("click",function(){if(confirm("Remove "+plants[idx].name+"?")){click(440);plants.splice(idx,1);save();render();}});
+acts.appendChild(w);acts.appendChild(del);card.appendChild(acts);
+list.appendChild(card);
+});
+summary.textContent=plants.length?("🌿 "+plants.length+" plant"+(plants.length>1?"s":"")+" · "+dueN+" due today · "+lateN+" overdue"):"🌿 Your indoor jungle starts here.";
+}
+document.getElementById("addBtn").addEventListener("click",function(){
+var n=nameIn.value.trim();
+if(!n){alert("Give your plant a name.");return;}
+click(880);
+plants.push({name:n.slice(0,30),interval:Math.min(90,Math.max(1,+intIn.value||3)),last:lastIn.value||todayStr()});
+nameIn.value="";save();render();
+});
+render();
+})();
+</script>
+</body>
+</html>

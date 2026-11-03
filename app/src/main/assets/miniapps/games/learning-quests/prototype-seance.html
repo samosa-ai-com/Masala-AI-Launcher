@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Gloom Manor - Prototype Chain</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0806;
+  --manor:#14100c;
+  --manor2:#1c140e;
+  --stone:#2a1e14;
+  --gold:#c9a86a;
+  --gold2:#e8c99a;
+  --ember:#ff6b2a;
+  --crimson:#8b1a1a;
+  --crimson2:#c0392b;
+  --candle:#ffb84d;
+  --candle2:#ff8c1a;
+  --mist:#8a7a6a;
+  --text:#f5e6d3;
+  --muted:#8a7a6a;
+  --line:#2a1e14;
+  --ghost:#a8d8ea;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center;background:radial-gradient(ellipse at top, #1a1208 0%, #0a0806 60%, #000 100%)}
+.manor{
+  width:100%;max-width:428px;min-width:360px;min-height:100vh;
+  background:linear-gradient(180deg, #14100c 0%, #0a0806 100%);
+  border-left:2px solid #2a1e14;border-right:2px solid #2a1e14;
+  display:flex;flex-direction:column;position:relative;overflow:hidden;
+  box-shadow:0 0 50px rgba(201,168,106,0.12);
+}
+/* Header */
+.header{
+  background:linear-gradient(180deg, #1c140e 0%, #14100c 100%);
+  border-bottom:2px solid var(--gold);padding:12px 14px 10px;text-align:center;position:relative;
+  box-shadow:0 4px 20px rgba(201,168,106,0.2);
+}
+.header::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg, transparent, var(--gold), transparent)}
+.header h1{font-size:17px;letter-spacing:3px;font-weight:900;color:var(--gold2);text-shadow:0 0 10px rgba(201,168,106,0.5);line-height:1}
+.header h1 span{color:#fff;text-shadow:0 0 8px var(--candle)}
+.header p{font-size:10px;letter-spacing:1.8px;color:var(--gold);opacity:0.85;margin-top:4px;font-weight:700}
+.header-actions{position:absolute;top:10px;right:10px;display:flex;gap:6px}
+.header-actions button{width:36px;height:36px;border-radius:8px;border:1px solid #2a1e14;background:#1c140e;color:var(--gold);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.header-actions button.active{background:var(--gold);color:#000}
+.progress-dots{display:flex;gap:8px;justify-content:center;margin-top:8px}
+.dot{width:28px;height:6px;border-radius:3px;background:#1c140e;border:1px solid #2a1e14;transition:all 0.3s}
+.dot.active{background:var(--gold);box-shadow:0 0 8px var(--gold);border-color:var(--gold)}
+.dot.done{background:var(--candle);box-shadow:0 0 8px var(--candle);border-color:var(--candle)}
+/* Chapter nav */
+.ch-nav{display:flex;gap:6px;padding:10px;background:#0a0806;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line)}
+.ch-nav::-webkit-scrollbar{display:none}
+.cbtn{
+  flex:1;min-width:72px;padding:8px 6px;border-radius:10px;border:1.5px solid #1c140e;background:#14100c;color:var(--muted);
+  font-size:11px;font-weight:800;letter-spacing:0.5px;text-align:center;cursor:pointer;transition:all 0.2s;position:relative;
+}
+.cbtn .num{font-size:13px;display:block;color:#fff;margin-bottom:2px}
+.cbtn.active{background:linear-gradient(180deg, #2a1a0a, #14100c);border-color:var(--gold);color:var(--gold);box-shadow:0 0 10px rgba(201,168,106,0.25)}
+.cbtn.done{border-color:var(--candle);color:var(--candle)}
+.cbtn.done::after{content:'✓';position:absolute;top:-6px;right:-6px;background:var(--candle);color:#000;font-size:10px;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900}
+.cbtn.locked{opacity:0.35;pointer-events:none}
+/* Query */
+.query{
+  margin:10px 10px 0;background:linear-gradient(135deg, #1c140e 0%, #241a0e 100%);
+  border:1px solid #2a1e14;border-radius:12px;padding:12px;position:relative;overflow:hidden;
+}
+.query::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--gold)}
+.query h3{font-size:11px;letter-spacing:1.5px;color:var(--gold);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.query .qtext{font-size:15px;font-weight:800;color:#fff;line-height:1.3}
+.query .qtext span{color:var(--candle);background:rgba(255,184,77,0.12);padding:2px 6px;border-radius:4px;font-family:monospace;border:1px solid rgba(255,184,77,0.2)}
+.query .qhint{margin-top:8px;font-size:12px;color:var(--muted);background:rgba(0,0,0,0.3);padding:8px 10px;border-radius:8px;border-left:2px solid var(--gold);display:none}
+.query .qhint.show{display:block}
+.query .progress{margin-top:8px;font-size:11px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.query .progress b{color:var(--gold)}
+/* Mansion */
+.mansion-wrap{margin:10px 10px 0;background:radial-gradient(ellipse at center, #1a1208 0%, #0a0806 100%);border:1.5px solid #2a1e14;border-radius:14px;padding:10px;position:relative;overflow:hidden;box-shadow:inset 0 0 30px rgba(0,0,0,0.6)}
+.mansion-wrap::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg, transparent, transparent 24px, rgba(201,168,106,0.02) 24px, rgba(201,168,106,0.02) 25px);pointer-events:none}
+.mansion-label{position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:9px;letter-spacing:1.8px;color:var(--gold);opacity:0.7;font-weight:700;background:#0a0806;padding:2px 10px;border-radius:20px;border:1px solid rgba(201,168,106,0.2);z-index:2}
+.floors{display:flex;flex-direction:column;gap:8px;padding-top:18px;position:relative;z-index:1}
+.floor{
+  background:linear-gradient(180deg, #1c140e, #14100c);border:1.5px solid #2a1e14;border-radius:10px;padding:8px 8px 8px;position:relative;transition:all 0.3s;overflow:hidden;
+}
+.floor::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg, transparent, rgba(201,168,106,0.2), transparent)}
+.floor.current{border-color:var(--gold);box-shadow:0 0 16px rgba(201,168,106,0.25), inset 0 0 20px rgba(201,168,106,0.05);background:linear-gradient(180deg, #241a0e, #1c140e)}
+.floor.current::after{content:'◉ YOU ARE HERE';position:absolute;top:6px;right:8px;font-size:8px;letter-spacing:1px;color:var(--gold);font-weight:800;background:rgba(201,168,106,0.15);padding:2px 6px;border-radius:20px;border:1px solid rgba(201,168,106,0.3)}
+.floor.ancestor{opacity:0.85}
+.floor.void{border-style:dashed;border-color:#3a2a1a;background:repeating-linear-gradient(45deg, #0a0806, #0a0806 8px, #14100c 8px, #14100c 16px);text-align:center;padding:14px}
+.floor-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.floor-header h4{font-size:12px;font-weight:800;color:var(--gold2);display:flex;align-items:center;gap:6px}
+.floor-header h4 span.icon{font-size:14px}
+.floor-header .proto{font-size:9px;letter-spacing:1px;color:var(--muted);background:#0a0806;padding:2px 6px;border-radius:20px;border:1px solid #1c140e}
+.floor.current .floor-header h4{color:#fff;text-shadow:0 0 6px var(--gold)}
+.furniture{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.furn{
+  height:48px;border-radius:8px;border:1.5px solid #2a1e14;background:linear-gradient(180deg, #1e150e, #14100c);color:var(--text);
+  font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;padding:0 10px;transition:all 0.15s;position:relative;overflow:hidden;
+}
+.furn .ficon{font-size:18px;flex:0 0 auto}
+.furn .flabel{line-height:1.1;text-align:left}
+.furn .flabel small{display:block;font-size:9px;color:var(--muted);font-weight:600;letter-spacing:0.5px}
+.furn:active{transform:scale(0.97)}
+.furn.correct{border-color:var(--candle);background:linear-gradient(180deg, #2a1a0a, #1c140e);box-shadow:0 0 10px rgba(255,184,77,0.3)}
+.furn.wrong{border-color:var(--crimson2);background:linear-gradient(180deg, #2a0a0a, #1a0505);animation:shake 0.4s}
+.floor.current .furn{border-color:#3a2a1a}
+.floor.current .furn:hover{border-color:var(--gold);background:linear-gradient(180deg, #241a0e, #1c140e)}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(201,168,106,0.4)}50%{box-shadow:0 0 0 8px rgba(201,168,106,0)}}
+.pulse{animation:pulse 1s 2}
+.stairs{display:flex;justify-content:center;align-items:center;gap:8px;padding:4px 0}
+.stairs-line{flex:1;height:1px;background:linear-gradient(90deg, transparent, var(--gold), transparent);opacity:0.3}
+.stairs-label{font-size:9px;letter-spacing:1.5px;color:var(--gold);opacity:0.6;font-weight:700;background:#0a0806;padding:2px 8px;border-radius:20px;border:1px solid rgba(201,168,106,0.15)}
+/* Controls */
+.controls{padding:10px;display:flex;flex-direction:column;gap:8px}
+.climb-row{display:flex;gap:8px}
+.ctrl-btn{
+  flex:1;height:48px;border-radius:10px;border:1.5px solid #2a1e14;background:#14100c;color:var(--text);
+  font-size:12px;font-weight:800;letter-spacing:1px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all 0.15s;
+}
+.ctrl-btn.climb{background:linear-gradient(180deg, #2a1a0a, #1c140e);border-color:var(--gold);color:var(--gold);box-shadow:0 0 10px rgba(201,168,106,0.15)}
+.ctrl-btn.absence{background:linear-gradient(180deg, #1a0a0a, #140808);border-color:var(--crimson);color:#ff8a80}
+.ctrl-btn.hint{background:#0a0806;border-color:#1c140e;color:var(--muted);flex:0 0 90px}
+.ctrl-btn:disabled{opacity:0.4;pointer-events:none}
+.ctrl-btn:active{transform:scale(0.97)}
+/* Console */
+.console{margin:0 10px;background:#020202;border:1px solid #1c140e;border-radius:10px;overflow:hidden}
+.console header{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#0f0a06;border-bottom:1px solid #1c140e}
+.console header h4{font-size:10px;letter-spacing:1.5px;color:var(--gold);display:flex;align-items:center;gap:6px}
+.console header button{font-size:10px;background:transparent;border:1px solid #1c140e;color:var(--muted);padding:3px 8px;border-radius:6px;cursor:pointer}
+.code-block{padding:10px;background:#080400;font-family:'Courier New',monospace;font-size:11px;line-height:1.6;color:#f5e6d3;overflow-x:auto;white-space:pre;border-bottom:1px solid #1c140e}
+.code-block .kw{color:var(--gold)} .code-block .str{color:var(--candle)} .code-block .com{color:#6a5040} .code-block .var{color:var(--ghost)}
+.log{height:90px;overflow-y:auto;padding:8px 10px;font-family:'Courier New',monospace;font-size:11px;line-height:1.5;background:#020202}
+.log-entry{padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;gap:6px}
+.log-entry .tag{font-weight:800;min-width:54px}
+.log-entry.ok .tag{color:#00e676} .log-entry.err .tag{color:#ff5252} .log-entry.info .tag{color:var(--ghost)} .log-entry.hint .tag{color:var(--gold)} .log-entry.win .tag{color:var(--candle)}
+.log-entry.win{color:var(--candle);font-weight:800;background:rgba(255,184,77,0.08);border-radius:4px;padding:4px 6px;margin-top:4px}
+.log-entry.fail{color:#ff8a80;background:rgba(139,26,26,0.12);border-radius:4px;padding:4px 6px;margin-top:4px}
+/* Grimoire */
+.grimoire{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:50;display:none;align-items:center;justify-content:center;padding:16px}
+.grimoire.open{display:flex}
+.grimoire-card{width:100%;max-width:400px;max-height:85vh;overflow-y:auto;background:linear-gradient(180deg, #1c140e 0%, #0f0a06 100%);border:1.5px solid var(--gold);border-radius:14px;box-shadow:0 0 30px rgba(201,168,106,0.3);padding:16px;position:relative}
+.grimoire-card h2{font-size:16px;color:var(--gold2);letter-spacing:1.5px;text-align:center;margin-bottom:4px}
+.grimoire-card .sub{font-size:11px;color:var(--muted);text-align:center;letter-spacing:1px;margin-bottom:12px}
+.grimoire-card h3{font-size:12px;color:var(--candle);letter-spacing:1px;margin:12px 0 6px}
+.grimoire-card p{font-size:13px;line-height:1.5;color:#f5e6d3;margin-bottom:8px}
+.grimoire-card .chain-viz{display:flex;align-items:center;gap:6px;justify-content:center;margin:10px 0;padding:10px;background:#0a0806;border:1px solid #1c140e;border-radius:8px;flex-wrap:wrap}
+.grimoire-card .chain-viz span{font-size:11px;font-weight:800;padding:4px 8px;border-radius:6px;background:#1c140e;border:1px solid #2a1e14;color:var(--gold)}
+.grimoire-card .chain-viz i{color:var(--gold);font-style:normal}
+.grimoire-card .close{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:8px;border:1px solid #2a1e14;background:#0a0806;color:var(--muted);font-size:16px;cursor:pointer}
+.grimoire-card code{background:rgba(201,168,106,0.12);padding:1px 6px;border-radius:4px;font-family:monospace;font-size:12px;color:var(--gold);border:1px solid rgba(201,168,106,0.15)}
+/* Legend */
+.legend{display:flex;gap:6px;padding:8px 10px;flex-wrap:wrap;justify-content:center}
+.legend span{font-size:10px;padding:4px 8px;border-radius:20px;border:1px solid #1c140e;background:#0f0a06;color:var(--muted);display:flex;align-items:center;gap:4px}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.legend i.own{background:var(--gold)} .legend i.proto{background:var(--ghost)} .legend i.absent{background:var(--crimson)}
+/* Footer */
+.footer{padding:8px 10px 14px;display:flex;gap:8px}
+.footer button{flex:1;height:40px;border-radius:8px;border:1px solid #1c140e;background:#14100c;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer}
+/* Toast */
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(80px);background:#1c140e;border:1px solid var(--gold);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,0.6), 0 0 16px rgba(201,168,106,0.3);transition:transform 0.3s;z-index:100;max-width:90%;text-align:center;pointer-events:none}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.win-overlay{position:absolute;inset:0;background:rgba(10,8,6,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;border-radius:14px;text-align:center;padding:20px}
+.win-overlay h2{font-size:20px;color:var(--gold);text-shadow:0 0 12px var(--gold);letter-spacing:1.5px}
+.win-overlay p{font-size:13px;color:#fff;margin-top:8px;line-height:1.4}
+.win-overlay button{margin-top:14px;height:44px;padding:0 20px;border-radius:10px;border:none;background:var(--gold);color:#000;font-weight:900;letter-spacing:1px;cursor:pointer;box-shadow:0 0 16px rgba(201,168,106,0.4)}
+</style>
+</head>
+<body>
+<div class="manor" id="manor">
+  <div class="header">
+    <h1>GLOOM <span>MANOR</span></h1>
+    <p>PROTOTYPE CHAIN • SEEK THE OWNER</p>
+    <div class="header-actions">
+      <button id="soundBtn" onclick="toggleSound()" title="Ambient chimes">🔔</button>
+      <button onclick="openGrimoire()" title="Grimoire guide">📖</button>
+    </div>
+    <div class="progress-dots" id="dots"></div>
+  </div>
+  <div class="ch-nav" id="chNav"></div>
+  <div class="query" id="query"></div>
+  <div class="mansion-wrap" id="mansionWrap">
+    <div class="mansion-label">MANSION • TAP FURNITURE TO CLAIM</div>
+    <div class="floors" id="floors"></div>
+    <div id="winHost"></div>
+  </div>
+  <div class="controls">
+    <div class="climb-row">
+      <button class="ctrl-btn climb" id="climbBtn" onclick="climb()">▲ CLIMB STAIRS</button>
+      <button class="ctrl-btn absence" onclick="declareAbsence()">⦻ DECLARE ABSENCE</button>
+    </div>
+    <div class="climb-row">
+      <button class="ctrl-btn hint" id="hintBtn" onclick="useHint()">💡 HINT (<span id="hintCount">3</span>)</button>
+      <button class="ctrl-btn" onclick="descend()" id="descendBtn">▼ DESCEND</button>
+      <button class="ctrl-btn" onclick="resetFloor()">↺ RESET FLOOR</button>
+    </div>
+  </div>
+  <div class="console">
+    <header><h4>◉ ESTATE LEDGER</h4><button onclick="clearLog()">CLEAR</button></header>
+    <div class="code-block" id="codeBlock"></div>
+    <div class="log" id="log"></div>
+  </div>
+  <div class="legend">
+    <span><i class="own"></i> Own property</span>
+    <span><i class="proto"></i> Prototype</span>
+    <span><i class="absent"></i> Absent</span>
+  </div>
+  <div class="footer">
+    <button onclick="resetChapter()">RESET CHAPTER</button>
+    <button onclick="resetAll()">RESET ALL</button>
+  </div>
+</div>
+<div class="grimoire" id="grimoire" onclick="closeGrimoire(event)">
+  <div class="grimoire-card" onclick="event.stopPropagation()">
+    <button class="close" onclick="closeGrimoire()">✕</button>
+    <h2>📖 GRIMOIRE OF CHAINS</h2>
+    <div class="sub">How the mansion remembers</div>
+    <div class="chain-viz"><span>YOU (instance)</span><i>→</i><span>Library</span><i>→</i><span>Attic</span><i>→</i><span>∅ null</span></div>
+    <h3>🕯️ The Rule</h3>
+    <p>When you ask for <code>obj.prop</code>, the mansion searches <b>your floor first</b>. If not found, it climbs the stairs to the prototype, then its prototype, until <code>null</code>.</p>
+    <h3>🪑 Furniture = Properties</h3>
+    <p>Each piece of furniture is a property. Tap it to claim <i>"this floor owns it"</i>. If the property isn't on your floor, <b>climb</b> to the ancestor floor that owns it.</p>
+    <h3>⦻ Absence</h3>
+    <p>If no floor owns the property, declare <b>Absence</b>. The chain ends at <code>null</code> — the void beyond the attic.</p>
+    <h3>👻 Shadowing</h3>
+    <p>A lower floor can have the same key as an ancestor — it <b>shadows</b> the one above. The lower one wins.</p>
+    <h3>🔍 hasOwnProperty vs in</h3>
+    <p><code>'x' in obj</code> checks the whole chain. <code>obj.hasOwnProperty('x')</code> checks only your floor.</p>
+    <h3>💡 Hints</h3>
+    <p>You have 3 hints per chapter. Use sparingly — they pulse the correct floor.</p>
+    <button onclick="closeGrimoire()" style="width:100%;margin-top:12px;height:44px;border-radius:10px;border:none;background:var(--gold);color:#000;font-weight:900;letter-spacing:1px;cursor:pointer">ENTER THE MANOR</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const CHAPTERS = [
+  {
+    id:1, name:'HEIRLOOM', sub:'Own vs Prototype', diff:'★☆☆',
+    floors:[
+      {name:'Study', sub:'YOU • instance', icon:'🕯️', props:[{key:'desk', label:'Desk', sub:'own', icon:'🪑'}, {key:'lamp', label:'Lamp', sub:'own', icon:'💡'}, {key:'quill', label:'Quill', sub:'own', icon:'✒️'}, {key:'ink', label:'Ink Pot', sub:'own', icon:'🧴'}]},
+      {name:'Library', sub:'Prototype • Person', icon:'📚', props:[{key:'bookshelf', label:'Bookshelf', sub:'proto', icon:'📚'}, {key:'armchair', label:'Armchair', sub:'proto', icon:'🛋️'}, {key:'toString', label:'toString()', sub:'proto', icon:'📜'}, {key:'hasOwnProperty', label:'hasOwnProperty', sub:'proto', icon:'🔍'}]},
+      {name:'Attic', sub:'Object.prototype', icon:'🏚️', props:[{key:'chest', label:'Chest', sub:'attic', icon:'🧳'}, {key:'mirror', label:'Mirror', sub:'attic', icon:'🪞'}]},
+      {name:'∅ Void', sub:'null • beyond', icon:'🌑', props:[], isVoid:true}
+    ],
+    queries:[
+      {prop:'desk', owner:0, hint:'Your own desk — check the Study (ground floor)'},
+      {prop:'toString', owner:1, hint:'Not yours — climb to the Library prototype'},
+      {prop:'chest', owner:2, hint:'High in the Attic — climb twice'},
+      {prop:'nonExistent', owner:-1, hint:'No floor owns this — declare Absence'},
+    ],
+    code:`<span class="kw">const</span> <span class="var">you</span> = <span class="kw">Object.create</span>(<span class="var">personProto</span>);\n<span class="var">you</span>.<span class="str">desk</span> = <span class="str">"oak"</span>; <span class="com">// own</span>\n<span class="var">personProto</span>.<span class="str">toString</span> = <span class="kw">fn</span>; <span class="com">// prototype</span>\n<span class="var">Object.prototype</span>.<span class="str">chest</span> = <span class="str">"old"</span>; <span class="com">// attic</span>\n<span class="kw">console.log</span>(<span class="str">'desk' in you</span>); <span class="com">// true</span>`
+  },
+  {
+    id:2, name:'SHADOWS', sub:'Shadowing', diff:'★★☆',
+    floors:[
+      {name:'Bedroom', sub:'YOU • instance', icon:'🛏️', props:[{key:'portrait', label:'Portrait', sub:'own • shadow', icon:'🖼️'}, {key:'bed', label:'Bed', sub:'own', icon:'🛏️'}, {key:'candle', label:'Candle', sub:'own', icon:'🕯️'}]},
+      {name:'Gallery', sub:'Prototype • Ancestor', icon:'🎨', props:[{key:'portrait', label:'Portrait', sub:'proto • shadowed', icon:'🖼️'}, {key:'statue', label:'Statue', sub:'proto', icon:'🗿'}, {key:'valueOf', label:'valueOf()', sub:'proto', icon:'📜'}]},
+      {name:'Crypt', sub:'Object.prototype', icon:'⚰️', props:[{key:'coffin', label:'Coffin', sub:'crypt', icon:'⚰️'}, {key:'urn', label:'Urn', sub:'crypt', icon:'🏺'}]},
+      {name:'∅ Void', sub:'null', icon:'🌑', props:[], isVoid:true}
+    ],
+    queries:[
+      {prop:'portrait', owner:0, hint:'Both floors have it — but yours shadows the ancestor. Stay on Bedroom!'},
+      {prop:'statue', owner:1, hint:'Only the Gallery has the statue — climb once'},
+      {prop:'coffin', owner:2, hint:'Deep in the Crypt — climb twice'},
+      {prop:'portrait', owner:0, hint:'Again — shadowing means the lower floor wins. Don\'t climb!'},
+    ],
+    code:`<span class="var">ancestor</span>.<span class="str">portrait</span> = <span class="str">"old"</span>;\n<span class="var">you</span> = <span class="kw">Object.create</span>(<span class="var">ancestor</span>);\n<span class="var">you</span>.<span class="str">portrait</span> = <span class="str">"new"</span>; <span class="com">// shadows!</span>\n<span class="kw">console.log</span>(<span class="var">you</span>.<span class="str">portrait</span>); <span class="com">// "new" (own wins)</span>\n<span class="kw">console.log</span>(<span class="var">you.hasOwnProperty</span>(<span class="str">'portrait'</span>)); <span class="com">// true</span>`
+  },
+  {
+    id:3, name:'UNSEEN STAIR', sub:'in vs hasOwnProperty', diff:'★★☆',
+    floors:[
+      {name:'Kitchen', sub:'YOU', icon:'🍳', props:[{key:'knife', label:'Knife', sub:'own', icon:'🔪'}, {key:'pan', label:'Pan', sub:'own', icon:'🍳'}]},
+      {name:'Cellar', sub:'Prototype', icon:'🍷', props:[{key:'wine', label:'Wine Rack', sub:'proto', icon:'🍷'}, {key:'barrel', label:'Barrel', sub:'proto', icon:'🛢️'}, {key:'toString', label:'toString()', sub:'proto', icon:'📜'}]},
+      {name:'Attic', sub:'Object.prototype', icon:'🏚️', props:[{key:'cobweb', label:'Cobweb', sub:'attic', icon:'🕸️'}]},
+      {name:'∅ Void', sub:'null', icon:'🌑', props:[], isVoid:true}
+    ],
+    queries:[
+      {prop:'knife', owner:0, hint:'Your knife — hasOwnProperty true, in true'},
+      {prop:'wine', owner:1, hint:'Cellar\'s wine — hasOwnProperty false, in true. Climb!'},
+      {prop:'toString', owner:1, hint:'Inherited method — climb to Cellar'},
+      {prop:'ghost', owner:-1, hint:'No floor has ghost — declare Absence (both checks false)'},
+    ],
+    code:`<span class="kw">console.log</span>(<span class="str">'knife' in you</span>); <span class="com">// true (chain)</span>\n<span class="kw">console.log</span>(<span class="var">you.hasOwnProperty</span>(<span class="str">'knife'</span>)); <span class="com">// true (own)</span>\n<span class="kw">console.log</span>(<span class="str">'wine' in you</span>); <span class="com">// true (chain)</span>\n<span class="kw">console.log</span>(<span class="var">you.hasOwnProperty</span>(<span class="str">'wine'</span>)); <span class="com">// false (proto)</span>`
+  },
+  {
+    id:4, name:'BLOODLINE\'S END', sub:'4-Level Chain → null', diff:'★★★',
+    floors:[
+      {name:'Nursery', sub:'YOU • Child', icon:'🧸', props:[{key:'toy', label:'Toy', sub:'own', icon:'🧸'}, {key:'cradle', label:'Cradle', sub:'own', icon:'🛏️'}]},
+      {name:'Parlor', sub:'Parent', icon:'🎩', props:[{key:'pipe', label:'Pipe', sub:'parent', icon:'🚬'}, {key:'ledger', label:'Ledger', sub:'parent', icon:'📒'}]},
+      {name:'Library', sub:'Grandparent', icon:'📚', props:[{key:'grimoire', label:'Grimoire', sub:'grand', icon:'📖'}, {key:'globe', label:'Globe', sub:'grand', icon:'🌍'}]},
+      {name:'Crypt', sub:'Object.prototype', icon:'⚰️', props:[{key:'hasOwnProperty', label:'hasOwnProperty', sub:'root', icon:'🔍'}, {key:'toString', label:'toString', sub:'root', icon:'📜'}]},
+      {name:'∅ Void', sub:'null • end', icon:'🌑', props:[], isVoid:true}
+    ],
+    queries:[
+      {prop:'toy', owner:0, hint:'Your toy — ground floor'},
+      {prop:'pipe', owner:1, hint:'Parent\'s pipe — climb once'},
+      {prop:'grimoire', owner:2, hint:'Grandparent\'s grimoire — climb twice'},
+      {prop:'hasOwnProperty', owner:3, hint:'Ancient root — climb three times to Crypt'},
+      {prop:'missing', owner:-1, hint:'Beyond the Crypt lies null — declare Absence'},
+    ],
+    code:`<span class="var">grand</span> = { <span class="str">grimoire</span>: <span class="str">"old"</span> };\n<span class="var">parent</span> = <span class="kw">Object.create</span>(<span class="var">grand</span>);\n<span class="var">you</span> = <span class="kw">Object.create</span>(<span class="var">parent</span>);\n<span class="var">you</span>.<span class="str">toy</span> = <span class="str">"bear"</span>;\n<span class="kw">console.log</span>(<span class="kw">Object.getPrototypeOf</span>(<span class="var">you</span>) === <span class="var">parent</span>); <span class="com">// true</span>`
+  },
+  {
+    id:5, name:'HOLLOW HOUSE', sub:'Object.create(null)', diff:'★★★★',
+    floors:[
+      {name:'Hollow Room', sub:'YOU • null proto', icon:'🕳️', props:[{key:'lantern', label:'Lantern', sub:'own', icon:'🏮'}, {key:'key', label:'Key', sub:'own', icon:'🗝️'}]},
+      {name:'∅ Void', sub:'null • no prototype', icon:'🌑', props:[], isVoid:true}
+    ],
+    queries:[
+      {prop:'lantern', owner:0, hint:'Your lantern — own property, but no prototype above'},
+      {prop:'toString', owner:-1, hint:'Normally in Object.prototype, but this house has no prototype — Absence!'},
+      {prop:'hasOwnProperty', owner:-1, hint:'Also absent — Object.create(null) has no chain'},
+      {prop:'key', owner:0, hint:'Your key — still own, still here'},
+    ],
+    code:`<span class="var">hollow</span> = <span class="kw">Object.create</span>(<span class="kw">null</span>); <span class="com">// no prototype!</span>\n<span class="var">hollow</span>.<span class="str">lantern</span> = <span class="str">"lit"</span>;\n<span class="kw">console.log</span>(<span class="var">hollow.toString</span>); <span class="com">// undefined!</span>\n<span class="kw">console.log</span>(<span class="kw">Object.getPrototypeOf</span>(<span class="var">hollow</span>)); <span class="com">// null</span>\n<span class="kw">console.log</span>(<span class="str">'toString' in hollow</span>); <span class="com">// false</span>`
+  }
+];
+
+let cur=1, curFloor=0, qIndex=0, hintsLeft=3;
+let state={completed:[], cur:1, hints:{}, sound:false, score:0};
+
+function load(){
+  try{
+    const s=JSON.parse(localStorage.getItem('gloomManor_v2')||'null');
+    if(s){ state=s; cur=s.cur||1; }
+  }catch(e){}
+  if(!state.completed) state.completed=[];
+  if(!state.hints) state.hints={};
+  hintsLeft = 3 - (state.hints[cur]||0);
+}
+function save(){
+  state.cur=cur;
+  localStorage.setItem('gloomManor_v2', JSON.stringify(state));
+}
+function toast(m){
+  const t=document.getElementById('toast');
+  t.textContent=m; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function renderNav(){
+  const nav=document.getElementById('chNav');
+  nav.innerHTML='';
+  CHAPTERS.forEach(ch=>{
+    const b=document.createElement('button');
+    b.className='cbtn';
+    if(ch.id===cur) b.classList.add('active');
+    if(state.completed.includes(ch.id)) b.classList.add('done');
+    if(ch.id>1 && !state.completed.includes(ch.id-1) && ch.id!==cur) b.classList.add('locked');
+    b.innerHTML=`<span class="num">${ch.id}</span>${ch.name}<br><small style="font-size:9px;opacity:0.7">${ch.diff}</small>`;
+    b.onclick=()=>{ if(b.classList.contains('locked')) return; switchChapter(ch.id); };
+    nav.appendChild(b);
+  });
+  const dots=document.getElementById('dots');
+  dots.innerHTML='';
+  CHAPTERS.forEach(ch=>{
+    const d=document.createElement('div');
+    d.className='dot'+(state.completed.includes(ch.id)?' done': ch.id===cur?' active':'');
+    dots.appendChild(d);
+  });
+}
+function renderQuery(){
+  const ch=CHAPTERS[cur-1];
+  const q=ch.queries[qIndex];
+  const el=document.getElementById('query');
+  if(!q){
+    el.innerHTML=`<h3>✅ CHAPTER COMPLETE</h3><div class="qtext">All properties found!</div><div class="progress"><span>Progress</span><b>${ch.queries.length}/${ch.queries.length}</b></div>`;
+    return;
+  }
+  const isAbsent = q.owner===-1;
+  el.innerHTML=`
+    <h3>🔍 SEEK THE OWNER — ${qIndex+1} / ${ch.queries.length}</h3>
+    <div class="qtext">Where does <span>${q.prop}</span> live?</div>
+    <div class="qhint" id="qhint">${q.hint}</div>
+    <div class="progress"><span>${isAbsent ? '⦻ Declare Absence if nowhere' : 'Tap furniture or climb stairs'}</span><b>${qIndex}/${ch.queries.length}</b></div>
+  `;
+  document.getElementById('codeBlock').innerHTML=ch.code;
+  updateControls();
+}
+function renderFloors(){
+  const ch=CHAPTERS[cur-1];
+  const host=document.getElementById('floors');
+  host.innerHTML='';
+  ch.floors.forEach((floor, idx)=>{
+    if(floor.isVoid){
+      const div=document.createElement('div');
+      div.className='floor void';
+      div.innerHTML=`<div style="font-size:18px">🌑</div><div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:1px;margin-top:4px">∅ NULL — END OF CHAIN</div><div style="font-size:10px;color:var(--muted);margin-top:2px">No properties beyond here</div>`;
+      host.appendChild(div);
+      return;
+    }
+    const div=document.createElement('div');
+    div.className='floor'+(idx===curFloor?' current':'')+(idx<curFloor?' ancestor':'');
+    div.dataset.floor=idx;
+    div.innerHTML=`
+      <div class="floor-header"><h4><span class="icon">${floor.icon}</span> ${floor.name}</h4><span class="proto">${floor.sub}</span></div>
+      <div class="furniture">${floor.props.map(p=>`
+        <button class="furn" data-key="${p.key}" onclick="claim('${p.key}', ${idx})">
+          <span class="ficon">${p.icon}</span>
+          <span class="flabel">${p.label}<small>${p.key}</small></span>
+        </button>
+      `).join('')}</div>
+    `;
+    host.appendChild(div);
+    if(idx < ch.floors.length-1 && !ch.floors[idx+1].isVoid){
+      const stairs=document.createElement('div');
+      stairs.className='stairs';
+      stairs.innerHTML=`<div class="stairs-line"></div><span class="stairs-label">▲ STAIRS ▲</span><div class="stairs-line"></div>`;
+      host.appendChild(stairs);
+    } else if(idx < ch.floors.length-1){
+      const stairs=document.createElement('div');
+      stairs.className='stairs';
+      stairs.innerHTML=`<div class="stairs-line"></div><span class="stairs-label">∅ VOID</span><div class="stairs-line"></div>`;
+      host.appendChild(stairs);
+    }
+  });
+  updateControls();
+}
+function updateControls(){
+  const ch=CHAPTERS[cur-1];
+  const maxFloor = ch.floors.filter(f=>!f.isVoid).length -1;
+  document.getElementById('climbBtn').disabled = curFloor >= maxFloor;
+  document.getElementById('descendBtn').disabled = curFloor <= 0;
+  document.getElementById('hintCount').textContent = hintsLeft;
+  document.getElementById('hintBtn').disabled = hintsLeft<=0;
+  document.getElementById('hintBtn').style.opacity = hintsLeft<=0 ? '0.4' : '1';
+}
+function switchChapter(id){
+  cur=id; curFloor=0; qIndex=0;
+  hintsLeft = 3 - (state.hints[cur]||0);
+  state.cur=cur; save();
+  renderNav(); renderQuery(); renderFloors();
+  clearLog();
+  addLog('info',`Chapter ${id} — ${CHAPTERS[id-1].name} entered`,'info');
+  document.getElementById('winHost').innerHTML='';
+  chime();
+}
+function claim(key, floorIdx){
+  const ch=CHAPTERS[cur-1];
+  const q=ch.queries[qIndex];
+  if(!q) return;
+  if(floorIdx !== curFloor){
+    toast(`Move to ${ch.floors[floorIdx].name} first — climb the stairs!`);
+    // pulse correct floor
+    const floors=document.querySelectorAll('.floor');
+    if(floors[floorIdx]){ floors[floorIdx].classList.add('pulse'); setTimeout(()=>floors[floorIdx].classList.remove('pulse'), 1200); }
+    return;
+  }
+  if(q.owner===-1){
+    addLog('fail',`'${key}' is not the answer — this property is absent! Declare Absence.`,'fail');
+    toast(`✖ Not absent — declare Absence instead`);
+    chime(false);
+    return;
+  }
+  if(key===q.prop && floorIdx===q.owner){
+    // correct
+    addLog('ok',`✓ '${key}' found on ${ch.floors[floorIdx].name} (floor ${floorIdx})`,'ok');
+    chime(true);
+    // highlight
+    document.querySelectorAll('.furn').forEach(b=>{
+      if(b.dataset.key===key && parseInt(b.closest('.floor').dataset.floor)===floorIdx) b.classList.add('correct');
+    });
+    setTimeout(()=>nextQuery(), 600);
+  } else if(key===q.prop && floorIdx!==q.owner){
+    addLog('fail',`✖ '${key}' is on ${ch.floors[q.owner].name}, not ${ch.floors[floorIdx].name}`,'fail');
+    toast(`✖ Wrong floor — try ${ch.floors[q.owner].name}`);
+    // pulse correct
+    const floors=document.querySelectorAll('.floor');
+    if(floors[q.owner]){ floors[q.owner].classList.add('pulse'); setTimeout(()=>floors[q.owner].classList.remove('pulse'), 1200); }
+    chime(false);
+  } else {
+    addLog('fail',`✖ '${key}' is not '${q.prop}'`,'fail');
+    toast(`✖ Not '${q.prop}' — keep looking`);
+    chime(false);
+  }
+}
+function nextQuery(){
+  qIndex++;
+  const ch=CHAPTERS[cur-1];
+  if(qIndex >= ch.queries.length){
+    // chapter complete
+    if(!state.completed.includes(cur)) state.completed.push(cur);
+    save();
+    renderNav();
+    renderQuery();
+    addLog('win',`★ Chapter ${cur} complete!`,'win');
+    const host=document.getElementById('winHost');
+    if(cur < CHAPTERS.length){
+      host.innerHTML=`<div class="win-overlay"><h2>CHAPTER ${cur} CLEARED</h2><p>${ch.name} — chain understood</p><p style="color:var(--gold);font-size:12px;margin-top:6px">${state.completed.length}/${CHAPTERS.length} chapters</p><button onclick="nextChapter()">NEXT CHAPTER →</button></div>`;
+    } else {
+      host.innerHTML=`<div class="win-overlay"><h2>🏆 MANOR MASTERED</h2><p>You walk the chain from YOU to null</p><p style="color:var(--gold);font-size:12px;margin-top:6px">All prototype secrets revealed</p><button onclick="resetAll()">WANDER AGAIN</button></div>`;
+      addLog('win',`🏆 All chapters complete — you own the manor!`,'win');
+    }
+    toast(`★ Chapter ${cur} cleared!`);
+    chime(true, true);
+  } else {
+    curFloor=0; // reset to ground for next query
+    renderFloors();
+    renderQuery();
+    addLog('info',`Next: where does '${ch.queries[qIndex].prop}' live?`,'info');
+  }
+}
+function climb(){
+  const ch=CHAPTERS[cur-1];
+  const maxFloor = ch.floors.filter(f=>!f.isVoid).length -1;
+  if(curFloor < maxFloor){
+    curFloor++;
+    renderFloors();
+    addLog('info',`▲ Climbed to ${ch.floors[curFloor].name}`,'info');
+    chime();
+    // check if this is correct floor for current query
+    const q=ch.queries[qIndex];
+    if(q && q.owner===curFloor) toast(`You sense '${q.prop}' nearby...`);
+  }
+}
+function descend(){
+  if(curFloor>0){
+    curFloor--;
+    renderFloors();
+    const ch=CHAPTERS[cur-1];
+    addLog('info',`▼ Descended to ${ch.floors[curFloor].name}`,'info');
+    chime();
+  }
+}
+function declareAbsence(){
+  const ch=CHAPTERS[cur-1];
+  const q=ch.queries[qIndex];
+  if(!q) return;
+  if(q.owner===-1){
+    addLog('ok',`⦻ Correct — '${q.prop}' is absent (beyond null)`,'ok');
+    chime(true);
+    setTimeout(()=>nextQuery(), 600);
+  } else {
+    addLog('fail',`✖ '${q.prop}' exists on ${ch.floors[q.owner].name} — not absent!`,'fail');
+    toast(`✖ It exists — check ${ch.floors[q.owner].name}`);
+    const floors=document.querySelectorAll('.floor');
+    if(floors[q.owner]){ floors[q.owner].classList.add('pulse'); setTimeout(()=>floors[q.owner].classList.remove('pulse'), 1200); }
+    chime(false);
+  }
+}
+function useHint(){
+  if(hintsLeft<=0){ toast('No hints left — trust the chain'); return; }
+  const ch=CHAPTERS[cur-1];
+  const q=ch.queries[qIndex];
+  if(!q) return;
+  hintsLeft--;
+  state.hints[cur]=(state.hints[cur]||0)+1;
+  save();
+  updateControls();
+  const hintEl=document.getElementById('qhint');
+  if(hintEl){ hintEl.classList.add('show'); }
+  addLog('hint',`💡 Hint: ${q.hint}`,'hint');
+  toast(`💡 Hint used — ${hintsLeft} left`);
+  // pulse correct floor
+  if(q.owner!==-1){
+    const floors=document.querySelectorAll('.floor');
+    if(floors[q.owner]){ floors[q.owner].classList.add('pulse'); setTimeout(()=>floors[q.owner].classList.remove('pulse'), 1500); }
+  }
+  chime();
+}
+function nextChapter(){
+  document.getElementById('winHost').innerHTML='';
+  if(cur < CHAPTERS.length) switchChapter(cur+1);
+}
+function resetFloor(){ curFloor=0; renderFloors(); addLog('info','Returned to ground floor','info'); }
+function resetChapter(){
+  qIndex=0; curFloor=0; state.hints[cur]=0; hintsLeft=3; save();
+  renderFloors(); renderQuery(); clearLog();
+  addLog('info',`Chapter ${cur} reset`,'info');
+  document.getElementById('winHost').innerHTML='';
+  toast('Chapter reset');
+}
+function resetAll(){
+  if(!confirm('Reset all progress?')) return;
+  state={completed:[], cur:1, hints:{}, sound:false, score:0};
+  cur=1; qIndex=0; curFloor=0; hintsLeft=3;
+  save(); renderNav(); renderQuery(); renderFloors(); clearLog();
+  addLog('info','Manor reset — all chapters locked except I','info');
+  document.getElementById('winHost').innerHTML='';
+  toast('All progress reset');
+}
+function clearLog(){ document.getElementById('log').innerHTML=''; }
+function addLog(tag, msg, cls){
+  const log=document.getElementById('log');
+  const div=document.createElement('div');
+  div.className='log-entry '+cls;
+  div.innerHTML=`<span class="tag">${tag.toUpperCase()}</span><span>${msg}</span>`;
+  log.appendChild(div);
+  log.scrollTop=log.scrollHeight;
+}
+function openGrimoire(){ document.getElementById('grimoire').classList.add('open'); }
+function closeGrimoire(e){
+  if(!e || e.target.id==='grimoire' || e.target.classList.contains('close')) document.getElementById('grimoire').classList.remove('open');
+  if(e && e.target.tagName==='BUTTON') document.getElementById('grimoire').classList.remove('open');
+}
+// Ambient chimes via Web Audio
+let audioCtx=null, chimeInterval=null;
+function ensureAudio(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+}
+function chime(success=null, big=false){
+  if(!state.sound) return;
+  try{
+    ensureAudio();
+    const osc=audioCtx.createOscillator();
+    const gain=audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    if(success===true){
+      osc.frequency.value= big ? 880 : 660;
+      gain.gain.value=0.08;
+    } else if(success===false){
+      osc.frequency.value=180;
+      gain.gain.value=0.06;
+    } else {
+      osc.frequency.value= 300 + Math.random()*100;
+      gain.gain.value=0.04;
+    }
+    osc.type='sine';
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (big?1.2:0.6));
+    osc.stop(audioCtx.currentTime + (big?1.2:0.6));
+  }catch(e){}
+}
+function toggleSound(){
+  state.sound=!state.sound; save();
+  const btn=document.getElementById('soundBtn');
+  btn.classList.toggle('active', state.sound);
+  if(state.sound){
+    ensureAudio();
+    toast('🔔 Chimes enabled');
+    chime(true);
+    // periodic ambient
+    if(chimeInterval) clearInterval(chimeInterval);
+    chimeInterval=setInterval(()=>{ if(state.sound && Math.random()<0.3) chime(); }, 9000);
+  } else {
+    toast('🔕 Chimes muted');
+    if(chimeInterval) clearInterval(chimeInterval);
+  }
+}
+// init
+load();
+renderNav();
+renderQuery();
+renderFloors();
+clearLog();
+addLog('info','Welcome to Gloom Manor — find who owns each property','info');
+addLog('info','Tap furniture, climb stairs, or declare absence','info');
+if(state.sound) document.getElementById('soundBtn').classList.add('active');
+</script>
+</body>
+</html>

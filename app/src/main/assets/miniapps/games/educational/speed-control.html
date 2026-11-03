@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Needle Control Test</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#F8FAFC;
+  --card:#FFFFFF;
+  --ink:#0F172A;
+  --muted:#64748B;
+  --line:#E2E8F0;
+  --accent:#0EA5E9;
+  --success:#16A34A;
+  --warn:#EAB308;
+  --danger:#EF4444;
+  --radius:20px;
+}
+html,body{height:100%;background:var(--bg);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);overflow-x:hidden}
+#app{max-width:428px;min-width:360px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;background:var(--bg);overflow-x:hidden}
+.topbar{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:var(--card);border-bottom:2px solid var(--line);position:sticky;top:0;z-index:10}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px;letter-spacing:-.2px}
+.brand-badge{width:36px;height:36px;border-radius:12px;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:18px}
+.pill{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;background:var(--bg);border:2px solid var(--line);border-radius:999px;padding:5px 10px}
+.screen{flex:1;display:none;padding:16px;flex-direction:column;gap:14px}
+.screen.active{display:flex}
+.card{background:var(--card);border:2px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:0 4px 16px rgba(15,23,42,.06)}
+.h1{font-size:22px;font-weight:900;letter-spacing:-.5px;line-height:1.1}
+.sub{font-size:14px;color:var(--muted);line-height:1.5;font-weight:500}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.stat{background:var(--card);border:2px solid var(--line);border-radius:16px;padding:10px;text-align:center}
+.stat-label{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.stat-val{font-size:20px;font-weight:900;margin-top:2px}
+.stat-val.small{font-size:16px}
+.gauge-wrap{position:relative;background:var(--card);border:2px solid var(--line);border-radius:var(--radius);padding:12px 12px 8px;box-shadow:0 4px 16px rgba(15,23,42,.06);overflow:hidden}
+.gauge-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.timer{font-weight:900;font-size:14px;background:var(--ink);color:#fff;border-radius:999px;padding:6px 12px;min-width:72px;text-align:center}
+.timer.warn{background:var(--warn);color:var(--ink)}
+.timer.danger{background:var(--danger);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block;margin-right:6px;animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.canvas-box{position:relative;width:100%;display:flex;justify-content:center;align-items:center;touch-action:none}
+canvas{display:block;max-width:100%;height:auto}
+.verdict{position:absolute;left:50%;top:58%;transform:translate(-50%,-50%);background:var(--card);border:3px solid var(--ink);border-radius:16px;padding:8px 14px;min-width:140px;text-align:center;box-shadow:0 6px 0 var(--ink);transition:all .15s}
+.verdict-text{font-weight:900;font-size:18px;letter-spacing:.5px;line-height:1}
+.verdict-sub{font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;opacity:.7;margin-top:2px}
+.verdict.perfect{border-color:var(--success);background:#F0FDF4;box-shadow:0 6px 0 var(--success);transform:translate(-50%,-50%) scale(1.05)}
+.verdict.good{border-color:var(--warn);background:#FEFCE8;box-shadow:0 6px 0 var(--warn)}
+.verdict.miss{border-color:var(--danger);background:#FEF2F2;box-shadow:0 6px 0 var(--danger)}
+.verdict.ok{border-color:var(--muted);background:#F8FAFC;box-shadow:0 6px 0 var(--muted)}
+.controls{display:flex;flex-direction:column;gap:12px}
+.control-btn{width:100%;height:88px;border-radius:24px;border:3px solid var(--ink);background:var(--ink);color:#fff;font-weight:900;font-size:18px;letter-spacing:.3px;box-shadow:0 6px 0 #020617;cursor:pointer;user-select:none;touch-action:none;display:flex;align-items:center;justify-content:center;gap:10px;transition:transform .08s, box-shadow .08s}
+.control-btn:active,.control-btn.holding{transform:translateY(4px);box-shadow:0 2px 0 #020617;background:#1E293B}
+.control-btn span{font-size:22px}
+.secondary-row{display:flex;gap:10px}
+.btn{flex:1;min-height:48px;border-radius:14px;border:2px solid var(--line);background:var(--card);font-weight:800;font-size:15px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 3px 0 var(--line)}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--line)}
+.btn-primary{background:var(--accent);border-color:#0B8AC7;color:#fff;box-shadow:0 3px 0 #0B8AC7}
+.btn-dark{background:var(--ink);color:#fff;border-color:var(--ink);box-shadow:0 3px 0 #020617}
+.modes{display:flex;gap:8px}
+.mode-btn{flex:1;min-height:44px;border-radius:12px;border:2px solid var(--line);background:var(--card);font-weight:800;font-size:13px;cursor:pointer}
+.mode-btn.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.legend{display:flex;gap:8px;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;background:var(--card);border:2px solid var(--line);border-radius:999px;padding:6px 10px}
+.dot{width:12px;height:12px;border-radius:4px;border:2px solid var(--ink)}
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
+.overlay.open{display:flex}
+.overlay-card{width:100%;max-width:400px;background:var(--card);border:3px solid var(--ink);border-radius:24px;padding:20px;box-shadow:0 12px 0 var(--ink);text-align:center}
+.big-score{font-size:48px;font-weight:900;letter-spacing:-1px;line-height:1}
+.progress{height:10px;background:var(--bg);border:2px solid var(--line);border-radius:999px;overflow:hidden;margin-top:10px}
+.progress-fill{height:100%;width:0%;background:var(--ink);transition:width .2s linear}
+.hint{font-size:12px;font-weight:600;color:var(--muted);text-align:center;line-height:1.4}
+.kbd{font-size:11px;font-weight:800;background:var(--bg);border:2px solid var(--line);border-radius:6px;padding:2px 6px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="brand"><div class="brand-badge">◐</div> Needle Control</div>
+    <div class="pill" id="bestPill">Best 0</div>
+  </div>
+
+  <section class="screen active" id="screenHome">
+    <div class="card">
+      <div class="h1">Steer the needle into the moving target</div>
+      <div class="sub" style="margin-top:8px">Hold to steer clockwise, release to drift back. Keep the needle inside the green band for points. Clean gauge, instant verdicts.</div>
+      <div class="legend" style="margin-top:12px">
+        <div class="legend-item"><span class="dot" style="background:#22C55E"></span> Target band</div>
+        <div class="legend-item"><span class="dot" style="background:#0F172A"></span> Live needle</div>
+        <div class="legend-item"><span class="dot" style="background:#E2E8F0"></span> Gauge track</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
+        <div style="background:#F0FDF4;border:2px solid #BBF7D0;border-radius:14px;padding:10px;text-align:center"><div style="font-weight:900;color:var(--success)">PERFECT</div><div style="font-size:12px;font-weight:700;opacity:.7">Center ±30% • +100</div></div>
+        <div style="background:#FEFCE8;border:2px solid #FDE68A;border-radius:14px;padding:10px;text-align:center"><div style="font-weight:900;color:#A16207">GOOD</div><div style="font-size:12px;font-weight:700;opacity:.7">Inside 60% • +50</div></div>
+        <div style="background:#F8FAFC;border:2px solid var(--line);border-radius:14px;padding:10px;text-align:center"><div style="font-weight:900;color:var(--muted)">OK</div><div style="font-size:12px;font-weight:700;opacity:.7">Edge • +10</div></div>
+        <div style="background:#FEF2F2;border:2px solid #FECACA;border-radius:14px;padding:10px;text-align:center"><div style="font-weight:900;color:var(--danger)">MISS</div><div style="font-size:12px;font-weight:700;opacity:.7">Outside • 0</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-weight:900;font-size:14px">Choose control</div>
+      <div class="modes" style="margin-top:10px">
+        <button class="mode-btn active" data-mode="hold">Hold to Steer</button>
+        <button class="mode-btn" data-mode="tap">Tap to Nudge</button>
+      </div>
+      <div class="sub" style="margin-top:8px" id="modeDesc">Press & hold the big button — needle climbs. Release and it drifts back. Time your hold to track the moving green band.</div>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="btn btn-dark" style="flex:1.2" id="btnStart">▶ Start Test</button>
+        <button class="btn" id="btnHow">How to score</button>
+      </div>
+      <div class="hint" style="margin-top:10px">Session: 30s • Target moves continuously • Score every 0.2s inside band</div>
+    </div>
+  </section>
+
+  <section class="screen" id="screenGame">
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Score</div><div class="stat-val" id="scoreVal">0</div></div>
+      <div class="stat"><div class="stat-label">Streak</div><div class="stat-val" id="streakVal">0</div></div>
+      <div class="stat"><div class="stat-label">Accuracy</div><div class="stat-val small" id="accVal">0%</div></div>
+    </div>
+
+    <div class="gauge-wrap">
+      <div class="gauge-header">
+        <div style="font-weight:800;font-size:12px;letter-spacing:.5px;text-transform:uppercase;display:flex;align-items:center"><span class="live-dot"></span> Live</div>
+        <div class="timer" id="timer">30.0s</div>
+      </div>
+      <div class="canvas-box" id="canvasBox">
+        <canvas id="gauge" width="340" height="200"></canvas>
+        <div class="verdict" id="verdict"><div class="verdict-text" id="verdictText">READY</div><div class="verdict-sub" id="verdictSub">Hold to begin</div></div>
+      </div>
+      <div class="progress"><div class="progress-fill" id="progressFill"></div></div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)">
+        <span>0°</span><span>90°</span><span>180°</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="control-btn" id="controlBtn"><span>◉</span> HOLD TO STEER</button>
+      <div class="secondary-row">
+        <button class="btn" id="btnPause">⏸ Pause</button>
+        <button class="btn btn-primary" id="btnRestart">↻ Restart</button>
+      </div>
+      <div class="hint">Tip: small corrections win. Don't chase — anticipate the band's swing. <span class="kbd">Space</span> also works.</div>
+    </div>
+  </section>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="overlay-card">
+    <div class="pill" id="overlayPill" style="margin:0 auto">Session Complete</div>
+    <div class="big-score" id="overlayScore" style="margin-top:10px">0</div>
+    <div style="font-weight:800;color:var(--muted);margin-top:4px" id="overlayVerdict">Nice control!</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px">
+      <div style="background:var(--bg);border:2px solid var(--line);border-radius:14px;padding:10px"><div style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)">Best</div><div style="font-weight:900;font-size:18px" id="overlayBest">0</div></div>
+      <div style="background:var(--bg);border:2px solid var(--line);border-radius:14px;padding:10px"><div style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)">Streak</div><div style="font-weight:900;font-size:18px" id="overlayStreak">0</div></div>
+      <div style="background:var(--bg);border:2px solid var(--line);border-radius:14px;padding:10px"><div style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)">Accuracy</div><div style="font-weight:900;font-size:18px" id="overlayAcc">0%</div></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn" id="btnOverlayHome" style="flex:1">Home</button>
+      <button class="btn btn-dark" id="btnOverlayRestart" style="flex:1.3">↻ Play Again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gauge');
+const ctx = canvas.getContext('2d');
+const verdictEl = document.getElementById('verdict');
+const verdictText = document.getElementById('verdictText');
+const verdictSub = document.getElementById('verdictSub');
+const scoreVal = document.getElementById('scoreVal');
+const streakVal = document.getElementById('streakVal');
+const accVal = document.getElementById('accVal');
+const timerEl = document.getElementById('timer');
+const progressFill = document.getElementById('progressFill');
+const controlBtn = document.getElementById('controlBtn');
+const bestPill = document.getElementById('bestPill');
+
+let mode = 'hold';
+let state = {
+  score:0, best:0, streak:0, maxStreak:0,
+  hits:0, totalChecks:0,
+  timeLeft:30, duration:30,
+  needle:10, velocity:0,
+  target:90, targetWidth:22, targetSpeed:0.9,
+  isHolding:false, running:false, paused:false,
+  lastScoreTime:0
+};
+
+const STORAGE_KEY='timingControl_v1';
+function loadBest(){
+  try{ const r=localStorage.getItem(STORAGE_KEY); if(r){ const p=JSON.parse(r); state.best=p.best||0; } }catch(e){}
+  bestPill.textContent='Best '+state.best;
+}
+function saveBest(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({best:state.best})); }catch(e){}
+  bestPill.textContent='Best '+state.best;
+}
+loadBest();
+
+// responsive canvas
+function resizeCanvas(){
+  const box=document.getElementById('canvasBox');
+  const w=Math.min(340, box.clientWidth);
+  const dpr=window.devicePixelRatio||1;
+  canvas.style.width=w+'px';
+  canvas.style.height=(w*0.59)+'px';
+  canvas.width=w*dpr;
+  canvas.height=w*0.59*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
+
+function drawGauge(){
+  const w=canvas.width/(window.devicePixelRatio||1);
+  const h=canvas.height/(window.devicePixelRatio||1);
+  const cx=w/2, cy=h-18, radius=Math.min(138, w*0.42);
+  ctx.clearRect(0,0,w,h);
+
+  // track bg
+  ctx.beginPath();
+  ctx.arc(cx,cy,radius, Math.PI, 0);
+  ctx.strokeStyle='#E2E8F0';
+  ctx.lineWidth=16;
+  ctx.lineCap='round';
+  ctx.stroke();
+
+  // ticks
+  ctx.strokeStyle='#CBD5E1';
+  ctx.lineWidth=2;
+  for(let a=0;a<=180;a+=18){
+    const rad=(180-a)*Math.PI/180;
+    const r1=radius-10, r2=radius+6;
+    const x1=cx+Math.cos(rad)*r1, y1=cy - Math.sin(rad)*r1;
+    const x2=cx+Math.cos(rad)*r2, y2=cy - Math.sin(rad)*r2;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    if(a%36===0){
+      ctx.fillStyle='#64748B';
+      ctx.font='700 10px Inter, system-ui, sans-serif';
+      ctx.textAlign='center';
+      const lx=cx+Math.cos(rad)*(radius+18), ly=cy - Math.sin(rad)*(radius+18);
+      ctx.fillText(a+'°', lx, ly+3);
+    }
+  }
+
+  // target band
+  const tStart = clamp(state.target - state.targetWidth, 0, 180);
+  const tEnd = clamp(state.target + state.targetWidth, 0, 180);
+  const startRad=(180-tStart)*Math.PI/180, endRad=(180-tEnd)*Math.PI/180;
+  // glow
+  ctx.beginPath();
+  ctx.arc(cx,cy,radius, Math.PI - tStart*Math.PI/180, Math.PI - tEnd*Math.PI/180);
+  ctx.strokeStyle='rgba(34,197,94,.18)';
+  ctx.lineWidth=28;
+  ctx.stroke();
+  // main band
+  ctx.beginPath();
+  ctx.arc(cx,cy,radius, Math.PI - tStart*Math.PI/180, Math.PI - tEnd*Math.PI/180);
+  ctx.strokeStyle='#22C55E';
+  ctx.lineWidth=16;
+  ctx.stroke();
+  // band edges
+  [tStart,tEnd].forEach(a=>{
+    const rad=(180-a)*Math.PI/180;
+    const x=cx+Math.cos(rad)*radius, y=cy - Math.sin(rad)*radius;
+    ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2); ctx.fillStyle='#16A34A'; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+  });
+  // center label of target
+  const midRad=(180-state.target)*Math.PI/180;
+  const mx=cx+Math.cos(midRad)*(radius-28), my=cy - Math.sin(midRad)*(radius-28);
+  ctx.fillStyle='#16A34A';
+  ctx.font='800 9px Inter, system-ui, sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('TARGET', mx, my);
+
+  // needle
+  const nRad=(180-state.needle)*Math.PI/180;
+  const nx=cx+Math.cos(nRad)*(radius-6), ny=cy - Math.sin(nRad)*(radius-6);
+  // shadow
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(nx,ny);
+  ctx.strokeStyle='rgba(15,23,42,.12)'; ctx.lineWidth=6; ctx.lineCap='round'; ctx.stroke();
+  // needle line
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(nx,ny);
+  ctx.strokeStyle='#0F172A'; ctx.lineWidth=4; ctx.lineCap='round'; ctx.stroke();
+  // tip
+  ctx.beginPath(); ctx.arc(nx,ny,7,0,Math.PI*2); ctx.fillStyle='#0F172A'; ctx.fill();
+  ctx.beginPath(); ctx.arc(nx,ny,3,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+  // center hub
+  ctx.beginPath(); ctx.arc(cx,cy,14,0,Math.PI*2); ctx.fillStyle='#0F172A'; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,14,0,Math.PI*2); ctx.strokeStyle='#020617'; ctx.lineWidth=2; ctx.stroke();
+}
+
+function getVerdict(){
+  const dist=Math.abs(state.needle - state.target);
+  const w=state.targetWidth;
+  if(dist < w*0.32) return {key:'perfect', text:'PERFECT!', sub:'+100 • dead center', color:'#16A34A', pts:100};
+  if(dist < w*0.62) return {key:'good', text:'GOOD', sub:'+50 • inside band', color:'#A16207', pts:50};
+  if(dist < w) return {key:'ok', text:'OK', sub:'+10 • on edge', color:'#64748B', pts:10};
+  return {key:'miss', text:'MISS', sub:'0 • outside', color:'#EF4444', pts:0};
+}
+
+function updateVerdict(v){
+  verdictText.textContent=v.text;
+  verdictSub.textContent=v.sub;
+  verdictEl.className='verdict '+v.key;
+  verdictText.style.color=v.color;
+}
+
+let rafId=null, lastTime=0, scoreAccum=0;
+function loop(now){
+  if(!state.running || state.paused){ rafId=requestAnimationFrame(loop); return; }
+  const dt=Math.min(32, now-lastTime)/16.67;
+  lastTime=now;
+
+  // target movement: smooth sine + slight drift
+  const t = now*0.001 * state.targetSpeed;
+  // move between 18 and 162 degrees
+  const range=62;
+  const center=90;
+  state.target = center + Math.sin(t)*range + Math.sin(t*0.53)*14;
+  state.target = clamp(state.target, 16, 164);
+
+  // needle physics
+  if(mode==='hold'){
+    if(state.isHolding) state.velocity += 0.62 * dt;
+    else state.velocity -= 0.48 * dt;
+    state.velocity *= 0.88;
+    state.needle += state.velocity * dt * 0.9;
+  } else {
+    // tap mode: velocity decays, taps add impulse
+    state.velocity *= 0.92;
+    state.needle += state.velocity * dt;
+    // gentle gravity to center
+    state.needle += (90 - state.needle)*0.002 * dt;
+  }
+  state.needle = clamp(state.needle, 0, 180);
+
+  // scoring every 200ms
+  scoreAccum += dt*16.67;
+  if(scoreAccum >= 200){
+    scoreAccum=0;
+    const v=getVerdict();
+    state.totalChecks++;
+    if(v.pts>0){
+      state.hits++;
+      state.score += v.pts;
+      state.streak += 1;
+      state.maxStreak=Math.max(state.maxStreak, state.streak);
+      if(state.score>state.best){ state.best=state.score; saveBest(); }
+    } else {
+      state.streak=0;
+    }
+    updateVerdict(v);
+    scoreVal.textContent=state.score;
+    streakVal.textContent=state.streak;
+    const acc = state.totalChecks? Math.round(state.hits/state.totalChecks*100):0;
+    accVal.textContent=acc+'%';
+  }
+
+  // timer
+  state.timeLeft -= dt/60;
+  if(state.timeLeft<=0){
+    state.timeLeft=0;
+    timerEl.textContent='0.0s';
+    progressFill.style.width='100%';
+    endGame();
+    return;
+  }
+  timerEl.textContent=state.timeLeft.toFixed(1)+'s';
+  if(state.timeLeft<8) timerEl.className='timer danger';
+  else if(state.timeLeft<15) timerEl.className='timer warn';
+  else timerEl.className='timer';
+  progressFill.style.width=((state.duration-state.timeLeft)/state.duration*100)+'%';
+
+  drawGauge();
+  rafId=requestAnimationFrame(loop);
+}
+
+function startGame(){
+  state.score=0; state.streak=0; state.maxStreak=0; state.hits=0; state.totalChecks=0;
+  state.timeLeft=state.duration; state.needle=12; state.velocity=0; state.isHolding=false; state.running=true; state.paused=false;
+  scoreAccum=0; lastTime=performance.now();
+  scoreVal.textContent='0'; streakVal.textContent='0'; accVal.textContent='0%';
+  timerEl.textContent=state.duration.toFixed(1)+'s'; timerEl.className='timer';
+  progressFill.style.width='0%';
+  updateVerdict({key:'ok', text:'GO!', sub:'keep inside green', color:'#0F172A', pts:0});
+  document.getElementById('screenHome').classList.remove('active');
+  document.getElementById('screenGame').classList.add('active');
+  document.getElementById('overlay').classList.remove('open');
+  resizeCanvas();
+  if(rafId) cancelAnimationFrame(rafId);
+  rafId=requestAnimationFrame(loop);
+}
+
+function endGame(){
+  state.running=false;
+  const acc = state.totalChecks? Math.round(state.hits/state.totalChecks*100):0;
+  document.getElementById('overlayScore').textContent=state.score;
+  document.getElementById('overlayBest').textContent=state.best;
+  document.getElementById('overlayStreak').textContent=state.maxStreak;
+  document.getElementById('overlayAcc').textContent=acc+'%';
+  let msg='Nice control!';
+  if(acc>=80 && state.score>=800) msg='Incredible precision! 🎯';
+  else if(acc>=60) msg='Solid tracking — great timing!';
+  else if(acc>=35) msg='Good effort — anticipate the swing!';
+  else msg='Keep practicing — small moves win!';
+  document.getElementById('overlayVerdict').textContent=msg;
+  document.getElementById('overlayPill').textContent = state.score===state.best && state.score>0 ? 'New Best! ⭐' : 'Session Complete';
+  document.getElementById('overlay').classList.add('open');
+}
+
+// controls
+controlBtn.addEventListener('pointerdown', (e)=>{
+  e.preventDefault();
+  if(!state.running) return;
+  if(mode==='hold'){
+    state.isHolding=true;
+    controlBtn.classList.add('holding');
+    controlBtn.innerHTML='<span>●</span> STEERING…';
+  } else {
+    // tap nudge
+    state.velocity += 7.5;
+    controlBtn.classList.add('holding');
+    setTimeout(()=>controlBtn.classList.remove('holding'),120);
+    if(navigator.vibrate) navigator.vibrate(12);
+  }
+});
+const endHold=()=>{
+  if(mode==='hold'){
+    state.isHolding=false;
+    controlBtn.classList.remove('holding');
+    controlBtn.innerHTML='<span>◉</span> HOLD TO STEER';
+  }
+};
+controlBtn.addEventListener('pointerup', endHold);
+controlBtn.addEventListener('pointercancel', endHold);
+controlBtn.addEventListener('pointerleave', endHold);
+window.addEventListener('pointerup', endHold);
+
+// keyboard
+window.addEventListener('keydown', (e)=>{
+  if(e.code==='Space'){
+    e.preventDefault();
+    if(!state.running) return;
+    if(mode==='hold') state.isHolding=true;
+    else state.velocity+=7.5;
+  }
+});
+window.addEventListener('keyup', (e)=>{
+  if(e.code==='Space' && mode==='hold') state.isHolding=false;
+});
+
+// mode switch
+document.querySelectorAll('.mode-btn').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('.mode-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    mode=b.dataset.mode;
+    document.getElementById('modeDesc').textContent = mode==='hold'
+      ? 'Press & hold the big button — needle climbs. Release and it drifts back. Time your hold to track the moving green band.'
+      : 'Tap the button to nudge the needle forward. It drifts back on its own. Tap rhythm to stay inside the band.';
+    controlBtn.innerHTML = mode==='hold' ? '<span>◉</span> HOLD TO STEER' : '<span>↗</span> TAP TO NUDGE';
+  });
+});
+
+document.getElementById('btnStart').onclick=startGame;
+document.getElementById('btnRestart').onclick=startGame;
+document.getElementById('btnOverlayRestart').onclick=startGame;
+document.getElementById('btnOverlayHome').onclick=()=>{
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('screenGame').classList.remove('active');
+  document.getElementById('screenHome').classList.add('active');
+  state.running=false;
+};
+document.getElementById('btnPause').onclick=()=>{
+  if(!state.running) return;
+  state.paused=!state.paused;
+  document.getElementById('btnPause').textContent = state.paused ? '▶ Resume' : '⏸ Pause';
+  if(!state.paused) lastTime=performance.now();
+};
+document.getElementById('btnHow').onclick=()=>{
+  document.getElementById('screenHome').scrollIntoView({behavior:'smooth'});
+};
+
+// initial draw
+drawGauge();
+updateVerdict({key:'ok', text:'READY', sub:'press Start', color:'#0F172A'});
+</script>
+</body>
+</html>

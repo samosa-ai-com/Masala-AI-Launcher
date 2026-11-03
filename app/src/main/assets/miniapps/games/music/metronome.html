@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Neon Swing Tap</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden;background:#070A14;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif;color:#fff}
+body{display:flex;justify-content:center;background:radial-gradient(1200px 600px at 50% -10%, #1a2a5a 0%, #070A14 55%, #05070f 100%)}
+.app{width:100%;max-width:428px;min-height:100dvh;display:flex;flex-direction:column;position:relative;overflow:hidden;border-left:1px solid rgba(255,255,255,0.06);border-right:1px solid rgba(255,255,255,0.06)}
+header{padding:14px 16px 10px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#00F5FF,#7B61FF);display:grid;place-items:center;box-shadow:0 0 18px rgba(0,245,255,0.6),0 0 32px rgba(123,97,255,0.4);font-size:18px}
+.logo h1{font-size:16px;letter-spacing:0.08em;font-weight:800;line-height:1}
+.logo p{font-size:11px;letter-spacing:0.12em;color:#8ea0c8;font-weight:600}
+.best-badge{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);backdrop-filter:blur(8px);padding:8px 12px;border-radius:999px;text-align:center;min-width:86px}
+.best-badge span{font-size:10px;letter-spacing:0.1em;color:#9fb0d6;display:block}
+.best-badge strong{font-size:16px;color:#fff}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:0 12px}
+.stat{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:10px 8px;text-align:center;backdrop-filter:blur(6px)}
+.stat label{font-size:10px;letter-spacing:0.12em;color:#8ea0c8;font-weight:700;display:block;margin-bottom:2px}
+.stat b{font-size:18px;line-height:1}
+.stat.combo b{color:#00F5FF;text-shadow:0 0 10px rgba(0,245,255,0.8)}
+.stat.score b{color:#fff}
+.stat.tempo b{color:#FF3B9A}
+.hearts{display:flex;justify-content:center;gap:8px;padding:10px 0 6px}
+.heart{width:28px;height:28px;border-radius:999px;display:grid;place-items:center;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);font-size:14px;transition:all .2s}
+.heart.lost{background:rgba(255,59,90,0.15);border-color:rgba(255,59,90,0.4);opacity:0.4;filter:grayscale(1)}
+.heart.active{box-shadow:0 0 12px rgba(255,59,90,0.5)}
+.stage-wrap{padding:0 12px;flex:1;display:flex;flex-direction:column;gap:10px}
+.canvas-card{position:relative;background:linear-gradient(180deg, rgba(14,22,48,0.9) 0%, rgba(7,12,28,0.95) 100%);border:1px solid rgba(0,245,255,0.18);border-radius:20px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,0.04) inset, 0 12px 40px rgba(0,0,0,0.5), 0 0 30px rgba(0,245,255,0.12);flex:1;min-height:340px;display:flex;flex-direction:column}
+.canvas-top{padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:0.08em;color:#8ea0c8;font-weight:700}
+.canvas-top .live{display:flex;align-items:center;gap:6px;color:#00F5FF}
+.dot{width:8px;height:8px;border-radius:50%;background:#00F5FF;box-shadow:0 0 8px #00F5FF;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+canvas{width:100%;height:100%;display:block;flex:1;touch-action:none}
+.grade-pop{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);font-weight:900;letter-spacing:0.06em;text-align:center;pointer-events:none;opacity:0;transition:opacity .15s, transform .15s}
+.grade-pop.show{opacity:1;transform:translate(-50%,-50%) scale(1.08)}
+.grade-pop small{display:block;font-size:12px;letter-spacing:0.12em;margin-top:2px;opacity:0.9}
+.grade-perfect{color:#00F5FF;text-shadow:0 0 12px #00F5FF, 0 0 30px #00F5FF;font-size:32px}
+.grade-good{color:#7BFF9F;text-shadow:0 0 12px #7BFF9F;font-size:28px}
+.grade-miss{color:#FF3B5A;text-shadow:0 0 12px #FF3B5A;font-size:28px}
+.tap-zone{position:relative;margin:0 12px 12px;background:linear-gradient(180deg, #0a1026 0%, #0e1a3a 100%);border:1px solid rgba(0,245,255,0.2);border-radius:20px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.4)}
+.tap-btn{width:100%;height:96px;border-radius:16px;border:none;background:linear-gradient(180deg, #00F5FF 0%, #0aa8ff 55%, #7B61FF 100%);color:#001018;font-weight:900;font-size:22px;letter-spacing:0.08em;box-shadow:0 0 20px rgba(0,245,255,0.5), 0 8px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.6);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;user-select:none;touch-action:manipulation;transition:transform .06s, filter .15s}
+.tap-btn:active{transform:scale(0.98);filter:brightness(1.1)}
+.tap-btn span:first-child{font-size:22px}
+.tap-btn span:last-child{font-size:11px;letter-spacing:0.14em;opacity:0.8;font-weight:800}
+.controls{display:flex;gap:8px;margin-top:10px}
+.btn{flex:1;height:44px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.08);color:#fff;font-weight:700;font-size:13px;letter-spacing:0.06em;cursor:pointer;backdrop-filter:blur(6px)}
+.btn.primary{background:linear-gradient(135deg,#FF3B9A,#7B61FF);border-color:transparent;box-shadow:0 4px 16px rgba(255,59,154,0.4)}
+.btn:active{transform:scale(0.98)}
+.overlay{position:absolute;inset:0;background:rgba(5,8,18,0.78);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;z-index:5}
+.overlay h2{font-size:28px;letter-spacing:0.06em;margin-bottom:8px;text-shadow:0 0 16px rgba(0,245,255,0.6)}
+.overlay p{color:#a8b6d6;font-size:14px;line-height:1.5;max-width:300px;margin-bottom:16px}
+.overlay .big-score{font-size:42px;font-weight:900;color:#00F5FF;text-shadow:0 0 20px rgba(0,245,255,0.8);margin:8px 0}
+.badge-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:10px 0}
+.mini-badge{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);padding:8px 12px;border-radius:999px;font-size:12px;font-weight:700}
+.mini-badge b{color:#00F5FF}
+.hint{font-size:11px;letter-spacing:0.08em;color:#7a8ab0;margin-top:8px}
+.tempo-bar{height:4px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;margin:0 12px}
+.tempo-fill{height:100%;width:30%;background:linear-gradient(90deg,#00F5FF,#FF3B9A);box-shadow:0 0 8px rgba(0,245,255,0.6);transition:width .4s}
+@media (max-height:740px){.canvas-card{min-height:300px}.tap-btn{height:84px}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+<header>
+<div class="logo"><div class="logo-mark">◐</div><div><h1>NEON SWING</h1><p>RHYTHM TAP</p></div></div>
+<div class="best-badge"><span>BEST</span><strong id="bestEl">0</strong></div>
+</header>
+<div class="stats">
+<div class="stat score"><label>SCORE</label><b id="scoreEl">0</b></div>
+<div class="stat combo"><label>COMBO</label><b id="comboEl">0</b></div>
+<div class="stat tempo"><label>TEMPO</label><b id="tempoEl">1.0x</b></div>
+</div>
+<div class="hearts" id="hearts"><div class="heart active">♥</div><div class="heart active">♥</div><div class="heart active">♥</div></div>
+<div class="tempo-bar"><div class="tempo-fill" id="tempoFill"></div></div>
+<div class="stage-wrap">
+<div class="canvas-card" id="stage">
+<div class="canvas-top"><span class="live"><span class="dot"></span> STAGE NEON-01</span><span id="streakInfo">STREAK TO BOOST</span></div>
+<canvas id="c" width="400" height="360"></canvas>
+<div class="grade-pop" id="gradePop"></div>
+<div class="overlay" id="startOverlay">
+<h2 style="color:#00F5FF">READY?</h2>
+<p>Tap exactly as the <b style="color:#fff">swinging arm crosses the center line</b>. Build streaks to raise tempo. 3 misses ends the run.</p>
+<div class="badge-row">
+<div class="mini-badge" style="color:#00F5FF;border-color:rgba(0,245,255,0.3)">PERFECT ±80ms</div>
+<div class="mini-badge" style="color:#7BFF9F">GOOD ±180ms</div>
+<div class="mini-badge" style="color:#FF3B5A">MISS</div>
+</div>
+<button class="btn primary" style="min-width:180px;height:48px;margin-top:8px;font-size:15px" id="playBtn">▶ START RUN</button>
+<div class="hint">TIP: Use headphones — feel the swing</div>
+</div>
+<div class="overlay" id="gameOverOverlay" style="display:none">
+<h2 style="color:#FF3B9A">RUN OVER</h2>
+<div class="big-score" id="finalScore">0</div>
+<p id="finalMsg">Great rhythm!</p>
+<div class="badge-row">
+<div class="mini-badge">SCORE <b id="finalScore2">0</b></div>
+<div class="mini-badge">MAX COMBO <b id="finalCombo">0</b></div>
+<div class="mini-badge">BEST <b id="finalBest">0</b></div>
+</div>
+<button class="btn primary" style="min-width:180px;height:48px;margin-top:12px" id="replayBtn">↻ PLAY AGAIN</button>
+<button class="btn" style="min-width:180px;margin-top:8px" id="shareBtn">SHARE SCORE</button>
+</div>
+</div>
+</div>
+<div class="tap-zone">
+<button class="tap-btn" id="tapBtn" aria-label="Tap in rhythm"><span>TAP!</span><span>WHEN ARM HITS CENTER</span></button>
+<div class="controls"><button class="btn" id="resetBtn">RESET BEST</button><button class="btn" id="howBtn">HOW TO PLAY</button></div>
+</div>
+</div>
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('scoreEl'),comboEl=document.getElementById('comboEl'),tempoEl=document.getElementById('tempoEl'),tempoFill=document.getElementById('tempoFill'),bestEl=document.getElementById('bestEl'),heartsEl=document.getElementById('hearts'),gradePop=document.getElementById('gradePop'),startOverlay=document.getElementById('startOverlay'),gameOverOverlay=document.getElementById('gameOverOverlay'),tapBtn=document.getElementById('tapBtn'),streakInfo=document.getElementById('streakInfo');
+let score=0,combo=0,maxCombo=0,misses=0,best=0,tempo=1.0,baseFreq=0.9,phase=0,isPlaying=false,lastTime=0,lastCrossTime=0,expectingWindow=false,windowExpire=0,canScoreForThisCross=true,particles=[],gradeTimeout=null,audioCtx=null;
+function loadBest(){try{best=parseInt(localStorage.getItem('neonSwingBest')||'0')}catch(e){best=0}bestEl.textContent=best}
+loadBest();
+function saveBest(){try{localStorage.setItem('neonSwingBest',String(best))}catch(e){}}
+function updateHUD(){scoreEl.textContent=score;comboEl.textContent=combo;tempoEl.textContent=tempo.toFixed(1)+'x';tempoFill.style.width=Math.min(100,20+(tempo-1)*40+combo*2)+'%';streakInfo.textContent=combo>=5?'BOOSTED!':(5-combo)+' STREAK TO BOOST';streakInfo.style.color=combo>=5?'#00F5FF':'#8ea0c8';const hearts=heartsEl.children;for(let i=0;i<3;i++)hearts[i].className=i<(3-misses)?'heart active':'heart lost'}
+function resizeCanvas(){const rect=canvas.getBoundingClientRect();const dpr=Math.min(2,window.devicePixelRatio||1);canvas.width=rect.width*dpr;canvas.height=rect.height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
+window.addEventListener('resize',resizeCanvas);resizeCanvas();
+function ensureAudio(){if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume()}
+function beep(freq,dur,vol,type){if(!audioCtx)return;const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type||'sine';o.frequency.value=freq;g.gain.value=vol||0.15;o.connect(g);g.connect(audioCtx.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+dur);o.stop(audioCtx.currentTime+dur)}
+function showGrade(text,cls,sub){gradePop.className='grade-pop show '+cls;gradePop.innerHTML=text+(sub?'<small>'+sub+'</small>':'');clearTimeout(gradeTimeout);gradeTimeout=setTimeout(()=>gradePop.className='grade-pop '+cls,600)}
+function addParticles(x,y,color,count){for(let i=0;i<count;i++)particles.push({x,y,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.9)*6-1,life:1,decay:0.04+Math.random()*0.03,color,size:2+Math.random()*4})}
+function triggerHaptic(ms){if(navigator.vibrate)navigator.vibrate(ms)}
+function onGrade(grade,deltaMs){if(grade==='perfect'){score+=100+Math.floor(combo*5);combo++;maxCombo=Math.max(maxCombo,combo);showGrade('PERFECT','grade-perfect',deltaMs!==undefined?Math.abs(deltaMs).toFixed(0)+'ms':'');addParticles(200,140,'#00F5FF',14);beep(880,0.12,0.18,'sine');setTimeout(()=>beep(1320,0.1,0.12,'sine'),70);triggerHaptic(30)}else if(grade==='good'){score+=50+Math.floor(combo*2);combo++;maxCombo=Math.max(maxCombo,combo);showGrade('GOOD','grade-good',Math.abs(deltaMs).toFixed(0)+'ms');addParticles(200,140,'#7BFF9F',8);beep(660,0.12,0.14,'sine');triggerHaptic(20)}else{misses++;combo=0;showGrade('MISS','grade-miss','');addParticles(200,140,'#FF3B5A',6);beep(180,0.25,0.2,'square');triggerHaptic([40,30,40])}const targetTempo=1+Math.floor(combo/5)*0.15+Math.min(0.5,maxCombo*0.01);tempo=Math.min(2.6,Math.max(1,targetTempo));updateHUD();if(misses>=3)endRun()}
+function startRun(){ensureAudio();score=0;combo=0;maxCombo=0;misses=0;tempo=1.0;phase=0;lastCrossTime=performance.now();expectingWindow=false;canScoreForThisCross=true;isPlaying=true;startOverlay.style.display='none';gameOverOverlay.style.display='none';updateHUD();lastTime=performance.now();requestAnimationFrame(loop);beep(440,0.15,0.15,'sine')}
+function endRun(){isPlaying=false;if(score>best){best=score;saveBest();bestEl.textContent=best}document.getElementById('finalScore').textContent=score;document.getElementById('finalScore2').textContent=score;document.getElementById('finalCombo').textContent=maxCombo;document.getElementById('finalBest').textContent=best;const msg=score>=1500?'Incredible timing! 🔥':score>=800?'Great rhythm!':score>=300?'Keep practicing!':'Feel the swing and try again';document.getElementById('finalMsg').textContent=msg;gameOverOverlay.style.display='flex';beep(220,0.4,0.2,'sawtooth')}
+function getTimeToCenter(){const mod=phase%Math.PI;const dist=Math.min(mod,Math.PI-mod);const phaseSpeed=baseFreq*Math.PI*2*tempo;return dist/phaseSpeed}
+function handleTap(){if(!isPlaying){if(startOverlay.style.display!=='none')startRun();return}ensureAudio();const now=performance.now();const timeToCenter=getTimeToCenter();const deltaMs=timeToCenter*1000;let grade;if(deltaMs<=80)grade='perfect';else if(deltaMs<=180)grade='good';else grade='miss';if(expectingWindow&&canScoreForThisCross){canScoreForThisCross=false;setTimeout(()=>{canScoreForThisCross=true},120)}tapBtn.style.transform='scale(0.96)';setTimeout(()=>tapBtn.style.transform='',120);onGrade(grade,deltaMs)}
+function loop(now){if(!isPlaying)return;const dt=Math.min(0.05,(now-lastTime)/1000);lastTime=now;const phaseSpeed=baseFreq*Math.PI*2*tempo;const prevPhase=phase;phase+=phaseSpeed*dt;const prevCrossIdx=Math.floor(prevPhase/Math.PI),curCrossIdx=Math.floor(phase/Math.PI);if(curCrossIdx!==prevCrossIdx){lastCrossTime=now;expectingWindow=true;windowExpire=now+220;canScoreForThisCross=true}if(expectingWindow&&now>windowExpire){expectingWindow=false;if(canScoreForThisCross){onGrade('miss');if(!isPlaying)return}canScoreForThisCross=false}draw(dt,now);if(isPlaying)requestAnimationFrame(loop)}
+function draw(dt,now){const w=canvas.getBoundingClientRect().width,h=canvas.getBoundingClientRect().height;ctx.clearRect(0,0,w,h);ctx.save();ctx.strokeStyle='rgba(0,245,255,0.08)';ctx.lineWidth=1;for(let i=0;i<w;i+=28){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,h);ctx.stroke()}for(let j=0;j<h;j+=28){ctx.beginPath();ctx.moveTo(0,j);ctx.lineTo(w,j);ctx.stroke()}const cx=w/2,cy=78,armLen=Math.min(170,h*0.52),amplitude=Math.PI/3.2,angle=Math.sin(phase)*amplitude;ctx.save();ctx.shadowColor='#00F5FF';ctx.shadowBlur=14;ctx.strokeStyle='rgba(0,245,255,0.9)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(cx,cy-10);ctx.lineTo(cx,cy+armLen+30);ctx.stroke();ctx.shadowBlur=0;ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;for(let y=cy;y<cy+armLen+20;y+=18){ctx.beginPath();ctx.moveTo(cx-6,y);ctx.lineTo(cx+6,y);ctx.stroke()}ctx.restore();ctx.save();ctx.shadowColor='#7B61FF';ctx.shadowBlur=16;ctx.fillStyle='#1a1f3d';ctx.strokeStyle='rgba(123,97,255,0.8)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,14,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#00F5FF';ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fill();ctx.restore();const bx=cx+Math.sin(angle)*armLen,by=cy+Math.cos(angle)*armLen;ctx.save();ctx.strokeStyle='rgba(0,245,255,0.35)';ctx.lineWidth=10;ctx.lineCap='round';ctx.shadowColor='#00F5FF';ctx.shadowBlur=18;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(bx,by);ctx.stroke();ctx.strokeStyle='rgba(255,255,255,0.95)';ctx.lineWidth=4;ctx.shadowBlur=0;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(bx,by);ctx.stroke();ctx.restore();ctx.save();const isNearCenter=Math.abs(angle)<0.18,ballColor=isNearCenter?'#00F5FF':'#FF3B9A';ctx.shadowColor=ballColor;ctx.shadowBlur=isNearCenter?22:14;ctx.fillStyle=ballColor;ctx.beginPath();ctx.arc(bx,by,16,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='rgba(255,255,255,0.9)';ctx.beginPath();ctx.arc(bx-4,by-4,4,0,Math.PI*2);ctx.fill();ctx.restore();ctx.save();const pulse=0.6+Math.sin(now*0.006)*0.4;ctx.globalAlpha=0.12+pulse*0.08;ctx.fillStyle='#00F5FF';ctx.beginPath();ctx.ellipse(cx,cy+armLen*0.92,44,10,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle='rgba(0,245,255,'+(0.5+pulse*0.3)+')';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(cx,cy+armLen*0.92,44,10,0,0,Math.PI*2);ctx.stroke();ctx.fillStyle='rgba(0,245,255,0.9)';ctx.font='700 10px system-ui';ctx.textAlign='center';ctx.fillText('CENTER',cx,cy+armLen*0.92+3);ctx.restore();for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vy+=0.18;p.life-=p.decay;if(p.life<=0){particles.splice(i,1);continue}ctx.globalAlpha=p.life;ctx.fillStyle=p.color;ctx.shadowColor=p.color;ctx.shadowBlur=8;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;ctx.shadowBlur=0;ctx.save();ctx.strokeStyle='rgba(255,255,255,0.08)';ctx.lineWidth=6;ctx.lineCap='round';ctx.beginPath();ctx.arc(cx,cy,34,-Math.PI*0.85,Math.PI*0.85);ctx.stroke();ctx.strokeStyle='#00F5FF';ctx.shadowColor='#00F5FF';ctx.shadowBlur=8;const t=Math.min(1,(tempo-1)/1.6);ctx.beginPath();ctx.arc(cx,cy,34,-Math.PI*0.85,-Math.PI*0.85+Math.PI*1.7*t);ctx.stroke();ctx.restore();ctx.restore()}
+tapBtn.addEventListener('click',handleTap);tapBtn.addEventListener('touchstart',e=>{e.preventDefault();handleTap()},{passive:false});canvas.addEventListener('click',handleTap);canvas.addEventListener('touchstart',e=>{e.preventDefault();handleTap()},{passive:false});document.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();handleTap()}});document.getElementById('playBtn').addEventListener('click',startRun);document.getElementById('replayBtn').addEventListener('click',startRun);document.getElementById('resetBtn').addEventListener('click',()=>{if(confirm('Reset best score?')){best=0;saveBest();bestEl.textContent=0;updateHUD()}});document.getElementById('howBtn').addEventListener('click',()=>{startOverlay.style.display='flex';gameOverOverlay.style.display='none';if(isPlaying)isPlaying=false;startOverlay.querySelector('h2').textContent='HOW TO PLAY';startOverlay.querySelector('p').innerHTML='Tap as the arm crosses the <b style="color:#00F5FF">center line</b>.<br>Perfect = ±80ms, Good = ±180ms.<br>Every 5 streak boosts tempo. 3 misses ends run.';document.getElementById('playBtn').textContent='▶ START RUN'});document.getElementById('shareBtn').addEventListener('click',()=>{const text=`Neon Swing Tap: ${score} pts, max combo ${maxCombo}! Can you beat it?`;if(navigator.share)navigator.share({title:'Neon Swing Tap',text});else navigator.clipboard.writeText(text).then(()=>{const b=document.getElementById('shareBtn');const o=b.textContent;b.textContent='COPIED!';setTimeout(()=>b.textContent=o,1500)})});document.getElementById('stage').addEventListener('touchstart',e=>{if(e.target.closest('button'))return;e.preventDefault();handleTap()},{passive:false});updateHUD();draw(0,performance.now());resizeCanvas();setTimeout(()=>draw(0,performance.now()),100);
+</script>
+</body>
+</html>

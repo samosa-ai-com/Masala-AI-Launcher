@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>Pop Concert Frenzy</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0a0a1a;--card:#16162e;--neon-pink:#ff2d95;--neon-cyan:#00f0ff;--neon-purple:#9d00ff;--neon-yellow:#ffe600;--text:#fff}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh;height:100dvh;display:flex;flex-direction:column;user-select:none;touch-action:manipulation}
+.bg{position:fixed;inset:0;z-index:-1;background:radial-gradient(ellipse at 50% 0%, #1a0a3a 0%, #0a0a1a 60%),linear-gradient(180deg, #0f0f2a 0%, #0a0a1a 100%)}
+.bg::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg, transparent 0 80px, rgba(0,240,255,0.03) 80px 81px);opacity:0.5}
+.bg::after{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:120%;height:40%;background:radial-gradient(ellipse at center, rgba(255,45,149,0.15) 0%, transparent 70%);pointer-events:none}
+/* Header */
+.header{padding:8px 12px;display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.logo{font-weight:900;letter-spacing:1px;font-size:18px;line-height:1;display:flex;align-items:center;gap:6px;text-shadow:0 0 10px var(--neon-pink), 0 0 20px var(--neon-pink)}
+.logo span{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--neon-cyan);display:block}
+.logo b{color:var(--neon-pink)}
+.rank-badge{background:linear-gradient(135deg, var(--neon-purple), var(--neon-pink));padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800;letter-spacing:0.5px;box-shadow:0 0 12px rgba(255,45,149,0.5);white-space:nowrap}
+.hud{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px}
+.hud-card{background:rgba(22,22,46,0.9);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:6px 8px;text-align:center;backdrop-filter:blur(10px);position:relative;overflow:hidden}
+.hud-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg, var(--neon-cyan), var(--neon-pink));opacity:0.8}
+.hud-label{font-size:8px;letter-spacing:1px;color:rgba(255,255,255,0.6);font-weight:700}
+.hud-value{font-size:16px;font-weight:900;line-height:1.1;margin-top:2px}
+.hud-value.pink{color:var(--neon-pink);text-shadow:0 0 8px var(--neon-pink)}
+.hud-value.cyan{color:var(--neon-cyan);text-shadow:0 0 8px var(--neon-cyan)}
+.hud-value.yellow{color:var(--neon-yellow);text-shadow:0 0 8px var(--neon-yellow)}
+.hud-value.white{color:#fff}
+.combo-bar{height:4px;background:rgba(255,255,255,0.1);border-radius:2px;margin-top:4px;overflow:hidden;display:none}
+.combo-bar.active{display:block}
+.combo-fill{height:100%;background:linear-gradient(90deg, var(--neon-yellow), var(--neon-pink));width:100%;transition:width 0.05s linear}
+.combo-text{font-size:10px;font-weight:900;color:var(--neon-yellow);margin-top:2px;letter-spacing:1px;display:none}
+.combo-text.active{display:block;animation:pulse 0.3s ease}
+/* Stage */
+.stage-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 12px;gap:8px;min-height:0}
+.stage{width:100%;max-width:380px;aspect-ratio:1;position:relative;background:linear-gradient(180deg, rgba(22,22,46,0.8), rgba(10,10,26,0.9));border-radius:20px;border:1px solid rgba(0,240,255,0.2);box-shadow:0 0 30px rgba(0,240,255,0.15), inset 0 0 20px rgba(157,0,255,0.1);padding:10px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.stage::before{content:'● LIVE ● SOLD OUT';position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:7px;letter-spacing:2px;color:var(--neon-pink);font-weight:800;opacity:0.7}
+.grid{flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:8px;margin-top:14px}
+.cell{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:14px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;transition:background 0.15s}
+.cell.hit{animation:cellHit 0.3s ease}
+@keyframes cellHit{0%{background:rgba(255,45,149,0.3)}100%{background:rgba(255,255,255,0.04)}}
+.target{position:absolute;inset:6px;background:linear-gradient(135deg, #1e1e3a, #2a1a4a);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;border:2px solid rgba(255,255,255,0.15);box-shadow:0 4px 15px rgba(0,0,0,0.4), 0 0 15px rgba(255,45,149,0.3);animation:popIn 0.22s cubic-bezier(0.175,0.885,0.32,1.275);touch-action:manipulation}
+.target:active{transform:scale(0.92)}
+@keyframes popIn{0%{transform:scale(0.3) rotate(-8deg);opacity:0}100%{transform:scale(1) rotate(0);opacity:1}}
+.target.rare{background:linear-gradient(135deg, #0a2a4a, #0a4a6a);border-color:var(--neon-cyan);box-shadow:0 4px 15px rgba(0,0,0,0.4), 0 0 18px rgba(0,240,255,0.5)}
+.target.golden{background:linear-gradient(135deg, #4a3a0a, #6a4a0a);border-color:var(--neon-yellow);box-shadow:0 4px 15px rgba(0,0,0,0.4), 0 0 20px rgba(255,230,0,0.6);animation:popIn 0.22s cubic-bezier(0.175,0.885,0.32,1.275), goldenPulse 0.6s infinite alternate}
+@keyframes goldenPulse{0%{box-shadow:0 4px 15px rgba(0,0,0,0.4), 0 0 20px rgba(255,230,0,0.6)}100%{box-shadow:0 4px 15px rgba(0,0,0,0.4), 0 0 30px rgba(255,230,0,0.9)}}
+.target-photo{font-size:28px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))}
+.target-name{font-size:7px;font-weight:800;letter-spacing:0.8px;color:rgba(255,255,255,0.9);text-align:center;line-height:1}
+.target-points{font-size:9px;font-weight:900;color:var(--neon-pink)}
+.target.rare .target-points{color:var(--neon-cyan)}
+.target.golden .target-points{color:var(--neon-yellow)}
+.fade-bar{position:absolute;bottom:0;left:0;height:4px;background:linear-gradient(90deg, var(--neon-pink), var(--neon-cyan));border-radius:0 0 10px 10px;transition:width 0.05s linear}
+.target.rare .fade-bar{background:linear-gradient(90deg, var(--neon-cyan), var(--neon-purple))}
+.target.golden .fade-bar{background:linear-gradient(90deg, var(--neon-yellow), #ff8c00)}
+.key-hint{position:absolute;top:4px;right:6px;font-size:8px;font-weight:800;color:rgba(255,255,255,0.35);background:rgba(0,0,0,0.3);padding:1px 4px;border-radius:4px}
+.fx{position:absolute;pointer-events:none;font-weight:900;font-size:14px;text-shadow:0 2px 8px rgba(0,0,0,0.8);animation:floatUp 0.7s ease forwards;z-index:5}
+@keyframes floatUp{0%{transform:translate(-50%, -50%) scale(0.8);opacity:1}100%{transform:translate(-50%, -80px) scale(1.1);opacity:0}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.boost-indicators{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;min-height:18px}
+.boost-tag{font-size:9px;font-weight:800;padding:3px 8px;border-radius:20px;background:rgba(0,240,255,0.15);border:1px solid var(--neon-cyan);color:var(--neon-cyan);display:flex;align-items:center;gap:4px;animation:pulse 1s infinite}
+.boost-tag.pink{background:rgba(255,45,149,0.15);border-color:var(--neon-pink);color:var(--neon-pink)}
+/* Shop */
+.shop{padding:8px 12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;flex-shrink:0}
+.shop-title{grid-column:1/-1;font-size:9px;letter-spacing:1.5px;color:rgba(255,255,255,0.5);font-weight:800;display:flex;align-items:center;justify-content:space-between}
+.shop-card{background:rgba(22,22,46,0.9);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:8px 6px;text-align:center;position:relative;overflow:hidden}
+.shop-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg, var(--neon-purple), var(--neon-pink));opacity:0.6}
+.shop-icon{font-size:18px}
+.shop-name{font-size:9px;font-weight:800;margin-top:2px;letter-spacing:0.5px}
+.shop-desc{font-size:7px;color:rgba(255,255,255,0.5);margin-top:1px;line-height:1.2}
+.shop-btn{margin-top:6px;width:100%;padding:6px 0;border:none;border-radius:8px;font-size:10px;font-weight:900;letter-spacing:0.5px;cursor:pointer;background:linear-gradient(135deg, var(--neon-pink), var(--neon-purple));color:#fff;box-shadow:0 2px 10px rgba(255,45,149,0.3);transition:transform 0.1s, opacity 0.2s}
+.shop-btn:active{transform:scale(0.95)}
+.shop-btn:disabled{opacity:0.4;filter:grayscale(0.5);cursor:not-allowed}
+.shop-cost{font-size:8px;color:var(--neon-yellow);font-weight:800;margin-top:2px}
+/* Overlays */
+.overlay{position:absolute;inset:0;background:rgba(10,10,26,0.92);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;z-index:10;border-radius:20px}
+.overlay h1{font-size:28px;font-weight:900;line-height:1;letter-spacing:-0.5px;text-shadow:0 0 20px var(--neon-pink)}
+.overlay h1 span{color:var(--neon-pink)}
+.overlay h1 em{color:var(--neon-cyan);font-style:normal}
+.subtitle{font-size:11px;color:rgba(255,255,255,0.6);margin-top:8px;line-height:1.4;max-width:260px}
+.stats-row{display:flex;gap:10px;margin-top:14px}
+.stat-box{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:8px 14px;min-width:70px}
+.stat-box b{display:block;font-size:16px;font-weight:900;color:var(--neon-cyan)}
+.stat-box span{font-size:8px;letter-spacing:1px;color:rgba(255,255,255,0.5);font-weight:700}
+.btn-primary{margin-top:16px;background:linear-gradient(135deg, var(--neon-pink), #ff6b35);color:#fff;border:none;padding:12px 28px;border-radius:30px;font-size:14px;font-weight:900;letter-spacing:1px;cursor:pointer;box-shadow:0 4px 20px rgba(255,45,149,0.4), 0 0 20px rgba(255,45,149,0.2);transition:transform 0.1s}
+.btn-primary:active{transform:scale(0.96)}
+.btn-secondary{margin-top:10px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.15);padding:8px 18px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer}
+.howto{margin-top:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;width:100%;max-width:300px}
+.howto div{background:rgba(255,255,255,0.05);border-radius:10px;padding:8px 6px;border:1px solid rgba(255,255,255,0.06)}
+.howto b{font-size:16px;display:block}
+.howto span{font-size:8px;color:rgba(255,255,255,0.6);font-weight:600;line-height:1.2;display:block;margin-top:2px}
+.hidden{display:none !important}
+.footer-note{font-size:8px;color:rgba(255,255,255,0.3);margin-top:10px;letter-spacing:0.5px}
+@media (max-height:700px){
+  .header{padding:6px 10px;gap:4px}
+  .logo{font-size:16px}
+  .hud-value{font-size:14px}
+  .stage{padding:8px}
+  .shop{padding:6px 10px}
+  .overlay h1{font-size:24px}
+}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+
+<div class="header">
+  <div class="title-row">
+    <div class="logo">🎤 <div><b>POP</b> FRENZY <span>CONCERT REACTION</span></div></div>
+    <div class="rank-badge" id="rankBadge">☆ NEW FAN</div>
+  </div>
+  <div class="hud">
+    <div class="hud-card"><div class="hud-label">SCORE</div><div class="hud-value pink" id="scoreEl">0</div></div>
+    <div class="hud-card"><div class="hud-label">TIME</div><div class="hud-value cyan" id="timeEl">30.0</div></div>
+    <div class="hud-card"><div class="hud-label">BEST</div><div class="hud-value white" id="bestEl">0</div></div>
+    <div class="hud-card"><div class="hud-label">COINS 💎</div><div class="hud-value yellow" id="coinsEl">0</div>
+      <div class="combo-bar" id="comboBar"><div class="combo-fill" id="comboFill"></div></div>
+      <div class="combo-text" id="comboText">COMBO x1</div>
+    </div>
+  </div>
+</div>
+
+<div class="stage-wrap">
+  <div class="stage" id="stage">
+    <div class="grid" id="grid"></div>
+    <div class="boost-indicators" id="boostIndicators"></div>
+
+    <!-- Start Overlay -->
+    <div class="overlay" id="startOverlay">
+      <h1><span>POP</span> <em>FRENZY</em></h1>
+      <p class="subtitle">Photo moments pop across the stage — tap before the light fades! Chain hits for massive combos.</p>
+      <div class="howto">
+        <div><b>📸</b><span>TAP FAST<br>Before fade</span></div>
+        <div><b>🔥</b><span>COMBO x5<br>Chain hits</span></div>
+        <div><b>💎</b><span>EARN & SHOP<br>Boosts mid-show</span></div>
+      </div>
+      <button class="btn-primary" id="startBtn">▶ START SHOW</button>
+      <p class="footer-note">Keys 1-9 also work • Best saved locally</p>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div class="overlay hidden" id="gameOverOverlay">
+      <h1 style="font-size:22px">SHOW <span>OVER!</span></h1>
+      <p class="subtitle" id="gameOverMsg">Amazing performance!</p>
+      <div class="stats-row">
+        <div class="stat-box"><b id="finalScore">0</b><span>SCORE</span></div>
+        <div class="stat-box"><b id="finalCombo">x0</b><span>BEST COMBO</span></div>
+        <div class="stat-box"><b id="finalCoins">+0</b><span>COINS</span></div>
+      </div>
+      <div class="stat-box" style="margin-top:10px;min-width:200px"><b id="finalRank" style="color:var(--neon-pink)">NEW FAN</b><span>FAN RANK</span></div>
+      <button class="btn-primary" id="restartBtn">↻ PLAY AGAIN</button>
+      <button class="btn-secondary" id="resetBtn">Reset progress</button>
+    </div>
+  </div>
+</div>
+
+<div class="shop">
+  <div class="shop-title"><span>⚡ MID-SHOW SHOP — tap anytime!</span><span id="shopCoins" style="color:var(--neon-yellow)">💎 0</span></div>
+  <div class="shop-card">
+    <div class="shop-icon">⏱️</div><div class="shop-name">ENCORE</div><div class="shop-desc">+7 seconds</div>
+    <button class="shop-btn" id="buyEncore">BUY</button><div class="shop-cost">💎 30</div>
+  </div>
+  <div class="shop-card">
+    <div class="shop-icon">❄️</div><div class="shop-name">SLOW FADE</div><div class="shop-desc">Slow 5s</div>
+    <button class="shop-btn" id="buySlow">BUY</button><div class="shop-cost">💎 40</div>
+  </div>
+  <div class="shop-card">
+    <div class="shop-icon">🌟</div><div class="shop-name">SPOTLIGHT</div><div class="shop-desc">2× points 8s</div>
+    <button class="shop-btn" id="buyDouble">BUY</button><div class="shop-cost">💎 50</div>
+  </div>
+</div>
+
+<script>
+const gridEl = document.getElementById('grid');
+const scoreEl = document.getElementById('scoreEl');
+const timeEl = document.getElementById('timeEl');
+const bestEl = document.getElementById('bestEl');
+const coinsEl = document.getElementById('coinsEl');
+const shopCoinsEl = document.getElementById('shopCoins');
+const rankBadge = document.getElementById('rankBadge');
+const comboBar = document.getElementById('comboBar');
+const comboFill = document.getElementById('comboFill');
+const comboText = document.getElementById('comboText');
+const boostIndicators = document.getElementById('boostIndicators');
+const startOverlay = document.getElementById('startOverlay');
+const gameOverOverlay = document.getElementById('gameOverOverlay');
+
+// Build grid cells
+for(let i=0;i<9;i++){
+  const cell=document.createElement('div');
+  cell.className='cell';
+  cell.dataset.index=i;
+  const hint=document.createElement('div');
+  hint.className='key-hint';
+  hint.textContent=i+1;
+  cell.appendChild(hint);
+  gridEl.appendChild(cell);
+}
+const cells=[...document.querySelectorAll('.cell')];
+
+// Game state
+let score=0, timeLeft=30, coins=0, best=0, combo=0, bestCombo=0, isPlaying=false;
+let timerInt=null, spawnInt=null, comboInt=null;
+let slowUntil=0, doubleUntil=0;
+let activeTargets=new Map(); // cellIndex -> {el, timeout, raf, startTime, duration}
+let lastHitTime=0;
+
+const RANKS=[
+  {score:0, name:'☆ NEW FAN'},
+  {score:100, name:'★ OPENING ACT'},
+  {score:250, name:'★★ FRONT ROW'},
+  {score:500, name:'★★★ HEADLINER'},
+  {score:800, name:'★★★★ IDOL LEGEND'},
+  {score:1200, name:'👑 SUPERSTAR'}
+];
+function getRank(s){ let r=RANKS[0]; for(let rk of RANKS) if(s>=rk.score) r=rk; return r; }
+
+const TARGETS=[
+  {emoji:'📸', name:'SNAP!', points:10, weight:45, cls:''},
+  {emoji:'💖', name:'HEART POP', points:12, weight:20, cls:''},
+  {emoji:'🎤', name:'VOCAL HIT', points:15, weight:15, cls:''},
+  {emoji:'✨', name:'RARE SHINE', points:25, weight:12, cls:'rare'},
+  {emoji:'💎', name:'DIAMOND', points:30, weight:5, cls:'rare'},
+  {emoji:'👑', name:'IDOL MOMENT', points:50, weight:3, cls:'golden'}
+];
+function pickTarget(){
+  const total=TARGETS.reduce((a,b)=>a+b.weight,0);
+  let r=Math.random()*total;
+  for(let t of TARGETS){ r-=t.weight; if(r<=0) return t; }
+  return TARGETS[0];
+}
+
+// Storage
+function load(){
+  try{
+    best=parseInt(localStorage.getItem('popFrenzy_best')||'0');
+    coins=parseInt(localStorage.getItem('popFrenzy_coins')||'0');
+  }catch(e){}
+  bestEl.textContent=best;
+  coinsEl.textContent=coins;
+  shopCoinsEl.textContent='💎 '+coins;
+  rankBadge.textContent=getRank(best).name;
+}
+function save(){
+  try{
+    localStorage.setItem('popFrenzy_best', best);
+    localStorage.setItem('popFrenzy_coins', coins);
+  }catch(e){}
+}
+load();
+
+// Audio
+let audioCtx=null;
+function beep(freq, dur, vol=0.15, type='sine'){
+  try{
+    if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type=type; o.frequency.value=freq; g.gain.value=vol;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+dur); o.stop(audioCtx.currentTime+dur);
+  }catch(e){}
+}
+
+function updateHUD(){
+  scoreEl.textContent=score;
+  coinsEl.textContent=coins;
+  shopCoinsEl.textContent='💎 '+coins;
+  // combo display
+  if(combo>1){
+    comboBar.classList.add('active');
+    comboText.classList.add('active');
+    const mult=getMultiplier();
+    comboText.textContent=`COMBO x${mult.toFixed(1).replace('.0','')} • ${combo} HITS`;
+    comboText.style.color= combo>=5 ? 'var(--neon-yellow)' : combo>=3 ? 'var(--neon-pink)' : '#fff';
+  } else {
+    comboBar.classList.remove('active');
+    comboText.classList.remove('active');
+  }
+  // boost indicators
+  const now=Date.now();
+  let html='';
+  if(now < slowUntil) html+=`<span class="boost-tag">❄️ SLOW ${Math.ceil((slowUntil-now)/1000)}s</span>`;
+  if(now < doubleUntil) html+=`<span class="boost-tag pink">🌟 2× ${Math.ceil((doubleUntil-now)/1000)}s</span>`;
+  boostIndicators.innerHTML=html;
+  // shop buttons
+  document.getElementById('buyEncore').disabled = !isPlaying || coins<30;
+  document.getElementById('buySlow').disabled = !isPlaying || coins<40;
+  document.getElementById('buyDouble').disabled = !isPlaying || coins<50;
+}
+
+function getMultiplier(){
+  if(combo<=1) return 1;
+  if(combo===2) return 1.5;
+  if(combo===3) return 2;
+  if(combo===4) return 2.5;
+  if(combo===5) return 3;
+  if(combo===6) return 4;
+  return 5;
+}
+
+function spawnTarget(){
+  if(!isPlaying) return;
+  // find empty cells
+  const empty=cells.map((c,i)=> activeTargets.has(i)?null:i).filter(v=>v!==null);
+  if(empty.length===0) return;
+  const idx=empty[Math.floor(Math.random()*empty.length)];
+  const cell=cells[idx];
+  const t=pickTarget();
+  const isSlow=Date.now() < slowUntil;
+  let duration = t.cls==='golden' ? 750 : t.cls==='rare' ? 950 : 1150;
+  if(isSlow) duration *= 1.6;
+  // create element
+  const el=document.createElement('div');
+  el.className='target '+(t.cls||'');
+  el.innerHTML=`<div class="target-photo">${t.emoji}</div><div class="target-name">${t.name}</div><div class="target-points">+${t.points}</div><div class="fade-bar" style="width:100%"></div>`;
+  const bar=el.querySelector('.fade-bar');
+  cell.appendChild(el);
+  const startTime=Date.now();
+  let raf;
+  function tick(){
+    const elapsed=Date.now()-startTime;
+    const pct=Math.max(0, 1 - elapsed/duration);
+    bar.style.width=(pct*100)+'%';
+    if(pct<=0){
+      // missed
+      removeTarget(idx, false);
+      combo=0;
+      updateHUD();
+      beep(120,0.15,0.08,'square');
+      cell.classList.add('hit');
+      setTimeout(()=>cell.classList.remove('hit'),300);
+    } else {
+      raf=requestAnimationFrame(tick);
+    }
+  }
+  raf=requestAnimationFrame(tick);
+  const timeout=setTimeout(()=>{}, duration+50); // placeholder to track
+  activeTargets.set(idx, {el, raf, timeout, startTime, duration, points:t.points, cls:t.cls});
+  // click handler
+  const handler=(e)=>{
+    e.preventDefault(); e.stopPropagation();
+    if(!activeTargets.has(idx)) return;
+    hitTarget(idx);
+  };
+  el.addEventListener('click', handler);
+  el.addEventListener('touchstart', handler, {passive:false});
+  // also allow cell tap
+  const cellHandler=(e)=>{
+    if(activeTargets.has(idx) && e.target===cell) hitTarget(idx);
+  };
+  cell._handler=cellHandler;
+  cell.addEventListener('click', cellHandler);
+  cell.addEventListener('touchstart', cellHandler, {passive:false});
+}
+
+function hitTarget(idx){
+  const data=activeTargets.get(idx);
+  if(!data) return;
+  cancelAnimationFrame(data.raf);
+  clearTimeout(data.timeout);
+  const cell=cells[idx];
+  // remove listeners
+  if(cell._handler){ cell.removeEventListener('click', cell._handler); cell.removeEventListener('touchstart', cell._handler); cell._handler=null; }
+  // combo
+  const now=Date.now();
+  if(now - lastHitTime < 1400) combo++;
+  else combo=1;
+  lastHitTime=now;
+  if(combo>bestCombo) bestCombo=combo;
+  // points
+  let mult=getMultiplier();
+  const isDouble= now < doubleUntil;
+  if(isDouble) mult*=2;
+  const earned=Math.round(data.points * mult);
+  score+=earned;
+  coins+= Math.ceil(earned/5); // earn coins
+  // fx
+  const fx=document.createElement('div');
+  fx.className='fx';
+  fx.style.left='50%'; fx.style.top='40%';
+  fx.style.color= data.cls==='golden' ? 'var(--neon-yellow)' : data.cls==='rare' ? 'var(--neon-cyan)' : 'var(--neon-pink)';
+  fx.textContent=`+${earned}` + (mult>1 ? ` x${mult.toFixed(1).replace('.0','')}` : '');
+  cell.appendChild(fx);
+  setTimeout(()=>fx.remove(),700);
+  // remove target
+  data.el.remove();
+  activeTargets.delete(idx);
+  cell.classList.add('hit');
+  setTimeout(()=>cell.classList.remove('hit'),200);
+  // sounds
+  if(data.cls==='golden') beep(880,0.25,0.2,'sine');
+  else if(combo>=4) beep(600+combo*40,0.12,0.15,'sine');
+  else beep(440,0.1,0.12,'sine');
+  // combo bar timer
+  if(comboInt) clearInterval(comboInt);
+  let comboTime=1400;
+  comboInt=setInterval(()=>{
+    comboTime-=50;
+    const pct=Math.max(0, comboTime/1400*100);
+    comboFill.style.width=pct+'%';
+    if(comboTime<=0){ clearInterval(comboInt); combo=0; updateHUD(); }
+    updateHUD();
+  },50);
+  updateHUD();
+  // check rank live
+  rankBadge.textContent=getRank(Math.max(best, score)).name;
+}
+
+function removeTarget(idx, isHit){
+  const data=activeTargets.get(idx);
+  if(!data) return;
+  cancelAnimationFrame(data.raf);
+  clearTimeout(data.timeout);
+  const cell=cells[idx];
+  if(cell._handler){ cell.removeEventListener('click', cell._handler); cell.removeEventListener('touchstart', cell._handler); cell._handler=null; }
+  if(data.el.parentNode) data.el.remove();
+  activeTargets.delete(idx);
+}
+
+function clearAllTargets(){
+  for(let idx of [...activeTargets.keys()]) removeTarget(idx);
+}
+
+function startGame(){
+  score=0; timeLeft=30; combo=0; bestCombo=0; lastHitTime=0;
+  slowUntil=0; doubleUntil=0;
+  clearAllTargets();
+  isPlaying=true;
+  startOverlay.classList.add('hidden');
+  gameOverOverlay.classList.add('hidden');
+  updateHUD();
+  timeEl.textContent=timeLeft.toFixed(1);
+  // timer
+  clearInterval(timerInt); clearInterval(spawnInt); clearInterval(comboInt);
+  timerInt=setInterval(()=>{
+    timeLeft-=0.1;
+    if(timeLeft<=0){ timeLeft=0; timeEl.textContent='0.0'; endGame(); }
+    else {
+      timeEl.textContent=timeLeft.toFixed(1);
+      if(timeLeft<5) timeEl.style.color='var(--neon-pink)';
+      else timeEl.style.color='';
+    }
+    updateHUD();
+  },100);
+  // spawn
+  spawnInt=setInterval(spawnTarget, 520);
+  // initial spawns
+  setTimeout(spawnTarget, 300);
+  setTimeout(spawnTarget, 700);
+  beep(523,0.15,0.2,'sine'); setTimeout(()=>beep(659,0.15,0.2,'sine'),120); setTimeout(()=>beep(784,0.2,0.2,'sine'),240);
+}
+
+function endGame(){
+  if(!isPlaying) return;
+  isPlaying=false;
+  clearInterval(timerInt); clearInterval(spawnInt); clearInterval(comboInt);
+  clearAllTargets();
+  // update best
+  let isNewBest=false;
+  if(score>best){ best=score; isNewBest=true; }
+  save();
+  bestEl.textContent=best;
+  rankBadge.textContent=getRank(best).name;
+  // fill game over
+  document.getElementById('finalScore').textContent=score;
+  document.getElementById('finalCombo').textContent='x'+getMultiplier().toFixed(1).replace('.0','') + ` (${bestCombo})`;
+  document.getElementById('finalCoins').textContent='+'+Math.ceil(score/8);
+  const rank=getRank(score);
+  document.getElementById('finalRank').textContent=rank.name;
+  document.getElementById('gameOverMsg').textContent= isNewBest ? '🎉 NEW BEST! You stole the show!' : (score>=500 ? '🔥 Headliner energy!' : score>=200 ? '✨ Crowd loves you!' : '💪 Keep practicing, star!');
+  // bonus coins for playing
+  coins+=Math.ceil(score/8);
+  save(); updateHUD();
+  gameOverOverlay.classList.remove('hidden');
+  if(isNewBest) beep(880,0.3,0.25,'sine');
+  else beep(330,0.4,0.15,'sine');
+}
+
+// Shop
+document.getElementById('buyEncore').addEventListener('click', ()=>{
+  if(!isPlaying || coins<30) return;
+  coins-=30; timeLeft+=7; beep(700,0.2,0.2,'sine'); updateHUD(); save();
+  const fx=document.createElement('div'); fx.className='fx'; fx.style.left='50%'; fx.style.top='50%'; fx.style.color='var(--neon-cyan)'; fx.textContent='+7s ENCORE!'; document.getElementById('stage').appendChild(fx); setTimeout(()=>fx.remove(),800);
+});
+document.getElementById('buySlow').addEventListener('click', ()=>{
+  if(!isPlaying || coins<40) return;
+  coins-=40; slowUntil=Date.now()+5000; beep(500,0.2,0.2,'sine'); updateHUD(); save();
+});
+document.getElementById('buyDouble').addEventListener('click', ()=>{
+  if(!isPlaying || coins<50) return;
+  coins-=50; doubleUntil=Date.now()+8000; beep(900,0.2,0.2,'sine'); updateHUD(); save();
+});
+
+// Buttons
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('restartBtn').addEventListener('click', startGame);
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(confirm('Reset best score and coins?')){
+    best=0; coins=0; save(); load(); updateHUD();
+    gameOverOverlay.classList.add('hidden'); startOverlay.classList.remove('hidden');
+  }
+});
+
+// Keyboard 1-9
+document.addEventListener('keydown', (e)=>{
+  if(!isPlaying) { if(e.key===' '||e.key==='Enter') startGame(); return; }
+  const n=parseInt(e.key);
+  if(n>=1 && n<=9){
+    const idx=n-1;
+    if(activeTargets.has(idx)) hitTarget(idx);
+  }
+});
+
+// Touch: prevent scroll
+document.addEventListener('touchmove', (e)=>{ if(isPlaying) e.preventDefault(); }, {passive:false});
+
+// Init HUD
+updateHUD();
+setInterval(updateHUD, 200);
+</script>
+</body>
+</html>

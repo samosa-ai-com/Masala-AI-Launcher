@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Ember Forge - Mutability Workshop</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0604;
+  --forge:#1a0e08;
+  --forge2:#241208;
+  --ember:#ff6b1a;
+  --ember2:#ff3b0a;
+  --gold:#ffb84d;
+  --gold2:#ff8c1a;
+  --glass:#ff6b35;
+  --glass2:#ff3b6b;
+  --cyan:#00e5ff;
+  --cyan2:#00b8d4;
+  --muted:#8a7060;
+  --text:#fff4e6;
+  --line:#3a1e0a;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center;background:radial-gradient(ellipse at top, #2a1200 0%, #0a0604 55%, #000 100%)}
+.workshop{
+  width:100%;max-width:428px;min-width:360px;min-height:100vh;
+  background:linear-gradient(180deg, #1a0e08 0%, #0f0804 100%);
+  border-left:2px solid #3a1e0a;border-right:2px solid #3a1e0a;
+  display:flex;flex-direction:column;position:relative;overflow:hidden;
+  box-shadow:0 0 40px rgba(255,107,26,0.15);
+}
+/* Header */
+.header{
+  background:linear-gradient(180deg, #2a1400 0%, #1a0e08 100%);
+  border-bottom:2px solid var(--ember);padding:12px 14px 10px;text-align:center;position:relative;
+  box-shadow:0 4px 20px rgba(255,107,26,0.25);
+}
+.header::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg, transparent, var(--gold), transparent)}
+.header h1{font-size:17px;letter-spacing:2.5px;font-weight:900;color:#fff;text-shadow:0 0 10px var(--ember), 0 0 20px rgba(255,107,26,0.5);line-height:1}
+.header h1 span{color:var(--gold);text-shadow:0 0 8px var(--gold)}
+.header p{font-size:10px;letter-spacing:1.8px;color:var(--gold);opacity:0.9;margin-top:4px;font-weight:700}
+.progress-dots{display:flex;gap:8px;justify-content:center;margin-top:8px}
+.dot{width:28px;height:6px;border-radius:3px;background:#2a1a0a;border:1px solid #3a1e0a;transition:all 0.3s}
+.dot.active{background:var(--ember);box-shadow:0 0 8px var(--ember);border-color:var(--ember)}
+.dot.done{background:var(--gold);box-shadow:0 0 8px var(--gold);border-color:var(--gold)}
+/* Level nav */
+.level-nav{display:flex;gap:6px;padding:10px;background:#0f0804;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line)}
+.level-nav::-webkit-scrollbar{display:none}
+.lbtn{
+  flex:1;min-width:78px;padding:8px 6px;border-radius:10px;border:1.5px solid #2a1a0a;background:#1a0e08;color:var(--muted);
+  font-size:11px;font-weight:800;letter-spacing:0.5px;text-align:center;cursor:pointer;transition:all 0.2s;position:relative;
+}
+.lbtn .num{font-size:13px;display:block;color:#fff;margin-bottom:2px}
+.lbtn.active{background:linear-gradient(180deg, #3a1a00, #1a0e08);border-color:var(--ember);color:var(--ember);box-shadow:0 0 10px rgba(255,107,26,0.3)}
+.lbtn.done{border-color:var(--gold);color:var(--gold)}
+.lbtn.done::after{content:'✓';position:absolute;top:-6px;right:-6px;background:var(--gold);color:#000;font-size:10px;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900}
+.lbtn.locked{opacity:0.4;pointer-events:none}
+/* Field guide */
+.guide{
+  margin:10px 10px 0;background:linear-gradient(135deg, #1a0e08 0%, #2a1400 100%);
+  border:1px solid #3a1e0a;border-radius:12px;padding:12px;position:relative;overflow:hidden;
+}
+.guide::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--gold)}
+.guide h3{font-size:11px;letter-spacing:1.5px;color:var(--gold);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.guide p{font-size:13px;line-height:1.5;color:#ffdcc0}
+.guide .tip{margin-top:8px;background:rgba(0,0,0,0.35);padding:8px 10px;border-radius:8px;border-left:2px solid var(--ember);font-size:12px;color:var(--muted);line-height:1.4}
+.guide .tip strong{color:var(--gold)}
+.guide .code-inline{background:rgba(255,107,26,0.15);padding:1px 6px;border-radius:4px;font-family:monospace;font-size:12px;color:var(--gold);border:1px solid rgba(255,107,26,0.2)}
+/* Forge */
+.forge-wrap{margin:10px 10px 0;background:radial-gradient(ellipse at center, #1e0f00 0%, #0a0604 100%);border:1.5px solid #3a1e0a;border-radius:14px;padding:10px;position:relative;overflow:hidden;box-shadow:inset 0 0 30px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,107,26,0.08)}
+.forge-wrap::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg, transparent, transparent 24px, rgba(255,107,26,0.02) 24px, rgba(255,107,26,0.02) 25px);pointer-events:none}
+.forge-label{position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:9px;letter-spacing:1.8px;color:var(--ember);opacity:0.8;font-weight:700;background:#0a0604;padding:2px 10px;border-radius:20px;border:1px solid rgba(255,107,26,0.2);z-index:2}
+.forge-svg{width:100%;height:260px;display:block;position:relative;z-index:1;touch-action:none}
+.var-badge{position:absolute;z-index:3;background:#0a0604;border:1px solid var(--ember);color:var(--gold);font-size:10px;font-weight:800;padding:4px 8px;border-radius:20px;letter-spacing:0.5px;box-shadow:0 2px 8px rgba(0,0,0,0.5);display:flex;align-items:center;gap:4px}
+.var-badge.cyan{border-color:var(--cyan);color:var(--cyan)}
+.var-badge .dot-sm{width:8px;height:8px;border-radius:50%;background:var(--ember);box-shadow:0 0 6px var(--ember)}
+.var-badge.cyan .dot-sm{background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
+.tether{position:absolute;height:2px;background:repeating-linear-gradient(90deg, var(--cyan) 0 6px, transparent 6px 10px);opacity:0.6;z-index:2;transform-origin:left center}
+/* Controls */
+.controls{padding:10px;display:flex;flex-direction:column;gap:8px}
+.run-btn{
+  height:52px;border-radius:12px;border:none;background:linear-gradient(180deg, #ff6b1a 0%, #cc2a00 100%);
+  color:#fff;font-size:14px;font-weight:900;letter-spacing:1.5px;cursor:pointer;
+  box-shadow:0 5px 0 #7a1500, 0 0 16px rgba(255,107,26,0.4);transition:all 0.1s;display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.run-btn:active{transform:translateY(3px);box-shadow:0 2px 0 #7a1500, 0 0 16px rgba(255,107,26,0.4)}
+.run-btn:disabled{opacity:0.5;pointer-events:none}
+.run-btn.ran{background:linear-gradient(180deg, #00c853 0%, #007a33 100%);box-shadow:0 5px 0 #004a1f, 0 0 16px rgba(0,200,83,0.4)}
+.action-row{display:flex;gap:8px}
+.action-row button{flex:1;height:44px;border-radius:10px;border:1.5px solid #2a1a0a;background:#1a0e08;color:var(--muted);font-size:11px;font-weight:800;letter-spacing:1px;cursor:pointer;transition:all 0.15s}
+.action-row button.primary{background:linear-gradient(180deg, #ffb84d, #ff8c1a);border-color:var(--gold);color:#000;box-shadow:0 0 12px rgba(255,184,77,0.3)}
+.action-row button:active{transform:scale(0.97)}
+.freeze-toggle{display:flex;gap:6px;background:#0a0604;border:1px solid #2a1a0a;border-radius:10px;padding:4px}
+.freeze-toggle button{flex:1;height:36px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--muted);font-size:11px;font-weight:800;cursor:pointer}
+.freeze-toggle button.active{background:#1a0e08;border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 8px rgba(0,229,255,0.2)}
+/* Console */
+.console{margin:0 10px;background:#020202;border:1px solid #2a1a0a;border-radius:10px;overflow:hidden}
+.console header{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#0f0804;border-bottom:1px solid #2a1a0a}
+.console header h4{font-size:10px;letter-spacing:1.5px;color:var(--gold);display:flex;align-items:center;gap:6px}
+.console header button{font-size:10px;background:transparent;border:1px solid #2a1a0a;color:var(--muted);padding:3px 8px;border-radius:6px;cursor:pointer}
+.code-block{padding:10px;background:#080300;font-family:'Courier New',monospace;font-size:12px;line-height:1.6;color:#ffdcc0;overflow-x:auto;white-space:pre;border-bottom:1px solid #1a0e08}
+.code-block .kw{color:var(--ember)} .code-block .str{color:var(--gold)} .code-block .com{color:#6a5040} .code-block .var{color:var(--cyan)}
+.log{height:90px;overflow-y:auto;padding:8px 10px;font-family:'Courier New',monospace;font-size:11px;line-height:1.5;background:#020202}
+.log-entry{padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;gap:6px}
+.log-entry .tag{font-weight:800;min-width:54px}
+.log-entry.out .tag{color:var(--gold)} .log-entry.ok .tag{color:#00e676} .log-entry.err .tag{color:#ff5252} .log-entry.info .tag{color:var(--cyan)}
+.log-entry.win{color:var(--gold);font-weight:800;background:rgba(255,184,77,0.08);border-radius:4px;padding:4px 6px;margin-top:4px}
+.log-entry.fail{color:#ff8a65;background:rgba(255,107,26,0.08);border-radius:4px;padding:4px 6px;margin-top:4px}
+/* Legend */
+.legend{display:flex;gap:6px;padding:8px 10px;flex-wrap:wrap;justify-content:center}
+.legend span{font-size:10px;padding:4px 8px;border-radius:20px;border:1px solid #2a1a0a;background:#0f0804;color:var(--muted);display:flex;align-items:center;gap:4px}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.legend i.shared{background:var(--ember)} .legend i.copy{background:var(--gold)} .legend i.frozen{background:var(--cyan)}
+/* Footer */
+.footer{padding:8px 10px 14px;display:flex;gap:8px}
+.footer button{flex:1;height:40px;border-radius:8px;border:1px solid #2a1a0a;background:#1a0e08;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer}
+/* Toast */
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(80px);background:#1a0e08;border:1px solid var(--ember);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,0.6), 0 0 16px rgba(255,107,26,0.3);transition:transform 0.3s;z-index:100;max-width:90%;text-align:center;pointer-events:none}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.win-overlay{position:absolute;inset:0;background:rgba(10,6,4,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;border-radius:14px;text-align:center;padding:20px}
+.win-overlay h2{font-size:20px;color:var(--gold);text-shadow:0 0 12px var(--gold);letter-spacing:1.5px}
+.win-overlay p{font-size:13px;color:#fff;margin-top:8px;line-height:1.4}
+.win-overlay button{margin-top:14px;height:44px;padding:0 20px;border-radius:10px;border:none;background:var(--ember);color:#fff;font-weight:900;letter-spacing:1px;cursor:pointer;box-shadow:0 0 16px rgba(255,107,26,0.5)}
+/* Anchor glow */
+@keyframes pulse{0%,100%{filter:drop-shadow(0 0 6px var(--ember))}50%{filter:drop-shadow(0 0 12px var(--ember)) brightness(1.3)}}
+.anchor{animation:pulse 2s infinite}
+</style>
+</head>
+<body>
+<div class="workshop" id="workshop">
+  <div class="header">
+    <h1>EMBER <span>FORGE</span></h1>
+    <p>MUTABILITY WORKSHOP • SHAPE • RUN • LEARN</p>
+    <div class="progress-dots" id="dots"></div>
+  </div>
+  <div class="level-nav" id="levelNav"></div>
+  <div class="guide" id="guide"></div>
+  <div class="forge-wrap" id="forgeWrap">
+    <div class="forge-label" id="forgeLabel">FORGE • DRAG GLOWING ANCHORS</div>
+    <svg class="forge-svg" id="forgeSvg" viewBox="0 0 360 260" preserveAspectRatio="xMidYMid meet"></svg>
+    <div id="badgesHost"></div>
+    <div id="winHost"></div>
+  </div>
+  <div class="controls">
+    <button class="run-btn" id="runBtn" onclick="runSnippet()">▶ RUN SNIPPET</button>
+    <div class="action-row" id="actionRow">
+      <button onclick="resetLevel()">RESET SHAPE</button>
+      <button class="primary" id="nextBtn" onclick="completeLevel()" disabled>COMPLETE →</button>
+    </div>
+    <div class="freeze-toggle" id="freezeToggle" style="display:none">
+      <button id="btnShallow" onclick="setFreeze('shallow')" class="active">SHALLOW FREEZE</button>
+      <button id="btnDeep" onclick="setFreeze('deep')">DEEP FREEZE</button>
+    </div>
+  </div>
+  <div class="console">
+    <header><h4>◉ LIVE CONSOLE</h4><button onclick="clearLog()">CLEAR</button></header>
+    <div class="code-block" id="codeBlock"></div>
+    <div class="log" id="log"></div>
+  </div>
+  <div class="legend">
+    <span><i class="shared"></i> Shared ref</span>
+    <span><i class="copy"></i> Spread copy</span>
+    <span><i class="frozen"></i> Frozen</span>
+  </div>
+  <div class="footer">
+    <button onclick="resetCurrent()">RESET LEVEL</button>
+    <button onclick="resetAll()">RESET ALL</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const LEVELS = [
+  {
+    id:1, name:'SHARED FLAME', sub:'Reshaping Shared Objects', diff:'★☆☆',
+    guide:`<h3>🔥 LEVEL 1 — SHARED FLAME</h3><p>Two variables can point to the <b>same object</b> in memory. Dragging the glass reshapes the shared object — both <span class="code-inline">shard</span> and <span class="code-inline">twin</span> see the change.</p><div class="tip"><strong>Try:</strong> Drag any glowing anchor. Notice both badges track the same shape. Then <b>RUN</b> to see <span class="code-inline">twin === shard</span> is <span class="code-inline">true</span>.</div>`,
+    snippet:`let shard = { points: [...] };\nlet twin = shard; // same reference\n\ntwin.points[0].x += 20;\nconsole.log(shard.points[0].x);\nconsole.log(twin === shard); // true`,
+    code:`<span class="kw">let</span> <span class="var">shard</span> = { <span class="str">points</span>: <span class="var">glass</span> };\n<span class="kw">let</span> <span class="var">twin</span> = <span class="var">shard</span>; <span class="com">// same reference!</span>\n\n<span class="var">twin</span>.<span class="str">points</span>[<span class="str">0</span>].<span class="str">x</span> += <span class="str">20</span>;\n<span class="var">console</span>.<span class="kw">log</span>(<span class="var">shard</span>.<span class="str">points</span>[<span class="str">0</span>].<span class="str">x</span>);\n<span class="var">console</span>.<span class="kw">log</span>(<span class="var">twin</span> === <span class="var">shard</span>); <span class="com">// true</span>`,
+    points:[{x:90,y:60},{x:270,y:70},{x:250,y:200},{x:110,y:190}],
+    hasGem:false,
+    win:(st)=> st.dragged && st.ran
+  },
+  {
+    id:2, name:'CONST BINDING', sub:'Constant Bindings', diff:'★★☆',
+    guide:`<h3>⚒️ LEVEL 2 — CONSTANT BINDING</h3><p><span class="code-inline">const</span> locks the <b>binding</b>, not the object. You can still mutate properties by dragging, but reassigning the variable throws.</p><div class="tip"><strong>Try:</strong> Drag to mutate — it works! Then <b>RUN</b> to see <span class="code-inline">ingot = {}</span> throw <span class="code-inline">TypeError</span> while <span class="code-inline">ingot.points[0].x = 99</span> succeeds.</div>`,
+    snippet:`const ingot = { points: [...] };\ningot.points[0].x = 99; // ✅ mutation OK\ningot = {}; // ❌ TypeError: Assignment to constant`,
+    code:`<span class="kw">const</span> <span class="var">ingot</span> = { <span class="str">points</span>: <span class="var">glass</span> };\n<span class="var">ingot</span>.<span class="str">points</span>[<span class="str">0</span>].<span class="str">x</span> = <span class="str">99</span>; <span class="com">// ✅ mutation OK</span>\n<span class="var">ingot</span> = {}; <span class="com">// ❌ TypeError</span>`,
+    points:[{x:100,y:50},{x:260,y:60},{x:240,y:210},{x:120,y:200}],
+    hasGem:false,
+    win:(st)=> st.dragged && st.ran
+  },
+  {
+    id:3, name:'COPY BY SPREAD', sub:'Shallow Copies', diff:'★★★',
+    guide:`<h3>💎 LEVEL 3 — COPY BY SPREAD</h3><p>Spread <span class="code-inline">{...obj}</span> copies top-level properties, but nested objects stay <b>shared</b>. Two glass pieces have independent outer anchors, but the central <span class="code-inline">gem</span> is linked.</p><div class="tip"><strong>Try:</strong> Drag outer anchors — pieces move independently. Drag the <b>cyan gem</b> — both pieces move! <b>RUN</b> to see shallow copy in action.</div>`,
+    snippet:`let a = { points: [...], gem: {x:180,y:130} };\nlet b = { ...a }; // shallow copy\n\nb.points[0].x += 30; // only b changes\nb.gem.x += 30; // both change! (shared ref)`,
+    code:`<span class="kw">let</span> <span class="var">a</span> = { <span class="str">points</span>: [...], <span class="str">gem</span>: {<span class="str">x</span>:<span class="str">180</span>} };\n<span class="kw">let</span> <span class="var">b</span> = { ...<span class="var">a</span> }; <span class="com">// shallow copy</span>\n\n<span class="var">b</span>.<span class="str">points</span>[<span class="str">0</span>].<span class="str">x</span> += <span class="str">30</span>; <span class="com">// only b</span>\n<span class="var">b</span>.<span class="str">gem</span>.<span class="str">x</span> += <span class="str">30</span>; <span class="com">// both!</span>`,
+    pointsA:[{x:40,y:60},{x:160,y:50},{x:150,y:200},{x:50,y:190}],
+    pointsB:[{x:200,y:60},{x:320,y:50},{x:310,y:200},{x:210,y:190}],
+    gem:{x:180,y:130},
+    hasGem:true,
+    win:(st)=> st.dragged && st.ran
+  },
+  {
+    id:4, name:'DEEP FREEZE', sub:'Deep Freezing', diff:'★★★★',
+    guide:`<h3>❄️ LEVEL 4 — DEEP FREEZE</h3><p><span class="code-inline">Object.freeze()</span> is shallow — nested objects stay mutable. A true <span class="code-inline">deepFreeze()</span> recurses through every level.</p><div class="tip"><strong>Try:</strong> Toggle <b>SHALLOW</b> — outer anchors lock, core still drags. Toggle <b>DEEP</b> — everything locks. <b>RUN</b> to apply freeze.</div>`,
+    snippet:`Object.freeze(obj); // shallow\nobj.points[0].x = 1; // blocked\nobj.core.x = 1; // still works!\n\ndeepFreeze(obj); // recursive\nobj.core.x = 1; // now blocked`,
+    code:`<span class="var">Object</span>.<span class="kw">freeze</span>(<span class="var">obj</span>); <span class="com">// shallow</span>\n<span class="var">obj</span>.<span class="str">points</span>[<span class="str">0</span>].<span class="str">x</span> = <span class="str">1</span>; <span class="com">// blocked</span>\n<span class="var">obj</span>.<span class="str">core</span>.<span class="str">x</span> = <span class="str">1</span>; <span class="com">// still works!</span>\n\n<span class="kw">deepFreeze</span>(<span class="var">obj</span>); <span class="com">// recursive</span>\n<span class="var">obj</span>.<span class="str">core</span>.<span class="str">x</span> = <span class="str">1</span>; <span class="com">// now blocked</span>`,
+    points:[{x:90,y:50},{x:270,y:60},{x:260,y:210},{x:100,y:200}],
+    core:{x:180,y:130},
+    hasGem:true,
+    isFreeze:true,
+    win:(st)=> st.ran && st.freezeToggled
+  }
+];
+
+let cur=1;
+let state={completed:[], perLevel:{}};
+let drag=null;
+
+function load(){
+  try{
+    const s=JSON.parse(localStorage.getItem('emberForge_v2')||'null');
+    if(s){ state=s; cur=s.cur||1; }
+  }catch(e){}
+  LEVELS.forEach(l=>{
+    if(!state.perLevel[l.id]) state.perLevel[l.id]={dragged:false, ran:false, freezeToggled:false, freezeMode:'shallow'};
+    // init points
+    const pl=state.perLevel[l.id];
+    if(l.id===3){
+      if(!pl.pointsA) pl.pointsA=JSON.parse(JSON.stringify(l.pointsA));
+      if(!pl.pointsB) pl.pointsB=JSON.parse(JSON.stringify(l.pointsB));
+      if(!pl.gem) pl.gem={...l.gem};
+    } else if(l.id===4){
+      if(!pl.points) pl.points=JSON.parse(JSON.stringify(l.points));
+      if(!pl.core) pl.core={...l.core};
+    } else {
+      if(!pl.points) pl.points=JSON.parse(JSON.stringify(l.points));
+    }
+  });
+  if(!state.completed) state.completed=[];
+}
+function save(){
+  state.cur=cur;
+  localStorage.setItem('emberForge_v2', JSON.stringify(state));
+}
+function toast(m){
+  const t=document.getElementById('toast');
+  t.textContent=m; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function renderNav(){
+  const nav=document.getElementById('levelNav');
+  nav.innerHTML='';
+  LEVELS.forEach(l=>{
+    const b=document.createElement('button');
+    b.className='lbtn';
+    if(l.id===cur) b.classList.add('active');
+    if(state.completed.includes(l.id)) b.classList.add('done');
+    if(l.id>1 && !state.completed.includes(l.id-1) && l.id!==cur) b.classList.add('locked');
+    // allow navigation to completed or next
+    const unlocked = l.id===1 || state.completed.includes(l.id-1) || state.completed.includes(l.id);
+    if(!unlocked && l.id!==cur) b.classList.add('locked');
+    b.innerHTML=`<span class="num">${l.id}</span>${l.name}<br><small style="font-size:9px;opacity:0.7">${l.diff}</small>`;
+    b.onclick=()=>{ if(b.classList.contains('locked')) return; switchLevel(l.id); };
+    nav.appendChild(b);
+  });
+  const dots=document.getElementById('dots');
+  dots.innerHTML='';
+  LEVELS.forEach(l=>{
+    const d=document.createElement('div');
+    d.className='dot'+(state.completed.includes(l.id)?' done': l.id===cur?' active':'');
+    dots.appendChild(d);
+  });
+}
+function renderGuide(){
+  document.getElementById('guide').innerHTML=LEVELS[cur-1].guide;
+  document.getElementById('codeBlock').innerHTML=LEVELS[cur-1].code;
+  const ft=document.getElementById('freezeToggle');
+  ft.style.display = LEVELS[cur-1].isFreeze ? 'flex' : 'none';
+  if(LEVELS[cur-1].isFreeze){
+    const mode=state.perLevel[cur].freezeMode||'shallow';
+    document.getElementById('btnShallow').className= mode==='shallow'?'active':'';
+    document.getElementById('btnDeep').className= mode==='deep'?'active':'';
+  }
+  updateNextBtn();
+}
+function switchLevel(id){
+  cur=id;
+  save();
+  renderNav();
+  renderGuide();
+  renderForge();
+  clearLog();
+  addLog('info',`Level ${id} — ${LEVELS[id-1].name} loaded`,'info');
+  document.getElementById('winHost').innerHTML='';
+  document.getElementById('runBtn').classList.remove('ran');
+  document.getElementById('runBtn').textContent='▶ RUN SNIPPET';
+}
+function updateNextBtn(){
+  const st=state.perLevel[cur];
+  const lvl=LEVELS[cur-1];
+  const ok=lvl.win(st);
+  const btn=document.getElementById('nextBtn');
+  btn.disabled=!ok;
+  btn.style.opacity= ok ? '1' : '0.5';
+}
+function svgCoords(e, svg){
+  const rect=svg.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width * 360;
+  const y = (e.clientY - rect.top) / rect.height * 260;
+  return {x:Math.max(10,Math.min(350,x)), y:Math.max(10,Math.min(250,y))};
+}
+function renderForge(){
+  const svg=document.getElementById('forgeSvg');
+  const lvl=LEVELS[cur-1];
+  const st=state.perLevel[cur];
+  svg.innerHTML='';
+  const badgesHost=document.getElementById('badgesHost');
+  badgesHost.innerHTML='';
+  // defs for glow
+  const defs=`<defs>
+    <linearGradient id="glassGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#ff6b1a" stop-opacity="0.9"/><stop offset="100%" stop-color="#ff3b6b" stop-opacity="0.7"/></linearGradient>
+    <linearGradient id="glassGrad2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#ffb84d" stop-opacity="0.85"/><stop offset="100%" stop-color="#ff6b1a" stop-opacity="0.6"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <radialGradient id="emberGlow" cx="50%" cy="50%"><stop offset="0%" stop-color="#ff6b1a" stop-opacity="0.3"/><stop offset="100%" stop-color="#ff6b1a" stop-opacity="0"/></radialGradient>
+  </defs>`;
+  svg.innerHTML+=defs;
+  // ember background blobs
+  svg.innerHTML+=`<ellipse cx="180" cy="240" rx="140" ry="18" fill="url(#emberGlow)"/>`;
+  svg.innerHTML+=`<ellipse cx="80" cy="230" rx="40" ry="10" fill="#ff3b0a" opacity="0.15"/>`;
+  svg.innerHTML+=`<ellipse cx="280" cy="235" rx="50" ry="12" fill="#ff6b1a" opacity="0.12"/>`;
+
+  if(lvl.id===1 || lvl.id===2){
+    const pts=st.points;
+    const ptsStr=pts.map(p=>`${p.x},${p.y}`).join(' ');
+    const frozen = lvl.isFreeze && st.freezeMode==='deep';
+    // glass polygon
+    svg.innerHTML+=`<polygon points="${ptsStr}" fill="url(#glassGrad)" stroke="#ff8c1a" stroke-width="2" opacity="0.9" style="filter:drop-shadow(0 0 12px rgba(255,107,26,0.4))"/>`;
+    svg.innerHTML+=`<polygon points="${ptsStr}" fill="none" stroke="#fff" stroke-width="0.5" opacity="0.3"/>`;
+    // anchors
+    pts.forEach((p,i)=>{
+      const isFrozen = lvl.isFreeze && (st.freezeMode==='deep' || st.freezeMode==='shallow');
+      svg.innerHTML+=`<g class="anchor-group" data-idx="${i}" data-type="point">
+        <circle cx="${p.x}" cy="${p.y}" r="14" fill="rgba(255,107,26,0.15)" stroke="none"/>
+        <circle cx="${p.x}" cy="${p.y}" r="11" fill="#1a0e08" stroke="${isFrozen?'#00e5ff':'#ff6b1a'}" stroke-width="2" style="filter:drop-shadow(0 0 6px ${isFrozen?'#00e5ff':'#ff6b1a'})" class="anchor"/>
+        <circle cx="${p.x}" cy="${p.y}" r="4" fill="${isFrozen?'#00e5ff':'#ffb84d'}"/>
+      </g>`;
+    });
+    // badges
+    if(lvl.id===1){
+      badgesHost.innerHTML=`<div class="var-badge" style="left:12px;top:42px"><span class="dot-sm"></span> shard</div><div class="var-badge cyan" style="right:12px;top:42px"><span class="dot-sm"></span> twin</div>`;
+      // tether line between badges
+      // visual tether from shard to twin via center
+    } else {
+      badgesHost.innerHTML=`<div class="var-badge" style="left:50%;top:42px;transform:translateX(-50%)"><span class="dot-sm"></span> const ingot</div>`;
+    }
+  } else if(lvl.id===3){
+    const ptsA=st.pointsA, ptsB=st.pointsB, gem=st.gem;
+    const strA=ptsA.map(p=>`${p.x},${p.y}`).join(' ');
+    const strB=ptsB.map(p=>`${p.x},${p.y}`).join(' ');
+    // two glass pieces
+    svg.innerHTML+=`<polygon points="${strA}" fill="url(#glassGrad)" stroke="#ff8c1a" stroke-width="2" opacity="0.85" style="filter:drop-shadow(0 0 10px rgba(255,107,26,0.3))"/>`;
+    svg.innerHTML+=`<polygon points="${strB}" fill="url(#glassGrad2)" stroke="#ffb84d" stroke-width="2" opacity="0.85" style="filter:drop-shadow(0 0 10px rgba(255,184,77,0.3))"/>`;
+    // tether from gem to both pieces
+    svg.innerHTML+=`<line x1="${gem.x}" y1="${gem.y}" x2="${ptsA[1].x}" y2="${ptsA[1].y}" stroke="#00e5ff" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.5"/>`;
+    svg.innerHTML+=`<line x1="${gem.x}" y1="${gem.y}" x2="${ptsB[0].x}" y2="${ptsB[0].y}" stroke="#00e5ff" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.5"/>`;
+    // gem
+    svg.innerHTML+=`<circle cx="${gem.x}" cy="${gem.y}" r="16" fill="rgba(0,229,255,0.15)" stroke="none"/>`;
+    svg.innerHTML+=`<circle cx="${gem.x}" cy="${gem.y}" r="12" fill="#002a33" stroke="#00e5ff" stroke-width="2" style="filter:drop-shadow(0 0 8px #00e5ff)" class="anchor"/>`;
+    svg.innerHTML+=`<circle cx="${gem.x}" cy="${gem.y}" r="5" fill="#00e5ff"/>`;
+    svg.innerHTML+=`<text x="${gem.x}" y="${gem.y-18}" text-anchor="middle" font-size="8" font-weight="800" fill="#00e5ff" letter-spacing="1">GEM</text>`;
+    // anchors A
+    ptsA.forEach((p,i)=>{
+      svg.innerHTML+=`<g class="anchor-group" data-idx="${i}" data-type="A"><circle cx="${p.x}" cy="${p.y}" r="14" fill="rgba(255,107,26,0.12)"/><circle cx="${p.x}" cy="${p.y}" r="11" fill="#1a0e08" stroke="#ff6b1a" stroke-width="2" style="filter:drop-shadow(0 0 6px #ff6b1a)" class="anchor"/><circle cx="${p.x}" cy="${p.y}" r="4" fill="#ffb84d"/></g>`;
+    });
+    ptsB.forEach((p,i)=>{
+      svg.innerHTML+=`<g class="anchor-group" data-idx="${i}" data-type="B"><circle cx="${p.x}" cy="${p.y}" r="14" fill="rgba(255,184,77,0.12)"/><circle cx="${p.x}" cy="${p.y}" r="11" fill="#1a0e08" stroke="#ffb84d" stroke-width="2" style="filter:drop-shadow(0 0 6px #ffb84d)" class="anchor"/><circle cx="${p.x}" cy="${p.y}" r="4" fill="#ff8c1a"/></g>`;
+    });
+    // gem anchor group
+    svg.innerHTML+=`<g class="anchor-group" data-type="gem"><circle cx="${gem.x}" cy="${gem.y}" r="20" fill="transparent" style="cursor:pointer"/></g>`;
+    badgesHost.innerHTML=`<div class="var-badge" style="left:12px;top:42px"><span class="dot-sm"></span> a</div><div class="var-badge" style="right:12px;top:42px;background:#1a0e08;border-color:#ffb84d;color:#ffb84d"><span class="dot-sm" style="background:#ffb84d;box-shadow:0 0 6px #ffb84d"></span> b = {...a}</div>`;
+  } else if(lvl.id===4){
+    const pts=st.points, core=st.core;
+    const ptsStr=pts.map(p=>`${p.x},${p.y}`).join(' ');
+    const mode=st.freezeMode||'shallow';
+    const outerFrozen = mode==='shallow' || mode==='deep';
+    const coreFrozen = mode==='deep';
+    svg.innerHTML+=`<polygon points="${ptsStr}" fill="url(#glassGrad)" stroke="${outerFrozen?'#00e5ff':'#ff8c1a'}" stroke-width="2" opacity="${outerFrozen?'0.6':'0.9'}" style="filter:drop-shadow(0 0 12px ${outerFrozen?'rgba(0,229,255,0.3)':'rgba(255,107,26,0.4)'})"/>`;
+    // core
+    svg.innerHTML+=`<circle cx="${core.x}" cy="${core.y}" r="18" fill="${coreFrozen?'rgba(0,229,255,0.15)':'rgba(255,107,26,0.2)'}" stroke="none"/>`;
+    svg.innerHTML+=`<circle cx="${core.x}" cy="${core.y}" r="13" fill="#1a0e08" stroke="${coreFrozen?'#00e5ff':'#ff6b1a'}" stroke-width="2" style="filter:drop-shadow(0 0 8px ${coreFrozen?'#00e5ff':'#ff6b1a'})" class="anchor"/>`;
+    svg.innerHTML+=`<circle cx="${core.x}" cy="${core.y}" r="5" fill="${coreFrozen?'#00e5ff':'#ffb84d'}"/>`;
+    svg.innerHTML+=`<text x="${core.x}" y="${core.y-20}" text-anchor="middle" font-size="8" font-weight="800" fill="${coreFrozen?'#00e5ff':'#ffb84d'}" letter-spacing="1">CORE</text>`;
+    pts.forEach((p,i)=>{
+      svg.innerHTML+=`<g class="anchor-group" data-idx="${i}" data-type="point"><circle cx="${p.x}" cy="${p.y}" r="14" fill="rgba(0,229,255,0.08)"/><circle cx="${p.x}" cy="${p.y}" r="11" fill="#1a0e08" stroke="${outerFrozen?'#00e5ff':'#ff6b1a'}" stroke-width="2" style="filter:drop-shadow(0 0 6px ${outerFrozen?'#00e5ff':'#ff6b1a'})" class="anchor"/><circle cx="${p.x}" cy="${p.y}" r="4" fill="${outerFrozen?'#00e5ff':'#ffb84d'}"/></g>`;
+    });
+    svg.innerHTML+=`<g class="anchor-group" data-type="core"><circle cx="${core.x}" cy="${core.y}" r="20" fill="transparent"/></g>`;
+    badgesHost.innerHTML=`<div class="var-badge" style="left:50%;top:42px;transform:translateX(-50%)"><span class="dot-sm"></span> obj ${mode==='deep'?'• DEEP FROZEN ❄️':'• SHALLOW FROZEN'}</div>`;
+  }
+
+  // attach drag handlers
+  svg.querySelectorAll('.anchor-group').forEach(g=>{
+    g.style.cursor='pointer';
+    g.addEventListener('pointerdown', onPointerDown);
+  });
+}
+function onPointerDown(e){
+  e.preventDefault();
+  const svg=document.getElementById('forgeSvg');
+  const lvl=LEVELS[cur-1];
+  const st=state.perLevel[cur];
+  const type=e.currentTarget.dataset.type;
+  const idx=parseInt(e.currentTarget.dataset.idx);
+  // check freeze locks
+  if(lvl.isFreeze){
+    const mode=st.freezeMode;
+    if(mode==='deep'){ toast('❄️ Deep frozen — all anchors locked!'); navigator.vibrate&&navigator.vibrate(20); svg.style.animation='shake 0.3s'; setTimeout(()=>svg.style.animation='',300); return; }
+    if(mode==='shallow' && type==='point'){ toast('❄️ Outer shell frozen — try the CORE'); navigator.vibrate&&navigator.vibrate(20); return; }
+  }
+  drag={type, idx, svg};
+  svg.setPointerCapture(e.pointerId);
+  const move=(ev)=>{
+    if(!drag) return;
+    const c=svgCoords(ev, svg);
+    if(lvl.id===1 || lvl.id===2){
+      st.points[drag.idx]={x:c.x, y:c.y};
+    } else if(lvl.id===3){
+      if(drag.type==='A') st.pointsA[drag.idx]={x:c.x, y:c.y};
+      else if(drag.type==='B') st.pointsB[drag.idx]={x:c.x, y:c.y};
+      else if(drag.type==='gem'){ st.gem={x:c.x, y:c.y}; }
+    } else if(lvl.id===4){
+      if(drag.type==='point') st.points[drag.idx]={x:c.x, y:c.y};
+      else if(drag.type==='core') st.core={x:c.x, y:c.y};
+    }
+    st.dragged=true;
+    renderForge();
+    save();
+    updateNextBtn();
+    if(navigator.vibrate) navigator.vibrate(5);
+  };
+  const up=(ev)=>{
+    svg.removeEventListener('pointermove', move);
+    svg.removeEventListener('pointerup', up);
+    svg.removeEventListener('pointercancel', up);
+    drag=null;
+    save();
+  };
+  svg.addEventListener('pointermove', move);
+  svg.addEventListener('pointerup', up);
+  svg.addEventListener('pointercancel', up);
+}
+function clearLog(){ document.getElementById('log').innerHTML=''; }
+function addLog(tag, msg, cls){
+  const log=document.getElementById('log');
+  const div=document.createElement('div');
+  div.className='log-entry '+cls;
+  div.innerHTML=`<span class="tag">${tag}</span><span>${msg}</span>`;
+  log.appendChild(div);
+  log.scrollTop=log.scrollHeight;
+}
+function runSnippet(){
+  const lvl=LEVELS[cur-1];
+  const st=state.perLevel[cur];
+  st.ran=true;
+  save();
+  updateNextBtn();
+  const btn=document.getElementById('runBtn');
+  btn.classList.add('ran');
+  btn.textContent='✓ RAN — CHECK LOG';
+  setTimeout(()=>{ btn.classList.remove('ran'); btn.textContent='▶ RUN SNIPPET'; }, 2000);
+
+  if(lvl.id===1){
+    const p0=st.points[0];
+    addLog('OUT',`shard.points[0] = {x:${Math.round(p0.x)}, y:${Math.round(p0.y)}}`,'out');
+    addLog('OUT',`twin === shard → true (same object!)`,'ok');
+    addLog('INFO',`Both vars reflect drag — shared reference`,'info');
+    if(st.dragged) addLog('WIN',`✓ Shared mutation observed!`,'win');
+  } else if(lvl.id===2){
+    const p0=st.points[0];
+    addLog('OUT',`ingot.points[0].x = ${Math.round(p0.x)} → ✅ mutated`,'ok');
+    addLog('ERR',`ingot = {} → TypeError: Assignment to constant variable`,'err');
+    addLog('INFO',`const prevents reassignment, not mutation`,'info');
+    if(st.dragged) addLog('WIN',`✓ Constant binding understood!`,'win');
+  } else if(lvl.id===3){
+    const a0=st.pointsA[0], b0=st.pointsB[0], g=st.gem;
+    addLog('OUT',`a.points[0].x = ${Math.round(a0.x)}`,'out');
+    addLog('OUT',`b.points[0].x = ${Math.round(b0.x)} (independent)`,'ok');
+    addLog('OUT',`a.gem.x = ${Math.round(g.x)} , b.gem.x = ${Math.round(g.x)} (shared!)`,'err');
+    addLog('INFO',`Spread is shallow — nested gem still shared`,'info');
+    addLog('WIN',`✓ Shallow copy visualized!`,'win');
+  } else if(lvl.id===4){
+    const mode=st.freezeMode;
+    if(mode==='shallow'){
+      addLog('OUT',`Object.freeze(obj) applied (shallow)`,'out');
+      addLog('OK',`obj.points[0].x = 1 → blocked ❄️`,'ok');
+      addLog('ERR',`obj.core.x = 1 → still mutable! (nested)`,'err');
+      addLog('INFO',`Shallow freeze doesn't recurse`,'info');
+    } else {
+      addLog('OUT',`deepFreeze(obj) applied (recursive)`,'out');
+      addLog('OK',`obj.points[0].x = 1 → blocked ❄️`,'ok');
+      addLog('OK',`obj.core.x = 1 → blocked ❄️`,'ok');
+      addLog('WIN',`✓ Deep freeze locks everything!`,'win');
+    }
+    st.freezeToggled=true;
+    save();
+    updateNextBtn();
+  }
+  // auto complete check
+  if(lvl.win(st)){
+    addLog('WIN',`Level ${lvl.id} ready — tap COMPLETE →`,'win');
+    toast(`Level ${lvl.id} complete! Tap COMPLETE →`);
+  }
+}
+function setFreeze(mode){
+  const st=state.perLevel[cur];
+  st.freezeMode=mode;
+  st.freezeToggled=true;
+  save();
+  renderForge();
+  renderGuide();
+  addLog('INFO',`Switched to ${mode.toUpperCase()} freeze — try dragging`,'info');
+  if(mode==='deep') toast('❄️ Deep freeze — all anchors locked');
+  else toast('🧊 Shallow freeze — outer locked, core free');
+  updateNextBtn();
+}
+function completeLevel(){
+  const lvl=LEVELS[cur-1];
+  const st=state.perLevel[cur];
+  if(!lvl.win(st)){ toast('Drag and RUN first!'); return; }
+  if(!state.completed.includes(cur)) state.completed.push(cur);
+  save();
+  renderNav();
+  const host=document.getElementById('winHost');
+  if(cur < 4){
+    host.innerHTML=`<div class="win-overlay"><h2>LEVEL ${cur} FORGED!</h2><p>${lvl.name} mastered</p><p style="color:var(--gold);font-size:12px;margin-top:6px">Progress saved • ${state.completed.length}/4</p><button onclick="nextLevel()">NEXT LEVEL →</button></div>`;
+    toast(`Level ${cur} forged!`);
+  } else {
+    host.innerHTML=`<div class="win-overlay"><h2>🏆 MASTER SMITH!</h2><p>All 4 mutability lessons forged</p><p style="color:var(--gold);font-size:12px;margin-top:6px">You understand references, const, spread & freeze</p><button onclick="resetAll()">FORGE AGAIN</button></div>`;
+    addLog('WIN',`🏆 All levels complete — Master Smith!`,'win');
+    toast('🏆 Workshop complete!');
+  }
+}
+function nextLevel(){
+  document.getElementById('winHost').innerHTML='';
+  if(cur < 4) switchLevel(cur+1);
+}
+function resetLevel(){
+  const lvl=LEVELS[cur-1];
+  const st=state.perLevel[cur];
+  if(lvl.id===3){
+    st.pointsA=JSON.parse(JSON.stringify(lvl.pointsA));
+    st.pointsB=JSON.parse(JSON.stringify(lvl.pointsB));
+    st.gem={...lvl.gem};
+  } else if(lvl.id===4){
+    st.points=JSON.parse(JSON.stringify(lvl.points));
+    st.core={...lvl.core};
+  } else {
+    st.points=JSON.parse(JSON.stringify(lvl.points));
+  }
+  st.dragged=false;
+  save();
+  renderForge();
+  toast('Shape reset');
+}
+function resetCurrent(){
+  resetLevel();
+  state.perLevel[cur].ran=false;
+  state.perLevel[cur].freezeToggled=false;
+  save();
+  clearLog();
+  addLog('INFO',`Level ${cur} reset`,'info');
+  document.getElementById('winHost').innerHTML='';
+  updateNextBtn();
+}
+function resetAll(){
+  if(!confirm('Reset all progress?')) return;
+  state={completed:[], perLevel:{}};
+  LEVELS.forEach(l=>{
+    state.perLevel[l.id]={dragged:false, ran:false, freezeToggled:false, freezeMode:'shallow'};
+    if(l.id===3){ state.perLevel[l.id].pointsA=JSON.parse(JSON.stringify(l.pointsA)); state.perLevel[l.id].pointsB=JSON.parse(JSON.stringify(l.pointsB)); state.perLevel[l.id].gem={...l.gem}; }
+    else if(l.id===4){ state.perLevel[l.id].points=JSON.parse(JSON.stringify(l.points)); state.perLevel[l.id].core={...l.core}; }
+    else state.perLevel[l.id].points=JSON.parse(JSON.stringify(l.points));
+  });
+  cur=1;
+  save();
+  switchLevel(1);
+  renderNav();
+  toast('All progress reset');
+}
+// init
+load();
+renderNav();
+renderGuide();
+renderForge();
+clearLog();
+addLog('INFO','Welcome to Ember Forge — drag anchors to reshape glass','info');
+addLog('INFO','Then RUN snippet to see mutability in action','info');
+</script>
+</body>
+</html>

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Balance Guess Drill</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#eef2ff;color:#1e1b4b;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center;background:linear-gradient(180deg, #a5b4fc 0%, #c4b5fd 45%, #fbcfe8 100%)}
+.app{width:100%;max-width:428px;min-width:360px;height:100dvh;display:flex;flex-direction:column;background:linear-gradient(180deg, #eef2ff 0%, #fdf2f8 100%);overflow:hidden;position:relative}
+header{padding:12px 12px 10px;display:flex;justify-content:space-between;align-items:center}
+.logo{line-height:1}
+.logo-top{font-size:10px;letter-spacing:0.16em;color:#6366f1;font-weight:800}
+.logo-main{font-family:Georgia,serif;font-size:18px;font-weight:800;color:#1e1b4b;letter-spacing:0.04em}
+.logo-main i{color:#ec4899;font-style:normal}
+.hstats{display:flex;gap:8px}
+.pill{background:#fff;border:1.5px solid #e0e7ff;border-radius:999px;padding:6px 10px;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;box-shadow:0 2px 8px rgba(99,102,241,0.08)}
+.pill b{color:#4f46e5}
+.pill span{color:#1e1b4b}
+.card{background:#fff;border:1.5px solid #e0e7ff;border-radius:18px;box-shadow:0 8px 24px rgba(99,102,241,0.10);overflow:hidden}
+.scale-card{margin:0 12px;padding:14px 12px 10px}
+.clue{font-size:11px;letter-spacing:0.10em;font-weight:800;color:#6366f1;text-align:center}
+.clue b{color:#1e1b4b}
+.equation{font-family:Georgia,serif;font-size:15px;font-weight:800;color:#1e1b4b;text-align:center;margin-top:4px}
+.equation span{color:#ec4899}
+.scale-wrap{position:relative;height:170px;margin-top:10px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
+.beam-wrap{width:92%;height:10px;position:relative;top:28px;transition:transform 0.45s cubic-bezier(0.34,1.56,0.64,1);transform-origin:center center}
+.beam{height:10px;background:linear-gradient(180deg, #4f46e5 0%, #3730a3 100%);border-radius:999px;box-shadow:0 3px 8px rgba(0,0,0,0.15);position:relative}
+.beam::before,.beam::after{content:"";position:absolute;top:50%;width:10px;height:10px;background:#1e1b4b;border-radius:50%;transform:translateY(-50%)}
+.beam::before{left:-4px}
+.beam::after{right:-4px}
+.pivot{width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-bottom:22px solid #c7d2fe;position:absolute;left:50%;top:10px;transform:translateX(-50%);filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))}
+.pivot::after{content:"";position:absolute;left:50%;top:22px;width:4px;height:14px;background:#a5b4fc;transform:translateX(-50%);border-radius:2px}
+.pans{position:absolute;top:38px;left:0;right:0;display:flex;justify-content:space-between;padding:0 6px;pointer-events:none}
+.pan-group{width:44%;display:flex;flex-direction:column;align-items:center;transition:transform 0.45s cubic-bezier(0.34,1.56,0.64,1)}
+.string{width:1.5px;height:28px;background:#a5b4fc;position:relative}
+.string::before,.string::after{content:"";position:absolute;top:0;width:1.5px;height:28px;background:#a5b4fc}
+.string::before{left:-18px;transform:rotate(-12deg);transform-origin:top}
+.string::after{right:-18px;transform:rotate(12deg);transform-origin:top}
+.pan{width:86px;height:14px;background:linear-gradient(180deg, #fde68a 0%, #f59e0b 100%);border:1.5px solid #d97706;border-radius:0 0 10px 10px;box-shadow:0 4px 10px rgba(0,0,0,0.12);margin-top:-1px;display:flex;align-items:center;justify-content:center}
+.pan-inner{width:78px;height:6px;background:rgba(0,0,0,0.08);border-radius:0 0 8px 8px;margin-top:2px}
+.weight{width:52px;height:52px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:800;box-shadow:0 6px 14px rgba(0,0,0,0.18);border:2px solid rgba(255,255,255,0.6);margin-top:6px;position:relative}
+.weight b{font-size:18px;line-height:1}
+.weight span{font-size:8px;letter-spacing:0.10em;opacity:0.9}
+.weight.left{background:linear-gradient(180deg, #60a5fa 0%, #2563eb 100%)}
+.weight.right{background:linear-gradient(180deg, #f472b6 0%, #db2777 100%)}
+.weight.hidden{background:linear-gradient(180deg, #e0e7ff 0%, #c7d2fe 100%);color:#4f46e5;border:2px dashed #818cf8}
+.weight.hidden b{font-size:20px}
+.feedback{height:36px;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px;font-size:13px;font-weight:800;letter-spacing:0.04em}
+.feedback.ok{color:#059669}
+.feedback.bad{color:#dc2626}
+.feedback.neutral{color:#6366f1}
+.badge{padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:0.06em}
+.badge.ok{background:#d1fae5;color:#065f46;border:1px solid #6ee7b7}
+.badge.bad{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.input-card{margin:10px 12px 12px;padding:12px}
+.input-row{display:flex;gap:8px;align-items:center}
+.input-wrap{flex:1;height:62px;background:#f8fafc;border:2px solid #c7d2fe;border-radius:14px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.input-wrap.focus{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(99,102,241,0.15)}
+.input-wrap input{width:100%;height:100%;border:none;background:transparent;text-align:center;font-size:28px;font-weight:800;color:#1e1b4b;letter-spacing:0.06em;outline:none}
+.input-wrap input::placeholder{color:#a5b4fc}
+.clear-btn{width:44px;height:44px;border-radius:12px;border:1.5px solid #e0e7ff;background:#fff;color:#6366f1;font-size:16px;font-weight:800;cursor:pointer;flex-shrink:0}
+.clear-btn:active{transform:scale(0.96)}
+.numpad{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+.key{height:52px;background:#fff;border:1.5px solid #e0e7ff;border-bottom:2px solid #c7d2fe;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#1e1b4b;cursor:pointer;user-select:none}
+.key:active{background:#4f46e5;color:#fff;border-color:#4f46e5;transform:translateY(1px);border-bottom-width:1px}
+.key.wide{grid-column:span 2}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.btn{height:52px;border-radius:14px;border:none;font-size:13px;font-weight:800;letter-spacing:0.06em;cursor:pointer}
+.btn:active{transform:scale(0.98)}
+.btn-primary{background:linear-gradient(180deg, #4f46e5 0%, #3730a3 100%);color:#fff;box-shadow:0 6px 16px rgba(79,70,229,0.30)}
+.btn-primary:disabled{background:#e0e7ff;color:#a5b4fc;box-shadow:none;cursor:not-allowed}
+.btn-ghost{background:#fff;border:1.5px solid #e0e7ff;color:#4f46e5}
+.hint{font-size:11px;color:#6b7280;font-weight:600;text-align:center;margin-top:8px}
+.confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.confetti i{position:absolute;width:8px;height:8px;border-radius:50%;animation:fall 0.8s ease forwards}
+@keyframes fall{0%{transform:translateY(-10px) rotate(0deg);opacity:1}100%{transform:translateY(120px) rotate(360deg);opacity:0}}
+.shake{animation:shake 0.3s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">
+      <div class="logo-top">BALANCE GUESS</div>
+      <div class="logo-main">SCALE <i>DRILL</i></div>
+    </div>
+    <div class="hstats">
+      <div class="pill"><span>ROUND</span> <b id="round">1</b></div>
+      <div class="pill"><span>SCORE</span> <b id="score">0</b></div>
+      <div class="pill"><span>STREAK</span> <b id="streak">0</b></div>
+    </div>
+  </header>
+
+  <div class="card scale-card">
+    <div class="clue" id="clue">RIGHT = LEFT + 7</div>
+    <div class="equation" id="equation"><span id="leftVal">24</span> <span style="color:#6366f1">→</span> <span id="rightHint">?</span></div>
+    <div class="scale-wrap" id="scaleWrap">
+      <div class="beam-wrap" id="beamWrap">
+        <div class="beam"></div>
+        <div class="pans">
+          <div class="pan-group" id="panLeft">
+            <div class="string"></div>
+            <div class="pan"><div class="pan-inner"></div></div>
+            <div class="weight left" id="wLeft"><b id="wLeftNum">24</b><span>KG</span></div>
+          </div>
+          <div class="pan-group" id="panRight">
+            <div class="string"></div>
+            <div class="pan"><div class="pan-inner"></div></div>
+            <div class="weight hidden" id="wRight"><b id="wRightNum">?</b><span id="wRightUnit">KG</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="pivot"></div>
+      <div class="confetti" id="confetti"></div>
+    </div>
+    <div class="feedback neutral" id="feedback"><span class="badge" style="background:#eef2ff;color:#4f46e5;border:1px solid #c7d2fe">GUESS THE RIGHT WEIGHT</span></div>
+  </div>
+
+  <div class="card input-card">
+    <div class="input-row">
+      <div class="input-wrap" id="inputWrap">
+        <input id="guessInput" type="text" inputmode="numeric" placeholder="?" readonly>
+      </div>
+      <button class="clear-btn" onclick="clearInput()">X</button>
+    </div>
+    <div class="numpad" id="numpad">
+      <div class="key" data-k="1">1</div>
+      <div class="key" data-k="2">2</div>
+      <div class="key" data-k="3">3</div>
+      <div class="key" data-k="4">4</div>
+      <div class="key" data-k="5">5</div>
+      <div class="key" data-k="6">6</div>
+      <div class="key" data-k="7">7</div>
+      <div class="key" data-k="8">8</div>
+      <div class="key" data-k="9">9</div>
+      <div class="key" data-k="0">0</div>
+      <div class="key" data-k="back">⌫</div>
+      <div class="key" data-k="enter" style="background:#4f46e5;color:#fff;border-color:#4f46e5">↵</div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-ghost" id="skipBtn" onclick="skipRound()">SKIP</button>
+      <button class="btn btn-primary" id="checkBtn" onclick="checkGuess()">CHECK</button>
+    </div>
+    <div class="hint">Type your guess • Big field • Instant balance feedback</div>
+  </div>
+</div>
+
+<script>
+let leftW=24, rightW=31, op="+", delta=7;
+let round=1, score=0, streak=0;
+let inputVal="";
+let revealed=false;
+
+const clueEl=document.getElementById("clue");
+const equationEl=document.getElementById("equation");
+const leftValEl=document.getElementById("leftVal");
+const rightHintEl=document.getElementById("rightHint");
+const wLeftNum=document.getElementById("wLeftNum");
+const wRight=document.getElementById("wRight");
+const wRightNum=document.getElementById("wRightNum");
+const wRightUnit=document.getElementById("wRightUnit");
+const feedback=document.getElementById("feedback");
+const guessInput=document.getElementById("guessInput");
+const inputWrap=document.getElementById("inputWrap");
+const beamWrap=document.getElementById("beamWrap");
+const panLeft=document.getElementById("panLeft");
+const panRight=document.getElementById("panRight");
+const roundEl=document.getElementById("round");
+const scoreEl=document.getElementById("score");
+const streakEl=document.getElementById("streak");
+const checkBtn=document.getElementById("checkBtn");
+const skipBtn=document.getElementById("skipBtn");
+
+function randInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+
+function newRound(){
+  revealed=false;
+  inputVal="";
+  guessInput.value="";
+  guessInput.placeholder="?";
+  checkBtn.textContent="CHECK";
+  checkBtn.disabled=false;
+  skipBtn.textContent="SKIP";
+  wRight.className="weight hidden";
+  wRightNum.textContent="?";
+  wRightUnit.textContent="KG";
+  wRightUnit.style.display="block";
+  feedback.className="feedback neutral";
+  feedback.innerHTML='<span class="badge" style="background:#eef2ff;color:#4f46e5;border:1px solid #c7d2fe">GUESS THE RIGHT WEIGHT</span>';
+  setBeam(0);
+  panLeft.style.transform="translateY(0)";
+  panRight.style.transform="translateY(0)";
+
+  const ops=["+","-","x","÷"];
+  op = ops[randInt(0,3)];
+  if(op==="+"){
+    leftW=randInt(8,42);
+    delta=randInt(3,18);
+    rightW=leftW+delta;
+    clueEl.innerHTML='RIGHT = LEFT <b>+ '+delta+'</b>';
+  } else if(op==="-"){
+    delta=randInt(4,16);
+    rightW=randInt(10,38);
+    leftW=rightW+delta;
+    clueEl.innerHTML='RIGHT = LEFT <b>− '+delta+'</b>';
+  } else if(op==="x"){
+    const mult=[2,3,4][randInt(0,2)];
+    leftW=randInt(4,18);
+    rightW=leftW*mult;
+    delta=mult;
+    clueEl.innerHTML='RIGHT = LEFT <b>× '+mult+'</b>';
+  } else {
+    const div=[2,3,4,5][randInt(0,3)];
+    rightW=randInt(6,20);
+    leftW=rightW*div;
+    delta=div;
+    clueEl.innerHTML='RIGHT = LEFT <b>÷ '+div+'</b>';
+  }
+  leftValEl.textContent=leftW;
+  rightHintEl.textContent="?";
+  wLeftNum.textContent=leftW;
+  roundEl.textContent=round;
+  scoreEl.textContent=score;
+  streakEl.textContent=streak;
+  inputWrap.classList.remove("shake");
+}
+
+function setBeam(deg){
+  beamWrap.style.transform="rotate("+deg+"deg)";
+  // pans counter-tilt for realism
+  panLeft.style.transform="translateY("+(deg>0? "6px":"-6px")+")";
+  panRight.style.transform="translateY("+(deg>0? "-6px":"6px")+")";
+}
+
+function updateInput(){
+  guessInput.value=inputVal;
+  inputWrap.classList.toggle("focus", inputVal.length>0);
+}
+
+function clearInput(){
+  if(revealed){
+    nextRound();
+    return;
+  }
+  inputVal="";
+  updateInput();
+}
+
+function handleKey(k){
+  if(revealed && k!=="back"){
+    // any key after reveal goes to next
+    if(k==="enter") nextRound();
+    return;
+  }
+  if(k==="back"){
+    inputVal=inputVal.slice(0,-1);
+    updateInput();
+    return;
+  }
+  if(k==="enter"){
+    checkGuess();
+    return;
+  }
+  if(/^[0-9]$/.test(k)){
+    if(inputVal.length>=3) return;
+    // avoid leading zero
+    if(inputVal==="0") inputVal=k;
+    else inputVal+=k;
+    updateInput();
+  }
+}
+
+document.getElementById("numpad").addEventListener("click", e=>{
+  const k=e.target.closest(".key");
+  if(!k) return;
+  handleKey(k.dataset.k);
+});
+
+// physical keyboard
+document.addEventListener("keydown", e=>{
+  if(e.key==="Enter") { e.preventDefault(); handleKey("enter"); }
+  else if(e.key==="Backspace") { e.preventDefault(); handleKey("back"); }
+  else if(e.key==="Escape") { clearInput(); }
+  else if(/^[0-9]$/.test(e.key)) { handleKey(e.key); }
+});
+
+function checkGuess(){
+  if(revealed){
+    nextRound();
+    return;
+  }
+  if(!inputVal){
+    inputWrap.classList.add("shake");
+    setTimeout(()=> inputWrap.classList.remove("shake"), 300);
+    if(navigator.vibrate) navigator.vibrate(20);
+    return;
+  }
+  const guess=parseInt(inputVal,10);
+  revealed=true;
+  // reveal true values
+  rightHintEl.textContent=rightW;
+  wRight.className="weight right";
+  wRightNum.textContent=rightW;
+  wRightUnit.textContent="KG";
+
+  if(guess===rightW){
+    score += 10 + Math.min(streak*2, 10);
+    streak++;
+    feedback.className="feedback ok";
+    feedback.innerHTML='<span class="badge ok">BALANCED ✓</span> <span>'+leftW+' → '+rightW+' correct!</span>';
+    setBeam(0);
+    burstConfetti();
+    if(navigator.vibrate) navigator.vibrate(18);
+    checkBtn.textContent="NEXT →";
+    skipBtn.textContent="NEXT →";
+  } else {
+    streak=0;
+    feedback.className="feedback bad";
+    feedback.innerHTML='<span class="badge bad">NOT BALANCED</span> <span>You: '+guess+' • True: '+rightW+'</span>';
+    const deg = guess < rightW ? -11 : 11;
+    setBeam(deg);
+    inputWrap.classList.add("shake");
+    setTimeout(()=> inputWrap.classList.remove("shake"), 300);
+    if(navigator.vibrate) navigator.vibrate([30,40,30]);
+    checkBtn.textContent="NEXT →";
+    skipBtn.textContent="NEXT →";
+  }
+  scoreEl.textContent=score;
+  streakEl.textContent=streak;
+}
+
+function skipRound(){
+  if(revealed){
+    nextRound();
+    return;
+  }
+  // reveal without scoring
+  revealed=true;
+  rightHintEl.textContent=rightW;
+  wRight.className="weight right";
+  wRightNum.textContent=rightW;
+  wRightUnit.textContent="KG";
+  feedback.className="feedback bad";
+  feedback.innerHTML='<span class="badge bad">REVEALED</span> <span>'+leftW+' → '+rightW+'</span>';
+  setBeam(0);
+  streak=0;
+  streakEl.textContent=streak;
+  checkBtn.textContent="NEXT →";
+  skipBtn.textContent="NEXT →";
+}
+
+function nextRound(){
+  round++;
+  newRound();
+}
+
+function burstConfetti(){
+  const c=document.getElementById("confetti");
+  c.innerHTML="";
+  const colors=["#4f46e5","#ec4899","#f59e0b","#10b981","#60a5fa"];
+  for(let i=0;i<14;i++){
+    const el=document.createElement("i");
+    el.style.left= (10 + Math.random()*80) + "%";
+    el.style.top="40%";
+    el.style.background=colors[i%colors.length];
+    el.style.animationDelay=(Math.random()*0.15)+"s";
+    el.style.transform="translateY(0) rotate("+ (Math.random()*360)+"deg)";
+    c.appendChild(el);
+  }
+  setTimeout(()=> c.innerHTML="", 900);
+}
+
+newRound();
+</script>
+</body>
+</html>

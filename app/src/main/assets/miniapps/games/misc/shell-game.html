@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Cup Shuffle — Hands of Fortune</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+html,body{height:100%;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+body{background:#020617;color:#fff;display:flex;justify-content:center}
+#wrap{width:100%;max-width:420px;height:100vh;height:100dvh;display:flex;flex-direction:column;background:linear-gradient(180deg,#1e293b 0%,#0f172a 55%,#020617 100%);position:relative;overflow:hidden}
+header{display:flex;justify-content:space-between;align-items:center;padding:10px 10px 8px;background:rgba(0,0,0,0.35);border-bottom:1px solid rgba(255,255,255,0.08);gap:6px}
+.hud{display:flex;gap:6px;flex-wrap:wrap}
+.pill{background:rgba(255,255,255,0.09);border:1px solid rgba(255,255,255,0.08);padding:5px 8px;border-radius:10px;font-size:11px;font-weight:800;letter-spacing:0.3px;line-height:1}
+.pill b{color:#fde68a}
+.pill.lives{color:#fca5a5}
+.pill.best{color:#86efac}
+#canvasWrap{flex:1;position:relative;display:flex;align-items:center;justify-content:center;padding:10px 10px 0}
+canvas{width:100%;height:100%;max-height:440px;background:radial-gradient(ellipse at 50% 0%,#334155 0%,#1e293b 45%,#0f172a 75%);border-radius:18px;border:2px solid rgba(255,255,255,0.1);box-shadow:0 10px 30px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08);touch-action:none;display:block}
+#msg{height:38px;display:flex;align-items:center;justify-content:center;text-align:center;padding:6px 10px;font-weight:900;font-size:13px;letter-spacing:0.3px;color:#fde68a;text-shadow:0 1px 0 rgba(0,0,0,0.6)}
+#msg.bad{color:#fca5a5}
+#msg.good{color:#86efac}
+#controls{display:flex;gap:8px;padding:8px 10px 10px}
+.btn{flex:1;padding:13px 8px;border:none;border-radius:14px;font-weight:900;font-size:13px;letter-spacing:0.4px;cursor:pointer;transition:transform 0.06s}
+.btn:active{transform:translateY(2px)}
+.btn.primary{background:linear-gradient(180deg,#fbbf24,#f59e0b);color:#1a1200;box-shadow:0 4px 0 #92400e}
+.btn.secondary{background:#1e293b;color:#e2e8f0;box-shadow:0 4px 0 #020617;border:1px solid rgba(255,255,255,0.08)}
+.btn:disabled{opacity:0.5;pointer-events:none}
+#overlay{position:absolute;inset:0;background:rgba(2,6,23,0.92);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px;text-align:center;z-index:10}
+#overlay h1{font-size:26px;font-weight:900;color:#fbbf24;line-height:1.1;margin-bottom:6px;text-shadow:0 2px 0 rgba(0,0,0,0.5)}
+#overlay h1 span{color:#fff}
+#overlay p{font-size:12.5px;line-height:1.5;opacity:0.85;max-width:300px;margin-bottom:10px}
+.badges{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;justify-content:center}
+.badge{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);padding:8px 10px;border-radius:12px;font-size:11px;font-weight:800;min-width:78px}
+.badge b{display:block;font-size:16px;color:#fde68a}
+.kbd{font-size:10px;opacity:0.6;margin-top:6px}
+.hint{font-size:10px;opacity:0.5;margin-top:8px}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <header>
+    <div class="hud">
+      <div class="pill">LVL <b id="lvl">1</b></div>
+      <div class="pill">SCORE <b id="score">0</b></div>
+      <div class="pill lives">♥ <b id="lives">3</b></div>
+    </div>
+    <div class="hud">
+      <div class="pill best">BEST Lv<b id="bestLvl">0</b> • <b id="bestScore">0</b></div>
+    </div>
+  </header>
+  <div id="canvasWrap"><canvas id="c"></canvas></div>
+  <div id="msg">Tap START to play</div>
+  <div id="controls">
+    <button class="btn secondary" id="restartBtn">↻ RESTART</button>
+    <button class="btn primary" id="actionBtn">▶ START</button>
+  </div>
+  <div id="overlay">
+    <h1>👐 CUP SHUFFLE<br><span>HANDS OF FORTUNE</span></h1>
+    <p>Watch the coin, track the hands as they <b>swap rapidly</b>. Tap your pick when shuffling stops!</p>
+    <div class="badges">
+      <div class="badge">BEST LEVEL<b id="oBestLvl">0</b></div>
+      <div class="badge">BEST SCORE<b id="oBestScore">0</b></div>
+      <div class="badge">LIVES<b>♥♥♥</b></div>
+    </div>
+    <button class="btn primary" id="playBtn" style="min-width:180px;margin-top:8px">▶ PLAY NOW</button>
+    <div class="kbd">Touch: tap a hand &nbsp;•&nbsp; Keys: 1 2 3 / ← ↓ → + Enter</div>
+    <div class="hint">Level up = more swaps + faster speed. 3 lives. Instant restart anytime.</div>
+  </div>
+</div>
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const msgEl=document.getElementById('msg');
+const lvlEl=document.getElementById('lvl');
+const scoreEl=document.getElementById('score');
+const livesEl=document.getElementById('lives');
+const bestLvlEl=document.getElementById('bestLvl');
+const bestScoreEl=document.getElementById('bestScore');
+const oBestLvl=document.getElementById('oBestLvl');
+const oBestScore=document.getElementById('oBestScore');
+const overlay=document.getElementById('overlay');
+const actionBtn=document.getElementById('actionBtn');
+const restartBtn=document.getElementById('restartBtn');
+const playBtn=document.getElementById('playBtn');
+
+let W=0,H=0,dpr=1;
+let level=1, score=0, lives=3;
+let bestLevel=0, bestScore=0;
+let cups=[];
+let state='idle'; // idle, preview, shuffling, pick, reveal, over
+let previewT=0;
+let shuffleQueue=[];
+let curSwap=null;
+let swapT=0;
+let swapDur=600;
+let revealT=0;
+let picked=-1;
+let selectedIdx=0;
+let lastTime=0;
+
+function loadBest(){
+  bestLevel=parseInt(localStorage.getItem('cupShuffle_bestLevel')||'0',10)||0;
+  bestScore=parseInt(localStorage.getItem('cupShuffle_bestScore')||'0',10)||0;
+}
+function saveBest(){
+  let changed=false;
+  if(level>bestLevel){ bestLevel=level; localStorage.setItem('cupShuffle_bestLevel', String(bestLevel)); changed=true; }
+  if(score>bestScore){ bestScore=score; localStorage.setItem('cupShuffle_bestScore', String(bestScore)); changed=true; }
+  updateHUD();
+}
+function updateHUD(){
+  lvlEl.textContent=level;
+  scoreEl.textContent=score;
+  livesEl.textContent='♥'.repeat(Math.max(0,lives)) + (lives===0?' ×':'');
+  bestLvlEl.textContent=bestLevel;
+  bestScoreEl.textContent=bestScore;
+  oBestLvl.textContent=bestLevel;
+  oBestScore.textContent=bestScore;
+}
+function setMsg(t, cls){
+  msgEl.textContent=t;
+  msgEl.className=cls||'';
+}
+
+function resize(){
+  const rect=canvas.getBoundingClientRect();
+  dpr=Math.min(2, window.devicePixelRatio||1);
+  W=rect.width;
+  H=rect.height;
+  canvas.width=Math.round(W*dpr);
+  canvas.height=Math.round(H*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  layoutCups();
+}
+function layoutCups(){
+  if(!W||!cups.length) return;
+  const centerX=W/2;
+  const spacing=W*0.27;
+  const baseY=H*0.60;
+  for(let c of cups){
+    const tx=centerX + (c.slot-1)*spacing;
+    c.tx=tx;
+    c.baseY=baseY;
+    if(!curSwap) c.x=tx;
+    c.y=baseY;
+  }
+}
+function initCups(){
+  cups=[];
+  for(let i=0;i<3;i++) cups.push({id:i, slot:i, x:0, y:0, tx:0, baseY:0, hasCoin:false, lift:0, yOff:0, z:0});
+  layoutCups();
+}
+function startGame(){
+  level=1; score=0; lives=3;
+  overlay.style.display='none';
+  actionBtn.textContent='↻ RESTART';
+  startRound();
+  updateHUD();
+}
+function startRound(){
+  // reset slots
+  for(let i=0;i<cups.length;i++){ cups[i].slot=i; cups[i].hasCoin=false; cups[i].lift=0; cups[i].yOff=0; cups[i].z=0; }
+  const coinIdx=Math.floor(Math.random()*3);
+  cups[coinIdx].hasCoin=true;
+  layoutCups();
+  state='preview';
+  previewT=0;
+  picked=-1;
+  selectedIdx=1;
+  // build shuffle queue
+  const swaps=Math.min(16, 4 + level*2);
+  swapDur=Math.max(210, 620 - level*42);
+  shuffleQueue=[];
+  for(let i=0;i<swaps;i++){
+    let a,b;
+    do{ a=Math.floor(Math.random()*3); b=Math.floor(Math.random()*3); }while(a===b);
+    shuffleQueue.push([a,b]);
+  }
+  curSwap=null;
+  swapT=0;
+  setMsg('👀 Watch the coin!');
+  updateHUD();
+}
+function beginNextSwap(){
+  if(shuffleQueue.length===0){
+    state='pick';
+    setMsg('👉 Tap your pick! (1-2-3)');
+    return;
+  }
+  const [a,b]=shuffleQueue.shift();
+  // swap slots immediately to compute targets
+  const slotA=cups[a].slot;
+  const slotB=cups[b].slot;
+  cups[a].slot=slotB;
+  cups[b].slot=slotA;
+  const centerX=W/2, spacing=W*0.27;
+  const targetAX=centerX + (cups[a].slot-1)*spacing;
+  const targetBX=centerX + (cups[b].slot-1)*spacing;
+  curSwap={a,b, startAX:cups[a].x, startBX:cups[b].x, targetAX, targetBX, arc: 38 + Math.random()*14 };
+  swapT=0;
+  // z ordering: a goes over
+  cups[a].z=10; cups[b].z=5;
+}
+function update(dt){
+  if(state==='preview'){
+    previewT+=dt;
+    // lift coin cup
+    const coin=cups.find(c=>c.hasCoin);
+    if(previewT<0.25) coin.lift=previewT/0.25;
+    else if(previewT<1.0) coin.lift=1;
+    else if(previewT<1.25) coin.lift=1 - (previewT-1.0)/0.25;
+    else { coin.lift=0; state='shuffling'; setMsg('🔀 Shuffling... watch closely!'); beginNextSwap(); }
+  } else if(state==='shuffling'){
+    if(!curSwap) beginNextSwap();
+    if(curSwap){
+      swapT+=dt*1000/swapDur;
+      if(swapT>=1){
+        swapT=1;
+        // finalize
+        cups[curSwap.a].x=curSwap.targetAX;
+        cups[curSwap.b].x=curSwap.targetBX;
+        cups[curSwap.a].yOff=0;
+        cups[curSwap.b].yOff=0;
+        cups[curSwap.a].tx=curSwap.targetAX;
+        cups[curSwap.b].tx=curSwap.targetBX;
+        cups[curSwap.a].z=0; cups[curSwap.b].z=0;
+        curSwap=null;
+        // small pause between swaps at higher levels is shorter
+        // immediately next swap will be started next frame
+        if(shuffleQueue.length===0 && !curSwap){
+          // will transition in next update
+        }
+      } else {
+        const t=swapT;
+        const ease=t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+        cups[curSwap.a].x=curSwap.startAX + (curSwap.targetAX - curSwap.startAX)*ease;
+        cups[curSwap.b].x=curSwap.startBX + (curSwap.targetBX - curSwap.startBX)*ease;
+        const arc=Math.sin(t*Math.PI)*curSwap.arc;
+        cups[curSwap.a].yOff=-arc;
+        cups[curSwap.b].yOff= arc*0.55;
+      }
+      if(!curSwap && shuffleQueue.length===0){
+        // check if finished
+        // need to ensure last swap finished
+      }
+      if(!curSwap && shuffleQueue.length===0 && state==='shuffling'){
+        // if no more swaps and no active swap, go to pick
+        // but we already handled finalize, so transition
+        if(swapT>=1){
+          state='pick';
+          setMsg('👉 Tap your pick! (1-2-3)');
+        }
+      }
+    }
+  } else if(state==='reveal'){
+    revealT+=dt;
+    // lift animation
+    const coinIdx=cups.findIndex(c=>c.hasCoin);
+    for(let c of cups){
+      let targetLift=0;
+      if(c.id===picked || c.hasCoin) targetLift=1;
+      // smooth
+      c.lift += (targetLift - c.lift)*Math.min(1, dt*10);
+    }
+    if(revealT>1.6){
+      const win=cups[picked] && cups[picked].hasCoin;
+      if(win){
+        score+=100*level;
+        saveBest();
+        level++;
+        setMsg('✅ Correct! +'+(100*(level-1))+' → Level '+level, 'good');
+        updateHUD();
+        // next round after short delay
+        state='idle';
+        setTimeout(()=>{ if(lives>0) startRound(); }, 900);
+      } else {
+        lives--;
+        saveBest();
+        updateHUD();
+        if(lives<=0){
+          state='over';
+          setMsg('💥 Game Over!', 'bad');
+          showGameOver();
+        } else {
+          setMsg('❌ Wrong! Lives: '+lives+' — next round', 'bad');
+          state='idle';
+          setTimeout(()=> startRound(), 1100);
+        }
+      }
+    }
+  }
+  // idle does nothing
+}
+
+function showGameOver(){
+  overlay.style.display='flex';
+  overlay.innerHTML=`
+    <h1>💥 GAME OVER<br><span>LEVEL ${level} • ${score} PTS</span></h1>
+    <p>${score===bestScore && score>0 ? '🎉 New best score!' : 'Watch closer next time — speed increases each level.'}</p>
+    <div class="badges">
+      <div class="badge">LEVEL<b>${level}</b></div>
+      <div class="badge">SCORE<b>${score}</b></div>
+      <div class="badge">BEST<b>${bestScore}</b></div>
+    </div>
+    <button class="btn primary" id="againBtn" style="min-width:180px;margin-top:8px">↻ INSTANT RESTART</button>
+    <div class="kbd">Tap any hand to guess • Keys 1-3 + Enter</div>
+  `;
+  document.getElementById('againBtn').onclick=()=>{
+    overlay.style.display='none';
+    // restore overlay template for next time? keep simple: recreate
+    level=1; score=0; lives=3;
+    startRound();
+    updateHUD();
+    // restore original overlay content after game over? We'll rebuild on next over
+    // but for now keep hidden until next over; actionBtn still works
+  };
+  // also need to restore overlay template when restarting via actionBtn
+}
+
+function drawCoin(x,y, scale=1){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.scale(scale,scale);
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.25)';
+  ctx.beginPath(); ctx.ellipse(0,6,14,4,0,0,Math.PI*2); ctx.fill();
+  // outer
+  ctx.fillStyle='#f59e0b';
+  ctx.beginPath(); ctx.arc(0,0,14,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#fbbf24';
+  ctx.beginPath(); ctx.arc(0,0,11.5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#fef3c7';
+  ctx.beginPath(); ctx.arc(-4,-4,3.2,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#92400e';
+  ctx.font='900 11px system-ui';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('$',0,1);
+  ctx.restore();
+}
+function drawHand(x,y,lift,yOff, isSelected){
+  const yy=y - lift*28 + yOff;
+  ctx.save();
+  ctx.translate(x,yy);
+  if(isSelected){
+    ctx.fillStyle='rgba(251,191,36,0.18)';
+    ctx.beginPath(); ctx.ellipse(0,18,44,18,0,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(251,191,36,0.9)';
+    ctx.lineWidth=2;
+    ctx.beginPath(); ctx.ellipse(0,18,44,18,0,0,Math.PI*2); ctx.stroke();
+  }
+  // shadow under hand
+  ctx.fillStyle='rgba(0,0,0,0.28)';
+  ctx.beginPath(); ctx.ellipse(0,22,34,7,0,0,Math.PI*2); ctx.fill();
+  // hand base - cupped hand shape
+  // palm
+  ctx.fillStyle='#e8b48a';
+  ctx.beginPath();
+  ctx.moveTo(-34,14);
+  ctx.bezierCurveTo(-36,-6, -20,-18, 0,-16);
+  ctx.bezierCurveTo(20,-18, 36,-6, 34,14);
+  ctx.quadraticCurveTo(0,24, -34,14);
+  ctx.fill();
+  // fingers - 4 arches on top
+  ctx.fillStyle='#d9a07a';
+  for(let i=-1.5;i<=1.5;i++){
+    const fx=i*14;
+    ctx.beginPath();
+    ctx.ellipse(fx, -8, 9, 12, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,0.12)';
+    ctx.lineWidth=1.2;
+    ctx.stroke();
+  }
+  // thumb
+  ctx.fillStyle='#e8b48a';
+  ctx.beginPath();
+  ctx.ellipse(-30,6,10,14, -0.6, 0, Math.PI*2);
+  ctx.fill();
+  // highlight
+  ctx.fillStyle='rgba(255,255,255,0.22)';
+  ctx.beginPath(); ctx.ellipse(-10,-10,10,6, -0.2, 0, Math.PI*2); ctx.fill();
+  // rim line
+  ctx.strokeStyle='rgba(0,0,0,0.18)';
+  ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.moveTo(-34,14); ctx.quadraticCurveTo(0,22,34,14); ctx.stroke();
+  // number label
+  ctx.fillStyle='rgba(0,0,0,0.55)';
+  ctx.font='800 10px system-ui';
+  ctx.textAlign='center';
+  ctx.fillText('',0,0);
+  ctx.restore();
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // table
+  const tableY=H*0.70;
+  // felt
+  ctx.fillStyle='#0f2a1a';
+  ctx.fillRect(0, tableY, W, H-tableY);
+  // wood edge
+  ctx.fillStyle='#3f2a14';
+  ctx.fillRect(0, tableY, W, 10);
+  ctx.fillStyle='rgba(255,255,255,0.08)';
+  ctx.fillRect(0, tableY, W, 1);
+  // subtle vignette
+  const g=ctx.createRadialGradient(W/2, H*0.35, 0, W/2, H*0.35, W*0.9);
+  g.addColorStop(0,'rgba(255,255,255,0.06)');
+  g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g;
+  ctx.fillRect(0,0,W,H);
+  // slot markers
+  ctx.fillStyle='rgba(255,255,255,0.07)';
+  ctx.font='800 11px system-ui';
+  ctx.textAlign='center';
+  for(let i=0;i<3;i++){
+    const sx=W/2 + (i-1)*W*0.27;
+    ctx.beginPath(); ctx.arc(sx, tableY+18, 18,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.fillText(String(i+1), sx, tableY+22);
+    ctx.fillStyle='rgba(255,255,255,0.07)';
+  }
+  // draw coins first (under hands) when revealed
+  // sort cups by yOff for depth
+  const sorted=[...cups].sort((a,b)=> (a.yOff - b.yOff) || (a.z - b.z));
+  for(let c of sorted){
+    const showCoin = (state==='preview' && c.hasCoin && previewT>0.18 && previewT<1.12) || (state==='reveal' && c.hasCoin);
+    if(showCoin){
+      drawCoin(c.x, c.baseY+8, 1);
+    }
+  }
+  // draw hands
+  for(let c of sorted){
+    const isSel = state==='pick' && cups.indexOf(c)===selectedIdx;
+    drawHand(c.x, c.baseY, c.lift, c.yOff, isSel);
+  }
+  // shuffle speed indicator
+  if(state==='shuffling'){
+    ctx.fillStyle='rgba(0,0,0,0.35)';
+    ctx.fillRect(W/2-52, 10, 104, 6);
+    ctx.fillStyle='#fbbf24';
+    const prog = shuffleQueue.length===0 && !curSwap ? 1 : 1 - (shuffleQueue.length / Math.max(1, (shuffleQueue.length + (curSwap?1:0))));
+    // simpler: progress bar based on swaps done
+    // compute total swaps
+    // we don't have total, approximate
+    ctx.fillRect(W/2-52, 10, 104* Math.min(1, (swapT||0)), 6);
+  }
+}
+
+function loop(now){
+  requestAnimationFrame(loop);
+  if(!lastTime) lastTime=now;
+  const dt=Math.min(0.033, (now-lastTime)/1000);
+  lastTime=now;
+  update(dt);
+  draw();
+}
+
+function pickIndex(idx){
+  if(state!=='pick') return;
+  picked=idx;
+  state='reveal';
+  revealT=0;
+  // lift picked immediately a bit
+  cups[idx].lift=0.2;
+  setMsg('Revealing...');
+  // haptic
+  if(navigator.vibrate) navigator.vibrate(30);
+}
+
+function handleCanvasTap(e){
+  const rect=canvas.getBoundingClientRect();
+  const x=(e.clientX ?? e.touches?.[0]?.clientX) - rect.left;
+  // find nearest cup
+  let best=-1, bestDist=Infinity;
+  for(let i=0;i<cups.length;i++){
+    const d=Math.abs(cups[i].x - x);
+    if(d<bestDist){ bestDist=d; best=i; }
+  }
+  if(bestDist < W*0.18) {
+    if(state==='pick'){
+      selectedIdx=best;
+      pickIndex(best);
+    } else if(state==='pick'){
+      // ignore
+    }
+  }
+}
+
+// input
+canvas.addEventListener('pointerdown', (e)=>{
+  e.preventDefault();
+  if(state==='pick'){
+    handleCanvasTap(e);
+  } else if(state==='idle' && lives>0){
+    // allow tap to start if needed
+  }
+}, {passive:false});
+
+window.addEventListener('keydown', (e)=>{
+  if(e.key==='1' || e.key==='ArrowLeft'){ selectedIdx=0; if(state==='pick') pickIndex(0); }
+  if(e.key==='2' || e.key==='ArrowDown' || e.key==='ArrowUp'){ selectedIdx=1; if(state==='pick') pickIndex(1); }
+  if(e.key==='3' || e.key==='ArrowRight'){ selectedIdx=2; if(state==='pick') pickIndex(2); }
+  if(e.key==='Enter' || e.key===' '){
+    if(state==='pick') pickIndex(selectedIdx);
+    if(state==='idle' && overlay.style.display==='none') startRound();
+  }
+  if(e.key==='r' || e.key==='R'){
+    doRestart();
+  }
+});
+
+function doRestart(){
+  // restore overlay template if it was replaced by gameOver
+  if(!document.getElementById('playBtn')){
+    overlay.innerHTML=`
+      <h1>👐 CUP SHUFFLE<br><span>HANDS OF FORTUNE</span></h1>
+      <p>Watch the coin, track the hands as they <b>swap rapidly</b>. Tap your pick when shuffling stops!</p>
+      <div class="badges">
+        <div class="badge">BEST LEVEL<b id="oBestLvl">${bestLevel}</b></div>
+        <div class="badge">BEST SCORE<b id="oBestScore">${bestScore}</b></div>
+        <div class="badge">LIVES<b>♥♥♥</b></div>
+      </div>
+      <button class="btn primary" id="playBtn" style="min-width:180px;margin-top:8px">▶ PLAY NOW</button>
+      <div class="kbd">Touch: tap a hand &nbsp;•&nbsp; Keys: 1 2 3 / ← ↓ → + Enter</div>
+      <div class="hint">Level up = more swaps + faster speed. 3 lives. Instant restart anytime.</div>
+    `;
+    // rebind
+    document.getElementById('playBtn').onclick=startGame;
+    // re-cache
+    oBestLvl=document.getElementById('oBestLvl');
+    oBestScore=document.getElementById('oBestScore');
+    updateHUD();
+  }
+  overlay.style.display='none';
+  level=1; score=0; lives=3;
+  startRound();
+  updateHUD();
+}
+
+actionBtn.onclick=()=>{
+  if(overlay.style.display!=='none'){
+    startGame();
+  } else {
+    doRestart();
+  }
+};
+restartBtn.onclick=doRestart;
+playBtn.onclick=startGame;
+
+// init
+loadBest();
+initCups();
+resize();
+updateHUD();
+requestAnimationFrame(loop);
+window.addEventListener('resize', resize);
+setTimeout(resize, 100);
+</script>
+</body>
+</html>

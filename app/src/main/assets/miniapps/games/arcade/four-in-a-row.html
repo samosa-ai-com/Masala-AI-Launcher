@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Connect Four vs AI</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow:hidden;touch-action:manipulation}
+header{width:100%;max-width:420px;padding:14px 16px 8px;text-align:center}
+h1{font-size:22px;letter-spacing:2px;font-weight:900;color:#fff;text-shadow:0 2px 10px rgba(59,130,246,.5)}
+h1 span{color:#38bdf8}
+.subtitle{font-size:11px;letter-spacing:1.5px;color:#94a3b8;margin-top:2px;text-transform:uppercase}
+.stats{display:flex;gap:8px;margin-top:12px}
+.stat{flex:1;background:#1e293b;border:1px solid #334155;border-radius:12px;padding:8px 4px;text-align:center}
+.stat-label{font-size:10px;letter-spacing:1px;color:#94a3b8;text-transform:uppercase}
+.stat-val{font-size:18px;font-weight:800;margin-top:2px}
+.stat-you .stat-val{color:#f87171}
+.stat-ai .stat-val{color:#facc15}
+.stat-draw .stat-val{color:#94a3b8}
+.difficulty{display:flex;gap:6px;margin-top:10px;background:#1e293b;padding:4px;border-radius:999px;border:1px solid #334155}
+.diff-btn{flex:1;padding:7px 0;border-radius:999px;border:none;font-size:12px;font-weight:700;letter-spacing:.5px;background:transparent;color:#94a3b8;cursor:pointer;transition:.15s}
+.diff-btn.active{background:#38bdf8;color:#0f172a;box-shadow:0 2px 8px rgba(56,189,248,.4)}
+.status{margin:10px 0 6px;font-size:13px;font-weight:700;letter-spacing:.6px;min-height:18px;text-align:center}
+.status.you{color:#f87171}
+.status.ai{color:#facc15}
+.status.win{color:#4ade80}
+.board-wrap{width:100%;max-width:420px;padding:0 12px}
+.board-bg{background:#1d4ed8;border-radius:16px;padding:10px 8px 12px;box-shadow:0 8px 24px rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.15);border:1px solid #3b82f6}
+.col-indicators{display:flex;gap:4px;margin-bottom:6px;padding:0 2px}
+.col-ind{flex:1;height:22px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#93c5fd;opacity:.9;cursor:pointer;border-radius:6px;transition:.12s}
+.col-ind:active{background:rgba(255,255,255,.12)}
+.board{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cell{aspect-ratio:1;background:#0f172a;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative;box-shadow:inset 0 3px 6px rgba(0,0,0,.6), inset 0 -1px 1px rgba(255,255,255,.05);overflow:hidden}
+.cell.clickable{cursor:pointer}
+.disc{width:86%;height:86%;border-radius:50%;transform:translateY(-120%);animation:drop .28s cubic-bezier(.34,1.56,.64,1) forwards;box-shadow:inset 0 -4px 8px rgba(0,0,0,.3), inset 0 2px 4px rgba(255,255,255,.4), 0 2px 6px rgba(0,0,0,.3);position:relative}
+.disc.placed{transform:translateY(0);animation:none}
+.disc.p1{background:radial-gradient(circle at 30% 30%, #fca5a5, #ef4444 55%, #991b1b);border:1px solid #fecaca}
+.disc.p2{background:radial-gradient(circle at 30% 30%, #fef08a, #eab308 55%, #854d0e);border:1px solid #fef9c3}
+.disc.win{box-shadow:0 0 0 3px #4ade80, 0 0 12px #4ade80, inset 0 -4px 8px rgba(0,0,0,.3)}
+.disc.win::after{content:'★';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+@keyframes drop{0%{transform:translateY(-180%)}100%{transform:translateY(0)}}
+.controls{width:100%;max-width:420px;display:flex;gap:10px;padding:12px 12px 18px}
+.btn{flex:1;padding:12px;border-radius:12px;border:none;font-weight:800;font-size:13px;letter-spacing:.5px;cursor:pointer;transition:.15s}
+.btn-primary{background:#38bdf8;color:#0f172a;box-shadow:0 4px 12px rgba(56,189,248,.3)}
+.btn-primary:active{transform:scale(.97)}
+.btn-ghost{background:#1e293b;color:#e2e8f0;border:1px solid #334155}
+.btn-ghost:active{transform:scale(.97)}
+.turn-dot{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;margin-right:6px;box-shadow:0 0 6px currentColor}
+.legend{display:flex;gap:14px;justify-content:center;margin-top:6px;font-size:11px;color:#94a3b8}
+.legend span{display:flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+</style>
+</head>
+<body>
+<header>
+<h1>CONNECT <span>FOUR</span></h1>
+<div class="subtitle">Tap a column to drop — AI answers</div>
+<div class="stats">
+<div class="stat stat-you"><div class="stat-label">You</div><div class="stat-val" id="youScore">0</div></div>
+<div class="stat stat-draw"><div class="stat-label">Draws</div><div class="stat-val" id="drawScore">0</div></div>
+<div class="stat stat-ai"><div class="stat-label">AI</div><div class="stat-val" id="aiScore">0</div></div>
+</div>
+<div class="difficulty" id="difficulty">
+<button class="diff-btn" data-diff="easy">EASY</button>
+<button class="diff-btn active" data-diff="medium">MEDIUM</button>
+<button class="diff-btn" data-diff="hard">HARD</button>
+</div>
+</header>
+<div class="status you" id="status"><span class="turn-dot" style="background:#f87171;color:#f87171"></span>Your turn — tap a column</div>
+<div class="board-wrap">
+<div class="board-bg">
+<div class="col-indicators" id="colIndicators"></div>
+<div class="board" id="board"></div>
+</div>
+<div class="legend"><span><i style="background:#ef4444"></i> You</span><span><i style="background:#eab308"></i> AI</span><span>First to 4 wins</span></div>
+</div>
+<div class="controls">
+<button class="btn btn-ghost" id="resetStatsBtn">Reset Stats</button>
+<button class="btn btn-primary" id="newGameBtn">New Game</button>
+</div>
+<script>
+const ROWS=6, COLS=7;
+let board=[], current=1, gameOver=false, difficulty='medium';
+let stats={you:0, ai:0, draw:0};
+let winningCells=null;
+
+const boardEl=document.getElementById('board');
+const statusEl=document.getElementById('status');
+const colIndEl=document.getElementById('colIndicators');
+
+function load(){
+  try{
+    const s=JSON.parse(localStorage.getItem('cf_stats_v2'));
+    if(s) stats=s;
+    const d=localStorage.getItem('cf_diff_v2');
+    if(d) difficulty=d;
+  }catch(e){}
+}
+function save(){
+  localStorage.setItem('cf_stats_v2', JSON.stringify(stats));
+  localStorage.setItem('cf_diff_v2', difficulty);
+}
+function updateStatsUI(){
+  document.getElementById('youScore').textContent=stats.you;
+  document.getElementById('aiScore').textContent=stats.ai;
+  document.getElementById('drawScore').textContent=stats.draw;
+  document.querySelectorAll('.diff-btn').forEach(b=>b.classList.toggle('active', b.dataset.diff===difficulty));
+}
+function initBoard(){
+  board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  current=1; gameOver=false; winningCells=null;
+  render();
+  setStatus("Your turn — tap a column", "you");
+}
+function render(){
+  boardEl.innerHTML='';
+  colIndEl.innerHTML='';
+  for(let c=0;c<COLS;c++){
+    const ind=document.createElement('div');
+    ind.className='col-ind';
+    ind.textContent='▼';
+    ind.style.opacity = isColFull(c) || gameOver ? '0.2' : '0.9';
+    ind.onclick=()=>handleCol(c);
+    colIndEl.appendChild(ind);
+  }
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const cell=document.createElement('div');
+      cell.className='cell clickable';
+      cell.dataset.col=c;
+      cell.onclick=()=>handleCol(c);
+      const v=board[r][c];
+      if(v!==0){
+        const disc=document.createElement('div');
+        disc.className='disc placed p'+v;
+        if(winningCells && winningCells.some(([wr,wc])=>wr===r && wc===c)) disc.classList.add('win');
+        cell.appendChild(disc);
+      }
+      boardEl.appendChild(cell);
+    }
+  }
+}
+function isColFull(c){ return board[0][c]!==0; }
+function getNextRow(c){
+  for(let r=ROWS-1;r>=0;r--) if(board[r][c]===0) return r;
+  return -1;
+}
+function handleCol(c){
+  if(gameOver) return;
+  if(current!==1) return;
+  if(isColFull(c)) return;
+  const r=getNextRow(c);
+  board[r][c]=1;
+  animateDrop(r,c,1, ()=>{
+    const win=checkWin(board,1);
+    if(win){
+      winningCells=win; gameOver=true; stats.you++; save(); updateStatsUI();
+      render(); setStatus("You win! 🎉", "win"); pulseBoard(); return;
+    }
+    if(isDraw(board)){ gameOver=true; stats.draw++; save(); updateStatsUI(); setStatus("Draw — well played!", "win"); return; }
+    current=2;
+    setStatus("AI thinking…", "ai");
+    render();
+    setTimeout(aiTurn, 380);
+  });
+  renderWithAnimation(r,c,1);
+}
+function renderWithAnimation(row,col,player){
+  // quick render with drop animation for the new disc
+  boardEl.innerHTML='';
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const cell=document.createElement('div');
+      cell.className='cell clickable';
+      cell.onclick=()=>handleCol(c);
+      const v=board[r][c];
+      if(v!==0){
+        const disc=document.createElement('div');
+        const isNew = r===row && c===col;
+        disc.className='disc p'+v + (isNew ? '' : ' placed');
+        if(winningCells && winningCells.some(([wr,wc])=>wr===r && wc===c)) disc.classList.add('win');
+        cell.appendChild(disc);
+      }
+      boardEl.appendChild(cell);
+    }
+  }
+}
+function animateDrop(r,c,player, cb){
+  // cb already handled via timeout in handleCol, but we keep render sync
+  if(cb) setTimeout(cb, 10);
+}
+function aiTurn(){
+  if(gameOver) return;
+  let col;
+  if(difficulty==='easy'){
+    col=easyMove();
+  } else if(difficulty==='medium'){
+    col=bestMove(3);
+  } else {
+    col=bestMove(5);
+  }
+  if(col===null || col===undefined || isColFull(col)){
+    const valid=getValidCols(board);
+    col=valid[Math.floor(Math.random()*valid.length)];
+  }
+  const r=getNextRow(col);
+  if(r===-1){ current=1; setStatus("Your turn — tap a column","you"); return; }
+  board[r][col]=2;
+  renderWithAnimation(r,col,2);
+  const win=checkWin(board,2);
+  if(win){
+    winningCells=win; gameOver=true; stats.ai++; save(); updateStatsUI();
+    render(); setStatus("AI wins — tap New Game to rematch", "ai"); return;
+  }
+  if(isDraw(board)){ gameOver=true; stats.draw++; save(); updateStatsUI(); setStatus("Draw!", "win"); return; }
+  current=1;
+  render();
+  setStatus("Your turn — tap a column", "you");
+}
+function easyMove(){
+  // 40% random, else try win/block
+  if(Math.random()<0.4){
+    const v=getValidCols(board); return v[Math.floor(Math.random()*v.length)];
+  }
+  // win if possible
+  for(let c of getValidCols(board)){
+    const r=getNextRow(c); board[r][c]=2;
+    if(checkWin(board,2)){ board[r][c]=0; return c; }
+    board[r][c]=0;
+  }
+  // block
+  for(let c of getValidCols(board)){
+    const r=getNextRow(c); board[r][c]=1;
+    if(checkWin(board,1)){ board[r][c]=0; return c; }
+    board[r][c]=0;
+  }
+  const v=getValidCols(board); return v[Math.floor(Math.random()*v.length)];
+}
+function getValidCols(b){ const a=[]; for(let c=0;c<COLS;c++) if(b[0][c]===0) a.push(c); return a; }
+function isDraw(b){ return b[0].every(v=>v!==0); }
+
+function checkWin(b, p){
+  // return winning cells array or null
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(b[r][c]!==p) continue;
+      // horiz
+      if(c+3<COLS && b[r][c+1]===p && b[r][c+2]===p && b[r][c+3]===p) return [[r,c],[r,c+1],[r,c+2],[r,c+3]];
+      // vert
+      if(r+3<ROWS && b[r+1][c]===p && b[r+2][c]===p && b[r+3][c]===p) return [[r,c],[r+1,c],[r+2,c],[r+3,c]];
+      // diag down-right
+      if(r+3<ROWS && c+3<COLS && b[r+1][c+1]===p && b[r+2][c+2]===p && b[r+3][c+3]===p) return [[r,c],[r+1,c+1],[r+2,c+2],[r+3,c+3]];
+      // diag up-right
+      if(r-3>=0 && c+3<COLS && b[r-1][c+1]===p && b[r-2][c+2]===p && b[r-3][c+3]===p) return [[r,c],[r-1,c+1],[r-2,c+2],[r-3,c+3]];
+    }
+  }
+  return null;
+}
+function evaluateWindow(window, p){
+  const opp = p===2?1:2;
+  let score=0;
+  const countP=window.filter(v=>v===p).length;
+  const countOpp=window.filter(v=>v===opp).length;
+  const countEmpty=window.filter(v=>v===0).length;
+  if(countP===4) score+=100000;
+  else if(countP===3 && countEmpty===1) score+=100;
+  else if(countP===2 && countEmpty===2) score+=10;
+  else if(countP===1 && countEmpty===3) score+=1;
+  if(countOpp===3 && countEmpty===1) score-=80;
+  else if(countOpp===2 && countEmpty===2) score-=4;
+  return score;
+}
+function evaluateBoard(b){
+  let score=0;
+  const centerCount = b.reduce((acc,row)=>acc + row.filter(v=>v===2).length,0);
+  // center column preference
+  let centerCol=0;
+  for(let r=0;r<ROWS;r++) if(b[r][3]===2) centerCol++;
+  score += centerCol*6;
+  // horizontal
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS-3;c++){
+      const w=[b[r][c],b[r][c+1],b[r][c+2],b[r][c+3]];
+      score+=evaluateWindow(w,2);
+    }
+  }
+  // vertical
+  for(let c=0;c<COLS;c++){
+    for(let r=0;r<ROWS-3;r++){
+      const w=[b[r][c],b[r+1][c],b[r+2][c],b[r+3][c]];
+      score+=evaluateWindow(w,2);
+    }
+  }
+  // diag down-right
+  for(let r=0;r<ROWS-3;r++){
+    for(let c=0;c<COLS-3;c++){
+      const w=[b[r][c],b[r+1][c+1],b[r+2][c+2],b[r+3][c+3]];
+      score+=evaluateWindow(w,2);
+    }
+  }
+  // diag up-right
+  for(let r=3;r<ROWS;r++){
+    for(let c=0;c<COLS-3;c++){
+      const w=[b[r][c],b[r-1][c+1],b[r-2][c+2],b[r-3][c+3]];
+      score+=evaluateWindow(w,2);
+    }
+  }
+  return score;
+}
+function minimax(b, depth, alpha, beta, maximizing){
+  const valid=getValidCols(b);
+  const winAI=checkWin(b,2);
+  const winP=checkWin(b,1);
+  if(winAI) return {score: 1000000 + depth, col:null};
+  if(winP) return {score: -1000000 - depth, col:null};
+  if(isDraw(b)) return {score:0, col:null};
+  if(depth===0) return {score:evaluateBoard(b), col:null};
+
+  if(maximizing){
+    let maxEval=-Infinity, bestCol=valid[0];
+    // order center first for pruning
+    const ordered=[...valid].sort((a,b)=>Math.abs(3-a)-Math.abs(3-b));
+    for(let c of ordered){
+      const r=getNextRowFor(b,c);
+      b[r][c]=2;
+      const evalRes=minimax(b, depth-1, alpha, beta, false);
+      b[r][c]=0;
+      if(evalRes.score > maxEval){ maxEval=evalRes.score; bestCol=c; }
+      alpha=Math.max(alpha, maxEval);
+      if(beta<=alpha) break;
+    }
+    return {score:maxEval, col:bestCol};
+  } else {
+    let minEval=Infinity, bestCol=valid[0];
+    const ordered=[...valid].sort((a,b)=>Math.abs(3-a)-Math.abs(3-b));
+    for(let c of ordered){
+      const r=getNextRowFor(b,c);
+      b[r][c]=1;
+      const evalRes=minimax(b, depth-1, alpha, beta, true);
+      b[r][c]=0;
+      if(evalRes.score < minEval){ minEval=evalRes.score; bestCol=c; }
+      beta=Math.min(beta, minEval);
+      if(beta<=alpha) break;
+    }
+    return {score:minEval, col:bestCol};
+  }
+}
+function getNextRowFor(b,c){
+  for(let r=ROWS-1;r>=0;r--) if(b[r][c]===0) return r;
+  return -1;
+}
+function bestMove(depth){
+  // quick win/block check before deep search for speed
+  for(let c of getValidCols(board)){
+    const r=getNextRow(c); board[r][c]=2;
+    if(checkWin(board,2)){ board[r][c]=0; return c; }
+    board[r][c]=0;
+  }
+  for(let c of getValidCols(board)){
+    const r=getNextRow(c); board[r][c]=1;
+    if(checkWin(board,1)){ board[r][c]=0; return c; }
+    board[r][c]=0;
+  }
+  const res=minimax(board, depth, -Infinity, Infinity, true);
+  return res.col;
+}
+function setStatus(text, cls){
+  statusEl.className='status '+cls;
+  if(cls==='you') statusEl.innerHTML='<span class="turn-dot" style="background:#f87171;color:#f87171"></span>'+text;
+  else if(cls==='ai') statusEl.innerHTML='<span class="turn-dot" style="background:#facc15;color:#facc15"></span>'+text;
+  else statusEl.textContent=text;
+}
+function pulseBoard(){
+  boardEl.animate([{transform:'scale(1)'},{transform:'scale(1.015)'},{transform:'scale(1)'}],{duration:300, easing:'ease-out'});
+}
+document.getElementById('newGameBtn').onclick=()=>{ initBoard(); };
+document.getElementById('resetStatsBtn').onclick=()=>{
+  if(confirm('Reset win/loss stats?')){
+    stats={you:0,ai:0,draw:0}; save(); updateStatsUI();
+  }
+};
+document.getElementById('difficulty').onclick=(e)=>{
+  const btn=e.target.closest('.diff-btn');
+  if(!btn) return;
+  difficulty=btn.dataset.diff; save(); updateStatsUI();
+  // haptic
+  if(navigator.vibrate) navigator.vibrate(20);
+};
+load(); updateStatsUI(); initBoard();
+</script>
+</body>
+</html>

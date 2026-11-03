@@ -64,6 +64,8 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -83,6 +85,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -185,7 +188,14 @@ fun ChatSurface(
                 .workingGlow(listening || paused, thinking, level, tokens.accent)
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                 .background(Color(0xFF15171E))
-                .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
+                .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                // The sheet consumes its own taps. Without this, a tap on the padding, an empty
+                // thread area or the gap above the composer fell through to the scrim behind and
+                // closed the chat — the scrim is only for taps outside the panel.
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                ) { },
         ) {
             Column(Modifier.fillMaxSize()) {
                 Header(
@@ -201,7 +211,30 @@ fun ChatSurface(
                     experts = experts,
                     onAskExpert = onAskExpert,
                 )
-                Box(Modifier.weight(1f)) {
+                // The hint under the orb promises a drag up to the thread, so the
+                // collapsed body itself takes that vertical drag — not just the 26 dp
+                // handle above. Keyed off once expanded: there the thread scrolls in
+                // this spot and must keep its scroll without collapsing the sheet.
+                var bodyDrag by remember { mutableFloatStateOf(0f) }
+                Box(
+                    Modifier.weight(1f).pointerInput(expanded) {
+                        if (expanded) return@pointerInput
+                        // Same 40 px trip as the handle above; up opens, down closes.
+                        // A tap never trips it, so the hint button below still clicks.
+                        detectVerticalDragGestures(
+                            onDragEnd = {
+                                when {
+                                    bodyDrag < -40f -> onExpanded(true)
+                                    bodyDrag > 40f -> onClose()
+                                }
+                                bodyDrag = 0f
+                            },
+                            // A cancelled gesture must not leave the trip count half-way, or the
+                            // next small drag would open the thread.
+                            onDragCancel = { bodyDrag = 0f },
+                        ) { _, dy -> bodyDrag += dy }
+                    },
+                ) {
                     when {
                         // Collapsed is the live orb, whether or not a conversation exists:
                         // that is the state's whole point, and what the swipe returns to.
@@ -214,6 +247,7 @@ fun ChatSurface(
                             // the final transcript is sent.
                             showShimmer = listening,
                             caption = if (paused) stringResource(R.string.voice_paused) else (turns.lastOrNull { it.role == TurnRole.MASALA }?.text ?: "").take(140),
+                            onExpand = { onExpanded(true) },
                         )
                         turns.isEmpty() && !listening && !paused && !thinking -> EmptyThread(level, character, experts, onAskExpert)
                         else -> Thread(
@@ -301,6 +335,7 @@ private fun Header(
                             }
                             drag = 0f
                         },
+                        onDragCancel = { drag = 0f },
                     ) { _, dy -> drag += dy }
                 }
                 .semantics { contentDescription = "Drag to expand or collapse" },
@@ -389,7 +424,14 @@ private fun Header(
 
 /** Talking: Sam and rings that follow the mic, with the last answer when idle. */
 @Composable
-private fun Orb(level: () -> Float, character: Character, listening: Boolean, caption: String, showShimmer: Boolean = false) {
+private fun Orb(
+    level: () -> Float,
+    character: Character,
+    listening: Boolean,
+    caption: String,
+    showShimmer: Boolean = false,
+    onExpand: () -> Unit,
+) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Box(contentAlignment = Alignment.Center) {
             // The engine reports one level per 200 ms audio window; animating between them
@@ -446,11 +488,17 @@ private fun Orb(level: () -> Float, character: Character, listening: Boolean, ca
             )
         }
         if (!listening) {
+            // The hint is the button for the drag the collapsed body takes: same
+            // look (bodySmall, textLow, same string), but TalkBack announces the
+            // role and tapping it expands.
+            val hint = stringResource(R.string.chat_drag_for_thread)
             Text(
-                stringResource(R.string.chat_drag_for_thread),
+                hint,
                 style = MaterialTheme.typography.bodySmall,
                 color = MasalaTheme.tokens.textLow,
-                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                    .clickable(role = Role.Button, onClickLabel = hint) { onExpand() }
+                    .semantics { contentDescription = hint },
             )
         }
     }
@@ -636,6 +684,10 @@ private fun ResultCard(result: ChatResult) {
             AudioPreview(result)
             return@Column
         }
+        if (result.kind == "video") {
+            VideoPreview(result, context, app)
+            return@Column
+        }
         val canOpen = miniApp || result.kind == "installed_app"
         if (canOpen) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -692,6 +744,45 @@ private fun WallpaperPreview(result: ChatResult, app: com.samosaai.masala.Masala
     }
 }
 
+/** The photos that rode with a user message, decoded from the files the send wrote. */
+@Composable
+private fun AttachmentThumbnails(paths: List<String>) {
+    val shown = paths.take(3)
+    val loaded = remember(shown) { mutableStateMapOf<String, androidx.compose.ui.graphics.ImageBitmap>() }
+    shown.forEach { path ->
+        LaunchedEffect(path) {
+            if (loaded[path] == null) {
+                val bitmap = withContext(Dispatchers.IO) {
+                    // A 12–50 MP camera photo decoded whole for a 132 dp tile is an OOM waiting.
+                    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    android.graphics.BitmapFactory.decodeFile(path, bounds)
+                    var sample = 1
+                    while (bounds.outWidth / (sample * 2) >= 264 && bounds.outHeight / (sample * 2) >= 264) sample *= 2
+                    android.graphics.BitmapFactory
+                        .decodeFile(path, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+                        ?.asImageBitmap()
+                }
+                if (bitmap != null) loaded[path] = bitmap
+            }
+        }
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(bottom = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        shown.forEach { path ->
+            loaded[path]?.let { bitmap ->
+                androidx.compose.foundation.Image(
+                    bitmap,
+                    contentDescription = null,
+                    modifier = Modifier.size(132.dp).clip(RoundedCornerShape(10.dp)),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                )
+            }
+        }
+    }
+}
+
 /** A generated/segmented image: sampled preview with gallery Save. */
 @Composable
 private fun GeneratedPreview(result: ChatResult, app: com.samosaai.masala.MasalaApp) {
@@ -709,6 +800,63 @@ private fun GeneratedPreview(result: ChatResult, app: com.samosaai.masala.Masala
         )
     }
     Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = {
+            scope.launch {
+                val r = runCatching { app.wallpaperTool.saveToGallery(result.ref) }
+                    .getOrElse { com.samosaai.masala.core.tool.ActionResult.error(it.message ?: "?") }
+                android.widget.Toast.makeText(context, r.message, android.widget.Toast.LENGTH_LONG).show()
+            }
+        }) { Text(stringResource(R.string.result_save)) }
+    }
+}
+
+/** An annotated clip: plays inline, with Open and Save for the file itself. */
+@Composable
+private fun VideoPreview(
+    result: ChatResult,
+    context: android.content.Context,
+    app: com.samosaai.masala.MasalaApp,
+) {
+    val scope = rememberCoroutineScope()
+    // The clip keeps its own shape; ask the file rather than assuming 16:9.
+    val aspect by produceState(16f / 9f, result.ref) {
+        value = withContext(Dispatchers.IO) {
+            val retriever = android.media.MediaMetadataRetriever()
+            runCatching {
+                retriever.setDataSource(result.ref)
+                val w = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toFloatOrNull() ?: 16f
+                val h = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toFloatOrNull() ?: 9f
+                if (w > 0f && h > 0f) (w / h).coerceIn(0.5f, 2.2f) else 16f / 9f
+            }.getOrDefault(16f / 9f).also { runCatching { retriever.release() } }
+        }
+    }
+    androidx.compose.ui.viewinterop.AndroidView(
+        factory = { ctx ->
+            android.widget.VideoView(ctx).apply {
+                setVideoPath(result.ref)
+                setOnPreparedListener { player ->
+                    player.isLooping = true
+                    start()
+                }
+            }
+        },
+        modifier = Modifier.fillMaxWidth().aspectRatio(aspect).clip(RoundedCornerShape(10.dp)),
+        onRelease = { view -> runCatching { view.stopPlayback() } },
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = {
+            runCatching {
+                context.startActivity(
+                    android.content.Intent(android.content.Intent.ACTION_VIEW)
+                        .setDataAndType(androidx.core.content.FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.files",
+                            java.io.File(result.ref),
+                        ), "video/mp4")
+                        .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION),
+                )
+            }
+        }) { Text(stringResource(R.string.result_open)) }
         TextButton(onClick = {
             scope.launch {
                 val r = runCatching { app.wallpaperTool.saveToGallery(result.ref) }
@@ -882,6 +1030,9 @@ private fun Bubble(
                 // lands, so render it, not the raw pipes and hashes. The user's own words stay plain
                 // text on the accent tile.
                 if (user) {
+                    // The photos that rode with this message: the turn used to show only the
+                    // text, so a send with an image looked like the image had been dropped.
+                    if (turn.attachmentPaths.isNotEmpty()) AttachmentThumbnails(turn.attachmentPaths)
                     Text(
                         turn.text,
                         style = MaterialTheme.typography.bodyMedium,
@@ -959,10 +1110,14 @@ private fun Controls(
     val scope = rememberCoroutineScope()
     val tooManyText = stringResource(R.string.chat_too_many_images, com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE)
     val badImageText = stringResource(R.string.chat_bad_image)
+    val waitForPhotosText = stringResource(R.string.chat_wait_for_photos)
     // Above the listening branches on purpose: a draft and its photos survive tapping the mic, so
     // switching to voice mid-sentence never throws away what was typed.
     var text by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue("")) }
     var queued by remember { mutableStateOf(listOf<com.samosaai.masala.chat.AttachedImage>()) }
+    // Selections still being compressed. Without this, Send could fire while a photo is in
+    // flight and leave it out, and several fast picks could all pass the three-image check.
+    var pendingAttachments by remember { mutableStateOf(0) }
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         if (listening && elapsedMs >= com.samosaai.masala.audio.SttEngine.CAP_WARN_MS) {
             Text(
@@ -1022,21 +1177,26 @@ private fun Controls(
                     }
                 }
                 fun addUri(uri: android.net.Uri, name: String) {
-                    if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                    if (queued.size + pendingAttachments >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
                         android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
                         return
                     }
+                    pendingAttachments++
                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                        val b64 = com.samosaai.masala.chat.compressToJpegBase64(context, uri)
-                        if (b64 == null) {
-                            launch(kotlinx.coroutines.Dispatchers.Main) {
-                                android.widget.Toast.makeText(context, badImageText, android.widget.Toast.LENGTH_SHORT).show()
+                        try {
+                            val b64 = com.samosaai.masala.chat.compressToJpegBase64(context, uri)
+                            if (b64 == null) {
+                                launch(kotlinx.coroutines.Dispatchers.Main) {
+                                    android.widget.Toast.makeText(context, badImageText, android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                val item = com.samosaai.masala.chat.AttachedImage(
+                                    id = "${System.currentTimeMillis()}-${queued.size}", name = name, jpegBase64 = b64,
+                                )
+                                launch(kotlinx.coroutines.Dispatchers.Main) { queued = queued + item }
                             }
-                        } else {
-                            val item = com.samosaai.masala.chat.AttachedImage(
-                                id = "${System.currentTimeMillis()}-${queued.size}", name = name, jpegBase64 = b64,
-                            )
-                            launch(kotlinx.coroutines.Dispatchers.Main) { queued = queued + item }
+                        } finally {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { pendingAttachments-- }
                         }
                     }
                 }
@@ -1053,12 +1213,12 @@ private fun Controls(
                     images = queued,
                     onRemoveImage = { id -> queued = queued.filterNot { it.id == id } },
                     onPickPhoto = {
-                        if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                        if (queued.size + pendingAttachments >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
                             android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
                         } else pickImage.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
                     },
                     onTakePhoto = {
-                        if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                        if (queued.size + pendingAttachments >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
                             android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
                         } else {
                             val dir = java.io.File(context.filesDir, "work").apply { mkdirs() }
@@ -1071,9 +1231,15 @@ private fun Controls(
                     onMic = mic,
                     micLevel = level,
                     onSend = {
-                        onAsk(text.text.trim(), queued.map { it.jpegBase64 })
-                        text = androidx.compose.ui.text.input.TextFieldValue("")
-                        queued = emptyList()
+                        // A photo still being compressed is part of the message: sending now
+                        // would drop it silently.
+                        if (pendingAttachments > 0) {
+                            android.widget.Toast.makeText(context, waitForPhotosText, android.widget.Toast.LENGTH_SHORT).show()
+                        } else {
+                            onAsk(text.text.trim(), queued.map { it.jpegBase64 })
+                            text = androidx.compose.ui.text.input.TextFieldValue("")
+                            queued = emptyList()
+                        }
                     },
                     modifier = Modifier.weight(1f),
                 )

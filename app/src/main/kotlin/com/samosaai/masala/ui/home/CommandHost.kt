@@ -349,24 +349,33 @@ fun ReplyCard(
                     } else {
                         val tooManyText = stringResource(R.string.chat_too_many_images, com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE)
                         val badImageText = stringResource(R.string.chat_bad_image)
+                        val waitForPhotosText = stringResource(R.string.chat_wait_for_photos)
                         var queued by remember { mutableStateOf(listOf<com.samosaai.masala.chat.AttachedImage>()) }
+                        // Photos still being compressed: Send must wait for them, and they count
+                        // towards the three-image cap while in flight.
+                        var pendingAttachments by remember { mutableStateOf(0) }
                         var cameraTarget by remember { mutableStateOf<android.net.Uri?>(null) }
                         fun addUri(uri: android.net.Uri, name: String) {
-                            if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                            if (queued.size + pendingAttachments >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
                                 android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
                                 return
                             }
+                            pendingAttachments++
                             scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                val b64 = com.samosaai.masala.chat.compressToJpegBase64(context, uri)
-                                if (b64 == null) {
-                                    launch(kotlinx.coroutines.Dispatchers.Main) {
-                                        android.widget.Toast.makeText(context, badImageText, android.widget.Toast.LENGTH_SHORT).show()
+                                try {
+                                    val b64 = com.samosaai.masala.chat.compressToJpegBase64(context, uri)
+                                    if (b64 == null) {
+                                        launch(kotlinx.coroutines.Dispatchers.Main) {
+                                            android.widget.Toast.makeText(context, badImageText, android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else {
+                                        val item = com.samosaai.masala.chat.AttachedImage(
+                                            id = "${System.currentTimeMillis()}-${queued.size}", name = name, jpegBase64 = b64,
+                                        )
+                                        launch(kotlinx.coroutines.Dispatchers.Main) { queued = queued + item }
                                     }
-                                } else {
-                                    val item = com.samosaai.masala.chat.AttachedImage(
-                                        id = "${System.currentTimeMillis()}-${queued.size}", name = name, jpegBase64 = b64,
-                                    )
-                                    launch(kotlinx.coroutines.Dispatchers.Main) { queued = queued + item }
+                                } finally {
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { pendingAttachments-- }
                                 }
                             }
                         }
@@ -402,7 +411,15 @@ fun ReplyCard(
                             // This card unmounts when listening starts, so it cannot carry the draft:
                             // the mic stays off until what is typed (or attached) is sent or cleared.
                             micEnabled = text.text.isBlank() && queued.isEmpty(),
-                            onSend = { app.commands.ask(text.text, images = queued.map { it.jpegBase64 }); text = TextFieldValue(""); queued = emptyList() },
+                            onSend = {
+                                if (pendingAttachments > 0) {
+                                    android.widget.Toast.makeText(context, waitForPhotosText, android.widget.Toast.LENGTH_SHORT).show()
+                                } else {
+                                    app.commands.ask(text.text, images = queued.map { it.jpegBase64 })
+                                    text = TextFieldValue("")
+                                    queued = emptyList()
+                                }
+                            },
                             modifier = Modifier.weight(1f),
                             fieldModifier = Modifier.focusRequester(field),
                         )

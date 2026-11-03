@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Valley Almanac</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--paper:#fdf6e3;--paper2:#fef9e7;--wood:#7a4a2a;--wood2:#a67c52;--green:#4a7c59;--green2:#6b9e7a;--moss:#2d4a32;--cream:#fff8e1;--accent:#d4a574;--accent2:#e8c39a;--ink:#3e2f1c;--muted:#8a7a65;--red:#c75b39;--blue:#5b8fb9;--shadow:0 4px 12px rgba(62,47,28,.15)}
+html,body{height:100%;overflow-x:hidden;background:#e9dcc3}
+body{font-family:Georgia,'Times New Roman',serif;color:var(--ink);display:flex;justify-content:center}
+.app{width:100%;max-width:428px;min-height:100vh;background:var(--paper);display:flex;flex-direction:column;overflow-x:hidden;box-shadow:0 0 30px rgba(0,0,0,.15)}
+/* header */
+.hdr{background:linear-gradient(180deg,#8b5a2a 0%,#6b3f1f 100%);color:#fff8e1;padding:10px 12px 8px;position:sticky;top:0;z-index:20;border-bottom:3px solid #4a2e14}
+.hdr-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.logo{font-size:18px;font-weight:800;letter-spacing:.5px;line-height:1}
+.logo span{font-size:11px;font-weight:400;opacity:.9;display:block;letter-spacing:1.2px;text-transform:uppercase}
+.hdr-actions{display:flex;gap:6px}
+.icon-btn{width:44px;height:44px;border-radius:10px;border:1.5px solid rgba(255,255,255,.4);background:rgba(255,255,255,.15);color:#fff;font-size:18px;display:grid;place-items:center;cursor:pointer}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px}
+.stat{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:6px 8px;text-align:center}
+.stat b{font-size:13px;display:block;line-height:1}
+.stat i{font-size:10px;opacity:.85;font-style:normal;text-transform:uppercase;letter-spacing:.6px}
+.stamina-wrap{margin-top:8px;background:rgba(0,0,0,.25);border-radius:20px;height:14px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,.3)}
+.stamina-fill{height:100%;background:linear-gradient(90deg,#7ed957,#4a7c59);border-radius:20px;transition:width .3s}
+.stamina-txt{position:absolute;inset:0;display:grid;place-items:center;font-size:10px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.season-bar{display:flex;justify-content:space-between;align-items:center;margin-top:8px;background:var(--cream);color:var(--ink);border-radius:10px;padding:6px 10px;border:1.5px solid var(--accent2)}
+.season-bar b{font-size:13px}
+.season-bar span{font-size:12px}
+.weather{font-size:12px;background:#fff;border:1px solid var(--accent2);padding:4px 8px;border-radius:20px}
+/* tabs */
+.tabs{display:flex;gap:6px;padding:8px 8px 0;overflow-x:auto;scrollbar-width:none;background:var(--paper);border-bottom:2px solid var(--accent2)}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1;min-width:62px;min-height:44px;padding:8px 6px;border-radius:10px 10px 0 0;border:1.5px solid var(--accent2);border-bottom:none;background:var(--cream);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;display:grid;place-items:center;gap:2px;color:var(--muted)}
+.tab.active{background:#fff;color:var(--wood);border-color:var(--wood2);box-shadow:0 -2px 8px rgba(0,0,0,.06)}
+.tab small{font-size:10px;font-weight:400}
+/* content */
+.content{flex:1;padding:10px 10px 16px;background:linear-gradient(180deg,#fff 0%,var(--paper) 100%)}
+.panel{display:none}
+.panel.active{display:block}
+.card{background:#fff;border:1.5px solid var(--accent2);border-radius:14px;padding:10px;box-shadow:var(--shadow);margin-bottom:10px}
+.card h3{font-size:14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.card h3 span{font-size:11px;font-weight:400;color:var(--muted);background:var(--cream);padding:3px 8px;border-radius:20px;border:1px solid var(--accent2)}
+.desc{font-size:12px;color:var(--muted);line-height:1.4;margin-bottom:8px}
+.btn{min-height:44px;padding:10px 14px;border-radius:10px;border:1.5px solid var(--wood2);background:linear-gradient(180deg,#fff8e1,#f5e6c8);color:var(--wood);font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:1;transition:.15s}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:linear-gradient(180deg,#6b9e7a,#4a7c59);color:#fff;border-color:#2d4a32}
+.btn.small{flex:none;min-width:44px;padding:8px 10px;font-size:12px}
+.btn:disabled{opacity:.5;pointer-events:none}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+.badge{font-size:11px;background:var(--green);color:#fff;padding:3px 8px;border-radius:20px;font-weight:700}
+.badge.warn{background:var(--red)}
+.badge.blue{background:var(--blue)}
+/* farm */
+.tools{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.tool{flex:1;min-width:70px;min-height:44px;border-radius:10px;border:2px solid var(--accent2);background:#fff;font-size:12px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px}
+.tool.active{border-color:var(--green);background:#e8f5e9;color:var(--moss);box-shadow:0 2px 8px rgba(74,124,89,.25)}
+.tool em{font-style:normal;font-size:16px}
+.farm-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;background:linear-gradient(180deg,#c8e6a0,#a8c686);padding:8px;border-radius:14px;border:2px solid #7aa35a;box-shadow:inset 0 2px 8px rgba(0,0,0,.1)}
+.tile{aspect-ratio:1;background:#d7b98e;border-radius:10px;border:1.5px solid #b89a6a;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden;min-height:54px;transition:.15s}
+.tile.tilled{background:#a67c52;border-color:#7a4a2a}
+.tile.watered{background:#8fb8d8;border-color:#5b8fb9;box-shadow:inset 0 0 0 2px rgba(91,143,185,.4)}
+.tile.ready{border-color:#4a7c59;box-shadow:0 0 0 2px #7ed957, 0 2px 8px rgba(0,0,0,.15)}
+.tile-ico{font-size:22px;line-height:1}
+.tile-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;color:#3e2f1c;background:rgba(255,255,255,.85);padding:1px 4px;border-radius:6px}
+.tile.watered .tile-label{background:rgba(255,255,255,.9)}
+.growth{position:absolute;bottom:2px;left:2px;right:2px;height:4px;background:rgba(0,0,0,.2);border-radius:4px;overflow:hidden}
+.growth i{display:block;height:100%;background:linear-gradient(90deg,#7ed957,#2d7a32);border-radius:4px}
+.next-day{width:100%;margin-top:10px;min-height:48px;font-size:15px}
+.festival-banner{background:linear-gradient(135deg,#fff3b0,#ffcc70);border:2px solid #d4a574;border-radius:12px;padding:10px;text-align:center;margin-bottom:10px}
+.festival-banner b{font-size:14px}
+.festival-banner p{font-size:12px;color:var(--muted);margin:4px 0 8px}
+/* market */
+.subtabs{display:flex;gap:6px;margin-bottom:8px}
+.subtab{flex:1;min-height:44px;border-radius:10px;border:1.5px solid var(--accent2);background:var(--cream);font-weight:700;font-size:13px;cursor:pointer}
+.subtab.active{background:var(--wood);color:#fff;border-color:var(--wood)}
+.shop-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.shop-item{background:#fff;border:1.5px solid var(--accent2);border-radius:12px;padding:8px;text-align:center}
+.shop-item b{font-size:13px;display:block}
+.shop-item i{font-size:11px;color:var(--muted);font-style:normal;display:block;margin:2px 0 6px;line-height:1.3}
+.shop-item .price{font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px}
+/* village */
+.villager{display:flex;gap:10px;align-items:center;background:#fff;border:1.5px solid var(--accent2);border-radius:12px;padding:10px;margin-bottom:8px}
+.villager-ava{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--cream),var(--accent2));border:2px solid var(--accent);display:grid;place-items:center;font-size:22px;flex:none}
+.villager-info{flex:1;min-width:0}
+.villager-info b{font-size:13px}
+.villager-info p{font-size:11px;color:var(--muted);line-height:1.3;margin:2px 0}
+.hearts{font-size:12px;letter-spacing:1px}
+.gift-row{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.gift-row select{flex:1;min-height:44px;border-radius:10px;border:1.5px solid var(--accent2);padding:0 8px;font-size:13px;background:#fff;min-width:120px}
+/* build */
+.build-card{display:flex;gap:10px;background:#fff;border:1.5px solid var(--accent2);border-radius:12px;padding:10px;margin-bottom:8px;align-items:center}
+.build-ico{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#e8f5e9,#c8e6a0);border:1.5px solid #7aa35a;display:grid;place-items:center;font-size:22px;flex:none}
+.build-info{flex:1}
+.build-info b{font-size:13px}
+.build-info p{font-size:11px;color:var(--muted);line-height:1.3}
+.build-cost{font-size:11px;font-weight:700;color:var(--wood);margin-top:4px}
+/* almanac */
+.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:8px 0}
+.cal-day{background:#fff;border:1.5px solid var(--accent2);border-radius:8px;padding:6px 4px;text-align:center;min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.cal-day.today{border-color:var(--green);background:#e8f5e9;box-shadow:0 0 0 2px rgba(74,124,89,.2)}
+.cal-day.fest{background:linear-gradient(135deg,#fff3b0,#ffcc70);border-color:#d4a574}
+.cal-day b{font-size:11px}
+.cal-day span{font-size:9px;color:var(--muted)}
+.code-box{width:100%;min-height:80px;border:1.5px solid var(--accent2);border-radius:10px;padding:8px;font-size:11px;font-family:monospace;background:#fff8e1;word-break:break-all}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#3e2f1c;color:#fff8e1;padding:10px 16px;border-radius:20px;font-size:13px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.3);z-index:50;display:none;max-width:90%;text-align:center}
+.inv-bar{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.inv-chip{background:#fff;border:1px solid var(--accent2);border-radius:20px;padding:4px 8px;font-size:11px;font-weight:700;display:flex;gap:4px;align-items:center}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="hdr">
+    <div class="hdr-top">
+      <div class="logo">🌾 VALLEY ALMANAC <span>Year 1 — Cozy Farm Journal</span></div>
+      <div class="hdr-actions">
+        <button class="icon-btn" id="btnHelp" aria-label="Help">?</button>
+        <button class="icon-btn" id="btnSave" aria-label="Save code">⎙</button>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="sCoins">200c</b><i>Coins</i></div>
+      <div class="stat"><b id="sRenown">0 ✦</b><i>Renown</i></div>
+      <div class="stat"><b id="sLevel">Lv 1</b><i>Farm Level</i></div>
+    </div>
+    <div class="stamina-wrap"><div class="stamina-fill" id="stFill" style="width:100%"></div><div class="stamina-txt" id="stTxt">100 / 100 Stamina</div></div>
+    <div class="season-bar">
+      <div><b id="sSeason">🌱 Spring — Day 1/7</b> <span id="sYear">Year 1</span></div>
+      <div class="weather" id="sWeather">☀️ Sunny</div>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="farm">🌱<br>Farm</button>
+    <button class="tab" data-tab="market">🛒<br>Market</button>
+    <button class="tab" data-tab="village">💛<br>Village</button>
+    <button class="tab" data-tab="build">🔨<br>Build</button>
+    <button class="tab" data-tab="almanac">📖<br>Almanac</button>
+  </nav>
+
+  <div class="content">
+    <!-- FARM -->
+    <section class="panel active" id="panel-farm">
+      <div id="festivalSlot"></div>
+      <div class="card">
+        <h3>Field Tools <span id="toolHint">Tap a plot to till</span></h3>
+        <div class="tools" id="tools">
+          <button class="tool active" data-tool="till"><em>⛏️</em>Till (5)</button>
+          <button class="tool" data-tool="water"><em>💧</em>Water (3)</button>
+          <button class="tool" data-tool="plant"><em>🌱</em>Plant (4)</button>
+          <button class="tool" data-tool="harvest"><em>✂️</em>Reap (4)</button>
+        </div>
+        <div class="inv-bar" id="invBar"></div>
+        <div class="farm-grid" id="farmGrid"></div>
+        <button class="btn primary next-day" id="btnSleep">🌙 Sleep — Next Day</button>
+        <p class="desc" style="text-align:center;margin-top:6px">Rain waters for free • Crops need daily water to grow • Harvest when golden</p>
+      </div>
+      <div class="card" id="animalsCard" style="display:none">
+        <h3>🐓 Barnyard <span id="animalInfo"></span></h3>
+        <div class="btn-row" id="animalActions"></div>
+      </div>
+    </section>
+
+    <!-- MARKET -->
+    <section class="panel" id="panel-market">
+      <div class="card">
+        <h3>Market Square <span id="marketSeason">Spring Seeds</span></h3>
+        <div class="subtabs">
+          <button class="subtab active" data-sub="buy">Buy Seeds</button>
+          <button class="subtab" data-sub="sell">Sell Harvest</button>
+        </div>
+        <div id="marketBuy"></div>
+        <div id="marketSell" style="display:none"></div>
+      </div>
+      <div class="card">
+        <h3>Mill Processing <span>Needs Mill building</span></h3>
+        <p class="desc">Turn 2 Corn into Cornmeal (90c) or 3 Turnips into Pickles (120c). Adds renown.</p>
+        <div class="btn-row">
+          <button class="btn" id="btnMillCorn">🌽 → Cornmeal</button>
+          <button class="btn" id="btnMillPickle">🥕 → Pickles</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VILLAGE -->
+    <section class="panel" id="panel-village">
+      <div class="card">
+        <h3>Village Bonds <span>Gift daily for perks</span></h3>
+        <p class="desc">Each villager loves certain crops. Reach 5 hearts to unlock a permanent perk. One gift per villager per day.</p>
+      </div>
+      <div id="villageList"></div>
+    </section>
+
+    <!-- BUILD -->
+    <section class="panel" id="panel-build">
+      <div class="card">
+        <h3>Construction <span id="buildDiscount"></span></h3>
+        <p class="desc">Buildings unlock animals and year-round growing. Costs are coins + renown.</p>
+      </div>
+      <div id="buildList"></div>
+      <div class="card">
+        <h3>Animals <span>Need Coop / Barn</span></h3>
+        <div id="animalShop"></div>
+      </div>
+    </section>
+
+    <!-- ALMANAC -->
+    <section class="panel" id="panel-almanac">
+      <div class="card">
+        <h3>📅 Season Calendar <span id="calTitle">Spring</span></h3>
+        <div class="calendar" id="calendar"></div>
+        <p class="desc">Festivals are gold. Attend on the day for coins + renown. Weather changes daily.</p>
+      </div>
+      <div class="card">
+        <h3>🏆 Progress</h3>
+        <div style="font-size:13px;line-height:1.6">
+          <div>Farm Level: <b id="aLevel">1</b> — <span id="aXp">0 / 100 XP</span></div>
+          <div>Total Harvests: <b id="aHarvests">0</b></div>
+          <div>Festivals Attended: <b id="aFests">0</b></div>
+          <div>Buildings: <b id="aBuilds">0 / 5</b></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>💾 Save Code <span>Carry your farm</span></h3>
+        <p class="desc">Copy this code to keep your year. Paste it on another device to restore.</p>
+        <textarea class="code-box" id="saveCode" readonly></textarea>
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn small primary" id="btnCopy">Copy Code</button>
+          <button class="btn small" id="btnExport">Refresh Code</button>
+        </div>
+        <p class="desc" style="margin-top:8px">Import code:</p>
+        <textarea class="code-box" id="importCode" placeholder="Paste code here..."></textarea>
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn primary" id="btnImport">Import & Restore</button>
+          <button class="btn" id="btnReset">Reset Farm</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>🌦️ Weather & Tips</h3>
+        <p class="desc">☀️ Sunny — normal • 🌧️ Rain — free watering • ⛈️ Storm — chance of damage • 💨 Wind — stamina +1 cost • ❄️ Snow — needs Greenhouse in Winter<br><br>Stamina refills on sleep. Level up for +5 max stamina. Well reduces watering cost. Greenhouse lets any crop grow in any season.</p>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const CROPS=[
+  {id:'turnip', name:'Turnip', icon:'🥕', season:'Spring', grow:3, regrow:0, seedPrice:15, sell:40, xp:10},
+  {id:'strawberry', name:'Strawberry', icon:'🍓', season:'Spring', grow:5, regrow:3, seedPrice:25, sell:35, xp:12},
+  {id:'tomato', name:'Tomato', icon:'🍅', season:'Summer', grow:4, regrow:2, seedPrice:20, sell:45, xp:12},
+  {id:'corn', name:'Corn', icon:'🌽', season:'Summer', grow:5, regrow:0, seedPrice:30, sell:70, xp:15},
+  {id:'pumpkin', name:'Pumpkin', icon:'🎃', season:'Fall', grow:6, regrow:0, seedPrice:35, sell:90, xp:18},
+  {id:'eggplant', name:'Eggplant', icon:'🍆', season:'Fall', grow:4, regrow:2, seedPrice:22, sell:50, xp:12},
+  {id:'frostberry', name:'Frostberry', icon:'🫐', season:'Winter', grow:4, regrow:0, seedPrice:28, sell:60, xp:14},
+  {id:'kale', name:'Kale', icon:'🥬', season:'Winter', grow:3, regrow:2, seedPrice:18, sell:38, xp:10},
+];
+const BUILDINGS=[
+  {id:'well', name:'Well', icon:'💧', desc:'Water costs 1 less stamina', cost:300, renown:5},
+  {id:'coop', name:'Coop', icon:'🐓', desc:'Unlocks Chickens → Eggs (25c/day)', cost:500, renown:10},
+  {id:'barn', name:'Barn', icon:'🐄', desc:'Unlocks Cows → Milk (40c/day)', cost:800, renown:15},
+  {id:'mill', name:'Mill', icon:'🏭', desc:'Process Corn & Turnips for more profit', cost:600, renown:12},
+  {id:'greenhouse', name:'Greenhouse', icon:'🏡', desc:'Grow any season, ignore snow', cost:1200, renown:20},
+];
+const VILLAGERS=[
+  {id:'mara', name:'Mara the Baker', icon:'👩‍🍳', loves:['strawberry','pumpkin'], perk:'Market prices +10%', desc:'Loves Strawberry & Pumpkin'},
+  {id:'jonah', name:'Jonah Fisher', icon:'🎣', loves:['tomato','corn'], perk:'Max Stamina +20', desc:'Loves Tomato & Corn'},
+  {id:'elara', name:'Elara Carpenter', icon:'🪚', loves:['turnip','eggplant'], perk:'Buildings 15% off', desc:'Loves Turnip & Eggplant'},
+  {id:'finn', name:'Mayor Finn', icon:'🎩', loves:['frostberry','kale'], perk:'+2 Renown per harvest', desc:'Loves Frostberry & Kale'},
+];
+const SEASONS=['Spring','Summer','Fall','Winter'];
+const WEATHERS={
+  Spring:[{id:'sunny',icon:'☀️',name:'Sunny',w:5},{id:'rainy',icon:'🌧️',name:'Rainy',w:4},{id:'stormy',icon:'⛈️',name:'Stormy',w:1},{id:'windy',icon:'💨',name:'Windy',w:2}],
+  Summer:[{id:'sunny',icon:'☀️',name:'Sunny',w:6},{id:'rainy',icon:'🌧️',name:'Rainy',w:2},{id:'stormy',icon:'⛈️',name:'Stormy',w:1},{id:'windy',icon:'💨',name:'Windy',w:2}],
+  Fall:[{id:'sunny',icon:'☀️',name:'Sunny',w:4},{id:'rainy',icon:'🌧️',name:'Rainy',w:4},{id:'windy',icon:'💨',name:'Windy',w:3},{id:'stormy',icon:'⛈️',name:'Stormy',w:1}],
+  Winter:[{id:'sunny',icon:'☀️',name:'Sunny',w:3},{id:'snowy',icon:'❄️',name:'Snowy',w:4},{id:'windy',icon:'💨',name:'Windy',w:2},{id:'stormy',icon:'⛈️',name:'Stormy',w:1}],
+};
+const FESTIVALS={Spring:{day:4,name:'Blossom Fair',icon:'🌸',reward:{coins:120,renown:5}},Summer:{day:4,name:'Sunfish Tourney',icon:'🐟',reward:{coins:150,renown:6}},Fall:{day:4,name:'Harvest Moon',icon:'🌕',reward:{coins:180,renown:7}},Winter:{day:4,name:'Starlight Eve',icon:'✨',reward:{coins:200,renown:8}}};
+
+let state;
+const LS_KEY='valley_almanac_v2';
+
+function defaultState(){
+  return {
+    day:1, coins:200, renown:0, xp:0, level:1, harvests:0, fests:0,
+    stamina:100, maxStamina:100,
+    weather:'sunny', weatherName:'Sunny', weatherIcon:'☀️',
+    tiles:Array.from({length:30},()=>({tilled:false,watered:false,crop:null})),
+    inventory:{turnip:0,strawberry:0,tomato:0,corn:0,pumpkin:0,eggplant:0,frostberry:0,kale:0,egg:0,milk:0,cornmeal:0,pickles:0,
+      turnip_seed:5,strawberry_seed:2,tomato_seed:0,corn_seed:0,pumpkin_seed:0,eggplant_seed:0,frostberry_seed:0,kale_seed:0},
+    buildings:{well:false,coop:false,barn:false,mill:false,greenhouse:false},
+    animals:{chickens:0,cows:0},
+    friendship:{mara:0,jonah:0,elara:0,finn:0},
+    lastGiftDay:{mara:0,jonah:0,elara:0,finn:0},
+    festivalDone:{},
+    seed:''
+  };
+}
+function getSeason(day){
+  const idx=Math.floor((day-1)/7);
+  return SEASONS[Math.min(idx,3)];
+}
+function getDayInSeason(day){ return ((day-1)%7)+1; }
+function pickWeather(season){
+  const pool=WEATHERS[season];
+  const total=pool.reduce((a,b)=>a+b.w,0);
+  let r=Math.random()*total;
+  for(let w of pool){ r-=w.w; if(r<=0) return w; }
+  return pool[0];
+}
+function cropById(id){ return CROPS.find(c=>c.id===id); }
+function hasPerk(villagerId){
+  return (state.friendship[villagerId]||0)>=5;
+}
+function buildingCost(b){
+  let c=b.cost;
+  if(hasPerk('elara')) c=Math.floor(c*0.85);
+  return c;
+}
+function sellPrice(crop){
+  let p=crop.sell;
+  if(hasPerk('mara')) p=Math.floor(p*1.1);
+  return p;
+}
+function staminaCost(base){
+  if(base===3 && state.buildings.well) return 2;
+  if(state.weather==='windy') return base+1;
+  return base;
+}
+function save(){
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+  updateSaveCode();
+}
+function load(){
+  try{
+    const raw=localStorage.getItem(LS_KEY);
+    if(raw){ state=JSON.parse(raw); if(!state.inventory.pickles) state.inventory.pickles=0; if(!state.festivalDone) state.festivalDone={}; }
+    else state=defaultState();
+  }catch{ state=defaultState(); }
+  // init weather if missing
+  if(!state.weatherName){ const w=pickWeather(getSeason(state.day)); state.weather=w.id; state.weatherName=w.name; state.weatherIcon=w.icon; }
+}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.display='block';
+  clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',2200);
+}
+function updateHeader(){
+  document.getElementById('sCoins').textContent=state.coins+'c';
+  document.getElementById('sRenown').textContent=state.renown+' ✦';
+  document.getElementById('sLevel').textContent='Lv '+state.level;
+  document.getElementById('stFill').style.width=(state.stamina/state.maxStamina*100)+'%';
+  document.getElementById('stTxt').textContent=state.stamina+' / '+state.maxStamina+' Stamina';
+  const season=getSeason(state.day);
+  const dis=getDayInSeason(state.day);
+  document.getElementById('sSeason').textContent=(season==='Spring'?'🌱':season==='Summer'?'☀️':season==='Fall'?'🍂':'❄️')+' '+season+' — Day '+dis+'/7';
+  document.getElementById('sYear').textContent='Year 1 • Day '+state.day+'/28';
+  document.getElementById('sWeather').textContent=state.weatherIcon+' '+state.weatherName;
+  // inv bar
+  const invBar=document.getElementById('invBar');
+  let chips='';
+  for(let c of CROPS){
+    const cnt=state.inventory[c.id]||0;
+    const seeds=state.inventory[c.id+'_seed']||0;
+    if(cnt>0||seeds>0) chips+=`<span class="inv-chip">${c.icon} ${c.name} ${cnt} <small style="opacity:.7">🌱${seeds}</small></span>`;
+  }
+  if(state.inventory.egg) chips+=`<span class="inv-chip">🥚 Egg ${state.inventory.egg}</span>`;
+  if(state.inventory.milk) chips+=`<span class="inv-chip">🥛 Milk ${state.inventory.milk}</span>`;
+  if(state.inventory.cornmeal) chips+=`<span class="inv-chip">🍞 Meal ${state.inventory.cornmeal}</span>`;
+  if(state.inventory.pickles) chips+=`<span class="inv-chip">🥒 Pickles ${state.inventory.pickles}</span>`;
+  invBar.innerHTML=chips||'<span style="font-size:12px;color:var(--muted)">No harvest yet — buy seeds at Market</span>';
+}
+function renderFarm(){
+  const grid=document.getElementById('farmGrid');
+  grid.innerHTML='';
+  state.tiles.forEach((t,i)=>{
+    const d=document.createElement('div');
+    d.className='tile'+(t.tilled?' tilled':'')+(t.watered?' watered':'')+(t.crop&&t.crop.ready?' ready':'');
+    let ico=''; let label='';
+    if(t.crop){
+      const c=cropById(t.crop.cropId);
+      if(t.crop.ready){ ico=c.icon; label='Ready!'; }
+      else {
+        const prog=t.crop.growth/t.crop.growNeed;
+        if(prog<0.4) ico='🌱';
+        else if(prog<0.8) ico='🌿';
+        else ico='🌾';
+        label=c.name;
+      }
+    } else if(t.tilled){
+      ico=t.watered?'💧':'🟫'; label=t.watered?'Watered':'Tilled';
+    } else {
+      ico='🟩'; label='Wild';
+    }
+    d.innerHTML=`<div class="tile-ico">${ico}</div><div class="tile-label">${label}</div>`;
+    if(t.crop && !t.crop.ready){
+      const pct=Math.min(100, Math.round(t.crop.growth/t.crop.growNeed*100));
+      d.innerHTML+=`<div class="growth"><i style="width:${pct}%"></i></div>`;
+    }
+    d.addEventListener('click',()=>handleTile(i));
+    grid.appendChild(d);
+  });
+  // festival banner
+  const season=getSeason(state.day);
+  const dis=getDayInSeason(state.day);
+  const fest=FESTIVALS[season];
+  const slot=document.getElementById('festivalSlot');
+  if(fest && dis===fest.day && !state.festivalDone[state.day]){
+    slot.innerHTML=`<div class="festival-banner"><b>${fest.icon} ${fest.name} Today!</b><p>Attend the festival for ${fest.reward.coins}c + ${fest.reward.renown} renown</p><button class="btn primary" id="btnFest">🎉 Attend Festival</button></div>`;
+    document.getElementById('btnFest').onclick=attendFestival;
+  } else if(fest && dis===fest.day && state.festivalDone[state.day]){
+    slot.innerHTML=`<div class="festival-banner" style="opacity:.7"><b>${fest.icon} ${fest.name} — Attended ✓</b><p>See you next season!</p></div>`;
+  } else slot.innerHTML='';
+
+  // animals card
+  const aCard=document.getElementById('animalsCard');
+  if(state.buildings.coop || state.buildings.barn){
+    aCard.style.display='block';
+    let info=[];
+    if(state.animals.chickens) info.push(`🐓 ${state.animals.chickens} Chickens`);
+    if(state.animals.cows) info.push(`🐄 ${state.animals.cows} Cows`);
+    document.getElementById('animalInfo').textContent=info.join(' • ')||'No animals yet';
+    const acts=document.getElementById('animalActions');
+    acts.innerHTML=`<button class="btn small" id="btnCollect">🥚 Collect Produce</button><span style="font-size:11px;color:var(--muted);align-self:center">Animals produce daily on sleep</span>`;
+    document.getElementById('btnCollect').onclick=collectNow;
+  } else aCard.style.display='none';
+}
+let currentTool='till';
+function handleTile(idx){
+  const t=state.tiles[idx];
+  if(currentTool==='till'){
+    if(t.tilled){ toast('Already tilled'); return; }
+    if(state.stamina<staminaCost(5)){ toast('Too tired — sleep!'); return; }
+    t.tilled=true; t.watered=false;
+    state.stamina-=staminaCost(5);
+    toast('Tilled plot');
+  } else if(currentTool==='water'){
+    if(!t.tilled){ toast('Till first'); return; }
+    if(t.watered){ toast('Already watered'); return; }
+    if(state.weather==='rainy'){ toast('Rain already watered!'); return; }
+    if(state.stamina<staminaCost(3)){ toast('Too tired'); return; }
+    t.watered=true;
+    state.stamina-=staminaCost(3);
+    toast('Watered 💧');
+  } else if(currentTool==='plant'){
+    if(!t.tilled){ toast('Till first'); return; }
+    if(t.crop){ toast('Already planted'); return; }
+    // open seed picker
+    openSeedPicker(idx);
+    return;
+  } else if(currentTool==='harvest'){
+    if(!t.crop || !t.crop.ready){ toast('Nothing ready'); return; }
+    if(state.stamina<staminaCost(4)){ toast('Too tired'); return; }
+    harvestTile(idx);
+    state.stamina-=staminaCost(4);
+  }
+  save(); updateHeader(); renderFarm(); renderMarketSell(); renderAlmanacStats();
+}
+function openSeedPicker(idx){
+  const season=getSeason(state.day);
+  const available=CROPS.filter(c=> c.season===season || state.buildings.greenhouse);
+  let opts=available.filter(c=> (state.inventory[c.id+'_seed']||0)>0);
+  if(opts.length===0){ toast('No seeds for this season — buy at Market'); return; }
+  // simple prompt via custom overlay: use first available? Better show picker modal
+  // Build inline picker
+  let html='<div style="position:fixed;inset:0;background:rgba(0,0,0,.4);display:grid;place-items:center;z-index:40" id="pickerOverlay"><div style="background:#fff;border-radius:14px;padding:12px;width:90%;max-width:360px;max-height:80vh;overflow:auto"><h3 style="font-size:14px;margin-bottom:8px">Choose Seed to Plant</h3>';
+  opts.forEach(c=>{
+    html+=`<button class="btn" style="width:100%;margin-bottom:6px;justify-content:space-between" data-pick="${c.id}"><span>${c.icon} ${c.name} — ${c.grow}d</span><span>🌱 ${state.inventory[c.id+'_seed']}</span></button>`;
+  });
+  html+=`<button class="btn" style="width:100%;margin-top:6px" id="pickCancel">Cancel</button></div></div>`;
+  document.body.insertAdjacentHTML('beforeend',html);
+  document.getElementById('pickCancel').onclick=()=>document.getElementById('pickerOverlay').remove();
+  document.getElementById('pickerOverlay').onclick=(e)=>{ if(e.target.id==='pickerOverlay') e.currentTarget.remove(); };
+  document.querySelectorAll('[data-pick]').forEach(b=>{
+    b.onclick=()=>{
+      const cid=b.dataset.pick;
+      const c=cropById(cid);
+      if(state.stamina<staminaCost(4)){ toast('Too tired'); document.getElementById('pickerOverlay').remove(); return; }
+      state.inventory[cid+'_seed']--;
+      state.tiles[idx].crop={cropId:cid, growth:0, growNeed:c.grow, ready:false, regrow:c.regrow};
+      state.stamina-=staminaCost(4);
+      document.getElementById('pickerOverlay').remove();
+      toast('Planted '+c.name+' 🌱');
+      save(); updateHeader(); renderFarm(); renderMarket();
+    };
+  });
+}
+function harvestTile(idx){
+  const t=state.tiles[idx];
+  const c=cropById(t.crop.cropId);
+  state.inventory[c.id]=(state.inventory[c.id]||0)+1;
+  state.harvests++;
+  state.xp+=c.xp;
+  if(hasPerk('finn')) state.renown+=2;
+  // renown per harvest small chance
+  if(Math.random()<0.15) state.renown+=1;
+  checkLevel();
+  if(c.regrow>0){
+    t.crop={cropId:c.id, growth:0, growNeed:c.regrow, ready:false, regrow:c.regrow};
+    toast('Harvested '+c.name+' — regrows in '+c.regrow+'d');
+  } else {
+    t.crop=null;
+    // keep tilled but need re-water? keep tilled
+    t.watered=false;
+    toast('Harvested '+c.name+' '+c.icon+' +'+c.xp+' XP');
+  }
+}
+function collectNow(){
+  let got=0;
+  if(state.animals.chickens){ const eggs=state.animals.chickens; state.inventory.egg=(state.inventory.egg||0)+eggs; got+=eggs; }
+  if(state.animals.cows){ const milk=state.animals.cows; state.inventory.milk=(state.inventory.milk||0)+milk; got+=milk; }
+  if(got) toast('Collected '+got+' produce!');
+  else toast('No animals to collect');
+  save(); updateHeader(); renderMarketSell();
+}
+function nextDay(){
+  if(state.day>=28){
+    toast('Year complete! Keep farming or reset in Almanac');
+    // allow continue looping? reset to 1? For now loop
+    state.day=1;
+  } else state.day++;
+  const season=getSeason(state.day);
+  const w=pickWeather(season);
+  state.weather=w.id; state.weatherName=w.name; state.weatherIcon=w.icon;
+  // stamina restore
+  state.stamina=state.maxStamina;
+  // process tiles
+  state.tiles.forEach(t=>{
+    if(t.crop && !t.crop.ready){
+      // check water need
+      let canGrow=false;
+      if(state.weather==='rainy') { t.watered=true; canGrow=true; }
+      else if(t.watered) canGrow=true;
+      else if(state.weather==='snowy' && !state.buildings.greenhouse) canGrow=false;
+      else canGrow=false;
+      // storm damage
+      if(state.weather==='stormy' && Math.random()<0.08){
+        t.crop=null; t.tilled=false; t.watered=false;
+        return;
+      }
+      if(canGrow){
+        // snowy without greenhouse halves growth
+        let inc=1;
+        if(state.weather==='snowy' && !state.buildings.greenhouse) inc=0.5;
+        t.crop.growth+=inc;
+        if(t.crop.growth>=t.crop.growNeed){ t.crop.ready=true; t.crop.growth=t.crop.growNeed; }
+      }
+      // reset water for next day (unless rainy will set again next day)
+      t.watered=false;
+      // if rainy, keep watered for growth already counted, but reset for next day logic? Actually we set watered true then growth, then reset to false for next day's need - but rainy auto waters next day anyway
+      if(state.weather==='rainy') t.watered=true; // keep for visual? but we reset above? Let's keep watered true if rainy
+    } else if(t.crop && t.crop.ready){
+      // ready crops stay, but if not harvested and storm? already handled
+      t.watered=false;
+      if(state.weather==='rainy') t.watered=true;
+    } else {
+      // empty tilled tiles: rain waters
+      if(state.weather==='rainy' && t.tilled) t.watered=true;
+      else t.watered=false;
+    }
+  });
+  // animal produce auto
+  if(state.animals.chickens) state.inventory.egg=(state.inventory.egg||0)+state.animals.chickens;
+  if(state.animals.cows) state.inventory.milk=(state.inventory.milk||0)+state.animals.cows;
+  // wither check: if winter snowy without greenhouse, tilled empty tiles 10% revert?
+  save(); updateHeader(); renderFarm(); renderMarket(); renderVillage(); renderBuild(); renderAlmanac(); 
+  toast(w.icon+' '+w.name+' — Day '+state.day);
+  if(state.day===28) toast('🌟 Year End tomorrow — finish strong!');
+}
+function attendFestival(){
+  const season=getSeason(state.day);
+  const fest=FESTIVALS[season];
+  state.coins+=fest.reward.coins;
+  state.renown+=fest.reward.renown;
+  state.xp+=20;
+  state.fests++;
+  state.festivalDone[state.day]=true;
+  checkLevel();
+  save(); updateHeader(); renderFarm(); renderAlmanacStats();
+  toast(fest.icon+' Festival! +'+fest.reward.coins+'c +'+fest.reward.renown+' renown');
+}
+function checkLevel(){
+  const newLevel=Math.floor(state.xp/100)+1;
+  if(newLevel>state.level){
+    state.level=newLevel;
+    state.maxStamina=100+(newLevel-1)*5 + (hasPerk('jonah')?20:0);
+    toast('Level Up! Lv '+newLevel+' — Max stamina '+state.maxStamina);
+  }
+}
+function renderMarket(){
+  const season=getSeason(state.day);
+  document.getElementById('marketSeason').textContent=season+' Seeds • '+state.coins+'c';
+  const buyDiv=document.getElementById('marketBuy');
+  let html='<div class="shop-grid">';
+  CROPS.forEach(c=>{
+    const isSeason=c.season===season || state.buildings.greenhouse;
+    const owned=state.inventory[c.id+'_seed']||0;
+    html+=`<div class="shop-item" style="${isSeason?'':'opacity:.5'}">
+      <b>${c.icon} ${c.name}</b>
+      <i>${c.grow}d • ${c.regrow?'Regrows '+c.regrow+'d':'One harvest'} • Sells ${sellPrice(c)}c</i>
+      <div class="price">${c.seedPrice}c • Owned 🌱${owned}</div>
+      <button class="btn small primary" ${!isSeason?'disabled':''} onclick="buySeed('${c.id}')">Buy</button>
+      ${isSeason?'':'<div style="font-size:10px;color:var(--red)">Out of season</div>'}
+    </div>`;
+  });
+  html+='</div>';
+  buyDiv.innerHTML=html;
+  renderMarketSell();
+}
+function renderMarketSell(){
+  const sellDiv=document.getElementById('marketSell');
+  let html='<div class="shop-grid">';
+  let has=false;
+  CROPS.forEach(c=>{
+    const cnt=state.inventory[c.id]||0;
+    if(cnt>0){ has=true;
+      html+=`<div class="shop-item"><b>${c.icon} ${c.name}</b><i>Have ${cnt}</i><div class="price">${sellPrice(c)}c each</div><div class="btn-row"><button class="btn small" onclick="sellCrop('${c.id}',1)">Sell 1</button><button class="btn small primary" onclick="sellCrop('${c.id}',${cnt})">Sell All</button></div></div>`;
+    }
+  });
+  [['egg','🥚 Egg',25],['milk','🥛 Milk',40],['cornmeal','🍞 Cornmeal',90],['pickles','🥒 Pickles',120]].forEach(([id,label,price])=>{
+    const cnt=state.inventory[id]||0;
+    if(cnt>0){ has=true; html+=`<div class="shop-item"><b>${label}</b><i>Have ${cnt}</i><div class="price">${price}c each</div><div class="btn-row"><button class="btn small" onclick="sellCrop('${id}',1)">Sell 1</button><button class="btn small primary" onclick="sellCrop('${id}',${cnt})">Sell All</button></div></div>`; }
+  });
+  if(!has) html+='<p class="desc" style="grid-column:1/-1;text-align:center;padding:12px">No harvest to sell yet — tend your field!</p>';
+  html+='</div>';
+  sellDiv.innerHTML=html;
+}
+function buySeed(id){
+  const c=cropById(id);
+  if(state.coins<c.seedPrice){ toast('Not enough coins'); return; }
+  state.coins-=c.seedPrice;
+  state.inventory[id+'_seed']=(state.inventory[id+'_seed']||0)+1;
+  save(); updateHeader(); renderMarket(); renderFarm();
+  toast('Bought '+c.name+' seed 🌱');
+}
+function sellCrop(id,amt){
+  const cnt=state.inventory[id]||0;
+  const sellAmt=Math.min(amt,cnt);
+  if(sellAmt<=0) return;
+  let price=0;
+  const crop=cropById(id);
+  if(crop) price=sellPrice(crop);
+  else if(id==='egg') price=25;
+  else if(id==='milk') price=40;
+  else if(id==='cornmeal') price=90;
+  else if(id==='pickles') price=120;
+  state.inventory[id]-=sellAmt;
+  state.coins+=price*sellAmt;
+  state.renown+=Math.floor(sellAmt/3);
+  state.xp+=sellAmt*2;
+  checkLevel();
+  save(); updateHeader(); renderMarket(); renderAlmanacStats();
+  toast('Sold '+sellAmt+'× for '+(price*sellAmt)+'c');
+}
+function renderVillage(){
+  const list=document.getElementById('villageList');
+  list.innerHTML='';
+  VILLAGERS.forEach(v=>{
+    const hearts=state.friendship[v.id]||0;
+    const canGift=state.lastGiftDay[v.id]!==state.day;
+    const heartStr='♥'.repeat(hearts)+'♡'.repeat(10-hearts);
+    const perkUnlocked=hearts>=5;
+    const div=document.createElement('div');
+    div.className='villager';
+    div.innerHTML=`<div class="villager-ava">${v.icon}</div>
+      <div class="villager-info">
+        <b>${v.name} ${perkUnlocked?'<span class="badge">Perk Active</span>':''}</b>
+        <p>${v.desc} • ${v.perk}</p>
+        <div class="hearts" style="color:${perkUnlocked?'#c75b39':'#d4a574'}">${heartStr} ${hearts}/10</div>
+        <div class="gift-row">
+          <select id="gift-${v.id}"><option value="">Choose gift…</option></select>
+          <button class="btn small ${canGift?'primary':''}" ${canGift?'':'disabled'} id="btnGift-${v.id}">${canGift?'Gift':'Gifted today'}</button>
+        </div>
+      </div>`;
+    list.appendChild(div);
+    const sel=div.querySelector(`#gift-${v.id}`);
+    // populate options with inventory items >0
+    [...CROPS.map(c=>c.id),'egg','milk','cornmeal','pickles'].forEach(id=>{
+      const cnt=state.inventory[id]||0;
+      if(cnt>0){
+        const label=id==='egg'?'🥚 Egg':id==='milk'?'🥛 Milk':id==='cornmeal'?'🍞 Cornmeal':id==='pickles'?'🥒 Pickles':cropById(id).icon+' '+cropById(id).name;
+        const opt=document.createElement('option'); opt.value=id; opt.textContent=label+' ×'+cnt; sel.appendChild(opt);
+      }
+    });
+    div.querySelector(`#btnGift-${v.id}`).onclick=()=>giftVillager(v.id, sel.value);
+  });
+}
+function giftVillager(vid, itemId){
+  if(!itemId){ toast('Choose a gift'); return; }
+  if(state.lastGiftDay[vid]===state.day){ toast('Already gifted today'); return; }
+  if((state.inventory[itemId]||0)<=0){ toast('None left'); return; }
+  if(state.stamina<staminaCost(5)){ toast('Too tired'); return; }
+  state.inventory[itemId]--;
+  state.stamina-=staminaCost(5);
+  const vill=VILLAGERS.find(v=>v.id===vid);
+  let gain=1;
+  if(vill.loves.includes(itemId)) gain=2;
+  state.friendship[vid]=Math.min(10,(state.friendship[vid]||0)+gain);
+  state.lastGiftDay[vid]=state.day;
+  state.renown+=1; state.xp+=5;
+  checkLevel();
+  // apply jonah perk immediately if reached 5
+  if(vid==='jonah' && state.friendship[vid]===5){
+    state.maxStamina+=20; state.stamina=Math.min(state.stamina+20, state.maxStamina);
+    toast('Perk unlocked! Max stamina +20');
+  }
+  save(); updateHeader(); renderVillage(); renderBuild(); renderMarketSell();
+  toast('Gifted '+itemId+' to '+vill.name+' +'+gain+' ♥');
+}
+function renderBuild(){
+  const list=document.getElementById('buildList');
+  list.innerHTML='';
+  const discount=hasPerk('elara')?'15% off active (Elara)':'';
+  document.getElementById('buildDiscount').textContent=discount;
+  BUILDINGS.forEach(b=>{
+    const built=state.buildings[b.id];
+    const cost=buildingCost(b);
+    const div=document.createElement('div');
+    div.className='build-card';
+    div.innerHTML=`<div class="build-ico">${b.icon}</div>
+      <div class="build-info"><b>${b.name} ${built?'<span class="badge">Built</span>':''}</b><p>${b.desc}</p><div class="build-cost">${built?'—':cost+'c + '+b.renown+' ✦ Renown'}</div></div>
+      <button class="btn small ${built?'':'primary'}" ${built?'disabled':''} id="build-${b.id}">${built?'Done':'Build'}</button>`;
+    list.appendChild(div);
+    if(!built) div.querySelector(`#build-${b.id}`).onclick=()=>buildBuilding(b.id);
+  });
+  const aShop=document.getElementById('animalShop');
+  let html='';
+  if(state.buildings.coop){
+    html+=`<div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border:1.5px solid var(--accent2);border-radius:10px;padding:10px;margin-bottom:8px"><div><b>🐓 Chicken</b><p style="font-size:11px;color:var(--muted)">200c • Lays 1 egg/day</p></div><button class="btn small primary" onclick="buyAnimal('chickens')">Buy</button></div>`;
+  } else html+=`<p class="desc">Build Coop to buy Chickens</p>`;
+  if(state.buildings.barn){
+    html+=`<div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border:1.5px solid var(--accent2);border-radius:10px;padding:10px"><div><b>🐄 Cow</b><p style="font-size:11px;color:var(--muted)">300c • Gives 1 milk/day</p></div><button class="btn small primary" onclick="buyAnimal('cows')">Buy</button></div>`;
+  } else html+=`<p class="desc">Build Barn to buy Cows</p>`;
+  html+=`<div style="margin-top:8px;font-size:12px">Owned: 🐓 ${state.animals.chickens} • 🐄 ${state.animals.cows}</div>`;
+  aShop.innerHTML=html;
+}
+function buildBuilding(id){
+  const b=BUILDINGS.find(x=>x.id===id);
+  const cost=buildingCost(b);
+  if(state.coins<cost){ toast('Need '+cost+'c'); return; }
+  if(state.renown<b.renown){ toast('Need '+b.renown+' renown'); return; }
+  state.coins-=cost; state.renown-=b.renown; state.buildings[id]=true; state.xp+=50; checkLevel();
+  save(); updateHeader(); renderBuild(); renderFarm(); renderMarket();
+  toast('Built '+b.name+'! '+b.icon);
+}
+function buyAnimal(type){
+  const price=type==='chickens'?200:300;
+  if(state.coins<price){ toast('Need '+price+'c'); return; }
+  state.coins-=price; state.animals[type]++; save(); updateHeader(); renderBuild(); renderFarm();
+  toast('Bought '+(type==='chickens'?'Chicken 🐓':'Cow 🐄'));
+}
+function renderAlmanac(){
+  const season=getSeason(state.day);
+  document.getElementById('calTitle').textContent=season+' — Year 1';
+  const cal=document.getElementById('calendar');
+  cal.innerHTML='';
+  for(let d=1;d<=7;d++){
+    const isToday=getDayInSeason(state.day)===d && getSeason(state.day)===season;
+    const fest=FESTIVALS[season] && FESTIVALS[season].day===d;
+    const div=document.createElement('div');
+    div.className='cal-day'+(isToday?' today':'')+(fest?' fest':'');
+    div.innerHTML=`<b>${d}</b><span>${fest?FESTIVALS[season].icon+' Fest':''}</span>`;
+    cal.appendChild(div);
+  }
+  renderAlmanacStats();
+  updateSaveCode();
+}
+function renderAlmanacStats(){
+  document.getElementById('aLevel').textContent=state.level;
+  document.getElementById('aXp').textContent=state.xp+' / '+(state.level*100)+' XP';
+  document.getElementById('aHarvests').textContent=state.harvests;
+  document.getElementById('aFests').textContent=state.fests;
+  document.getElementById('aBuilds').textContent=Object.values(state.buildings).filter(Boolean).length+' / 5';
+}
+function updateSaveCode(){
+  try{
+    const code=btoa(encodeURIComponent(JSON.stringify(state)));
+    document.getElementById('saveCode').value=code;
+  }catch{}
+}
+function initTabs(){
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click',()=>{
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      t.classList.add('active');
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+    });
+  });
+  document.querySelectorAll('.subtab').forEach(s=>{
+    s.addEventListener('click',()=>{
+      document.querySelectorAll('.subtab').forEach(x=>x.classList.remove('active'));
+      s.classList.add('active');
+      const isBuy=s.dataset.sub==='buy';
+      document.getElementById('marketBuy').style.display=isBuy?'block':'none';
+      document.getElementById('marketSell').style.display=isBuy?'none':'block';
+    });
+  });
+  document.querySelectorAll('.tool').forEach(t=>{
+    t.addEventListener('click',()=>{
+      document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active'));
+      t.classList.add('active');
+      currentTool=t.dataset.tool;
+      const hints={till:'Tap a plot to till',water:'Tap tilled plot to water',plant:'Tap tilled plot to plant',harvest:'Tap golden crop to reap'};
+      document.getElementById('toolHint').textContent=hints[currentTool];
+    });
+  });
+}
+
+// mill
+document.getElementById('btnMillCorn').onclick=()=>{
+  if(!state.buildings.mill){ toast('Build Mill first'); return; }
+  if((state.inventory.corn||0)<2){ toast('Need 2 Corn'); return; }
+  state.inventory.corn-=2; state.inventory.cornmeal=(state.inventory.cornmeal||0)+1; state.renown+=1; state.xp+=8; checkLevel(); save(); updateHeader(); renderMarketSell(); toast('Milled Cornmeal 🍞');
+};
+document.getElementById('btnMillPickle').onclick=()=>{
+  if(!state.buildings.mill){ toast('Build Mill first'); return; }
+  if((state.inventory.turnip||0)<3){ toast('Need 3 Turnips'); return; }
+  state.inventory.turnip-=3; state.inventory.pickles=(state.inventory.pickles||0)+1; state.renown+=1; state.xp+=8; checkLevel(); save(); updateHeader(); renderMarketSell(); toast('Made Pickles 🥒');
+};
+
+document.getElementById('btnSleep').onclick=nextDay;
+document.getElementById('btnCopy').onclick=()=>{
+  const c=document.getElementById('saveCode'); c.select(); document.execCommand('copy');
+  if(navigator.clipboard) navigator.clipboard.writeText(c.value);
+  toast('Code copied!');
+};
+document.getElementById('btnExport').onclick=()=>{ updateSaveCode(); toast('Code refreshed'); };
+document.getElementById('btnImport').onclick=()=>{
+  const code=document.getElementById('importCode').value.trim();
+  if(!code){ toast('Paste a code'); return; }
+  try{
+    const obj=JSON.parse(decodeURIComponent(atob(code)));
+    state=obj; save(); updateHeader(); renderFarm(); renderMarket(); renderVillage(); renderBuild(); renderAlmanac();
+    toast('Farm restored!');
+  }catch(e){ toast('Invalid code'); }
+};
+document.getElementById('btnReset').onclick=()=>{
+  if(confirm('Reset farm? This erases progress.')){
+    state=defaultState(); const w=pickWeather('Spring'); state.weather=w.id; state.weatherName=w.name; state.weatherIcon=w.icon;
+    save(); updateHeader(); renderFarm(); renderMarket(); renderVillage(); renderBuild(); renderAlmanac(); toast('Farm reset');
+  }
+};
+document.getElementById('btnHelp').onclick=()=>toast('Till → Water → Plant → Reap → Sell → Build → Befriend! Sleep to grow.');
+document.getElementById('btnSave').onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelector('[data-tab="almanac"]').classList.add('active');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-almanac').classList.add('active');
+  updateSaveCode();
+};
+
+// expose for inline handlers
+window.buySeed=buySeed; window.sellCrop=sellCrop; window.buyAnimal=buyAnimal;
+
+load();
+initTabs();
+updateHeader();
+renderFarm();
+renderMarket();
+renderVillage();
+renderBuild();
+renderAlmanac();
+</script>
+</body>
+</html>

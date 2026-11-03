@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>JS Coercion Quiz</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  background:#0b0f1a;
+  color:#e6e8ef;
+  display:flex;justify-content:center;
+  min-height:100vh;
+  -webkit-tap-highlight-color:transparent;
+}
+.app{
+  width:100%;max-width:428px;min-width:360px;
+  min-height:100vh;
+  display:flex;flex-direction:column;
+  background:linear-gradient(180deg,#0f1424 0%,#0b0f1a 100%);
+  position:relative;
+}
+header{
+  padding:14px 16px 10px;
+  position:sticky;top:0;z-index:10;
+  background:rgba(11,15,26,0.92);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid rgba(255,255,255,0.08);
+}
+.topRow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,#f7df1e 0%,#eab308 100%);
+  display:grid;place-items:center;
+  color:#111;font-weight:900;font-size:14px;letter-spacing:-0.5px;
+  box-shadow:0 4px 16px rgba(247,223,30,0.35);
+}
+.brand h1{font-size:16px;font-weight:800;letter-spacing:-0.3px;line-height:1}
+.brand p{font-size:11px;color:#9aa3b8;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;margin-top:2px}
+.scorePill{
+  background:#151a2e;border:1px solid rgba(255,255,255,0.08);
+  padding:8px 12px;border-radius:999px;
+  font-size:13px;font-weight:700;white-space:nowrap;
+}
+.scorePill span{color:#f7df1e}
+.progressWrap{margin-top:12px}
+.progressMeta{display:flex;justify-content:space-between;font-size:12px;color:#9aa3b8;font-weight:600;margin-bottom:6px}
+.bar{height:8px;background:#1a2040;border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06)}
+.fill{height:100%;width:0%;background:linear-gradient(90deg,#f7df1e,#facc15);border-radius:999px;transition:width 0.4s ease}
+main{flex:1;padding:16px;display:flex;flex-direction:column;gap:14px}
+.card{
+  background:#12182e;
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:18px;
+  overflow:hidden;
+  box-shadow:0 10px 30px rgba(0,0,0,0.35);
+}
+.cardHead{
+  padding:12px 14px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(255,255,255,0.03);
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.qBadge{
+  font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;
+  color:#0b0f1a;background:#f7df1e;padding:6px 10px;border-radius:999px;
+}
+.qCount{font-size:12px;color:#9aa3b8;font-weight:700}
+.codeBlock{
+  margin:14px;
+  background:#0a0e1f;
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:14px;
+  overflow:hidden;
+}
+.codeTop{
+  display:flex;align-items:center;gap:6px;
+  padding:10px 12px;
+  background:#0f142e;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.dot{width:10px;height:10px;border-radius:50%}
+.codeTop span:last-child{margin-left:auto;font-size:11px;color:#7c86a6;font-weight:700;letter-spacing:0.3px}
+pre{
+  margin:0;padding:16px 14px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+  font-size:17px;line-height:1.5;
+  color:#e6e8ef;
+  overflow-x:auto;white-space:pre;
+}
+pre code{font-size:inherit}
+.kw{color:#c084fc}.str{color:#4ade80}.num{color:#fbbf24}.op{color:#94a3b8}.cm{color:#64748b;font-style:italic}
+.questionText{
+  padding:0 14px 2px;
+  font-size:15px;font-weight:600;color:#dbe0f0;line-height:1.4;
+}
+.choices{padding:12px 14px 14px;display:grid;gap:10px}
+.choice{
+  width:100%;min-height:52px;
+  padding:12px 14px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,0.10);
+  background:#0f1530;
+  color:#e6e8ef;
+  font-size:16px;font-weight:600;
+  text-align:left;
+  display:flex;align-items:center;gap:12px;
+  cursor:pointer;
+  transition:transform 0.08s ease, border-color 0.2s ease, background 0.2s ease;
+  user-select:none;
+}
+.choice:active{transform:scale(0.99)}
+.choiceLetter{
+  width:32px;height:32px;flex:0 0 32px;
+  border-radius:9px;display:grid;place-items:center;
+  background:#1c2347;color:#9aa3b8;font-size:13px;font-weight:800;
+  border:1px solid rgba(255,255,255,0.08);
+}
+.choice:hover{border-color:rgba(247,223,30,0.35)}
+.choice.correct{
+  background:rgba(34,197,94,0.12);
+  border-color:rgba(34,197,94,0.55);
+}
+.choice.correct .choiceLetter{background:#16a34a;color:#fff;border-color:transparent}
+.choice.wrong{
+  background:rgba(239,68,68,0.12);
+  border-color:rgba(239,68,68,0.55);
+}
+.choice.wrong .choiceLetter{background:#dc2626;color:#fff;border-color:transparent}
+.choice.dim{opacity:0.55}
+.choice:disabled{cursor:default}
+.verdict{
+  margin:0 14px 14px;
+  border-radius:14px;
+  padding:14px;
+  border:1px solid rgba(255,255,255,0.08);
+  display:none;
+}
+.verdict.show{display:block;animation:pop 0.25s ease}
+@keyframes pop{from{transform:translateY(4px);opacity:0}to{transform:translateY(0);opacity:1}}
+.verdict.ok{background:rgba(34,197,94,0.10);border-color:rgba(34,197,94,0.35)}
+.verdict.bad{background:rgba(239,68,68,0.10);border-color:rgba(239,68,68,0.35)}
+.verdictTitle{font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.verdictTitle i{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-style:normal}
+.verdict.ok i{background:#16a34a;color:#fff}
+.verdict.bad i{background:#dc2626;color:#fff}
+.verdict p{font-size:13.5px;line-height:1.5;color:#cbd5e1}
+.verdict p strong{color:#e6e8ef}
+.actions{padding:0 14px 14px;display:flex;gap:10px}
+.btn{
+  flex:1;min-height:48px;
+  border-radius:14px;border:1px solid rgba(255,255,255,0.10);
+  background:#1a2040;color:#e6e8ef;
+  font-size:15px;font-weight:800;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.btnPrimary{
+  background:linear-gradient(180deg,#f7df1e,#facc15);
+  color:#111;border-color:transparent;
+  box-shadow:0 6px 18px rgba(247,223,30,0.35);
+}
+.btn:disabled{opacity:0.45;cursor:default}
+.btn:active{transform:scale(0.99)}
+.footerActions{display:flex;gap:10px;padding:0 0 6px}
+.smallBtn{
+  flex:1;min-height:44px;border-radius:12px;
+  border:1px solid rgba(255,255,255,0.08);
+  background:#0f1530;color:#9aa3b8;
+  font-size:13px;font-weight:700;cursor:pointer;
+}
+.results{
+  padding:18px 14px 14px;
+  text-align:center;
+}
+.trophy{
+  width:64px;height:64px;margin:0 auto 12px;
+  border-radius:18px;background:linear-gradient(135deg,#f7df1e,#f59e0b);
+  display:grid;place-items:center;font-size:30px;
+  box-shadow:0 10px 24px rgba(247,223,30,0.35);
+}
+.results h2{font-size:20px;font-weight:900;letter-spacing:-0.4px}
+.results .sub{font-size:13px;color:#9aa3b8;margin-top:6px;line-height:1.5}
+.scoreBig{
+  margin:14px auto;
+  background:#0a0e1f;border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;padding:14px;
+  display:flex;justify-content:space-around;gap:10px;
+}
+.scoreBig div b{display:block;font-size:22px;font-weight:900}
+.scoreBig div span{font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:#9aa3b8;font-weight:700}
+.review{margin-top:14px;text-align:left;display:grid;gap:8px}
+.reviewItem{
+  background:#0f1530;border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;padding:10px 12px;
+  display:flex;justify-content:space-between;gap:10px;align-items:center;
+}
+.reviewItem span{font-size:13px;color:#cbd5e1;font-weight:600}
+.badge{font-size:11px;font-weight:800;padding:5px 8px;border-radius:999px;white-space:nowrap}
+.badge.ok{background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3)}
+.badge.bad{background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3)}
+.hint{font-size:12px;color:#7c86a6;text-align:center;padding:6px 10px;line-height:1.4}
+kbd{font-family:ui-monospace,monospace;background:#1a2040;border:1px solid rgba(255,255,255,0.12);border-bottom-width:2px;padding:1px 6px;border-radius:6px;font-size:11px;color:#cbd5e1}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="topRow">
+      <div class="brand">
+        <div class="logo">JS</div>
+        <div>
+          <h1>JS Coercion Quiz</h1>
+          <p>8 tricky conversions</p>
+        </div>
+      </div>
+      <div class="scorePill" id="scorePill">Score <span id="scoreTxt">0/0</span></div>
+    </div>
+    <div class="progressWrap">
+      <div class="progressMeta"><span id="progressLabel">Question 1 of 8</span><span id="percentLabel">0%</span></div>
+      <div class="bar"><div class="fill" id="fill"></div></div>
+    </div>
+  </header>
+
+  <main id="main"></main>
+  <div class="hint">Tip: <kbd>1</kbd>-<kbd>4</kbd> to answer &nbsp;•&nbsp; <kbd>Enter</kbd> next &nbsp;•&nbsp; progress auto-saved</div>
+</div>
+
+<script>
+const QUESTIONS = [
+  {
+    code: '[] + []',
+    q: 'What does this expression evaluate to?',
+    choices: ['""  (empty string)', '"0"', '"[]"', '0'],
+    correct: 0,
+    explain: 'Both arrays become strings via <strong>.toString()</strong> → "" . Then <strong>+</strong> concatenates strings: "" + "" = "" . No numbers involved.'
+  },
+  {
+    code: '[] + {}',
+    q: 'What is the result of adding an array and an object?',
+    choices: ['"[object Object]"', '"[object Object]0"', '{}', 'NaN'],
+    correct: 0,
+    explain: '[] → "" and {} → "[object Object]" (Object.prototype.toString). String + string wins, so "" + "[object Object]" = "[object Object]".'
+  },
+  {
+    code: '"5" - 3',
+    q: 'What does the minus operator do here?',
+    choices: ['2  (number)', '"53"  (string)', '"2"  (string)', 'NaN'],
+    correct: 0,
+    explain: '<strong>-</strong> always coerces to numbers. "5" → 5, then 5 - 3 = 2 (number). Only <strong>+</strong> prefers string concatenation.'
+  },
+  {
+    code: '"5" + 3',
+    q: 'What does plus do with a string and a number?',
+    choices: ['"53"  (string)', '8  (number)', '53  (number)', 'NaN'],
+    correct: 0,
+    explain: '<strong>+</strong> is special: if either side is a string, it concatenates. "5" + String(3) = "53" (string), not 8.'
+  },
+  {
+    code: 'true + false',
+    q: 'What is true plus false?',
+    choices: ['1  (number)', '"truefalse"', '0', 'true'],
+    correct: 0,
+    explain: 'Booleans coerce to numbers for <strong>+</strong> when no string is present: true → 1, false → 0, so 1 + 0 = 1.'
+  },
+  {
+    code: 'null == 0',
+    q: 'Does loose equality consider null equal to 0?',
+    choices: ['false', 'true', 'null', '0'],
+    correct: 0,
+    explain: '<strong>null</strong> only loosely equals <strong>undefined</strong> (and itself). It does NOT coerce to 0 for ==, so null == 0 is false. (But Number(null) is 0 — confusing!)'
+  },
+  {
+    code: 'typeof NaN',
+    q: 'What does typeof return for NaN?',
+    choices: ['"number"', '"NaN"', '"undefined"', '"object"'],
+    correct: 0,
+    explain: 'NaN means “Not-a-Number” but its type is still <strong>number</strong>. It’s a numeric value representing a failed number operation.'
+  },
+  {
+    code: '0.1 + 0.2 === 0.3',
+    q: 'Is this comparison true?',
+    choices: ['false', 'true', '"0.3"', 'NaN'],
+    correct: 0,
+    explain: '0.1 + 0.2 = 0.30000000000000004 due to binary floating-point. So it’s not exactly 0.3, and === is false. Use an epsilon check instead.'
+  }
+];
+
+const LS_KEY = 'jsCoercionQuizSave';
+let state = {
+  idx: 0,
+  score: 0,
+  answered: Array(8).fill(null), // null or choice index
+  revealed: Array(8).fill(false),
+  finished: false
+};
+
+function load(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){
+      const p = JSON.parse(raw);
+      if(p && typeof p.idx==='number' && Array.isArray(p.answered)){
+        state = {...state, ...p};
+        // clamp
+        state.idx = Math.max(0, Math.min(7, state.idx));
+        if(state.answered.length!==8) state.answered = Array(8).fill(null);
+        if(state.revealed.length!==8) state.revealed = Array(8).fill(false);
+      }
+    }
+  }catch(e){}
+}
+function save(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
+}
+
+function render(){
+  const main = document.getElementById('main');
+  const total = QUESTIONS.length;
+  const answeredCount = state.answered.filter(v=>v!==null).length;
+  document.getElementById('scoreTxt').textContent = state.score + '/' + answeredCount;
+  document.getElementById('progressLabel').textContent = state.finished ? 'Complete' : `Question ${state.idx+1} of ${total}`;
+  const pct = state.finished ? 100 : Math.round((state.idx/total)*100);
+  document.getElementById('percentLabel').textContent = pct + '%';
+  document.getElementById('fill').style.width = pct + '%';
+
+  if(state.finished){
+    main.innerHTML = resultsHTML();
+    bindResults();
+    return;
+  }
+
+  const q = QUESTIONS[state.idx];
+  const isRevealed = state.revealed[state.idx];
+  const picked = state.answered[state.idx];
+
+  main.innerHTML = `
+    <section class="card">
+      <div class="cardHead">
+        <div class="qBadge">Question ${state.idx+1}</div>
+        <div class="qCount">${state.idx+1} / ${total}</div>
+      </div>
+
+      <div class="codeBlock">
+        <div class="codeTop">
+          <div class="dot" style="background:#ff5f56"></div>
+          <div class="dot" style="background:#ffbd2e"></div>
+          <div class="dot" style="background:#27c93f"></div>
+          <span>JavaScript • console</span>
+        </div>
+        <pre><code>${highlight(q.code)}</code></pre>
+      </div>
+      <div class="questionText">${q.q}</div>
+
+      <div class="choices" id="choices">
+        ${q.choices.map((c,i)=>{
+          let cls='choice';
+          if(isRevealed){
+            if(i===q.correct) cls+=' correct';
+            else if(i===picked) cls+=' wrong';
+            else cls+=' dim';
+          }
+          return `<button class="${cls}" data-i="${i}" ${isRevealed?'disabled':''}>
+            <span class="choiceLetter">${['A','B','C','D'][i]}</span>
+            <span style="flex:1">${escapeHtml(c)}</span>
+            ${isRevealed && i===q.correct ? '<span style="font-size:14px">✓</span>' : ''}
+            ${isRevealed && i===picked && i!==q.correct ? '<span style="font-size:14px">✕</span>' : ''}
+          </button>`;
+        }).join('')}
+      </div>
+
+      <div class="verdict ${isRevealed ? 'show '+(picked===q.correct?'ok':'bad') : ''}" id="verdict" style="${isRevealed?'display:block':''}">
+        ${isRevealed ? `
+          <div class="verdictTitle"><i>${picked===q.correct?'✓':'✕'}</i> ${picked===q.correct?'Correct!':'Not quite'}</div>
+          <p>${q.explain}</p>
+        ` : ''}
+      </div>
+
+      <div class="actions">
+        <button class="btn" id="restartBtn" style="flex:0 0 auto;min-width:96px">↺ Restart</button>
+        <button class="btn btnPrimary" id="nextBtn" ${!isRevealed?'disabled':''}>${state.idx===total-1?'See results →':'Next →'}</button>
+      </div>
+    </section>
+
+    <div class="footerActions">
+      <button class="smallBtn" id="prevBtn" ${state.idx===0?'disabled':''}>← Previous</button>
+      <button class="smallBtn" id="skipBtn" ${isRevealed?'disabled':''}>Skip</button>
+    </div>
+  `;
+
+  // bind
+  document.querySelectorAll('.choice').forEach(b=>{
+    b.addEventListener('click', ()=> choose(parseInt(b.dataset.i)));
+  });
+  document.getElementById('nextBtn').addEventListener('click', next);
+  document.getElementById('restartBtn').addEventListener('click', restart);
+  const prevBtn=document.getElementById('prevBtn');
+  if(prevBtn) prevBtn.addEventListener('click', prev);
+  const skipBtn=document.getElementById('skipBtn');
+  if(skipBtn) skipBtn.addEventListener('click', skip);
+}
+
+function highlight(code){
+  // very small highlighter for these snippets
+  let h = escapeHtml(code);
+  h = h.replace(/typeof/g,'<span class="kw">typeof</span>');
+  h = h.replace(/null|true|false|NaN|undefined/g, m=>`<span class="kw">${m}</span>`);
+  h = h.replace(/"[^"]*"/g, m=>`<span class="str">${m}</span>`);
+  h = h.replace(/\b0\.1\b|\b0\.2\b|\b0\.3\b|\b\d+\b/g, m=>`<span class="num">${m}</span>`);
+  h = h.replace(/===|==|\+/g, m=>`<span class="op">${m}</span>`);
+  return h;
+}
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function choose(i){
+  if(state.revealed[state.idx]) return;
+  state.answered[state.idx]=i;
+  state.revealed[state.idx]=true;
+  if(i===QUESTIONS[state.idx].correct) state.score++;
+  save();
+  render();
+  // haptic
+  if(navigator.vibrate) navigator.vibrate(i===QUESTIONS[state.idx].correct ? 30 : [30,40,30]);
+}
+
+function next(){
+  if(!state.revealed[state.idx]) return;
+  if(state.idx < QUESTIONS.length-1){
+    state.idx++;
+    save();
+    render();
+  } else {
+    state.finished=true;
+    save();
+    render();
+  }
+}
+function prev(){
+  if(state.idx>0){ state.idx--; save(); render(); }
+}
+function skip(){
+  if(state.revealed[state.idx]) return;
+  state.answered[state.idx]=-1;
+  state.revealed[state.idx]=true;
+  save();
+  render();
+}
+function restart(){
+  state = {idx:0, score:0, answered:Array(8).fill(null), revealed:Array(8).fill(false), finished:false};
+  save();
+  render();
+}
+
+function resultsHTML(){
+  const total=QUESTIONS.length;
+  const correct=state.score;
+  const pct=Math.round(correct/total*100);
+  let title = pct===100 ? 'Flawless! 🎉' : pct>=75 ? 'Sharp intuition!' : pct>=50 ? 'Getting there!' : 'Tricky, right?';
+  let msg = pct===100 ? 'You nailed every coercion quirk. You really know your == from your ===.' : 'Review the explanations below and try again — these quirks love to surprise.';
+  return `
+    <section class="card results">
+      <div class="trophy">🏆</div>
+      <h2>${title}</h2>
+      <p class="sub">${msg}</p>
+      <div class="scoreBig">
+        <div><b>${correct}/${total}</b><span>Score</span></div>
+        <div><b>${pct}%</b><span>Accuracy</span></div>
+        <div><b>${total}</b><span>Questions</span></div>
+      </div>
+      <div class="actions" style="padding:0">
+        <button class="btn btnPrimary" id="restart2">↺ Play again</button>
+        <button class="btn" id="reviewBtn">Review answers</button>
+      </div>
+      <div class="review" id="review" style="display:none">
+        ${QUESTIONS.map((q,i)=>{
+          const picked = state.answered[i];
+          const ok = picked===q.correct;
+          return `<div class="reviewItem">
+            <span><b>Q${i+1}:</b> <code style="font-family:ui-monospace,monospace;background:#0a0e1f;padding:2px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.08)">${escapeHtml(q.code)}</code></span>
+            <span class="badge ${ok?'ok':'bad'}">${ok?'✓ Correct':'✕ Wrong'}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </section>
+  `;
+}
+function bindResults(){
+  document.getElementById('restart2').addEventListener('click', restart);
+  const rb=document.getElementById('reviewBtn');
+  const rv=document.getElementById('review');
+  rb.addEventListener('click', ()=>{
+    const isHidden = rv.style.display==='none';
+    rv.style.display = isHidden ? 'grid' : 'none';
+    rb.textContent = isHidden ? 'Hide review' : 'Review answers';
+  });
+}
+
+// keyboard
+document.addEventListener('keydown', (e)=>{
+  if(state.finished) return;
+  if(e.key>='1' && e.key<='4'){
+    const idx=parseInt(e.key)-1;
+    if(!state.revealed[state.idx]) choose(idx);
+  }
+  if(e.key==='Enter'){
+    if(state.revealed[state.idx]) next();
+  }
+  if(e.key==='ArrowRight' && state.revealed[state.idx]) next();
+  if(e.key==='ArrowLeft') prev();
+});
+
+load();
+render();
+</script>
+</body>
+</html>

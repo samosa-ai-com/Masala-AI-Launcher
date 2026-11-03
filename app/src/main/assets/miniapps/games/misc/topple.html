@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Stack-Then-Throw Duel</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden;background:#0f172a;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.app{width:100%;max-width:428px;min-width:360px;margin:0 auto;min-height:100vh;background:linear-gradient(180deg,#1e293b 0%,#0f172a 100%);display:flex;flex-direction:column;position:relative;overflow:hidden}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:rgba(0,0,0,0.35);backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.1)}
+.badge{background:#1e293b;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:6px 10px;color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;gap:6px;min-height:36px}
+.badge span{font-size:11px;opacity:0.7;font-weight:600}
+.timer{font-size:22px;font-weight:900;color:#facc15;letter-spacing:1px}
+.score{font-size:18px;font-weight:900;color:#fff}
+.phase-pill{background:#f59e0b;color:#000;font-weight:900;font-size:11px;padding:4px 8px;border-radius:999px;letter-spacing:0.5px}
+.canvas-wrap{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:8px 0 0}
+canvas{width:100%;height:auto;max-width:428px;background:linear-gradient(180deg,#38bdf8 0%,#7dd3fc 35%,#fef9c3 35.5%,#fde68a 36%,#a3e635 36.5%,#65a30d 100%);border-radius:16px;border:2px solid rgba(255,255,255,0.2);touch-action:none;display:block}
+.hud-row{display:flex;gap:8px;padding:8px 12px;width:100%;justify-content:space-between;align-items:center}
+.hud-card{flex:1;background:rgba(255,255,255,0.95);border-radius:12px;padding:8px 10px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.2)}
+.hud-card b{font-size:13px;color:#0f172a;display:block}
+.hud-card small{font-size:10px;color:#64748b;font-weight:700;letter-spacing:0.5px}
+.controls{padding:10px 12px 14px;background:rgba(15,23,42,0.9);border-top:1px solid rgba(255,255,255,0.1);display:flex;flex-direction:column;gap:8px}
+.btn{width:100%;border:none;border-radius:14px;padding:14px 16px;font-weight:900;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;touch-action:manipulation;user-select:none}
+.btn:active{transform:scale(0.98)}
+.btn-primary{background:linear-gradient(180deg,#facc15,#eab308);color:#422006;box-shadow:0 4px 0 #a16207,0 6px 16px rgba(0,0,0,0.3)}
+.btn-secondary{background:#334155;color:#fff;border:1px solid rgba(255,255,255,0.15)}
+.btn-shield{background:linear-gradient(180deg,#38bdf8,#0ea5e9);color:#fff;box-shadow:0 4px 0 #0369a1}
+.btn:disabled{opacity:0.5;pointer-events:none}
+.row2{display:flex;gap:8px}
+.row2 .btn{flex:1}
+.instruction{text-align:center;color:#e2e8f0;font-size:13px;font-weight:600;padding:4px 0}
+.drag-line{position:absolute;pointer-events:none}
+.modal{position:absolute;inset:0;background:rgba(15,23,42,0.85);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10}
+.modal-card{background:#fff;border-radius:20px;padding:20px;width:100%;max-width:340px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.4)}
+.modal-card h2{font-size:22px;color:#0f172a;margin-bottom:6px}
+.modal-card p{font-size:13px;color:#475569;line-height:1.5;margin-bottom:14px}
+.stars{font-size:20px;margin-bottom:8px}
+.shield-indicator{position:absolute;left:12px;top:50%;transform:translateY(-50%);background:rgba(56,189,248,0.9);color:#fff;font-size:10px;font-weight:900;padding:4px 6px;border-radius:8px;display:none}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="badge"><span>ROUND</span> <b id="roundTxt">1/3</b> <span id="phasePill" class="phase-pill">STACK</span></div>
+    <div class="timer" id="timerTxt">15.0</div>
+    <div class="badge"><span>SCORE</span> <b id="scoreTxt" class="score">0 - 0</b></div>
+  </div>
+
+  <div class="canvas-wrap">
+    <div style="position:relative;width:100%;max-width:428px">
+      <canvas id="c" width="360" height="520"></canvas>
+      <div id="shieldTag" class="shield-indicator">🛡️ SHIELD UP</div>
+    </div>
+    <div class="hud-row">
+      <div class="hud-card"><small>YOUR TOWER</small><b id="youBlocks">0 blocks</b><b id="youStatus" style="color:#16a34a;font-size:11px">STABLE</b></div>
+      <div class="hud-card"><small>RIVAL TOWER</small><b id="rivalBlocks">0 blocks</b><b id="rivalStatus" style="color:#dc2626;font-size:11px">STANDING</b></div>
+      <div class="hud-card"><small>THROWS</small><b id="throwCount">0</b><small>drag to flick</small></div>
+    </div>
+  </div>
+
+  <div class="controls" id="controls">
+    <div class="instruction" id="instr">TAP DROP to stack your tower — build high before time runs out!</div>
+    <button class="btn btn-primary" id="dropBtn">🧱 TAP TO DROP BLOCK</button>
+    <div class="row2" id="throwRow" style="display:none">
+      <button class="btn btn-shield" id="shieldBtn">🛡️ HOLD SHIELD</button>
+      <button class="btn btn-secondary" id="skipBtn">SKIP → THROW</button>
+    </div>
+    <div class="row2" id="aimRow" style="display:none">
+      <button class="btn btn-shield" id="shieldBtn2">🛡️ HOLD SHIELD</button>
+      <div style="flex:1;background:rgba(255,255,255,0.1);border-radius:12px;display:flex;align-items:center;justify-content:center;color:#facc15;font-weight:800;font-size:12px;padding:8px">DRAG ON FIELD TO AIM & RELEASE</div>
+    </div>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="modal-card">
+      <div class="stars">🧱 ⚔️ 🎯</div>
+      <h2>Stack-Then-Throw Duel</h2>
+      <p><b>Phase 1 — STACK (12s):</b> Tap DROP to build your tower as high as you can.<br><b>Phase 2 — THROW (20s):</b> Drag from your side to flick balls at the rival tower. Hold 🛡️ to block incoming fire! Computer throws back.</p>
+      <p style="font-size:11px;color:#64748b">Best of 3 rounds. Knock down more rival blocks than you lose.</p>
+      <button class="btn btn-primary" id="startBtn">▶ START DUEL</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const W=360, H=520;
+const groundY=460;
+const basePlayerX=85, baseRivalX=275;
+let round=1, totalRounds=3;
+let phase='stack'; // stack, throw, result
+let timer=12, timerMax=12;
+let running=false;
+let scoreYou=0, scoreRival=0;
+let blocks=[], balls=[], particles=[];
+let throwCount=0;
+let shieldActive=false;
+let drag={active:false,sx:0,sy:0,cx:0,cy:0};
+let lastTime=0;
+let computerCooldown=0;
+
+function rand(a,b){return Math.random()*(b-a)+a}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+
+class Block{
+  constructor(x,y,w,h,color){
+    this.x=x; this.y=y; this.w=w; this.h=h;
+    this.vx=0; this.vy=0; this.angle=0; this.va=0;
+    this.color=color; this.knocked=false; this.initialY=y;
+  }
+  update(){
+    if(this.y+this.h/2 >= groundY-0.5 && Math.abs(this.vy)<0.3 && Math.abs(this.va)<0.05){
+      // settle
+      this.vy*=0.5; this.vx*=0.85; this.va*=0.85;
+      if(Math.abs(this.vy)<0.1) this.vy=0;
+    } else {
+      this.vy+=0.55; // gravity
+    }
+    this.x+=this.vx; this.y+=this.vy; this.angle+=this.va;
+    this.vx*=0.995; this.va*=0.99;
+    // ground collision
+    if(this.y+this.h/2 > groundY){
+      this.y=groundY - this.h/2;
+      this.vy*=-0.25;
+      if(Math.abs(this.vy)<0.6) this.vy=0;
+      this.vx*=0.82; this.va*=0.85;
+      // friction
+      if(Math.abs(this.vx)<0.05) this.vx=0;
+    }
+    // walls
+    if(this.x-this.w/2 < 2){ this.x=2+this.w/2; this.vx*=-0.4; }
+    if(this.x+this.w/2 > W-2){ this.x=W-2-this.w/2; this.vx*=-0.4; }
+    // knocked detection
+    if(!this.knocked){
+      if(this.y > groundY-8 || Math.abs(this.angle)>0.9 || Math.abs(this.x - (this.isPlayer?basePlayerX:baseRivalX))>70){
+        // will be counted later
+      }
+    }
+  }
+  draw(){
+    ctx.save();
+    ctx.translate(this.x,this.y);
+    ctx.rotate(this.angle);
+    ctx.fillStyle=this.color;
+    ctx.strokeStyle='rgba(0,0,0,0.25)';
+    ctx.lineWidth=2;
+    // brick pattern
+    ctx.fillRect(-this.w/2,-this.h/2,this.w,this.h);
+    ctx.strokeRect(-this.w/2,-this.h/2,this.w,this.h);
+    ctx.fillStyle='rgba(255,255,255,0.25)';
+    ctx.fillRect(-this.w/2+2,-this.h/2+2,this.w-4,4);
+    ctx.restore();
+  }
+}
+
+class Ball{
+  constructor(x,y,vx,vy,owner){
+    this.x=x; this.y=y; this.vx=vx; this.vy=vy; this.r=9; this.owner=owner; this.life=400;
+  }
+  update(){
+    this.vy+=0.45;
+    this.x+=this.vx; this.y+=this.vy;
+    this.vx*=0.998;
+    this.life--;
+    if(this.y+this.r > groundY){
+      this.y=groundY - this.r;
+      this.vy*=-0.55; this.vx*=0.85;
+      if(Math.abs(this.vy)<1) this.vy=0;
+    }
+    if(this.x-this.r<0 || this.x+this.r>W) this.vx*=-0.7;
+  }
+  draw(){
+    ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+    ctx.fillStyle=this.owner==='player'?'#facc15':'#ef4444';
+    ctx.fill(); ctx.strokeStyle='rgba(0,0,0,0.3)'; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.arc(this.x-3,this.y-3,3,0,Math.PI*2); ctx.fill();
+  }
+}
+
+function createRivalTower(){
+  const count = 6 + Math.floor(rand(0,3)) + round; // 7-10
+  const colors=['#fb7185','#f43f5e','#e11d48','#be123c'];
+  for(let i=0;i<count;i++){
+    const w= rand(38,48);
+    const h=14;
+    const x= baseRivalX + rand(-6,6);
+    const y= groundY - h/2 - i*(h+0.5) - rand(0,2);
+    const b=new Block(x,y,w,h,colors[i%colors.length]);
+    b.isPlayer=false;
+    blocks.push(b);
+  }
+}
+
+function dropPlayerBlock(){
+  if(phase!=='stack') return;
+  const w= rand(36,46);
+  const h=14;
+  const x= basePlayerX + rand(-14,14);
+  const y= 40;
+  const colors=['#60a5fa','#3b82f6','#2563eb','#1d4ed8'];
+  const b=new Block(x,y,w,h,colors[Math.floor(rand(0,colors.length))]);
+  b.isPlayer=true;
+  b.vx=rand(-0.8,0.8);
+  blocks.push(b);
+  // haptic
+  if(navigator.vibrate) navigator.vibrate(20);
+  updateHud();
+}
+
+function startRound(){
+  blocks=[]; balls=[]; particles=[];
+  timerMax = phase==='stack'?12:20;
+  timer = timerMax;
+  throwCount=0;
+  drag.active=false;
+  computerCooldown=60;
+  if(phase==='stack'){
+    createRivalTower();
+    // give player a base block
+    const base=new Block(basePlayerX, groundY-7, 52,14,'#93c5fd');
+    base.isPlayer=true; base.vy=0; blocks.push(base);
+  }
+  running=true;
+  updateHud();
+}
+
+function endStackPhase(){
+  phase='throw';
+  timerMax=20; timer=20;
+  document.getElementById('phasePill').textContent='THROW';
+  document.getElementById('phasePill').style.background='#38bdf8';
+  document.getElementById('instr').textContent='DRAG from your side to aim, RELEASE to fire! Hold 🛡️ to block!';
+  document.getElementById('dropBtn').style.display='none';
+  document.getElementById('throwRow').style.display='none';
+  document.getElementById('aimRow').style.display='flex';
+  // add slingshot visual hint
+}
+
+function endThrowPhase(){
+  // calculate score
+  let playerStanding=0, rivalStanding=0, playerTotal=0, rivalTotal=0;
+  blocks.forEach(b=>{
+    const isPlayer=b.isPlayer;
+    if(isPlayer) playerTotal++; else rivalTotal++;
+    const standing = b.y < groundY-10 && Math.abs(b.angle)<0.8 && Math.abs(b.x - (isPlayer?basePlayerX:baseRivalX))<45;
+    if(standing){
+      if(isPlayer) playerStanding++; else rivalStanding++;
+    }
+  });
+  const playerKnocked = playerTotal - playerStanding;
+  const rivalKnocked = rivalTotal - rivalStanding;
+  // points: rival knocked - player knocked, plus bonus for throws
+  let roundScore = rivalKnocked - playerKnocked;
+  if(rivalKnocked>playerKnocked) scoreYou++;
+  else if(playerKnocked>rivalKnocked) scoreRival++;
+  else {
+    // tie goes to higher tower? compare standing
+    if(playerStanding>rivalStanding) scoreYou++; else if(rivalStanding>playerStanding) scoreRival++;
+  }
+  // show result modal
+  running=false;
+  let title, msg;
+  if(rivalKnocked>playerKnocked) {title='Round Won! 🎉'; msg=`You knocked ${rivalKnocked} rival blocks, lost ${playerKnocked}.`;}
+  else if(playerKnocked>rivalKnocked) {title='Round Lost 😣'; msg=`Rival knocked ${playerKnocked} of yours, you knocked ${rivalKnocked}.`;}
+  else {title='Round Draw 🤝'; msg=`Both knocked ${rivalKnocked}. Standing: You ${playerStanding} vs Rival ${rivalStanding}.`;}
+  if(round>=totalRounds){
+    const finalWin = scoreYou>scoreRival;
+    setTimeout(()=>showModal(finalWin?`🏆 YOU WIN ${scoreYou}-${scoreRival}!`:`💥 RIVAL WINS ${scoreRival}-${scoreYou}`, msg + `<br><br><b>Final Score: You ${scoreYou} - ${scoreRival} Rival</b>`, finalWin?'Play Again':'Try Again'),400);
+  } else {
+    setTimeout(()=>showModal(title, msg + `<br><b>Score: You ${scoreYou} - ${scoreRival} Rival</b><br>Next round in 2s...`, 'Next Round'),400);
+    setTimeout(()=>{
+      round++; document.getElementById('roundTxt').textContent=round+'/'+totalRounds;
+      phase='stack';
+      document.getElementById('phasePill').textContent='STACK';
+      document.getElementById('phasePill').style.background='#f59e0b';
+      document.getElementById('instr').textContent='TAP DROP to stack your tower — build high before time runs out!';
+      document.getElementById('dropBtn').style.display='flex';
+      document.getElementById('throwRow').style.display='flex';
+      document.getElementById('aimRow').style.display='none';
+      startRound();
+      hideModal();
+    },2200);
+  }
+  updateHud();
+}
+
+function showModal(title, desc, btnText){
+  const m=document.getElementById('modal');
+  m.style.display='flex';
+  m.innerHTML=`<div class="modal-card"><div class="stars">✨</div><h2>${title}</h2><p>${desc}</p><button class="btn btn-primary" id="modalBtn">${btnText||'Continue'}</button></div>`;
+  document.getElementById('modalBtn').onclick=()=>{
+    if(title.includes('YOU WIN')||title.includes('RIVAL WINS')){
+      // reset game
+      round=1; scoreYou=0; scoreRival=0; phase='stack';
+      document.getElementById('roundTxt').textContent='1/3';
+      document.getElementById('phasePill').textContent='STACK';
+      document.getElementById('phasePill').style.background='#f59e0b';
+      document.getElementById('instr').textContent='TAP DROP to stack your tower — build high before time runs out!';
+      document.getElementById('dropBtn').style.display='flex';
+      document.getElementById('throwRow').style.display='flex';
+      document.getElementById('aimRow').style.display='none';
+      hideModal(); startRound();
+    } else {
+      hideModal();
+    }
+  };
+}
+function hideModal(){document.getElementById('modal').style.display='none'}
+
+function updateHud(){
+  document.getElementById('scoreTxt').textContent=scoreYou+' - '+scoreRival;
+  document.getElementById('roundTxt').textContent=round+'/'+totalRounds;
+  document.getElementById('timerTxt').textContent=timer.toFixed(1);
+  let pc=0, rc=0;
+  blocks.forEach(b=>{ if(b.isPlayer) pc++; else rc++; });
+  document.getElementById('youBlocks').textContent=pc+' blocks';
+  document.getElementById('rivalBlocks').textContent=rc+' blocks';
+  document.getElementById('throwCount').textContent=throwCount;
+  const youStanding = blocks.filter(b=>b.isPlayer && b.y<groundY-10).length;
+  const rivalStanding = blocks.filter(b=>!b.isPlayer && b.y<groundY-10).length;
+  document.getElementById('youStatus').textContent= youStanding>=5?'STRONG':'WOBBLY';
+  document.getElementById('rivalStatus').textContent= rivalStanding>=5?'STANDING':'CRUMBLING';
+  document.getElementById('youStatus').style.color= youStanding>=5?'#16a34a':'#eab308';
+}
+
+function handleCollisions(){
+  // block-block simple AABB push
+  for(let i=0;i<blocks.length;i++){
+    for(let j=i+1;j<blocks.length;j++){
+      const a=blocks[i], b=blocks[j];
+      const dx=b.x-a.x, dy=b.y-a.y;
+      const ox=(a.w/2+b.w/2)-Math.abs(dx);
+      const oy=(a.h/2+b.h/2)-Math.abs(dy);
+      if(ox>0 && oy>0){
+        // resolve along smallest overlap
+        if(oy<ox){
+          const dir = dy>0?1:-1;
+          const push=oy/2+0.2;
+          a.y-=dir*push*0.5; b.y+=dir*push*0.5;
+          // impulse
+          const relVy = b.vy - a.vy;
+          if(Math.abs(relVy)>0.1){
+            a.vy+=relVy*0.15*dir; b.vy-=relVy*0.15*dir;
+          }
+          a.vx+=rand(-0.2,0.2); b.vx+=rand(-0.2,0.2);
+          a.va+=rand(-0.02,0.02); b.va+=rand(-0.02,0.02);
+          // damp
+          a.vy*=0.9; b.vy*=0.9;
+        } else {
+          const dir = dx>0?1:-1;
+          const push=ox/2+0.2;
+          a.x-=dir*push*0.5; b.x+=dir*push*0.5;
+          a.vx-=dir*0.3; b.vx+=dir*0.3;
+        }
+      }
+    }
+  }
+  // ball-block
+  for(let bi=balls.length-1;bi>=0;bi--){
+    const ball=balls[bi];
+    // shield block
+    if(shieldActive){
+      const sx= basePlayerX+28, sy= groundY-45, sw=10, sh=90;
+      if(ball.x+ball.r > sx-sw/2 && ball.x-ball.r < sx+sw/2 && ball.y+ball.r > sy-sh/2 && ball.y-ball.r < sy+sh/2){
+        ball.vx = Math.abs(ball.vx)*0.9 + 2;
+        ball.vy += rand(-2,2);
+        // spark
+        for(let k=0;k<4;k++) particles.push({x:ball.x,y:ball.y,vx:rand(-3,3),vy:rand(-4,0),life:12,color:'#38bdf8'});
+        continue;
+      }
+    }
+    for(let j=0;j<blocks.length;j++){
+      const bl=blocks[j];
+      // AABB vs circle
+      const closestX=clamp(ball.x, bl.x-bl.w/2, bl.x+bl.w/2);
+      const closestY=clamp(ball.y, bl.y-bl.h/2, bl.y+bl.h/2);
+      const dx=ball.x-closestX, dy=ball.y-closestY;
+      const dist=Math.hypot(dx,dy);
+      if(dist < ball.r+1){
+        // impulse
+        const nx= dist?dx/dist:0, ny= dist?dy/dist:-1;
+        const overlap= ball.r+1 - dist;
+        ball.x+=nx*overlap; ball.y+=ny*overlap;
+        const impulse= 6;
+        ball.vx = nx*impulse*0.6 + ball.vx*0.3;
+        ball.vy = ny*impulse*0.6 + ball.vy*0.3;
+        bl.vx += -nx*2.5; bl.vy += -ny*2.5;
+        bl.va += (nx*0.08 + rand(-0.04,0.04));
+        // particles
+        for(let k=0;k<3;k++) particles.push({x:closestX,y:closestY,vx:rand(-2,2),vy:rand(-3,0),life:10,color:bl.color});
+        if(ball.owner==='player' && !bl.isPlayer) bl.knocked=true;
+        if(ball.owner==='rival' && bl.isPlayer) bl.knocked=true;
+      }
+    }
+  }
+}
+
+function computerAI(){
+  if(phase!=='throw') return;
+  computerCooldown--;
+  if(computerCooldown<=0){
+    computerCooldown = rand(70,110); // ~1.2-1.8s at 60fps
+    // fire from rival side towards player tower
+    const sx= baseRivalX+10, sy= rand(groundY-120, groundY-40);
+    const targetX= basePlayerX + rand(-20,20);
+    const targetY= groundY - rand(20,80);
+    const dx= targetX - sx, dy= targetY - sy;
+    const power= rand(0.9,1.15);
+    const vx= dx*0.08*power + rand(-1,1);
+    const vy= dy*0.08*power + rand(-1.5,0.5);
+    balls.push(new Ball(sx,sy,vx,vy,'rival'));
+  }
+}
+
+function drawScene(){
+  ctx.clearRect(0,0,W,H);
+  // ground
+  ctx.fillStyle='#65a30d'; ctx.fillRect(0,groundY,W,H-groundY);
+  ctx.fillStyle='#4d7c0f'; ctx.fillRect(0,groundY,W,6);
+  // bases
+  ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.fillRect(basePlayerX-30,groundY-4,60,4); ctx.fillRect(baseRivalX-30,groundY-4,60,4);
+  // labels
+  ctx.fillStyle='#0f172a'; ctx.font='900 10px system-ui'; ctx.textAlign='center';
+  ctx.fillText('YOU',basePlayerX,groundY+14); ctx.fillText('RIVAL',baseRivalX,groundY+14);
+  // slingshot hint
+  if(phase==='throw'){
+    ctx.strokeStyle='rgba(15,23,42,0.25)'; ctx.lineWidth=2; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(45,groundY-90); ctx.lineTo(45,groundY-10); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='rgba(15,23,42,0.6)'; ctx.font='700 8px system-ui'; ctx.fillText('DRAG HERE',45,groundY-95);
+    // shield visual
+    if(shieldActive){
+      ctx.fillStyle='rgba(56,189,248,0.85)'; ctx.strokeStyle='#0ea5e9'; ctx.lineWidth=2;
+      const sx=basePlayerX+28, sy=groundY-45;
+      ctx.beginPath(); ctx.roundRect(sx-8,sy-45,16,90,8); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.font='12px system-ui'; ctx.fillText('🛡️',sx,sy);
+    }
+  }
+  // blocks
+  blocks.forEach(b=>b.draw());
+  // balls
+  balls.forEach(b=>b.draw());
+  // particles
+  particles.forEach(p=>{
+    ctx.fillStyle=p.color; ctx.globalAlpha= p.life/12;
+    ctx.fillRect(p.x,p.y,4,4);
+  }); ctx.globalAlpha=1;
+  // drag line
+  if(drag.active){
+    const dx=drag.sx-drag.cx, dy=drag.sy-drag.cy;
+    const power=Math.hypot(dx,dy);
+    const clampedPower=Math.min(power,70);
+    const nx= power?dx/power:0, ny= power?dy/power:0;
+    // line
+    ctx.strokeStyle='#facc15'; ctx.lineWidth=3; ctx.beginPath();
+    ctx.moveTo(drag.sx,drag.sy); ctx.lineTo(drag.sx+nx*clampedPower*0.9, drag.sy+ny*clampedPower*0.9); ctx.stroke();
+    // power dot
+    ctx.fillStyle= clampedPower>50?'#ef4444':clampedPower>30?'#facc15':'#22c55e';
+    ctx.beginPath(); ctx.arc(drag.sx,drag.sy,8,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#000'; ctx.font='800 8px system-ui'; ctx.textAlign='center'; ctx.fillText(Math.round(clampedPower)+'%',drag.sx,drag.sy+3);
+    // trajectory preview
+    ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.setLineDash([3,3]); ctx.lineWidth=1.5; ctx.beginPath();
+    let px=drag.sx, py=drag.sy, pvx=nx*clampedPower*0.18, pvy=ny*clampedPower*0.18;
+    ctx.moveTo(px,py);
+    for(let i=0;i<12;i++){ pvx*=0.998; pvy+=0.45; px+=pvx; py+=pvy; ctx.lineTo(px,py); }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+}
+
+function loop(ts){
+  requestAnimationFrame(loop);
+  if(!lastTime) lastTime=ts;
+  const dt=Math.min(32, ts-lastTime)/16.66; lastTime=ts;
+  if(running){
+    timer-= dt/60;
+    if(timer<=0){
+      timer=0;
+      if(phase==='stack') endStackPhase();
+      else if(phase==='throw') endThrowPhase();
+    }
+    blocks.forEach(b=>b.update());
+    balls.forEach(b=>b.update());
+    // remove old balls
+    balls=balls.filter(b=>b.life>0 && b.y < H+20);
+    particles.forEach(p=>{p.x+=p.vx; p.y+=p.vy; p.vy+=0.3; p.life--;});
+    particles=particles.filter(p=>p.life>0);
+    handleCollisions();
+    computerAI();
+  }
+  drawScene();
+  updateHud();
+}
+
+// input
+function getPos(e){
+  const rect=canvas.getBoundingClientRect();
+  const scaleX=W/rect.width, scaleY=H/rect.height;
+  const t=e.touches?e.touches[0]:e;
+  return {x:(t.clientX-rect.left)*scaleX, y:(t.clientY-rect.top)*scaleY};
+}
+canvas.addEventListener('touchstart',e=>{
+  if(phase!=='throw') return;
+  e.preventDefault();
+  const p=getPos(e);
+  // only allow drag from left third
+  if(p.x<140){
+    drag.active=true; drag.sx=p.x; drag.sy=p.y; drag.cx=p.x; drag.cy=p.y;
+  }
+},{passive:false});
+canvas.addEventListener('touchmove',e=>{
+  if(!drag.active) return;
+  e.preventDefault();
+  const p=getPos(e);
+  drag.cx=p.x; drag.cy=p.y;
+},{passive:false});
+canvas.addEventListener('touchend',e=>{
+  if(!drag.active) return;
+  e.preventDefault();
+  const dx=drag.sx-drag.cx, dy=drag.sy-drag.cy;
+  const power=Math.hypot(dx,dy);
+  if(power>12){
+    const clamped=Math.min(power,70);
+    const nx=dx/power, ny=dy/power;
+    const vx=nx*clamped*0.18, vy=ny*clamped*0.18;
+    balls.push(new Ball(drag.sx,drag.sy,vx,vy,'player'));
+    throwCount++;
+    if(navigator.vibrate) navigator.vibrate(30);
+  }
+  drag.active=false;
+},{passive:false});
+// mouse for desktop testing
+canvas.addEventListener('mousedown',e=>{
+  if(phase!=='throw') return;
+  const p=getPos(e);
+  if(p.x<140){drag.active=true; drag.sx=p.x; drag.sy=p.y; drag.cx=p.x; drag.cy=p.y;}
+});
+canvas.addEventListener('mousemove',e=>{
+  if(!drag.active) return;
+  const p=getPos(e); drag.cx=p.x; drag.cy=p.y;
+});
+canvas.addEventListener('mouseup',e=>{
+  if(!drag.active) return;
+  const dx=drag.sx-drag.cx, dy=drag.sy-drag.cy;
+  const power=Math.hypot(dx,dy);
+  if(power>12){
+    const clamped=Math.min(power,70);
+    const nx=dx/power, ny=dy/power;
+    balls.push(new Ball(drag.sx,drag.sy,nx*clamped*0.18, ny*clamped*0.18,'player'));
+    throwCount++;
+  }
+  drag.active=false;
+});
+
+document.getElementById('dropBtn').addEventListener('click',dropPlayerBlock);
+document.getElementById('dropBtn').addEventListener('touchstart',e=>{e.preventDefault(); dropPlayerBlock();},{passive:false});
+document.getElementById('skipBtn').addEventListener('click',()=>{ if(phase==='stack') endStackPhase(); });
+function setShield(on){
+  shieldActive=on;
+  document.getElementById('shieldTag').style.display=on?'block':'none';
+}
+['shieldBtn','shieldBtn2'].forEach(id=>{
+  const el=document.getElementById(id);
+  el.addEventListener('touchstart',e=>{e.preventDefault(); setShield(true)},{passive:false});
+  el.addEventListener('touchend',e=>{e.preventDefault(); setShield(false)},{passive:false});
+  el.addEventListener('mousedown',()=>setShield(true));
+  el.addEventListener('mouseup',()=>setShield(false));
+  el.addEventListener('mouseleave',()=>setShield(false));
+});
+document.getElementById('startBtn').addEventListener('click',()=>{
+  hideModal(); phase='stack'; round=1; scoreYou=0; scoreRival=0;
+  document.getElementById('roundTxt').textContent='1/3';
+  document.getElementById('phasePill').textContent='STACK';
+  document.getElementById('phasePill').style.background='#f59e0b';
+  document.getElementById('dropBtn').style.display='flex';
+  document.getElementById('throwRow').style.display='flex';
+  document.getElementById('aimRow').style.display='none';
+  startRound();
+});
+
+requestAnimationFrame(loop);
+drawScene();
+</script>
+</body>
+</html>
+

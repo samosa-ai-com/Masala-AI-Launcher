@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Peak Hopper — 12 Winds</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b1220;color:#e6f0ff;-webkit-tap-highlight-color:transparent}
+.app{max-width:428px;min-width:360px;margin:0 auto;min-height:100vh;background:linear-gradient(180deg,#0f1c33 0%,#0b1220 60%,#0a1628 100%);display:flex;flex-direction:column;overflow-x:hidden}
+header{padding:12px 14px 8px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid rgba(255,255,255,.08)}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#38bdf8,#22d3ee);display:grid;place-items:center;font-weight:900;color:#04202e;font-size:18px}
+.brand h1{font-size:16px;line-height:1.1;letter-spacing:.2px}
+.brand p{font-size:11px;opacity:.7}
+.hdrStats{display:flex;gap:8px}
+.pill{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);padding:6px 8px;border-radius:999px;font-size:11px;display:flex;align-items:center;gap:6px}
+.pill b{color:#7dd3fc}
+.tabs{display:flex;gap:8px;padding:10px 12px}
+.tab{flex:1;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#cfe8ff;font-weight:700;font-size:14px}
+.tab.active{background:linear-gradient(135deg,#38bdf8,#0ea5e9);color:#04202e;border-color:transparent}
+.section{padding:0 12px 10px}
+.card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:10px}
+.sectionTitle{font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin:6px 2px 8px}
+.leapers{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.leaper{padding:10px 8px;border-radius:12px;border:2px solid transparent;background:rgba(255,255,255,.06);text-align:center;cursor:pointer;min-height:92px}
+.leaper.active{border-color:#38bdf8;background:rgba(56,189,248,.15)}
+.leaper .emo{font-size:22px}
+.leaper h3{font-size:13px;margin:4px 0 2px}
+.leaper p{font-size:10px;opacity:.75;line-height:1.3}
+.leaper .perk{margin-top:6px;font-size:10px;background:rgba(0,0,0,.25);padding:4px 6px;border-radius:999px;display:inline-block}
+.peaks{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.peakBtn{position:relative;padding:10px 6px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#e6f0ff;text-align:center;cursor:pointer;min-height:78px}
+.peakBtn.locked{opacity:.45}
+.peakBtn.current{outline:2px solid #38bdf8;outline-offset:1px}
+.peakBtn .num{font-weight:900;font-size:16px}
+.peakBtn .name{font-size:10px;opacity:.8;margin-top:2px}
+.peakBtn .stars{font-size:11px;margin-top:4px;letter-spacing:1px}
+.peakBtn .time{font-size:9px;opacity:.6;margin-top:2px}
+.canvasWrap{position:relative;margin:8px 12px 0;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.12);background:linear-gradient(180deg,#87ceeb 0%,#a8d8f0 18%,#cfe9f7 32%,#e6f0ff 45%,#dbeafe 100%);box-shadow:0 8px 24px rgba(0,0,0,.35)}
+canvas{display:block;width:100%;height:520px;touch-action:none}
+.hud{position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:8px}
+.hudTop{display:flex;justify-content:space-between;gap:8px}
+.hudChip{background:rgba(15,23,42,.92);color:#e6f0ff;border:1px solid rgba(255,255,255,.15);padding:6px 8px;border-radius:10px;font-size:12px;display:flex;align-items:center;gap:6px;pointer-events:auto}
+.hudChip b{color:#38bdf8}
+.windMeter{display:flex;align-items:center;gap:6px}
+.windArrow{width:28px;height:28px;border-radius:999px;background:rgba(255,255,255,.9);display:grid;place-items:center;font-weight:900;color:#0f172a;transition:transform .2s}
+.windBar{width:64px;height:8px;background:rgba(0,0,0,.15);border-radius:999px;overflow:hidden}
+.windFill{height:100%;background:linear-gradient(90deg,#22d3ee,#38bdf8);width:0%;transition:width .2s}
+.controls{display:grid;grid-template-columns:72px 72px 1fr 72px;gap:8px;padding:10px 12px 12px;align-items:center}
+.cbtn{height:56px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:#e6f0ff;font-weight:800;font-size:18px;display:grid;place-items:center;user-select:none;touch-action:none}
+.cbtn:active{transform:scale(.97);background:rgba(56,189,248,.25)}
+.cbtn.primary{background:linear-gradient(135deg,#38bdf8,#0ea5e9);color:#04202e;border-color:transparent;font-size:15px}
+.cbtn.dash{background:linear-gradient(135deg,#f59e0b,#f97316);color:#1a0f00;border-color:transparent}
+.cbtn span{font-size:10px;font-weight:700;opacity:.9;margin-top:2px;display:block}
+.btnRow{display:flex;gap:8px;padding:0 12px 10px}
+.btn{flex:1;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:#e6f0ff;font-weight:800;font-size:14px}
+.btn.primary{background:linear-gradient(135deg,#38bdf8,#0ea5e9);color:#04202e;border-color:transparent}
+.btn.ghost{background:transparent}
+.legend{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.leg{font-size:11px;padding:6px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.2);display:flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+.overlay{position:absolute;inset:0;background:rgba(8,15,30,.78);backdrop-filter:blur(6px);display:none;place-items:center;padding:16px;text-align:center}
+.overlay.show{display:grid}
+.modal{background:#0f172a;border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:16px;max-width:340px;width:100%;color:#e6f0ff}
+.modal h2{font-size:18px;margin-bottom:6px}
+.modal p{font-size:13px;opacity:.85;line-height:1.4}
+.modal .big{font-size:28px;margin:6px 0}
+.starsBig{font-size:20px;letter-spacing:3px;margin:6px 0}
+.guide{font-size:13px;line-height:1.5;opacity:.9}
+.guide h3{font-size:13px;margin:10px 0 4px;color:#7dd3fc}
+.kbd{display:inline-block;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.15);font-size:11px}
+.notice{font-size:11px;opacity:.7;text-align:center;padding:6px 12px}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="brand">
+      <div class="logo">⛰</div>
+      <div>
+        <h1>PEAK HOPPER</h1>
+        <p>12 Winds • Upward Hopper</p>
+      </div>
+    </div>
+    <div class="hdrStats">
+      <div class="pill">◆ <b id="totalShards">0</b></div>
+      <div class="pill">★ <b id="totalStars">0/36</b></div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" id="tabPlay">▶ Play</button>
+    <button class="tab" id="tabTrails">⛰ Trails</button>
+    <button class="tab" id="tabGuide">📖 Guide</button>
+  </div>
+
+  <div id="viewPlay">
+    <div class="section">
+      <div class="sectionTitle">Choose Leaper</div>
+      <div class="leapers" id="leapers"></div>
+      <div class="legend">
+        <span class="leg"><i class="dot" style="background:#94a3b8"></i> Solid</span>
+        <span class="leg"><i class="dot" style="background:#38bdf8"></i> Springy</span>
+        <span class="leg"><i class="dot" style="background:#f59e0b"></i> Moving</span>
+        <span class="leg"><i class="dot" style="background:#ef4444"></i> Crumbling</span>
+        <span class="leg">◆ Shard</span>
+        <span class="leg">💨 Wind pushes sideways</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sectionTitle">Select Peak — 12 Wind-Blown Trails</div>
+      <div class="peaks" id="peaksGrid"></div>
+    </div>
+
+    <div class="canvasWrap" id="wrap">
+      <canvas id="game" width="400" height="520"></canvas>
+      <div class="hud">
+        <div class="hudTop">
+          <div class="hudChip">⛰ <b id="hudPeak">Peak 1</b> <span id="hudDiff" style="opacity:.7;font-size:11px"></span></div>
+          <div class="hudChip windMeter">
+            <div class="windArrow" id="windArrow">→</div>
+            <div>
+              <div style="font-size:10px;opacity:.7">WIND</div>
+              <div class="windBar"><div class="windFill" id="windFill"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="hudTop" style="justify-content:space-between">
+          <div class="hudChip">▭ <b id="hudPlatforms">0/18</b> <span style="opacity:.7">cleared</span></div>
+          <div class="hudChip">◆ <b id="hudShards">0</b> <span style="opacity:.7" id="hudShardTotal">/0</span></div>
+          <div class="hudChip">⏱ <b id="hudTime">00:00</b></div>
+        </div>
+      </div>
+      <div class="overlay" id="overlay">
+        <div class="modal" id="modal"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="cbtn" id="btnLeft" aria-label="Move left">◀<span>STEER</span></button>
+      <button class="cbtn" id="btnRight" aria-label="Move right">▶<span>STEER</span></button>
+      <button class="cbtn primary" id="btnJump" aria-label="Jump and hold to glide">⤒ JUMP<span id="glideHint">HOLD=GLIDE</span></button>
+      <button class="cbtn dash" id="btnDash" aria-label="Dash">⚡<span>DASH</span></button>
+    </div>
+    <div class="btnRow">
+      <button class="btn primary" id="btnStart">▶ PLAY PEAK</button>
+      <button class="btn" id="btnPause">⏸ Pause</button>
+      <button class="btn ghost" id="btnRestart">↻ Restart</button>
+    </div>
+    <div class="notice">Large touch targets • Hold JUMP in air to glide • Dash has cooldown • Wind gusts push you — time your leaps!</div>
+  </div>
+
+  <div id="viewTrails" style="display:none">
+    <div class="section">
+      <div class="card" id="trailsCard"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn ghost" id="btnReset">Reset Progress</button>
+        <button class="btn" id="btnBackPlay">Back to Play</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="viewGuide" style="display:none">
+    <div class="section">
+      <div class="card guide">
+        <h3>Goal</h3>
+        <p>Climb 12 peaks from Gale Hollow to Storm Crown. Land on platforms, collect ◆ shards, reach the green SUMMIT. Each peak has 18 platforms + summit.</p>
+        <h3>Platforms</h3>
+        <p><b style="color:#cbd5e1">Solid</b> — stable. <b style="color:#38bdf8">Springy (blue)</b> — super bounce. <b style="color:#f59e0b">Moving (amber)</b> — carries you sideways. <b style="color:#ef4444">Crumbling (red)</b> — collapses 0.4s after landing!</p>
+        <h3>Wind</h3>
+        <p>Gusts push you left/right. Watch the WIND meter. Gusts come every 3–5s. Higher peaks = stronger wind.</p>
+        <h3>Leapers</h3>
+        <p><b>Scout</b> — best steering (tight air control). <b>Gale</b> — powerful dash, short cooldown. <b>Feather</b> — long glide (hold JUMP in air to float).</p>
+        <h3>Controls</h3>
+        <p><span class="kbd">◀ ▶</span> steer • <span class="kbd">⤒ JUMP</span> tap to jump, hold in air to glide • <span class="kbd">⚡ DASH</span> burst (cooldown) • Keyboard: Arrow keys / A-D, Space/W, Shift</p>
+        <h3>Stars & Persistence</h3>
+        <p>Each peak awards up to 3★: 1 for summit, 1 for ≥50% shards, 1 for beating par time. Best times and total shards save automatically on this phone.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PEAKS = [
+  {name:"Gale Hollow", par:45, wind:0.6},
+  {name:"Breeze Ridge", par:42, wind:0.9},
+  {name:"Kite Bluff", par:40, wind:1.2},
+  {name:"Whistle Crag", par:38, wind:1.5},
+  {name:"Hawk Spire", par:36, wind:1.8},
+  {name:"Cloud Shelf", par:35, wind:2.1},
+  {name:"Tempest Wall", par:34, wind:2.4},
+  {name:"Squall Needle", par:33, wind:2.7},
+  {name:"Gale Maw", par:32, wind:3.0},
+  {name:"Storm Crown W", par:30, wind:3.3},
+  {name:"Storm Crown E", par:30, wind:3.6},
+  {name:"Storm Crown", par:28, wind:4.0},
+];
+const LEAPERS = [
+  {id:'scout', name:'Scout', emoji:'🥾', desc:'Tight steering', perk:'Steer ★★★', steer:1.0, dashPower:7, dashCd:900, glide:0.38},
+  {id:'gale', name:'Gale', emoji:'💨', desc:'Power dash', perk:'Dash ★★★', steer:0.75, dashPower:11, dashCd:650, glide:0.35},
+  {id:'feather', name:'Feather', emoji:'🪶', desc:'Long glide', perk:'Glide ★★★', steer:0.8, dashPower:6, dashCd:900, glide:0.18},
+];
+
+const STORAGE_KEY='peakHopper_v2';
+let save = loadSave();
+function loadSave(){
+  try{
+    const s=JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if(s && s.stars) return s;
+  }catch(e){}
+  return {stars:Array(12).fill(0), bestTimes:Array(12).fill(null), totalShards:0, unlocked:0, leaper:'scout'};
+}
+function persist(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(save));
+  renderPeaks(); renderTrails(); updateHeader();
+}
+function updateHeader(){
+  document.getElementById('totalShards').textContent = save.totalShards;
+  const tot = save.stars.reduce((a,b)=>a+b,0);
+  document.getElementById('totalStars').textContent = tot+'/36';
+}
+
+let currentPeak = save.unlocked;
+let currentLeaper = LEAPERS.find(l=>l.id===save.leaper) || LEAPERS[0];
+
+// UI render leapers
+const leapersEl=document.getElementById('leapers');
+function renderLeapers(){
+  leapersEl.innerHTML='';
+  LEAPERS.forEach(l=>{
+    const d=document.createElement('button');
+    d.className='leaper'+(l.id===currentLeaper.id?' active':'');
+    d.innerHTML=`<div class="emo">${l.emoji}</div><h3>${l.name}</h3><p>${l.desc}</p><div class="perk">${l.perk}</div>`;
+    d.onclick=()=>{ currentLeaper=l; save.leaper=l.id; persist(); renderLeapers(); if(game) game.leaper=l; updateGlideHint(); };
+    leapersEl.appendChild(d);
+  });
+}
+function updateGlideHint(){
+  document.getElementById('glideHint').textContent = currentLeaper.id==='feather' ? 'HOLD=LONG GLIDE' : 'HOLD=GLIDE';
+}
+
+// peaks grid
+const peaksGrid=document.getElementById('peaksGrid');
+function renderPeaks(){
+  peaksGrid.innerHTML='';
+  PEAKS.forEach((p,i)=>{
+    const locked = i>save.unlocked;
+    const btn=document.createElement('button');
+    btn.className='peakBtn'+(locked?' locked':'')+(i===currentPeak?' current':'');
+    const stars = save.stars[i]||0;
+    const starStr = '★'.repeat(stars)+'☆'.repeat(3-stars);
+    const bt = save.bestTimes[i]!=null ? formatTime(save.bestTimes[i]) : '—';
+    btn.innerHTML=`<div class="num">${i+1}</div><div class="name">${p.name}</div><div class="stars">${locked?'🔒':starStr}</div><div class="time">${locked?'Locked':bt}</div>`;
+    btn.onclick=()=>{
+      if(locked) return;
+      currentPeak=i;
+      document.getElementById('hudPeak').textContent='Peak '+(i+1);
+      document.getElementById('hudDiff').textContent='• '+p.name;
+      renderPeaks();
+      if(game) game.loadLevel(i);
+    };
+    peaksGrid.appendChild(btn);
+  });
+  document.getElementById('hudPeak').textContent='Peak '+(currentPeak+1);
+  document.getElementById('hudDiff').textContent='• '+PEAKS[currentPeak].name;
+}
+function renderTrails(){
+  const el=document.getElementById('trailsCard');
+  let html=`<div style="font-weight:900;margin-bottom:8px">Trail Progress</div>`;
+  html+=`<div style="display:grid;gap:8px">`;
+  PEAKS.forEach((p,i)=>{
+    const st=save.stars[i]||0;
+    const bt=save.bestTimes[i];
+    const locked=i>save.unlocked;
+    html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:12px;background:${locked?'rgba(255,255,255,.04)':'rgba(56,189,248,.12)'};border:1px solid rgba(255,255,255,.1)">
+      <div><div style="font-weight:800;font-size:13px">${i+1}. ${p.name} ${locked?'🔒':''}</div><div style="font-size:11px;opacity:.7">Par ${p.par}s • Wind ${p.wind.toFixed(1)}</div></div>
+      <div style="text-align:right"><div style="letter-spacing:2px">${locked?'—': '★'.repeat(st)+'☆'.repeat(3-st)}</div><div style="font-size:11px;opacity:.7">${bt!=null?formatTime(bt):'— best'}</div></div>
+    </div>`;
+  });
+  html+=`</div><div style="margin-top:10px;font-size:12px;opacity:.7">Total shards collected: <b>${save.totalShards}</b> • Stars ${save.stars.reduce((a,b)=>a+b,0)}/36</div>`;
+  el.innerHTML=html;
+}
+function formatTime(s){
+  if(s==null) return '—';
+  const m=Math.floor(s/60), sec=Math.floor(s%60), ms=Math.floor((s%1)*10);
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}.${ms}`;
+}
+
+// Tabs
+document.getElementById('tabPlay').onclick=()=>showTab('play');
+document.getElementById('tabTrails').onclick=()=>showTab('trails');
+document.getElementById('tabGuide').onclick=()=>showTab('guide');
+document.getElementById('btnBackPlay').onclick=()=>showTab('play');
+function showTab(t){
+  document.getElementById('viewPlay').style.display = t==='play'?'block':'none';
+  document.getElementById('viewTrails').style.display = t==='trails'?'block':'none';
+  document.getElementById('viewGuide').style.display = t==='guide'?'block':'none';
+  document.getElementById('tabPlay').classList.toggle('active', t==='play');
+  document.getElementById('tabTrails').classList.toggle('active', t==='trails');
+  document.getElementById('tabGuide').classList.toggle('active', t==='guide');
+  if(t==='trails') renderTrails();
+}
+
+// Canvas setup
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const wrap=document.getElementById('wrap');
+function resizeCanvas(){
+  const rect=wrap.getBoundingClientRect();
+  const w=Math.round(rect.width);
+  const h=520;
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  canvas.width=w*dpr;
+  canvas.height=h*dpr;
+  canvas.style.width=w+'px';
+  canvas.style.height=h+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  if(game) game.onResize(w,h);
+}
+window.addEventListener('resize', resizeCanvas);
+
+// Seeded RNG
+function mulberry32(a){return function(){let t=a+=0x6D2B79F5; t=Math.imul(t^t>>>15,t|1); t^=t+Math.imul(t^t>>>7,t|61); return ((t^t>>>14)>>>0)/4294967296;}}
+
+class Game{
+  constructor(){
+    this.W=400; this.H=520;
+    this.leaper=currentLeaper;
+    this.peakIndex=currentPeak;
+    this.running=false; this.paused=false;
+    this.time=0; this.startTime=0;
+    this.wind=0; this.windDir=1; this.gustTimer=0; this.gustDur=0; this.baseWind=0;
+    this.platforms=[]; this.shards=[]; this.particles=[];
+    this.player={x:180,y:0,w:18,h:22,vx:0,vy:0,onGround:false,groundPlat:null, dashCd:0, cleared:new Set(), shards:0};
+    this.cameraY=0;
+    this.worldH=3000;
+    this.summit=null;
+    this.onResize(this.W,this.H);
+    this.loadLevel(this.peakIndex);
+    this.loop();
+  }
+  onResize(w,h){ this.W=w; this.H=h; }
+  loadLevel(idx){
+    this.peakIndex=idx;
+    this.baseWind=PEAKS[idx].wind;
+    this.wind=0; this.windDir= Math.random()<0.5?1:-1;
+    this.gustTimer= 1 + Math.random()*2;
+    this.gustDur=0;
+    this.time=0; this.startTime=performance.now();
+    this.running=false; this.paused=false;
+    this.particles=[];
+    this.generate(idx);
+    this.player.cleared=new Set();
+    this.player.shards=0;
+    this.player.vx=0; this.player.vy=0; this.player.dashCd=0;
+    // place player on first platform
+    const startPlat=this.platforms[0];
+    this.player.x=startPlat.x + startPlat.w/2 - this.player.w/2;
+    this.player.y=startPlat.y - this.player.h;
+    this.player.onGround=true; this.player.groundPlat=startPlat;
+    this.cameraY= this.worldH - this.H;
+    this.updateHUD();
+    hideOverlay();
+    this.running=true;
+  }
+  generate(idx){
+    const rng=mulberry32(12345+idx*999);
+    this.platforms=[]; this.shards=[];
+    this.worldH=3000;
+    const count=18;
+    const spacing=(this.worldH-400)/count;
+    // difficulty mix
+    const diff=idx/11;
+    for(let i=0;i<count;i++){
+      const y = this.worldH - 80 - i*spacing + (rng()*30-15);
+      const w = 72 + rng()*28;
+      const x = 12 + rng()*(this.W - w - 24);
+      let type='solid';
+      const r=rng();
+      if(diff<0.3){
+        if(r>0.75) type='springy'; else if(r>0.65) type='moving'; else if(r>0.6) type='crumbling';
+      } else if(diff<0.6){
+        if(r>0.7) type='springy'; else if(r>0.5) type='moving'; else if(r>0.4) type='crumbling';
+      } else {
+        if(r>0.6) type='springy'; else if(r>0.4) type='moving'; else if(r>0.2) type='crumbling';
+      }
+      const plat={id:i, x,y,w,h:12, type, vx:0, dir: rng()<0.5?1:-1, range: 40+rng()*60, ox:x, crumble:0, gone:false, visited:false};
+      if(type==='moving'){
+        plat.vx = (0.9 + diff*1.2 + rng()*0.6) * plat.dir;
+      }
+      this.platforms.push(plat);
+      if(rng()<0.45){
+        this.shards.push({x: x+w/2-6, y: y-18, r:7, taken:false, platId:i});
+      }
+    }
+    // summit
+    this.summit={x:this.W/2-60, y:120, w:120, h:16, type:'summit'};
+    this.platforms.push({...this.summit, id:99});
+    // ensure start platform solid
+    this.platforms[0].type='solid';
+    this.platforms[0].w=90;
+  }
+  update(dt){
+    if(!this.running || this.paused) return;
+    this.time += dt;
+    // wind gusts
+    this.gustTimer -= dt;
+    if(this.gustDur>0){
+      this.gustDur -= dt;
+      this.wind = this.windDir * (this.baseWind + 2.2 + Math.sin(this.time*6)*0.6);
+      if(this.gustDur<=0){
+        this.gustTimer = 2.5 + Math.random()*2.5;
+        this.windDir = Math.random()<0.5?1:-1;
+        this.wind *= 0.3;
+      }
+    } else {
+      // base breeze
+      this.wind = this.windDir * (this.baseWind*0.35 + Math.sin(this.time*0.9)*0.4);
+      if(this.gustTimer<=0){
+        this.gustDur = 1.2 + Math.random()*0.8;
+        this.windDir = Math.random()<0.5?1:-1;
+      }
+    }
+    // update moving platforms
+    for(const p of this.platforms){
+      if(p.gone) continue;
+      if(p.type==='moving'){
+        p.x += p.vx;
+        if(p.x < 8 || p.x + p.w > this.W-8) p.vx*=-1;
+      }
+      if(p.type==='crumbling' && p.crumble>0){
+        p.crumble -= dt;
+        if(p.crumble<=0) p.gone=true;
+      }
+    }
+    // input
+    const left = keys.left, right=keys.right;
+    const steer = this.leaper.steer;
+    const accel = 0.65 * steer;
+    const maxSpeed = 4.2 * (0.85 + steer*0.3);
+    if(left) this.player.vx -= accel;
+    if(right) this.player.vx += accel;
+    // friction
+    if(!left && !right){
+      this.player.vx *= this.player.onGround ? 0.82 : 0.98;
+    }
+    // wind force
+    this.player.vx += this.wind * 0.045;
+    // clamp
+    this.player.vx = Math.max(-maxSpeed-2, Math.min(maxSpeed+2, this.player.vx));
+    // dash cooldown
+    if(this.player.dashCd>0) this.player.dashCd-=dt*1000;
+
+    // gravity & glide
+    let gravity = 0.62;
+    if(!this.player.onGround && keys.jumpHeld){
+      // glide reduces gravity
+      gravity = this.leaper.glide;
+      // also slight horizontal control boost
+      if(left||right) this.player.vx *= 1.01;
+      // particles for glide
+      if(Math.random()<0.3) this.particles.push({x:this.player.x+9,y:this.player.y+18,vx:(Math.random()-0.5)*1,vy:Math.random()*1+0.5,life:0.4, max:0.4});
+    }
+    if(!this.player.onGround){
+      this.player.vy += gravity;
+      if(this.player.vy>10) this.player.vy=10;
+    }
+
+    // carry by moving platform
+    if(this.player.onGround && this.player.groundPlat && this.player.groundPlat.type==='moving' && !this.player.groundPlat.gone){
+      this.player.x += this.player.groundPlat.vx;
+    }
+
+    // integrate
+    this.player.x += this.player.vx;
+    this.player.y += this.player.vy;
+
+    // bounds
+    if(this.player.x<0){ this.player.x=0; this.player.vx=0; }
+    if(this.player.x+this.player.w>this.W){ this.player.x=this.W-this.player.w; this.player.vx=0; }
+
+    // platform collision (only when falling)
+    let landed=false;
+    if(this.player.vy>=0){
+      for(const p of this.platforms){
+        if(p.gone) continue;
+        const px=p.x, py=p.y, pw=p.w, ph=p.h;
+        const prevY = this.player.y - this.player.vy;
+        const bottom = this.player.y + this.player.h;
+        const prevBottom = prevY + this.player.h;
+        if(bottom >= py && prevBottom <= py+4 && this.player.x+this.player.w>px+4 && this.player.x < px+pw-4){
+          // land
+          this.player.y = py - this.player.h;
+          this.player.vy = 0;
+          this.player.onGround=true;
+          this.player.groundPlat=p;
+          landed=true;
+          if(!p.visited){
+            p.visited=true;
+            this.player.cleared.add(p.id);
+          }
+          if(p.type==='springy'){
+            this.player.vy = -14.5;
+            this.player.onGround=false;
+            this.spawnBurst(p.x+pw/2, p.y, '#38bdf8');
+          } else if(p.type==='crumbling'){
+            if(p.crumble===0) p.crumble=0.4;
+          }
+          if(p.id===99){
+            this.win();
+          }
+          break;
+        }
+      }
+    }
+    if(!landed){
+      // check if still on ground (walk off)
+      if(this.player.onGround){
+        const gp=this.player.groundPlat;
+        if(!gp || gp.gone || this.player.x+this.player.w < gp.x || this.player.x > gp.x+gp.w){
+          this.player.onGround=false;
+          this.player.groundPlat=null;
+        }
+      }
+    }
+
+    // shards
+    for(const s of this.shards){
+      if(s.taken) continue;
+      const cx=s.x+6, cy=s.y+6;
+      const px=this.player.x+this.player.w/2, py=this.player.y+this.player.h/2;
+      const dx=cx-px, dy=cy-py;
+      if(Math.hypot(dx,dy)<18){
+        s.taken=true;
+        this.player.shards++;
+        save.totalShards++;
+        this.spawnBurst(cx,cy,'#facc15');
+        persist();
+      }
+    }
+
+    // fall death
+    if(this.player.y > this.cameraY + this.H + 80){
+      this.fail();
+    }
+
+    // camera follow
+    const targetCam = this.player.y - this.H*0.55;
+    this.cameraY += (targetCam - this.cameraY)*0.12;
+    this.cameraY = Math.max(0, Math.min(this.worldH - this.H, this.cameraY));
+
+    // particles
+    for(let i=this.particles.length-1;i>=0;i--){
+      const pt=this.particles[i];
+      pt.x+=pt.vx; pt.y+=pt.vy; pt.life-=dt;
+      if(pt.life<=0) this.particles.splice(i,1);
+    }
+    // wind particles
+    if(Math.random()<0.4){
+      const y = this.cameraY + Math.random()*this.H;
+      const x = this.windDir>0 ? -10 : this.W+10;
+      this.particles.push({x,y,vx:this.wind*1.2,vy:(Math.random()-0.5)*0.5,life:1.2,max:1.2, wind:true});
+    }
+
+    this.updateHUD();
+  }
+  spawnBurst(x,y,color){
+    for(let i=0;i<8;i++){
+      this.particles.push({x,y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4-1,life:0.5,max:0.5,color});
+    }
+  }
+  dash(){
+    if(this.player.dashCd>0) return;
+    const dir = keys.right ? 1 : keys.left ? -1 : (this.player.vx>=0?1:-1);
+    this.player.vx += dir * this.leaper.dashPower;
+    this.player.vy -= 2;
+    this.player.dashCd = this.leaper.dashCd;
+    this.spawnBurst(this.player.x+9,this.player.y+10,'#fb923c');
+    // haptic
+    if(navigator.vibrate) navigator.vibrate(30);
+  }
+  jump(){
+    if(this.player.onGround){
+      this.player.vy = -11.2;
+      this.player.onGround=false;
+      this.player.groundPlat=null;
+      this.spawnBurst(this.player.x+9,this.player.y+18,'#e0f2fe');
+    }
+  }
+  updateHUD(){
+    document.getElementById('hudPlatforms').textContent = this.player.cleared.size + '/18';
+    document.getElementById('hudShards').textContent = this.player.shards;
+    document.getElementById('hudShardTotal').textContent = '/'+this.shards.length;
+    document.getElementById('hudTime').textContent = formatTime(this.time);
+    const wperc = Math.min(100, Math.abs(this.wind)/5*100);
+    document.getElementById('windFill').style.width = wperc+'%';
+    document.getElementById('windArrow').textContent = this.wind>0 ? '→' : '←';
+    document.getElementById('windArrow').style.transform = `scaleX(${1+Math.abs(this.wind)*0.08})`;
+    document.getElementById('windArrow').style.background = Math.abs(this.wind)>2 ? '#f59e0b' : 'rgba(255,255,255,.9)';
+  }
+  win(){
+    this.running=false;
+    const elapsed=this.time;
+    const peak=PEAKS[this.peakIndex];
+    const totalShards=this.shards.length;
+    const gotShardStar = totalShards>0 && this.player.shards >= Math.ceil(totalShards*0.5);
+    const gotTimeStar = elapsed <= peak.par;
+    let stars=1;
+    if(gotShardStar) stars++;
+    if(gotTimeStar) stars++;
+    // save
+    if(stars > (save.stars[this.peakIndex]||0)) save.stars[this.peakIndex]=stars;
+    if(save.bestTimes[this.peakIndex]==null || elapsed < save.bestTimes[this.peakIndex]) save.bestTimes[this.peakIndex]=elapsed;
+    if(this.peakIndex===save.unlocked && this.peakIndex<11) save.unlocked++;
+    persist();
+    showOverlay(`
+      <div style="font-size:28px">🏔️ SUMMIT!</div>
+      <h2>${peak.name} Cleared</h2>
+      <div class="starsBig">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</div>
+      <p>Time <b>${formatTime(elapsed)}</b> (par ${peak.par}s) • Shards ${this.player.shards}/${totalShards} • Platforms ${this.player.cleared.size}/18</p>
+      <p style="margin-top:6px;font-size:11px;opacity:.7">${gotShardStar?'◆ Shard star earned • ':''}${gotTimeStar?'⏱ Time star earned • ':''}Best ${formatTime(save.bestTimes[this.peakIndex])}</p>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn ghost" onclick="hideOverlay();game.loadLevel(game.peakIndex)">↻ Replay</button>
+        <button class="btn primary" onclick="hideOverlay();nextPeak()">${this.peakIndex<11?'Next Peak →':'Trails ✓'}</button>
+      </div>
+    `);
+  }
+  fail(){
+    this.running=false;
+    showOverlay(`
+      <div class="big">💨 Fell!</div>
+      <h2>Try Again</h2>
+      <p>Wind caught you. Use dash to recover and hold jump to glide.</p>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn primary" onclick="hideOverlay();game.loadLevel(game.peakIndex)">↻ Retry</button>
+        <button class="btn ghost" onclick="hideOverlay()">Close</button>
+      </div>
+    `);
+  }
+  draw(){
+    const W=this.W, H=this.H;
+    ctx.clearRect(0,0,W,H);
+    // sky gradient already via CSS, draw mountains parallax
+    ctx.save();
+    // distant peaks
+    ctx.globalAlpha=0.18;
+    ctx.fillStyle='#0f172a';
+    ctx.beginPath();
+    ctx.moveTo(0, 220 - this.cameraY*0.08);
+    ctx.lineTo(W*0.3, 140 - this.cameraY*0.08);
+    ctx.lineTo(W*0.6, 200 - this.cameraY*0.08);
+    ctx.lineTo(W, 160 - this.cameraY*0.08);
+    ctx.lineTo(W, H); ctx.lineTo(0,H); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha=1;
+
+    // wind streaks
+    ctx.strokeStyle='rgba(255,255,255,.35)';
+    ctx.lineWidth=1;
+    for(let i=0;i<6;i++){
+      const y = ( (this.time*120 + i*90) % (H+40) ) -20;
+      const x0 = this.wind>0 ? -20 : W+20;
+      const x1 = x0 + this.wind*18;
+      ctx.beginPath();
+      ctx.moveTo( (x0+W*0.2 + i*40)%W, y);
+      ctx.lineTo( (x1+W*0.2 + i*40)%W, y);
+      ctx.stroke();
+    }
+
+    ctx.save();
+    ctx.translate(0, -this.cameraY);
+
+    // platforms
+    for(const p of this.platforms){
+      if(p.gone) continue;
+      const py=p.y, px=p.x;
+      if(py < this.cameraY-40 || py > this.cameraY+H+40) continue;
+      // shadow
+      ctx.fillStyle='rgba(0,0,0,.12)';
+      ctx.fillRect(px+2, py+3, p.w, p.h);
+      let col='#e2e8f0', border='#94a3b8';
+      if(p.type==='springy'){ col='#38bdf8'; border='#0ea5e9'; }
+      else if(p.type==='moving'){ col='#f59e0b'; border='#d97706'; }
+      else if(p.type==='crumbling'){ col=p.crumble>0?'#fca5a5':'#ef4444'; border='#dc2626'; if(p.crumble>0) ctx.globalAlpha=0.6+Math.sin(this.time*20)*0.2; }
+      else if(p.type==='summit'){ col='#22c55e'; border='#16a34a'; }
+      ctx.fillStyle=col;
+      ctx.strokeStyle=border;
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      if(ctx.roundRect) ctx.roundRect(px, py, p.w, p.h, 6);
+      else ctx.rect(px, py, p.w, p.h);
+      ctx.fill(); ctx.stroke();
+      ctx.globalAlpha=1;
+      // top highlight
+      ctx.fillStyle='rgba(255,255,255,.55)';
+      ctx.fillRect(px+4, py+2, p.w-8, 3);
+      // icon
+      if(p.type==='springy'){
+        ctx.fillStyle='#04202e'; ctx.font='10px system-ui'; ctx.fillText('⤒', px+p.w/2-5, py+10);
+      } else if(p.type==='moving'){
+        ctx.fillStyle='#1a0f00'; ctx.font='10px system-ui'; ctx.fillText('⇄', px+p.w/2-6, py+10);
+      } else if(p.type==='crumbling'){
+        ctx.fillStyle='#7f1d1d'; ctx.font='10px system-ui'; ctx.fillText('⚠', px+p.w/2-5, py+10);
+      } else if(p.type==='summit'){
+        ctx.fillStyle='#052e16'; ctx.font='bold 11px system-ui'; ctx.fillText('SUMMIT', px+p.w/2-22, py+11);
+      }
+    }
+
+    // shards
+    for(const s of this.shards){
+      if(s.taken) continue;
+      if(s.y < this.cameraY-40 || s.y > this.cameraY+H+40) continue;
+      const bob = Math.sin(this.time*3 + s.x*0.05)*3;
+      ctx.save();
+      ctx.translate(s.x+6, s.y+6+bob);
+      ctx.rotate(this.time*2);
+      ctx.fillStyle='#facc15';
+      ctx.strokeStyle='#a16207';
+      ctx.lineWidth=1.5;
+      ctx.beginPath();
+      ctx.moveTo(0,-7); ctx.lineTo(6,0); ctx.lineTo(0,7); ctx.lineTo(-6,0); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.restore();
+      // glow
+      ctx.fillStyle='rgba(250,204,21,.18)';
+      ctx.beginPath(); ctx.arc(s.x+6, s.y+6+bob, 12, 0, Math.PI*2); ctx.fill();
+    }
+
+    // player
+    const pl=this.player;
+    ctx.save();
+    ctx.translate(pl.x+pl.w/2, pl.y+pl.h/2);
+    // dash trail
+    if(pl.dashCd>0 && pl.dashCd<300){
+      ctx.globalAlpha=0.3; ctx.fillStyle='#fb923c';
+      ctx.beginPath(); ctx.arc(-pl.vx*0.1, 0, 10, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+    }
+    // body
+    const isFeather=this.leaper.id==='feather';
+    ctx.fillStyle = this.leaper.id==='scout' ? '#38bdf8' : this.leaper.id==='gale' ? '#f59e0b' : '#a78bfa';
+    ctx.strokeStyle='rgba(0,0,0,.25)'; ctx.lineWidth=1.5;
+    ctx.beginPath();
+    if(ctx.roundRect) ctx.roundRect(-pl.w/2, -pl.h/2, pl.w, pl.h, 6);
+    else ctx.rect(-pl.w/2, -pl.h/2, pl.w, pl.h);
+    ctx.fill(); ctx.stroke();
+    // face
+    ctx.fillStyle='#0f172a'; ctx.font='11px system-ui'; ctx.textAlign='center';
+    ctx.fillText(this.leaper.emoji, 0, 2);
+    // glide cape
+    if(!pl.onGround && keys.jumpHeld){
+      ctx.fillStyle='rgba(255,255,255,.7)';
+      ctx.beginPath(); ctx.ellipse(0, 6, 10, 4, 0, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+
+    // particles
+    for(const pt of this.particles){
+      if(pt.y < this.cameraY-20 || pt.y > this.cameraY+H+20) continue;
+      const a = pt.life/pt.max;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = pt.color || (pt.wind ? 'rgba(255,255,255,.6)' : '#fff');
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.wind?1.5:3, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+
+    ctx.restore();
+    ctx.restore();
+
+    // dash cooldown ring on button
+    const dashBtn=document.getElementById('btnDash');
+    if(this.player.dashCd>0){
+      const pct=this.player.dashCd/this.leaper.dashCd;
+      dashBtn.style.opacity=0.6;
+      dashBtn.innerHTML=`⚡<span>${Math.ceil(this.player.dashCd/100)} </span>`;
+    } else {
+      dashBtn.style.opacity=1;
+      dashBtn.innerHTML=`⚡<span>DASH</span>`;
+    }
+  }
+  loop(){
+    const step=(now)=>{
+      const dt=Math.min(0.033, (now - (this._last||now))/1000);
+      this._last=now;
+      this.update(dt);
+      this.draw();
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+}
+
+let keys={left:false,right:false,jumpHeld:false};
+let game;
+function initGame(){
+  resizeCanvas();
+  renderLeapers(); renderPeaks(); renderTrails(); updateHeader(); updateGlideHint();
+  game=new Game();
+  // set initial hud
+  document.getElementById('hudPeak').textContent='Peak '+(currentPeak+1);
+}
+initGame();
+
+// Input
+function bindHold(el, onDown, onUp){
+  const down=(e)=>{ e.preventDefault(); onDown(); };
+  const up=(e)=>{ e.preventDefault(); if(onUp) onUp(); };
+  el.addEventListener('touchstart', down, {passive:false});
+  el.addEventListener('touchend', up, {passive:false});
+  el.addEventListener('touchcancel', up, {passive:false});
+  el.addEventListener('mousedown', down);
+  window.addEventListener('mouseup', up);
+}
+bindHold(document.getElementById('btnLeft'), ()=>keys.left=true, ()=>keys.left=false);
+bindHold(document.getElementById('btnRight'), ()=>keys.right=true, ()=>keys.right=false);
+bindHold(document.getElementById('btnJump'), ()=>{
+  keys.jumpHeld=true;
+  if(game) game.jump();
+}, ()=>keys.jumpHeld=false);
+document.getElementById('btnDash').addEventListener('touchstart', (e)=>{e.preventDefault(); if(game) game.dash();});
+document.getElementById('btnDash').addEventListener('click', ()=>{ if(game) game.dash(); });
+
+// keyboard
+window.addEventListener('keydown', (e)=>{
+  if(e.key==='ArrowLeft' || e.key==='a') keys.left=true;
+  if(e.key==='ArrowRight' || e.key==='d') keys.right=true;
+  if(e.key===' ' || e.key==='ArrowUp' || e.key==='w'){ if(!keys.jumpHeld) game.jump(); keys.jumpHeld=true; }
+  if(e.key==='Shift') game.dash();
+});
+window.addEventListener('keyup', (e)=>{
+  if(e.key==='ArrowLeft' || e.key==='a') keys.left=false;
+  if(e.key==='ArrowRight' || e.key==='d') keys.right=false;
+  if(e.key===' ' || e.key==='ArrowUp' || e.key==='w') keys.jumpHeld=false;
+});
+
+// buttons
+document.getElementById('btnStart').onclick=()=>{ if(game) game.loadLevel(currentPeak); };
+document.getElementById('btnRestart').onclick=()=>{ if(game) game.loadLevel(currentPeak); };
+document.getElementById('btnPause').onclick=()=>{
+  if(!game) return;
+  game.paused=!game.paused;
+  document.getElementById('btnPause').textContent = game.paused ? '▶ Resume' : '⏸ Pause';
+  if(game.paused) showOverlay(`<div class="big">⏸ Paused</div><p>Peak ${currentPeak+1} — ${PEAKS[currentPeak].name}</p><div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" onclick="hideOverlay();game.paused=false;document.getElementById('btnPause').textContent='⏸ Pause'">▶ Resume</button><button class="btn ghost" onclick="hideOverlay();game.loadLevel(game.peakIndex)">↻ Restart</button></div>`);
+  else hideOverlay();
+};
+document.getElementById('btnReset').onclick=()=>{
+  if(confirm('Reset all stars, times and shards?')){
+    save={stars:Array(12).fill(0), bestTimes:Array(12).fill(null), totalShards:0, unlocked:0, leaper:currentLeaper.id};
+    persist(); renderPeaks(); if(game) game.loadLevel(0); currentPeak=0; showTab('play');
+  }
+};
+
+function showOverlay(html){
+  document.getElementById('modal').innerHTML=html;
+  document.getElementById('overlay').classList.add('show');
+}
+function hideOverlay(){ document.getElementById('overlay').classList.remove('show'); }
+function nextPeak(){
+  if(currentPeak<11){
+    currentPeak++;
+    renderPeaks();
+    game.loadLevel(currentPeak);
+  } else {
+    showTab('trails');
+  }
+}
+// expose for inline onclick
+window.hideOverlay=hideOverlay;
+window.nextPeak=nextPeak;
+
+// prevent scrolling while touching canvas
+canvas.addEventListener('touchmove', e=>e.preventDefault(), {passive:false});
+</script>
+</body>
+</html>
+

@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Angle Trainer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
+  background:#070D1C;
+  color:#E2E8F0;
+  display:flex;justify-content:center;
+  -webkit-tap-highlight-color:transparent;
+}
+.app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100dvh;
+  background: radial-gradient(600px 400px at 50% -10%, #1E2A4A 0%, #0B1220 60%, #070D1C 100%);
+  display:flex;flex-direction:column;
+  padding:12px 14px 16px;
+  gap:10px;
+}
+.header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:6px 2px;
+}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{
+  width:38px;height:38px;border-radius:10px;
+  background:#FACC15;color:#0B1220;display:grid;place-items:center;
+  font-weight:900;font-size:18px;letter-spacing:-0.5px;
+  box-shadow:0 4px 12px rgba(250,204,21,0.3);
+}
+.brand h1{font-size:18px;font-weight:800;letter-spacing:-0.3px;line-height:1}
+.brand p{font-size:11px;color:#94A3B8;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;margin-top:2px}
+.icon-btn{
+  width:44px;height:44px;border-radius:12px;
+  background:#141E33;border:1px solid #1E2F4A;color:#E2E8F0;
+  display:grid;place-items:center;font-size:18px;cursor:pointer;
+}
+.stats{
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:8px;
+}
+.stat{
+  background:#111C33;border:1px solid #1E2F4A;border-radius:14px;
+  padding:10px 8px;text-align:center;
+}
+.stat .label{font-size:10px;letter-spacing:0.7px;text-transform:uppercase;color:#94A3B8;font-weight:700}
+.stat .value{font-size:18px;font-weight:800;margin-top:2px;color:#F8FAFC}
+.stat .sub{font-size:11px;color:#64748B;font-weight:600}
+.mode-row{
+  display:flex;gap:8px;align-items:center;justify-content:space-between;
+  background:#0F1A30;border:1px solid #1E2F4A;border-radius:12px;padding:8px 10px;
+}
+.mode-label{font-size:12px;font-weight:700;color:#94A3B8;letter-spacing:0.4px}
+.modes{display:flex;gap:6px}
+.mode-btn{
+  padding:8px 12px;border-radius:10px;border:1px solid #1E2F4A;
+  background:#141E33;color:#CBD5E1;font-size:13px;font-weight:700;cursor:pointer;
+}
+.mode-btn.active{background:#FACC15;color:#0B1220;border-color:#FACC15}
+.canvas-card{
+  background:#0F1A30;border:1px solid #1E2F4A;border-radius:18px;
+  padding:12px 12px 10px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.canvas-wrap{
+  position:relative;
+  width:100%;
+  aspect-ratio:1.15;
+  background: radial-gradient(400px 300px at 50% 50%, #162544 0%, #0F1A30 65%);
+  border-radius:14px;
+  border:1px solid #1E2F4A;
+  overflow:hidden;
+  display:grid;place-items:center;
+}
+canvas{width:100%;height:100%;display:block}
+.badge{
+  position:absolute;top:10px;left:10px;
+  background:#0B1220;border:1px solid #1E2F4A;color:#94A3B8;
+  font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;
+  padding:6px 10px;border-radius:999px;
+}
+.round-badge{
+  position:absolute;top:10px;right:10px;
+  background:#FACC15;color:#0B1220;
+  font-size:12px;font-weight:900;padding:6px 10px;border-radius:999px;
+}
+.feedback{
+  min-height:72px;
+  background:#111C33;border:1px solid #1E2F4A;border-radius:14px;
+  padding:12px 12px;
+  display:flex;flex-direction:column;gap:6px;justify-content:center;
+}
+.feedback.empty{
+  border-style:dashed;color:#64748B;align-items:center;text-align:center;
+  font-size:13px;font-weight:600;line-height:1.4;
+}
+.fb-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.fb-actual{font-size:13px;font-weight:800;color:#F8FAFC}
+.fb-actual span{color:#FACC15}
+.fb-points{
+  background:#FACC15;color:#0B1220;font-weight:900;font-size:13px;
+  padding:6px 10px;border-radius:999px;white-space:nowrap;
+}
+.fb-detail{font-size:12px;color:#94A3B8;font-weight:600;display:flex;gap:10px;flex-wrap:wrap}
+.fb-detail b{color:#E2E8F0}
+.verdict{font-size:13px;font-weight:800}
+.verdict.perfect{color:#4ADE80}
+.verdict.good{color:#FACC15}
+.verdict.ok{color:#FB923C}
+.verdict.miss{color:#F87171}
+.input-card{
+  background:#0F1A30;border:1px solid #1E2F4A;border-radius:16px;
+  padding:12px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.input-row{display:flex;gap:10px;align-items:center}
+.guess-display{
+  flex:1;
+  background:#070D1C;border:1px solid #1E2F4A;border-radius:12px;
+  height:56px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 14px;
+}
+.guess-display .prefix{font-size:12px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:#64748B}
+.guess-value{font-size:28px;font-weight:900;color:#F8FAFC;letter-spacing:-1px;min-width:60px;text-align:right}
+.guess-value.empty{color:#334155;font-size:18px;font-weight:700}
+.guess-unit{font-size:18px;font-weight:800;color:#94A3B8;margin-left:4px}
+.submit-btn{
+  height:56px;min-width:96px;padding:0 18px;
+  background:#FACC15;color:#0B1220;border:none;border-radius:12px;
+  font-size:16px;font-weight:900;letter-spacing:0.2px;cursor:pointer;
+  box-shadow:0 6px 16px rgba(250,204,21,0.25);
+}
+.submit-btn:active{transform:scale(0.98)}
+.submit-btn:disabled{opacity:0.45;box-shadow:none;cursor:not-allowed}
+.keypad{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+}
+.key{
+  height:56px;border-radius:12px;
+  background:#141E33;border:1px solid #1E2F4A;
+  color:#F1F5F9;font-size:20px;font-weight:800;cursor:pointer;
+  display:grid;place-items:center;
+  user-select:none;
+}
+.key:active{background:#1E2F4A;transform:scale(0.98)}
+.key.action{background:#0B1220;color:#94A3B8;font-size:14px;font-weight:800;letter-spacing:0.5px}
+.key.enter{background:#1E2F4A;color:#FACC15;border-color:#2A3F62}
+.actions{
+  display:flex;gap:8px;
+}
+.btn{
+  flex:1;height:48px;border-radius:12px;border:1px solid #1E2F4A;
+  background:#141E33;color:#E2E8F0;font-size:14px;font-weight:800;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.btn.primary{background:#E2E8F0;color:#0B1220;border-color:#E2E8F0}
+.btn:active{transform:scale(0.98)}
+.hint{
+  text-align:center;font-size:11px;color:#475569;font-weight:600;letter-spacing:0.3px;
+  padding:2px 0 4px;
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="brand">
+      <div class="logo">∠</div>
+      <div>
+        <h1>Angle Trainer</h1>
+        <p>Protractor-free • Estimate</p>
+      </div>
+    </div>
+    <button class="icon-btn" id="restartBtn" aria-label="Restart">↻</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="label">Score</div>
+      <div class="value" id="scoreVal">0</div>
+      <div class="sub" id="scoreSub">0 rounds</div>
+    </div>
+    <div class="stat">
+      <div class="label">Avg Error</div>
+      <div class="value" id="avgVal">—</div>
+      <div class="sub">degrees</div>
+    </div>
+    <div class="stat">
+      <div class="label">Streak</div>
+      <div class="value" id="streakVal">0</div>
+      <div class="sub" id="bestSub">best 0</div>
+    </div>
+  </div>
+
+  <div class="mode-row">
+    <div class="mode-label">Range</div>
+    <div class="modes">
+      <button class="mode-btn active" data-mode="classic">10°–170°</button>
+      <button class="mode-btn" data-mode="full">15°–345°</button>
+    </div>
+  </div>
+
+  <div class="canvas-card">
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="dial" width="600" height="520"></canvas>
+      <div class="badge">Dark Board • No Protractor</div>
+      <div class="round-badge" id="roundBadge">Round 1</div>
+    </div>
+  </div>
+
+  <div class="feedback empty" id="feedback">
+    <div>👁️ Estimate the yellow angle.<br>Type your guess and tap <b style="color:#FACC15">Check</b>.</div>
+  </div>
+
+  <div class="input-card">
+    <div class="input-row">
+      <div class="guess-display" id="guessDisplay">
+        <span class="prefix">Your guess</span>
+        <div style="display:flex;align-items:baseline">
+          <span class="guess-value empty" id="guessValue">—</span>
+          <span class="guess-unit">°</span>
+        </div>
+      </div>
+      <button class="submit-btn" id="submitBtn">Check</button>
+    </div>
+    <div class="keypad" id="keypad">
+      <button class="key" data-k="1">1</button>
+      <button class="key" data-k="2">2</button>
+      <button class="key" data-k="3">3</button>
+      <button class="key" data-k="4">4</button>
+      <button class="key" data-k="5">5</button>
+      <button class="key" data-k="6">6</button>
+      <button class="key" data-k="7">7</button>
+      <button class="key" data-k="8">8</button>
+      <button class="key" data-k="9">9</button>
+      <button class="key action" data-k="clear">C</button>
+      <button class="key" data-k="0">0</button>
+      <button class="key action" data-k="back">⌫</button>
+    </div>
+    <div class="actions">
+      <button class="btn" id="nextBtn">Next Angle →</button>
+      <button class="btn primary" id="newBtn">New Round</button>
+    </div>
+  </div>
+  <div class="hint">Large touch targets • No zoom needed • Works offline • Tip: 90° is square, 45° is half of that</div>
+</div>
+
+<script>
+const canvas = document.getElementById('dial');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvasWrap');
+const scoreVal = document.getElementById('scoreVal');
+const scoreSub = document.getElementById('scoreSub');
+const avgVal = document.getElementById('avgVal');
+const streakVal = document.getElementById('streakVal');
+const bestSub = document.getElementById('bestSub');
+const roundBadge = document.getElementById('roundBadge');
+const feedback = document.getElementById('feedback');
+const guessValueEl = document.getElementById('guessValue');
+const submitBtn = document.getElementById('submitBtn');
+const nextBtn = document.getElementById('nextBtn');
+const newBtn = document.getElementById('newBtn');
+const restartBtn = document.getElementById('restartBtn');
+
+let mode = 'classic';
+let actual = 0;
+let round = 1;
+let totalScore = 0;
+let totalError = 0;
+let played = 0;
+let streak = 0;
+let bestStreak = parseInt(localStorage.getItem('angle_bestStreak')||'0',10);
+let guessStr = '';
+let revealed = false;
+
+bestSub.textContent = 'best ' + bestStreak;
+
+function generateAngle(){
+  if(mode==='classic'){
+    // 10 to 170 inclusive, avoid multiples of 90 being too easy? keep them but less frequent
+    // generate integer, ensure not too close to 0/180
+    return Math.floor(Math.random()*161)+10; // 10-170
+  } else {
+    // full circle 15-345
+    return Math.floor(Math.random()*331)+15;
+  }
+}
+
+function resizeCanvas(){
+  const rect = wrap.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio||1, 2.5);
+  const w = rect.width;
+  const h = rect.height;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w+'px';
+  canvas.style.height = h+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  draw();
+}
+
+function draw(){
+  const W = wrap.clientWidth;
+  const H = wrap.clientHeight;
+  const cx = W*0.5;
+  const cy = H*0.58;
+  const r = Math.min(W,H)*0.42;
+
+  ctx.clearRect(0,0,W,H);
+
+  // subtle grid dots
+  ctx.fillStyle = 'rgba(148,163,184,0.07)';
+  for(let x=20;x<W;x+=28){
+    for(let y=20;y<H;y+=28){
+      ctx.beginPath(); ctx.arc(x,y,0.9,0,Math.PI*2); ctx.fill();
+    }
+  }
+
+  // outer dial ring
+  ctx.strokeStyle = '#1E2F4A';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+
+  // inner ring
+  ctx.strokeStyle = 'rgba(30,47,74,0.6)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx,cy,r*0.92,0,Math.PI*2); ctx.stroke();
+
+  // tick marks
+  for(let deg=0; deg<360; deg+=10){
+    const rad = deg*Math.PI/180;
+    const isMajor = deg%30===0;
+    const isCardinal = deg%90===0;
+    const len = isCardinal ? 14 : isMajor ? 9 : 5;
+    const w = isCardinal ? 2.2 : isMajor ? 1.6 : 1;
+    const x1 = cx + Math.cos(rad)*(r - 1);
+    const y1 = cy + Math.sin(rad)*(r - 1);
+    const x2 = cx + Math.cos(rad)*(r - 1 - len);
+    const y2 = cy + Math.sin(rad)*(r - 1 - len);
+    ctx.strokeStyle = isCardinal ? '#334155' : isMajor ? '#2A3F62' : 'rgba(42,63,98,0.7)';
+    ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  }
+
+  // cardinal labels subtle (N E S W) - not degrees
+  ctx.fillStyle = '#475569';
+  ctx.font = '700 11px system-ui';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('E', cx + r + 14, cy);
+  ctx.fillText('N', cx, cy - r - 12);
+  ctx.fillText('W', cx - r - 14, cy);
+  ctx.fillText('S', cx, cy + r + 12);
+
+  // base ray (0° to East) - blue
+  const baseLen = r*0.82;
+  ctx.strokeStyle = '#38BDF8';
+  ctx.lineWidth = 4;
+  ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(cx,cy);
+  ctx.lineTo(cx + baseLen, cy);
+  ctx.stroke();
+  // base dot at end
+  ctx.fillStyle='#38BDF8';
+  ctx.beginPath(); ctx.arc(cx+baseLen, cy, 5,0,Math.PI*2); ctx.fill();
+
+  // angle ray - yellow
+  const rad = actual*Math.PI/180;
+  // canvas y is down, so math CCW is -rad in canvas
+  const ax = cx + Math.cos(-rad)*baseLen;
+  const ay = cy + Math.sin(-rad)*baseLen;
+  ctx.strokeStyle = '#FACC15';
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(ax,ay); ctx.stroke();
+  ctx.fillStyle='#FACC15';
+  ctx.beginPath(); ctx.arc(ax,ay,5,0,Math.PI*2); ctx.fill();
+
+  // arc sector
+  const arcR = r*0.28;
+  const start = 0;
+  const end = -rad;
+  // determine anticlockwise for shortest arc
+  // For 0-180, end negative small, need anticlockwise true to go CCW 0-> -rad
+  // For 180-360, end negative large (or positive), need false
+  let anticlockwise = actual>0 && actual<=180;
+  // normalize for >180 case where end wraps
+  // Actually for actual=270, end=-4.71 which is 1.57, going clockwise 90deg is shorter
+  // So anticlockwise false is correct
+  ctx.fillStyle = 'rgba(250,204,21,0.14)';
+  ctx.strokeStyle = 'rgba(250,204,21,0.95)';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(cx,cy);
+  ctx.arc(cx,cy,arcR,start,end,anticlockwise);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx,cy,arcR,start,end,anticlockwise);
+  ctx.stroke();
+
+  // small arc arrow
+  const midAngle = -rad/2;
+  // adjust mid for >180 to be on other side? For >180, mid should be the short way? Actually our arc is short way, so mid is -rad/2 for <=180, and for >180 the short way is the other direction (360-actual). Our current anticlockwise logic already picks short way, but mid calc for >180 is wrong.
+  // Fix: if actual>180, the short arc is clockwise from 0 to end (which is 360-actual). Mid should be (360-actual)/2 clockwise = (360-actual)/2 positive canvas angle.
+  let mid = midAngle;
+  if(actual>180){
+    const short = 360-actual;
+    mid = (short*Math.PI/180)/2; // positive
+  }
+  const mx = cx + Math.cos(mid)* (arcR+10);
+  const my = cy + Math.sin(mid)* (arcR+10);
+  // arrow head tiny
+  ctx.fillStyle='rgba(250,204,21,0.9)';
+  ctx.beginPath(); ctx.arc(mx,my,2.2,0,Math.PI*2); ctx.fill();
+
+  // center dot
+  ctx.fillStyle='#0B1220';
+  ctx.beginPath(); ctx.arc(cx,cy,10,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#1E2F4A'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.fillStyle='#F8FAFC';
+  ctx.beginPath(); ctx.arc(cx,cy,4.5,0,Math.PI*2); ctx.fill();
+
+  // if revealed, show actual number near arc
+  if(revealed){
+    const labelAngle = actual<=180 ? -rad/2 : ( (360-actual)*Math.PI/180)/2;
+    const lx = cx + Math.cos(labelAngle)*(arcR+28);
+    const ly = cy + Math.sin(labelAngle)*(arcR+28);
+    ctx.fillStyle='#0B1220';
+    // pill background
+    const txt = actual+'°';
+    ctx.font='900 13px system-ui';
+    const tw = ctx.measureText(txt).width;
+    const padX=10, padY=6;
+    const bx = lx - tw/2 - padX;
+    const by = ly - 10 - padY;
+    const bw = tw + padX*2;
+    const bh = 20 + padY;
+    ctx.beginPath();
+    // rounded rect
+    const rr=10;
+    ctx.moveTo(bx+rr,by); ctx.lineTo(bx+bw-rr,by); ctx.quadraticCurveTo(bx+bw,by,bx+bw,by+rr);
+    ctx.lineTo(bx+bw,by+bh-rr); ctx.quadraticCurveTo(bx+bw,by+bh,bx+bw-rr,by+bh);
+    ctx.lineTo(bx+rr,by+bh); ctx.quadraticCurveTo(bx,by+bh,bx,by+bh-rr);
+    ctx.lineTo(bx,by+rr); ctx.quadraticCurveTo(bx,by,bx+rr,by);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle='rgba(250,204,21,0.9)'; ctx.lineWidth=1.2; ctx.stroke();
+    ctx.fillStyle='#FACC15';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(txt, lx, ly);
+  }
+}
+
+function updateGuessDisplay(){
+  if(guessStr===''){
+    guessValueEl.textContent='—';
+    guessValueEl.classList.add('empty');
+    submitBtn.disabled=true;
+  } else {
+    guessValueEl.textContent=guessStr;
+    guessValueEl.classList.remove('empty');
+    submitBtn.disabled=false;
+  }
+}
+
+function setFeedbackEmpty(){
+  feedback.className='feedback empty';
+  feedback.innerHTML='<div>👁️ Estimate the yellow angle.<br>Type your guess and tap <b style="color:#FACC15">Check</b>.</div>';
+}
+
+function showFeedback(guess, actualVal){
+  let err = Math.abs(guess - actualVal);
+  if(mode==='full'){
+    err = Math.min(err, 360-err);
+  }
+  let points=0, verdict='', cls='';
+  if(err<=3){ points=100; verdict='Perfect! 🎯'; cls='perfect'; }
+  else if(err<=5){ points=80; verdict='Excellent! ✨'; cls='good'; }
+  else if(err<=10){ points=60; verdict='Good eye! 👍'; cls='good'; }
+  else if(err<=15){ points=40; verdict='Close!'; cls='ok'; }
+  else if(err<=20){ points=20; verdict='Not bad'; cls='ok'; }
+  else { points=0; verdict='Keep practicing'; cls='miss'; }
+
+  // update stats
+  totalScore+=points;
+  totalError+=err;
+  played++;
+  if(err<=10) streak++; else streak=0;
+  if(streak>bestStreak){ bestStreak=streak; localStorage.setItem('angle_bestStreak', bestStreak); }
+
+  scoreVal.textContent=totalScore;
+  scoreSub.textContent=played+' rounds';
+  avgVal.textContent=(totalError/played).toFixed(1)+'°';
+  streakVal.textContent=streak;
+  bestSub.textContent='best '+bestStreak;
+
+  feedback.className='feedback';
+  feedback.innerHTML=`
+    <div class="fb-top">
+      <div class="fb-actual">Actual <span>${actualVal}°</span> • You <span style="color:${err<=10?'#4ADE80':'#F8FAFC'}">${guess}°</span></div>
+      <div class="fb-points">+${points}</div>
+    </div>
+    <div class="fb-detail"><span>Error <b>${err}°</b></span> <span>•</span> <span>Round <b>${round}</b></span></div>
+    <div class="verdict ${cls}">${verdict} ${err<=5?'— within 5°!':''}</div>
+  `;
+}
+
+function newAngle(){
+  actual = generateAngle();
+  revealed=false;
+  guessStr='';
+  updateGuessDisplay();
+  setFeedbackEmpty();
+  roundBadge.textContent='Round '+(round);
+  draw();
+}
+
+function handleSubmit(){
+  if(guessStr==='') return;
+  const g = parseInt(guessStr,10);
+  if(isNaN(g)) return;
+  if(g<0 || g>360){
+    feedback.className='feedback';
+    feedback.innerHTML=`<div class="verdict miss">Enter 0°–360°</div><div class="fb-detail">Your guess <b>${g}°</b> is out of range</div>`;
+    return;
+  }
+  revealed=true;
+  draw();
+  showFeedback(g, actual);
+  // auto advance hint
+  nextBtn.textContent='Next Angle →';
+  // haptic
+  if(navigator.vibrate) navigator.vibrate(30);
+}
+
+function handleKey(k){
+  if(revealed && k!=='clear' && k!=='back'){
+    // if already revealed, start new round on digit press
+    // but allow editing? We'll require Next
+    return;
+  }
+  if(k==='clear'){ guessStr=''; }
+  else if(k==='back'){ guessStr=guessStr.slice(0,-1); }
+  else {
+    if(guessStr.length>=3) return;
+    // prevent leading zero weirdness but allow 0
+    if(guessStr==='0' && k==='0') return;
+    guessStr+=k;
+  }
+  updateGuessDisplay();
+}
+
+// events
+document.getElementById('keypad').addEventListener('click', e=>{
+  const b=e.target.closest('.key');
+  if(!b) return;
+  handleKey(b.dataset.k);
+});
+submitBtn.addEventListener('click', handleSubmit);
+nextBtn.addEventListener('click', ()=>{
+  if(!revealed){
+    // skip
+    round++;
+    newAngle();
+  } else {
+    round++;
+    newAngle();
+  }
+});
+newBtn.addEventListener('click', ()=>{
+  round++;
+  newAngle();
+});
+restartBtn.addEventListener('click', ()=>{
+  totalScore=0; totalError=0; played=0; streak=0; round=1;
+  scoreVal.textContent='0';
+  scoreSub.textContent='0 rounds';
+  avgVal.textContent='—';
+  streakVal.textContent='0';
+  newAngle();
+});
+document.querySelectorAll('.mode-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    mode=btn.dataset.mode;
+    // reset round with new mode
+    newAngle();
+  });
+});
+
+// keyboard
+window.addEventListener('keydown', e=>{
+  if(e.key>='0' && e.key<='9'){ handleKey(e.key); }
+  else if(e.key==='Backspace'){ handleKey('back'); }
+  else if(e.key==='Enter'){ handleSubmit(); }
+  else if(e.key==='Escape'){ guessStr=''; updateGuessDisplay(); }
+});
+
+// init
+newAngle();
+window.addEventListener('resize', resizeCanvas);
+requestAnimationFrame(()=>{ resizeCanvas(); setTimeout(resizeCanvas,100); });
+</script>
+</body>
+</html>
+

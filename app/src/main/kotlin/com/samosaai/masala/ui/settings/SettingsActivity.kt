@@ -101,6 +101,7 @@ import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.masala
 import com.samosaai.masala.miniapps.MiniAppActivity
 import com.samosaai.masala.miniapps.MiniAppIconView
+import com.samosaai.masala.miniapps.openMiniApp
 import com.samosaai.masala.ui.skills.SkillSheetActivity
 import com.samosaai.masala.ui.components.LauncherRow
 import com.samosaai.masala.ui.drawer.visibilityLabel
@@ -113,7 +114,7 @@ import kotlin.math.roundToInt
 
 /** The settings shell (plan Phase 1): home app, theme, text size, drawer, hidden apps. */
 class SettingsActivity : ComponentActivity() {
-    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, MINI_APPS, SKILLS, PERSONAS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, PERMISSIONS, ABOUT, BRIEF, WIDGETS, WALLPAPERS }
+    private enum class Page { MAIN, HIDDEN_APPS, LAYOUT, RECORDING, POCKET_STORE, SKILLS, PERSONAS, TASKS, FILES, AI_MODELS, VOICE, APPEARANCE, DRAWER, PRIVACY, PERMISSIONS, ABOUT, BRIEF, WIDGETS, WALLPAPERS }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Transparent bars; MasalaTheme picks the icon colour from the chosen theme.
@@ -145,7 +146,7 @@ class SettingsActivity : ComponentActivity() {
                             onHiddenApps = { page = Page.HIDDEN_APPS },
                             onLayout = { page = Page.LAYOUT },
                             onRecording = { page = Page.RECORDING },
-                            onMiniApps = { page = Page.MINI_APPS },
+                            onMiniApps = { page = Page.POCKET_STORE },
                             onWidgets = { page = Page.WIDGETS },
                             onSkills = { page = Page.SKILLS },
                             onTasks = { page = Page.TASKS },
@@ -158,7 +159,36 @@ class SettingsActivity : ComponentActivity() {
                         Page.HIDDEN_APPS -> HiddenAppsPage(onBack = { page = Page.MAIN })
                         Page.LAYOUT -> LayoutPage(settings, onBack = { page = Page.MAIN })
                         Page.RECORDING -> RecordingPage(onBack = { page = Page.MAIN })
-                        Page.MINI_APPS -> MiniAppsPage(onBack = { page = Page.MAIN })
+                        Page.POCKET_STORE -> {
+                            val storeScope = rememberCoroutineScope()
+                            com.samosaai.masala.ui.miniapps.PocketStorePage(
+                                onBack = { page = Page.MAIN },
+                                onOpenBundled = { pocket -> openMiniApp(pocket.id) },
+                                onCustomize = { pocket ->
+                                    storeScope.launch {
+                                        val html = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                            runCatching {
+                                                assets.open(pocket.assetPath).bufferedReader().use { it.readText() }
+                                            }.getOrNull()
+                                        }
+                                        if (html.isNullOrEmpty()) {
+                                            android.widget.Toast.makeText(this@SettingsActivity, getString(R.string.pocket_store_copy_failed), android.widget.Toast.LENGTH_SHORT).show()
+                                            return@launch
+                                        }
+                                        val id = masala.miniApps.create(pocket.title, html)
+                                        if (id == null) {
+                                            android.widget.Toast.makeText(this@SettingsActivity, getString(R.string.pocket_store_copy_too_large), android.widget.Toast.LENGTH_SHORT).show()
+                                            return@launch
+                                        }
+                                        askInChat(getString(R.string.miniapp_customize_prefill, pocket.title, id))
+                                    }
+                                },
+                                onOpenMine = { id ->
+                                    startActivity(Intent(this@SettingsActivity, MiniAppActivity::class.java).putExtra(MiniAppActivity.EXTRA_APP_ID, id))
+                                },
+                                onAskCreate = { askInChat(getString(R.string.miniapp_create_prefill)) },
+                            )
+                        }
                         Page.SKILLS -> SkillsPage(onBack = { page = Page.MAIN }, onEditExpert = { id ->
                             editExpertId = id
                             personasReturn = Page.SKILLS
@@ -374,79 +404,6 @@ class SettingsActivity : ComponentActivity() {
         startActivity(Intent(this, com.samosaai.masala.HomeActivity::class.java).putExtra(com.samosaai.masala.HomeActivity.EXTRA_SHOW_INPUT, true)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
         finish()
-    }
-
-    /** Every stored mini-app, so a created app is never invisible (plan: Lane D follow-ups). */
-    @Composable
-    private fun MiniAppsPage(onBack: () -> Unit) {
-        val scope = rememberCoroutineScope()
-        val apps by remember { masala.miniApps.all }.collectAsStateWithLifecycle(emptyList())
-        val format = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
-        SettingsScaffold(stringResource(R.string.settings_miniapps), onBack = onBack) {
-            Button(onClick = { askInChat(getString(R.string.miniapp_create_prefill)) }) { Text(stringResource(R.string.miniapp_create)) }
-            var filter by rememberSaveable { mutableStateOf("") }
-            // The search sits below Create (Batch A added the button on top), and only for long lists.
-            // Also while a filter is set, so it can't be left hiding rows with no field to clear it.
-            if (apps.size > 5 || filter.isNotEmpty()) ListSearchField(filter, { filter = it }, stringResource(R.string.miniapps_filter))
-            val shown = remember(apps, filter) {
-                val q = filter.trim().lowercase()
-                if (q.isEmpty()) apps else apps.filter { it.title.lowercase().contains(q) }
-            }
-            if (apps.isEmpty()) {
-                Text(stringResource(R.string.miniapps_empty), style = MaterialTheme.typography.bodyMedium)
-            } else if (shown.isEmpty()) {
-                Text(stringResource(R.string.miniapps_empty_no_match), style = MaterialTheme.typography.bodyMedium)
-            }
-            shown.forEach { row ->
-                var confirmDelete by remember(row.id) { mutableStateOf(false) }
-                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        MiniAppIconView(row.icon, row.title, 40.dp)
-                        Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                            Text(row.title, style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                format.format(java.util.Date(row.updatedAt)),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { startActivity(Intent(this@SettingsActivity, MiniAppActivity::class.java).putExtra(MiniAppActivity.EXTRA_APP_ID, row.id)) }) {
-                            Text(stringResource(R.string.miniapp_open))
-                        }
-                        TextButton(onClick = {
-                            scope.launch {
-                                val problems = masala.layouts.pinMiniApp(row.id, row.title)
-                                android.widget.Toast.makeText(
-                                    this@SettingsActivity,
-                                    getString(if (problems.isEmpty()) R.string.miniapp_pinned else R.string.miniapp_pin_failed),
-                                    android.widget.Toast.LENGTH_SHORT,
-                                ).show()
-                            }
-                        }) { Text(stringResource(R.string.miniapp_pin)) }
-                        TextButton(onClick = { confirmDelete = true }) {
-                            Text(stringResource(R.string.settings_version_delete))
-                        }
-                    }
-                }
-                HorizontalDivider()
-                if (confirmDelete) {
-                    AlertDialog(
-                        onDismissRequest = { confirmDelete = false },
-                        title = { Text(stringResource(R.string.miniapp_delete_title)) },
-                        text = { Text(stringResource(R.string.miniapp_delete_message, row.title)) },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                confirmDelete = false
-                                scope.launch { masala.deleteMiniApp(row.id) }
-                            }) { Text(stringResource(R.string.settings_version_delete)) }
-                        },
-                        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_back)) } },
-                    )
-                }
-            }
-        }
     }
 
     /** The widget library in one place: preview, add to home, duplicate, delete (plan W2). */

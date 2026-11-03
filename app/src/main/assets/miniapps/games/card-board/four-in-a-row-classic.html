@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Drop Disc Duel</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0f172a;
+  --card:#1e293b;
+  --board:#2563eb;
+  --board-dark:#1d4ed8;
+  --hole:#0f172a;
+  --red:#ff3b30;
+  --red2:#ff6b6b;
+  --yellow:#ffcc02;
+  --yellow2:#ffe066;
+  --text:#f8fafc;
+  --muted:#94a3b8;
+  --win:#22c55e;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center}
+.app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100dvh;
+  padding:12px 14px 18px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  background: radial-gradient(600px 400px at 50% -10%, #1e3a8a 0%, transparent 70%), var(--bg);
+}
+.header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 2px 2px;
+}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{
+  width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--red),#ff8a65 60%, var(--yellow));
+  display:grid;place-items:center;font-weight:900;font-size:18px;color:white;box-shadow:0 4px 12px rgba(0,0,0,.3);
+  border:2px solid rgba(255,255,255,.15)
+}
+.logo h1{font-size:18px;letter-spacing:.08em;font-weight:900;line-height:1}
+.logo p{font-size:11px;color:var(--muted);letter-spacing:.12em;font-weight:700;margin-top:2px}
+.icon-btn{
+  width:44px;height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.08);color:var(--text);font-size:18px;display:grid;place-items:center;
+}
+.score-row{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;
+}
+.score-card{
+  background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:16px;
+  padding:10px 8px;text-align:center;position:relative;overflow:hidden;
+}
+.score-card.active{outline:2px solid var(--yellow);outline-offset:0;box-shadow:0 0 0 4px rgba(255,204,2,.15)}
+.score-card.cpu.active{outline-color:var(--red)}
+.score-label{font-size:10px;letter-spacing:.14em;font-weight:800;color:var(--muted)}
+.score-value{font-size:22px;font-weight:900;margin-top:2px}
+.score-sub{font-size:11px;font-weight:700;color:var(--muted);margin-top:1px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:4px;border:2px solid rgba(255,255,255,.3)}
+.dot.red{background:var(--red)} .dot.yellow{background:var(--yellow)}
+.turn-bar{
+  background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:999px;
+  padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.turn-pill{
+  display:flex;align-items:center;gap:8px;font-weight:900;font-size:13px;letter-spacing:.04em;
+  background:rgba(255,255,255,.08);padding:6px 12px;border-radius:999px;transition:.2s;
+}
+.turn-pill.you{color:var(--yellow)} .turn-pill.cpu{color:var(--red)}
+.turn-pill.active{transform:scale(1.05);background:rgba(255,255,255,.14)}
+.difficulty{
+  display:flex;gap:6px;align-items:center;
+}
+.diff-btn{
+  font-size:11px;font-weight:800;letter-spacing:.06em;padding:7px 10px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.12);background:transparent;color:var(--muted);
+}
+.diff-btn.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+.board-wrap{
+  background:linear-gradient(180deg, #1e40af, #1e3a8a);
+  border-radius:20px;padding:10px 8px 12px;
+  box-shadow:0 12px 30px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.15);
+  border:1px solid rgba(255,255,255,.1);
+  position:relative;
+}
+.col-hints{
+  display:grid;grid-template-columns:repeat(7,1fr);gap:6px;padding:0 4px 8px;
+}
+.col-hint{
+  height:28px;display:grid;place-items:center;
+}
+.col-hint span{
+  width:28px;height:28px;border-radius:50%;display:grid;place-items:center;
+  font-size:14px;font-weight:900;color:transparent;transition:.15s;transform:translateY(4px) scale(.8);
+}
+.col-hint.show span{color:var(--yellow);background:rgba(255,204,2,.15);transform:translateY(0) scale(1)}
+.col-hint.show.cpu span{color:var(--red);background:rgba(255,59,48,.15)}
+.board{
+  display:grid;grid-template-columns:repeat(7,1fr);gap:6px;
+  background:var(--board);padding:8px;border-radius:16px;
+  box-shadow:inset 0 4px 12px rgba(0,0,0,.3), inset 0 -2px 0 rgba(255,255,255,.15);
+  position:relative;
+}
+.col{
+  display:flex;flex-direction:column;gap:6px;cursor:pointer;
+  border-radius:12px;padding:2px;
+  touch-action:manipulation;
+  min-height:48px;
+}
+.col:active{background:rgba(255,255,255,.08)}
+.cell{
+  aspect-ratio:1;
+  background:var(--hole);
+  border-radius:50%;
+  position:relative;
+  box-shadow:inset 0 6px 10px rgba(0,0,0,.6), inset 0 -2px 4px rgba(255,255,255,.08), 0 1px 0 rgba(255,255,255,.15);
+  overflow:hidden;
+}
+.disc{
+  position:absolute;inset:3px;border-radius:50%;
+  display:grid;place-items:center;
+  box-shadow:inset 0 -6px 10px rgba(0,0,0,.25), inset 0 4px 8px rgba(255,255,255,.35), 0 4px 10px rgba(0,0,0,.3);
+  animation:drop .32s cubic-bezier(.2,.8,.3,1);
+}
+.disc.red{
+  background: radial-gradient(35% 35% at 30% 28%, #ff9a8a 0%, var(--red) 55%, #b91c1c 100%);
+  border:2px solid #7f1d1d;
+}
+.disc.yellow{
+  background: radial-gradient(35% 35% at 30% 28%, #fff7a3 0%, var(--yellow) 55%, #b45309 100%);
+  border:2px solid #92400e;
+}
+.disc.win{
+  box-shadow:0 0 0 3px var(--win), 0 0 18px var(--win), inset 0 -6px 10px rgba(0,0,0,.25), inset 0 4px 8px rgba(255,255,255,.35);
+  z-index:2;
+}
+.disc.ghost{
+  opacity:.55;animation:none;border-style:dashed;background: radial-gradient(35% 35% at 30% 28%, rgba(255,255,255,.9) 0%, var(--yellow) 60%, #b45309 100%);
+}
+.disc.ghost.cpu{opacity:.5;background: radial-gradient(35% 35% at 30% 28%, #ff9a8a 0%, var(--red) 60%, #7f1d1d 100%)}
+@keyframes drop{
+  0%{transform:translateY(-320px) scale(.9);opacity:0}
+  60%{transform:translateY(8px) scale(1.02)}
+  100%{transform:translateY(0) scale(1);opacity:1}
+}
+.controls{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+}
+.btn{
+  height:48px;border-radius:14px;border:none;font-weight:900;font-size:14px;letter-spacing:.04em;
+  display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
+  touch-action:manipulation;
+}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--text);color:var(--bg);box-shadow:0 6px 16px rgba(0,0,0,.25)}
+.btn-ghost{background:var(--card);color:var(--text);border:1px solid rgba(255,255,255,.12)}
+.btn-rematch{background:linear-gradient(135deg, var(--yellow), #f59e0b);color:#1a1a1a;box-shadow:0 6px 16px rgba(255,204,2,.3)}
+.result-overlay{
+  position:absolute;inset:0;background:rgba(15,23,42,.78);backdrop-filter:blur(6px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  border-radius:20px;opacity:0;pointer-events:none;transition:.25s;transform:scale(.98);
+  padding:20px;text-align:center;
+}
+.result-overlay.show{opacity:1;pointer-events:auto;transform:scale(1)}
+.result-badge{
+  font-size:12px;font-weight:900;letter-spacing:.16em;padding:6px 12px;border-radius:999px;
+  background:rgba(255,255,255,.12);color:var(--text);border:1px solid rgba(255,255,255,.15)
+}
+.result-title{font-size:32px;font-weight:1000;letter-spacing:-.02em;line-height:1}
+.result-title.win{color:var(--yellow);text-shadow:0 4px 16px rgba(255,204,2,.4)}
+.result-title.lose{color:var(--red);text-shadow:0 4px 16px rgba(255,59,48,.4)}
+.result-title.draw{color:var(--text)}
+.result-sub{color:var(--muted);font-weight:700;font-size:13px}
+.result-actions{display:flex;gap:10px;width:100%;max-width:320px;margin-top:4px}
+.result-actions .btn{flex:1;height:52px;font-size:15px}
+.footer{
+  text-align:center;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.08em;padding:4px;
+}
+@media (max-width:380px){
+  .board{gap:5px;padding:6px}
+  .col{gap:5px}
+  .score-value{font-size:20px}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="logo">
+      <div class="logo-mark">4</div>
+      <div>
+        <h1>DROP DUEL</h1>
+        <p>CONNECT FOUR • VS CPU</p>
+      </div>
+    </div>
+    <button class="icon-btn" id="resetScores" aria-label="Reset scores" title="Reset scores">↺</button>
+  </div>
+
+  <div class="score-row">
+    <div class="score-card you active" id="cardYou">
+      <div class="score-label"><span class="dot yellow"></span>YOU</div>
+      <div class="score-value" id="scoreYou">0</div>
+      <div class="score-sub">Wins</div>
+    </div>
+    <div class="score-card" id="cardDraw">
+      <div class="score-label">DRAWS</div>
+      <div class="score-value" id="scoreDraw">0</div>
+      <div class="score-sub">Ties</div>
+    </div>
+    <div class="score-card cpu" id="cardCpu">
+      <div class="score-label"><span class="dot red"></span>CPU</div>
+      <div class="score-value" id="scoreCpu">0</div>
+      <div class="score-sub">Wins</div>
+    </div>
+  </div>
+
+  <div class="turn-bar">
+    <div class="turn-pill you active" id="turnPill">
+      <span id="turnDot" class="dot yellow"></span>
+      <span id="turnText">YOUR TURN</span>
+    </div>
+    <div class="difficulty">
+      <button class="diff-btn" data-diff="easy">EASY</button>
+      <button class="diff-btn on" data-diff="hard">HARD</button>
+    </div>
+  </div>
+
+  <div class="board-wrap" id="boardWrap">
+    <div class="col-hints" id="colHints"></div>
+    <div class="board" id="board"></div>
+
+    <div class="result-overlay" id="overlay">
+      <div class="result-badge" id="badge">GAME OVER</div>
+      <div class="result-title" id="resultTitle">YOU WIN!</div>
+      <div class="result-sub" id="resultSub">Four in a row — brilliant drop!</div>
+      <div class="result-actions">
+        <button class="btn btn-rematch" id="rematchBtn">↻ REMATCH</button>
+        <button class="btn btn-ghost" id="closeBtn" style="background:rgba(255,255,255,.1);color:white;border-color:rgba(255,255,255,.2)">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-ghost" id="undoBtn">↩ UNDO</button>
+    <button class="btn btn-primary" id="newGameBtn">NEW GAME</button>
+  </div>
+
+  <div class="footer">TAP A COLUMN TO DROP • FIRST TO 4 WINS</div>
+</div>
+
+<script>
+const ROWS=6, COLS=7;
+const HUMAN=1, CPU=2;
+let board, currentPlayer, gameOver, winningCells, moveHistory, scores, difficulty='hard', busy=false;
+
+const boardEl=document.getElementById('board');
+const hintsEl=document.getElementById('colHints');
+const turnPill=document.getElementById('turnPill');
+const turnText=document.getElementById('turnText');
+const turnDot=document.getElementById('turnDot');
+const overlay=document.getElementById('overlay');
+const resultTitle=document.getElementById('resultTitle');
+const resultSub=document.getElementById('resultSub');
+const badge=document.getElementById('badge');
+
+function loadScores(){
+  try{
+    const s=JSON.parse(localStorage.getItem('dropduel-scores')||'null');
+    if(s) return s;
+  }catch(e){}
+  return {you:0,cpu:0,draw:0};
+}
+function saveScores(){ localStorage.setItem('dropduel-scores', JSON.stringify(scores)); }
+function loadDiff(){
+  const d=localStorage.getItem('dropduel-diff');
+  if(d) difficulty=d;
+}
+
+scores=loadScores();
+loadDiff();
+
+function initBoard(){
+  board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  currentPlayer=HUMAN;
+  gameOver=false;
+  winningCells=[];
+  moveHistory=[];
+  busy=false;
+  render();
+  updateTurnUI();
+  hideOverlay();
+}
+
+function createBoardDOM(){
+  boardEl.innerHTML='';
+  hintsEl.innerHTML='';
+  for(let c=0;c<COLS;c++){
+    const h=document.createElement('div');
+    h.className='col-hint';
+    h.innerHTML='<span>▼</span>';
+    h.id='hint-'+c;
+    hintsEl.appendChild(h);
+  }
+  for(let c=0;c<COLS;c++){
+    const col=document.createElement('div');
+    col.className='col';
+    col.dataset.col=c;
+    col.setAttribute('role','button');
+    col.setAttribute('aria-label','Drop in column '+(c+1));
+    for(let r=0;r<ROWS;r++){
+      const cell=document.createElement('div');
+      cell.className='cell';
+      cell.dataset.r=r; cell.dataset.c=c;
+      col.appendChild(cell);
+    }
+    // touch/click
+    col.addEventListener('click',()=> onColumnTap(c));
+    col.addEventListener('touchstart',()=> showHint(c), {passive:true});
+    col.addEventListener('mouseenter',()=> showHint(c));
+    col.addEventListener('mouseleave',()=> clearHints());
+    col.addEventListener('touchend',()=> setTimeout(clearHints,300));
+    boardEl.appendChild(col);
+  }
+}
+
+function showHint(c){
+  if(gameOver||busy) return;
+  clearHints();
+  const el=document.getElementById('hint-'+c);
+  if(!el) return;
+  el.classList.add('show');
+  if(currentPlayer===CPU) el.classList.add('cpu');
+  // ghost disc preview
+  const colEl=boardEl.children[c];
+  if(!colEl) return;
+  // find lowest empty
+  let row=-1;
+  for(let r=ROWS-1;r>=0;r--) if(board[r][c]===0){row=r;break;}
+  if(row===-1) return;
+  const cell=colEl.children[row];
+  if(cell.querySelector('.disc')) return;
+  const ghost=document.createElement('div');
+  ghost.className='disc ghost '+(currentPlayer===CPU?'cpu':'');
+  ghost.id='ghost';
+  cell.appendChild(ghost);
+}
+function clearHints(){
+  document.querySelectorAll('.col-hint').forEach(e=>e.classList.remove('show','cpu'));
+  const g=document.getElementById('ghost');
+  if(g) g.remove();
+}
+
+function render(){
+  // update score UI
+  document.getElementById('scoreYou').textContent=scores.you;
+  document.getElementById('scoreCpu').textContent=scores.cpu;
+  document.getElementById('scoreDraw').textContent=scores.draw;
+  // difficulty UI
+  document.querySelectorAll('.diff-btn').forEach(b=>{
+    b.classList.toggle('on', b.dataset.diff===difficulty);
+  });
+  // board discs
+  for(let c=0;c<COLS;c++){
+    const colEl=boardEl.children[c];
+    if(!colEl) continue;
+    for(let r=0;r<ROWS;r++){
+      const cell=colEl.children[r];
+      // keep ghost? remove all discs then re-add
+      const existing=cell.querySelector('.disc:not(.ghost)');
+      if(existing) existing.remove();
+      const v=board[r][c];
+      if(v!==0){
+        const d=document.createElement('div');
+        d.className='disc '+(v===HUMAN?'yellow':'red');
+        // check win highlight
+        if(winningCells.some(([wr,wc])=>wr===r&&wc===c)) d.classList.add('win');
+        cell.appendChild(d);
+      }
+    }
+  }
+  // active card highlight
+  document.getElementById('cardYou').classList.toggle('active', !gameOver && currentPlayer===HUMAN);
+  document.getElementById('cardCpu').classList.toggle('active', !gameOver && currentPlayer===CPU);
+}
+
+function updateTurnUI(){
+  if(gameOver) return;
+  if(currentPlayer===HUMAN){
+    turnPill.className='turn-pill you active';
+    turnDot.className='dot yellow';
+    turnText.textContent='YOUR TURN';
+  } else {
+    turnPill.className='turn-pill cpu active';
+    turnDot.className='dot red';
+    turnText.textContent='CPU THINKING…';
+  }
+}
+
+function onColumnTap(c){
+  if(gameOver||busy) return;
+  if(currentPlayer!==HUMAN) return;
+  if(!isValidMove(c)) {
+    // shake feedback
+    if(navigator.vibrate) navigator.vibrate(30);
+    return;
+  }
+  doMove(c, HUMAN);
+  if(checkTerminalAfterMove()) return;
+  // CPU turn
+  currentPlayer=CPU;
+  updateTurnUI();
+  render();
+  busy=true;
+  setTimeout(()=>{
+    busy=false;
+    if(gameOver) return;
+    const cpuCol = pickCpuMove();
+    if(cpuCol===-1){
+      // draw
+      handleDraw();
+      return;
+    }
+    doMove(cpuCol, CPU);
+    if(checkTerminalAfterMove()) return;
+    currentPlayer=HUMAN;
+    updateTurnUI();
+    render();
+  }, 420);
+}
+
+function doMove(col, player){
+  let row=-1;
+  for(let r=ROWS-1;r>=0;r--) if(board[r][col]===0){row=r;break;}
+  if(row===-1) return false;
+  board[row][col]=player;
+  moveHistory.push({r:row,c:col,player});
+  // haptic
+  if(navigator.vibrate) navigator.vibrate(player===HUMAN?20:10);
+  render();
+  return true;
+}
+
+function isValidMove(c){ return board[0][c]===0; }
+
+function checkTerminalAfterMove(){
+  const last=moveHistory[moveHistory.length-1];
+  if(!last) return false;
+  const win=checkWinFor(last.player);
+  if(win){
+    winningCells=win;
+    gameOver=true;
+    render();
+    if(last.player===HUMAN){
+      scores.you++; saveScores();
+      showResult('win');
+    } else {
+      scores.cpu++; saveScores();
+      showResult('lose');
+    }
+    return true;
+  }
+  if(isBoardFull()){
+    gameOver=true;
+    scores.draw++; saveScores();
+    showResult('draw');
+    return true;
+  }
+  return false;
+}
+function handleDraw(){
+  gameOver=true;
+  scores.draw++; saveScores();
+  showResult('draw');
+}
+
+function isBoardFull(){
+  for(let c=0;c<COLS;c++) if(board[0][c]===0) return false;
+  return true;
+}
+
+function checkWinFor(player){
+  // returns winning cells array or null
+  // horizontal
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS-3;c++){
+      if(board[r][c]===player && board[r][c+1]===player && board[r][c+2]===player && board[r][c+3]===player){
+        return [[r,c],[r,c+1],[r,c+2],[r,c+3]];
+      }
+    }
+  }
+  for(let r=0;r<ROWS-3;r++){
+    for(let c=0;c<COLS;c++){
+      if(board[r][c]===player && board[r+1][c]===player && board[r+2][c]===player && board[r+3][c]===player){
+        return [[r,c],[r+1,c],[r+2,c],[r+3,c]];
+      }
+    }
+  }
+  for(let r=0;r<ROWS-3;r++){
+    for(let c=0;c<COLS-3;c++){
+      if(board[r][c]===player && board[r+1][c+1]===player && board[r+2][c+2]===player && board[r+3][c+3]===player){
+        return [[r,c],[r+1,c+1],[r+2,c+2],[r+3,c+3]];
+      }
+    }
+  }
+  for(let r=3;r<ROWS;r++){
+    for(let c=0;c<COLS-3;c++){
+      if(board[r][c]===player && board[r-1][c+1]===player && board[r-2][c+2]===player && board[r-3][c+3]===player){
+        return [[r,c],[r-1,c+1],[r-2,c+2],[r-3,c+3]];
+      }
+    }
+  }
+  return null;
+}
+
+function showResult(type){
+  overlay.classList.add('show');
+  if(type==='win'){
+    badge.textContent='VICTORY';
+    badge.style.background='rgba(255,204,2,.18)'; badge.style.color='#ffcc02'; badge.style.borderColor='rgba(255,204,2,.3)';
+    resultTitle.textContent='YOU WIN!';
+    resultTitle.className='result-title win';
+    resultSub.textContent='Four in a row — unstoppable!';
+    turnPill.className='turn-pill you'; turnText.textContent='YOU WON';
+  } else if(type==='lose'){
+    badge.textContent='DEFEAT';
+    badge.style.background='rgba(255,59,48,.18)'; badge.style.color='#ff3b30'; badge.style.borderColor='rgba(255,59,48,.3)';
+    resultTitle.textContent='CPU WINS!';
+    resultTitle.className='result-title lose';
+    resultSub.textContent='The computer lined up four. Rematch?';
+    turnPill.className='turn-pill cpu'; turnText.textContent='CPU WON';
+  } else {
+    badge.textContent='STALEMATE';
+    badge.style.background='rgba(255,255,255,.12)'; badge.style.color='white'; badge.style.borderColor='rgba(255,255,255,.15)';
+    resultTitle.textContent='DRAW!';
+    resultTitle.className='result-title draw';
+    resultSub.textContent='Board full — no four in a row.';
+    turnPill.className='turn-pill'; turnText.textContent='DRAW';
+  }
+  render();
+  if(navigator.vibrate) navigator.vibrate(type==='win'?[30,40,60]: type==='lose'?[60,30,60]:30);
+}
+function hideOverlay(){ overlay.classList.remove('show'); }
+
+// CPU AI
+function pickCpuMove(){
+  const valid=getValidCols();
+  if(valid.length===0) return -1;
+  if(difficulty==='easy'){
+    // 60% optimal, 40% random
+    if(Math.random()<0.4) return valid[Math.floor(Math.random()*valid.length)];
+  }
+  // 1. win if possible
+  for(let c of valid){
+    const r=getNextRow(c);
+    board[r][c]=CPU;
+    if(checkWinFor(CPU)){ board[r][c]=0; return c; }
+    board[r][c]=0;
+  }
+  // 2. block opponent win
+  for(let c of valid){
+    const r=getNextRow(c);
+    board[r][c]=HUMAN;
+    if(checkWinFor(HUMAN)){ board[r][c]=0; return c; }
+    board[r][c]=0;
+  }
+  // 3. use minimax for hard
+  if(difficulty==='hard'){
+    let bestScore=-Infinity, bestCol=valid[0];
+    // center preference order for tie-breaking
+    const order=[3,2,4,1,5,0,6].filter(c=>valid.includes(c));
+    for(let c of order){
+      const r=getNextRow(c);
+      board[r][c]=CPU;
+      const score=minimax(4, -Infinity, Infinity, false);
+      board[r][c]=0;
+      if(score>bestScore){ bestScore=score; bestCol=c; }
+    }
+    return bestCol;
+  } else {
+    // easy: center preference
+    const centerOrder=[3,2,4,1,5,0,6];
+    for(let c of centerOrder) if(valid.includes(c)) return c;
+    return valid[0];
+  }
+}
+
+function getValidCols(){
+  const cols=[];
+  for(let c=0;c<COLS;c++) if(board[0][c]===0) cols.push(c);
+  return cols;
+}
+function getNextRow(col){
+  for(let r=ROWS-1;r>=0;r--) if(board[r][col]===0) return r;
+  return -1;
+}
+
+function minimax(depth, alpha, beta, maximizing){
+  const valid=getValidCols();
+  const winCPU=checkWinFor(CPU);
+  const winHuman=checkWinFor(HUMAN);
+  if(winCPU) return 100000 + depth;
+  if(winHuman) return -100000 - depth;
+  if(depth===0 || valid.length===0) return evaluateBoard();
+  if(maximizing){
+    let maxEval=-Infinity;
+    for(let c of valid){
+      const r=getNextRow(c);
+      board[r][c]=CPU;
+      const evalScore=minimax(depth-1, alpha, beta, false);
+      board[r][c]=0;
+      maxEval=Math.max(maxEval, evalScore);
+      alpha=Math.max(alpha, evalScore);
+      if(beta<=alpha) break;
+    }
+    return maxEval;
+  } else {
+    let minEval=Infinity;
+    for(let c of valid){
+      const r=getNextRow(c);
+      board[r][c]=HUMAN;
+      const evalScore=minimax(depth-1, alpha, beta, true);
+      board[r][c]=0;
+      minEval=Math.min(minEval, evalScore);
+      beta=Math.min(beta, evalScore);
+      if(beta<=alpha) break;
+    }
+    return minEval;
+  }
+}
+
+function evaluateBoard(){
+  let score=0;
+  // center control is valuable
+  let centerCount=0;
+  for(let r=0;r<ROWS;r++) if(board[r][3]===CPU) centerCount++;
+  score+=centerCount*6;
+  // evaluate all windows of 4
+  score+=evaluateWindows(CPU)*10;
+  score-=evaluateWindows(HUMAN)*10;
+  return score;
+}
+function evaluateWindows(player){
+  let s=0;
+  // horizontal
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS-3;c++) s+=scoreWindow([board[r][c],board[r][c+1],board[r][c+2],board[r][c+3]], player);
+  // vertical
+  for(let r=0;r<ROWS-3;r++) for(let c=0;c<COLS;c++) s+=scoreWindow([board[r][c],board[r+1][c],board[r+2][c],board[r+3][c]], player);
+  // diag down-right
+  for(let r=0;r<ROWS-3;r++) for(let c=0;c<COLS-3;c++) s+=scoreWindow([board[r][c],board[r+1][c+1],board[r+2][c+2],board[r+3][c+3]], player);
+  // diag up-right
+  for(let r=3;r<ROWS;r++) for(let c=0;c<COLS-3;c++) s+=scoreWindow([board[r][c],board[r-1][c+1],board[r-2][c+2],board[r-3][c+3]], player);
+  return s;
+}
+function scoreWindow(window, player){
+  const opp = player===CPU?HUMAN:CPU;
+  const countP=window.filter(v=>v===player).length;
+  const countO=window.filter(v=>v===opp).length;
+  const countE=window.filter(v=>v===0).length;
+  if(countP===4) return 100;
+  if(countP===3 && countE===1) return 5;
+  if(countP===2 && countE===2) return 2;
+  if(countO===3 && countE===1) return -4;
+  return 0;
+}
+
+// controls
+document.getElementById('newGameBtn').addEventListener('click', initBoard);
+document.getElementById('rematchBtn').addEventListener('click', initBoard);
+document.getElementById('closeBtn').addEventListener('click', hideOverlay);
+document.getElementById('undoBtn').addEventListener('click', ()=>{
+  if(moveHistory.length===0 || gameOver) return;
+  // undo last two moves (human+cpu) if possible
+  const last=moveHistory.pop();
+  board[last.r][last.c]=0;
+  if(moveHistory.length>0 && moveHistory[moveHistory.length-1].player===CPU){
+    const last2=moveHistory.pop();
+    board[last2.r][last2.c]=0;
+  }
+  gameOver=false; winningCells=[]; currentPlayer=HUMAN;
+  hideOverlay(); render(); updateTurnUI();
+});
+document.getElementById('resetScores').addEventListener('click', ()=>{
+  scores={you:0,cpu:0,draw:0}; saveScores(); render();
+  if(navigator.vibrate) navigator.vibrate(20);
+});
+document.querySelectorAll('.diff-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    difficulty=b.dataset.diff;
+    localStorage.setItem('dropduel-diff', difficulty);
+    render();
+  });
+});
+
+// init
+createBoardDOM();
+initBoard();
+// keyboard support
+window.addEventListener('keydown', e=>{
+  if(e.key>='1' && e.key<='7'){
+    const c=parseInt(e.key)-1;
+    onColumnTap(c);
+  }
+  if(e.key==='r' || e.key==='R') initBoard();
+  if(e.key==='Escape') hideOverlay();
+});
+</script>
+</body>
+</html>

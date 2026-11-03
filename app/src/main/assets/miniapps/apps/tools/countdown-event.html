@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DayZero — Event Countdowns</title>
+<style>
+:root{--bg:#0f1424;--card:#1a2240;--acc:#7aa2ff;--txt:#edf1ff;--mut:#8c97b8}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;min-height:100vh}
+.wrap{max-width:480px;margin:0 auto;padding:16px 14px 32px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}
+.sub{color:var(--mut);font-size:13px;margin:2px 0 0}
+#muteBtn{background:var(--card);border:1px solid #33406e;color:var(--txt);border-radius:12px;min-width:48px;min-height:44px;font-size:18px}
+.card{background:var(--card);border:1px solid #33406e;border-radius:18px;padding:14px;margin:12px 0}
+.card input{width:100%;min-height:48px;border-radius:12px;border:1px solid #33406e;background:#0f1424;color:var(--txt);font-size:15px;padding:0 12px;margin:4px 0}
+#addBtn{width:100%;min-height:52px;border:0;border-radius:12px;background:var(--acc);color:#0b1030;font-size:17px;font-weight:800;margin-top:8px}
+.ev{background:var(--card);border:1px solid #33406e;border-radius:16px;padding:12px 14px;margin:8px 0}
+.ev .nm{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+.ev .nm span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev .nm button{min-width:44px;min-height:44px;border-radius:10px;border:1px solid #5a3a4a;background:#2a1822;color:#ff9aa8;font-size:16px}
+.ev .dt{color:var(--mut);font-size:12px;margin:2px 0 8px}
+.digits{display:flex;gap:6px}
+.digits div{flex:1;background:#0f1424;border-radius:10px;text-align:center;padding:8px 2px}
+.digits b{font-size:20px;font-variant-numeric:tabular-nums;display:block}
+.digits small{color:var(--mut);font-size:10px;text-transform:uppercase}
+.ev.past{opacity:.65}
+.ev.past .digits b{color:var(--acc)}
+.empty{text-align:center;color:var(--mut);font-size:14px;padding:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div><h1>DayZero</h1><p class="sub">Countdowns to what matters</p></div><button id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="card">
+<input type="text" id="ename" placeholder="Event name (e.g. Goa trip)" maxlength="60">
+<input type="datetime-local" id="edate" aria-label="Event date and time">
+<button id="addBtn">Add countdown</button>
+</div>
+<div id="list"></div>
+</div>
+<script>
+(function(){
+"use strict";
+var KEY="dayzero-v1";
+var store={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+var muted=store.get("muted-countdown-event",false);
+var muteBtn=document.getElementById("muteBtn");
+function paintMute(){muteBtn.textContent=muted?"🔇":"🔊";}paintMute();
+var actx=null;
+function beep(f){if(muted)return;try{var C=window.AudioContext||window.webkitAudioContext;if(!C)return;if(!actx)actx=new C();if(actx.state==="suspended")actx.resume();var o=actx.createOscillator(),g=actx.createGain();o.type="sine";o.frequency.value=f||660;g.gain.value=0.05;o.connect(g);g.connect(actx.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.08);o.stop(actx.currentTime+0.09);}catch(e){}}
+muteBtn.addEventListener("click",function(){muted=!muted;store.set("muted-countdown-event",muted);paintMute();beep(720);});
+var events=store.get(KEY,[]);
+if(!Array.isArray(events))events=[];
+var list=document.getElementById("list");
+document.getElementById("addBtn").addEventListener("click",function(){
+var nm=document.getElementById("ename").value.trim();
+var dv=document.getElementById("edate").value;
+if(!nm){beep(300);document.getElementById("ename").focus();return;}
+var ts=Date.parse(dv);
+if(isNaN(ts)){beep(300);document.getElementById("edate").focus();return;}
+events.push({id:Date.now(),name:nm,ts:ts});
+store.set(KEY,events);beep(780);
+document.getElementById("ename").value="";document.getElementById("edate").value="";draw();});
+function parts(ms){if(ms<0)ms=0;var s=Math.floor(ms/1000);return{d:Math.floor(s/86400),h:Math.floor(s%86400/3600),m:Math.floor(s%3600/60),s:s%60};}
+function pad(n){return (n<10?"0":"")+n;}
+function draw(){
+var t=Date.now();
+events.sort(function(a,b){return a.ts-b.ts;});
+list.innerHTML="";
+if(!events.length){list.innerHTML="<div class='empty'>No countdowns yet — add your first event above.</div>";return;}
+events.forEach(function(e){
+var diff=e.ts-t,past=diff<=0;
+var d=document.createElement("div");d.className="ev"+(past?" past":"");
+var nm=document.createElement("div");nm.className="nm";
+var sp=document.createElement("span");sp.textContent=e.name;
+var del=document.createElement("button");del.textContent="✕";del.setAttribute("aria-label","Delete countdown");
+del.addEventListener("click",function(){if(!window.confirm("Delete the countdown to "+e.name+"?"))return;beep(340);events=events.filter(function(x){return x.id!==e.id;});store.set(KEY,events);draw();});
+nm.appendChild(sp);nm.appendChild(del);
+var dt=document.createElement("div");dt.className="dt";dt.textContent=new Date(e.ts).toLocaleString("en");
+var dg=document.createElement("div");dg.className="digits";
+if(past){dg.innerHTML="<div><b>0</b><small>done</small></div>";var msg=document.createElement("div");msg.className="dt";msg.textContent="This moment has arrived.";d.appendChild(nm);d.appendChild(dt);d.appendChild(dg);d.appendChild(msg);}
+else{var p=parts(diff);var cells=[["d","days"],["h","hrs"],["m","min"],["s","sec"]];cells.forEach(function(c){var cell=document.createElement("div");var b=document.createElement("b");b.textContent=c[0]==="d"?p[c[0]]:pad(p[c[0]]);b.dataset.unit=c[0];var sm=document.createElement("small");sm.textContent=c[1];cell.appendChild(b);cell.appendChild(sm);dg.appendChild(cell);});d.appendChild(nm);d.appendChild(dt);d.appendChild(dg);}
+list.appendChild(d);});
+}
+draw();
+setInterval(function(){
+var t=Date.now();
+var evs=list.querySelectorAll(".ev");
+events.forEach(function(e,i){
+var box=evs[i];if(!box||e.ts-t<=0)return;
+var p=parts(e.ts-t);
+var bs=box.querySelectorAll("b[data-unit]");
+if(bs.length===4){bs[0].textContent=p.d;bs[1].textContent=pad(p.h);bs[2].textContent=pad(p.m);bs[3].textContent=pad(p.s);}
+});
+},1000);
+})();
+</script>
+</body>
+</html>

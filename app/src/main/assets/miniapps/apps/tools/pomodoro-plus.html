@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Focus Flow Timer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif}
+:root{
+  --bg:#0f1117;
+  --card:#1a1d27;
+  --card2:#232636;
+  --accent:#ff5a3c;
+  --accent2:#ff7a45;
+  --work:#ff5a3c;
+  --short:#2ec4b6;
+  --long:#7c5cff;
+  --text:#f5f6fb;
+  --muted:#9aa0b5;
+  --line:#2a2e42;
+  --radius:20px;
+}
+body{background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;overflow-x:hidden}
+header{padding:18px 16px 8px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,#ff5a3c,#ff8a3d);display:grid;place-items:center;font-size:18px}
+.logo h1{font-size:18px;font-weight:800;letter-spacing:-0.02em}
+.logo p{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-top:1px}
+.icon-btn{width:42px;height:42px;border-radius:14px;background:var(--card);border:1px solid var(--line);color:var(--text);display:grid;place-items:center;font-size:18px;cursor:pointer}
+.wrap{flex:1;padding:0 16px 16px;max-width:480px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.presets{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.presets::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;padding:10px 14px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--muted);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;transition:.2s}
+.chip.active{background:var(--text);color:#0f1117;border-color:var(--text)}
+.chip small{opacity:.7;font-weight:600}
+.timer-card{background:var(--card);border:1px solid var(--line);border-radius:28px;padding:18px 16px 16px;position:relative;overflow:hidden}
+.timer-card::before{content:"";position:absolute;inset:0;background:radial-gradient(600px 300px at 50% 0%, rgba(255,90,60,.08), transparent 70%);pointer-events:none}
+.mode-row{display:flex;gap:8px;justify-content:center;margin-bottom:14px;position:relative}
+.mode-pill{padding:7px 12px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;border:1px solid transparent;cursor:pointer;transition:.2s}
+.mode-pill.work{background:rgba(255,90,60,.15);color:#ff7a5c;border-color:rgba(255,90,60,.25)}
+.mode-pill.short{background:rgba(46,196,182,.14);color:#2ec4b6;border-color:rgba(46,196,182,.25)}
+.mode-pill.long{background:rgba(124,92,255,.15);color:#9d8cff;border-color:rgba(124,92,255,.25)}
+.mode-pill.idle{opacity:.45;background:var(--card2);color:var(--muted);border-color:var(--line)}
+.ring-wrap{position:relative;width:220px;height:220px;margin:0 auto;display:grid;place-items:center}
+.ring-wrap svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:var(--line);stroke-width:10}
+.ring-fg{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset .5s linear, stroke .3s}
+.ring-center{position:relative;text-align:center;z-index:1}
+.time{font-size:52px;font-weight:900;letter-spacing:-0.04em;line-height:1;font-variant-numeric:tabular-nums}
+.time-sub{margin-top:6px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted)}
+.cycle-dots{display:flex;gap:6px;justify-content:center;margin-top:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--line);transition:.3s}
+.dot.done{background:var(--accent)}
+.dot.current{box-shadow:0 0 0 4px rgba(255,90,60,.2)}
+.controls{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:16px;position:relative}
+.ctrl{height:48px;border-radius:16px;border:1px solid var(--line);background:var(--card2);color:var(--text);font-weight:800;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 18px;transition:.15s}
+.ctrl:active{transform:scale(.97)}
+.ctrl.primary{width:132px;height:52px;border-radius:18px;background:var(--text);color:#0f1117;border-color:var(--text);font-size:16px}
+.ctrl.ghost{width:52px;padding:0}
+.ctrl:disabled{opacity:.4}
+.toggles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.toggle-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px;display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center}
+.toggle-card .t-icon{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;font-size:16px}
+.toggle-card b{font-size:12px;font-weight:800}
+.toggle-card span{font-size:11px;color:var(--muted);font-weight:600;line-height:1.2}
+.switch{width:44px;height:26px;background:var(--line);border-radius:999px;position:relative;cursor:pointer;transition:.2s;flex-shrink:0}
+.switch.on{background:var(--accent)}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.switch.on::after{left:21px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;display:flex;align-items:center;gap:12px}
+.stat-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:18px}
+.stat b{font-size:20px;font-weight:900}
+.stat p{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:0.06em;text-transform:uppercase}
+.log-card{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.log-head{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+.log-head h3{font-size:14px;font-weight:800}
+.log-head button{font-size:12px;font-weight:700;color:var(--muted);background:none;border:none;cursor:pointer}
+.log-list{max-height:260px;overflow:auto}
+.log-empty{padding:24px;text-align:center;color:var(--muted);font-size:13px}
+.log-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid rgba(42,46,66,.6)}
+.log-item:last-child{border:none}
+.log-badge{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;font-size:14px;flex-shrink:0}
+.log-meta{flex:1;min-width:0}
+.log-meta b{font-size:13px;font-weight:800;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log-meta span{font-size:11px;color:var(--muted);font-weight:600}
+.log-time{font-size:11px;color:var(--muted);font-weight:700;white-space:nowrap}
+/* settings drawer */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:.25s;z-index:20}
+.overlay.open{opacity:1;pointer-events:auto}
+.drawer{position:fixed;inset:auto 0 0 0;background:#151821;border-top:1px solid var(--line);border-radius:28px 28px 0 0;max-height:88vh;overflow:auto;transform:translateY(100%);transition:.3s cubic-bezier(.32,.72,0,1);z-index:21;padding-bottom:max(16px, env(safe-area-inset-bottom))}
+.drawer.open{transform:translateY(0)}
+.drawer-head{position:sticky;top:0;background:#151821;padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);z-index:1}
+.drawer-head h2{font-size:16px;font-weight:900}
+.drawer-body{padding:16px;display:flex;flex-direction:column;gap:16px}
+.setting-group{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px}
+.setting-group h4{font-size:12px;font-weight:800;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid rgba(42,46,66,.5)}
+.row:last-child{border:none}
+.row label{font-size:13px;font-weight:700}
+.row small{font-size:11px;color:var(--muted);font-weight:600}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper button{width:32px;height:32px;border-radius:10px;border:1px solid var(--line);background:var(--card2);color:var(--text);font-size:16px;font-weight:800;cursor:pointer}
+.stepper span{width:52px;text-align:center;font-weight:800;font-variant-numeric:tabular-nums}
+.preset-edit{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.preset-mini{padding:10px;border-radius:14px;background:var(--card2);border:1px solid var(--line);text-align:center;cursor:pointer}
+.preset-mini.active{border-color:var(--accent);background:rgba(255,90,60,.1)}
+.preset-mini b{font-size:12px;display:block}
+.preset-mini span{font-size:10px;color:var(--muted);font-weight:700}
+.save-btn{width:100%;height:52px;border-radius:16px;background:var(--text);color:#0f1117;border:none;font-weight:900;font-size:15px;cursor:pointer}
+.hint{font-size:11px;color:var(--muted);text-align:center;font-weight:600;line-height:1.4}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-mark">◐</div>
+    <div>
+      <h1>Focus Flow</h1>
+      <p>Deep work timer</p>
+    </div>
+  </div>
+  <button class="icon-btn" id="openSettings" aria-label="Settings">⚙</button>
+</header>
+
+<div class="wrap">
+  <div class="presets" id="presetChips"></div>
+
+  <div class="timer-card" id="timerCard">
+    <div class="mode-row" id="modeRow">
+      <button class="mode-pill work" data-mode="work">Work</button>
+      <button class="mode-pill idle" data-mode="shortBreak">Short Break</button>
+      <button class="mode-pill idle" data-mode="longBreak">Long Break</button>
+    </div>
+
+    <div class="ring-wrap">
+      <svg viewBox="0 0 220 220">
+        <circle class="ring-bg" cx="110" cy="110" r="92"></circle>
+        <circle class="ring-fg" id="ringFg" cx="110" cy="110" r="92" stroke="#ff5a3c" stroke-dasharray="578.05" stroke-dashoffset="0"></circle>
+      </svg>
+      <div class="ring-center">
+        <div class="time" id="timeDisplay">25:00</div>
+        <div class="time-sub" id="timeSub">Ready to focus</div>
+        <div class="cycle-dots" id="cycleDots"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="ctrl ghost" id="resetBtn" title="Reset">↺</button>
+      <button class="ctrl primary" id="startBtn">▶ Start</button>
+      <button class="ctrl ghost" id="skipBtn" title="Skip">⏭</button>
+    </div>
+  </div>
+
+  <div class="toggles">
+    <div class="toggle-card">
+      <div class="t-icon" style="background:rgba(255,90,60,.15)">🔔</div>
+      <b>Sound</b>
+      <span>End chime</span>
+      <div class="switch" id="soundSwitch"></div>
+    </div>
+    <div class="toggle-card">
+      <div class="t-icon" style="background:rgba(46,196,182,.15)">💬</div>
+      <b>Notify</b>
+      <span>Desktop alert</span>
+      <div class="switch" id="notifySwitch"></div>
+    </div>
+    <div class="toggle-card">
+      <div class="t-icon" style="background:rgba(124,92,255,.15)">↻</div>
+      <b>Auto-start</b>
+      <span>Breaks</span>
+      <div class="switch" id="autoSwitch"></div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-icon" style="background:rgba(255,90,60,.15)">🔥</div>
+      <div><b id="statSessions">0</b><p>Sessions today</p></div>
+    </div>
+    <div class="stat">
+      <div class="stat-icon" style="background:rgba(46,196,182,.15)">⏱</div>
+      <div><b id="statFocus">0m</b><p>Focus time</p></div>
+    </div>
+  </div>
+
+  <div class="log-card">
+    <div class="log-head">
+      <h3>Session log</h3>
+      <button id="clearLog">Clear</button>
+    </div>
+    <div class="log-list" id="logList"></div>
+  </div>
+  <div class="hint">Works offline. Settings & history saved on this device. Keep tab open for background ticks.</div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <h2>Settings</h2>
+    <button class="icon-btn" id="closeSettings" style="width:36px;height:36px">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="setting-group">
+      <h4>Presets</h4>
+      <div class="preset-edit" id="presetEdit"></div>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px;font-weight:600">Tap a preset to apply it. Durations below will update.</p>
+    </div>
+
+    <div class="setting-group">
+      <h4>Durations (minutes)</h4>
+      <div class="row">
+        <div><label>Work</label><br><small>Focus interval</small></div>
+        <div class="stepper"><button data-step="work" data-dir="-1">−</button><span id="valWork">25</span><button data-step="work" data-dir="1">+</button></div>
+      </div>
+      <div class="row">
+        <div><label>Short break</label><br><small>Between sessions</small></div>
+        <div class="stepper"><button data-step="shortBreak" data-dir="-1">−</button><span id="valShort">5</span><button data-step="shortBreak" data-dir="1">+</button></div>
+      </div>
+      <div class="row">
+        <div><label>Long break</label><br><small>After full cycle</small></div>
+        <div class="stepper"><button data-step="longBreak" data-dir="-1">−</button><span id="valLong">15</span><button data-step="longBreak" data-dir="1">+</button></div>
+      </div>
+      <div class="row">
+        <div><label>Long break interval</label><br><small>Work sessions before long break</small></div>
+        <div class="stepper"><button data-step="interval" data-dir="-1">−</button><span id="valInterval">4</span><button data-step="interval" data-dir="1">+</button></div>
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <h4>Behavior</h4>
+      <div class="row">
+        <div><label>Auto-start breaks</label><br><small>Start break when work ends</small></div>
+        <div class="switch" id="setAutoBreak"></div>
+      </div>
+      <div class="row">
+        <div><label>Auto-start work</label><br><small>Start work when break ends</small></div>
+        <div class="switch" id="setAutoWork"></div>
+      </div>
+      <div class="row">
+        <div><label>Sound</label><br><small>Play chime on complete</small></div>
+        <div class="switch" id="setSound"></div>
+      </div>
+      <div class="row">
+        <div><label>Desktop notifications</label><br><small>Requires permission</small></div>
+        <div class="switch" id="setNotify"></div>
+      </div>
+    </div>
+
+    <button class="save-btn" id="saveSettings">Done</button>
+    <p class="hint">Tip: enable notifications to get alerts even when tab is in background.</p>
+  </div>
+</div>
+
+<script>
+const PRESETS = {
+  standard: { name:'Standard', work:25, shortBreak:5, longBreak:15, interval:4, icon:'◐' },
+  deep: { name:'Deep Work', work:50, shortBreak:10, longBreak:20, interval:3, icon:'⬢' },
+  long: { name:'Long Session', work:90, shortBreak:15, longBreak:30, interval:2, icon:'⬣' }
+};
+const STORAGE_KEY='focusflow.v2';
+const defaults = {
+  preset:'standard',
+  work:25, shortBreak:5, longBreak:15, interval:4,
+  autoBreak:true, autoWork:false,
+  sound:true, notify:false,
+  history:[]
+};
+
+let state = load();
+let timer = {
+  mode:'work',
+  remaining: state.work*60,
+  total: state.work*60,
+  running:false,
+  completedInCycle:0,
+  tickId:null
+};
+
+const els={
+  presetChips:document.getElementById('presetChips'),
+  presetEdit:document.getElementById('presetEdit'),
+  timeDisplay:document.getElementById('timeDisplay'),
+  timeSub:document.getElementById('timeSub'),
+  ringFg:document.getElementById('ringFg'),
+  modeRow:document.getElementById('modeRow'),
+  cycleDots:document.getElementById('cycleDots'),
+  startBtn:document.getElementById('startBtn'),
+  resetBtn:document.getElementById('resetBtn'),
+  skipBtn:document.getElementById('skipBtn'),
+  soundSwitch:document.getElementById('soundSwitch'),
+  notifySwitch:document.getElementById('notifySwitch'),
+  autoSwitch:document.getElementById('autoSwitch'),
+  statSessions:document.getElementById('statSessions'),
+  statFocus:document.getElementById('statFocus'),
+  logList:document.getElementById('logList'),
+  overlay:document.getElementById('overlay'),
+  drawer:document.getElementById('drawer'),
+  valWork:document.getElementById('valWork'),
+  valShort:document.getElementById('valShort'),
+  valLong:document.getElementById('valLong'),
+  valInterval:document.getElementById('valInterval'),
+  setAutoBreak:document.getElementById('setAutoBreak'),
+  setAutoWork:document.getElementById('setAutoWork'),
+  setSound:document.getElementById('setSound'),
+  setNotify:document.getElementById('setNotify'),
+};
+
+function load(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw) return {...defaults};
+    const p=JSON.parse(raw);
+    return {...defaults, ...p, history: Array.isArray(p.history)?p.history:[]};
+  }catch{ return {...defaults} }
+}
+function save(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function applyPreset(key){
+  const p=PRESETS[key];
+  if(!p) return;
+  state.preset=key;
+  state.work=p.work; state.shortBreak=p.shortBreak; state.longBreak=p.longBreak; state.interval=p.interval;
+  save();
+  syncSettingsUI();
+  if(!timer.running){
+    switchMode('work', false);
+  }
+  renderPresets();
+}
+
+function switchMode(mode, keepRunning){
+  timer.mode=mode;
+  timer.total = state[mode]*60;
+  timer.remaining = timer.total;
+  if(!keepRunning) timer.running=false;
+  updateModePills();
+  updateRing();
+  updateDisplay();
+  updateDots();
+  updateStartBtn();
+}
+
+function updateModePills(){
+  document.querySelectorAll('.mode-pill').forEach(b=>{
+    const m=b.dataset.mode;
+    b.className='mode-pill '+(m===timer.mode ? (m==='work'?'work':m==='shortBreak'?'short':'long') : 'idle');
+  });
+  // ring color
+  const colors={work:'#ff5a3c', shortBreak:'#2ec4b6', longBreak:'#7c5cff'};
+  els.ringFg.setAttribute('stroke', colors[timer.mode]||'#ff5a3c');
+}
+
+function updateDisplay(){
+  const m=Math.floor(timer.remaining/60).toString().padStart(2,'0');
+  const s=(timer.remaining%60).toString().padStart(2,'0');
+  els.timeDisplay.textContent=`${m}:${s}`;
+  const labels={work:'Focus time', shortBreak:'Short break', longBreak:'Long break'};
+  if(timer.running){
+    els.timeSub.textContent = labels[timer.mode] + ' • ' + (timer.mode==='work' ? `Session ${timer.completedInCycle+1}/${state.interval}` : 'Recharge');
+  } else {
+    if(timer.remaining===timer.total) els.timeSub.textContent='Ready to '+(timer.mode==='work'?'focus':'rest');
+    else els.timeSub.textContent='Paused';
+  }
+  document.title = `${m}:${s} • ${labels[timer.mode]} — Focus Flow`;
+}
+
+function updateRing(){
+  const circumference=2*Math.PI*92;
+  const progress = timer.total? (timer.remaining/timer.total) : 0;
+  const offset = circumference * (1-progress);
+  els.ringFg.style.strokeDasharray = circumference;
+  els.ringFg.style.strokeDashoffset = offset;
+}
+
+function updateDots(){
+  els.cycleDots.innerHTML='';
+  for(let i=0;i<state.interval;i++){
+    const d=document.createElement('div');
+    d.className='dot'+(i<timer.completedInCycle?' done':'')+(i===timer.completedInCycle && timer.mode==='work' ? ' current':'');
+    els.cycleDots.appendChild(d);
+  }
+}
+
+function updateStartBtn(){
+  if(timer.running){
+    els.startBtn.textContent='⏸ Pause';
+  } else {
+    els.startBtn.textContent = timer.remaining===timer.total ? '▶ Start' : '▶ Resume';
+  }
+}
+
+function renderPresets(){
+  els.presetChips.innerHTML='';
+  Object.entries(PRESETS).forEach(([key,p])=>{
+    const b=document.createElement('button');
+    b.className='chip'+(state.preset===key?' active':'');
+    b.innerHTML=`<span>${p.icon}</span> ${p.name} <small>${p.work}/${p.shortBreak}/${p.longBreak}</small>`;
+    b.onclick=()=>applyPreset(key);
+    els.presetChips.appendChild(b);
+  });
+  // drawer presets
+  els.presetEdit.innerHTML='';
+  Object.entries(PRESETS).forEach(([key,p])=>{
+    const d=document.createElement('div');
+    d.className='preset-mini'+(state.preset===key?' active':'');
+    d.innerHTML=`<b>${p.icon} ${p.name}</b><span>${p.work}m • ${p.shortBreak}m • ${p.longBreak}m</span>`;
+    d.onclick=()=>applyPreset(key);
+    els.presetEdit.appendChild(d);
+  });
+}
+
+function syncSettingsUI(){
+  els.valWork.textContent=state.work;
+  els.valShort.textContent=state.shortBreak;
+  els.valLong.textContent=state.longBreak;
+  els.valInterval.textContent=state.interval;
+  setSwitch(els.soundSwitch, state.sound);
+  setSwitch(els.notifySwitch, state.notify);
+  setSwitch(els.autoSwitch, state.autoBreak);
+  setSwitch(els.setAutoBreak, state.autoBreak);
+  setSwitch(els.setAutoWork, state.autoWork);
+  setSwitch(els.setSound, state.sound);
+  setSwitch(els.setNotify, state.notify);
+  updateDots();
+}
+
+function setSwitch(el,on){ el.classList.toggle('on', !!on); }
+
+function renderStats(){
+  const todayStr=new Date().toDateString();
+  const todayLogs=state.history.filter(h=> new Date(h.at).toDateString()===todayStr && h.type==='work');
+  const sessions=todayLogs.length;
+  const focusMin=todayLogs.reduce((a,b)=>a+b.duration,0);
+  els.statSessions.textContent=sessions;
+  els.statFocus.textContent = focusMin>=60 ? `${Math.floor(focusMin/60)}h ${focusMin%60}m` : `${focusMin}m`;
+}
+
+function renderLog(){
+  if(!state.history.length){
+    els.logList.innerHTML=`<div class="log-empty">No sessions yet.<br>Complete a focus block to see it here.</div>`;
+    return;
+  }
+  const sorted=[...state.history].sort((a,b)=> new Date(b.at)-new Date(a.at));
+  els.logList.innerHTML='';
+  sorted.slice(0,50).forEach(h=>{
+    const d=new Date(h.at);
+    const timeStr=d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    const dateStr=d.toLocaleDateString([], {month:'short', day:'numeric'});
+    const isWork=h.type==='work';
+    const badgeBg=isWork?'rgba(255,90,60,.15)': h.type==='shortBreak'?'rgba(46,196,182,.15)':'rgba(124,92,255,.15)';
+    const badgeIcon=isWork?'◐': h.type==='shortBreak'?'☕':'🌙';
+    const title=isWork?`Focus • ${h.duration}m` : h.type==='shortBreak'?`Short break • ${h.duration}m`:`Long break • ${h.duration}m`;
+    const sub=`${h.presetName||''} • ${isWork?'Completed':'Rested'}`;
+    const row=document.createElement('div');
+    row.className='log-item';
+    row.innerHTML=`<div class="log-badge" style="background:${badgeBg}">${badgeIcon}</div>
+      <div class="log-meta"><b>${title}</b><span>${sub}</span></div>
+      <div class="log-time">${dateStr} ${timeStr}</div>`;
+    els.logList.appendChild(row);
+  });
+}
+
+let audioCtx=null;
+function ensureAudio(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+}
+function playChime(){
+  if(!state.sound) return;
+  try{
+    ensureAudio();
+    const now=audioCtx.currentTime;
+    [0,0.18,0.36].forEach((off,i)=>{
+      const o=audioCtx.createOscillator();
+      const g=audioCtx.createGain();
+      o.type='sine';
+      o.frequency.setValueAtTime([880,1108,1318][i], now+off);
+      g.gain.setValueAtTime(0, now+off);
+      g.gain.linearRampToValueAtTime(0.18, now+off+0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, now+off+0.5);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(now+off); o.stop(now+off+0.55);
+    });
+  }catch{}
+}
+
+function notify(title, body){
+  if(!state.notify) return;
+  if('Notification' in window && Notification.permission==='granted'){
+    try{ new Notification(title, {body, icon:''}); }catch{}
+  }
+}
+
+function completeSession(){
+  const durationMin = state[timer.mode];
+  const entry={ id:Date.now().toString(36), type:timer.mode, duration:durationMin, at:new Date().toISOString(), presetName: PRESETS[state.preset]?.name || state.preset };
+  state.history.push(entry);
+  // keep last 200
+  if(state.history.length>200) state.history=state.history.slice(-200);
+  save();
+  renderStats(); renderLog();
+  playChime();
+  if(navigator.vibrate) navigator.vibrate([120,60,120]);
+
+  if(timer.mode==='work'){
+    timer.completedInCycle++;
+    const needLong = timer.completedInCycle >= state.interval;
+    const next = needLong ? 'longBreak' : 'shortBreak';
+    if(needLong) timer.completedInCycle=0; // reset after long break will happen, but we keep for next cycle
+    // Actually we reset after long break completes; for now keep count for dots
+    // If we just completed work that triggers long, we already reset? Let's handle: dots should reset after long break, not now.
+    // So revert: if needLong, don't reset yet, let long break show full dots, reset after long break.
+    if(needLong) timer.completedInCycle = state.interval; // show all done
+    notify('Focus complete', `${durationMin}m done — time for ${needLong?'a long break':'a short break'}.`);
+    switchMode(next, false);
+    if(state.autoBreak) startTimer();
+    else { updateDotsForNext(); }
+  } else {
+    const wasLong = timer.mode==='longBreak';
+    if(wasLong) timer.completedInCycle=0;
+    notify('Break over', 'Ready for next focus block?');
+    switchMode('work', false);
+    if(state.autoWork) startTimer();
+  }
+  // ensure dots reflect correctly after switch
+  updateDots();
+}
+
+function updateDotsForNext(){
+  // if we are in break, dots should show completed count
+  // timer.completedInCycle already holds work count
+  updateDots();
+}
+
+function tick(){
+  if(!timer.running) return;
+  timer.remaining--;
+  if(timer.remaining<=0){
+    timer.remaining=0;
+    updateDisplay(); updateRing();
+    timer.running=false;
+    clearInterval(timer.tickId); timer.tickId=null;
+    updateStartBtn();
+    completeSession();
+    return;
+  }
+  updateDisplay(); updateRing();
+}
+
+function startTimer(){
+  if(timer.running) return;
+  ensureAudio();
+  // request notification permission if needed
+  if(state.notify && 'Notification' in window && Notification.permission==='default'){
+    Notification.requestPermission().then(p=>{
+      if(p!=='granted'){ state.notify=false; save(); syncSettingsUI(); }
+    });
+  }
+  timer.running=true;
+  updateStartBtn(); updateDisplay();
+  timer.tickId=setInterval(tick,1000);
+}
+
+function pauseTimer(){
+  timer.running=false;
+  clearInterval(timer.tickId); timer.tickId=null;
+  updateStartBtn(); updateDisplay();
+}
+
+function resetTimer(){
+  pauseTimer();
+  timer.remaining=timer.total;
+  updateDisplay(); updateRing(); updateStartBtn();
+}
+
+function skipTimer(){
+  pauseTimer();
+  // log as skipped? No, just move to next without logging
+  if(timer.mode==='work'){
+    const needLong = (timer.completedInCycle+1) >= state.interval;
+    // treat skip as not counting toward cycle
+    const next = needLong ? 'longBreak' : 'shortBreak';
+    // don't increment completedInCycle on skip
+    switchMode(next,false);
+  } else {
+    if(timer.mode==='longBreak') timer.completedInCycle=0;
+    switchMode('work',false);
+  }
+  updateDots();
+}
+
+// events
+els.startBtn.onclick=()=>{
+  if(timer.running) pauseTimer();
+  else startTimer();
+};
+els.resetBtn.onclick=resetTimer;
+els.skipBtn.onclick=skipTimer;
+
+document.querySelectorAll('.mode-pill').forEach(b=>{
+  b.onclick=()=>{
+    const m=b.dataset.mode;
+    if(m===timer.mode) return;
+    pauseTimer();
+    switchMode(m,false);
+  };
+});
+
+function toggleSetting(key){
+  state[key]=!state[key];
+  if(key==='notify' && state.notify && 'Notification' in window && Notification.permission==='default'){
+    Notification.requestPermission().then(p=>{
+      if(p!=='granted'){ state.notify=false; save(); syncSettingsUI(); alert('Notifications blocked in browser settings.'); }
+      else { save(); syncSettingsUI(); }
+    });
+  } else {
+    save(); syncSettingsUI();
+  }
+  if(!timer.running){
+    // if durations changed via preset, already handled
+  }
+}
+els.soundSwitch.onclick=()=>toggleSetting('sound');
+els.notifySwitch.onclick=()=>toggleSetting('notify');
+els.autoSwitch.onclick=()=>toggleSetting('autoBreak');
+els.setAutoBreak.onclick=()=>toggleSetting('autoBreak');
+els.setAutoWork.onclick=()=>toggleSetting('autoWork');
+els.setSound.onclick=()=>toggleSetting('sound');
+els.setNotify.onclick=()=>toggleSetting('notify');
+
+// steppers
+document.querySelectorAll('.stepper button').forEach(btn=>{
+  btn.onclick=()=>{
+    const field=btn.dataset.step;
+    const dir=parseInt(btn.dataset.dir,10);
+    if(field==='interval'){
+      let v=state.interval+dir;
+      v=Math.max(1, Math.min(8, v));
+      state.interval=v;
+    } else {
+      let v=state[field]+dir;
+      v=Math.max(1, Math.min(120, v));
+      state[field]=v;
+      // if current mode matches, update total/remaining if not running and at full
+      if(timer.mode===field && !timer.running && timer.remaining===timer.total){
+        timer.total=v*60; timer.remaining=v*60;
+      } else if(timer.mode===field && !timer.running){
+        timer.total=v*60;
+      }
+    }
+    // mark preset as custom if diverges
+    const p=PRESETS[state.preset];
+    if(p && (state.work!==p.work || state.shortBreak!==p.shortBreak || state.longBreak!==p.longBreak || state.interval!==p.interval)){
+      state.preset='custom';
+    }
+    save(); syncSettingsUI(); renderPresets();
+    updateRing(); updateDisplay(); updateDots();
+  };
+});
+
+document.getElementById('clearLog').onclick=()=>{
+  if(!state.history.length) return;
+  if(confirm('Clear all session history?')){
+    state.history=[]; save(); renderLog(); renderStats();
+  }
+};
+
+// drawer
+const openDrawer=()=>{
+  els.overlay.classList.add('open');
+  els.drawer.classList.add('open');
+};
+const closeDrawer=()=>{
+  els.overlay.classList.remove('open');
+  els.drawer.classList.remove('open');
+};
+document.getElementById('openSettings').onclick=openDrawer;
+document.getElementById('closeSettings').onclick=closeDrawer;
+document.getElementById('saveSettings').onclick=closeDrawer;
+els.overlay.onclick=closeDrawer;
+
+// keyboard
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'){ e.preventDefault(); els.startBtn.click(); }
+  if(e.key==='r' || e.key==='R') resetTimer();
+  if(e.key==='s' || e.key==='S') skipTimer();
+});
+
+// init
+renderPresets();
+syncSettingsUI();
+switchMode('work', false);
+renderStats();
+renderLog();
+updateRing();
+
+// handle visibility: keep title updated
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden && timer.running){
+    // no-op, interval continues
+  }
+});
+
+// persist on unload
+window.addEventListener('beforeunload', save);
+</script>
+</body>
+</html>

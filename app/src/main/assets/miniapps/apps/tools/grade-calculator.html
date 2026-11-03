@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GradePilot Calculator</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#0e1420;color:#eef3ff}
+.wrap{max-width:430px;margin:0 auto;padding:16px 16px 40px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:22px;margin:0}
+.mutebtn{min-width:44px;min-height:44px;border-radius:12px;background:#182234;color:#fff;font-size:19px;cursor:pointer;border:1px solid #2a3a55}
+.hero{background:#182234;border:1px solid #2a3a55;border-radius:18px;padding:18px;text-align:center;margin:12px 0}
+.hero .g{font-size:52px;font-weight:800;font-variant-numeric:tabular-nums}
+.hero .w{font-size:13px;opacity:.75}
+.card{background:#182234;border:1px solid #2a3a55;border-radius:16px;padding:14px;margin:12px 0}
+label{font-size:13px;opacity:.85}
+input,select{width:100%;min-height:48px;border-radius:12px;border:1px solid #2a3a55;background:#0e1420;color:#fff;font-size:16px;padding:0 12px;margin:4px 0 8px}
+.row3{display:flex;gap:8px}.row3 div{flex:1;min-width:0}
+button.add{width:100%;min-height:52px;border-radius:14px;border:none;background:#60a5fa;color:#0b1a33;font-size:17px;font-weight:800;cursor:pointer}
+.cat{background:#0e1420;border:1px solid #2a3a55;border-radius:12px;padding:10px 12px;margin:8px 0}
+.cat .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.cat b{font-size:16px}
+.del{min-width:44px;min-height:44px;border-radius:10px;border:1px solid #5b2323;background:transparent;color:#f87171;font-size:16px;cursor:pointer}
+input[type=range]{width:100%;min-height:44px;accent-color:#60a5fa;padding:0;margin:4px 0}
+.whatif{background:#0e1420;border:1px dashed #60a5fa;border-radius:12px;padding:12px;margin-top:10px;font-size:14px}
+.empty{text-align:center;opacity:.65;padding:14px;font-size:14px}
+h2{font-size:16px;margin:4px 0 8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>GradePilot</h1><button class="mutebtn" id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="hero"><div class="g" id="gradeTxt">–</div><div class="w" id="weightTxt">weighted grade</div></div>
+<div class="card">
+<h2>Add category</h2>
+<label for="nameIn">Category</label><input id="nameIn" maxlength="24" placeholder="e.g. Homework">
+<div class="row3">
+<div><label for="wtIn">Weight %</label><input id="wtIn" type="number" min="1" max="100" value="25"></div>
+<div><label for="scIn">Score %</label><input id="scIn" type="number" min="0" max="100" value="85"></div>
+</div>
+<button class="add" id="addBtn">Add category</button>
+<div id="list"></div>
+</div>
+<div class="card">
+<h2>What-if slider</h2>
+<label for="wiSel">Try a different score for</label><select id="wiSel"></select>
+<label for="wiRange">Score: <span id="wiVal">85</span>%</label>
+<input type="range" id="wiRange" min="0" max="100" value="85">
+<div class="whatif" id="wiOut">Add a category to try what-if scores.</div>
+</div>
+<div class="card">
+<h2>Final exam estimator</h2>
+<div class="row3">
+<div><label for="targetIn">Target grade %</label><input id="targetIn" type="number" min="0" max="100" value="90"></div>
+<div><label for="finalWtIn">Final weight %</label><input id="finalWtIn" type="number" min="1" max="100" value="30"></div>
+</div>
+<button class="add" id="needBtn">What do I need?</button>
+<div class="whatif" id="needOut">Enter a target and the final weight, then tap above.</div>
+</div>
+</div>
+<script>
+(function(){
+"use strict";
+var K="grade-calculator-v1",MK="grade-calculator-mute";
+var cats=[];try{cats=JSON.parse(localStorage.getItem(K)||"[]");if(!Array.isArray(cats))cats=[];}catch(e){cats=[];}
+var muted=localStorage.getItem(MK)==="1",AC=null;
+var muteBtn=document.getElementById("muteBtn");
+function click(f){if(muted)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume();var o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.frequency.value=f||700;var t=AC.currentTime;g.gain.setValueAtTime(0.07,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.07);o.start(t);o.stop(t+0.07);}catch(e){}}
+function save(){localStorage.setItem(K,JSON.stringify(cats));}
+muteBtn.textContent=muted?"🔇":"🔊";
+muteBtn.addEventListener("click",function(){muted=!muted;localStorage.setItem(MK,muted?"1":"0");muteBtn.textContent=muted?"🔇":"🔊";click(700);});
+function gradeOf(list){var w=list.reduce(function(a,c){return a+(+c.wt||0);},0);if(w<=0)return null;var s=list.reduce(function(a,c){return a+(+c.wt||0)*(+c.score||0);},0)/w;return {g:s,w:w};}
+function render(){
+var r=gradeOf(cats);
+document.getElementById("gradeTxt").textContent=r===null?"–":r.g.toFixed(1)+"%";
+document.getElementById("weightTxt").textContent=r===null?"weighted grade (add categories)":"weights total "+r.w+"%"+(r.w!==100?" — scaled to 100":"");
+var list=document.getElementById("list");
+list.innerHTML=cats.length?"":'<div class="empty">No categories yet. Add homework, quizzes, exams…</div>';
+cats.forEach(function(c,i){
+var d=document.createElement("div");d.className="cat";
+var t=document.createElement("div");t.className="top";
+var b=document.createElement("b");b.textContent=c.name+" · "+c.score+"% × "+c.wt+"%";t.appendChild(b);
+var del=document.createElement("button");del.className="del";del.textContent="✕";del.setAttribute("aria-label","Delete category");
+del.addEventListener("click",function(){if(confirm("Delete "+cats[i].name+"?")){click(440);cats.splice(i,1);save();render();}});
+t.appendChild(del);d.appendChild(t);list.appendChild(d);
+});
+var sel=document.getElementById("wiSel");sel.innerHTML="";
+cats.forEach(function(c,i){var o=document.createElement("option");o.value=i;o.textContent=c.name;sel.appendChild(o);});
+whatif();
+}
+function whatif(){
+var out=document.getElementById("wiOut");
+if(!cats.length){out.textContent="Add a category to try what-if scores.";return;}
+var i=+document.getElementById("wiSel").value||0;if(i>=cats.length)i=0;
+var v=+document.getElementById("wiRange").value;
+document.getElementById("wiVal").textContent=v;
+var copy=cats.map(function(c){return {wt:c.wt,score:c.score};});copy[i].score=v;
+var r=gradeOf(copy);
+out.textContent="If "+cats[i].name+" were "+v+"%, your grade would be "+r.g.toFixed(1)+"% (now "+gradeOf(cats).g.toFixed(1)+"%).";
+}
+document.getElementById("addBtn").addEventListener("click",function(){
+var n=document.getElementById("nameIn").value.trim()||"Category";
+var w=Math.min(100,Math.max(1,+document.getElementById("wtIn").value||25));
+var s=Math.min(100,Math.max(0,+document.getElementById("scIn").value||0));
+click(880);cats.push({name:n.slice(0,24),wt:w,score:s});
+document.getElementById("nameIn").value="";save();render();
+});
+document.getElementById("wiSel").addEventListener("change",function(){click(700);var i=+document.getElementById("wiSel").value||0;if(cats[i])document.getElementById("wiRange").value=cats[i].score;whatif();});
+document.getElementById("wiRange").addEventListener("input",whatif);
+document.getElementById("needBtn").addEventListener("click",function(){
+click(880);
+var target=+document.getElementById("targetIn").value,fw=+document.getElementById("finalWtIn").value;
+var out=document.getElementById("needOut");
+if(!(fw>0&&fw<100)){out.textContent="Final weight must be between 1 and 99.";return;}
+var r=gradeOf(cats);
+if(r===null){out.textContent="Add your current categories first.";return;}
+var cur=r.g*(r.w/100),need=(target-cur*(1-fw/100))/(fw/100);
+if(need>100)out.textContent="You would need "+need.toFixed(1)+"% on the final — above 100. Adjust your target.";
+else if(need<0)out.textContent="You already have the target locked in, even with 0% on the final.";
+else out.textContent="You need "+need.toFixed(1)+"% on the final (worth "+fw+"%) to finish at "+target+"%.";
+});
+render();
+})();
+</script>
+</body>
+</html>

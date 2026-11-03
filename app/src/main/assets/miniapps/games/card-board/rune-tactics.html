@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Galaxy Auto-Battler</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#070A1A;--panel:#11152E;--panel2:#1A1F45;--accent:#7B5CFF;--accent2:#00E5FF;--gold:#FFC93C;--hp:#FF3B6B;--text:#E6E8FF;--muted:#8A8FC0;--border:#2A2F6B;--success:#00E676;--danger:#FF5252}
+body{font-family:Inter,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);max-width:428px;margin:0 auto;min-height:100vh;overflow-x:hidden}
+.bg{position:fixed;inset:0;z-index:-1;background:radial-gradient(ellipse at 20% 10%, #1A1F6B 0%, transparent 50%),radial-gradient(ellipse at 80% 90%, #4A1A6B 0%, transparent 50%),radial-gradient(ellipse at 50% 50%, #0B0E2A 0%, #070A1A 100%)}
+.bg::after{content:"";position:absolute;inset:0;background-image:radial-gradient(1px 1px at 20% 30%, #fff 100%, transparent),radial-gradient(1px 1px at 40% 70%, #fff 100%, transparent),radial-gradient(1.5px 1.5px at 90% 40%, #fff 100%, transparent),radial-gradient(1px 1px at 65% 20%, #fff 100%, transparent),radial-gradient(1px 1px at 10% 80%, #fff 100%, transparent);opacity:.35}
+.header{position:sticky;top:0;z-index:20;background:rgba(7,10,26,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:8px 10px}
+.hrow{display:flex;gap:6px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.pill{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:13px;font-weight:700;min-height:36px}
+.pill.gold{color:var(--gold);border-color:#5A4A1A}
+.pill.hp{color:#FF8FA8}
+.pill.xp{color:var(--accent2)}
+.btn{border:none;border-radius:12px;padding:10px 14px;font-weight:800;font-size:13px;cursor:pointer;min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:.15s}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#5A3DFF);color:#fff;box-shadow:0 4px 16px rgba(123,92,255,.4)}
+.btn-gold{background:linear-gradient(135deg,#FFC93C,#FF8C00);color:#1A1200}
+.btn-ghost{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+.btn-small{padding:8px 10px;font-size:12px;min-height:36px}
+.btn:disabled{opacity:.45;pointer-events:none}
+.tabs{display:flex;gap:6px;margin-top:8px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1;min-width:68px;background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:10px;padding:10px 6px;font-size:12px;font-weight:800;text-align:center;cursor:pointer;min-height:44px}
+.tab.active{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 4px 12px rgba(123,92,255,.4)}
+.main{padding:10px 10px 90px}
+.card{background:linear-gradient(180deg,rgba(26,31,69,.95),rgba(17,21,46,.98));border:1px solid var(--border);border-radius:16px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.card h3{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.shop-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(min-width:380px){.shop-grid{grid-template-columns:1fr 1fr 1fr}}
+.shop-card{background:var(--panel2);border:1px solid var(--border);border-radius:14px;padding:8px;text-align:center;position:relative;overflow:hidden}
+.shop-card .cost{position:absolute;top:6px;right:6px;background:var(--gold);color:#1A1200;font-weight:900;font-size:11px;padding:2px 6px;border-radius:999px}
+.hero-icon{width:48px;height:48px;border-radius:12px;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid rgba(255,255,255,.15)}
+.hero-name{font-size:12px;font-weight:800;line-height:1.1}
+.hero-traits{font-size:10px;color:var(--muted);margin:2px 0}
+.hero-stats{font-size:10px;color:var(--accent2);font-weight:700}
+.stars{color:var(--gold);font-size:10px;letter-spacing:1px}
+.board-wrap{overflow:hidden}
+.board{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;background:rgba(0,0,0,.25);padding:6px;border-radius:12px;border:1px solid var(--border)}
+.cell{aspect-ratio:1;background:radial-gradient(ellipse at 30% 20%, rgba(123,92,255,.25), rgba(17,21,46,.9));border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;min-height:44px;cursor:pointer;transition:.15s}
+.cell.enemy{opacity:.9;background:radial-gradient(ellipse at 30% 20%, rgba(255,59,107,.25), rgba(40,15,30,.9))}
+.cell.selected{outline:2px solid var(--accent2);outline-offset:1px;box-shadow:0 0 12px rgba(0,229,255,.5)}
+.cell .c-icon{font-size:18px;line-height:1}
+.cell .c-name{font-size:7px;font-weight:800;text-align:center;line-height:1;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px}
+.cell .c-hp{position:absolute;bottom:2px;left:3px;right:3px;height:4px;background:rgba(0,0,0,.6);border-radius:999px;overflow:hidden}
+.cell .c-hp i{display:block;height:100%;background:linear-gradient(90deg,var(--success),#00C853);transition:width .3s}
+.cell .c-star{position:absolute;top:2px;left:4px;font-size:8px;color:var(--gold)}
+.cell .c-cost{position:absolute;top:2px;right:4px;font-size:8px;background:var(--gold);color:#000;font-weight:900;padding:1px 3px;border-radius:4px}
+.bench{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-top:8px}
+.bench .cell{background:rgba(255,255,255,.06);border-style:dashed}
+.bench-label{font-size:11px;color:var(--muted);font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin:10px 0 6px;display:flex;justify-content:space-between}
+.trait-list{display:flex;flex-wrap:wrap;gap:6px}
+.trait{padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800;border:1px solid var(--border);background:var(--panel2);display:flex;align-items:center;gap:6px}
+.trait.active{background:linear-gradient(135deg,var(--accent),#00B8D4);color:#fff;border-color:transparent;box-shadow:0 4px 12px rgba(123,92,255,.3)}
+.trait .cnt{background:rgba(0,0,0,.3);padding:2px 6px;border-radius:999px;font-size:10px}
+.commanders{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cmd{padding:10px;border-radius:14px;border:2px solid var(--border);background:var(--panel2);cursor:pointer;text-align:left}
+.cmd.active{border-color:var(--accent2);background:linear-gradient(135deg,rgba(0,229,255,.15),rgba(123,92,255,.15));box-shadow:0 4px 16px rgba(0,229,255,.2)}
+.cmd b{font-size:12px;display:block}
+.cmd span{font-size:11px;color:var(--muted);line-height:1.3}
+.gear-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.gear{padding:8px;border-radius:12px;background:var(--panel2);border:1px solid var(--border);text-align:center;cursor:pointer}
+.gear.owned{border-color:var(--gold);background:rgba(255,201,60,.12)}
+.gear .g-icon{font-size:20px}
+.gear b{font-size:11px;display:block;margin:4px 0 2px}
+.gear span{font-size:10px;color:var(--muted)}
+.battle-log{max-height:120px;overflow:auto;background:rgba(0,0,0,.3);border-radius:10px;padding:8px;font-size:11px;line-height:1.5;color:#C5CAFF;border:1px solid var(--border)}
+.battle-log b{color:var(--gold)}
+.progress{height:8px;background:rgba(255,255,255,.1);border-radius:999px;overflow:hidden}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .4s}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal.open{display:flex}
+.modal-card{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:16px;width:100%;max-width:400px;max-height:90vh;overflow:auto}
+.input{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:12px;font-size:13px;min-height:44px}
+.row{display:flex;gap:8px;align-items:center}
+.row .btn{flex:1}
+.kbd{font-size:10px;background:rgba(255,255,255,.1);padding:2px 6px;border-radius:6px}
+.divider{height:1px;background:var(--border);margin:10px 0}
+.hint{font-size:11px;color:var(--muted);line-height:1.4}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<header class="header">
+  <div class="hrow">
+    <div class="pill gold">🪙 <span id="gold">30</span></div>
+    <div class="pill hp">❤ <span id="hp">20</span>/20</div>
+    <div class="pill">⚔ Round <span id="round">1</span>/12</div>
+    <div class="pill xp">⭐ Lv <span id="lvl">1</span> <span id="xpText" style="font-size:10px;color:var(--muted)">0/4</span></div>
+  </div>
+  <div class="hrow" style="margin-top:8px">
+    <button class="btn btn-ghost btn-small" onclick="app.buyXP()">Buy XP 4🪙</button>
+    <button class="btn btn-ghost btn-small" onclick="app.refreshShop()">Refresh 2🪙</button>
+    <button class="btn btn-ghost btn-small" id="lockBtn" onclick="app.toggleLock()">🔓 Lock</button>
+    <button class="btn btn-primary btn-small" onclick="app.battle()">⚔ FIGHT</button>
+  </div>
+  <div class="progress" style="margin-top:8px"><i id="xpBar" style="width:0%"></i></div>
+  <div class="tabs">
+    <div class="tab active" data-tab="shop" onclick="app.tab('shop')">Shop</div>
+    <div class="tab" data-tab="board" onclick="app.tab('board')">Board</div>
+    <div class="tab" data-tab="traits" onclick="app.tab('traits')">Bonds</div>
+    <div class="tab" data-tab="gear" onclick="app.tab('gear')">Gear</div>
+    <div class="tab" data-tab="save" onclick="app.tab('save')">Save</div>
+  </div>
+</header>
+<main class="main">
+  <section id="view-shop" class="card">
+    <h3>🛒 Starport Shop <span class="kbd" id="shopInfo">Lv1 odds</span></h3>
+    <div id="shopGrid" class="shop-grid"></div>
+    <div class="divider"></div>
+    <div class="row">
+      <button class="btn btn-ghost" onclick="app.refreshShop()">🔄 Refresh</button>
+      <button class="btn btn-gold" onclick="app.battle()">▶ Battle Next</button>
+    </div>
+    <p class="hint" style="margin-top:8px">Buy 3 copies of same hero to ⭐ up. Stars stack HP +60% and ATK +50%. Bench holds 8. Board is 8 columns × 4 rows.</p>
+  </section>
+  <section id="view-board" class="card" style="display:none">
+    <h3>♟ Deployment <span style="font-size:11px;color:var(--accent2)" id="boardCount">0/4 deployed</span></h3>
+    <div class="board-wrap">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px;letter-spacing:.06em">ENEMY HALF (preview) — YOUR HALF ↓</div>
+      <div id="board" class="board"></div>
+      <div class="bench-label"><span>Bench (tap hero → tap board)</span><button class="btn btn-ghost btn-small" style="min-height:28px;padding:4px 8px" onclick="app.sellMode=!app.sellMode;app.renderBoard();app.toast(app.sellMode?'Sell mode: tap hero to sell':'Sell off')">💰 <span id="sellLabel">Sell</span></button></div>
+      <div id="bench" class="bench"></div>
+    </div>
+    <div class="divider"></div>
+    <div class="row">
+      <button class="btn btn-ghost" onclick="app.autoDeploy()">✨ Auto</button>
+      <button class="btn btn-ghost" onclick="app.clearBoard()">Clear</button>
+      <button class="btn btn-primary" onclick="app.battle()">⚔ Fight</button>
+    </div>
+    <div id="selectedInfo" class="hint" style="margin-top:8px;background:rgba(123,92,255,.12);padding:8px;border-radius:10px;display:none"></div>
+  </section>
+  <section id="view-traits" class="card" style="display:none">
+    <h3>🔗 Trait Bonds</h3>
+    <div id="traitList" class="trait-list"></div>
+    <div class="divider"></div>
+    <h3>👑 Commander</h3>
+    <div id="commanderList" class="commanders"></div>
+    <p class="hint" style="margin-top:8px">Commander bonus applies all season. Change anytime before battle.</p>
+  </section>
+  <section id="view-gear" class="card" style="display:none">
+    <h3>⚙️ Gear Foundry <span style="font-size:11px;color:var(--gold)" id="gearGold">Earn gear every 3 wins</span></h3>
+    <div id="gearGrid" class="gear-grid"></div>
+    <div class="divider"></div>
+    <p class="hint">Tap gear → tap a deployed hero to equip. Each hero holds 1 gear.</p>
+    <div id="gearAssignHint" class="hint" style="margin-top:6px;color:var(--accent2);font-weight:700"></div>
+  </section>
+  <section id="view-save" class="card" style="display:none">
+    <h3>💾 Season Progress</h3>
+    <div class="row" style="margin-bottom:8px">
+      <div class="pill" style="flex:1">🏆 Wins <b id="wins">0</b></div>
+      <div class="pill" style="flex:1">💀 Losses <b id="losses">0</b></div>
+      <div class="pill" style="flex:1">🔥 Streak <b id="streak">0</b></div>
+    </div>
+    <div class="progress" style="margin-bottom:8px"><i id="seasonBar" style="width:8%"></i></div>
+    <p class="hint" id="seasonHint">Season 1 — Reach round 12 to claim Galaxy Crown.</p>
+    <div class="divider"></div>
+    <label style="font-size:12px;font-weight:800;color:var(--muted)">Export Save Code</label>
+    <textarea id="saveCode" class="input" rows="3" readonly placeholder="Your code appears here" style="margin:6px 0;font-family:monospace;font-size:11px"></textarea>
+    <div class="row">
+      <button class="btn btn-ghost" onclick="app.exportSave()">📋 Copy Code</button>
+      <button class="btn btn-primary" onclick="app.saveNow()">💾 Save</button>
+    </div>
+    <div class="divider"></div>
+    <label style="font-size:12px;font-weight:800;color:var(--muted)">Import Save Code</label>
+    <textarea id="importCode" class="input" rows="3" placeholder="Paste code here" style="margin:6px 0;font-family:monospace;font-size:11px"></textarea>
+    <div class="row">
+      <button class="btn btn-ghost" onclick="app.importSave()">⬇ Import</button>
+      <button class="btn btn-ghost" onclick="app.resetSeason()" style="color:var(--danger)">Reset Season</button>
+    </div>
+    <p class="hint" style="margin-top:8px">Progress auto-saves to this device. Export code to move to another phone.</p>
+  </section>
+  <section id="view-battle" class="card" style="display:none">
+    <h3>⚔ Battle — Round <span id="battleRound">1</span> <span id="battleResult" style="margin-left:6px"></span></h3>
+    <div id="battleBoard" class="board" style="margin:8px 0"></div>
+    <div class="battle-log" id="battleLog"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn btn-ghost" onclick="app.closeBattle()">Back</button>
+      <button class="btn btn-primary" id="nextRoundBtn" onclick="app.nextRound()">Next Round →</button>
+    </div>
+  </section>
+</main>
+<div id="toast" style="position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(80px);background:#1A1F45;border:1px solid var(--accent);color:#fff;padding:10px 16px;border-radius:999px;font-size:13px;font-weight:700;transition:.3s;z-index:60;max-width:90%;text-align:center;pointer-events:none;opacity:0">toast</div>
+<div id="heroModal" class="modal" onclick="if(event.target===this)app.closeModal()">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <b id="modalTitle">Hero</b>
+      <button class="btn btn-ghost btn-small" onclick="app.closeModal()">✕</button>
+    </div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+<script>
+const HEROES=[
+  {id:'nova',name:'Nova',icon:'🌟',cost:1,traits:['Void','Sniper'],hp:600,atk:55,range:3,aspd:0.8,ability:'Void Ray: +40% dmg to farthest enemy'},
+  {id:'titan',name:'Titan',icon:'🗿',cost:1,traits:['Vanguard','Bruiser'],hp:900,atk:40,range:1,aspd:0.6,ability:'Shield Wall: +30 armor 4s'},
+  {id:'ember',name:'Ember',icon:'🔥',cost:1,traits:['Ember','Duelist'],hp:650,atk:50,range:1,aspd:0.9,ability:'Flame Slash: burn 60 dmg/s'},
+  {id:'frost',name:'Frost',icon:'❄️',cost:1,traits:['Frost','Psion'],hp:550,atk:45,range:2,aspd:0.75,ability:'Freeze: stun 1.2s'},
+  {id:'mech',name:'Mech-01',icon:'🤖',cost:2,traits:['Mech','Vanguard'],hp:850,atk:60,range:1,aspd:0.7,ability:'Overcharge: +50% atk 3s'},
+  {id:'psion',name:'Psion',icon:'🔮',cost:2,traits:['Psion','Void'],hp:600,atk:65,range:3,aspd:0.85,ability:'Mind Blast: AoE 120'},
+  {id:'viper',name:'Viper',icon:'🐍',cost:2,traits:['Ember','Sniper'],hp:620,atk:70,range:3,aspd:0.8,ability:'Venom: -30% heal'},
+  {id:'glacier',name:'Glacier',icon:'🧊',cost:2,traits:['Frost','Bruiser'],hp:950,atk:45,range:1,aspd:0.6,ability:'Ice Armor: +400 shield'},
+  {id:'pulse',name:'Pulse',icon:'⚡',cost:3,traits:['Mech','Psion'],hp:700,atk:80,range:2,aspd:0.9,ability:'EMP: silence 2s'},
+  {id:'draco',name:'Draco',icon:'🐉',cost:3,traits:['Ember','Bruiser'],hp:1100,atk:65,range:1,aspd:0.65,ability:'Dragon Breath: cone 180'},
+  {id:'spectre',name:'Spectre',icon:'👻',cost:3,traits:['Void','Duelist'],hp:680,atk:85,range:1,aspd:1.0,ability:'Phase: dodge 2s'},
+  {id:'warden',name:'Warden',icon:'🛡️',cost:3,traits:['Vanguard','Frost'],hp:1000,atk:55,range:1,aspd:0.6,ability:'Taunt: force attack'},
+  {id:'eclipse',name:'Eclipse',icon:'🌑',cost:4,traits:['Void','Ember'],hp:800,atk:95,range:2,aspd:0.85,ability:'Black Hole: pull + 200 AoE'},
+  {id:'omega',name:'Omega',icon:'Ω',cost:4,traits:['Mech','Sniper'],hp:750,atk:110,range:4,aspd:0.75,ability:'Orbital: 300 true dmg'},
+  {id:'aurora',name:'Aurora',icon:'🌌',cost:4,traits:['Frost','Psion'],hp:700,atk:90,range:3,aspd:0.8,ability:'Blizzard: slow 40%'},
+  {id:'colossus',name:'Colossus',icon:'🏔️',cost:5,traits:['Vanguard','Bruiser'],hp:1400,atk:100,range:1,aspd:0.55,ability:'Quake: stun all 1s'},
+  {id:'seraph',name:'Seraph',icon:'👼',cost:5,traits:['Psion','Duelist'],hp:850,atk:120,range:2,aspd:1.0,ability:'Divine: heal 35% HP'},
+  {id:'abyss',name:'Abyss',icon:'🕳️',cost:5,traits:['Void','Bruiser'],hp:1200,atk:110,range:1,aspd:0.7,ability:'Devour: execute <20% HP'},
+];
+const TRAITS={
+  Void:{icon:'🌌',levels:[3,6],desc:'3: +15% true dmg | 6: +35% true dmg'},
+  Mech:{icon:'🤖',levels:[2,4,6],desc:'2: +20 armor | 4: +45 armor | 6: +80 armor + regen'},
+  Ember:{icon:'🔥',levels:[3,6],desc:'3: +25% atk | 6: +55% atk + burn'},
+  Frost:{icon:'❄️',levels:[2,4],desc:'2: +20% HP | 4: +40% HP + slow'},
+  Vanguard:{icon:'🛡️',levels:[2,4],desc:'2: +25 armor | 4: +60 armor'},
+  Sniper:{icon:'🎯',levels:[2,4],desc:'2: +20% range dmg | 4: +45%'},
+  Psion:{icon:'🔮',levels:[3,6],desc:'3: +20 mana | 6: +50 mana + spell power'},
+  Bruiser:{icon:'💪',levels:[2,4],desc:'2: +300 HP | 4: +700 HP'},
+  Duelist:{icon:'⚔️',levels:[2,4],desc:'2: +30% aspd | 4: +70% aspd'},
+};
+const COMMANDERS=[
+  {id:'admiral',name:'Admiral Kael',icon:'👨‍🚀',desc:'+1 team size at Lv5. +5 gold start.',bonus:{gold:5,teamBonusAt5:1}},
+  {id:'oracle',name:'Oracle Lyra',icon:'🧙‍♀️',desc:'Shop refresh 1🪙 cheaper. +10% trait power.',bonus:{refreshDiscount:1,traitMult:1.1}},
+  {id:'forge',name:'Forge Master',icon:'🔨',desc:'Start with random gear. Gear +15% stronger.',bonus:{startGear:1,gearMult:1.15}},
+  {id:'voidlord',name:'Void Lord',icon:'👁️',desc:'Void trait needs 1 fewer. +1 reroll lock.',bonus:{voidMinus1:true}},
+];
+const GEAR=[
+  {id:'blade',name:'Star Blade',icon:'🗡️',desc:'+40 ATK',stat:{atk:40}},
+  {id:'shield',name:'Nebula Shield',icon:'🛡️',desc:'+400 HP',stat:{hp:400}},
+  {id:'boots',name:'Warp Boots',icon:'👢',desc:'+35% ASPD',stat:{aspd:0.35}},
+  {id:'scope',name:'Void Scope',icon:'🔭',desc:'+2 Range',stat:{range:2}},
+  {id:'core',name:'Plasma Core',icon:'🔋',desc:'+60 ATK +200 HP',stat:{atk:60,hp:200}},
+  {id:'cloak',name:'Phase Cloak',icon:'🥷',desc:'Dodge 20% +30 ATK',stat:{atk:30,dodge:0.2}},
+];
+const LEVEL_XP=[0,4,8,14,22,32,44,60,80];
+const SHOP_ODDS=[
+  {1:[100,0,0,0,0]},
+  {1:[100,0,0,0,0]},
+  {1:[75,25,0,0,0]},
+  {1:[55,30,15,0,0]},
+  {1:[45,33,20,2,0]},
+  {1:[30,40,25,5,0]},
+  {1:[19,30,35,15,1]},
+  {1:[14,20,35,25,6]},
+  {1:[10,15,30,30,15]},
+];
+const MAX_ROUND=12;
+let state={
+  gold:30,hp:20,round:1,level:1,xp:0,shop:[],shopLocked:false,
+  bench:[],board:Array(32).fill(null),
+  wins:0,losses:0,streak:0,commander:'admiral',gearOwned:[],pendingGear:null,
+  selected:null,sellMode:false
+};
+function encodeSave(obj){
+  const json=JSON.stringify(obj);
+  return btoa(unescape(encodeURIComponent(json)));
+}
+function decodeSave(code){
+  const json=decodeURIComponent(escape(atob(code)));
+  return JSON.parse(json);
+}
+const app={
+  init(){
+    const saved=localStorage.getItem('galaxy_autobattler_v2');
+    if(saved){ try{ const p=decodeSave(saved); Object.assign(state,p); }catch(e){} }
+    if(!state.board||state.board.length!==32) state.board=Array(32).fill(null);
+    if(!state.bench) state.bench=[];
+    if(!state.gearOwned) state.gearOwned=[];
+    if(state.commander==='admiral' && state.gold===30 && state.round===1 && state.wins===0){
+      // give admiral bonus only once at start - already 30, add 5 if fresh
+      // avoid double add on reload: check flag
+      if(!localStorage.getItem('galaxy_admiral_bonus')){
+        state.gold+=5;
+        localStorage.setItem('galaxy_admiral_bonus','1');
+      }
+    }
+    if(!state.shop || state.shop.length===0) this.refreshShop(true);
+    this.renderAll();
+    this.tab('shop');
+  },
+  saveNow(){
+    const code=encodeSave(state);
+    localStorage.setItem('galaxy_autobattler_v2',code);
+    document.getElementById('saveCode').value=code;
+    this.toast('Season saved ✓');
+  },
+  exportSave(){
+    const code=encodeSave(state);
+    document.getElementById('saveCode').value=code;
+    if(navigator.clipboard) navigator.clipboard.writeText(code).catch(()=>{});
+    this.toast('Code copied to clipboard');
+  },
+  importSave(){
+    const code=document.getElementById('importCode').value.trim();
+    if(!code) return this.toast('Paste a code first');
+    try{
+      const p=decodeSave(code);
+      Object.assign(state,p);
+      if(!state.board||state.board.length!==32) state.board=Array(32).fill(null);
+      localStorage.setItem('galaxy_autobattler_v2',code);
+      this.renderAll();
+      this.toast('Season imported ✓');
+    }catch(e){ this.toast('Invalid code'); }
+  },
+  resetSeason(){
+    if(!confirm('Reset season? Progress lost.')) return;
+    const cmd=state.commander;
+    state={gold:30,hp:20,round:1,level:1,xp:0,shop:[],shopLocked:false,bench:[],board:Array(32).fill(null),wins:0,losses:0,streak:0,commander:cmd,gearOwned:[],pendingGear:null,selected:null,sellMode:false};
+    if(state.commander==='admiral') state.gold+=5;
+    if(state.commander==='forge'){ const g=GEAR[Math.floor(Math.random()*GEAR.length)]; state.gearOwned.push(g.id); }
+    localStorage.removeItem('galaxy_admiral_bonus');
+    this.refreshShop(true);
+    this.renderAll();
+    this.saveNow();
+  },
+  tab(name){
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+    ['shop','board','traits','gear','save','battle'].forEach(v=>{
+      const el=document.getElementById('view-'+v);
+      if(el) el.style.display = v===name ? 'block' : 'none';
+    });
+    if(name==='board') this.renderBoard();
+    if(name==='traits') this.renderTraits();
+    if(name==='gear') this.renderGear();
+    if(name==='save') this.renderSave();
+    if(name==='shop') this.renderShop();
+  },
+  renderAll(){
+    document.getElementById('gold').textContent=state.gold;
+    document.getElementById('hp').textContent=state.hp;
+    document.getElementById('round').textContent=state.round;
+    document.getElementById('lvl').textContent=state.level;
+    document.getElementById('xpText').textContent=`${state.xp}/${LEVEL_XP[state.level]||'MAX'}`;
+    document.getElementById('xpBar').style.width= (LEVEL_XP[state.level]? (state.xp/LEVEL_XP[state.level]*100):100)+'%';
+    document.getElementById('lockBtn').textContent= state.shopLocked ? '🔒 Locked' : '🔓 Lock';
+    document.getElementById('lockBtn').style.background= state.shopLocked ? 'var(--gold)' : '';
+    document.getElementById('lockBtn').style.color= state.shopLocked ? '#000' : '';
+    this.renderShop();
+    this.renderBoard();
+    this.renderTraits();
+    this.renderGear();
+    this.renderSave();
+  },
+  getOdds(){
+    const lvl=Math.min(state.level,9);
+    const entry=SHOP_ODDS[lvl-1];
+    return entry[1];
+  },
+  rollHero(){
+    const odds=this.getOdds();
+    const r=Math.random()*100;
+    let acc=0, tier=1;
+    for(let i=0;i<5;i++){ acc+=odds[i]; if(r<acc){ tier=i+1; break; } }
+    const pool=HEROES.filter(h=>h.cost===tier);
+    return pool[Math.floor(Math.random()*pool.length)];
+  },
+  refreshShop(free=false){
+    if(state.shopLocked && !free) return this.toast('Shop locked — unlock first');
+    const cost= state.commander==='oracle'?1:2;
+    if(!free){
+      if(state.gold<cost) return this.toast('Not enough gold');
+      state.gold-=cost;
+    }
+    state.shop=[];
+    for(let i=0;i<5;i++) state.shop.push(this.rollHero());
+    this.renderAll();
+    if(!free) this.saveNow();
+  },
+  toggleLock(){
+    state.shopLocked=!state.shopLocked;
+    this.renderAll();
+    this.saveNow();
+  },
+  buyXP(){
+    if(state.level>=9) return this.toast('Max level');
+    if(state.gold<4) return this.toast('Need 4🪙');
+    state.gold-=4; state.xp+=4;
+    while(state.level<9 && state.xp>=LEVEL_XP[state.level]){
+      state.xp-=LEVEL_XP[state.level];
+      state.level++;
+      this.toast('Level up! Lv'+state.level);
+    }
+    this.renderAll(); this.saveNow();
+  },
+  buyHero(idx){
+    const hero=state.shop[idx];
+    if(!hero) return;
+    if(state.gold<hero.cost) return this.toast('Need '+hero.cost+'🪙');
+    if(state.bench.length>=8 && !state.board.includes(null)) return this.toast('Bench & board full');
+    state.gold-=hero.cost;
+    const inst={uid:Date.now()+Math.random(),heroId:hero.id,stars:1,gear:null};
+    if(state.bench.length<8) state.bench.push(inst);
+    else {
+      const empty=state.board.findIndex((v,i)=>v===null && i>=16);
+      if(empty!==-1) state.board[empty]=inst; else state.bench.push(inst);
+    }
+    state.shop[idx]=null;
+    this.checkStarUp();
+    this.renderAll(); this.saveNow();
+  },
+  checkStarUp(){
+    const all=[...state.bench,...state.board.filter(Boolean)];
+    const groups={};
+    all.forEach(u=>{ const k=u.heroId+'_'+u.stars; (groups[k]=groups[k]||[]).push(u); });
+    let upgraded=false;
+    for(const k in groups){
+      if(groups[k].length>=3){
+        const star=groups[k][0].stars;
+        if(star>=3) continue;
+        let toRemove=groups[k].slice(0,3);
+        toRemove.forEach(u=>{
+          let bi=state.bench.indexOf(u); if(bi!==-1) state.bench.splice(bi,1);
+          else { let bdi=state.board.indexOf(u); if(bdi!==-1) state.board[bdi]=null; }
+        });
+        const hero=HEROES.find(h=>h.id===groups[k][0].heroId);
+        const upgradedInst={uid:Date.now()+Math.random(),heroId:hero.id,stars:star+1,gear:toRemove.find(x=>x.gear)?.gear||null};
+        state.bench.push(upgradedInst);
+        upgraded=true;
+        this.toast(`⭐ ${hero.name} → ${star+1}★!`);
+      }
+    }
+    if(upgraded) this.checkStarUp();
+  },
+  renderShop(){
+    const grid=document.getElementById('shopGrid');
+    const odds=this.getOdds();
+    document.getElementById('shopInfo').textContent=`Lv${state.level} ${odds.map((o,i)=>o?`$${i+1}:${o}%`:null).filter(Boolean).join(' ')}`;
+    grid.innerHTML='';
+    state.shop.forEach((h,i)=>{
+      if(!h){
+        const d=document.createElement('div'); d.className='shop-card'; d.style.opacity=.4; d.innerHTML='<div style="padding:18px 0;color:var(--muted);font-size:11px">Sold</div>'; grid.appendChild(d); return;
+      }
+      const el=document.createElement('div'); el.className='shop-card'; el.style.borderColor= ['#8A8FC0','#2ECC71','#3498DB','#9B59B6','#FFC93C'][h.cost-1];
+      el.innerHTML=`
+        <div class="cost">${h.cost}🪙</div>
+        <div class="hero-icon" style="background:linear-gradient(135deg,${['#2C3E50','#1ABC9C','#2980B9','#8E44AD','#F39C12'][h.cost-1]},rgba(0,0,0,.4))">${h.icon}</div>
+        <div class="hero-name">${h.name}</div>
+        <div class="hero-traits">${h.traits.join(' • ')}</div>
+        <div class="hero-stats">${h.hp} HP • ${h.atk} ATK</div>
+        <div class="stars">★${h.cost}</div>
+        <button class="btn btn-primary" style="width:100%;margin-top:6px;min-height:36px;font-size:12px">Buy</button>
+      `;
+      el.querySelector('button').onclick=()=>this.buyHero(i);
+      el.onclick=(e)=>{ if(e.target.tagName!=='BUTTON') this.showHero(h); };
+      grid.appendChild(el);
+    });
+  },
+  showHero(h){
+    document.getElementById('modalTitle').textContent=`${h.icon} ${h.name} — ${h.cost}🪙`;
+    document.getElementById('modalBody').innerHTML=`
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${h.traits.map(t=>`<span class="trait active" style="font-size:11px">${TRAITS[t]?.icon||''} ${t}</span>`).join('')}</div>
+      <div class="row" style="margin-bottom:8px"><div class="pill">❤ ${h.hp} HP</div><div class="pill">⚔ ${h.atk} ATK</div><div class="pill">🏹 ${h.range} RNG</div></div>
+      <p style="font-size:12px;color:var(--muted);line-height:1.5">${h.ability}</p>
+      <p style="font-size:11px;color:var(--accent2);margin-top:8px">Combine 3 → ⭐⭐ ( +60% HP, +50% ATK ) → ⭐⭐⭐</p>
+    `;
+    document.getElementById('heroModal').classList.add('open');
+  },
+  closeModal(){ document.getElementById('heroModal').classList.remove('open'); },
+  renderBoard(){
+    const boardEl=document.getElementById('board');
+    const benchEl=document.getElementById('bench');
+    const maxDeploy= this.maxTeamSize();
+    const deployed= state.board.filter(Boolean).length;
+    document.getElementById('boardCount').textContent=`${deployed}/${maxDeploy} deployed`;
+    document.getElementById('sellLabel').textContent= state.sellMode ? 'Exit Sell' : 'Sell';
+    boardEl.innerHTML='';
+    for(let i=0;i<32;i++){
+      const isEnemyRow=i<16;
+      const unit=state.board[i];
+      const cell=document.createElement('div'); cell.className='cell'+(isEnemyRow?' enemy':'');
+      if(state.selected && state.selected.type==='board' && state.selected.idx===i) cell.classList.add('selected');
+      if(unit){
+        const hero=HEROES.find(h=>h.id===unit.heroId);
+        const stars='★'.repeat(unit.stars);
+        cell.innerHTML=`
+          <div class="c-star">${stars}</div>
+          ${unit.gear?`<div style="position:absolute;top:2px;right:18px;font-size:8px">${GEAR.find(g=>g.id===unit.gear)?.icon||''}</div>`:''}
+          <div class="c-cost">${hero.cost}</div>
+          <div class="c-icon">${hero.icon}</div>
+          <div class="c-name">${hero.name}</div>
+          <div class="c-hp"><i style="width:100%"></i></div>
+        `;
+        cell.style.borderColor= ['#8A8FC0','#2ECC71','#3498DB','#9B59B6','#FFC93C'][hero.cost-1];
+      } else {
+        cell.innerHTML=`<span style="font-size:10px;color:var(--muted)">${isEnemyRow?'·':'+'}</span>`;
+        if(isEnemyRow) cell.style.opacity=.35;
+      }
+      cell.onclick=()=>this.clickCell(i);
+      boardEl.appendChild(cell);
+    }
+    benchEl.innerHTML='';
+    for(let i=0;i<8;i++){
+      const unit=state.bench[i];
+      const cell=document.createElement('div'); cell.className='cell';
+      if(state.selected && state.selected.type==='bench' && state.selected.idx===i) cell.classList.add('selected');
+      if(unit){
+        const hero=HEROES.find(h=>h.id===unit.heroId);
+        cell.innerHTML=`
+          <div class="c-star">${'★'.repeat(unit.stars)}</div>
+          <div class="c-cost">${hero.cost}</div>
+          <div class="c-icon">${hero.icon}</div>
+          <div class="c-name">${hero.name}</div>
+        `;
+        cell.style.borderColor= ['#8A8FC0','#2ECC71','#3498DB','#9B59B6','#FFC93C'][hero.cost-1];
+      } else {
+        cell.innerHTML='<span style="font-size:10px;color:var(--muted)">+</span>';
+      }
+      cell.onclick=()=>this.clickBench(i);
+      benchEl.appendChild(cell);
+    }
+    const info=document.getElementById('selectedInfo');
+    if(state.selected){
+      const u= state.selected.type==='bench'? state.bench[state.selected.idx] : state.board[state.selected.idx];
+      if(u){
+        const hero=HEROES.find(h=>h.id===u.heroId);
+        const gear= u.gear? GEAR.find(g=>g.id===u.gear):null;
+        info.style.display='block';
+        info.innerHTML=`<b>${hero.icon} ${hero.name} ${'★'.repeat(u.stars)}</b> — ${hero.traits.join(' • ')} • ${hero.hp} HP • ${hero.atk} ATK • ${hero.ability} ${gear?`<br>Gear: ${gear.icon} ${gear.name} ${gear.desc}`:''} <br><span style="color:var(--muted)">Tap another cell to move • Sell refunds ${hero.cost}🪙</span>`;
+      } else info.style.display='none';
+    } else info.style.display='none';
+  },
+  maxTeamSize(){
+    let base= Math.min(2+Math.floor(state.level/2),6);
+    if(state.commander==='admiral' && state.level>=5) base+=1;
+    return base;
+  },
+  clickCell(idx){
+    if(idx<16) return this.toast('Enemy half — deploy on your side (bottom 2 rows)');
+    const unit=state.board[idx];
+    if(state.sellMode && unit){
+      const hero=HEROES.find(h=>h.id===unit.heroId);
+      state.gold+=hero.cost;
+      if(unit.gear){ state.gearOwned.push(unit.gear); }
+      state.board[idx]=null;
+      this.toast(`Sold ${hero.name} +${hero.cost}🪙`);
+      this.renderAll(); this.saveNow(); return;
+    }
+    if(state.pendingGear){
+      if(unit){
+        if(unit.gear) state.gearOwned.push(unit.gear);
+        unit.gear=state.pendingGear;
+        this.toast(`Equipped ${GEAR.find(g=>g.id===state.pendingGear).name}`);
+        state.pendingGear=null;
+        this.renderAll(); this.saveNow(); return;
+      } else return this.toast('Tap a hero to equip');
+    }
+    if(!state.selected){
+      if(unit) state.selected={type:'board',idx};
+      else return;
+    } else {
+      const src= state.selected;
+      const srcUnit= src.type==='bench'? state.bench[src.idx] : state.board[src.idx];
+      if(!srcUnit){ state.selected=null; this.renderBoard(); return; }
+      if(src.type==='board' && src.idx===idx){ state.selected=null; this.renderBoard(); return; }
+      const destUnit=state.board[idx];
+      if(src.type==='bench'){
+        const deployed=state.board.filter(Boolean).length;
+        if(!destUnit && deployed>=this.maxTeamSize() && srcUnit){
+          this.toast(`Team limit ${this.maxTeamSize()} — level up!`);
+          state.selected=null; this.renderBoard(); return;
+        }
+        state.bench.splice(src.idx,1);
+        if(destUnit) state.bench.splice(src.idx,0,destUnit);
+        state.board[idx]=srcUnit;
+      } else {
+        state.board[src.idx]=destUnit;
+        state.board[idx]=srcUnit;
+      }
+      state.selected=null;
+      this.checkStarUp();
+    }
+    this.renderAll();
+  },
+  clickBench(idx){
+    const unit=state.bench[idx];
+    if(state.sellMode && unit){
+      const hero=HEROES.find(h=>h.id===unit.heroId);
+      state.gold+=hero.cost;
+      if(unit.gear) state.gearOwned.push(unit.gear);
+      state.bench.splice(idx,1);
+      this.toast(`Sold ${hero.name} +${hero.cost}🪙`);
+      this.renderAll(); this.saveNow(); return;
+    }
+    if(state.pendingGear){
+      if(unit){
+        if(unit.gear) state.gearOwned.push(unit.gear);
+        unit.gear=state.pendingGear;
+        this.toast(`Equipped ${GEAR.find(g=>g.id===state.pendingGear).name}`);
+        state.pendingGear=null;
+        this.renderAll(); this.saveNow(); return;
+      } else return this.toast('Tap a hero to equip');
+    }
+    if(!state.selected){
+      if(unit) state.selected={type:'bench',idx};
+      else return;
+    } else {
+      const src=state.selected;
+      const srcUnit= src.type==='bench'? state.bench[src.idx] : state.board[src.idx];
+      if(!srcUnit){ state.selected=null; this.renderBoard(); return; }
+      if(src.type==='bench' && src.idx===idx){ state.selected=null; this.renderBoard(); return; }
+      if(src.type==='bench'){
+        state.bench[src.idx]=unit;
+        state.bench[idx]=srcUnit;
+      } else {
+        const boardUnit=state.board[src.idx];
+        state.board[src.idx]=unit||null;
+        if(unit) state.bench[idx]=boardUnit;
+        else { state.bench.splice(idx,1); state.bench.push(boardUnit); }
+        state.bench=state.bench.filter(Boolean);
+      }
+      state.selected=null;
+    }
+    this.renderAll();
+  },
+  autoDeploy(){
+    const max=this.maxTeamSize();
+    let deployed=state.board.filter(Boolean).length;
+    const sorted=[...state.bench].sort((a,b)=>{
+      const ha=HEROES.find(h=>h.id===a.heroId), hb=HEROES.find(h=>h.id===b.heroId);
+      return (hb.cost*100+hb.atk)-(ha.cost*100+ha.atk);
+    });
+    for(const u of sorted){
+      if(deployed>=max) break;
+      const empty=state.board.findIndex((v,i)=>v===null && i>=16);
+      if(empty===-1) break;
+      const idx=state.bench.indexOf(u);
+      state.bench.splice(idx,1);
+      state.board[empty]=u;
+      deployed++;
+    }
+    this.renderAll(); this.saveNow();
+  },
+  clearBoard(){
+    state.board.forEach((u,i)=>{
+      if(u){
+        if(state.bench.length<8) state.bench.push(u);
+        state.board[i]=null;
+      }
+    });
+    this.renderAll();
+  },
+  renderTraits(){
+    const el=document.getElementById('traitList');
+    const counts={};
+    const all=[...state.bench,...state.board.filter(Boolean)];
+    all.forEach(u=>{
+      const h=HEROES.find(x=>x.id===u.heroId);
+      h.traits.forEach(t=> counts[t]=(counts[t]||0)+1);
+    });
+    if(state.commander==='voidlord' && counts['Void']) counts['Void']+=1;
+    el.innerHTML='';
+    Object.entries(TRAITS).forEach(([name,info])=>{
+      const c=counts[name]||0;
+      const activeLevel= info.levels.filter(l=>c>=l).pop()||0;
+      const isActive=activeLevel>0;
+      const d=document.createElement('div'); d.className='trait'+(isActive?' active':'');
+      d.innerHTML=`<span>${info.icon} ${name}</span> <span class="cnt">${c}</span> ${isActive?`✓ ${activeLevel}`:''}`;
+      d.title=info.desc;
+      d.onclick=()=>this.toast(`${name}: ${info.desc} — You have ${c}`);
+      el.appendChild(d);
+    });
+    const cl=document.getElementById('commanderList');
+    cl.innerHTML='';
+    COMMANDERS.forEach(c=>{
+      const div=document.createElement('div'); div.className='cmd'+(state.commander===c.id?' active':'');
+      div.innerHTML=`<b>${c.icon} ${c.name}</b><span>${c.desc}</span>`;
+      div.onclick=()=>{ state.commander=c.id; this.renderTraits(); this.renderAll(); this.saveNow(); this.toast(`Commander: ${c.name}`); };
+      cl.appendChild(div);
+    });
+  },
+  renderGear(){
+    const grid=document.getElementById('gearGrid');
+    grid.innerHTML='';
+    GEAR.forEach(g=>{
+      const owned=state.gearOwned.includes(g.id);
+      const div=document.createElement('div'); div.className='gear'+(owned?' owned':'');
+      div.innerHTML=`<div class="g-icon">${g.icon}</div><b>${g.name}</b><span>${g.desc}</span><div style="margin-top:6px;font-size:10px;color:${owned?'var(--gold)':'var(--muted)'}">${owned?'Tap to equip':'Locked'}</div>`;
+      div.onclick=()=>{
+        if(!owned) return this.toast('Win battles to earn gear');
+        state.pendingGear=g.id;
+        state.gearOwned=state.gearOwned.filter(x=>x!==g.id);
+        document.getElementById('gearAssignHint').textContent=`✨ ${g.name} ready — go to Board and tap a hero`;
+        this.tab('board');
+        this.renderAll();
+      };
+      grid.appendChild(div);
+    });
+    if(state.pendingGear){
+      document.getElementById('gearAssignHint').textContent=`✨ ${GEAR.find(x=>x.id===state.pendingGear).name} ready — tap a hero on board/bench`;
+    } else document.getElementById('gearAssignHint').textContent='';
+  },
+  renderSave(){
+    document.getElementById('wins').textContent=state.wins;
+    document.getElementById('losses').textContent=state.losses;
+    document.getElementById('streak').textContent=state.streak;
+    document.getElementById('seasonBar').style.width= (state.round/MAX_ROUND*100)+'%';
+    document.getElementById('seasonHint').textContent= state.round>=MAX_ROUND ? '🏆 Galaxy Crown claimed! Reset to start new season.' : `Season 1 — Round ${state.round}/${MAX_ROUND} — ${MAX_ROUND-state.round} battles to Crown.`;
+    if(!document.getElementById('saveCode').value){
+      document.getElementById('saveCode').value=encodeSave(state);
+    }
+  },
+  battle(){
+    const deployed=state.board.filter(Boolean);
+    if(deployed.length===0) return this.toast('Deploy heroes first!');
+    this.tab('battle');
+    document.getElementById('battleRound').textContent=state.round;
+    document.getElementById('battleResult').textContent='';
+    document.getElementById('nextRoundBtn').style.display='none';
+    this.runBattle();
+  },
+  closeBattle(){ this.tab('board'); },
+  nextRound(){
+    if(state.round>=MAX_ROUND){
+      this.toast('🏆 Season complete! Reset for new season');
+      return;
+    }
+    state.round++;
+    const interest=Math.min(5, Math.floor(state.gold/10));
+    const streakBonus= state.streak>0? Math.min(3, state.streak):0;
+    const income=5+interest+streakBonus;
+    state.gold+=income;
+    state.xp+=2;
+    while(state.level<9 && state.xp>=LEVEL_XP[state.level]){
+      state.xp-=LEVEL_XP[state.level]; state.level++;
+    }
+    if(!state.shopLocked){
+      state.shop=[];
+      for(let i=0;i<5;i++) state.shop.push(this.rollHero());
+    }
+    if(state.wins>0 && state.wins%3===0 && state.gearOwned.length+ (state.pendingGear?1:0) <6){
+      const avail=GEAR.filter(g=>!state.gearOwned.includes(g.id) && g.id!==state.pendingGear);
+      if(avail.length){ const g=avail[Math.floor(Math.random()*avail.length)]; state.gearOwned.push(g.id); this.toast(`🎁 Gear earned: ${g.name}!`); }
+    }
+    this.renderAll();
+    this.tab('shop');
+    this.saveNow();
+  },
+  getRival(){
+    const round=state.round;
+    const templates=[
+      [{id:'titan',stars:1},{id:'ember',stars:1},{id:'nova',stars:1}],
+      [{id:'mech',stars:1},{id:'titan',stars:1},{id:'frost',stars:1},{id:'ember',stars:1}],
+      [{id:'psion',stars:1},{id:'viper',stars:1},{id:'glacier',stars:1},{id:'mech',stars:1}],
+      [{id:'pulse',stars:1},{id:'draco',stars:1},{id:'warden',stars:1},{id:'viper',stars:1}],
+      [{id:'eclipse',stars:1},{id:'spectre',stars:1},{id:'pulse',stars:1},{id:'draco',stars:1},{id:'glacier',stars:1}],
+      [{id:'omega',stars:1},{id:'eclipse',stars:1},{id:'aurora',stars:1},{id:'warden',stars:1},{id:'colossus',stars:1}],
+      [{id:'colossus',stars:2},{id:'seraph',stars:1},{id:'abyss',stars:1},{id:'omega',stars:1},{id:'eclipse',stars:1},{id:'aurora',stars:1}],
+    ];
+    const idx=Math.min(round-1, templates.length-1);
+    const picks=templates[idx];
+    return picks.map(p=>({uid:Math.random(),heroId:p.id,stars:p.stars,gear:null}));
+  },
+  runBattle(){
+    const logEl=document.getElementById('battleLog');
+    const boardEl=document.getElementById('battleBoard');
+    logEl.innerHTML='';
+    const log=(msg)=>{ logEl.innerHTML+=msg+'<br>'; logEl.scrollTop=logEl.scrollHeight; };
+    const playerUnits= state.board.map((u,i)=>{
+      if(!u) return null;
+      const h=HEROES.find(x=>x.id===u.heroId);
+      let hp=h.hp * (u.stars===1?1:u.stars===2?1.6:2.4);
+      let atk=h.atk * (u.stars===1?1:u.stars===2?1.5:2.2);
+      const counts=this.getTraitCounts();
+      if(counts['Bruiser']>=2) hp+=300;
+      if(counts['Bruiser']>=4) hp+=400;
+      if(counts['Ember']>=3) atk*=1.25;
+      if(counts['Ember']>=6) atk*=1.24;
+      if(counts['Vanguard']>=2) hp+=150;
+      if(u.gear){
+        const g=GEAR.find(x=>x.id===u.gear);
+        if(g.stat.hp) hp+=g.stat.hp;
+        if(g.stat.atk) atk+=g.stat.atk;
+      }
+      if(state.commander==='oracle') atk*=1.1;
+      return {uid:u.uid,heroId:u.heroId,stars:u.stars,gear:u.gear,hero:h,hp,maxHp:hp,atk,aspd:h.aspd + (u.gear && GEAR.find(x=>x.id===u.gear)?.stat.aspd||0),range:h.range + (u.gear && GEAR.find(x=>x.id===u.gear)?.stat.range||0),pos:i,team:'player',alive:true,cd:0};
+    }).filter(Boolean);
+    const rivalRaw=this.getRival();
+    const rivalUnits=rivalRaw.map((u,idx)=>{
+      const h=HEROES.find(x=>x.id===u.heroId);
+      let hp=h.hp * (u.stars===1?1:u.stars===2?1.6:2.4) * (1+ state.round*0.08);
+      let atk=h.atk * (u.stars===1?1:u.stars===2?1.5:2.2) * (1+ state.round*0.06);
+      const pos= idx<8? idx : 8+ (idx-8);
+      return {uid:'r'+idx,heroId:u.heroId,stars:u.stars,hero:h,hp,maxHp:hp,atk,aspd:h.aspd,range:h.range,pos,team:'rival',alive:true,cd:0};
+    });
+    let allUnits=[...playerUnits,...rivalUnits];
+    const renderBattleBoard=()=>{
+      boardEl.innerHTML='';
+      for(let i=0;i<32;i++){
+        const cell=document.createElement('div'); cell.className='cell';
+        const unit=allUnits.find(u=>u.pos===i && u.alive);
+        if(unit){
+          const pct=Math.max(0, unit.hp/unit.maxHp*100);
+          cell.innerHTML=`<div class="c-star">${'★'.repeat(unit.stars)}</div><div class="c-icon">${unit.hero.icon}</div><div class="c-name">${unit.hero.name}</div><div class="c-hp"><i style="width:${pct}%"></i></div>`;
+          cell.style.background= unit.team==='player' ? 'radial-gradient(ellipse at 30% 20%, rgba(0,229,255,.3), rgba(17,21,46,.9))' : 'radial-gradient(ellipse at 30% 20%, rgba(255,59,107,.3), rgba(40,15,30,.9))';
+          cell.style.borderColor= unit.team==='player' ? 'var(--accent2)' : 'var(--danger)';
+        } else {
+          cell.innerHTML='<span style="font-size:10px;color:var(--muted)">·</span>';
+          cell.style.opacity=.4;
+        }
+        boardEl.appendChild(cell);
+      }
+    };
+    renderBattleBoard();
+    let tick=0;
+    const maxTicks=120;
+    const interval=setInterval(()=>{
+      tick++;
+      allUnits.forEach(u=>{
+        if(!u.alive) return;
+        u.cd-=0.2;
+        if(u.cd<=0){
+          const enemies=allUnits.filter(e=>e.team!==u.team && e.alive);
+          if(enemies.length===0) return;
+          const rc=(pos)=>({r:Math.floor(pos/8),c:pos%8});
+          const a=rc(u.pos);
+          let best=null, bestDist=999;
+          enemies.forEach(e=>{
+            const b=rc(e.pos);
+            const dist=Math.abs(a.r-b.r)+Math.abs(a.c-b.c);
+            if(dist<bestDist){ bestDist=dist; best=e; }
+          });
+          if(best){
+            let dmg=u.atk;
+            const counts=this.getTraitCounts();
+            if(u.hero.traits.includes('Void') && counts['Void']>=3) dmg*=1.15;
+            if(u.hero.traits.includes('Void') && counts['Void']>=6) dmg*=1.17;
+            if(u.hero.traits.includes('Sniper') && counts['Sniper']>=2) dmg*=1.2;
+            if(best.gear==='cloak' && Math.random()<0.2){ log(`<b>${best.hero.name}</b> dodged!`); }
+            else {
+              best.hp-=dmg;
+              if(tick%3===0) log(`${u.hero.icon} <b>${u.hero.name}</b> hits ${best.hero.icon} ${best.hero.name} for ${Math.round(dmg)}`);
+              if(best.hp<=0){ best.alive=false; best.hp=0; log(`💥 ${best.hero.icon} <b>${best.hero.name}</b> defeated!`); }
+            }
+            u.cd= 1/u.aspd;
+          }
+        }
+      });
+      renderBattleBoard();
+      const playerAlive=playerUnits.filter(u=>u.alive).length;
+      const rivalAlive=rivalUnits.filter(u=>u.alive).length;
+      if(playerAlive===0 || rivalAlive===0 || tick>=maxTicks){
+        clearInterval(interval);
+        let finalWin=false;
+        if(playerAlive===0 && rivalAlive===0) finalWin=false;
+        else if(playerAlive===0) finalWin=false;
+        else if(rivalAlive===0) finalWin=true;
+        else if(tick>=maxTicks){
+          const pHp=playerUnits.filter(u=>u.alive).reduce((s,u)=>s+u.hp,0);
+          const rHp=rivalUnits.filter(u=>u.alive).reduce((s,u)=>s+u.hp,0);
+          finalWin=pHp>=rHp;
+        } else finalWin= rivalAlive===0;
+        if(finalWin){
+          state.wins++; state.streak=Math.max(0,state.streak)+1;
+          document.getElementById('battleResult').innerHTML='<span style="color:var(--success)">★ VICTORY</span>';
+          log(`<br><b style="color:var(--success)">VICTORY!</b> +${5+Math.min(5,Math.floor(state.gold/10))}🪙 next round`);
+        } else {
+          state.losses++; state.hp=Math.max(0, state.hp-2); state.streak=0;
+          document.getElementById('battleResult').innerHTML='<span style="color:var(--danger)">✕ DEFEAT</span>';
+          log(`<br><b style="color:var(--danger)">DEFEAT!</b> -2 ❤`);
+          if(state.hp<=0) log(`<b style="color:var(--danger)">Season ended — HP 0! Reset to try again.</b>`);
+        }
+        document.getElementById('nextRoundBtn').style.display='inline-flex';
+        document.getElementById('nextRoundBtn').textContent= state.hp<=0 ? 'Reset Season' : (state.round>=MAX_ROUND ? 'Claim Crown 👑' : 'Next Round →');
+        if(state.hp<=0) document.getElementById('nextRoundBtn').onclick=()=>{ app.resetSeason(); app.tab('shop'); };
+        else document.getElementById('nextRoundBtn').onclick=()=>app.nextRound();
+        this.renderAll(); this.saveNow();
+      }
+    }, 220);
+  },
+  getTraitCounts(){
+    const counts={};
+    const all=[...state.board.filter(Boolean)];
+    all.forEach(u=>{
+      const h=HEROES.find(x=>x.id===u.heroId);
+      h.traits.forEach(t=> counts[t]=(counts[t]||0)+1);
+    });
+    if(state.commander==='voidlord' && counts['Void']) counts['Void']+=1;
+    return counts;
+  },
+  toast(msg){
+    const t=document.getElementById('toast');
+    t.textContent=msg; t.style.opacity=1; t.style.transform='translateX(-50%) translateY(0)';
+    setTimeout(()=>{ t.style.opacity=0; t.style.transform='translateX(-50%) translateY(80px)'; },2200);
+  }
+};
+app.init();
+</script>
+</body>
+</html>

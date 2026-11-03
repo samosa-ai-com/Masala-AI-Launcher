@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Seesaw Balance</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;background:#87CEEB;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#wrap{height:100%;display:flex;flex-direction:column;max-width:480px;margin:0 auto;background:linear-gradient(180deg,#87CEEB 0%,#B3E5FC 45%,#FFE0B2 100%);position:relative}
+header{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(62,39,35,0.92);color:#fff;gap:6px;flex-wrap:wrap}
+.hud{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;font-weight:700}
+.hud span{background:rgba(255,255,255,0.12);padding:4px 8px;border-radius:8px;white-space:nowrap}
+.hud .best{color:#FFD54F}
+#angleBadge{transition:background 0.2s}
+#gameArea{flex:1;position:relative;overflow:hidden;touch-action:none}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+#touchZones{position:absolute;inset:0;display:flex;pointer-events:none}
+.zone{flex:1;display:flex;align-items:flex-end;justify-content:center;padding-bottom:18px;pointer-events:auto;touch-action:none}
+.zone:active{background:rgba(255,255,255,0.08)}
+.zone span{background:rgba(62,39,35,0.85);color:#fff;padding:8px 14px;border-radius:20px;font-weight:800;font-size:13px;letter-spacing:0.5px;border:2px solid rgba(255,255,255,0.3)}
+#leftZone span{transform:rotate(-2deg)}
+#rightZone span{transform:rotate(2deg)}
+#controls{display:flex;gap:8px;padding:8px 10px;background:#3E2723;justify-content:center}
+.btn{flex:1;max-width:160px;padding:10px 12px;border:none;border-radius:12px;font-weight:800;font-size:14px;color:#3E2723;background:#FFD54F;touch-action:none}
+.btn.secondary{background:#fff;color:#3E2723}
+#overlay{position:absolute;inset:0;background:rgba(33,20,10,0.55);display:flex;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(2px)}
+.card{background:#FFF8E1;border-radius:18px;padding:18px 16px;max-width:360px;width:100%;text-align:center;box-shadow:0 12px 30px rgba(0,0,0,0.3);border:3px solid #8D6E63}
+.card h1{font-size:22px;color:#3E2723;margin-bottom:6px}
+.card p{font-size:13px;color:#5D4037;line-height:1.4;margin-bottom:10px}
+.badgeRow{display:flex;gap:8px;justify-content:center;margin:8px 0;flex-wrap:wrap}
+.badge{background:#3E2723;color:#FFD54F;padding:6px 10px;border-radius:10px;font-weight:800;font-size:12px}
+.kbd{font-size:11px;color:#8D6E63;margin-top:6px}
+#streakPop{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);font-weight:900;font-size:28px;color:#2E7D32;text-shadow:0 2px 0 #fff,0 4px 12px rgba(0,0,0,0.2);pointer-events:none;opacity:0;transition:opacity 0.2s}
+</style>
+</head>
+<body>
+<div id="wrap">
+<header>
+<div class="hud">
+<span id="scoreEl">Score 0</span>
+<span id="levelEl">Lv 1</span>
+<span id="livesEl">♥♥♥</span>
+</div>
+<div class="hud">
+<span id="angleEl">0°</span>
+<span id="bestEl" class="best">Best 0</span>
+</div>
+</header>
+<div id="gameArea">
+<canvas id="c"></canvas>
+<div id="touchZones">
+<div class="zone" id="leftZone"><span>◀ LEFT</span></div>
+<div class="zone" id="rightZone"><span>RIGHT ▶</span></div>
+</div>
+<div id="streakPop"></div>
+<div id="overlay">
+<div class="card" id="card">
+<h1>⚖️ Seesaw Balance</h1>
+<p><b>Nudge falling balls</b> onto the lighter side to keep the beam level!</p>
+<p>Tap <b>LEFT / RIGHT</b> to push the falling ball before it lands. Keep within <b>±15°</b> for streak points. Tip past <b>35°</b> or miss = lose a life.</p>
+<div class="badgeRow">
+<span class="badge">3 Lives</span>
+<span class="badge">Streak Bonus</span>
+<span class="badge">Weight 1-3</span>
+</div>
+<button class="btn" id="playBtn" style="width:100%;max-width:none;margin-top:8px">▶ PLAY</button>
+<div class="kbd">Touch: tap zones • Keyboard: ← → / A D to nudge • R restart • Space nudge</div>
+<div id="overlayStats" style="margin-top:10px;font-size:12px;color:#5D4037"></div>
+</div>
+</div>
+</div>
+<div id="controls">
+<button class="btn secondary" id="restartBtn">↻ Restart</button>
+<button class="btn" id="pauseBtn">⏸ Pause</button>
+</div>
+</div>
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('scoreEl');
+const levelEl=document.getElementById('levelEl');
+const livesEl=document.getElementById('livesEl');
+const angleEl=document.getElementById('angleEl');
+const bestEl=document.getElementById('bestEl');
+const overlay=document.getElementById('overlay');
+const playBtn=document.getElementById('playBtn');
+const restartBtn=document.getElementById('restartBtn');
+const pauseBtn=document.getElementById('pauseBtn');
+const overlayStats=document.getElementById('overlayStats');
+const streakPop=document.getElementById('streakPop');
+const leftZone=document.getElementById('leftZone');
+const rightZone=document.getElementById('rightZone');
+
+let W=0,H=0,dpr=1;
+function resize(){
+  const rect=document.getElementById('gameArea').getBoundingClientRect();
+  W=rect.width; H=rect.height;
+  dpr=Math.min(2, window.devicePixelRatio||1);
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Game state
+let score=0, level=1, lives=3, best=0;
+let beamAngle=0, angularVel=0;
+let stuckBalls=[], fallingBall=null;
+let gravity=900;
+let playing=false, paused=false;
+let streakTime=0, streakCount=0;
+let timeAcc=0, spawnCooldown=0;
+let tipCooldown=0;
+let particles=[];
+let shake=0;
+let pivot={x:0,y:0}, beamLen=0, beamThick=18;
+
+const STORAGE_KEY='seesaw_bestScore_v2';
+try{ best=parseInt(localStorage.getItem(STORAGE_KEY)||'0')||0; }catch(e){}
+bestEl.textContent='Best '+best;
+
+function updateHUD(){
+  scoreEl.textContent='Score '+Math.floor(score);
+  levelEl.textContent='Lv '+level;
+  livesEl.textContent='♥'.repeat(Math.max(0,lives)) + '♡'.repeat(Math.max(0,3-lives));
+  const deg=(beamAngle*180/Math.PI);
+  angleEl.textContent=(deg>0?'+':'')+deg.toFixed(1)+'°';
+  if(Math.abs(deg)<15) angleEl.style.background='#2E7D32';
+  else if(Math.abs(deg)<25) angleEl.style.background='#F9A825';
+  else angleEl.style.background='#C62828';
+  angleEl.style.color='#fff';
+  angleEl.style.padding='4px 8px';
+  angleEl.style.borderRadius='8px';
+  bestEl.textContent='Best '+best;
+}
+
+function saveBest(){
+  if(score>best){ best=Math.floor(score); try{localStorage.setItem(STORAGE_KEY, best);}catch(e){} }
+}
+
+function resetGame(){
+  score=0; level=1; lives=3;
+  beamAngle=0; angularVel=0;
+  stuckBalls=[]; fallingBall=null;
+  streakTime=0; streakCount=0; timeAcc=0; spawnCooldown=0.6; tipCooldown=0; particles=[]; shake=0;
+  gravity=900;
+  playing=true; paused=false;
+  overlay.style.display='none';
+  pauseBtn.textContent='⏸ Pause';
+  updateHUD();
+  spawnBall();
+}
+
+function gameOver(){
+  playing=false;
+  saveBest();
+  overlay.style.display='flex';
+  document.getElementById('card').innerHTML=`
+    <h1>💥 Tipped Over!</h1>
+    <p>Score <b>${Math.floor(score)}</b> • Level <b>${level}</b> • Best <b>${best}</b></p>
+    <p>${score>=best && score>0 ? '🎉 New High Score!' : 'Keep the beam level to build streaks!'}</p>
+    <button class="btn" id="playBtn2" style="width:100%;max-width:none;margin-top:8px">↻ Play Again</button>
+    <div class="kbd">Tip: nudge early — heavy red balls tip faster!</div>
+  `;
+  document.getElementById('playBtn2').onclick=resetGame;
+  updateHUD();
+}
+
+function loseLife(reason){
+  if(tipCooldown>0) return;
+  lives--;
+  tipCooldown=1.0;
+  shake=12;
+  // burst particles
+  for(let i=0;i<14;i++) particles.push({x:pivot.x, y:pivot.y, vx:(Math.random()-0.5)*300, vy:-Math.random()*250, life:0.6, r:4+Math.random()*4, c: reason==='tip'?'#EF5350':'#FFB74D'});
+  // clear beam
+  stuckBalls=[];
+  beamAngle*=0.3;
+  angularVel=0;
+  fallingBall=null;
+  spawnCooldown=0.9;
+  streakTime=0; streakCount=0;
+  if(lives<=0){
+    setTimeout(gameOver, 300);
+  }
+  updateHUD();
+}
+
+function spawnBall(){
+  if(!playing || paused) return;
+  if(fallingBall) return;
+  // weight distribution by level
+  let r=Math.random();
+  let w=1;
+  if(level<=2) w = r<0.6?1: r<0.9?2:3;
+  else if(level<=4) w = r<0.4?1: r<0.75?2:3;
+  else w = r<0.25?1: r<0.6?2:3;
+  const rad=14 + w*7;
+  const col = w===1 ? '#4FC3F7' : w===2 ? '#FFB74D' : '#EF5350';
+  fallingBall={
+    x: W/2 + (Math.random()-0.5)*70,
+    y: -rad-12,
+    vx: 0, vy: 0,
+    r: rad, w: w, col: col,
+    weight: w
+  };
+}
+
+function nudge(dir){
+  if(!playing || paused) return;
+  if(!fallingBall) return;
+  // dir -1 left, +1 right
+  fallingBall.vx += dir * 380;
+  // clamp
+  fallingBall.vx = Math.max(-520, Math.min(520, fallingBall.vx));
+  // visual
+  shake=2;
+}
+
+leftZone.addEventListener('pointerdown', e=>{ e.preventDefault(); nudge(-1); });
+rightZone.addEventListener('pointerdown', e=>{ e.preventDefault(); nudge(1); });
+canvas.addEventListener('pointerdown', e=>{
+  // also allow tap on canvas left/right half as fallback
+  const rect=canvas.getBoundingClientRect();
+  const x=e.clientX-rect.left;
+  if(x < W/2) nudge(-1); else nudge(1);
+});
+
+window.addEventListener('keydown', e=>{
+  if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A') { e.preventDefault(); nudge(-1); }
+  if(e.key==='ArrowRight' || e.key==='d' || e.key==='D') { e.preventDefault(); nudge(1); }
+  if(e.code==='Space') { e.preventDefault(); nudge(Math.random()<0.5?-1:1); }
+  if(e.key==='r' || e.key==='R') resetGame();
+  if(e.key==='p' || e.key==='P') togglePause();
+});
+
+function togglePause(){
+  if(!playing) return;
+  paused=!paused;
+  pauseBtn.textContent= paused ? '▶ Resume' : '⏸ Pause';
+  if(paused){
+    overlay.style.display='flex';
+    document.getElementById('card').innerHTML=`
+      <h1>⏸ Paused</h1>
+      <p>Score ${Math.floor(score)} • Level ${level}</p>
+      <button class="btn" id="resumeBtn" style="width:100%">▶ Resume</button>
+      <button class="btn secondary" id="restartBtn2" style="width:100%;margin-top:8px">↻ Restart</button>
+    `;
+    document.getElementById('resumeBtn').onclick=togglePause;
+    document.getElementById('restartBtn2').onclick=resetGame;
+  } else {
+    overlay.style.display='none';
+  }
+}
+pauseBtn.onclick=togglePause;
+restartBtn.onclick=resetGame;
+playBtn.onclick=resetGame;
+
+function showStreak(text){
+  streakPop.textContent=text;
+  streakPop.style.opacity='1';
+  streakPop.style.transform='translate(-50%,-50%) scale(1.1)';
+  setTimeout(()=>{ streakPop.style.opacity='0'; }, 600);
+}
+
+// Physics helpers
+function beamEndpoints(){
+  const cx=pivot.x, cy=pivot.y;
+  const cos=Math.cos(beamAngle), sin=Math.sin(beamAngle);
+  const hx=(beamLen/2)*cos, hy=(beamLen/2)*sin;
+  return {p1:{x:cx-hx,y:cy-hy}, p2:{x:cx+hx,y:cy+hy}, cos, sin, cx, cy};
+}
+
+function update(dt){
+  if(!playing || paused) return;
+  timeAcc+=dt;
+  if(tipCooldown>0) tipCooldown-=dt;
+  if(shake>0) shake=Math.max(0, shake - dt*20);
+
+  // level progression every 350 points or 22 sec
+  const newLevel = 1 + Math.floor(score/350);
+  if(newLevel!==level){
+    level=newLevel;
+    // confetti
+    for(let i=0;i<18;i++) particles.push({x:W/2, y:H*0.3, vx:(Math.random()-0.5)*400, vy:-Math.random()*300-50, life:0.9, r:5, c: ['#FFD54F','#4FC3F7','#81C784','#FF8A65'][i%4]});
+    updateHUD();
+  }
+  gravity = 900 + level*70;
+
+  // spawn logic
+  if(!fallingBall){
+    spawnCooldown-=dt;
+    if(spawnCooldown<=0) spawnBall();
+  }
+
+  // update falling ball
+  if(fallingBall){
+    fallingBall.vy += gravity * dt;
+    fallingBall.vx *= (1 - 0.6*dt); // air drag
+    fallingBall.x += fallingBall.vx * dt;
+    fallingBall.y += fallingBall.vy * dt;
+
+    // wall bounce
+    if(fallingBall.x - fallingBall.r < 4){ fallingBall.x=4+fallingBall.r; fallingBall.vx*=-0.5; }
+    if(fallingBall.x + fallingBall.r > W-4){ fallingBall.x=W-4-fallingBall.r; fallingBall.vx*=-0.5; }
+
+    // check beam collision
+    const {p1,p2,cos,sin,cx,cy}=beamEndpoints();
+    // vector beam
+    const bx=p2.x-p1.x, by=p2.y-p1.y;
+    const blen=Math.hypot(bx,by);
+    const bnx=-by/blen, bny=bx/blen; // normal up (perpendicular)
+    // closest point on segment
+    const apx=fallingBall.x - p1.x, apy=fallingBall.y - p1.y;
+    let t = (apx*bx + apy*by)/(blen*blen);
+    t=Math.max(0,Math.min(1,t));
+    const closestX=p1.x + bx*t, closestY=p1.y + by*t;
+    const dx=fallingBall.x - closestX, dy=fallingBall.y - closestY;
+    const dist=Math.hypot(dx,dy);
+    const halfThick=beamThick/2;
+    // check if above beam (dot with normal >0) and moving down-ish
+    const dot = dx*bnx + dy*bny;
+    if(dist < fallingBall.r + halfThick -1 && dot>0 && fallingBall.vy> -50){
+      // check s within beam
+      const s = (fallingBall.x - cx)*cos + (fallingBall.y - cy)*sin; // projection onto beam dir
+      if(Math.abs(s) < beamLen/2 -2){
+        // attach!
+        // bonus for correct side: lighter side is opposite tilt
+        const isCorrect = (s * beamAngle < 0) || Math.abs(beamAngle)<0.05;
+        stuckBalls.push({s: s, w: fallingBall.w, r: fallingBall.r, col: fallingBall.col, weight: fallingBall.weight});
+        // impulse to beam
+        angularVel += (fallingBall.weight * s * 0.00018);
+        // score bonus
+        let bonus = 25 * fallingBall.weight * level;
+        if(isCorrect) bonus += 40 * level;
+        score += bonus;
+        // particles
+        for(let i=0;i<10;i++) particles.push({x:closestX, y:closestY, vx:(Math.random()-0.5)*200, vy:-Math.random()*180, life:0.5, r:3+Math.random()*3, c: isCorrect?'#66BB6A':'#FFD54F'});
+        if(isCorrect) showStreak('+'+bonus+' ✓');
+        else showStreak('+'+bonus);
+        fallingBall=null;
+        spawnCooldown=0.7;
+        updateHUD();
+      }
+    } else {
+      // miss check: fell below screen
+      if(fallingBall.y - fallingBall.r > H+30){
+        fallingBall=null;
+        loseLife('miss');
+      }
+      // also if ball goes far below pivot without hitting, it will be caught above
+    }
+  }
+
+  // beam physics
+  // compute torque: sum(weight * s * cos(angle)) * g factor
+  let totalTorque=0;
+  let moment= 9000; // base beam inertia
+  for(const b of stuckBalls){
+    totalTorque += b.weight * b.s * Math.cos(beamAngle);
+    moment += b.weight * b.s * b.s * 1.2;
+  }
+  // scale torque to angular accel
+  const angularAccel = totalTorque * 0.00055; // tuned
+  angularVel += angularAccel * dt * 60; // scale
+  // damping
+  angularVel *= Math.pow(0.985, dt*60); // per frame damping
+  angularVel -= beamAngle * 0.8 * dt; // slight centering spring to avoid stuck
+  beamAngle += angularVel * dt;
+
+  // streak & scoring
+  const degAbs=Math.abs(beamAngle*180/Math.PI);
+  if(degAbs < 15){
+    streakTime+=dt;
+    streakCount = Math.floor(streakTime*1.2);
+    // score per second while balanced
+    score += dt * (18 * level) * (1 + Math.min(2, streakTime*0.15));
+    if(streakTime>1 && Math.floor(streakTime*2)%2===0){
+      // occasional sparkle
+      if(Math.random()<0.08) particles.push({x:pivot.x + (Math.random()-0.5)*beamLen*0.6, y:pivot.y - 20, vx:(Math.random()-0.5)*60, vy:-40-Math.random()*40, life:0.6, r:3, c:'#FFF176'});
+    }
+  } else {
+    streakTime=Math.max(0, streakTime - dt*1.5);
+  }
+
+  // tip check
+  if(degAbs > 35){
+    loseLife('tip');
+  }
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+= 600*dt; p.life-=dt;
+    if(p.life<=0) particles.splice(i,1);
+  }
+
+  updateHUD();
+}
+
+function draw(){
+  // background
+  ctx.clearRect(0,0,W,H);
+  // sky gradient already via CSS, but draw canvas bg for crisp
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#87CEEB'); g.addColorStop(0.5,'#B3E5FC'); g.addColorStop(1,'#FFE0B2');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  // clouds
+  ctx.fillStyle='rgba(255,255,255,0.9)';
+  const cloudPos=[[W*0.15, H*0.12],[W*0.75,H*0.18],[W*0.45,H*0.08]];
+  for(const [cx,cy] of cloudPos){
+    ctx.beginPath();
+    ctx.ellipse(cx,cy,38,18,0,0,Math.PI*2);
+    ctx.ellipse(cx-22,cy+6,28,14,0,0,Math.PI*2);
+    ctx.ellipse(cx+22,cy+6,26,13,0,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  // ground
+  ctx.fillStyle='#A1887F';
+  ctx.fillRect(0, H*0.82, W, H*0.18);
+  ctx.fillStyle='#8D6E63';
+  for(let i=0;i<W;i+=18){
+    ctx.fillRect(i, H*0.82, 2, H*0.18);
+  }
+
+  // pivot base
+  pivot.x=W/2; pivot.y=H*0.62;
+  beamLen=Math.min(W*0.88, 340);
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.15)';
+  ctx.beginPath(); ctx.ellipse(pivot.x, H*0.82, 70, 10, 0,0,Math.PI*2); ctx.fill();
+
+  // fulcrum triangle wood
+  ctx.save();
+  if(shake>0){ ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake); }
+  ctx.fillStyle='#5D4037';
+  ctx.beginPath();
+  ctx.moveTo(pivot.x-42, H*0.82);
+  ctx.lineTo(pivot.x+42, H*0.82);
+  ctx.lineTo(pivot.x, pivot.y+14);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#8D6E63';
+  ctx.beginPath();
+  ctx.moveTo(pivot.x-30, H*0.82);
+  ctx.lineTo(pivot.x+30, H*0.82);
+  ctx.lineTo(pivot.x, pivot.y+6);
+  ctx.closePath(); ctx.fill();
+  // bolt
+  ctx.fillStyle='#3E2723';
+  ctx.beginPath(); ctx.arc(pivot.x, pivot.y, 7,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#FFD54F';
+  ctx.beginPath(); ctx.arc(pivot.x, pivot.y, 3.5,0,Math.PI*2); ctx.fill();
+
+  // beam
+  const {p1,p2,cos,sin}=beamEndpoints();
+  ctx.save();
+  ctx.translate(pivot.x, pivot.y);
+  ctx.rotate(beamAngle);
+  // wood plank
+  ctx.fillStyle='#BC8A5A';
+  ctx.strokeStyle='#5D4037';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  // rounded rect centered
+  const rw=beamLen, rh=beamThick;
+  const r=8;
+  ctx.moveTo(-rw/2+r, -rh/2);
+  ctx.lineTo(rw/2-r, -rh/2);
+  ctx.quadraticCurveTo(rw/2, -rh/2, rw/2, -rh/2+r);
+  ctx.lineTo(rw/2, rh/2-r);
+  ctx.quadraticCurveTo(rw/2, rh/2, rw/2-r, rh/2);
+  ctx.lineTo(-rw/2+r, rh/2);
+  ctx.quadraticCurveTo(-rw/2, rh/2, -rw/2, rh/2-r);
+  ctx.lineTo(-rw/2, -rh/2+r);
+  ctx.quadraticCurveTo(-rw/2, -rh/2, -rw/2+r, -rh/2);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // wood grain lines
+  ctx.strokeStyle='rgba(62,39,35,0.25)';
+  ctx.lineWidth=1.2;
+  for(let y=-rh/2+4; y<rh/2; y+=5){
+    ctx.beginPath(); ctx.moveTo(-rw/2+10, y); ctx.lineTo(rw/2-10, y+ (Math.sin(y*0.5)*2)); ctx.stroke();
+  }
+  // center mark
+  ctx.fillStyle='#3E2723';
+  ctx.fillRect(-1.5, -rh/2, 3, rh);
+  ctx.restore();
+
+  // stuck balls on beam
+  for(const b of stuckBalls){
+    const bx = pivot.x + b.s*cos - Math.sin(beamAngle)*(b.r+beamThick/2);
+    const by = pivot.y + b.s*sin + Math.cos(beamAngle)*( - (b.r+beamThick/2) ); // actually normal offset
+    // correct normal: (-sin, cos) is up
+    const nx = -sin, ny = -cos; // wait cos/sin confusion: beam dir (cos,sin), normal (-sin,cos)
+    const nxx = -sin, nyy = Math.cos(beamAngle);
+    const x = pivot.x + b.s*cos + nxx*(b.r+beamThick/2);
+    const y = pivot.y + b.s*sin + nyy*(b.r+beamThick/2);
+    // shadow on beam
+    ctx.fillStyle='rgba(0,0,0,0.18)';
+    ctx.beginPath(); ctx.ellipse(pivot.x + b.s*cos, pivot.y + b.s*sin, b.r*0.7, 4, beamAngle, 0, Math.PI*2); ctx.fill();
+    // ball
+    ctx.fillStyle=b.col;
+    ctx.beginPath(); ctx.arc(x,y,b.r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(62,39,35,0.9)'; ctx.lineWidth=2; ctx.stroke();
+    // highlight
+    ctx.fillStyle='rgba(255,255,255,0.7)';
+    ctx.beginPath(); ctx.arc(x-b.r*0.3, y-b.r*0.3, b.r*0.28,0,Math.PI*2); ctx.fill();
+    // weight label
+    ctx.fillStyle='#3E2723'; ctx.font=`800 ${Math.max(12, b.r*0.7)}px system-ui`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(b.w, x, y+1);
+  }
+
+  // falling ball
+  if(fallingBall){
+    // drop shadow
+    ctx.fillStyle='rgba(0,0,0,0.12)';
+    ctx.beginPath(); ctx.ellipse(fallingBall.x, H*0.82, fallingBall.r*0.8, 5,0,0,Math.PI*2); ctx.fill();
+    // trajectory dotted line to beam
+    ctx.strokeStyle='rgba(62,39,35,0.18)'; ctx.setLineDash([6,6]); ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(fallingBall.x, fallingBall.y); ctx.lineTo(fallingBall.x+fallingBall.vx*0.25, fallingBall.y+fallingBall.vy*0.25+30); ctx.stroke(); ctx.setLineDash([]);
+    // ball
+    ctx.fillStyle=fallingBall.col;
+    ctx.beginPath(); ctx.arc(fallingBall.x, fallingBall.y, fallingBall.r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#3E2723'; ctx.lineWidth=2.5; ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.arc(fallingBall.x-fallingBall.r*0.3, fallingBall.y-fallingBall.r*0.3, fallingBall.r*0.28,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#3E2723'; ctx.font=`800 ${Math.max(12, fallingBall.r*0.7)}px system-ui`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(fallingBall.w, fallingBall.x, fallingBall.y+1);
+    // arrow indicator
+    if(Math.abs(fallingBall.vx)>10){
+      ctx.fillStyle='#3E2723'; ctx.font='12px system-ui'; ctx.textAlign='center';
+      ctx.fillText(fallingBall.vx>0?'→':'←', fallingBall.x, fallingBall.y - fallingBall.r -10);
+    }
+  }
+
+  ctx.restore(); // end shake
+
+  // angle meter arc at pivot
+  ctx.save();
+  ctx.translate(pivot.x, pivot.y+18);
+  ctx.strokeStyle='rgba(62,39,35,0.25)'; ctx.lineWidth=6; ctx.lineCap='round';
+  ctx.beginPath(); ctx.arc(0,0,34, Math.PI*1.15, Math.PI*1.85); ctx.stroke();
+  // safe zone green
+  ctx.strokeStyle='#66BB6A'; ctx.lineWidth=6;
+  ctx.beginPath(); ctx.arc(0,0,34, Math.PI*1.5-0.26, Math.PI*1.5+0.26); ctx.stroke();
+  // danger red ticks
+  ctx.strokeStyle='#EF5350'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.arc(0,0,34, Math.PI*1.15, Math.PI*1.15+0.12); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,0,34, Math.PI*1.85-0.12, Math.PI*1.85); ctx.stroke();
+  // needle
+  ctx.rotate(beamAngle);
+  ctx.strokeStyle='#3E2723'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-30); ctx.stroke();
+  ctx.fillStyle='#3E2723'; ctx.beginPath(); ctx.arc(0,0,5,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // particles
+  for(const p of particles){
+    ctx.globalAlpha=Math.max(0, p.life/0.6);
+    ctx.fillStyle=p.c;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // streak indicator
+  if(playing && !paused){
+    const degAbs=Math.abs(beamAngle*180/Math.PI);
+    if(degAbs<15){
+      ctx.fillStyle='rgba(46,125,50,0.95)'; ctx.font='800 13px system-ui'; ctx.textAlign='center';
+      ctx.fillText(`STREAK x${(1+streakTime*0.2).toFixed(1)}  +${Math.floor(18*level*(1+Math.min(2,streakTime*0.15)))} /s`, W/2, H*0.14);
+    } else {
+      ctx.fillStyle='rgba(198,40,40,0.9)'; ctx.font='700 12px system-ui'; ctx.textAlign='center';
+      ctx.fillText('TILT! Nudge to lighter side', W/2, H*0.14);
+    }
+    // level progress
+    ctx.fillStyle='rgba(62,39,35,0.15)'; ctx.fillRect(W/2-60, H*0.17, 120, 6);
+    ctx.fillStyle='#FFD54F'; ctx.fillRect(W/2-60, H*0.17, 120 * ((score%350)/350), 6);
+  }
+}
+
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(0.033, (now-last)/1000);
+  last=now;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+updateHUD();
+draw();
+
+// prevent scroll
+document.addEventListener('touchmove', e=>e.preventDefault(), {passive:false});
+</script>
+</body>
+</html>

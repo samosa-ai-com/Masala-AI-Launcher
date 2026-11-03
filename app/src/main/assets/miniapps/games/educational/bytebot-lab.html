@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>Robo Queue - Maze Upload</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0e111a;--panel:#1a1f2e;--card:#242b3d;--accent:#00e5a0;--accent2:#00b8ff;--warn:#ff6b35;--gold:#ffcc33;--text:#e8ecf1;--muted:#8a94a8;--border:rgba(255,255,255,0.08)}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;user-select:none;touch-action:manipulation}
+.bg{position:fixed;inset:0;z-index:-1;background:radial-gradient(ellipse at 20% 0%, rgba(0,229,160,0.08) 0%, transparent 50%), radial-gradient(ellipse at 80% 100%, rgba(0,184,255,0.08) 0%, transparent 50%), var(--bg)}
+/* Header */
+.header{padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(26,31,46,0.9);border-bottom:1px solid var(--border);backdrop-filter:blur(10px);flex-shrink:0}
+.logo{font-weight:900;font-size:15px;letter-spacing:0.5px;display:flex;align-items:center;gap:8px}
+.logo i{width:28px;height:28px;background:linear-gradient(135deg, var(--accent), var(--accent2));border-radius:8px;display:grid;place-items:center;font-size:16px}
+.logo span{font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--muted);display:block;line-height:1}
+.header-stats{display:flex;gap:6px;align-items:center}
+.stat-pill{background:var(--card);border:1px solid var(--border);padding:4px 8px;border-radius:20px;font-size:11px;font-weight:800;display:flex;align-items:center;gap:4px}
+.stat-pill.gold{color:var(--gold);border-color:rgba(255,204,51,0.3)}
+.level-nav{display:flex;gap:4px;align-items:center}
+.level-nav button{width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-weight:800;font-size:12px;cursor:pointer}
+.level-nav button.active{background:var(--accent);color:#000;border-color:var(--accent)}
+.level-nav button.done{border-color:var(--gold);color:var(--gold)}
+.level-nav button:disabled{opacity:0.3}
+/* Main */
+.main{flex:1;display:flex;gap:8px;padding:8px;min-height:0;overflow:hidden}
+@media(max-width:700px){.main{flex-direction:column;overflow:auto}}
+/* Left: Maze */
+.maze-panel{flex:1.2;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0}
+.panel-title{font-size:10px;letter-spacing:1.2px;font-weight:800;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.mission-name{font-size:12px;font-weight:800;color:var(--text);letter-spacing:0.3px}
+.mission-desc{font-size:10px;color:var(--muted);line-height:1.3}
+.grid-wrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;background:rgba(0,0,0,0.2);border-radius:12px;padding:8px;border:1px solid var(--border);position:relative;overflow:hidden}
+.grid{display:grid;gap:3px;touch-action:manipulation}
+.cell{width:42px;height:42px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:8px;display:grid;place-items:center;font-size:18px;position:relative;transition:all 0.2s}
+@media(max-width:700px){.cell{width:36px;height:36px;font-size:16px}}
+.cell.wall{background:#0f1420;border-color:#1e2a3a;box-shadow:inset 0 0 10px rgba(0,0,0,0.5)}
+.cell.wall::after{content:'▦';color:#2a3a50;font-size:14px}
+.cell.gate{background:linear-gradient(135deg, rgba(0,229,160,0.2), rgba(0,184,255,0.2));border-color:var(--accent);box-shadow:0 0 12px rgba(0,229,160,0.3)}
+.cell.door{background:rgba(255,107,53,0.15);border-color:var(--warn)}
+.cell.door.open{background:rgba(0,229,160,0.15);border-color:var(--accent)}
+.cell.chip::before{content:'';position:absolute;inset:4px;border:1px dashed rgba(255,204,51,0.4);border-radius:6px;pointer-events:none}
+.robot{position:absolute;inset:3px;background:linear-gradient(135deg, #fff, #e0e7ff);border-radius:8px;display:grid;place-items:center;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,0.4), 0 0 0 2px var(--accent);z-index:3;transition:all 0.35s cubic-bezier(0.34,1.56,0.64,1)}
+.robot.dir-0{transform:rotate(0deg)} .robot.dir-1{transform:rotate(90deg)} .robot.dir-2{transform:rotate(180deg)} .robot.dir-3{transform:rotate(270deg)}
+.robot.bump{animation:bump 0.3s ease}
+@keyframes bump{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.chip-icon{font-size:16px;filter:drop-shadow(0 0 6px rgba(255,204,51,0.6));animation:float 1.5s ease infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+.switch-icon{font-size:16px}
+.door-icon{font-size:14px}
+.gate-icon{font-size:18px;animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.limit-bar{height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;display:flex;gap:2px;padding:2px}
+.limit-seg{flex:1;background:rgba(255,255,255,0.08);border-radius:2px;transition:background 0.2s}
+.limit-seg.used{background:var(--accent)}
+.limit-seg.over{background:var(--warn)}
+.limit-label{font-size:9px;font-weight:700;color:var(--muted);display:flex;justify-content:space-between}
+/* Right: Program */
+.program-panel{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:280px;max-width:380px;min-height:0}
+@media(max-width:700px){.program-panel{max-width:none;min-width:0}}
+.palette{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pal-btn{padding:10px 6px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-weight:800;font-size:11px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:transform 0.1s, border-color 0.2s}
+.pal-btn:active{transform:scale(0.96)}
+.pal-btn b{font-size:18px;line-height:1}
+.pal-btn small{font-size:8px;color:var(--muted);letter-spacing:0.5px}
+.pal-btn.forward{border-color:rgba(0,229,160,0.3)} .pal-btn.forward b{color:var(--accent)}
+.pal-btn.left,.pal-btn.right{border-color:rgba(0,184,255,0.3)} .pal-btn.left b,.pal-btn.right b{color:var(--accent2)}
+.pal-btn.act{border-color:rgba(255,204,51,0.3)} .pal-btn.act b{color:var(--gold)}
+.queue-wrap{background:rgba(0,0,0,0.2);border:1px solid var(--border);border-radius:12px;padding:8px;min-height:70px}
+.queue-title{font-size:9px;letter-spacing:1px;font-weight:800;color:var(--muted);display:flex;justify-content:space-between}
+.queue{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;min-height:32px}
+.q-item{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;font-size:14px;font-weight:900;border:1px solid var(--border);background:var(--card);position:relative;animation:popIn 0.2s cubic-bezier(0.175,0.885,0.32,1.275)}
+.q-item.forward{background:rgba(0,229,160,0.15);border-color:var(--accent);color:var(--accent)}
+.q-item.left,.q-item.right{background:rgba(0,184,255,0.15);border-color:var(--accent2);color:var(--accent2)}
+.q-item.act{background:rgba(255,204,51,0.15);border-color:var(--gold);color:var(--gold)}
+.q-item.active{box-shadow:0 0 0 2px #fff, 0 0 12px rgba(255,255,255,0.5);transform:scale(1.05)}
+.q-item.done{opacity:0.5}
+.q-num{position:absolute;top:-6px;right:-6px;background:#fff;color:#000;font-size:7px;font-weight:900;width:14px;height:14px;border-radius:50%;display:grid;place-items:center}
+@keyframes popIn{0%{transform:scale(0.5);opacity:0}100%{transform:scale(1);opacity:1}}
+.controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.ctrl-btn{padding:8px 4px;border-radius:10px;border:none;font-weight:800;font-size:11px;cursor:pointer;transition:transform 0.1s, opacity 0.2s}
+.ctrl-btn:active{transform:scale(0.96)}
+.ctrl-btn.undo{background:var(--card);color:var(--text);border:1px solid var(--border)}
+.ctrl-btn.clear{background:rgba(255,107,53,0.15);color:var(--warn);border:1px solid rgba(255,107,53,0.3)}
+.ctrl-btn.run{background:linear-gradient(135deg, var(--accent), var(--accent2));color:#000;box-shadow:0 2px 12px rgba(0,229,160,0.3)}
+.ctrl-btn:disabled{opacity:0.35;cursor:not-allowed}
+.run-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.run-row .ctrl-btn{padding:10px}
+.log-wrap{background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:12px;padding:8px;flex:1;min-height:80px;max-height:140px;overflow:auto;display:flex;flex-direction:column;gap:4px}
+.log-title{font-size:9px;letter-spacing:1px;font-weight:800;color:var(--muted);position:sticky;top:0;background:rgba(0,0,0,0.25);padding-bottom:4px}
+.log-entry{font-size:10px;padding:4px 6px;border-radius:6px;background:rgba(255,255,255,0.04);border-left:2px solid transparent;display:flex;gap:6px;align-items:center}
+.log-entry.ok{border-left-color:var(--accent);color:#c8f5e6}
+.log-entry.fail{border-left-color:var(--warn);color:#ffd0b8}
+.log-entry.info{border-left-color:var(--accent2);color:#cceeff}
+.stars-row{display:flex;gap:4px;align-items:center}
+.star{font-size:14px;filter:grayscale(1);opacity:0.3;transition:all 0.3s}
+.star.on{filter:none;opacity:1;text-shadow:0 0 8px var(--gold)}
+/* Overlays */
+.overlay{position:absolute;inset:0;background:rgba(14,17,26,0.92);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center;z-index:10;border-radius:16px}
+.overlay h2{font-size:20px;font-weight:900}
+.overlay p{font-size:11px;color:var(--muted);margin-top:6px;max-width:280px;line-height:1.4}
+.overlay-stats{display:flex;gap:8px;margin-top:12px}
+.o-stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 12px;min-width:70px}
+.o-stat b{display:block;font-size:16px;font-weight:900}
+.o-stat span{font-size:8px;letter-spacing:1px;color:var(--muted);font-weight:700}
+.btn-primary{margin-top:14px;background:linear-gradient(135deg, var(--accent), var(--accent2));color:#000;border:none;padding:10px 22px;border-radius:20px;font-size:13px;font-weight:900;cursor:pointer;box-shadow:0 4px 16px rgba(0,229,160,0.3)}
+.btn-secondary{margin-top:8px;background:var(--card);color:var(--text);border:1px solid var(--border);padding:8px 16px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer}
+.hidden{display:none !important}
+.footer{padding:6px 10px;display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--muted);letter-spacing:0.5px;flex-shrink:0;border-top:1px solid var(--border);background:rgba(26,31,46,0.5)}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="header">
+  <div class="logo"><i>🤖</i><div>ROBO QUEUE<div style="display:flex;gap:4px;align-items:center"><span>MAZE UPLOAD</span><span id="totalStars" style="color:var(--gold);font-size:10px">★ 0</span></div></div></div>
+  <div class="header-stats">
+    <div class="level-nav" id="levelNav"></div>
+    <div class="stat-pill gold" id="medalPill">🏅 0</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="maze-panel">
+    <div class="panel-title"><span id="missionLabel">MISSION 01</span><span class="stars-row" id="starsRow"><span class="star">★</span><span class="star">★</span><span class="star">★</span></span></div>
+    <div class="mission-name" id="missionName">First Steps</div>
+    <div class="mission-desc" id="missionDesc">Queue moves to reach the green upload gate.</div>
+    <div class="grid-wrap" id="gridWrap">
+      <div class="grid" id="grid"></div>
+      <div class="overlay" id="startOverlay">
+        <h2>🤖 Ready to Code?</h2>
+        <p>Tap instruction blocks to build your program. Press <b style="color:var(--accent)">RUN</b> to watch the robot execute step-by-step.</p>
+        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;justify-content:center">
+          <span style="background:rgba(0,229,160,0.15);border:1px solid var(--accent);padding:4px 8px;border-radius:20px;font-size:10px;font-weight:800">↑ FORWARD</span>
+          <span style="background:rgba(0,184,255,0.15);border:1px solid var(--accent2);padding:4px 8px;border-radius:20px;font-size:10px;font-weight:800">↺ ↻ TURN</span>
+          <span style="background:rgba(255,204,51,0.15);border:1px solid var(--gold);padding:4px 8px;border-radius:20px;font-size:10px;font-weight:800">✋ ACT</span>
+        </div>
+        <button class="btn-primary" id="dismissStart">START CODING →</button>
+      </div>
+      <div class="overlay hidden" id="winOverlay">
+        <h2 id="winTitle">✅ Upload Complete!</h2>
+        <p id="winDesc">You reached the gate.</p>
+        <div class="overlay-stats">
+          <div class="o-stat"><b id="winSteps">0</b><span>STEPS USED</span></div>
+          <div class="o-stat"><b id="winChips">0/0</b><span>CHIPS</span></div>
+          <div class="o-stat"><b id="winStars">★ ★ ★</b><span>STARS</span></div>
+        </div>
+        <div class="stars-row" id="winStarsRow" style="margin-top:10px;justify-content:center"></div>
+        <button class="btn-primary" id="nextBtn">NEXT MISSION →</button>
+        <button class="btn-secondary" id="replayBtn">Replay</button>
+      </div>
+      <div class="overlay hidden" id="failOverlay">
+        <h2>⚠️ Run Failed</h2>
+        <p id="failDesc">The robot didn't reach the gate. Adjust your program and try again.</p>
+        <button class="btn-primary" id="retryBtn">EDIT PROGRAM</button>
+        <button class="btn-secondary" id="resetFailBtn">Reset Maze</button>
+      </div>
+    </div>
+    <div class="limit-bar" id="limitBar"></div>
+    <div class="limit-label"><span id="limitLabel">0 / 6 instructions</span><span id="optimalLabel">Optimal: 4</span></div>
+  </div>
+
+  <div class="program-panel">
+    <div class="panel-title">INSTRUCTION PALETTE <span style="color:var(--muted);font-weight:600">tap to queue</span></div>
+    <div class="palette">
+      <button class="pal-btn forward" data-ins="F"><b>↑</b>FORWARD<small>MOVE 1 TILE</small></button>
+      <button class="pal-btn left" data-ins="L"><b>↺</b>TURN LEFT<small>ROTATE 90°</small></button>
+      <button class="pal-btn right" data-ins="R"><b>↻</b>TURN RIGHT<small>ROTATE 90°</small></button>
+      <button class="pal-btn act" data-ins="A"><b>✋</b>INTERACT<small>CHIP / SWITCH</small></button>
+    </div>
+    <div class="queue-wrap">
+      <div class="queue-title"><span>PROGRAM QUEUE</span><span id="queueCount">0 queued</span></div>
+      <div class="queue" id="queue"></div>
+    </div>
+    <div class="controls">
+      <button class="ctrl-btn undo" id="undoBtn">↩ UNDO</button>
+      <button class="ctrl-btn clear" id="clearBtn">✕ CLEAR</button>
+      <button class="ctrl-btn run" id="runBtn">▶ RUN</button>
+    </div>
+    <div class="run-row">
+      <button class="ctrl-btn undo" id="stepBtn">⏭ STEP</button>
+      <button class="ctrl-btn undo" id="resetBtn">↺ RESET</button>
+    </div>
+    <div class="log-wrap" id="logWrap">
+      <div class="log-title">RUN LOG <span id="logStatus" style="float:right;color:var(--muted);font-weight:600">idle</span></div>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <span>💾 Stars & medals saved locally • Touch & keyboard (F/L/R/A, Enter, Backspace)</span>
+  <span id="progressLabel">1/6 missions</span>
+</div>
+
+<script>
+const LEVELS=[
+  {
+    id:1, name:"First Steps", desc:"Move forward to the upload gate. Learn FORWARD.",
+    rows:5, cols:5, limit:6, optimal:4,
+    start:{x:0,y:2,dir:1},
+    walls:[],
+    chips:[],
+    switches:[],
+    doors:[],
+    gate:{x:4,y:2}
+  },
+  {
+    id:2, name:"Turn Training", desc:"Walls block the way — turn to navigate the corridor.",
+    rows:5, cols:5, limit:10, optimal:7,
+    start:{x:0,y:0,dir:1},
+    walls:[[1,0],[1,1],[1,2],[3,2],[3,3],[3,4]],
+    chips:[{x:2,y:0}],
+    switches:[],
+    doors:[],
+    gate:{x:4,y:4}
+  },
+  {
+    id:3, name:"Chip Collectors", desc:"Collect all 3 chips, then reach the gate. Use INTERACT on chips.",
+    rows:6, cols:6, limit:14, optimal:11,
+    start:{x:0,y:0,dir:1},
+    walls:[[2,2],[2,3],[3,2],[3,3]],
+    chips:[{x:1,y:2},{x:4,y:1},{x:3,y:5}],
+    switches:[],
+    doors:[],
+    gate:{x:5,y:5}
+  },
+  {
+    id:4, name:"Switch & Door", desc:"Press the switch (✋) to open the orange door, then upload.",
+    rows:6, cols:6, limit:14, optimal:10,
+    start:{x:0,y:2,dir:1},
+    walls:[[1,0],[1,1],[1,3],[1,4],[1,5],[3,0],[3,1],[3,3],[3,4],[3,5]],
+    chips:[{x:2,y:1}],
+    switches:[{x:2,y:2, doorId:1}],
+    doors:[{x:3,y:2, id:1}],
+    gate:{x:5,y:2}
+  },
+  {
+    id:5, name:"Two Gates", desc:"Two switches, two doors. Order matters — plan your queue!",
+    rows:7, cols:7, limit:18, optimal:14,
+    start:{x:0,y:3,dir:1},
+    walls:[[1,1],[1,2],[1,4],[1,5],[2,1],[2,5],[4,1],[4,5],[5,1],[5,2],[5,4],[5,5]],
+    chips:[{x:3,y:1},{x:3,y:5}],
+    switches:[{x:2,y:3, doorId:1},{x:4,y:3, doorId:2}],
+    doors:[{x:3,y:2, id:1},{x:3,y:4, id:2}],
+    gate:{x:6,y:3}
+  },
+  {
+    id:6, name:"Tight Code", desc:"Tight limit! Collect 2 chips and upload in ≤12 steps. Optimize!",
+    rows:6, cols:6, limit:12, optimal:10,
+    start:{x:0,y:5,dir:0},
+    walls:[[1,1],[1,2],[1,4],[2,4],[3,1],[3,2],[4,1]],
+    chips:[{x:2,y:0},{x:5,y:2}],
+    switches:[{x:3,y:3, doorId:1}],
+    doors:[{x:3,y:4, id:1}],
+    gate:{x:5,y:5}
+  }
+];
+
+let currentLevel=0;
+let queue=[];
+let isRunning=false;
+let stepIndex=-1;
+let robotState=null;
+let chipState=[], doorState=[], switchState=[];
+let progress={};
+
+function loadProgress(){
+  try{ progress=JSON.parse(localStorage.getItem('roboQueue_progress')||'{}'); }catch(e){progress={}}
+  if(!progress.levels) progress.levels={};
+}
+function saveProgress(){
+  try{ localStorage.setItem('roboQueue_progress', JSON.stringify(progress)); }catch(e){}
+}
+loadProgress();
+
+function getLevelStars(lvlId){
+  return (progress.levels[lvlId] && progress.levels[lvlId].stars) || 0;
+}
+function updateHeader(){
+  const nav=document.getElementById('levelNav');
+  nav.innerHTML='';
+  LEVELS.forEach((lvl,i)=>{
+    const btn=document.createElement('button');
+    btn.textContent=lvl.id;
+    if(i===currentLevel) btn.className='active';
+    else if(getLevelStars(lvl.id)>0) btn.className='done';
+    btn.onclick=()=>{ if(!isRunning) loadLevel(i); };
+    nav.appendChild(btn);
+  });
+  let total=0, medals=0;
+  LEVELS.forEach(l=>{ const s=getLevelStars(l.id); total+=s; if(s>=3) medals++; else if(s>=2) medals+=0.5; });
+  document.getElementById('totalStars').textContent='★ '+total;
+  document.getElementById('medalPill').textContent='🏅 '+medals;
+  document.getElementById('progressLabel').textContent=(currentLevel+1)+'/'+LEVELS.length+' missions';
+}
+
+const gridEl=document.getElementById('grid');
+const queueEl=document.getElementById('queue');
+const logEl=document.getElementById('log');
+
+function loadLevel(idx){
+  currentLevel=idx;
+  const lvl=LEVELS[idx];
+  queue=[]; isRunning=false; stepIndex=-1;
+  // reset dynamic state
+  chipState=lvl.chips.map(c=>({...c, collected:false}));
+  doorState=lvl.doors.map(d=>({...d, open:false}));
+  switchState=lvl.switches.map(s=>({...s, pressed:false}));
+  robotState={x:lvl.start.x, y:lvl.start.y, dir:lvl.start.dir};
+  document.getElementById('missionLabel').textContent='MISSION '+String(lvl.id).padStart(2,'0');
+  document.getElementById('missionName').textContent=lvl.name;
+  document.getElementById('missionDesc').textContent=lvl.desc;
+  document.getElementById('optimalLabel').textContent='Optimal: '+lvl.optimal;
+  document.getElementById('startOverlay').classList.add('hidden');
+  document.getElementById('winOverlay').classList.add('hidden');
+  document.getElementById('failOverlay').classList.add('hidden');
+  // show start only first time
+  if(idx===0 && !progress.seenIntro){
+    document.getElementById('startOverlay').classList.remove('hidden');
+    progress.seenIntro=true; saveProgress();
+  }
+  renderGrid();
+  renderQueue();
+  renderLog(true);
+  updateHeader();
+  updateStarsRow();
+  updateLimitBar();
+}
+
+function isWall(x,y){
+  const lvl=LEVELS[currentLevel];
+  return lvl.walls.some(w=>w[0]===x && w[1]===y);
+}
+function getDoorAt(x,y){
+  return doorState.find(d=>d.x===x && d.y===y);
+}
+function getChipAt(x,y){
+  return chipState.find(c=>c.x===x && c.y===y && !c.collected);
+}
+function getSwitchAt(x,y){
+  return switchState.find(s=>s.x===x && s.y===y);
+}
+function isBlocked(x,y){
+  if(x<0||y<0||x>=LEVELS[currentLevel].cols||y>=LEVELS[currentLevel].rows) return true;
+  if(isWall(x,y)) return true;
+  const door=getDoorAt(x,y);
+  if(door && !door.open) return true;
+  return false;
+}
+
+function renderGrid(){
+  const lvl=LEVELS[currentLevel];
+  gridEl.style.gridTemplateColumns=`repeat(${lvl.cols}, 1fr)`;
+  gridEl.style.gridTemplateRows=`repeat(${lvl.rows}, 1fr)`;
+  gridEl.innerHTML='';
+  for(let y=0;y<lvl.rows;y++){
+    for(let x=0;x<lvl.cols;x++){
+      const cell=document.createElement('div');
+      cell.className='cell';
+      if(isWall(x,y)) cell.classList.add('wall');
+      if(lvl.gate.x===x && lvl.gate.y===y) cell.classList.add('gate');
+      const door=getDoorAt(x,y);
+      if(door){ cell.classList.add('door'); if(door.open) cell.classList.add('open'); }
+      // contents
+      const chip=getChipAt(x,y);
+      if(chip) cell.innerHTML='<span class="chip-icon">🔷</span>';
+      const sw=getSwitchAt(x,y);
+      if(sw){
+        const pressed=sw.pressed;
+        cell.innerHTML=(cell.innerHTML||'')+`<span class="switch-icon">${pressed?'🟢':'🔘'}</span>`;
+        if(pressed) cell.style.boxShadow='0 0 10px rgba(0,229,160,0.4)';
+      }
+      if(door){
+        cell.innerHTML=(cell.innerHTML||'')+`<span class="door-icon">${door.open?'🟩':'🟧'}</span>`;
+      }
+      if(lvl.gate.x===x && lvl.gate.y===y) cell.innerHTML=(cell.innerHTML||'')+'<span class="gate-icon">⬢</span>';
+      // robot
+      if(robotState.x===x && robotState.y===y){
+        const r=document.createElement('div');
+        r.className='robot dir-'+robotState.dir;
+        r.id='robotEl';
+        r.textContent='🤖';
+        cell.appendChild(r);
+      }
+      gridEl.appendChild(cell);
+    }
+  }
+}
+
+function renderQueue(){
+  queueEl.innerHTML='';
+  const map={F:{icon:'↑',cls:'forward'}, L:{icon:'↺',cls:'left'}, R:{icon:'↻',cls:'right'}, A:{icon:'✋',cls:'act'}};
+  queue.forEach((ins,i)=>{
+    const d=document.createElement('div');
+    d.className='q-item '+map[ins].cls;
+    if(i===stepIndex) d.classList.add('active');
+    if(stepIndex>=0 && i<stepIndex) d.classList.add('done');
+    d.innerHTML=map[ins].icon+`<span class="q-num">${i+1}</span>`;
+    d.title='Tap to remove';
+    d.onclick=()=>{ if(!isRunning){ queue.splice(i,1); renderQueue(); updateLimitBar(); } };
+    queueEl.appendChild(d);
+  });
+  if(queue.length===0) queueEl.innerHTML='<span style="font-size:10px;color:var(--muted);padding:6px">No instructions yet — tap palette above</span>';
+  document.getElementById('queueCount').textContent=queue.length+' queued';
+  document.getElementById('limitLabel').textContent=queue.length+' / '+LEVELS[currentLevel].limit+' instructions';
+  updateLimitBar();
+  updateButtons();
+}
+
+function updateLimitBar(){
+  const lvl=LEVELS[currentLevel];
+  const bar=document.getElementById('limitBar');
+  bar.innerHTML='';
+  for(let i=0;i<lvl.limit;i++){
+    const seg=document.createElement('div');
+    seg.className='limit-seg';
+    if(i<queue.length) seg.classList.add('used');
+    if(queue.length>lvl.limit) seg.classList.add('over');
+    bar.appendChild(seg);
+  }
+  if(queue.length>lvl.limit){
+    document.getElementById('limitLabel').style.color='var(--warn)';
+  } else document.getElementById('limitLabel').style.color='';
+}
+
+function updateButtons(){
+  const overLimit=queue.length>LEVELS[currentLevel].limit;
+  document.getElementById('runBtn').disabled=isRunning || queue.length===0 || overLimit;
+  document.getElementById('stepBtn').disabled=isRunning || queue.length===0 || overLimit;
+  document.getElementById('undoBtn').disabled=isRunning || queue.length===0;
+  document.getElementById('clearBtn').disabled=isRunning || queue.length===0;
+}
+
+function updateStarsRow(){
+  const stars=getLevelStars(LEVELS[currentLevel].id);
+  const row=document.getElementById('starsRow');
+  [...row.children].forEach((s,i)=>{ s.classList.toggle('on', i<stars); });
+}
+
+function renderLog(clear=false){
+  if(clear) logEl.innerHTML='';
+}
+function addLog(msg, type='info'){
+  const e=document.createElement('div');
+  e.className='log-entry '+type;
+  e.innerHTML=msg;
+  logEl.appendChild(e);
+  logEl.parentElement.scrollTop=logEl.parentElement.scrollHeight;
+}
+
+function addInstruction(ins){
+  if(isRunning) return;
+  const lvl=LEVELS[currentLevel];
+  if(queue.length>=lvl.limit+2){ // allow slight over to show error
+    addLog('⚠️ Limit exceeded! Remove steps to run.', 'fail');
+    return;
+  }
+  queue.push(ins);
+  renderQueue();
+  // haptic
+  try{navigator.vibrate(20)}catch(e){}
+}
+
+function resetMaze(){
+  const lvl=LEVELS[currentLevel];
+  chipState=lvl.chips.map(c=>({...c, collected:false}));
+  doorState=lvl.doors.map(d=>({...d, open:false}));
+  switchState=lvl.switches.map(s=>({...s, pressed:false}));
+  robotState={x:lvl.start.x, y:lvl.start.y, dir:lvl.start.dir};
+  stepIndex=-1; isRunning=false;
+  renderGrid(); renderQueue(); renderLog(true);
+  document.getElementById('logStatus').textContent='idle';
+  document.getElementById('logStatus').style.color='';
+  document.getElementById('failOverlay').classList.add('hidden');
+  document.getElementById('winOverlay').classList.add('hidden');
+  updateButtons();
+}
+
+async function runProgram(stepMode=false){
+  if(isRunning) return;
+  if(queue.length===0) return;
+  if(queue.length>LEVELS[currentLevel].limit){
+    addLog('❌ Program too long — exceeds limit of '+LEVELS[currentLevel].limit, 'fail');
+    return;
+  }
+  // reset state before run
+  const lvl=LEVELS[currentLevel];
+  chipState=lvl.chips.map(c=>({...c, collected:false}));
+  doorState=lvl.doors.map(d=>({...d, open:false}));
+  switchState=lvl.switches.map(s=>({...s, pressed:false}));
+  robotState={x:lvl.start.x, y:lvl.start.y, dir:lvl.start.dir};
+  stepIndex=-1;
+  renderGrid(); renderLog(true);
+  document.getElementById('logStatus').textContent='running…';
+  document.getElementById('logStatus').style.color='var(--accent)';
+  isRunning=true; updateButtons();
+  const dirs=[[0,-1],[1,0],[0,1],[-1,0]]; // N,E,S,W
+  for(let i=0;i<queue.length;i++){
+    stepIndex=i; renderQueue();
+    const ins=queue[i];
+    let msg='', type='ok';
+    if(ins==='F'){
+      const nx=robotState.x+dirs[robotState.dir][0];
+      const ny=robotState.y+dirs[robotState.dir][1];
+      if(isBlocked(nx,ny)){
+        msg=`<b>${i+1}. FORWARD</b> — blocked at (${nx},${ny})`;
+        type='fail';
+        addLog(msg, type);
+        // bump anim
+        const r=document.getElementById('robotEl');
+        if(r){ r.classList.add('bump'); setTimeout(()=>r.classList.remove('bump'),300); }
+      } else {
+        robotState.x=nx; robotState.y=ny;
+        msg=`<b>${i+1}. FORWARD</b> → (${nx},${ny})`;
+        type='ok';
+        addLog(msg, type);
+      }
+    } else if(ins==='L'){
+      robotState.dir=(robotState.dir+3)%4;
+      msg=`<b>${i+1}. TURN LEFT</b> → facing ${['N','E','S','W'][robotState.dir]}`;
+      addLog(msg, 'info');
+    } else if(ins==='R'){
+      robotState.dir=(robotState.dir+1)%4;
+      msg=`<b>${i+1}. TURN RIGHT</b> → facing ${['N','E','S','W'][robotState.dir]}`;
+      addLog(msg, 'info');
+    } else if(ins==='A'){
+      const chip=getChipAt(robotState.x, robotState.y);
+      const sw=getSwitchAt(robotState.x, robotState.y);
+      if(chip){
+        chip.collected=true;
+        msg=`<b>${i+1}. INTERACT</b> — collected chip at (${chip.x},${chip.y}) ✓`;
+        type='ok';
+        addLog(msg, type);
+      } else if(sw && !sw.pressed){
+        sw.pressed=true;
+        // open linked door
+        const door=doorState.find(d=>d.id===sw.doorId);
+        if(door) door.open=true;
+        msg=`<b>${i+1}. INTERACT</b> — switch triggered! Door opened`;
+        type='ok';
+        addLog(msg, type);
+      } else {
+        msg=`<b>${i+1}. INTERACT</b> — nothing here`;
+        type='fail';
+        addLog(msg, type);
+      }
+    }
+    renderGrid();
+    if(stepMode){
+      isRunning=false; updateButtons();
+      document.getElementById('logStatus').textContent='paused — step '+(i+1);
+      return; // pause after one step, keep state
+    }
+    await new Promise(r=>setTimeout(r, 380));
+  }
+  isRunning=false; updateButtons();
+  // check win
+  const lvlGate=LEVELS[currentLevel].gate;
+  const atGate=robotState.x===lvlGate.x && robotState.y===lvlGate.y;
+  const allChips=chipState.every(c=>c.collected) || chipState.length===0;
+  const collectedCount=chipState.filter(c=>c.collected).length;
+  if(atGate){
+    // stars
+    let stars=1;
+    if(allChips) stars=2;
+    if(allChips && queue.length<=lvl.optimal) stars=3;
+    // save
+    const prev=progress.levels[lvl.id]?.stars||0;
+    if(stars>prev){
+      progress.levels[lvl.id]={stars, bestSteps:queue.length, medal: stars===3?'gold':stars===2?'silver':'bronze'};
+      saveProgress();
+    }
+    document.getElementById('winSteps').textContent=queue.length;
+    document.getElementById('winChips').textContent=collectedCount+'/'+lvl.chips.length;
+    document.getElementById('winStars').textContent='★'.repeat(stars)+'☆'.repeat(3-stars);
+    const winRow=document.getElementById('winStarsRow');
+    winRow.innerHTML='';
+    for(let i=0;i<3;i++){ const s=document.createElement('span'); s.textContent='★'; s.className='star'+(i<stars?' on':''); s.style.fontSize='22px'; winRow.appendChild(s); }
+    document.getElementById('winTitle').textContent= stars===3 ? '🌟 Perfect Upload!' : '✅ Upload Complete!';
+    document.getElementById('winDesc').textContent= stars===3 ? 'Optimal code! All chips + tight limit.' : allChips ? 'Great job — all chips collected!' : 'Gate reached — try collecting all chips for more stars.';
+    document.getElementById('winOverlay').classList.remove('hidden');
+    document.getElementById('logStatus').textContent='success ★'+stars;
+    document.getElementById('logStatus').style.color='var(--gold)';
+    updateHeader(); updateStarsRow();
+    try{navigator.vibrate([40,30,60])}catch(e){}
+  } else {
+    document.getElementById('failDesc').textContent= !allChips ? `You missed ${chipState.filter(c=>!c.collected).length} chip(s). Collect them with INTERACT before uploading.` : `Robot at (${robotState.x},${robotState.y}) — not at gate (${lvlGate.x},${lvlGate.y}).`;
+    document.getElementById('failOverlay').classList.remove('hidden');
+    document.getElementById('logStatus').textContent='failed';
+    document.getElementById('logStatus').style.color='var(--warn)';
+  }
+}
+
+// Palette clicks
+document.querySelectorAll('.pal-btn').forEach(b=>{
+  b.addEventListener('click', ()=> addInstruction(b.dataset.ins));
+  b.addEventListener('touchstart', (e)=>{ e.preventDefault(); addInstruction(b.dataset.ins); }, {passive:false});
+});
+document.getElementById('undoBtn').onclick=()=>{ if(queue.length){ queue.pop(); renderQueue(); } };
+document.getElementById('clearBtn').onclick=()=>{ queue=[]; renderQueue(); renderLog(true); document.getElementById('logStatus').textContent='idle'; };
+document.getElementById('runBtn').onclick=()=> runProgram(false);
+document.getElementById('stepBtn').onclick=()=>{
+  if(stepIndex===-1 && !isRunning){
+    // start step mode from beginning - need to reset
+    const lvl=LEVELS[currentLevel];
+    chipState=lvl.chips.map(c=>({...c, collected:false}));
+    doorState=lvl.doors.map(d=>({...d, open:false}));
+    switchState=lvl.switches.map(s=>({...s, pressed:false}));
+    robotState={x:lvl.start.x, y:lvl.start.y, dir:lvl.start.dir};
+    renderGrid(); renderLog(true);
+  }
+  // continue stepping
+  // we need to handle step continuation: if paused, continue from next index
+  // For simplicity, if not running, run one step from current stepIndex+1
+  if(isRunning) return;
+  // create a temporary run of one step
+  (async()=>{
+    if(queue.length>LEVELS[currentLevel].limit){ addLog('❌ Over limit', 'fail'); return; }
+    const nextIdx=stepIndex+1;
+    if(nextIdx>=queue.length){
+      // check win
+      const lvlGate=LEVELS[currentLevel].gate;
+      const atGate=robotState.x===lvlGate.x && robotState.y===lvlGate.y;
+      if(atGate) runProgram(false); // trigger win check via full run? Instead just evaluate
+      else { document.getElementById('failOverlay').classList.remove('hidden'); }
+      return;
+    }
+    stepIndex=nextIdx;
+    renderQueue();
+    const ins=queue[nextIdx];
+    const dirs=[[0,-1],[1,0],[0,1],[-1,0]];
+    let msg='', type='ok';
+    if(ins==='F'){
+      const nx=robotState.x+dirs[robotState.dir][0];
+      const ny=robotState.y+dirs[robotState.dir][1];
+      if(isBlocked(nx,ny)){ msg=`<b>${nextIdx+1}. FORWARD</b> — blocked`; type='fail'; addLog(msg,type); }
+      else { robotState.x=nx; robotState.y=ny; msg=`<b>${nextIdx+1}. FORWARD</b> → (${nx},${ny})`; addLog(msg,'ok'); }
+    } else if(ins==='L'){ robotState.dir=(robotState.dir+3)%4; msg=`<b>${nextIdx+1}. TURN LEFT</b>`; addLog(msg,'info'); }
+    else if(ins==='R'){ robotState.dir=(robotState.dir+1)%4; msg=`<b>${nextIdx+1}. TURN RIGHT</b>`; addLog(msg,'info'); }
+    else if(ins==='A'){
+      const chip=getChipAt(robotState.x, robotState.y);
+      const sw=getSwitchAt(robotState.x, robotState.y);
+      if(chip){ chip.collected=true; msg=`<b>${nextIdx+1}. INTERACT</b> — chip ✓`; addLog(msg,'ok'); }
+      else if(sw && !sw.pressed){ sw.pressed=true; const door=doorState.find(d=>d.id===sw.doorId); if(door) door.open=true; msg=`<b>${nextIdx+1}. INTERACT</b> — switch!`; addLog(msg,'ok'); }
+      else { msg=`<b>${nextIdx+1}. INTERACT</b> — nothing`; addLog(msg,'fail'); }
+    }
+    renderGrid();
+    document.getElementById('logStatus').textContent='step '+(nextIdx+1)+'/'+queue.length;
+    // if last step, check win after short delay
+    if(nextIdx===queue.length-1){
+      setTimeout(()=>{
+        const lvlGate=LEVELS[currentLevel].gate;
+        const atGate=robotState.x===lvlGate.x && robotState.y===lvlGate.y;
+        const allChips=chipState.every(c=>c.collected);
+        if(atGate){
+          let stars=1; if(allChips) stars=2; if(allChips && queue.length<=LEVELS[currentLevel].optimal) stars=3;
+          const prev=progress.levels[LEVELS[currentLevel].id]?.stars||0;
+          if(stars>prev){ progress.levels[LEVELS[currentLevel].id]={stars, bestSteps:queue.length}; saveProgress(); }
+          document.getElementById('winSteps').textContent=queue.length;
+          document.getElementById('winChips').textContent=chipState.filter(c=>c.collected).length+'/'+LEVELS[currentLevel].chips.length;
+          document.getElementById('winStars').textContent='★'.repeat(stars)+'☆'.repeat(3-stars);
+          const winRow=document.getElementById('winStarsRow'); winRow.innerHTML=''; for(let i=0;i<3;i++){ const s=document.createElement('span'); s.textContent='★'; s.className='star'+(i<stars?' on':''); s.style.fontSize='22px'; winRow.appendChild(s); }
+          document.getElementById('winOverlay').classList.remove('hidden');
+          updateHeader(); updateStarsRow();
+        }
+      },300);
+    }
+  })();
+};
+document.getElementById('resetBtn').onclick=resetMaze;
+document.getElementById('dismissStart').onclick=()=> document.getElementById('startOverlay').classList.add('hidden');
+document.getElementById('retryBtn').onclick=()=> document.getElementById('failOverlay').classList.add('hidden');
+document.getElementById('resetFailBtn').onclick=resetMaze;
+document.getElementById('replayBtn').onclick=()=>{ document.getElementById('winOverlay').classList.add('hidden'); resetMaze(); };
+document.getElementById('nextBtn').onclick=()=>{
+  document.getElementById('winOverlay').classList.add('hidden');
+  if(currentLevel < LEVELS.length-1) loadLevel(currentLevel+1);
+  else { loadLevel(0); }
+};
+
+// Keyboard
+document.addEventListener('keydown', e=>{
+  const k=e.key.toLowerCase();
+  if(k==='f' || k==='arrowup') addInstruction('F');
+  else if(k==='l' || k==='arrowleft') addInstruction('L');
+  else if(k==='r' || k==='arrowright') addInstruction('R');
+  else if(k==='a' || k===' ') { e.preventDefault(); addInstruction('A'); }
+  else if(k==='enter'){ if(!isRunning) runProgram(false); }
+  else if(k==='backspace'){ if(queue.length){ queue.pop(); renderQueue(); } }
+  else if(k==='escape'){ resetMaze(); }
+});
+
+// Init
+loadLevel(0);
+</script>
+</body>
+</html>

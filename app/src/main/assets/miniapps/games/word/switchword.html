@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Word Ladder Party</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden;width:100%;background:#0f172a;color:#f1f5f9;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+body{font-size:16px;line-height:1.5;-webkit-tap-highlight-color:transparent}
+.app{width:100%;max-width:428px;min-width:360px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:linear-gradient(180deg,#0f172a 0%,#1e1b4b 45%,#0f172a 100%);padding:10px 12px 14px}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 4px 10px}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-badge{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#f59e0b,#ec4899);display:grid;place-items:center;font-weight:900;font-size:18px;letter-spacing:0.5px;box-shadow:0 4px 12px rgba(236,72,153,.4)}
+.logo h1{font-size:18px;line-height:1.1;font-weight:800}
+.logo p{font-size:11px;opacity:.7;letter-spacing:.6px;text-transform:uppercase}
+.stats{display:flex;gap:8px}
+.stat{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:6px 10px;min-width:68px;text-align:center}
+.stat b{display:block;font-size:16px;line-height:1}
+.stat span{font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.5px}
+.target-card{background:#fff;color:#0f172a;border-radius:18px;padding:14px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);margin-bottom:10px}
+.word-box{text-align:center;flex:1}
+.word-box small{font-size:10px;letter-spacing:.8px;text-transform:uppercase;opacity:.6;font-weight:700}
+.word-display{font-size:22px;font-weight:900;letter-spacing:3px;margin-top:2px}
+.word-display.target{color:#7c3aed}
+.arrow{width:36px;height:36px;border-radius:50%;background:#f1f5f9;display:grid;place-items:center;font-size:18px;flex-shrink:0}
+.meta-row{display:flex;gap:8px;margin-bottom:10px}
+.meta{flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between}
+.meta b{font-size:14px}
+.meta span{font-size:12px;opacity:.8}
+.timer-wrap{margin-bottom:10px}
+.timer-bar{height:10px;background:rgba(255,255,255,.12);border-radius:999px;overflow:hidden}
+.timer-fill{height:100%;width:100%;background:linear-gradient(90deg,#22c55e,#f59e0b);transition:width .4s linear}
+.timer-text{display:flex;justify-content:space-between;font-size:12px;margin-top:6px;opacity:.9}
+.ladder-wrap{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:12px;flex:1;display:flex;flex-direction:column;min-height:220px}
+.ladder-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.ladder-head h2{font-size:13px;letter-spacing:.6px;text-transform:uppercase;opacity:.8}
+.moves{font-size:12px;background:#fff;color:#0f172a;padding:4px 10px;border-radius:999px;font-weight:800}
+.ladder{flex:1;overflow-y:auto;max-height:34vh;display:flex;flex-direction:column;gap:6px;padding-right:4px;scroll-behavior:smooth}
+.step{display:flex;align-items:center;gap:6px;background:#fff;color:#0f172a;border-radius:12px;padding:8px 10px;box-shadow:0 2px 8px rgba(0,0,0,.12);animation:pop .2s ease}
+.step.start{border-left:4px solid #22c55e}
+.step.target{border-left:4px solid #7c3aed;background:linear-gradient(90deg,#fff,#ede9fe)}
+.step.current{outline:2px solid #f59e0b;outline-offset:1px}
+.letters{display:flex;gap:4px}
+.letter{width:28px;height:32px;border-radius:8px;background:#f1f5f9;display:grid;place-items:center;font-weight:900;font-size:16px;border:1px solid #e2e8f0}
+.letter.changed{background:#fef3c7;border-color:#f59e0b;color:#92400e}
+.step-num{font-size:11px;font-weight:800;opacity:.5;min-width:18px}
+.input-area{margin-top:10px;background:#fff;border-radius:16px;padding:10px 10px 8px;color:#0f172a}
+.input-label{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;opacity:.6;display:flex;justify-content:space-between}
+.input-letters{display:flex;gap:6px;justify-content:center;margin:8px 0 6px}
+.input-letters .box{width:42px;height:46px;border-radius:10px;border:2px solid #e2e8f0;display:grid;place-items:center;font-weight:900;font-size:20px;background:#f8fafc;text-transform:uppercase}
+.input-letters .box.filled{border-color:#7c3aed;background:#ede9fe}
+.input-letters .box.active{border-color:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.2)}
+.hint-text{font-size:12px;min-height:16px;text-align:center;color:#dc2626;font-weight:600}
+.hint-text.ok{color:#16a34a}
+.keyboard{display:grid;gap:6px;margin-top:8px}
+.kb-row{display:flex;gap:6px;justify-content:center}
+.kb-key{flex:1;max-width:52px;min-height:44px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.12);color:#fff;font-weight:800;font-size:16px;display:grid;place-items:center;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.kb-key:active{transform:scale(.96);background:rgba(255,255,255,.22)}
+.kb-key.wide{max-width:78px;background:#f59e0b;color:#0f172a;border-color:transparent;font-size:13px}
+.kb-key.enter{background:#7c3aed;border-color:transparent}
+.controls{display:flex;gap:8px;margin-top:10px}
+.btn{flex:1;min-height:48px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;touch-action:manipulation}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:#fff;color:#0f172a;border-color:transparent}
+.btn.ghost{opacity:.9}
+.difficulty{display:flex;gap:6px;margin:10px 0 6px}
+.diff{flex:1;min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-weight:800;font-size:13px}
+.diff.active{background:#7c3aed;border-color:#7c3aed;box-shadow:0 4px 12px rgba(124,58,237,.4)}
+.footer{font-size:11px;opacity:.6;text-align:center;margin-top:8px}
+.modal{position:fixed;inset:0;background:rgba(2,6,23,.72);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
+.modal.open{display:flex}
+.card{background:#fff;color:#0f172a;border-radius:20px;padding:18px 16px;max-width:400px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,.3);max-height:90vh;overflow:auto}
+.card h3{font-size:18px;margin-bottom:6px}
+.card p{font-size:14px;opacity:.8;line-height:1.5}
+.card ul{margin:8px 0 0 18px;font-size:13px;opacity:.85}
+.card ul li{margin:4px 0}
+.card .actions{display:flex;gap:8px;margin-top:14px}
+.card .actions button{flex:1;min-height:48px;border-radius:12px;border:0;font-weight:800;font-size:14px}
+.primary-btn{background:#7c3aed;color:#fff}
+.secondary-btn{background:#f1f5f9;color:#0f172a}
+.badge{display:inline-flex;align-items:center;gap:4px;background:#fef3c7;color:#92400e;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800}
+@keyframes pop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.shake{animation:shake .25s ease}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="logo">
+      <div class="logo-badge">W↔W</div>
+      <div>
+        <h1>Word Ladder Party</h1>
+        <p>Swap one letter • Climb to the top</p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="bestScore">0</b><span>Best</span></div>
+      <div class="stat"><b id="streak">0🔥</b><span>Streak</span></div>
+    </div>
+  </header>
+
+  <div class="target-card">
+    <div class="word-box"><small>Start</small><div class="word-display" id="startWord">CAT</div></div>
+    <div class="arrow">→</div>
+    <div class="word-box"><small>Target</small><div class="word-display target" id="targetWord">DOG</div></div>
+    <div class="arrow">🎯</div>
+  </div>
+
+  <div class="meta-row">
+    <div class="meta"><span>Score</span><b id="score">0</b></div>
+    <div class="meta"><span>Level</span><b id="level">1</b></div>
+    <div class="meta"><span>Length</span><b id="lenBadge">3</b></div>
+  </div>
+
+  <div class="difficulty">
+    <button class="diff active" data-len="3">3 Letters</button>
+    <button class="diff" data-len="4">4 Letters</button>
+    <button class="diff" data-len="5">5 Letters</button>
+  </div>
+
+  <div class="timer-wrap">
+    <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
+    <div class="timer-text"><span id="timerText">75s left</span><span id="movesText">0 moves</span></div>
+  </div>
+
+  <div class="ladder-wrap">
+    <div class="ladder-head"><h2>Your Ladder</h2><span class="moves" id="movesBadge">0 steps</span></div>
+    <div class="ladder" id="ladder"></div>
+    <div class="input-area">
+      <div class="input-label"><span>Next word</span><span id="hintBtn" style="color:#7c3aed;cursor:pointer">💡 Hint</span></div>
+      <div class="input-letters" id="inputLetters"></div>
+      <div class="hint-text" id="hintText">Change exactly ONE letter to make a real word</div>
+      <div class="keyboard" id="keyboard"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn ghost" id="undoBtn">↩ Undo</button>
+    <button class="btn ghost" id="howBtn">? How</button>
+    <button class="btn primary" id="newBtn">↻ New Ladder</button>
+  </div>
+  <div class="footer">Large tap targets • No zoom needed • Works offline • Best score saved</div>
+</div>
+
+<div class="modal" id="howModal">
+  <div class="card">
+    <h3>How to Play</h3>
+    <p><b>Climb from START to TARGET</b> by changing <b>exactly one letter</b> each step. Every step must be a real word.</p>
+    <ul>
+      <li>Example: <b>CAT → COT → DOT → DOG</b></li>
+      <li>Tap letters or type, then press <b>Enter</b>. One letter different only!</li>
+      <li>Beat the timer for bonus points. Streaks multiply your score.</li>
+      <li>Use <b>Hint</b> if stuck, <b>Undo</b> to backtrack.</li>
+      <li>3 letters = quick party, 4-5 letters = brain burner.</li>
+    </ul>
+    <div class="actions"><button class="primary-btn" id="closeHow">Let's Play!</button></div>
+  </div>
+</div>
+
+<div class="modal" id="winModal">
+  <div class="card">
+    <h3 id="winTitle">🎉 Ladder Complete!</h3>
+    <p id="winDesc">You climbed in 3 moves!</p>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <span class="badge" id="winScore">+100 pts</span>
+      <span class="badge" id="winStreak">🔥 Streak 1</span>
+      <span class="badge" id="winTime">⏱ 42s left</span>
+    </div>
+    <div class="actions">
+      <button class="secondary-btn" id="winClose">Close</button>
+      <button class="primary-btn" id="nextLadder">Next Ladder →</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="loseModal">
+  <div class="card">
+    <h3>⏰ Time's Up!</h3>
+    <p id="loseDesc">You were so close! The target was DOG.</p>
+    <p style="margin-top:8px;font-size:13px;opacity:.7">Streak reset. Try a new ladder — you got this!</p>
+    <div class="actions"><button class="primary-btn" id="tryAgain">Try Again</button></div>
+  </div>
+</div>
+
+<script>
+const DICTS={
+3:["cat","cot","cog","dog","dot","hot","hit","hat","bat","bet","bit","but","cut","cup","cap","map","man","men","pen","pin","pan","pat","pot","pit","sit","sat","set","sea","tea","toe","top","tip","tap","tan","ten","tin","win","wit","wet","pet","peg","pig","big","bag","bog","log","lag","leg","let","lot","lit","lid","lad","mad","mat","met","net","not","nut","gut","gun","run","sun","fun","bun","bus","bug","rug","rag","ram","rim","dim","dam","jam","ham","hum","sum","sup","sip","zip","zap","lap","lip","lop","cop","cob","cub","rub","rob","rod","red","bed","bad","fad","fan","fin","fit","fig","fog","fox","box","boy","buy","bay","day","may","way","saw","raw","law","low","cow","how","now","wow","pow","paw","pay","say","soy","joy","job","jog","jag","wag","wig","dig","fin","fat","hip","hop","hug","mug","mud","mad","mid","mix","fix","fox","six","sax","wax","tax","fax"],
+4:["cold","cord","card","ward","warm","word","worm","work","fork","form","foam","roam","road","load","lord","lore","love","live","life","lift","gift","gilt","gold","golf","wolf","hold","hole","home","hone","tone","tune","turn","tarn","tarp","care","came","game","gale","gate","gave","have","hate","late","lake","like","hike","hide","ride","rude","rule","mule","mole","mile","mild","mind","mine","wine","wind","wild","tile","tale","talk","walk","head","heal","teal","tell","tall","tail","pale","sale","sane","sand","hand","hard","hare","mate","make","take","time","tame","tire","fire","firm","farm","fort","port","part","pact","fact","face","lace","lack","luck","lock","look","book","boot","boat","coat","cost","cast","cask","task","tusk","tuck","duck","dark","dare","bare","bark","park","perk","peek","peel","feel","feet","fate","gait","wait","wail","mail","mall","malt","melt","felt","fall","fail","foil","foul","four","pour","tour","tore","tide","play","plan","clan","clay","slay","stay","star","scar","slam","slap","slat","seat","beat","bead","beak","peak","seal","seam","team","tram","trap","trip","grip","grin","grit","brat","brag","drag","crab","cram","ward","ware","wore","more","mice","mite","math","bath","bash","cash","most","must","musk","mask","mast","mart","mark","bean","been","weep","week","seek","seem","beam","bear","beer","beet","belt","best","bask"],
+5:["stone","atone","alone","along","aloft","bluff","blush","brush","crush","crust","trust","truss","truce","trace","track","crack","crank","crane","crone","clone","clove","glove","grove","grave","grape","graph","grasp","plant","plank","blank","blink","bring","brain","braid","brand","grand","grant","giant","light","night","sight","fight","flint","fling","sting","stink","stung","stoke","spoke","spike","spine","shine","shone","phone","phase","chase","chose","chore","charm","chart","heart","heard","beard","board","broad","bread","break","brake","brave","clown","flown","flock","clock","trick","truck","trunk","drunk","drank","store","stare","share","shark","spark","spare","spore","sport","spurt","spine","spice","slice","slick","stick","stock","stuck","stack","stark","stork","storm","story","stony","steak","steal","steel","wheel","whale","while","white","write","wrote","grind","grain","groan","grown","crown","brown","brave","crane","crone","stone","shone","phone","thorn","throne"]
+};
+let state={
+  len:3,
+  start:"",
+  target:"",
+  ladder:[],
+  pathHint:[],
+  input:"",
+  timeLeft:75,
+  timer:null,
+  score:0,
+  best: parseInt(localStorage.getItem('ladder_best')||'0'),
+  streak: parseInt(localStorage.getItem('ladder_streak')||'0'),
+  level: parseInt(localStorage.getItem('ladder_level')||'1'),
+  moves:0,
+  playing:false
+};
+const $=id=>document.getElementById(id);
+function differsByOne(a,b){
+  if(a.length!==b.length) return false;
+  let d=0;
+  for(let i=0;i<a.length;i++) if(a[i]!==b[i]) d++;
+  return d===1;
+}
+function getDict(len){ return DICTS[len].map(w=>w.toLowerCase()); }
+function getSet(len){ return new Set(getDict(len)); }
+function randomChoice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function neighbors(word,set){
+  const res=[];
+  for(const w of set){ if(differsByOne(word,w)) res.push(w); }
+  return res;
+}
+function generateLadder(len, steps=4){
+  const dict=getDict(len);
+  const set=new Set(dict);
+  let tries=0;
+  while(tries<80){
+    tries++;
+    let cur=randomChoice(dict);
+    let visited=new Set([cur]);
+    let path=[cur];
+    let ok=true;
+    for(let i=0;i<steps;i++){
+      const nbs=neighbors(cur,set).filter(w=>!visited.has(w));
+      if(nbs.length===0){ ok=false; break; }
+      cur=randomChoice(nbs);
+      visited.add(cur);
+      path.push(cur);
+    }
+    if(!ok) continue;
+    // ensure start and target not too similar (at least 2 letters diff)
+    const start=path[0], target=path[path.length-1];
+    let diff=0; for(let i=0;i<len;i++) if(start[i]!==target[i]) diff++;
+    if(diff<2) continue;
+    return {start,target,path};
+  }
+  // fallback curated
+  if(len===3) return {start:"cat",target:"dog",path:["cat","cot","dot","dog"]};
+  if(len===4) return {start:"cold",target:"warm",path:["cold","cord","word","warm"]};
+  return {start:"stone",target:"crane",path:["stone","stoke","spoke","spike","spine","shine","shone","phone","crone","crane"]};
+}
+function bfsHint(from,to,set){
+  if(from===to) return [from];
+  const q=[[from]];
+  const seen=new Set([from]);
+  while(q.length){
+    const path=q.shift();
+    const last=path[path.length-1];
+    for(const nb of neighbors(last,set)){
+      if(seen.has(nb)) continue;
+      const np=[...path,nb];
+      if(nb===to) return np;
+      seen.add(nb);
+      q.push(np);
+      if(q.length>800) break;
+    }
+    if(q.length>800) break;
+  }
+  return null;
+}
+function renderInput(){
+  const c=$('inputLetters');
+  c.innerHTML='';
+  for(let i=0;i<state.len;i++){
+    const ch=state.input[i]||'';
+    const d=document.createElement('div');
+    d.className='box'+(ch?' filled':'')+(i===state.input.length?' active':'');
+    d.textContent=ch.toUpperCase();
+    c.appendChild(d);
+  }
+}
+function renderLadder(){
+  const el=$('ladder');
+  el.innerHTML='';
+  state.ladder.forEach((w,idx)=>{
+    const prev=idx>0?state.ladder[idx-1]:null;
+    const row=document.createElement('div');
+    row.className='step'+(idx===0?' start':'')+(w===state.target?' target':'')+(idx===state.ladder.length-1?' current':'');
+    const num=document.createElement('div'); num.className='step-num'; num.textContent=idx+1;
+    const letters=document.createElement('div'); letters.className='letters';
+    for(let i=0;i<w.length;i++){
+      const l=document.createElement('div'); l.className='letter';
+      if(prev && prev[i]!==w[i]) l.classList.add('changed');
+      l.textContent=w[i].toUpperCase();
+      letters.appendChild(l);
+    }
+    const label=document.createElement('div'); label.style.cssText='margin-left:auto;font-size:11px;font-weight:800;opacity:.6';
+    label.textContent= idx===0?'START': w===state.target?'TARGET':'';
+    row.appendChild(num); row.appendChild(letters); row.appendChild(label);
+    el.appendChild(row);
+  });
+  el.scrollTop=el.scrollHeight;
+  $('movesBadge').textContent= (state.ladder.length-1)+' steps';
+  $('movesText').textContent= (state.ladder.length-1)+' moves';
+}
+function updateHeader(){
+  $('bestScore').textContent=state.best;
+  $('streak').textContent=state.streak+'🔥';
+  $('score').textContent=state.score;
+  $('level').textContent=state.level;
+  $('lenBadge').textContent=state.len;
+  $('startWord').textContent=state.start.toUpperCase();
+  $('targetWord').textContent=state.target.toUpperCase();
+}
+function setHint(msg,ok=false){
+  const h=$('hintText');
+  h.textContent=msg;
+  h.className='hint-text'+(ok?' ok':'');
+}
+function startTimer(){
+  clearInterval(state.timer);
+  const total= state.len===3?75: state.len===4?90:120;
+  state.timeLeft=total;
+  updateTimer();
+  state.timer=setInterval(()=>{
+    state.timeLeft--;
+    updateTimer();
+    if(state.timeLeft<=0){
+      clearInterval(state.timer);
+      state.playing=false;
+      state.streak=0;
+      localStorage.setItem('ladder_streak','0');
+      $('loseDesc').textContent=`You were climbing ${state.start.toUpperCase()} → ${state.target.toUpperCase()} and got to ${state.ladder[state.ladder.length-1].toUpperCase()}.`;
+      $('loseModal').classList.add('open');
+      try{navigator.vibrate&&navigator.vibrate([120,60,120])}catch(e){}
+    }
+  },1000);
+}
+function updateTimer(){
+  const total= state.len===3?75: state.len===4?90:120;
+  const pct=Math.max(0, state.timeLeft/total*100);
+  $('timerFill').style.width=pct+'%';
+  $('timerFill').style.background= state.timeLeft<15? 'linear-gradient(90deg,#ef4444,#f59e0b)': state.timeLeft<30? 'linear-gradient(90deg,#f59e0b,#22c55e)':'linear-gradient(90deg,#22c55e,#06b6d4)';
+  $('timerText').textContent= state.timeLeft+'s left';
+}
+function newGame(){
+  const gen=generateLadder(state.len, state.len===3?4: state.len===4?5:6);
+  state.start=gen.start;
+  state.target=gen.target;
+  state.pathHint=gen.path;
+  state.ladder=[state.start];
+  state.input='';
+  state.moves=0;
+  state.playing=true;
+  renderLadder(); renderInput(); updateHeader(); startTimer();
+  setHint('Change exactly ONE letter to make a real word');
+}
+function handleSubmit(){
+  const word=state.input.toLowerCase().trim();
+  if(!state.playing) return;
+  if(word.length!==state.len){ shake(); setHint(`Word must be ${state.len} letters`); return; }
+  const set=getSet(state.len);
+  if(!set.has(word)){ shake(); setHint(`"${word.toUpperCase()}" not in dictionary`); return; }
+  const last=state.ladder[state.ladder.length-1];
+  if(word===last){ shake(); setHint('That is the same word! Change one letter'); return; }
+  if(state.ladder.includes(word)){ shake(); setHint('Already used — no loops!'); return; }
+  if(!differsByOne(last,word)){ shake(); setHint('Change exactly ONE letter from '+last.toUpperCase()); return; }
+  // valid
+  state.ladder.push(word);
+  state.input='';
+  renderLadder(); renderInput();
+  setHint('Nice! Keep climbing → '+state.target.toUpperCase(), true);
+  try{navigator.vibrate&&navigator.vibrate(30)}catch(e){}
+  if(word===state.target){
+    clearInterval(state.timer);
+    const timeBonus=state.timeLeft*2;
+    const streakBonus=state.streak*15;
+    const base=100 + (state.len-3)*50;
+    const gained= base + timeBonus + streakBonus;
+    state.score+=gained;
+    state.streak+=1;
+    state.level+=1;
+    if(state.score>state.best) state.best=state.score;
+    localStorage.setItem('ladder_best', state.best);
+    localStorage.setItem('ladder_streak', state.streak);
+    localStorage.setItem('ladder_level', state.level);
+    updateHeader();
+    $('winTitle').textContent='🎉 Ladder Complete!';
+    $('winDesc').textContent=`${state.start.toUpperCase()} → ${state.target.toUpperCase()} in ${state.ladder.length-1} moves!`;
+    $('winScore').textContent=`+${gained} pts (base ${base} + time ${timeBonus} + streak ${streakBonus})`;
+    $('winStreak').textContent=`🔥 Streak ${state.streak}`;
+    $('winTime').textContent=`⏱ ${state.timeLeft}s left`;
+    $('winModal').classList.add('open');
+    state.playing=false;
+    try{navigator.vibrate&&navigator.vibrate([60,40,60,40,100])}catch(e){}
+  }
+}
+function shake(){
+  const el=$('inputLetters');
+  el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+  try{navigator.vibrate&&navigator.vibrate(50)}catch(e){}
+}
+function handleKey(k){
+  if(k==='back'){
+    state.input=state.input.slice(0,-1);
+    renderInput();
+  } else if(k==='enter'){
+    handleSubmit();
+  } else if(/^[a-z]$/.test(k)){
+    if(state.input.length<state.len){
+      state.input+=k;
+      renderInput();
+    }
+  }
+}
+function buildKeyboard(){
+  const rows=["qwertyuiop","asdfghjkl","zxcvbnm"];
+  const kb=$('keyboard');
+  kb.innerHTML='';
+  rows.forEach((row,idx)=>{
+    const r=document.createElement('div'); r.className='kb-row';
+    if(idx===2){
+      const back=document.createElement('button'); back.className='kb-key wide'; back.textContent='⌫'; back.onclick=()=>handleKey('back');
+      r.appendChild(back);
+    }
+    for(const ch of row){
+      const b=document.createElement('button'); b.className='kb-key'; b.textContent=ch.toUpperCase();
+      b.onclick=()=>handleKey(ch);
+      r.appendChild(b);
+    }
+    if(idx===2){
+      const ent=document.createElement('button'); ent.className='kb-key wide enter'; ent.textContent='Enter'; ent.onclick=()=>handleKey('enter');
+      r.appendChild(ent);
+    }
+    kb.appendChild(r);
+  });
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Backspace'){ handleKey('back'); e.preventDefault(); }
+  else if(e.key==='Enter'){ handleKey('enter'); e.preventDefault(); }
+  else if(/^[a-zA-Z]$/.test(e.key)){ handleKey(e.key.toLowerCase()); }
+});
+$('undoBtn').onclick=()=>{
+  if(state.ladder.length>1){ state.ladder.pop(); renderLadder(); setHint('Undid last step',true); }
+};
+$('newBtn').onclick=()=>{ newGame(); };
+$('hintBtn').onclick=()=>{
+  if(!state.playing) return;
+  const last=state.ladder[state.ladder.length-1];
+  const set=getSet(state.len);
+  // try to use known path first
+  let idx=state.pathHint.indexOf(last);
+  if(idx!==-1 && idx < state.pathHint.length-1){
+    const nxt=state.pathHint[idx+1];
+    setHint(`Try: ${nxt.toUpperCase()} (one possible step)`, true);
+    return;
+  }
+  const bfs=bfsHint(last, state.target, set);
+  if(bfs && bfs.length>1) setHint(`Hint: ${bfs[1].toUpperCase()} → keeps you on shortest path`, true);
+  else setHint('No hint found — try any valid one-letter change', false);
+};
+document.querySelectorAll('.diff').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('.diff').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    state.len=parseInt(b.dataset.len);
+    newGame();
+  };
+});
+$('howBtn').onclick=()=>$('howModal').classList.add('open');
+$('closeHow').onclick=()=>$('howModal').classList.remove('open');
+$('howModal').onclick=e=>{ if(e.target.id==='howModal') e.currentTarget.classList.remove('open'); };
+$('winClose').onclick=()=>$('winModal').classList.remove('open');
+$('nextLadder').onclick=()=>{ $('winModal').classList.remove('open'); newGame(); };
+$('tryAgain').onclick=()=>{ $('loseModal').classList.remove('open'); newGame(); };
+$('winModal').onclick=e=>{ if(e.target.id==='winModal') e.currentTarget.classList.remove('open'); };
+$('loseModal').onclick=e=>{ if(e.target.id==='loseModal') e.currentTarget.classList.remove('open'); };
+
+// init
+buildKeyboard();
+updateHeader();
+newGame();
+</script>
+</body>
+</html>

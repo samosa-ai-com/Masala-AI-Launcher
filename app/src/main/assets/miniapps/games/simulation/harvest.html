@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Cozy Farm Grid</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#fdf6e3;
+  --card:#ffffff;
+  --soil:#8d6e53;
+  --soil-dark:#6b4f3a;
+  --green:#4a7c59;
+  --green-light:#e8f5e9;
+  --accent:#ff8c42;
+  --accent-dark:#e67e22;
+  --text:#3e2723;
+  --muted:#8d7a6e;
+  --border:#f0d9b5;
+  --shadow:0 4px 12px rgba(61,43,31,0.12);
+  --radius:16px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center}
+.app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100vh;
+  min-height:100dvh;
+  background:var(--bg);
+  display:flex;
+  flex-direction:column;
+  overflow-x:hidden;
+  position:relative;
+}
+/* Header */
+.header{
+  background:linear-gradient(135deg,#4a7c59 0%,#6a9c7a 100%);
+  color:white;
+  padding:14px 16px 16px;
+  border-radius:0 0 20px 20px;
+  box-shadow:var(--shadow);
+  position:sticky;top:0;z-index:10;
+}
+.header-top{display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:20px;font-weight:800;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
+.logo span{font-size:24px}
+.header-actions{display:flex;gap:8px}
+.icon-btn{
+  width:40px;height:40px;border-radius:12px;border:none;background:rgba(255,255,255,0.2);
+  color:white;font-size:18px;display:grid;place-items:center;cursor:pointer;
+}
+.icon-btn:active{transform:scale(0.95)}
+.stats-row{display:flex;gap:10px;margin-top:12px}
+.stat{
+  flex:1;background:rgba(255,255,255,0.18);backdrop-filter:blur(6px);
+  border-radius:14px;padding:10px 12px;display:flex;align-items:center;gap:8px;
+  border:1px solid rgba(255,255,255,0.25)
+}
+.stat-ico{width:36px;height:36px;background:white;border-radius:10px;display:grid;place-items:center;font-size:18px;flex-shrink:0}
+.stat-label{font-size:11px;opacity:0.9;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+.stat-val{font-size:18px;font-weight:800;line-height:1}
+.stat-sub{font-size:11px;opacity:0.85}
+
+/* Level bar */
+.level-card{
+  margin:12px 16px 0;
+  background:var(--card);
+  border-radius:var(--radius);
+  padding:14px;
+  box-shadow:var(--shadow);
+  border:1px solid var(--border);
+}
+.level-head{display:flex;justify-content:space-between;align-items:center}
+.level-title{font-weight:800;font-size:15px}
+.level-badge{background:var(--green-light);color:var(--green);padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700}
+.level-desc{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
+.progress-wrap{margin-top:10px}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px}
+.progress-track{height:10px;background:#f0e6d3;border-radius:20px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),#ffb347);border-radius:20px;transition:width 0.4s ease;width:0%}
+
+/* Grid */
+.grid-section{margin:12px 16px 0;background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.section-title{font-weight:800;font-size:14px;display:flex;align-items:center;gap:6px}
+.section-hint{font-size:11px;color:var(--muted);font-weight:600}
+.grid{
+  display:grid;gap:8px;justify-content:center;
+}
+.grid.cols-3{grid-template-columns:repeat(3,1fr)}
+.grid.cols-4{grid-template-columns:repeat(4,1fr)}
+.plot{
+  aspect-ratio:1;
+  background:#f9e4c8;
+  border-radius:14px;
+  border:2px dashed #d7b48e;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;cursor:pointer;
+  min-height:88px;
+  transition:transform 0.1s;
+  user-select:none;
+}
+.plot:active{transform:scale(0.97)}
+.plot.planted{
+  background:linear-gradient(180deg,#a67c52 0%,#8d6e53 100%);
+  border-style:solid;border-color:var(--soil-dark);
+}
+.plot.ready{
+  background:linear-gradient(180deg,#7bc67e 0%,#4a7c59 100%);
+  border-color:#2e7d32;animation:pulse 1.2s infinite;
+}
+.plot.wilted{
+  background:#5d4037;border-color:#3e2723;
+}
+.plot.crow{
+  background:linear-gradient(180deg,#ff6b6b 0%,#c0392b 100%);
+  border-color:#922b21;animation:shake 0.4s infinite;
+}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.02)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
+.plot-emoji{font-size:28px;line-height:1;filter:drop-shadow(0 2px 2px rgba(0,0,0,0.2))}
+.plot-name{font-size:10px;font-weight:800;margin-top:4px;text-transform:uppercase;letter-spacing:0.3px;color:white;text-shadow:0 1px 2px rgba(0,0,0,0.3)}
+.plot-timer{font-size:10px;font-weight:700;background:rgba(0,0,0,0.55);color:white;padding:2px 6px;border-radius:20px;margin-top:4px}
+.plot-bar{position:absolute;bottom:0;left:0;height:6px;background:var(--accent);transition:width 0.3s;border-radius:0 6px 0 0}
+.plot-bar.wilt{background:#ff3b30}
+.plot-action{
+  position:absolute;top:4px;right:4px;background:white;color:var(--text);font-size:9px;font-weight:800;padding:3px 6px;border-radius:20px;box-shadow:0 2px 6px rgba(0,0,0,0.15)
+}
+.plot.crow .plot-action{background:#ffeb3b;color:#3e2723;animation:blink 0.6s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.7}}
+.empty-plus{font-size:22px;color:#c9a88a;font-weight:300}
+.empty-text{font-size:10px;color:#b08968;font-weight:700;margin-top:2px}
+
+/* Shop */
+.shop-section{margin:12px 16px 0;background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.shop-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media(max-width:380px){.shop-grid{grid-template-columns:repeat(2,1fr)}}
+.seed-card{
+  background:#fffaf0;border:2px solid var(--border);border-radius:14px;padding:10px 8px;
+  text-align:center;cursor:pointer;position:relative;transition:all 0.15s;
+  min-height:118px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;
+}
+.seed-card.selected{border-color:var(--green);background:var(--green-light);box-shadow:0 4px 10px rgba(74,124,89,0.2);transform:translateY(-2px)}
+.seed-card:active{transform:scale(0.97)}
+.seed-emoji{font-size:26px}
+.seed-name{font-size:12px;font-weight:800;margin-top:4px}
+.seed-meta{font-size:10px;color:var(--muted);line-height:1.3;margin-top:2px}
+.seed-price{
+  margin-top:6px;background:var(--green);color:white;font-size:11px;font-weight:800;padding:5px 10px;border-radius:20px;width:100%;
+}
+.seed-card.selected .seed-price{background:var(--accent)}
+.seed-card.locked{opacity:0.55;pointer-events:none}
+.seed-card.locked .seed-price{background:#bdbdbd}
+.badge-soon{position:absolute;top:-6px;right:-6px;background:#ff3b30;color:white;font-size:9px;font-weight:800;padding:3px 6px;border-radius:20px}
+
+/* Bag */
+.bag-section{margin:12px 16px;background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.bag-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.bag-item{
+  background:#fff3e0;border:1px solid #ffe0b2;border-radius:12px;padding:8px 10px;display:flex;align-items:center;gap:8px;flex:1;min-width:110px;
+}
+.bag-item-emoji{font-size:20px}
+.bag-item-info{flex:1}
+.bag-item-name{font-size:12px;font-weight:800}
+.bag-item-count{font-size:11px;color:var(--muted);font-weight:600}
+.bag-empty{font-size:13px;color:var(--muted);text-align:center;padding:12px;background:#faf6f0;border-radius:12px;border:1px dashed var(--border);width:100%}
+.sell-btn{
+  width:100%;margin-top:10px;background:linear-gradient(135deg,var(--accent),#ffb347);color:white;border:none;
+  padding:14px;border-radius:14px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 4px 10px rgba(255,140,66,0.3);
+  display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;
+}
+.sell-btn:disabled{opacity:0.5;pointer-events:none}
+.sell-btn:active{transform:scale(0.98)}
+
+/* Footer */
+.footer{padding:12px 16px 20px;text-align:center;font-size:11px;color:var(--muted);line-height:1.5}
+.footer strong{color:var(--green)}
+
+/* Toast */
+.toast{
+  position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(80px);
+  background:#3e2723;color:white;padding:12px 18px;border-radius:30px;font-size:13px;font-weight:700;
+  box-shadow:0 8px 20px rgba(0,0,0,0.25);opacity:0;transition:all 0.3s;z-index:50;pointer-events:none;white-space:nowrap;
+}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* Modal */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(61,43,31,0.55);backdrop-filter:blur(4px);
+  display:none;align-items:center;justify-content:center;z-index:40;padding:16px;
+}
+.modal-overlay.open{display:flex}
+.modal{
+  background:white;border-radius:20px;padding:20px;width:100%;max-width:380px;box-shadow:0 20px 40px rgba(0,0,0,0.2);max-height:90vh;overflow:auto;
+}
+.modal h2{font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px}
+.modal p{font-size:13px;color:var(--muted);line-height:1.6;margin-top:8px}
+.modal-list{margin-top:12px;display:grid;gap:8px}
+.modal-item{display:flex;gap:10px;align-items:flex-start;background:#fdf6e3;padding:10px 12px;border-radius:12px;border:1px solid var(--border)}
+.modal-item-ico{font-size:20px;flex-shrink:0}
+.modal-item-text{font-size:12px;line-height:1.5}
+.modal-item-text strong{color:var(--text)}
+.modal-btn{
+  width:100%;margin-top:16px;background:var(--green);color:white;border:none;padding:14px;border-radius:14px;font-weight:800;font-size:14px;cursor:pointer;min-height:48px;
+}
+.levelup-emoji{font-size:48px;text-align:center;margin-bottom:8px}
+.confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="header">
+    <div class="header-top">
+      <div class="logo"><span>🌾</span> Cozy Farm Grid</div>
+      <div class="header-actions">
+        <button class="icon-btn" id="helpBtn" aria-label="Help">?</button>
+        <button class="icon-btn" id="resetBtn" aria-label="Reset">↺</button>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-ico">🪙</div>
+        <div>
+          <div class="stat-label">Coins</div>
+          <div class="stat-val" id="coinsVal">20</div>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="stat-ico">🏆</div>
+        <div>
+          <div class="stat-label">Best</div>
+          <div class="stat-val" id="bestVal">0</div>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="stat-ico">📦</div>
+        <div>
+          <div class="stat-label">Bag</div>
+          <div class="stat-val" id="bagVal">0</div>
+          <div class="stat-sub" id="bagSub">items</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="level-card">
+    <div class="level-head">
+      <div class="level-title" id="levelTitle">Level 1 — Sunny Patch</div>
+      <div class="level-badge" id="levelBadge">3×3 Plots</div>
+    </div>
+    <div class="level-desc" id="levelDesc">Grow turnips & radishes. Learn the rhythm: plant → wait → harvest → sell!</div>
+    <div class="progress-wrap">
+      <div class="progress-label"><span>Level Progress</span><span id="progressText">0 / 100 🪙</span></div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+  </div>
+
+  <div class="grid-section">
+    <div class="section-head">
+      <div class="section-title">🌱 Your Plots</div>
+      <div class="section-hint" id="gridHint">Tap to plant</div>
+    </div>
+    <div class="grid cols-3" id="grid"></div>
+  </div>
+
+  <div class="shop-section">
+    <div class="section-head">
+      <div class="section-title">🛒 Seed Shop</div>
+      <div class="section-hint">Select then plant</div>
+    </div>
+    <div class="shop-grid" id="shop"></div>
+  </div>
+
+  <div class="bag-section">
+    <div class="section-head">
+      <div class="section-title">🎒 Harvest Bag</div>
+      <div class="section-hint" id="bagHint">Sell for coins</div>
+    </div>
+    <div class="bag-row" id="bagRow"></div>
+    <button class="sell-btn" id="sellBtn">💰 Sell All Harvest — <span id="sellValue">0 🪙</span></button>
+  </div>
+
+  <div class="footer">
+    <strong>How to play:</strong> Pick a seed → tap empty plot to plant → harvest when <em>Ready!</em> → sell.<br>
+    🐦‍⬛ Tap crows in 3s to shoo (+2🪙) or crop wilts! Wilted crops must be cleared.<br>
+    Reach the coin target to unlock the next level with new crops & bigger field.
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="helpModal">
+  <div class="modal">
+    <h2>🌻 How to Farm</h2>
+    <p>Cozy Farm Grid is a quick, tactile farming loop. Every level has its own crops, field size and coin target.</p>
+    <div class="modal-list">
+      <div class="modal-item"><div class="modal-item-ico">🌱</div><div class="modal-item-text"><strong>Plant:</strong> Select a seed in the shop (costs coins), then tap any dashed empty plot.</div></div>
+      <div class="modal-item"><div class="modal-item-ico">⏳</div><div class="modal-item-text"><strong>Grow:</strong> Green bar fills. Each crop has its own grow time (6–16s).</div></div>
+      <div class="modal-item"><div class="modal-item-ico">✨</div><div class="modal-item-text"><strong>Harvest:</strong> When plot says <em>Ready!</em>, tap to collect to your bag. Don't wait too long!</div></div>
+      <div class="modal-item"><div class="modal-item-ico">🥀</div><div class="modal-item-text"><strong>Wilt:</strong> Ready crops wilt if not harvested in time (red bar). Tap wilted plot to clear.</div></div>
+      <div class="modal-item"><div class="modal-item-ico">🐦‍⬛</div><div class="modal-item-text"><strong>Crows:</strong> Randomly land on ready crops. Tap the plot within 3 seconds to shoo (+2🪙) or it wilts!</div></div>
+      <div class="modal-item"><div class="modal-item-ico">💰</div><div class="modal-item-text"><strong>Sell:</strong> Tap <em>Sell All</em> to turn bag items into coins. Reach the level target to level up!</div></div>
+    </div>
+    <button class="modal-btn" id="closeHelp">Got it, let's farm! 🌾</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="levelModal">
+  <div class="modal" style="text-align:center">
+    <div class="levelup-emoji">🎉</div>
+    <h2 style="justify-content:center" id="levelUpTitle">Level Up!</h2>
+    <p id="levelUpDesc" style="text-align:center"></p>
+    <button class="modal-btn" id="closeLevel">Continue Farming →</button>
+  </div>
+</div>
+
+<script>
+const LEVELS = [
+  {
+    id:1,
+    name:"Sunny Patch",
+    grid:"3×3",
+    cols:3, rows:3,
+    target:100,
+    desc:"Grow turnips & radishes. Learn the rhythm: plant → wait → harvest → sell!",
+    crops:[
+      {id:"turnip", name:"Turnip", emoji:"🥬", cost:5, grow:6, sell:12, wilt:10, color:"#a8d5a2"},
+      {id:"radish", name:"Radish", emoji:"🥕", cost:8, grow:8, sell:18, wilt:12, color:"#ff8a65"},
+    ]
+  },
+  {
+    id:2,
+    name:"Meadow Fields",
+    grid:"3×4",
+    cols:3, rows:4,
+    target:250,
+    desc:"Bigger field! Tomatoes, corn & pumpkins pay more but need patience.",
+    crops:[
+      {id:"tomato", name:"Tomato", emoji:"🍅", cost:12, grow:10, sell:28, wilt:12, color:"#ef5350"},
+      {id:"corn", name:"Corn", emoji:"🌽", cost:15, grow:12, sell:35, wilt:10, color:"#ffca28"},
+      {id:"pumpkin", name:"Pumpkin", emoji:"🎃", cost:20, grow:15, sell:50, wilt:14, color:"#ff8c42"},
+    ]
+  },
+  {
+    id:3,
+    name:"Golden Acres",
+    grid:"4×4",
+    cols:4, rows:4,
+    target:500,
+    desc:"Master farm! Strawberries, sunflowers & blueberries — high risk, high reward.",
+    crops:[
+      {id:"strawberry", name:"Strawberry", emoji:"🍓", cost:18, grow:9, sell:40, wilt:8, color:"#ec407a"},
+      {id:"sunflower", name:"Sunflower", emoji:"🌻", cost:25, grow:14, sell:60, wilt:12, color:"#fdd835"},
+      {id:"blueberry", name:"Blueberry", emoji:"🫐", cost:30, grow:16, sell:75, wilt:10, color:"#5c6bc0"},
+    ]
+  }
+];
+
+const CROP_MAP = {};
+LEVELS.forEach(l=>l.crops.forEach(c=>CROP_MAP[c.id]=c));
+
+let state = {
+  coins:20,
+  best:0,
+  level:1,
+  selectedSeed:null,
+  plots:[],
+  bag:{},
+  totalEarned:0,
+  crowTimers:{}
+};
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem('cozyFarmState');
+    const best = parseInt(localStorage.getItem('cozyFarmBest')||'0',10);
+    if(best) state.best = best;
+    if(raw){
+      const s = JSON.parse(raw);
+      if(s.coins!=null) state.coins=s.coins;
+      if(s.level) state.level=s.level;
+      if(s.bag) state.bag=s.bag;
+      if(s.totalEarned!=null) state.totalEarned=s.totalEarned;
+      if(s.plots) state.plots=s.plots;
+      if(s.selectedSeed) state.selectedSeed=s.selectedSeed;
+    }
+  }catch(e){}
+  if(!state.plots || state.plots.length===0) initPlots();
+  else {
+    // rehydrate timestamps: ensure plots have correct structure
+    state.plots = state.plots.map(p=>{
+      if(p.cropId && !p.plantedAt) p.plantedAt = Date.now();
+      return p;
+    });
+    // if level changed size, adjust
+    const lvl = getLevel();
+    const needed = lvl.cols*lvl.rows;
+    if(state.plots.length !== needed){
+      // keep as many as possible, fill rest empty
+      const newPlots = Array(needed).fill(0).map((_,i)=> state.plots[i] || emptyPlot());
+      state.plots = newPlots;
+    }
+  }
+  if(!state.selectedSeed){
+    state.selectedSeed = getLevel().crops[0].id;
+  }
+}
+function saveState(){
+  try{
+    localStorage.setItem('cozyFarmState', JSON.stringify({
+      coins:state.coins, level:state.level, bag:state.bag, totalEarned:state.totalEarned, plots:state.plots, selectedSeed:state.selectedSeed
+    }));
+    if(state.coins > state.best){
+      state.best = state.coins;
+      localStorage.setItem('cozyFarmBest', String(state.best));
+    } else {
+      // also save best if totalEarned higher? best is max coins ever held
+      localStorage.setItem('cozyFarmBest', String(state.best));
+    }
+  }catch(e){}
+}
+function emptyPlot(){ return {id:Math.random().toString(36).slice(2,7), cropId:null, plantedAt:null, readyAt:null, wiltAt:null, hasCrow:false, crowAt:null} }
+function getLevel(){ return LEVELS.find(l=>l.id===state.level) || LEVELS[0] }
+function initPlots(){
+  const lvl = getLevel();
+  state.plots = Array(lvl.cols*lvl.rows).fill(0).map(()=> emptyPlot());
+}
+
+const gridEl = document.getElementById('grid');
+const shopEl = document.getElementById('shop');
+const coinsVal = document.getElementById('coinsVal');
+const bestVal = document.getElementById('bestVal');
+const bagVal = document.getElementById('bagVal');
+const bagRow = document.getElementById('bagRow');
+const sellBtn = document.getElementById('sellBtn');
+const sellValueEl = document.getElementById('sellValue');
+const progressFill = document.getElementById('progressFill');
+const progressText = document.getElementById('progressText');
+const levelTitle = document.getElementById('levelTitle');
+const levelBadge = document.getElementById('levelBadge');
+const levelDesc = document.getElementById('levelDesc');
+const gridHint = document.getElementById('gridHint');
+const toastEl = document.getElementById('toast');
+
+function showToast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=> toastEl.classList.remove('show'), 2200);
+}
+
+function renderStats(){
+  coinsVal.textContent = state.coins;
+  bestVal.textContent = state.best;
+  const totalItems = Object.values(state.bag).reduce((a,b)=>a+b,0);
+  bagVal.textContent = totalItems;
+  document.getElementById('bagSub').textContent = totalItems===1?'item':'items';
+  const lvl = getLevel();
+  levelTitle.textContent = `Level ${lvl.id} — ${lvl.name}`;
+  levelBadge.textContent = `${lvl.grid} Plots`;
+  levelDesc.textContent = lvl.desc;
+  const pct = Math.min(100, Math.round((state.totalEarned / lvl.target)*100));
+  progressFill.style.width = pct+'%';
+  progressText.textContent = `${state.totalEarned} / ${lvl.target} 🪙`;
+  if(pct>=100) progressFill.style.background = 'linear-gradient(90deg,#4caf50,#8bc34a)';
+  else progressFill.style.background = 'linear-gradient(90deg,var(--accent),#ffb347)';
+
+  // bag
+  bagRow.innerHTML = '';
+  const entries = Object.entries(state.bag).filter(([_,c])=>c>0);
+  if(entries.length===0){
+    bagRow.innerHTML = '<div class="bag-empty">No harvest yet — plant & harvest to fill your bag!</div>';
+  } else {
+    entries.forEach(([cropId,count])=>{
+      const crop = CROP_MAP[cropId];
+      const div = document.createElement('div');
+      div.className='bag-item';
+      div.innerHTML = `<div class="bag-item-emoji">${crop.emoji}</div><div class="bag-item-info"><div class="bag-item-name">${crop.name}</div><div class="bag-item-count">×${count} · ${crop.sell}🪙 each</div></div>`;
+      bagRow.appendChild(div);
+    });
+  }
+  const sellTotal = entries.reduce((sum,[id,c])=> sum + CROP_MAP[id].sell*c, 0);
+  sellValueEl.textContent = sellTotal + ' 🪙';
+  sellBtn.disabled = sellTotal===0;
+  gridHint.textContent = state.plots.some(p=>p.hasCrow) ? '⚠️ Tap crow!' : 'Tap to plant';
+}
+
+function renderShop(){
+  shopEl.innerHTML='';
+  const lvl = getLevel();
+  lvl.crops.forEach(crop=>{
+    const card = document.createElement('button');
+    card.className='seed-card' + (state.selectedSeed===crop.id ? ' selected':'');
+    card.innerHTML = `
+      <div class="seed-emoji">${crop.emoji}</div>
+      <div class="seed-name">${crop.name}</div>
+      <div class="seed-meta">${crop.grow}s grow<br>${crop.sell}🪙 sell · ${crop.wilt}s to wilt</div>
+      <div class="seed-price">${crop.cost} 🪙</div>
+    `;
+    card.onclick = ()=>{
+      state.selectedSeed = crop.id;
+      renderShop();
+      renderStats();
+      saveState();
+      showToast(`Selected ${crop.name} ${crop.emoji}`);
+    };
+    shopEl.appendChild(card);
+  });
+  // show locked next level crops as preview
+  const next = LEVELS.find(l=>l.id===state.level+1);
+  if(next){
+    next.crops.forEach(crop=>{
+      if(lvl.crops.find(c=>c.id===crop.id)) return;
+      const card = document.createElement('div');
+      card.className='seed-card locked';
+      card.innerHTML = `<div class="badge-soon">Lvl ${next.id}</div><div class="seed-emoji">${crop.emoji}</div><div class="seed-name">${crop.name}</div><div class="seed-meta">${crop.grow}s · ${crop.sell}🪙</div><div class="seed-price">🔒 ${crop.cost} 🪙</div>`;
+      shopEl.appendChild(card);
+    });
+  }
+}
+
+function renderGrid(){
+  const lvl = getLevel();
+  gridEl.className = 'grid cols-'+lvl.cols;
+  gridEl.innerHTML='';
+  state.plots.forEach((plot, idx)=>{
+    const div = document.createElement('button');
+    div.className='plot';
+    div.style.minHeight = lvl.cols===4 ? '78px' : '88px';
+    // determine state
+    if(plot.cropId){
+      const crop = CROP_MAP[plot.cropId];
+      const now = Date.now();
+      const elapsed = (now - plot.plantedAt)/1000;
+      const grow = crop.grow;
+      const isReady = elapsed >= grow;
+      const wiltElapsed = isReady ? (now - plot.readyAt)/1000 : 0;
+      const wiltTime = crop.wilt;
+      const isWilted = plot.wiltAt && now >= plot.wiltAt;
+      const hasCrow = plot.hasCrow;
+
+      if(isWilted){
+        div.classList.add('wilted');
+        div.innerHTML = `<div class="plot-emoji">🥀</div><div class="plot-name">Wilted</div><div class="plot-timer">Tap to clear</div>`;
+      } else if(hasCrow){
+        div.classList.add('crow');
+        const crowLeft = Math.max(0, 3 - Math.floor((now - plot.crowAt)/1000));
+        div.innerHTML = `<div class="plot-emoji">🐦‍⬛</div><div class="plot-name">${crop.name}</div><div class="plot-timer">Shoo! ${crowLeft}s</div><div class="plot-action">TAP!</div><div class="plot-bar wilt" style="width:${(crowLeft/3*100)}%"></div>`;
+      } else if(isReady){
+        div.classList.add('ready');
+        const wiltPct = Math.max(0, 100 - (wiltElapsed / wiltTime * 100));
+        const wiltLeft = Math.max(0, Math.ceil(wiltTime - wiltElapsed));
+        div.innerHTML = `<div class="plot-emoji">${crop.emoji}</div><div class="plot-name">${crop.name}</div><div class="plot-timer">Ready! ${wiltLeft}s</div><div class="plot-action">Harvest</div><div class="plot-bar wilt" style="width:${wiltPct}%"></div>`;
+      } else {
+        div.classList.add('planted');
+        const pct = Math.min(100, (elapsed/grow*100));
+        const left = Math.max(0, Math.ceil(grow - elapsed));
+        // sprout stages
+        let emoji = '🌱';
+        if(pct>65) emoji='🌿';
+        else if(pct>35) emoji='☘️';
+        div.innerHTML = `<div class="plot-emoji">${emoji}</div><div class="plot-name">${crop.name}</div><div class="plot-timer">${left}s left</div><div class="plot-bar" style="width:${pct}%"></div>`;
+      }
+    } else {
+      div.innerHTML = `<div class="empty-plus">＋</div><div class="empty-text">Empty</div>`;
+    }
+    div.onclick = ()=> handlePlotTap(idx);
+    gridEl.appendChild(div);
+  });
+}
+
+function handlePlotTap(idx){
+  const plot = state.plots[idx];
+  const now = Date.now();
+
+  // wilted -> clear
+  if(plot.wiltAt && now >= plot.wiltAt){
+    state.plots[idx] = emptyPlot();
+    showToast('Cleared wilted crop 🧹');
+    renderGrid(); renderStats(); saveState();
+    return;
+  }
+  // crow -> shoo
+  if(plot.hasCrow){
+    plot.hasCrow=false;
+    plot.crowAt=null;
+    state.coins += 2;
+    state.totalEarned += 2;
+    if(state.coins>state.best) state.best=state.coins;
+    showToast('Shooed crow! +2🪙');
+    checkLevelUp();
+    renderGrid(); renderStats(); saveState();
+    return;
+  }
+  // planted
+  if(plot.cropId){
+    const crop = CROP_MAP[plot.cropId];
+    const elapsed = (now - plot.plantedAt)/1000;
+    if(elapsed >= crop.grow){
+      // harvest
+      state.bag[plot.cropId] = (state.bag[plot.cropId]||0)+1;
+      state.plots[idx] = emptyPlot();
+      showToast(`Harvested ${crop.name} ${crop.emoji}!`);
+      renderGrid(); renderStats(); saveState();
+    } else {
+      showToast(`${crop.name} growing... ${Math.ceil(crop.grow - elapsed)}s left`);
+    }
+    return;
+  }
+  // empty -> plant
+  const seedId = state.selectedSeed;
+  if(!seedId){ showToast('Select a seed first!'); return; }
+  const crop = CROP_MAP[seedId];
+  if(!crop){ showToast('Select a seed!'); return; }
+  if(state.coins < crop.cost){
+    showToast(`Need ${crop.cost}🪙 for ${crop.name}`);
+    return;
+  }
+  state.coins -= crop.cost;
+  plot.cropId = crop.id;
+  plot.plantedAt = now;
+  plot.readyAt = now + crop.grow*1000;
+  plot.wiltAt = now + (crop.grow + crop.wilt)*1000;
+  plot.hasCrow=false;
+  plot.crowAt=null;
+  showToast(`Planted ${crop.name} ${crop.emoji} 🌱`);
+  renderGrid(); renderStats(); saveState();
+}
+
+function checkLevelUp(){
+  const lvl = getLevel();
+  if(state.totalEarned >= lvl.target){
+    const next = LEVELS.find(l=>l.id===state.level+1);
+    if(next){
+      state.level = next.id;
+      // expand grid
+      const needed = next.cols*next.rows;
+      const newPlots = Array(needed).fill(0).map((_,i)=> state.plots[i] || emptyPlot());
+      state.plots = newPlots;
+      state.selectedSeed = next.crops[0].id;
+      document.getElementById('levelUpTitle').textContent = `Level ${next.id} Unlocked!`;
+      document.getElementById('levelUpDesc').textContent = `${next.name} — ${next.desc} Field expanded to ${next.grid}!`;
+      document.getElementById('levelModal').classList.add('open');
+      showToast(`Level ${next.id} unlocked! 🎉`);
+    } else {
+      // max level, celebrate
+      document.getElementById('levelUpTitle').textContent = `Master Farmer! 🌟`;
+      document.getElementById('levelUpDesc').textContent = `You've mastered all fields! Keep farming to beat your best: ${state.best}🪙`;
+      document.getElementById('levelModal').classList.add('open');
+    }
+    renderShop(); renderGrid(); renderStats(); saveState();
+  }
+}
+
+// Sell
+document.getElementById('sellBtn').onclick = ()=>{
+  const entries = Object.entries(state.bag).filter(([_,c])=>c>0);
+  if(entries.length===0) return;
+  let total=0;
+  entries.forEach(([id,c])=> total += CROP_MAP[id].sell*c);
+  state.coins += total;
+  state.totalEarned += total;
+  if(state.coins>state.best) state.best=state.coins;
+  state.bag={};
+  showToast(`Sold harvest for ${total}🪙!`);
+  checkLevelUp();
+  renderStats(); saveState();
+};
+
+// Modals
+document.getElementById('helpBtn').onclick = ()=> document.getElementById('helpModal').classList.add('open');
+document.getElementById('closeHelp').onclick = ()=> document.getElementById('helpModal').classList.remove('open');
+document.getElementById('helpModal').onclick = (e)=>{ if(e.target===e.currentTarget) e.currentTarget.classList.remove('open') };
+document.getElementById('closeLevel').onclick = ()=> document.getElementById('levelModal').classList.remove('open');
+document.getElementById('levelModal').onclick = (e)=>{ if(e.target===e.currentTarget) e.currentTarget.classList.remove('open') };
+document.getElementById('resetBtn').onclick = ()=>{
+  if(confirm('Reset farm? Coins, bag and plots will be cleared. Best score stays.')){
+    const best = state.best;
+    state.coins=20; state.level=1; state.bag={}; state.totalEarned=0; state.selectedSeed=LEVELS[0].crops[0].id;
+    initPlots();
+    state.best=best;
+    localStorage.removeItem('cozyFarmState');
+    saveState();
+    renderShop(); renderGrid(); renderStats();
+    showToast('Farm reset! Fresh start 🌱');
+  }
+};
+
+// Game loops
+function tick(){
+  const now = Date.now();
+  let changed=false;
+  state.plots.forEach(plot=>{
+    if(plot.cropId && !plot.hasCrow && plot.readyAt && now >= plot.readyAt && plot.wiltAt && now < plot.wiltAt){
+      // ready but not yet wilted - eligible for crow
+    }
+    // check wilt
+    if(plot.wiltAt && now >= plot.wiltAt && plot.cropId){
+      // mark wilted (keep cropId for display but wiltAt passed)
+      // we keep as is, render will show wilted
+      changed=true;
+    }
+    // check crow timeout
+    if(plot.hasCrow && plot.crowAt && now - plot.crowAt >= 3000){
+      // crow ruins crop
+      plot.hasCrow=false;
+      plot.crowAt=null;
+      // wilt it immediately
+      plot.wiltAt = now;
+      changed=true;
+      showToast('Crow ruined a crop! 🐦‍⬛🥀');
+    }
+  });
+  renderGrid();
+  renderStats();
+  if(changed) saveState();
+}
+function crowSpawner(){
+  // chance to spawn crow on a ready plot
+  const candidates = state.plots.filter(p=> p.cropId && p.readyAt && Date.now()>=p.readyAt && p.wiltAt && Date.now()<p.wiltAt && !p.hasCrow);
+  if(candidates.length===0) return;
+  if(Math.random() < 0.35){
+    const pick = candidates[Math.floor(Math.random()*candidates.length)];
+    pick.hasCrow=true;
+    pick.crowAt=Date.now();
+    showToast('Crow incoming! Tap fast! 🐦‍⬛');
+    renderGrid();
+  }
+}
+
+// init
+loadState();
+renderShop();
+renderGrid();
+renderStats();
+setInterval(tick, 400);
+setInterval(crowSpawner, 2500);
+setInterval(saveState, 2000);
+
+// first time help
+if(!localStorage.getItem('cozyFarmSeenHelp')){
+  setTimeout(()=> document.getElementById('helpModal').classList.add('open'), 600);
+  localStorage.setItem('cozyFarmSeenHelp','1');
+}
+</script>
+</body>
+</html>

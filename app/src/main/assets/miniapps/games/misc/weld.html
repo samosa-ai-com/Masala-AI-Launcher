@@ -1,0 +1,143 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Torch Weld</title><style>*{box-sizing:border-box;margin:0;padding:0}:root{--bg:#0f0e0a;--card:#1c1a14;--card2:#25211a;--line:#3a3528;--accent:#f97316;--accent2:#facc15;--good:#4ade80;--bad:#f87171;--text:#fdf6e3;--muted:#9a9588}html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}body{max-width:428px;margin:0 auto;overflow-x:hidden}.header{position:sticky;top:0;z-index:10;background:rgba(15,14,10,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 12px;display:flex;justify-content:space-between;align-items:center}.brand{display:flex;gap:10px;align-items:center}.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#f97316,#facc15);display:grid;place-items:center;font-size:18px}.brand h1{font-size:14px;line-height:1.1}.brand p{font-size:11px;color:var(--muted)}.pill{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}.pill b{color:var(--text)}.wrap{padding:12px}.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}.hudItem{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}.hudItem b{font-size:18px;display:block}.hudItem span{font-size:11px;color:var(--muted)}.gameArea{position:relative;background:linear-gradient(180deg,#1c1a14 0%,#0f0e0a 100%);border:1px solid var(--line);border-radius:16px;overflow:hidden;padding:8px}.gameArea canvas{display:block;width:100%;height:auto;touch-action:none;border-radius:12px;background:radial-gradient(ellipse at 50% 20%,#2a1e0f 0%,#0f0e0a 70%)}.levelBar{display:flex;gap:6px;overflow:auto;padding:6px 0;margin-bottom:8px}.levelBtn{white-space:nowrap;min-height:36px;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card2);color:var(--muted);font-size:12px;font-weight:700}.levelBtn.active{background:var(--accent);color:#0f0e0a;border-color:var(--accent)}.levelBtn.done{background:var(--good);color:#0f0e0a;border-color:var(--good)}.progress{height:10px;background:#0f0e0a;border-radius:999px;overflow:hidden;border:1px solid var(--line);margin:8px 0}.progress i{display:block;height:100%;background:linear-gradient(90deg,#f97316,#facc15);width:0%;transition:width .2s}.controls{display:flex;gap:8px;margin-top:10px}.btn{border:0;border-radius:12px;padding:12px;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center;justify-content:center;flex:1;gap:8px}.btnPrimary{background:linear-gradient(135deg,#f97316,#facc15);color:#0f0e0a}.btnGhost{background:var(--card2);border:1px solid var(--line);color:var(--text)}.tip{font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px;text-align:center;line-height:1.4}.overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(15,14,10,.88);padding:16px;text-align:center;border-radius:16px}.hidden{display:none!important}.torch{position:absolute;width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fff,#facc15 30%,#f97316 60%,#991b1b 100%);border:2px solid #fff;box-shadow:0 0 16px rgba(249,115,22,.8),0 0 32px rgba(250,204,21,.4);pointer-events:none;transform:translate(-50%,-50%);z-index:5}.spark{position:absolute;width:4px;height:4px;background:var(--accent2);border-radius:50%;pointer-events:none;animation:spark .4s ease-out forwards}@keyframes spark{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0}}</style></head><body><header class="header"><div class="brand"><div class="logo">🔥</div><div><h1>Torch Weld</h1><p>Steady hand • Follow seam</p></div></div><div class="pill">Best <b id="bestEl">0</b></div></header><div class="wrap"><div class="hud"><div class="hudItem"><b id="scoreEl">0</b><span>Score</span></div><div class="hudItem"><b id="levelEl">1/6</b><span>Level</span></div><div class="hudItem"><b id="timeEl">30</b><span>Seconds</span></div></div><div class="levelBar" id="levelBar"></div><div class="gameArea" id="gameArea"><canvas id="cv" width="360" height="400"></canvas><div class="torch hidden" id="torch"></div><div class="overlay" id="startOverlay"><div><h2 style="font-size:20px">🔧 Workshop Weld</h2><p style="font-size:13px;color:var(--muted);margin:8px 0">Guide the torch <b>along the glowing seam</b> without straying.<br>Stay on path — break the weld = fail!<br>Complete before time runs out.</p><button class="btn btnPrimary" id="playBtn" style="width:100%">🔥 Start Weld</button></div></div><div class="overlay hidden" id="overOverlay"><div><h2 id="overTitle">Weld Complete!</h2><p id="overDesc" style="font-size:13px;color:var(--muted);margin:8px 0"></p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0"><div style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px"><b id="overScore" style="font-size:18px;display:block">0</b><span style="font-size:11px;color:var(--muted)">Score</span></div><div style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px"><b id="overBest" style="font-size:18px;display:block">0</b><span style="font-size:11px;color:var(--muted)">Best</span></div></div><button class="btn btnPrimary" id="nextBtn" style="width:100%">Next Seam</button><button class="btn btnGhost" id="retryBtn" style="width:100%;margin-top:8px">Retry</button></div></div></div><div class="progress"><i id="progressBar"></i></div><div class="controls"><button class="btn btnGhost" id="resetBtn">↻ Reset</button><button class="btn btnPrimary" id="pauseBtn">⏸ Pause</button></div><div class="tip">💡 Keep torch on the <b>glowing seam</b> — stray off = sparks & fail! Steady hand wins.</div></div><script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=360,H=400,torch=document.getElementById('torch');
+let level=0,score=0,best=parseInt(localStorage.getItem('torch-best')||'0',10),playing=false,paused=false,time=30,timerId=null,progress=0,torchPos={x:W/2,y:H/2},isDragging=false,path=[],pathProgress=0;
+const LEVELS=[
+{name:'Straight',time:20,path:()=>{let p=[];for(let i=0;i<=100;i++){let t=i/100;p.push({x:40+t*280,y:200})}return p}},
+{name:'Curved',time:25,path:()=>{let p=[];for(let i=0;i<=100;i++){let t=i/100,a=t*Math.PI;p.push({x:40+t*280,y:200+Math.sin(a)*80})}return p}},
+{name:'Zigzag',time:25,path:()=>{let p=[];for(let i=0;i<=100;i++){let t=i/100,seg=Math.floor(t*5),y=120+seg*40+(t*5-seg)*40;p.push({x:40+t*280,y:seg%2?y:200-(y-200)})}return p}},
+{name:'S-Curve',time:30,path:()=>{let p=[];for(let i=0;i<=100;i++){let t=i/100;p.push({x:40+t*280,y:200+Math.sin(t*Math.PI*2)*60})}return p}},
+{name:'Spiral',time:30,path:()=>{let p=[];for(let i=0;i<=100;i++){let t=i/100,a=t*Math.PI*4,r=20+t*60;p.push({x:180+Math.cos(a)*r,y:200+Math.sin(a)*r})}return p}},
+{name:'Master',time:35,path:()=>{let p=[];for(let i=0;i<=100;i++){let t=i/100;p.push({x:40+t*280,y:200+Math.sin(t*Math.PI*6)*40})}return p}}
+];
+function save(){localStorage.setItem('torch-best',best)}
+function updateHud(){
+document.getElementById('scoreEl').textContent=score;
+document.getElementById('levelEl').textContent=(level+1)+'/'+LEVELS.length;
+document.getElementById('timeEl').textContent=time;
+document.getElementById('bestEl').textContent=best;
+document.getElementById('progressBar').style.width=progress+'%';
+let bar=document.getElementById('levelBar');bar.innerHTML='';
+LEVELS.forEach((l,i)=>{let b=document.createElement('button');b.className='levelBtn'+(i===level?' active':'')+(i<level?' done':'');b.textContent=(i<level?'✓ ':'')+l.name;b.onclick=()=>{if(i<=level){level=i;initLevel()}};bar.appendChild(b)});
+}
+function initLevel(){
+let lvl=LEVELS[level];
+path=lvl.path();pathProgress=0;progress=0;time=lvl.time;torchPos={x:path[0].x,y:path[0].y};
+updateHud();draw();
+document.getElementById('startOverlay').classList.remove('hidden');
+document.getElementById('overOverlay').classList.add('hidden');
+torch.classList.add('hidden');
+playing=false;paused=false;clearInterval(timerId);
+}
+function draw(){
+ctx.clearRect(0,0,W,H);
+// workshop bg
+let grad=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,300);
+grad.addColorStop(0,'#2a1e0f');grad.addColorStop(1,'#0f0e0a');
+ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
+// seam glow
+ctx.shadowColor='#f97316';ctx.shadowBlur=16;ctx.strokeStyle='#facc15';ctx.lineWidth=8;ctx.lineCap='round';ctx.lineJoin='round';
+ctx.beginPath();ctx.moveTo(path[0].x,path[0].y);for(let i=1;i<path.length;i++)ctx.lineTo(path[i].x,path[i].y);ctx.stroke();ctx.shadowBlur=0;
+// seam core
+ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(path[0].x,path[0].y);for(let i=1;i<path.length;i++)ctx.lineTo(path[i].x,path[i].y);ctx.stroke();
+// progress
+if(pathProgress>0){
+ctx.strokeStyle='rgba(74,222,128,.9)';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(path[0].x,path[0].y);
+let idx=Math.floor(pathProgress*path.length);for(let i=1;i<idx;i++)ctx.lineTo(path[i].x,path[i].y);ctx.stroke();
+}
+// start/end markers
+ctx.fillStyle='#4ade80';ctx.beginPath();ctx.arc(path[0].x,path[0].y,8,0,6.28);ctx.fill();ctx.fillStyle='#fff';ctx.font='10px system-ui';ctx.textAlign='center';ctx.fillText('START',path[0].x,path[0].y-14);
+ctx.fillStyle='#f87171';ctx.beginPath();ctx.arc(path[path.length-1].x,path[path.length-1].y,8,0,6.28);ctx.fill();ctx.fillStyle='#fff';ctx.fillText('END',path[path.length-1].x,path[path.length-1].y-14);
+}
+function getPos(e){
+let rect=cv.getBoundingClientRect(),sx=W/rect.width,sy=H/rect.height,t=e.touches?e.touches[0]:e;
+return {x:(t.clientX-rect.left)*sx,y:(t.clientY-rect.top)*sy}
+}
+function distToPath(x,y){
+let min=Infinity,closest=0;
+for(let i=0;i<path.length;i++){
+let dx=x-path[i].x,dy=y-path[i].y,d=Math.hypot(dx,dy);
+if(d<min){min=d;closest=i/path.length}
+}
+return {dist:min,progress:closest}
+}
+function handleMove(e){
+if(!playing||paused||!isDragging)return;
+e.preventDefault();
+let p=getPos(e);torchPos=p;
+torch.style.left=p.x+'px';torch.style.top=p.y+'px';
+let d=distToPath(p.x,p.y);
+if(d.dist>18){
+// off seam - fail
+playing=false;clearInterval(timerId);
+torch.style.boxShadow='0 0 16px rgba(248,113,113,.8)';
+if(navigator.vibrate)navigator.vibrate([80,40,80]);
+setTimeout(()=>failLevel(),300);
+return;
+}
+// progress must go forward
+if(d.progress>pathProgress){
+pathProgress=d.progress;progress=pathProgress*100;
+score+=2;updateHud();draw();
+if(pathProgress>=0.98)completeLevel();
+}
+// sparks
+if(Math.random()<0.4)spawnSpark(p.x,p.y);
+}
+function spawnSpark(x,y){
+let s=document.createElement('div');s.className='spark';
+s.style.left=x+'px';s.style.top=y+'px';
+s.style.setProperty('--dx',(Math.random()-0.5)*40+'px');
+s.style.setProperty('--dy',(Math.random()-0.5)*40+'px');
+document.getElementById('gameArea').appendChild(s);
+setTimeout(()=>s.remove(),400);
+}
+function completeLevel(){
+playing=false;clearInterval(timerId);
+score+=time*10+100;
+if(score>best){best=score;save()}
+document.getElementById('overTitle').textContent='Weld Complete! 🔥';
+document.getElementById('overDesc').textContent=LEVELS[level].name+' seam welded — steady hand!';
+document.getElementById('overScore').textContent=score;
+document.getElementById('overBest').textContent=best;
+document.getElementById('overOverlay').classList.remove('hidden');
+updateHud();
+if(navigator.vibrate)navigator.vibrate(50);
+}
+function failLevel(){
+playing=false;clearInterval(timerId);
+document.getElementById('overTitle').textContent='Weld Broken! 💥';
+document.getElementById('overDesc').textContent='Strayed off the seam — keep the torch steady!';
+document.getElementById('overScore').textContent=score;
+document.getElementById('overBest').textContent=best;
+document.getElementById('overOverlay').classList.remove('hidden');
+}
+function startLevel(){
+playing=true;paused=false;isDragging=false;
+document.getElementById('startOverlay').classList.add('hidden');
+document.getElementById('overOverlay').classList.add('hidden');
+torch.classList.remove('hidden');
+torch.style.left=torchPos.x+'px';torch.style.top=torchPos.y+'px';
+clearInterval(timerId);
+timerId=setInterval(()=>{
+if(!playing||paused)return;
+time--;updateHud();
+if(time<=0){playing=false;clearInterval(timerId);failLevel()}
+},1000);
+}
+cv.addEventListener('mousedown',e=>{if(!playing)return;isDragging=true;handleMove(e)});
+window.addEventListener('mousemove',handleMove);
+window.addEventListener('mouseup',()=>isDragging=false);
+cv.addEventListener('touchstart',e=>{if(!playing)return;isDragging=true;handleMove(e)},{passive:false});
+cv.addEventListener('touchmove',handleMove,{passive:false});
+cv.addEventListener('touchend',()=>isDragging=false);
+document.getElementById('playBtn').onclick=startLevel;
+document.getElementById('nextBtn').onclick=()=>{level=(level+1)%LEVELS.length;initLevel()};
+document.getElementById('retryBtn').onclick=()=>initLevel();
+document.getElementById('resetBtn').onclick=()=>{level=0;score=0;initLevel()};
+document.getElementById('pauseBtn').onclick=()=>{
+if(!playing)return;
+paused=!paused;
+document.getElementById('pauseBtn').textContent=paused?'▶ Resume':'⏸ Pause';
+};
+initLevel();
+</script></body></html>
