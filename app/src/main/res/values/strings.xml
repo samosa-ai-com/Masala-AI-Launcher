@@ -382,6 +382,8 @@
     <string name="widgets_rows">%1$d rows</string>
     <string name="widgets_resize_on_home">Resize</string>
     <string name="widgets_edit_in_manager">Edit in manager</string>
+    <string name="widgets_edit_with_ai">Edit with AI</string>
+    <string name="widgets_customize_with_ai">Customize with AI</string>
     <string name="widgets_removed">Removed from home</string>
     <string name="widgets_resized">Resized</string>
     <string name="widgets_add">Add</string>

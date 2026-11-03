@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.samosaai.masala.ui.home.DrawerDrag
 import com.samosaai.masala.widgets.media.openStreamViewer
@@ -187,6 +188,9 @@ class HomeActivity : ComponentActivity() {
         val apps by launcher.apps.collectAsStateWithLifecycle()
         val layout by app.layouts.resolved.collectAsStateWithLifecycle()
         val snapshot by app.contextService.snapshot.collectAsStateWithLifecycle()
+        // Who made each library widget: a template is shared, so editing it in place would change
+        // every placement's copy. Only this flow carries createdBy.
+        val libraryWidgets by remember { app.widgetLibrary.watch() }.collectAsStateWithLifecycle(emptyList())
             // Chat state lives here, above both the pill (which opens it on a long-press)
             // and the surface itself.
             val sessions by app.chats.summaries.collectAsStateWithLifecycle()
@@ -1201,12 +1205,32 @@ class HomeActivity : ComponentActivity() {
                 widgetMenuFor = null
                 action()
             }
+            // A bundled template is one shared library row, so the agent makes the user's own
+            // widget from it instead of rewriting it for every placement. Both prefills are the
+            // manager's, so the change a person gets here is the change they would get there.
+            val isTemplate = libraryWidgets.any { it.createdBy == "template" && it.spec.id == spec.id }
+            val aiPrefill = getString(
+                if (isTemplate) R.string.widgets_customize_prefill else R.string.widgets_edit_prefill,
+                spec.title ?: spec.id,
+            )
             com.samosaai.masala.ui.home.widgets.WidgetMenuDialog(
                 spec = spec,
                 pages = layout.layout.pages.map { it.id to (it.title ?: it.id) },
                 currentPageId = layout.layout.pages.firstOrNull { p ->
                     p.sections.any { it.id == sectionId || (it is com.samosaai.masala.core.contract.CellGridSection && it.cells.any { c -> c.id == sectionId }) }
                 }?.id,
+                onEditWithAi = { done {
+                    // The chat card is the edit form: prefilled, cursor at the end, one Send away.
+                    if (app.commands.openInput(aiPrefill)) {
+                        chatOpen = true
+                        expanded = true
+                    } else {
+                        chatBusyToast()
+                    }
+                } },
+                editWithAiLabel = stringResource(
+                    if (isTemplate) R.string.widgets_customize_with_ai else R.string.widgets_edit_with_ai,
+                ),
                 onResizeOnHome = if (cellWidth == null) null else ({ done { resizingCell = sectionId } }),
                 onRemove = { done { scope.launch {
                     app.layouts.removeWidgetRefs("Remove from home: ${spec.title ?: spec.id}", spec.id)

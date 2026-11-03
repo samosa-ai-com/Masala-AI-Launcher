@@ -22,14 +22,22 @@ import com.samosaai.masala.R
 import com.samosaai.masala.core.contract.WidgetSpec
 
 /**
- * A generated widget's menu on home (plan `docs/plans/widget-maker.md` W2): remove it from home
- * (every placement, one undoable version), resize within its own range, or edit it in the manager.
+ * A generated widget's menu on home (plan `docs/plans/widget-maker.md` W2): edit it with AI right
+ * here, remove it from home (every placement, one undoable version), resize within its own range,
+ * or open it in the manager.
  */
 @Composable
 fun WidgetMenuDialog(
     spec: WidgetSpec,
     pages: List<Pair<String, String>> = emptyList(),
     currentPageId: String? = null,
+    /**
+     * Opens the chat input prefilled for this widget. The manager's Edit/Customize used to be the
+     * only way in, which meant Settings, a tab, and finding the same widget again.
+     */
+    onEditWithAi: (() -> Unit)? = null,
+    /** "Edit with AI", or "Customize with AI" for a template (a template edit makes a copy). */
+    editWithAiLabel: String = "",
     onRemove: () -> Unit,
     onResize: (Int) -> Unit,
     onMoveUp: (() -> Unit)? = null,
@@ -52,6 +60,10 @@ fun WidgetMenuDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (!resizing && !moving) {
+                    // The one action the card is for: a change to *this* widget, in one tap.
+                    if (onEditWithAi != null && editWithAiLabel.isNotBlank()) {
+                        MenuRow(editWithAiLabel, onEditWithAi)
+                    }
                     MenuRow(stringResource(R.string.widgets_remove_from_home), onRemove)
                     if (onResizeOnHome != null) {
                         MenuRow(stringResource(R.string.widgets_resize_on_home), onResizeOnHome)

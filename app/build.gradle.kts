@@ -35,6 +35,9 @@ android {
     }
 
     testOptions {
+        // android.util.Log is a stub in JVM tests; return its defaults instead of throwing, so a
+        // test can exercise a failed save (which logs) without Robolectric.
+        unitTests.isReturnDefaultValues = true
         unitTests.all { test ->
             test.maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 2)
         }

@@ -14,12 +14,15 @@ import org.junit.Test
 /** Review fix: an emptied library stays empty — templates seed only on a fresh install. */
 class WidgetLibraryTest {
 
-    private class FakeDao : WidgetDao {
+    private class FakeDao(var failId: String? = null) : WidgetDao {
         val rows = mutableMapOf<String, WidgetEntity>()
         override suspend fun all(): List<WidgetEntity> = rows.values.toList()
         override fun watch(): Flow<List<WidgetEntity>> = MutableStateFlow(emptyList())
         override suspend fun get(id: String): WidgetEntity? = rows[id]
-        override suspend fun upsert(entity: WidgetEntity) { rows[entity.id] = entity }
+        override suspend fun upsert(entity: WidgetEntity) {
+            if (entity.id == failId) error("the disk was full")
+            rows[entity.id] = entity
+        }
         override suspend fun delete(id: String) { rows.remove(id) }
     }
 
@@ -87,6 +90,51 @@ class WidgetLibraryTest {
         lib.load(seedIfEmpty = false)
         assertTrue("expected pomodoro, had ${lib.current().keys}", "pomodoro" in lib.current().keys)
         assertTrue("second_brain" in lib.current().keys)
+    }
+
+    @Test
+    fun `a template whose save failed is offered again on the next start`() = runBlocking {
+        // The failure that left templates missing from a real phone: the save threw, but the id
+        // was recorded as offered anyway, so it was never retried.
+        val seeds = FakeSeeds(com.samosaai.masala.core.widgets.WidgetTemplates.legacyIds.toMutableSet())
+        val dao = FakeDao(failId = "pomodoro")
+        val lib = WidgetLibrary(dao, FakeVersions(), seeds)
+        lib.load(seedIfEmpty = false)
+        assertFalse("pomodoro" in lib.current().keys)
+        assertTrue("focus_streak" in lib.current().keys)
+
+        dao.failId = null
+        lib.load(seedIfEmpty = false)
+        assertTrue("pomodoro" in lib.current().keys)
+    }
+
+    @Test
+    fun `an install with none of the original templates gets them too`() = runBlocking {
+        // A library created by custom widgets only, from before the gallery seeded templates:
+        // it has never been offered water or habits, so an upgrade must not skip them.
+        val seeds = FakeSeeds()
+        val dao = FakeDao()
+        dao.rows["todo-mono"] = WidgetEntity(
+            id = "todo-mono",
+            specJson = com.samosaai.masala.core.contract.MasalaJson.strict.encodeToString(
+                com.samosaai.masala.core.contract.WidgetSpec.serializer(),
+                com.samosaai.masala.core.widgets.WidgetTemplates.load("habits").widget.copy(id = "todo-mono"),
+            ),
+            tier = "spec", title = "TODO", createdBy = "user", createdAt = 0, updatedAt = 0,
+        )
+        val lib = WidgetLibrary(dao, FakeVersions(), seeds)
+        lib.load(seedIfEmpty = false)
+        assertTrue("water" in lib.current().keys)
+        assertTrue("habits" in lib.current().keys)
+        assertTrue("todo-mono" in lib.current().keys)
+    }
+
+    @Test
+    fun `a fresh install gets every bundled template`() = runBlocking {
+        val lib = WidgetLibrary(FakeDao(), FakeVersions(), FakeSeeds())
+        lib.load(seedIfEmpty = true)
+        val expected = com.samosaai.masala.core.widgets.WidgetTemplates.ids.toSet()
+        org.junit.Assert.assertEquals(expected, lib.current().keys)
     }
 
     @Test

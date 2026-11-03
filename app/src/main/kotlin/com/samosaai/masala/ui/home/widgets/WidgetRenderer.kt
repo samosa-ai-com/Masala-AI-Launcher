@@ -7,10 +7,13 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,6 +34,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -170,42 +174,54 @@ private fun Component(
         }
         is WidgetComponent.Counter -> {
             val value = source.store.int(widgetId, component.key)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.weight(1f)) {
-                    if (labelShown(component.label, title)) Text(component.label, style = MaterialTheme.typography.labelLarge, color = MasalaTheme.tokens.onWallpaperMedium)
-                    Text(
-                        if (component.goal != null) "$value / ${component.goal}" else value.toString(),
-                        style = if (component.style?.emphasis == Emphasis.LARGE) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,
-                        color = tinted(component.style),
-                        modifier = Modifier.combinedClickable(
-                            onClick = {},
-                            onLongClick = { source.store.set(widgetId, component.key, "0") },
-                        ),
-                    )
-                    component.goal?.let { goal ->
-                        LinearProgressIndicator(
-                            progress = { (value.toFloat() / goal.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        if (labelShown(component.label, title)) {
+                            Text(
+                                component.label,
+                                // labelMedium so a 2-cell card keeps "Blocks today" whole
+                                // beside the step chips.
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MasalaTheme.tokens.onWallpaperMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Text(
+                            if (component.goal != null) "$value / ${component.goal}" else value.toString(),
+                            style = if (component.style?.emphasis == Emphasis.LARGE) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,
+                            color = tinted(component.style),
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.combinedClickable(
+                                onClick = {},
+                                onLongClick = { source.store.set(widgetId, component.key, "0") },
+                            ),
                         )
                     }
-                }
-                // A counter you can only add to is a counter you can't correct: a mis-tap and a
-                // new day both need a minus and a reset. Long-press the number to start over.
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = {
-                        if (value > 0) source.store.increment(widgetId, component.key, -component.step)
-                    }) { Text("−${component.step}") }
-                    Button(onClick = { source.store.increment(widgetId, component.key, component.step) }) {
-                        Text("+${component.step}")
+                    // Compact steps: a full Button beside a TextButton squeezed a 2-cell card until
+                    // its label wrapped one letter per line (seen in the gallery preview).
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        StepChip(if (component.step == 1) "−" else "−${component.step}") {
+                            if (value > 0) source.store.increment(widgetId, component.key, -component.step)
+                        }
+                        StepChip(if (component.step == 1) "+" else "+${component.step}") {
+                            source.store.increment(widgetId, component.key, component.step)
+                        }
                     }
                 }
+                component.goal?.let { goal ->
+                    LinearProgressIndicator(
+                        progress = { (value.toFloat() / goal.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                    )
+                }
             }
-            Text(
-                "Long-press the number to reset",
-                style = MaterialTheme.typography.labelSmall,
-                color = MasalaTheme.tokens.onWallpaperMedium,
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
         is WidgetComponent.Checklist -> ChecklistRow(component, widgetId, storage, source)
         is WidgetComponent.Timer -> TimerRow(component, widgetId, storage, source, labelShown(component.label, title))
@@ -480,6 +496,28 @@ private const val MAX_CHECKLIST = 20
 
 /** Where a timer records the deadline it already rang for. */
 private fun ringKey(key: String) = "$key.rang"
+
+/** A small −/+ control for a counter; the label sets the width, so a 2-cell card still fits. */
+@Composable
+private fun StepChip(label: String, onClick: () -> Unit) {
+    androidx.compose.foundation.layout.Box(
+        Modifier
+            .heightIn(min = 34.dp)
+            .clip(RoundedCornerShape(17.dp))
+            .background(MasalaTheme.tokens.onWallpaperMedium.copy(alpha = 0.16f))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            color = OnWallpaper,
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
+}
 
 /**
  * A checklist you can actually keep: tick an item, add one, rename or remove one, or reset the

@@ -60,13 +60,19 @@ class WidgetLibrary(
             return
         }
         if (rows.isEmpty()) {
-            if (seedIfEmpty) seedTemplates()
-            // Every bundled template counts as offered from here on: deleting one later must
-            // not bring it back on the next start.
-            seeds?.remember(WidgetTemplates.ids.toSet())
-            // An upgrade can arrive with an empty library but a saved layout; the new templates
-            // still belong in it. seedNewTemplates adds nothing when they were already offered.
-            seedNewTemplates(emptySet())
+            if (seedIfEmpty) {
+                seedTemplates()
+                // Every bundled template counts as offered from here on: deleting one later must
+                // not bring it back on the next start.
+                seeds?.remember(WidgetTemplates.ids.toSet())
+            } else {
+                // An upgrade can arrive with an empty library (custom widgets only, from before
+                // templates seeded) but a saved layout. Remembering every id here marked all of
+                // them offered without ever saving one — the bug that left seven templates
+                // missing from a real phone. seedNewTemplates saves what was never offered, and
+                // nothing when the user really deleted them (that install has bookkeeping).
+                seedNewTemplates(emptySet())
+            }
             return
         }
         _widgets.value = rows.mapNotNull { row ->
@@ -89,12 +95,32 @@ class WidgetLibrary(
     private suspend fun seedNewTemplates(existing: Set<String>) {
         val store = seeds ?: return
         val known = store.known()
-        val offered = if (known.isEmpty()) WidgetTemplates.legacyIds.toSet() + existing else known + existing
-        val missing = WidgetTemplates.ids.filterNot { it in offered }
-        missing.forEach { id ->
-            runCatching { WidgetTemplates.load(id).widget }.getOrNull()?.let { save(it, createdBy = "template") }
+        val offered = when {
+            known.isNotEmpty() -> known + existing
+            // No bookkeeping yet. An install that still has at least one of the original templates
+            // was offered them, so a deleted one stays deleted. One with none of them never had
+            // them at all (its library was created after the gallery, by custom widgets), and gets
+            // the full set — that is the phone where seven templates were missing.
+            existing.any { it in WidgetTemplates.legacyIds } -> WidgetTemplates.legacyIds.toSet() + existing
+            else -> existing
         }
-        if (missing.isNotEmpty() || known.isEmpty()) store.remember(WidgetTemplates.ids.toSet())
+        val missing = WidgetTemplates.ids.filterNot { it in offered }
+        val saved = mutableSetOf<String>()
+        missing.forEach { id ->
+            runCatching { WidgetTemplates.load(id).widget }.getOrNull()?.let { spec ->
+                // save() logs and gives up on its own; only a row that actually landed counts.
+                save(spec, createdBy = "template")
+                if (id in _widgets.value) saved += id
+            }
+        }
+        // Only templates that reached the library count as offered. Recording a failed save as
+        // offered skipped it forever: seven templates (water, habits, next_events, battery_steps,
+        // camera_tile, two_cameras, countdown) were missing from a real install that way.
+        if (missing.isNotEmpty() || known.isEmpty()) {
+            store.remember(
+                (if (known.isEmpty()) WidgetTemplates.legacyIds.toSet() else emptySet()) + existing + saved,
+            )
+        }
     }
 
     /** Saves [spec] as a new version (Undo in the manager restores [versions]). */
