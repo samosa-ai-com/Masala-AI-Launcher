@@ -19,6 +19,9 @@ object AgentHistory {
     const val CANCELLED = "Cancelled: the run was interrupted before this tool completed."
     const val CONTEXT_NOTE = "[System Note: Conversation context restored from previous turn]"
 
+    /** Characters per token the local estimate assumes. */
+    const val CHARS_PER_TOKEN = 4
+
     /** The last [count] exchanges (a user message and everything after it), for follow-ups. */
     fun lastExchanges(history: List<ChatMessage>, count: Int): List<ChatMessage> {
         var seen = 0
@@ -29,10 +32,27 @@ object AgentHistory {
     }
 
     /**
+     * Rough token count for a message list: four characters per token, the usual rule of thumb.
+     * Used until the API reports its own `usage`, and for messages the report doesn't cover.
+     */
+    fun tokensOf(messages: List<ChatMessage>): Int = messages.sumOf { it.textContent.length } / 4
+
+    /** [trim] on a token budget rather than a character one. */
+    fun trimToTokens(history: List<ChatMessage>, maxTokens: Int): List<ChatMessage> =
+        trim(history, maxTokens.coerceAtLeast(1) * CHARS_PER_TOKEN)
+
+    /**
      * Drops the oldest messages until the text fits [maxChars], without leaving a tool result at the
      * start, and puts a note first if an assistant message would be.
+     *
+     * Never returns an empty list. A tail of big tool results can use up the whole budget, which
+     * would leave nothing but the system prompt in the request — servers reject that outright
+     * (`messages` needs a user or tool role) and the rejection repeats on every retry. In that case
+     * the window backs up to the newest message that isn't a tool result, so the turn that owns
+     * those results goes along with them.
      */
     fun trim(history: List<ChatMessage>, maxChars: Int): List<ChatMessage> {
+        if (history.isEmpty()) return history
         var chars = 0
         var start = history.size
         while (start > 0) {
@@ -41,6 +61,12 @@ object AgentHistory {
             start--
         }
         while (start < history.size && history[start].role == "tool") start++
+        // The budget ran out inside a block of tool results: keep the turn that called them
+        // instead of sending a request with no user or tool message in it.
+        if (start >= history.size) {
+            val owner = history.indexOfLast { it.role != "tool" }
+            start = if (owner >= 0) owner else history.size - 1
+        }
         val trimmed = history.subList(start, history.size)
         if (trimmed.firstOrNull()?.role == "assistant") {
             return listOf(ChatMessage("user", JsonPrimitive(CONTEXT_NOTE))) + trimmed

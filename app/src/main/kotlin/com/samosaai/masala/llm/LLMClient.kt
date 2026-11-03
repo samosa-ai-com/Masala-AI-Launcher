@@ -12,9 +12,9 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
-// From the private prototype's llm/LLMClient.kt. Changes: no SAMOSA_* BuildConfig or settings coupling (the caller
-// passes the endpoint, key and model, see LlmConfig), no dictation cleanup (that comes with speech),
-// and an optional response_format for structured output (plan Phase 1, lane B).
+// OpenAI-compatible chat client. The caller passes the endpoint, key and model (see LlmConfig);
+// dictation cleanup arrives with speech, and response_format is available for structured output
+// (plan Phase 1, lane B).
 
 /** the private prototype's default API timeout. */
 const val DEFAULT_API_TIMEOUT_SECONDS = 180L

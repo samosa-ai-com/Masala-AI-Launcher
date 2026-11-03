@@ -317,4 +317,24 @@ class AgentHistoryTest {
         val h = listOf(user("x".repeat(500)))
         assertEquals(h, AgentHistory.trim(h, maxChars = 10))
     }
+
+    @Test fun trimNeverReturnsEmptyWhenToolResultsExceedTheBudget() {
+        // A long run whose tail is one huge tool result: the budget breaks inside the tools, and
+        // skipping leading tool results used to consume the message list entirely.
+        val h = listOf(
+            user("ask"),
+            assistant("", "1"),
+            ChatMessage("tool", JsonPrimitive("r".repeat(5_000)), toolCallId = "1"),
+        )
+        val trimmed = AgentHistory.trimToTokens(h, maxTokens = 10)
+        assertTrue(trimmed.isNotEmpty())
+        // The turn that called the tool comes along with it, so the pair stays valid.
+        assertEquals(listOf("assistant", "tool"), trimmed.takeLast(2).map { it.role })
+    }
+
+    @Test fun trimToTokensUsesFourCharactersPerToken() {
+        val h = listOf(user("a".repeat(400)))
+        assertEquals(h, AgentHistory.trimToTokens(h, maxTokens = 100))
+        assertEquals(100, AgentHistory.tokensOf(h))
+    }
 }

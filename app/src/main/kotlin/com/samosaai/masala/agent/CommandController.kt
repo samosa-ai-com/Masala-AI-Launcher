@@ -43,6 +43,8 @@ class CommandController(
     private val onTurnStart: (() -> Unit)? = null,
     /** Tidies a spoken transcript before it is sent; null sends it as heard. */
     private val cleaner: TranscriptCleaner? = null,
+    /** The context budget for this chat, in tokens; compaction fires at [MasalaAgent.COMPACT_AT_FRACTION] of it. */
+    private val maxContextTokens: Int = MasalaAgent.DEFAULT_MAX_CONTEXT_TOKENS,
 ) {
     private val _state = MutableStateFlow<CommandState>(CommandState.Idle)
     /**
@@ -156,6 +158,9 @@ class CommandController(
     }
 
     private var history: List<ChatMessage> = emptyList()
+
+    /** Prompt tokens the server last reported for this chat; 0 until a reply carries `usage`. */
+    private var lastPromptTokens: Int = 0
     private var readAloud: CommandState.Reply? = null
 
     /**
@@ -325,18 +330,34 @@ class CommandController(
      * Keeps the model's context bounded without losing the thread: once the history is long,
      * it becomes one summary plus the recent turns. The visible transcript is untouched, and
      * the summary is written into it as a system note so the change is never silent.
+     *
+     * The newest user message is held back from the summary and re-appended afterwards: it is the
+     * turn being answered, so folding it into the summary would answer a question the summary
+     * only paraphrases. On failure the whole history is simply windowed instead.
      */
     private suspend fun compactIfNeeded() {
-        val chars = history.sumOf { it.textContent.length }
-        if (chars < COMPACT_AT_CHARS) return
-        val readable = history.joinToString("\n\n") { "[${it.role}] ${it.textContent}" }
+        val tokens = maxOf(lastPromptTokens, AgentHistory.tokensOf(history))
+        if (tokens < (maxContextTokens * MasalaAgent.COMPACT_AT_FRACTION).toInt()) return
+        // The request that triggered compaction is still unanswered: keep it out of the summary.
+        val preserveLast = history.lastOrNull()?.takeIf { it.role == "user" }
+        val toSummarize = if (preserveLast != null) history.dropLast(1) else history
+        val readable = toSummarize.joinToString("\n\n") { message ->
+            // A tool-call turn has no text of its own; naming the calls keeps the summary honest.
+            val body = message.textContent.ifBlank {
+                message.toolCalls?.joinToString(", ") { "called ${it.function.name}" }.orEmpty()
+            }
+            "[${message.role}] $body"
+        }
         val summary = summarize?.invoke(readable)?.trim()?.takeIf { it.isNotBlank() }
         if (summary != null) {
-            history = listOf(com.samosaai.masala.llm.ChatMessage("assistant", JsonPrimitive(summary)))
+            history = buildList {
+                add(com.samosaai.masala.llm.ChatMessage("assistant", JsonPrimitive(summary)))
+                preserveLast?.let(::add)
+            }
             onTurn?.invoke(com.samosaai.masala.chat.ChatTurn(com.samosaai.masala.chat.TurnRole.SYSTEM, summary))
         } else {
             // No summariser, or it failed: keep what fits rather than sending everything.
-            history = com.samosaai.masala.agent.AgentHistory.trim(history, MasalaAgent.DEFAULT_MAX_HISTORY_CHARS)
+            history = AgentHistory.trimToTokens(history, maxContextTokens)
         }
     }
 
@@ -416,7 +437,7 @@ class CommandController(
                             results = results.values.toList(),
                         ),
                     )
-                    is AgentEvent.Failed -> publish(CommandState.Error(prompt, event.message))
+                    is AgentEvent.Failed -> publish(CommandState.Error(prompt, friendlyModelError(event.message)))
                     // Recorded, not fatal: the model keeps going and finishes around the gap.
                     is AgentEvent.NeedsCapability -> missingAccess += event.capability
                     AgentEvent.StepLimit -> publish(CommandState.Error(prompt, "That took too many steps. Try asking in smaller pieces."))
@@ -427,12 +448,9 @@ class CommandController(
             throw e
         } finally {
             history = agent.history
+            // Real server numbers when it reports them, the character estimate otherwise.
+            lastPromptTokens = agent.lastPromptTokens ?: AgentHistory.tokensOf(history)
         }
-    }
-
-    private companion object {
-        /** Roughly 7.5k tokens: compact before the agent's own 40k-char trim would kick in. */
-        const val COMPACT_AT_CHARS = 30_000
     }
 
     private fun stateFor(prompt: String, outcome: ActionDispatcher.Outcome, spoken: Boolean, done: String? = null): CommandState = when (outcome) {
@@ -440,6 +458,24 @@ class CommandController(
         ActionDispatcher.Outcome.Declined -> CommandState.Reply(prompt, "Okay, I didn't do it.", spoken = spoken)
         is ActionDispatcher.Outcome.Failed -> CommandState.Error(prompt, outcome.message)
         is ActionDispatcher.Outcome.NeedsCapability -> CommandState.Error(prompt, outcome.reason, outcome.marker)
+    }
+}
+
+/**
+ * What a failed model call should read like. "HTTP 400" tells a person nothing actionable, so the
+ * common ones get a sentence that names the fix; anything else stays as the server said it.
+ */
+internal fun friendlyModelError(raw: String?): String {
+    val message = raw?.trim().orEmpty()
+    if (message.isEmpty()) return "The model didn't answer. Try again."
+    val code = Regex("""\b(4\d\d|5\d\d)\b""").find(message)?.groupValues?.get(1)
+    return when (code) {
+        "400" -> "The model refused that request (HTTP 400). If this chat is long, start a new one and ask again there."
+        "401", "403" -> "The model server refused the key. Check it in Settings → Models & keys."
+        "413" -> "That was too much for one request. Try again with a shorter message or fewer files."
+        "429" -> "The model server is busy or rate-limited. Try again in a moment."
+        "500", "502", "503", "504" -> "The model server had a problem (HTTP $code). Try again in a moment."
+        else -> message
     }
 }
 
