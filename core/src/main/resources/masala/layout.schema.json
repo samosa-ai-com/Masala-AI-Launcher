@@ -767,6 +767,53 @@
             "type",
             "name"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "open_settings"
+            },
+            "page": {
+              "type": "string",
+              "enum": [
+                "BRIEF",
+                "WIDGETS",
+                "PERMISSIONS",
+                "MAIN"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "page"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "flip"
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "coin",
+                "dice"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "key",
+            "kind"
+          ]
         }
       ]
     },
@@ -1194,6 +1241,18 @@
             },
             "style": {
               "$ref": "#/$defs/WidgetStyle"
+            },
+            "date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "reset": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly"
+              ]
             }
           },
           "additionalProperties": false,
@@ -1218,6 +1277,14 @@
               "items": {
                 "type": "string"
               }
+            },
+            "reset": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly"
+              ]
             }
           },
           "additionalProperties": false,
@@ -1246,6 +1313,10 @@
             },
             "sound": {
               "type": "boolean"
+            },
+            "autoStartKey": {
+              "type": "string",
+              "minLength": 1
             }
           },
           "additionalProperties": false,
@@ -1273,6 +1344,14 @@
             },
             "style": {
               "$ref": "#/$defs/WidgetStyle"
+            },
+            "reset": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly"
+              ]
             }
           },
           "additionalProperties": false,

@@ -85,6 +85,24 @@ sealed interface MasalaAction {
     @SerialName("refresh_widget")
     data class RefreshWidget(val widgetId: String = "") : MasalaAction
 
+    /**
+     * A coin flip or a dice roll, resolved on the card: the result is written to the widget's
+     * storage under [key], so the card shows it instead of opening chat. [kind] is `coin` or
+     * `dice`.
+     */
+    @Serializable
+    @SerialName("flip")
+    data class Flip(val key: String, val kind: String) : MasalaAction
+
+    /**
+     * Opens one page of Masala's settings (Daily brief for weather/place, Widgets for cameras and
+     * web hosts, Permissions for calendar/health). A widget's "set this up" note uses it, so a card
+     * that needs a permission can point at the exact screen.
+     */
+    @Serializable
+    @SerialName("open_settings")
+    data class OpenSettings(val page: String) : MasalaAction
+
     /** Click feedback on a widget button. Only "click" exists; unknown kinds are rejected. */
     @Serializable
     @SerialName("play_sound")
@@ -129,5 +147,7 @@ fun MasalaAction.sensitivity(toolSensitivity: (String) -> ToolSensitivity?): Too
     is MasalaAction.RefreshWidget,
     is MasalaAction.PlaySound,
     is MasalaAction.OpenMiniApp,
+    is MasalaAction.OpenSettings,
+    is MasalaAction.Flip,
     is MasalaAction.OpenFolder -> ToolSensitivity.READ_ONLY
 }

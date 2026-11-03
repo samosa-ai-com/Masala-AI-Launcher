@@ -695,7 +695,7 @@ class MasalaApp : Application() {
         launcher = LauncherModel(scope, catalog, database.appOverrides(), actions)
         catalog.start()
 
-        contextService = ContextService(this, scope, modes).also { it.start() }
+        contextService = ContextService(this, scope, modes, weather, settings).also { it.start() }
         // Routines watch the context; starting after the service means the first evaluation has
         // a real snapshot (time, battery, weather) instead of defaults.
         scope.launch { runCatching { wallpaperRoutineEngine.start() } }

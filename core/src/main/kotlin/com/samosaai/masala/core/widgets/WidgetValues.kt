@@ -79,7 +79,13 @@ object WidgetValues {
     ): List<String> {
         val lines = when (binding.source) {
             BindingSource.STORAGE -> storage[binding.key]?.lines()?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
-            BindingSource.NEXT_EVENT -> listOfNotNull(textOf(binding, storage, snapshot, extra))
+            BindingSource.NEXT_EVENT -> snapshot.nextEvents.ifEmpty { listOfNotNull(snapshot.nextEvent) }
+                .map { e ->
+                    buildString {
+                        append(e.title).append(" · ").append(e.start.toLocalTime().toString())
+                        e.location?.takeIf { it.isNotBlank() }?.let { append(" · ").append(it) }
+                    }
+                }
             BindingSource.SECOND_BRAIN -> extra[binding.key]?.lines()?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
             else -> return emptyList()
         }

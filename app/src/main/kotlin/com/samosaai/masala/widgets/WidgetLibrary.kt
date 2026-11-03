@@ -85,6 +85,21 @@ class WidgetLibrary(
         // An upgrade with a saved layout passes false, and still needs the templates it was never
         // offered — which is exactly what seedNewTemplates adds, without resurrecting deleted ones.
         seedNewTemplates(rows.map { it.id }.toSet())
+        refreshTemplates(rows)
+    }
+
+    /**
+     * Brings a bundled template row up to date with the JSON this build ships. A template is not a
+     * user's widget: when a release improves one (a Pomodoro that chains its break, a fixed URL),
+     * the parser change must reach it. Rows the user made (or that the Widget Maker copied) are
+     * never touched, and a template the user deleted has no row to refresh.
+     */
+    private suspend fun refreshTemplates(rows: List<com.samosaai.masala.data.WidgetEntity>) {
+        rows.filter { it.createdBy == "template" }.forEach { row ->
+            val bundled = runCatching { WidgetTemplates.load(row.id).widget }.getOrNull() ?: return@forEach
+            val current = _widgets.value[row.id] ?: return@forEach
+            if (bundled != current) save(bundled, createdBy = "template")
+        }
     }
 
     /**

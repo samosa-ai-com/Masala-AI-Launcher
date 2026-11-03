@@ -18,7 +18,8 @@
           "Fri",
           "Sat",
           "Sun"
-        ]
+        ],
+        "reset": "weekly"
       }
     ],
     "size": {

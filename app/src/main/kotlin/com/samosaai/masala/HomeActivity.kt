@@ -313,6 +313,8 @@ class HomeActivity : ComponentActivity() {
         var itemMenuFor by remember { mutableStateOf<Item?>(null) }
         var resizingCell by remember { mutableStateOf<String?>(null) }
         var widgetMenuFor by remember { mutableStateOf<Pair<com.samosaai.masala.core.contract.WidgetSpec, String>?>(null) }
+            // The widget whose own settings sheet is open; null when closed.
+            var widgetSettingsFor by remember { mutableStateOf<com.samosaai.masala.core.contract.WidgetSpec?>(null) }
         var addWidgetSheet by remember { mutableStateOf(false) }
         // Long-press on empty home space: Change wallpaper / Add widget / Settings.
         var homeMenu by remember { mutableStateOf(false) }
@@ -1219,6 +1221,7 @@ class HomeActivity : ComponentActivity() {
                 currentPageId = layout.layout.pages.firstOrNull { p ->
                     p.sections.any { it.id == sectionId || (it is com.samosaai.masala.core.contract.CellGridSection && it.cells.any { c -> c.id == sectionId }) }
                 }?.id,
+                onSettings = { done { widgetSettingsFor = spec } },
                 onEditWithAi = { done {
                     // The chat card is the edit form: prefilled, cursor at the end, one Send away.
                     if (app.commands.openInput(aiPrefill)) {
@@ -1255,6 +1258,21 @@ class HomeActivity : ComponentActivity() {
                 } } },
                 onEdit = { done { startActivity(Intent(this@HomeActivity, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_PAGE, "WIDGETS")) } },
                 onDismiss = { widgetMenuFor = null },
+            )
+        }
+
+        widgetSettingsFor?.let { spec ->
+            val prefs = com.samosaai.masala.widgets.WidgetPrefsStore.of(app.widgetStates.values(spec.id))
+            com.samosaai.masala.ui.home.widgets.WidgetSettingsSheet(
+                spec = spec,
+                prefs = prefs,
+                store = app.widgetStates,
+                sources = app.streamSources.current().values.map { it.id to it.name },
+                onOpenPage = { page ->
+                    widgetSettingsFor = null
+                    startActivity(Intent(this@HomeActivity, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_PAGE, page))
+                },
+                onDismiss = { widgetSettingsFor = null },
             )
         }
 

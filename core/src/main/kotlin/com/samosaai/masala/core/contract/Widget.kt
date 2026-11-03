@@ -125,12 +125,24 @@ sealed interface WidgetComponent {
         val label: String,
         val step: Int = 1,
         val goal: Int? = null,
+        /**
+         * A countdown's target date (ISO `yyyy-MM-dd`): the value shown is the days left, not a
+         * stored count. Null is a plain tap counter.
+         */
+        val date: String? = null,
+        /** `daily` / `weekly` / `monthly`: what the value starts over by itself. */
+        val reset: String? = null,
         val style: WidgetStyle? = null,
     ) : WidgetComponent
 
     @Serializable
     @SerialName("checklist")
-    data class Checklist(val key: String, val items: List<String>) : WidgetComponent
+    data class Checklist(
+        val key: String,
+        val items: List<String>,
+        /** `daily` / `weekly` / `monthly`: when the ticks start over. */
+        val reset: String? = null,
+    ) : WidgetComponent
 
     @Serializable
     @SerialName("timer")
@@ -138,14 +150,25 @@ sealed interface WidgetComponent {
         val key: String,
         val label: String,
         val seconds: Int,
-        /** Rings when it reaches zero (a Pomodoro's break), while the card is on screen. */
+        /** Rings when it reaches zero: a chime and a notification, even when home is not visible. */
         val sound: Boolean = false,
+        /**
+         * The timer key in the same widget to start when this one ends (a Pomodoro's break, or the
+         * same key for an hourly nudge that repeats). Null stops at the end.
+         */
+        val autoStartKey: String? = null,
     ) : WidgetComponent
 
     @Serializable
     @SerialName("progress")
-    data class Progress(val label: String, val binding: Binding, val max: Double, val style: WidgetStyle? = null) :
-        WidgetComponent
+    data class Progress(
+        val label: String,
+        val binding: Binding,
+        val max: Double,
+        /** `daily` / `weekly` / `monthly`: when the amount starts over. */
+        val reset: String? = null,
+        val style: WidgetStyle? = null,
+    ) : WidgetComponent
 
     @Serializable
     @SerialName("chart")

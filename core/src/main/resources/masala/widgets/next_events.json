@@ -12,7 +12,11 @@
         "binding": {
           "source": "next_event"
         },
-        "maxRows": 3
+        "maxRows": 5,
+        "rowAction": {
+          "type": "ask_masala",
+          "prompt": "What are my upcoming events?"
+        }
       }
     ],
     "size": {

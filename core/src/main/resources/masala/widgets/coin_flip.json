@@ -8,12 +8,28 @@
     "title": "Coin",
     "components": [
       {
-        "type": "button",
-        "label": "Flip",
-        "action": {
-          "type": "ask_masala",
-          "prompt": "Flip a coin for me"
-        }
+        "type": "row",
+        "children": [
+          {
+            "type": "text",
+            "binding": {
+              "source": "storage",
+              "key": "last"
+            },
+            "style": {
+              "emphasis": "large"
+            }
+          },
+          {
+            "type": "button",
+            "label": "Flip",
+            "action": {
+              "type": "flip",
+              "key": "last",
+              "kind": "coin"
+            }
+          }
+        ]
       }
     ],
     "size": {

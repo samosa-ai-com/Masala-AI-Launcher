@@ -19,8 +19,8 @@
     ],
     "size": {
       "min": 1,
-      "default": 1,
-      "max": 2,
+      "default": 2,
+      "max": 3,
       "minW": 2,
       "defaultW": 2,
       "maxW": 2

@@ -1,7 +1,7 @@
 {
   "id": "stand_hourly",
   "name": "Stand up",
-  "description": "An hourly nudge that rings so you actually move.",
+  "description": "An hourly nudge that starts the next hour as soon as one ends.",
   "category": "Health",
   "widget": {
     "id": "stand_hourly",
@@ -12,7 +12,8 @@
         "key": "stand",
         "label": "Next stand",
         "seconds": 3600,
-        "sound": true
+        "sound": true,
+        "autoStartKey": "stand"
       }
     ],
     "size": {

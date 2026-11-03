@@ -15,7 +15,8 @@
           "Plan tomorrow",
           "Tidy desk",
           "Note one win"
-        ]
+        ],
+        "reset": "daily"
       }
     ],
     "size": {

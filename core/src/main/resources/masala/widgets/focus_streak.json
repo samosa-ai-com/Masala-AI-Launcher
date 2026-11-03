@@ -15,7 +15,8 @@
         "style": {
           "tint": "blue",
           "emphasis": "large"
-        }
+        },
+        "reset": "daily"
       }
     ],
     "size": {

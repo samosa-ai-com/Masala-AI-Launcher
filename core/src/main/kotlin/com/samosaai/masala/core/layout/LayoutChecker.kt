@@ -266,6 +266,15 @@ object LayoutChecker {
             is MasalaAction.StartTimer -> if (action.seconds !in 1..MAX_TIMER_SECONDS) {
                 problems += Problem("$path.seconds", "seconds must be 1 to $MAX_TIMER_SECONDS")
             }
+            is MasalaAction.Flip -> {
+                if (action.kind != "coin" && action.kind != "dice") {
+                    problems += Problem("$path.kind", "Only a coin or a dice can be flipped")
+                }
+                if (action.key.isBlank()) problems += Problem("$path.key", "key is empty")
+            }
+            is MasalaAction.OpenSettings -> if (action.page !in SETTINGS_PAGES) {
+                problems += Problem("$path.page", "Unknown settings page '${action.page}'")
+            }
             is MasalaAction.SetMode -> if (env.modeIds != null && action.id !in env.modeIds) {
                 problems += Problem("$path.id", "Unknown mode '${action.id}'")
             }
@@ -277,6 +286,8 @@ object LayoutChecker {
             }
             // An empty ask_masala prompt opens the ask box with nothing typed. A blank refresh_widget
             // id means the widget holding the button; the renderer fills it in before dispatching.
+            is MasalaAction.OpenSettings,
+            is MasalaAction.Flip,
             MasalaAction.OpenDrawer, MasalaAction.ExpandNotifications, is MasalaAction.Search,
             is MasalaAction.OpenMiniApp, is MasalaAction.AskMasala, is MasalaAction.RefreshWidget,
             is MasalaAction.PlaySound -> Unit
@@ -449,6 +460,9 @@ object LayoutChecker {
             else -> Unit
         }
     }
+
+    /** Settings pages a widget button may open: the ones that fix a card's missing data. */
+    val SETTINGS_PAGES = setOf("BRIEF", "WIDGETS", "PERMISSIONS", "MAIN")
 
     private val PHONE_NUMBER = Regex("""^\+?[0-9 ()\-.*#]{3,32}$""")
     private const val MAX_TIMER_SECONDS = WidgetChecker.MAX_TIMER_SECONDS

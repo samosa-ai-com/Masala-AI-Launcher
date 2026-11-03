@@ -156,6 +156,11 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- Widget timers: the exact alarm that rings a Pomodoro/tea/break timer while home is hidden -->
+        <receiver
+            android:name=".widgets.WidgetTimerReceiver"
+            android:exported="false" />
+
         <!-- Scheduled tasks: the alarm that starts a run (Masala's own PendingIntent only) -->
         <receiver
             android:name=".scheduled.ScheduledTaskReceiver"

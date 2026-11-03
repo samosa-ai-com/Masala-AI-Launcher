@@ -14,7 +14,8 @@
           "Stretch",
           "Read 10 pages",
           "Walk outside"
-        ]
+        ],
+        "reset": "daily"
       }
     ],
     "size": {

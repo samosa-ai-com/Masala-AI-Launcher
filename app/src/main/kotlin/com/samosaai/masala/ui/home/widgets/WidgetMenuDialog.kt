@@ -38,6 +38,8 @@ fun WidgetMenuDialog(
     onEditWithAi: (() -> Unit)? = null,
     /** "Edit with AI", or "Customize with AI" for a template (a template edit makes a copy). */
     editWithAiLabel: String = "",
+    /** Opens this widget's own settings (goal, duration, reset, place, URL…). */
+    onSettings: (() -> Unit)? = null,
     onRemove: () -> Unit,
     onResize: (Int) -> Unit,
     onMoveUp: (() -> Unit)? = null,
@@ -63,6 +65,9 @@ fun WidgetMenuDialog(
                     // The one action the card is for: a change to *this* widget, in one tap.
                     if (onEditWithAi != null && editWithAiLabel.isNotBlank()) {
                         MenuRow(editWithAiLabel, onEditWithAi)
+                    }
+                    if (onSettings != null) {
+                        MenuRow(stringResource(R.string.widgets_edit_settings), onSettings)
                     }
                     MenuRow(stringResource(R.string.widgets_remove_from_home), onRemove)
                     if (onResizeOnHome != null) {

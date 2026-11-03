@@ -11,6 +11,8 @@ import java.time.LocalDateTime
 data class ContextSnapshot(
     @Serializable(with = LocalDateTimeSerializer::class) val now: LocalDateTime,
     val nextEvent: NextEvent? = null,
+    /** The next few events, soonest first; [nextEvent] is its first for rules. */
+    val nextEvents: List<NextEvent> = emptyList(),
     val charging: Boolean? = null,
     val batteryPercent: Int? = null,
     val bluetoothDevices: List<String> = emptyList(),

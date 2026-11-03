@@ -8,12 +8,28 @@
     "title": "Dice",
     "components": [
       {
-        "type": "button",
-        "label": "Roll",
-        "action": {
-          "type": "ask_masala",
-          "prompt": "Roll a dice for me"
-        }
+        "type": "row",
+        "children": [
+          {
+            "type": "text",
+            "binding": {
+              "source": "storage",
+              "key": "last"
+            },
+            "style": {
+              "emphasis": "large"
+            }
+          },
+          {
+            "type": "button",
+            "label": "Roll",
+            "action": {
+              "type": "flip",
+              "key": "last",
+              "kind": "dice"
+            }
+          }
+        ]
       }
     ],
     "size": {

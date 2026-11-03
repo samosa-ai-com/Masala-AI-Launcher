@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
@@ -57,11 +58,19 @@ class ContextService(
     private val context: Context,
     private val scope: CoroutineScope,
     modes: ModeStore,
+    /** Open-Meteo, the same client the brief uses; null keeps weather out (tests). */
+    private val weatherClient: com.samosaai.masala.weather.WeatherClient? = null,
+    /** Where the saved place lives (Settings → Daily brief). */
+    private val settings: com.samosaai.masala.data.SettingsStore? = null,
 ) {
     private data class Real(
         val battery: Pair<Boolean?, Int?> = null to null,
         val bluetooth: List<String> = emptyList(),
         val nextEvent: NextEvent? = null,
+        val nextEvents: List<NextEvent> = emptyList(),
+        val weather: com.samosaai.masala.core.contract.WeatherNow? = null,
+        val steps: Int? = null,
+        val sleepHours: Double? = null,
     )
 
     private val real = MutableStateFlow(Real())
@@ -86,11 +95,15 @@ class ContextService(
             ContextSnapshot(
                 now = now,
                 nextEvent = real.nextEvent,
+                nextEvents = real.nextEvents,
                 charging = real.battery.first,
                 batteryPercent = real.battery.second,
                 bluetoothDevices = real.bluetooth,
                 activeModes = active.sorted(),
                 urgentCount = urgent,
+                weather = real.weather,
+                steps = real.steps,
+                sleepHours = real.sleepHours,
             ),
         )
     }.distinctUntilChanged().stateIn(scope, SharingStarted.Eagerly, overrideState.value.initial())
@@ -110,6 +123,8 @@ class ContextService(
         started = true
         registerBattery()
         registerBluetooth()
+        startWeather()
+        startHealth()
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) = refreshCalendar()
         }
@@ -125,6 +140,9 @@ class ContextService(
         if (!visible) return
         minute.value = minuteNow()
         refreshCalendar()
+        // A phone that was away for a while (or had no network) gets a fresh reading on return.
+        scope.launch { refreshWeather() }
+        scope.launch { refreshHealth() }
         tick = scope.launch {
             while (isActive) {
                 val now = System.currentTimeMillis()
@@ -210,15 +228,84 @@ class ContextService(
         real.value = real.value.copy(bluetooth = connected.values.toList())
     }
 
+    // ---- weather ----
+
+    private var weatherJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * Today's weather for the widgets (`rain_soon`, `weather_globe`). The place is the one saved in
+     * Settings → Daily brief; without one, the phone's last known coarse location is used when the
+     * user has allowed location. Refreshed every 20 minutes (the client caches for 30, so this is
+     * one request per half hour at most) and whenever home comes back.
+     */
+    private fun startWeather() {
+        if (weatherClient == null || weatherJob != null) return
+        weatherJob = scope.launch {
+            while (isActive) {
+                refreshWeather()
+                delay(20 * 60_000L)
+            }
+        }
+    }
+
+    private suspend fun refreshWeather() {
+        val client = weatherClient ?: return
+        val place = runCatching { settings?.settings?.firstOrNull()?.briefPlace }.getOrNull()
+            ?: runCatching {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+                    withContext(Dispatchers.IO) {
+                        com.samosaai.masala.weather.WeatherClient.currentPlace(context, "Here")
+                    }
+                } else {
+                    null
+                }
+            }.getOrNull()
+        if (place == null) {
+            real.value = real.value.copy(weather = null)
+            return
+        }
+        // today() returns a Result of its own; only a success that carried a temperature counts.
+        runCatching { client.today(place).getOrNull() }
+            .onSuccess { daily -> real.value = real.value.copy(weather = daily?.now) }
+            .onFailure { Log.w(TAG, "Weather refresh failed", it) }
+    }
+
+    // ---- health ----
+
+    private var healthJob: kotlinx.coroutines.Job? = null
+
+    /** Steps and last night's sleep for the health widgets, when Health Connect is granted. */
+    private fun startHealth() {
+        if (healthJob != null) return
+        healthJob = scope.launch {
+            while (isActive) {
+                refreshHealth()
+                delay(15 * 60_000L)
+            }
+        }
+    }
+
+    private suspend fun refreshHealth() {
+        val reading = runCatching { com.samosaai.masala.health.HealthSignals.read(context) }.getOrNull() ?: return
+        real.value = real.value.copy(steps = reading.steps, sleepHours = reading.sleepHours)
+    }
+
     // ---- calendar ----
 
     private fun refreshCalendar() {
-        scope.launch { real.value = real.value.copy(nextEvent = withContext(Dispatchers.IO) { queryNextEvent() }) }
+        scope.launch {
+            val events = withContext(Dispatchers.IO) { queryNextEvents() }
+            real.value = real.value.copy(nextEvent = events.firstOrNull(), nextEvents = events)
+        }
     }
 
-    /** The first event starting in the next day, or null without permission or events. */
-    private fun queryNextEvent(): NextEvent? {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED) return null
+    /** The next few events in the coming day; the first is what rules see as [Real.nextEvent]. */
+    private fun queryNextEvents(limit: Int = 5): List<NextEvent> {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED) {
+            return emptyList()
+        }
         val now = System.currentTimeMillis()
         val uri = CalendarContract.Instances.CONTENT_URI.buildUpon().also {
             android.content.ContentUris.appendId(it, now)
@@ -230,19 +317,20 @@ class ContextService(
                 arrayOf(CalendarContract.Instances.TITLE, CalendarContract.Instances.BEGIN, CalendarContract.Instances.EVENT_LOCATION, CalendarContract.Instances.ALL_DAY),
                 null, null, "${CalendarContract.Instances.BEGIN} ASC",
             )?.use { c ->
-                while (c.moveToNext()) {
+                val events = mutableListOf<NextEvent>()
+                while (c.moveToNext() && events.size < limit) {
                     val begin = c.getLong(1)
                     // Already started and all-day events aren't "next".
                     if (begin < now || c.getInt(3) == 1) continue
-                    return@use NextEvent(
+                    events += NextEvent(
                         title = c.getString(0).orEmpty().ifBlank { "Event" },
                         start = LocalDateTime.ofInstant(Instant.ofEpochMilli(begin), ZoneId.systemDefault()),
                         location = c.getString(2)?.takeIf { it.isNotBlank() },
                     )
                 }
-                null
-            }
-        }.onFailure { Log.w(TAG, "Calendar query failed", it) }.getOrNull()
+                events
+            }.orEmpty()
+        }.onFailure { Log.w(TAG, "Calendar query failed", it) }.getOrDefault(emptyList())
     }
 
     private companion object {

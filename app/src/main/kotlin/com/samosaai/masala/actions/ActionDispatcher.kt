@@ -16,6 +16,7 @@ import com.samosaai.masala.layout.ModeStore
 import com.samosaai.masala.miniapps.openMiniApp
 import com.samosaai.masala.skills.SkillRegistry
 import com.samosaai.masala.tools.MasalaToolExecutor
+import com.samosaai.masala.ui.settings.SettingsActivity
 import com.samosaai.masala.ui.skills.SkillSheetActivity
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -114,6 +115,13 @@ class ActionDispatcher(
             else if (refresh(action.widgetId)) Outcome.Done()
             else Outcome.Failed("Couldn't refresh that widget yet")
         }
+        is MasalaAction.OpenSettings -> {
+            val target = SettingsActivity::class.java
+            start(Intent(context, target).putExtra(SettingsActivity.EXTRA_PAGE, action.page))
+        }
+        // A coin/dice is resolved by the card itself (it writes the result into the widget's state);
+        // dispatched from anywhere else there is nothing for the phone to do.
+        is MasalaAction.Flip -> Outcome.Failed("A flip happens on its widget")
         is MasalaAction.PlaySound -> playClick(action)
     }
 
