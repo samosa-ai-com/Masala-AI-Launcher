@@ -232,10 +232,12 @@ class MeetingTranscriber(
         val all = repo.turnsNow(meetingId)
         val previous = all.filter { it.chunkIdx == chunkIdx - 1 }.maxByOrNull { it.endMs } ?: return
         val first = all.filter { it.chunkIdx == chunkIdx }.minByOrNull { it.startMs } ?: return
+        // Only a turn that ended near this boundary can be the fragment the next window repeated.
+        // A phrase minutes before the boundary ("thank you") is real speech, not a duplicate.
+        val boundary = repo.chunk(meetingId, chunkIdx)?.startMs ?: return
+        if (boundary - previous.endMs > settings.overlapMs) return
         // Only the same person's fragment, and only when the new turn contains it word for word in
         // order. A shared half of a sentence ("we should") is not a duplicate of "we should launch".
-        // (A time check would be wrong here: by construction the previous turn ends before the new
-        // window starts, so "no time overlap" is always true.)
         if (previous.speaker != first.speaker) return
         val old = previous.text.lowercase().replace(Regex("[^\\p{L}\\p{N}\\p{M}\\s]"), " ")
             .split(Regex("\\s+")).filter { it.isNotBlank() }

@@ -484,7 +484,7 @@ class MeetingRecorderService : Service() {
         val open = PendingIntent.getActivity(
             this,
             0,
-            Intent(this, MeetingActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            MeetingActivity.intent(this, meetingId).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val paused = _state.value.status == MeetingStatus.PAUSED
