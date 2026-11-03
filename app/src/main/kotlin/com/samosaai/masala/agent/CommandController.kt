@@ -13,8 +13,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
@@ -70,7 +73,7 @@ class CommandController(
                 experts = state.experts, results = state.results,
             )
             is CommandState.Error -> com.samosaai.masala.chat.ChatTurn(
-                com.samosaai.masala.chat.TurnRole.ERROR, state.message,
+                com.samosaai.masala.chat.TurnRole.ERROR, state.message, steps = state.steps,
             )
             else -> null
         }
@@ -82,7 +85,30 @@ class CommandController(
 
     val state: StateFlow<CommandState> = _state.asStateFlow()
 
+    /**
+     * True while a turn is live (thinking, listening, or a take paused at the cap). One chat at a
+     * time: while this is true no new turn can start and the thread cannot be replaced, so a
+     * running turn can never be cancelled out from under itself (the crash on + / History / a
+     * second send).
+     */
+    val busy: StateFlow<Boolean> = state
+        .map { it.isLive() }
+        .stateIn(scope, SharingStarted.Eagerly, false)
+
+    /** The same answer, read synchronously: a guard must not wait for a flow dispatch. */
+    private fun isBusy(): Boolean = _state.value.isLive()
+
+    private fun CommandState.isLive(): Boolean =
+        this is CommandState.Thinking || this == CommandState.Listening || this == CommandState.ListeningPaused
+
     private var job: Job? = null
+
+    /**
+     * The tool steps the current turn has taken, readable from outside [runTurn] so a failure or
+     * a Stop can record how far it got (and a reopened chat shows the trace).
+     */
+    @Volatile
+    private var turnSteps: List<String> = emptyList()
 
     /**
      * Set when the user hides the chat mid-turn (sheet X, Back, drawer): the turn
@@ -192,13 +218,38 @@ class CommandController(
     private var draft = ""
     fun takeDraft(): String = draft.also { draft = "" }
 
-    /** Shows the card with its input field and nothing else. */
-    fun openInput(prefill: String = "") {
+    /**
+     * Shows the card with its input field and nothing else. Returns false (and changes nothing)
+     * while a turn is live: replacing the working card would have to cancel that turn, which is
+     * what used to crash the app.
+     */
+    fun openInput(prefill: String = ""): Boolean {
+        if (isBusy()) return false
         job?.cancel()
         draft = prefill
         // Asking to type is coming back: a chat minimized earlier would hide the card.
         _minimized.value = false
         _state.value = CommandState.Input
+        return true
+    }
+
+    /**
+     * Stop: cancels a running turn and records what it had done as a [TurnRole.STATUS] note, so
+     * reopening the chat shows the trace instead of only the user's message. Nothing was sent
+     * while listening, so a cancelled take records nothing.
+     */
+    fun stop() {
+        val thinking = _state.value as? CommandState.Thinking
+        dismiss()
+        if (thinking == null) return
+        val steps = if (thinking.steps.isNotEmpty()) thinking.steps else turnSteps
+        onTurn?.invoke(
+            com.samosaai.masala.chat.ChatTurn(
+                com.samosaai.masala.chat.TurnRole.STATUS,
+                STOPPED_NOTE,
+                steps = steps,
+            ),
+        )
     }
 
     fun dismiss() {
@@ -210,37 +261,66 @@ class CommandController(
         _state.value = CommandState.Idle
     }
 
-    /** [spoken] transcripts get their names corrected against apps, modes and skills the phone knows. */
-    fun ask(text: String, spoken: Boolean = false, images: List<String> = emptyList()) {
-        _minimized.value = false
+    /**
+     * Sends a typed or spoken message. Returns false when a turn is already running: cancelling it
+     * to start another is what used to crash the app, and losing a half-finished reply is worse
+     * than asking the user to wait. Blank text opens the input card instead.
+     *
+     * [spoken] transcripts get their names corrected against apps, modes and skills the phone knows.
+     */
+    fun ask(text: String, spoken: Boolean = false, images: List<String> = emptyList()): Boolean {
         val raw = text.trim()
         if (raw.isEmpty() && images.isEmpty()) return openInput()
+        if (isBusy()) return false
+        startTurn(raw, spoken, images)
+        return true
+    }
+
+    /** Starts a turn whatever [busy] says: the take that just ended is the only live work. */
+    private fun startTurn(raw: String, spoken: Boolean, images: List<String>) {
+        _minimized.value = false
         job?.cancel()
         val prompt = if (spoken) NameCorrector(names()).correct(raw) else raw
         _state.value = CommandState.Thinking(if (prompt.isBlank()) com.samosaai.masala.chat.IMAGE_PLACEHOLDER else prompt)
+        turnSteps = emptyList()
         // One stable folder for this send's images, so the model text can name them.
         val messageId = if (images.isEmpty()) null else UUID.randomUUID().toString()
+        val transcript = if (prompt.isBlank()) com.samosaai.masala.chat.IMAGE_PLACEHOLDER else prompt
         job = scope.launch {
-            // Compact first: the summary must appear above the turn that triggered it, not
-            // below it, and the new prompt must not be part of what gets summarised.
-            compactIfNeeded()
-            // The transcript keeps the placeholder; only the model text carries path lines,
-            // so the thread still reads the same after a reload.
-            val paths = if (messageId == null) emptyList()
-            else runCatching { materializeAttachments?.invoke(messageId, images) }.getOrNull().orEmpty()
-            val transcript = if (prompt.isBlank()) com.samosaai.masala.chat.IMAGE_PLACEHOLDER else prompt
-            onTurn?.invoke(
-                com.samosaai.masala.chat.ChatTurn(
-                    com.samosaai.masala.chat.TurnRole.USER, transcript, attachmentPaths = paths,
-                ),
-            )
-            handle(modelTextWithImagePaths(prompt, paths), spoken, images, transcript)
+            // Everything about the turn lives behind this boundary: a tool, the model client or
+            // the chat store failing must show an error in the thread, never kill the process
+            // (and never lose the steps it had already run).
+            try {
+                // Compact first: the summary must appear above the turn that triggered it, not
+                // below it, and the new prompt must not be part of what gets summarised.
+                compactIfNeeded()
+                // The transcript keeps the placeholder; only the model text carries path lines,
+                // so the thread still reads the same after a reload.
+                val paths = if (messageId == null) emptyList()
+                else runCatching { materializeAttachments?.invoke(messageId, images) }.getOrNull().orEmpty()
+                onTurn?.invoke(
+                    com.samosaai.masala.chat.ChatTurn(
+                        com.samosaai.masala.chat.TurnRole.USER, transcript, attachmentPaths = paths,
+                    ),
+                )
+                handle(modelTextWithImagePaths(prompt, paths), spoken, images, transcript)
+            } catch (e: CancellationException) {
+                // Stop, a chat switch or process teardown: not a failure, and the turn is
+                // recorded by whoever cancelled it.
+                throw e
+            } catch (e: Throwable) {
+                // Logging must never be the thing that fails: JVM tests don't mock android.util.Log.
+                runCatching { android.util.Log.e("CommandController", "turn failed", e) }
+                publish(CommandState.Error(transcript, friendlyTurnError(e), steps = turnSteps))
+            }
         }
     }
 
     /** Tap on the mic. Returns false if listening can't start. */
     fun startListening(): Boolean {
         val input = speech ?: return false
+        // The mic is another way into the same single chat: it can't cancel a running turn.
+        if (isBusy()) return false
         job?.cancel()
         // The specific reason first; async errors during listening update the card too.
         var reason: String? = null
@@ -412,7 +492,9 @@ class CommandController(
                     val quick = heard.isBlank() ||
                         CommandFastPath.match(NameCorrector(names()).correct(heard.trim()), resolveApp) != null
                     val text = if (quick) heard else cleaner?.clean(heard) ?: heard
-                    ask(text, spoken = true)
+                    // The take just ended, so this is the only live work: start it directly
+                    // rather than through ask's one-at-a-time guard.
+                    startTurn(text.trim(), spoken = true, images = emptyList())
                 }
                 .onFailure { publish(CommandState.Error("", friendlySttMessage(it.message, speechStrings))) }
         }
@@ -436,6 +518,7 @@ class CommandController(
         // Advice in an expert's area goes to the agent too: it consults the expert itself, in place.
         val agent = newAgent().also { it.restore(history) }
         val steps = mutableListOf<String>()
+        turnSteps = emptyList()
         // Who answered, in order of first use; the badge on the reply and the stored turn.
         val consulted = linkedMapOf<String, com.samosaai.masala.chat.ExpertCredit>()
         // Access a step asked for and did not have: the answer still comes, plus a Grant row.
@@ -459,6 +542,7 @@ class CommandController(
                             consulted[expert.id] = expert
                             steps += "Consulting ${expert.title}"
                         }
+                        turnSteps = steps.toList()
                         _state.value = CommandState.Thinking(display, steps.toList())
                     }
                     is AgentEvent.Results -> event.items.forEach { item ->
@@ -475,10 +559,18 @@ class CommandController(
                             results = results.values.toList(),
                         ),
                     )
-                    is AgentEvent.Failed -> publish(CommandState.Error(transcript, friendlyModelError(event.message)))
+                    is AgentEvent.Failed -> publish(
+                        CommandState.Error(transcript, friendlyModelError(event.message), steps = steps.toList()),
+                    )
                     // Recorded, not fatal: the model keeps going and finishes around the gap.
                     is AgentEvent.NeedsCapability -> missingAccess += event.capability
-                    AgentEvent.StepLimit -> publish(CommandState.Error(transcript, "That took too many steps. Try asking in smaller pieces."))
+                    AgentEvent.StepLimit -> publish(
+                        CommandState.Error(
+                            transcript,
+                            "That took too many steps. Try asking in smaller pieces.",
+                            steps = steps.toList(),
+                        ),
+                    )
                     else -> Unit
                 }
             }
@@ -502,6 +594,22 @@ class CommandController(
         is ActionDispatcher.Outcome.Failed -> CommandState.Error(prompt, outcome.message)
         is ActionDispatcher.Outcome.NeedsCapability -> CommandState.Error(prompt, outcome.reason, outcome.marker)
     }
+}
+
+/** What the thread says when the user stops a running turn (the steps follow under it). */
+private const val STOPPED_NOTE = "Stopped. This is what it had done so far."
+
+/**
+ * A failure that isn't a model status line: name the step-free case plainly, otherwise keep the
+ * server's words so the user can act on them.
+ */
+internal fun friendlyTurnError(error: Throwable): String {
+    if (error is java.io.IOException) {
+        return "The connection dropped while working on that. Check the network and try again."
+    }
+    val message = error.message?.trim().orEmpty()
+    return friendlyModelError(message).takeIf { it != "The model didn't answer. Try again." }
+        ?: "Something went wrong while working on that."
 }
 
 /**

@@ -400,7 +400,12 @@ class SettingsActivity : ComponentActivity() {
 
     /** Home's input card, already holding [prefill], for the user to finish in their own words. */
     private fun askInChat(prefill: String) {
-        masala.commands.openInput(prefill)
+        // A reply already running owns the chat: opening the input card would cancel it (and
+        // used to crash), so say why and stay here.
+        if (!masala.commands.openInput(prefill)) {
+            android.widget.Toast.makeText(this, R.string.chat_busy, android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
         startActivity(Intent(this, com.samosaai.masala.HomeActivity::class.java).putExtra(com.samosaai.masala.HomeActivity.EXTRA_SHOW_INPUT, true)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
         finish()

@@ -439,11 +439,15 @@ class MasalaApp : Application() {
 
     internal fun recordTurn(turn: com.samosaai.masala.chat.ChatTurn) {
         scope.launch {
-            val id = turnLock.withLock {
-                val id = activeChatId.value ?: chats.create().id.also { activeChatId.value = it }
-                chats.append(id, turn)
-                id
-            }
+            // Storing a turn must never take the app down: a failed write loses the line, not the
+            // chat, and the live screen still shows it.
+            val id = runCatching {
+                turnLock.withLock {
+                    val id = activeChatId.value ?: chats.create().id.also { activeChatId.value = it }
+                    chats.append(id, turn)
+                    id
+                }
+            }.onFailure { android.util.Log.e("MasalaApp", "couldn't store a turn", it) }.getOrNull() ?: return@launch
             // A finished turn notifies only when the user looked away; watching it land
             // is notice enough. The check runs after the append so the thread exists
             // when the tap opens it.

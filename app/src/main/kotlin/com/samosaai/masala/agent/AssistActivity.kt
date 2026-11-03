@@ -22,6 +22,7 @@ import com.samosaai.masala.data.LauncherSettings
 import com.samosaai.masala.masala
 import com.samosaai.masala.ui.home.ConfirmationSheet
 import com.samosaai.masala.ui.home.QuestionSheet
+import com.samosaai.masala.R
 import com.samosaai.masala.ui.home.ReplyCard
 import com.samosaai.masala.ui.theme.MasalaTheme
 
@@ -34,8 +35,14 @@ class AssistActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        // Only from idle: a command still running (or this screen recreated on rotation) must not be cancelled.
-        if (masala.commands.state.value == CommandState.Idle) masala.commands.openInput()
+        // Only from idle: a command still running (or this screen recreated on rotation) must not
+        // be cancelled. Refused means a reply is in flight, so there is no card to show: say so
+        // and close instead of leaving an empty overlay over the user's app.
+        if (masala.commands.state.value == CommandState.Idle && !masala.commands.openInput()) {
+            android.widget.Toast.makeText(this, R.string.chat_busy, android.widget.Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
         setContent {
             val settings by masala.settings.settings.collectAsStateWithLifecycle(LauncherSettings())
             MasalaTheme(settings, systemBars = false) {

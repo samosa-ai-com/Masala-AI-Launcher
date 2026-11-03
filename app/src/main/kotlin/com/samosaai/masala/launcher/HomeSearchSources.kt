@@ -73,7 +73,9 @@ class HomeSearchSources(private val context: Context, private val app: MasalaApp
     override fun openSkill(skill: MasalaSkill) {
         if (skill.persona != null) {
             // Experts are consulted inside the chat: there is no screen of their own to open.
-            app.commands.openInput(context.getString(R.string.search_ask_expert, skill.title.ifBlank { skill.id }))
+            if (!app.commands.openInput(context.getString(R.string.search_ask_expert, skill.title.ifBlank { skill.id }))) {
+                busyToast()
+            }
             return
         }
         context.startActivity(SkillSheetActivity.intent(context, skill.id, "").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -85,7 +87,12 @@ class HomeSearchSources(private val context: Context, private val app: MasalaApp
 
     override fun openFile(hit: FileHit) {
         // The model opens and reads files through its tools; asking keeps one path for every file type.
-        app.commands.ask(context.getString(R.string.search_open_file, hit.path))
+        if (!app.commands.ask(context.getString(R.string.search_open_file, hit.path))) busyToast()
+    }
+
+    /** One chat at a time: the search entry points say so instead of replacing a running turn. */
+    private fun busyToast() {
+        android.widget.Toast.makeText(context, R.string.chat_busy, android.widget.Toast.LENGTH_SHORT).show()
     }
 
     override fun webSearch(query: String) {

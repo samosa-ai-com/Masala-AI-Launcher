@@ -205,10 +205,17 @@ class HomeActivity : ComponentActivity() {
             // unknown ids (a deleted chat) leave the current thread showing.
             // Declared before the effects that call it.
             fun openSession(id: String?) {
+                val target = id?.takeIf { it.isNotBlank() }
+                // One chat at a time: while a turn runs, another thread can't be opened, because
+                // replacing it would cancel the turn mid-flight (that used to crash the app).
+                // Coming back to the thread that is already open is always fine.
+                if (app.commands.busy.value && target != null && target != app.activeChatId.value) {
+                    chatBusyToast()
+                    return
+                }
                 chatPrefill = ""
                 chatPrefillNonce = 0
                 drawerOpen = false
-                val target = id?.takeIf { it.isNotBlank() }
                 // Returning to the same thread (notification tap) resumes it; switching
                 // threads cancels the live one so its reply can't land in the new chat.
                 // Blank ids (old notices) just reopen what's showing.
@@ -738,6 +745,9 @@ class HomeActivity : ComponentActivity() {
                         mic = rememberMicTap(app),
                         level = { pillLevel },
                         onOpenChat = if (resumable) ({ openSession(activeId) }) else ({
+                            if (app.commands.busy.value) {
+                                chatBusyToast()
+                            } else {
                             app.commands.focus()
                             chatOpen = true
                             expanded = true
@@ -754,6 +764,7 @@ class HomeActivity : ComponentActivity() {
                                         app.commands.restoreSession(session.turns, sameChat)
                                     }
                                 }
+                            }
                             }
                         }),
                     )
@@ -796,11 +807,13 @@ class HomeActivity : ComponentActivity() {
                     onExpanded = { expanded = it },
                     mic = rememberMicTap(app),
                     onSend = { app.commands.sendNow() },
-                    onStop = { app.commands.dismiss() },
+                    onStop = { app.commands.stop() },
                     onContinue = { app.commands.continueListening() },
                     elapsedMs = elapsedMs,
                     ready = voiceReady,
-                    onAsk = { text, images -> app.commands.ask(text, images = images) },
+                    onAsk = { text, images ->
+                        app.commands.ask(text, images = images).also { if (!it) chatBusyToast() }
+                    },
                     onClose = {
                         // Minimizing keeps a running turn alive (notification carries it);
                         // only Stop cancels.
@@ -812,6 +825,12 @@ class HomeActivity : ComponentActivity() {
                     allowAll = allowAll,
                     onAllowAll = { app.commands.setAllowAll(it) },
                     onNewChat = {
+                        // A live turn owns the thread: a new chat would cancel it and, before this
+                        // guard, took the app down with it.
+                        if (app.commands.busy.value) {
+                            chatBusyToast()
+                            return@ChatSurface
+                        }
                         app.activeChatId.value = null
                         turns = emptyList()
                         sessionTitle = ""
@@ -825,7 +844,9 @@ class HomeActivity : ComponentActivity() {
                     experts = app.experts().map {
                         com.samosaai.masala.chat.ExpertCredit(it.id, it.title.ifBlank { it.id })
                     },
-                    onRetry = { app.commands.ask(getString(R.string.capability_retry_prompt)) },
+                    onRetry = {
+                        if (!app.commands.ask(getString(R.string.capability_retry_prompt))) chatBusyToast()
+                    },
                     onAskExpert = { expert ->
                         // Seeded, not sent: the user finishes the sentence, the agent does the rest.
                         app.commands.openInput(getString(R.string.search_ask_expert, expert.title))
@@ -1347,6 +1368,11 @@ class HomeActivity : ComponentActivity() {
 
     private fun openSettings() {
         startActivity(Intent(this, SettingsActivity::class.java))
+    }
+
+    /** One chat at a time: the same sentence wherever a chat action is refused mid-turn. */
+    private fun chatBusyToast() {
+        android.widget.Toast.makeText(this, R.string.chat_busy, android.widget.Toast.LENGTH_SHORT).show()
     }
 
     companion object {

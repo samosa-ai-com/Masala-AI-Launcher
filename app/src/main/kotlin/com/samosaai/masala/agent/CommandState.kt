@@ -22,6 +22,15 @@ sealed interface CommandState {
         /** What the turn made (a mini app, a file), for the card under the answer. */
         val results: List<com.samosaai.masala.chat.ChatResult> = emptyList(),
     ) : CommandState
-    /** [capability] is the marker of a permission or special access that would fix it, for a Grant button. */
-    data class Error(val prompt: String, val message: String, val capability: String? = null) : CommandState
+    /**
+     * [capability] is the marker of a permission or special access that would fix it, for a Grant
+     * button. [steps] are the tool steps that ran before it failed, so the thread (and a reopened
+     * chat) shows how far the turn got instead of only the user's message.
+     */
+    data class Error(
+        val prompt: String,
+        val message: String,
+        val capability: String? = null,
+        val steps: List<String> = emptyList(),
+    ) : CommandState
 }
