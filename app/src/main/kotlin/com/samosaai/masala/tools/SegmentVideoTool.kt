@@ -43,7 +43,13 @@ class SegmentVideoTool(
     private val settings: AiSettingsStore,
     private val resolver: ToolFiles,
 ) {
-    suspend fun segment(path: String, prompt: String, maxFrames: Int? = null, mode: String? = null): ActionResult =
+    suspend fun segment(
+        path: String,
+        prompt: String,
+        maxFrames: Int? = null,
+        mode: String? = null,
+        qualityName: String? = null,
+    ): ActionResult =
         withContext(Dispatchers.IO) {
             val phrase = prompt.trim()
             if (phrase.isEmpty()) return@withContext ActionResult.error("Say what to find, e.g. 'red bicycle'.")
@@ -52,6 +58,7 @@ class SegmentVideoTool(
                     "Segmentation isn't set up yet. Pick a provider in Settings → Masala AI → Models & keys.",
                 )
             val hint = SamShared.clampMaxFrames(maxFrames)
+            val quality = SamShared.VideoQuality.parse(qualityName)
             val file = runCatching { resolveVideoFile(path) }.getOrElse {
                 return@withContext ActionResult.error(it.message ?: "Couldn't read that video.")
             }
@@ -93,7 +100,7 @@ class SegmentVideoTool(
             var stats: OverlayStats? = null
             var encodeNote: String? = null
             if (recordFrames.isNotEmpty()) {
-                runCatching { encodeOverlay(file, durationMs, recordFrames, dir, stamp) }
+                runCatching { encodeOverlay(file, durationMs, recordFrames, dir, stamp, quality) }
                     .onSuccess { (path, s) -> videoPath = path; stats = s }
                     .onFailure { encodeNote = it.message?.take(160) }
             }
@@ -110,7 +117,12 @@ class SegmentVideoTool(
                 val s = stats
                 if (s != null && videoPath != null) {
                     val seconds = s.frames / s.fps.toFloat()
-                    append(" Annotated clip: ${s.frames} frames encoded at ${s.fps} fps, ${s.width}x${s.height} MP4 (~%.1f s)".format(seconds))
+                    append(
+                        " Annotated clip: ${s.frames} frames at ${s.fps} fps, ${s.width}x${s.height} MP4 " +
+                            "(~%.1f s, ${quality.wire} quality, ~%d Mbps)".format(
+                                seconds, s.width * s.height * quality.bitrateFactor / 1_000_000,
+                            ),
+                    )
                     if (s.skipped > 0) append(" (${s.skipped} sampled frame${if (s.skipped == 1) "" else "s"} wouldn't decode and were skipped)")
                     append(".")
                 } else if (sheetPath != null) {
@@ -197,6 +209,7 @@ class SegmentVideoTool(
         all: List<SamShared.VideoRecordFrame>,
         dir: File,
         stamp: Long,
+        quality: SamShared.VideoQuality,
     ): Pair<String, OverlayStats> {
         require(all.isNotEmpty()) { "no frames with detections to encode" }
         val out = File(dir, "segment-video-$stamp.mp4")
@@ -210,19 +223,22 @@ class SegmentVideoTool(
                 sourceTimeUs(0, all.size, durationMs),
                 MediaMetadataRetriever.OPTION_CLOSEST,
             ) ?: throw IllegalStateException("couldn't decode a source frame")
-            val (outW, outH) = SamShared.overlaySize(probe.width, probe.height)
+            val (outW, outH) = SamShared.overlaySize(probe.width, probe.height, quality.maxSide)
             if (!probe.isRecycled()) probe.recycle()
             // A fixed grid at a bounded rate: the API may return hundreds of frames, and the
             // clip must still play at its own pace (see SamShared.renderSlots).
-            val fps = SamShared.renderFps(durationMs)
-            val slots = SamShared.renderSlots(all, durationMs, fps)
+            val fps = SamShared.renderFps(durationMs, quality)
+            val slots = SamShared.renderSlots(all, durationMs, fps, quality)
             val mime = MediaFormat.MIMETYPE_VIDEO_AVC
             // Name and format from the same probe: creating by mime can pick a different encoder
             // that doesn't accept the format we configured.
             val (codecName, color) = pickEncoder(mime)
             val format = MediaFormat.createVideoFormat(mime, outW, outH).apply {
                 setInteger(MediaFormat.KEY_COLOR_FORMAT, color)
-                setInteger(MediaFormat.KEY_BIT_RATE, (outW * outH * 4).coerceIn(400_000, 6_000_000))
+                setInteger(
+                    MediaFormat.KEY_BIT_RATE,
+                    (outW * outH * quality.bitrateFactor).coerceIn(400_000, 20_000_000),
+                )
                 setInteger(MediaFormat.KEY_FRAME_RATE, fps)
                 setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
             }

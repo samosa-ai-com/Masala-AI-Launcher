@@ -178,13 +178,27 @@ class SegmentVideoToolTest {
     }
 
     @Test
-    fun `render fps stays inside the cap and the usable range`() {
-        // A 7 s clip: 150 frames allows 21 fps, clamped to the 15 fps ceiling.
-        assertEquals(15, SamShared.renderFps(7_000))
-        // A 30 s clip: 150 frames is 5 fps.
-        assertEquals(5, SamShared.renderFps(30_000))
+    fun `quality presets trade frames and size for time`() {
+        assertEquals(SamShared.VideoQuality.BALANCED, SamShared.VideoQuality.parse(null))
+        assertEquals(SamShared.VideoQuality.BALANCED, SamShared.VideoQuality.parse("nonsense"))
+        assertEquals(SamShared.VideoQuality.BEST, SamShared.VideoQuality.parse("BEST"))
+        // Same clip, more quality: more frames and a bigger picture.
+        assertTrue(SamShared.VideoQuality.BEST.maxFrames > SamShared.VideoQuality.BALANCED.maxFrames)
+        assertTrue(SamShared.VideoQuality.BALANCED.maxSide > SamShared.VideoQuality.FAST.maxSide)
+        assertTrue(SamShared.renderFps(7_000, SamShared.VideoQuality.BEST) >
+            SamShared.renderFps(7_000, SamShared.VideoQuality.FAST))
+    }
+
+    @Test
+    fun `render fps follows quality and the clip length`() {
+        // Fast: 150 frames over 7 s allows 21 fps, capped at its 15 fps ceiling.
+        assertEquals(15, SamShared.renderFps(7_000, SamShared.VideoQuality.FAST))
+        // Balanced (default): 300 frames over 7 s, capped at 30.
+        assertEquals(30, SamShared.renderFps(7_000))
+        // A 30 s clip: 300 frames is 10 fps, still inside the range.
+        assertEquals(10, SamShared.renderFps(30_000))
         // Unknown duration: the ceiling rather than a divide by zero.
-        assertEquals(15, SamShared.renderFps(0))
+        assertEquals(30, SamShared.renderFps(0))
     }
 
     @Test
@@ -194,8 +208,8 @@ class SegmentVideoToolTest {
                 "<1f>" +
                 "<2f>0<|box;x1=90;y1=130;x2=250;y2=190;w=320;h=240|>",
         )
-        val fps = SamShared.renderFps(2_000)
-        val slots = SamShared.renderSlots(frames, 2_000, fps)
+        val fps = SamShared.renderFps(2_000, SamShared.VideoQuality.FAST)
+        val slots = SamShared.renderSlots(frames, 2_000, fps, SamShared.VideoQuality.FAST)
         // ~2 s at 15 fps, and a frame the API reported with no detections is still rendered.
         assertTrue(slots.size in 28..30, "slots=${slots.size}")
         assertTrue(slots.any { it != null && !it.hasDetections() }, "the undetected moment should still be a slot")

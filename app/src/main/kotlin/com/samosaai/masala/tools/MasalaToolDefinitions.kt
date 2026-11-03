@@ -197,7 +197,11 @@ object MasalaToolDefinitions {
             "object's masks/boxes burned in) plus the full frame-to-boxes list in a JSON file " +
             "(a contact-sheet PNG only if video encoding fails). " +
             "Clips must be 30 seconds or less and under 12 MB; for anything longer, trim or split " +
-            "it first with media_edit. Rendering is per frame, so a long clip takes minutes. " +
+            "it first with media_edit. Rendering is per frame, so it takes minutes. " +
+            "quality: 'fast' (720p, few frames), 'balanced' (default: 960p, more frames) or " +
+            "'best' (1080p, source-like smoothness, several times slower). If the user did not " +
+            "say which they want, ask once before running, with these three options and their " +
+            "trade-off. State the settings used in the answer. " +
             "max_frames (default 8, max 16) is only a hint — the API samples its own frames. " +
             "For a still image use segment_image instead.",
         schema {
@@ -213,6 +217,11 @@ object MasalaToolDefinitions {
                 putJsonObject("max_frames") {
                     put("type", "integer")
                     put("description", "Hint for how many frames to report (default 8, max 16). The API samples its own frames.")
+                }
+                putJsonObject("quality") {
+                    put("type", "string")
+                    put("enum", kotlinx.serialization.json.buildJsonArray { add(kotlinx.serialization.json.JsonPrimitive("fast")); add(kotlinx.serialization.json.JsonPrimitive("balanced")); add(kotlinx.serialization.json.JsonPrimitive("best")) })
+                    put("description", "fast (720p, quickest) | balanced (default, 960p) | best (1080p, smoothest, several times slower).")
                 }
                 putJsonObject("mode") {
                     put("type", "string")

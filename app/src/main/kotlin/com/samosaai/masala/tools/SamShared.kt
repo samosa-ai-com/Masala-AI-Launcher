@@ -224,11 +224,38 @@ internal object SamShared {
     const val MAX_CLIP_SECONDS = 30
 
     /**
-     * Frames the annotated clip renders at most. The API can return hundreds of frames for a
-     * short clip (60 fps source), and rendering all of them is minutes of work for a result that
-     * can't play faster than 15 fps anyway; 150 frames is 10 s at 15 fps or 30 s at 5 fps.
+     * How much time the annotated clip is allowed to cost. Rendering is per frame — decode a
+     * source frame, decode its masks, compose, encode — so the frame budget, resolution and
+     * bitrate all trade quality for minutes. The user picks one; [BALANCED] is the default.
      */
-    const val MAX_RENDER_FRAMES = 150
+    enum class VideoQuality(
+        val wire: String,
+        /** Frames the clip may render; the frame rate follows from clip length. */
+        val maxFrames: Int,
+        /** Long side of the rendered frames. */
+        val maxSide: Int,
+        val fpsCap: Int,
+        /** Bit rate multiplier over width×height (roughly bits per pixel). */
+        val bitrateFactor: Int,
+    ) {
+        /** Small and quick: a 30 s clip renders at 5 fps. */
+        FAST("fast", 150, 720, 15, 4),
+
+        /** The default: twice the frames and a sharper picture for about twice the wait. */
+        BALANCED("balanced", 300, 960, 30, 5),
+
+        /** Source-like smoothness and full-HD frames; several times slower. */
+        BEST("best", 600, 1080, 30, 8);
+
+        companion object {
+            /** Unknown or missing means the default, never a failure. */
+            fun parse(value: String?): VideoQuality =
+                entries.firstOrNull { it.wire.equals(value?.trim(), ignoreCase = true) } ?: BALANCED
+        }
+    }
+
+    /** Frames a [quality] render may use; kept for callers that only know the budget. */
+    fun maxFramesFor(quality: VideoQuality): Int = quality.maxFrames
 
     /** Why a clip was refused, or null when it fits the cap. */
     fun clipTooLong(durationMs: Long): String? {
@@ -243,10 +270,10 @@ internal object SamShared {
      * Playback rate for the annotated clip: fast enough to keep motion, capped by how many frames
      * [MAX_RENDER_FRAMES] allows over the clip, so a 7 s clip plays at 15 fps and a 30 s one at 5.
      */
-    fun renderFps(durationMs: Long): Int {
-        if (durationMs <= 0) return MAX_OVERLAY_FPS
+    fun renderFps(durationMs: Long, quality: VideoQuality = VideoQuality.BALANCED): Int {
+        if (durationMs <= 0) return quality.fpsCap
         val seconds = (durationMs / 1000.0).coerceAtLeast(0.1)
-        return (MAX_RENDER_FRAMES / seconds).toInt().coerceIn(MIN_OVERLAY_FPS, MAX_OVERLAY_FPS)
+        return (quality.maxFrames / seconds).toInt().coerceIn(MIN_OVERLAY_FPS, quality.fpsCap)
     }
 
     /**
@@ -255,9 +282,14 @@ internal object SamShared {
      * over the clip's own timeline is what keeps the result the real video instead of a montage,
      * and keeps the duration right whatever rate the API sampled at.
      */
-    fun renderSlots(frames: List<VideoRecordFrame>, durationMs: Long, fps: Int): List<VideoRecordFrame?> {
+    fun renderSlots(
+        frames: List<VideoRecordFrame>,
+        durationMs: Long,
+        fps: Int,
+        quality: VideoQuality = VideoQuality.BALANCED,
+    ): List<VideoRecordFrame?> {
         if (frames.isEmpty() || durationMs <= 0 || fps <= 0) return emptyList()
-        val count = ((durationMs * fps + 999) / 1000).toInt().coerceAtMost(MAX_RENDER_FRAMES)
+        val count = ((durationMs * fps + 999) / 1000).toInt().coerceAtMost(quality.maxFrames)
         val times = videoFrameTimesMs(frames.size, durationMs)
         val byFrame = frames.associateBy { it.frame }
         val slotTimes = (0 until count).map { it * 1000L / fps }
