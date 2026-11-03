@@ -161,6 +161,12 @@ class CommandController(
 
     /** Prompt tokens the server last reported for this chat; 0 until a reply carries `usage`. */
     private var lastPromptTokens: Int = 0
+
+    /**
+     * Bumped whenever the conversation is replaced, so a run that was cancelled mid-flight
+     * can't write its token count into the chat that replaced it.
+     */
+    private var generation: Int = 0
     private var readAloud: CommandState.Reply? = null
 
     /**
@@ -322,6 +328,10 @@ class CommandController(
             allowAllOverridden = false
             _allowAll.value = allowAllDefault
         }
+        // A different conversation starts its own budget: the last chat's prompt size says
+        // nothing about this one's, and a stale large number would compact a short chat at once.
+        generation++
+        lastPromptTokens = 0
         history = listOfNotNull(summary?.let { com.samosaai.masala.llm.ChatMessage("assistant", JsonPrimitive(it)) }) + spoken
         _state.value = CommandState.Idle
     }
@@ -331,17 +341,14 @@ class CommandController(
      * it becomes one summary plus the recent turns. The visible transcript is untouched, and
      * the summary is written into it as a system note so the change is never silent.
      *
-     * The newest user message is held back from the summary and re-appended afterwards: it is the
-     * turn being answered, so folding it into the summary would answer a question the summary
-     * only paraphrases. On failure the whole history is simply windowed instead.
+     * The prompt that triggered compaction is not in [history] yet ([ask] compacts first), so the
+     * whole history is summarised and the new question is simply appended afterwards.
      */
     private suspend fun compactIfNeeded() {
+        if (history.isEmpty()) return
         val tokens = maxOf(lastPromptTokens, AgentHistory.tokensOf(history))
         if (tokens < (maxContextTokens * MasalaAgent.COMPACT_AT_FRACTION).toInt()) return
-        // The request that triggered compaction is still unanswered: keep it out of the summary.
-        val preserveLast = history.lastOrNull()?.takeIf { it.role == "user" }
-        val toSummarize = if (preserveLast != null) history.dropLast(1) else history
-        val readable = toSummarize.joinToString("\n\n") { message ->
+        val readable = history.joinToString("\n\n") { message ->
             // A tool-call turn has no text of its own; naming the calls keeps the summary honest.
             val body = message.textContent.ifBlank {
                 message.toolCalls?.joinToString(", ") { "called ${it.function.name}" }.orEmpty()
@@ -350,10 +357,7 @@ class CommandController(
         }
         val summary = summarize?.invoke(readable)?.trim()?.takeIf { it.isNotBlank() }
         if (summary != null) {
-            history = buildList {
-                add(com.samosaai.masala.llm.ChatMessage("assistant", JsonPrimitive(summary)))
-                preserveLast?.let(::add)
-            }
+            history = listOf(com.samosaai.masala.llm.ChatMessage("assistant", JsonPrimitive(summary)))
             onTurn?.invoke(com.samosaai.masala.chat.ChatTurn(com.samosaai.masala.chat.TurnRole.SYSTEM, summary))
         } else {
             // No summariser, or it failed: keep what fits rather than sending everything.
@@ -390,6 +394,7 @@ class CommandController(
         withContext(ConfirmationGate.AllowAll { _allowAll.value }) { runTurn(prompt, spoken, images) }
 
     private suspend fun runTurn(prompt: String, spoken: Boolean, images: List<String>) {
+        val gen = generation
         onTurnStart?.invoke()
         CommandFastPath.match(prompt, resolveApp)?.let { action ->
             publish(stateFor(prompt, run(action), spoken))
@@ -447,9 +452,14 @@ class CommandController(
         } catch (e: CancellationException) {
             throw e
         } finally {
-            history = agent.history
-            // Real server numbers when it reports them, the character estimate otherwise.
-            lastPromptTokens = agent.lastPromptTokens ?: AgentHistory.tokensOf(history)
+            // A chat switch while this run was in flight owns the history now; leave it alone.
+            if (gen == generation) {
+                // The whole conversation, not the agent's five-exchange window: otherwise
+                // compaction could never summarise turns the agent has already let go of.
+                history = agent.transcript
+                // Real server numbers when it reports them, the character estimate otherwise.
+                lastPromptTokens = agent.lastPromptTokens ?: AgentHistory.tokensOf(history)
+            }
         }
     }
 
@@ -468,7 +478,8 @@ class CommandController(
 internal fun friendlyModelError(raw: String?): String {
     val message = raw?.trim().orEmpty()
     if (message.isEmpty()) return "The model didn't answer. Try again."
-    val code = Regex("""\b(4\d\d|5\d\d)\b""").find(message)?.groupValues?.get(1)
+    // Only a real status line counts: "tool returned 400 items" is not an HTTP failure.
+    val code = Regex("""\bHTTP[\s:]+(\d{3})\b""").find(message)?.groupValues?.get(1)
     return when (code) {
         "400" -> "The model refused that request (HTTP 400). If this chat is long, start a new one and ask again there."
         "401", "403" -> "The model server refused the key. Check it in Settings → Models & keys."

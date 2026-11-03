@@ -68,6 +68,11 @@ class MasalaAgent(
         dropped = dropped + messages.subList(0, messages.size - kept.size)
         messages = kept + user
         val visible = definitions.filter { scope.allows(it.name) }.map { it.toLlm() }
+        // The system prompt and the tool schemas ride with every request, so they come out of the
+        // same budget; the schema block alone can be tens of thousands of tokens.
+        val schemaTokens = AgentHistory.tokensOf(
+            listOf(ChatMessage("user", JsonPrimitive(visible.joinToString("\n") { "${it.function.name}${it.function.parameters}" }))),
+        )
         // The last tool call and how many times in a row it has repeated, so a loop stops
         // early instead of burning the round budget.
         var lastCall = ""
@@ -75,9 +80,11 @@ class MasalaAgent(
         try {
             repeat(maxSteps) {
                 emit(AgentEvent.Thinking)
-                val request = listOf(
-                    ChatMessage("system", JsonPrimitive(systemPrompt(promptContext()))),
-                ) + AgentHistory.cullImages(AgentHistory.trimToTokens(messages, maxTokens)).asSendable()
+                val system = ChatMessage("system", JsonPrimitive(systemPrompt(promptContext())))
+                val historyBudget = (maxTokens - schemaTokens - AgentHistory.tokensOf(listOf(system)))
+                    .coerceAtLeast(MIN_HISTORY_TOKENS)
+                val request = listOf(system) +
+                    AgentHistory.cullImages(AgentHistory.trimToTokens(messages, historyBudget)).asSendable()
                 val reply = try {
                     model.next(request, visible).withValidToolCallArguments()
                 } catch (e: CancellationException) {
@@ -202,6 +209,9 @@ class MasalaAgent(
 
         /** Compaction fires here, as a share of [DEFAULT_MAX_CONTEXT_TOKENS], before the trim is needed. */
         const val COMPACT_AT_FRACTION = 0.8
+
+        /** Even a huge system prompt and tool block leave this much room for the conversation. */
+        const val MIN_HISTORY_TOKENS = 4_000
 
         /**
          * The same tool with the same arguments this many times in a row means a loop: stop

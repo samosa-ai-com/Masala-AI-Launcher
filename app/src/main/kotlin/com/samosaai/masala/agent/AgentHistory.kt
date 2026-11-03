@@ -22,6 +22,12 @@ object AgentHistory {
     /** Characters per token the local estimate assumes. */
     const val CHARS_PER_TOKEN = 4
 
+    /**
+     * What one image part is charged in the estimate. A ~1k-pixel image costs roughly this many
+     * tokens whatever its file size, so base64 length is deliberately not counted.
+     */
+    const val IMAGE_PART_TOKENS = 1_100
+
     /** The last [count] exchanges (a user message and everything after it), for follow-ups. */
     fun lastExchanges(history: List<ChatMessage>, count: Int): List<ChatMessage> {
         var seen = 0
@@ -33,9 +39,17 @@ object AgentHistory {
 
     /**
      * Rough token count for a message list: four characters per token, the usual rule of thumb.
-     * Used until the API reports its own `usage`, and for messages the report doesn't cover.
+     * Counts what actually goes on the wire, not just the visible text: tool-call names and
+     * arguments are sent too, and each image part is charged the token cost of a ~1k-pixel image
+     * rather than its base64 length (a data URI is tens of thousands of characters but a few
+     * hundred tokens of model input, and counting the characters would make the window useless).
      */
-    fun tokensOf(messages: List<ChatMessage>): Int = messages.sumOf { it.textContent.length } / 4
+    fun tokensOf(messages: List<ChatMessage>): Int =
+        messages.sumOf { message ->
+            val chars = message.textContent.length +
+                message.toolCalls.orEmpty().sumOf { it.function.name.length + it.function.arguments.length }
+            chars / CHARS_PER_TOKEN + message.imageCount * IMAGE_PART_TOKENS
+        }
 
     /** [trim] on a token budget rather than a character one. */
     fun trimToTokens(history: List<ChatMessage>, maxTokens: Int): List<ChatMessage> =

@@ -63,17 +63,40 @@ class ChatCompactionTest {
         add(ChatTurn(TurnRole.USER, "and the open question?"))
     }
 
-    @Test fun `compaction keeps the question that triggered it`() = runBlocking<Unit> {
+    @Test fun `compaction summarises the older thread and appends the new question once`() = runBlocking<Unit> {
         val c = controller()
         c.restoreSession(longChat())
-        c.ask("and the open question?")
+        c.ask("a brand new question")
         c.settled()
 
         assertTrue(summarized.isNotEmpty(), "compaction did not run")
         val request = requests.last()
-        // The summary stands in for the older turns, and the question comes after it.
+        // The summary stands in for every older turn.
         assertTrue(request.any { it.textContent == summaryAnswer })
-        assertEquals("and the open question?", request.last().textContent)
+        // The question is there exactly once, and it is last.
+        assertEquals(listOf("a brand new question"), request.map { it.textContent }.filter { it == "a brand new question" })
+        assertEquals("a brand new question", request.last().textContent)
+        // The old thread's turns are gone from the request, not merely buried under a summary.
+        assertTrue(request.none { it.textContent.startsWith("q0 ") })
+    }
+
+    @Test fun `switching to a short chat does not compact on the old chat's token count`() = runBlocking<Unit> {
+        val c = controller()
+        c.restoreSession(longChat())
+        c.ask("first")
+        c.settled()
+        val afterFirst = summarized.size
+
+        // A different chat: its budget starts clean, so a two-turn thread must not be summarised.
+        c.restoreSession(
+            listOf(
+                ChatTurn(TurnRole.USER, "hi"),
+                ChatTurn(TurnRole.MASALA, "hello"),
+            ),
+        )
+        c.ask("how are you")
+        c.settled()
+        assertEquals(afterFirst, summarized.size, "a short chat inherited the previous chat's token count")
     }
 
     @Test fun `compaction failure leaves the thread windowed, never empty`() = runBlocking<Unit> {
@@ -107,5 +130,9 @@ class ChatCompactionTest {
         )
         assertEquals("The model didn't answer. Try again.", friendlyModelError(null))
         assertEquals("socket closed", friendlyModelError("socket closed"))
+        // A number inside a tool's own message is not an HTTP status line.
+        assertEquals("tool returned 400 items", friendlyModelError("tool returned 400 items"))
+        // A number in a tool's own message is not an HTTP status line.
+        assertEquals("tool returned 400 items", friendlyModelError("tool returned 400 items"))
     }
 }
