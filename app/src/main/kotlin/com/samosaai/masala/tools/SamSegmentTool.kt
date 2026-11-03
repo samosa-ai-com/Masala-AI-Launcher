@@ -12,20 +12,9 @@ import com.samosaai.masala.core.tool.ToolFiles
 import com.samosaai.masala.llm.AiSettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import kotlinx.serialization.json.buildJsonArray
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 /**
  * SAM 3.1 segmentation (plan `docs/plans/media-tools.md`): sends an image + a
@@ -39,13 +28,6 @@ class SamSegmentTool(
     private val settings: AiSettingsStore,
     private val resolver: ToolFiles,
 ) {
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
-    private val http = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(300, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
-        .build()
-
     data class Box(val x1: Int, val y1: Int, val x2: Int, val y2: Int)
 
     suspend fun segment(pathOrUrl: String, prompt: String): ActionResult =
@@ -67,7 +49,7 @@ class SamSegmentTool(
                 return@withContext ActionResult.error(it.message ?: "Segmentation failed.")
             }
             val boxes = parseBoxes(text)
-            val maskCount = MASK_RE.findAll(text).count()
+            val maskCount = SamShared.countMasks(text)
             val dir = File(context.filesDir, "generated").apply { mkdirs() }
             val stamp = System.currentTimeMillis()
             File(dir, "segment-$stamp.txt").writeText(text.take(200_000))
@@ -126,52 +108,14 @@ class SamSegmentTool(
         return "data:image/jpeg;base64,$b64"
     }
 
-    private fun callSam(baseUrl: String, apiKey: String, model: String, imageUrl: String, phrase: String): String {
-        val body = buildJsonObject {
-            put("model", model)
-            putJsonArray("input") {
-                addJsonObject {
-                    put("type", "message")
-                    put("role", "user")
-                    putJsonArray("content") {
-                        addJsonObject {
-                            put("type", "input_text")
-                            put("text", phrase)
-                        }
-                        addJsonObject {
-                            put("type", "input_image")
-                            put("image_url", imageUrl)
-                        }
-                    }
-                }
-            }
-            put("stream", false)
-        }.toString().toRequestBody("application/json".toMediaType())
-        val req = Request.Builder()
-            .url(baseUrl.trimEnd('/') + "/responses")
-            .post(body)
-            .apply { if (apiKey.isNotBlank()) header("Authorization", "Bearer $apiKey") }
-            .build()
-        http.newCall(req).execute().use { response ->
-            val text = response.body?.string().orEmpty()
-            if (!response.isSuccessful) {
-                val detail = runCatching {
-                    json.parseToJsonElement(text).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
-                }.getOrNull()
-                throw IllegalStateException("HTTP ${response.code}: ${(detail ?: text).take(300)}")
-            }
-            val output = json.parseToJsonElement(text).jsonObject["output"]?.jsonArray
-                ?: throw IllegalStateException("The model returned nothing usable.")
-            val sb = StringBuilder()
-            for (item in output) {
-                val content = item.jsonObject["content"]?.jsonArray ?: continue
-                for (part in content) {
-                    part.jsonObject["text"]?.jsonPrimitive?.content?.let { sb.append(it) }
-                }
-            }
-            return sb.toString()
-        }
-    }
+    private fun callSam(baseUrl: String, apiKey: String, model: String, imageUrl: String, phrase: String): String =
+        SamShared.postResponses(
+            baseUrl, apiKey, model,
+            buildJsonArray {
+                add(SamShared.textPart(phrase))
+                add(SamShared.imagePart(imageUrl))
+            },
+        )
 
     private fun drawBoxes(pathOrUrl: String, boxes: List<Box>): Bitmap? {
         val t = pathOrUrl.trim()
@@ -203,16 +147,7 @@ class SamSegmentTool(
     }
 
     companion object {
-        private val BOX_RE = Regex("<\\|box;x1=(\\d+);y1=(\\d+);x2=(\\d+);y2=(\\d+);")
-        private val MASK_RE = Regex("<\\|mask;")
-
         fun parseBoxes(wire: String): List<Box> =
-            BOX_RE.findAll(wire).map {
-                Box(it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), it.groupValues[4].toInt())
-            }.toList()
-
-        private fun kotlinx.serialization.json.JsonArrayBuilder.addJsonObject(block: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit) {
-            add(buildJsonObject(block))
-        }
+            SamShared.parseRichBoxes(wire).map { Box(it.x1, it.y1, it.x2, it.y2) }
     }
 }
