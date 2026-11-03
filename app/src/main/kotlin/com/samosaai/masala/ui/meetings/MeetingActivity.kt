@@ -557,7 +557,7 @@ private fun LiveMeetingScreen(meetingId: String, onBack: () -> Unit, onFinished:
         app.meetings.setRawNotes(meetingId, notes, app.meetings.bookmarks(current))
     }
     val displayedTurns = remember(turns) { turns.takeLast(200) }
-    LaunchedEffect(displayedTurns.size) {
+    LaunchedEffect(turns.size) {
         if (displayedTurns.isEmpty()) return@LaunchedEffect
         // Follow new turns only when the user is already at the bottom; scrolling up to read older
         // text must not be yanked back. The list shows the last 200 turns, so indices are its own.
@@ -1333,7 +1333,9 @@ private class MeetingPlayer(
             // While preparing, MediaPlayer refuses seekTo: keep it for onPrepared.
             if (prepared) player?.seekTo(offset.toInt()) else pendingSeekMs = offset
         } else {
-            play(target, offset, start = prepared && player?.isPlaying == true)
+            // Keep a pending play: tapping a turn while the next chunk is still preparing must not
+            // turn the player silent while the UI says it is playing.
+            play(target, offset, start = wantsPlay || (prepared && player?.isPlaying == true))
         }
     }
 
@@ -1344,7 +1346,6 @@ private class MeetingPlayer(
                 if (start) player?.start()
             } else {
                 pendingSeekMs = offsetMs
-                wantsPlay = start
             }
             return
         }
