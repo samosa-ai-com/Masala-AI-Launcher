@@ -40,11 +40,25 @@ internal object SamShared {
     /** Contact-sheet preview decodes this many returned frames at most. */
     const val CONTACT_SHEET_FRAMES = 3
 
+    /** Annotated-clip encoder bounds: long side capped, fps clamped to this range. */
+    const val OVERLAY_MAX_SIDE = 720
+    const val MIN_OVERLAY_FPS = 5
+    const val MAX_OVERLAY_FPS = 15
+
     /** One box as the model reports it; [w]/[h] are the frame's pixel size (0 when absent). */
     data class RichBox(val x1: Int, val y1: Int, val x2: Int, val y2: Int, val w: Int, val h: Int)
 
     /** One `<Nf>` group of the video wire format: frame index plus its boxes. */
     data class VideoFrame(val frame: Int, val boxes: List<RichBox>)
+
+    /**
+     * One `<Nf>` group with everything that frame reported: full mask records
+     * (for the annotated clip) plus all boxes (box-only detections have no
+     * record, and the JSON sidecar is built from these).
+     */
+    data class VideoRecordFrame(val frame: Int, val records: List<SamRecord>, val boxes: List<RichBox>) {
+        fun hasDetections(): Boolean = records.isNotEmpty() || boxes.isNotEmpty()
+    }
 
     /**
      * One detection record: object id, box (source pixels, [RichBox.w]/[h] are
@@ -110,6 +124,30 @@ internal object SamShared {
     fun countMasks(wire: String): Int = MASK_RE.findAll(wire).count()
 
     /**
+     * Splits the video wire format into per-frame record groups, mirroring
+     * [parseVideoFrames] but keeping each frame's full mask records alongside
+     * its boxes. Text without any `<Nf>` marker is one frame 0.
+     */
+    fun parseVideoRecords(wire: String): List<VideoRecordFrame> {
+        val marks = FRAME_RE.findAll(wire).toList()
+        if (marks.isEmpty()) {
+            val records = parseRecords(wire)
+            val boxes = parseRichBoxes(wire)
+            return if (records.isEmpty() && boxes.isEmpty()) {
+                emptyList()
+            } else {
+                listOf(VideoRecordFrame(0, records, boxes))
+            }
+        }
+        return marks.mapIndexed { idx, m ->
+            val start = m.range.last + 1
+            val end = marks.getOrNull(idx + 1)?.range?.first ?: wire.length
+            val segment = wire.substring(start, end)
+            VideoRecordFrame(m.groupValues[1].toInt(), parseRecords(segment), parseRichBoxes(segment))
+        }
+    }
+
+    /**
      * Parses `id<|box;…|><|mask;…|>` records in wire order. The base85 payload
      * alphabet excludes `,;<>|` so the mask token ends at the first `|>`.
      */
@@ -172,6 +210,49 @@ internal object SamShared {
         if (n == 1) return listOf(0)
         return (0 until n).map { it * (total - 1) / (n - 1) }.distinct()
     }
+
+    /**
+     * One source timestamp per API-sampled frame, spread like [contactTimesMs]:
+     * the API samples its frames evenly across the clip, so frame `i` of
+     * `frameCount` sits at the centre of segment `i + 1`. Empty when the count
+     * or duration is unknown (callers fall back to a fixed stride).
+     */
+    fun videoFrameTimesMs(frameCount: Int, durationMs: Long): List<Long> =
+        contactTimesMs(durationMs, frameCount)
+
+    /**
+     * Output frame rate for the annotated clip: the API's sampled rate
+     * (`apiFrames` over the clip duration), clamped to 5–15 fps so a sparse
+     * sample still plays smoothly and a dense one still encodes quickly.
+     * Unknown count or duration plays at the minimum.
+     */
+    fun overlayFps(apiFrames: Int, durationMs: Long): Int {
+        if (apiFrames <= 0 || durationMs <= 0) return MIN_OVERLAY_FPS
+        val sampled = ((apiFrames * 1000L + durationMs / 2) / durationMs).toInt()
+        return sampled.coerceIn(MIN_OVERLAY_FPS, MAX_OVERLAY_FPS)
+    }
+
+    /**
+     * Output frame size at the source's aspect ratio with the long side capped
+     * at [maxSide] (default 720 px). Dimensions are rounded down to even —
+     * the AVC encoder requires it — and floored at 2. Unreadable source sizes
+     * fall back to a square 720 frame.
+     */
+    fun overlaySize(srcW: Int, srcH: Int, maxSide: Int = OVERLAY_MAX_SIDE): Pair<Int, Int> {
+        if (srcW <= 0 || srcH <= 0) return Pair(maxSide, maxSide)
+        val s = (maxSide / maxOf(srcW, srcH).toFloat()).coerceAtMost(1f)
+        val w = ((srcW * s).toInt().coerceAtLeast(2) / 2) * 2
+        val h = ((srcH * s).toInt().coerceAtLeast(2) / 2) * 2
+        return Pair(w, h)
+    }
+
+    /**
+     * Which parsed frames get encoded: only frames with detections (mask
+     * records or boxes). Empty frames are skipped — there is nothing to burn
+     * in — while their timestamps still come from their API frame index.
+     */
+    fun encodePlan(frames: List<VideoRecordFrame>): List<VideoRecordFrame> =
+        frames.filter { it.hasDetections() }
 
     /** Scales one model-space box onto a decoded frame of [dstW]×[dstH]. */
     fun scaleBox(b: RichBox, dstW: Int, dstH: Int): FloatArray {

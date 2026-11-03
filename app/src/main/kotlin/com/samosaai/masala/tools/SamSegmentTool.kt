@@ -13,6 +13,7 @@ import com.samosaai.masala.core.tool.ToolFiles
 import com.samosaai.masala.llm.AiSettingsStore
 import com.samosaai.masala.tools.sam.Cutout
 import com.samosaai.masala.tools.sam.MaskCodec
+import com.samosaai.masala.tools.sam.MaskDraw
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonArray
@@ -237,11 +238,11 @@ class SamSegmentTool(
                 return@forEachIndexed
             }
             canvas.drawRect(left, top, right, bottom, faintBox)
-            val hue = (i * 137 % 360).toFloat()
-            val fill = Color.HSVToColor(110, floatArrayOf(hue, 0.85f, 1f))
-            val edge = Color.HSVToColor(255, floatArrayOf(hue, 0.9f, 1f))
-            drawMaskFill(canvas, raster, r.maskWidth, r.maskHeight, left, top, right, bottom, fill)
-            drawMaskEdge(canvas, raster, r.maskWidth, r.maskHeight, left, top, right, bottom, edge)
+            val fill = MaskDraw.fillFor(i)
+            val edge = MaskDraw.edgeFor(i)
+            val dst = RectF(left, top, right, bottom)
+            drawMaskFill(canvas, raster, r.maskWidth, r.maskHeight, dst, fill)
+            drawMaskEdge(canvas, raster, r.maskWidth, r.maskHeight, dst, edge)
         }
         return bmp
     }
@@ -252,17 +253,9 @@ class SamSegmentTool(
         raster: ByteArray,
         w: Int,
         h: Int,
-        left: Float,
-        top: Float,
-        right: Float,
-        bottom: Float,
+        dst: RectF,
         fill: Int,
-    ) {
-        val pixels = IntArray(w * h) { i -> if (raster[i] != 0.toByte()) fill else 0 }
-        val mask = Bitmap.createBitmap(pixels, w, h, Bitmap.Config.ARGB_8888)
-        canvas.drawBitmap(mask, null, RectF(left, top, right, bottom), Paint().apply { isFilterBitmap = false })
-        if (!mask.isRecycled()) mask.recycle()
-    }
+    ) = MaskDraw.fillOn(canvas, raster, w, h, dst, fill)
 
     /** Thin outline: strokes the scaled cell of every set pixel touching an unset one. */
     private fun drawMaskEdge(
@@ -270,34 +263,12 @@ class SamSegmentTool(
         raster: ByteArray,
         w: Int,
         h: Int,
-        left: Float,
-        top: Float,
-        right: Float,
-        bottom: Float,
+        dst: RectF,
         edge: Int,
     ) {
-        val cellW = (right - left) / w
-        val cellH = (bottom - top) / h
-        val paint = Paint().apply {
-            color = edge
-            style = Paint.Style.STROKE
-            strokeWidth = maxOf(2f, minOf(cellW, cellH) / 2f)
-        }
-        fun isSet(x: Int, y: Int): Boolean =
-            x in 0 until w && y in 0 until h && raster[y * w + x] != 0.toByte()
-        for (y in 0 until h) {
-            for (x in 0 until w) {
-                if (!isSet(x, y)) continue
-                if (isSet(x - 1, y) && isSet(x + 1, y) && isSet(x, y - 1) && isSet(x, y + 1)) continue
-                canvas.drawRect(
-                    left + x * cellW,
-                    top + y * cellH,
-                    left + (x + 1) * cellW,
-                    top + (y + 1) * cellH,
-                    paint,
-                )
-            }
-        }
+        val cellW = dst.width() / w
+        val cellH = dst.height() / h
+        MaskDraw.edgeOn(canvas, raster, w, h, dst, edge, maxOf(2f, minOf(cellW, cellH) / 2f))
     }
 
     companion object {
