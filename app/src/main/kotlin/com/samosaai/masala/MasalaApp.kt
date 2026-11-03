@@ -465,12 +465,18 @@ class MasalaApp : Application() {
                         "and what is still open. Be compact and factual; no greetings, no advice.",
                 ),
             ),
-            com.samosaai.masala.llm.ChatMessage("user", kotlinx.serialization.json.JsonPrimitive(transcript.take(60_000))),
+            com.samosaai.masala.llm.ChatMessage("user", kotlinx.serialization.json.JsonPrimitive(transcript.takeLast(COMPACT_INPUT_CHARS))),
         )
         model.next(prompt, emptyList()).textContent.takeIf { it.isNotBlank() }
     }.getOrNull()
 
     companion object {
+        /**
+         * How much of a conversation the summariser reads: the newest part, since that is what the
+         * thread is currently about. Well under the request window, and enough for a long run.
+         */
+        const val COMPACT_INPUT_CHARS = 200_000
+
         /** A scheduled task with no skill runs a plain command under this id. */
         const val COMMAND_SKILL_ID = "command"
         val COMMAND_SKILL = MasalaSkill(id = COMMAND_SKILL_ID, title = "Command", instructions = "")

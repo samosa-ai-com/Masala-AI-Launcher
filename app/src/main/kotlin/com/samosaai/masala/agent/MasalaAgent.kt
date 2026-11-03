@@ -36,7 +36,7 @@ class MasalaAgent(
     private val scope: ToolScope,
     private val systemPrompt: (AgentPrompt.PromptContext) -> String,
     private val maxSteps: Int = DEFAULT_MAX_STEPS,
-    private val maxHistoryChars: Int = DEFAULT_MAX_HISTORY_CHARS,
+    private val maxTokens: Int = DEFAULT_MAX_CONTEXT_TOKENS,
     private val maxRepeatedToolCalls: Int = DEFAULT_MAX_REPEATED_TOOL_CALLS,
     private val fetchOnlyResults: Boolean = false,
 ) {
@@ -47,6 +47,12 @@ class MasalaAgent(
 
     /** The conversation the model sees (the last [KEPT_EXCHANGES] exchanges), without the system prompt. */
     val history: List<ChatMessage> get() = messages
+
+    /**
+     * Prompt tokens the server reported for the newest request, when it reports them. The chat
+     * uses it to decide when to compact; null until the first reply carries `usage`.
+     */
+    val lastPromptTokens: Int? get() = model.lastPromptTokens
 
     /** The whole conversation, including exchanges [history] has let go of: what a skill run saves. */
     val transcript: List<ChatMessage> get() = dropped + messages
@@ -62,6 +68,11 @@ class MasalaAgent(
         dropped = dropped + messages.subList(0, messages.size - kept.size)
         messages = kept + user
         val visible = definitions.filter { scope.allows(it.name) }.map { it.toLlm() }
+        // The system prompt and the tool schemas ride with every request, so they come out of the
+        // same budget; the schema block alone can be tens of thousands of tokens.
+        val schemaTokens = AgentHistory.tokensOf(
+            listOf(ChatMessage("user", JsonPrimitive(visible.joinToString("\n") { "${it.function.name}${it.function.parameters}" }))),
+        )
         // The last tool call and how many times in a row it has repeated, so a loop stops
         // early instead of burning the round budget.
         var lastCall = ""
@@ -69,9 +80,11 @@ class MasalaAgent(
         try {
             repeat(maxSteps) {
                 emit(AgentEvent.Thinking)
-                val request = listOf(
-                    ChatMessage("system", JsonPrimitive(systemPrompt(promptContext()))),
-                ) + AgentHistory.cullImages(AgentHistory.trim(messages, maxHistoryChars))
+                val system = ChatMessage("system", JsonPrimitive(systemPrompt(promptContext())))
+                val historyBudget = (maxTokens - schemaTokens - AgentHistory.tokensOf(listOf(system)))
+                    .coerceAtLeast(MIN_HISTORY_TOKENS)
+                val request = listOf(system) +
+                    AgentHistory.cullImages(AgentHistory.trimToTokens(messages, historyBudget)).asSendable()
                 val reply = try {
                     model.next(request, visible).withValidToolCallArguments()
                 } catch (e: CancellationException) {
@@ -162,6 +175,16 @@ class MasalaAgent(
         return FetchAllowance.allows(url, all.filter { it.role == "tool" && it.toolCallId in searchCalls }.map { it.textContent })
     }
 
+    /**
+     * Guarantees the request carries something the server will accept: at least one `user` or
+     * `tool` message. A window can in principle end up with assistant turns only (an empty trim,
+     * a tool-call block), and servers answer such a request with a bare HTTP 400 that repeats on
+     * every retry. The note is the same one [AgentHistory] already uses after a trim.
+     */
+    private fun List<ChatMessage>.asSendable(): List<ChatMessage> =
+        if (any { it.role == "user" || it.role == "tool" }) this
+        else listOf(ChatMessage("user", JsonPrimitive(AgentHistory.CONTEXT_NOTE))) + this
+
     private fun toolMessage(callId: String, result: ToolResult): ChatMessage {
         val text = when (result) {
             // Tell the model plainly to stop trying and say what is missing, as a sub-agent's
@@ -179,11 +202,22 @@ class MasalaAgent(
         const val DEFAULT_MAX_STEPS = 100
 
         /**
+         * The context budget one request may use, in tokens. Generous because the window is what
+         * keeps a long thread coherent; [AgentHistory.trimToTokens] still bounds every request.
+         */
+        const val DEFAULT_MAX_CONTEXT_TOKENS = 256_000
+
+        /** Compaction fires here, as a share of [DEFAULT_MAX_CONTEXT_TOKENS], before the trim is needed. */
+        const val COMPACT_AT_FRACTION = 0.8
+
+        /** Even a huge system prompt and tool block leave this much room for the conversation. */
+        const val MIN_HISTORY_TOKENS = 4_000
+
+        /**
          * The same tool with the same arguments this many times in a row means a loop: stop
          * rather than spend the whole round budget on it.
          */
         const val DEFAULT_MAX_REPEATED_TOOL_CALLS = 4
-        const val DEFAULT_MAX_HISTORY_CHARS = 40_000
         const val KEPT_EXCHANGES = 5
 
         fun ToolResult.asText() = when (this) {

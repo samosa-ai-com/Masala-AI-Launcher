@@ -42,6 +42,7 @@ class CommandControllerTest {
         speech: SpeechInput? = null,
         summarize: (suspend (String) -> String?)? = null,
         cleaner: TranscriptCleaner? = null,
+        maxContextTokens: Int = MasalaAgent.DEFAULT_MAX_CONTEXT_TOKENS,
     ) = CommandController(
         scope = scope,
         resolveApp = { if (it == "spotify") spotify else null },
@@ -61,6 +62,7 @@ class CommandControllerTest {
         speech = speech,
         summarize = summarize,
         cleaner = cleaner,
+        maxContextTokens = maxContextTokens,
     )
 
     // A ceiling for a hang, not a stopwatch: the turn runs on Dispatchers.Default, which also feeds
@@ -376,9 +378,9 @@ class CommandControllerTest {
     @Test fun aLongConversationIsSummarisedBeforeTheRun() = runBlocking<Unit> {
         val recorded = mutableListOf<com.samosaai.masala.chat.ChatTurn>()
         var asked = 0
-        val c = controller(summarize = { asked++; "SUMMARY: user asked for a timer app" })
+        val c = controller(summarize = { asked++; "SUMMARY: user asked for a timer app" }, maxContextTokens = 1_000)
         c.onTurn = { recorded += it }
-        // Well past the 30k-character compaction threshold.
+        // Well past the compaction line for this test's deliberately small window.
         c.restoreSession(
             List(60) { i ->
                 com.samosaai.masala.chat.ChatTurn(
