@@ -219,7 +219,7 @@ private fun MeetingHost(initialId: String?, autoStart: Boolean, serial: Int, fin
             // A new intent (a notification, a widget tap, another meeting): honour where it points.
             initialId?.let {
                 openId = it
-                dest = Dest.DETAIL
+                dest = if (recorder.active && recorder.meetingId == it) Dest.LIVE else Dest.DETAIL
             }
             if (autoStart && !recorder.active && activeRow == null) startMeeting()
         } else if (autoStart && !recorder.active && activeRow == null) {
@@ -435,6 +435,18 @@ private suspend fun importMeeting(context: Context, app: MasalaApp, uri: Uri): S
         ?: "Imported audio"
     // A 60-minute meeting is ~115 MB decoded; refuse something far larger before copying it.
     if (size > 300L * 1024 * 1024) return@withContext null
+    // Probe the duration from the URI so a two-hour compressed file is refused before it becomes a
+    // 230 MB WAV on disk.
+    val probed = runCatching {
+        MediaMetadataRetriever().use { retriever ->
+            retriever.setDataSource(context, uri)
+            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+        }
+    }.getOrDefault(0L)
+    if (probed > 60 * 60_000L) return@withContext null
+    val needed = (probed.coerceAtLeast(1) / 1000L) * 32_000L + 100L * 1024 * 1024
+    val free = runCatching { android.os.StatFs(context.filesDir.path).availableBytes }.getOrDefault(Long.MAX_VALUE)
+    if (free < needed) return@withContext null
     val mime = context.contentResolver.getType(uri).orEmpty()
     val ext = when {
         mime.contains("mpeg") -> "mp3"
@@ -451,7 +463,23 @@ private suspend fun importMeeting(context: Context, app: MasalaApp, uri: Uri): S
     )
     val target = File(app.meetings.dir(session.id), "import.$ext")
     val copied = runCatching {
-        context.contentResolver.openInputStream(uri)?.use { input -> target.outputStream().use { input.copyTo(it) } }
+        var total = 0L
+        val limit = 250L * 1024 * 1024
+        val buffer = ByteArray(64 * 1024)
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            target.outputStream().use { out ->
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read <= 0) break
+                    total += read
+                    if (total > limit) {
+                        target.delete()
+                        return@runCatching false
+                    }
+                    out.write(buffer, 0, read)
+                }
+            }
+        }
         target.length() > 0
     }.getOrDefault(false)
     if (!copied) {
@@ -479,7 +507,7 @@ private suspend fun importMeeting(context: Context, app: MasalaApp, uri: Uri): S
     val parts = com.samosaai.masala.core.audio.WavSplitter.split(wav, app.meetings.dir(session.id), "chunk", 5 * 60_000L)
     wav.delete()
     target.delete()
-    if (parts.isEmpty()) {
+    if (parts.isEmpty() || parts.sumOf { it.durationMs } > 60 * 60_000L) {
         app.meetings.delete(session.id)
         return@withContext null
     }
@@ -487,7 +515,8 @@ private suspend fun importMeeting(context: Context, app: MasalaApp, uri: Uri): S
         app.meetings.addChunk(session.id, index, part.file, part.startMs, com.samosaai.masala.core.meeting.ChunkStatus.RECORDED)
         app.meetings.setChunkDuration(session.id, index, part.durationMs)
     }
-    app.meetings.finish(session.id, MeetingStatus.TRANSCRIBING, duration)
+    // The split windows are the truth; a retriever can report 0 for a format it half understands.
+    app.meetings.finish(session.id, MeetingStatus.TRANSCRIBING, parts.sumOf { it.durationMs })
     MeetingWork.enqueue(context, session.id)
     session.id
 }
@@ -527,13 +556,14 @@ private fun LiveMeetingScreen(meetingId: String, onBack: () -> Unit, onFinished:
         val current = app.meetings.get(meetingId) ?: return@LaunchedEffect
         app.meetings.setRawNotes(meetingId, notes, app.meetings.bookmarks(current))
     }
-    LaunchedEffect(turns.size) {
-        if (turns.isEmpty()) return@LaunchedEffect
+    val displayedTurns = remember(turns) { turns.takeLast(200) }
+    LaunchedEffect(displayedTurns.size) {
+        if (displayedTurns.isEmpty()) return@LaunchedEffect
         // Follow new turns only when the user is already at the bottom; scrolling up to read older
-        // text must not be yanked back every time a turn lands.
+        // text must not be yanked back. The list shows the last 200 turns, so indices are its own.
         val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-        if (lastVisible >= turns.size - 2) {
-            listState.animateScrollToItem(turns.lastIndex)
+        if (lastVisible >= displayedTurns.size - 2) {
+            listState.animateScrollToItem(displayedTurns.lastIndex)
         }
     }
     val active = recorder.active && recorder.meetingId == meetingId
@@ -686,7 +716,7 @@ private fun LiveMeetingScreen(meetingId: String, onBack: () -> Unit, onFinished:
             Spacer(Modifier.weight(1f))
         } else {
             LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
-                items(turns.takeLast(200), key = { it.id }) { turn -> TurnRow(turn, emptyMap()) }
+                items(displayedTurns, key = { it.id }) { turn -> TurnRow(turn, emptyMap()) }
             }
         }
     }
@@ -940,7 +970,15 @@ private fun MeetingDetailScreen(meetingId: String, onBack: () -> Unit, onOpenSet
                     scope.launch { app.meetings.setDoneActions(meetingId, next) }
                 },
                 onRemind = { action ->
-                    meeting?.let { app.commands.openInput(MeetingExport.reminderPrompt(it, action.text, action.owner)) }
+                    meeting?.let {
+                        if (app.commands.openInput(MeetingExport.reminderPrompt(it, action.text, action.owner))) {
+                            // The draft lives in HomeActivity's chat; bring it forward.
+                            context.startActivity(
+                                Intent(context, com.samosaai.masala.HomeActivity::class.java)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                            )
+                        }
+                    }
                 },
                 onRegenerate = {
                     scope.launch {
@@ -1274,8 +1312,12 @@ private class MeetingPlayer(
     private var player: MediaPlayer? = null
     private var index = -1
     private var baseMs = 0L
+    private var prepared = false
+    private var pendingSeekMs: Long? = null
+    private var wantsPlay = false
 
-    val positionMs: Long get() = baseMs + (player?.currentPosition ?: 0).toLong()
+    val positionMs: Long
+        get() = baseMs + (if (prepared) runCatching { player?.currentPosition }.getOrNull() ?: 0 else 0).toLong()
 
     fun playFrom(globalMs: Long) {
         if (parts.isEmpty()) return
@@ -1288,16 +1330,22 @@ private class MeetingPlayer(
         val target = parts.indexOfLast { globalMs >= it.startMs }.coerceAtLeast(0)
         val offset = (globalMs - parts[target].startMs).coerceAtLeast(0)
         if (target == index && player != null) {
-            player?.seekTo(offset.toInt())
+            // While preparing, MediaPlayer refuses seekTo: keep it for onPrepared.
+            if (prepared) player?.seekTo(offset.toInt()) else pendingSeekMs = offset
         } else {
-            play(target, offset, start = player?.isPlaying == true)
+            play(target, offset, start = prepared && player?.isPlaying == true)
         }
     }
 
     private fun play(newIndex: Int, offsetMs: Long, start: Boolean = true) {
         if (newIndex == index && player != null) {
-            player?.seekTo(offsetMs.toInt())
-            if (start) player?.start()
+            if (prepared) {
+                player?.seekTo(offsetMs.toInt())
+                if (start) player?.start()
+            } else {
+                pendingSeekMs = offsetMs
+                wantsPlay = start
+            }
             return
         }
         release()
@@ -1306,13 +1354,18 @@ private class MeetingPlayer(
         index = newIndex
         val media = MediaPlayer()
         player = media
+        prepared = false
+        pendingSeekMs = offsetMs
+        wantsPlay = start
         runCatching {
             media.setDataSource(part.file.absolutePath)
-            media.setOnPreparedListener {
-                runCatching { it.seekTo(offsetMs.toInt()) }
-                if (start) runCatching { it.start() }
+            media.setOnPreparedListener { mp ->
+                prepared = true
+                runCatching { mp.seekTo((pendingSeekMs ?: 0L).toInt()) }
+                if (wantsPlay) runCatching { mp.start() }
             }
             media.setOnCompletionListener {
+                prepared = false
                 if (newIndex + 1 < parts.size) play(newIndex + 1, 0) else {
                     release()
                     onEnded()
@@ -1320,6 +1373,7 @@ private class MeetingPlayer(
             }
             media.setOnErrorListener { mp, _, _ ->
                 runCatching { mp.reset() }
+                prepared = false
                 release()
                 onError()
                 true
@@ -1333,13 +1387,16 @@ private class MeetingPlayer(
     }
 
     fun pause() {
-        player?.pause()
+        if (prepared) player?.pause() else wantsPlay = false
     }
 
     fun release() {
         runCatching { player?.release() }
         player = null
         index = -1
+        prepared = false
+        pendingSeekMs = null
+        wantsPlay = false
     }
 }
 

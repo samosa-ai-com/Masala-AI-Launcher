@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.samosaai.masala.BuildConfig
 import com.samosaai.masala.R
+import com.samosaai.masala.meetings.MeetingRecorderService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -65,6 +66,12 @@ class RecordingService : Service() {
     @Synchronized
     private fun startRecording() {
         if (recorder != null) return
+        // One microphone: a meeting owns it while it runs, and both encoders would fight for it.
+        if (MeetingRecorderService.state.value.active) {
+            Log.i(TAG, "A meeting is recording; the quick recorder stays off")
+            stopSelf()
+            return
+        }
         ensureChannel()
         startForeground(NOTIF_ID, notification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
         if (!beginChunk()) {

@@ -24,6 +24,12 @@ object SpeakerLabels {
     const val MATCH_THRESHOLD = 0.5
 
     /**
+     * How far a turn in the new window may sit from where the same words would be in the previous
+     * window's tail. Text alone is not enough: "yes" or "okay" repeats all meeting.
+     */
+    const val TIME_TOLERANCE_MS = 2_000L
+
+    /**
      * Maps [incoming]'s labels (a fresh window, its clock starting at 0) onto [previous]'s
      * labels (already canonical), using the last [overlapMs] of [previous] and the first
      * [overlapMs] of [incoming]. [previousDurationMs] is the previous window's length.
@@ -41,11 +47,17 @@ object SpeakerLabels {
 
         // local label -> canonical label -> votes
         val votes = mutableMapOf<String, MutableMap<String, Int>>()
+        val overlapStartsAt = previousDurationMs - overlapMs
         head.forEach { here ->
             val local = here.speaker ?: return@forEach
+            // Where this turn was in the previous window: the overlap is the tail, and the new
+            // window starts at 0, so the same speech sat at (overlap start + here.start).
+            val expectedInPrevious = overlapStartsAt + here.startMs
             tail.forEach { there ->
                 val canonical = there.speaker ?: return@forEach
-                if (matches(here.text, there.text)) {
+                if (kotlin.math.abs(there.startMs - expectedInPrevious) <= TIME_TOLERANCE_MS &&
+                    matches(here.text, there.text)
+                ) {
                     val row = votes.getOrPut(local) { mutableMapOf() }
                     row[canonical] = (row[canonical] ?: 0) + 1
                 }

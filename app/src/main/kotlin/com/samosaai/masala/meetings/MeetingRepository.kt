@@ -180,9 +180,19 @@ class MeetingRepository(
                     )
                 },
             )
+            refreshSpeakerCount(meetingId)
         }
 
-    suspend fun deleteTurn(turnId: Long) = turns.deleteById(turnId)
+    suspend fun deleteTurn(meetingId: String, turnId: Long) {
+        turns.deleteById(turnId)
+        refreshSpeakerCount(meetingId)
+    }
+
+    /** Recomputes the session's detected-speaker count after turns change. */
+    suspend fun refreshSpeakerCount(meetingId: String) {
+        val count = turns.speakerCount(meetingId)
+        sessions.setSpeakerCount(meetingId, count, clock())
+    }
 
     suspend fun setNote(id: String, note: MeetingNote, status: String) {
         val json = MasalaJson.strict.encodeToString(MeetingNote.serializer(), note)
@@ -222,7 +232,8 @@ class MeetingRepository(
         chunks.deleteByMeeting(id)
         sessions.delete(id)
         dir(id).deleteRecursively()
-        // The overlap copies live in the cache, outside the meeting folder.
+        // Upload and overlap copies live in the cache, outside the meeting folder.
+        File(context.cacheDir, "meeting-$id").deleteRecursively()
         context.cacheDir.listFiles { f -> f.name.startsWith("meeting-prev-$id-") }?.forEach { runCatching { it.delete() } }
     }
 
@@ -239,6 +250,12 @@ class MeetingRepository(
             // The chunk that was still being written has no intact file; the closed ones do.
             chunks.abandonOpen(row.id, "The recording stopped before this part was finished.")
             MeetingWork.enqueue(context, row.id)
+        }
+        // A session can also be left "transcribing" with a chunk the recorder never closed (a kill
+        // between stop and the close write). Those rows are terminal and the queue can finish.
+        chunks.meetingsWithOpenChunks().forEach { id ->
+            chunks.abandonOpen(id, "The recording stopped before this part was finished.")
+            MeetingWork.enqueue(context, id)
         }
     }
 

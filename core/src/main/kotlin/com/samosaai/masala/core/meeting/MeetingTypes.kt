@@ -44,4 +44,7 @@ object ChunkStatus {
     const val TRANSCRIBING = "transcribing"
     const val DONE = "done"
     const val FAILED = "failed"
+
+    /** The file cannot be read (the process died while writing it): terminal, never retried. */
+    const val SKIPPED = "skipped"
 }

@@ -92,6 +92,8 @@ class MeetingNotesWriter(
         val note = reduce(meeting, template, contentful, failed, windows.size, names)
             ?: mergeFallback(meeting, template, contentful, failed, windows.size)
         repo.setNote(meetingId, note, MeetingStatus.READY)
+        // New action items mean the old checklist is meaningless; indices would tick the wrong rows.
+        repo.setDoneActions(meetingId, emptySet())
         repo.setStatus(meetingId, MeetingStatus.READY)
         Result.success(Unit)
     }
@@ -164,7 +166,10 @@ class MeetingNotesWriter(
             ChatMessage(
                 "user",
                 JsonPrimitive(
-                    "Meeting: ${meeting.title}\nDate: ${meeting.startedAt}\nDuration: ${durationWords(meeting.activeMs)}\n" +
+                    "Meeting: ${meeting.title}\nDate: ${
+                        java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT)
+                            .format(java.util.Date(meeting.startedAt))
+                    }\nDuration: ${durationWords(meeting.activeMs)}\n" +
                         "Speaker labels: $known\n\n$user$extractions",
                 ),
             ),

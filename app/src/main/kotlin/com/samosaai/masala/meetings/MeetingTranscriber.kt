@@ -40,6 +40,9 @@ class MeetingTranscriber(
     private var cachedClient: Pair<Pair<String, String>, AudioApi>? = null
 
     /** Transcribes every recorded chunk, in order. False when one failed (the worker retries later). */
+    /** False when no transcription endpoint is set: the worker must fail visibly, not retry. */
+    fun configured(): Boolean = speech().baseUrl.isNotBlank()
+
     suspend fun drain(meetingId: String): Boolean = withContext(Dispatchers.IO) {
         repo.resetStuckChunks(meetingId)
         while (true) {
@@ -71,7 +74,14 @@ class MeetingTranscriber(
                 work.mkdirs()
                 val wavFile = File(work, "chunk-%03d.wav".format(chunk.idx))
                 if (!wavFile.isFile || wavFile.length() == 0L) {
-                    if (!AndroidTranscriber.toWav(source, wavFile)) error("Couldn't convert chunk ${chunk.idx + 1} to WAV")
+                    // An imported chunk is already the mono 16-bit WAV the splitter wrote; only the
+                    // recorder's AAC needs the platform decoder.
+                    val converted = if (source.extension.equals("wav", ignoreCase = true)) {
+                        runCatching { source.copyTo(wavFile, overwrite = true); true }.getOrDefault(false)
+                    } else {
+                        AndroidTranscriber.toWav(source, wavFile)
+                    }
+                    if (!converted) error("Couldn't convert chunk ${chunk.idx + 1} to WAV")
                 }
                 val raw = WavPcm.readOrThrow(wavFile)
                 // Level and rumble clean-up once per chunk; re-runs reuse the cleaned file.
@@ -222,12 +232,17 @@ class MeetingTranscriber(
         val all = repo.turnsNow(meetingId)
         val previous = all.filter { it.chunkIdx == chunkIdx - 1 }.maxByOrNull { it.endMs } ?: return
         val first = all.filter { it.chunkIdx == chunkIdx }.minByOrNull { it.startMs } ?: return
-        if (previous.endMs <= first.startMs) return
-        val old = words(previous.text)
-        val new = words(first.text)
+        // Only the same person's fragment, and only when the new turn contains it word for word in
+        // order. A shared half of a sentence ("we should") is not a duplicate of "we should launch".
+        // (A time check would be wrong here: by construction the previous turn ends before the new
+        // window starts, so "no time overlap" is always true.)
+        if (previous.speaker != first.speaker) return
+        val old = previous.text.lowercase().replace(Regex("[^\\p{L}\\p{N}\\p{M}\\s]"), " ")
+            .split(Regex("\\s+")).filter { it.isNotBlank() }
+        val new = first.text.lowercase().replace(Regex("[^\\p{L}\\p{N}\\p{M}\\s]"), " ")
+            .split(Regex("\\s+")).filter { it.isNotBlank() }
         if (old.isEmpty() || new.isEmpty()) return
-        val shared = old.count { it in new }
-        if (shared * 2 >= old.size) repo.deleteTurn(previous.id)
+        if (new.windowed(old.size).any { it == old }) repo.deleteTurn(meetingId, previous.id)
     }
 
     private fun words(text: String): List<String> = text.lowercase()

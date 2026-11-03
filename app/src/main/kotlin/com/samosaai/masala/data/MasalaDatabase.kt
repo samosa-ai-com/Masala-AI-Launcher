@@ -48,7 +48,7 @@ import kotlinx.coroutines.flow.Flow
         MeetingChunkEntity::class,
         MeetingTurnEntity::class,
     ],
-    version = 12,
+    version = 13,
 )
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
@@ -140,6 +140,18 @@ abstract class MasalaDatabase : RoomDatabase() {
          * AI meeting notes (plan `docs/plans/meeting-notes.md`): sessions, their 5-minute chunks and
          * the speaker-labelled turns. Audio stays in app-private files; these rows are the index.
          */
+        /** Speaker count on the session, for the widget without a join. */
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE meeting_sessions ADD COLUMN speakerCount INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    "UPDATE meeting_sessions SET speakerCount = (" +
+                        "SELECT COUNT(DISTINCT speaker) FROM meeting_turns " +
+                        "WHERE meeting_turns.meetingId = meeting_sessions.id AND speaker IS NOT NULL)",
+                )
+            }
+        }
+
         val MIGRATION_11_12 = object : Migration(11, 12) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -181,7 +193,7 @@ abstract class MasalaDatabase : RoomDatabase() {
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
                     MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
-                    MIGRATION_11_12,
+                    MIGRATION_11_12, MIGRATION_12_13,
                 ).build()
     }
 }
@@ -652,6 +664,8 @@ data class MeetingSessionEntity(
     val noteJson: String? = null,
     val brainPath: String? = null,
     val error: String? = null,
+    /** Distinct detected speakers, kept current when turns are written (the widget shows it). */
+    val speakerCount: Int = 0,
     val createdAt: Long = 0,
     val updatedAt: Long = 0,
 )
@@ -740,6 +754,10 @@ interface MeetingDao {
     @Query("UPDATE meeting_sessions SET noteMarkdown = :markdown, noteJson = :json, status = :status, error = :error, updatedAt = :at WHERE id = :id")
     suspend fun setNote(id: String, markdown: String?, json: String?, status: String, error: String?, at: Long)
 
+    @Query("UPDATE meeting_sessions SET speakerCount = :count, updatedAt = :at WHERE id = :id")
+    suspend fun setSpeakerCount(id: String, count: Int, at: Long)
+
+
     @Query("UPDATE meeting_sessions SET brainPath = :path, updatedAt = :at WHERE id = :id")
     suspend fun setBrainPath(id: String, path: String?, at: Long)
 
@@ -782,7 +800,7 @@ interface MeetingChunkDao {
     suspend fun close(id: String, idx: Int, durationMs: Long)
 
     /** A chunk left open by a killed process cannot be read; keep the row honest about why. */
-    @Query("UPDATE meeting_chunks SET status = 'failed', error = :reason WHERE meetingId = :id AND status = 'open'")
+    @Query("UPDATE meeting_chunks SET status = 'skipped', error = :reason WHERE meetingId = :id AND status = 'open'")
     suspend fun abandonOpen(id: String, reason: String)
 
     /** The UI's Retry: failed chunks get their attempts back and rejoin the queue. */
@@ -798,7 +816,7 @@ interface MeetingChunkDao {
     @Query("UPDATE meeting_chunks SET durationMs = :durationMs WHERE id = :id")
     suspend fun setDuration(id: String, durationMs: Long)
 
-    @Query("SELECT COUNT(*) FROM meeting_chunks WHERE meetingId = :id AND status != 'done'")
+    @Query("SELECT COUNT(*) FROM meeting_chunks WHERE meetingId = :id AND status NOT IN ('done', 'skipped')")
     suspend fun remaining(id: String): Int
 
     /** A worker killed mid-chunk leaves 'transcribing': the next run must pick it up again. */
@@ -810,6 +828,9 @@ interface MeetingChunkDao {
 
     @Query("DELETE FROM meeting_chunks WHERE meetingId = :id")
     suspend fun deleteByMeeting(id: String)
+
+    @Query("SELECT DISTINCT meetingId FROM meeting_chunks WHERE status = 'open'")
+    suspend fun meetingsWithOpenChunks(): List<String>
 }
 
 @Dao
@@ -831,6 +852,9 @@ interface MeetingTurnDao {
 
     @Query("DELETE FROM meeting_turns WHERE id = :turnId")
     suspend fun deleteById(turnId: Long)
+
+    @Query("SELECT COUNT(DISTINCT speaker) FROM meeting_turns WHERE meetingId = :id AND speaker IS NOT NULL")
+    suspend fun speakerCount(id: String): Int
 
     @Query("SELECT speaker, SUM(endMs - startMs) AS ms FROM meeting_turns WHERE meetingId = :id GROUP BY speaker ORDER BY ms DESC")
     suspend fun talkTime(id: String): List<SpeakerTalk>

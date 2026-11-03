@@ -40,6 +40,15 @@ class MeetingWork(context: Context, params: WorkerParameters) : CoroutineWorker(
         val meeting = app.meetings.get(meetingId) ?: return Result.success()
         if (meeting.status == MeetingStatus.FAILED) return Result.success()
 
+        if (!app.meetingTranscriber.configured()) {
+            // Nothing to retry: the user has to configure an endpoint first.
+            app.meetings.setStatus(meetingId, MeetingStatus.FAILED)
+            app.meetings.setError(
+                meetingId,
+                applicationContext.getString(R.string.meeting_err_no_endpoint),
+            )
+            return Result.success()
+        }
         runCatching { setForeground(foreground(meeting.title, 0, 0)) }
         val drained = app.meetingTranscriber.drain(meetingId)
         if (!drained) {
@@ -64,8 +73,25 @@ class MeetingWork(context: Context, params: WorkerParameters) : CoroutineWorker(
             // Still recording: the next chunk rotation enqueues again.
             return Result.success()
         }
+        // A chunk that used up its attempts is skipped by drain, so the queue reports success while
+        // work remains. That must become a visible failure with Retry, not a forever-transcribing
+        // meeting that never runs again.
+        val stuck = app.meetings.chunksNow(meetingId).firstOrNull {
+            it.status == com.samosaai.masala.core.meeting.ChunkStatus.FAILED && it.attempts >= MAX_ATTEMPTS
+        }
+        if (stuck != null) {
+            app.meetings.setStatus(meetingId, MeetingStatus.FAILED)
+            app.meetings.setError(
+                meetingId,
+                stuck.error ?: applicationContext.getString(R.string.meeting_transcribe_retry),
+            )
+            return Result.success()
+        }
         val total = app.meetings.chunkCount(meetingId)
-        val done = app.meetings.chunksNow(meetingId).count { it.status == com.samosaai.masala.core.meeting.ChunkStatus.DONE }
+        val done = app.meetings.chunksNow(meetingId).count {
+            it.status == com.samosaai.masala.core.meeting.ChunkStatus.DONE ||
+                it.status == com.samosaai.masala.core.meeting.ChunkStatus.SKIPPED
+        }
         runCatching { setForeground(foreground(latest.title, done, total)) }
         if (app.meetings.remainingChunks(meetingId) == 0) {
             val force = inputData.getBoolean(KEY_FORCE_NOTES, false)
@@ -77,6 +103,14 @@ class MeetingWork(context: Context, params: WorkerParameters) : CoroutineWorker(
             }
             // Only drop the audio once there is a note to keep: a failed generation must not take
             // away the recording that could still produce one.
+            if (!wrote) {
+                // No note and no second chance: say so and let the user Regenerate/Retry.
+                app.meetings.setStatus(meetingId, MeetingStatus.FAILED)
+                app.meetings.setError(
+                    meetingId,
+                    applicationContext.getString(R.string.meeting_notes_failed),
+                )
+            }
             if (wrote && !MeetingSettings(applicationContext).keepAudio) {
                 app.meetings.deleteChunkFiles(meetingId)
             }

@@ -68,7 +68,9 @@ object MeetingExport {
         names: Map<String, String>,
         turns: List<com.samosaai.masala.data.MeetingTurnEntity>,
     ): String? {
-        val path = brainPath(meeting)
+        // A meeting exported before the id suffix existed keeps its old file; otherwise every save
+        // would write a second copy next to it.
+        val path = meeting.brainPath ?: brainPath(meeting)
         val body = markdown(meeting, note, names, turns)
         val outcome = runCatching { brain.write(path, body, append = false, allowDuplicate = true) }.getOrNull()
         if (outcome?.ok != true) {

@@ -149,12 +149,11 @@ class MasalaApp : Application() {
             live -> "Recording"
             row?.status == com.samosaai.masala.core.meeting.MeetingStatus.TRANSCRIBING -> "Transcribing…"
             row?.status == com.samosaai.masala.core.meeting.MeetingStatus.INTERRUPTED -> "Interrupted"
-            row?.noteMarkdown != null -> "Notes ready · ${row.activeMs / 60_000} min"
+            row?.noteMarkdown != null -> "Notes ready"
             row != null -> "No notes yet"
             else -> "Not recording"
         }
-        val names = row?.let { meetings.speakerNames(it) }.orEmpty()
-        val speakerCount = names.size
+        val speakerCount = row?.speakerCount ?: 0
         return mapOf(
             "status" to status,
             "title" to (if (live) recorder.title else row?.title).orEmpty().ifBlank { "Meeting notes" },
