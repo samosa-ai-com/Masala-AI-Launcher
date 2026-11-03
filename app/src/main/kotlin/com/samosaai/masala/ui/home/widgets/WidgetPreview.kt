@@ -39,6 +39,8 @@ fun WidgetPreview(
     rows: Int = spec.size.default,
     /** False for a long list: a globe otherwise keeps drawing below the fold. */
     animate: Boolean = true,
+    /** The widget's real share of the grid (2 of 4 cells = 0.5), so a small tile looks small. */
+    widthFraction: Float = 1f,
 ) {
     val app = LocalContext.current.masala
     val scope = rememberCoroutineScope()
@@ -58,7 +60,7 @@ fun WidgetPreview(
         )
     }
     Box(
-        modifier.fillMaxWidth()
+        modifier.fillMaxWidth(widthFraction.coerceIn(0.25f, 1f))
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(8.dp),

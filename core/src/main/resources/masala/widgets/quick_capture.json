@@ -16,14 +16,14 @@
         "label": "Remember",
         "action": {
           "type": "ask_masala",
-          "prompt": "Remember this: "
+          "prompt": "Remember something new for me"
         }
       }
     ],
     "size": {
       "min": 1,
       "default": 2,
-      "max": 3
+      "max": 2
     }
   }
 }

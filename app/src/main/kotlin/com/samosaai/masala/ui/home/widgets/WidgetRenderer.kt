@@ -36,6 +36,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -151,7 +153,11 @@ private fun Component(
         )
     when (component) {
         is WidgetComponent.Text -> {
-            val text = component.text ?: component.binding?.let { WidgetValues.textOf(it, storage, snapshot, extra) } ?: return
+            // A binding with no value yet shows a dash, not a vanished line: an empty next-meeting
+            // card used to render as a bare title with nothing under it.
+            val text = component.text
+                ?: component.binding?.let { WidgetValues.textOf(it, storage, snapshot, extra) }
+                ?: "—"
             Text(
                 text,
                 style = if (component.style?.emphasis == Emphasis.LARGE) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.bodyLarge,
@@ -171,6 +177,10 @@ private fun Component(
                         if (component.goal != null) "$value / ${component.goal}" else value.toString(),
                         style = if (component.style?.emphasis == Emphasis.LARGE) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,
                         color = tinted(component.style),
+                        modifier = Modifier.combinedClickable(
+                            onClick = {},
+                            onLongClick = { source.store.set(widgetId, component.key, "0") },
+                        ),
                     )
                     component.goal?.let { goal ->
                         LinearProgressIndicator(
@@ -179,23 +189,25 @@ private fun Component(
                         )
                     }
                 }
-                Button(onClick = { source.store.increment(widgetId, component.key, component.step) }) { Text("+${component.step}") }
-            }
-        }
-        is WidgetComponent.Checklist -> {
-            val ticks = source.store.bools(widgetId, component.key, component.items.size)
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                component.items.forEachIndexed { i, item ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().clickable(role = Role.Checkbox) { source.store.toggle(widgetId, component.key, i, component.items.size) },
-                    ) {
-                        Checkbox(checked = ticks.getOrElse(i) { false }, onCheckedChange = { source.store.toggle(widgetId, component.key, i, component.items.size) })
-                        Text(item, style = MaterialTheme.typography.bodyMedium, color = if (ticks.getOrElse(i) { false }) MasalaTheme.tokens.onWallpaperMedium else OnWallpaper)
+                // A counter you can only add to is a counter you can't correct: a mis-tap and a
+                // new day both need a minus and a reset. Long-press the number to start over.
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = {
+                        if (value > 0) source.store.increment(widgetId, component.key, -component.step)
+                    }) { Text("−${component.step}") }
+                    Button(onClick = { source.store.increment(widgetId, component.key, component.step) }) {
+                        Text("+${component.step}")
                     }
                 }
             }
+            Text(
+                "Long-press the number to reset",
+                style = MaterialTheme.typography.labelSmall,
+                color = MasalaTheme.tokens.onWallpaperMedium,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
+        is WidgetComponent.Checklist -> ChecklistRow(component, widgetId, storage, source)
         is WidgetComponent.Timer -> TimerRow(component, widgetId, storage, source, labelShown(component.label, title))
         is WidgetComponent.Progress -> {
             val value = component.binding.let { WidgetValues.numberOf(it, storage, snapshot, extra) }
@@ -351,6 +363,9 @@ private fun TimerRow(component: WidgetComponent.Timer, widgetId: String, storage
             com.samosaai.masala.widgets.WidgetSounds.chime(context)
             source.store.set(widgetId, ringKey(component.key), deadline.toString())
         }
+        // Back to the full duration, ready for another run: a card stuck on 00:00 looked broken
+        // and a later tap had to guess whether it meant restart or stop.
+        source.store.set(widgetId, component.key, "")
     }
     val left = if (deadline == null) null else (deadline - now).coerceAtLeast(0)
     val running = left != null && left > 0
@@ -360,9 +375,12 @@ private fun TimerRow(component: WidgetComponent.Timer, widgetId: String, storage
             if (showLabel) Text(component.label, style = MaterialTheme.typography.labelLarge, color = MasalaTheme.tokens.onWallpaperMedium)
             Text(
                 left?.let { formatDuration(it) } ?: formatDuration(component.seconds * 1000L),
-                // Tabular figures: the digits don't shift while it counts down.
-                style = MaterialTheme.typography.headlineSmall.copy(fontFeatureSettings = "tnum"),
+                // Tabular figures: the digits don't shift while it counts down. titleLarge (not
+                // headline) so a 2-cell card keeps "25:00" on one line beside the button.
+                style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
                 color = OnWallpaper,
+                maxLines = 1,
+                softWrap = false,
             )
         }
         FilledIconButton(
@@ -405,10 +423,10 @@ private fun Globe(value: String?, label: String?, accent: Color, animate: Boolea
         remember { androidx.compose.runtime.mutableFloatStateOf(0.5f) }
     }
     androidx.compose.foundation.layout.Box(
-        Modifier.fillMaxWidth().height(118.dp),
+        Modifier.fillMaxWidth().height(92.dp),
         contentAlignment = Alignment.Center,
     ) {
-        androidx.compose.foundation.Canvas(Modifier.size(112.dp)) {
+        androidx.compose.foundation.Canvas(Modifier.size(88.dp)) {
             val r = size.minDimension / 2f
             drawCircle(
                 brush = androidx.compose.ui.graphics.Brush.radialGradient(
@@ -457,8 +475,137 @@ private fun Globe(value: String?, label: String?, accent: Color, animate: Boolea
     }
 }
 
+/** A widget checklist stays readable; the checker's own cap is 20. */
+private const val MAX_CHECKLIST = 20
+
 /** Where a timer records the deadline it already rang for. */
 private fun ringKey(key: String) = "$key.rang"
+
+/**
+ * A checklist you can actually keep: tick an item, add one, rename or remove one, or reset the
+ * whole list for a new day. The spec's items are the starting point; once edited, the widget keeps
+ * its own list under `<key>.items`, so a template update never overwrites the user's list.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ChecklistRow(
+    component: WidgetComponent.Checklist,
+    widgetId: String,
+    storage: Map<String, String>,
+    source: WidgetSource,
+) {
+    val stored = storage["${component.key}.items"]
+    val items = remember(stored, component.items) {
+        stored?.lines()?.map { it.trim() }?.filter { it.isNotEmpty() }?.take(MAX_CHECKLIST) ?: component.items
+    }
+    val ticks = source.store.bools(widgetId, component.key, items.size)
+    var editing by remember { mutableStateOf<Int?>(null) }
+    fun persist(next: List<String>, nextTicks: List<Boolean>) {
+        source.store.set(widgetId, "${component.key}.items", next.joinToString("\n"))
+        source.store.set(widgetId, component.key, nextTicks.joinToString(",") { if (it) "1" else "0" })
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        items.forEachIndexed { i, item ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+                    .combinedClickable(
+                        onClick = { source.store.toggle(widgetId, component.key, i, items.size) },
+                        onLongClick = { editing = i },
+                    ),
+            ) {
+                Checkbox(
+                    checked = ticks.getOrElse(i) { false },
+                    onCheckedChange = { source.store.toggle(widgetId, component.key, i, items.size) },
+                )
+                Text(
+                    item,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (ticks.getOrElse(i) { false }) MasalaTheme.tokens.onWallpaperMedium else OnWallpaper,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { editing = i }) { Text("…") }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { editing = items.size }, enabled = items.size < MAX_CHECKLIST) { Text("+ Add") }
+            if (items.indices.any { ticks.getOrElse(it) { false } }) {
+                TextButton(onClick = {
+                    source.store.set(widgetId, component.key, items.joinToString(",") { "0" })
+                }) { Text("Reset") }
+            }
+        }
+    }
+    editing?.let { index ->
+        val existing = items.getOrNull(index).orEmpty()
+        ChecklistItemDialog(
+            initial = existing,
+            canDelete = index < items.size,
+            onSave = { text ->
+                val next = items.toMutableList()
+                val nextTicks = ticks.toMutableList()
+                if (index < next.size) {
+                    next[index] = text
+                } else {
+                    next += text
+                    nextTicks += false
+                }
+                persist(next, nextTicks)
+                editing = null
+            },
+            onDelete = if (index < items.size) {
+                {
+                    // The tick belongs to the item, not the position: dropping item 2 must keep
+                    // the ticks of the items that move up.
+                    persist(
+                        items.filterIndexed { i, _ -> i != index },
+                        ticks.filterIndexed { i, _ -> i != index },
+                    )
+                    editing = null
+                }
+            } else null,
+            onDismiss = { editing = null },
+        )
+    }
+}
+
+/** Name one checklist item; a long-press on a row opens this too, with Delete. */
+@Composable
+private fun ChecklistItemDialog(
+    initial: String,
+    canDelete: Boolean,
+    onSave: (String) -> Unit,
+    onDelete: (() -> Unit)?,
+    onDismiss: () -> Unit,
+) {
+    var text by remember(initial) { mutableStateOf(initial) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (canDelete) "Edit item" else "New item") },
+        text = {
+            androidx.compose.material3.OutlinedTextField(
+                value = text,
+                onValueChange = { if (it.length <= 60) text = it },
+                singleLine = true,
+                label = { Text("Item") },
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { if (text.isNotBlank()) onSave(text.trim()) },
+                enabled = text.isNotBlank(),
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            Row {
+                onDelete?.let { TextButton(onClick = it) { Text("Delete") } }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+    )
+}
 
 @Composable
 private fun ChartBars(component: WidgetComponent.Chart, storage: Map<String, String>, snapshot: ContextSnapshot) {

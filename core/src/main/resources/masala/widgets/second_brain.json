@@ -39,7 +39,7 @@
     ],
     "size": {
       "min": 2,
-      "default": 3,
+      "default": 2,
       "max": 3
     }
   }

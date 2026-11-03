@@ -637,6 +637,13 @@ internal fun friendlyModelError(raw: String?): String {
     if (NETWORK_WORDS.any { message.contains(it, ignoreCase = true) }) {
         return "The connection dropped while working on that. Check the network and try again."
     }
+    // Not the conversation: one step returned more than the model can read at once (a huge file,
+    // a base64 image, a directory listing). The agent drops the oversized output and retries, so
+    // seeing this means even the trimmed step was too big.
+    if (AgentHistory.isContextOverflow(message)) {
+        return "That step returned more data than the model can read at once. Try again with a narrower " +
+            "request — one file, a folder, or a search instead of a whole directory."
+    }
     // Only a real status line counts: "tool returned 400 items" is not an HTTP failure.
     val code = Regex("""\bHTTP[\s:]+(\d{3})\b""").find(message)?.groupValues?.get(1)
     return when (code) {

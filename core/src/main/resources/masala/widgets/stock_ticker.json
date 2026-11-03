@@ -1,18 +1,18 @@
 {
   "id": "stock_ticker",
-  "name": "Stock ticker",
-  "description": "One quote, refreshed every 15 minutes. Replace the url with your symbol.",
+  "name": "Crypto price",
+  "description": "One coin in dollars, refreshed every 15 minutes. Replace the url and path for another asset.",
   "category": "Money",
   "widget": {
     "id": "stock_ticker",
-    "title": "AAPL",
+    "title": "ETH",
     "components": [
       {
         "type": "web_value",
-        "label": "Quote",
+        "label": "Ethereum",
         "http": {
-          "url": "https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d",
-          "jsonPath": "$.chart.result[0].meta.regularMarketPrice",
+          "url": "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
+          "jsonPath": "$.ethereum.usd",
           "every": 900
         },
         "suffix": "USD",

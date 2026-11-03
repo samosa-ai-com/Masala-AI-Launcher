@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -103,12 +104,29 @@ fun AddWidgetSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        // Scrolling the gallery used to drag the sheet and a small downward flick dismissed it.
+        // The sheet closes by the scrim, Back, or the actions — never by a scroll gesture.
+        sheetGesturesEnabled = false,
     ) {
         Column(
             Modifier.fillMaxWidth().fillMaxHeight(0.92f).padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(stringResource(R.string.widgets_add_sheet_title), style = MaterialTheme.typography.titleLarge)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.widgets_add_sheet_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                // The one action most people want, in reach without scrolling.
+                Button(onClick = onDescribe) {
+                    Text(stringResource(R.string.widgets_create_with_ai))
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                TextButton(onClick = onManage) { Text(stringResource(R.string.widgets_manage)) }
+                TextButton(onClick = onSettings) { Text(stringResource(R.string.widgets_settings)) }
+            }
             OutlinedTextField(
                 query,
                 { query = it },
@@ -160,13 +178,6 @@ fun AddWidgetSheet(
                         onSetupSource = onSettings,
                     )
                 }
-                item("actions") {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        TextButton(onClick = onDescribe) { Text(stringResource(R.string.widgets_describe_short)) }
-                        TextButton(onClick = onManage) { Text(stringResource(R.string.widgets_manage)) }
-                        TextButton(onClick = onSettings) { Text(stringResource(R.string.widgets_settings)) }
-                    }
-                }
             }
         }
     }
@@ -184,7 +195,12 @@ private fun GalleryEntry(
     onSetupSource: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
-        WidgetPreview(spec, rows = spec.size.default.coerceAtMost(2))
+        WidgetPreview(
+            spec,
+            rows = spec.size.default.coerceAtMost(2),
+            // 2 cells of 4 is half the sheet: small widgets stop looking full-width in the gallery.
+            widthFraction = (spec.size.defaultW / 4f).coerceIn(0.25f, 1f),
+        )
         Row(
             Modifier.fillMaxWidth().padding(top = 6.dp),
             verticalAlignment = Alignment.CenterVertically,

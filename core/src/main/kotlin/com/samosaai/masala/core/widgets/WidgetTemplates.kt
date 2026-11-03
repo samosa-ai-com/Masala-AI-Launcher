@@ -23,7 +23,7 @@ object WidgetTemplates {
     /** Kept by hand: a classpath folder can't be listed on Android. A test checks each one. */
     /** The templates every install has always had; an upgrade knows it was offered these. */
     val legacyIds: List<String> = listOf(
-        "water", "habits", "next_events", "battery_steps", "camera_tile", "two_cameras", "countdown", "price_from_url",
+        "water", "habits", "next_events", "battery_steps", "camera_tile", "two_cameras", "countdown",
     )
 
     /** Everything shipped today: the original eight plus the gallery's shelves. */

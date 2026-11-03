@@ -23,7 +23,7 @@
     "size": {
       "min": 1,
       "default": 2,
-      "max": 3
+      "max": 2
     }
   }
 }

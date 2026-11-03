@@ -11,7 +11,8 @@
         "type": "timer",
         "key": "tea",
         "label": "Tea",
-        "seconds": 240
+        "seconds": 240,
+        "sound": true
       }
     ],
     "size": {

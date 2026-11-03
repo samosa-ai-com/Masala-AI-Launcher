@@ -38,7 +38,8 @@ object WidgetValues {
             BindingSource.SLEEP -> snapshot.sleepHours?.let { trimNumber(it) + " h" }
             BindingSource.STEPS -> snapshot.steps?.toString()
             BindingSource.WEATHER -> snapshot.weather?.let { "${trimNumber(it.tempC)}°C ${it.kind.name.lowercase()}" }
-            BindingSource.URGENT_COUNT -> snapshot.urgentCount.takeIf { it > 0 }?.toString()
+            // Zero urgent notifications is information ("nothing waiting"), not missing data.
+            BindingSource.URGENT_COUNT -> snapshot.urgentCount.toString()
             BindingSource.HTTP -> null
             BindingSource.STREAM_STATUS -> null
             BindingSource.SKILL_RESULT -> null
@@ -57,7 +58,7 @@ object WidgetValues {
             BindingSource.BATTERY -> snapshot.batteryPercent?.toDouble()
             BindingSource.STEPS -> snapshot.steps?.toDouble()
             BindingSource.SLEEP -> snapshot.sleepHours
-            BindingSource.URGENT_COUNT -> snapshot.urgentCount.takeIf { it > 0 }?.toDouble()
+            BindingSource.URGENT_COUNT -> snapshot.urgentCount.toDouble()
             BindingSource.WEATHER -> snapshot.weather?.tempC
             BindingSource.SECOND_BRAIN -> extra[binding.key]?.toDoubleOrNull()
             BindingSource.NEXT_EVENT,

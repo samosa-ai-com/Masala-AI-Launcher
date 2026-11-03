@@ -340,6 +340,7 @@
     <string name="widgets_empty_no_match">No widgets match.</string>
     <string name="widgets_filter">Filter widgets</string>
     <string name="widgets_search">Search widgets</string>
+    <string name="widgets_create_with_ai">Create with AI</string>
     <string name="widgets_all">All</string>
     <string name="widgets_describe">Describe a widget…</string>
     <string name="widgets_describe_prefill">"I want a home-screen widget that "</string>

@@ -13,6 +13,37 @@ class AgentHistoryCullTest {
     private fun shot(text: String, seed: Byte = 1) =
         visionUserMessage(text, seed.toString().repeat(40))
 
+    @Test fun `an oversized message is cut before it can blow the window`() {
+        // Four base64 images read as text were 2.7 MB in one turn and the server rejected the
+        // request at 1.7M tokens. No single message may go in whole past the cap.
+        val huge = ChatMessage("tool", JsonPrimitive("x".repeat(AgentHistory.MAX_MESSAGE_CHARS + 5_000)), toolCallId = "c1")
+        val capped = AgentHistory.capOversized(listOf(huge)).single()
+        assertTrue(capped.textContent.length < huge.textContent.length)
+        assertTrue(capped.textContent.contains("truncated"))
+        assertEquals("c1", capped.toolCallId)
+        // A short message is untouched.
+        val small = ChatMessage("user", JsonPrimitive("hello"))
+        assertEquals(small, AgentHistory.capOversized(listOf(small)).single())
+    }
+
+    @Test fun `a context overflow is recognised from the server body`() {
+        val real = "{\"error\":{\"code\":\"context_length_exceeded\",\"message\":\"The input (1771021 tokens) " +
+            "exceeds the model's context window of 1048576 tokens. Reduce the length of the input.\"}}"
+        assertTrue(AgentHistory.isContextOverflow(real))
+        assertTrue(AgentHistory.isContextOverflow("This model's maximum context length is 8192 tokens"))
+        assertFalse(AgentHistory.isContextOverflow("tool returned 400 items"))
+        assertFalse(AgentHistory.isContextOverflow(null))
+    }
+
+    @Test fun `shrinkForContext keeps a little of each tool result and only two images`() {
+        val tool = ChatMessage("tool", JsonPrimitive("y".repeat(50_000)), toolCallId = "c1")
+        val shots = (1..4).map { shot("shot$it", it.toByte()) }
+        val shrunk = AgentHistory.shrinkForContext(listOf(tool) + shots)
+        assertTrue(shrunk.first().textContent.length < 5_000)
+        assertTrue(shrunk.first().textContent.contains("truncated"))
+        assertEquals(2, shrunk.drop(1).count { it.imageCount > 0 })
+    }
+
     @Test fun `four or fewer images pass through untouched`() {
         val history = (1..4).map { shot("shot$it", it.toByte()) }
         assertEquals(history, AgentHistory.cullImages(history))

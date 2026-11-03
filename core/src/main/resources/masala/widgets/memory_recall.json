@@ -22,7 +22,7 @@
         "label": "Recall",
         "action": {
           "type": "ask_masala",
-          "prompt": "What do I know about "
+          "prompt": "What did I save recently?"
         }
       }
     ],

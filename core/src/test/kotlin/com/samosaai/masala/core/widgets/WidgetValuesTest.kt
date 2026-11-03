@@ -40,7 +40,8 @@ class WidgetValuesTest {
         assertEquals("7.5 h", WidgetValues.textOf(binding(BindingSource.SLEEP), empty, snapshot))
         assertEquals("16°C cloudy", WidgetValues.textOf(binding(BindingSource.WEATHER), empty, snapshot))
         assertEquals("2", WidgetValues.textOf(binding(BindingSource.URGENT_COUNT), empty, snapshot))
-        assertNull(WidgetValues.textOf(binding(BindingSource.URGENT_COUNT), empty, snapshot.copy(urgentCount = 0)))
+        // Zero waiting notifications is a real value; the card says 0 rather than a dash.
+        assertEquals("0", WidgetValues.textOf(binding(BindingSource.URGENT_COUNT), empty, snapshot.copy(urgentCount = 0)))
     }
 
     @Test

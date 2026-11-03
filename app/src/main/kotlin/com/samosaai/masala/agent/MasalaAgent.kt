@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 
 /** Runs one tool; the app passes `MasalaToolExecutor::execute`, which gates and logs it. */
 fun interface AgentToolRunner {
@@ -77,21 +79,39 @@ class MasalaAgent(
         // early instead of burning the round budget.
         var lastCall = ""
         var repeats = 0
+        // Images a tool read, handed to the model once the round's tool results are in place.
+        val readImages = mutableListOf<ReadImage>()
         try {
             repeat(maxSteps) {
                 emit(AgentEvent.Thinking)
-                val system = ChatMessage("system", JsonPrimitive(systemPrompt(promptContext())))
-                val historyBudget = (maxTokens - schemaTokens - AgentHistory.tokensOf(listOf(system)))
-                    .coerceAtLeast(MIN_HISTORY_TOKENS)
-                val request = listOf(system) +
-                    AgentHistory.cullImages(AgentHistory.trimToTokens(messages, historyBudget)).asSendable()
-                val reply = try {
-                    model.next(request, visible).withValidToolCallArguments()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    return@flow emit(AgentEvent.Failed(e.message ?: e::class.java.simpleName))
+                var answer: ChatMessage? = null
+                var contextRetried = false
+                while (answer == null) {
+                    val system = ChatMessage("system", JsonPrimitive(systemPrompt(promptContext())))
+                    val historyBudget = (maxTokens - schemaTokens - AgentHistory.tokensOf(listOf(system)))
+                        .coerceAtLeast(MIN_HISTORY_TOKENS)
+                    val request = listOf(system) +
+                        AgentHistory.cullImages(
+                            AgentHistory.trimToTokens(AgentHistory.capOversized(messages), historyBudget),
+                        ).asSendable()
+                    try {
+                        answer = model.next(request, visible).withValidToolCallArguments()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // One oversized step (a file listing, a base64 image read) used to fail the
+                        // whole turn. Keep a little of every tool output, drop the oldest images
+                        // and ask once more — the user sees an answer instead of a dead end.
+                        if (!contextRetried && AgentHistory.isContextOverflow(e.message)) {
+                            contextRetried = true
+                            messages = AgentHistory.shrinkForContext(messages)
+                            emit(AgentEvent.Thinking)
+                            continue
+                        }
+                        return@flow emit(AgentEvent.Failed(e.message ?: e::class.java.simpleName))
+                    }
                 }
+                val reply = answer
                 messages = messages + reply
                 val calls = reply.toolCalls.orEmpty()
                 if (calls.isEmpty()) return@flow emit(AgentEvent.Done(reply.textContent))
@@ -119,7 +139,13 @@ class MasalaAgent(
                     }
                     emit(AgentEvent.ToolCall(name, args))
                     val result = tools.run(name, args)
-                    messages = messages + toolMessage(call.id, result)
+                    val image = (result as? ToolResult.Success)?.let { readImage(it.output) }
+                    if (image != null) {
+                        readImages += image
+                        messages = messages + toolMessage(call.id, ToolResult.Success(image.summary))
+                    } else {
+                        messages = messages + toolMessage(call.id, result)
+                    }
                     emit(AgentEvent.ToolDone(name, result))
                     if (result is ToolResult.Success) result.results().takeIf { it.isNotEmpty() }?.let { emit(AgentEvent.Results(it)) }
                     if (result is ToolResult.NeedsCapability) {
@@ -128,6 +154,14 @@ class MasalaAgent(
                         // leaving the user with an error and no answer.
                         emit(AgentEvent.NeedsCapability(result.capability, result.reason))
                     }
+                }
+                // Images read by tools become a vision message *after* the tool results: a user
+                // message between an assistant tool_call and its result is rejected by strict
+                // servers, and the pixels cost a few hundred tokens instead of megabytes of
+                // base64 text (which is what used to blow the window).
+                if (readImages.isNotEmpty()) {
+                    messages = messages + visionMessage(readImages)
+                    readImages.clear()
                 }
             }
             emit(AgentEvent.StepLimit)
@@ -186,7 +220,7 @@ class MasalaAgent(
         else listOf(ChatMessage("user", JsonPrimitive(AgentHistory.CONTEXT_NOTE))) + this
 
     private fun toolMessage(callId: String, result: ToolResult): ChatMessage {
-        val text = when (result) {
+        val raw = when (result) {
             // Tell the model plainly to stop trying and say what is missing, as a sub-agent's
             // parent expects one clear report rather than a retry loop.
             is ToolResult.NeedsCapability ->
@@ -194,12 +228,59 @@ class MasalaAgent(
                     "Do not call it again. Finish your answer and say what they have to grant."
             else -> result.asText()
         }
-        return ChatMessage("tool", JsonPrimitive(text), toolCallId = callId)
+        // The transcript keeps the full output on purpose (a skill's saved run is a record);
+        // the request caps each message in AgentHistory.capOversized, so size is paid once, at
+        // the wire, not by silently losing data the user may need to reopen.
+        return ChatMessage("tool", JsonPrimitive(raw), toolCallId = callId)
+    }
+
+    /**
+     * An image a tool read. [summary] is the text that goes into the tool message; [data] rides as
+     * an image part, which a vision model charges by pixels rather than by base64 length.
+     */
+    private data class ReadImage(val mime: String, val name: String, val dimensions: String, val data: String) {
+        val summary: String get() = "Read image: $name ($dimensions). The image itself is attached."
+    }
+
+    /** `IMAGE_DATA:<mime>:<WxH>:<bytes>:<name>:<base64>` from read_file, or null. */
+    private fun readImage(output: String): ReadImage? {
+        if (!output.startsWith("IMAGE_DATA:")) return null
+        val parts = output.split(":", limit = 6)
+        if (parts.size < 6) return null
+        val base64 = parts[5]
+        // A 4 MB image is ~5.3 MB of base64: attached, it is a few thousand tokens, but the
+        // request body is not free either. Past this, describe it instead.
+        if (base64.length > MAX_INLINE_IMAGE_CHARS) return null
+        return ReadImage(parts[1], parts[4], parts[2], base64)
+    }
+
+    private fun visionMessage(images: List<ReadImage>): ChatMessage {
+        val label = if (images.size == 1) {
+            "The assistant read an image file: ${images[0].name} (${images[0].dimensions})."
+        } else {
+            "The assistant read ${images.size} image files: " +
+                images.joinToString { "${it.name} (${it.dimensions})" } + "."
+        }
+        return ChatMessage("user", kotlinx.serialization.json.buildJsonArray {
+            add(kotlinx.serialization.json.buildJsonObject {
+                put("type", "text")
+                put("text", label)
+            })
+            images.forEach { image ->
+                add(kotlinx.serialization.json.buildJsonObject {
+                    put("type", "image_url")
+                    putJsonObject("image_url") { put("url", "data:${image.mime};base64,${image.data}") }
+                })
+            }
+        })
     }
 
     companion object {
         /** A request that needs many steps (search, read, edit, verify) must not stop early. */
         const val DEFAULT_MAX_STEPS = 100
+
+        /** Images above this base64 size are described, not attached. */
+        const val MAX_INLINE_IMAGE_CHARS = 5_500_000
 
         /**
          * The context budget one request may use, in tokens. Generous because the window is what

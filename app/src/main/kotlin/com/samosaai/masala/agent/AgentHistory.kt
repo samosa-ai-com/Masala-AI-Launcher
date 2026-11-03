@@ -51,6 +51,53 @@ object AgentHistory {
             chars / CHARS_PER_TOKEN + message.imageCount * IMAGE_PART_TOKENS
         }
 
+    /** One message may be this long in a request before it is cut down (about 12k tokens). */
+    const val MAX_MESSAGE_CHARS = 48_000
+
+    /** What a tool result keeps when a context overflow is retried. */
+    const val OVERFLOW_TOOL_CHARS = 4_000
+
+    /**
+     * Cuts any single message that is too long for a request. [trim] alone can't help when the
+     * newest message alone is bigger than the whole budget — that is how four images read as
+     * base64 text (2.7 MB) produced a 1.7M-token request and a hard 400.
+     */
+    fun capOversized(history: List<ChatMessage>, maxChars: Int = MAX_MESSAGE_CHARS): List<ChatMessage> =
+        history.map { message ->
+            val text = message.textContent
+            if (text.length <= maxChars || message.content !is JsonPrimitive) message
+            else message.copy(content = JsonPrimitive(text.take(maxChars) + TRUNCATED))
+        }
+
+    /**
+     * The last resort before failing a turn: keep a little of every tool result and only the
+     * newest images, then let the caller retry once.
+     */
+    fun shrinkForContext(
+        history: List<ChatMessage>,
+        keepToolChars: Int = OVERFLOW_TOOL_CHARS,
+        keepImages: Int = 2,
+    ): List<ChatMessage> =
+        cullImages(history.map { message ->
+            if (message.role == "tool" && message.textContent.length > keepToolChars) {
+                message.copy(content = JsonPrimitive(message.textContent.take(keepToolChars) + TRUNCATED))
+            } else {
+                message
+            }
+        }, keepParts = keepImages)
+
+    /** Whether a model error is the server refusing an input that is too large. */
+    fun isContextOverflow(message: String?): Boolean {
+        val text = message?.trim().orEmpty()
+        if (text.isEmpty()) return false
+        return text.contains("context_length_exceeded", ignoreCase = true) ||
+            text.contains("exceeds the model's context window", ignoreCase = true) ||
+            text.contains("maximum context length", ignoreCase = true) ||
+            text.contains("too many tokens", ignoreCase = true)
+    }
+
+    private const val TRUNCATED = "\n…[truncated to fit the model's context]"
+
     /** [trim] on a token budget rather than a character one. */
     fun trimToTokens(history: List<ChatMessage>, maxTokens: Int): List<ChatMessage> =
         trim(history, maxTokens.coerceAtLeast(1) * CHARS_PER_TOKEN)
