@@ -1,0 +1,35 @@
+{
+  "id": "memory_recall",
+  "name": "Ask your notes",
+  "description": "The newest note, and a button to ask about anything.",
+  "category": "Masala",
+  "widget": {
+    "id": "memory_recall",
+    "title": "Notes",
+    "components": [
+      {
+        "type": "text",
+        "binding": {
+          "source": "second_brain",
+          "key": "latest"
+        },
+        "style": {
+          "emphasis": "large"
+        }
+      },
+      {
+        "type": "button",
+        "label": "Recall",
+        "action": {
+          "type": "ask_masala",
+          "prompt": "What do I know about "
+        }
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 2,
+      "max": 3
+    }
+  }
+}

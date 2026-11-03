@@ -45,7 +45,7 @@ object WidgetSchema {
 
     private fun componentTypes(): List<JsonObject> = listOf(
         text(), counter(), checklist(), timer(), progress(), chart(), button(), image(),
-        listRows(), gauge(), row(), column(), video(), snapshot(), webValue(),
+        listRows(), gauge(), globe(), row(), column(), video(), snapshot(), webValue(),
     )
 
     private fun text(): JsonObject = buildJsonObject {
@@ -95,6 +95,7 @@ object WidgetSchema {
             put("key", string("Storage key holding the running deadline"))
             put("label", string())
             put("seconds", int("Countdown length"))
+            put("sound", bool("Ring when it reaches zero (default false)"))
         }
         putJsonArray("required") { add("type"); add("key"); add("label"); add("seconds") }
         put("additionalProperties", false)
@@ -122,6 +123,18 @@ object WidgetSchema {
             put("days", int("How many values, oldest first, comma-separated in storage"))
         }
         putJsonArray("required") { add("type"); add("binding") }
+        put("additionalProperties", false)
+    }
+
+    private fun globe(): JsonObject = buildJsonObject {
+        put("type", "object")
+        putJsonObject("properties") {
+            put("type", const("globe"))
+            put("label", string("Small caption under the value"))
+            putJsonObject("binding") { merge(binding()) }
+            putJsonObject("style") { merge(style()) }
+        }
+        putJsonArray("required") { add("type") }
         put("additionalProperties", false)
     }
 
@@ -280,8 +293,8 @@ object WidgetSchema {
     private fun binding(): JsonObject = buildJsonObject {
         put("type", "object")
         putJsonObject("properties") {
-            put("source", enumOf("storage", "next_event", "battery", "media", "steps", "sleep", "weather", "urgent_count", "stream_status", "skill_result", "http"))
-            put("key", string("Storage key (source storage), stream source id (stream_status), skill id (skill_result), else missing"))
+            put("source", enumOf("storage", "next_event", "battery", "media", "steps", "sleep", "weather", "urgent_count", "stream_status", "skill_result", "second_brain", "http"))
+            put("key", string("Storage key (storage), source id (stream_status), skill id (skill_result), notes|latest (second_brain), else missing"))
             putJsonObject("http") { merge(http()) }
         }
         putJsonArray("required") { add("source") }
@@ -369,7 +382,7 @@ object WidgetSchema {
         put("type", "object")
         putJsonObject("properties") {
             put("type", const("play_sound"))
-            put("kind", const("click"))
+            put("kind", enumOf("click", "chime"))
         }
         putJsonArray("required") { add("type") }
         put("additionalProperties", false)
@@ -382,6 +395,11 @@ object WidgetSchema {
 
     private fun int(description: String = "") = buildJsonObject {
         put("type", "integer")
+        if (description.isNotEmpty()) put("description", description)
+    }
+
+    private fun bool(description: String = "") = buildJsonObject {
+        put("type", "boolean")
         if (description.isNotEmpty()) put("description", description)
     }
 

@@ -25,6 +25,8 @@ import kotlinx.serialization.builtins.serializer
 class WidgetLibrary(
     private val dao: WidgetDao,
     private val versions: WidgetVersionDao,
+    /** Which templates this install has been offered; null keeps the old fresh-install-only rule. */
+    private val seeds: WidgetSeedStore? = null,
 ) {
     private val _widgets = MutableStateFlow<Map<String, WidgetSpec>>(emptyMap())
     val widgets: StateFlow<Map<String, WidgetSpec>> = _widgets.asStateFlow()
@@ -59,6 +61,9 @@ class WidgetLibrary(
         }
         if (rows.isEmpty()) {
             if (seedIfEmpty) seedTemplates()
+            // Every bundled template counts as offered from here on: deleting one later must
+            // not bring it back on the next start.
+            seeds?.remember(WidgetTemplates.ids.toSet())
             return
         }
         _widgets.value = rows.mapNotNull { row ->
@@ -67,6 +72,23 @@ class WidgetLibrary(
                 .getOrNull()
         }.toMap()
         _version.value++
+        if (seedIfEmpty) seedNewTemplates(rows.map { it.id }.toSet())
+    }
+
+    /**
+     * Adds the templates this install has never been offered, once (plan `docs/plans/widget-gallery.md`
+     * §4). An install from before the seeding bookkeeping is treated as having had the original
+     * eight — so a user who deleted one does not get it back, but the new shelves do appear.
+     */
+    private suspend fun seedNewTemplates(existing: Set<String>) {
+        val store = seeds ?: return
+        val known = store.known()
+        val offered = if (known.isEmpty()) WidgetTemplates.legacyIds.toSet() + existing else known + existing
+        val missing = WidgetTemplates.ids.filterNot { it in offered }
+        missing.forEach { id ->
+            runCatching { WidgetTemplates.load(id).widget }.getOrNull()?.let { save(it, createdBy = "template") }
+        }
+        if (missing.isNotEmpty() || known.isEmpty()) store.remember(WidgetTemplates.ids.toSet())
     }
 
     /** Saves [spec] as a new version (Undo in the manager restores [versions]). */

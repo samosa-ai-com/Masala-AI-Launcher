@@ -117,12 +117,17 @@ class ActionDispatcher(
         is MasalaAction.PlaySound -> playClick(action)
     }
 
-    private fun playClick(action: MasalaAction.PlaySound): Outcome {
-        if (action.kind != "click") return Outcome.Failed("Unknown sound '${action.kind}'")
-        val audio = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-            ?: return Outcome.Failed("No audio on this device")
-        audio.playSoundEffect(android.media.AudioManager.FX_KEY_CLICK)
-        return Outcome.Done()
+    private fun playClick(action: MasalaAction.PlaySound): Outcome = when (action.kind) {
+        "click" -> {
+            com.samosaai.masala.widgets.WidgetSounds.click(context)
+            Outcome.Done()
+        }
+        // The device's notification tone: what a timer uses when it reaches zero.
+        "chime" -> {
+            com.samosaai.masala.widgets.WidgetSounds.chime(context)
+            Outcome.Done()
+        }
+        else -> Outcome.Failed("Unknown sound '${action.kind}'")
     }
 
     private suspend fun setMode(action: MasalaAction.SetMode): Outcome {

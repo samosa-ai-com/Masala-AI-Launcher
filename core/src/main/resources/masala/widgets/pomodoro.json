@@ -1,0 +1,27 @@
+{
+  "id": "pomodoro",
+  "name": "Pomodoro",
+  "description": "25 minutes of focus, with a chime when it ends.",
+  "category": "Focus",
+  "widget": {
+    "id": "pomodoro",
+    "title": "Focus 25",
+    "components": [
+      {
+        "type": "timer",
+        "key": "work",
+        "label": "Focus",
+        "seconds": 1500,
+        "sound": true
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 1,
+      "max": 2,
+      "minW": 2,
+      "defaultW": 2,
+      "maxW": 2
+    }
+  }
+}

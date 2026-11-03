@@ -1,0 +1,46 @@
+{
+  "id": "second_brain",
+  "name": "Second Brain",
+  "description": "What your knowledge base holds: how many notes, and the newest one.",
+  "category": "Masala",
+  "widget": {
+    "id": "second_brain",
+    "title": "Second Brain",
+    "components": [
+      {
+        "type": "globe",
+        "label": "notes",
+        "binding": {
+          "source": "second_brain",
+          "key": "notes"
+        },
+        "style": {
+          "tint": "blue"
+        }
+      },
+      {
+        "type": "text",
+        "binding": {
+          "source": "second_brain",
+          "key": "latest"
+        },
+        "style": {
+          "emphasis": "normal"
+        }
+      },
+      {
+        "type": "button",
+        "label": "Ask about it",
+        "action": {
+          "type": "ask_masala",
+          "prompt": "What did I save recently?"
+        }
+      }
+    ],
+    "size": {
+      "min": 2,
+      "default": 3,
+      "max": 3
+    }
+  }
+}

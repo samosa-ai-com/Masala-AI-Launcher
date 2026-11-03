@@ -87,6 +87,81 @@ object MasalaToolDefinitions {
         }
     )
 
+    val setWallpaperRoutine = tool(
+        "set_wallpaper_routine",
+        "Save a wallpaper routine: a named, ordered list of rules that changes the home wallpaper " +
+            "by itself. The first rule whose conditions all match wins; otherwise defaultSource " +
+            "applies. Conditions are AND-ed and all optional: a time window (from/to, 'HH:mm', a " +
+            "window may cross midnight), days (ISO 1=Mon..7=Sun), weather (clear, cloudy, rain, " +
+            "snow, storm, fog), charging, batteryBelow (%), minTempC/maxTempC. A source is " +
+            "'asset:<file>' for a bundled wallpaper, 'id:<n>' for one the user generated, or a " +
+            "/path or http(s) url. Only the home screen rotates (target 'home'). Prefer 3-5 rules " +
+            "with plain-language names. Reusing an id replaces that routine.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Short slug; omit to derive it from the name.")
+                }
+                putJsonObject("name") { put("type", "string") }
+                putJsonObject("enabled") { put("type", "boolean") }
+                putJsonObject("target") {
+                    put("type", "string")
+                    put("description", "Only 'home' for now.")
+                    putJsonArray("enum") { add("home") }
+                }
+                putJsonObject("defaultSource") {
+                    put("type", "string")
+                    put("description", "Shown when no rule matches.")
+                }
+                putJsonObject("rules") {
+                    put("type", "array")
+                    putJsonObject("items") {
+                        put("type", "object")
+                        putJsonObject("properties") {
+                            putJsonObject("source") { put("type", "string") }
+                            putJsonObject("when") {
+                                put("type", "object")
+                                putJsonObject("properties") {
+                                    putJsonObject("from") { put("type", "string"); put("description", "'HH:mm'") }
+                                    putJsonObject("to") { put("type", "string"); put("description", "'HH:mm'") }
+                                    putJsonObject("days") {
+                                        put("type", "array")
+                                        putJsonObject("items") { put("type", "integer") }
+                                    }
+                                    putJsonObject("weather") {
+                                        put("type", "array")
+                                        putJsonObject("items") {
+                                            put("type", "string")
+                                            putJsonArray("enum") {
+                                                add("clear"); add("cloudy"); add("rain")
+                                                add("snow"); add("storm"); add("fog")
+                                            }
+                                        }
+                                    }
+                                    putJsonObject("charging") { put("type", "boolean") }
+                                    putJsonObject("batteryBelow") { put("type", "integer") }
+                                    putJsonObject("minTempC") { put("type", "number") }
+                                    putJsonObject("maxTempC") { put("type", "number") }
+                                }
+                            }
+                        }
+                        putJsonArray("required") { add("source") }
+                    }
+                }
+            }
+            putJsonArray("required") { add("name"); add("rules") }
+        }
+    )
+
+    val wallpaperRoutineStatus = tool(
+        "wallpaper_routine_status",
+        "What the wallpaper routines are showing right now, which rule won, why the last attempt " +
+            "failed if it did, and when the next change is due. Use it to answer 'why is my " +
+            "wallpaper this?' or to check a routine you just saved.",
+        schema { }
+    )
+
     val generateWallpaper = tool(
         "generate_wallpaper",
         "Generate a portrait phone wallpaper from a text description with the configured image " +
@@ -1766,6 +1841,8 @@ object MasalaToolDefinitions {
         dialNumber,
         openApp,
         setWallpaper,
+        setWallpaperRoutine,
+        wallpaperRoutineStatus,
         generateWallpaper,
         generateImage,
         editImage,

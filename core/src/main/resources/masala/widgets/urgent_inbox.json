@@ -1,0 +1,31 @@
+{
+  "id": "urgent_inbox",
+  "name": "Waiting on you",
+  "description": "How many urgent notifications are waiting.",
+  "category": "Home",
+  "widget": {
+    "id": "urgent_inbox",
+    "title": "Waiting",
+    "components": [
+      {
+        "type": "gauge",
+        "label": "Urgent",
+        "binding": {
+          "source": "urgent_count"
+        },
+        "max": 10,
+        "style": {
+          "tint": "red"
+        }
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 1,
+      "max": 2,
+      "minW": 2,
+      "defaultW": 2,
+      "maxW": 2
+    }
+  }
+}

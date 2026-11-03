@@ -9,6 +9,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
@@ -42,8 +43,9 @@ import kotlinx.coroutines.flow.Flow
         StreamSourceEntity::class,
         WidgetHttpValueEntity::class,
         WallpaperEntity::class,
+        WallpaperRoutineEntity::class,
     ],
-    version = 10,
+    version = 11,
 )
 abstract class MasalaDatabase : RoomDatabase() {
     abstract fun appOverrides(): AppOverrideDao
@@ -60,6 +62,7 @@ abstract class MasalaDatabase : RoomDatabase() {
     abstract fun wikiPages(): WikiDao
     abstract fun appLaunches(): AppLaunchDao
     abstract fun wallpapers(): WallpaperDao
+    abstract fun wallpaperRoutines(): WallpaperRoutineDao
 
     companion object {
         /** UI refresh U3: the launch log behind the globe drawer and "Suggested now". */
@@ -121,6 +124,12 @@ abstract class MasalaDatabase : RoomDatabase() {
         }
 
         /** Mini-app media bridge (plan `docs/plans/media-tools.md`): per-app opt-in, default off. */
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `wallpaper_routines` (`id` TEXT NOT NULL, `json` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))")
+            }
+        }
+
         val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE mini_apps ADD COLUMN mediaAllowed INTEGER NOT NULL DEFAULT 0")
@@ -129,7 +138,10 @@ abstract class MasalaDatabase : RoomDatabase() {
 
         fun create(context: Context): MasalaDatabase =
             Room.databaseBuilder(context, MasalaDatabase::class.java, "masala.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10).build()
+                .addMigrations(
+                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+                    MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
+                ).build()
     }
 }
 
@@ -168,6 +180,29 @@ data class WallpaperEntity(
     val style: String = "",
     val createdAt: Long,
 )
+
+/** One saved wallpaper routine: its JSON and when it last changed. */
+@Entity(tableName = "wallpaper_routines")
+data class WallpaperRoutineEntity(
+    @PrimaryKey val id: String,
+    val json: String,
+    val updatedAt: Long,
+)
+
+@Dao
+interface WallpaperRoutineDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(routine: WallpaperRoutineEntity)
+
+    @Query("SELECT * FROM wallpaper_routines ORDER BY updatedAt DESC")
+    suspend fun all(): List<WallpaperRoutineEntity>
+
+    @Query("SELECT * FROM wallpaper_routines ORDER BY updatedAt DESC")
+    fun watch(): Flow<List<WallpaperRoutineEntity>>
+
+    @Query("DELETE FROM wallpaper_routines WHERE id = :id")
+    suspend fun delete(id: String)
+}
 
 @Dao
 interface WallpaperDao {

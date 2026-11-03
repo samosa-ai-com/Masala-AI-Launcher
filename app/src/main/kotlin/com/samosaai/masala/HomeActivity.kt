@@ -161,6 +161,8 @@ class HomeActivity : ComponentActivity() {
         masala.videoPool.backgrounded = false
         // Rules are evaluated again on resume and then on the minute tick (plan Phase 2).
         masala.contextService.setHomeVisible(true)
+        // Back on home: a routine that became due while another app was open applies now.
+        runCatching { masala.wallpaperRoutineEngine.refresh("home") }
         isDefault = HomeRole.isDefault(this)
         // Shortcut access comes with being the default home app.
         masala.launcher.refreshShortcuts()
@@ -545,8 +547,24 @@ class HomeActivity : ComponentActivity() {
                 onFullscreen = { id -> this@HomeActivity.openStreamViewer(id) },
             )
         }
-        val widgetSource = remember(snapshot, mediaHost) {
-            com.samosaai.masala.ui.home.widgets.WidgetSource(snapshot = { snapshot }, store = widgetStore, onAction = ::run, streams = app.streamSources, media = mediaHost, http = app.httpValues, approved = { app.httpApproval.approved(it) })
+        // The Second Brain's own numbers: collected here so a widget showing them redraws when
+        // a note is added, without the renderer knowing what a Second Brain is.
+        val brainTitles by app.secondBrain.titles.collectAsStateWithLifecycle()
+        val brainFacts = remember(brainTitles) {
+            if (brainTitles.isEmpty()) emptyMap()
+            else mapOf("notes" to brainTitles.size.toString(), "latest" to brainTitles.last())
+        }
+        val widgetSource = remember(snapshot, mediaHost, brainFacts) {
+            com.samosaai.masala.ui.home.widgets.WidgetSource(
+                snapshot = { snapshot },
+                store = widgetStore,
+                onAction = ::run,
+                streams = app.streamSources,
+                media = mediaHost,
+                http = app.httpValues,
+                approved = { app.httpApproval.approved(it) },
+                extra = { brainFacts },
+            )
         }
         // The context below is remembered on purpose; drops read the live layout through these.
         val latestLayout = rememberUpdatedState(layout)
@@ -1239,6 +1257,18 @@ class HomeActivity : ComponentActivity() {
                     else toast(getString(R.string.widgets_added_on, app.layouts.pageLabel(placed.pageId ?: id)))
                     addWidgetSheet = false
                 } },
+                onCustomise = { id ->
+                    addWidgetSheet = false
+                    // Seed the chat instead of duplicating blind: the agent makes the user's own
+                    // version from the template, which is the whole point of Customize.
+                    val name = app.widgetLibrary.current()[id]?.title ?: id
+                    if (app.commands.openInput(getString(R.string.widgets_customize_prefill, name))) {
+                        chatOpen = true
+                        expanded = true
+                    } else {
+                        chatBusyToast()
+                    }
+                },
                 onDescribe = { addWidgetSheet = false; askMasala(getString(R.string.widgets_describe_prefill)) },
                 onManage = { addWidgetSheet = false; startActivity(Intent(this@HomeActivity, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_PAGE, "WIDGETS")) },
                 onSettings = { addWidgetSheet = false; openSettings() },

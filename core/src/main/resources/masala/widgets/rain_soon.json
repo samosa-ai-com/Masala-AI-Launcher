@@ -1,0 +1,33 @@
+{
+  "id": "rain_soon",
+  "name": "Rain soon",
+  "description": "Today's weather in one line, for the coat decision.",
+  "category": "Weather",
+  "widget": {
+    "id": "rain_soon",
+    "title": "Weather",
+    "components": [
+      {
+        "type": "text",
+        "text": "Today",
+        "style": {
+          "emphasis": "normal"
+        }
+      },
+      {
+        "type": "text",
+        "binding": {
+          "source": "weather"
+        },
+        "style": {
+          "emphasis": "large"
+        }
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 2,
+      "max": 3
+    }
+  }
+}

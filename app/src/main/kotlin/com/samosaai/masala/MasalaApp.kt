@@ -106,9 +106,37 @@ class MasalaApp : Application() {
     }
     /** Every generated widget's own values (counters, ticks); shared by home and the manager. */
     val widgetStates by lazy { com.samosaai.masala.widgets.WidgetStateStore(scope, database.widgetStates()) }
-    val widgetLibrary by lazy { com.samosaai.masala.widgets.WidgetLibrary(database.widgets(), database.widgetVersions()) }
+    val widgetLibrary by lazy {
+        com.samosaai.masala.widgets.WidgetLibrary(
+            database.widgets(),
+            database.widgetVersions(),
+            com.samosaai.masala.widgets.PrefsWidgetSeedStore(this),
+        )
+    }
     /** Generated wallpapers and their prompts (plan wallpaper-generation): the catalog. */
     val wallpapers by lazy { com.samosaai.masala.wallpapers.WallpaperStore(database.wallpapers(), java.io.File(filesDir, "wallpapers")) }
+
+    val wallpaperRoutines by lazy { com.samosaai.masala.wallpapers.WallpaperRoutineStore(database.wallpaperRoutines()) }
+
+    /** Applies routines on start, context changes, window boundaries and unlock. */
+    val wallpaperRoutineEngine by lazy {
+        com.samosaai.masala.wallpapers.WallpaperRoutineEngine(
+            context = this,
+            scope = scope,
+            store = wallpaperRoutines,
+            wallpapers = wallpapers,
+            tool = wallpaperTool,
+            snapshot = contextService.snapshot,
+        )
+    }
+
+    private val wallpaperRoutineTools by lazy {
+        com.samosaai.masala.wallpapers.WallpaperRoutineTools(
+            store = wallpaperRoutines,
+            refresh = { wallpaperRoutineEngine.refresh("saved") },
+            statusOf = { wallpaperRoutineEngine.status.value },
+        )
+    }
     val settings by lazy { SettingsStore(this) }
 
     /** Open-Meteo for the daily brief and the `weather` tool. */
@@ -235,6 +263,17 @@ class MasalaApp : Application() {
     }
 
     /** Scheduled tasks and Second Brain notes, linked both ways (plan `second-brain-robust.md`, S5). */
+    /**
+     * What Masala's own widgets show (plan `docs/plans/widget-gallery.md` §4): the Second Brain's
+     * size and its newest entry. Empty until there is something to say, so a widget can show its
+     * placeholder instead of a zero.
+     */
+    fun brainFacts(): Map<String, String> {
+        val titles = runCatching { secondBrain.titles.value }.getOrDefault(emptyList())
+        if (titles.isEmpty()) return emptyMap()
+        return mapOf("notes" to titles.size.toString(), "latest" to titles.last())
+    }
+
     val taskNoteLinks: TaskNoteLinks by lazy { TaskNoteLinks(scheduledTasks, secondBrain) }
 
     /** Models, keys and voice choices (Settings → Masala AI); every model call reads it. */
@@ -640,6 +679,9 @@ class MasalaApp : Application() {
         catalog.start()
 
         contextService = ContextService(this, scope, modes).also { it.start() }
+        // Routines watch the context; starting after the service means the first evaluation has
+        // a real snapshot (time, battery, weather) instead of defaults.
+        scope.launch { runCatching { wallpaperRoutineEngine.start() } }
         layouts = LayoutRepository(
             context = this,
             scope = scope,
@@ -664,6 +706,18 @@ class MasalaApp : Application() {
         MemoryTools.create(secondBrain).forEach(tools::register)
         tools.register(MemoryRawTool.create(this, secondBrain) { tools.fileAccess })
         tools.register(MemoryTools.linkTask(taskNoteLinks))
+        tools.register(
+            com.samosaai.masala.core.tool.FunctionTool(
+                com.samosaai.masala.tools.MasalaToolDefinitions.setWallpaperRoutine,
+                com.samosaai.masala.core.tool.ToolSensitivity.CHANGES_SOMETHING,
+            ) { wallpaperRoutineTools.set(it) },
+        )
+        tools.register(
+            com.samosaai.masala.core.tool.FunctionTool(
+                com.samosaai.masala.tools.MasalaToolDefinitions.wallpaperRoutineStatus,
+                com.samosaai.masala.core.tool.ToolSensitivity.READ_ONLY,
+            ) { wallpaperRoutineTools.status() },
+        )
         mcp.servers
         dispatcher = ActionDispatcher(this, actions, launcher, modes, confirmationGate, tools, { skills }, { toolExecutor(confirmationGate) }) { widgetId ->
             // A refresh tap only refetches hosts the user already approved at placement; anything

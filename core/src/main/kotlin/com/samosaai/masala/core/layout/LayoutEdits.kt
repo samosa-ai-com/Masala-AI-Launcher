@@ -347,6 +347,7 @@ object LayoutEdits {
             is WidgetComponent.Image -> 1.0
             is WidgetComponent.ListRows -> 3.0
             is WidgetComponent.Gauge -> 2.0
+            is WidgetComponent.Globe -> 3.0
             is WidgetComponent.Row -> component.children.maxOfOrNull(::component) ?: 0.0
             is WidgetComponent.Column -> component.children.sumOf(::component)
             is WidgetComponent.Video -> 4.0

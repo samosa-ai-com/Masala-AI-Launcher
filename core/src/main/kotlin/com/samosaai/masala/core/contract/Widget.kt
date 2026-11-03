@@ -58,6 +58,9 @@ enum class BindingSource {
     @SerialName("http") HTTP,
     @SerialName("stream_status") STREAM_STATUS,
     @SerialName("skill_result") SKILL_RESULT,
+
+    /** Masala's own knowledge base: `notes` (count), `latest` (title). Filled by the app. */
+    @SerialName("second_brain") SECOND_BRAIN,
 }
 
 /**
@@ -131,7 +134,13 @@ sealed interface WidgetComponent {
 
     @Serializable
     @SerialName("timer")
-    data class Timer(val key: String, val label: String, val seconds: Int) : WidgetComponent
+    data class Timer(
+        val key: String,
+        val label: String,
+        val seconds: Int,
+        /** Rings when it reaches zero (a Pomodoro's break), while the card is on screen. */
+        val sound: Boolean = false,
+    ) : WidgetComponent
 
     @Serializable
     @SerialName("progress")
@@ -165,6 +174,16 @@ sealed interface WidgetComponent {
     @Serializable
     @SerialName("gauge")
     data class Gauge(val label: String, val binding: Binding, val max: Double, val style: WidgetStyle? = null) :
+        WidgetComponent
+
+    /**
+     * A slowly turning wireframe globe with an optional value in its middle (plan
+     * `docs/plans/widget-gallery.md` §4). Decoration, but useful decoration: battery, steps or a
+     * count read as a live instrument. One per widget.
+     */
+    @Serializable
+    @SerialName("globe")
+    data class Globe(val label: String? = null, val binding: Binding? = null, val style: WidgetStyle? = null) :
         WidgetComponent
 
     /** Side by side. Rows and columns nest at most two deep. */

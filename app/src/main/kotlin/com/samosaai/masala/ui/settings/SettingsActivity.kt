@@ -50,6 +50,8 @@ import com.samosaai.masala.ui.home.widgets.WidgetCard
 import com.samosaai.masala.ui.home.widgets.WidgetSource
 import com.samosaai.masala.layout.LayoutTransfer
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -210,7 +212,11 @@ class SettingsActivity : ComponentActivity() {
                         Page.ABOUT -> AboutPage(onBack = { page = Page.MAIN })
                         Page.BRIEF -> BriefPage(settings, update = { change -> lifecycleScope.launch { masala.settings.update(change) } }, onBack = { page = Page.MAIN })
                         Page.WIDGETS -> WidgetsPage(onBack = { page = Page.MAIN })
-                        Page.WALLPAPERS -> WallpapersPage(onBack = { page = Page.MAIN }, onGenerateWithAI = { askInChat(getString(R.string.wallpaper_generate_prefill)) })
+                        Page.WALLPAPERS -> WallpapersPage(
+                            onBack = { page = Page.MAIN },
+                            onGenerateWithAI = { askInChat(getString(R.string.wallpaper_generate_prefill)) },
+                            onAskForRoutine = { askInChat(getString(R.string.wallpaper_routines_prefill)) },
+                        )
                     } }
                 }
             }
@@ -450,13 +456,45 @@ class SettingsActivity : ComponentActivity() {
             }
             val mine = tab == 0
             var filter by rememberSaveable { mutableStateOf("") }
-            val rows = remember(entries, mine, filter) {
+            var shelf by rememberSaveable { mutableStateOf<String?>(null) }
+            val shelves = remember(entries, mine, templatesByWidgetId) {
+                if (mine) emptyList()
+                else com.samosaai.masala.core.widgets.WidgetTemplates.categories.filter { category ->
+                    entries.any { (it.createdBy == "template") && templatesByWidgetId[it.spec.id]?.category == category }
+                }
+            }
+            val rows = remember(entries, mine, filter, shelf, templatesByWidgetId) {
                 val q = filter.trim().lowercase()
+                val template = templatesByWidgetId
                 entries.filter { (it.createdBy != "template") == mine }
-                    .filter { q.isEmpty() || it.spec.id.lowercase().contains(q) || (it.spec.title?.lowercase()?.contains(q) == true) }
+                    .filter { shelf == null || template[it.spec.id]?.category == shelf }
+                    .filter {
+                        q.isEmpty() || it.spec.id.lowercase().contains(q) ||
+                            (it.spec.title?.lowercase()?.contains(q) == true) ||
+                            (template[it.spec.id]?.name?.lowercase()?.contains(q) == true) ||
+                            (template[it.spec.id]?.description?.lowercase()?.contains(q) == true)
+                    }
             }
             if (entries.any { (it.createdBy != "template") == mine } && (rows.size > 5 || filter.isNotEmpty())) {
                 ListSearchField(filter, { filter = it }, stringResource(R.string.widgets_filter))
+            }
+            if (shelves.size > 1) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    item {
+                        androidx.compose.material3.FilterChip(
+                            selected = shelf == null,
+                            onClick = { shelf = null },
+                            label = { Text(stringResource(R.string.widgets_all)) },
+                        )
+                    }
+                    items(shelves) { category ->
+                        androidx.compose.material3.FilterChip(
+                            selected = shelf == category,
+                            onClick = { shelf = if (shelf == category) null else category },
+                            label = { Text(category) },
+                        )
+                    }
+                }
             }
             if (rows.isEmpty()) {
                 Text(

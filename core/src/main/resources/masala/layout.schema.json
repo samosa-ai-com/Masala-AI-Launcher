@@ -1134,7 +1134,8 @@
             "urgent_count",
             "http",
             "stream_status",
-            "skill_result"
+            "skill_result",
+            "second_brain"
           ]
         },
         "key": {
@@ -1242,6 +1243,9 @@
             "seconds": {
               "type": "integer",
               "minimum": 1
+            },
+            "sound": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false,
@@ -1497,6 +1501,27 @@
             "type",
             "label",
             "http"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "globe"
+            },
+            "label": {
+              "type": "string"
+            },
+            "binding": {
+              "$ref": "#/$defs/Binding"
+            },
+            "style": {
+              "$ref": "#/$defs/WidgetStyle"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
           ]
         }
       ]
