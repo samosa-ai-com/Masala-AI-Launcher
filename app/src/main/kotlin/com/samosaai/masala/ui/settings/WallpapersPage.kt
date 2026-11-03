@@ -208,11 +208,8 @@ fun WallpapersPage(
             onSet = { target ->
                 pickedGenerated = null
                 scope.launch {
-                    val result = app.wallpaperTool.setWallpaper(w.file.absolutePath, target)
-                    // A picked wallpaper is the user's choice: let the next routine trigger
-                    // re-decide instead of treating the previous rule as still applied.
-                    if (result.success) app.wallpaperRoutineEngine.forgetApplied()
-                    toast(result.message)
+                    // The tool clears a routine's applied marker on any manual set.
+                    toast(app.wallpaperTool.setWallpaper(w.file.absolutePath, target).message)
                 }
             },
             onExtra = {
@@ -248,9 +245,7 @@ fun WallpapersPage(
                     if (f == null) {
                         toast(saveFailedText)
                     } else {
-                        val result = app.wallpaperTool.setWallpaper(f.absolutePath, target)
-                        if (result.success) app.wallpaperRoutineEngine.forgetApplied()
-                        toast(result.message)
+                        toast(app.wallpaperTool.setWallpaper(f.absolutePath, target).message)
                     }
                 }
             },
@@ -275,9 +270,7 @@ fun WallpapersPage(
             onSet = { target ->
                 pickedDeviceUri = null
                 scope.launch {
-                    val result = app.wallpaperTool.setWallpaper(uri.toString(), target)
-                    if (result.success) app.wallpaperRoutineEngine.forgetApplied()
-                    toast(result.message)
+                    toast(app.wallpaperTool.setWallpaper(uri.toString(), target).message)
                 }
             },
             onExtra = {},

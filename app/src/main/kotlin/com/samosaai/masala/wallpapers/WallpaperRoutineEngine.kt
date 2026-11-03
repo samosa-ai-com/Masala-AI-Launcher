@@ -134,7 +134,7 @@ class WallpaperRoutineEngine(
             )
             return@withLock
         }
-        val result = runCatching { tool.setWallpaper(target, "home") }
+        val result = runCatching { tool.setWallpaper(target, "home", manual = false) }
             .getOrElse { ActionResult.error(it.message ?: "Couldn't set the wallpaper") }
         if (!result.success) {
             _status.value = Status(

@@ -699,6 +699,9 @@ class MasalaApp : Application() {
         // Routines watch the context; starting after the service means the first evaluation has
         // a real snapshot (time, battery, weather) instead of defaults.
         scope.launch { runCatching { wallpaperRoutineEngine.start() } }
+        // Every manual set (a chat card, the wallpapers page, set_wallpaper) releases the last
+        // routine decision, so the next trigger re-decides instead of keeping the manual pick.
+        wallpaperTool.onManualSet = { wallpaperRoutineEngine.forgetApplied() }
         layouts = LayoutRepository(
             context = this,
             scope = scope,
