@@ -64,6 +64,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -186,7 +187,14 @@ fun ChatSurface(
                 .workingGlow(listening || paused, thinking, level, tokens.accent)
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                 .background(Color(0xFF15171E))
-                .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
+                .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                // The sheet consumes its own taps. Without this, a tap on the padding, an empty
+                // thread area or the gap above the composer fell through to the scrim behind and
+                // closed the chat — the scrim is only for taps outside the panel.
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                ) { },
         ) {
             Column(Modifier.fillMaxSize()) {
                 Header(
@@ -730,6 +738,38 @@ private fun WallpaperPreview(result: ChatResult, app: com.samosaai.masala.Masala
     }
 }
 
+/** The photos that rode with a user message, decoded from the files the send wrote. */
+@Composable
+private fun AttachmentThumbnails(paths: List<String>) {
+    val shown = paths.take(3)
+    val loaded = remember(shown) { mutableStateMapOf<String, androidx.compose.ui.graphics.ImageBitmap>() }
+    shown.forEach { path ->
+        LaunchedEffect(path) {
+            if (loaded[path] == null) {
+                val bitmap = withContext(Dispatchers.IO) {
+                    android.graphics.BitmapFactory.decodeFile(path)?.asImageBitmap()
+                }
+                if (bitmap != null) loaded[path] = bitmap
+            }
+        }
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(bottom = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        shown.forEach { path ->
+            loaded[path]?.let { bitmap ->
+                androidx.compose.foundation.Image(
+                    bitmap,
+                    contentDescription = null,
+                    modifier = Modifier.size(132.dp).clip(RoundedCornerShape(10.dp)),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                )
+            }
+        }
+    }
+}
+
 /** A generated/segmented image: sampled preview with gallery Save. */
 @Composable
 private fun GeneratedPreview(result: ChatResult, app: com.samosaai.masala.MasalaApp) {
@@ -920,6 +960,9 @@ private fun Bubble(
                 // lands, so render it, not the raw pipes and hashes. The user's own words stay plain
                 // text on the accent tile.
                 if (user) {
+                    // The photos that rode with this message: the turn used to show only the
+                    // text, so a send with an image looked like the image had been dropped.
+                    if (turn.attachmentPaths.isNotEmpty()) AttachmentThumbnails(turn.attachmentPaths)
                     Text(
                         turn.text,
                         style = MaterialTheme.typography.bodyMedium,

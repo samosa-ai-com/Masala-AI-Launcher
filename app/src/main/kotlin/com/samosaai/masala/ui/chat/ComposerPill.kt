@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
@@ -110,8 +109,9 @@ fun ComposerPill(
                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
                     cursorBrush = SolidColor(tokens.accent),
                     maxLines = 5,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { if (canSend) onSend() }),
+                    // Enter starts a new line, not a send: the pill has a send button, and a
+                    // multi-line message is normal here (ImeAction.Send made newlines impossible).
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
                     decorationBox = { field ->
                         Box {
                             if (value.text.isEmpty()) Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = tokens.textMedium)

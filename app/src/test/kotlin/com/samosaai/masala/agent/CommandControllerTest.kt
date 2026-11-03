@@ -590,6 +590,17 @@ class CommandControllerTest {
         assertIs<CommandState.Idle>(c.state.value)
     }
 
+    @Test fun textWithImageSendsBoth() = runBlocking<Unit> {
+        replies += reply("A red bicycle on a street.")
+        val c = controller()
+        c.ask("what is this?", images = listOf("QUJD"))
+        c.settled()
+        val sent = requests.flatten().last().content.toString()
+        assertTrue(sent.contains("what is this?"), "prompt missing from the vision message: $sent")
+        assertTrue(sent.contains("image_url"), "vision part missing when text is present: $sent")
+        assertTrue(sent.contains("data:image/jpeg;base64,QUJD"), "image bytes missing: $sent")
+    }
+
     @Test fun imageAskSendsVisionPartsWithPlaceholderTurn() = runBlocking<Unit> {
         replies += reply("A red bicycle.")
         val c = controller()
