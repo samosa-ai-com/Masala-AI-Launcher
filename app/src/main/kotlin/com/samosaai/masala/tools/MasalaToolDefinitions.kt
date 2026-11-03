@@ -196,6 +196,8 @@ object MasalaToolDefinitions {
             "noun phrase like 'red bicycle'. Returns an annotated MP4 (sampled frames with the " +
             "object's masks/boxes burned in) plus the full frame-to-boxes list in a JSON file " +
             "(a contact-sheet PNG only if video encoding fails). " +
+            "Clips must be 30 seconds or less and under 12 MB; for anything longer, trim or split " +
+            "it first with media_edit. Rendering is per frame, so a long clip takes minutes. " +
             "max_frames (default 8, max 16) is only a hint — the API samples its own frames. " +
             "For a still image use segment_image instead.",
         schema {

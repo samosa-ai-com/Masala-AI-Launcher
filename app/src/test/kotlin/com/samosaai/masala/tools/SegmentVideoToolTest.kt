@@ -169,17 +169,37 @@ class SegmentVideoToolTest {
     }
 
     @Test
-    fun `encodePlan keeps every frame slot so the clip keeps its timeline`() {
+    fun `a clip over the limit is refused with advice`() {
+        assertNull(SamShared.clipTooLong(30_000))
+        val why = SamShared.clipTooLong(48_000)
+        assertNotNull(why)
+        assertTrue(why.contains("48s"), why)
+        assertTrue(why.contains("Trim"), why)
+    }
+
+    @Test
+    fun `render fps stays inside the cap and the usable range`() {
+        // A 7 s clip: 150 frames allows 21 fps, clamped to the 15 fps ceiling.
+        assertEquals(15, SamShared.renderFps(7_000))
+        // A 30 s clip: 150 frames is 5 fps.
+        assertEquals(5, SamShared.renderFps(30_000))
+        // Unknown duration: the ceiling rather than a divide by zero.
+        assertEquals(15, SamShared.renderFps(0))
+    }
+
+    @Test
+    fun `render slots cover the clip and keep undetected moments`() {
         val frames = SamShared.parseVideoRecords(
             "<0f>0<|box;x1=80;y1=120;x2=240;y2=180;w=320;h=240|><|mask;x=0;y=0;data=61,161,~abc|>" +
                 "<1f>" +
                 "<2f>0<|box;x1=90;y1=130;x2=250;y2=190;w=320;h=240|>",
         )
-        val plan = SamShared.encodePlan(frames)
-        // The skipped frame is still a slot: dropping it would compress the video into a montage.
-        assertEquals(listOf(0, 1, 2), plan.map { it.frame })
-        assertFalse(plan[1].hasDetections())
-        assertTrue(plan[0].hasDetections())
-        assertTrue(SamShared.encodePlan(emptyList()).isEmpty())
+        val fps = SamShared.renderFps(2_000)
+        val slots = SamShared.renderSlots(frames, 2_000, fps)
+        // ~2 s at 15 fps, and a frame the API reported with no detections is still rendered.
+        assertTrue(slots.size in 28..30, "slots=${slots.size}")
+        assertTrue(slots.any { it != null && !it.hasDetections() }, "the undetected moment should still be a slot")
+        assertTrue(slots.any { it != null && it.hasDetections() })
+        assertTrue(SamShared.renderSlots(emptyList(), 2_000, fps).isEmpty())
     }
 }

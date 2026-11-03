@@ -58,6 +58,8 @@ class SegmentVideoTool(
             SamShared.checkVideoSize(file.length())?.let { return@withContext ActionResult.error(it) }
             // One probe frame first, so an unreadable video fails before the network call.
             val durationMs = readDurationMs(file)
+            // A long clip is minutes of work at one frame at a time: say so before starting.
+            SamShared.clipTooLong(durationMs)?.let { return@withContext ActionResult.error(it) }
             if (durationMs <= 0 && !probeFrame(file, 0L)) {
                 return@withContext ActionResult.error(
                     "Couldn't read any frames from '${file.name}'. It may be corrupt or DRM-protected.",
@@ -84,15 +86,14 @@ class SegmentVideoTool(
             val jsonFile = File(dir, "segment-video-$stamp.json")
             jsonFile.writeText(SamShared.framesJson(hits).take(200_000))
             val recordFrames = SamShared.parseVideoRecords(text)
-            val plan = SamShared.encodePlan(recordFrames)
             val maskTotal = recordFrames.sumOf { it.records.size }
             // The annotated clip is the result; the contact sheet survives only
             // as the fallback when encoding fails (it was a stand-in).
             var videoPath: String? = null
             var stats: OverlayStats? = null
             var encodeNote: String? = null
-            if (plan.isNotEmpty()) {
-                runCatching { encodeOverlay(file, durationMs, recordFrames, plan, dir, stamp) }
+            if (recordFrames.isNotEmpty()) {
+                runCatching { encodeOverlay(file, durationMs, recordFrames, dir, stamp) }
                     .onSuccess { (path, s) -> videoPath = path; stats = s }
                     .onFailure { encodeNote = it.message?.take(160) }
             }
@@ -194,11 +195,10 @@ class SegmentVideoTool(
         file: File,
         durationMs: Long,
         all: List<SamShared.VideoRecordFrame>,
-        plan: List<SamShared.VideoRecordFrame>,
         dir: File,
         stamp: Long,
     ): Pair<String, OverlayStats> {
-        require(plan.isNotEmpty()) { "no frames with detections to encode" }
+        require(all.isNotEmpty()) { "no frames with detections to encode" }
         val out = File(dir, "segment-video-$stamp.mp4")
         val retriever = MediaMetadataRetriever()
         var encoder: MediaCodec? = null
@@ -212,7 +212,10 @@ class SegmentVideoTool(
             ) ?: throw IllegalStateException("couldn't decode a source frame")
             val (outW, outH) = SamShared.overlaySize(probe.width, probe.height)
             if (!probe.isRecycled()) probe.recycle()
-            val fps = SamShared.overlayFps(all.size, durationMs)
+            // A fixed grid at a bounded rate: the API may return hundreds of frames, and the
+            // clip must still play at its own pace (see SamShared.renderSlots).
+            val fps = SamShared.renderFps(durationMs)
+            val slots = SamShared.renderSlots(all, durationMs, fps)
             val mime = MediaFormat.MIMETYPE_VIDEO_AVC
             // Name and format from the same probe: creating by mime can pick a different encoder
             // that doesn't accept the format we configured.
@@ -272,12 +275,14 @@ class SegmentVideoTool(
             }
             var encoded = 0
             var skipped = 0
-            val slotCount = plan.size
-            for (rec in plan) {
-                // Cancellation point: a 10 s clip at 10 fps is ~100 quick frames.
+            val slotCount = slots.size
+            if (slotCount == 0) throw IllegalStateException("no frames to render")
+            for ((slot, rec) in slots.withIndex()) {
+                // Cancellation point: a few dozen frames now, not one per API sample.
                 yield()
+                val slotTimeUs = slot * 1_000_000L / fps
                 val src = retriever.getFrameAtTime(
-                    sourceTimeUs(rec.frame, slotCount, durationMs),
+                    slotTimeUs,
                     MediaMetadataRetriever.OPTION_CLOSEST,
                 )
                 if (src == null) {
@@ -286,7 +291,8 @@ class SegmentVideoTool(
                 }
                 try {
                     // No detection on this slot: the real frame still goes in, unannotated.
-                    val composed = composeFrame(src, rec, outW, outH)
+                    val composed = rec?.let { composeFrame(src, it, outW, outH) }
+                        ?: scaleFrame(src, outW, outH)
                     val pixels = IntArray(outW * outH)
                     try {
                         composed.getPixels(pixels, 0, outW, 0, 0, outW, outH)
@@ -303,8 +309,8 @@ class SegmentVideoTool(
                                 ?: throw IllegalStateException("encoder input buffer gone")
                             ib.clear()
                             ib.put(yuv)
-                            // The slot's own timestamp: skipped frames must not squeeze the timeline.
-                            enc.queueInputBuffer(inIdx, 0, yuv.size, rec.frame * 1_000_000L / fps, 0)
+                            // The slot's own timestamp, so the clip keeps its real duration.
+                            enc.queueInputBuffer(inIdx, 0, yuv.size, slotTimeUs, 0)
                             fed = true
                             break
                         }
@@ -400,6 +406,16 @@ class SegmentVideoTool(
      * red box. The caller recycles [src]; the returned bitmap is mutable and
      * owned by the caller.
      */
+    /** The source frame at the output size, mutable ARGB, with nothing drawn on it. */
+    private fun scaleFrame(src: Bitmap, outW: Int, outH: Int): Bitmap {
+        val scaled = Bitmap.createScaledBitmap(src, outW, outH, true)
+        if (scaled.config == Bitmap.Config.ARGB_8888 && scaled.isMutable) return scaled
+        val copy = scaled.copy(Bitmap.Config.ARGB_8888, true)
+            ?: throw IllegalStateException("couldn't copy a video frame")
+        if (!scaled.isRecycled()) scaled.recycle()
+        return copy
+    }
+
     private fun composeFrame(
         src: Bitmap,
         rec: SamShared.VideoRecordFrame,

@@ -220,6 +220,53 @@ internal object SamShared {
     fun videoFrameTimesMs(frameCount: Int, durationMs: Long): List<Long> =
         contactTimesMs(durationMs, frameCount)
 
+    /** Clips longer than this are refused with advice: annotating one frame at a time is slow. */
+    const val MAX_CLIP_SECONDS = 30
+
+    /**
+     * Frames the annotated clip renders at most. The API can return hundreds of frames for a
+     * short clip (60 fps source), and rendering all of them is minutes of work for a result that
+     * can't play faster than 15 fps anyway; 150 frames is 10 s at 15 fps or 30 s at 5 fps.
+     */
+    const val MAX_RENDER_FRAMES = 150
+
+    /** Why a clip was refused, or null when it fits the cap. */
+    fun clipTooLong(durationMs: Long): String? {
+        if (durationMs <= MAX_CLIP_SECONDS * 1000L) return null
+        val seconds = (durationMs + 500) / 1000
+        return "That clip is ${seconds}s. Annotating is rendered frame by frame, so clips are " +
+            "limited to ${MAX_CLIP_SECONDS}s. Trim it with media_edit, or split it into parts and " +
+            "segment them one at a time."
+    }
+
+    /**
+     * Playback rate for the annotated clip: fast enough to keep motion, capped by how many frames
+     * [MAX_RENDER_FRAMES] allows over the clip, so a 7 s clip plays at 15 fps and a 30 s one at 5.
+     */
+    fun renderFps(durationMs: Long): Int {
+        if (durationMs <= 0) return MAX_OVERLAY_FPS
+        val seconds = (durationMs / 1000.0).coerceAtLeast(0.1)
+        return (MAX_RENDER_FRAMES / seconds).toInt().coerceIn(MIN_OVERLAY_FPS, MAX_OVERLAY_FPS)
+    }
+
+    /**
+     * One entry per rendered frame: the API frame nearest that moment, or null when the object
+     * was not visible then (the source frame still goes in, unannotated). Rendering a fixed grid
+     * over the clip's own timeline is what keeps the result the real video instead of a montage,
+     * and keeps the duration right whatever rate the API sampled at.
+     */
+    fun renderSlots(frames: List<VideoRecordFrame>, durationMs: Long, fps: Int): List<VideoRecordFrame?> {
+        if (frames.isEmpty() || durationMs <= 0 || fps <= 0) return emptyList()
+        val count = ((durationMs * fps + 999) / 1000).toInt().coerceAtMost(MAX_RENDER_FRAMES)
+        val times = videoFrameTimesMs(frames.size, durationMs)
+        val byFrame = frames.associateBy { it.frame }
+        val slotTimes = (0 until count).map { it * 1000L / fps }
+        return slotTimes.map { t ->
+            val nearest = times.indices.minByOrNull { kotlin.math.abs(times[it] - t) } ?: return@map null
+            byFrame[frames[nearest].frame]
+        }
+    }
+
     /**
      * Output frame rate for the annotated clip: the API's sampled rate
      * (`apiFrames` over the clip duration), clamped to 5–15 fps so a sparse
@@ -244,19 +291,6 @@ internal object SamShared {
         val w = ((srcW * s).toInt().coerceAtLeast(2) / 2) * 2
         val h = ((srcH * s).toInt().coerceAtLeast(2) / 2) * 2
         return Pair(w, h)
-    }
-
-    /**
-     * The clip's frames in order, one per slot from 0 to the last frame the API reported.
-     * Frames the API skipped (no object visible) are kept as empty records: the annotated clip
-     * has to keep the source's timeline and show the real footage between detections, or the
-     * result plays as a sped-up montage of the detected frames instead of the video.
-     */
-    fun encodePlan(frames: List<VideoRecordFrame>): List<VideoRecordFrame> {
-        if (frames.isEmpty()) return emptyList()
-        val byFrame = frames.associateBy { it.frame }
-        val last = frames.maxOf { it.frame }
-        return (0..last).map { byFrame[it] ?: VideoRecordFrame(it, emptyList(), emptyList()) }
     }
 
     /** Scales one model-space box onto a decoded frame of [dstW]×[dstH]. */
