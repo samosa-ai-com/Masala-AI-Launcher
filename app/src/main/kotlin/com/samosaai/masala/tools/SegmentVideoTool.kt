@@ -65,9 +65,17 @@ class SegmentVideoTool(
             SamShared.checkVideoSize(file.length())?.let { return@withContext ActionResult.error(it) }
             // One probe frame first, so an unreadable video fails before the network call.
             val durationMs = readDurationMs(file)
+            // Without a duration neither the cap nor the render timeline is known: reading it
+            // wrong would either skip the limit or produce an empty clip, so stop here.
+            if (durationMs <= 0) {
+                return@withContext ActionResult.error(
+                    "Couldn't read how long that clip is. Re-save or re-encode it (media_edit " +
+                        "with operation copy) and try again.",
+                )
+            }
             // A long clip is minutes of work at one frame at a time: say so before starting.
             SamShared.clipTooLong(durationMs)?.let { return@withContext ActionResult.error(it) }
-            if (durationMs <= 0 && !probeFrame(file, 0L)) {
+            if (!probeFrame(file, 0L)) {
                 return@withContext ActionResult.error(
                     "Couldn't read any frames from '${file.name}'. It may be corrupt or DRM-protected.",
                 )
@@ -232,7 +240,7 @@ class SegmentVideoTool(
             val mime = MediaFormat.MIMETYPE_VIDEO_AVC
             // Name and format from the same probe: creating by mime can pick a different encoder
             // that doesn't accept the format we configured.
-            val (codecName, color) = pickEncoder(mime)
+            val (codecName, color) = pickEncoder(mime, outW, outH)
             val format = MediaFormat.createVideoFormat(mime, outW, outH).apply {
                 setInteger(MediaFormat.KEY_COLOR_FORMAT, color)
                 setInteger(
@@ -293,6 +301,29 @@ class SegmentVideoTool(
             var skipped = 0
             val slotCount = slots.size
             if (slotCount == 0) throw IllegalStateException("no frames to render")
+            var lastPixels: IntArray? = null
+            // Queue one composed frame; shared by the normal path and the carried one.
+            fun feed(pixels: IntArray, ptsUs: Long) {
+                val yuv = argbToYuv420(pixels, outW, outH, semiPlanar)
+                var fed = false
+                var tries = 0
+                while (!fed && tries++ < 3) {
+                    val inIdx = enc.dequeueInputBuffer(10_000)
+                    if (inIdx >= 0) {
+                        val ib = enc.getInputBuffer(inIdx)
+                            ?: throw IllegalStateException("encoder input buffer gone")
+                        ib.clear()
+                        ib.put(yuv)
+                        // The slot's own timestamp, so the clip keeps its real duration.
+                        enc.queueInputBuffer(inIdx, 0, yuv.size, ptsUs, 0)
+                        fed = true
+                        break
+                    }
+                    drain(false)
+                }
+                if (!fed) throw IllegalStateException("encoder stalled")
+                drain(false)
+            }
             for ((slot, rec) in slots.withIndex()) {
                 // Cancellation point: a few dozen frames now, not one per API sample.
                 yield()
@@ -302,7 +333,15 @@ class SegmentVideoTool(
                     MediaMetadataRetriever.OPTION_CLOSEST,
                 )
                 if (src == null) {
-                    skipped++
+                    // Repeat what was last encoded rather than dropping the slot: a gap at the
+                    // end would end the file before the clip does.
+                    val carried = lastPixels
+                    if (carried == null) {
+                        skipped++
+                        continue
+                    }
+                    feed(carried, slotTimeUs)
+                    encoded++
                     continue
                 }
                 try {
@@ -315,25 +354,8 @@ class SegmentVideoTool(
                     } finally {
                         if (!composed.isRecycled()) composed.recycle()
                     }
-                    val yuv = argbToYuv420(pixels, outW, outH, semiPlanar)
-                    var fed = false
-                    var tries = 0
-                    while (!fed && tries++ < 3) {
-                        val inIdx = enc.dequeueInputBuffer(10_000)
-                        if (inIdx >= 0) {
-                            val ib = enc.getInputBuffer(inIdx)
-                                ?: throw IllegalStateException("encoder input buffer gone")
-                            ib.clear()
-                            ib.put(yuv)
-                            // The slot's own timestamp, so the clip keeps its real duration.
-                            enc.queueInputBuffer(inIdx, 0, yuv.size, slotTimeUs, 0)
-                            fed = true
-                            break
-                        }
-                        drain(false)
-                    }
-                    if (!fed) throw IllegalStateException("encoder stalled")
-                    drain(false)
+                    lastPixels = pixels
+                    feed(pixels, slotTimeUs)
                     encoded++
                 } finally {
                     if (!src.isRecycled()) src.recycle()
@@ -392,10 +414,11 @@ class SegmentVideoTool(
 
     /** Picks an explicit YUV420 input color both the encoder and we can write. */
     /** The encoder to use and a colour format it accepts, chosen together (see the caller). */
-    private fun pickEncoder(mime: String): Pair<String, Int> {
+    private fun pickEncoder(mime: String, width: Int, height: Int): Pair<String, Int> {
+        // Probe at the size the render will use: a codec that accepts 720x720 may refuse 1080.
         val name = runCatching {
             MediaCodecList(MediaCodecList.REGULAR_CODECS)
-                .findEncoderForFormat(MediaFormat.createVideoFormat(mime, 720, 720))
+                .findEncoderForFormat(MediaFormat.createVideoFormat(mime, width, height))
         }.getOrNull() ?: throw IllegalStateException("no usable $mime encoder on this device")
         val probe = runCatching { MediaCodec.createByCodecName(name) }.getOrNull()
             ?: throw IllegalStateException("no usable $mime encoder on this device")
