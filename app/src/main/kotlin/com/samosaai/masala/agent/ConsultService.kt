@@ -211,7 +211,11 @@ class ConsultService(
     private fun oneLine(text: String) = text.replace('\n', ' ').replace(Regex("\\s+"), " ").trim().take(60)
 
     companion object {
-        /** Long enough for a slow model, short enough that a stuck expert can't hold the turn. */
-        const val TIMEOUT_MS = 90_000L
+        /**
+         * Long enough for a slow model, short enough that a stuck expert can't hold the turn. An app
+         * build writes a whole single-file app in one model call; at 90 s the first software-engineer
+         * consult timed out on every build on the phone, and the retry rebuilt it from scratch.
+         */
+        const val TIMEOUT_MS = 180_000L
     }
 }
