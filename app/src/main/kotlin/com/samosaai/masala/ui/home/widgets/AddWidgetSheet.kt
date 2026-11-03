@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -101,12 +102,29 @@ fun AddWidgetSheet(
     // A new search or shelf starts at the first result: the sheet keeps its scroll position, so
     // without this the best match could open above the fold.
     LaunchedEffect(query, category) { listState.scrollToItem(0) }
+    // At the top, finger-down leaves nothing for the list to consume, and the sheet reads it as
+    // "drag me closed". Swallow that remainder so scrolling never dismisses the panel.
+    val listGuard = remember {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: androidx.compose.ui.geometry.Offset,
+                available: androidx.compose.ui.geometry.Offset,
+                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
+            ): androidx.compose.ui.geometry.Offset =
+                if (available.y > 0f && !listState.canScrollBackward) {
+                    androidx.compose.ui.geometry.Offset(0f, available.y)
+                } else {
+                    androidx.compose.ui.geometry.Offset.Zero
+                }
+        }
+    }
+    // Swipe-down-to-close stays. What is stopped is the *list* handing its downward overscroll to
+    // the sheet: at the top of the gallery, a normal scroll used to start closing the panel. A drag
+    // on the header or handle still closes it, deliberately.
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        // Scrolling the gallery used to drag the sheet and a small downward flick dismissed it.
-        // The sheet closes by the scrim, Back, or the actions — never by a scroll gesture.
-        sheetGesturesEnabled = false,
+        sheetState = sheetState,
     ) {
         Column(
             Modifier.fillMaxWidth().fillMaxHeight(0.92f).padding(horizontal = 16.dp, vertical = 8.dp),
@@ -161,7 +179,7 @@ fun AddWidgetSheet(
             }
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxWidth().weight(1f),
+                modifier = Modifier.fillMaxWidth().weight(1f).nestedScroll(listGuard),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 items(shown, key = { it.spec.id }) { (spec, _) ->
