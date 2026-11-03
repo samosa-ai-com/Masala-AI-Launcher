@@ -38,5 +38,11 @@ object PocketCatalog {
         parse(context.assets.open(CATALOG).bufferedReader().use { it.readText() })
     }.getOrDefault(emptyList())
 
+    @Volatile private var cache: List<PocketApp>? = null
+
+    /** [load], memoized for the process: the viewer resolves a bundled id without re-parsing. */
+    fun cached(context: Context): List<PocketApp> =
+        cache ?: load(context.applicationContext).also { cache = it }
+
     const val CATALOG = "miniapps/catalog.json"
 }

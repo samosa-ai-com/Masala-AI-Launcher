@@ -128,7 +128,7 @@ fun MiniAppView(
  * connections (from the page or its workers), and `shouldOverrideUrlLoading` never sees a form POST.
  * Everything else stays allowed so the app runs as written.
  */
-private const val OFFLINE_CSP =
+internal const val miniAppOfflineCsp =
     "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' data: blob:; form-action 'self'"
 
 /**
@@ -141,7 +141,7 @@ private const val OFFLINE_CSP =
  * The builtins it calls later are captured first, so an app that replaces `forEach`, `apply` or
  * `defineProperty` can't switch it off. `MiniAppNetworkTest` tries each way around this.
  */
-private const val NO_WEBRTC = """
+internal const val miniAppNoWebRtc = """
 (function () {
   var NAMES = ['RTCPeerConnection', 'webkitRTCPeerConnection'];
   var define = Object.defineProperty, describe = Object.getOwnPropertyDescriptor, call = Reflect.apply;
@@ -226,16 +226,16 @@ internal fun hostMiniApp(
     if (!networkAllowed) {
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             // Every frame: this WebView only ever shows this one app.
-            WebViewCompat.addDocumentStartJavaScript(wv, NO_WEBRTC, setOf("*"))
+            WebViewCompat.addDocumentStartJavaScript(wv, miniAppNoWebRtc, setOf("*"))
         } else {
             // Older WebView: the main frame only, before any of the app's own script. After the
             // doctype, or the page would render in quirks mode.
             val doctype = Regex("^\\s*<!doctype[^>]*>", RegexOption.IGNORE_CASE).find(html)?.value.orEmpty()
-            document = "$doctype<script>$NO_WEBRTC</script>${html.substring(doctype.length)}"
+            document = "$doctype<script>$miniAppNoWebRtc</script>${html.substring(doctype.length)}"
         }
     }
     val htmlBytes = document.toByteArray(Charsets.UTF_8)
-    val headers = if (networkAllowed) emptyMap() else mapOf("Content-Security-Policy" to OFFLINE_CSP)
+    val headers = if (networkAllowed) emptyMap() else mapOf("Content-Security-Policy" to miniAppOfflineCsp)
     wv.webViewClient = object : WebViewClient() {
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
             val url = request.url.toString()
@@ -313,7 +313,7 @@ object MiniAppConsole {
 }
 
 @SuppressLint("SetJavaScriptEnabled")
-private fun applyMiniAppSettings(wv: WebView, networkAllowed: Boolean) {
+internal fun applyMiniAppSettings(wv: WebView, networkAllowed: Boolean) {
     wv.settings.javaScriptEnabled = true
     // No bridge, no files, no content providers: the app sees only its own origin.
     wv.settings.allowFileAccess = false
@@ -359,6 +359,7 @@ class MiniAppActivity : ComponentActivity() {
         var title by remember { mutableStateOf("") }
         var icon by remember { mutableStateOf<String?>(null) }
         var html by remember { mutableStateOf<String?>(null) }
+        var pocket by remember { mutableStateOf<PocketApp?>(null) }
         var gone by remember { mutableStateOf(false) }
         var confirmDelete by remember { mutableStateOf(false) }
         var webView by remember { mutableStateOf<WebView?>(null) }
@@ -371,12 +372,22 @@ class MiniAppActivity : ComponentActivity() {
         }
         LaunchedEffect(appId) {
             val row = withContext(Dispatchers.IO) { app.miniApps.get(appId) }
-            if (row == null) {
-                gone = true
-            } else {
+            if (row != null) {
                 title = row.title
                 icon = row.icon
                 html = row.html
+            } else {
+                // No user copy: a bundled pocket app opens straight from the pack.
+                val bundled = withContext(Dispatchers.IO) {
+                    PocketCatalog.cached(this@MiniAppActivity).firstOrNull { it.id == appId }
+                }
+                if (bundled == null) {
+                    gone = true
+                } else {
+                    title = bundled.title
+                    icon = null
+                    pocket = bundled
+                }
             }
         }
         // Back leaves full size first, then goes through the web history like any browser.
@@ -417,13 +428,18 @@ class MiniAppActivity : ComponentActivity() {
                     gone -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(stringResource(R.string.miniapp_gone), style = MaterialTheme.typography.bodyMedium)
                     }
-                    html == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    html == null && pocket == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
                     else -> {
-                        val doc = html!!
+                        val doc = html
+                        val bundled = pocket
                         Box(Modifier.weight(1f).fillMaxWidth()) {
-                            MiniAppView(appId, doc, true, Modifier.fillMaxSize()) { webView = it }
+                            if (doc != null) {
+                                MiniAppView(appId, doc, true, Modifier.fillMaxSize()) { webView = it }
+                            } else if (bundled != null) {
+                                BundledMiniAppView(bundled, Modifier.fillMaxSize()) { webView = it }
+                            }
                             // Full size keeps one way out over the app: Back, or this button.
                             if (full) IconButton(
                                 onClick = { setFull(false) },
@@ -443,7 +459,15 @@ class MiniAppActivity : ComponentActivity() {
                                 scope.launch {
                                     val file = withContext(Dispatchers.IO) {
                                         java.io.File(cacheDir, "miniapps").apply { mkdirs() }
-                                            .resolve("$appId.html").apply { writeText(doc) }
+                                            .resolve("$appId.html").apply {
+                                                if (doc != null) {
+                                                    writeText(doc)
+                                                } else {
+                                                    assets.open(bundled!!.assetPath).use { input ->
+                                                        outputStream().use { o -> input.copyTo(o) }
+                                                    }
+                                                }
+                                            }
                                     }
                                     val uri = androidx.core.content.FileProvider.getUriForFile(
                                         this@MiniAppActivity, "$packageName.miniapp", file
@@ -462,6 +486,10 @@ class MiniAppActivity : ComponentActivity() {
                                     )
                                 }
                             }) { Text(stringResource(R.string.miniapp_share)) }
+                            // Pin and Delete need a stored row: a bundled app opens from the pack, so the
+                            // layout checker would reject its id as unknown and there is nothing to delete.
+                            // (Customise in the store copies it into the user's apps first.)
+                            if (doc != null) {
                             // Resolved in composition: reading resources off LocalContext inside the
                             // launch below trips lint (LocalContextGetResourceValueCall).
                             val pinTitle = stringResource(R.string.miniapp_title)
@@ -478,6 +506,7 @@ class MiniAppActivity : ComponentActivity() {
                                 }
                             }) { Text(stringResource(R.string.miniapp_pin)) }
                             TextButton(onClick = { confirmDelete = true }) { Text(stringResource(R.string.settings_version_delete)) }
+                            }
                         }
                     }
                 }
