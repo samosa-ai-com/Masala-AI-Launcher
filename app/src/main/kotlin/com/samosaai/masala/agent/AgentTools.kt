@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import com.samosaai.masala.core.layout.LayoutChecker
+import com.samosaai.masala.core.layout.LayoutLoss
 import com.samosaai.masala.core.tool.ActionResult
 import com.samosaai.masala.core.tool.FunctionTool
 import com.samosaai.masala.core.tool.Tool
@@ -60,14 +61,27 @@ object AgentTools {
             put("description", description)
         }
 
+    val readLayout = ToolDefinition(
+        "read_layout",
+        "The current home screen layout document as JSON (pages → sections → items and widgets). Read it " +
+            "before edit_layout: change only what the user asked for, keep everything else, and send the whole " +
+            "edited document back. Never send a test or partial layout; every accepted layout replaces home.",
+        schema(emptyList()) {},
+    )
+
     val editLayout = ToolDefinition(
         "edit_layout",
-        "Replace the home screen layout with a new one. Pass the complete layout document as JSON; " +
-            "it is checked first and refused with a list of problems if anything is wrong. The previous " +
-            "layout stays in the undo history.",
+        "Replace the home screen layout with a new one. Call read_layout first and pass the complete edited " +
+            "document as JSON; it is checked first and refused with a list of problems if anything is wrong. A " +
+            "layout that would remove most of what is on home is refused unless replace_all is true, which is " +
+            "only for when the user asked for a brand-new home screen. The previous layout stays in the undo history.",
         schema(listOf("layout_json", "label")) {
             stringProp("layout_json", "The whole layout document, as a JSON string.")
             stringProp("label", "A few words describing the change, shown in the undo history.")
+            putJsonObject("replace_all") {
+                put("type", "boolean")
+                put("description", "true only when the user asked to start home over. Default false.")
+            }
         },
     )
 
@@ -152,6 +166,13 @@ object AgentTools {
     )
 
     private const val MAX_SLEEP_SECONDS = 300
+    private const val READ_LAYOUT_MAX_CHARS = 40_000
+    /** Same shape as MasalaJson.strict (the format edit_layout parses), on one line to save tokens. */
+    private val compactJson = kotlinx.serialization.json.Json {
+        classDiscriminator = "type"
+        explicitNulls = false
+        encodeDefaults = false
+    }
 
     /**
      * [runSkill] opens the skill sheet and [consult] asks an expert in place; leave either null while
@@ -168,11 +189,30 @@ object AgentTools {
     ): List<Tool> {
         val app = context.applicationContext
         return listOfNotNull(
+            FunctionTool(readLayout, READ_ONLY) { _ ->
+                val doc = layouts.base.value ?: return@FunctionTool ActionResult.error("The home layout isn't loaded yet. Try again in a moment.")
+                val json = compactJson.encodeToString(com.samosaai.masala.core.contract.LayoutDoc.serializer(), doc)
+                if (json.length > READ_LAYOUT_MAX_CHARS) {
+                    ActionResult.ok(json.take(READ_LAYOUT_MAX_CHARS) + "\n--- cut at $READ_LAYOUT_MAX_CHARS of ${json.length} characters ---")
+                } else {
+                    ActionResult.ok(json)
+                }
+            },
             FunctionTool(editLayout, CHANGES_SOMETHING) { args ->
                 val text = args.string("layout_json") ?: return@FunctionTool missing("layout_json")
                 val label = args.string("label") ?: "Edited by Masala"
                 val parsed = LayoutChecker.parse(text)
-                val layout = parsed.layout ?: return@FunctionTool ActionResult.error(problems(parsed.problems))
+                val layout = parsed.layout
+                    ?: return@FunctionTool ActionResult.error(problems(parsed.problems) + "\nCall read_layout to see the exact format of the current home.")
+                val current = layouts.base.value
+                if (args.boolean("replace_all") != true && current != null && LayoutLoss.dropsMost(current, layout)) {
+                    val (kept, had) = LayoutLoss.kept(current, layout)
+                    return@FunctionTool ActionResult.error(
+                        "Not applied: this layout keeps only $kept of the $had apps and widgets on home. Call read_layout, " +
+                            "edit that document so everything the user didn't ask to remove stays, and send the whole result. " +
+                            "Pass replace_all true only if the user asked for a brand-new home screen.",
+                    )
+                }
                 val problems = layouts.apply(label, layout)
                 if (problems.isEmpty()) ActionResult.ok("Layout updated: $label. The user can undo it.") else ActionResult.error(problems(problems))
             },
