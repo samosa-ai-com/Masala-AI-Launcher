@@ -20,7 +20,9 @@ data class ExpertCredit(val id: String, val title: String)
 /**
  * One thing on the conversation screen. [steps] are the tool steps a reply took, kept
  * beside the text so a reopened session shows the same trace; [experts] are the personas
- * whose answers shaped it; [at] is when it landed.
+ * whose answers shaped it; [at] is when it landed; [attachmentPaths] are the app-private
+ * files the turn's images were written to, so a reopened chat can hand the media tools a
+ * path (default keeps every existing row decodable).
  */
 @Serializable
 data class ChatTurn(
@@ -31,6 +33,8 @@ data class ChatTurn(
     val experts: List<ExpertCredit> = emptyList(),
     /** What the turn made, kept so the card survives a reload. */
     val results: List<ChatResult> = emptyList(),
+    /** Absolute paths under `filesDir/chat_attachments` for this turn's images, if still on disk. */
+    val attachmentPaths: List<String> = emptyList(),
 )
 
 /**

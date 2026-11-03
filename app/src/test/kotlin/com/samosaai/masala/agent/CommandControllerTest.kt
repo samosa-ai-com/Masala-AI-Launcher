@@ -43,6 +43,7 @@ class CommandControllerTest {
         summarize: (suspend (String) -> String?)? = null,
         cleaner: TranscriptCleaner? = null,
         maxContextTokens: Int = MasalaAgent.DEFAULT_MAX_CONTEXT_TOKENS,
+        materialize: (suspend (String, List<String>) -> List<String>)? = null,
     ) = CommandController(
         scope = scope,
         resolveApp = { if (it == "spotify") spotify else null },
@@ -63,6 +64,7 @@ class CommandControllerTest {
         summarize = summarize,
         cleaner = cleaner,
         maxContextTokens = maxContextTokens,
+        materializeAttachments = materialize,
     )
 
     // A ceiling for a hang, not a stopwatch: the turn runs on Dispatchers.Default, which also feeds
@@ -601,5 +603,52 @@ class CommandControllerTest {
         val sent = requests.flatten().last().content.toString()
         assertTrue(sent.contains("image_url"), "vision parts missing: $sent")
         assertTrue(sent.contains("data:image/jpeg;base64,QUJD"), "image bytes missing: $sent")
+    }
+
+    @Test fun imageAskMaterializesPathsForTheModelOnly() = runBlocking<Unit> {
+        replies += reply("A red bicycle.")
+        val stored = mutableListOf<com.samosaai.masala.chat.ChatTurn>()
+        val c = controller(materialize = { _, images -> images.indices.map { "/files/chat_attachments/m1/$it.jpg" } })
+        c.onTurn = { stored += it }
+        c.ask("", images = listOf("QUJD"))
+        val answer = assertIs<CommandState.Reply>(c.settled())
+        assertEquals("A red bicycle.", answer.text)
+        // The transcript turn keeps the placeholder and carries the paths for reopened chats.
+        val user = stored.first { it.role == com.samosaai.masala.chat.TurnRole.USER }
+        assertEquals(com.samosaai.masala.chat.IMAGE_PLACEHOLDER, user.text)
+        assertEquals(listOf("/files/chat_attachments/m1/0.jpg"), user.attachmentPaths)
+        // The reply prompt shown in the UI has no paths either.
+        assertEquals(com.samosaai.masala.chat.IMAGE_PLACEHOLDER, answer.prompt)
+        // Only the model text names the file; the vision bytes still ride along.
+        val sent = requests.flatten().last()
+        assertTrue(
+            sent.textContent.contains("[image 1 of 1: /files/chat_attachments/m1/0.jpg]"),
+            "path line missing: ${sent.textContent}",
+        )
+        assertTrue(sent.content.toString().contains("data:image/jpeg;base64,QUJD"), "vision bytes missing")
+    }
+
+    @Test fun restoreResuppliesOnlyPathsStillOnDisk() = runBlocking<Unit> {
+        replies += reply("first answer")
+        replies += reply("second answer")
+        val live = java.io.File.createTempFile("attach-live", ".jpg").apply {
+            writeBytes(byteArrayOf(1, 2, 3))
+            deleteOnExit()
+        }
+        val c = controller()
+        c.restoreSession(
+            listOf(
+                com.samosaai.masala.chat.ChatTurn(
+                    com.samosaai.masala.chat.TurnRole.USER,
+                    com.samosaai.masala.chat.IMAGE_PLACEHOLDER,
+                    attachmentPaths = listOf("/nonexistent/gone.jpg", live.absolutePath),
+                ),
+            ),
+        )
+        c.ask("and then?")
+        withTimeout(15_000) { c.state.first { it is CommandState.Reply && it.text == "first answer" } }
+        val history = requests.last().dropLast(1).joinToString("\n") { it.textContent }
+        assertTrue(history.contains(live.absolutePath), "live path missing: $history")
+        assertTrue(!history.contains("/nonexistent/gone.jpg"), "gone path resupplied: $history")
     }
 }

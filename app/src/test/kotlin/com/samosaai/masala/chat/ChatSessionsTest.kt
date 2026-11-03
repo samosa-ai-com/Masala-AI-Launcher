@@ -248,4 +248,38 @@ class ChatSessionsTest {
         assertNull(s.revertTo("missing", 0))
         assertEquals(1, s.get(chat.id)!!.turns.size)
     }
+
+    @Test
+    fun `deleting a chat removes its attachment images but nothing else`() = runBlocking<Unit> {
+        val s = ChatSessions(java.io.File(tmp.root, "chats"), clock = { now++ }, newId = { "id-${now}" }, filesDir = tmp.root)
+        val chat = s.create()
+        val listed = java.io.File(tmp.root, "chat_attachments/m1/0.jpg").apply {
+            parentFile.mkdirs()
+            writeBytes(byteArrayOf(1, 2, 3))
+        }
+        val unlisted = java.io.File(tmp.root, "chat_attachments/m1/other.jpg").apply {
+            writeBytes(byteArrayOf(4))
+        }
+        val outside = java.io.File(tmp.root, "outside.txt").apply { writeText("mine") }
+        s.append(chat.id, user("look").copy(attachmentPaths = listOf(listed.absolutePath, outside.absolutePath)))
+        s.delete(chat.id)
+        assertTrue(!listed.exists())
+        // The folder survives for the unlisted file; the outside file is never touched.
+        assertTrue(unlisted.isFile)
+        assertTrue(outside.isFile)
+    }
+
+    @Test
+    fun `attachment paths survive a reload`() = runBlocking<Unit> {
+        val s = store()
+        val chat = s.create()
+        s.append(chat.id, user("(image attached)").copy(attachmentPaths = listOf("/files/chat_attachments/m/0.jpg")))
+
+        val reopened = store()
+        reopened.load()
+        assertEquals(
+            listOf("/files/chat_attachments/m/0.jpg"),
+            reopened.get(chat.id)?.turns?.single()?.attachmentPaths,
+        )
+    }
 }

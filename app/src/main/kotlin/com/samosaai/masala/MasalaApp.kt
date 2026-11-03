@@ -130,6 +130,8 @@ class MasalaApp : Application() {
         com.samosaai.masala.chat.ChatSessions(
             java.io.File(filesDir, com.samosaai.masala.chat.ChatSessions.DIR),
             onDeleted = { id -> consults.deleteChat(id) },
+            // Deleting a chat removes the attachment images its turns materialized.
+            filesDir = filesDir,
         )
     }
 
@@ -397,7 +399,7 @@ class MasalaApp : Application() {
             summarize = { transcript -> summarizeHistory(transcript) },
             onTurnStart = { consultCalls.set(0) },
             // Every transcript, on-device or server, is tidied by the model before it is sent.
-            cleaner = LlmTranscriptCleaner(
+              cleaner = LlmTranscriptCleaner(
                 complete = { messages ->
                     cleanerClient().chat(messages, temperature = 0f)
                         .choices.firstOrNull()?.message?.textContent.orEmpty()
@@ -408,12 +410,21 @@ class MasalaApp : Application() {
                         ?.let { code -> Language.entries.firstOrNull { it.matchesCode(code) } }
                 },
             ),
+            // Attached photos land in app-private storage, so the model text can name files
+            // the media tools accept (see ChatAttachments).
+            materializeAttachments = { messageId, images ->
+                com.samosaai.masala.chat.materializeAttachments(filesDir, messageId, images)
+            },
         ).also { controller ->
             controller.onTurn = ::recordTurn
             scope.launch {
                 chats.load()
                 // Consults whose chat is gone: the app was killed between the two deletes.
                 consults.pruneOrphans(chats.summaries.value.mapTo(HashSet()) { it.id })
+            }
+            // Orphaned attachment images (reverted turns, pruned chats) older than 14 days go.
+            scope.launch(Dispatchers.IO) {
+                runCatching { com.samosaai.masala.chat.sweepOldAttachments(filesDir) }
             }
         }
     }

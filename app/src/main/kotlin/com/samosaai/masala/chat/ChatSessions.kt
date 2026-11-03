@@ -23,6 +23,12 @@ class ChatSessions(
     private val newId: () -> String = { UUID.randomUUID().toString() },
     /** Told when a conversation is removed, so what belongs to it (its consults) goes too. Awaited, so a kill can't leave it behind. */
     private val onDeleted: suspend (String) -> Unit = {},
+    /**
+     * The app's files dir; when set, deleting a chat also removes the attachment images its
+     * turns materialized. Confined to the attachments folder (see [deleteAttachmentFiles]);
+     * null keeps the store files-only, as in unit tests.
+     */
+    private val filesDir: File? = null,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -102,8 +108,9 @@ class ChatSessions(
 
     /** Removes a conversation, its file and what belongs to it. */
     suspend fun delete(id: String) = lock.withLock { withContext(Dispatchers.IO) {
-        loaded.remove(id)
+        val dropped = loaded.remove(id)
         fileFor(id).delete()
+        if (dropped != null) dropAttachments(dropped)
         onDeleted(id)
         publish()
     } }
@@ -147,8 +154,17 @@ class ChatSessions(
         extra.forEach {
             loaded.remove(it.id)
             fileFor(it.id).delete()
+            dropAttachments(it)
             onDeleted(it.id)
         }
+    }
+
+    /** Removes the attachment images [session]'s turns materialized; pruned sessions go through here too. */
+    private fun dropAttachments(session: ChatSession) {
+        val base = filesDir ?: return
+        val paths = session.turns.flatMap { it.attachmentPaths }
+        if (paths.isEmpty()) return
+        deleteAttachmentFiles(base, paths)
     }
 
     private fun read(id: String): ChatSession? = runCatching {

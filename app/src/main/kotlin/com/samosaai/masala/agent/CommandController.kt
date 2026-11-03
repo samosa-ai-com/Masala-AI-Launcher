@@ -3,6 +3,7 @@ package com.samosaai.masala.agent
 import com.samosaai.masala.actions.ActionDispatcher
 import com.samosaai.masala.actions.ConfirmationGate
 import com.samosaai.masala.audio.PttEngine
+import com.samosaai.masala.chat.modelTextWithImagePaths
 import com.samosaai.masala.core.agent.CommandFastPath
 import com.samosaai.masala.core.agent.NameCorrector
 import com.samosaai.masala.core.contract.MasalaAction
@@ -17,6 +18,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
+import java.io.File
+import java.util.UUID
 
 /**
  * Typed and spoken commands (plan Phase 4 M3). Simple ones (timers, alarms, open an app) skip the
@@ -45,6 +48,12 @@ class CommandController(
     private val cleaner: TranscriptCleaner? = null,
     /** The context budget for this chat, in tokens; compaction fires at [MasalaAgent.COMPACT_AT_FRACTION] of it. */
     private val maxContextTokens: Int = MasalaAgent.DEFAULT_MAX_CONTEXT_TOKENS,
+    /**
+     * Writes a send's images to app-private storage and returns their absolute paths, so the
+     * model text can name files the media tools accept. Null (tests, previews) sends vision
+     * parts only. Never throws out of [ask]: a failure just means no path lines.
+     */
+    private val materializeAttachments: (suspend (messageId: String, images: List<String>) -> List<String>)? = null,
 ) {
     private val _state = MutableStateFlow<CommandState>(CommandState.Idle)
     /**
@@ -209,12 +218,23 @@ class CommandController(
         job?.cancel()
         val prompt = if (spoken) NameCorrector(names()).correct(raw) else raw
         _state.value = CommandState.Thinking(if (prompt.isBlank()) com.samosaai.masala.chat.IMAGE_PLACEHOLDER else prompt)
+        // One stable folder for this send's images, so the model text can name them.
+        val messageId = if (images.isEmpty()) null else UUID.randomUUID().toString()
         job = scope.launch {
             // Compact first: the summary must appear above the turn that triggered it, not
             // below it, and the new prompt must not be part of what gets summarised.
             compactIfNeeded()
-            onTurn?.invoke(com.samosaai.masala.chat.ChatTurn(com.samosaai.masala.chat.TurnRole.USER, if (prompt.isBlank()) com.samosaai.masala.chat.IMAGE_PLACEHOLDER else prompt))
-            handle(prompt, spoken, images)
+            // The transcript keeps the placeholder; only the model text carries path lines,
+            // so the thread still reads the same after a reload.
+            val paths = if (messageId == null) emptyList()
+            else runCatching { materializeAttachments?.invoke(messageId, images) }.getOrNull().orEmpty()
+            val transcript = if (prompt.isBlank()) com.samosaai.masala.chat.IMAGE_PLACEHOLDER else prompt
+            onTurn?.invoke(
+                com.samosaai.masala.chat.ChatTurn(
+                    com.samosaai.masala.chat.TurnRole.USER, transcript, attachmentPaths = paths,
+                ),
+            )
+            handle(modelTextWithImagePaths(prompt, paths), spoken, images, transcript)
         }
     }
 
@@ -319,9 +339,17 @@ class CommandController(
                     it.role != com.samosaai.masala.chat.TurnRole.SYSTEM
             }
             .map {
+                // Reopened chats keep no image bytes, but the materialized files may still be on
+                // disk: re-supply the paths that survived so media tools can read them, and leave
+                // out whatever is gone rather than naming files that don't exist.
+                val text = if (it.role == com.samosaai.masala.chat.TurnRole.USER && it.attachmentPaths.isNotEmpty()) {
+                    modelTextWithImagePaths(it.text, it.attachmentPaths.filter { path -> File(path).isFile })
+                } else {
+                    it.text
+                }
                 com.samosaai.masala.llm.ChatMessage(
                     if (it.role == com.samosaai.masala.chat.TurnRole.USER) "user" else "assistant",
-                    JsonPrimitive(it.text),
+                    JsonPrimitive(text),
                 )
             }
         if (!sameChat) {
@@ -390,14 +418,19 @@ class CommandController(
         }
     }
 
-    private suspend fun handle(prompt: String, spoken: Boolean, images: List<String> = emptyList()) =
-        withContext(ConfirmationGate.AllowAll { _allowAll.value }) { runTurn(prompt, spoken, images) }
+    private suspend fun handle(prompt: String, spoken: Boolean, images: List<String> = emptyList(), transcript: String = prompt) =
+        withContext(ConfirmationGate.AllowAll { _allowAll.value }) { runTurn(prompt, spoken, images, transcript) }
 
-    private suspend fun runTurn(prompt: String, spoken: Boolean, images: List<String>) {
+    /**
+     * [prompt] is the model text (with image path lines when the send had images); [transcript]
+     * is what the thread shows, without them. Fast-path matching, the working title and the
+     * reply/error prompts all read the transcript, so paths never leak into the UI.
+     */
+    private suspend fun runTurn(prompt: String, spoken: Boolean, images: List<String>, transcript: String = prompt) {
         val gen = generation
         onTurnStart?.invoke()
-        CommandFastPath.match(prompt, resolveApp)?.let { action ->
-            publish(stateFor(prompt, run(action), spoken))
+        CommandFastPath.match(transcript, resolveApp)?.let { action ->
+            publish(stateFor(transcript, run(action), spoken))
             return
         }
         // Advice in an expert's area goes to the agent too: it consults the expert itself, in place.
@@ -409,12 +442,12 @@ class CommandController(
         val missingAccess = linkedSetOf<String>()
         // What the turn made, for the card under the answer.
         val results = linkedMapOf<String, com.samosaai.masala.chat.ChatResult>()
-        // Attached photos ride as vision parts; image bytes stay in-memory, the stored
-        // turn keeps the placeholder text so reopened chats still read sensibly.
+        // Attached photos ride as vision parts; the model text also names their files so
+        // path-taking tools can read them. The stored turn keeps the transcript text.
         val userMessage = if (images.isEmpty()) ChatMessage("user", JsonPrimitive(prompt))
         else com.samosaai.masala.llm.attachmentsUserMessage(prompt, emptyList(), images)
-        // What's shown while working: an image-only turn still names itself.
-        val display = if (prompt.isBlank() && images.isNotEmpty()) com.samosaai.masala.chat.IMAGE_PLACEHOLDER else prompt
+        // What's shown while working: paths never reach the UI.
+        val display = transcript
         try {
             agent.run(userMessage).collect { event ->
                 when (event) {
@@ -433,7 +466,7 @@ class CommandController(
                     }
                     is AgentEvent.Done -> publish(
                         CommandState.Reply(
-                            prompt,
+                            transcript,
                             event.text.ifBlank { "Done." },
                             steps.toList(),
                             spoken = spoken,
@@ -442,10 +475,10 @@ class CommandController(
                             results = results.values.toList(),
                         ),
                     )
-                    is AgentEvent.Failed -> publish(CommandState.Error(prompt, friendlyModelError(event.message)))
+                    is AgentEvent.Failed -> publish(CommandState.Error(transcript, friendlyModelError(event.message)))
                     // Recorded, not fatal: the model keeps going and finishes around the gap.
                     is AgentEvent.NeedsCapability -> missingAccess += event.capability
-                    AgentEvent.StepLimit -> publish(CommandState.Error(prompt, "That took too many steps. Try asking in smaller pieces."))
+                    AgentEvent.StepLimit -> publish(CommandState.Error(transcript, "That took too many steps. Try asking in smaller pieces."))
                     else -> Unit
                 }
             }
