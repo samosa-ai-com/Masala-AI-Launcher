@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PocketLedger — Expense Tracker</title>
+<style>
+:root{--bg:#f6f4ee;--card:#fff;--acc:#0f766e;--txt:#1c2420;--mut:#6f7d76}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;min-height:100vh}
+.wrap{max-width:480px;margin:0 auto;padding:16px 14px 32px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}
+.sub{color:var(--mut);font-size:13px;margin:2px 0 0}
+#muteBtn{background:var(--card);border:1px solid #dde3de;color:var(--txt);border-radius:12px;min-width:48px;min-height:44px;font-size:18px}
+.total{background:#123f3a;color:#fff;border-radius:18px;padding:16px;margin:12px 0;text-align:center}
+.total small{opacity:.75;font-size:12px}
+#monthTotal{font-size:36px;font-weight:800;font-variant-numeric:tabular-nums}
+.card{background:var(--card);border:1px solid #dde3de;border-radius:18px;padding:14px;margin:10px 0}
+.card input{width:100%;min-height:48px;border-radius:12px;border:1px solid #c9d2cd;font-size:16px;padding:0 12px;margin:4px 0}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.chips button{min-height:44px;padding:0 14px;border-radius:999px;border:1px solid #c9d2cd;background:#f1f5f3;font-size:14px}
+.chips button.on{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:700}
+#addBtn{width:100%;min-height:52px;border:0;border-radius:12px;background:var(--acc);color:#fff;font-size:17px;font-weight:700}
+.barrow{margin:8px 0;font-size:13px}
+.barrow .top{display:flex;justify-content:space-between;margin-bottom:3px}
+.btrack{background:#e7edea;border-radius:8px;height:12px;overflow:hidden}
+.bfill{background:var(--acc);height:12px;border-radius:8px}
+.item{display:flex;align-items:center;gap:8px;padding:10px 2px;border-top:1px solid #e7edea;font-size:14px}
+.item .amt{font-weight:800;font-variant-numeric:tabular-nums}
+.item .cat{font-size:11px;background:#eef4f2;border-radius:6px;padding:2px 6px;color:var(--acc)}
+.item .note{color:var(--mut);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item button{min-width:44px;min-height:44px;border-radius:10px;border:1px solid #e5c9c9;background:#fdf0f0;color:#b3261e;font-size:16px}
+.empty{text-align:center;color:var(--mut);font-size:14px;padding:16px}
+h2{font-size:15px;margin:6px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div><h1>PocketLedger</h1><p class="sub">Simple spending log</p></div><button id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="total"><small id="monthLabel">This month</small><div id="monthTotal">$0.00</div></div>
+<div class="card"><h2>Add expense</h2>
+<input type="number" id="amt" placeholder="Amount (e.g. 12.50)" inputmode="decimal" min="0">
+<input type="text" id="note" placeholder="Note (optional)" maxlength="60">
+<div class="chips" id="cats"></div>
+<button id="addBtn">Add expense</button>
+</div>
+<div class="card"><h2>Spending by category</h2><div id="bars"></div></div>
+<div class="card"><h2>History</h2><div id="list"></div></div>
+</div>
+<script>
+(function(){
+"use strict";
+var KEY="pocketledger-v1";
+var store={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+var muted=store.get("muted-expense-tracker",false);
+var muteBtn=document.getElementById("muteBtn");
+function paintMute(){muteBtn.textContent=muted?"🔇":"🔊";}paintMute();
+var actx=null;
+function beep(f){if(muted)return;try{var C=window.AudioContext||window.webkitAudioContext;if(!C)return;if(!actx)actx=new C();if(actx.state==="suspended")actx.resume();var o=actx.createOscillator(),g=actx.createGain();o.type="sine";o.frequency.value=f||660;g.gain.value=0.05;o.connect(g);g.connect(actx.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.08);o.stop(actx.currentTime+0.09);}catch(e){}}
+muteBtn.addEventListener("click",function(){muted=!muted;store.set("muted-expense-tracker",muted);paintMute();beep(720);});
+var CATS=["Food","Travel","Bills","Fun","Other"];
+var items=store.get(KEY,[]);
+if(!Array.isArray(items))items=[];
+var selCat=CATS[0];
+var catsEl=document.getElementById("cats");
+CATS.forEach(function(c){var b=document.createElement("button");b.textContent=c;if(c===selCat)b.classList.add("on");b.addEventListener("click",function(){beep(550);selCat=c;var bs=catsEl.querySelectorAll("button");for(var i=0;i<bs.length;i++)bs[i].classList.remove("on");b.classList.add("on");});catsEl.appendChild(b);});
+function money(n){return "$"+Number(n).toFixed(2);}
+document.getElementById("monthLabel").textContent=new Date().toLocaleString("en",{month:"long",year:"numeric"});
+document.getElementById("addBtn").addEventListener("click",function(){
+var a=parseFloat(document.getElementById("amt").value);
+if(isNaN(a)||a<=0){beep(300);document.getElementById("amt").focus();return;}
+var note=document.getElementById("note").value.trim();
+items.unshift({id:Date.now(),amt:Math.round(a*100)/100,note:note,cat:selCat,ts:Date.now()});
+store.set(KEY,items);beep(780);
+document.getElementById("amt").value="";document.getElementById("note").value="";draw();});
+function draw(){
+var d=new Date(),sum=0,byCat={};
+items.forEach(function(e){var t=new Date(e.ts);if(t.getMonth()===d.getMonth()&&t.getFullYear()===d.getFullYear()){sum+=e.amt;byCat[e.cat]=(byCat[e.cat]||0)+e.amt;}});
+document.getElementById("monthTotal").textContent=money(sum);
+var bars=document.getElementById("bars");bars.innerHTML="";
+var max=0,k;for(k in byCat)if(byCat[k]>max)max=byCat[k];
+if(!max){bars.innerHTML="<div class='empty'>Nothing spent this month yet.</div>";}
+else{CATS.forEach(function(c){if(!byCat[c])return;var row=document.createElement("div");row.className="barrow";var pct=Math.round(byCat[c]/max*100);row.innerHTML="<div class='top'><span>"+c+"</span><span>"+money(byCat[c])+"</span></div><div class='btrack'><div class='bfill' style='width:"+pct+"%'></div></div>";bars.appendChild(row);});}
+var list=document.getElementById("list");list.innerHTML="";
+if(!items.length){list.innerHTML="<div class='empty'>No expenses yet — add your first one above.</div>";return;}
+items.slice(0,60).forEach(function(e){var div=document.createElement("div");div.className="item";var sp=document.createElement("span");sp.className="amt";sp.textContent=money(e.amt);var ct=document.createElement("span");ct.className="cat";ct.textContent=e.cat;var nt=document.createElement("span");nt.className="note";nt.textContent=(e.note||"—")+" · "+new Date(e.ts).toLocaleDateString("en");var del=document.createElement("button");del.textContent="✕";del.setAttribute("aria-label","Delete expense");del.addEventListener("click",function(){if(!window.confirm("Delete this "+money(e.amt)+" expense?"))return;beep(340);items=items.filter(function(x){return x.id!==e.id;});store.set(KEY,items);draw();});div.appendChild(sp);div.appendChild(ct);div.appendChild(nt);div.appendChild(del);list.appendChild(div);});
+}
+draw();
+})();
+</script>
+</body>
+</html>

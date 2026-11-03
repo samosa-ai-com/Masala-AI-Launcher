@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SevenStreak — Habit Tracker</title>
+<style>
+:root{--bg:#101820;--card:#1a2432;--acc:#ffb020;--txt:#f3efe6;--mut:#93a1b8}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;min-height:100vh}
+.wrap{max-width:480px;margin:0 auto;padding:16px 14px 32px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}
+.sub{color:var(--mut);font-size:13px;margin:2px 0 0}
+#muteBtn{background:var(--card);border:1px solid #31415a;color:var(--txt);border-radius:12px;min-width:48px;min-height:44px;font-size:18px}
+.bar{background:var(--card);border:1px solid #31415a;border-radius:16px;padding:12px 14px;margin:12px 0;display:flex;align-items:center;gap:10px;font-size:14px}
+.bar input{width:24px;height:24px}
+.bar button{margin-left:auto;min-height:44px;border-radius:10px;border:0;background:#31415a;color:var(--txt);padding:0 14px;font-size:14px}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid #31415a;border-radius:16px;overflow:hidden;font-size:13px}
+th,td{padding:6px 2px;text-align:center}
+th{color:var(--mut);font-size:11px}
+th.today{color:var(--acc)}
+td.hname{text-align:left;padding-left:8px;max-width:110px}
+td.hname input{width:100%;background:transparent;border:0;border-bottom:1px dashed #31415a;color:var(--txt);font-size:13px;min-height:44px}
+.cell{width:40px;height:44px;border-radius:10px;border:1px solid #31415a;background:#111927;color:#5b6b86;font-size:16px}
+.cell.done{background:var(--acc);border-color:var(--acc);color:#231600;font-weight:800}
+.streak{font-size:12px;color:var(--acc);font-weight:700;white-space:nowrap}
+.foot{color:var(--mut);font-size:12px;text-align:center;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div><h1>SevenStreak</h1><p class="sub">7 habits × 7 days</p></div><button id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="bar"><input type="checkbox" id="autoReset"><label for="autoReset">Fresh grid every Monday</label><button id="clearBtn">Reset</button></div>
+<table><thead><tr id="dayHead"><th></th></tr></thead><tbody id="body"></tbody></table>
+<p class="foot">Tap a square to mark a habit done. Streak counts unbroken days up to today.</p>
+</div>
+<script>
+(function(){
+"use strict";
+var KEY="sevenstreak-v1";
+var store={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+var muted=store.get("muted-habit-tracker",false);
+var muteBtn=document.getElementById("muteBtn");
+function paintMute(){muteBtn.textContent=muted?"🔇":"🔊";}paintMute();
+var actx=null;
+function beep(f){if(muted)return;try{var C=window.AudioContext||window.webkitAudioContext;if(!C)return;if(!actx)actx=new C();if(actx.state==="suspended")actx.resume();var o=actx.createOscillator(),g=actx.createGain();o.type="sine";o.frequency.value=f||660;g.gain.value=0.05;o.connect(g);g.connect(actx.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.08);o.stop(actx.currentTime+0.09);}catch(e){}}
+muteBtn.addEventListener("click",function(){muted=!muted;store.set("muted-habit-tracker",muted);paintMute();beep(720);});
+var DAYS=["M","T","W","T","F","S","S"];
+var todayIdx=(new Date().getDay()+6)%7;
+function blanks(){return [false,false,false,false,false,false,false];}
+var defaults=["Drink water","Read 10 pages","Walk 20 min","No sweets","Tidy desk","Stretch","Early bed"];
+var st=store.get(KEY,null);
+if(!st||!Array.isArray(st.habits)||st.habits.length!==7){st={habits:defaults.map(function(n){return{name:n,days:blanks()};}),auto:true,week:""};}
+function weekKey(){var d=new Date();var one=new Date(d.getFullYear(),0,4);var day=(d.getDay()+6)%7;var monday=new Date(d);monday.setDate(d.getDate()-day);return monday.getFullYear()+"-"+(monday.getMonth()+1)+"-"+monday.getDate();}
+var wk=weekKey();
+if(st.auto&&st.week&&st.week!==wk){st.habits.forEach(function(h){h.days=blanks();});}
+st.week=wk;
+function save(){store.set(KEY,st);}
+var head=document.getElementById("dayHead");
+DAYS.forEach(function(d,i){var th=document.createElement("th");th.textContent=d;if(i===todayIdx)th.className="today";head.appendChild(th);});
+var th2=document.createElement("th");th2.textContent="🔥";head.appendChild(th2);
+var body=document.getElementById("body");
+var autoBox=document.getElementById("autoReset");autoBox.checked=!!st.auto;
+autoBox.addEventListener("change",function(){beep(600);st.auto=autoBox.checked;save();});
+document.getElementById("clearBtn").addEventListener("click",function(){beep(330);if(!window.confirm("Clear all checkmarks for this week?"))return;st.habits.forEach(function(h){h.days=blanks();});save();draw();});
+function streakOf(days){var n=0;var i=todayIdx;if(!days[i])i--;for(;i>=0;i--){if(days[i])n++;else break;}return n;}
+function draw(){body.innerHTML="";st.habits.forEach(function(h,hi){var tr=document.createElement("tr");var nm=document.createElement("td");nm.className="hname";var inp=document.createElement("input");inp.value=h.name;inp.maxLength=24;inp.setAttribute("aria-label","Habit name "+(hi+1));inp.addEventListener("change",function(){h.name=inp.value.trim()||defaults[hi];save();});nm.appendChild(inp);tr.appendChild(nm);h.days.forEach(function(done,di){var td=document.createElement("td");var b=document.createElement("button");b.className="cell"+(done?" done":"");b.textContent=done?"✓":"·";b.setAttribute("aria-label",h.name+" day "+DAYS[di]);b.addEventListener("click",function(){h.days[di]=!h.days[di];beep(h.days[di]?820:420);save();draw();});td.appendChild(b);tr.appendChild(td);});var st2=document.createElement("td");st2.className="streak";st2.textContent=streakOf(h.days)+"d";tr.appendChild(st2);body.appendChild(tr);});}
+draw();
+})();
+</script>
+</body>
+</html>

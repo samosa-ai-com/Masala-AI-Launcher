@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Merge Ops — Conflict Resolver</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f172a;
+  --card:#1e293b;
+  --card2:#27354f;
+  --accent:#38bdf8;
+  --accent2:#f59e0b;
+  --ok:#22c55e;
+  --bad:#ef4444;
+  --muted:#94a3b8;
+  --text:#f1f5f9;
+  --border:#334155;
+  --radius:16px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;overflow-x:hidden}
+body{max-width:428px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column}
+button{font:inherit}
+.topbar{
+  position:sticky;top:0;z-index:10;
+  background:rgba(15,23,42,0.96);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--border);
+  padding:10px 12px 8px;
+}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-badge{
+  width:38px;height:38px;border-radius:10px;
+  background:linear-gradient(135deg,#38bdf8,#6366f1);
+  display:grid;place-items:center;font-weight:900;font-size:18px;color:#0f172a;
+  box-shadow:0 4px 12px rgba(56,189,248,.35)
+}
+.logo h1{font-size:16px;line-height:1;letter-spacing:.02em}
+.logo p{font-size:11px;color:var(--muted);margin-top:2px}
+.top-actions{display:flex;gap:8px}
+.icon-btn{
+  min-width:44px;min-height:44px;padding:0 10px;
+  border-radius:12px;border:1px solid var(--border);
+  background:var(--card);color:var(--text);
+  display:grid;place-items:center;font-size:13px;font-weight:700;
+}
+.stats{
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:8px;margin-top:10px
+}
+.stat{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;padding:8px 10px;text-align:center
+}
+.stat label{font-size:10px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+.stat strong{font-size:16px;display:block;margin-top:2px}
+.progress-wrap{margin-top:10px}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px}
+.bar{height:8px;background:#0b1224;border:1px solid var(--border);border-radius:999px;overflow:hidden}
+.bar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#38bdf8,#22c55e);transition:width .4s}
+.main{padding:12px 12px 18px;flex:1;display:flex;flex-direction:column;gap:12px}
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px;
+  box-shadow:0 8px 24px rgba(0,0,0,.25)
+}
+.mission-head{display:flex;gap:10px;align-items:flex-start}
+.mission-num{
+  min-width:44px;min-height:44px;border-radius:12px;
+  background:#0b1224;border:1px solid var(--border);
+  display:grid;place-items:center;font-weight:900;color:var(--accent)
+}
+.mission-head h2{font-size:16px;line-height:1.2}
+.mission-head p{font-size:13px;color:var(--muted);margin-top:4px;line-height:1.4}
+.badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.badge{font-size:11px;padding:5px 8px;border-radius:999px;border:1px solid var(--border);background:#0b1224;color:var(--muted)}
+.badge.accent{color:#0f172a;background:var(--accent);border-color:transparent;font-weight:800}
+.badge.warn{color:#0f172a;background:var(--accent2);border-color:transparent;font-weight:800}
+.file-strip{
+  margin-top:10px;background:#0b1224;border:1px solid var(--border);
+  border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px
+}
+.file-strip strong{font-size:13px;word-break:break-all}
+.file-strip span{font-size:11px;color:var(--muted)}
+.timer-row{display:flex;align-items:center;gap:10px;margin-top:10px}
+.timer{
+  flex:1;height:44px;border-radius:12px;background:#0b1224;border:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;padding:0 12px;font-weight:800
+}
+.timer .dot{width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.timer.warn .dot{background:var(--accent2);box-shadow:0 0 8px var(--accent2)}
+.timer.danger .dot{background:var(--bad);box-shadow:0 0 8px var(--bad);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.hunk{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:16px;overflow:hidden
+}
+.hunk-head{
+  padding:12px 14px;display:flex;justify-content:space-between;align-items:center;
+  background:linear-gradient(180deg,#1e293b,#1a2740);border-bottom:1px solid var(--border)
+}
+.hunk-head h3{font-size:14px}
+.hunk-head span{font-size:11px;color:var(--muted);background:#0b1224;border:1px solid var(--border);padding:4px 8px;border-radius:999px}
+.evidence{
+  padding:10px 12px;background:#0f1a33;border-bottom:1px solid var(--border);
+  display:grid;gap:8px
+}
+.evidence .ev{
+  display:flex;gap:8px;align-items:flex-start;
+  background:#0b1224;border:1px solid var(--border);border-radius:10px;padding:8px 10px
+}
+.ev i{font-style:normal;min-width:28px;min-height:28px;border-radius:8px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--border);font-size:14px}
+.ev p{font-size:12px;line-height:1.4;color:#cbd5e1}
+.ev p b{color:var(--text)}
+.code-grid{display:grid;gap:0}
+.code-block{padding:10px 12px}
+.code-block h4{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.code{
+  background:#0b1224;border:1px solid var(--border);border-radius:10px;
+  padding:10px 10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:12.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;overflow-x:hidden
+}
+.code .add{color:#86efac}
+.code .rem{color:#fca5a5}
+.code .com{color:#94a3b8}
+.choices{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px;
+  background:#0b1224;border-top:1px solid var(--border)
+}
+.choice{
+  min-height:44px;border-radius:12px;border:1px solid var(--border);
+  background:var(--card);color:var(--text);font-weight:800;font-size:12px;
+  padding:8px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px
+}
+.choice small{font-weight:600;color:var(--muted);font-size:10px}
+.choice.active{border-color:var(--accent);background:rgba(56,189,248,.15);box-shadow:0 0 0 2px rgba(56,189,248,.25) inset}
+.choice.correct{border-color:var(--ok);background:rgba(34,197,94,.15)}
+.choice.wrong{border-color:var(--bad);background:rgba(239,68,68,.15)}
+.actions{display:flex;gap:8px;margin-top:4px}
+.btn{
+  flex:1;min-height:48px;border-radius:14px;border:1px solid var(--border);
+  background:var(--card);color:var(--text);font-weight:800;font-size:14px;
+  padding:0 14px;display:flex;align-items:center;justify-content:center;gap:8px
+}
+.btn.primary{background:linear-gradient(135deg,#38bdf8,#6366f1);color:#0f172a;border-color:transparent;box-shadow:0 6px 16px rgba(56,189,248,.35)}
+.btn.ghost{background:#0b1224}
+.btn:disabled{opacity:.5}
+.hint-box{
+  background:#fffbeb;border:1px solid #f59e0b;color:#78350f;
+  border-radius:12px;padding:10px 12px;font-size:12px;line-height:1.4;display:none
+}
+.hint-box.show{display:block}
+.field-log{max-height:50vh;overflow:auto;display:grid;gap:8px}
+.log-item{background:#0b1224;border:1px solid var(--border);border-radius:12px;padding:10px 12px}
+.log-item strong{font-size:13px}
+.log-item p{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
+.modal{
+  position:fixed;inset:0;background:rgba(2,6,23,.72);backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;padding:16px;z-index:20
+}
+.modal.show{display:flex}
+.modal-card{
+  width:100%;max-width:400px;background:var(--card);border:1px solid var(--border);
+  border-radius:18px;padding:16px;box-shadow:0 20px 50px rgba(0,0,0,.5);max-height:90dvh;overflow:auto
+}
+.modal-card h3{font-size:18px}
+.modal-card p{font-size:13px;color:var(--muted);line-height:1.5;margin-top:6px}
+.kbd{font-family:ui-monospace,monospace;background:#0b1224;border:1px solid var(--border);border-bottom-width:2px;padding:2px 6px;border-radius:6px;font-size:11px}
+.divider{height:1px;background:var(--border);margin:10px 0}
+.small{font-size:11px;color:var(--muted);line-height:1.4}
+.center{text-align:center}
+.stars{font-size:20px;letter-spacing:2px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">
+    <div class="logo">
+      <div class="logo-badge">≋</div>
+      <div>
+        <h1>MERGE OPS</h1>
+        <p>Conflict Resolution Unit</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="btnLog" aria-label="Field log">📒 Log</button>
+      <button class="icon-btn" id="btnReset" aria-label="Reset progress">↺</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><label>Mission</label><strong id="statMission">1 / 5</strong></div>
+    <div class="stat"><label>Score</label><strong id="statScore">0</strong></div>
+    <div class="stat"><label>Streak</label><strong id="statStreak">0🔥</strong></div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-label"><span>Campaign progress</span><span id="progressText">0%</span></div>
+    <div class="bar"><i id="progressBar"></i></div>
+  </div>
+</div>
+
+<div class="main" id="main">
+  <!-- injected -->
+</div>
+
+<!-- Field Log Modal -->
+<div class="modal" id="logModal" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <h3>📒 Field Log</h3>
+      <button class="icon-btn" id="closeLog" style="min-width:44px">✕</button>
+    </div>
+    <p>Locally saved progress. Review past missions and evidence calls.</p>
+    <div class="divider"></div>
+    <div class="field-log" id="logList"></div>
+    <div class="divider"></div>
+    <button class="btn ghost" id="exportBtn" style="width:100%">Copy progress code</button>
+    <p class="small" id="exportMsg" style="margin-top:8px"></p>
+  </div>
+</div>
+
+<!-- Result Modal -->
+<div class="modal" id="resultModal" role="dialog" aria-modal="true">
+  <div class="modal-card center">
+    <div id="resultIcon" style="font-size:42px">🎉</div>
+    <h3 id="resultTitle">Mission Complete</h3>
+    <p id="resultDesc"></p>
+    <div class="stars" id="resultStars">★★★</div>
+    <p class="small" id="resultDetail"></p>
+    <div class="divider"></div>
+    <div class="actions">
+      <button class="btn ghost" id="btnReplay">Replay</button>
+      <button class="btn primary" id="btnNext">Next Mission →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const MISSIONS = [
+  {
+    id:1,
+    title:"The Midnight Hotfix",
+    file:"src/payments/checkout.js",
+    brief:"Two engineers patched checkout at 2am. Maya added retry logic for flaky networks. Jon added a discount guard. Both touched the same function. Your job: keep what’s safe, combine where needed.",
+    badges:["Timed 90s","2 hunks","Evidence: comments + docs"],
+    time:90,
+    hunks:[
+      {
+        id:"h1",
+        title:"Hunk 1 — Retry vs Guard",
+        evidence:[
+          {icon:"💬", text:"<b>Comment — Maya:</b> “Retry 3× on NETWORK_ERR — approved in RFC-42. Do not remove.”"},
+          {icon:"📄", text:"<b>Docs — Discounts:</b> Discounts must be validated <em>before</em> charging. See payments.md#discounts."}
+        ],
+        base:`function checkout(cart){\n  charge(cart.total);\n}`,
+        ours:`function checkout(cart){\n  // Maya: retry on flaky network\n  for(let i=0;i<3;i++){\n    try{ charge(cart.total); break; }\n    catch(e){ if(e.code!=='NETWORK_ERR') throw e; }\n  }\n}`,
+        theirs:`function checkout(cart){\n  // Jon: validate discount first\n  if(cart.discount) validateDiscount(cart.discount);\n  charge(cart.total);\n}`,
+        options:[
+          {label:"Keep Maya", sub:"Retry only", value:"ours"},
+          {label:"Keep Jon", sub:"Guard only", value:"theirs"},
+          {label:"Combine", sub:"Guard + Retry", value:"both"}
+        ],
+        correct:"both",
+        hint:"Docs say validate BEFORE charge. Maya’s retry is approved. You need both — guard first, then retry the charge."
+      },
+      {
+        id:"h2",
+        title:"Hunk 2 — Timeout value",
+        evidence:[
+          {icon:"💬", text:"<b>Comment — SRE:</b> “Timeout must stay 5000ms — 2000ms causes false failures in prod.”"},
+          {icon:"📄", text:"<b>Incident #118:</b> Lowering timeout to 2s increased failures by 18%."}
+        ],
+        base:`const TIMEOUT = 5000;`,
+        ours:`const TIMEOUT = 5000; // keep SRE approved`,
+        theirs:`const TIMEOUT = 2000; // faster UX`,
+        options:[
+          {label:"Keep 5000ms", sub:"SRE safe", value:"ours"},
+          {label:"Keep 2000ms", sub:"Faster", value:"theirs"},
+          {label:"Combine", sub:"Average 3500", value:"both"}
+        ],
+        correct:"ours",
+        hint:"SRE + incident data outweigh ‘faster UX’. Keep 5000ms."
+      }
+    ]
+  },
+  {
+    id:2,
+    title:"The Feature Flag Fiasco",
+    file:"src/ui/FeatureBanner.jsx",
+    brief:"Product wants a new banner behind a flag. Alex removed the old banner entirely. Priya kept it and gated the new one. The flag docs say: keep legacy until 100% rollout.",
+    badges:["Timed 80s","2 hunks","Evidence: flag docs"],
+    time:80,
+    hunks:[
+      {
+        id:"h1",
+        title:"Hunk 1 — Banner rendering",
+        evidence:[
+          {icon:"📄", text:"<b>Flag Docs:</b> “flag.newBanner = true shows NEW banner, else show LEGACY. Do not delete legacy until v2.1.”"},
+          {icon:"💬", text:"<b>Priya:</b> “Legacy still used by 40% of users.”"}
+        ],
+        base:`return <Banner />`,
+        ours:`return null // Alex: removed old banner`,
+        theirs:`return flag.newBanner ? <NewBanner/> : <Banner/>`,
+        options:[
+          {label:"Remove", sub:"Alex", value:"ours"},
+          {label:"Gate flag", sub:"Priya", value:"theirs"},
+          {label:"Show both", sub:"Duplicate", value:"both"}
+        ],
+        correct:"theirs",
+        hint:"Docs are explicit: gate, don’t delete. Priya is correct."
+      },
+      {
+        id:"h2",
+        title:"Hunk 2 — Analytics",
+        evidence:[
+          {icon:"💬", text:"<b>Comment — Data:</b> “We need both events: banner_shown + banner_variant for A/B.”"},
+          {icon:"📄", text:"<b>Spec:</b> Log variant even when legacy shown."}
+        ],
+        base:`track('banner_shown')`,
+        ours:`track('banner_shown')`,
+        theirs:`track('banner_shown'); track('banner_variant', flag.newBanner?'new':'legacy')`,
+        options:[
+          {label:"Single event", sub:"Alex", value:"ours"},
+          {label:"Both events", sub:"Priya", value:"theirs"},
+          {label:"Only variant", sub:"New only", value:"both"}
+        ],
+        correct:"theirs",
+        hint:"Spec requires both events. Theirs adds the missing variant log."
+      }
+    ]
+  },
+  {
+    id:3,
+    title:"The Auth Rewrite",
+    file:"src/auth/session.js",
+    brief:"Security audited auth. Sam added httpOnly cookies. Taylor added localStorage cache for speed. Security policy forbids tokens in localStorage.",
+    badges:["Timed 75s","2 hunks","Evidence: security policy"],
+    time:75,
+    hunks:[
+      {
+        id:"h1",
+        title:"Hunk 1 — Token storage",
+        evidence:[
+          {icon:"📄", text:"<b>Security Policy:</b> “Never store auth tokens in localStorage — XSS risk. Use httpOnly cookies only.”"},
+          {icon:"💬", text:"<b>Sam:</b> “httpOnly cookie set by server, JS cannot read.”"}
+        ],
+        base:`storeToken(token)`,
+        ours:`setCookie('token', token, {httpOnly:true, secure:true})`,
+        theirs:`localStorage.setItem('token', token) // fast`,
+        options:[
+          {label:"httpOnly cookie", sub:"Sam", value:"ours"},
+          {label:"localStorage", sub:"Taylor", value:"theirs"},
+          {label:"Both stores", sub:"Redundant", value:"both"}
+        ],
+        correct:"ours",
+        hint:"Policy is non-negotiable. localStorage is insecure here."
+      },
+      {
+        id:"h2",
+        title:"Hunk 2 — Session refresh",
+        evidence:[
+          {icon:"💬", text:"<b>Comment — Sam:</b> “Refresh must use cookie, not header.”"},
+          {icon:"💬", text:"<b>Comment — Taylor:</b> “Added silent refresh every 5m — good idea, just needs cookie.”"}
+        ],
+        base:`function refresh(){ fetch('/refresh') }`,
+        ours:`function refresh(){ fetch('/refresh', {credentials:'include'}) }`,
+        theirs:`function refresh(){ setInterval(()=>fetch('/refresh'), 5*60*1000) }`,
+        options:[
+          {label:"Credentials", sub:"Sam", value:"ours"},
+          {label:"Interval", sub:"Taylor", value:"theirs"},
+          {label:"Combine", sub:"Interval + creds", value:"both"}
+        ],
+        correct:"both",
+        hint:"Both ideas are valid together: interval refresh WITH credentials:include."
+      }
+    ]
+  },
+  {
+    id:4,
+    title:"The Config Clash",
+    file:"config/deploy.yml",
+    brief:"DevOps war: Kai set replicas to 3 for HA. Lee set to 1 to save cost in staging. The file is for production. Prod runbook says min 3 replicas.",
+    badges:["Timed 70s","2 hunks","Evidence: runbook"],
+    time:70,
+    hunks:[
+      {
+        id:"h1",
+        title:"Hunk 1 — Replicas",
+        evidence:[
+          {icon:"📄", text:"<b>Prod Runbook:</b> “Production must run 3 replicas minimum for HA.”"},
+          {icon:"💬", text:"<b>Kai:</b> “This file is prod — see path config/deploy.yml (prod).”"}
+        ],
+        base:`replicas: 2`,
+        ours:`replicas: 3 # HA`,
+        theirs:`replicas: 1 # cost save`,
+        options:[
+          {label:"3 replicas", sub:"Kai", value:"ours"},
+          {label:"1 replica", sub:"Lee", value:"theirs"},
+          {label:"2 replicas", sub:"Compromise", value:"both"}
+        ],
+        correct:"ours",
+        hint:"Prod runbook wins. This is prod file — keep 3."
+      },
+      {
+        id:"h2",
+        title:"Hunk 2 — Env flag",
+        evidence:[
+          {icon:"💬", text:"<b>Comment — Lee:</b> “Good catch — env should be production here.”"},
+          {icon:"📄", text:"<b>Docs:</b> env must match deploy target."}
+        ],
+        base:`env: staging`,
+        ours:`env: production`,
+        theirs:`env: production`,
+        options:[
+          {label:"production", sub:"Both agree", value:"ours"},
+          {label:"staging", sub:"Old", value:"theirs"},
+          {label:"Combine", sub:"Both envs", value:"both"}
+        ],
+        correct:"ours",
+        hint:"Both sides agree on production — either ‘ours’ or ‘theirs’ is fine, but pick one. Trick: they’re identical, so either counts — we accept ‘ours’."
+      }
+    ]
+  },
+  {
+    id:5,
+    title:"The Final Merge — Release Day",
+    file:"src/api/client.js",
+    brief:"Release day! Two critical fixes collide. One adds auth header, the other adds retry + logging. You must combine correctly — missing either breaks prod.",
+    badges:["Timed 90s","3 hunks","Boss mission"],
+    time:90,
+    hunks:[
+      {
+        id:"h1",
+        title:"Hunk 1 — Headers",
+        evidence:[
+          {icon:"📄", text:"<b>API Spec:</b> “All requests must include Authorization: Bearer <token>.”"},
+          {icon:"💬", text:"<b>Review:</b> “Auth header missing = 401 for all users.”"}
+        ],
+        base:`fetch(url)`,
+        ours:`fetch(url, {headers:{Authorization: 'Bearer '+token}})`,
+        theirs:`fetch(url) // no auth`,
+        options:[
+          {label:"With auth", sub:"Fix 401", value:"ours"},
+          {label:"No auth", sub:"Broken", value:"theirs"},
+          {label:"Both", sub:"Duplicate", value:"both"}
+        ],
+        correct:"ours",
+        hint:"Spec requires auth header. Keep ours."
+      },
+      {
+        id:"h2",
+        title:"Hunk 2 — Retry logic",
+        evidence:[
+          {icon:"💬", text:"<b>Comment — On-call:</b> “Retry on 503 is required — we had outage without it.”"},
+          {icon:"📄", text:"<b>Postmortem #42:</b> Retry saved 12k requests."}
+        ],
+        base:`return fetch(url)`,
+        ours:`return fetch(url)`,
+        theirs:`return fetchWithRetry(url, {retries:3, onRetry:log})`,
+        options:[
+          {label:"No retry", sub:"Ours", value:"ours"},
+          {label:"Retry+log", sub:"Theirs", value:"theirs"},
+          {label:"Retry no log", sub:"Partial", value:"both"}
+        ],
+        correct:"theirs",
+        hint:"Retry with logging is proven to save prod. Choose theirs."
+      },
+      {
+        id:"h3",
+        title:"Hunk 3 — Error handling",
+        evidence:[
+          {icon:"💬", text:"<b>Both agree:</b> “Should throw AppError with code, not generic Error.”"},
+          {icon:"📄", text:"<b>Style Guide:</b> Use AppError for API errors."}
+        ],
+        base:`throw new Error('fail')`,
+        ours:`throw new AppError('API_FAIL', {cause:e})`,
+        theirs:`throw new AppError('API_FAIL', {cause:e})`,
+        options:[
+          {label:"AppError", sub:"Correct", value:"ours"},
+          {label:"Generic Error", sub:"Old", value:"theirs"},
+          {label:"Combine", sub:"Both throws", value:"both"}
+        ],
+        correct:"ours",
+        hint:"Both sides actually wrote AppError — pick AppError (ours/theirs same, we accept ours)."
+      }
+    ]
+  }
+];
+
+const STORAGE_KEY = "mergeOps_progress_v2";
+let state = {
+  current:0,
+  score:0,
+  streak:0,
+  answers:{}, // missionId -> {hunkId: value}
+  completed:{}, // missionId -> {score, stars, timeLeft}
+  log:[]
+};
+let timerId=null;
+let timeLeft=0;
+
+function load(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(raw) state = {...state, ...JSON.parse(raw)};
+  }catch{}
+}
+function save(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+function formatTime(s){
+  const m=Math.floor(s/60), sec=s%60;
+  return `${m}:${String(sec).padStart(2,'0')}`;
+}
+function updateTop(){
+  document.getElementById('statMission').textContent = `${state.current+1} / ${MISSIONS.length}`;
+  document.getElementById('statScore').textContent = state.score;
+  document.getElementById('statStreak').textContent = state.streak + "🔥";
+  const done = Object.keys(state.completed).length;
+  const pct = Math.round(done / MISSIONS.length * 100);
+  document.getElementById('progressText').textContent = pct + "%";
+  document.getElementById('progressBar').style.width = pct + "%";
+}
+function render(){
+  const m = MISSIONS[state.current];
+  if(!m) return renderDone();
+  timeLeft = m.time;
+  const main = document.getElementById('main');
+  main.innerHTML = `
+    <div class="card">
+      <div class="mission-head">
+        <div class="mission-num">${m.id}</div>
+        <div style="flex:1">
+          <h2>${m.title}</h2>
+          <p>${m.brief}</p>
+          <div class="badges">
+            ${m.badges.map((b,i)=>`<span class="badge ${i===0?'warn':''}">${b}</span>`).join('')}
+            <span class="badge accent">${m.file}</span>
+          </div>
+        </div>
+      </div>
+      <div class="file-strip">
+        <strong>📄 ${m.file}</strong>
+        <span>${m.hunks.length} hunks to resolve</span>
+      </div>
+      <div class="timer-row">
+        <div class="timer" id="timerBox"><span class="dot"></span> <span id="timerText">${formatTime(timeLeft)}</span> <span style="margin-left:auto;font-size:11px;color:var(--muted)">tap hint if stuck</span></div>
+        <button class="btn ghost" id="btnHint" style="flex:0 0 auto;min-width:88px">💡 Hint</button>
+      </div>
+      <div class="hint-box" id="hintBox"></div>
+    </div>
+    <div id="hunks"></div>
+    <div class="actions">
+      <button class="btn ghost" id="btnSkip">Skip →</button>
+      <button class="btn primary" id="btnSubmit" disabled>Resolve & Ship 🚀</button>
+    </div>
+    <p class="small center">Choose for each hunk: keep one side or combine both. Evidence in comments & docs tells you which is safe.</p>
+  `;
+  const hunksEl = document.getElementById('hunks');
+  hunksEl.innerHTML = m.hunks.map(h=>`
+    <div class="hunk" data-hunk="${h.id}">
+      <div class="hunk-head">
+        <h3>${h.title}</h3>
+        <span>${h.id.toUpperCase()}</span>
+      </div>
+      <div class="evidence">
+        ${h.evidence.map(e=>`<div class="ev"><i>${e.icon}</i><p>${e.text}</p></div>`).join('')}
+      </div>
+      <div class="code-grid">
+        <div class="code-block">
+          <h4>Base <span style="color:var(--muted);font-weight:600">common ancestor</span></h4>
+          <div class="code">${escapeHtml(h.base)}</div>
+        </div>
+        <div class="code-block">
+          <h4><span style="color:#38bdf8">◼ OURS</span> <span>current branch</span></h4>
+          <div class="code">${escapeHtml(h.ours)}</div>
+        </div>
+        <div class="code-block">
+          <h4><span style="color:#f59e0b">◼ THEIRS</span> <span>incoming</span></h4>
+          <div class="code">${escapeHtml(h.theirs)}</div>
+        </div>
+      </div>
+      <div class="choices">
+        ${h.options.map(o=>`
+          <button class="choice" data-hunk="${h.id}" data-val="${o.value}">
+            ${o.label}<small>${o.sub}</small>
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  // restore answers
+  const ans = state.answers[m.id] || {};
+  for(const hid in ans){
+    const btn = document.querySelector(`.choice[data-hunk="${hid}"][data-val="${ans[hid]}"]`);
+    if(btn) btn.classList.add('active');
+  }
+  checkReady();
+  bindHunkEvents();
+  document.getElementById('btnHint').onclick = showHint;
+  document.getElementById('btnSubmit').onclick = submit;
+  document.getElementById('btnSkip').onclick = ()=>{ stopTimer(); state.current = Math.min(state.current+1, MISSIONS.length-1); save(); updateTop(); render(); startTimer(); };
+  startTimer();
+}
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function bindHunkEvents(){
+  document.querySelectorAll('.choice').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const hunk = btn.dataset.hunk;
+      const val = btn.dataset.val;
+      const m = MISSIONS[state.current];
+      if(!state.answers[m.id]) state.answers[m.id]={};
+      state.answers[m.id][hunk]=val;
+      save();
+      // toggle active
+      document.querySelectorAll(`.choice[data-hunk="${hunk}"]`).forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      checkReady();
+    });
+  });
+}
+function checkReady(){
+  const m = MISSIONS[state.current];
+  const ans = state.answers[m.id]||{};
+  const ready = m.hunks.every(h=> ans[h.id]);
+  document.getElementById('btnSubmit').disabled = !ready;
+}
+function showHint(){
+  const m = MISSIONS[state.current];
+  const box = document.getElementById('hintBox');
+  // find first unanswered or first hunk
+  const ans = state.answers[m.id]||{};
+  let target = m.hunks.find(h=> !ans[h.id]) || m.hunks[0];
+  box.innerHTML = `<strong>💡 Hint for ${target.title}:</strong> ${target.hint}`;
+  box.classList.add('show');
+  // penalty: -5 sec
+  timeLeft = Math.max(0, timeLeft-5);
+  updateTimerUI();
+}
+function startTimer(){
+  stopTimer();
+  updateTimerUI();
+  timerId = setInterval(()=>{
+    timeLeft--;
+    updateTimerUI();
+    if(timeLeft<=0){
+      stopTimer();
+      submit(true);
+    }
+  },1000);
+}
+function stopTimer(){ if(timerId){clearInterval(timerId); timerId=null;} }
+function updateTimerUI(){
+  const el = document.getElementById('timerText');
+  const box = document.getElementById('timerBox');
+  if(!el) return;
+  el.textContent = formatTime(Math.max(0,timeLeft));
+  box.classList.remove('warn','danger');
+  if(timeLeft<=20) box.classList.add('danger');
+  else if(timeLeft<=40) box.classList.add('warn');
+}
+function submit(timedOut=false){
+  stopTimer();
+  const m = MISSIONS[state.current];
+  const ans = state.answers[m.id]||{};
+  let correct=0;
+  m.hunks.forEach(h=>{
+    const got = ans[h.id];
+    // special: mission 4 hunk2 and mission5 hunk3 have identical ours/theirs, accept either
+    let ok = got===h.correct;
+    if(m.id===4 && h.id==='h2' && (got==='ours' || got==='theirs')) ok=true;
+    if(m.id===5 && h.id==='h3' && (got==='ours' || got==='theirs')) ok=true;
+    if(ok) correct++;
+  });
+  const total = m.hunks.length;
+  const accuracy = correct/total;
+  let stars = 1;
+  if(accuracy===1) stars=3;
+  else if(accuracy>=0.5) stars=2;
+  if(timedOut && stars>1) stars--;
+  const timeBonus = Math.floor(timeLeft/10);
+  const earned = correct*100 + (accuracy===1?50:0) + timeBonus;
+  // streak
+  if(accuracy===1) state.streak++;
+  else state.streak=0;
+  state.score += earned;
+  state.completed[m.id] = {correct, total, stars, earned, timeLeft, timedOut};
+  state.log.unshift({mission:m.title, file:m.file, correct, total, stars, at:new Date().toLocaleString()});
+  if(state.log.length>20) state.log.pop();
+  save();
+  updateTop();
+  showResult({m, correct, total, stars, earned, timedOut});
+}
+function showResult({m, correct, total, stars, earned, timedOut}){
+  const modal=document.getElementById('resultModal');
+  const icon=document.getElementById('resultIcon');
+  const title=document.getElementById('resultTitle');
+  const desc=document.getElementById('resultDesc');
+  const detail=document.getElementById('resultDetail');
+  const starsEl=document.getElementById('resultStars');
+  if(correct===total){
+    icon.textContent="🎉";
+    title.textContent= timedOut ? "Shipped — just in time!" : "Perfect Merge!";
+    desc.textContent=`You resolved ${correct}/${total} hunks correctly in ${m.file}. Evidence weighed perfectly.`;
+  } else if(correct===0){
+    icon.textContent="💥";
+    title.textContent="Merge Conflict!";
+    desc.textContent=`Only ${correct}/${total} correct. Review the evidence — comments and docs are your source of truth.`;
+  } else {
+    icon.textContent="🛠️";
+    title.textContent="Shipped with fixes";
+    desc.textContent=`You got ${correct}/${total} hunks right. Check the field log to see what to improve.`;
+  }
+  starsEl.textContent = "★".repeat(stars) + "☆".repeat(3-stars);
+  detail.textContent = `+${earned} pts • Time left ${formatTime(timeLeft)} • Streak ${state.streak}`;
+  modal.classList.add('show');
+  // highlight correct answers in background
+  highlightAnswers();
+}
+function highlightAnswers(){
+  const m = MISSIONS[state.current];
+  const ans = state.answers[m.id]||{};
+  m.hunks.forEach(h=>{
+    let correct = h.correct;
+    // handle identical cases
+    document.querySelectorAll(`.choice[data-hunk="${h.id}"]`).forEach(btn=>{
+      const v=btn.dataset.val;
+      const got = ans[h.id];
+      btn.classList.remove('correct','wrong');
+      if(v===correct) btn.classList.add('correct');
+      if(v===got && got!==correct){
+        // check special accept
+        let ok = got===correct;
+        if(m.id===4 && h.id==='h2' && (got==='ours'||got==='theirs')) ok=true;
+        if(m.id===5 && h.id==='h3' && (got==='ours'||got==='theirs')) ok=true;
+        if(!ok) btn.classList.add('wrong');
+      }
+    });
+  });
+}
+function renderDone(){
+  const main=document.getElementById('main');
+  const totalStars = Object.values(state.completed).reduce((a,c)=>a+c.stars,0);
+  main.innerHTML=`
+    <div class="card center">
+      <div style="font-size:44px">🏆</div>
+      <h2>Campaign Complete</h2>
+      <p style="color:var(--muted);margin-top:6px;line-height:1.5">You’ve resolved all ${MISSIONS.length} missions. You’re now a certified Merge Ops agent.</p>
+      <div class="stars" style="margin-top:10px">${"★".repeat(Math.min(5,Math.round(totalStars/3)))} </div>
+      <p class="small" style="margin-top:8px">Total score ${state.score} • Stars ${totalStars}/15</p>
+      <div class="divider"></div>
+      <div class="actions">
+        <button class="btn ghost" id="btnRestart">Restart Campaign</button>
+        <button class="btn primary" id="btnReview">Review Log</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="font-size:14px">What you learned</h3>
+      <p class="small" style="margin-top:6px">• Weigh evidence: comments, docs, runbooks beat “faster” or “cheaper”.<br>• Combine when both changes are valid (guard + retry).<br>• Never store secrets in localStorage; keep prod HA.</p>
+    </div>
+  `;
+  document.getElementById('btnRestart').onclick=()=>{
+    if(confirm("Restart campaign? Progress will reset.")){
+      localStorage.removeItem(STORAGE_KEY);
+      state={current:0,score:0,streak:0,answers:{},completed:{},log:[]};
+      updateTop(); render();
+    }
+  };
+  document.getElementById('btnReview').onclick=()=> openLog();
+}
+function openLog(){
+  const list=document.getElementById('logList');
+  if(state.log.length===0){
+    list.innerHTML=`<p class="small">No missions completed yet. Finish a mission to see it here.</p>`;
+  } else {
+    list.innerHTML = state.log.map(l=>`
+      <div class="log-item">
+        <strong>${l.mission} — ${l.stars}★</strong>
+        <p>${l.file} • ${l.correct}/${l.total} hunks • ${l.at}</p>
+      </div>
+    `).join('') + `<div class="log-item"><strong>Total score: ${state.score}</strong><p>Progress saved locally on this device.</p></div>`;
+  }
+  document.getElementById('logModal').classList.add('show');
+}
+
+// top actions
+document.getElementById('btnLog').onclick=openLog;
+document.getElementById('closeLog').onclick=()=> document.getElementById('logModal').classList.remove('show');
+document.getElementById('logModal').addEventListener('click', e=>{ if(e.target.id==='logModal') e.currentTarget.classList.remove('show'); });
+document.getElementById('resultModal').addEventListener('click', e=>{ if(e.target.id==='resultModal') e.currentTarget.classList.remove('show'); });
+document.getElementById('btnNext').onclick=()=>{
+  document.getElementById('resultModal').classList.remove('show');
+  if(state.current < MISSIONS.length-1){
+    state.current++;
+    save(); updateTop(); render();
+  } else {
+    renderDone();
+  }
+};
+document.getElementById('btnReplay').onclick=()=>{
+  document.getElementById('resultModal').classList.remove('show');
+  // clear answers for this mission
+  const m=MISSIONS[state.current];
+  delete state.answers[m.id];
+  // remove completed to allow replay without double score? keep score but allow replay
+  // subtract previous earned
+  const prev = state.completed[m.id];
+  if(prev) state.score = Math.max(0, state.score - prev.earned);
+  delete state.completed[m.id];
+  save(); updateTop(); render();
+};
+document.getElementById('btnReset').onclick=()=>{
+  if(confirm("Reset all progress? This clears score and log.")){
+    localStorage.removeItem(STORAGE_KEY);
+    state={current:0,score:0,streak:0,answers:{},completed:{},log:[]};
+    stopTimer(); updateTop(); render();
+  }
+};
+document.getElementById('exportBtn').onclick=async()=>{
+  const code = btoa(JSON.stringify(state)).slice(0,1200);
+  try{
+    await navigator.clipboard.writeText(code);
+    document.getElementById('exportMsg').textContent="✓ Progress code copied — paste to save elsewhere.";
+  }catch{
+    document.getElementById('exportMsg').textContent="Copy this code: "+code.slice(0,200)+"…";
+  }
+};
+
+// init
+load();
+updateTop();
+render();
+</script>
+</body>
+</html>

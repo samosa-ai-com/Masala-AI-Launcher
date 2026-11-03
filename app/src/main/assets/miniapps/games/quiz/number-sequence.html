@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Next Number — Sequence Quiz</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#eef2f7;--card:#ffffff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#0284c7;--ok:#16a34a;--bad:#dc2626;--border:#e2e8f0}
+html,body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;min-height:100vh;overflow-x:hidden}
+body{display:flex;justify-content:center}
+.wrap{width:100%;max-width:428px;min-width:360px;min-height:100vh;display:flex;flex-direction:column}
+header{background:linear-gradient(180deg,#0f172a,#1e293b);color:#fff;padding:14px 14px 12px;position:sticky;top:0;z-index:5}
+.hTop{display:flex;align-items:center;justify-content:space-between}
+.logo{font-weight:900;letter-spacing:.08em;font-size:14px}
+.logo span{color:#7dd3fc;font-weight:400}
+.stats{display:flex;gap:8px;margin-top:10px}
+.stat{flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px;text-align:center}
+.stat b{font-size:16px;display:block;color:#fff}
+.stat span{font-size:10px;letter-spacing:.08em;color:#94a3b8}
+main{flex:1;padding:12px 12px 16px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--card);border-radius:20px;padding:14px;border:1px solid var(--border);box-shadow:0 8px 24px rgba(15,23,42,.08)}
+.pill{display:inline-block;font-size:10px;letter-spacing:.1em;font-weight:800;color:var(--accent2);background:#e0f2fe;padding:4px 8px;border-radius:20px}
+.qTitle{font-size:13px;font-weight:800;margin:8px 0 4px}
+.qHint{font-size:11px;color:var(--muted);line-height:1.4}
+.seqWrap{background:#f8fafc;border:1px solid var(--border);border-radius:16px;padding:12px;margin-top:10px}
+.seq{display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap}
+.term{min-width:54px;min-height:54px;padding:8px 10px;background:#fff;border:2px solid var(--border);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.term.q{border-style:dashed;border-color:var(--accent);color:var(--accent);background:#f0f9ff;font-size:22px}
+.term.ok{border-color:var(--ok);background:#f0fdf4;color:var(--ok);animation:okPop .4s}
+.term.bad{border-color:var(--bad);background:#fef2f2;color:var(--bad);animation:shake .4s}
+@keyframes okPop{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.feedback{margin-top:10px;padding:10px 12px;border-radius:12px;font-size:12px;font-weight:700;text-align:center;display:none}
+.feedback.on{display:block}
+.feedback.ok{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
+.feedback.bad{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+.inputRow{display:flex;gap:8px;margin-top:12px}
+.input{flex:1;height:52px;border:2px solid var(--border);border-radius:12px;padding:0 14px;font-size:20px;font-weight:800;text-align:center;outline:none}
+.input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(14,165,233,.15)}
+.btn{height:52px;padding:0 16px;border-radius:12px;border:1px solid var(--border);font-weight:800;font-size:13px;letter-spacing:.06em;cursor:pointer;touch-action:manipulation;min-width:88px}
+.btnPrimary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btnGhost{background:#fff;color:var(--text)}
+.btn:disabled{opacity:.4}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.k{height:48px;border-radius:10px;border:1px solid var(--border);background:#fff;font-size:18px;font-weight:800;cursor:pointer;touch-action:manipulation}
+.k.wide{grid-column:span 1}
+.k.action{background:var(--text);color:#fff;border-color:var(--text);font-size:12px;letter-spacing:.06em}
+.progress{height:6px;background:#e2e8f0;border-radius:20px;overflow:hidden;margin-top:10px}
+.bar{height:100%;background:var(--accent);width:0%;transition:width .3s}
+.footer{padding:10px 12px;text-align:center;font-size:10px;color:var(--muted)}
+.help{font-size:11px;color:var(--muted);line-height:1.5;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<div class="hTop">
+<div class="logo">NEXT NUMBER <span>— QUIZ</span></div>
+<div style="font-size:11px;color:#7dd3fc;font-weight:700" id="qCount">Q 1</div>
+</div>
+<div class="stats">
+<div class="stat"><b id="streak">0</b><span>STREAK</span></div>
+<div class="stat"><b id="score">0</b><span>SCORE</span></div>
+<div class="stat"><b id="best">0</b><span>BEST</span></div>
+</div>
+</header>
+<main>
+<div class="card">
+<div class="pill" id="patternPill">ARITHMETIC</div>
+<div class="qTitle">What comes next?</div>
+<div class="qHint" id="qHint">Find the pattern and fill the missing term.</div>
+<div class="seqWrap">
+<div class="seq" id="seq"></div>
+<div class="feedback" id="feedback"></div>
+</div>
+<div class="inputRow">
+<input class="input" id="answerInput" type="tel" inputmode="numeric" placeholder="?" autocomplete="off">
+<button class="btn btnPrimary" id="checkBtn">CHECK</button>
+</div>
+<div class="keypad" id="keypad"></div>
+<div style="display:flex;gap:8px;margin-top:10px">
+<button class="btn btnGhost" style="flex:1" id="skipBtn">SKIP →</button>
+<button class="btn btnGhost" style="flex:1" id="restartBtn">RESTART</button>
+</div>
+<div class="progress"><div class="bar" id="bar"></div></div>
+<div class="help" id="helpText">Type or tap the missing number. Streak bonus every 3 correct!</div>
+</div>
+</main>
+<div class="footer">Clean quiz-card • Session score • Instant feedback</div>
+</div>
+<script>
+const PATTERNS=[
+ {name:"ARITHMETIC", gen:()=>{
+  const a=Math.floor(Math.random()*12)+1, d=Math.floor(Math.random()*7)+2;
+  const seq=[a,a+d,a+2*d,a+3*d,a+4*d];
+  return {seq:seq.slice(0,4), ans:seq[4], explain:`+${d} each step`, hint:`Arithmetic +${d}`};
+ }},
+ {name:"GEOMETRIC", gen:()=>{
+  const a=[2,3,4][Math.floor(Math.random()*3)], r=[2,3][Math.floor(Math.random()*2)];
+  const seq=[a,a*r,a*r*r,a*r*r*r,a*r*r*r*r];
+  return {seq:seq.slice(0,4), ans:seq[4], explain:`×${r} each step`, hint:`Geometric ×${r}`};
+ }},
+ {name:"SQUARES", gen:()=>{
+  const s=Math.floor(Math.random()*4)+2;
+  const seq=[s*s,(s+1)*(s+1),(s+2)*(s+2),(s+3)*(s+3),(s+4)*(s+4)];
+  return {seq:seq.slice(0,4), ans:seq[4], explain:`Squares ${(s)}² → ${(s+4)}²`, hint:`n²`};
+ }},
+ {name:"CUBES", gen:()=>{
+  const s=Math.floor(Math.random()*3)+2;
+  const seq=[s**3,(s+1)**3,(s+2)**3,(s+3)**3,(s+4)**3];
+  return {seq:seq.slice(0,4), ans:seq[4], explain:`Cubes ${s}³ → ${(s+4)}³`, hint:`n³`};
+ }},
+ {name:"PRIMES", gen:()=>{
+  const primes=[2,3,5,7,11,13,17,19,23,29,31,37,41,43,47];
+  const i=Math.floor(Math.random()*8);
+  const seq=primes.slice(i,i+5);
+  return {seq:seq.slice(0,4), ans:seq[4], explain:`Prime numbers`, hint:`Primes`};
+ }},
+ {name:"FIBONACCI", gen:()=>{
+  const a=Math.floor(Math.random()*6)+1, b=Math.floor(Math.random()*6)+1;
+  const seq=[a,b]; for(let i=2;i<5;i++) seq.push(seq[i-1]+seq[i-2]);
+  return {seq:seq.slice(0,4), ans:seq[4], explain:`Each = sum of previous two`, hint:`Fibonacci`};
+ }},
+ {name:"TRIANGULAR", gen:()=>{
+  const n=Math.floor(Math.random()*5)+3;
+  const tri=k=>k*(k+1)/2;
+  const seq=[tri(n),tri(n+1),tri(n+2),tri(n+3),tri(n+4)];
+  return {seq:seq.slice(0,4), ans:seq[4], explain:`Triangular numbers`, hint:`n(n+1)/2`};
+ }},
+ {name:"POWERS OF 2", gen:()=>{
+  const p=Math.floor(Math.random()*4);
+  const seq=[2**p,2**(p+1),2**(p+2),2**(p+3),2**(p+4)];
+  return {seq:seq.slice(0,4), ans:seq[4], explain:`Powers of 2`, hint:`2ⁿ`};
+ }},
+ {name:"DOUBLE PLUS", gen:()=>{
+  const a=Math.floor(Math.random()*8)+2, add=Math.floor(Math.random()*5)+1;
+  const seq=[a]; for(let i=1;i<5;i++) seq.push(seq[i-1]*2+add);
+  return {seq:seq.slice(0,4), ans:seq[4], explain:`×2 +${add} each step`, hint:`×2+${add}`};
+ }},
+ {name:"ALTERNATING", gen:()=>{
+  const a=Math.floor(Math.random()*10)+5, d1=Math.floor(Math.random()*5)+2, d2=Math.floor(Math.random()*5)+2;
+  const seq=[a,a+d1,a+d1-d2,a+2*d1-d2,a+2*d1-2*d2+5];
+  // simpler: +d1, -d2 pattern
+  const base=Math.floor(Math.random()*12)+4;
+  const s=[base, base+d1, base+d1-d2, base+2*d1-d2, base+2*d1-2*d2];
+  return {seq:s.slice(0,4), ans:s[4], explain:`+${d1}, −${d2} alternating`, hint:`Alt +${d1}/−${d2}`};
+ }},
+ {name:"EVEN / ODD", gen:()=>{
+  const start=Math.floor(Math.random()*10)*2+2;
+  const seq=[start,start+2,start+4,start+6,start+8];
+  return {seq:seq.slice(0,4), ans:seq[4], explain:`Even numbers +2`, hint:`+2 evens`};
+ }},
+ {name:"QUADRATIC", gen:()=>{
+  const n=Math.floor(Math.random()*4)+2;
+  const seq=[n*n+1,(n+1)*(n+1)+1,(n+2)*(n+2)+1,(n+3)*(n+3)+1,(n+4)*(n+4)+1];
+  return {seq:seq.slice(0,4), ans:seq[4], explain:`n²+1`, hint:`n²+1`};
+ }},
+];
+
+let cur=null, score=0, streak=0, best=0, qIndex=0, answered=0, correct=0, checked=false;
+try{let s=JSON.parse(localStorage.getItem("nextNumberSave")); if(s){score=s.score||0; best=s.best||0; qIndex=s.qIndex||0; answered=s.answered||0; correct=s.correct||0;}}catch(e){}
+function persist(){localStorage.setItem("nextNumberSave",JSON.stringify({score,best,qIndex,answered,correct}));}
+function newPuzzle(){
+ const p=PATTERNS[Math.floor(Math.random()*PATTERNS.length)];
+ cur=p.gen(); cur.name=p.name;
+ checked=false;
+ document.getElementById("patternPill").textContent=cur.name;
+ document.getElementById("qHint").textContent=cur.hint;
+ document.getElementById("feedback").className="feedback";
+ document.getElementById("feedback").textContent="";
+ document.getElementById("answerInput").value="";
+ document.getElementById("answerInput").disabled=false;
+ document.getElementById("checkBtn").textContent="CHECK";
+ document.getElementById("checkBtn").disabled=false;
+ document.getElementById("qCount").textContent=`Q ${qIndex+1}`;
+ renderSeq(false);
+ updateStats();
+ document.getElementById("answerInput").focus();
+}
+function renderSeq(reveal){
+ const el=document.getElementById("seq"); el.innerHTML="";
+ cur.seq.forEach(v=>{
+  const d=document.createElement("div"); d.className="term"; d.textContent=v; el.appendChild(d);
+ });
+ const q=document.createElement("div"); q.className="term q"+(reveal? (reveal==="ok"?" ok":" bad"):""); q.textContent= reveal && reveal!=="ok" && reveal!=="bad" ? cur.ans : "?";
+ if(reveal==="ok"||reveal==="bad") q.textContent=cur.ans;
+ el.appendChild(q);
+}
+function updateStats(){
+ document.getElementById("streak").textContent=streak;
+ document.getElementById("score").textContent=score;
+ document.getElementById("best").textContent=best;
+ document.getElementById("bar").style.width= Math.min(100, (streak/10*100))+"%";
+}
+function check(){
+ if(checked) { next(); return; }
+ const val=document.getElementById("answerInput").value.trim();
+ if(val===""||isNaN(Number(val))){ showFeedback("Enter a number",false); shake(); return; }
+ const num=Number(val);
+ checked=true; answered++; qIndex++;
+ if(num===cur.ans){
+  correct++; streak++; let pts=10; if(streak%3===0) pts+=5;
+  score+=pts; best=Math.max(best,score);
+  showFeedback(`✓ Correct! ${cur.explain} +${pts} pts`,true);
+  renderSeq("ok");
+  if(navigator.vibrate) navigator.vibrate(30);
+ } else {
+  streak=0;
+  showFeedback(`✗ Wrong — answer ${cur.ans}. ${cur.explain}`,false);
+  renderSeq("bad");
+  if(navigator.vibrate) navigator.vibrate([40,40,40]);
+ }
+ document.getElementById("checkBtn").textContent="NEXT →";
+ document.getElementById("answerInput").disabled=true;
+ persist(); updateStats();
+}
+function showFeedback(t,ok){
+ const f=document.getElementById("feedback"); f.textContent=t; f.className="feedback on "+(ok?"ok":"bad");
+}
+function shake(){
+ const inp=document.getElementById("answerInput"); inp.style.animation="shake .35s"; setTimeout(()=>inp.style.animation="",350);
+}
+function next(){ newPuzzle(); }
+function skip(){
+ qIndex++; streak=0; persist(); updateStats(); newPuzzle();
+ showFeedback("Skipped — streak reset",false);
+}
+function restart(){
+ score=0; streak=0; qIndex=0; answered=0; correct=0; persist(); newPuzzle();
+ showFeedback("Session restarted",true); setTimeout(()=>{document.getElementById("feedback").className="feedback";},1200);
+}
+// keypad
+function buildKeypad(){
+ const kp=document.getElementById("keypad"); kp.innerHTML="";
+ const keys=["1","2","3","4","5","6","7","8","9","-","0","⌫"];
+ keys.forEach(k=>{
+  const b=document.createElement("button"); b.className="k"+(k==="⌫"?" action":""); b.textContent=k;
+  b.onclick=()=>{
+   const inp=document.getElementById("answerInput");
+   if(k==="⌫") inp.value=inp.value.slice(0,-1);
+   else inp.value+=k;
+   inp.focus();
+  };
+  kp.appendChild(b);
+ });
+}
+document.getElementById("checkBtn").onclick=check;
+document.getElementById("skipBtn").onclick=skip;
+document.getElementById("restartBtn").onclick=restart;
+document.getElementById("answerInput").addEventListener("keydown",e=>{ if(e.key==="Enter") check(); });
+buildKeypad(); newPuzzle();
+</script>
+</body>
+</html>

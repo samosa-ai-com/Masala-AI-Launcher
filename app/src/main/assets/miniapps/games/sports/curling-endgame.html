@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Stone Slide — 12 Ends</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#081525;color:#0f2438;display:flex;justify-content:center}
+#app{width:100%;max-width:428px;min-width:360px;min-height:100vh;background:#eaf4fb;display:flex;flex-direction:column;overflow:hidden;position:relative}
+header{background:linear-gradient(180deg,#12365a 0%,#0d2a48 100%);color:#fff;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:3px solid #7fb8e0}
+.h-left{display:flex;align-items:center;gap:8px}
+.logo{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#bfe6ff,#4a90c8);display:grid;place-items:center;font-size:18px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.h-title{line-height:1}
+.h-title b{font-size:15px;letter-spacing:.6px;display:block}
+.h-title span{font-size:10px;opacity:.85;letter-spacing:.8px}
+.h-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.pill{font-size:10px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);padding:3px 7px;border-radius:20px;letter-spacing:.5px}
+.stars-top{font-size:12px;font-weight:800;color:#ffd54f;text-shadow:0 1px 0 rgba(0,0,0,.4)}
+nav{display:flex;gap:6px;padding:8px 10px;background:#d6e9f6;border-bottom:2px solid #b8d4e8}
+.navbtn{flex:1;min-height:38px;border-radius:10px;border:2px solid #a9c9e2;background:#fff;font-weight:800;font-size:13px;color:#12365a;cursor:pointer}
+.navbtn.active{background:#12365a;color:#fff;border-color:#12365a}
+main{flex:1;overflow:auto;padding:10px 10px 14px;display:flex;flex-direction:column;gap:10px}
+.card{background:#fff;border-radius:14px;border:2px solid #cfe3f3;box-shadow:0 4px 12px rgba(15,42,72,.08);padding:10px}
+.endbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:linear-gradient(90deg,#fff,#e6f1fa);border-radius:12px;border:2px solid #cfe3f3}
+.endbar b{font-size:13px;color:#12365a}
+.endbar span{font-size:11px;color:#4a6a85;font-weight:600}
+.badge{font-size:11px;font-weight:800;background:#12365a;color:#fff;padding:4px 8px;border-radius:20px}
+.sheet-wrap{position:relative;background:linear-gradient(180deg,#d4ecfb 0%,#a9d4f0 45%,#cfe9fb 100%);border-radius:14px;border:3px solid #fff;box-shadow:inset 0 0 0 2px #b8d8ee, 0 6px 16px rgba(0,0,0,.12);overflow:hidden;padding:8px}
+.sheet-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.sheet-top span{font-size:10px;font-weight:800;letter-spacing:.7px;color:#12365a;background:#fff;padding:3px 7px;border-radius:20px;border:1px solid #b8d8ee}
+canvas#sheet{width:100%;height:auto;display:block;background:linear-gradient(180deg,#e6f6ff 0%,#c8e6fb 50%,#eaf6ff 100%);border-radius:10px;border:2px solid #8ec1e6;touch-action:none}
+.controls{display:grid;gap:10px}
+.ctrl-row{display:flex;align-items:center;gap:8px;background:#f6fbff;border:1px solid #d6e9f6;border-radius:12px;padding:8px 10px}
+.ctrl-label{width:52px;font-size:11px;font-weight:800;color:#12365a;line-height:1}
+.ctrl-label small{display:block;font-weight:600;color:#5a7a96;font-size:10px}
+.range-wrap{flex:1;display:flex;align-items:center;gap:6px}
+input[type=range]{flex:1;height:28px;-webkit-appearance:none;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:8px;background:#d6e9f6;border-radius:20px;border:1px solid #b8d4e8}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;border-radius:50%;background:#12365a;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25);margin-top:-11px}
+.val{width:44px;text-align:center;font-weight:900;font-size:14px;color:#12365a;background:#fff;border:1px solid #b8d4e8;border-radius:8px;padding:4px 0}
+.stepbtn{width:36px;height:36px;border-radius:10px;border:2px solid #b8d4e8;background:#fff;font-weight:900;font-size:16px;color:#12365a;display:grid;place-items:center;cursor:pointer;flex-shrink:0}
+.action-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.btn{min-height:46px;border-radius:12px;border:2px solid transparent;font-weight:900;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;letter-spacing:.3px}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:linear-gradient(180deg,#e74c3c,#c0392b);color:#fff;border-color:#a93226;box-shadow:0 4px 10px rgba(192,57,43,.35)}
+.btn-dark{background:#12365a;color:#fff;border-color:#0d2a48}
+.btn-light{background:#fff;color:#12365a;border-color:#b8d4e8}
+.btn-gold{background:linear-gradient(180deg,#ffd54f,#d4a017);color:#3a2a00;border-color:#b8920f}
+.btn:disabled{opacity:.45;pointer-events:none}
+.throw-list{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.throw-card{border-radius:12px;padding:8px;border:2px solid #d6e9f6;background:#f6fbff;text-align:center;position:relative}
+.throw-card.active{border-color:#12365a;background:#e6f1fa;box-shadow:0 2px 8px rgba(18,54,90,.15)}
+.throw-card.done{border-color:#2e7d32;background:#e8f5e9}
+.throw-card h4{font-size:11px;color:#12365a}
+.throw-card .ang{font-size:12px;font-weight:800;color:#12365a;margin-top:2px}
+.throw-card .pwr{font-size:10px;color:#5a7a96;font-weight:700}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:4px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.dot-red{background:#e74c3c}
+.dot-gold{background:#d4a017}
+.score-strip{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font-size:11px;font-weight:800;padding:6px 10px;border-radius:20px;background:#fff;border:1px solid #cfe3f3;color:#12365a}
+.chip b{color:#c0392b}
+.grid-ends{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.end-tile{background:#fff;border:2px solid #cfe3f3;border-radius:14px;padding:10px;text-align:center;cursor:pointer;position:relative;min-height:92px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.end-tile.locked{opacity:.45;pointer-events:none;background:#eef4f9}
+.end-tile.current{border-color:#12365a;box-shadow:0 4px 12px rgba(18,54,90,.15)}
+.end-tile b{font-size:12px;color:#12365a}
+.end-tile span{font-size:10px;color:#5a7a96;font-weight:700}
+.stars{font-size:13px;letter-spacing:1px}
+.modal{position:fixed;inset:0;background:rgba(8,21,37,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
+.modal.open{display:flex}
+.modal-card{width:100%;max-width:360px;background:#fff;border-radius:16px;border:3px solid #12365a;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.3)}
+.modal-head{background:linear-gradient(180deg,#12365a,#0d2a48);color:#fff;padding:14px;text-align:center}
+.modal-head h3{font-size:16px}
+.modal-head p{font-size:11px;opacity:.85;margin-top:4px}
+.modal-body{padding:14px;display:grid;gap:10px}
+.kv{display:flex;justify-content:space-between;align-items:center;background:#f6fbff;border:1px solid #d6e9f6;border-radius:10px;padding:8px 10px;font-size:13px;font-weight:700;color:#12365a}
+.kv em{font-style:normal;color:#5a7a96;font-size:11px}
+.big-score{font-size:28px;font-weight:900;text-align:center;color:#12365a}
+.big-score small{font-size:12px;color:#5a7a96;display:block;font-weight:700}
+.help h3{font-size:14px;color:#12365a;margin:10px 0 6px}
+.help p, .help li{font-size:12px;line-height:1.5;color:#2a4a68}
+.help ul{padding-left:18px}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.legend span{font-size:11px;font-weight:700;background:#f6fbff;border:1px solid #d6e9f6;padding:5px 8px;border-radius:20px}
+.footer{padding:8px 10px;text-align:center;font-size:10px;color:#5a7a96}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+  <div class="h-left">
+    <div class="logo">🥌</div>
+    <div class="h-title"><b>STONE SLIDE</b><span>12 ENDS • ICE SHEET PUZZLE</span></div>
+  </div>
+  <div class="h-right">
+    <div class="stars-top" id="totalStars">☆☆☆ 0/36</div>
+    <div class="pill" id="archiveCode">CODE —</div>
+  </div>
+</header>
+<nav>
+  <button class="navbtn active" id="tabPlay">PLAY</button>
+  <button class="navbtn" id="tabEnds">ENDS</button>
+  <button class="navbtn" id="tabHelp">COACH</button>
+</nav>
+<main>
+  <!-- PLAY VIEW -->
+  <section id="viewPlay">
+    <div class="endbar">
+      <div><b id="endTitle">END 1 — OPEN DRAW</b><br><span id="endDesc">Draw to the button. Par 140 energy.</span></div>
+      <div class="badge" id="endBadge">1 / 12</div>
+    </div>
+
+    <div class="sheet-wrap">
+      <div class="sheet-top">
+        <span>❄️ ICE SHEET — TOP IS BUTTON</span>
+        <span id="energyInfo">ENERGY 0 / 140</span>
+      </div>
+      <canvas id="sheet" width="360" height="520"></canvas>
+      <div class="score-strip" style="margin-top:8px">
+        <div class="chip">Score: <b id="liveScore">0</b> — Opp best: <b id="oppBest">—</b></div>
+        <div class="chip">You best: <b id="youBest">—</b></div>
+        <div class="chip" id="statusChip">AIM & THROW</div>
+      </div>
+    </div>
+
+    <div class="card controls">
+      <div class="ctrl-row">
+        <div class="ctrl-label">ANGLE <small>left / right</small></div>
+        <button class="stepbtn" id="angMinus">−</button>
+        <div class="range-wrap">
+          <input type="range" id="angRange" min="-30" max="30" value="0" step="1">
+        </div>
+        <button class="stepbtn" id="angPlus">+</button>
+        <div class="val" id="angVal">0°</div>
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">POWER <small>energy</small></div>
+        <button class="stepbtn" id="pwrMinus">−</button>
+        <div class="range-wrap">
+          <input type="range" id="pwrRange" min="12" max="100" value="55" step="1">
+        </div>
+        <button class="stepbtn" id="pwrPlus">+</button>
+        <div class="val" id="pwrVal">55</div>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-primary" id="throwBtn">● THROW</button>
+        <button class="btn btn-light" id="undoBtn">↩ UNDO</button>
+        <button class="btn btn-light" id="resetBtn">⟲ RESET</button>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-gold" id="demoBtn">▶ COACH DEMO</button>
+        <button class="btn btn-dark" id="reviewBtn">▤ REVIEW</button>
+        <button class="btn btn-light" id="nextBtn">NEXT ▶</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <b style="font-size:12px;color:#12365a">THROW LIST — 3 STONES</b>
+        <span style="font-size:10px;font-weight:800;color:#5a7a96"><span class="dot dot-red"></span>YOU <span class="dot dot-gold" style="margin-left:6px"></span>OPP</span>
+      </div>
+      <div class="throw-list" id="throwList"></div>
+      <div class="legend">
+        <span>🎯 Button = centre of house</span>
+        <span>🛡️ Gold = opponent guards</span>
+        <span>⭐ Par = energy limit for 3★</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ENDS VIEW -->
+  <section id="viewEnds" style="display:none">
+    <div class="card">
+      <b style="font-size:13px;color:#12365a">CHOOSE END — 12 PUZZLES</b>
+      <p style="font-size:11px;color:#5a7a96;margin-top:4px">Earn stars to unlock. 3★ needs max score under par energy.</p>
+      <div class="grid-ends" id="endsGrid" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <b style="font-size:12px;color:#12365a">PROGRESS</b>
+      <div class="kv" style="margin-top:8px"><span>Total Stars</span><b id="progStars">0 / 36</b></div>
+      <div class="kv"><span>Ends Cleared</span><b id="progCleared">0 / 12</b></div>
+      <div class="kv"><span>Archive Code</span><b id="progCode">—</b></div>
+      <button class="btn btn-light" style="width:100%;margin-top:10px" id="resetProgress">RESET ALL PROGRESS</button>
+    </div>
+  </section>
+
+  <!-- HELP VIEW -->
+  <section id="viewHelp" style="display:none">
+    <div class="card help">
+      <b style="font-size:13px;color:#12365a">HOW TO PLAY — COACH'S BOARD</b>
+      <h3>Goal</h3>
+      <p>Each end you have <b>3 red stones</b>. Slide them from the bottom hack toward the button (top centre). Beat the fixed <b>gold opponent stones</b>. Closest to button scores.</p>
+      <h3>Scoring</h3>
+      <ul>
+        <li>Only one side scores per end. Count your red stones <b>closer than the opponent's closest gold</b>.</li>
+        <li>0–3 points per end. Guards can be knocked, bumped or used.</li>
+        <li>Collisions are real — use them to move guards or freeze to them.</li>
+      </ul>
+      <h3>Stars & Par</h3>
+      <ul>
+        <li><b>★★★</b> = max points AND total power ≤ par</li>
+        <li><b>★★</b> = 2+ points within par+20</li>
+        <li><b>★</b> = at least 1 point</li>
+        <li>Lower power = better. Don't blast every throw.</li>
+      </ul>
+      <h3>Controls</h3>
+      <ul>
+        <li><b>ANGLE</b> −30° to +30° — aim left/right. <b>POWER</b> 12–100 — energy.</li>
+        <li><b>THROW</b> to slide. <b>UNDO</b> removes last throw. <b>RESET</b> restarts end.</li>
+        <li>Drag on the ice to aim too. Dotted line = preview.</li>
+        <li><b>COACH DEMO</b> loads suggested angle/power for this throw.</li>
+      </ul>
+      <div class="kv" style="margin-top:10px"><span>Tip</span><em>Soft draws beat hard hits on guarded ends</em></div>
+    </div>
+  </section>
+
+  <div class="footer">Icy blue sheet • Red vs Gold • Offline • No external requests</div>
+</main>
+</div>
+
+<!-- SCORE MODAL -->
+<div class="modal" id="scoreModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="modalTitle">END COMPLETE</h3>
+      <p id="modalSub">Review your sheet</p>
+    </div>
+    <div class="modal-body">
+      <div class="big-score" id="modalScore">0 pts <small>—</small></div>
+      <div class="kv"><span>Energy Used</span><b id="modalEnergy">0 / 140</b></div>
+      <div class="kv"><span>Par</span><b id="modalPar">140</b></div>
+      <div class="kv"><span>Stars Earned</span><b id="modalStars">☆☆☆</b></div>
+      <div class="kv"><span>Best on End</span><b id="modalBest">—</b></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button class="btn btn-light" id="modalRetry">RETRY</button>
+        <button class="btn btn-primary" id="modalNext">NEXT END</button>
+      </div>
+      <button class="btn btn-dark" id="modalClose" style="width:100%">KEEP SLIDING</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ENDS = [
+  {id:1,name:"OPEN DRAW",desc:"Single stone on button. Draw around it.",par:140,opp:[{x:50,y:15}],demo:[{a:0,p:52},{a:6,p:54},{a:-6,p:53}]},
+  {id:2,name:"THE GUARD",desc:"Guard blocks the button. Go around.",par:150,opp:[{x:50,y:15},{x:50,y:32}],demo:[{a:12,p:58},{a:-12,p:58},{a:0,p:62}]},
+  {id:3,name:"DOUBLE GUARD",desc:"Two guards. Thread the gap or bump.",par:160,opp:[{x:50,y:14},{x:42,y:30},{x:58,y:30}],demo:[{a:0,p:60},{a:14,p:56},{a:-14,p:56}]},
+  {id:4,name:"CORNER FREEZE",desc:"Opponents on wings. Freeze to one.",par:165,opp:[{x:38,y:18},{x:62,y:18},{x:50,y:26}],demo:[{a:-10,p:55},{a:10,p:55},{a:0,p:58}]},
+  {id:5,name:"CENTRE LINE",desc:"Three in a line. Pick them off.",par:170,opp:[{x:50,y:13},{x:50,y:21},{x:50,y:29}],demo:[{a:8,p:57},{a:-8,p:57},{a:0,p:64}]},
+  {id:6,name:"SPLIT HOUSE",desc:"Wide split. Take the open side.",par:175,opp:[{x:35,y:15},{x:65,y:15},{x:50,y:24}],demo:[{a:-12,p:54},{a:12,p:54},{a:0,p:60}]},
+  {id:7,name:"THE WALL",desc:"Four-guard wall. Blast or draw.",par:180,opp:[{x:50,y:14},{x:30,y:30},{x:42,y:30},{x:58,y:30},{x:70,y:30}],demo:[{a:0,p:72},{a:10,p:58},{a:-10,p:58}]},
+  {id:8,name:"TIGHT BUTTON",desc:"Cluster on button. Nudge them.",par:185,opp:[{x:50,y:12},{x:47,y:18},{x:53,y:18},{x:50,y:24}],demo:[{a:4,p:56},{a:-4,p:56},{a:0,p:62}]},
+  {id:9,name:"ANGLE TEST",desc:"Wide guards. Sharp angles needed.",par:190,opp:[{x:30,y:20},{x:70,y:20},{x:50,y:12},{x:50,y:28}],demo:[{a:16,p:60},{a:-16,p:60},{a:0,p:58}]},
+  {id:10,name:"CROWDED HOUSE",desc:"Five stones crowding house.",par:195,opp:[{x:50,y:13},{x:38,y:17},{x:62,y:17},{x:42,y:24},{x:58,y:24}],demo:[{a:6,p:58},{a:-6,p:58},{a:0,p:66}]},
+  {id:11,name:"CHAMPION'S END",desc:"Six stones. Only perfect draws score.",par:200,opp:[{x:50,y:12},{x:36,y:16},{x:64,y:16},{x:44,y:22},{x:56,y:22},{x:50,y:30}],demo:[{a:9,p:57},{a:-9,p:57},{a:0,p:64}]},
+  {id:12,name:"FINAL STONE",desc:"Final. Two guards + four in house.",par:210,opp:[{x:50,y:13},{x:40,y:18},{x:60,y:18},{x:50,y:23},{x:32,y:30},{x:68,y:30}],demo:[{a:12,p:60},{a:-12,p:60},{a:0,p:68}]},
+];
+
+const STORAGE_KEY="stoneSlide_12ends_v2";
+let state = {
+  current:0,
+  stars:Array(12).fill(0),
+  unlocked:0,
+  archive:"",
+  history:[]
+};
+function genCode(){
+  const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s="ICE-";
+  for(let i=0;i<4;i++) s+=chars[Math.floor(Math.random()*chars.length)];
+  s+="-";
+  for(let i=0;i<4;i++) s+=chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+function load(){
+  try{
+    const j=JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if(j && j.stars) state=j;
+    if(!state.archive) state.archive=genCode();
+  }catch(e){ state.archive=genCode(); }
+  if(!state.archive) state.archive=genCode();
+}
+function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+let canvas, ctx, W, H, dpr;
+let angle=0, power=55;
+let throwIndex=0;
+let stones=[];
+let initialOpp=[];
+let energyUsed=0;
+let isSimulating=false;
+let animId=null;
+let throwHistory=[]; // snapshots
+
+const WORLD_W=100, WORLD_H=100;
+const R_WORLD=4.2;
+const BUTTON={x:50,y:14};
+const HOUSE_R=13;
+
+function worldToCanvas(x,y){
+  return {x: (x/WORLD_W)*W, y: (y/WORLD_H)*H};
+}
+function canvasToWorld(x,y){
+  return {x: (x/W)*WORLD_W, y: (y/H)*WORLD_H};
+}
+
+function initCanvas(){
+  canvas=document.getElementById('sheet');
+  ctx=canvas.getContext('2d');
+  function resize(){
+    const wrap=canvas.parentElement;
+    W=wrap.clientWidth - 16;
+    H=Math.round(W*1.44);
+    dpr=Math.min(2, window.devicePixelRatio||1);
+    canvas.width=W*dpr;
+    canvas.height=H*dpr;
+    canvas.style.width=W+"px";
+    canvas.style.height=H+"px";
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    draw();
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  // drag to aim
+  let dragging=false;
+  canvas.addEventListener('pointerdown', e=>{
+    if(isSimulating || throwIndex>=3) return;
+    dragging=true; canvas.setPointerCapture(e.pointerId);
+    updateAimFromPointer(e);
+  });
+  canvas.addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    updateAimFromPointer(e);
+  });
+  canvas.addEventListener('pointerup', e=>{
+    dragging=false;
+  });
+}
+function updateAimFromPointer(e){
+  const rect=canvas.getBoundingClientRect();
+  const cx= (e.clientX - rect.left);
+  const cy= (e.clientY - rect.top);
+  // start at bottom centre world 50,95 -> canvas
+  const start=worldToCanvas(50,95);
+  const dx=cx - start.x;
+  const dy=start.y - cy; // up is positive
+  if(dy<10) return;
+  let ang = Math.atan2(dx, dy) * 180/Math.PI;
+  ang=Math.max(-30, Math.min(30, ang));
+  let dist=Math.hypot(dx, dy);
+  // map dist to power: 40px -> 30 power, 180px -> 90
+  let p = Math.round(20 + (dist/200)*100);
+  p=Math.max(12, Math.min(100, p));
+  angle=Math.round(ang);
+  power=p;
+  syncControls();
+  draw();
+}
+
+function syncControls(){
+  document.getElementById('angRange').value=angle;
+  document.getElementById('pwrRange').value=power;
+  document.getElementById('angVal').textContent=angle+"°";
+  document.getElementById('pwrVal').textContent=power;
+  document.getElementById('energyInfo').textContent="ENERGY "+energyUsed+" / "+ENDS[state.current].par;
+}
+
+function setupEnd(idx){
+  state.current=idx;
+  throwIndex=0;
+  energyUsed=0;
+  stones=[];
+  throwHistory=[];
+  initialOpp = ENDS[idx].opp.map((o,i)=>({x:o.x,y:o.y,vx:0,vy:0,team:'opp',id:'o'+i}));
+  stones = initialOpp.map(s=>({...s}));
+  isSimulating=false;
+  if(animId) cancelAnimationFrame(animId);
+  updateEndBar();
+  syncControls();
+  renderThrowList();
+  updateLiveScore();
+  draw();
+  save();
+}
+
+function updateEndBar(){
+  const e=ENDS[state.current];
+  document.getElementById('endTitle').textContent=`END ${e.id} — ${e.name}`;
+  document.getElementById('endDesc').textContent=e.desc+` Par ${e.par} energy.`;
+  document.getElementById('endBadge').textContent=(state.current+1)+" / 12";
+  document.getElementById('energyInfo').textContent="ENERGY "+energyUsed+" / "+e.par;
+}
+
+function renderThrowList(){
+  const list=document.getElementById('throwList');
+  list.innerHTML="";
+  for(let i=0;i<3;i++){
+    const done=i < throwIndex;
+    const active=i===throwIndex && !isSimulating;
+    const card=document.createElement('div');
+    card.className="throw-card"+(done?" done":"")+(active?" active":"");
+    let ang="-", pwr="-";
+    if(done && throwHistory[i]){
+      ang=throwHistory[i].angle+"°";
+      pwr=throwHistory[i].power;
+    } else if(active){
+      ang=angle+"°"; pwr=power;
+    }
+    card.innerHTML=`<h4>THROW ${i+1}</h4><div class="ang">${ang}</div><div class="pwr">PWR ${pwr}</div><div style="margin-top:4px;font-size:10px;font-weight:800;color:${done?'#2e7d32':'#5a7a96'}">${done?'DONE':active?'READY':'WAIT'}</div>`;
+    list.appendChild(card);
+  }
+  document.getElementById('throwBtn').disabled = isSimulating || throwIndex>=3;
+  document.getElementById('undoBtn').disabled = isSimulating || throwIndex===0;
+  document.getElementById('nextBtn').disabled = state.current>=11;
+}
+
+function draw(){
+  if(!ctx) return;
+  // clear
+  ctx.clearRect(0,0,W,H);
+  // ice base
+  // subtle texture lines
+  ctx.fillStyle="#e6f6ff";
+  ctx.fillRect(0,0,W,H);
+  // side boards
+  ctx.fillStyle="rgba(18,54,90,.06)";
+  for(let y=0;y<H;y+=18){
+    ctx.fillRect(0,y,W,1);
+  }
+  // centre line vertical
+  ctx.strokeStyle="rgba(18,54,90,.12)";
+  ctx.lineWidth=1;
+  ctx.setLineDash([6,6]);
+  ctx.beginPath();
+  const cx=W/2;
+  ctx.moveTo(cx,0); ctx.lineTo(cx,H);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // hog line (y ~ 75% world)
+  const hogY = worldToCanvas(50,72).y;
+  ctx.strokeStyle="#5a9bd1";
+  ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(8,hogY); ctx.lineTo(W-8,hogY); ctx.stroke();
+  ctx.fillStyle="#5a9bd1";
+  ctx.font="700 9px system-ui";
+  ctx.fillText("HOG",10,hogY-4);
+  // tee line
+  const teeY = worldToCanvas(50,BUTTON.y).y;
+  ctx.strokeStyle="rgba(18,54,90,.15)";
+  ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,teeY); ctx.lineTo(W,teeY); ctx.stroke();
+  // house
+  const btn = worldToCanvas(BUTTON.x,BUTTON.y);
+  const houseRpx = (HOUSE_R/WORLD_W)*W;
+  // outer blue
+  ctx.beginPath(); ctx.arc(btn.x,btn.y,houseRpx,0,Math.PI*2); ctx.fillStyle="#0d4a8a"; ctx.fill();
+  ctx.beginPath(); ctx.arc(btn.x,btn.y,houseRpx*0.75,0,Math.PI*2); ctx.fillStyle="#ffffff"; ctx.fill();
+  ctx.beginPath(); ctx.arc(btn.x,btn.y,houseRpx*0.45,0,Math.PI*2); ctx.fillStyle="#e74c3c"; ctx.fill();
+  ctx.beginPath(); ctx.arc(btn.x,btn.y,houseRpx*0.18,0,Math.PI*2); ctx.fillStyle="#ffffff"; ctx.fill();
+  ctx.beginPath(); ctx.arc(btn.x,btn.y,4,0,Math.PI*2); ctx.fillStyle="#12365a"; ctx.fill();
+  // hack at bottom
+  const hack = worldToCanvas(50,95);
+  ctx.fillStyle="#12365a";
+  ctx.fillRect(hack.x-18, hack.y-2, 36, 6);
+  ctx.fillStyle="#fff";
+  ctx.font="700 8px system-ui";
+  ctx.fillText("HACK",hack.x-14, hack.y-6);
+  // preview trajectory if not simulating and throws left
+  if(!isSimulating && throwIndex<3){
+    const start=worldToCanvas(50,95);
+    const rad=angle*Math.PI/180;
+    const speed = 0.9 + (power/100)*4.2; // world units per frame initial
+    // preview line: simple straight with slight curve? just straight
+    const len = (power/100)* (H*0.75);
+    const endX = start.x + Math.sin(rad)*len;
+    const endY = start.y - Math.cos(rad)*len;
+    ctx.strokeStyle="rgba(18,54,90,.35)";
+    ctx.lineWidth=2;
+    ctx.setLineDash([4,6]);
+    ctx.beginPath(); ctx.moveTo(start.x,start.y); ctx.lineTo(endX,endY); ctx.stroke();
+    ctx.setLineDash([]);
+    // arrow head
+    ctx.fillStyle="rgba(18,54,90,.5)";
+    ctx.beginPath(); ctx.arc(endX,endY,4,0,Math.PI*2); ctx.fill();
+  }
+  // draw stones
+  stones.forEach(s=>{
+    const p=worldToCanvas(s.x,s.y);
+    const rpx=(R_WORLD/WORLD_W)*W;
+    // shadow
+    ctx.beginPath(); ctx.arc(p.x+2,p.y+3,rpx,0,Math.PI*2); ctx.fillStyle="rgba(0,0,0,.15)"; ctx.fill();
+    // stone body
+    ctx.beginPath(); ctx.arc(p.x,p.y,rpx,0,Math.PI*2);
+    if(s.team==='opp'){
+      ctx.fillStyle="#d4a017";
+      ctx.fill();
+      ctx.strokeStyle="#8a6d00";
+      ctx.lineWidth=2; ctx.stroke();
+      // inner highlight
+      ctx.beginPath(); ctx.arc(p.x-3,p.y-3,rpx*0.45,0,Math.PI*2); ctx.fillStyle="rgba(255,255,255,.45)"; ctx.fill();
+      ctx.fillStyle="#3a2a00";
+      ctx.font="900 10px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText("G",p.x,p.y+1);
+    } else {
+      ctx.fillStyle="#e74c3c";
+      ctx.fill();
+      ctx.strokeStyle="#8e1c12";
+      ctx.lineWidth=2; ctx.stroke();
+      ctx.beginPath(); ctx.arc(p.x-3,p.y-3,rpx*0.45,0,Math.PI*2); ctx.fillStyle="rgba(255,255,255,.45)"; ctx.fill();
+      ctx.fillStyle="#fff";
+      ctx.font="900 10px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText("●",p.x,p.y+1);
+    }
+    // ring if closest
+    // will be highlighted in live score but not here
+  });
+  // distance labels for stones in house
+  // draw button cross
+  ctx.strokeStyle="rgba(255,255,255,.9)";
+  ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(btn.x-6,btn.y); ctx.lineTo(btn.x+6,btn.y); ctx.moveTo(btn.x,btn.y-6); ctx.lineTo(btn.x,btn.y+6); ctx.stroke();
+}
+
+function throwStone(){
+  if(isSimulating || throwIndex>=3) return;
+  // snapshot for undo
+  throwHistory[throwIndex]={angle,power};
+  const snapshot = stones.map(s=>({...s}));
+  // push history stack
+  if(!state.history) state.history=[];
+  // we keep per-end history in memory
+  // store snapshot before throw
+  if(!window._snapshots) window._snapshots=[];
+  window._snapshots.push({idx:throwIndex, stones: snapshot, energy: energyUsed});
+  // create stone
+  const rad=angle*Math.PI/180;
+  const speed = 0.9 + (power/100)*4.2;
+  const vx = Math.sin(rad)*speed;
+  const vy = -Math.cos(rad)*speed;
+  const newStone={x:50,y:95,vx,vy,team:'player',id:'p'+throwIndex};
+  stones.push(newStone);
+  energyUsed+=power;
+  throwIndex++;
+  isSimulating=true;
+  renderThrowList();
+  syncControls();
+  simulate();
+}
+
+function simulate(){
+  const FRICTION=0.985;
+  const WALL_DAMP=0.65;
+  let frames=0;
+  function step(){
+    let moving=false;
+    // move
+    for(let s of stones){
+      if(s.vx===0 && s.vy===0) continue;
+      s.x += s.vx;
+      s.y += s.vy;
+      s.vx *= FRICTION;
+      s.vy *= FRICTION;
+      const sp=Math.hypot(s.vx,s.vy);
+      if(sp<0.04){ s.vx=0; s.vy=0; }
+      else moving=true;
+      // walls
+      if(s.x < R_WORLD){ s.x=R_WORLD; s.vx*=-WALL_DAMP; }
+      if(s.x > WORLD_W - R_WORLD){ s.x=WORLD_W - R_WORLD; s.vx*=-WALL_DAMP; }
+      if(s.y < R_WORLD){ s.y=R_WORLD; s.vy*=-WALL_DAMP; }
+      if(s.y > WORLD_H - R_WORLD){ s.y=WORLD_H - R_WORLD; s.vy*=-WALL_DAMP; }
+    }
+    // collisions
+    for(let i=0;i<stones.length;i++){
+      for(let j=i+1;j<stones.length;j++){
+        const a=stones[i], b=stones[j];
+        const dx=b.x-a.x, dy=b.y-a.y;
+        const dist=Math.hypot(dx,dy);
+        const minDist=2*R_WORLD;
+        if(dist < minDist && dist>0.001){
+          const overlap=minDist - dist;
+          const nx=dx/dist, ny=dy/dist;
+          a.x -= nx*overlap/2;
+          a.y -= ny*overlap/2;
+          b.x += nx*overlap/2;
+          b.y += ny*overlap/2;
+          const v1n=a.vx*nx + a.vy*ny;
+          const v2n=b.vx*nx + b.vy*ny;
+          const dv=v1n - v2n;
+          // only if approaching
+          if(dv>0){
+            // elastic with damping 0.88
+            const imp=dv*0.88;
+            a.vx -= imp*nx;
+            a.vy -= imp*ny;
+            b.vx += imp*nx;
+            b.vy += imp*ny;
+            moving=true;
+          }
+        }
+      }
+    }
+    frames++;
+    draw();
+    updateLiveScore();
+    if(moving && frames<600){
+      animId=requestAnimationFrame(step);
+    } else {
+      // stop all
+      stones.forEach(s=>{ if(Math.hypot(s.vx,s.vy)<0.08){s.vx=0;s.vy=0;}});
+      isSimulating=false;
+      renderThrowList();
+      draw();
+      updateLiveScore();
+      if(throwIndex>=3){
+        setTimeout(()=>evaluateEnd(), 400);
+      }
+    }
+  }
+  step();
+}
+
+function computeScore(){
+  const oppStones=stones.filter(s=>s.team==='opp');
+  const playerStones=stones.filter(s=>s.team==='player');
+  function distToButton(s){ return Math.hypot(s.x-BUTTON.x, s.y-BUTTON.y); }
+  const oppDists=oppStones.map(distToButton);
+  const playerDists=playerStones.map(distToButton);
+  const oppBest = oppDists.length? Math.min(...oppDists): Infinity;
+  const youBest = playerDists.length? Math.min(...playerDists): Infinity;
+  let score=0;
+  if(playerDists.length){
+    // count player stones closer than oppBest
+    score = playerDists.filter(d=> d < oppBest).length;
+    // if no opp? then count in house
+    if(!oppDists.length){
+      score = playerDists.filter(d=> d < HOUSE_R).length;
+    }
+  }
+  return {score, oppBest, youBest, playerDists, oppDists};
+}
+
+function updateLiveScore(){
+  const {score, oppBest, youBest}=computeScore();
+  document.getElementById('liveScore').textContent=score;
+  document.getElementById('oppBest').textContent= oppBest===Infinity? "—" : oppBest.toFixed(1);
+  document.getElementById('youBest').textContent= youBest===Infinity? "—" : youBest.toFixed(1);
+  const chip=document.getElementById('statusChip');
+  if(isSimulating) chip.textContent="SLIDING…";
+  else if(throwIndex>=3) chip.textContent="END REVIEW";
+  else chip.textContent=`THROW ${throwIndex+1} / 3`;
+}
+
+function starsForEnd(score, energy, par){
+  if(score>=3 && energy <= par) return 3;
+  if(score>=2 && energy <= par+20) return 2;
+  if(score>=1) return 1;
+  return 0;
+}
+
+function evaluateEnd(){
+  const e=ENDS[state.current];
+  const {score, oppBest, youBest}=computeScore();
+  const stars=starsForEnd(score, energyUsed, e.par);
+  const prev=state.stars[state.current]||0;
+  if(stars>prev) state.stars[state.current]=stars;
+  // unlock next if scored at least 1
+  if(score>=1 && state.unlocked < state.current+1){
+    state.unlocked = Math.min(11, state.current+1);
+  }
+  // if perfect 3 stars, also unlock next
+  if(stars>=2 && state.unlocked < state.current+1) state.unlocked = Math.min(11, state.current+1);
+  // ensure current unlocked
+  if(state.unlocked < state.current) state.unlocked=state.current;
+  save();
+  updateProgressUI();
+  showModal(score, stars, e);
+}
+
+function showModal(score, stars, end){
+  const modal=document.getElementById('scoreModal');
+  document.getElementById('modalTitle').textContent=`END ${end.id} — ${score} POINT${score!==1?'S':''}`;
+  document.getElementById('modalSub').textContent=end.name+" • "+end.desc;
+  document.getElementById('modalScore').innerHTML=`${score} pts <small>${score>=2?'Great sheet!':score===1?'On the board':'No score — try softer draws'}</small>`;
+  document.getElementById('modalEnergy').textContent=energyUsed+" / "+end.par;
+  document.getElementById('modalPar').textContent=end.par+" (par)";
+  document.getElementById('modalStars').textContent="★".repeat(stars)+"☆".repeat(3-stars) + `  ${stars}/3`;
+  document.getElementById('modalBest').textContent=(state.stars[state.current]||0)+"/3 best";
+  modal.classList.add('open');
+  // confetti if 3 stars
+}
+
+function hideModal(){ document.getElementById('scoreModal').classList.remove('open'); }
+
+function undo(){
+  if(isSimulating || throwIndex===0) return;
+  // restore last snapshot
+  if(window._snapshots && window._snapshots.length){
+    const snap=window._snapshots.pop();
+    stones=snap.stones.map(s=>({...s}));
+    energyUsed=snap.energy;
+    throwIndex=snap.idx;
+    throwHistory.pop();
+    renderThrowList();
+    syncControls();
+    updateLiveScore();
+    draw();
+  }
+}
+function resetEnd(){
+  if(isSimulating) return;
+  window._snapshots=[];
+  setupEnd(state.current);
+}
+
+function coachDemo(){
+  if(isSimulating || throwIndex>=3) return;
+  const demo=ENDS[state.current].demo[throwIndex];
+  if(!demo) return;
+  angle=demo.a;
+  power=demo.p;
+  syncControls();
+  draw();
+  // flash
+  const btn=document.getElementById('demoBtn');
+  btn.textContent="✓ LOADED";
+  setTimeout(()=>btn.textContent="▶ COACH DEMO",900);
+}
+
+function updateProgressUI(){
+  const total=state.stars.reduce((a,b)=>a+b,0);
+  document.getElementById('totalStars').textContent=`★ ${total}/36`;
+  document.getElementById('progStars').textContent=total+" / 36";
+  document.getElementById('progCleared').textContent=state.stars.filter(s=>s>0).length+" / 12";
+  document.getElementById('progCode').textContent=state.archive;
+  document.getElementById('archiveCode').textContent=state.archive;
+  // ends grid
+  const grid=document.getElementById('endsGrid');
+  grid.innerHTML="";
+  ENDS.forEach((e,i)=>{
+    const locked=i>state.unlocked && state.stars[i]===0 && i!==0;
+    // first end always unlocked
+    const isLocked = i>state.unlocked && i!==0 && state.stars[i]===0;
+    // actually allow if previous has at least 1 star
+    const tile=document.createElement('div');
+    tile.className="end-tile"+(isLocked?" locked":"")+(i===state.current?" current":"");
+    const stars=state.stars[i]||0;
+    tile.innerHTML=`<b>END ${e.id}</b><span>${e.name}</span><div class="stars">${"★".repeat(stars)}${"☆".repeat(3-stars)}</div><span>Par ${e.par}</span>`;
+    tile.onclick=()=>{
+      if(isLocked) return;
+      switchView('play');
+      setupEnd(i);
+      window.scrollTo(0,0);
+    };
+    grid.appendChild(tile);
+  });
+}
+
+function switchView(v){
+  document.getElementById('viewPlay').style.display=v==='play'?'block':'none';
+  document.getElementById('viewEnds').style.display=v==='ends'?'block':'none';
+  document.getElementById('viewHelp').style.display=v==='help'?'block':'none';
+  document.getElementById('tabPlay').classList.toggle('active',v==='play');
+  document.getElementById('tabEnds').classList.toggle('active',v==='ends');
+  document.getElementById('tabHelp').classList.toggle('active',v==='help');
+}
+
+function bindUI(){
+  document.getElementById('angRange').addEventListener('input', e=>{ angle=parseInt(e.target.value); syncControls(); draw(); });
+  document.getElementById('pwrRange').addEventListener('input', e=>{ power=parseInt(e.target.value); syncControls(); draw(); });
+  document.getElementById('angMinus').onclick=()=>{ angle=Math.max(-30,angle-1); syncControls(); draw(); };
+  document.getElementById('angPlus').onclick=()=>{ angle=Math.min(30,angle+1); syncControls(); draw(); };
+  document.getElementById('pwrMinus').onclick=()=>{ power=Math.max(12,power-2); syncControls(); draw(); };
+  document.getElementById('pwrPlus').onclick=()=>{ power=Math.min(100,power+2); syncControls(); draw(); };
+  document.getElementById('throwBtn').onclick=throwStone;
+  document.getElementById('undoBtn').onclick=undo;
+  document.getElementById('resetBtn').onclick=resetEnd;
+  document.getElementById('demoBtn').onclick=coachDemo;
+  document.getElementById('reviewBtn').onclick=()=>{
+    if(throwIndex>=3) evaluateEnd();
+    else {
+      const {score}=computeScore();
+      const e=ENDS[state.current];
+      const stars=starsForEnd(score, energyUsed, e.par);
+      showModal(score, stars, e);
+    }
+  };
+  document.getElementById('nextBtn').onclick=()=>{
+    if(state.current<11){
+      // only allow if unlocked
+      if(state.current < state.unlocked || state.stars[state.current]>0){
+        setupEnd(state.current+1);
+      } else {
+        // need at least 1 point to proceed, but allow free navigation via ENDS tab
+        setupEnd(Math.min(11, state.current+1));
+      }
+    }
+  };
+  document.getElementById('tabPlay').onclick=()=>switchView('play');
+  document.getElementById('tabEnds').onclick=()=>{ switchView('ends'); updateProgressUI(); };
+  document.getElementById('tabHelp').onclick=()=>switchView('help');
+  document.getElementById('modalClose').onclick=hideModal;
+  document.getElementById('modalRetry').onclick=()=>{ hideModal(); resetEnd(); };
+  document.getElementById('modalNext').onclick=()=>{
+    hideModal();
+    if(state.current<11){
+      const next=Math.min(11, state.current+1);
+      setupEnd(next);
+      switchView('play');
+    } else {
+      switchView('ends');
+    }
+  };
+  document.getElementById('scoreModal').addEventListener('click', e=>{
+    if(e.target.id==='scoreModal') hideModal();
+  });
+  document.getElementById('resetProgress').onclick=()=>{
+    if(confirm("Reset all stars and unlocks?")){
+      state.stars=Array(12).fill(0);
+      state.unlocked=0;
+      state.archive=genCode();
+      save();
+      updateProgressUI();
+      setupEnd(0);
+      switchView('play');
+    }
+  };
+}
+
+load();
+window.addEventListener('DOMContentLoaded', ()=>{
+  initCanvas();
+  bindUI();
+  // ensure unlocked at least 0
+  if(state.unlocked===undefined) state.unlocked=0;
+  setupEnd(state.current||0);
+  updateProgressUI();
+  syncControls();
+});
+</script>
+</body>
+</html>

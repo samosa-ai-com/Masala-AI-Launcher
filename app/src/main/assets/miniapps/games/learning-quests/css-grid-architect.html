@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>City Island Grid Builder</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b1020;
+  --bg2:#121a33;
+  --card:#162040;
+  --card2:#1c2a52;
+  --line:#2a3a6b;
+  --accent:#00e5ff;
+  --accent2:#ff3d8a;
+  --accent3:#ffd600;
+  --text:#eaf0ff;
+  --muted:#9aa8d0;
+  --ok:#00e676;
+  --warn:#ffab00;
+  --radius:16px;
+}
+[data-theme="light"]{
+  --bg:#eef2ff;
+  --bg2:#ffffff;
+  --card:#ffffff;
+  --card2:#f1f4ff;
+  --line:#d6ddf5;
+  --text:#162040;
+  --muted:#5a6aa0;
+}
+html,body{height:100%}
+body{
+  font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  overflow-x:hidden;
+  -webkit-text-size-adjust:100%;
+}
+.wrap{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  margin:0 auto;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  background:radial-gradient(600px 400px at 50% -10%, #1e2a5a 0%, transparent 70%), var(--bg);
+}
+[data-theme="light"] .wrap{background:radial-gradient(600px 400px at 50% -10%, #c7d2ff 0%, transparent 70%), var(--bg)}
+header{
+  position:sticky;top:0;z-index:10;
+  background:linear-gradient(180deg, rgba(11,16,32,0.95), rgba(11,16,32,0.85));
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+  padding:12px 14px 10px;
+}
+[data-theme="light"] header{background:linear-gradient(180deg, rgba(255,255,255,0.95), rgba(238,242,255,0.9))}
+.toprow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-badge{
+  width:40px;height:40px;border-radius:12px;
+  background:linear-gradient(135deg, var(--accent), var(--accent2));
+  display:grid;place-items:center;
+  font-weight:900;font-size:18px;color:#0b1020;
+  box-shadow:0 4px 16px rgba(0,229,255,0.35);
+}
+.logo h1{font-size:15px;line-height:1.1;font-weight:800;letter-spacing:-0.02em}
+.logo p{font-size:11px;color:var(--muted);font-weight:600}
+.icon-btn{
+  width:44px;height:44px;border-radius:12px;
+  border:1px solid var(--line);
+  background:var(--card);
+  color:var(--text);
+  display:grid;place-items:center;
+  font-size:18px;cursor:pointer;
+  touch-action:manipulation;
+}
+.meters{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px
+}
+.meter{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:8px 10px;
+}
+.meter-label{font-size:10px;letter-spacing:0.08em;font-weight:800;color:var(--muted);text-transform:uppercase;display:flex;justify-content:space-between}
+.meter-bar{height:8px;background:var(--bg2);border-radius:99px;overflow:hidden;margin-top:6px;border:1px solid var(--line)}
+.meter-fill{height:100%;border-radius:99px;transition:width 0.5s ease}
+.meter-fill.pop{background:linear-gradient(90deg, var(--accent), #7c4dff)}
+.meter-fill.hap{background:linear-gradient(90deg, var(--accent3), var(--accent2))}
+.meter-val{font-size:12px;font-weight:800}
+
+.level-nav{
+  display:flex;gap:8px;padding:12px 14px;
+  overflow-x:auto;scrollbar-width:none;
+}
+.level-nav::-webkit-scrollbar{display:none}
+.lvl-btn{
+  flex:1;min-width:78px;
+  min-height:48px;
+  border-radius:14px;
+  border:1.5px solid var(--line);
+  background:var(--card);
+  color:var(--text);
+  cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;
+  touch-action:manipulation;
+  transition:all 0.2s;
+}
+.lvl-btn.active{
+  background:linear-gradient(135deg, var(--accent) 0%, #7c4dff 100%);
+  color:#0b1020;
+  border-color:transparent;
+  box-shadow:0 6px 18px rgba(0,229,255,0.35);
+}
+.lvl-btn.done{border-color:var(--ok)}
+.lvl-btn .num{font-size:11px;font-weight:800;letter-spacing:0.06em;opacity:0.8}
+.lvl-btn .name{font-size:12px;font-weight:800}
+.lvl-btn.active .num{opacity:1}
+.stars{font-size:10px;letter-spacing:1px}
+
+main{padding:0 14px 18px;flex:1;display:flex;flex-direction:column;gap:12px}
+
+.card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  overflow:hidden;
+  box-shadow:0 8px 24px rgba(0,0,0,0.25);
+}
+.card-head{
+  padding:14px 14px 10px;
+  border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg, var(--card2), var(--card));
+}
+.card-head h2{font-size:15px;font-weight:900;display:flex;align-items:center;gap:8px}
+.card-head h2 span.badge{
+  font-size:10px;font-weight:800;letter-spacing:0.08em;
+  background:var(--accent);color:#0b1020;
+  padding:3px 7px;border-radius:99px;
+}
+.card-head p{font-size:12.5px;line-height:1.45;color:var(--muted);margin-top:6px}
+.objectives{padding:10px 14px;display:flex;flex-direction:column;gap:7px}
+.obj{
+  display:flex;align-items:center;gap:8px;
+  font-size:12.5px;font-weight:600;
+  background:var(--bg2);
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:8px 10px;
+}
+.obj .dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:11px;flex-shrink:0;background:var(--card)}
+.obj.ok{border-color:rgba(0,230,118,0.4);background:rgba(0,230,118,0.08)}
+.obj.ok .dot{background:var(--ok);border-color:var(--ok);color:#0b1020}
+
+.editor-wrap{padding:12px 14px}
+.editor-label{
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:11px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);
+  margin-bottom:8px;
+}
+.editor-label button{
+  font-size:11px;font-weight:800;
+  background:transparent;border:1px solid var(--line);
+  color:var(--accent);padding:6px 10px;border-radius:99px;cursor:pointer;
+  min-height:32px;touch-action:manipulation;
+}
+.editor{
+  position:relative;
+  background:#0a0f24;
+  border:1.5px solid var(--line);
+  border-radius:12px;
+  overflow:hidden;
+}
+[data-theme="light"] .editor{background:#0b1020}
+.editor textarea{
+  width:100%;min-height:132px;
+  background:transparent;
+  color:#eaf0ff;
+  border:0;outline:0;
+  font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size:13.5px;line-height:1.6;
+  padding:12px 12px 12px 14px;
+  resize:vertical;
+  tab-size:2;
+}
+.editor .hint-line{
+  font-family:ui-monospace,monospace;
+  font-size:11px;color:#7a8ab8;
+  padding:6px 12px;
+  border-top:1px solid #1e2a4a;
+  background:rgba(255,255,255,0.02);
+}
+.preview-wrap{padding:0 14px 12px}
+.preview-label{
+  font-size:11px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:8px;
+}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);display:inline-block;margin-right:6px;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.island-frame{
+  background:linear-gradient(180deg, #0d1b3a 0%, #0a1430 100%);
+  border:1.5px solid var(--line);
+  border-radius:14px;
+  padding:10px;
+  overflow:hidden;
+}
+[data-theme="light"] .island-frame{background:linear-gradient(180deg, #0f1e4a 0%, #0a1430 100%)}
+#island{
+  display:grid;
+  min-height:148px;
+  border-radius:10px;
+  overflow:hidden;
+  background:rgba(255,255,255,0.04);
+  border:1px dashed rgba(255,255,255,0.15);
+  transition:all 0.3s;
+}
+.block{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;
+  padding:10px 6px;
+  font-weight:800;
+  text-align:center;
+  border:1px solid rgba(255,255,255,0.08);
+  min-height:56px;
+}
+.block .ico{font-size:18px}
+.block .lbl{font-size:11px;letter-spacing:0.04em;text-transform:uppercase;opacity:0.95}
+.block .sub{font-size:10px;opacity:0.7;font-weight:600}
+.b1{background:linear-gradient(135deg, #00e5ff, #2979ff);color:#0b1020}
+.b2{background:linear-gradient(135deg, #ff3d8a, #ff6e40);color:white}
+.b3{background:linear-gradient(135deg, #ffd600, #ffab00);color:#0b1020}
+.b4{background:linear-gradient(135deg, #00e676, #00bfa5);color:#0b1020}
+.b5{background:linear-gradient(135deg, #7c4dff, #536dfe);color:white}
+.b6{background:linear-gradient(135deg, #ff6ec7, #b388ff);color:#0b1020}
+.b7{background:linear-gradient(135deg, #64ffda, #00e5ff);color:#0b1020}
+.b8{background:linear-gradient(135deg, #ff9a00, #ff3d00);color:white}
+
+.controls{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+  padding:0 14px 12px;
+}
+.btn{
+  min-height:48px;
+  border-radius:12px;
+  border:1.5px solid var(--line);
+  background:var(--card2);
+  color:var(--text);
+  font-size:13px;font-weight:800;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  touch-action:manipulation;
+  padding:0 12px;
+}
+.btn:active{transform:scale(0.98)}
+.btn-primary{
+  background:linear-gradient(135deg, var(--accent), #7c4dff);
+  color:#0b1020;
+  border-color:transparent;
+  box-shadow:0 6px 16px rgba(0,229,255,0.3);
+}
+.btn-ghost{background:transparent}
+.feedback{
+  margin:0 14px;
+  border-radius:12px;
+  padding:12px 14px;
+  font-size:13px;line-height:1.5;
+  font-weight:600;
+  display:none;
+  border:1px solid var(--line);
+}
+.feedback.show{display:block}
+.feedback.ok{background:rgba(0,230,118,0.1);border-color:rgba(0,230,118,0.35);color:#b9f6ca}
+[data-theme="light"] .feedback.ok{color:#0a5c36;background:rgba(0,230,118,0.12)}
+.feedback.err{background:rgba(255,61,138,0.1);border-color:rgba(255,61,138,0.35);color:#ff8ab8}
+[data-theme="light"] .feedback.err{color:#8a1038}
+.feedback.info{background:rgba(0,229,255,0.08);border-color:rgba(0,229,255,0.3);color:#9be7ff}
+[data-theme="light"] .feedback.info{color:#0a4a5c}
+
+.hint-box{
+  margin:0 14px;
+  background:var(--bg2);
+  border:1px dashed var(--line);
+  border-radius:12px;
+  padding:12px 14px;
+  font-size:12.5px;line-height:1.5;color:var(--muted);
+  display:none;
+}
+.hint-box.show{display:block}
+.hint-box code{
+  background:var(--card);
+  border:1px solid var(--line);
+  padding:1px 6px;border-radius:6px;
+  font-size:12px;color:var(--accent);
+}
+
+.footer{
+  padding:10px 14px 16px;
+  display:flex;gap:10px;
+}
+.footer .btn{flex:1}
+
+.toast{
+  position:fixed;left:50%;bottom:18px;transform:translateX(-50%) translateY(80px);
+  background:#0b1020;color:white;
+  border:1px solid rgba(255,255,255,0.15);
+  padding:10px 16px;border-radius:99px;
+  font-size:13px;font-weight:700;
+  box-shadow:0 8px 24px rgba(0,0,0,0.4);
+  opacity:0;transition:all 0.3s;pointer-events:none;z-index:99;
+  max-width:90vw;text-align:center;
+}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <div class="toprow">
+      <div class="logo">
+        <div class="logo-badge">◧</div>
+        <div>
+          <h1>CITY ISLAND GRID</h1>
+          <p>Build with CSS Grid • 4 levels</p>
+        </div>
+      </div>
+      <button class="icon-btn" id="themeBtn" aria-label="Toggle theme">☾</button>
+    </div>
+    <div class="meters">
+      <div class="meter">
+        <div class="meter-label"><span>Population</span><span class="meter-val" id="popVal">0</span></div>
+        <div class="meter-bar"><div class="meter-fill pop" id="popBar" style="width:0%"></div></div>
+      </div>
+      <div class="meter">
+        <div class="meter-label"><span>Happiness</span><span class="meter-val" id="hapVal">0%</span></div>
+        <div class="meter-bar"><div class="meter-fill hap" id="hapBar" style="width:0%"></div></div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="level-nav" id="levelNav"></nav>
+
+  <main>
+    <section class="card" id="levelCard">
+      <div class="card-head">
+        <h2 id="lvlTitle">Level 1 — Skyline Columns <span class="badge" id="lvlBadge">FOUNDATIONS</span></h2>
+        <p id="lvlDesc"></p>
+      </div>
+      <div class="objectives" id="objectives"></div>
+
+      <div class="editor-wrap">
+        <div class="editor-label">
+          <span>#island { declarations }</span>
+          <button id="copyBtn">Copy starter</button>
+        </div>
+        <div class="editor">
+          <textarea id="codeInput" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" rows="6"></textarea>
+          <div class="hint-line" id="hintLine">Tip: type only declarations — no selector or braces needed</div>
+        </div>
+      </div>
+
+      <div class="preview-wrap">
+        <div class="preview-label"><span><span class="live-dot"></span>Live island preview</span><span id="previewInfo" style="font-size:11px;color:var(--muted)"></span></div>
+        <div class="island-frame">
+          <div id="island"></div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn" id="hintBtn">💡 Hint</button>
+        <button class="btn" id="resetBtn">↺ Reset</button>
+        <button class="btn btn-primary" id="checkBtn" style="grid-column:1 / -1">▶ Check Build</button>
+      </div>
+
+      <div class="feedback" id="feedback"></div>
+      <div class="hint-box" id="hintBox"></div>
+    </section>
+
+    <div class="footer">
+      <button class="btn btn-ghost" id="prevBtn">← Prev</button>
+      <button class="btn" id="nextBtn">Next →</button>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const LEVELS = [
+  {
+    id:1,
+    name:"Skyline Columns",
+    badge:"FOUNDATIONS",
+    desc:"The island is empty! Use <b>grid-template-columns</b> to split it into <b>3 equal columns</b> so three towers can stand side-by-side.",
+    starter:"display: grid;\n/* add columns below */",
+    hint:"You need 3 equal tracks. Try <code>grid-template-columns: 1fr 1fr 1fr</code> or <code>repeat(3, 1fr)</code>.",
+    objectives:[
+      {id:"cols", text:"Create 3 equal columns (1fr 1fr 1fr or repeat)"},
+    ],
+    blocks: [
+      {ico:"🏙️", lbl:"Tower A", sub:"1fr", cls:"b1"},
+      {ico:"🏢", lbl:"Tower B", sub:"1fr", cls:"b2"},
+      {ico:"🏛️", lbl:"Tower C", sub:"1fr", cls:"b3"},
+    ],
+    validate: (css, computed) => {
+      const checks = [];
+      const norm = css.replace(/\s+/g,' ').toLowerCase();
+      const hasRepeat3 = /repeat\s*\(\s*3\s*,\s*1fr\s*\)/.test(norm);
+      const hasThreeFr = /grid-template-columns\s*:\s*1fr\s+1fr\s+1fr/.test(norm);
+      const hasCols = hasRepeat3 || hasThreeFr;
+      checks.push({id:"cols", pass:hasCols, msg: hasCols ? "3 columns detected" : "Need 3 equal columns"});
+      // also check computed style has 3 columns
+      const cols = computed.gridTemplateColumns.split(' ').filter(Boolean);
+      // computed may be pixel values, count them
+      const colCount = cols.length;
+      if(colCount===3 && !hasCols){
+        // allow if computed shows 3 but syntax different? still require correct syntax
+      }
+      return checks;
+    },
+    success:"Skyline complete! Three towers now share the island equally."
+  },
+  {
+    id:2,
+    name:"Breezy Blocks",
+    badge:"GAPS & FLOW",
+    desc:"Two neighborhoods need breathing room. Make <b>2 equal columns</b> with a <b>gap of 12–24px</b> between them.",
+    starter:"display: grid;\ngrid-template-columns: 1fr 1fr;\n/* add gap */",
+    hint:"Add <code>gap: 16px</code> (or <code>grid-gap</code> / <code>column-gap</code> + <code>row-gap</code>). Any value 12px–24px passes. Keep 2 columns!",
+    objectives:[
+      {id:"cols2", text:"Keep 2 equal columns"},
+      {id:"gap", text:"Set gap / grid-gap between 12px and 24px"},
+    ],
+    blocks: [
+      {ico:"🏘️", lbl:"Northside", sub:"1fr", cls:"b4"},
+      {ico:"🏡", lbl:"Southside", sub:"1fr", cls:"b5"},
+      {ico:"🌳", lbl:"Park Row", sub:"span 2", cls:"b3"},
+      {ico:"🏪", lbl:"Market", sub:"span 2", cls:"b2"},
+    ],
+    validate: (css, computed) => {
+      const norm = css.replace(/\s+/g,' ').toLowerCase();
+      const has2Cols = /grid-template-columns\s*:\s*1fr\s+1fr/.test(norm) || /repeat\s*\(\s*2\s*,\s*1fr\s*\)/.test(norm);
+      let gapPass=false, gapVal=null;
+      const gapMatch = norm.match(/(?:^|;|\s)(?:gap|grid-gap|column-gap)\s*:\s*(\d+(?:\.\d+)?)px/);
+      if(gapMatch){
+        gapVal = parseFloat(gapMatch[1]);
+        if(gapVal>=12 && gapVal<=24) gapPass=true;
+      }
+      // also check computed gap
+      const compGap = parseFloat(computed.gap) || parseFloat(computed.columnGap) || 0;
+      if(!gapPass && compGap>=12 && compGap<=24) gapPass=true;
+
+      return [
+        {id:"cols2", pass:has2Cols, msg: has2Cols ? "2 columns OK" : "Need 2 equal columns"},
+        {id:"gap", pass:gapPass, msg: gapPass ? `Gap ${gapVal||compGap}px ✓` : "Need gap 12–24px"}
+      ];
+    },
+    success:"Perfect spacing! Residents love the new boulevards."
+  },
+  {
+    id:3,
+    name:"District Map",
+    badge:"NAMED AREAS",
+    desc:"Zone the city with <b>named areas</b>. Define <code>grid-template-areas</code> so header spans top, park + homes in middle, shops span bottom.",
+    starter:"display: grid;\ngrid-template-columns: 1fr 1fr;\ngrid-template-rows: auto auto auto;\ngrid-template-areas:\n  \"header header\"\n  \"park homes\"\n  \"shops shops\";",
+    hint:"You must include all 4 names: <code>header</code>, <code>park</code>, <code>homes</code>, <code>shops</code> inside <code>grid-template-areas</code>. Keep the quotes! Example:<br><code>\"header header\" \"park homes\" \"shops shops\"</code>",
+    objectives:[
+      {id:"areas", text:"Define grid-template-areas with header, park, homes, shops"},
+      {id:"colsA", text:"Keep 2 columns (1fr 1fr)"},
+    ],
+    blocks: [
+      {ico:"🏛️", lbl:"Header", sub:"header", cls:"b1", area:"header"},
+      {ico:"🌳", lbl:"Park", sub:"park", cls:"b4", area:"park"},
+      {ico:"🏘️", lbl:"Homes", sub:"homes", cls:"b5", area:"homes"},
+      {ico:"🛍️", lbl:"Shops", sub:"shops", cls:"b2", area:"shops"},
+    ],
+    validate: (css, computed) => {
+      const norm = css.toLowerCase();
+      const hasAreas = /grid-template-areas/.test(norm);
+      const hasHeader = /header/.test(norm);
+      const hasPark = /park/.test(norm);
+      const hasHomes = /homes/.test(norm);
+      const hasShops = /shops/.test(norm);
+      const allNames = hasHeader && hasPark && hasHomes && hasShops;
+      const passAreas = hasAreas && allNames;
+      const has2Cols = /grid-template-columns\s*:\s*1fr\s+1fr/.test(norm.replace(/\s+/g,' ')) || /repeat\s*\(\s*2\s*,\s*1fr\s*\)/.test(norm);
+      return [
+        {id:"areas", pass:passAreas, msg: passAreas ? "All 4 areas present" : "Need header, park, homes, shops in grid-template-areas"},
+        {id:"colsA", pass:has2Cols, msg: has2Cols ? "2 columns OK" : "Need 2 columns"}
+      ];
+    },
+    success:"Zoning approved! Each district knows its place."
+  },
+  {
+    id:4,
+    name:"Responsive Reef",
+    badge:"AUTO-FIT",
+    desc:"The archipelago must adapt! Use <b>repeat(auto-fit, minmax(…))</b> so islands reflow responsively. Min 70–120px, max 1fr.",
+    starter:"display: grid;\ngap: 12px;\n/* make it responsive */",
+    hint:"Use <code>grid-template-columns: repeat(auto-fit, minmax(80px, 1fr))</code>. Min can be 70–120px, max must be <code>1fr</code>. <code>auto-fill</code> also passes!",
+    objectives:[
+      {id:"autofit", text:"Use repeat(auto-fit or auto-fill, minmax(70–120px, 1fr))"},
+    ],
+    blocks: [
+      {ico:"🏝️", lbl:"Islet 1", sub:"auto", cls:"b1"},
+      {ico:"🏝️", lbl:"Islet 2", sub:"auto", cls:"b2"},
+      {ico:"🏝️", lbl:"Islet 3", sub:"auto", cls:"b3"},
+      {ico:"🏝️", lbl:"Islet 4", sub:"auto", cls:"b4"},
+      {ico:"🏝️", lbl:"Islet 5", sub:"auto", cls:"b5"},
+      {ico:"🏝️", lbl:"Islet 6", sub:"auto", cls:"b6"},
+      {ico:"🏝️", lbl:"Islet 7", sub:"auto", cls:"b7"},
+      {ico:"🏝️", lbl:"Islet 8", sub:"auto", cls:"b8"},
+    ],
+    validate: (css, computed) => {
+      const norm = css.replace(/\s+/g,' ').toLowerCase();
+      const re = /repeat\s*\(\s*auto-(fit|fill)\s*,\s*minmax\s*\(\s*(\d+(?:\.\d+)?)px\s*,\s*1fr\s*\)\s*\)/;
+      const m = norm.match(re);
+      let pass=false, msg="";
+      if(m){
+        const min = parseFloat(m[2]);
+        if(min>=70 && min<=120){ pass=true; msg=`auto-${m[1]} minmax(${min}px, 1fr) ✓`; }
+        else msg=`Min ${min}px out of range (70–120px)`;
+      } else {
+        msg="Need repeat(auto-fit, minmax(80px, 1fr))";
+      }
+      return [{id:"autofit", pass, msg}];
+    },
+    success:"Responsive! Islands now reflow beautifully on any screen."
+  }
+];
+
+const STORAGE_KEY = "city-island-grid-v2";
+let state = {
+  level:1,
+  theme:"dark",
+  progress:{},
+  code:{},
+  stars:{},
+  pop:0,
+  hap:0
+};
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const s = JSON.parse(raw);
+      state = {...state, ...s, progress:s.progress||{}, code:s.code||{}, stars:s.stars||{}};
+    }
+  }catch(e){}
+  if(!state.code[1]) LEVELS.forEach(l=>{ if(!state.code[l.id]) state.code[l.id]=l.starter });
+  document.documentElement.setAttribute("data-theme", state.theme==="light"?"light":"dark");
+  document.getElementById("app").setAttribute("data-theme", state.theme==="light"?"light":"dark");
+  updateThemeIcon();
+}
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+function updateThemeIcon(){
+  document.getElementById("themeBtn").textContent = state.theme==="light" ? "☀" : "☾";
+}
+
+function renderNav(){
+  const nav = document.getElementById("levelNav");
+  nav.innerHTML="";
+  LEVELS.forEach(l=>{
+    const btn=document.createElement("button");
+    btn.className="lvl-btn"+(state.level===l.id?" active":"")+(state.stars[l.id]?" done":"");
+    btn.innerHTML=`<span class="num">LEVEL 0${l.id}</span><span class="name">${l.name.split(' ')[0]}</span><span class="stars">${state.stars[l.id] ? "★".repeat(state.stars[l.id]) : "☆☆☆"}</span>`;
+    btn.onclick=()=>{ state.level=l.id; saveState(); renderLevel(); renderNav(); };
+    nav.appendChild(btn);
+  });
+}
+
+function renderLevel(){
+  const lvl = LEVELS.find(l=>l.id===state.level);
+  document.getElementById("lvlTitle").innerHTML=`Level ${lvl.id} — ${lvl.name} <span class="badge">${lvl.badge}</span>`;
+  document.getElementById("lvlDesc").innerHTML=lvl.desc;
+  const objWrap=document.getElementById("objectives");
+  objWrap.innerHTML="";
+  lvl.objectives.forEach(o=>{
+    const div=document.createElement("div");
+    div.className="obj"; div.id="obj-"+o.id;
+    div.innerHTML=`<div class="dot">○</div><span>${o.text}</span>`;
+    objWrap.appendChild(div);
+  });
+  const input=document.getElementById("codeInput");
+  input.value = state.code[lvl.id] || lvl.starter;
+  document.getElementById("hintBox").classList.remove("show");
+  document.getElementById("feedback").className="feedback";
+  document.getElementById("feedback").style.display="none";
+  updatePreview();
+  updateMeters();
+  document.getElementById("prevBtn").disabled = state.level===1;
+  document.getElementById("nextBtn").disabled = state.level===LEVELS.length;
+  document.getElementById("prevBtn").style.opacity = state.level===1 ? "0.5" : "1";
+  document.getElementById("nextBtn").style.opacity = state.level===LEVELS.length ? "0.5" : "1";
+}
+
+function applyCSS(cssText){
+  const island=document.getElementById("island");
+  // reset to base
+  island.style.cssText="display:grid; min-height:148px; border-radius:10px; overflow:hidden; background:rgba(255,255,255,0.04); border:1px dashed rgba(255,255,255,0.15);";
+  // parse declarations: split by ; and apply
+  const decls = cssText.split(";").map(s=>s.trim()).filter(Boolean);
+  decls.forEach(d=>{
+    const idx=d.indexOf(":");
+    if(idx===-1) return;
+    const prop=d.slice(0,idx).trim();
+    const val=d.slice(idx+1).trim();
+    if(!prop||!val) return;
+    // sanitize: only allow grid related + gap + display
+    const allowed = ["display","grid-template-columns","grid-template-rows","grid-template-areas","grid-template","gap","grid-gap","column-gap","row-gap","grid-auto-rows","grid-auto-columns","grid-auto-flow","justify-items","align-items","place-items"];
+    if(allowed.includes(prop)){
+      try{ island.style.setProperty(prop, val); }catch(e){}
+    }
+  });
+}
+
+function updatePreview(){
+  const lvl = LEVELS.find(l=>l.id===state.level);
+  const css = document.getElementById("codeInput").value;
+  state.code[lvl.id]=css;
+  saveState();
+  applyCSS(css);
+  const island=document.getElementById("island");
+  island.innerHTML="";
+  lvl.blocks.forEach(b=>{
+    const div=document.createElement("div");
+    div.className="block "+b.cls;
+    if(b.area) div.style.gridArea=b.area;
+    div.innerHTML=`<div class="ico">${b.ico}</div><div class="lbl">${b.lbl}</div><div class="sub">${b.sub}</div>`;
+    island.appendChild(div);
+  });
+  // live check for objectives UI
+  const computed = getComputedStyle(island);
+  const checks = lvl.validate(css, computed);
+  checks.forEach(c=>{
+    const el=document.getElementById("obj-"+c.id);
+    if(!el) return;
+    if(c.pass){
+      el.classList.add("ok");
+      el.querySelector(".dot").textContent="✓";
+    } else {
+      el.classList.remove("ok");
+      el.querySelector(".dot").textContent="○";
+    }
+  });
+  // preview info
+  const cols = computed.gridTemplateColumns;
+  const gap = computed.gap || computed.columnGap;
+  document.getElementById("previewInfo").textContent = `${cols.split(' ').length} cols • gap ${gap}`;
+}
+
+function showFeedback(ok, msg){
+  const fb=document.getElementById("feedback");
+  fb.className="feedback show "+(ok?"ok":"err");
+  fb.style.display="block";
+  fb.innerHTML=msg;
+}
+function showToast(msg){
+  const t=document.getElementById("toast");
+  t.textContent=msg;
+  t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"),2200);
+}
+
+function checkBuild(){
+  const lvl = LEVELS.find(l=>l.id===state.level);
+  const css=document.getElementById("codeInput").value;
+  const island=document.getElementById("island");
+  const computed=getComputedStyle(island);
+  const checks=lvl.validate(css, computed);
+  const allPass=checks.every(c=>c.pass);
+  if(allPass){
+    const prevStars=state.stars[lvl.id]||0;
+    if(!prevStars){
+      state.pop = Math.min(100, state.pop + 25);
+      state.hap = Math.min(100, state.hap + 20);
+      // bonus for later levels
+      if(lvl.id===3) state.pop+=10;
+      if(lvl.id===4) { state.pop=Math.min(100, state.pop+15); state.hap=Math.min(100, state.hap+15); }
+    }
+    state.stars[lvl.id]=3;
+    state.progress[lvl.id]=true;
+    saveState();
+    renderNav();
+    updateMeters();
+    showFeedback(true, `✅ <b>Build approved!</b> ${lvl.success}<br><span style="opacity:0.9">+25 population • +20 happiness • ★★★</span>`);
+    showToast("Build approved! ★★★");
+    // confetti effect
+    island.animate([{transform:"scale(1)"},{transform:"scale(1.02)"},{transform:"scale(1)"}],{duration:400});
+    if(lvl.id<LEVELS.length){
+      setTimeout(()=>{
+        const fb=document.getElementById("feedback");
+        fb.innerHTML+=`<br><button onclick="goNext()" style="margin-top:8px;background:#0b1020;color:white;border:1px solid rgba(255,255,255,0.2);padding:8px 14px;border-radius:99px;font-weight:800;cursor:pointer;min-height:36px">Next level →</button>`;
+      },300);
+    }
+  } else {
+    const msgs=checks.map(c=>`${c.pass?"✅":"❌"} ${c.msg}`).join("<br>");
+    showFeedback(false, `<b>Not quite — keep building:</b><br>${msgs}`);
+    island.animate([{transform:"translateX(0)"},{transform:"translateX(-4px)"},{transform:"translateX(4px)"},{transform:"translateX(0)"}],{duration:300});
+  }
+}
+
+function goNext(){
+  if(state.level<LEVELS.length){
+    state.level++;
+    saveState();
+    renderNav();
+    renderLevel();
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+}
+
+function updateMeters(){
+  // calculate based on progress if not set
+  const done = Object.keys(state.stars).length;
+  if(state.pop===0 && done>0){
+    state.pop = done*25;
+    state.hap = done*20;
+  }
+  document.getElementById("popVal").textContent = state.pop.toLocaleString();
+  document.getElementById("hapVal").textContent = state.hap+"%";
+  document.getElementById("popBar").style.width = state.pop+"%";
+  document.getElementById("hapBar").style.width = state.hap+"%";
+}
+
+// events
+document.getElementById("codeInput").addEventListener("input", updatePreview);
+document.getElementById("checkBtn").addEventListener("click", checkBuild);
+document.getElementById("resetBtn").addEventListener("click", ()=>{
+  const lvl=LEVELS.find(l=>l.id===state.level);
+  document.getElementById("codeInput").value=lvl.starter;
+  updatePreview();
+  showToast("Reset to starter");
+});
+document.getElementById("hintBtn").addEventListener("click", ()=>{
+  const lvl=LEVELS.find(l=>l.id===state.level);
+  const box=document.getElementById("hintBox");
+  if(box.classList.contains("show")){
+    box.classList.remove("show");
+  } else {
+    box.innerHTML="💡 <b>Hint:</b> "+lvl.hint;
+    box.classList.add("show");
+  }
+});
+document.getElementById("copyBtn").addEventListener("click", ()=>{
+  const txt=document.getElementById("codeInput").value;
+  navigator.clipboard.writeText(txt).then(()=>showToast("Copied!")).catch(()=>showToast("Copy: "+txt.slice(0,30)));
+});
+document.getElementById("themeBtn").addEventListener("click", ()=>{
+  state.theme = state.theme==="dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", state.theme==="light"?"light":"dark");
+  document.getElementById("app").setAttribute("data-theme", state.theme==="light"?"light":"dark");
+  updateThemeIcon();
+  saveState();
+});
+document.getElementById("prevBtn").addEventListener("click", ()=>{
+  if(state.level>1){ state.level--; saveState(); renderNav(); renderLevel(); }
+});
+document.getElementById("nextBtn").addEventListener("click", goNext);
+
+// init
+loadState();
+renderNav();
+renderLevel();
+</script>
+</body>
+</html>

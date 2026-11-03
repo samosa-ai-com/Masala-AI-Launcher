@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>Sky Blocks Climber</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#87CEEB;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#app{width:100%;max-width:428px;height:100vh;height:100dvh;margin:0 auto;position:relative;background:linear-gradient(180deg,#87CEEB 0%,#B0E6FF 35%,#E0F6FF 65%,#FFF8DC 100%);overflow:hidden;display:flex;flex-direction:column;touch-action:none}
+header{position:absolute;top:0;left:0;right:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:10px 12px;gap:8px;pointer-events:none}
+.hud{pointer-events:auto;background:rgba(255,255,255,0.92);border:2px solid #222;border-radius:14px;padding:6px 10px;box-shadow:0 4px 0 #222;min-width:0}
+.hud b{font-size:13px;line-height:1;color:#222;display:block}
+.hud span{font-size:11px;color:#555;font-weight:700}
+.hud-row{display:flex;gap:8px;align-items:center}
+.badge{width:36px;height:36px;background:#FFD700;border:2px solid #222;border-radius:10px;display:grid;place-items:center;font-size:18px;box-shadow:0 3px 0 #222}
+#canvasWrap{flex:1;position:relative;overflow:hidden}
+canvas{width:100%;height:100%;display:block}
+#centerMsg{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);background:#fff;border:3px solid #222;border-radius:18px;padding:14px 16px;box-shadow:0 6px 0 #222;text-align:center;z-index:5;min-width:260px;max-width:90%}
+#centerMsg h1{font-size:20px;color:#222;line-height:1.1}
+#centerMsg p{font-size:13px;color:#444;margin:6px 0 10px;line-height:1.4}
+.btn{appearance:none;border:2px solid #222;border-radius:12px;padding:10px 14px;font-weight:900;font-size:14px;cursor:pointer;box-shadow:0 4px 0 #222;transition:transform .05s}
+.btn:active{transform:translateY(2px);box-shadow:0 2px 0 #222}
+.btn-primary{background:#4ECDC4;color:#222}
+.btn-dark{background:#222;color:#fff}
+.btn-gold{background:#FFD700;color:#222}
+.btn-small{padding:7px 10px;font-size:12px;border-radius:10px}
+#controls{position:absolute;left:0;right:0;bottom:0;height:148px;pointer-events:none;z-index:6;display:flex;justify-content:space-between;align-items:flex-end;padding:0 14px 14px}
+.joystick{pointer-events:auto;width:118px;height:118px;background:rgba(255,255,255,0.88);border:3px solid #222;border-radius:50%;box-shadow:0 5px 0 #222;position:relative;touch-action:none}
+.joy-base{position:absolute;inset:0;border-radius:50%;display:grid;place-items:center;color:#888;font-weight:800;font-size:10px;letter-spacing:.08em}
+.joy-stick{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;background:#222;border-radius:50%;box-shadow:inset 0 -4px 0 rgba(0,0,0,.3),0 2px 6px rgba(0,0,0,.3);display:grid;place-items:center;color:#fff;font-size:18px}
+.joy-stick:after{content:'';position:absolute;inset:8px;border-radius:50%;border:2px solid rgba(255,255,255,.2)}
+.jumpBtn{pointer-events:auto;width:92px;height:92px;background:#FF6B6B;border:3px solid #222;border-radius:50%;box-shadow:0 5px 0 #222;display:grid;place-items:center;color:#fff;font-weight:900;font-size:15px;letter-spacing:.04em;touch-action:none;user-select:none}
+.jumpBtn:active{transform:translateY(2px);box-shadow:0 3px 0 #222}
+.jumpBtn small{font-size:10px;opacity:.9}
+#topBar{position:absolute;top:64px;left:50%;transform:translateX(-50%);z-index:6;background:rgba(34,34,34,0.92);color:#fff;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:800;display:flex;gap:10px;align-items:center;white-space:nowrap}
+#topBar i{font-style:normal;background:#4ECDC4;color:#222;padding:2px 8px;border-radius:999px}
+#infoPanel{position:absolute;inset:0;background:rgba(255,255,255,0.98);z-index:20;display:none;overflow:auto;padding:18px 16px 24px}
+#infoPanel.open{display:block}
+#infoPanel h2{font-size:18px;margin-bottom:8px}
+#infoPanel h3{font-size:13px;margin:12px 0 4px;color:#222}
+#infoPanel p, #infoPanel li{font-size:13px;line-height:1.5;color:#333}
+#infoPanel ul{padding-left:18px}
+.chip{display:inline-block;background:#222;color:#fff;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:800;margin:2px}
+#toast{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#222;color:#fff;padding:10px 14px;border-radius:12px;font-weight:800;font-size:13px;z-index:7;display:none;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="hud">
+      <div class="hud-row">
+        <div>
+          <b id="timer">00:00.0</b>
+          <span>TIME</span>
+        </div>
+        <div style="width:1px;height:28px;background:#ddd"></div>
+        <div>
+          <b id="drops">0 drops</b>
+          <span id="bestLabel">BEST --:--</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;pointer-events:auto">
+      <div class="badge" id="summitBadge" title="Summit badge">⛰️</div>
+      <button class="btn btn-small btn-dark" id="infoBtn">HOW</button>
+      <button class="btn btn-small btn-dark" id="resetBtn">↺</button>
+    </div>
+  </header>
+
+  <div id="canvasWrap">
+    <canvas id="c"></canvas>
+    <div id="topBar"><i id="stageLabel">STAGE 0 • START</i> <span id="cpLabel">CP 0/4</span> <span id="heightLabel">0m</span></div>
+    <div id="centerMsg">
+      <h1>SKY BLOCKS CLIMBER</h1>
+      <p>Jump across floating toy blocks to the golden summit. Time your jumps over <b>spinning bars</b> and balance on <b>narrow beams</b>. Fall = back to checkpoint.</p>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-primary" id="playBtn">▶ PLAY</button>
+        <button class="btn btn-dark" id="howBtn2">TECH GUIDE</button>
+      </div>
+      <p style="margin-top:10px;font-size:11px;color:#666">Joystick left + JUMP right • or Arrow keys + Space • Portrait 360-428px</p>
+    </div>
+    <div id="toast"></div>
+  </div>
+
+  <div id="controls">
+    <div class="joystick" id="joy">
+      <div class="joy-base">MOVE</div>
+      <div class="joy-stick" id="stick">✥</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:auto">
+      <div style="background:rgba(255,255,255,.9);border:2px solid #222;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:800">HOLD TO RUN • TAP TO JUMP</div>
+      <div class="jumpBtn" id="jumpBtn"><span>JUMP<br><small>SPACE</small></span></div>
+    </div>
+  </div>
+
+  <div id="infoPanel">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2>How it’s built — no external 3D</h2>
+      <button class="btn btn-small btn-dark" id="closeInfo">✕ CLOSE</button>
+    </div>
+    <p>This mini-app is <b>100% inline</b> — no CDN, no Three.js, no images. It runs offline as a single HTML file.</p>
+    <h3>1) 3D without external requests</h3>
+    <ul>
+      <li><span class="chip">Canvas 2D only</span> Custom perspective projection: camera eye → target, basis vectors (right/up/forward), then <code>xCam·f / zCam</code> to NDC → screen.</li>
+      <li>Each block is 8 vertices → 6 faces. Faces are projected, depth-sorted (painter’s algorithm) and drawn with flat shading (top lighter, sides darker) for chunky toy look.</li>
+      <li>Sky is CSS gradient; clouds are 2D ellipses drawn before 3D to avoid extra geometry.</li>
+    </ul>
+    <h3>2) Controls</h3>
+    <ul>
+      <li>Touch: left joystick (118px base, 56px stick, 45px radius) → normalized vector → world velocity. Right 92px JUMP button. Both use <code>touch-action:none</code> and prevent scroll.</li>
+      <li>Keyboard: Arrow/WASD + Space. Input merged, clamped to unit circle, camera-relative lerp for smooth feel.</li>
+      <li>Large targets, 14px+ text, max-width 428px, no horizontal scroll — portrait mobile-first.</li>
+    </ul>
+    <h3>3) Physics (arcade, not rigid-body)</h3>
+    <ul>
+      <li>Gravity 26, jump impulse 10.5, max fall -18. Horizontal speed 6.2, lerp 0.18 for responsiveness.</li>
+      <li>AABB top-collision only: if previous bottom ≥ platform top and current bottom ≤ top + overlap, snap to top, zero vy, grounded.</li>
+      <li>Spinning bars: line-segment distance check in XZ plane → knockback + bounce. Beams: narrow AABB requires precise landing.</li>
+      <li>Fall threshold = checkpointY - 12 → respawn, increment drop counter.</li>
+    </ul>
+    <h3>4) Persistence</h3>
+    <ul>
+      <li><code>localStorage</code> keys: <code>skyBlocks_bestTime</code>, <code>skyBlocks_highestCP</code>, <code>skyBlocks_summits</code>. Best time is lowest summit time; highest checkpoint unlocks stage label.</li>
+      <li>Timer starts on first input, stops at summit. Summit badge glows and persists.</li>
+    </ul>
+    <h3>5) Performance tips</h3>
+    <ul>
+      <li>~18 platforms → ~108 faces/frame, sort O(n log n) trivial for mobile.</li>
+      <li>Cap dt at 33ms, use <code>requestAnimationFrame</code>, avoid allocations in loop (reuse vectors).</li>
+      <li>All CSS/JS inline, &lt;60KB, no external fonts/images — instant load in WebView.</li>
+    </ul>
+    <div style="margin-top:14px;display:flex;gap:8px">
+      <button class="btn btn-primary" id="closeInfo2">GOT IT</button>
+      <button class="btn btn-dark" id="resetBest">RESET BEST</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const timerEl = document.getElementById('timer');
+const dropsEl = document.getElementById('drops');
+const bestLabel = document.getElementById('bestLabel');
+const stageLabel = document.getElementById('stageLabel');
+const cpLabel = document.getElementById('cpLabel');
+const heightLabel = document.getElementById('heightLabel');
+const centerMsg = document.getElementById('centerMsg');
+const playBtn = document.getElementById('playBtn');
+const joy = document.getElementById('joy');
+const stick = document.getElementById('stick');
+const jumpBtn = document.getElementById('jumpBtn');
+const toast = document.getElementById('toast');
+const summitBadge = document.getElementById('summitBadge');
+
+let W=0,H=0,dpr=1;
+function resize(){
+  const rect = document.getElementById('canvasWrap').getBoundingClientRect();
+  dpr = Math.min(2, window.devicePixelRatio||1);
+  W = rect.width; H = rect.height;
+  canvas.width = Math.round(W*dpr);
+  canvas.height = Math.round(H*dpr);
+  canvas.style.width = W+'px';
+  canvas.style.height = H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// persistence
+const LS_BEST='skyBlocks_bestTime', LS_CP='skyBlocks_highestCP', LS_SUMMITS='skyBlocks_summits';
+let bestTime = parseFloat(localStorage.getItem(LS_BEST)||'NaN');
+let highestCP = parseInt(localStorage.getItem(LS_CP)||'0',10);
+let summits = parseInt(localStorage.getItem(LS_SUMMITS)||'0',10);
+function fmtTime(s){
+  if(!isFinite(s)) return '--:--';
+  const m=Math.floor(s/60), sec=(s%60);
+  return String(m).padStart(2,'0')+':'+sec.toFixed(1).padStart(4,'0');
+}
+function updateBestUI(){
+  bestLabel.textContent = isFinite(bestTime) ? 'BEST '+fmtTime(bestTime) : 'BEST --:--';
+  summitBadge.style.background = summits>0 ? '#FFD700' : '#fff';
+  summitBadge.style.boxShadow = summits>0 ? '0 0 0 3px #FFD700, 0 4px 0 #222' : '0 3px 0 #222';
+  summitBadge.textContent = summits>0 ? '🏆' : '⛰️';
+}
+updateBestUI();
+
+// level
+const platforms = [
+  {id:'start', x:0, y:0, z:0, w:5, h:1, d:5, color:'#FF6B6B', cp:0, label:'START'},
+  {id:'p1a', x:0, y:3.2, z:-7, w:3, h:0.6, d:3, color:'#4ECDC4'},
+  {id:'p1b', x:3.2, y:5.2, z:-10.5, w:3, h:0.6, d:3, color:'#FFE66D'},
+  {id:'cp1', x:-2.2, y:7, z:-14.5, w:3.6, h:0.9, d:3.6, color:'#A8E6CF', cp:1, label:'STAGE 1'},
+  {id:'spin1', x:0, y:9.2, z:-18.5, w:6.5, h:0.45, d:0.6, color:'#FF8E53', spin:true, spinSpeed:1.15},
+  {id:'p2a', x:0, y:10.5, z:-22.5, w:2.8, h:0.6, d:2.8, color:'#6C5CE7'},
+  {id:'p2b', x:3.8, y:12, z:-26, w:2.8, h:0.6, d:2.8, color:'#74B9FF'},
+  {id:'cp2', x:-1.5, y:13.5, z:-30, w:3.6, h:0.9, d:3.6, color:'#A8E6CF', cp:2, label:'STAGE 2'},
+  {id:'beam1', x:0, y:15.5, z:-34.5, w:0.75, h:0.4, d:8, color:'#FDCB6E', beam:true},
+  {id:'beam2', x:2.2, y:17.5, z:-40.5, w:0.75, h:0.4, d:6.5, color:'#E17055', beam:true},
+  {id:'p3a', x:-1, y:19.2, z:-45, w:2.6, h:0.6, d:2.6, color:'#00B894'},
+  {id:'cp3', x:0, y:21, z:-49, w:3.6, h:0.9, d:3.6, color:'#A8E6CF', cp:3, label:'STAGE 3'},
+  {id:'spin2', x:0, y:23.2, z:-53.5, w:7.2, h:0.45, d:0.6, color:'#FF7675', spin:true, spinSpeed:-1.45},
+  {id:'p4a', x:-3.2, y:24.8, z:-57.5, w:2.3, h:0.6, d:2.3, color:'#55EFC4'},
+  {id:'p4b', x:3.2, y:26.5, z:-61, w:2.3, h:0.6, d:2.3, color:'#81ECEC'},
+  {id:'summit', x:0, y:28.5, z:-65, w:6.2, h:1.3, d:6.2, color:'#FFD700', cp:4, summit:true, label:'SUMMIT'},
+];
+const checkpoints = [
+  {cp:0, x:0, y:1, z:0},
+  {cp:1, x:-2.2, y:8.2, z:-14.5},
+  {cp:2, x:-1.5, y:14.7, z:-30},
+  {cp:3, x:0, y:22.2, z:-49},
+  {cp:4, x:0, y:30, z:-65},
+];
+
+// player
+let player = {x:0, y:1.6, z:0, vx:0, vy:0, vz:0, grounded:false, on:null, prevY:1.6};
+let lastCP = 0;
+let drops = 0;
+let elapsed = 0;
+let running = false;
+let started = false;
+let won = false;
+let spinAngle1=0, spinAngle2=0;
+
+function respawn(){
+  const cp = checkpoints[lastCP];
+  player.x = cp.x; player.y = cp.y; player.z = cp.z;
+  player.vx=0; player.vy=0; player.vz=0; player.grounded=false; player.on=null;
+  spinAngle1=0; spinAngle2=0;
+}
+respawn();
+
+// input
+let joyVec={x:0,y:0};
+let keys={};
+let jumpQueued=false;
+let joyActive=false;
+
+function setStick(dx,dy){
+  const r=45;
+  let len=Math.hypot(dx,dy);
+  if(len>r){ dx=dx/len*r; dy=dy/len*r; len=r; }
+  stick.style.transform=`translate(${dx}px,${dy}px)`;
+  joyVec.x = dx/r;
+  joyVec.y = dy/r;
+}
+function resetStick(){
+  stick.style.transform='translate(0px,0px)';
+  joyVec.x=0; joyVec.y=0;
+}
+joy.addEventListener('touchstart', e=>{
+  e.preventDefault(); joyActive=true;
+  const rect=joy.getBoundingClientRect();
+  const t=e.touches[0];
+  setStick(t.clientX-(rect.left+rect.width/2), t.clientY-(rect.top+rect.height/2));
+},{passive:false});
+joy.addEventListener('touchmove', e=>{
+  e.preventDefault();
+  if(!joyActive) return;
+  const rect=joy.getBoundingClientRect();
+  const t=e.touches[0];
+  setStick(t.clientX-(rect.left+rect.width/2), t.clientY-(rect.top+rect.height/2));
+},{passive:false});
+joy.addEventListener('touchend', e=>{
+  e.preventDefault(); joyActive=false; resetStick();
+},{passive:false});
+joy.addEventListener('mousedown', e=>{
+  joyActive=true;
+  const rect=joy.getBoundingClientRect();
+  setStick(e.clientX-(rect.left+rect.width/2), e.clientY-(rect.top+rect.height/2));
+  const mm=(ev)=>{ if(!joyActive) return; setStick(ev.clientX-(rect.left+rect.width/2), ev.clientY-(rect.top+rect.height/2)); };
+  const mu=()=>{ joyActive=false; resetStick(); window.removeEventListener('mousemove',mm); window.removeEventListener('mouseup',mu); };
+  window.addEventListener('mousemove',mm); window.addEventListener('mouseup',mu);
+});
+
+function doJump(){
+  if(player.grounded){
+    player.vy = 10.5;
+    player.grounded=false;
+    if(!started){ started=true; running=true; showToast('GO!'); }
+  }
+}
+jumpBtn.addEventListener('touchstart', e=>{ e.preventDefault(); doJump(); },{passive:false});
+jumpBtn.addEventListener('mousedown', e=>{ e.preventDefault(); doJump(); });
+jumpBtn.addEventListener('click', e=>{ e.preventDefault(); });
+
+window.addEventListener('keydown', e=>{
+  const k=e.key.toLowerCase();
+  if(k===' '){ e.preventDefault(); doJump(); }
+  if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(k)){
+    keys[k]=true;
+    if(!started && !won){ started=true; running=true; centerMsg.style.display='none'; }
+  }
+  if(k==='r'){ resetGame(); }
+});
+window.addEventListener('keyup', e=>{
+  const k=e.key.toLowerCase();
+  keys[k]=false;
+});
+
+// UI
+function showToast(msg, ms=1200){
+  toast.textContent=msg; toast.style.display='block';
+  clearTimeout(showToast._t);
+  showToast._t=setTimeout(()=>toast.style.display='none', ms);
+}
+playBtn.addEventListener('click', ()=>{
+  centerMsg.style.display='none';
+  started=true; running=true;
+});
+document.getElementById('infoBtn').addEventListener('click', ()=> document.getElementById('infoPanel').classList.add('open'));
+document.getElementById('howBtn2').addEventListener('click', ()=> document.getElementById('infoPanel').classList.add('open'));
+document.getElementById('closeInfo').addEventListener('click', ()=> document.getElementById('infoPanel').classList.remove('open'));
+document.getElementById('closeInfo2').addEventListener('click', ()=> document.getElementById('infoPanel').classList.remove('open'));
+document.getElementById('resetBtn').addEventListener('click', resetGame);
+document.getElementById('resetBest').addEventListener('click', ()=>{
+  localStorage.removeItem(LS_BEST); localStorage.removeItem(LS_CP); localStorage.removeItem(LS_SUMMITS);
+  bestTime=NaN; highestCP=0; summits=0; updateBestUI(); showToast('Best cleared');
+});
+function resetGame(){
+  drops=0; elapsed=0; running=false; started=false; won=false; lastCP=0;
+  respawn(); centerMsg.style.display='block'; centerMsg.innerHTML=`<h1>SKY BLOCKS CLIMBER</h1><p>Jump across floating toy blocks to the golden summit. Time your jumps over <b>spinning bars</b> and balance on <b>narrow beams</b>.</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn btn-primary" id="playBtn2">▶ PLAY</button><button class="btn btn-dark" id="howBtn3">TECH GUIDE</button></div><p style="margin-top:10px;font-size:11px;color:#666">Joystick + JUMP or Arrows + Space</p>`;
+  document.getElementById('playBtn2').addEventListener('click', ()=>{ centerMsg.style.display='none'; started=true; running=true; });
+  document.getElementById('howBtn3').addEventListener('click', ()=> document.getElementById('infoPanel').classList.add('open'));
+  updateHUD();
+}
+
+// math helpers
+function dot(a,b){ return a.x*b.x + a.y*b.y + a.z*b.z; }
+function sub(a,b){ return {x:a.x-b.x, y:a.y-b.y, z:a.z-b.z}; }
+function add(a,b){ return {x:a.x+b.x, y:a.y+b.y, z:a.z+b.z}; }
+function cross(a,b){ return {x:a.y*b.z - a.z*b.y, y:a.z*b.x - a.x*b.z, z:a.x*b.y - a.y*b.x}; }
+function len(v){ return Math.hypot(v.x,v.y,v.z); }
+function norm(v){ const l=len(v)||1; return {x:v.x/l, y:v.y/l, z:v.z/l}; }
+function darken(hex, amt){
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  const f=p=>Math.max(0,Math.min(255, Math.round(p*(1-amt))));
+  return `rgb(${f(r)},${f(g)},${f(b)})`;
+}
+function lighten(hex, amt){
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  const f=p=>Math.max(0,Math.min(255, Math.round(p + (255-p)*amt)));
+  return `rgb(${f(r)},${f(g)},${f(b)})`;
+}
+
+// rendering helpers
+function projectPoint(p, eye, basis, f, aspect){
+  const v = sub(p, eye);
+  const xCam = dot(v, basis.right);
+  const yCam = dot(v, basis.up);
+  const zCam = dot(v, basis.forward);
+  if(zCam < 0.15) return null;
+  const xNdc = (xCam * f / aspect) / zCam;
+  const yNdc = (yCam * f) / zCam;
+  return {xCam,yCam,zCam,xNdc,yNdc};
+}
+function toScreen(ndc){
+  return {x: (ndc.xNdc*0.5+0.5)*W, y: (1-(ndc.yNdc*0.5+0.5))*H };
+}
+
+function drawCubeFaces(faces){
+  // faces already sorted far->near
+  for(const face of faces){
+    const pts = face.pts;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.fillStyle = face.color;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(34,34,34,0.95)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    // inner highlight for top
+    if(face.isTop){
+      ctx.fillStyle='rgba(255,255,255,0.18)';
+      ctx.fill();
+    }
+  }
+}
+
+// game loop
+let lastT=performance.now();
+function updateHUD(){
+  timerEl.textContent = fmtTime(elapsed);
+  dropsEl.textContent = drops + (drops===1?' drop':' drops');
+  const cp = platforms.find(p=>p.cp===lastCP);
+  stageLabel.textContent = cp ? (cp.label||'STAGE '+lastCP) : 'START';
+  cpLabel.textContent = `CP ${lastCP}/4`;
+  heightLabel.textContent = Math.max(0, Math.round(player.y*3))+'m';
+  if(lastCP>highestCP){
+    highestCP=lastCP;
+    localStorage.setItem(LS_CP, String(highestCP));
+  }
+}
+
+function checkAABBLanding(prevBottom, currBottom, playerX, playerZ, plat){
+  const hw=plat.w/2, hd=plat.d/2;
+  const top = plat.y + plat.h/2;
+  const withinXZ = playerX >= plat.x - hw - 0.32 && playerX <= plat.x + hw + 0.32 &&
+                   playerZ >= plat.z - hd - 0.32 && playerZ <= plat.z + hd + 0.32;
+  if(!withinXZ) return false;
+  if(prevBottom >= top - 0.05 && currBottom <= top + 0.12){
+    return true;
+  }
+  return false;
+}
+
+function segmentDist2D(px,pz, ax,az, bx,bz){
+  const apx=px-ax, apz=pz-az, abx=bx-ax, abz=bz-az;
+  const ab2=abx*abx+abz*abz || 1;
+  let t=(apx*abx+apz*abz)/ab2; t=Math.max(0,Math.min(1,t));
+  const cx=ax+abx*t, cz=az+abz*t;
+  return {dist: Math.hypot(px-cx, pz-cz), cx, cz};
+}
+
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.033, (now-lastT)/1000); lastT=now;
+
+  // input -> velocity
+  let ix = joyVec.x;
+  let iz = joyVec.y; // joystick y positive = down
+  // keyboard
+  if(keys['arrowleft']||keys['a']) ix -= 1;
+  if(keys['arrowright']||keys['d']) ix += 1;
+  if(keys['arrowup']||keys['w']) iz -= 1;
+  if(keys['arrowdown']||keys['s']) iz += 1;
+  let mag=Math.hypot(ix,iz);
+  if(mag>1){ ix/=mag; iz/=mag; }
+  // camera-relative: we want forward = -Z, so iz maps to Z
+  const speed = 6.2;
+  const targetVX = ix * speed;
+  const targetVZ = iz * speed;
+
+  // lerp
+  const lerp = player.grounded ? 0.22 : 0.14;
+  player.vx += (targetVX - player.vx)*lerp;
+  player.vz += (targetVZ - player.vz)*lerp;
+
+  // gravity
+  if(!won){
+    player.vy -= 26 * dt;
+    if(player.vy < -18) player.vy = -18;
+  }
+
+  // integrate
+  const prevY = player.y;
+  const prevBottom = prevY - 0.5;
+  player.prevY = prevY;
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+  player.z += player.vz * dt;
+
+  // spin angles
+  spinAngle1 += 1.15 * dt;
+  spinAngle2 += -1.45 * dt;
+
+  // collision with platforms
+  let grounded=false;
+  let onPlat=null;
+  const currBottom = player.y - 0.5;
+
+  // update spinning platforms positions for collision (they rotate but stay at same center)
+  for(const p of platforms){
+    if(p.spin){
+      // for collision we treat as line, but also allow landing when aligned? Actually spinning bars are hazards, not platforms to stand on.
+      // So skip landing check for spin bars
+      continue;
+    }
+    if(checkAABBLanding(prevBottom, currBottom, player.x, player.z, p)){
+      // snap
+      const top = p.y + p.h/2;
+      player.y = top + 0.5;
+      player.vy = 0;
+      grounded = true;
+      onPlat = p;
+      // friction: reduce velocity a bit when on platform
+      player.vx *= 0.92;
+      player.vz *= 0.92;
+      // checkpoint
+      if(p.cp!==undefined && p.cp>lastCP){
+        lastCP = p.cp;
+        showToast('CHECKPOINT '+lastCP+' ✓');
+        // persist
+        localStorage.setItem(LS_CP, String(Math.max(highestCP,lastCP)));
+        if(p.summit){
+          // win
+          if(!won){
+            won=true; running=false;
+            const finalTime = elapsed;
+            if(!isFinite(bestTime) || finalTime < bestTime){
+              bestTime = finalTime;
+              localStorage.setItem(LS_BEST, String(bestTime));
+              showToast('NEW BEST! '+fmtTime(bestTime), 2000);
+            } else {
+              showToast('SUMMIT! '+fmtTime(finalTime), 2000);
+            }
+            summits++; localStorage.setItem(LS_SUMMITS, String(summits));
+            updateBestUI();
+            centerMsg.style.display='block';
+            centerMsg.innerHTML=`<h1>🏆 SUMMIT REACHED!</h1><p>Time <b>${fmtTime(finalTime)}</b> • Drops <b>${drops}</b><br>Best <b>${fmtTime(bestTime)}</b> • Summits <b>${summits}</b></p><div style="display:flex;gap:8px;justify-content:center"><button class="btn btn-gold" id="againBtn">↺ AGAIN</button><button class="btn btn-dark" id="shareBtn">SHARE BADGE</button></div>`;
+            document.getElementById('againBtn').addEventListener('click', resetGame);
+            document.getElementById('shareBtn').addEventListener('click', ()=>{
+              const txt=`I summited Sky Blocks in ${fmtTime(finalTime)} with ${drops} drops! ⛰️`;
+              if(navigator.share) navigator.share({title:'Sky Blocks Climber', text:txt}).catch(()=>{});
+              else { navigator.clipboard.writeText(txt).then(()=>showToast('Badge copied!')); }
+            });
+          }
+        }
+      }
+      break; // only one platform per frame (highest)
+    }
+  }
+  player.grounded = grounded;
+  player.on = onPlat;
+
+  // spinning bar hazard
+  for(const p of platforms){
+    if(!p.spin) continue;
+    const ang = p.id==='spin1' ? spinAngle1 : spinAngle2;
+    const L = p.w;
+    const ax = p.x + Math.cos(ang)*L/2, az = p.z + Math.sin(ang)*L/2;
+    const bx = p.x - Math.cos(ang)*L/2, bz = p.z - Math.sin(ang)*L/2;
+    const {dist, cx, cz} = segmentDist2D(player.x, player.z, ax,az, bx,bz);
+    const yDist = Math.abs(player.y - p.y);
+    if(dist < 0.85 && yDist < 1.0){
+      // knockback
+      const nx = player.x - cx, nz = player.z - cz;
+      const nl = Math.hypot(nx,nz)||1;
+      player.vx += (nx/nl)*8;
+      player.vz += (nz/nl)*8;
+      player.vy = 4;
+      player.grounded=false;
+      showToast('HIT! Time it!');
+      break;
+    }
+  }
+
+  // fall check
+  const cpY = checkpoints[lastCP].y;
+  if(player.y < cpY - 12 || player.y < -6){
+    drops++;
+    showToast('FALL → CP '+lastCP);
+    respawn();
+  }
+
+  // timer
+  if(running && !won){
+    elapsed += dt;
+  }
+  updateHUD();
+
+  // render
+  render();
+}
+
+function render(){
+  // clear with sky gradient (already CSS, but we draw canvas bg)
+  ctx.clearRect(0,0,W,H);
+  // subtle vignette sky already via CSS, draw clouds
+  ctx.save();
+  ctx.globalAlpha=0.9;
+  const cloudCols=['#ffffff','#fff8dc'];
+  const clouds=[
+    {x:W*0.15,y:H*0.18,s:1},{x:W*0.7,y:H*0.12,s:1.2},{x:W*0.45,y:H*0.22,s:0.9},{x:W*0.85,y:H*0.28,s:0.8}
+  ];
+  for(const cl of clouds){
+    ctx.fillStyle='rgba(255,255,255,0.95)';
+    const cx=cl.x, cy=cl.y, s=cl.s;
+    ctx.beginPath();
+    ctx.ellipse(cx,cy, 38*s,18*s,0,0,Math.PI*2);
+    ctx.ellipse(cx+22*s,cy+4*s, 30*s,14*s,0,0,Math.PI*2);
+    ctx.ellipse(cx-20*s,cy+6*s, 26*s,12*s,0,0,Math.PI*2);
+    ctx.fill();
+  }
+  // sun
+  ctx.fillStyle='#FFD93D';
+  ctx.beginPath(); ctx.arc(W-36, 36, 22,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,217,61,0.25)';
+  ctx.beginPath(); ctx.arc(W-36,36,34,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // camera
+  const eye = {x: player.x, y: player.y + 6.5, z: player.z + 11};
+  const target = {x: player.x, y: player.y, z: player.z - 2};
+  const forward = norm(sub(target, eye));
+  const worldUp = {x:0,y:1,z:0};
+  let right = cross(forward, worldUp);
+  if(len(right)<0.001) right={x:1,y:0,z:0}; else right=norm(right);
+  const up = norm(cross(right, forward));
+  const basis={right, up, forward};
+  const fov=58*Math.PI/180;
+  const f=1/Math.tan(fov/2);
+  const aspect=W/H;
+
+  // collect faces
+  let allFaces=[];
+  // helper to add cube
+  function addCube(px,py,pz,w,h,d,color, rotY=0, isCheckpoint=false, isSummit=false){
+    const hw=w/2, hh=h/2, hd=d/2;
+    let verts=[
+      {x:-hw,y:-hh,z:-hd},{x:hw,y:-hh,z:-hd},{x:hw,y:-hh,z:hd},{x:-hw,y:-hh,z:hd},
+      {x:-hw,y:hh,z:-hd},{x:hw,y:hh,z:-hd},{x:hw,y:hh,z:hd},{x:-hw,y:hh,z:hd},
+    ];
+    if(rotY){
+      const c=Math.cos(rotY), s=Math.sin(rotY);
+      verts=verts.map(v=>({x: v.x*c + v.z*s, y:v.y, z: -v.x*s + v.z*c}));
+    }
+    verts=verts.map(v=>({x:v.x+px, y:v.y+py, z:v.z+pz}));
+    // project
+    const proj = verts.map(v=> projectPoint(v, eye, basis, f, aspect));
+    // if any behind, we still try to draw faces where all 4 verts visible
+    const facesIdx=[
+      {idx:[0,1,2,3], shade:0.35, isTop:false}, // bottom
+      {idx:[4,5,6,7], shade:0, isTop:true}, // top
+      {idx:[3,2,6,7], shade:0.15, isTop:false}, // front
+      {idx:[0,1,5,4], shade:0.25, isTop:false}, // back
+      {idx:[0,3,7,4], shade:0.2, isTop:false}, // left
+      {idx:[1,2,6,5], shade:0.12, isTop:false}, // right
+    ];
+    for(const fi of facesIdx){
+      const idx=fi.idx;
+      const p0=proj[idx[0]], p1=proj[idx[1]], p2=proj[idx[2]], p3=proj[idx[3]];
+      if(!p0||!p1||!p2||!p3) continue;
+      // backface cull: compute normal in camera space? Simple: if face is bottom and camera above, cull bottom? Keep all for toy look but cull bottom when above
+      // depth = avg zCam
+      const zAvg=(p0.zCam+p1.zCam+p2.zCam+p3.zCam)/4;
+      const pts=[toScreen(p0), toScreen(p1), toScreen(p2), toScreen(p3)];
+      // simple frustum cull: if all points outside screen, skip
+      // color shading
+      let col=color;
+      if(fi.isTop) col=lighten(color,0.18);
+      else col=darken(color, fi.shade);
+      if(isSummit && fi.isTop) col='#FFD700';
+      if(isCheckpoint && fi.isTop) col=lighten(color,0.25);
+      allFaces.push({pts, color:col, z:zAvg, isTop:fi.isTop});
+    }
+    // add edge studs for toy block (small cubes on top) - visual only, not physics
+    if(!isSummit && w>2 && d>2){
+      // 4 studs
+      const studR=0.22, studH=0.18;
+      const offs=[{x:-0.6,z:-0.6},{x:0.6,z:-0.6},{x:-0.6,z:0.6},{x:0.6,z:0.6}];
+      for(const o of offs){
+        const sx=px+o.x, sy=py+hh+studH/2, sz=pz+o.z;
+        // small cube stud
+        const sv=[
+          {x:-studR,y:-studH/2,z:-studR},{x:studR,y:-studH/2,z:-studR},{x:studR,y:-studH/2,z:studR},{x:-studR,y:-studH/2,z:studR},
+          {x:-studR,y:studH/2,z:-studR},{x:studR,y:studH/2,z:-studR},{x:studR,y:studH/2,z:studR},{x:-studR,y:studH/2,z:studR},
+        ].map(v=>({x:v.x+sx,y:v.y+sy,z:v.z+sz}));
+        const sproj=sv.map(v=>projectPoint(v,eye,basis,f,aspect));
+        const sFaces=[
+          {idx:[4,5,6,7], shade:0},{idx:[3,2,6,7], shade:0.1},{idx:[0,1,5,4], shade:0.15},{idx:[0,3,7,4], shade:0.12},{idx:[1,2,6,5], shade:0.08}
+        ];
+        for(const sfi of sFaces){
+          const a=sproj[sfi.idx[0]], b=sproj[sfi.idx[1]], c=sproj[sfi.idx[2]], d=sproj[sfi.idx[3]];
+          if(!a||!b||!c||!d) continue;
+          const zAvg=(a.zCam+b.zCam+c.zCam+d.zCam)/4;
+          const pts=[toScreen(a),toScreen(b),toScreen(c),toScreen(d)];
+          let scol=darken(color, sfi.shade*0.6);
+          if(sfi.idx[0]===4) scol=lighten(color,0.3);
+          allFaces.push({pts,color:scol,z:zAvg,isTop:false});
+        }
+      }
+    }
+  }
+
+  // add platforms
+  for(const p of platforms){
+    let rot=0;
+    if(p.spin){
+      rot = p.id==='spin1' ? spinAngle1 : spinAngle2;
+    }
+    addCube(p.x,p.y,p.z,p.w,p.h,p.d,p.color, rot, p.cp!==undefined, p.summit);
+    // label for checkpoints/summit - will draw after 3D as overlay
+  }
+
+  // player cube
+  const py = player.y;
+  addCube(player.x, py, player.z, 0.62, 1.0, 0.62, player.grounded ? '#222' : '#FF4757', 0, false, false);
+  // player face indicator (eyes)
+  // we add a small visor as extra cube on front
+  // front is -z? Actually player faces -z (forward). So visor at z -0.2
+  // We'll add as separate cube
+  const visorW=0.5, visorH=0.22, visorD=0.08;
+  const vx=player.x, vy=py+0.15, vz=player.z - 0.32;
+  addCube(vx,vy,vz,visorW,visorH,visorD,'#74B9FF',0,false,false);
+
+  // sort far to near
+  allFaces.sort((a,b)=> b.z - a.z);
+  drawCubeFaces(allFaces);
+
+  // draw checkpoint flags / summit glow in 2D overlay projected
+  for(const p of platforms){
+    if(p.cp!==undefined){
+      const topPos={x:p.x, y:p.y+p.h/2+1.2, z:p.z};
+      const pr=projectPoint(topPos, eye, basis, f, aspect);
+      if(!pr) continue;
+      const s=toScreen(pr);
+      if(s.x< -20 || s.x>W+20 || s.y< -20 || s.y>H+20) continue;
+      // flag pole
+      ctx.fillStyle='#222';
+      ctx.fillRect(s.x-1, s.y-18, 2, 18);
+      ctx.fillStyle= p.summit ? '#FFD700' : (p.cp===lastCP ? '#4ECDC4' : '#fff');
+      ctx.strokeStyle='#222'; ctx.lineWidth=1.2;
+      ctx.beginPath();
+      ctx.moveTo(s.x+1, s.y-18); ctx.lineTo(s.x+18, s.y-13); ctx.lineTo(s.x+1, s.y-8); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#222';
+      ctx.font='700 9px system-ui';
+      ctx.textAlign='center';
+      ctx.fillText(p.label||('CP'+p.cp), s.x+9, s.y-20);
+    }
+  }
+
+  // height fog / shadow under player
+  if(player.grounded && player.on){
+    const shPos={x:player.x, y:player.on.y+player.on.h/2+0.02, z:player.z};
+    const pr=projectPoint(shPos, eye, basis, f, aspect);
+    if(pr){
+      const s=toScreen(pr);
+      ctx.fillStyle='rgba(0,0,0,0.18)';
+      ctx.beginPath(); ctx.ellipse(s.x, s.y, 14, 6, 0,0,Math.PI*2); ctx.fill();
+    }
+  }
+}
+
+// start loop
+requestAnimationFrame(loop);
+updateHUD();
+
+// prevent scroll
+document.addEventListener('touchmove', e=>{ if(e.target.closest('#app')) e.preventDefault(); }, {passive:false});
+
+})();
+</script>
+</body>
+</html>

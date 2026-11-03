@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Carnival Lane Sprint</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --green1:#0b4d2a;
+  --green2:#137a3a;
+  --green3:#1ea54a;
+  --cream:#fff8e1;
+  --gold:#ffd54f;
+  --gold2:#ffb300;
+  --ink:#0f2416;
+  --card:#ffffff;
+  --muted:#5a7a64;
+}
+html,body{height:100%;background:#061a0f;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);overflow-x:hidden}
+body{display:flex;justify-content:center}
+.app{
+  width:100%;
+  max-width:428px;
+  min-height:100dvh;
+  background:linear-gradient(180deg,#0e5a2f 0%,#0b4d2a 55%,#08361e 100%);
+  display:flex;
+  flex-direction:column;
+  position:relative;
+  overflow-x:hidden;
+}
+/* header bunting */
+.bunting{
+  height:28px;
+  background:
+    radial-gradient(circle at 20px 0,#ffd54f 14px,transparent 15px),
+    radial-gradient(circle at 60px 0,#ff6f6f 14px,transparent 15px),
+    radial-gradient(circle at 100px 0,#7ec8ff 14px,transparent 15px),
+    radial-gradient(circle at 140px 0,#ffd54f 14px,transparent 15px),
+    radial-gradient(circle at 180px 0,#ff6f6f 14px,transparent 15px),
+    radial-gradient(circle at 220px 0,#7ec8ff 14px,transparent 15px),
+    radial-gradient(circle at 260px 0,#ffd54f 14px,transparent 15px),
+    radial-gradient(circle at 300px 0,#ff6f6f 14px,transparent 15px),
+    radial-gradient(circle at 340px 0,#7ec8ff 14px,transparent 15px),
+    radial-gradient(circle at 380px 0,#ffd54f 14px,transparent 15px);
+  background-repeat:repeat-x;
+  background-size:400px 28px;
+  opacity:.95;
+}
+.topbar{
+  padding:12px 14px 10px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.brand{
+  display:flex;align-items:center;gap:10px;
+}
+.logo{
+  width:44px;height:44px;border-radius:12px;
+  background:linear-gradient(135deg,#ffd54f,#ffb300);
+  display:grid;place-items:center;
+  font-size:22px;
+  border:2px solid #fff;
+  box-shadow:0 4px 12px rgba(0,0,0,.25);
+}
+.brand h1{
+  color:#fff;
+  font-size:18px;
+  line-height:1;
+  font-weight:900;
+  letter-spacing:.3px;
+  text-shadow:0 2px 0 rgba(0,0,0,.25);
+}
+.brand p{color:#c8e6c9;font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-top:2px}
+.stats{
+  display:flex;gap:8px;
+}
+.stat{
+  background:rgba(255,255,255,.95);
+  border-radius:12px;
+  padding:8px 10px;
+  min-width:68px;
+  text-align:center;
+  box-shadow:0 4px 10px rgba(0,0,0,.2);
+}
+.stat b{display:block;font-size:18px;line-height:1;color:var(--green1)}
+.stat span{font-size:10px;font-weight:800;letter-spacing:.7px;color:var(--muted);text-transform:uppercase}
+.hero{
+  margin:0 14px;
+  background:var(--cream);
+  border-radius:18px;
+  padding:12px 12px 10px;
+  box-shadow:0 8px 20px rgba(0,0,0,.25);
+  border:2px solid #fff;
+}
+.hero h2{font-size:15px;text-align:center;color:var(--green1);font-weight:900}
+.hero p{font-size:13px;text-align:center;color:#3a5a44;margin-top:4px;line-height:1.35}
+.pick-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:8px;
+  margin-top:10px;
+}
+.pick{
+  background:#fff;
+  border:2px solid #dbe8dc;
+  border-radius:14px;
+  padding:8px 4px 8px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+  cursor:pointer;
+  min-height:84px;
+  transition:.15s;
+  position:relative;
+}
+.pick:active{transform:scale(.97)}
+.pick.selected{
+  border-color:var(--gold2);
+  background:linear-gradient(180deg,#fff8c4,#fff);
+  box-shadow:0 0 0 3px rgba(255,213,79,.5),0 6px 14px rgba(0,0,0,.15);
+}
+.pick .avatar{
+  width:44px;height:44px;border-radius:50%;
+  display:grid;place-items:center;
+  font-size:22px;
+  border:2px solid #fff;
+  box-shadow:0 3px 8px rgba(0,0,0,.15);
+}
+.pick:nth-child(1) .avatar{background:#ff6b6b}
+.pick:nth-child(2) .avatar{background:#4fc3f7}
+.pick:nth-child(3) .avatar{background:#ffd54f}
+.pick:nth-child(4) .avatar{background:#a78bfa}
+.pick strong{font-size:12px;font-weight:900;color:var(--ink);line-height:1}
+.pick em{font-size:10px;font-style:normal;font-weight:800;color:var(--muted);letter-spacing:.4px}
+.pick .check{
+  position:absolute;top:-6px;right:-6px;
+  width:20px;height:20px;border-radius:50%;
+  background:var(--green2);color:#fff;
+  display:grid;place-items:center;
+  font-size:12px;font-weight:900;
+  border:2px solid #fff;
+  opacity:0;transform:scale(.6);transition:.15s;
+}
+.pick.selected .check{opacity:1;transform:scale(1)}
+.track-wrap{
+  margin:14px 14px 0;
+  background:linear-gradient(180deg,#1b8a3d,#0f6b2e);
+  border-radius:18px;
+  padding:10px;
+  border:2px solid rgba(255,255,255,.9);
+  box-shadow:0 8px 20px rgba(0,0,0,.25), inset 0 0 0 2px rgba(255,255,255,.15);
+  position:relative;
+  overflow:hidden;
+}
+.track-wrap::before{
+  content:"";
+  position:absolute;inset:0;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 18px, rgba(255,255,255,.04) 18px 19px);
+  pointer-events:none;
+}
+.track-header{
+  display:flex;justify-content:space-between;align-items:center;
+  color:#fff;font-weight:900;font-size:12px;letter-spacing:.6px;text-transform:uppercase;
+  text-shadow:0 1px 0 rgba(0,0,0,.3);
+  margin-bottom:8px;
+  position:relative;
+}
+.track-header span:last-child{background:rgba(0,0,0,.25);padding:4px 8px;border-radius:20px;font-size:11px}
+.lanes{
+  display:flex;flex-direction:column;gap:8px;position:relative;
+}
+.lane{
+  height:56px;
+  background:linear-gradient(180deg,#2ecc71 0%,#27ae60 100%);
+  border-radius:12px;
+  border:2px solid rgba(255,255,255,.85);
+  position:relative;
+  overflow:hidden;
+  display:flex;align-items:center;
+  box-shadow:inset 0 3px 0 rgba(255,255,255,.25), inset 0 -3px 0 rgba(0,0,0,.12);
+}
+.lane::after{
+  content:"";
+  position:absolute;left:0;right:0;top:50%;
+  height:2px;background:repeating-linear-gradient(90deg,#fff 0 10px, transparent 10px 16px);
+  opacity:.9;
+}
+.lane-num{
+  position:absolute;left:8px;top:50%;transform:translateY(-50%);
+  width:28px;height:28px;border-radius:50%;
+  background:#fff;color:var(--green1);
+  display:grid;place-items:center;
+  font-weight:900;font-size:13px;
+  z-index:2;
+  box-shadow:0 2px 6px rgba(0,0,0,.2);
+}
+.finish{
+  position:absolute;right:14px;top:0;bottom:0;width:10px;
+  background:repeating-linear-gradient(180deg,#fff 0 8px,#111 8px 16px);
+  border-left:2px solid #fff;
+  border-right:2px solid #fff;
+  z-index:1;
+}
+.racer{
+  position:absolute;
+  left:36px;
+  top:50%;
+  transform:translateY(-50%);
+  width:44px;height:44px;
+  border-radius:50%;
+  display:grid;place-items:center;
+  font-size:22px;
+  border:2px solid #fff;
+  box-shadow:0 4px 10px rgba(0,0,0,.25);
+  z-index:3;
+  transition:left .08s linear;
+  will-change:left;
+}
+.racer.r1{background:#ff6b6b}
+.racer.r2{background:#4fc3f7}
+.racer.r3{background:#ffd54f}
+.racer.r4{background:#a78bfa}
+.racer .trail{
+  position:absolute;right:38px;top:50%;transform:translateY(-50%);
+  width:18px;height:8px;background:rgba(255,255,255,.7);border-radius:10px;
+  opacity:0;
+}
+.racing .trail{opacity:1}
+.lane-label{
+  position:absolute;left:88px;top:6px;
+  background:rgba(0,0,0,.55);color:#fff;
+  font-size:10px;font-weight:800;letter-spacing:.5px;
+  padding:2px 6px;border-radius:20px;
+  z-index:2;
+}
+.controls{
+  padding:14px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.btn-start{
+  width:100%;
+  height:56px;
+  border:none;
+  border-radius:16px;
+  background:linear-gradient(180deg,#ffd54f,#ffb300);
+  color:#3a2500;
+  font-size:18px;
+  font-weight:900;
+  letter-spacing:.5px;
+  text-transform:uppercase;
+  box-shadow:0 6px 0 #b77900, 0 10px 20px rgba(0,0,0,.25);
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  min-height:44px;
+}
+.btn-start:active{transform:translateY(4px);box-shadow:0 2px 0 #b77900, 0 6px 12px rgba(0,0,0,.2)}
+.btn-start:disabled{opacity:.55;filter:grayscale(.2);cursor:not-allowed;transform:none;box-shadow:0 6px 0 #b77900, 0 10px 20px rgba(0,0,0,.15)}
+.btn-row{display:flex;gap:10px}
+.btn-sec{
+  flex:1;height:44px;border-radius:12px;border:2px solid rgba(255,255,255,.9);
+  background:rgba(255,255,255,.12);color:#fff;font-weight:800;font-size:13px;
+  backdrop-filter:blur(6px);cursor:pointer;min-height:44px;
+}
+.btn-sec:active{transform:scale(.98)}
+.tip{
+  text-align:center;color:#c8e6c9;font-size:12px;font-weight:600;line-height:1.4;padding:0 10px;
+}
+.banner{
+  position:absolute;inset:0;
+  background:rgba(6,26,15,.72);
+  backdrop-filter:blur(4px);
+  display:none;
+  align-items:center;justify-content:center;
+  padding:18px;
+  z-index:20;
+}
+.banner.show{display:flex}
+.banner-card{
+  width:100%;max-width:360px;
+  background:var(--cream);
+  border-radius:20px;
+  padding:18px 16px 16px;
+  text-align:center;
+  border:3px solid #fff;
+  box-shadow:0 16px 40px rgba(0,0,0,.35);
+  animation:pop .35s cubic-bezier(.175,.885,.32,1.275);
+}
+@keyframes pop{0%{transform:scale(.8);opacity:0}100%{transform:scale(1);opacity:1}}
+.banner-card .confetti{font-size:28px}
+.banner-card h3{font-size:22px;font-weight:900;color:var(--green1);margin-top:6px}
+.banner-card h3 span{color:#d48800}
+.banner-card p{font-size:14px;color:#3a5a44;margin-top:6px;line-height:1.4;font-weight:600}
+.banner-card .points-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  margin-top:10px;
+  background:linear-gradient(180deg,#ffd54f,#ffb300);
+  color:#3a2500;
+  padding:8px 14px;border-radius:20px;
+  font-weight:900;font-size:14px;
+  box-shadow:0 4px 10px rgba(0,0,0,.15);
+}
+.banner-actions{display:flex;gap:10px;margin-top:14px}
+.btn-banner{
+  flex:1;height:48px;border-radius:12px;border:none;
+  font-weight:900;font-size:14px;cursor:pointer;min-height:44px;
+}
+.btn-banner.primary{background:var(--green2);color:#fff;box-shadow:0 4px 0 #0a4d2a}
+.btn-banner.primary:active{transform:translateY(2px);box-shadow:0 2px 0 #0a4d2a}
+.btn-banner.ghost{background:#fff;border:2px solid #dbe8dc;color:var(--green1)}
+.confetti-piece{
+  position:absolute;width:8px;height:12px;border-radius:2px;top:-10px;
+  animation:fall linear forwards;
+}
+@keyframes fall{
+  to{transform:translateY(110vh) rotate(720deg)}
+}
+.footer{
+  text-align:center;color:rgba(255,255,255,.7);font-size:11px;font-weight:600;letter-spacing:.4px;padding:6px 0 14px;
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="bunting" aria-hidden="true"></div>
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">🏁</div>
+      <div>
+        <h1>CARNIVAL SPRINT</h1>
+        <p>Pick &amp; Watch • 4 Lanes</p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="points">0</b><span>Points</span></div>
+      <div class="stat"><b id="races">0</b><span>Races</span></div>
+    </div>
+  </div>
+
+  <div class="hero">
+    <h2>Pick your champion, then hit GO!</h2>
+    <p>Four racers sprint at random paces. First past the post wins. Guess right to score big.</p>
+    <div class="pick-grid" id="pickGrid">
+      <!-- injected -->
+    </div>
+  </div>
+
+  <div class="track-wrap" id="trackWrap">
+    <div class="track-header"><span>🏟️ Carnival Track</span><span id="status">Ready to race</span></div>
+    <div class="lanes" id="lanes">
+      <!-- lanes injected -->
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn-start" id="startBtn">▶ START RACE</button>
+    <div class="btn-row">
+      <button class="btn-sec" id="randomBtn">🎲 Random Pick</button>
+      <button class="btn-sec" id="resetBtn">↺ Reset Points</button>
+    </div>
+    <div class="tip" id="tip">Tip: Watch the bursts — every race is random. No two sprints are the same!</div>
+  </div>
+
+  <div class="footer">Track-Green Carnival • Tap a racer to pick • Large buttons for thumbs</div>
+
+  <div class="banner" id="banner" role="dialog" aria-modal="true">
+    <div class="banner-card">
+      <div class="confetti">🎉🎊✨</div>
+      <h3 id="bannerTitle">Ruby Wins!</h3>
+      <p id="bannerText">You picked the winner!</p>
+      <div class="points-badge" id="bannerPoints">+10 Points</div>
+      <div class="banner-actions">
+        <button class="btn-banner ghost" id="closeBanner">Close</button>
+        <button class="btn-banner primary" id="againBtn">Race Again ▶</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const RACERS = [
+  {name:'Ruby Rocket', emoji:'🔥', short:'RUBY', color:'r1'},
+  {name:'Blue Bolt', emoji:'⚡', short:'BOLT', color:'r2'},
+  {name:'Sunny Dash', emoji:'☀️', short:'SUNNY', color:'r3'},
+  {name:'Violet Vroom', emoji:'💜', short:'VIOLET', color:'r4'}
+];
+
+let selected = 0;
+let points = parseInt(localStorage.getItem('carnival_points')||'0',10);
+let races = parseInt(localStorage.getItem('carnival_races')||'0',10);
+let racing = false;
+let positions = [0,0,0,0];
+let rafId = null;
+let winner = null;
+
+const pickGrid = document.getElementById('pickGrid');
+const lanesEl = document.getElementById('lanes');
+const pointsEl = document.getElementById('points');
+const racesEl = document.getElementById('races');
+const statusEl = document.getElementById('status');
+const startBtn = document.getElementById('startBtn');
+const banner = document.getElementById('banner');
+const bannerTitle = document.getElementById('bannerTitle');
+const bannerText = document.getElementById('bannerText');
+const bannerPoints = document.getElementById('bannerPoints');
+const tipEl = document.getElementById('tip');
+
+function save(){
+  localStorage.setItem('carnival_points', points);
+  localStorage.setItem('carnival_races', races);
+}
+function updateStats(){
+  pointsEl.textContent = points;
+  racesEl.textContent = races;
+}
+
+function renderPicks(){
+  pickGrid.innerHTML = '';
+  RACERS.forEach((r,i)=>{
+    const btn = document.createElement('button');
+    btn.className = 'pick' + (i===selected ? ' selected':'');
+    btn.setAttribute('aria-label','Pick '+r.name);
+    btn.innerHTML = `
+      <div class="avatar">${r.emoji}</div>
+      <strong>${r.short}</strong>
+      <em>Lane ${i+1}</em>
+      <div class="check">✓</div>
+    `;
+    btn.onclick = ()=>{
+      if(racing) return;
+      selected = i;
+      renderPicks();
+      renderLanes();
+      tipEl.textContent = `You picked ${r.name} in Lane ${i+1} — tap START RACE!`;
+    };
+    pickGrid.appendChild(btn);
+  });
+}
+
+function renderLanes(){
+  lanesEl.innerHTML = '';
+  RACERS.forEach((r,i)=>{
+    const lane = document.createElement('div');
+    lane.className = 'lane';
+    lane.innerHTML = `
+      <div class="lane-num">${i+1}</div>
+      <div class="lane-label">${r.short} ${i===selected ? '★ YOUR PICK' : ''}</div>
+      <div class="finish" aria-hidden="true"></div>
+      <div class="racer ${r.color}" id="racer-${i}" style="left:${36 + positions[i]}px">
+        <span>${r.emoji}</span>
+        <span class="trail"></span>
+      </div>
+    `;
+    lanesEl.appendChild(lane);
+  });
+  // position racers based on container width
+  updateRacerPositions();
+}
+
+function getTrackWidth(){
+  const wrap = document.getElementById('trackWrap');
+  // lane inner width minus racer and finish
+  return wrap.clientWidth - 20 - 36 - 44 - 14; // padding + left offset + racer width + finish
+}
+
+function updateRacerPositions(){
+  const w = getTrackWidth();
+  RACERS.forEach((_,i)=>{
+    const el = document.getElementById('racer-'+i);
+    if(!el) return;
+    const left = 36 + (positions[i]/100)*w;
+    el.style.left = left + 'px';
+  });
+}
+
+function setRacingUI(isRacing){
+  racing = isRacing;
+  const wrap = document.getElementById('trackWrap');
+  if(isRacing) wrap.classList.add('racing');
+  else wrap.classList.remove('racing');
+  startBtn.disabled = isRacing;
+  startBtn.textContent = isRacing ? '● RACING...' : '▶ START RACE';
+  statusEl.textContent = isRacing ? 'They’re off!' : 'Ready to race';
+}
+
+function startRace(){
+  if(racing) return;
+  positions = [0,0,0,0];
+  winner = null;
+  setRacingUI(true);
+  renderLanes();
+  // random base speeds per racer for this race
+  const base = RACERS.map(()=> 0.55 + Math.random()*0.55); // 0.55-1.1
+  const burstChance = 0.04;
+  let lastTime = performance.now();
+
+  function frame(now){
+    const dt = Math.min(32, now - lastTime);
+    lastTime = now;
+    const factor = dt / 16.67; // normalize to 60fps
+
+    for(let i=0;i<4;i++){
+      // random pace: base + jitter + occasional burst/slow
+      let jitter = (Math.random()-0.5)*0.35;
+      let burst = 0;
+      if(Math.random() < burstChance) burst = (Math.random()-0.3)*1.2;
+      let slow = 0;
+      if(Math.random() < 0.03) slow = -0.4;
+      let speed = base[i] + jitter + burst + slow;
+      speed = Math.max(0.15, speed);
+      positions[i] += speed * factor * 0.62; // tuned so race ~3-5s
+      if(positions[i] > 100) positions[i] = 100;
+    }
+    updateRacerPositions();
+
+    // check winner
+    for(let i=0;i<4;i++){
+      if(positions[i] >= 100){
+        winner = i;
+        break;
+      }
+    }
+    if(winner !== null){
+      finishRace();
+      return;
+    }
+    rafId = requestAnimationFrame(frame);
+  }
+  rafId = requestAnimationFrame(frame);
+}
+
+function finishRace(){
+  cancelAnimationFrame(rafId);
+  setRacingUI(false);
+  races += 1;
+  const isWin = winner === selected;
+  const earned = isWin ? 10 : 1;
+  points += earned;
+  save();
+  updateStats();
+
+  // banner
+  const winRacer = RACERS[winner];
+  const pickRacer = RACERS[selected];
+  bannerTitle.innerHTML = `${winRacer.emoji} ${winRacer.name} Wins!`;
+  if(isWin){
+    bannerText.textContent = `You picked ${pickRacer.name} — perfect call!`;
+    bannerPoints.textContent = `+${earned} Points • Jackpot!`;
+    bannerPoints.style.background = 'linear-gradient(180deg,#ffd54f,#ffb300)';
+    launchConfetti();
+  } else {
+    bannerText.textContent = `You picked ${pickRacer.name}, but ${winRacer.name} edged ahead. You still get +1 for racing!`;
+    bannerPoints.textContent = `+${earned} Point`;
+    bannerPoints.style.background = 'linear-gradient(180deg,#c8e6c9,#a5d6a7)';
+  }
+  banner.classList.add('show');
+  statusEl.textContent = `${winRacer.short} won!`;
+  tipEl.textContent = isWin ? '🎉 Winner! Try a different pick or race again.' : 'So close! Random paces mean anyone can win next time.';
+}
+
+function launchConfetti(){
+  const app = document.getElementById('app');
+  const colors = ['#ffd54f','#ff6b6b','#4fc3f7','#a78bfa','#2ecc71','#fff'];
+  for(let i=0;i<22;i++){
+    const c = document.createElement('div');
+    c.className = 'confetti-piece';
+    c.style.left = (Math.random()*100)+'%';
+    c.style.background = colors[Math.floor(Math.random()*colors.length)];
+    c.style.animationDuration = (0.9 + Math.random()*0.8)+'s';
+    c.style.animationDelay = (Math.random()*0.3)+'s';
+    c.style.transform = `rotate(${Math.random()*360}deg)`;
+    app.appendChild(c);
+    setTimeout(()=>c.remove(),1800);
+  }
+}
+
+function closeBanner(){
+  banner.classList.remove('show');
+}
+
+// events
+startBtn.addEventListener('click', startRace);
+document.getElementById('randomBtn').addEventListener('click', ()=>{
+  if(racing) return;
+  selected = Math.floor(Math.random()*4);
+  renderPicks(); renderLanes();
+  tipEl.textContent = `Random pick: ${RACERS[selected].name} — feeling lucky? Hit START!`;
+});
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(racing) return;
+  if(confirm('Reset points and races to zero?')){
+    points=0; races=0; save(); updateStats();
+    tipEl.textContent = 'Score reset. Pick a racer and start fresh!';
+  }
+});
+document.getElementById('closeBanner').addEventListener('click', closeBanner);
+document.getElementById('againBtn').addEventListener('click', ()=>{
+  closeBanner();
+  setTimeout(startRace, 180);
+});
+banner.addEventListener('click', (e)=>{
+  if(e.target===banner) closeBanner();
+});
+
+// handle resize
+window.addEventListener('resize', updateRacerPositions);
+
+// init
+updateStats();
+renderPicks();
+renderLanes();
+</script>
+</body>
+</html>

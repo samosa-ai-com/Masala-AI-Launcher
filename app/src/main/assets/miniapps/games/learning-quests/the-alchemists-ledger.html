@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Apothecary Variables</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --wood:#3e2723;
+  --wood2:#5d4037;
+  --cream:#fdf6e3;
+  --paper:#fff8e1;
+  --sage:#7a9a7e;
+  --sage-dark:#5a7a5e;
+  --amber:#d4a017;
+  --amber-light:#f9e2a0;
+  --rose:#c97b84;
+  --lav:#8e7cc3;
+  --teal:#4a9a8b;
+  --ink:#2c2c2c;
+  --muted:#6d6a62;
+  --seal:#b71c1c;
+  --seal-dark:#8b0000;
+  --shadow:0 4px 16px rgba(62,39,35,.18);
+  --radius:16px;
+}
+html,body{height:100%;background:#2b1d14;color:var(--ink);font-family: ui-serif, Georgia, 'Times New Roman', serif; -webkit-text-size-adjust:100%; overflow-x:hidden}
+body{display:flex;justify-content:center;background: radial-gradient(1200px 600px at 50% -10%, #6d4c41 0%, #3e2723 55%, #1e120c 100%) fixed}
+.app{width:100%;max-width:428px;min-width:360px;min-height:100dvh;background:var(--cream);display:flex;flex-direction:column;position:relative;overflow-x:hidden;box-shadow:0 0 40px rgba(0,0,0,.4)}
+/* Header */
+.header{background:linear-gradient(180deg, #4e342e 0%, #3e2723 100%);color:#fbe9c0;padding:10px 14px 12px;position:sticky;top:0;z-index:20;box-shadow:0 2px 12px rgba(0,0,0,.3)}
+.header-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-icon{width:38px;height:38px;background:linear-gradient(135deg, #f9e2a0, #d4a017);border-radius:10px;display:grid;place-items:center;font-size:20px;box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 2px 6px rgba(0,0,0,.3)}
+.brand h1{font-size:17px;letter-spacing:.04em;font-weight:800;line-height:1}
+.brand p{font-size:11px;opacity:.85;letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+.header-actions{display:flex;gap:8px}
+.icon-btn{width:44px;height:44px;border-radius:12px;border:1.5px solid rgba(251,233,192,.35);background:rgba(255,255,255,.08);color:#fbe9c0;display:grid;place-items:center;font-size:18px;cursor:pointer;flex-shrink:0}
+.icon-btn:active{transform:scale(.96)}
+.progress-row{margin-top:10px;display:flex;align-items:center;gap:8px}
+.progress-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.9;white-space:nowrap}
+.progress-track{flex:1;height:8px;background:rgba(0,0,0,.35);border-radius:999px;overflow:hidden;border:1px solid rgba(251,233,192,.2)}
+.progress-fill{height:100%;background:linear-gradient(90deg, #7a9a7e, #a8d5a2);border-radius:999px;transition:width .4s ease}
+.chapter-badge{font-size:11px;background:rgba(251,233,192,.15);border:1px solid rgba(251,233,192,.25);padding:4px 8px;border-radius:999px;white-space:nowrap}
+
+/* Chapter intro */
+.chapter-head{padding:14px 16px 10px;background:linear-gradient(180deg, #fff8e1 0%, #fdf6e3 100%);border-bottom:1px solid #e8dcc0}
+.chapter-kicker{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--sage-dark);font-weight:700}
+.chapter-title{font-size:20px;font-weight:800;color:var(--wood);margin:4px 0 6px;line-height:1.2}
+.chapter-desc{font-size:14px;line-height:1.5;color:#4a3f35}
+.chapter-desc strong{color:var(--wood)}
+.lesson-callout{margin-top:10px;background:#fff;border:1px solid #e8dcc0;border-left:4px solid var(--sage);border-radius:10px;padding:10px 12px;display:flex;gap:10px;align-items:flex-start}
+.lesson-callout .ico{width:32px;height:32px;border-radius:8px;background:#e8f5e9;display:grid;place-items:center;font-size:16px;flex-shrink:0}
+.lesson-callout p{font-size:13px;line-height:1.45;color:#3e352e}
+.lesson-callout code{background:#f1e8c8;padding:1px 6px;border-radius:6px;font-family:ui-monospace, Menlo, monospace;font-size:12px}
+
+/* Shelf */
+.shelf-wrap{padding:12px 14px;background:var(--cream)}
+.shelf-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.shelf-label span:last-child{font-weight:400;text-transform:none;letter-spacing:0;font-size:12px;color:var(--sage-dark)}
+.shelf{background:linear-gradient(180deg, #8d6e63 0%, #6d4c41 100%);border-radius:18px;padding:14px 10px 18px;box-shadow:inset 0 3px 0 rgba(255,255,255,.15), inset 0 -4px 12px rgba(0,0,0,.25), var(--shadow);position:relative;border:2px solid #4e342e}
+.shelf::after{content:"";position:absolute;left:8px;right:8px;bottom:6px;height:6px;background:linear-gradient(180deg, #3e2723, #281610);border-radius:0 0 12px 12px;opacity:.9}
+.vials{display:grid;gap:10px}
+.vials.cols2{grid-template-columns:1fr 1fr}
+.vials.cols3{grid-template-columns:1fr 1fr 1fr}
+.vial-card{background:linear-gradient(180deg, #fffef7 0%, #fff8e1 100%);border-radius:16px;padding:10px 8px 10px;border:1.5px solid #e8dcc0;box-shadow:0 3px 10px rgba(0,0,0,.12);position:relative;text-align:center;cursor:pointer;transition:transform .15s, box-shadow .15s, border-color .15s;min-height:148px;display:flex;flex-direction:column;align-items:center;justify-content:space-between}
+.vial-card:active{transform:scale(.98)}
+.vial-card.selected{border-color:var(--amber);box-shadow:0 0 0 3px rgba(212,160,23,.25), 0 4px 14px rgba(0,0,0,.15)}
+.vial-card.filled{border-color:var(--sage)}
+.vial-card.error-shake{animation:shake .4s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.vial-top{width:100%;display:flex;justify-content:space-between;align-items:center}
+.vial-type{font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;padding:3px 7px;border-radius:999px;color:#fff}
+.vial-type.number{background:var(--teal)}
+.vial-type.string{background:var(--lav)}
+.vial-type.boolean{background:var(--rose)}
+.vial-seal{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 6px;border-radius:999px;border:1.5px solid}
+.vial-seal.let{color:var(--sage-dark);border-color:var(--sage);background:#e8f5e9}
+.vial-seal.const{color:#fff;background:var(--seal);border-color:var(--seal-dark)}
+.vial-visual{position:relative;width:64px;height:78px;margin:6px 0 4px}
+.vial-glass{position:absolute;left:50%;transform:translateX(-50%);bottom:0;width:52px;height:62px;background:linear-gradient(180deg, rgba(255,255,255,.85) 0%, rgba(255,255,255,.35) 100%);border:2px solid rgba(90,70,60,.25);border-radius:8px 8px 18px 18px;overflow:hidden;backdrop-filter:blur(2px)}
+.vial-liquid{position:absolute;bottom:0;left:0;right:0;border-radius:0 0 16px 16px;transition:height .4s cubic-bezier(.2,.8,.2,1), background .3s}
+.vial-liquid.number{background:linear-gradient(180deg, #7ec8b8, #2e7d6f)}
+.vial-liquid.string{background:linear-gradient(180deg, #b8a0e0, #6a4fb0)}
+.vial-liquid.boolean{background:linear-gradient(180deg, #e8a0a8, #b55a65)}
+.vial-neck{position:absolute;top:0;left:50%;transform:translateX(-50%);width:22px;height:18px;background:linear-gradient(180deg, #d7ccc8, #a1887f);border:1px solid #8d6e63;border-radius:4px}
+.vial-cork{position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:26px;height:10px;background:linear-gradient(180deg, #d4a017, #8d6e63);border-radius:4px;border:1px solid #6d4c41}
+.vial-wax{position:absolute;top:-10px;left:50%;transform:translateX(-50%);width:30px;height:14px;background:radial-gradient(ellipse at 30% 30%, #e53935, #b71c1c);border-radius:6px;border:1px solid #7f0000;display:grid;place-items:center;color:#fff;font-size:8px;font-weight:900;letter-spacing:.05em;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.vial-label{font-family:ui-monospace, Menlo, monospace;font-size:13px;font-weight:700;color:var(--wood);background:#f1e8c8;padding:2px 8px;border-radius:999px;border:1px solid #e0d3a8;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vial-value{font-size:12px;color:var(--muted);min-height:16px;margin-top:4px;word-break:break-all;line-height:1.2}
+.vial-value.filled{color:var(--wood);font-weight:700;font-family:ui-monospace, monospace}
+.vial-hint{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* Code preview */
+.code-card{margin:12px 14px;background:#1e1a16;color:#f5e6c8;border-radius:14px;padding:12px 14px;box-shadow:var(--shadow);border:1px solid #3e2723;overflow:hidden}
+.code-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.code-head span{font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.7}
+.code-head button{font-size:11px;background:rgba(255,255,255,.08);color:#f5e6c8;border:1px solid rgba(255,255,255,.15);padding:6px 10px;border-radius:999px;cursor:pointer}
+.code-lines{font-family:ui-monospace, Menlo, monospace;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-all}
+.code-lines .kw{color:#a8d5a2}
+.code-lines .var{color:#f9e2a0}
+.code-lines .val{color:#82b1ff}
+.code-lines .str{color:#ce93d8}
+.code-lines .bool{color:#ffab91}
+.code-lines .comment{color:#8d8d8d;font-style:italic}
+
+/* Pantry */
+.pantry{padding:10px 14px 14px;background:linear-gradient(180deg, #fdf6e3 0%, #fff8e1 100%);border-top:1px solid #e8dcc0}
+.pantry-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.pantry-head h3{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--wood)}
+.pantry-head span{font-size:12px;color:var(--muted)}
+.ingredients{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+.ingredients::-webkit-scrollbar{display:none}
+.ing-btn{flex:0 0 auto;min-width:108px;max-width:132px;background:#fff;border:1.5px solid #e8dcc0;border-radius:14px;padding:10px 10px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:transform .12s, border-color .12s, box-shadow .12s;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.ing-btn:active{transform:scale(.97)}
+.ing-btn.selected{border-color:var(--amber);box-shadow:0 0 0 3px rgba(212,160,23,.2);background:#fffde7}
+.ing-icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;border:1px solid rgba(0,0,0,.06)}
+.ing-icon.number{background:#e0f2f1;color:#00695c}
+.ing-icon.string{background:#ede7f6;color:#4527a0}
+.ing-icon.boolean{background:#fce4ec;color:#880e4f}
+.ing-name{font-size:12px;font-weight:800;color:var(--wood);text-align:center;line-height:1.2}
+.ing-meta{font-size:11px;color:var(--muted);font-family:ui-monospace, monospace;text-align:center;word-break:break-all}
+.ing-type{font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;padding:2px 6px;border-radius:999px;color:#fff}
+.ing-type.number{background:var(--teal)}
+.ing-type.string{background:var(--lav)}
+.ing-type.boolean{background:var(--rose)}
+
+/* Controls */
+.controls{padding:10px 14px 16px;display:flex;gap:10px;background:var(--cream);border-top:1px solid #e8dcc0;position:sticky;bottom:0;z-index:10}
+.btn{flex:1;height:48px;border-radius:12px;border:none;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .1s, opacity .2s}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.45;pointer-events:none}
+.btn-ghost{background:#fff;border:1.5px solid #d7ccc8;color:var(--wood)}
+.btn-primary{background:linear-gradient(180deg, #7a9a7e 0%, #5a7a5e 100%);color:#fff;box-shadow:0 3px 10px rgba(90,122,94,.35);border:1px solid #4a6a4e}
+.btn-amber{background:linear-gradient(180deg, #f9e2a0, #d4a017);color:#3e2723;border:1px solid #b8960c}
+
+/* Toast */
+.toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%) translateY(12px);background:#2c2c2c;color:#fff;padding:12px 16px;border-radius:12px;font-size:13px;line-height:1.4;max-width:min(92%, 400px);text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:opacity .25s, transform .25s;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.success{background:#2e7d32}
+.toast.error{background:#b71c1c}
+
+/* Sheets */
+.overlay{position:fixed;inset:0;background:rgba(30,18,12,.55);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .25s;z-index:30}
+.overlay.open{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:50%;bottom:0;transform:translate(-50%, 100%);width:100%;max-width:428px;min-width:360px;background:var(--paper);border-radius:20px 20px 0 0;max-height:86dvh;display:flex;flex-direction:column;box-shadow:0 -8px 32px rgba(0,0,0,.3);transition:transform .32s cubic-bezier(.2,.8,.2,1);z-index:31;overflow:hidden}
+.sheet.open{transform:translate(-50%, 0)}
+.sheet-handle{width:36px;height:5px;background:#d7ccc8;border-radius:999px;margin:10px auto 6px}
+.sheet-head{padding:6px 16px 12px;border-bottom:1px solid #e8dcc0;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sheet-head h2{font-size:16px;color:var(--wood)}
+.sheet-head p{font-size:12px;color:var(--muted)}
+.sheet-body{overflow:auto;padding:14px 16px 18px;flex:1}
+.sheet-close{width:44px;height:44px;border-radius:12px;border:1.5px solid #d7ccc8;background:#fff;display:grid;place-items:center;font-size:18px;cursor:pointer;flex-shrink:0}
+
+/* Recipe book */
+.chapter-list{display:flex;flex-direction:column;gap:10px}
+.chapter-item{border:1.5px solid #e8dcc0;border-radius:14px;overflow:hidden;background:#fff}
+.chapter-item.locked{opacity:.55}
+.chapter-item.active{border-color:var(--sage);box-shadow:0 0 0 2px rgba(122,154,126,.15)}
+.ch-item-head{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;gap:10px}
+.ch-item-head h3{font-size:14px;color:var(--wood)}
+.ch-item-head p{font-size:12px;color:var(--muted);margin-top:2px}
+.ch-badge{font-size:11px;padding:4px 8px;border-radius:999px;font-weight:700;white-space:nowrap}
+.ch-badge.done{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
+.ch-badge.current{background:#fff8e1;color:#7a5a00;border:1px solid #f9e2a0}
+.ch-badge.locked{background:#efebe9;color:#6d6a62;border:1px solid #d7ccc8}
+.ch-steps{padding:0 14px 12px;display:flex;flex-direction:column;gap:8px;border-top:1px dashed #e8dcc0;margin-top:2px;padding-top:10px}
+.step{font-size:13px;display:flex;gap:10px;align-items:flex-start;line-height:1.4}
+.step .check{width:22px;height:22px;border-radius:999px;border:1.5px solid #c8c0a8;display:grid;place-items:center;font-size:12px;flex-shrink:0;background:#fff}
+.step.done .check{background:#7a9a7e;border-color:#7a9a7e;color:#fff}
+.step code{font-family:ui-monospace, monospace;background:#f1e8c8;padding:1px 6px;border-radius:6px;font-size:12px}
+
+/* Field guide */
+.guide-card{background:#fff;border:1.5px solid #e8dcc0;border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.guide-card h3{font-size:14px;color:var(--wood);display:flex;align-items:center;gap:8px}
+.guide-card h3 span.ico{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:14px}
+.guide-card p{font-size:13px;line-height:1.5;color:#4a3f35;margin-top:6px}
+.guide-card code{font-family:ui-monospace, monospace;background:#f1e8c8;padding:1px 6px;border-radius:6px;font-size:12px}
+.guide-card ul{margin:8px 0 0 18px;font-size:13px;line-height:1.5;color:#4a3f35}
+.guide-compare{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.compare-box{border-radius:12px;padding:10px;border:1.5px solid}
+.compare-box.let{background:#e8f5e9;border-color:#a5d6a7}
+.compare-box.const{background:#ffebee;border-color:#ef9a9a}
+.compare-box h4{font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.compare-box p{font-size:12px;margin-top:4px}
+
+/* Success */
+.success-card{margin:12px 14px;background:linear-gradient(135deg, #e8f5e9 0%, #fff8e1 100%);border:1.5px solid #a5d6a7;border-radius:16px;padding:16px;text-align:center;box-shadow:var(--shadow)}
+.success-card h3{color:#2e7d32;font-size:16px}
+.success-card p{font-size:13px;color:#4a3f35;margin:6px 0 12px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="header">
+    <div class="header-top">
+      <div class="brand">
+        <div class="brand-icon">⚗️</div>
+        <div>
+          <h1>Apothecary Variables</h1>
+          <p>Measure • Label • Seal</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" id="btnRecipe" aria-label="Recipe Book">📖</button>
+        <button class="icon-btn" id="btnGuide" aria-label="Field Guide">🌿</button>
+      </div>
+    </div>
+    <div class="progress-row">
+      <span class="progress-label" id="progressLabel">Chapter 1 of 5</span>
+      <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:20%"></div></div>
+      <span class="chapter-badge" id="chapterBadge">First Light</span>
+    </div>
+  </header>
+
+  <div class="chapter-head">
+    <div class="chapter-kicker" id="chapterKicker">Chapter 1 — First Light</div>
+    <div class="chapter-title" id="chapterTitle">Your First Vial</div>
+    <div class="chapter-desc" id="chapterDesc"></div>
+    <div class="lesson-callout" id="lessonCallout"></div>
+  </div>
+
+  <div class="shelf-wrap">
+    <div class="shelf-label"><span>Workbench Shelf</span><span id="shelfHint">Tap ingredient → tap vial</span></div>
+    <div class="shelf">
+      <div class="vials" id="vials"></div>
+    </div>
+  </div>
+
+  <div class="code-card">
+    <div class="code-head"><span>✦ Live Parchment</span><button id="btnCopy">Copy code</button></div>
+    <div class="code-lines" id="codeLines"></div>
+  </div>
+
+  <div id="successArea"></div>
+
+  <div class="pantry">
+    <div class="pantry-head"><h3>Pantry</h3><span id="pantryHint">Choose an essence</span></div>
+    <div class="ingredients" id="ingredients"></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-ghost" id="btnUndo">↩️ Undo</button>
+    <button class="btn btn-primary" id="btnCheck">Check Brew ✓</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="overlay" id="overlay"></div>
+
+  <!-- Recipe Book Sheet -->
+  <div class="sheet" id="sheetRecipe" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <div><h2>📖 Recipe Book</h2><p>Track your chapters & steps</p></div>
+      <button class="sheet-close" data-close="sheetRecipe">✕</button>
+    </div>
+    <div class="sheet-body" id="recipeBody"></div>
+  </div>
+
+  <!-- Field Guide Sheet -->
+  <div class="sheet" id="sheetGuide" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <div><h2>🌿 Field Guide</h2><p>let vs const • types • vials</p></div>
+      <button class="sheet-close" data-close="sheetGuide">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="guide-card">
+        <h3><span class="ico" style="background:#e8f5e9">🏷️</span> What is a variable?</h3>
+        <p>A <strong>labeled vial</strong> that holds one value. The label is the <code>name</code>, the liquid is the <code>value</code>, and the color tells you the <code>type</code>.</p>
+        <p><code>let luna = 12;</code> means: create a reassignable vial called <em>luna</em> and pour <em>12</em> into it.</p>
+      </div>
+      <div class="guide-card">
+        <h3><span class="ico" style="background:#e0f2f1">🎨</span> Typed Essences</h3>
+        <p>Every ingredient has a type. A vial only accepts its matching type — just like in code.</p>
+        <ul>
+          <li><strong style="color:var(--teal)">Number</strong> — teal • <code>12</code>, <code>3.14</code></li>
+          <li><strong style="color:var(--lav)">String</strong> — lavender • <code>"moon"</code>, <code>'herb'</code></li>
+          <li><strong style="color:var(--rose)">Boolean</strong> — rose • <code>true</code> / <code>false</code></li>
+        </ul>
+        <p>Pouring a <code>string</code> into a <code>number</code> vial fizzles — type mismatch!</p>
+      </div>
+      <div class="guide-compare">
+        <div class="compare-box let"><h4>🟢 let — Reassignable</h4><p>Open vial. Pour, pour again. The old brew is replaced.</p><code>let x = 1; x = 2;</code></div>
+        <div class="compare-box const"><h4>🔴 const — Sealed</h4><p>Wax-sealed. First pour locks it. Refills are rejected with a shake.</p><code>const y = 1; y = 2; // ❌</code></div>
+      </div>
+      <div class="guide-card">
+        <h3><span class="ico" style="background:#fff8e1">⚗️</span> How to play</h3>
+        <ul>
+          <li><strong>1.</strong> Tap an ingredient in the Pantry to pick it up.</li>
+          <li><strong>2.</strong> Tap a vial on the shelf to pour.</li>
+          <li><strong>3.</strong> Watch the Live Parchment update to real code.</li>
+          <li><strong>4.</strong> Use <strong>Undo</strong> if you mis-pour.</li>
+          <li><strong>5.</strong> Hit <strong>Check Brew</strong> to complete the recipe.</li>
+        </ul>
+      </div>
+      <div class="guide-card">
+        <h3><span class="ico" style="background:#ede7f6">💡</span> Why sealed vials?</h3>
+        <p><code>const</code> protects important values — like a recipe's base or a potion's true name. If it could change by accident, the whole brew fails. Sealing makes your intent clear.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CHAPTERS = [
+  {
+    id:1, kicker:"Chapter 1 — First Light", title:"Your First Vial", badge:"First Light",
+    desc:`Welcome, apprentice. Every potion starts with a <strong>labeled vial</strong> — that's a <strong>variable</strong>. Let's brew your first one.`,
+    lesson:`<div class="ico">🌱</div><p><strong>New:</strong> <code>let</code> creates a reassignable vial. <code>let luna = 12;</code> labels a vial <em>luna</em> and pours <em>12</em> in.</p>`,
+    vials:[
+      {id:"luna", label:"luna", type:"number", kind:"let", expect:12, hint:"needs 12"},
+    ],
+    pantry:[
+      {id:"n12", name:"Moonwater", value:12, type:"number", display:"12"},
+      {id:"n7", name:"Dewdrop", value:7, type:"number", display:"7"},
+      {id:"sHi", name:"Whisper Petal", value:"hello", type:"string", display:'"hello"'},
+    ],
+    steps:[
+      {text:"Pour <code>12</code> into <code>luna</code> (let)", check:(s)=> s.luna===12},
+    ],
+    success:"Beautiful. You declared your first variable — a vial with a name and a value."
+  },
+  {
+    id:2, kicker:"Chapter 2 — Typed Essences", title:"Colors of Essence", badge:"Typed Essences",
+    desc:`Essences have <strong>types</strong>. Teal is <strong>number</strong>, lavender is <strong>string</strong>, rose is <strong>boolean</strong>. Match them or the vial fizzles.`,
+    lesson:`<div class="ico">🎨</div><p><strong>Rule:</strong> A vial only accepts its own type. Watch the color band — it tells you what belongs inside.</p>`,
+    vials:[
+      {id:"count", label:"count", type:"number", kind:"let", expect:5, hint:"needs 5"},
+      {id:"greeting", label:"greeting", type:"string", kind:"let", expect:"hello", hint:'needs "hello"'},
+      {id:"isReady", label:"isReady", type:"boolean", kind:"let", expect:true, hint:"needs true"},
+    ],
+    pantry:[
+      {id:"n5", name:"Sun Seed", value:5, type:"number", display:"5"},
+      {id:"n9", name:"Stone Shard", value:9, type:"number", display:"9"},
+      {id:"sHello", name:"Whisper Petal", value:"hello", type:"string", display:'"hello"'},
+      {id:"sBye", name:"Ash Leaf", value:"bye", type:"string", display:'"bye"'},
+      {id:"bTrue", name:"Ember Seed", value:true, type:"boolean", display:"true"},
+      {id:"bFalse", name:"Frost Bud", value:false, type:"boolean", display:"false"},
+    ],
+    steps:[
+      {text:"Pour <code>5</code> into <code>count</code> (number)", check:(s)=> s.count===5},
+      {text:"Pour <code>\"hello\"</code> into <code>greeting</code> (string)", check:(s)=> s.greeting==="hello"},
+      {text:"Pour <code>true</code> into <code>isReady</code> (boolean)", check:(s)=> s.isReady===true},
+    ],
+    success:"Perfect color-matching! You now read types like a true apothecary."
+  },
+  {
+    id:3, kicker:"Chapter 3 — Changing Brews", title:"The Reassignable Brew", badge:"Changing Brews",
+    desc:`A <code>let</code> vial is <strong>reassignable</strong> — you can pour again and the old value is replaced. Try changing a brew mid-recipe.`,
+    lesson:`<div class="ico">🔄</div><p><strong>let allows change:</strong> <code>let x = 1;</code> then <code>x = 2;</code> replaces the value. The vial stays the same, the liquid changes.</p>`,
+    vials:[
+      {id:"brew", label:"brew", type:"number", kind:"let", expect:20, hint:"start 10 → change to 20"},
+      {id:"note", label:"note", type:"string", kind:"let", expect:"moon", hint:'needs "moon"'},
+    ],
+    pantry:[
+      {id:"n10", name:"Dewdrop", value:10, type:"number", display:"10"},
+      {id:"n20", name:"Moonwater", value:20, type:"number", display:"20"},
+      {id:"sMoon", name:"Lunar Petal", value:"moon", type:"string", display:'"moon"'},
+      {id:"sSun", name:"Solar Leaf", value:"sun", type:"string", display:'"sun"'},
+    ],
+    steps:[
+      {text:"Pour <code>10</code> into <code>brew</code>, then re-pour <code>20</code> (let allows refill)", check:(s)=> s.brew===20},
+      {text:"Pour <code>\"moon\"</code> into <code>note</code>", check:(s)=> s.note==="moon"},
+    ],
+    success:"You reassigned a variable! The vial kept its label, but the essence changed."
+  },
+  {
+    id:4, kicker:"Chapter 4 — Sealed with Wax", title:"The Sealed Vial", badge:"Sealed with Wax",
+    desc:`Some vials are <strong>sealed with wax</strong> — that's <code>const</code>. The first pour locks forever. Try to refill it and it <strong>rejects</strong> with a shake.`,
+    lesson:`<div class="ico">🔒</div><p><strong>const is sealed:</strong> <code>const id = 42;</code> can never be reassigned. Use it for values that must not change.</p>`,
+    vials:[
+      {id:"id", label:"id", type:"number", kind:"const", expect:42, hint:"sealed — needs 42"},
+      {id:"score", label:"score", type:"number", kind:"let", expect:100, hint:"reassignable — needs 100"},
+    ],
+    pantry:[
+      {id:"n42", name:"Star Core", value:42, type:"number", display:"42"},
+      {id:"n99", name:"Comet Dust", value:99, type:"number", display:"99"},
+      {id:"n100", name:"Sun Seed", value:100, type:"number", display:"100"},
+      {id:"n10b", name:"Dewdrop", value:10, type:"number", display:"10"},
+    ],
+    steps:[
+      {text:"Pour <code>42</code> into sealed <code>id</code> (const)", check:(s)=> s.id===42},
+      {text:"Pour <code>100</code> into <code>score</code> (let)", check:(s)=> s.score===100},
+      {text:"Try refilling <code>id</code> — see it reject! (then undo if needed)", check:(s)=> s.id===42, optional:true},
+    ],
+    success:"You felt the seal! const vials protect their value — any refill is rejected."
+  },
+  {
+    id:5, kicker:"Chapter 5 — Master's Trial", title:"The Master Potion", badge:"Master's Trial",
+    desc:`Final trial. Mix <strong>all types</strong>, respect <strong>seals</strong>, and reassign where allowed. Brew the master potion to graduate.`,
+    lesson:`<div class="ico">👑</div><p><strong>Trial:</strong> <code>const</code> stays, <code>let</code> may change. Match types. The parchment must read exactly right.</p>`,
+    vials:[
+      {id:"elixir", label:"elixir", type:"string", kind:"const", expect:"cure", hint:'sealed — "cure"'},
+      {id:"doses", label:"doses", type:"number", kind:"let", expect:3, hint:"reassignable — needs 3"},
+      {id:"isPotent", label:"isPotent", type:"boolean", kind:"let", expect:true, hint:"needs true"},
+    ],
+    pantry:[
+      {id:"sCure", name:"Cure Bloom", value:"cure", type:"string", display:'"cure"'},
+      {id:"sPoison", name:"Nightshade", value:"poison", type:"string", display:'"poison"'},
+      {id:"n3", name:"Tri-Seed", value:3, type:"number", display:"3"},
+      {id:"n1", name:"Single Dew", value:1, type:"number", display:"1"},
+      {id:"n5b", name:"Sun Seed", value:5, type:"number", display:"5"},
+      {id:"bTrue2", name:"Ember Seed", value:true, type:"boolean", display:"true"},
+      {id:"bFalse2", name:"Frost Bud", value:false, type:"boolean", display:"false"},
+    ],
+    steps:[
+      {text:"Pour <code>\"cure\"</code> into sealed <code>elixir</code> (const)", check:(s)=> s.elixir==="cure"},
+      {text:"Pour <code>3</code> into <code>doses</code> (let)", check:(s)=> s.doses===3},
+      {text:"Pour <code>true</code> into <code>isPotent</code> (boolean)", check:(s)=> s.isPotent===true},
+    ],
+    success:"Masterwork! You've mastered declared vs reassignable variables. The apothecary is yours."
+  }
+];
+
+let current = 0;
+let state = {}; // vialId -> value or undefined
+let history = [];
+let selectedIng = null;
+let unlocked = 1;
+let completed = {};
+
+function loadProgress(){
+  try{
+    const d = JSON.parse(localStorage.getItem('apothecary_progress')||'{}');
+    if(d.unlocked) unlocked = d.unlocked;
+    if(d.completed) completed = d.completed;
+    if(typeof d.current === 'number') current = d.current;
+  }catch(e){}
+}
+function saveProgress(){
+  localStorage.setItem('apothecary_progress', JSON.stringify({unlocked, completed, current}));
+}
+
+function getChapter(){ return CHAPTERS[current]; }
+
+function initState(){
+  state = {};
+  history = [];
+  selectedIng = null;
+  getChapter().vials.forEach(v=> state[v.id]=undefined);
+  renderAll();
+}
+
+function pushHistory(){
+  history.push(JSON.stringify(state));
+  if(history.length>20) history.shift();
+}
+
+function showToast(msg, type=""){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast show '+type;
+  clearTimeout(t._timer);
+  t._timer=setTimeout(()=> t.className='toast', 2600);
+}
+
+function renderAll(){
+  const ch=getChapter();
+  document.getElementById('chapterKicker').textContent=ch.kicker;
+  document.getElementById('chapterTitle').textContent=ch.title;
+  document.getElementById('chapterDesc').innerHTML=ch.desc;
+  document.getElementById('lessonCallout').innerHTML=ch.lesson;
+  document.getElementById('progressLabel').textContent=`Chapter ${ch.id} of ${CHAPTERS.length}`;
+  document.getElementById('progressFill').style.width = ((ch.id/CHAPTERS.length)*100)+'%';
+  document.getElementById('chapterBadge').textContent=ch.badge;
+  document.getElementById('pantryHint').textContent = selectedIng ? `Holding ${selectedIng.display} — tap a vial` : 'Choose an essence';
+  renderVials();
+  renderPantry();
+  renderCode();
+  renderSuccess();
+  renderRecipeBook();
+  document.getElementById('btnUndo').disabled = history.length===0;
+  document.getElementById('btnCheck').textContent = isChapterComplete() ? 'Next Chapter →' : 'Check Brew ✓';
+  document.getElementById('btnCheck').className = isChapterComplete() ? 'btn btn-amber' : 'btn btn-primary';
+}
+
+function renderVials(){
+  const ch=getChapter();
+  const wrap=document.getElementById('vials');
+  wrap.className='vials '+(ch.vials.length===3?'cols3': ch.vials.length===2?'cols2':'');
+  wrap.innerHTML='';
+  ch.vials.forEach(v=>{
+    const val=state[v.id];
+    const hasVal = val!==undefined;
+    const card=document.createElement('div');
+    card.className='vial-card'+(hasVal?' filled':'');
+    card.dataset.vial=v.id;
+    card.innerHTML=`
+      <div class="vial-top">
+        <span class="vial-type ${v.type}">${v.type}</span>
+        <span class="vial-seal ${v.kind}">${v.kind==='const'?'🔒 const':'🟢 let'}</span>
+      </div>
+      <div class="vial-visual">
+        <div class="vial-glass"><div class="vial-liquid ${v.type}" style="height:${hasVal? (v.type==='boolean'? '55%' : '62%') : '0%'}; opacity:${hasVal?1:0}"></div></div>
+        <div class="vial-neck"></div>
+        ${v.kind==='const' ? `<div class="vial-wax">WAX</div>` : `<div class="vial-cork"></div>`}
+      </div>
+      <div class="vial-label">${v.label}</div>
+      <div class="vial-value ${hasVal?'filled':''}">${hasVal? formatVal(val) : v.hint}</div>
+      <div class="vial-hint">${v.kind==='const'?'sealed — no refills':'reassignable'}</div>
+    `;
+    card.addEventListener('click', ()=> onVialClick(v));
+    wrap.appendChild(card);
+  });
+}
+
+function formatVal(v){
+  if(typeof v==='string') return `"${v}"`;
+  return String(v);
+}
+
+function renderPantry(){
+  const ch=getChapter();
+  const wrap=document.getElementById('ingredients');
+  wrap.innerHTML='';
+  ch.pantry.forEach(ing=>{
+    const btn=document.createElement('button');
+    btn.className='ing-btn'+(selectedIng && selectedIng.id===ing.id ? ' selected':'');
+    btn.innerHTML=`
+      <div class="ing-icon ${ing.type}">${ing.type==='number'?'#️⃣': ing.type==='string'?'💬':'◐'}</div>
+      <div class="ing-name">${ing.name}</div>
+      <div class="ing-meta">${ing.display}</div>
+      <div class="ing-type ${ing.type}">${ing.type}</div>
+    `;
+    btn.addEventListener('click', ()=> {
+      selectedIng = (selectedIng && selectedIng.id===ing.id) ? null : ing;
+      renderAll();
+      if(selectedIng) showToast(`Picked up ${ing.name} ${ing.display} — now tap a vial`);
+    });
+    wrap.appendChild(btn);
+  });
+}
+
+function renderCode(){
+  const ch=getChapter();
+  const lines=[];
+  ch.vials.forEach(v=>{
+    const val=state[v.id];
+    if(val===undefined){
+      lines.push(`<span class="comment">// ${v.kind} ${v.label} — empty, pour ${v.type} ${v.hint}</span>`);
+    } else {
+      const valStr = typeof val==='string' ? `<span class="str">"${val}"</span>` : (typeof val==='boolean' ? `<span class="bool">${val}</span>` : `<span class="val">${val}</span>`);
+      const kw = `<span class="kw">${v.kind}</span>`;
+      const vr = `<span class="var">${v.label}</span>`;
+      lines.push(`${kw} ${vr} = ${valStr};`);
+    }
+  });
+  // show reassign hint if let vial was changed? we track via history not needed
+  document.getElementById('codeLines').innerHTML = lines.join('\n');
+}
+
+function renderSuccess(){
+  const area=document.getElementById('successArea');
+  if(isChapterComplete()){
+    const ch=getChapter();
+    const isLast = ch.id===CHAPTERS.length;
+    area.innerHTML=`<div class="success-card"><h3>✨ Brew Complete!</h3><p>${ch.success}</p><button class="btn ${isLast?'btn-primary':'btn-amber'}" style="width:100%" onclick="nextChapter()">${isLast?'🎉 Review Recipe Book':'Next Chapter →'}</button></div>`;
+  } else area.innerHTML='';
+}
+
+function isChapterComplete(){
+  const ch=getChapter();
+  return ch.steps.every(s=> s.optional ? true : s.check(state));
+}
+
+function onVialClick(vial){
+  if(!selectedIng){
+    showToast('Pick an ingredient from the Pantry first', 'error');
+    // wiggle pantry hint
+    document.getElementById('pantryHint').animate([{transform:'scale(1)'},{transform:'scale(1.08)'},{transform:'scale(1)'}],{duration:300});
+    return;
+  }
+  // type check
+  if(selectedIng.type !== vial.type){
+    const card=document.querySelector(`[data-vial="${vial.id}"]`);
+    card.classList.add('error-shake');
+    setTimeout(()=> card.classList.remove('error-shake'), 400);
+    showToast(`Fizzle! ${selectedIng.name} is ${selectedIng.type}, but ${vial.label} needs ${vial.type}.`, 'error');
+    return;
+  }
+  // const sealed check
+  if(vial.kind==='const' && state[vial.id]!==undefined){
+    const card=document.querySelector(`[data-vial="${vial.id}"]`);
+    card.classList.add('error-shake');
+    setTimeout(()=> card.classList.remove('error-shake'), 500);
+    showToast(`Sealed! ${vial.label} is const — wax holds, refill rejected. Use Undo to fix a mistake.`, 'error');
+    return;
+  }
+  // pour
+  pushHistory();
+  state[vial.id]=selectedIng.value;
+  showToast(`Poured ${selectedIng.display} into ${vial.label} ✓`, 'success');
+  // keep selection for quick refills? clear after pour for clarity but allow re-pour
+  // don't clear, let user tap another vial with same ingredient
+  renderAll();
+  saveProgress();
+}
+
+function nextChapter(){
+  if(!isChapterComplete()){
+    showToast('Complete all steps first, then check your brew', 'error');
+    return;
+  }
+  completed[getChapter().id]=true;
+  if(current < CHAPTERS.length-1){
+    unlocked = Math.max(unlocked, getChapter().id+1);
+    current++;
+    saveProgress();
+    initState();
+    window.scrollTo({top:0, behavior:'smooth'});
+    showToast(`Chapter ${getChapter().id} unlocked!`, 'success');
+  } else {
+    showToast('You are a Master Apothecary! Revisit any chapter in the Recipe Book.', 'success');
+    openSheet('sheetRecipe');
+  }
+}
+
+function renderRecipeBook(){
+  const body=document.getElementById('recipeBody');
+  body.innerHTML='';
+  const list=document.createElement('div');
+  list.className='chapter-list';
+  CHAPTERS.forEach((ch, idx)=>{
+    const isUnlocked = ch.id <= unlocked;
+    const isDone = !!completed[ch.id];
+    const isActive = idx===current;
+    const item=document.createElement('div');
+    item.className='chapter-item'+(isActive?' active':'')+(isUnlocked?'':' locked');
+    const badge = isDone ? '<span class="ch-badge done">✓ Done</span>' : isActive ? '<span class="ch-badge current">● Current</span>' : isUnlocked ? '<span class="ch-badge current">Unlocked</span>' : '<span class="ch-badge locked">🔒 Locked</span>';
+    item.innerHTML=`
+      <div class="ch-item-head" data-idx="${idx}">
+        <div><h3>${ch.id}. ${ch.title}</h3><p>${ch.badge} • ${ch.vials.length} vial${ch.vials.length>1?'s':''}</p></div>
+        ${badge}
+      </div>
+      ${isUnlocked? `<div class="ch-steps">${ch.steps.map(s=>{
+        const done = s.check(state) && isActive ? true : (isDone ? true : false);
+        // for non-active chapters, show done if completed
+        const showDone = isDone ? true : (isActive ? s.check(state) : false);
+        return `<div class="step ${showDone?'done':''}"><span class="check">${showDone?'✓':''}</span><span>${s.text}</span></div>`;
+      }).join('')}</div>`:''}
+    `;
+    const head=item.querySelector('.ch-item-head');
+    head.addEventListener('click', ()=>{
+      if(!isUnlocked){ showToast('Finish the previous chapter to unlock this one', 'error'); return; }
+      current=idx;
+      saveProgress();
+      initState();
+      closeSheets();
+      window.scrollTo({top:0, behavior:'smooth'});
+    });
+    list.appendChild(item);
+  });
+  // progress summary
+  const prog=document.createElement('div');
+  prog.style.cssText='margin-top:12px;background:#fff;border:1.5px solid #e8dcc0;border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center';
+  prog.innerHTML=`<span style="font-size:13px;color:var(--muted)"><strong style="color:var(--wood)">${Object.keys(completed).length}/${CHAPTERS.length}</strong> chapters brewed</span><button class="btn btn-ghost" style="height:36px;padding:0 14px;flex:0 0 auto" id="btnReset">Reset progress</button>`;
+  body.appendChild(list);
+  body.appendChild(prog);
+  setTimeout(()=>{
+    const b=document.getElementById('btnReset');
+    if(b) b.addEventListener('click', ()=>{
+      if(confirm('Reset all progress?')){
+        unlocked=1; completed={}; current=0;
+        saveProgress(); initState(); closeSheets(); showToast('Progress reset');
+      }
+    });
+  },0);
+}
+
+// Sheets
+function openSheet(id){
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById(id).classList.add('open');
+  document.getElementById(id).setAttribute('aria-hidden','false');
+}
+function closeSheets(){
+  document.getElementById('overlay').classList.remove('open');
+  document.querySelectorAll('.sheet').forEach(s=>{ s.classList.remove('open'); s.setAttribute('aria-hidden','true'); });
+}
+document.getElementById('btnRecipe').addEventListener('click', ()=> openSheet('sheetRecipe'));
+document.getElementById('btnGuide').addEventListener('click', ()=> openSheet('sheetGuide'));
+document.getElementById('overlay').addEventListener('click', closeSheets);
+document.querySelectorAll('.sheet-close').forEach(b=> b.addEventListener('click', ()=> closeSheets()));
+
+document.getElementById('btnUndo').addEventListener('click', ()=>{
+  if(history.length===0){ showToast('Nothing to undo', 'error'); return; }
+  state = JSON.parse(history.pop());
+  selectedIng=null;
+  renderAll();
+  showToast('Undid last pour ↩️');
+});
+document.getElementById('btnCheck').addEventListener('click', ()=>{
+  if(isChapterComplete()) nextChapter();
+  else {
+    const ch=getChapter();
+    const missing = ch.steps.filter(s=> !s.optional && !s.check(state));
+    showToast(`Not yet — ${missing.length} step${missing.length>1?'s':''} left. Check the Recipe Book.`, 'error');
+    // highlight incomplete vials
+    document.getElementById('vials').animate([{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:300});
+  }
+});
+document.getElementById('btnCopy').addEventListener('click', ()=>{
+  const text=document.getElementById('codeLines').innerText;
+  navigator.clipboard.writeText(text).then(()=> showToast('Code copied to clipboard ✓','success')).catch(()=> showToast(text));
+});
+
+// init
+loadProgress();
+initState();
+window.nextChapter = nextChapter;
+</script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Trap the Cat - Hex Escape</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden;background:#f6f7f9}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;justify-content:center;color:#1a2332}
+.app{width:100%;max-width:428px;min-width:360px;background:#f6f7f9;min-height:100vh;display:flex;flex-direction:column;position:relative}
+.header{padding:12px 14px 10px;display:flex;justify-content:space-between;align-items:center;gap:10px;background:#fff;border-bottom:1px solid #e6e8ec;position:sticky;top:0;z-index:2}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:38px;height:38px;border-radius:10px;background:#1a2332;display:grid;place-items:center;font-size:18px;color:#fff}
+.brand h1{font-size:13px;letter-spacing:.06em;line-height:1}
+.brand p{font-size:10px;opacity:.6;letter-spacing:.06em}
+.stats{display:flex;gap:8px}
+.stat{background:#f0f2f5;border:1px solid #e6e8ec;border-radius:10px;padding:6px 10px;text-align:center;min-width:64px}
+.stat b{font-size:13px;display:block}
+.stat span{font-size:9px;opacity:.6;letter-spacing:.06em}
+.boardWrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 10px 10px;gap:12px}
+.board{position:relative;background:#fff;border:1px solid #e6e8ec;border-radius:16px;padding:12px 8px;box-shadow:0 4px 16px rgba(0,0,0,.06);width:100%;max-width:360px}
+.hexGrid{display:flex;flex-direction:column;align-items:center;gap:2px}
+.row{display:flex;gap:3px}
+.hex{width:clamp(26px,7.1vw,32px);height:clamp(26px,7.1vw,32px);background:#eef1f5;border:1px solid #d8dde6;border-radius:6px;display:grid;place-items:center;font-size:14px;cursor:pointer;user-select:none;transition:transform .08s,background .12s;position:relative}
+.hex:active{transform:scale(.94)}
+.hex.blocked{background:#1a2332;border-color:#1a2332;color:#fff}
+.hex.cat{background:#ffcc33;border-color:#e6b800;box-shadow:0 2px 8px rgba(255,204,51,.5)}
+.hex.edge{background:#f0f2f5}
+.hex.hint{outline:2px solid #3b82f6;outline-offset:1px}
+.controls{display:flex;gap:8px;width:100%;max-width:360px}
+.btn{flex:1;min-height:48px;border-radius:12px;border:1px solid #d8dde6;background:#fff;color:#1a2332;font-weight:800;font-size:13px;letter-spacing:.02em;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:#1a2332;color:#fff;border-color:#1a2332}
+.btn:disabled{opacity:.45;pointer-events:none}
+.status{font-size:12px;font-weight:700;text-align:center;min-height:18px}
+.status.win{color:#0a7a42}
+.status.lose{color:#c0392b}
+.overlay{position:absolute;inset:0;background:rgba(246,247,249,.92);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;pointer-events:none;transition:.2s;z-index:5;border-radius:16px}
+.overlay.show{opacity:1;pointer-events:auto}
+.sheet{width:100%;max-width:320px;background:#fff;border:1px solid #e6e8ec;border-radius:16px;padding:16px;box-shadow:0 12px 32px rgba(0,0,0,.12);text-align:center}
+.sheet h2{font-size:14px;letter-spacing:.06em}
+.sheet p{font-size:12px;opacity:.7;line-height:1.5;margin-top:6px}
+.sheet .big{font-size:28px;margin:6px 0}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.kv div{background:#f6f7f9;border:1px solid #e6e8ec;border-radius:12px;padding:8px;text-align:center}
+.kv b{font-size:14px}
+.kv span{font-size:10px;opacity:.6;letter-spacing:.06em}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="header">
+<div class="brand"><div class="logo">🐱</div><div><h1>TRAP THE CAT</h1><p>HEX ESCAPE • BLOCK & ENCLOSE</p></div></div>
+<div class="stats"><div class="stat"><b id="wins">0</b><span>WINS</span></div><div class="stat"><b id="best">—</b><span>BEST</span></div></div>
+</div>
+<div class="boardWrap">
+<div class="board" id="board">
+<div class="hexGrid" id="grid"></div>
+<div class="overlay" id="overlay"><div class="sheet"><div class="big" id="overlayIcon">🎉</div><h2 id="overlayTitle">Trapped!</h2><p id="overlayDesc"></p><div class="kv"><div><span>BLOCKS</span><b id="overlayBlocks">0</b></div><div><span>BEST</span><b id="overlayBest">—</b></div></div><div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1" id="overlayReset">Reset</button><button class="btn primary" style="flex:1" id="overlayNew">New Game</button></div></div></div>
+</div>
+<div class="status" id="status">Tap a tile to block — cat moves to nearest edge</div>
+<div class="controls">
+<button class="btn" id="btnReset">↺ Reset</button>
+<button class="btn primary" id="btnNew">✦ New Game</button>
+</div>
+<p style="font-size:10px;opacity:.5;text-align:center;line-height:1.4;max-width:360px">11×11 hex board • Cat steps toward nearest edge after each block • Enclose fully to win • Fewest blocks is best</p>
+</div>
+</div>
+<script>
+const SIZE=11;
+const STORAGE_KEY='catTrap_v2';
+let store={wins:0,best:null};
+try{const s=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null'); if(s) store=s;}catch(e){}
+if(store.wins==null) store.wins=0;
+if(!('best' in store)) store.best=null;
+
+const $=id=>document.getElementById(id);
+const gridEl=$('grid'), statusEl=$('status'), overlay=$('overlay');
+let board=[], cat={r:5,c:5}, blocks=0, gameOver=false;
+
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(store)); updateStats();}
+function updateStats(){
+ $('wins').textContent=store.wins;
+ $('best').textContent=store.best? store.best : '—';
+}
+
+function initBoard(){
+ board=Array.from({length:SIZE},(_,r)=>Array.from({length:SIZE},(_,c)=>({r,c,blocked:false})));
+ // random initial blocks ~12
+ let placed=0;
+ while(placed<12){
+  const r=Math.floor(Math.random()*SIZE), c=Math.floor(Math.random()*SIZE);
+  if((r===5&&c===5) || board[r][c].blocked) continue;
+  // avoid blocking edge completely at start
+  if(r===0||r===SIZE-1||c===0||c===SIZE-1) continue;
+  board[r][c].blocked=true; placed++;
+ }
+ cat={r:5,c:5}; blocks=0; gameOver=false;
+ overlay.classList.remove('show');
+ statusEl.textContent='Tap a tile to block — cat moves to nearest edge';
+ statusEl.className='status';
+ render();
+}
+
+function neighbors(r,c){
+ // hex axial: odd-r offset
+ const isOdd=r%2===1;
+ const dirs=isOdd? [[-1,0],[-1,1],[0,1],[1,1],[1,0],[0,-1]] : [[-1,-1],[-1,0],[0,1],[1,0],[1,-1],[0,-1]];
+ const res=[];
+ dirs.forEach(([dr,dc])=>{
+  const nr=r+dr, nc=c+dc;
+  if(nr>=0&&nr<SIZE&&nc>=0&&nc<SIZE) res.push({r:nr,c:nc});
+ });
+ return res;
+}
+
+function isEdge(r,c){ return r===0||r===SIZE-1||c===0||c===SIZE-1; }
+
+function bfsToEdge(start){
+ const q=[start], seen=new Set([start.r+','+start.c]), prev=new Map();
+ prev.set(start.r+','+start.c,null);
+ while(q.length){
+  const cur=q.shift();
+  if(isEdge(cur.r,cur.c)) {
+   // reconstruct path
+   const path=[cur];
+   let key=cur.r+','+cur.c;
+   while(prev.get(key)){
+    const p=prev.get(key);
+    path.push(p);
+    key=p.r+','+p.c;
+   }
+   path.reverse();
+   return path;
+  }
+  neighbors(cur.r,cur.c).forEach(n=>{
+   const key=n.r+','+n.c;
+   if(seen.has(key)) return;
+   if(board[n.r][n.c].blocked) return;
+   seen.add(key); prev.set(key,cur); q.push(n);
+  });
+ }
+ return null;
+}
+
+function catMove(){
+ if(gameOver) return;
+ // if cat already on edge -> lose
+ if(isEdge(cat.r,cat.c)){
+  gameOver=true;
+  statusEl.textContent='Cat escaped! Try again.';
+  statusEl.className='status lose';
+  showOverlay(false);
+  return;
+ }
+ const path=bfsToEdge(cat);
+ if(!path){
+  // trapped -> win
+  gameOver=true;
+  store.wins++;
+  if(store.best===null || blocks < store.best) store.best=blocks;
+  save();
+  statusEl.textContent=`Trapped in ${blocks} blocks!`;
+  statusEl.className='status win';
+  showOverlay(true);
+  return;
+ }
+ if(path.length>1){
+  cat=path[1];
+  // check if cat reached edge after move
+  if(isEdge(cat.r,cat.c)){
+   gameOver=true;
+   statusEl.textContent='Cat escaped through the edge!';
+   statusEl.className='status lose';
+   showOverlay(false);
+   return;
+  }
+ }
+ render();
+}
+
+function showOverlay(won){
+ $('overlayIcon').textContent= won?'🎉':'😿';
+ $('overlayTitle').textContent= won?'Trapped!':'Escaped!';
+ $('overlayDesc').textContent= won? `You enclosed the cat in ${blocks} blocks.` : `The cat slipped out after ${blocks} blocks.`;
+ $('overlayBlocks').textContent=blocks;
+ $('overlayBest').textContent=store.best? store.best : '—';
+ if(won && store.best===blocks) $('overlayDesc').textContent+=' New best!';
+ overlay.classList.add('show');
+ try{navigator.vibrate&&navigator.vibrate(won?[30,30,30]:[60,40,60])}catch(e){}
+}
+
+function render(){
+ gridEl.innerHTML='';
+ for(let r=0;r<SIZE;r++){
+  const row=document.createElement('div'); row.className='row';
+  // offset for hex stagger
+  row.style.marginLeft= (r%2===1? '16px':'0');
+  for(let c=0;c<SIZE;c++){
+   const cell=board[r][c];
+   const div=document.createElement('div');
+   div.className='hex';
+   if(cell.blocked) div.classList.add('blocked');
+   if(cat.r===r && cat.c===c) div.classList.add('cat');
+   if(isEdge(r,c) && !cell.blocked) div.classList.add('edge');
+   div.textContent= cat.r===r && cat.c===c ? '🐱' : cell.blocked ? '⬢' : '';
+   div.onclick=()=>onTap(r,c);
+   gridEl.appendChild(row); // ensure row added
+   row.appendChild(div);
+  }
+  gridEl.appendChild(row);
+ }
+}
+
+function onTap(r,c){
+ if(gameOver) return;
+ if(board[r][c].blocked) return;
+ if(cat.r===r && cat.c===c) return;
+ board[r][c].blocked=true; blocks++;
+ // cat moves
+ catMove();
+ render();
+ if(!gameOver){
+  statusEl.textContent=`${blocks} blocks • Cat at ${cat.r+1},${cat.c+1}`;
+ }
+}
+
+$('btnReset').onclick=initBoard;
+$('btnNew').onclick=initBoard;
+$('overlayReset').onclick=initBoard;
+$('overlayNew').onclick=initBoard;
+
+updateStats();
+initBoard();
+</script>
+</body>
+</html>

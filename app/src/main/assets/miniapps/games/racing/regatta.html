@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Sailboat Sprint</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#0a2a4a;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+.app{width:100%;max-width:428px;min-width:360px;height:100dvh;margin:0 auto;background:linear-gradient(180deg,#87d8ff 0%,#3aa0ff 45%,#0a4a8a 100%);display:flex;flex-direction:column;overflow:hidden;position:relative;box-shadow:0 0 0 1px rgba(0,0,0,.1)}
+header{padding:10px 12px 8px;background:linear-gradient(180deg,#fff 0%,#e6f4ff 100%);border-bottom:3px solid #0a2a4a;display:flex;flex-direction:column;gap:6px;z-index:5}
+.top-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.logo{font-weight:900;font-size:18px;letter-spacing:.5px;color:#0a2a4a;line-height:1}
+.logo span{color:#ff3b30}
+.stats{display:flex;gap:6px;flex-wrap:wrap}
+.pill{background:#0a2a4a;color:#fff;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:6px;min-height:28px}
+.pill b{color:#ffd60a}
+.pill.best{background:#ffd60a;color:#0a2a4a}
+.pill.best b{color:#0a2a4a}
+.sub-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lap-bar{flex:1;height:14px;background:#dbeeff;border:2px solid #0a2a4a;border-radius:999px;overflow:hidden;position:relative}
+.lap-fill{height:100%;width:0%;background:linear-gradient(90deg,#ffd60a,#ff9500);transition:width .2s}
+.lap-text{font-size:11px;font-weight:900;color:#0a2a4a;white-space:nowrap}
+.icon-btn{min-width:48px;min-height:48px;border-radius:14px;border:2px solid #0a2a4a;background:#fff;color:#0a2a4a;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;padding:0 10px}
+.icon-btn:active{transform:scale(.96)}
+.icon-btn.primary{background:#ffd60a}
+.canvas-wrap{flex:1;position:relative;overflow:hidden;background:#1a8cff}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:linear-gradient(180deg,rgba(10,42,74,.55),rgba(10,42,74,.75));backdrop-filter:blur(2px);z-index:4}
+.card{width:100%;max-width:360px;background:#fff;border:3px solid #0a2a4a;border-radius:20px;padding:18px 16px;text-align:center;box-shadow:0 12px 24px rgba(0,0,0,.25)}
+.card h1{font-size:26px;font-weight:900;color:#0a2a4a;line-height:1}
+.card h1 em{font-style:normal;color:#007aff}
+.card p{font-size:14px;color:#334155;margin:8px 0 12px;line-height:1.4}
+.big-btn{width:100%;min-height:56px;border-radius:16px;border:3px solid #0a2a4a;background:#ffd60a;color:#0a2a4a;font-size:18px;font-weight:900;cursor:pointer;touch-action:manipulation}
+.big-btn:active{transform:scale(.98)}
+.big-btn.secondary{background:#fff;margin-top:8px;font-size:15px;min-height:48px}
+.row2{display:flex;gap:8px;margin-top:10px}
+.row2 .big-btn{flex:1}
+.hint{font-size:11px;color:#64748b;margin-top:8px}
+.badge{display:inline-flex;align-items:center;gap:6px;background:#e6f4ff;border:2px solid #0a2a4a;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:800;color:#0a2a4a;margin-bottom:8px}
+.controls{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:end;padding:10px 10px 12px;pointer-events:none;z-index:3}
+.steer{pointer-events:auto;display:flex;gap:10px}
+.steer-btn{width:72px;height:72px;border-radius:20px;border:3px solid #0a2a4a;background:rgba(255,255,255,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900;color:#0a2a4a;font-size:22px;touch-action:manipulation;user-select:none}
+.steer-btn span{font-size:10px;margin-top:2px}
+.steer-btn:active{background:#ffd60a;transform:scale(.96)}
+.center-hint{pointer-events:none;background:rgba(10,42,74,.85);color:#fff;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:6px}
+.toast{position:absolute;left:50%;top:18%;transform:translateX(-50%);background:#fff;border:2px solid #0a2a4a;border-radius:999px;padding:8px 14px;font-weight:900;font-size:14px;color:#0a2a4a;z-index:3;pointer-events:none;opacity:0;transition:.2s}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.stun-flash{position:absolute;inset:0;background:rgba(255,59,48,.18);pointer-events:none;opacity:0;z-index:2}
+.stun-flash.on{opacity:1}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="top-row">
+      <div class="logo">SAILBOAT <span>SPRINT</span> ⛵</div>
+      <button class="icon-btn" id="pauseBtn" aria-label="Pause">⏸</button>
+    </div>
+    <div class="stats">
+      <div class="pill">SCORE <b id="scoreEl">0</b></div>
+      <div class="pill">LVL <b id="levelEl">1</b></div>
+      <div class="pill">FLAGS <b id="flagsEl">0</b></div>
+      <div class="pill best">BEST <b id="bestEl">0</b></div>
+    </div>
+    <div class="sub-row">
+      <div class="lap-bar"><div class="lap-fill" id="lapFill"></div></div>
+      <div class="lap-text" id="lapText">LAP 1/3</div>
+      <button class="icon-btn" id="tiltBtn" style="min-height:32px;min-width:64px;font-size:11px;border-radius:999px">TILT OFF</button>
+    </div>
+  </header>
+  <div class="canvas-wrap" id="wrap">
+    <canvas id="c" width="400" height="700"></canvas>
+    <div class="stun-flash" id="flash"></div>
+    <div class="toast" id="toast">+100 FLAG!</div>
+    <div class="controls">
+      <div class="steer">
+        <button class="steer-btn" id="leftBtn">◀<span>HOLD</span></button>
+        <button class="steer-btn" id="rightBtn">▶<span>HOLD</span></button>
+      </div>
+      <div class="center-hint">👆 DRAG TO STEER</div>
+    </div>
+    <div class="overlay" id="overlay">
+      <div class="card" id="card">
+        <div class="badge">🌊 BRIGHT OPEN-SEA RACE</div>
+        <h1>VERTICAL <em>SAILBOAT</em> RACE</h1>
+        <p>Drag anywhere to steer. Collect <b style="color:#0a8a00">green flags</b> (+100), dodge <b>rocks & buoys</b>. Hit = stun & slow! Beat your rival across 3 laps. Speed rises each level.</p>
+        <button class="big-btn" id="playBtn">▶ START RACE</button>
+        <div class="row2">
+          <button class="big-btn secondary" id="howBtn">HOW TO PLAY</button>
+          <button class="big-btn secondary" id="tiltHowBtn">TILT: OFF</button>
+        </div>
+        <div class="hint">Mobile-first • 360–428px • Large touch targets • Tilt-friendly • Best saved</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const wrap=document.getElementById('wrap');
+const overlay=document.getElementById('overlay');
+const card=document.getElementById('card');
+const scoreEl=document.getElementById('scoreEl');
+const levelEl=document.getElementById('levelEl');
+const flagsEl=document.getElementById('flagsEl');
+const bestEl=document.getElementById('bestEl');
+const lapFill=document.getElementById('lapFill');
+const lapText=document.getElementById('lapText');
+const pauseBtn=document.getElementById('pauseBtn');
+const playBtn=document.getElementById('playBtn');
+const howBtn=document.getElementById('howBtn');
+const tiltBtn=document.getElementById('tiltBtn');
+const tiltHowBtn=document.getElementById('tiltHowBtn');
+const leftBtn=document.getElementById('leftBtn');
+const rightBtn=document.getElementById('rightBtn');
+const toast=document.getElementById('toast');
+const flash=document.getElementById('flash');
+
+let W=400,H=700,dpr=1;
+function resize(){
+  W=wrap.clientWidth;
+  H=wrap.clientHeight;
+  dpr=Math.min(window.devicePixelRatio||1,2);
+  canvas.width=W*dpr;
+  canvas.height=H*dpr;
+  canvas.style.width=W+'px';
+  canvas.style.height=H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize',resize);
+resize();
+
+// Game state
+let best = parseInt(localStorage.getItem('sailBest')||'0',10);
+bestEl.textContent=best;
+let state='menu'; // menu, playing, paused, over, won
+let score=0, level=1, flags=0, distance=0, lap=1, totalLaps=3;
+const LAP_DIST=2200;
+let baseSpeed=4.2;
+let speed=baseSpeed;
+let scroll=0;
+let spawnTimer=0, spawnEvery=42;
+let shake=0;
+
+const player={x:200,y:0,w:36,h:52,targetX:200,stunned:0,tilt:0};
+const rival={x:260,y:0,w:34,h:48,targetX:260,phase:0};
+let obstacles=[]; // {x,y,w,h,type}
+let collectibles=[]; // flags
+let wakes=[]; // particles
+let buoys=[];
+
+function resetGame(){
+  score=0; level=1; flags=0; distance=0; lap=1; speed=baseSpeed; scroll=0; spawnTimer=0; spawnEvery=42;
+  obstacles=[]; collectibles=[]; wakes=[]; buoys=[];
+  player.x=W/2; player.targetX=W/2; player.stunned=0;
+  rival.x=W/2+40; rival.targetX=W/2+40; rival.phase=Math.random()*Math.PI*2;
+  updateHUD();
+}
+
+function updateHUD(){
+  scoreEl.textContent=score;
+  levelEl.textContent=level;
+  flagsEl.textContent=flags;
+  lapText.textContent=`LAP ${Math.min(lap,totalLaps)}/${totalLaps}`;
+  const prog = ((distance % LAP_DIST)/LAP_DIST)*100;
+  lapFill.style.width=prog+'%';
+  if(score>best){ best=score; localStorage.setItem('sailBest',best); bestEl.textContent=best; }
+}
+
+function showToast(t){
+  toast.textContent=t;
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'),700);
+}
+function triggerStun(){
+  flash.classList.add('on');
+  setTimeout(()=>flash.classList.remove('on'),180);
+  if(navigator.vibrate) navigator.vibrate(80);
+  shake=10;
+}
+
+// Tilt
+let tiltEnabled=false, tiltGamma=0;
+function updateTiltBtn(){
+  tiltBtn.textContent= tiltEnabled ? 'TILT ON' : 'TILT OFF';
+  tiltHowBtn.textContent= 'TILT: '+(tiltEnabled?'ON':'OFF');
+  tiltBtn.style.background= tiltEnabled ? '#ffd60a' : '#fff';
+}
+async function toggleTilt(){
+  if(!tiltEnabled){
+    try{
+      if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function'){
+        const p=await DeviceOrientationEvent.requestPermission();
+        if(p!=='granted'){ showToast('Tilt blocked'); return; }
+      }
+      window.addEventListener('deviceorientation', onTilt, true);
+      tiltEnabled=true; showToast('Tilt ON - tilt phone');
+    }catch(e){
+      window.addEventListener('deviceorientation', onTilt, true);
+      tiltEnabled=true;
+    }
+  } else {
+    window.removeEventListener('deviceorientation', onTilt, true);
+    tiltEnabled=false; tiltGamma=0; showToast('Tilt OFF');
+  }
+  updateTiltBtn();
+}
+function onTilt(e){
+  if(e.gamma!=null) tiltGamma = Math.max(-30, Math.min(30, e.gamma));
+}
+tiltBtn.addEventListener('click', toggleTilt);
+tiltHowBtn.addEventListener('click', toggleTilt);
+
+// Input - drag
+let dragging=false;
+function setTargetFromPointer(e){
+  const rect=canvas.getBoundingClientRect();
+  const cx = (e.touches? e.touches[0].clientX : e.clientX) - rect.left;
+  player.targetX = Math.max(18, Math.min(W-18, cx));
+}
+canvas.addEventListener('pointerdown', e=>{
+  if(state!=='playing') return;
+  dragging=true;
+  canvas.setPointerCapture(e.pointerId);
+  setTargetFromPointer(e);
+});
+canvas.addEventListener('pointermove', e=>{
+  if(!dragging) return;
+  setTargetFromPointer(e);
+});
+canvas.addEventListener('pointerup', ()=> dragging=false);
+canvas.addEventListener('pointercancel', ()=> dragging=false);
+canvas.addEventListener('touchmove', e=>{ if(dragging) e.preventDefault(); }, {passive:false});
+
+// Buttons hold
+let holdLeft=false, holdRight=false;
+function bindHold(btn, dir){
+  const down=(e)=>{ e.preventDefault(); if(dir==='left') holdLeft=true; else holdRight=true; };
+  const up=()=>{ holdLeft=false; holdRight=false; };
+  btn.addEventListener('pointerdown', down);
+  btn.addEventListener('pointerup', up);
+  btn.addEventListener('pointerleave', up);
+  btn.addEventListener('pointercancel', up);
+  btn.addEventListener('touchstart', down, {passive:false});
+  btn.addEventListener('touchend', up);
+}
+bindHold(leftBtn,'left');
+bindHold(rightBtn,'right');
+
+// Keyboard
+window.addEventListener('keydown', e=>{
+  if(e.key==='ArrowLeft') holdLeft=true;
+  if(e.key==='ArrowRight') holdRight=true;
+  if(e.key===' ') { e.preventDefault(); togglePause(); }
+});
+window.addEventListener('keyup', e=>{
+  if(e.key==='ArrowLeft') holdLeft=false;
+  if(e.key==='ArrowRight') holdRight=false;
+});
+
+function togglePause(){
+  if(state==='playing'){ state='paused'; showMenuPaused(); }
+  else if(state==='paused'){ state='playing'; overlay.style.display='none'; }
+}
+pauseBtn.addEventListener('click', togglePause);
+
+function showMenuStart(){
+  overlay.style.display='flex';
+  card.innerHTML=`
+    <div class="badge">🌊 BRIGHT OPEN-SEA RACE</div>
+    <h1>VERTICAL <em>SAILBOAT</em> RACE</h1>
+    <p>Drag anywhere to steer. Collect <b style="color:#0a8a00">green flags</b> (+100), dodge <b>rocks & buoys</b>. Hit = stun & slow! Beat your rival across 3 laps. Speed rises each level.</p>
+    <button class="big-btn" id="playBtn2">▶ START RACE</button>
+    <div class="row2">
+      <button class="big-btn secondary" id="howBtn2">HOW TO PLAY</button>
+      <button class="big-btn secondary" id="tiltHowBtn2">TILT: ${tiltEnabled?'ON':'OFF'}</button>
+    </div>
+    <div class="hint">Best: ${best} • Drag + tilt-friendly • 48px+ touch targets</div>`;
+  card.querySelector('#playBtn2').onclick=startGame;
+  card.querySelector('#howBtn2').onclick=showHow;
+  card.querySelector('#tiltHowBtn2').onclick=toggleTilt;
+}
+function showMenuPaused(){
+  overlay.style.display='flex';
+  card.innerHTML=`
+    <div class="badge">⏸ PAUSED</div>
+    <h1>TAKE A <em>BREATHER</em></h1>
+    <p>Score ${score} • Lap ${lap}/${totalLaps} • Level ${level}</p>
+    <button class="big-btn" id="resumeBtn">▶ RESUME</button>
+    <button class="big-btn secondary" id="restartBtn2">RESTART RACE</button>
+    <div class="hint">Tip: hold ◀ ▶ or drag for precise steering</div>`;
+  card.querySelector('#resumeBtn').onclick=()=>{ overlay.style.display='none'; state='playing'; };
+  card.querySelector('#restartBtn2').onclick=()=>{ overlay.style.display='none'; startGame(); };
+}
+function showHow(){
+  overlay.style.display='flex';
+  card.innerHTML=`
+    <div class="badge">⛵ HOW TO PLAY</div>
+    <h1>STEER & <em>COLLECT</em></h1>
+    <p style="text-align:left;line-height:1.5">
+    • <b>Drag</b> anywhere on water to steer, or hold ◀ ▶ buttons<br>
+    • <b>Tilt</b> phone left/right if enabled<br>
+    • <b>Green flags</b> = +100 & speed burst<br>
+    • <b>Rocks (gray) & buoys (red)</b> = stun 1s, -30 pts<br>
+    • <b>Wake effects</b> trail behind boats<br>
+    • Every lap = level up, faster spawn<br>
+    • First to finish 3 laps wins! Best saved.
+    </p>
+    <button class="big-btn" id="backBtn">GOT IT</button>`;
+  card.querySelector('#backBtn').onclick=showMenuStart;
+}
+function showGameOver(won){
+  overlay.style.display='flex';
+  const title = won ? `YOU <em>WON!</em> 🏆` : `WIPED <em>OUT!</em> 💥`;
+  const msg = won ? `Finished ${totalLaps} laps! Score ${score} • Flags ${flags} • Level ${level}` : `Crashed too much! Score ${score} • Best ${Math.max(best,score)}`;
+  card.innerHTML=`
+    <div class="badge">${won?'🏁 CHAMPION':'🌊 TRY AGAIN'}</div>
+    <h1>${title}</h1>
+    <p>${msg}</p>
+    <button class="big-btn" id="againBtn">${won?'RACE AGAIN':'RETRY'}</button>
+    <button class="big-btn secondary" id="menuBtn">MENU</button>
+    <div class="hint">${score>=best && score>0 ? '⭐ New best saved!' : 'Best: '+Math.max(best,score)}</div>`;
+  card.querySelector('#againBtn').onclick=()=>{ overlay.style.display='none'; startGame(); };
+  card.querySelector('#menuBtn').onclick=()=>{ state='menu'; showMenuStart(); };
+}
+
+function startGame(){
+  resetGame();
+  state='playing';
+  overlay.style.display='none';
+  lastTime=performance.now();
+}
+
+playBtn && playBtn.addEventListener('click', startGame);
+howBtn && howBtn.addEventListener('click', showHow);
+
+// Spawning
+function spawn(){
+  // 60% flag, 40% obstacle mix
+  const isFlag = Math.random()<0.55;
+  const x = 24 + Math.random()*(W-48);
+  if(isFlag){
+    collectibles.push({x, y:-30, w:28, h:36, taken:false, sway:Math.random()*Math.PI*2});
+  } else {
+    const type = Math.random()<0.5 ? 'rock' : 'buoy';
+    const w = type==='rock' ? 38+Math.random()*18 : 30;
+    const h = type==='rock' ? 32+Math.random()*12 : 34;
+    obstacles.push({x, y:-40, w, h, type, rot:(Math.random()-0.5)*0.6});
+  }
+  // occasionally spawn pair for challenge
+  if(Math.random()<0.28){
+    const x2 = Math.max(24, Math.min(W-24, x + (Math.random()<0.5?-1:1)*(70+Math.random()*50)));
+    if(Math.random()<0.5) collectibles.push({x:x2, y:-70, w:28,h:36,taken:false,sway:Math.random()*6});
+    else obstacles.push({x:x2, y:-70, w:34,h:32,type: Math.random()<0.5?'rock':'buoy', rot:0});
+  }
+}
+
+// Game loop
+let lastTime=performance.now();
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt = Math.min(32, now - lastTime);
+  lastTime=now;
+  if(state!=='playing'){
+    draw(now);
+    return;
+  }
+  // speed & level
+  speed = baseSpeed + (level-1)*0.7 + Math.min(2, distance/6000);
+  // input
+  if(holdLeft) player.targetX -= 7 * (dt/16);
+  if(holdRight) player.targetX += 7 * (dt/16);
+  if(tiltEnabled) player.targetX += tiltGamma * 0.45 * (dt/16);
+  player.targetX = Math.max(20, Math.min(W-20, player.targetX));
+  // move player smoothly
+  if(player.stunned>0){
+    player.stunned -= dt/1000;
+    if(player.stunned<=0) player.stunned=0;
+  } else {
+    const dx = player.targetX - player.x;
+    player.x += dx * 0.18 * (dt/16);
+  }
+  // rival AI
+  rival.phase += 0.02 * (dt/16);
+  // rival seeks nearest flag, avoids obstacles
+  let desiredX = rival.x + Math.sin(rival.phase)*1.2;
+  let nearest=null, nd=9999;
+  for(const f of collectibles){ if(!f.taken){ const d=Math.abs(f.y - rival.y); if(d<220 && d<nd){ nd=d; nearest=f; } } }
+  if(nearest) desiredX += (nearest.x - rival.x)*0.04;
+  // avoid obstacles ahead
+  for(const o of obstacles){
+    const dy = o.y - rival.y;
+    if(dy>-20 && dy<120 && Math.abs(o.x - rival.x)<50){
+      desiredX += (rival.x < o.x ? -1 : 1) * 1.8;
+    }
+  }
+  rival.targetX = Math.max(22, Math.min(W-22, desiredX));
+  rival.x += (rival.targetX - rival.x)*0.08 * (dt/16);
+
+  // positions
+  player.y = H - 110;
+  rival.y = H - 170 - Math.sin(now*0.002)*6;
+
+  // spawn
+  spawnTimer++;
+  if(spawnTimer >= spawnEvery){
+    spawnTimer=0;
+    spawn();
+    // increase difficulty
+    spawnEvery = Math.max(18, 42 - level*3 - Math.floor(distance/800));
+  }
+
+  // move world
+  scroll += speed * (dt/16);
+  distance += speed * (dt/16);
+  // lap & level
+  const newLap = Math.floor(distance / LAP_DIST) + 1;
+  if(newLap !== lap){
+    lap=newLap;
+    if(lap<=totalLaps){
+      level++;
+      score+=250;
+      showToast(`LAP ${lap-1} DONE! +250`);
+      if(navigator.vibrate) navigator.vibrate([40,30,40]);
+    }
+    if(lap>totalLaps){
+      // win
+      state='won';
+      updateHUD();
+      showGameOver(true);
+      return;
+    }
+  }
+  // level up by distance too
+  if(distance > level*900){
+    // already handled via lap, but extra
+  }
+
+  // move entities
+  for(const o of obstacles) o.y += speed * (dt/16);
+  for(const f of collectibles) f.y += speed * (dt/16);
+  // cull
+  obstacles = obstacles.filter(o=> o.y < H+60);
+  collectibles = collectibles.filter(f=> f.y < H+60 && !f.taken);
+
+  // collisions - flags
+  for(const f of collectibles){
+    if(f.taken) continue;
+    const dx=Math.abs(f.x - player.x), dy=Math.abs(f.y - player.y);
+    if(dx < (player.w/2 + f.w/2 -4) && dy < (player.h/2 + f.h/2 -6)){
+      f.taken=true;
+      flags++; score+=100;
+      // speed burst
+      wakes.push({x:player.x, y:player.y+18, a:1, s:6, life:1});
+      showToast('+100 FLAG!');
+      if(navigator.vibrate) navigator.vibrate(30);
+    }
+    // rival collects too (just remove, no score)
+    const rdx=Math.abs(f.x - rival.x), rdy=Math.abs(f.y - rival.y);
+    if(rdx < 22 && rdy < 24 && !f.taken){
+      f.taken=true;
+      // rival wake puff
+      wakes.push({x:rival.x, y:rival.y+16, a:.7, s:5, life:1, rival:true});
+    }
+  }
+  collectibles = collectibles.filter(f=>!f.taken);
+
+  // collisions - obstacles
+  for(const o of obstacles){
+    const dx=Math.abs(o.x - player.x), dy=Math.abs(o.y - player.y);
+    const hitW = (player.w/2 + o.w/2 -6), hitH=(player.h/2 + o.h/2 -8);
+    if(dx < hitW && dy < hitH && player.stunned<=0){
+      player.stunned=1.0;
+      score=Math.max(0, score-30);
+      triggerStun();
+      showToast('HIT! -30');
+      // knockback
+      player.targetX += (player.x < o.x ? -28 : 28);
+      // remove obstacle after hit to avoid multi-hit
+      o.y = H+100;
+    }
+    // rival hits just bounces
+    const rdx=Math.abs(o.x - rival.x), rdy=Math.abs(o.y - rival.y);
+    if(rdx < (rival.w/2 + o.w/2 -4) && rdy < (rival.h/2 + o.h/2 -6)){
+      rival.targetX += (rival.x < o.x ? -30 : 30);
+      o.y+= 8;
+    }
+  }
+
+  // wakes
+  if(Math.random()<0.9){
+    wakes.push({x:player.x + (Math.random()-0.5)*10, y:player.y+22, a:0.9, s:2+Math.random()*3, life:1, rival:false});
+    if(Math.random()<0.7) wakes.push({x:rival.x + (Math.random()-0.5)*8, y:rival.y+18, a:0.6, s:2+Math.random()*2, life:1, rival:true});
+  }
+  for(const w of wakes){ w.life-=0.03*(dt/16); w.a*=0.97; w.y+= speed*0.6*(dt/16); w.s+=0.18*(dt/16); }
+  wakes=wakes.filter(w=> w.life>0 && w.a>0.05);
+
+  if(shake>0) shake -= 0.8*(dt/16);
+
+  updateHUD();
+  draw(now);
+}
+
+function draw(now){
+  // shake
+  ctx.save();
+  if(shake>0){
+    ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+  }
+  // sea background
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'#4fc3ff');
+  grad.addColorStop(0.5,'#1a8cff');
+  grad.addColorStop(1,'#0a3a6b');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,W,H);
+
+  // wave lines
+  ctx.strokeStyle='rgba(255,255,255,.18)';
+  ctx.lineWidth=2;
+  for(let y= - (scroll%40); y<H; y+=40){
+    ctx.beginPath();
+    for(let x=0;x<W;x+=12){
+      const wy = y + Math.sin((x*0.02)+(scroll*0.02)+y*0.05)*6;
+      if(x===0) ctx.moveTo(x,wy); else ctx.lineTo(x,wy);
+    }
+    ctx.stroke();
+  }
+  // subtle foam streaks
+  ctx.fillStyle='rgba(255,255,255,.07)';
+  for(let i=0;i<3;i++){
+    const fx = (W*0.25 + i*W*0.3 + Math.sin(scroll*0.005+i)*20) % W;
+    ctx.fillRect(fx,0,2,H);
+  }
+
+  // lane markers (buoys line)
+  ctx.fillStyle='rgba(255,255,255,.9)';
+  for(let y= - (scroll%80); y<H; y+=80){
+    ctx.fillRect(6, y, 4, 18);
+    ctx.fillRect(W-10, y, 4, 18);
+  }
+
+  // wakes
+  for(const w of wakes){
+    ctx.globalAlpha = w.a * w.life;
+    ctx.fillStyle = w.rival ? 'rgba(255,255,255,.35)' : 'rgba(255,255,255,.55)';
+    ctx.beginPath();
+    ctx.ellipse(w.x, w.y, w.s*2.2, w.s*1.1, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // flags
+  for(const f of collectibles){
+    drawFlag(f.x, f.y, f.sway + now*0.004);
+  }
+  // obstacles
+  for(const o of obstacles){
+    if(o.type==='rock') drawRock(o.x,o.y,o.w,o.h,o.rot);
+    else drawBuoy(o.x,o.y,o.w,o.h);
+  }
+
+  // boats
+  drawBoat(rival.x, rival.y, false, now, false);
+  drawBoat(player.x, player.y, true, now, player.stunned>0);
+
+  // stun stars
+  if(player.stunned>0){
+    ctx.font='16px system-ui';
+    ctx.textAlign='center';
+    const t=now*0.01;
+    ctx.fillText('💫', player.x + Math.cos(t)*18, player.y - 38 + Math.sin(t*1.5)*4);
+    ctx.fillText('💫', player.x - Math.cos(t)*16, player.y - 32 + Math.cos(t*1.2)*5);
+  }
+
+  // rival label
+  ctx.fillStyle='rgba(10,42,74,.9)';
+  ctx.font='700 10px system-ui';
+  ctx.textAlign='center';
+  ctx.fillText('RIVAL', rival.x, rival.y - 36);
+  ctx.fillStyle='#ffd60a';
+  ctx.font='800 10px system-ui';
+  ctx.fillText('YOU', player.x, player.y - 38);
+
+  ctx.restore();
+}
+
+function drawFlag(x,y,sway){
+  // pole
+  ctx.fillStyle='#0a2a4a';
+  ctx.fillRect(x-1.5, y-14, 3, 28);
+  // flag triangle waving
+  ctx.fillStyle='#2ecc71';
+  ctx.strokeStyle='#0a2a4a';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  const wave = Math.sin(sway)*4;
+  ctx.moveTo(x+1.5, y-14);
+  ctx.lineTo(x+22+wave, y-8);
+  ctx.lineTo(x+1.5, y-2);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // flag inner shine
+  ctx.fillStyle='rgba(255,255,255,.35)';
+  ctx.beginPath();
+  ctx.moveTo(x+1.5, y-12);
+  ctx.lineTo(x+12+wave*0.5, y-8);
+  ctx.lineTo(x+1.5, y-6);
+  ctx.closePath(); ctx.fill();
+  // base buoy
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(x, y+14, 7, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#0a2a4a'; ctx.lineWidth=1.5; ctx.stroke();
+}
+
+function drawRock(x,y,w,h,rot){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(rot*0.3);
+  ctx.fillStyle='#6b7280';
+  ctx.strokeStyle='#0a2a4a';
+  ctx.lineWidth=2.5;
+  ctx.beginPath();
+  ctx.moveTo(-w/2+4, -h/2+6);
+  ctx.lineTo(w/2-6, -h/2+2);
+  ctx.lineTo(w/2-2, h/2-4);
+  ctx.lineTo(-w/2+6, h/2-2);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // highlight
+  ctx.fillStyle='rgba(255,255,255,.25)';
+  ctx.beginPath();
+  ctx.ellipse(-w*0.15, -h*0.15, w*0.28, h*0.22, -0.4, 0, Math.PI*2);
+  ctx.fill();
+  // shadow in water
+  ctx.fillStyle='rgba(10,42,74,.25)';
+  ctx.beginPath(); ctx.ellipse(0, h/2+6, w*0.5, 6, 0,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function drawBuoy(x,y,w,h){
+  ctx.save();
+  ctx.translate(x,y);
+  // shadow
+  ctx.fillStyle='rgba(10,42,74,.25)';
+  ctx.beginPath(); ctx.ellipse(0, h/2+8, w*0.45, 5,0,0,Math.PI*2); ctx.fill();
+  // body
+  ctx.fillStyle='#ff3b30';
+  ctx.strokeStyle='#0a2a4a';
+  ctx.lineWidth=2.5;
+  ctx.beginPath();
+  ctx.roundRect(-w/2, -h/2, w, h, 8);
+  ctx.fill(); ctx.stroke();
+  // stripes
+  ctx.fillStyle='#fff';
+  ctx.fillRect(-w/2+4, -h/2+8, w-8, 6);
+  ctx.fillRect(-w/2+4, h/2-14, w-8, 6);
+  // top light
+  ctx.fillStyle='#ffd60a';
+  ctx.beginPath(); ctx.arc(0, -h/2-4, 6,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#0a2a4a'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.restore();
+}
+function drawBoat(x,y,isPlayer,now,stunned){
+  ctx.save();
+  ctx.translate(x,y);
+  if(stunned){
+    ctx.rotate(Math.sin(now*0.02)*0.35);
+  } else {
+    ctx.rotate(Math.sin(now*0.003 + (isPlayer?0:1))*0.06);
+  }
+  // hull shadow
+  ctx.fillStyle='rgba(0,0,0,.18)';
+  ctx.beginPath(); ctx.ellipse(0, 18, 22, 7, 0,0,Math.PI*2); ctx.fill();
+  // hull
+  ctx.fillStyle= isPlayer ? '#ffffff' : '#ffe9e9';
+  ctx.strokeStyle='#0a2a4a';
+  ctx.lineWidth=2.5;
+  ctx.beginPath();
+  ctx.moveTo(-18, 6);
+  ctx.quadraticCurveTo(-14, 18, 0, 18);
+  ctx.quadraticCurveTo(14, 18, 18, 6);
+  ctx.lineTo(14, 10);
+  ctx.lineTo(-14, 10);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // hull stripe
+  ctx.fillStyle= isPlayer ? '#007aff' : '#ff3b30';
+  ctx.fillRect(-14, 10, 28, 4);
+  // mast
+  ctx.fillStyle='#0a2a4a';
+  ctx.fillRect(-1.5, -28, 3, 38);
+  // sail
+  ctx.fillStyle= isPlayer ? '#ffffff' : '#ff6b6b';
+  ctx.strokeStyle='#0a2a4a';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(2, -28);
+  ctx.lineTo(20, -6);
+  ctx.lineTo(2, 8);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // sail detail
+  ctx.fillStyle= isPlayer ? '#007aff' : '#ffd60a';
+  ctx.beginPath();
+  ctx.moveTo(2, -18);
+  ctx.lineTo(14, -6);
+  ctx.lineTo(2, 0);
+  ctx.closePath(); ctx.fill();
+  // front sail small
+  ctx.fillStyle='#fff';
+  ctx.beginPath();
+  ctx.moveTo(-2, -22);
+  ctx.lineTo(-16, -4);
+  ctx.lineTo(-2, 6);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // person
+  ctx.fillStyle='#ffcc99';
+  ctx.beginPath(); ctx.arc(0, 4, 4.5,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#0a2a4a'; ctx.lineWidth=1.2; ctx.stroke();
+  ctx.fillStyle='#0a2a4a';
+  ctx.beginPath(); ctx.arc(0, 4.5, 1,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+// init draw
+draw(performance.now());
+requestAnimationFrame(loop);
+
+// prevent scroll
+document.addEventListener('touchmove', e=>{
+  if(e.target.closest('.canvas-wrap')) e.preventDefault();
+}, {passive:false});
+
+})();
+</script>
+</body>
+</html>

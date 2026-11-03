@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Rescue Beam</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --sea1:#061a2e;
+  --sea2:#0a2a4a;
+  --sea3:#0f3a5a;
+  --glow:#ffb84d;
+  --glow2:#ffd166;
+  --glow3:#ff8c1a;
+  --teal:#4ecdc4;
+  --danger:#ff4d6d;
+  --rock:#1a2a3a;
+}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  background:radial-gradient(ellipse 800px 600px at 50% 0%,#0f3a5a 0%,#061a2e 50%,#020a14 100%);
+  color:#fff;
+  display:flex;justify-content:center;
+  min-height:100vh;min-height:100dvh;
+}
+.app{
+  width:100%;max-width:428px;min-width:360px;
+  min-height:100vh;min-height:100dvh;
+  display:flex;flex-direction:column;
+  position:relative;overflow:hidden;
+  background:
+    radial-gradient(ellipse 600px 400px at 50% -10%,rgba(255,184,77,0.08),transparent 60%),
+    radial-gradient(ellipse 500px 300px at 80% 20%,rgba(78,205,196,0.06),transparent 60%),
+    linear-gradient(180deg,#061a2e 0%,#0a2a4a 100%);
+  border-left:1px solid rgba(255,255,255,0.06);
+  border-right:1px solid rgba(255,255,255,0.06);
+}
+.header{
+  position:relative;z-index:2;
+  padding:10px 14px 8px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.4),transparent);
+  border-bottom:1px solid rgba(255,184,77,0.12);
+}
+.top-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.logo{font-size:11px;letter-spacing:0.14em;text-transform:uppercase;opacity:0.9;font-weight:800;color:var(--glow2)}
+.chips{display:flex;gap:6px}
+.chip{
+  font-size:10px;font-weight:800;letter-spacing:0.05em;
+  background:rgba(0,0,0,0.35);border:1px solid rgba(255,184,77,0.25);
+  padding:5px 8px;border-radius:999px;color:var(--glow2);
+}
+.title-row{display:flex;justify-content:space-between;align-items:end;margin-top:6px}
+h1{font-size:19px;font-weight:900;letter-spacing:-0.02em;line-height:1}
+h1 span{color:var(--glow)}
+.subtitle{font-size:11px;opacity:0.7;margin-top:2px}
+.hearts{
+  display:flex;gap:3px;align-items:center;
+  background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.12);
+  padding:6px 10px;border-radius:999px;
+}
+.heart{font-size:15px;transition:all 0.3s}
+.heart.lost{opacity:0.25;filter:grayscale(1);transform:scale(0.85)}
+.stats{
+  position:relative;z-index:2;
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:8px;padding:8px 12px 0;
+}
+.stat{
+  background:rgba(0,0,0,0.32);backdrop-filter:blur(6px);
+  border:1px solid rgba(255,255,255,0.08);border-radius:12px;
+  padding:7px 6px;text-align:center;
+}
+.stat-label{font-size:9px;letter-spacing:0.1em;text-transform:uppercase;opacity:0.65;font-weight:800}
+.stat-value{font-size:14px;font-weight:900;margin-top:1px;font-variant-numeric:tabular-nums}
+.stat-sub{font-size:10px;opacity:0.6}
+.combo-bar{
+  position:relative;z-index:2;
+  margin:8px 12px 0;
+  background:rgba(0,0,0,0.32);border:1px solid rgba(255,184,77,0.15);
+  border-radius:12px;padding:8px 10px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.combo-info{font-size:12px;font-weight:800}
+.combo-info span{color:var(--glow2)}
+.combo-mult{
+  background:linear-gradient(180deg,var(--glow2),var(--glow));
+  color:#1a0f00;
+  padding:5px 10px;border-radius:999px;
+  font-size:12px;font-weight:900;
+  box-shadow:0 2px 8px rgba(255,184,77,0.4);
+}
+.canvas-wrap{
+  position:relative;z-index:2;
+  margin:8px 12px 0;
+  background:linear-gradient(180deg,#0a2a4a 0%,#061a2e 100%);
+  border:1px solid rgba(255,255,255,0.1);border-radius:14px;
+  overflow:hidden;
+  box-shadow:0 8px 24px rgba(0,0,0,0.4);
+  touch-action:none;
+}
+canvas{
+  display:block;width:100%;height:auto;
+  touch-action:none;
+}
+.beam-controls{
+  position:relative;z-index:2;
+  padding:8px 12px 0;
+}
+.slider-wrap{
+  background:rgba(0,0,0,0.32);border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px;padding:10px 12px;
+}
+.slider-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:800;margin-bottom:6px}
+.slider-head span:last-child{color:var(--glow2)}
+input[type=range]{
+  width:100%;height:36px;-webkit-appearance:none;appearance:none;
+  background:transparent;cursor:pointer;
+}
+input[type=range]::-webkit-slider-runnable-track{
+  height:8px;background:rgba(255,255,255,0.15);border-radius:999px;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:28px;height:28px;
+  background:linear-gradient(180deg,var(--glow2),var(--glow));
+  border:2px solid #fff;border-radius:50%;
+  margin-top:-10px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.4);
+}
+input[type=range]::-moz-range-track{height:8px;background:rgba(255,255,255,0.15);border-radius:999px}
+input[type=range]::-moz-range-thumb{
+  width:28px;height:28px;background:linear-gradient(180deg,var(--glow2),var(--glow));
+  border:2px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.4)
+}
+.hint{
+  text-align:center;font-size:11px;opacity:0.7;margin-top:6px;font-weight:600;
+}
+.controls{
+  position:relative;z-index:2;
+  padding:10px 12px 12px;
+  display:flex;gap:8px;
+}
+.btn{
+  flex:1;min-height:48px;border-radius:12px;border:none;
+  font-size:13px;font-weight:800;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:transform 0.08s,opacity 0.2s;
+  box-shadow:0 4px 12px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.btn:active{transform:scale(0.97)}
+.btn-primary{background:linear-gradient(180deg,var(--glow2),var(--glow));color:#1a0f00}
+.btn-secondary{background:rgba(0,0,0,0.32);color:#fff;border:1px solid rgba(255,255,255,0.14)}
+.toast{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  background:rgba(0,0,0,0.82);border:1px solid rgba(255,184,77,0.25);
+  padding:8px 14px;border-radius:999px;font-size:12px;font-weight:800;
+  z-index:5;pointer-events:none;opacity:0;transition:opacity 0.2s;
+  white-space:nowrap;
+}
+.toast.show{opacity:1}
+.overlay{
+  position:absolute;inset:0;background:rgba(2,10,20,0.82);backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;padding:16px;z-index:10;
+}
+.card{
+  width:100%;max-width:360px;
+  background:linear-gradient(180deg,#0f2a4a 0%,#061a2e 100%);
+  border:1px solid rgba(255,184,77,0.2);border-radius:18px;
+  padding:16px;text-align:center;
+  box-shadow:0 16px 40px rgba(0,0,0,0.6);
+}
+.card h2{font-size:18px;font-weight:900;margin-bottom:6px}
+.card p{font-size:12px;line-height:1.5;opacity:0.85;margin-bottom:10px}
+.badge{display:inline-block;background:rgba(255,184,77,0.15);border:1px solid rgba(255,184,77,0.3);border-radius:999px;padding:4px 10px;font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;color:var(--glow2)}
+.big{font-size:26px;font-weight:900;margin:6px 0;color:var(--glow2)}
+.btn-full{width:100%;min-height:48px;border:none;border-radius:12px;background:linear-gradient(180deg,var(--glow2),var(--glow));color:#1a0f00;font-size:15px;font-weight:900;cursor:pointer;margin-top:8px}
+.btn-ghost{width:100%;min-height:42px;margin-top:8px;border:1px solid rgba(255,255,255,0.14);background:transparent;color:#fff;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="header">
+    <div class="top-row">
+      <div class="logo">🏮 Night Sea • Rescue Beam</div>
+      <div class="chips">
+        <div class="chip" id="bestScoreChip">Best: —</div>
+        <div class="chip" id="bestLevelChip">Lv Best: —</div>
+      </div>
+    </div>
+    <div class="title-row">
+      <div>
+        <h1>RESCUE <span>BEAM</span></h1>
+        <div class="subtitle">Drag to aim • Hold to guide ships past rocks</div>
+      </div>
+      <div class="hearts" id="heartsEl">
+        <span class="heart" id="h1">❤️</span><span class="heart" id="h2">❤️</span><span class="heart" id="h3">❤️</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Level</div><div class="stat-value" id="levelEl">1</div><div class="stat-sub" id="levelSub">0/5 rescued</div></div>
+    <div class="stat"><div class="stat-label">Score</div><div class="stat-value" id="scoreEl">0</div><div class="stat-sub" id="scoreSub">+0 combo</div></div>
+    <div class="stat"><div class="stat-label">Rescued</div><div class="stat-value" id="rescuedEl">0</div><div class="stat-sub">ships</div></div>
+  </div>
+
+  <div class="combo-bar">
+    <div class="combo-info">Combo: <span id="comboEl">x1</span> • <span id="comboTxt">0 chain</span></div>
+    <div class="combo-mult" id="comboMult">x1.0</div>
+  </div>
+
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="gameCanvas" width="360" height="480"></canvas>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <div class="beam-controls">
+    <div class="slider-wrap">
+      <div class="slider-head"><span>◀ Drag or slide to aim beam ▶</span><span id="angleEl">0°</span></div>
+      <input type="range" id="beamSlider" min="-60" max="60" value="0" step="1">
+      <div class="hint">Hold beam on ships to guide them to the harbor • Avoid rocks 🪨</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-secondary" id="pauseBtn">⏸️ Pause</button>
+    <button class="btn btn-secondary" id="resetBtn">🔄 Reset</button>
+    <button class="btn btn-primary" id="boostBtn">⚡ Boost</button>
+  </div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="card">
+      <div class="badge">Night-Sea • Glowing Beam Cone</div>
+      <h2>Rescue Beam</h2>
+      <p>Rotate the <b>lantern beam</b> onto approaching ships and <b>hold it</b> to guide them past rocks into the harbor. Chain rescues for combos — <b>3 lives</b>, level up every 5 rescues.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:10px 0">
+        <div style="background:rgba(255,184,77,0.12);border:1px solid rgba(255,184,77,0.25);border-radius:10px;padding:8px"><div style="font-size:14px">🏮</div><div style="font-size:9px;font-weight:800;opacity:0.7;margin-top:2px">DRAG TO AIM</div></div>
+        <div style="background:rgba(78,205,196,0.12);border:1px solid rgba(78,205,196,0.25);border-radius:10px;padding:8px"><div style="font-size:14px">🚢</div><div style="font-size:9px;font-weight:800;opacity:0.7;margin-top:2px">HOLD TO GUIDE</div></div>
+        <div style="background:rgba(255,77,109,0.12);border:1px solid rgba(255,77,109,0.25);border-radius:10px;padding:8px"><div style="font-size:14px">🪨</div><div style="font-size:9px;font-weight:800;opacity:0.7;margin-top:2px">AVOID ROCKS</div></div>
+      </div>
+      <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:8px 10px;text-align:left;font-size:11px;line-height:1.4;margin-bottom:10px">
+        <b>How:</b> Drag anywhere on the sea or use the slider to rotate the amber beam. Ships inside the glowing cone are guided toward the harbor (center bottom). Keep the beam on them until they dock. Crash or miss = -1 life. Combo grows with consecutive rescues.
+      </div>
+      <button class="btn-full" id="startBtn">START RESCUE 🏮</button>
+      <button class="btn-ghost" id="howBtn">📖 Tips</button>
+      <p style="font-size:10px;opacity:0.5;margin-top:8px">Large drag area • No horizontal scroll • Best score & level saved</p>
+    </div>
+  </div>
+
+  <div class="overlay" id="howOverlay" style="display:none">
+    <div class="card">
+      <h2>Tips</h2>
+      <p style="text-align:left">
+        • <b>Beam:</b> 30° cone from lantern (bottom center). Drag left/right to rotate -60° to +60°.<br>
+        • <b>Guide:</b> Ships in beam slowly steer toward beam center and avoid rocks. Hold until harbor.<br>
+        • <b>Harbor:</b> Glowing zone at bottom center (80px wide). Only rescues there count.<br>
+        • <b>Rocks:</b> Dark obstacles — guided ships will try to steer around, but direct hits still crash.<br>
+        • <b>Combo:</b> Each rescue +1 combo, score = 100 × combo. Miss/crash resets combo.<br>
+        • <b>Levels:</b> Every 5 rescues = level up, faster ships + more rocks.<br>
+        • <b>Boost:</b> Tap ⚡ for brief wider beam (5s cooldown).
+      </p>
+      <button class="btn-full" id="closeHowBtn">Got it</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="levelOverlay" style="display:none">
+    <div class="card" id="levelCard"></div>
+  </div>
+
+  <div class="overlay" id="gameOverOverlay" style="display:none">
+    <div class="card" id="gameOverCard"></div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const $ = s => document.querySelector(s);
+
+let W=360, H=480;
+let beamAngle=0; // degrees, 0=up, negative left, positive right
+let beamHalf=15; // degrees half-width
+let beamLen=500;
+let lantern={x:W/2, y:H-28};
+
+let ships=[];
+let rocks=[];
+let particles=[];
+
+let level=1, score=0, rescued=0, rescuedInLevel=0;
+let combo=0, maxCombo=0;
+let lives=3;
+let playing=false, paused=false;
+let spawnTimer=0, spawnInterval=1800;
+let bestScore=0, bestLevel=0;
+let boostActive=false, boostTimer=0, boostCooldown=0;
+
+let lastTime=0;
+let animationId=null;
+
+function loadBest(){
+  try{
+    bestScore=parseInt(localStorage.getItem('rescueBeam_bestScore')||'0',10)||0;
+    bestLevel=parseInt(localStorage.getItem('rescueBeam_bestLevel')||'0',10)||0;
+  }catch(e){}
+  updateBestUI();
+}
+function saveBest(){
+  try{
+    if(score>bestScore){ bestScore=score; localStorage.setItem('rescueBeam_bestScore', String(bestScore)); }
+    if(level>bestLevel){ bestLevel=level; localStorage.setItem('rescueBeam_bestLevel', String(bestLevel)); }
+  }catch(e){}
+  updateBestUI();
+}
+function updateBestUI(){
+  $('#bestScoreChip').textContent = bestScore ? `Best: ${bestScore}` : 'Best: —';
+  $('#bestLevelChip').textContent = bestLevel ? `Lv Best: ${bestLevel}` : 'Lv Best: —';
+}
+function showToast(msg, ms=1200){
+  const t=$('#toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), ms);
+}
+function updateUI(){
+  $('#levelEl').textContent=level;
+  $('#levelSub').textContent=`${rescuedInLevel}/5 to next`;
+  $('#scoreEl').textContent=score;
+  $('#scoreSub').textContent= combo>0 ? `+${100*combo} next` : 'chain rescues';
+  $('#rescuedEl').textContent=rescued;
+  $('#comboEl').textContent=`x${combo>0?combo:1}`;
+  $('#comboTxt').textContent= combo>0 ? `${combo} chain` : 'no chain';
+  $('#comboMult').textContent=`x${(1+combo*0.5).toFixed(1)}`;
+  $('#angleEl').textContent=`${beamAngle>0?'+':''}${beamAngle}°`;
+  $('#beamSlider').value=beamAngle;
+  for(let i=1;i<=3;i++){
+    const h=$('#h'+i);
+    if(i<=lives){ h.classList.remove('lost'); h.textContent='❤️'; }
+    else { h.classList.add('lost'); h.textContent='🖤'; }
+  }
+}
+function rand(min,max){ return Math.random()*(max-min)+min; }
+function randInt(min,max){ return Math.floor(rand(min,max+1)); }
+
+function generateRocks(){
+  rocks=[];
+  const count = 3 + Math.min(5, level+1);
+  for(let i=0;i<count;i++){
+    let x,y,ok;
+    let attempts=0;
+    do{
+      x=rand(30,W-30);
+      y=rand(80,H-120);
+      ok=true;
+      // avoid harbor area
+      if(y>H-80 && Math.abs(x-W/2)<60) ok=false;
+      // avoid too close to lantern
+      if(Math.hypot(x-lantern.x, y-lantern.y)<50) ok=false;
+      // avoid overlapping other rocks
+      for(let r of rocks){
+        if(Math.hypot(x-r.x, y-r.y)<45) ok=false;
+      }
+      attempts++;
+    }while(!ok && attempts<30);
+    rocks.push({x,y,r: rand(14,22), rot: rand(0,Math.PI)});
+  }
+}
+function spawnShip(){
+  const x = rand(20,W-20);
+  const speed = rand(0.6,1.0) + level*0.12;
+  ships.push({
+    x, y:-20,
+    vx: rand(-0.2,0.2),
+    vy: speed,
+    r:12,
+    guided:false,
+    wobble: rand(0,Math.PI*2),
+    color: Math.random()<0.5 ? '#4ecdc4' : '#ffd166'
+  });
+}
+function isInBeam(ship){
+  const dx = ship.x - lantern.x;
+  const dy = lantern.y - ship.y; // positive up
+  if(dy<=0) return false; // behind lantern
+  const dist = Math.hypot(dx,dy);
+  if(dist>beamLen) return false;
+  const angleToShip = Math.atan2(dx, dy) * 180/Math.PI; // 0=up
+  const diff = Math.abs(angleToShip - beamAngle);
+  const half = boostActive ? beamHalf+10 : beamHalf;
+  return diff < half;
+}
+function updateShips(dt){
+  for(let i=ships.length-1;i>=0;i--){
+    const s=ships[i];
+    const inBeam = isInBeam(s);
+    s.guided = inBeam;
+
+    if(inBeam){
+      // guide toward beam center line
+      const beamCenterX = lantern.x + Math.tan(beamAngle*Math.PI/180) * (lantern.y - s.y);
+      // steer toward center
+      const steer = (beamCenterX - s.x) * 0.015;
+      s.vx += steer;
+      s.vx *= 0.96; // damping
+      // slight speed boost when guided
+      s.vy += 0.002;
+      // avoid rocks: if near rock, steer away
+      for(let r of rocks){
+        const dx=s.x-r.x, dy=s.y-r.y;
+        const d=Math.hypot(dx,dy);
+        if(d < r.r + 40){
+          const push = (r.r+40 - d) * 0.02;
+          const ang=Math.atan2(dy,dx);
+          s.vx += Math.cos(ang)*push;
+          s.vy += Math.sin(ang)*push*0.3;
+        }
+      }
+    } else {
+      // drift slightly
+      s.vx += rand(-0.02,0.02);
+      s.vx *= 0.98;
+    }
+    s.vx = Math.max(-1.5, Math.min(1.5, s.vx));
+    s.x += s.vx * (dt/16);
+    s.y += s.vy * (dt/16);
+    s.wobble += 0.05;
+
+    // check rock collision
+    let crashed=false;
+    for(let r of rocks){
+      if(Math.hypot(s.x-r.x, s.y-r.y) < s.r + r.r -2){
+        crashed=true; break;
+      }
+    }
+    if(crashed){
+      // crash
+      createParticles(s.x,s.y,'#ff4d6d',12);
+      ships.splice(i,1);
+      lives--;
+      combo=0;
+      showToast('Ship crashed on rocks! 🪨 -1 life', 1200);
+      if(navigator.vibrate) navigator.vibrate([40,60,40]);
+      updateUI();
+      if(lives<=0) gameOver();
+      continue;
+    }
+
+    // check harbor or miss
+    if(s.y >= H-36){
+      const harborLeft=W/2-40, harborRight=W/2+40;
+      if(s.x >= harborLeft && s.x <= harborRight){
+        // rescued
+        createParticles(s.x, H-36, '#4ecdc4', 10);
+        ships.splice(i,1);
+        rescued++;
+        rescuedInLevel++;
+        combo++;
+        maxCombo=Math.max(maxCombo,combo);
+        const pts = 100 * combo;
+        score+=pts;
+        showToast(`Rescued! +${pts} • Combo x${combo}`, 1000);
+        if(navigator.vibrate) navigator.vibrate(20);
+        if(rescuedInLevel>=5){
+          levelUp();
+        }
+        updateUI();
+        saveBest();
+      } else {
+        // missed - went ashore outside harbor
+        createParticles(s.x,s.y,'#ff8a5b',8);
+        ships.splice(i,1);
+        lives--;
+        combo=0;
+        showToast('Ship lost at sea! -1 life', 1200);
+        if(navigator.vibrate) navigator.vibrate([30,50,30]);
+        updateUI();
+        if(lives<=0) gameOver();
+      }
+    }
+
+    // remove if out of bounds sideways
+    if(s.x < -20 || s.x > W+20){
+      ships.splice(i,1);
+    }
+  }
+}
+function createParticles(x,y,color,count){
+  for(let i=0;i<count;i++){
+    particles.push({
+      x,y,
+      vx: rand(-2,2), vy: rand(-3,-0.5),
+      life:1, decay: rand(0.02,0.04),
+      r: rand(2,5), color
+    });
+  }
+}
+function updateParticles(dt){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.08; p.life-=p.decay;
+    if(p.life<=0) particles.splice(i,1);
+  }
+}
+function levelUp(){
+  level++;
+  rescuedInLevel=0;
+  spawnInterval = Math.max(900, 1800 - level*120);
+  generateRocks();
+  saveBest();
+  // show level overlay briefly
+  $('#levelCard').innerHTML=`
+    <div class="badge">Level Up</div>
+    <h2>Level ${level} • Night Deepens</h2>
+    <p>Faster ships, more rocks. Keep the beam steady!</p>
+    <div class="big">Level ${level}</div>
+    <button class="btn-full" id="continueBtn">Continue Rescue</button>
+  `;
+  $('#levelOverlay').style.display='flex';
+  $('#continueBtn').onclick=()=>{
+    $('#levelOverlay').style.display='none';
+    if(playing && !paused) lastTime=performance.now();
+  };
+  showToast(`Level ${level}! Faster ships`, 1400);
+  updateUI();
+}
+function gameOver(){
+  playing=false;
+  cancelAnimationFrame(animationId);
+  saveBest();
+  const isBest = score===bestScore && score>0;
+  $('#gameOverCard').innerHTML=`
+    <div class="badge" style="background:rgba(255,77,109,0.15);border-color:rgba(255,77,109,0.3);color:#ff8a9a">Out of Lives</div>
+    <h2>Rescue Ended</h2>
+    <p>Level <b>${level}</b> • Rescued <b>${rescued}</b> ships • Max combo <b>x${maxCombo}</b></p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0">
+      <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px"><div style="font-size:10px;opacity:0.6;font-weight:800">SCORE</div><div style="font-size:18px;font-weight:900;color:var(--glow2)">${score}</div></div>
+      <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px"><div style="font-size:10px;opacity:0.6;font-weight:800">BEST</div><div style="font-size:18px;font-weight:900">${bestScore}</div></div>
+    </div>
+    <div style="font-size:11px;opacity:0.7;margin-bottom:8px">${isBest?'🎉 New best score!':`Best level: ${bestLevel}`}</div>
+    <button class="btn-full" id="retryBtn">Try Again 🏮</button>
+    <button class="btn-ghost" id="closeOverBtn">Close</button>
+  `;
+  $('#gameOverOverlay').style.display='flex';
+  $('#retryBtn').onclick=()=>{ $('#gameOverOverlay').style.display='none'; resetGame(); startGame(); };
+  $('#closeOverBtn').onclick=()=>{ $('#gameOverOverlay').style.display='none'; resetGame(); };
+}
+
+function draw(){
+  // clear
+  ctx.clearRect(0,0,W,H);
+  // sea gradient
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'#0a2a4a');
+  grad.addColorStop(0.5,'#0f3a5a');
+  grad.addColorStop(1,'#061a2e');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,W,H);
+  // stars
+  ctx.fillStyle='rgba(255,255,255,0.6)';
+  for(let i=0;i<20;i++){
+    const x=(i*47)%W, y=(i*31)%80;
+    ctx.beginPath(); ctx.arc(x,y, Math.random()<0.3?1.2:0.7,0,Math.PI*2); ctx.fill();
+  }
+  // moon
+  ctx.fillStyle='rgba(255,240,180,0.9)';
+  ctx.beginPath(); ctx.arc(W-40,30,14,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,240,180,0.15)';
+  ctx.beginPath(); ctx.arc(W-40,30,22,0,Math.PI*2); ctx.fill();
+  // waves
+  ctx.strokeStyle='rgba(255,255,255,0.06)';
+  ctx.lineWidth=1;
+  for(let y=100;y<H-40;y+=28){
+    ctx.beginPath();
+    for(let x=0;x<W;x+=10){
+      const wy = y + Math.sin(x*0.02 + Date.now()*0.001 + y*0.01)*3;
+      if(x===0) ctx.moveTo(x,wy); else ctx.lineTo(x,wy);
+    }
+    ctx.stroke();
+  }
+  // rocks
+  rocks.forEach(r=>{
+    ctx.save();
+    ctx.translate(r.x,r.y);
+    ctx.rotate(r.rot);
+    ctx.fillStyle='#0f1e2e';
+    ctx.strokeStyle='rgba(255,255,255,0.08)';
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.moveTo(-r.r, -r.r*0.6);
+    ctx.lineTo(-r.r*0.4, -r.r);
+    ctx.lineTo(r.r*0.7, -r.r*0.5);
+    ctx.lineTo(r.r, r.r*0.4);
+    ctx.lineTo(r.r*0.3, r.r);
+    ctx.lineTo(-r.r*0.6, r.r*0.7);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // highlight
+    ctx.fillStyle='rgba(255,255,255,0.08)';
+    ctx.beginPath(); ctx.ellipse(-r.r*0.2,-r.r*0.3, r.r*0.4, r.r*0.25,0,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
+  // harbor
+  const harborY=H-36;
+  ctx.fillStyle='rgba(78,205,196,0.15)';
+  ctx.fillRect(W/2-40, harborY, 80, 36);
+  ctx.strokeStyle='rgba(78,205,196,0.5)';
+  ctx.lineWidth=2;
+  ctx.strokeRect(W/2-40, harborY, 80, 36);
+  ctx.fillStyle='rgba(78,205,196,0.9)';
+  ctx.font='10px system-ui';
+  ctx.textAlign='center';
+  ctx.fillText('HARBOR', W/2, harborY+20);
+  ctx.fillText('▲', W/2, harborY+10);
+  // beam cone
+  ctx.save();
+  ctx.translate(lantern.x, lantern.y);
+  ctx.rotate(beamAngle*Math.PI/180);
+  const halfRad = (boostActive? beamHalf+10 : beamHalf) * Math.PI/180;
+  // outer glow
+  ctx.fillStyle= boostActive ? 'rgba(255,184,77,0.18)' : 'rgba(255,184,77,0.12)';
+  ctx.beginPath();
+  ctx.moveTo(0,0);
+  ctx.lineTo(Math.sin(-halfRad)*beamLen, -Math.cos(-halfRad)*beamLen);
+  ctx.lineTo(Math.sin(halfRad)*beamLen, -Math.cos(halfRad)*beamLen);
+  ctx.closePath();
+  ctx.fill();
+  // inner beam
+  const gradBeam=ctx.createRadialGradient(0,0,0, 0,-beamLen/2, beamLen);
+  gradBeam.addColorStop(0,'rgba(255,209,102,0.35)');
+  gradBeam.addColorStop(0.4,'rgba(255,184,77,0.18)');
+  gradBeam.addColorStop(1,'rgba(255,184,77,0)');
+  ctx.fillStyle=gradBeam;
+  ctx.beginPath();
+  ctx.moveTo(0,0);
+  ctx.lineTo(Math.sin(-halfRad*0.7)*beamLen, -Math.cos(-halfRad*0.7)*beamLen);
+  ctx.lineTo(Math.sin(halfRad*0.7)*beamLen, -Math.cos(halfRad*0.7)*beamLen);
+  ctx.closePath();
+  ctx.fill();
+  // beam edge lines
+  ctx.strokeStyle= boostActive ? 'rgba(255,209,102,0.5)' : 'rgba(255,209,102,0.25)';
+  ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.moveTo(0,0);
+  ctx.lineTo(Math.sin(-halfRad)*beamLen, -Math.cos(-halfRad)*beamLen);
+  ctx.moveTo(0,0);
+  ctx.lineTo(Math.sin(halfRad)*beamLen, -Math.cos(halfRad)*beamLen);
+  ctx.stroke();
+  ctx.restore();
+  // lantern
+  ctx.save();
+  ctx.translate(lantern.x, lantern.y);
+  // glow
+  const g=ctx.createRadialGradient(0,0,0, 0,0,28);
+  g.addColorStop(0,'rgba(255,184,77,0.9)');
+  g.addColorStop(0.4,'rgba(255,140,26,0.4)');
+  g.addColorStop(1,'rgba(255,140,26,0)');
+  ctx.fillStyle=g;
+  ctx.beginPath(); ctx.arc(0,0,28,0,Math.PI*2); ctx.fill();
+  // lantern body
+  ctx.fillStyle='#1a0f00';
+  ctx.fillRect(-10, -8, 20, 16);
+  ctx.fillStyle= boostActive ? '#ffd166' : '#ffb84d';
+  ctx.fillRect(-8, -6, 16, 12);
+  ctx.fillStyle='rgba(255,255,255,0.4)';
+  ctx.fillRect(-8, -6, 16, 3);
+  // light
+  ctx.fillStyle='#fff8cc';
+  ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  // ships
+  ships.forEach(s=>{
+    ctx.save();
+    ctx.translate(s.x,s.y);
+    // guided glow
+    if(s.guided){
+      ctx.fillStyle='rgba(78,205,196,0.25)';
+      ctx.beginPath(); ctx.arc(0,0,18,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='rgba(78,205,196,0.6)';
+      ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(0,0,14,0,Math.PI*2); ctx.stroke();
+    }
+    // ship body
+    ctx.rotate(Math.sin(s.wobble)*0.08);
+    ctx.fillStyle=s.guided ? '#4ecdc4' : '#8aa0b8';
+    ctx.strokeStyle='rgba(0,0,0,0.3)';
+    ctx.lineWidth=1;
+    // hull
+    ctx.beginPath();
+    ctx.moveTo(-10,4);
+    ctx.lineTo(10,4);
+    ctx.lineTo(7,-4);
+    ctx.lineTo(-7,-4);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // sail
+    ctx.fillStyle=s.guided ? '#ffd166' : '#e0e8f0';
+    ctx.beginPath();
+    ctx.moveTo(0,-4);
+    ctx.lineTo(-6,-14);
+    ctx.lineTo(6,-14);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // icon
+    ctx.fillStyle='#0a1a2e';
+    ctx.font='8px system-ui';
+    ctx.textAlign='center';
+    ctx.fillText('🚢',0,2);
+    ctx.restore();
+  });
+  // particles
+  particles.forEach(p=>{
+    ctx.globalAlpha=p.life;
+    ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+}
+
+function loop(now){
+  if(!playing || paused) return;
+  const dt = Math.min(32, now - lastTime);
+  lastTime=now;
+
+  // spawn
+  spawnTimer+=dt;
+  if(spawnTimer>spawnInterval){
+    spawnTimer=0;
+    spawnShip();
+    // occasionally spawn double
+    if(level>2 && Math.random()<0.3) setTimeout(spawnShip, 400);
+  }
+  // boost timers
+  if(boostActive){
+    boostTimer-=dt;
+    if(boostTimer<=0){ boostActive=false; showToast('Boost ended',800); }
+  }
+  if(boostCooldown>0) boostCooldown-=dt;
+
+  updateShips(dt);
+  updateParticles(dt);
+  draw();
+  animationId=requestAnimationFrame(loop);
+}
+
+function resetGame(){
+  ships=[]; rocks=[]; particles=[];
+  level=1; score=0; rescued=0; rescuedInLevel=0; combo=0; maxCombo=0; lives=3;
+  beamAngle=0; spawnInterval=1800; spawnTimer=0;
+  boostActive=false; boostTimer=0; boostCooldown=0;
+  generateRocks();
+  updateUI();
+  draw();
+}
+function startGame(){
+  resetGame();
+  playing=true; paused=false;
+  $('#startOverlay').style.display='none';
+  $('#gameOverOverlay').style.display='none';
+  $('#levelOverlay').style.display='none';
+  $('#pauseBtn').textContent='⏸️ Pause';
+  lastTime=performance.now();
+  spawnShip();
+  draw();
+  animationId=requestAnimationFrame(loop);
+  showToast('Drag to aim beam onto ships!', 1400);
+}
+
+// input: drag to aim
+function setAngleFromX(clientX){
+  const rect=canvas.getBoundingClientRect();
+  const x = (clientX - rect.left) * (W / rect.width);
+  const dx = x - lantern.x;
+  const dy = lantern.y - 0; // approximate, use full height for sensitivity
+  // simpler: map x position to angle: left edge -60, right edge +60
+  // Use atan2 for more natural
+  const angle = Math.atan2(dx, lantern.y - 100) * 180/Math.PI;
+  beamAngle = Math.max(-60, Math.min(60, Math.round(angle)));
+  updateUI();
+  if(playing && !paused) draw();
+}
+let dragging=false;
+canvas.addEventListener('pointerdown', e=>{
+  dragging=true;
+  canvas.setPointerCapture(e.pointerId);
+  setAngleFromX(e.clientX);
+});
+canvas.addEventListener('pointermove', e=>{
+  if(!dragging) return;
+  setAngleFromX(e.clientX);
+});
+canvas.addEventListener('pointerup', e=>{
+  dragging=false;
+});
+canvas.addEventListener('pointercancel', ()=>dragging=false);
+
+$('#beamSlider').addEventListener('input', e=>{
+  beamAngle=parseInt(e.target.value,10);
+  updateUI();
+  if(playing) draw();
+});
+
+$('#startBtn').onclick=startGame;
+$('#howBtn').onclick=()=> $('#howOverlay').style.display='flex';
+$('#closeHowBtn').onclick=()=> $('#howOverlay').style.display='none';
+$('#howOverlay').onclick=e=>{ if(e.target.id==='howOverlay') e.currentTarget.style.display='none'; };
+
+$('#pauseBtn').onclick=()=>{
+  if(!playing) return;
+  if(paused){
+    paused=false;
+    $('#pauseBtn').textContent='⏸️ Pause';
+    lastTime=performance.now();
+    animationId=requestAnimationFrame(loop);
+    showToast('Resumed');
+  } else {
+    paused=true;
+    $('#pauseBtn').textContent='▶️ Resume';
+    cancelAnimationFrame(animationId);
+    showToast('Paused');
+  }
+};
+$('#resetBtn').onclick=()=>{
+  if(confirm('Reset rescue? Progress lost.')){
+    cancelAnimationFrame(animationId);
+    resetGame();
+    $('#startOverlay').style.display='flex';
+  }
+};
+$('#boostBtn').onclick=()=>{
+  if(boostCooldown>0){ showToast(`Boost cooldown ${Math.ceil(boostCooldown/1000)}s`,800); return; }
+  if(!playing){ showToast('Start a run first!'); return; }
+  boostActive=true; boostTimer=5000; boostCooldown=8000;
+  showToast('⚡ Boost! Wider beam for 5s', 1200);
+  if(navigator.vibrate) navigator.vibrate(30);
+};
+
+// keyboard
+window.addEventListener('keydown', e=>{
+  if(e.key==='ArrowLeft'){ beamAngle=Math.max(-60,beamAngle-5); updateUI(); if(playing) draw(); }
+  if(e.key==='ArrowRight'){ beamAngle=Math.min(60,beamAngle+5); updateUI(); if(playing) draw(); }
+  if(e.key===' ') { e.preventDefault(); if(!playing) startGame(); }
+});
+
+loadBest();
+generateRocks();
+updateUI();
+draw();
+
+// prevent scroll
+document.addEventListener('touchmove', e=>{ if(e.target.closest('#gameCanvas')) e.preventDefault(); }, {passive:false});
+</script>
+</body>
+</html>

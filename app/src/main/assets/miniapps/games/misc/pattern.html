@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Sequence Spark</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0F1220;--card:#1A1E35;--card2:#242845;--accent:#7B61FF;--accent2:#00D1FF;--text:#FFFFFF;--muted:#9AA0C3;--red:#FF3B30;--blue:#007AFF;--yellow:#FFCC00;--green:#34C759;--radius:18px}
+html,body{height:100%;overflow-x:hidden}
+body{font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;background:var(--bg);color:var(--text);display:flex;justify-content:center;align-items:flex-start;min-height:100vh}
+.app{width:100%;max-width:428px;min-width:360px;min-height:100vh;background:linear-gradient(180deg,#0F1220 0%,#151A33 100%);display:flex;flex-direction:column;position:relative;overflow-x:hidden}
+header{padding:14px 16px 8px;display:flex;justify-content:space-between;align-items:center}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#7B61FF,#00D1FF);display:grid;place-items:center;font-weight:900;font-size:18px}
+.logo h1{font-size:16px;line-height:1;font-weight:800;letter-spacing:-0.3px}
+.logo p{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.6px;text-transform:uppercase}
+.best-badge{background:var(--card);border:1px solid #2A2F55;border-radius:999px;padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700}
+.best-badge span{color:var(--yellow)}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:10px 16px}
+.stat{background:var(--card);border:1px solid #2A2F55;border-radius:14px;padding:10px 12px;text-align:center}
+.stat-label{font-size:10px;letter-spacing:0.8px;text-transform:uppercase;color:var(--muted);font-weight:700}
+.stat-value{font-size:20px;font-weight:900;margin-top:2px}
+.stat-value.lives{letter-spacing:2px}
+.stat-value.level{color:var(--accent2)}
+.main{flex:1;padding:0 16px 16px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--card);border:1px solid #2A2F55;border-radius:var(--radius);padding:14px;position:relative;overflow:hidden}
+.prompt{font-size:13px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:10px;min-height:18px}
+.stage{height:188px;background:var(--card2);border-radius:16px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;border:1px solid #2E345E}
+.stage::before{content:"";position:absolute;inset:0;background:radial-gradient(400px 200px at 50% 0%, rgba(123,97,255,0.15), transparent 70%)}
+.flash-slot{width:118px;height:118px;border-radius:22px;background:#0F1220;border:2px solid #2E345E;display:grid;place-items:center;position:relative;z-index:1;transition:transform 0.15s, box-shadow 0.15s, border-color 0.15s, background 0.15s}
+.flash-slot.active{transform:scale(1.08);box-shadow:0 0 30px rgba(255,255,255,0.25);border-color:rgba(255,255,255,0.6)}
+.flash-slot.idle{opacity:0.9}
+.shape{width:64px;height:64px;display:grid;place-items:center;transition:transform 0.15s}
+.shape.circle{width:62px;height:62px;border-radius:50%}
+.shape.square{width:58px;height:58px;border-radius:12px}
+.shape.triangle{width:66px;height:58px;clip-path:polygon(50% 0%, 0% 100%, 100% 100%);border-radius:0}
+.shape.diamond{width:56px;height:56px;transform:rotate(45deg);border-radius:10px}
+.shape-inner{font-size:28px;line-height:1;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.3))}
+.diamond .shape-inner{transform:rotate(-45deg)}
+.stage-hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(15,18,32,0.9);border:1px solid #2E345E;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:700;color:var(--muted);z-index:2;white-space:nowrap}
+.dots{display:flex;gap:6px;justify-content:center;margin-top:10px}
+.dot{width:10px;height:10px;border-radius:50%;background:#2E345E;border:1px solid #3A4170;transition:all 0.2s}
+.dot.seen{background:var(--accent);border-color:var(--accent);box-shadow:0 0 8px rgba(123,97,255,0.6)}
+.dot.current{transform:scale(1.3);background:var(--accent2);border-color:var(--accent2)}
+.timer-wrap{height:10px;background:#0F1220;border-radius:999px;overflow:hidden;border:1px solid #2E345E;margin-top:12px;position:relative}
+.timer-bar{height:100%;width:100%;background:linear-gradient(90deg,#00D1FF,#7B61FF);border-radius:999px;transform-origin:left;transition:width 0.1s linear}
+.timer-bar.warn{background:linear-gradient(90deg,#FF3B30,#FF9500)}
+.timer-label{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--muted);margin-top:6px;letter-spacing:0.4px}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.choice-btn{height:92px;background:var(--card);border:2px solid #2A2F55;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-tap-highlight-color:transparent;transition:transform 0.08s, border-color 0.15s, background 0.15s;position:relative;overflow:hidden}
+.choice-btn:active{transform:scale(0.97)}
+.choice-btn:disabled{opacity:0.45;pointer-events:none}
+.choice-btn.correct{border-color:var(--green);background:rgba(52,199,89,0.15);box-shadow:0 0 18px rgba(52,199,89,0.35)}
+.choice-btn.wrong{border-color:var(--red);background:rgba(255,59,48,0.15);animation:shake 0.35s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.choice-shape{width:44px;height:44px;display:grid;place-items:center;border-radius:12px}
+.choice-shape.circle{border-radius:50%}
+.choice-shape.triangle{clip-path:polygon(50% 0%, 0% 100%, 100% 100%)}
+.choice-shape.diamond{transform:rotate(45deg);width:38px;height:38px;border-radius:8px}
+.choice-shape.diamond span{transform:rotate(-45deg)}
+.choice-label{font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--muted)}
+.controls{display:flex;gap:10px}
+.btn-primary{flex:1;height:56px;border:none;border-radius:14px;background:linear-gradient(135deg,#7B61FF,#5A3DFF);color:white;font-size:16px;font-weight:900;letter-spacing:0.3px;cursor:pointer;touch-action:manipulation;box-shadow:0 8px 20px rgba(123,97,255,0.35)}
+.btn-primary:active{transform:scale(0.98)}
+.btn-secondary{height:56px;padding:0 18px;border-radius:14px;background:var(--card);border:1px solid #2A2F55;color:var(--text);font-size:14px;font-weight:800;cursor:pointer}
+.btn-secondary:active{transform:scale(0.98)}
+.overlay{position:absolute;inset:0;background:rgba(15,18,32,0.92);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10;border-radius:var(--radius)}
+.overlay-card{background:var(--card2);border:1px solid #3A4170;border-radius:20px;padding:20px;width:100%;max-width:360px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.4)}
+.overlay-card h2{font-size:22px;font-weight:900;margin-bottom:6px}
+.overlay-card p{font-size:14px;color:var(--muted);line-height:1.5;margin-bottom:14px}
+.badge-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}
+.mini-badge{background:var(--card);border:1px solid #2A2F55;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:800;color:var(--muted);display:flex;align-items:center;gap:6px}
+.levelup{position:absolute;inset:0;display:grid;place-items:center;background:radial-gradient(500px 300px at 50% 30%, rgba(0,209,255,0.25), transparent 70%);z-index:9;pointer-events:none;opacity:0;transition:opacity 0.2s}
+.levelup.show{opacity:1;pointer-events:auto}
+.levelup-card{background:linear-gradient(135deg,#7B61FF,#00D1FF);padding:2px;border-radius:20px;transform:scale(0.9);animation:pop 0.5s forwards}
+@keyframes pop{to{transform:scale(1)}}
+.levelup-inner{background:#0F1220;border-radius:18px;padding:18px 22px;text-align:center;min-width:220px}
+.levelup-inner h3{font-size:28px;font-weight:900}
+.levelup-inner p{font-size:13px;color:var(--muted);margin-top:4px}
+.guide{font-size:12px;color:var(--muted);line-height:1.6;background:var(--card);border:1px solid #2A2F55;border-radius:14px;padding:12px}
+.guide strong{color:var(--text)}
+.guide ul{margin:6px 0 0 16px}
+.help-btn{width:100%;height:44px;border-radius:12px;background:transparent;border:1px dashed #2A2F55;color:var(--muted);font-weight:800;font-size:13px;cursor:pointer}
+.hidden{display:none !important}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="logo">
+      <div class="logo-mark">◈</div>
+      <div>
+        <h1>SEQUENCE SPARK</h1>
+        <p>Watch • Remember • Complete</p>
+      </div>
+    </div>
+    <div class="best-badge">🏆 <span id="bestDisplay">Best 1</span></div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Level</div><div class="stat-value level" id="levelVal">1</div></div>
+    <div class="stat"><div class="stat-label">Score</div><div class="stat-value" id="scoreVal">0</div></div>
+    <div class="stat"><div class="stat-label">Lives</div><div class="stat-value lives" id="livesVal">❤❤❤</div></div>
+  </div>
+
+  <div class="main">
+    <div class="card" id="gameCard" style="position:relative">
+      <div class="prompt" id="prompt">Tap START to begin</div>
+      <div class="stage" id="stage">
+        <div class="flash-slot idle" id="flashSlot">
+          <div class="shape circle" id="flashShape" style="background:#2A2F55"><span class="shape-inner" id="flashIcon">◉</span></div>
+        </div>
+        <div class="stage-hint" id="stageHint">Ready?</div>
+      </div>
+      <div class="dots" id="dots"></div>
+      <div class="timer-wrap" id="timerWrap" style="opacity:0.4">
+        <div class="timer-bar" id="timerBar" style="width:100%"></div>
+      </div>
+      <div class="timer-label"><span id="timerText">⏱ Waiting</span><span id="levelInfo">Pattern: 3 steps</span></div>
+
+      <!-- Overlays -->
+      <div class="overlay" id="startOverlay">
+        <div class="overlay-card">
+          <h2>How to Play</h2>
+          <p>Watch the flashing <strong>colored shapes</strong>. When it stops, pick <strong>what comes next</strong> before the timer drains.</p>
+          <div class="badge-row">
+            <div class="mini-badge">⏱ Timer shrinks each level</div>
+            <div class="mini-badge">❤ 3 lives</div>
+            <div class="mini-badge">🎉 Fanfare on level up</div>
+          </div>
+          <p style="font-size:12px">Structure: <strong>Watch phase → Choose phase → Result</strong>. Pattern grows +1 each level. Best saved locally.</p>
+          <button class="btn-primary" id="startBtn" style="width:100%">START GAME</button>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn-secondary" id="howBtn" style="flex:1">Guide</button>
+            <button class="btn-secondary" id="soundBtn" style="flex:1">🔊 Sound On</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="levelup" id="levelUpEl">
+        <div class="levelup-card"><div class="levelup-inner"><h3>LEVEL UP! 🎉</h3><p id="levelUpText">Level 2 • Pattern 4</p></div></div>
+      </div>
+    </div>
+
+    <div class="choices" id="choices"></div>
+
+    <div class="controls">
+      <button class="btn-primary" id="actionBtn">▶ START</button>
+      <button class="btn-secondary" id="restartBtn">↻ Restart</button>
+    </div>
+
+    <div class="guide" id="guideBox">
+      <strong>Structure & Features Guide</strong>
+      <ul>
+        <li><strong>Watch Phase:</strong> Central stage flashes sequence (600ms per shape). Dots show progress.</li>
+        <li><strong>Complete Phase:</strong> 4 large touch targets (≥64px) — pick the next shape. Timer drains (5s → 2.5s).</li>
+        <li><strong>Progression:</strong> Level = pattern length. +10 pts per correct. Lives = 3. Best level saved in localStorage.</li>
+        <li><strong>Feedback:</strong> Correct = green glow + chime, Wrong = shake + buzz, Level-up = fanfare + confetti.</li>
+        <li><strong>Mobile-first:</strong> 360–428px portrait, no horizontal scroll, 16px+ text, thumb-friendly 2×2 grid.</li>
+      </ul>
+      <button class="help-btn" id="toggleGuide" style="margin-top:10px">Hide guide</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ITEMS = [
+  {id:0, color:'#FF3B30', bg:'#FF3B30', shape:'circle', icon:'●', label:'Red Circle'},
+  {id:1, color:'#007AFF', bg:'#007AFF', shape:'square', icon:'■', label:'Blue Square'},
+  {id:2, color:'#FFCC00', bg:'#FFCC00', shape:'triangle', icon:'▲', label:'Yellow Tri'},
+  {id:3, color:'#34C759', bg:'#34C759', shape:'diamond', icon:'◆', label:'Green Diamond'},
+];
+let level=1, score=0, lives=3, best=1, sequence=[], answerId=null, phase='idle', timerInt=null, timeLeft=0, timeMax=5, soundOn=true, audioCtx=null;
+
+const els = {
+  levelVal: document.getElementById('levelVal'),
+  scoreVal: document.getElementById('scoreVal'),
+  livesVal: document.getElementById('livesVal'),
+  bestDisplay: document.getElementById('bestDisplay'),
+  prompt: document.getElementById('prompt'),
+  stageHint: document.getElementById('stageHint'),
+  flashSlot: document.getElementById('flashSlot'),
+  flashShape: document.getElementById('flashShape'),
+  flashIcon: document.getElementById('flashIcon'),
+  dots: document.getElementById('dots'),
+  timerBar: document.getElementById('timerBar'),
+  timerWrap: document.getElementById('timerWrap'),
+  timerText: document.getElementById('timerText'),
+  levelInfo: document.getElementById('levelInfo'),
+  choices: document.getElementById('choices'),
+  actionBtn: document.getElementById('actionBtn'),
+  startOverlay: document.getElementById('startOverlay'),
+  startBtn: document.getElementById('startBtn'),
+  levelUpEl: document.getElementById('levelUpEl'),
+  levelUpText: document.getElementById('levelUpText'),
+  guideBox: document.getElementById('guideBox'),
+};
+
+function loadBest(){
+  try{ best = parseInt(localStorage.getItem('seqSparkBest')||'1',10); }catch(e){ best=1; }
+  els.bestDisplay.textContent = 'Best '+best;
+}
+function saveBest(){
+  if(level>best){ best=level; try{localStorage.setItem('seqSparkBest', String(best));}catch(e){} els.bestDisplay.textContent='Best '+best; }
+}
+function ensureAudio(){
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+}
+function tone(freq, dur, type='sine', gain=0.25, when=0){
+  if(!soundOn||!audioCtx) return;
+  const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+  o.type=type; o.frequency.value=freq; o.connect(g); g.connect(audioCtx.destination);
+  const t=audioCtx.currentTime+when;
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(gain,t+0.02); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  o.start(t); o.stop(t+dur);
+}
+function playFlashSound(id){ ensureAudio(); const f=[440,550,660,770][id]||440; tone(f,0.18,'sine',0.22); }
+function playCorrect(){ ensureAudio(); tone(600,0.12,'sine',0.3,0); tone(800,0.18,'sine',0.3,0.12); tone(1000,0.25,'sine',0.28,0.24); }
+function playWrong(){ ensureAudio(); tone(180,0.3,'square',0.18,0); tone(120,0.4,'square',0.15,0.15); if(navigator.vibrate) navigator.vibrate(120); }
+function playFanfare(){ ensureAudio(); [261,329,392,523,659,784].forEach((f,i)=> tone(f,0.35,'sine',0.22,i*0.12)); setTimeout(()=>{ if(navigator.vibrate) navigator.vibrate([60,40,60,40,120]); },100); }
+function playTick(){ if(!soundOn) return; ensureAudio(); tone(900,0.06,'sine',0.08); }
+function playTimeout(){ ensureAudio(); tone(150,0.6,'sawtooth',0.2); }
+
+function updateStats(){
+  els.levelVal.textContent=level;
+  els.scoreVal.textContent=score;
+  els.livesVal.textContent='❤'.repeat(lives)+'♡'.repeat(3-lives);
+  els.levelInfo.textContent='Pattern: '+(level+2)+' steps';
+}
+function setPrompt(t){ els.prompt.textContent=t; }
+function setHint(t){ els.stageHint.textContent=t; }
+
+function renderDots(total, seen){
+  els.dots.innerHTML='';
+  for(let i=0;i<total;i++){
+    const d=document.createElement('div'); d.className='dot';
+    if(i<seen) d.classList.add('seen');
+    if(i===seen && phase==='watching') d.classList.add('current');
+    els.dots.appendChild(d);
+  }
+}
+function showIdleShape(){
+  els.flashSlot.className='flash-slot idle';
+  els.flashShape.className='shape circle';
+  els.flashShape.style.background='#2A2F55';
+  els.flashShape.style.border='none';
+  els.flashIcon.textContent='◉';
+  els.flashIcon.style.color='#9AA0C3';
+}
+function showShape(id, active=false){
+  const it=ITEMS[id];
+  els.flashSlot.className='flash-slot'+(active?' active':'');
+  els.flashShape.className='shape '+it.shape;
+  els.flashShape.style.background=it.bg;
+  els.flashIcon.textContent=it.icon;
+  els.flashIcon.style.color= it.id===2 ? '#1A1E35' : 'white';
+  els.flashSlot.style.borderColor = active ? 'rgba(255,255,255,0.7)' : '#2E345E';
+  els.flashSlot.style.background = active ? 'rgba(255,255,255,0.06)' : '#0F1220';
+}
+
+function generateSequence(){
+  const len = level+2; // grows each level: 3,4,5...
+  sequence=[];
+  for(let i=0;i<len;i++) sequence.push(Math.floor(Math.random()*4));
+  answerId = sequence[sequence.length-1];
+}
+
+function buildChoices(){
+  els.choices.innerHTML='';
+  // 4 choices: correct + 3 others (ensure all 4 types appear for clarity)
+  let opts = [...ITEMS].sort(()=>Math.random()-0.5);
+  // ensure correct is included (it always is since we have all 4)
+  opts.forEach(it=>{
+    const btn=document.createElement('button');
+    btn.className='choice-btn';
+    btn.dataset.id=it.id;
+    btn.innerHTML=`<div class="choice-shape ${it.shape}" style="background:${it.bg}"><span style="color:${it.id===2?'#1A1E35':'white'};font-size:20px">${it.icon}</span></div><div class="choice-label">${it.label}</div>`;
+    btn.addEventListener('click', ()=> handleChoice(it.id, btn));
+    btn.addEventListener('touchstart', ()=>{}, {passive:true});
+    els.choices.appendChild(btn);
+  });
+}
+
+function setChoicesEnabled(on){
+  [...els.choices.children].forEach(b=> b.disabled=!on);
+}
+
+async function playSequence(){
+  phase='watching';
+  els.actionBtn.textContent='👀 Watching...';
+  els.actionBtn.disabled=true;
+  setChoicesEnabled(false);
+  const showLen = sequence.length-1; // show all except last (the question)
+  renderDots(showLen,0);
+  setPrompt('Watch the pattern');
+  setHint('Memorize • '+(showLen)+' flashes');
+  els.timerWrap.style.opacity='0.4';
+  els.timerBar.style.width='100%';
+  els.timerBar.classList.remove('warn');
+  els.timerText.textContent='⏱ Get ready';
+
+  // small pause before start
+  await wait(600);
+  for(let i=0;i<showLen;i++){
+    renderDots(showLen,i);
+    // flash
+    showShape(sequence[i], true);
+    playFlashSound(sequence[i]);
+    setHint(`Flash ${i+1} / ${showLen}`);
+    await wait(520);
+    // off
+    els.flashSlot.classList.remove('active');
+    els.flashShape.style.background='#0F1220';
+    els.flashShape.style.border='2px solid #2E345E';
+    await wait(220);
+  }
+  renderDots(showLen, showLen);
+  showIdleShape();
+  setHint('Your turn!');
+  startAnswerPhase();
+}
+
+function startAnswerPhase(){
+  phase='answering';
+  setPrompt('What comes NEXT?');
+  setHint('Pick before timer drains!');
+  els.actionBtn.textContent='Choose!';
+  els.actionBtn.disabled=true;
+  setChoicesEnabled(true);
+  // timer: 5s at level1, -0.25s per level, min 2.5s
+  timeMax = Math.max(2.5, 5 - (level-1)*0.25);
+  timeLeft = timeMax;
+  els.timerWrap.style.opacity='1';
+  els.timerBar.classList.remove('warn');
+  updateTimerBar();
+  clearInterval(timerInt);
+  timerInt = setInterval(()=>{
+    timeLeft -= 0.05;
+    if(timeLeft<=1.2) els.timerBar.classList.add('warn');
+    if(timeLeft<=0){
+      timeLeft=0; updateTimerBar(); clearInterval(timerInt);
+      handleTimeout();
+    } else {
+      updateTimerBar();
+      if(timeLeft<2 && Math.floor(timeLeft*10)%6===0) playTick();
+    }
+  },50);
+}
+function updateTimerBar(){
+  const pct = Math.max(0, (timeLeft/timeMax)*100);
+  els.timerBar.style.width=pct+'%';
+  els.timerText.textContent='⏱ '+timeLeft.toFixed(1)+'s';
+}
+function handleChoice(id, btn){
+  if(phase!=='answering') return;
+  clearInterval(timerInt);
+  setChoicesEnabled(false);
+  const correct = id===answerId;
+  if(correct){
+    btn.classList.add('correct');
+    playCorrect();
+    score += 10 + Math.floor(timeLeft*2);
+    setPrompt('Correct! +'+(10+Math.floor(timeLeft*2)));
+    setHint('Nice memory!');
+    saveBest();
+    updateStats();
+    setTimeout(()=> levelUp(), 650);
+  } else {
+    btn.classList.add('wrong');
+    // highlight correct
+    [...els.choices.children].forEach(b=>{ if(parseInt(b.dataset.id)===answerId) b.classList.add('correct'); });
+    playWrong();
+    setPrompt('Wrong! It was '+ITEMS[answerId].label);
+    setHint('Try again');
+    loseLife();
+  }
+}
+function handleTimeout(){
+  playTimeout();
+  if(navigator.vibrate) navigator.vibrate([80,40,80]);
+  setChoicesEnabled(false);
+  [...els.choices.children].forEach(b=>{ if(parseInt(b.dataset.id)===answerId) b.classList.add('correct'); });
+  setPrompt('Time out!');
+  setHint('It was '+ITEMS[answerId].label);
+  loseLife();
+}
+function loseLife(){
+  lives--;
+  updateStats();
+  if(lives<=0){
+    setTimeout(()=> gameOver(), 900);
+  } else {
+    els.actionBtn.disabled=false;
+    els.actionBtn.textContent='▶ Next Pattern';
+    phase='between';
+    // pulse lives
+    els.livesVal.animate([{transform:'scale(1)'},{transform:'scale(1.2)'},{transform:'scale(1)'}],{duration:300});
+  }
+}
+function levelUp(){
+  level++;
+  saveBest();
+  updateStats();
+  // fanfare overlay
+  els.levelUpText.textContent='Level '+level+' • Pattern '+(level+2);
+  els.levelUpEl.classList.add('show');
+  playFanfare();
+  setPrompt('Level '+level+' unlocked!');
+  setHint('Pattern grows longer');
+  setTimeout(()=>{
+    els.levelUpEl.classList.remove('show');
+    nextRound();
+  }, 1100);
+}
+function nextRound(){
+  generateSequence();
+  buildChoices();
+  updateStats();
+  playSequence();
+}
+function gameOver(){
+  phase='gameover';
+  clearInterval(timerInt);
+  els.actionBtn.textContent='↻ Play Again';
+  els.actionBtn.disabled=false;
+  setPrompt('Game Over');
+  setHint('Score '+score+' • Reached Level '+level);
+  // show overlay with best
+  els.startOverlay.classList.remove('hidden');
+  els.startOverlay.querySelector('h2').textContent='Game Over';
+  els.startOverlay.querySelector('p').innerHTML=`You reached <strong>Level ${level}</strong> with <strong>${score} pts</strong>.<br>Best: <strong>Level ${best}</strong> • Pattern grows each level.`;
+  els.startBtn.textContent='PLAY AGAIN';
+}
+function startGame(){
+  ensureAudio();
+  level=1; score=0; lives=3;
+  loadBest();
+  updateStats();
+  showIdleShape();
+  els.startOverlay.classList.add('hidden');
+  els.actionBtn.textContent='▶ Starting...';
+  generateSequence();
+  buildChoices();
+  playSequence();
+}
+function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+// events
+els.startBtn.addEventListener('click', startGame);
+els.actionBtn.addEventListener('click', ()=>{
+  if(phase==='idle' || phase==='gameover'){ startGame(); }
+  else if(phase==='between'){ nextRound(); }
+});
+document.getElementById('restartBtn').addEventListener('click', ()=>{
+  clearInterval(timerInt); phase='idle'; showIdleShape(); setPrompt('Tap START to begin'); setHint('Ready?'); els.timerBar.style.width='100%'; els.timerWrap.style.opacity='0.4'; els.timerText.textContent='⏱ Waiting'; els.actionBtn.textContent='▶ START'; els.actionBtn.disabled=false; els.choices.innerHTML=''; renderDots(0,0); level=1; score=0; lives=3; updateStats(); els.startOverlay.classList.remove('hidden'); els.startOverlay.querySelector('h2').textContent='How to Play'; els.startOverlay.querySelector('p').innerHTML='Watch the flashing <strong>colored shapes</strong>. When it stops, pick <strong>what comes next</strong> before the timer drains.'; els.startBtn.textContent='START GAME';
+});
+document.getElementById('soundBtn').addEventListener('click', (e)=>{
+  soundOn=!soundOn; e.target.textContent = soundOn ? '🔊 Sound On' : '🔇 Sound Off';
+  if(soundOn) ensureAudio();
+});
+document.getElementById('howBtn').addEventListener('click', ()=>{
+  els.startOverlay.classList.add('hidden');
+  els.guideBox.classList.remove('hidden');
+  els.guideBox.scrollIntoView({behavior:'smooth', block:'center'});
+});
+document.getElementById('toggleGuide').addEventListener('click', ()=>{
+  const hidden = els.guideBox.classList.contains('hidden');
+  if(hidden){ els.guideBox.classList.remove('hidden'); document.getElementById('toggleGuide').textContent='Hide guide'; }
+  else { els.guideBox.classList.add('hidden'); }
+});
+// init
+loadBest(); updateStats(); showIdleShape(); renderDots(0,0); buildChoices(); setChoicesEnabled(false);
+</script>
+</body>
+</html>

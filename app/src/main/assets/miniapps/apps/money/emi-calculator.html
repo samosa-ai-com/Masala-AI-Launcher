@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LoanLens — EMI Calculator</title>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--acc:#1d4ed8;--txt:#16213a;--mut:#67748f}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;min-height:100vh}
+.wrap{max-width:480px;margin:0 auto;padding:16px 14px 32px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}
+.sub{color:var(--mut);font-size:13px;margin:2px 0 0}
+#muteBtn{background:var(--card);border:1px solid #d8dfec;color:var(--txt);border-radius:12px;min-width:48px;min-height:44px;font-size:18px}
+.hero{background:#16295e;color:#fff;border-radius:18px;padding:18px;text-align:center;margin:12px 0}
+.hero small{opacity:.75;font-size:12px}
+#emi{font-size:44px;font-weight:800;font-variant-numeric:tabular-nums}
+.card{background:var(--card);border:1px solid #d8dfec;border-radius:18px;padding:16px;margin:10px 0}
+.srow{margin:10px 0}
+.srow .top{display:flex;justify-content:space-between;font-size:14px;margin-bottom:2px}
+.srow .top b{font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;min-height:44px}
+.lines div{display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid #e8edf5;font-size:15px;font-variant-numeric:tabular-nums}
+.split{display:flex;height:16px;border-radius:8px;overflow:hidden;margin:10px 0 4px}
+#splitP{background:var(--acc)}
+#splitI{background:#f59e0b}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--mut)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px}
+table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 4px;text-align:right}
+th{color:var(--mut);font-size:11px}
+th:first-child,td:first-child{text-align:left}
+tr+tr td{border-top:1px solid #e8edf5}
+h2{font-size:15px;margin:4px 0 6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div><h1>LoanLens</h1><p class="sub">Know your loan before you sign</p></div><button id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="hero"><small>MONTHLY EMI</small><div id="emi">$0</div></div>
+<div class="card">
+<div class="srow"><div class="top"><span>Loan amount</span><b id="pVal"></b></div><input type="range" id="p" min="1000" max="500000" step="1000" value="50000"></div>
+<div class="srow"><div class="top"><span>Interest rate (yearly)</span><b id="rVal"></b></div><input type="range" id="r" min="1" max="24" step="0.1" value="8"></div>
+<div class="srow"><div class="top"><span>Duration</span><b id="yVal"></b></div><input type="range" id="y" min="1" max="30" step="1" value="5"></div>
+</div>
+<div class="card"><h2>Totals</h2>
+<div class="lines"><div><span>Total interest</span><b id="tInt">$0</b></div><div><span>Total payable</span><b id="tPay">$0</b></div></div>
+<div class="split"><div id="splitP"></div><div id="splitI"></div></div>
+<div class="legend"><span><i style="background:#1d4ed8"></i>Principal</span><span><i style="background:#f59e0b"></i>Interest</span></div>
+</div>
+<div class="card"><h2>Year by year</h2><table><thead><tr><th>Year</th><th>Principal</th><th>Interest</th><th>Balance</th></tr></thead><tbody id="amort"></tbody></table></div>
+</div>
+<script>
+(function(){
+"use strict";
+var KEY="loanlens-v1";
+var store={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+var muted=store.get("muted-emi-calculator",false);
+var muteBtn=document.getElementById("muteBtn");
+function paintMute(){muteBtn.textContent=muted?"🔇":"🔊";}paintMute();
+var actx=null;
+function beep(f){if(muted)return;try{var C=window.AudioContext||window.webkitAudioContext;if(!C)return;if(!actx)actx=new C();if(actx.state==="suspended")actx.resume();var o=actx.createOscillator(),g=actx.createGain();o.type="sine";o.frequency.value=f||660;g.gain.value=0.04;o.connect(g);g.connect(actx.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.08);o.stop(actx.currentTime+0.09);}catch(e){}}
+muteBtn.addEventListener("click",function(){muted=!muted;store.set("muted-emi-calculator",muted);paintMute();beep(720);});
+var saved=store.get(KEY,{p:50000,r:8,y:5});
+var pEl=document.getElementById("p"),rEl=document.getElementById("r"),yEl=document.getElementById("y");
+pEl.value=saved.p;rEl.value=saved.r;yEl.value=saved.y;
+function money(n){return "$"+Math.round(n).toLocaleString("en");}
+function calc(){
+var P=parseFloat(pEl.value),R=parseFloat(rEl.value),Y=parseInt(yEl.value,10);
+var i=R/1200,n=Y*12;
+var emi=i===0?P/n:P*i*Math.pow(1+i,n)/(Math.pow(1+i,n)-1);
+var total=emi*n,interest=total-P;
+document.getElementById("emi").textContent=money(emi);
+document.getElementById("pVal").textContent=money(P);
+document.getElementById("rVal").textContent=R.toFixed(1)+"%";
+document.getElementById("yVal").textContent=Y+(Y===1?" yr":" yrs");
+document.getElementById("tInt").textContent=money(interest);
+document.getElementById("tPay").textContent=money(total);
+document.getElementById("splitP").style.width=(P/total*100)+"%";
+document.getElementById("splitI").style.width=(interest/total*100)+"%";
+var tb=document.getElementById("amort");tb.innerHTML="";
+var bal=P;
+for(var yr=1;yr<=Y;yr++){var yp=0,yi=0;for(var m=0;m<12&&bal>0.005;m++){var im=bal*i;var pr=Math.min(emi-im,bal);bal-=pr;yp+=pr;yi+=im;}
+var tr=document.createElement("tr");
+tr.innerHTML="<td>"+yr+"</td><td>"+money(yp)+"</td><td>"+money(yi)+"</td><td>"+money(Math.max(0,bal))+"</td>";
+tb.appendChild(tr);}
+store.set(KEY,{p:P,r:R,y:Y});}
+[pEl,rEl,yEl].forEach(function(el){el.addEventListener("input",calc);el.addEventListener("change",function(){beep(560);});});
+calc();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Keep-Up Juggle</title><style>*{box-sizing:border-box;margin:0;padding:0}:root{--bg:#0a0e1a;--card:#141a2e;--card2:#1e2642;--line:#2a3558;--accent:#facc15;--accent2:#38bdf8;--good:#4ade80;--bad:#f87171;--text:#f0f2ff;--muted:#8a94b8}html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}body{max-width:428px;margin:0 auto;overflow-x:hidden}.header{position:sticky;top:0;z-index:10;background:rgba(10,14,26,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 12px;display:flex;justify-content:space-between;align-items:center}.brand{display:flex;gap:10px;align-items:center}.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#facc15,#f97316);display:grid;place-items:center;font-size:18px}.brand h1{font-size:14px;line-height:1.1}.brand p{font-size:11px;color:var(--muted)}.pill{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}.pill b{color:var(--text)}.wrap{padding:12px}.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}.hudItem{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}.hudItem b{font-size:18px;display:block}.hudItem span{font-size:11px;color:var(--muted)}.canvasWrap{position:relative;background:linear-gradient(180deg,#1a2040 0%,#0f142e 50%,#1a1a3a 100%);border:1px solid var(--line);border-radius:16px;overflow:hidden;padding:0}.canvasWrap canvas{display:block;width:100%;height:auto;touch-action:none}.tossZones{position:absolute;bottom:0;left:0;right:0;height:28%;display:flex;gap:2px;padding:4px;pointer-events:none}.zone{flex:1;border:2px dashed rgba(255,255,255,.25);border-radius:12px;display:grid;place-items:center;font-size:11px;font-weight:700;color:rgba(255,255,255,.6);background:rgba(255,255,255,.04)}.zone.active{border-color:var(--accent);background:rgba(250,204,21,.15);color:var(--accent)}.controls{display:flex;gap:8px;margin-top:10px}.btn{border:0;border-radius:12px;padding:12px;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center;justify-content:center;flex:1;gap:8px}.btnPrimary{background:linear-gradient(135deg,#facc15,#f97316);color:#0a0e1a}.btnGhost{background:var(--card2);border:1px solid var(--line);color:var(--text)}.tip{font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px;text-align:center;line-height:1.4}.overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,14,26,.88);padding:16px;text-align:center}.hidden{display:none!important}.comboPop{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-size:28px;font-weight:800;color:var(--accent);text-shadow:0 2px 10px rgba(0,0,0,.5);pointer-events:none;animation:pop .6s ease}</style></head><body><header class="header"><div class="brand"><div class="logo">🤹</div><div><h1>Keep-Up Juggle</h1><p>Tap left / right to toss</p></div></div><div class="pill">Best <b id="bestEl">0</b></div></header><div class="wrap"><div class="hud"><div class="hudItem"><b id="scoreEl">0</b><span>Score</span></div><div class="hudItem"><b id="comboEl">x1</b><span>Combo</span></div><div class="hudItem"><b id="ballsEl">1</b><span>Balls</span></div></div><div class="canvasWrap" id="gameWrap"><canvas id="cv" width="360" height="480"></canvas><div class="tossZones"><div class="zone" id="zoneL">◀ LEFT TAP</div><div class="zone" id="zoneR">RIGHT TAP ▶</div></div><div class="overlay" id="startOverlay"><div><h2 style="font-size:20px">🎪 Keep Them Up!</h2><p style="font-size:13px;color:var(--muted);margin:8px 0">Tap <b>LEFT</b> or <b>RIGHT</b> half to toss balls on that side.<br>Chain catches = combo multiplier!<br>New ball every 7s — survive!</p><button class="btn btnPrimary" id="playBtn" style="width:100%;margin-top:8px">▶ Play</button><p style="font-size:11px;color:var(--muted);margin-top:8px">Best Combo: <b id="bestComboEl2">x1</b></p></div></div><div class="overlay hidden" id="overOverlay"><div><h2 id="overTitle">Dropped!</h2><p id="overDesc" style="font-size:13px;color:var(--muted);margin:8px 0"></p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0"><div style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px"><b id="overScore" style="font-size:18px;display:block">0</b><span style="font-size:11px;color:var(--muted)">Score</span></div><div style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px"><b id="overCombo" style="font-size:18px;display:block">x1</b><span style="font-size:11px;color:var(--muted)">Best Combo</span></div></div><button class="btn btnPrimary" id="againBtn" style="width:100%">↻ Play Again</button></div></div></div><div class="controls"><button class="btn btnGhost" id="pauseBtn">⏸ Pause</button><button class="btn btnPrimary" id="resetBtn">↻ Restart</button></div><div class="tip">💡 Keep balls in the <b>dashed toss zone</b> — tap that side to launch! Miss = game over. Build combo for 2x, 3x, 5x!</div></div><script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=360,H=480;
+let balls=[],score=0,combo=1,comboStreak=0,best=parseInt(localStorage.getItem('juggle-best')||'0',10),bestCombo=parseInt(localStorage.getItem('juggle-bestCombo')||'1',10),playing=false,paused=false,spawnTimer=0,animId=null;
+const colors=['#facc15','#38bdf8','#4ade80','#f87171','#a78bfa','#fb7185','#34d399'];
+function save(){localStorage.setItem('juggle-best',best);localStorage.setItem('juggle-bestCombo',bestCombo)}
+function updateHud(){
+document.getElementById('scoreEl').textContent=score;
+document.getElementById('comboEl').textContent='x'+combo;
+document.getElementById('ballsEl').textContent=balls.length;
+document.getElementById('bestEl').textContent=best;
+document.getElementById('bestComboEl2').textContent='x'+bestCombo;
+}
+function spawnBall(){
+let x=60+Math.random()*(W-120),y=60;
+balls.push({x,y,vx:(Math.random()-0.5)*4,vy:0,r:16+Math.random()*6,color:colors[Math.floor(Math.random()*colors.length)],tossCooldown:0})
+}
+function resetGame(){
+balls=[];score=0;combo=1;comboStreak=0;spawnTimer=0;spawnBall();updateHud();
+document.getElementById('overOverlay').classList.add('hidden');
+document.getElementById('startOverlay').classList.remove('hidden');
+playing=false;paused=false;cancelAnimationFrame(animId);
+draw();
+}
+function startGame(){
+playing=true;paused=false;score=0;combo=1;comboStreak=0;balls=[];spawnBall();spawnTimer=0;
+document.getElementById('startOverlay').classList.add('hidden');
+document.getElementById('overOverlay').classList.add('hidden');
+updateHud();
+loop();
+}
+function toss(side){
+if(!playing||paused)return;
+let tossed=0;
+let zoneY=H*0.72;
+balls.forEach(b=>{
+let inZone=b.y>zoneY-20 && b.y<H-10;
+let onSide=side==='left'? b.x<W/2 : b.x>=W/2;
+if(inZone&&onSide&&b.tossCooldown<=0){
+b.vy=-13 - Math.random()*3 - combo*0.5;
+b.vx+=(side==='left'? 1.5 : -1.5) + (Math.random()-0.5)*3;
+b.tossCooldown=12;
+tossed++;
+if(navigator.vibrate)navigator.vibrate(20);
+}
+});
+if(tossed>0){
+comboStreak+=tossed;
+if(comboStreak>=3)combo=2;
+if(comboStreak>=6)combo=3;
+if(comboStreak>=10)combo=5;
+if(comboStreak>=15)combo=8;
+score+=tossed*10*combo;
+if(combo>bestCombo){bestCombo=combo;save()}
+if(score>best){best=score;save()}
+updateHud();
+showCombo();
+flashZone(side);
+} else {
+// miss tap - small penalty
+comboStreak=Math.max(0,comboStreak-1);
+if(comboStreak<3)combo=1;else if(comboStreak<6)combo=2;else if(comboStreak<10)combo=3;else combo=5;
+updateHud();
+}
+}
+function flashZone(side){
+let el=side==='left'?document.getElementById('zoneL'):document.getElementById('zoneR');
+el.classList.add('active');setTimeout(()=>el.classList.remove('active'),180);
+}
+function showCombo(){
+if(combo<=1)return;
+let wrap=document.getElementById('gameWrap');
+let d=document.createElement('div');d.className='comboPop';d.textContent='x'+combo+' COMBO!';
+wrap.appendChild(d);setTimeout(()=>d.remove(),600);
+}
+function loop(){
+if(!playing||paused)return;
+animId=requestAnimationFrame(loop);
+// physics
+balls.forEach(b=>{
+b.vy+=0.45;
+b.x+=b.vx; b.y+=b.vy;
+b.vx*=0.99;
+if(b.x-b.r<0){b.x=b.r;b.vx*=-0.7}
+if(b.x+b.r>W){b.x=W-b.r;b.vx*=-0.7}
+if(b.tossCooldown>0)b.tossCooldown--;
+if(b.y+b.r>H-6){
+// hit ground = game over
+gameOver();
+}
+});
+// ball-ball collision simple
+for(let i=0;i<balls.length;i++)for(let j=i+1;j<balls.length;j++){
+let a=balls[i],b=balls[j],dx=b.x-a.x,dy=b.y-a.y,dist=Math.hypot(dx,dy),min=a.r+b.r;
+if(dist<min&&dist>0){
+let nx=dx/dist,ny=dy/dist,overlap=(min-dist)/2;
+a.x-=nx*overlap; a.y-=ny*overlap; b.x+=nx*overlap; b.y+=ny*overlap;
+let dvx=b.vx-a.vx,dvy=b.vy-a.vy,dot=dvx*nx+dvy*ny;
+if(dot<0){let imp=dot*0.8; a.vx+=imp*nx; a.vy+=imp*ny; b.vx-=imp*nx; b.vy-=imp*ny;}
+}
+}
+spawnTimer+=16;
+if(spawnTimer>7000){spawnBall();spawnTimer=0;updateHud()}
+draw();
+}
+function draw(){
+ctx.clearRect(0,0,W,H);
+// stage
+let grad=ctx.createLinearGradient(0,0,0,H);
+grad.addColorStop(0,'#1a2040');grad.addColorStop(0.5,'#0f142e');grad.addColorStop(1,'#1a1a3a');
+ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
+// spotlights
+ctx.fillStyle='rgba(250,204,21,.07)';ctx.beginPath();ctx.ellipse(W*0.25,0,90,120,0,0,6.28);ctx.fill();
+ctx.fillStyle='rgba(56,189,248,.07)';ctx.beginPath();ctx.ellipse(W*0.75,0,90,120,0,0,6.28);ctx.fill();
+// floor
+ctx.fillStyle='#0a0e1a';ctx.fillRect(0,H-6,W,6);
+ctx.fillStyle='rgba(250,204,21,.3)';ctx.fillRect(0,H-6,W,2);
+// toss zone line
+ctx.strokeStyle='rgba(255,255,255,.15)';ctx.setLineDash([6,6]);ctx.beginPath();ctx.moveTo(0,H*0.72);ctx.lineTo(W,H*0.72);ctx.stroke();ctx.setLineDash([]);
+ctx.fillStyle='rgba(255,255,255,.5)';ctx.font='10px system-ui';ctx.textAlign='center';ctx.fillText('TOSS ZONE',W/2,H*0.72-6);
+// balls
+balls.forEach(b=>{
+ctx.shadowColor=b.color;ctx.shadowBlur=12;
+ctx.fillStyle=b.color;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,6.28);ctx.fill();ctx.shadowBlur=0;
+ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.arc(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.35,0,6.28);ctx.fill();
+ctx.strokeStyle='rgba(0,0,0,.2)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,6.28);ctx.stroke();
+});
+// center line
+ctx.strokeStyle='rgba(255,255,255,.08)';ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);ctx.stroke();
+}
+function gameOver(){
+playing=false;cancelAnimationFrame(animId);
+if(score>best){best=score;save()}
+if(combo>bestCombo){bestCombo=combo;save()}
+document.getElementById('overScore').textContent=score;
+document.getElementById('overCombo').textContent='x'+Math.max(combo,bestCombo);
+document.getElementById('overDesc').textContent='Kept '+balls.length+' balls up — great juggle!';
+document.getElementById('overTitle').textContent=score>best*0.8?'Amazing! 🎉':'Dropped! 💫';
+document.getElementById('overOverlay').classList.remove('hidden');
+updateHud();
+if(navigator.vibrate)navigator.vibrate([80,40,80]);
+}
+function handleTap(e){
+let rect=cv.getBoundingClientRect(),x=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+let side=x<rect.width/2?'left':'right';
+toss(side);
+}
+cv.addEventListener('mousedown',handleTap);
+cv.addEventListener('touchstart',handleTap,{passive:true});
+document.getElementById('playBtn').onclick=startGame;
+document.getElementById('againBtn').onclick=startGame;
+document.getElementById('resetBtn').onclick=resetGame;
+document.getElementById('pauseBtn').onclick=()=>{
+if(!playing)return;
+paused=!paused;
+document.getElementById('pauseBtn').textContent=paused?'▶ Resume':'⏸ Pause';
+if(!paused)loop();
+};
+updateHud();draw();
+</script></body></html>

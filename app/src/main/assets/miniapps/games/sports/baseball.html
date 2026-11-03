@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Batting Blast</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background:#0a2e14;
+  display:flex;justify-content:center;
+  color:#fff;
+  -webkit-tap-highlight-color: transparent;
+}
+.app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  height:100dvh;
+  background: linear-gradient(180deg, #87CEEB 0%, #a8e0ff 18%, #4CAF50 18.5%);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  position:relative;
+}
+/* Header */
+.header{
+  background: #0f4d1a;
+  padding:10px 12px 8px;
+  border-bottom:3px solid #ffcc00;
+  flex-shrink:0;
+}
+.top-row{
+  display:flex;justify-content:space-between;align-items:center;
+}
+.logo{
+  font-weight:900;
+  font-size:20px;
+  letter-spacing:0.5px;
+  line-height:1;
+}
+.logo span{color:#ffcc00}
+.logo small{display:block;font-size:10px;letter-spacing:2px;color:#a8e6a8;font-weight:700}
+.stats{
+  display:flex;gap:6px;
+}
+.stat{
+  background:rgba(255,255,255,0.12);
+  border:1px solid rgba(255,255,255,0.2);
+  border-radius:10px;
+  padding:6px 8px;
+  text-align:center;
+  min-width:62px;
+}
+.stat b{display:block;font-size:16px;line-height:1;color:#ffcc00}
+.stat i{font-style:normal;font-size:9px;letter-spacing:0.8px;color:#d0ffd0;font-weight:700}
+.pitch-bar{
+  margin-top:8px;
+  display:flex;gap:8px;align-items:center;
+}
+.pitch-count{
+  background:#fff;
+  color:#0f4d1a;
+  font-weight:900;
+  font-size:13px;
+  padding:6px 10px;
+  border-radius:20px;
+  display:flex;align-items:center;gap:6px;
+}
+.pitch-count em{
+  background:#0f4d1a;color:#ffcc00;
+  font-style:normal;
+  padding:2px 7px;border-radius:10px;
+  font-size:13px;
+}
+.speed-badge{
+  background:#ff3b30;
+  color:#fff;
+  font-weight:900;
+  font-size:12px;
+  padding:6px 10px;
+  border-radius:20px;
+  letter-spacing:0.5px;
+}
+.speed-badge.idle{background:rgba(255,255,255,0.18);color:#fff}
+.avg{
+  margin-left:auto;
+  font-size:11px;
+  font-weight:700;
+  color:#e0ffe0;
+  background:rgba(0,0,0,0.2);
+  padding:5px 8px;border-radius:20px;
+}
+
+/* Canvas wrap */
+.canvas-wrap{
+  flex:1;
+  position:relative;
+  overflow:hidden;
+  background: transparent;
+}
+canvas{
+  display:block;
+  width:100%;
+  height:100%;
+}
+.overlay{
+  position:absolute;inset:0;
+  pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+.feedback{
+  font-weight:900;
+  font-size:42px;
+  text-align:center;
+  line-height:0.9;
+  text-shadow: 0 3px 0 rgba(0,0,0,0.3), 0 6px 12px rgba(0,0,0,0.4);
+  transform:scale(0.8);
+  opacity:0;
+  transition: all 0.2s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+.feedback.show{transform:scale(1);opacity:1}
+.feedback small{
+  display:block;
+  font-size:18px;
+  margin-top:6px;
+  background:rgba(0,0,0,0.75);
+  padding:4px 12px;
+  border-radius:20px;
+  color:#ffcc00;
+}
+.distance-pop{
+  position:absolute;
+  left:50%;top:42%;
+  transform:translate(-50%,-50%) scale(0.5);
+  background:#ffcc00;
+  color:#0f4d1a;
+  font-weight:900;
+  font-size:22px;
+  padding:8px 16px;
+  border-radius:14px;
+  border:3px solid #fff;
+  box-shadow:0 8px 20px rgba(0,0,0,0.3);
+  opacity:0;
+  transition:all 0.3s;
+  pointer-events:none;
+  white-space:nowrap;
+}
+.distance-pop.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.timing-bar-wrap{
+  position:absolute;
+  bottom:14px;
+  left:12px;right:12px;
+  background:rgba(0,0,0,0.55);
+  backdrop-filter: blur(6px);
+  border-radius:14px;
+  padding:8px 10px 6px;
+  border:1px solid rgba(255,255,255,0.2);
+}
+.timing-label{
+  display:flex;justify-content:space-between;
+  font-size:9px;font-weight:800;letter-spacing:1px;color:#fff;opacity:0.9;
+  margin-bottom:4px;
+}
+.timing-track{
+  height:14px;
+  background: linear-gradient(90deg, #ff3b30 0%, #ff9500 25%, #4cd964 40%, #ffcc00 50%, #4cd964 60%, #ff9500 75%, #ff3b30 100%);
+  border-radius:20px;
+  position:relative;
+  overflow:hidden;
+  border:2px solid rgba(255,255,255,0.9);
+}
+.timing-sweet{
+  position:absolute;
+  left:40%;right:40%;top:0;bottom:0;
+  background:rgba(255,255,255,0.35);
+  border-left:2px dashed #fff;
+  border-right:2px dashed #fff;
+}
+.timing-indicator{
+  position:absolute;
+  top:-2px;bottom:-2px;
+  width:4px;
+  background:#fff;
+  border-radius:2px;
+  box-shadow:0 0 8px rgba(0,0,0,0.5);
+  transition:left 0.05s linear;
+}
+.timing-indicator.sweet{background:#ffcc00; width:6px; box-shadow:0 0 10px #ffcc00}
+.start-prompt{
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  background:#fff;
+  color:#0f4d1a;
+  padding:14px 18px;
+  border-radius:16px;
+  text-align:center;
+  box-shadow:0 10px 30px rgba(0,0,0,0.3);
+  pointer-events:auto;
+  width:82%;
+  max-width:320px;
+}
+.start-prompt h3{font-size:18px;margin-bottom:4px}
+.start-prompt p{font-size:13px;color:#555;line-height:1.4;margin-bottom:10px}
+.start-prompt button{
+  background:#0f4d1a;color:#ffcc00;
+  border:none;
+  padding:10px 18px;
+  border-radius:12px;
+  font-weight:900;
+  font-size:15px;
+  width:100%;
+}
+
+/* Controls */
+.controls{
+  background:#0f4d1a;
+  padding:10px 12px 12px;
+  border-top:3px solid #ffcc00;
+  flex-shrink:0;
+}
+.swing-btn{
+  width:100%;
+  height:68px;
+  background: linear-gradient(180deg, #ff3b30 0%, #d32f2f 100%);
+  color:#fff;
+  border:none;
+  border-radius:16px;
+  font-weight:900;
+  font-size:22px;
+  letter-spacing:1px;
+  box-shadow: 0 6px 0 #8b1a1a, 0 8px 16px rgba(0,0,0,0.3);
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  touch-action: manipulation;
+  user-select:none;
+}
+.swing-btn:active{
+  transform:translateY(4px);
+  box-shadow: 0 2px 0 #8b1a1a, 0 4px 8px rgba(0,0,0,0.3);
+}
+.swing-btn:disabled{
+  opacity:0.5;
+  transform:none;
+  box-shadow: 0 6px 0 #8b1a1a;
+}
+.swing-btn span{font-size:28px}
+.control-row{
+  display:flex;gap:8px;margin-top:10px;
+}
+.btn-secondary{
+  flex:1;
+  height:48px;
+  border-radius:12px;
+  border:2px solid rgba(255,255,255,0.25);
+  background:rgba(255,255,255,0.12);
+  color:#fff;
+  font-weight:800;
+  font-size:13px;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.btn-secondary.active{
+  background:#ffcc00;
+  color:#0f4d1a;
+  border-color:#ffcc00;
+}
+.btn-secondary:active{transform:scale(0.97)}
+.hint{
+  text-align:center;
+  font-size:11px;
+  color:#a8e6a8;
+  margin-top:6px;
+  font-weight:600;
+}
+
+/* Confetti */
+.confetti{
+  position:absolute;
+  width:10px;height:10px;
+  top:-10px;
+  animation: fall linear forwards;
+  pointer-events:none;
+}
+@keyframes fall{
+  to{transform:translateY(110vh) rotate(720deg)}
+}
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-6px)}
+  75%{transform:translateX(6px)}
+}
+.shake{animation:shake 0.3s}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="top-row">
+      <div class="logo">BATTING<span> BLAST</span><small>⚾ TIMING CHALLENGE</small></div>
+      <div class="stats">
+        <div class="stat"><b id="hits">0</b><i>HITS</i></div>
+        <div class="stat"><b id="best">0 ft</b><i>BEST</i></div>
+      </div>
+    </div>
+    <div class="pitch-bar">
+      <div class="pitch-count">PITCH <em id="pitchNum">0</em></div>
+      <div class="speed-badge idle" id="speedBadge">READY</div>
+      <div class="avg" id="avg">AVG .000</div>
+    </div>
+  </div>
+
+  <div class="canvas-wrap" id="fieldWrap">
+    <canvas id="c"></canvas>
+    <div class="overlay" id="overlay">
+      <div class="feedback" id="feedback"></div>
+    </div>
+    <div class="distance-pop" id="distPop"></div>
+    
+    <div class="timing-bar-wrap" id="timingWrap">
+      <div class="timing-label"><span>EARLY</span><span style="color:#ffcc00">● SWEET SPOT ●</span><span>LATE</span></div>
+      <div class="timing-track">
+        <div class="timing-sweet"></div>
+        <div class="timing-indicator" id="indicator" style="left:0%"></div>
+      </div>
+    </div>
+
+    <div class="start-prompt" id="startPrompt">
+      <h3>⚾ Ready to Bat?</h3>
+      <p>Tap <b>SWING!</b> as the ball crosses the plate. Perfect timing = Home Run!</p>
+      <button id="startBtn">THROW FIRST PITCH →</button>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="swing-btn" id="swingBtn"> <span>⚾</span> SWING! <span>💥</span></button>
+    <div class="control-row">
+      <button class="btn-secondary" id="nextBtn">⏭ NEXT PITCH</button>
+      <button class="btn-secondary" id="autoBtn">AUTO: OFF</button>
+      <button class="btn-secondary" id="resetBtn">↺ RESET</button>
+    </div>
+    <div class="hint">Tap anywhere on field to swing • Watch the timing bar!</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('fieldWrap');
+const pitchNumEl = document.getElementById('pitchNum');
+const hitsEl = document.getElementById('hits');
+const bestEl = document.getElementById('best');
+const avgEl = document.getElementById('avg');
+const speedBadge = document.getElementById('speedBadge');
+const feedbackEl = document.getElementById('feedback');
+const distPop = document.getElementById('distPop');
+const indicator = document.getElementById('indicator');
+const startPrompt = document.getElementById('startPrompt');
+const swingBtn = document.getElementById('swingBtn');
+const nextBtn = document.getElementById('nextBtn');
+const autoBtn = document.getElementById('autoBtn');
+const resetBtn = document.getElementById('resetBtn');
+
+let W=0,H=0,dpr=1;
+function resize(){
+  const rect = wrap.getBoundingClientRect();
+  W = rect.width;
+  H = rect.height;
+  dpr = Math.min(window.devicePixelRatio||1, 2);
+  canvas.width = W*dpr;
+  canvas.height = H*dpr;
+  canvas.style.width = W+'px';
+  canvas.style.height = H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Game state
+let pitchCount=0, hits=0, best=0, totalDist=0;
+let isPitching=false, canSwing=false, hasSwung=false;
+let arrivalTime=0, startTime=0, duration=0, mph=0;
+let ballProgress=0;
+let autoMode=false;
+let animId=null;
+let trail=[];
+let batAngle=-35;
+let batSwinging=false;
+let batSwingStart=0;
+let lastResult=null;
+
+// Audio
+let audioCtx=null;
+function beep(freq, dur, vol=0.3, type='sine'){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.value=vol;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime+dur);
+    o.stop(audioCtx.currentTime+dur);
+  }catch(e){}
+}
+
+function updateStats(){
+  pitchNumEl.textContent = pitchCount;
+  hitsEl.textContent = hits;
+  bestEl.textContent = best + ' ft';
+  const avg = pitchCount ? (hits/pitchCount).toFixed(3).replace('0.','.') : '.000';
+  avgEl.textContent = 'AVG ' + avg;
+  if(mph) {
+    speedBadge.textContent = mph + ' MPH';
+    speedBadge.className='speed-badge';
+    if(mph>=95) speedBadge.style.background='#ff3b30';
+    else if(mph>=88) speedBadge.style.background='#ff9500';
+    else speedBadge.style.background='#4cd964';
+  } else {
+    speedBadge.textContent='READY';
+    speedBadge.className='speed-badge idle';
+    speedBadge.style.background='';
+  }
+}
+
+function startPitch(){
+  if(isPitching) return;
+  startPrompt.style.display='none';
+  pitchCount++;
+  mph = 78 + Math.floor(Math.random()*25); // 78-102
+  duration = 950 - (mph-78)*14; // faster = shorter
+  duration = Math.max(520, duration);
+  // add slight variance
+  duration += (Math.random()*60-30);
+  startTime = performance.now();
+  arrivalTime = startTime + duration;
+  ballProgress=0;
+  isPitching=true;
+  canSwing=true;
+  hasSwung=false;
+  trail=[];
+  batAngle=-35;
+  feedbackEl.className='feedback';
+  distPop.className='distance-pop';
+  updateStats();
+  beep(600,0.08,0.15);
+  if(animId) cancelAnimationFrame(animId);
+  loop();
+}
+
+function swing(){
+  if(!canSwing || hasSwung) return;
+  hasSwung=true;
+  canSwing=false;
+  batSwinging=true;
+  batSwingStart=performance.now();
+  // vibrate
+  if(navigator.vibrate) navigator.vibrate(30);
+  
+  const now = performance.now();
+  const diff = now - arrivalTime; // negative = early, positive = late
+  const adiff = Math.abs(diff);
+  
+  let result, distance=0, label='';
+  
+  if(adiff <= 40){
+    // Perfect
+    distance = 360 + Math.floor(Math.random()*60); // 360-420
+    label='HOME RUN!!!';
+    result='perfect';
+  } else if(adiff <= 80){
+    distance = 220 + Math.floor(Math.random()*90); // 220-310
+    label = distance>270 ? 'TRIPLE!' : 'DOUBLE!';
+    result='good';
+  } else if(adiff <= 150){
+    // ok - chance foul
+    if(Math.random()<0.3){
+      result='foul';
+      label='FOUL BALL';
+    } else {
+      distance = 90 + Math.floor(Math.random()*110); // 90-200
+      label='SINGLE!';
+      result='ok';
+    }
+  } else {
+    result='miss';
+    label = diff<0 ? 'TOO EARLY!' : 'TOO LATE!';
+  }
+  
+  if(result==='perfect' || result==='good' || result==='ok'){
+    hits++;
+    totalDist+=distance;
+    if(distance>best) best=distance;
+    showHit(result, label, distance, diff);
+  } else if(result==='foul'){
+    showFoul();
+  } else {
+    showMiss(label);
+  }
+  
+  updateStats();
+  // auto next pitch
+  if(autoMode){
+    setTimeout(()=>{ if(!isPitching) startPitch(); }, result==='perfect'? 1800 : 1200);
+  }
+}
+
+function showHit(type, label, distance, diff){
+  const timingText = diff<0 ? `${Math.abs(Math.round(diff))}ms early` : `${Math.round(diff)}ms late`;
+  if(type==='perfect'){
+    feedbackEl.innerHTML = `💥 ${label}<small>⚾ ${distance} FT • ${timingText}</small>`;
+    feedbackEl.style.color='#ffcc00';
+    feedbackEl.className='feedback show';
+    distPop.textContent = `🚀 ${distance} FT • HOME RUN!`;
+    distPop.className='distance-pop show';
+    beep(880,0.2,0.4); setTimeout(()=>beep(1100,0.3,0.4),120);
+    if(navigator.vibrate) navigator.vibrate([40,30,60]);
+    spawnConfetti(24);
+    // flash
+    wrap.style.background='#ffcc00';
+    setTimeout(()=>wrap.style.background='',150);
+  } else if(type==='good'){
+    feedbackEl.innerHTML = `${label}<small>⚾ ${distance} FT • ${timingText}</small>`;
+    feedbackEl.style.color='#4cd964';
+    feedbackEl.className='feedback show';
+    distPop.textContent = `⚾ ${distance} FT • ${label}`;
+    distPop.className='distance-pop show';
+    beep(700,0.15,0.3); setTimeout(()=>beep(900,0.15,0.3),100);
+    if(navigator.vibrate) navigator.vibrate(40);
+    spawnConfetti(10);
+  } else {
+    feedbackEl.innerHTML = `${label}<small>⚾ ${distance} FT</small>`;
+    feedbackEl.style.color='#fff';
+    feedbackEl.className='feedback show';
+    distPop.textContent = `⚾ ${distance} FT`;
+    distPop.className='distance-pop show';
+    beep(600,0.12,0.25);
+  }
+  setTimeout(()=>{ distPop.className='distance-pop'; }, 1600);
+  isPitching=false;
+}
+
+function showFoul(){
+  feedbackEl.innerHTML = `FOUL BALL<small>Stay alive!</small>`;
+  feedbackEl.style.color='#ff9500';
+  feedbackEl.className='feedback show';
+  beep(400,0.2,0.25,'square');
+  wrap.classList.add('shake');
+  setTimeout(()=>wrap.classList.remove('shake'),300);
+  isPitching=false;
+}
+
+function showMiss(label){
+  feedbackEl.innerHTML = `STRIKE!<small>${label}</small>`;
+  feedbackEl.style.color='#ff3b30';
+  feedbackEl.className='feedback show';
+  beep(250,0.3,0.3,'square');
+  if(navigator.vibrate) navigator.vibrate([20,20,20]);
+  wrap.classList.add('shake');
+  setTimeout(()=>wrap.classList.remove('shake'),300);
+  isPitching=false;
+}
+
+function spawnConfetti(n){
+  for(let i=0;i<n;i++){
+    const c=document.createElement('div');
+    c.className='confetti';
+    c.style.left = (10+Math.random()*80)+'%';
+    c.style.background = ['#ffcc00','#ff3b30','#4cd964','#fff','#0f4d1a'][Math.floor(Math.random()*5)];
+    c.style.animationDuration = (0.8+Math.random()*0.7)+'s';
+    c.style.animationDelay = (Math.random()*0.2)+'s';
+    c.style.transform = `rotate(${Math.random()*360}deg)`;
+    c.style.borderRadius = Math.random()>0.5?'50%':'2px';
+    document.getElementById('app').appendChild(c);
+    setTimeout(()=>c.remove(),1800);
+  }
+}
+
+// Drawing
+function drawField(){
+  // sky already via CSS, draw field elements
+  // grass stripes
+  const grassTop = H*0.18;
+  ctx.fillStyle='#2e8b3a';
+  ctx.fillRect(0, grassTop, W, H-grassTop);
+  // stripes
+  ctx.fillStyle='rgba(255,255,255,0.06)';
+  for(let i=0;i<6;i++){
+    const y = grassTop + (H-grassTop)*(i/6);
+    if(i%2===0) ctx.fillRect(0,y,W,(H-grassTop)/6);
+  }
+  // dirt infield diamond
+  const cx=W/2;
+  const plateY = H*0.72;
+  const moundY = H*0.22;
+  // foul lines
+  ctx.strokeStyle='rgba(255,255,255,0.9)';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(cx, plateY);
+  ctx.lineTo(0, grassTop+10);
+  ctx.moveTo(cx, plateY);
+  ctx.lineTo(W, grassTop+10);
+  ctx.stroke();
+  // wall
+  ctx.fillStyle='#8d6e63';
+  ctx.fillRect(0, grassTop, W, 10);
+  ctx.fillStyle='#ffcc00';
+  ctx.fillRect(0, grassTop+8, W, 3);
+  // crowd dots
+  ctx.fillStyle='rgba(0,0,0,0.15)';
+  for(let i=0;i<30;i++){
+    const x=(i/30)*W + Math.sin(i)*5;
+    const y= grassTop-6 - (i%3)*4;
+    ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
+  }
+  // mound
+  ctx.fillStyle='#c2a47a';
+  ctx.beginPath();
+  ctx.ellipse(cx, moundY, 28, 14, 0,0,Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle='#a88c65';
+  ctx.beginPath(); ctx.ellipse(cx, moundY, 18, 8,0,0,Math.PI*2); ctx.fill();
+  // pitcher's rubber
+  ctx.fillStyle='#fff';
+  ctx.fillRect(cx-10, moundY-2,20,4);
+  // infield dirt
+  ctx.fillStyle='#d8b48a';
+  ctx.beginPath();
+  ctx.moveTo(cx, plateY+18);
+  ctx.lineTo(cx-70, plateY-30);
+  ctx.lineTo(cx-45, plateY-70);
+  ctx.lineTo(cx+45, plateY-70);
+  ctx.lineTo(cx+70, plateY-30);
+  ctx.closePath();
+  ctx.fill();
+  // bases
+  ctx.fillStyle='#fff';
+  [[cx, plateY-62],[cx-52, plateY-38],[cx+52, plateY-38]].forEach(([x,y])=>{
+    ctx.save(); ctx.translate(x,y); ctx.rotate(Math.PI/4); ctx.fillRect(-7,-7,14,14); ctx.restore();
+  });
+  // home plate
+  ctx.fillStyle='#fff';
+  ctx.beginPath();
+  ctx.moveTo(cx-12, plateY-6); ctx.lineTo(cx+12, plateY-6); ctx.lineTo(cx+12, plateY+4); ctx.lineTo(cx, plateY+10); ctx.lineTo(cx-12, plateY+4); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='#0f4d1a'; ctx.lineWidth=1; ctx.stroke();
+  // strike zone
+  ctx.strokeStyle='rgba(255,255,255,0.85)';
+  ctx.lineWidth=2;
+  ctx.setLineDash([4,4]);
+  ctx.strokeRect(cx-32, plateY-38, 64, 32);
+  ctx.setLineDash([]);
+  ctx.fillStyle='rgba(255,255,255,0.08)';
+  ctx.fillRect(cx-32, plateY-38,64,32);
+  // plate shadow
+  ctx.fillStyle='rgba(0,0,0,0.12)';
+  ctx.beginPath(); ctx.ellipse(cx, plateY+12, 22,6,0,0,Math.PI*2); ctx.fill();
+}
+
+function drawBall(x,y, scale=1){
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(x, y+8*scale, 10*scale, 4*scale,0,0,Math.PI*2); ctx.fill();
+  // ball
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(x,y, 10*scale,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#e0e0e0'; ctx.lineWidth=1; ctx.stroke();
+  // seams
+  ctx.strokeStyle='#ff3b30'; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.arc(x,y, 7*scale, -0.6, 0.6); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x,y, 7*scale, Math.PI-0.6, Math.PI+0.6); ctx.stroke();
+  // trail
+  if(trail.length>1){
+    ctx.strokeStyle='rgba(255,255,255,0.35)';
+    ctx.lineWidth=3;
+    ctx.beginPath();
+    ctx.moveTo(trail[0].x, trail[0].y);
+    for(let i=1;i<trail.length;i++) ctx.lineTo(trail[i].x, trail[i].y);
+    ctx.stroke();
+  }
+}
+
+function drawBat(){
+  const cx=W/2;
+  const plateY=H*0.72;
+  const bx = cx+18;
+  const by = plateY-6;
+  ctx.save();
+  ctx.translate(bx, by);
+  ctx.rotate(batAngle*Math.PI/180);
+  // bat
+  ctx.fillStyle='#5d4037';
+  ctx.beginPath();
+  // handle to barrel
+  ctx.roundRect(-6,-42,12,48,6);
+  ctx.fill();
+  ctx.fillStyle='#8d6e63';
+  ctx.fillRect(-5,-42,10,10);
+  // grip
+  ctx.fillStyle='#0f4d1a';
+  for(let i=0;i<4;i++) ctx.fillRect(-6, -2+i*8,12,3);
+  ctx.restore();
+  // hands
+  ctx.fillStyle='#ffdbac';
+  ctx.beginPath(); ctx.arc(bx, by, 6,0,Math.PI*2); ctx.fill();
+}
+
+function loop(){
+  const now = performance.now();
+  if(isPitching){
+    const elapsed = now - startTime;
+    ballProgress = Math.min(1, elapsed/duration);
+    // ease in
+    const eased = 1 - Math.pow(1-ballProgress, 2);
+    // update indicator
+    const pct = Math.min(100, ballProgress*100);
+    indicator.style.left = pct+'%';
+    if(ballProgress>0.38 && ballProgress<0.62) indicator.classList.add('sweet');
+    else indicator.classList.remove('sweet');
+    
+    // if reached plate without swing -> strike
+    if(ballProgress>=1 && !hasSwung){
+      hasSwung=true;
+      canSwing=false;
+      isPitching=false;
+      showMiss('SWING AND MISS!');
+      updateStats();
+      if(autoMode) setTimeout(()=>startPitch(), 1000);
+    }
+  }
+  // bat animation
+  if(batSwinging){
+    const t = performance.now() - batSwingStart;
+    if(t<180){
+      const p=t/180;
+      // -35 -> 55 -> -35
+      if(p<0.5) batAngle = -35 + (90)*(p*2);
+      else batAngle = 55 - (90)*((p-0.5)*2);
+    } else {
+      batAngle=-35;
+      batSwinging=false;
+    }
+  }
+  
+  // draw
+  ctx.clearRect(0,0,W,H);
+  drawField();
+  drawBat();
+  if(isPitching || hasSwung){
+    const moundY=H*0.22;
+    const plateY=H*0.72;
+    const eased = 1 - Math.pow(1-ballProgress,2);
+    const y = moundY + (plateY - moundY)*eased;
+    const x = W/2 + Math.sin(ballProgress*Math.PI*2)*2; // slight wobble
+    const scale = 0.7 + eased*0.5; // grows as it approaches
+    // trail
+    if(isPitching && ballProgress<1){
+      trail.push({x,y});
+      if(trail.length>8) trail.shift();
+    }
+    if(ballProgress<1 || hasSwung && ballProgress>=0.95){
+      drawBall(x,y,scale);
+    }
+  }
+  
+  if(isPitching || batSwinging) animId=requestAnimationFrame(loop);
+  else {
+    // still draw static field
+    // keep looping for bat? no
+  }
+}
+
+// Events
+swingBtn.addEventListener('click', (e)=>{
+  e.preventDefault();
+  if(!isPitching && !hasSwung && pitchCount===0){
+    startPitch();
+    setTimeout(swing, 50);
+  } else {
+    swing();
+  }
+});
+wrap.addEventListener('click', (e)=>{
+  if(e.target.closest('button') || e.target.closest('.start-prompt')) return;
+  if(isPitching) swing();
+});
+wrap.addEventListener('touchstart', (e)=>{
+  if(e.target.closest('button') || e.target.closest('.start-prompt')) return;
+  e.preventDefault();
+  if(isPitching) swing();
+},{passive:false});
+
+document.getElementById('startBtn').addEventListener('click', startPitch);
+nextBtn.addEventListener('click', ()=>{
+  if(!isPitching) startPitch();
+});
+autoBtn.addEventListener('click', ()=>{
+  autoMode=!autoMode;
+  autoBtn.textContent = autoMode ? 'AUTO: ON' : 'AUTO: OFF';
+  autoBtn.classList.toggle('active', autoMode);
+  if(autoMode && !isPitching) startPitch();
+});
+resetBtn.addEventListener('click', ()=>{
+  pitchCount=0; hits=0; best=0; totalDist=0;
+  isPitching=false; canSwing=false; hasSwung=false;
+  mph=0; ballProgress=0; trail=[];
+  feedbackEl.className='feedback';
+  distPop.className='distance-pop';
+  startPrompt.style.display='block';
+  indicator.style.left='0%';
+  updateStats();
+  ctx.clearRect(0,0,W,H);
+  drawField(); drawBat();
+  if(animId) cancelAnimationFrame(animId);
+});
+
+// keyboard for testing
+window.addEventListener('keydown', e=>{
+  if(e.code==='Space'){ e.preventDefault(); isPitching? swing() : startPitch(); }
+});
+
+// initial draw
+updateStats();
+drawField();
+drawBat();
+
+// polyfill roundRect
+if(!CanvasRenderingContext2D.prototype.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+    this.beginPath();
+    this.moveTo(x+r,y); this.lineTo(x+w-r,y); this.quadraticCurveTo(x+w,y,x+w,y+r);
+    this.lineTo(x+w,y+h-r); this.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    this.lineTo(x+r,y+h); this.quadraticCurveTo(x,y+h,x,y+h-r);
+    this.lineTo(x,y+r); this.quadraticCurveTo(x,y,x+r,y); this.closePath();
+  }
+}
+</script>
+</body>
+</html>

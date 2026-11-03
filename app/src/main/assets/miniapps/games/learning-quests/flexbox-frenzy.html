@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Vault Flex — Heist Puzzle</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0b1220;--card:#141e33;--card2:#1a2a4a;--line:#24365e;--gold:#facc15;--gold2:#fde047;--cyan:#22d3ee;--pink:#f472b6;--green:#4ade80;--text:#f1f5f9;--muted:#94a3b8;--danger:#ef4444}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;overflow-x:hidden}
+body{font-size:16px;line-height:1.4}
+.app{max-width:428px;min-height:100vh;margin:0 auto;background:linear-gradient(180deg,#0f1a33 0%,#0b1220 55%,#0a0f1e 100%);display:flex;flex-direction:column;position:relative;overflow-x:hidden}
+.topbar{padding:12px 14px 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(15,23,42,0.9);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10;backdrop-filter:blur(8px)}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--gold),#f59e0b);display:grid;place-items:center;color:#0b1220;font-weight:900;font-size:18px;box-shadow:0 4px 12px rgba(250,204,21,0.35)}
+.brand h1{font-size:16px;line-height:1;letter-spacing:0.5px}
+.brand h1 span{color:var(--gold)}
+.brand p{font-size:11px;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase}
+.stats{display:flex;gap:8px;align-items:center}
+.pill{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 10px;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;min-height:32px}
+.pill.lives{color:#fecaca}
+.pill.streak{color:var(--gold2)}
+.pill.score{color:var(--cyan)}
+.floors{padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.floor-btn{border:1px solid var(--line);background:var(--card);border-radius:14px;padding:10px 10px;text-align:left;cursor:pointer;min-height:64px;position:relative;overflow:hidden;transition:0.15s}
+.floor-btn.active{border-color:var(--gold);background:linear-gradient(135deg,#1e2a4a,#1a2f5a);box-shadow:0 0 0 2px rgba(250,204,21,0.15)}
+.floor-btn.locked{opacity:0.55;filter:grayscale(0.2)}
+.floor-btn .fnum{font-size:10px;letter-spacing:0.8px;color:var(--gold);font-weight:800}
+.floor-btn .fname{font-size:14px;font-weight:800;margin-top:2px}
+.floor-btn .fdesc{font-size:11px;color:var(--muted);margin-top:2px}
+.floor-btn .fprog{font-size:11px;color:var(--cyan);margin-top:4px;font-weight:700}
+.lock-badge{position:absolute;top:8px;right:8px;font-size:14px}
+.vault-head{margin:0 12px;background:var(--card);border:1px solid var(--line);border-radius:14px 14px 0 0;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.vault-title{font-weight:900;font-size:14px;letter-spacing:0.4px}
+.vault-title span{color:var(--gold)}
+.vault-sub{font-size:11px;color:var(--muted)}
+.timer-wrap{display:flex;align-items:center;gap:8px}
+.timer{font-weight:900;font-size:14px;background:#0f172a;border:1px solid var(--line);padding:6px 10px;border-radius:999px;min-width:64px;text-align:center}
+.timer.warn{color:var(--danger);border-color:rgba(239,68,68,0.4);animation:pulse 0.8s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.vault-stage-wrap{margin:0 12px;background:radial-gradient(600px 200px at 50% 0%,rgba(250,204,21,0.08),transparent),var(--card2);border:1px solid var(--line);border-top:none;border-radius:0 0 14px 14px;padding:12px;position:relative}
+.stage-labels{display:flex;justify-content:space-between;font-size:10px;letter-spacing:0.7px;color:var(--muted);text-transform:uppercase;margin-bottom:6px}
+.stage{position:relative;height:188px;background:#0b1220;border:1px solid #1e2f52;border-radius:12px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.03), inset 0 8px 24px rgba(0,0,0,0.4)}
+.flex-container{position:absolute;inset:8px;display:flex;gap:8px;padding:8px}
+#ghost{opacity:1;pointer-events:none}
+#ghost .bar{border:2px dashed rgba(250,204,21,0.9);background:rgba(250,204,21,0.14);color:rgba(250,204,21,0.9)}
+#player .bar{box-shadow:0 4px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.15)}
+.bar{border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;min-width:44px;min-height:44px;flex-shrink:0;transition:0.2s}
+.bar small{font-size:10px;opacity:0.8;font-weight:700}
+.match-row{margin-top:10px;background:#0f172a;border:1px solid var(--line);border-radius:999px;height:28px;display:flex;align-items:center;padding:3px;gap:8px;position:relative;overflow:hidden}
+.match-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--gold),#f59e0b);width:0%;transition:width 0.35s ease;min-width:0}
+.match-text{position:absolute;left:50%;transform:translateX(-50%);font-size:12px;font-weight:900;letter-spacing:0.5px;text-shadow:0 1px 2px rgba(0,0,0,0.6)}
+.match-row.good .match-fill{background:linear-gradient(90deg,var(--green),#22c55e)}
+.controls{padding:12px;display:flex;flex-direction:column;gap:12px}
+.group{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 10px 12px}
+.group-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.group-title{font-size:12px;font-weight:900;letter-spacing:0.6px;text-transform:uppercase;color:var(--gold2);display:flex;align-items:center;gap:6px}
+.group-hint{font-size:11px;color:var(--muted);background:#0f172a;border:1px solid var(--line);padding:4px 8px;border-radius:999px}
+.btn-grid{display:flex;flex-wrap:wrap;gap:8px}
+.opt{flex:1 1 auto;min-height:44px;min-width:72px;padding:8px 10px;border-radius:12px;border:1.5px solid var(--line);background:#0f1a33;color:var(--text);font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:0.15s;text-align:center}
+.opt:active{transform:scale(0.98)}
+.opt.active{background:var(--gold);color:#0b1220;border-color:var(--gold);box-shadow:0 4px 12px rgba(250,204,21,0.3)}
+.opt.small{font-size:12px;min-width:64px}
+.actions{padding:0 12px 12px;display:grid;grid-template-columns:1fr 1.6fr;gap:10px}
+.btn{min-height:48px;border-radius:14px;border:1px solid var(--line);font-weight:900;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:0.15s}
+.btn:active{transform:scale(0.98)}
+.btn-secondary{background:var(--card);color:var(--text)}
+.btn-primary{background:linear-gradient(135deg,var(--gold),#f59e0b);color:#0b1220;border-color:transparent;box-shadow:0 6px 16px rgba(250,204,21,0.35);font-size:15px;letter-spacing:0.3px}
+.btn:disabled{opacity:0.5;pointer-events:none}
+.footer{padding:10px 12px 16px;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:11px}
+.footer b{color:var(--text)}
+.modal{position:fixed;inset:0;background:rgba(2,6,23,0.72);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+.modal.open{display:flex}
+.sheet{width:100%;max-width:360px;background:linear-gradient(180deg,#162447,#0f1a33);border:1px solid #2a3d6b;border-radius:18px;padding:18px;box-shadow:0 20px 40px rgba(0,0,0,0.5);text-align:center}
+.sheet h2{font-size:20px}
+.sheet p{color:var(--muted);font-size:13px;margin-top:6px}
+.sheet .big{font-size:42px;margin:6px 0}
+.sheet .row{display:flex;gap:10px;margin-top:14px}
+.sheet .row .btn{flex:1}
+.kbd{font-family:ui-monospace,Menlo,monospace;background:#0b1220;border:1px solid var(--line);padding:2px 6px;border-radius:6px;font-size:11px;color:var(--cyan)}
+.help{margin:0 12px;background:var(--card);border:1px dashed #2a3d6b;border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:flex-start}
+.help i{width:28px;height:28px;border-radius:8px;background:rgba(34,211,238,0.15);display:grid;place-items:center;flex-shrink:0}
+.help p{font-size:12px;color:var(--muted);line-height:1.4}
+.help b{color:var(--text)}
+@media (max-width:360px){.opt{min-width:60px;font-size:12px}.brand h1{font-size:15px}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">◈</div>
+      <div>
+        <h1>VAULT <span>FLEX</span></h1>
+        <p>Heist • Flexbox Drill</p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="pill lives" id="livesPill">❤ <span id="livesTxt">3</span></div>
+      <div class="pill streak" id="streakPill">🔥 <span id="streakTxt">0</span></div>
+      <div class="pill score">◆ <span id="scoreTxt">0</span></div>
+    </div>
+  </div>
+
+  <div class="floors" id="floors"></div>
+
+  <div class="vault-head">
+    <div>
+      <div class="vault-title" id="vaultTitle">FLOOR 1 — VAULT 1 <span>• LOBBY</span></div>
+      <div class="vault-sub" id="vaultSub">Match the ghost bars. Real flex engine.</div>
+    </div>
+    <div class="timer-wrap">
+      <div class="timer" id="timer">00:45</div>
+    </div>
+  </div>
+
+  <div class="vault-stage-wrap">
+    <div class="stage-labels"><span>◐ Ghost target (dashed)</span><span>● Your bars (solid)</span></div>
+    <div class="stage" id="stage">
+      <div class="flex-container" id="ghost"></div>
+      <div class="flex-container" id="player"></div>
+    </div>
+    <div class="match-row" id="matchRow">
+      <div class="match-fill" id="matchFill"></div>
+      <div class="match-text" id="matchText">MATCH 0% — KEEP TUNING</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="group" id="group-direction">
+      <div class="group-head">
+        <div class="group-title">↔ Direction <span class="kbd">flex-direction</span></div>
+        <div class="group-hint" id="hintDir">row</div>
+      </div>
+      <div class="btn-grid" id="gridDir"></div>
+    </div>
+    <div class="group" id="group-justify">
+      <div class="group-head">
+        <div class="group-title">⇔ Distribution <span class="kbd">justify-content</span></div>
+        <div class="group-hint" id="hintJust">flex-start</div>
+      </div>
+      <div class="btn-grid" id="gridJust"></div>
+    </div>
+    <div class="group" id="group-align">
+      <div class="group-head">
+        <div class="group-title">↕ Alignment <span class="kbd">align-items</span></div>
+        <div class="group-hint" id="hintAlign">stretch</div>
+      </div>
+      <div class="btn-grid" id="gridAlign"></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-secondary" id="hintBtn">💡 Hint <span id="hintCount" style="opacity:0.7;font-size:12px">3</span></button>
+    <button class="btn btn-primary" id="checkBtn">CRACK VAULT →</button>
+  </div>
+
+  <div class="help">
+    <i>◎</i>
+    <p><b>How to heist:</b> Ghost bars show the hidden solution. Tap the three property rows until your solid bars perfectly overlap the dashed ghosts. Judged by the real browser flex engine. <b>45s</b> per vault, <b>3 lives</b>, streaks unlock floors.</p>
+  </div>
+
+  <div class="footer">
+    <div>Best streak <b id="bestTxt">0</b> • Vaults cracked <b id="crackedTxt">0</b></div>
+    <div style="display:flex;gap:8px"><button class="btn btn-secondary" style="min-height:32px;padding:6px 10px;font-size:12px" id="resetBtn">Reset</button></div>
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<script>
+const FLOORS = [
+  {name:"Lobby", desc:"Distribution basics", icon:"🏦", puzzles:[
+    {solution:{flexDirection:"row", justifyContent:"flex-start", alignItems:"center"}, bars:[{w:64,h:44,c:"#22d3ee"},{w:72,h:52,c:"#a78bfa"},{w:56,h:40,c:"#f472b6"}]},
+    {solution:{flexDirection:"row", justifyContent:"center", alignItems:"center"}, bars:[{w:58,h:48,c:"#facc15"},{w:58,h:48,c:"#4ade80"},{w:58,h:48,c:"#60a5fa"}]},
+    {solution:{flexDirection:"row", justifyContent:"space-between", alignItems:"center"}, bars:[{w:52,h:42,c:"#fb7185"},{w:68,h:46,c:"#34d399"},{w:60,h:50,c:"#fbbf24"}]},
+  ]},
+  {name:"Gallery", desc:"Align + distribute", icon:"🖼️", puzzles:[
+    {solution:{flexDirection:"row", justifyContent:"space-around", alignItems:"flex-start"}, bars:[{w:62,h:36,c:"#22d3ee"},{w:70,h:56,c:"#a78bfa"},{w:54,h:42,c:"#f472b6"},{w:48,h:38,c:"#facc15"}]},
+    {solution:{flexDirection:"row", justifyContent:"flex-end", alignItems:"center"}, bars:[{w:60,h:44,c:"#4ade80"},{w:64,h:48,c:"#60a5fa"},{w:56,h:40,c:"#f472b6"}]},
+    {solution:{flexDirection:"row", justifyContent:"space-evenly", alignItems:"flex-end"}, bars:[{w:58,h:38,c:"#fb7185"},{w:62,h:52,c:"#34d399"},{w:66,h:44,c:"#fbbf24"}]},
+  ]},
+  {name:"Vault Core", desc:"Direction matters", icon:"🔐", puzzles:[
+    {solution:{flexDirection:"column", justifyContent:"center", alignItems:"center"}, bars:[{w:80,h:36,c:"#22d3ee"},{w:70,h:32,c:"#a78bfa"},{w:90,h:36,c:"#f472b6"}]},
+    {solution:{flexDirection:"row-reverse", justifyContent:"space-between", alignItems:"center"}, bars:[{w:56,h:42,c:"#facc15"},{w:68,h:50,c:"#4ade80"},{w:60,h:44,c:"#60a5fa"}]},
+    {solution:{flexDirection:"column-reverse", justifyContent:"flex-start", alignItems:"flex-end"}, bars:[{w:72,h:34,c:"#fb7185"},{w:84,h:38,c:"#34d399"},{w:66,h:32,c:"#fbbf24"}]},
+  ]},
+  {name:"Penthouse", desc:"Master heist", icon:"🏙️", puzzles:[
+    {solution:{flexDirection:"row", justifyContent:"space-between", alignItems:"stretch"}, bars:[{w:62,h:44,c:"#22d3ee"},{w:68,h:52,c:"#a78bfa"},{w:60,h:40,c:"#f472b6"}]},
+    {solution:{flexDirection:"column", justifyContent:"space-around", alignItems:"center"}, bars:[{w:88,h:30,c:"#facc15"},{w:76,h:34,c:"#4ade80"},{w:92,h:30,c:"#60a5fa"}]},
+    {solution:{flexDirection:"row-reverse", justifyContent:"space-evenly", alignItems:"flex-end"}, bars:[{w:58,h:36,c:"#fb7185"},{w:64,h:48,c:"#34d399"},{w:60,h:42,c:"#fbbf24"},{w:52,h:38,c:"#a78bfa"}]},
+  ]}
+];
+
+const DIR_OPTS = [
+  {v:"row", l:"→ Row"},
+  {v:"row-reverse", l:"← Row Rev"},
+  {v:"column", l:"↓ Column"},
+  {v:"column-reverse", l:"↑ Col Rev"},
+];
+const JUST_OPTS = [
+  {v:"flex-start", l:"Start"},
+  {v:"center", l:"Center"},
+  {v:"flex-end", l:"End"},
+  {v:"space-between", l:"Between"},
+  {v:"space-around", l:"Around"},
+  {v:"space-evenly", l:"Evenly"},
+];
+const ALIGN_OPTS = [
+  {v:"flex-start", l:"Top"},
+  {v:"center", l:"Center"},
+  {v:"flex-end", l:"Bottom"},
+  {v:"stretch", l:"Stretch"},
+];
+
+let state = {
+  floor:0, vault:0,
+  lives:3, streak:0, best:0, score:0, cracked:0,
+  timer:45, timerId:null,
+  hints:3,
+  player:{flexDirection:"row", justifyContent:"flex-start", alignItems:"stretch"},
+  unlocked:1
+};
+
+const els = {
+  floors: document.getElementById('floors'),
+  vaultTitle: document.getElementById('vaultTitle'),
+  vaultSub: document.getElementById('vaultSub'),
+  timer: document.getElementById('timer'),
+  ghost: document.getElementById('ghost'),
+  player: document.getElementById('player'),
+  matchFill: document.getElementById('matchFill'),
+  matchText: document.getElementById('matchText'),
+  matchRow: document.getElementById('matchRow'),
+  gridDir: document.getElementById('gridDir'),
+  gridJust: document.getElementById('gridJust'),
+  gridAlign: document.getElementById('gridAlign'),
+  hintDir: document.getElementById('hintDir'),
+  hintJust: document.getElementById('hintJust'),
+  hintAlign: document.getElementById('hintAlign'),
+  livesTxt: document.getElementById('livesTxt'),
+  streakTxt: document.getElementById('streakTxt'),
+  scoreTxt: document.getElementById('scoreTxt'),
+  bestTxt: document.getElementById('bestTxt'),
+  crackedTxt: document.getElementById('crackedTxt'),
+  hintBtn: document.getElementById('hintBtn'),
+  hintCount: document.getElementById('hintCount'),
+  checkBtn: document.getElementById('checkBtn'),
+  modal: document.getElementById('modal'),
+  sheet: document.getElementById('sheet'),
+};
+
+function loadPersist(){
+  try{
+    const s = JSON.parse(localStorage.getItem('vaultflex_v2')||'{}');
+    if(s.best) state.best=s.best;
+    if(s.cracked) state.cracked=s.cracked;
+    if(s.unlocked) state.unlocked=s.unlocked;
+    if(s.score) state.score=s.score;
+  }catch(e){}
+}
+function savePersist(){
+  localStorage.setItem('vaultflex_v2', JSON.stringify({best:state.best,cracked:state.cracked,unlocked:state.unlocked,score:state.score}));
+}
+
+function currentPuzzle(){
+  return FLOORS[state.floor].puzzles[state.vault];
+}
+
+function renderFloors(){
+  els.floors.innerHTML='';
+  FLOORS.forEach((f,i)=>{
+    const locked = i >= state.unlocked;
+    const done = FLOORS[i].puzzles.every((_,pi)=> isVaultDone(i,pi));
+    const btn=document.createElement('button');
+    btn.className='floor-btn'+(i===state.floor?' active':'')+(locked?' locked':'');
+    btn.innerHTML=`
+      <div class="fnum">FLOOR ${i+1} ${done?'• DONE':''}</div>
+      <div class="fname">${f.icon} ${f.name}</div>
+      <div class="fdesc">${f.desc}</div>
+      <div class="fprog">${locked?'🔒 Locked': (i===state.floor? (state.vault+1)+'/'+f.puzzles.length+' vaults' : 'Tap to enter')}</div>
+      ${locked?'<div class="lock-badge">🔒</div>':''}
+    `;
+    btn.onclick=()=>{
+      if(locked){ toast('Crack previous floor to unlock!'); return; }
+      state.floor=i; state.vault=0; resetVaultState(); renderAll(); startTimer();
+    };
+    els.floors.appendChild(btn);
+  });
+}
+
+function isVaultDone(floor,vault){
+  try{
+    const d=JSON.parse(localStorage.getItem('vaultflex_done')||'{}');
+    return !!d[`${floor}-${vault}`];
+  }catch(e){return false}
+}
+function markDone(floor,vault){
+  const d=JSON.parse(localStorage.getItem('vaultflex_done')||'{}');
+  d[`${floor}-${vault}`]=true;
+  localStorage.setItem('vaultflex_done', JSON.stringify(d));
+}
+
+function buildGrid(container, opts, prop){
+  container.innerHTML='';
+  opts.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'+(state.player[prop]===o.v?' active':'');
+    b.textContent=o.l;
+    b.onclick=()=>{
+      state.player[prop]=o.v;
+      updateControls();
+      renderPlayer();
+      updateMatch();
+      blip(0.12, 600 + Math.random()*200);
+    };
+    container.appendChild(b);
+  });
+}
+
+function updateControls(){
+  buildGrid(els.gridDir, DIR_OPTS, 'flexDirection');
+  buildGrid(els.gridJust, JUST_OPTS, 'justifyContent');
+  buildGrid(els.gridAlign, ALIGN_OPTS, 'alignItems');
+  els.hintDir.textContent=state.player.flexDirection;
+  els.hintJust.textContent=state.player.justifyContent;
+  els.hintAlign.textContent=state.player.alignItems;
+  els.livesTxt.textContent=state.lives;
+  els.streakTxt.textContent=state.streak;
+  els.scoreTxt.textContent=state.score;
+  els.bestTxt.textContent=state.best;
+  els.crackedTxt.textContent=state.cracked;
+  els.hintCount.textContent=state.hints;
+  els.hintBtn.disabled = state.hints<=0;
+}
+
+function renderBars(container, bars, isGhost){
+  container.innerHTML='';
+  bars.forEach((bar,i)=>{
+    const d=document.createElement('div');
+    d.className='bar';
+    d.style.width=bar.w+'px';
+    // handle stretch: if align is stretch and direction is row, height should stretch
+    // we keep height but allow stretch to override via CSS when needed
+    d.style.height=bar.h+'px';
+    d.style.background = isGhost ? '' : bar.c;
+    d.style.color = isGhost ? '' : '#0b1220';
+    d.innerHTML = isGhost ? `<small>GHOST</small>` : `${i+1}`;
+    // for column direction, width/height swap visually still works
+    container.appendChild(d);
+  });
+}
+
+function applyFlexStyles(el, sol){
+  el.style.flexDirection=sol.flexDirection;
+  el.style.justifyContent=sol.justifyContent;
+  el.style.alignItems=sol.alignItems;
+  el.style.flexWrap='nowrap';
+}
+
+function renderGhost(){
+  const p=currentPuzzle();
+  applyFlexStyles(els.ghost, p.solution);
+  renderBars(els.ghost, p.bars, true);
+}
+function renderPlayer(){
+  applyFlexStyles(els.player, state.player);
+  const p=currentPuzzle();
+  renderBars(els.player, p.bars, false);
+  // stretch visual tweak: if stretch, make bars fill cross axis
+  if(state.player.alignItems==='stretch' && state.player.flexDirection.startsWith('row')){
+    [...els.player.children].forEach(ch=>{ ch.style.height='auto'; ch.style.alignSelf='stretch'; ch.style.minHeight='44px'; });
+  }
+  if(state.player.alignItems==='stretch' && state.player.flexDirection.startsWith('column')){
+    [...els.player.children].forEach(ch=>{ ch.style.width='auto'; ch.style.alignSelf='stretch'; ch.style.minWidth='44px'; });
+  }
+}
+
+function calcMatch(){
+  const sol=currentPuzzle().solution;
+  let score=0;
+  if(state.player.flexDirection===sol.flexDirection) score+=34;
+  if(state.player.justifyContent===sol.justifyContent) score+=33;
+  if(state.player.alignItems===sol.alignItems) score+=33;
+  return score;
+}
+
+function updateMatch(){
+  const m=calcMatch();
+  els.matchFill.style.width=m+'%';
+  if(m===100){
+    els.matchRow.classList.add('good');
+    els.matchText.textContent='MATCH 100% — READY TO CRACK!';
+    els.checkBtn.style.transform='scale(1.02)';
+  } else {
+    els.matchRow.classList.remove('good');
+    els.checkBtn.style.transform='scale(1)';
+    let label='KEEP TUNING';
+    if(m>=66) label='ALMOST THERE';
+    else if(m>=33) label='GOOD PROGRESS';
+    els.matchText.textContent=`MATCH ${m}% — ${label}`;
+  }
+}
+
+function resetVaultState(){
+  state.player={flexDirection:"row", justifyContent:"flex-start", alignItems:"stretch"};
+  state.timer=45;
+  state.hints=3;
+  updateTimerUI();
+}
+
+function renderAll(){
+  const f=FLOORS[state.floor];
+  els.vaultTitle.innerHTML=`FLOOR ${state.floor+1} — VAULT ${state.vault+1} <span>• ${f.name.toUpperCase()}</span>`;
+  els.vaultSub.textContent=`${f.puzzles.length} vaults • ${f.desc} • Real flex engine`;
+  renderFloors();
+  renderGhost();
+  renderPlayer();
+  updateControls();
+  updateMatch();
+  updateTimerUI();
+}
+
+function updateTimerUI(){
+  const m=Math.floor(state.timer/60).toString().padStart(2,'0');
+  const s=(state.timer%60).toString().padStart(2,'0');
+  els.timer.textContent=`${m}:${s}`;
+  els.timer.classList.toggle('warn', state.timer<=10);
+}
+
+function startTimer(){
+  clearInterval(state.timerId);
+  state.timerId=setInterval(()=>{
+    state.timer--;
+    updateTimerUI();
+    if(state.timer<=0){
+      clearInterval(state.timerId);
+      failVault('Time ran out! Guards spotted you.');
+    }
+  },1000);
+}
+
+function stopTimer(){ clearInterval(state.timerId); }
+
+function checkVault(){
+  const m=calcMatch();
+  if(m===100){
+    successVault();
+  } else {
+    // partial feedback
+    state.lives--;
+    state.streak=0;
+    updateControls();
+    blip(0.2, 180, 'sawtooth');
+    if(state.lives<=0){
+      failVault('Out of lives! The vault locked down.');
+    } else {
+      showModal('fail', m);
+    }
+  }
+}
+
+function successVault(){
+  stopTimer();
+  const timeBonus = Math.max(0, state.timer*2);
+  const streakBonus = state.streak*10;
+  const hintPenalty = (3-state.hints)*5;
+  const earned = 100 + timeBonus + streakBonus - hintPenalty;
+  state.score += Math.max(20, earned);
+  state.streak++;
+  state.cracked++;
+  if(state.streak>state.best) state.best=state.streak;
+  markDone(state.floor, state.vault);
+  // unlock next floor if finished all vaults in floor
+  const floorDone = FLOORS[state.floor].puzzles.every((_,i)=> isVaultDone(state.floor,i));
+  if(floorDone && state.unlocked <= state.floor+1 && state.unlocked < FLOORS.length){
+    state.unlocked = state.floor+2;
+  }
+  savePersist();
+  blip(0.25, 880, 'sine'); setTimeout(()=>blip(0.2,1100),120);
+  showModal('success', 100, {earned, timeBonus, streakBonus});
+}
+
+function failVault(msg){
+  stopTimer();
+  state.lives--;
+  if(state.lives<0) state.lives=0;
+  updateControls();
+  savePersist();
+  if(state.lives<=0){
+    showModal('gameover', 0, {msg});
+  } else {
+    showModal('fail', calcMatch(), {msg});
+  }
+}
+
+function showModal(type, match, extra={}){
+  let html='';
+  if(type==='success'){
+    html=`
+      <div class="big">💎</div>
+      <h2>VAULT CRACKED!</h2>
+      <p>Perfect overlap — the flex engine confirms it.</p>
+      <div style="background:#0b1220;border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:12px;text-align:left;font-size:13px">
+        <div style="display:flex;justify-content:space-between"><span>Base</span><b>+100</b></div>
+        <div style="display:flex;justify-content:space-between"><span>Time bonus</span><b>+${extra.timeBonus}</b></div>
+        <div style="display:flex;justify-content:space-between"><span>Streak ×${state.streak}</span><b>+${extra.streakBonus}</b></div>
+        <div style="display:flex;justify-content:space-between;color:var(--gold)"><span>Total earned</span><b>+${extra.earned}</b></div>
+      </div>
+      <div class="row">
+        <button class="btn btn-secondary" onclick="closeModal()">Stay</button>
+        <button class="btn btn-primary" onclick="nextVault()">Next Vault →</button>
+      </div>
+    `;
+  } else if(type==='fail'){
+    const sol=currentPuzzle().solution;
+    html=`
+      <div class="big">🚨</div>
+      <h2>${extra.msg||'NOT QUITE!'}</h2>
+      <p>Match ${match}% — lives left: ${state.lives}. Check the ghost vs your bars.</p>
+      <div style="background:#0b1220;border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:12px;text-align:left;font-size:12px">
+        <div><b>Target was:</b> <span class="kbd">${sol.flexDirection}</span> <span class="kbd">${sol.justifyContent}</span> <span class="kbd">${sol.alignItems}</span></div>
+        <div style="margin-top:6px;color:var(--muted)">Tip: Distribution moves bars along the main axis, Alignment moves them across.</div>
+      </div>
+      <div class="row">
+        <button class="btn btn-secondary" onclick="closeModal()">Try Again</button>
+        <button class="btn btn-primary" onclick="closeModal();resetVaultState();renderAll();startTimer();">Retry Vault</button>
+      </div>
+    `;
+  } else if(type==='gameover'){
+    html=`
+      <div class="big">🔒</div>
+      <h2>HEIST FAILED</h2>
+      <p>Out of lives. The vault sealed. Your streak resets but score stays.</p>
+      <div style="margin-top:10px;font-size:13px">Score <b>${state.score}</b> • Best streak <b>${state.best}</b></div>
+      <div class="row">
+        <button class="btn btn-primary" onclick="restartGame()">Restart Heist</button>
+      </div>
+    `;
+  }
+  els.sheet.innerHTML=html;
+  els.modal.classList.add('open');
+}
+
+function closeModal(){ els.modal.classList.remove('open'); if(state.lives>0 && state.timer>0 && !els.modal.classList.contains('open')){} }
+window.closeModal=closeModal;
+
+function nextVault(){
+  closeModal();
+  const f=FLOORS[state.floor];
+  if(state.vault < f.puzzles.length-1){
+    state.vault++;
+  } else {
+    // next floor if unlocked
+    if(state.floor < FLOORS.length-1 && state.floor+1 < state.unlocked){
+      state.floor++; state.vault=0;
+    } else if(state.floor === FLOORS.length-1 && state.vault===f.puzzles.length-1){
+      // game complete
+      showComplete();
+      return;
+    } else {
+      // floor complete but next locked? shouldn't happen, but loop
+      state.vault=0;
+    }
+  }
+  resetVaultState();
+  renderAll();
+  startTimer();
+}
+
+function showComplete(){
+  els.sheet.innerHTML=`
+    <div class="big">👑</div>
+    <h2>ALL VAULTS CRACKED!</h2>
+    <p>You mastered flexbox — every ghost matched by the real layout engine.</p>
+    <div style="background:#0b1220;border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:12px">
+      <div style="font-size:28px;font-weight:900;color:var(--gold)">${state.score} pts</div>
+      <div style="font-size:12px;color:var(--muted)">Best streak ${state.best} • ${state.cracked} vaults</div>
+    </div>
+    <div class="row"><button class="btn btn-primary" onclick="restartGame()">Play Again</button></div>
+  `;
+  els.modal.classList.add('open');
+}
+
+function restartGame(){
+  closeModal();
+  state.lives=3; state.streak=0; state.floor=0; state.vault=0;
+  resetVaultState(); renderAll(); startTimer();
+}
+
+function doHint(){
+  if(state.hints<=0) return;
+  const sol=currentPuzzle().solution;
+  const wrong=[];
+  if(state.player.flexDirection!==sol.flexDirection) wrong.push('flexDirection');
+  if(state.player.justifyContent!==sol.justifyContent) wrong.push('justifyContent');
+  if(state.player.alignItems!==sol.alignItems) wrong.push('alignItems');
+  if(wrong.length===0){ toast('You already match! Hit CRACK VAULT.'); return; }
+  const pick=wrong[Math.floor(Math.random()*wrong.length)];
+  state.player[pick]=sol[pick];
+  state.hints--;
+  updateControls(); renderPlayer(); updateMatch();
+  blip(0.15, 500);
+  toast(`Hint: ${pick} → ${sol[pick]}`);
+}
+
+function toast(msg){
+  const t=document.createElement('div');
+  t.textContent=msg;
+  t.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#0f172a;border:1px solid #2a3d6b;color:#f1f5f9;padding:10px 14px;border-radius:999px;font-size:13px;font-weight:700;z-index:60;box-shadow:0 8px 20px rgba(0,0,0,0.4)';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),1800);
+}
+
+// audio
+let audioCtx;
+function blip(dur=0.15, freq=600, type='sine'){
+  try{
+    if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.value=0.12;
+    o.connect(g).connect(audioCtx.destination);
+    o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+dur);
+    o.stop(audioCtx.currentTime+dur);
+  }catch(e){}
+}
+
+// events
+document.getElementById('hintBtn').onclick=doHint;
+document.getElementById('checkBtn').onclick=checkVault;
+document.getElementById('resetBtn').onclick=()=>{
+  if(confirm('Reset progress? Score and unlocks will be cleared.')){
+    localStorage.removeItem('vaultflex_v2'); localStorage.removeItem('vaultflex_done');
+    state.score=0; state.best=0; state.cracked=0; state.unlocked=1; state.lives=3; state.streak=0;
+    state.floor=0; state.vault=0; resetVaultState(); renderAll(); startTimer();
+  }
+};
+els.modal.addEventListener('click', (e)=>{ if(e.target===els.modal) closeModal(); });
+
+// init
+loadPersist();
+renderAll();
+startTimer();
+updateControls();
+</script>
+</body>
+</html>

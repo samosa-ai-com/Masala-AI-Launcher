@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Tower Stacker</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden;background:#0b1220;color:#eef2ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+body{display:flex;justify-content:center;background:radial-gradient(1200px 600px at 50% -10%,#1e2a4a 0%,#0b1220 60%)}
+.app{width:100%;max-width:428px;min-height:100dvh;display:flex;flex-direction:column;background:linear-gradient(180deg,#0f1a33 0%,#0b1220 100%);position:relative;overflow:hidden;border-left:1px solid rgba(255,255,255,.06);border-right:1px solid rgba(255,255,255,.06)}
+header{position:sticky;top:0;z-index:10;background:rgba(11,18,32,.92);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.08);padding:10px 12px calc(10px + env(safe-area-inset-top,0px));display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#38bdf8,#6366f1);display:grid;place-items:center;font-weight:900;letter-spacing:.5px;box-shadow:0 6px 18px rgba(99,102,241,.35)}
+.brand h1{font-size:16px;line-height:1;font-weight:800}
+.brand p{font-size:12px;opacity:.7;margin-top:2px}
+.stats{display:flex;gap:8px}
+.stat{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:8px 10px;min-width:68px;text-align:center}
+.stat b{display:block;font-size:18px;line-height:1}
+.stat span{font-size:11px;opacity:.75;letter-spacing:.4px;text-transform:uppercase}
+.canvas-wrap{position:relative;flex:1;display:flex;flex-direction:column;min-height:420px;background:linear-gradient(180deg,rgba(255,255,255,.02),transparent)}
+canvas{width:100%;height:100%;display:block;touch-action:none;flex:1}
+.hud{position:absolute;left:12px;right:12px;top:12px;display:flex;justify-content:space-between;pointer-events:none;gap:8px}
+.pill{background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(8px);padding:8px 10px;border-radius:999px;font-size:13px;display:flex;align-items:center;gap:6px}
+.pill strong{font-size:14px}
+.perfect{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);background:linear-gradient(135deg,#facc15,#f97316);color:#1a1200;padding:8px 14px;border-radius:999px;font-weight:900;letter-spacing:.6px;box-shadow:0 10px 24px rgba(249,115,22,.4);opacity:0;pointer-events:none;transition:.25s}
+.perfect.show{opacity:1;transform:translate(-50%,-50%) scale(1.05)}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;padding:18px;background:linear-gradient(180deg,rgba(5,10,22,.55),rgba(5,10,22,.78));backdrop-filter:blur(2px)}
+.card{width:100%;max-width:360px;background:rgba(255,255,255,.96);color:#0f172a;border-radius:20px;padding:18px;box-shadow:0 18px 40px rgba(0,0,0,.35);text-align:center}
+.card h2{font-size:22px;line-height:1.1}
+.card p{font-size:14px;opacity:.75;margin:8px 0 14px;line-height:1.5}
+.row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn{appearance:none;border:0;border-radius:14px;padding:14px 16px;font-weight:800;font-size:16px;min-height:48px;min-width:120px;cursor:pointer;touch-action:manipulation}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:linear-gradient(135deg,#38bdf8,#6366f1);color:white;box-shadow:0 8px 18px rgba(99,102,241,.35);flex:1}
+.btn-ghost{background:#0f172a;color:white;flex:1}
+.btn-light{background:white;color:#0f172a;border:1px solid rgba(15,23,42,.12)}
+.hint{font-size:12px;opacity:.6;margin-top:10px}
+.bottom{position:sticky;bottom:0;z-index:10;background:rgba(11,18,32,.96);backdrop-filter:blur(10px);border-top:1px solid rgba(255,255,255,.08);padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;align-items:center}
+.tap{flex:1;min-height:56px;border-radius:16px;border:0;background:linear-gradient(135deg,#22d3ee,#6366f1);color:white;font-weight:900;font-size:18px;letter-spacing:.5px;box-shadow:0 10px 22px rgba(99,102,241,.35);cursor:pointer;touch-action:manipulation}
+.tap:active{transform:scale(.99)}
+.small{width:56px;min-height:56px;border-radius:16px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.08);color:white;font-weight:800;font-size:14px;cursor:pointer}
+.small:active{transform:scale(.98)}
+.muted{font-size:12px;opacity:.7;text-align:center;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="brand">
+      <div class="logo">▦</div>
+      <div>
+        <h1>Tower Stacker</h1>
+        <p>Tap to drop • Trim the overhang</p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="lvl">0</b><span>Level</span></div>
+      <div class="stat"><b id="best">0</b><span>Best</span></div>
+    </div>
+  </header>
+
+  <div class="canvas-wrap" id="wrap">
+    <canvas id="c" width="428" height="640" aria-label="Tower stacker game"></canvas>
+    <div class="hud">
+      <div class="pill">🏗️ <strong id="scoreHud">0</strong> &nbsp;<span style="opacity:.7">stacked</span></div>
+      <div class="pill" id="speedPill">⚡ <span id="speedTxt">x1.0</span></div>
+    </div>
+    <div class="perfect" id="perfect">PERFECT! +1</div>
+
+    <div class="overlay" id="startOv">
+      <div class="card">
+        <h2>Stack the Tower</h2>
+        <p>Each block glides back & forth. Tap <b>TAP</b> to drop it. Overhangs are trimmed — miss completely and it's game over. Speed rises every level.</p>
+        <div class="row">
+          <button class="btn btn-primary" id="playBtn">▶ Play</button>
+          <button class="btn btn-light" id="howBtn">How to play</button>
+        </div>
+        <div class="hint">Tip: aim for the center for a Perfect — keeps full width!</div>
+      </div>
+    </div>
+
+    <div class="overlay" id="overOv" style="display:none">
+      <div class="card">
+        <h2 id="overTitle">Tower Fell!</h2>
+        <p id="overMsg">You stacked 0 levels.</p>
+        <div class="row">
+          <button class="btn btn-primary" id="retryBtn">↻ Play Again</button>
+          <button class="btn btn-ghost" id="shareBtn">Share</button>
+        </div>
+        <div class="muted">Best saved on this device</div>
+      </div>
+    </div>
+
+    <div class="overlay" id="howOv" style="display:none">
+      <div class="card">
+        <h2>How to Play</h2>
+        <p style="text-align:left">• Block slides at the top — tap to drop.<br>• Only the overlapping part stays; the rest falls.<br>• Next block = overlap size. No overlap = game over.<br>• Perfect (≥95% overlap) keeps full width + bonus.<br>• Camera rises as you climb. Beat your best!</p>
+        <div class="row"><button class="btn btn-primary" id="closeHow">Got it</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <button class="small" id="resetBtn" aria-label="Reset">↻</button>
+    <button class="tap" id="tapBtn" aria-label="Tap to drop">TAP TO DROP</button>
+    <button class="small" id="pauseBtn" aria-label="Pause">⏸</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('wrap');
+  const lvlEl = document.getElementById('lvl');
+  const bestEl = document.getElementById('best');
+  const scoreHud = document.getElementById('scoreHud');
+  const speedTxt = document.getElementById('speedTxt');
+  const perfectEl = document.getElementById('perfect');
+  const startOv = document.getElementById('startOv');
+  const overOv = document.getElementById('overOv');
+  const howOv = document.getElementById('howOv');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg = document.getElementById('overMsg');
+
+  const STORAGE_KEY = 'tower-stacker-best-v2';
+  let best = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10) || 0;
+  bestEl.textContent = best;
+
+  let W = 428, H = 640, dpr = Math.min(2, window.devicePixelRatio || 1);
+  function resize(){
+    const rect = wrap.getBoundingClientRect();
+    W = Math.round(rect.width);
+    // keep portrait canvas height responsive but stable
+    H = Math.round(Math.max(520, Math.min(720, window.innerHeight - 140)));
+    canvas.style.height = H + 'px';
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  // Game state
+  const BLOCK_H = 28;
+  const BASE_W = 160;
+  const GROUND_Y = () => H - 70;
+  let blocks = [];
+  let current = null;
+  let debris = [];
+  let level = 0;
+  let offsetY = 0;
+  let targetOffsetY = 0;
+  let playing = false;
+  let paused = false;
+  let gameOver = false;
+  let lastT = 0;
+  let perfectTimer = 0;
+
+  function hueFor(i){
+    return (200 + i*18) % 360;
+  }
+  function blockColor(i, alpha=1){
+    const h = hueFor(i);
+    return `hsla(${h} 85% 60% / ${alpha})`;
+  }
+  function blockStroke(i){
+    const h = hueFor(i);
+    return `hsl(${h} 85% 45%)`;
+  }
+
+  function resetGame(){
+    blocks = [];
+    debris = [];
+    level = 0;
+    offsetY = 0;
+    targetOffsetY = 0;
+    gameOver = false;
+    paused = false;
+    // base block
+    const baseW = Math.min(BASE_W, W - 40);
+    const base = { x: (W - baseW)/2, y: GROUND_Y(), w: baseW, h: BLOCK_H, i: 0 };
+    blocks.push(base);
+    spawnMoving();
+    updateHUD();
+    hideOver();
+  }
+
+  function spawnMoving(){
+    const prev = blocks[blocks.length-1];
+    const w = prev.w;
+    const y = prev.y - BLOCK_H - 14; // gap above
+    const speedBase = 1.9; // px per frame at 60fps ~ scaled by dt
+    const speed = speedBase + Math.min(3.2, level * 0.18);
+    current = {
+      x: 0,
+      y: y,
+      w: w,
+      h: BLOCK_H,
+      dir: 1,
+      speed: speed,
+      i: blocks.length
+    };
+    // ensure camera target
+    const topY = current.y;
+    const visibleTop = 90;
+    if (topY + offsetY < visibleTop){
+      targetOffsetY = visibleTop - topY;
+    }
+  }
+
+  function updateHUD(){
+    lvlEl.textContent = level;
+    scoreHud.textContent = level;
+    bestEl.textContent = best;
+    const sp = current ? (current.speed/1.9).toFixed(1) : '1.0';
+    speedTxt.textContent = 'x' + sp;
+  }
+
+  function showPerfect(){
+    perfectEl.classList.add('show');
+    perfectTimer = 600;
+  }
+  function hidePerfectSoon(dt){
+    if(perfectTimer>0){
+      perfectTimer -= dt;
+      if(perfectTimer<=0) perfectEl.classList.remove('show');
+    }
+  }
+
+  function drop(){
+    if(gameOver) return;
+    if(!playing){
+      playing = true;
+      startOv.style.display='none';
+      return;
+    }
+    if(paused) return;
+    if(!current) return;
+
+    const prev = blocks[blocks.length-1];
+    const cur = current;
+
+    const curLeft = cur.x;
+    const curRight = cur.x + cur.w;
+    const prevLeft = prev.x;
+    const prevRight = prev.x + prev.w;
+
+    const overlapLeft = Math.max(curLeft, prevLeft);
+    const overlapRight = Math.min(curRight, prevRight);
+    const overlap = overlapRight - overlapLeft;
+
+    if(overlap <= 0){
+      // miss
+      // add debris for whole current block falling
+      debris.push({x:cur.x, y:cur.y, w:cur.w, h:cur.h, vx: cur.dir*2, vy: 2, rot:0, vr:(Math.random()-.5)*0.2, i:cur.i, life:1200});
+      current = null;
+      gameOver = true;
+      playing = false;
+      if(level > best){
+        best = level;
+        localStorage.setItem(STORAGE_KEY, String(best));
+      }
+      updateHUD();
+      showGameOver(false);
+      return;
+    }
+
+    const ratio = overlap / prev.w;
+    const isPerfect = ratio >= 0.95;
+
+    let newW, newX;
+    if(isPerfect){
+      // keep full width, snap to prev for perfect
+      newW = prev.w;
+      newX = prev.x;
+      showPerfect();
+      // bonus: slight score bump visual only (level still +1)
+    } else {
+      newW = overlap;
+      newX = overlapLeft;
+      // create debris for trimmed parts
+      const leftTrim = overlapLeft - curLeft;
+      if(leftTrim > 1){
+        debris.push({x:curLeft, y:cur.y, w:leftTrim, h:cur.h, vx:-2.5, vy:1, rot:0, vr:-0.12, i:cur.i, life:1100});
+      }
+      const rightTrim = curRight - overlapRight;
+      if(rightTrim > 1){
+        debris.push({x:overlapRight, y:cur.y, w:rightTrim, h:cur.h, vx:2.5, vy:1, rot:0, vr:0.12, i:cur.i, life:1100});
+      }
+    }
+
+    const placed = { x:newX, y:cur.y, w:newW, h:cur.h, i:cur.i };
+    blocks.push(placed);
+    level++;
+    if(level > best){
+      best = level;
+      localStorage.setItem(STORAGE_KEY, String(best));
+    }
+    updateHUD();
+    // spawn next
+    spawnMoving();
+    // haptic
+    if(navigator.vibrate) navigator.vibrate(isPerfect?30:12);
+  }
+
+  function showGameOver(won){
+    overTitle.textContent = won ? 'Amazing Tower!' : 'Tower Fell!';
+    overMsg.textContent = `You stacked ${level} level${level===1?'':'s'}.` + (level>=best && level>0 ? ' New best!' : ` Best: ${best}.`);
+    overOv.style.display='grid';
+  }
+  function hideOver(){ overOv.style.display='none'; }
+
+  // Input
+  function bindTap(el, fn){
+    el.addEventListener('click', fn);
+    el.addEventListener('touchend', (e)=>{ e.preventDefault(); fn(); }, {passive:false});
+  }
+  bindTap(document.getElementById('tapBtn'), drop);
+  canvas.addEventListener('click', drop);
+  canvas.addEventListener('touchend', (e)=>{ e.preventDefault(); drop(); }, {passive:false});
+  window.addEventListener('keydown', (e)=>{
+    if(e.code==='Space'){ e.preventDefault(); drop(); }
+    if(e.code==='KeyR'){ resetGame(); playing=true; startOv.style.display='none'; }
+    if(e.code==='KeyP'){ togglePause(); }
+  });
+
+  document.getElementById('playBtn').addEventListener('click', ()=>{ resetGame(); playing=true; startOv.style.display='none'; });
+  document.getElementById('retryBtn').addEventListener('click', ()=>{ resetGame(); playing=true; hideOver(); });
+  document.getElementById('resetBtn').addEventListener('click', ()=>{ resetGame(); playing=false; startOv.style.display='grid'; hideOver(); });
+  document.getElementById('pauseBtn').addEventListener('click', togglePause);
+  document.getElementById('howBtn').addEventListener('click', ()=> howOv.style.display='grid');
+  document.getElementById('closeHow').addEventListener('click', ()=> howOv.style.display='none');
+  document.getElementById('shareBtn').addEventListener('click', async ()=>{
+    const text = `I stacked ${level} levels in Tower Stacker! Best: ${best} 🏗️`;
+    if(navigator.share){ try{ await navigator.share({title:'Tower Stacker', text}); }catch{} }
+    else if(navigator.clipboard){ await navigator.clipboard.writeText(text); overMsg.textContent = 'Copied: ' + text; }
+  });
+
+  function togglePause(){
+    if(gameOver || !playing) return;
+    paused = !paused;
+    document.getElementById('pauseBtn').textContent = paused ? '▶' : '⏸';
+  }
+
+  // Render helpers
+  function drawBlock(b, yOff){
+    const x = b.x, y = b.y + yOff, w = b.w, h = b.h;
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    ctx.fillRect(x+2, y+4, w, h);
+    // body gradient
+    const grad = ctx.createLinearGradient(x, y, x, y+h);
+    const hcol = hueFor(b.i);
+    grad.addColorStop(0, `hsl(${hcol} 90% 68%)`);
+    grad.addColorStop(1, `hsl(${hcol} 78% 52%)`);
+    ctx.fillStyle = grad;
+    roundRect(x, y, w, h, 6, true, false);
+    // top highlight
+    ctx.fillStyle = 'rgba(255,255,255,.28)';
+    roundRect(x, y, w, Math.min(8, h*0.45), 6, true, false);
+    // stroke
+    ctx.strokeStyle = blockStroke(b.i);
+    ctx.lineWidth = 1.2;
+    roundRect(x, y, w, h, 6, false, true);
+    // center line
+    ctx.fillStyle = 'rgba(255,255,255,.18)';
+    ctx.fillRect(x+8, y+h/2-1, w-16, 2);
+  }
+  function roundRect(x,y,w,h,r,fill,stroke){
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+    if(fill) ctx.fill();
+    if(stroke) ctx.stroke();
+  }
+
+  function drawGrid(yOff){
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,.06)';
+    ctx.lineWidth = 1;
+    const step = 28;
+    const startY = Math.floor((-yOff)%step);
+    for(let y=startY; y<H; y+=step){
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    }
+    for(let x=0; x<W; x+=step){
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Loop
+  function frame(t){
+    requestAnimationFrame(frame);
+    if(!lastT) lastT = t;
+    const dt = Math.min(32, t - lastT);
+    lastT = t;
+    const dt60 = dt / 16.666;
+
+    // update moving block
+    if(playing && !paused && !gameOver && current){
+      current.x += current.dir * current.speed * dt60;
+      if(current.x + current.w >= W - 6){
+        current.x = W - 6 - current.w;
+        current.dir = -1;
+      } else if(current.x <= 6){
+        current.x = 6;
+        current.dir = 1;
+      }
+    }
+
+    // camera lerp
+    offsetY += (targetOffsetY - offsetY) * 0.08 * dt60;
+    // debris physics
+    for(let d of debris){
+      d.x += d.vx * dt60;
+      d.y += d.vy * dt60;
+      d.vy += 0.35 * dt60;
+      d.rot += d.vr * dt60;
+      d.life -= dt;
+    }
+    debris = debris.filter(d=> d.life>0 && d.y < H+80);
+
+    hidePerfectSoon(dt);
+
+    // draw
+    ctx.clearRect(0,0,W,H);
+    // bg vignette
+    const bg = ctx.createLinearGradient(0,0,0,H);
+    bg.addColorStop(0,'rgba(99,102,241,.10)');
+    bg.addColorStop(1,'rgba(14,165,233,.06)');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0,0,W,H);
+    drawGrid(offsetY);
+
+    // ground
+    const gy = GROUND_Y() + offsetY;
+    ctx.fillStyle = 'rgba(255,255,255,.08)';
+    ctx.fillRect(0, gy+BLOCK_H, W, H - gy);
+    ctx.fillStyle = 'rgba(255,255,255,.14)';
+    ctx.fillRect(0, gy+BLOCK_H, W, 2);
+
+    // blocks
+    for(let b of blocks){
+      drawBlock(b, offsetY);
+    }
+    if(current){
+      // ghost of prev alignment
+      const prev = blocks[blocks.length-1];
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = 'white';
+      ctx.fillRect(prev.x, current.y + offsetY, prev.w, 2);
+      ctx.restore();
+      drawBlock({...current, y: current.y}, offsetY);
+      // direction arrow
+      ctx.fillStyle = 'rgba(255,255,255,.9)';
+      ctx.font = '12px system-ui';
+      ctx.textAlign = 'center';
+      // subtle indicator
+      // ctx.fillText(current.dir>0?'›':'‹', current.x + current.w/2, current.y + offsetY - 6);
+    }
+    // debris
+    for(let d of debris){
+      ctx.save();
+      ctx.translate(d.x + d.w/2, d.y + offsetY + d.h/2);
+      ctx.rotate(d.rot);
+      ctx.fillStyle = blockColor(d.i, 0.95);
+      ctx.strokeStyle = blockStroke(d.i);
+      ctx.lineWidth = 1;
+      roundRect(-d.w/2, -d.h/2, d.w, d.h, 6, true, true);
+      ctx.restore();
+    }
+
+    // idle bob for start
+    if(!playing && !gameOver && current){
+      // gentle hint pulse on TAP button handled by CSS, nothing here
+    }
+  }
+
+  // init
+  resize();
+  window.addEventListener('resize', resize);
+  resetGame();
+  requestAnimationFrame(frame);
+
+  // prevent scroll on tap
+  document.addEventListener('touchmove', (e)=>{
+    if(e.target.closest('canvas') || e.target.closest('.tap')) e.preventDefault();
+  }, {passive:false});
+})();
+</script>
+</body>
+</html>

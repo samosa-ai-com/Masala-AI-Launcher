@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Gravity Playground</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#050711;color:#e6e8ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif;overflow-x:hidden}
+  body{display:flex;justify-content:center;background:radial-gradient(1200px 600px at 50% -10%, #1a2450 0%, #0a0e1f 45%, #050711 100%)}
+  .app{width:100%;max-width:428px;min-width:360px;min-height:100dvh;display:flex;flex-direction:column;padding:14px 14px 18px;gap:12px}
+  header{text-align:center;padding:6px 0 2px}
+  h1{font-size:22px;letter-spacing:0.14em;font-weight:800;color:#fff;text-shadow:0 2px 12px rgba(99,102,241,0.6)}
+  h1 span{color:#8b8eff}
+  .sub{font-size:12px;letter-spacing:0.12em;color:#9aa0c3;margin-top:4px;font-weight:600}
+  .scores{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .card{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.10);border-radius:16px;padding:10px 8px;text-align:center;backdrop-filter:blur(8px)}
+  .card-label{font-size:10px;letter-spacing:0.12em;color:#9aa0c3;font-weight:700}
+  .card-value{font-size:22px;font-weight:800;color:#fff;margin-top:2px;line-height:1}
+  .card-sub{font-size:10px;color:#7d84b0;margin-top:2px;font-weight:600}
+  .canvas-wrap{background:linear-gradient(180deg, #0e1430 0%, #0a1028 55%, #070a1a 100%);border:1px solid rgba(139,142,255,0.18);border-radius:20px;overflow:hidden;position:relative;box-shadow:0 12px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08);flex:1;min-height:380px;display:flex;flex-direction:column}
+  .canvas-header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(255,255,255,0.04);border-bottom:1px solid rgba(255,255,255,0.06)}
+  .live{font-size:11px;letter-spacing:0.12em;color:#7de2ff;font-weight:800;display:flex;align-items:center;gap:6px}
+  .dot{width:8px;height:8px;border-radius:50%;background:#3de0a6;box-shadow:0 0 8px #3de0a6;animation:pulse 1.2s infinite}
+  .live.paused .dot{background:#ff6b6b;box-shadow:0 0 8px #ff6b6b;animation:none}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+  .gravity-badge{font-size:11px;font-weight:800;color:#ffd86e;background:rgba(255,216,110,0.12);border:1px solid rgba(255,216,110,0.25);padding:4px 10px;border-radius:999px}
+  canvas{width:100%;height:100%;display:block;touch-action:none;flex:1}
+  .controls{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);border-radius:20px;padding:14px;backdrop-filter:blur(10px)}
+  .slider-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .slider-label{font-size:12px;letter-spacing:0.10em;font-weight:800;color:#c2c6e8}
+  .slider-value{font-size:13px;font-weight:800;color:#ffd86e}
+  .range-wrap{position:relative;padding:6px 0}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:8px;background:rgba(255,255,255,0.10);border-radius:999px;outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;border-radius:50%;background:#ffd86e;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.4), 0 0 0 6px rgba(255,216,110,0.18);cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:#ffd86e;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.4);cursor:pointer}
+  .range-labels{display:flex;justify-content:space-between;font-size:10px;letter-spacing:0.08em;color:#7d84b0;font-weight:700;margin-top:6px}
+  .buttons{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+  button{height:54px;border-radius:16px;border:none;font-size:15px;font-weight:800;letter-spacing:0.08em;cursor:pointer;touch-action:manipulation;transition:transform 0.08s, filter 0.15s}
+  button:active{transform:scale(0.97)}
+  .btn-start{background:linear-gradient(180deg, #3de0a6 0%, #1fb98a 100%);color:#04261c;box-shadow:0 6px 16px rgba(61,224,166,0.35), inset 0 1px 0 rgba(255,255,255,0.4)}
+  .btn-start.paused{background:linear-gradient(180deg, #ffd86e 0%, #ffb84d 100%);color:#2b1a00;box-shadow:0 6px 16px rgba(255,184,77,0.35), inset 0 1px 0 rgba(255,255,255,0.4)}
+  .btn-reset{background:rgba(255,255,255,0.08);color:#e6e8ff;border:1px solid rgba(255,255,255,0.14);box-shadow:inset 0 1px 0 rgba(255,255,255,0.08)}
+  .hint{text-align:center;font-size:11px;color:#7d84b0;font-weight:600;letter-spacing:0.04em;padding:2px 0}
+  .hint b{color:#9aa0c3}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><span>◉</span> GRAVITY PLAYGROUND</h1>
+    <div class="sub">DARK SPACE PHYSICS LAB</div>
+  </header>
+
+  <div class="scores">
+    <div class="card">
+      <div class="card-label">BOUNCES</div>
+      <div class="card-value" id="bounces">0</div>
+      <div class="card-sub">hits</div>
+    </div>
+    <div class="card">
+      <div class="card-label">AIR TIME</div>
+      <div class="card-value" id="airtime">0.0s</div>
+      <div class="card-sub">flight</div>
+    </div>
+    <div class="card">
+      <div class="card-label">BEST</div>
+      <div class="card-value" id="best">0</div>
+      <div class="card-sub">record</div>
+    </div>
+  </div>
+
+  <div class="canvas-wrap" id="wrap">
+    <div class="canvas-header">
+      <div class="live" id="liveInd"><span class="dot"></span> LIVE</div>
+      <div class="gravity-badge" id="gravityBadge">1.0 G • EARTH</div>
+    </div>
+    <canvas id="c"></canvas>
+  </div>
+
+  <div class="controls">
+    <div class="slider-row">
+      <div class="slider-label">◎ GRAVITY STRENGTH</div>
+      <div class="slider-value" id="gravityVal">1.00 G</div>
+    </div>
+    <div class="range-wrap">
+      <input type="range" id="gravity" min="0.1" max="2.5" step="0.05" value="1.0">
+    </div>
+    <div class="range-labels"><span>0.1 MOON</span><span>1.0 EARTH</span><span>2.5 JUPITER</span></div>
+    <div class="buttons">
+      <button class="btn-start" id="startBtn">▶ START</button>
+      <button class="btn-reset" id="resetBtn">↺ RESET</button>
+    </div>
+  </div>
+  <div class="hint">Tap <b>START</b> to drop • <b>Drag the ball</b> to throw • Slide gravity live</div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('wrap');
+const gravitySlider = document.getElementById('gravity');
+const gravityVal = document.getElementById('gravityVal');
+const gravityBadge = document.getElementById('gravityBadge');
+const bouncesEl = document.getElementById('bounces');
+const airtimeEl = document.getElementById('airtime');
+const bestEl = document.getElementById('best');
+const startBtn = document.getElementById('startBtn');
+const resetBtn = document.getElementById('resetBtn');
+const liveInd = document.getElementById('liveInd');
+
+let W=0,H=0,DPR=1, floorY=0;
+let gravity = 1.0;
+let running = false;
+let bounces = 0;
+let best = parseInt(localStorage.getItem('gp_best')||'0',10);
+let startTime = 0;
+let elapsed = 0;
+
+bestEl.textContent = best;
+
+const ball = {
+  x: 0, y: 0, vx: 0, vy: 0, r: 18,
+  trail: []
+};
+
+let stars = [];
+let dragging = false;
+let dragOffset = {x:0,y:0};
+let lastPos = {x:0,y:0};
+let wasRunningBeforeDrag = false;
+
+function gravityLabel(g){
+  if(g < 0.4) return 'MOON';
+  if(g < 0.8) return 'MARS';
+  if(g < 1.3) return 'EARTH';
+  if(g < 1.9) return 'HEAVY';
+  return 'JUPITER';
+}
+
+function updateGravityUI(){
+  gravityVal.textContent = gravity.toFixed(2) + ' G';
+  gravityBadge.textContent = gravity.toFixed(1) + ' G • ' + gravityLabel(gravity);
+  // color shift
+  const hue = 45 - (gravity-1)*12;
+  gravityBadge.style.color = `hsl(${hue} 100% 70%)`;
+  gravityBadge.style.borderColor = `hsla(${hue} 100% 60% / 0.3)`;
+  gravityBadge.style.background = `hsla(${hue} 100% 60% / 0.12)`;
+}
+
+gravitySlider.addEventListener('input', e=>{
+  gravity = parseFloat(e.target.value);
+  updateGravityUI();
+});
+
+function resize(){
+  const rect = canvas.getBoundingClientRect();
+  // if not yet laid out, use wrap width
+  const w = rect.width || wrap.clientWidth - 2;
+  const h = rect.height || 380;
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  W = w;
+  H = h;
+  canvas.width = Math.round(W * DPR);
+  canvas.height = Math.round(H * DPR);
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  floorY = H - 14;
+  // generate stars
+  const count = Math.floor((W*H)/2800);
+  stars = [];
+  for(let i=0;i<count;i++){
+    stars.push({
+      x: Math.random()*W,
+      y: Math.random()*(H*0.85),
+      r: Math.random()*1.4 + 0.3,
+      a: Math.random()*0.7+0.3,
+      tw: Math.random()*0.04+0.005
+    });
+  }
+  if(!running && bounces===0){
+    resetBall(false);
+  }
+}
+
+function resetBall(keepScore){
+  ball.x = W/2;
+  ball.y = 60;
+  ball.vx = (Math.random()-0.5)*1.2;
+  ball.vy = 0;
+  ball.trail = [];
+  if(!keepScore){
+    bounces = 0;
+    elapsed = 0;
+    bouncesEl.textContent = '0';
+    airtimeEl.textContent = '0.0s';
+  }
+}
+
+function start(){
+  if(running) {
+    // pause
+    running = false;
+    startBtn.textContent = '▶ START';
+    startBtn.classList.remove('paused');
+    liveInd.classList.add('paused');
+    liveInd.innerHTML = '<span class="dot"></span> PAUSED';
+    return;
+  }
+  running = true;
+  if(bounces===0 && elapsed===0) startTime = performance.now();
+  else startTime = performance.now() - elapsed*1000;
+  startBtn.textContent = '⏸ PAUSE';
+  startBtn.classList.add('paused');
+  liveInd.classList.remove('paused');
+  liveInd.innerHTML = '<span class="dot"></span> LIVE';
+  if(!animId) loop();
+}
+
+function reset(){
+  running = false;
+  startBtn.textContent = '▶ START';
+  startBtn.classList.remove('paused');
+  liveInd.classList.add('paused');
+  liveInd.innerHTML = '<span class="dot"></span> READY';
+  resetBall(false);
+  draw();
+}
+
+startBtn.addEventListener('click', start);
+resetBtn.addEventListener('click', reset);
+
+// pointer interactions for drag-to-throw
+function getPos(e){
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX ?? e.touches?.[0]?.clientX) - rect.left;
+  const y = (e.clientY ?? e.touches?.[0]?.clientY) - rect.top;
+  return {x,y};
+}
+function hitTest(px,py){
+  const dx = px - ball.x;
+  const dy = py - ball.y;
+  return Math.sqrt(dx*dx+dy*dy) < ball.r + 14;
+}
+
+canvas.addEventListener('pointerdown', e=>{
+  const p = getPos(e);
+  if(hitTest(p.x,p.y)){
+    dragging = true;
+    wasRunningBeforeDrag = running;
+    // keep running but capture
+    canvas.setPointerCapture(e.pointerId);
+    dragOffset.x = p.x - ball.x;
+    dragOffset.y = p.y - ball.y;
+    lastPos = {x:p.x, y:p.y, t:performance.now()};
+    ball.vx = 0; ball.vy = 0;
+    e.preventDefault();
+  }
+});
+canvas.addEventListener('pointermove', e=>{
+  if(!dragging) return;
+  const p = getPos(e);
+  const now = performance.now();
+  const dt = Math.max(1, now - lastPos.t);
+  // velocity from drag delta
+  const vx = (p.x - lastPos.x) / dt * 16;
+  const vy = (p.y - lastPos.y) / dt * 16;
+  ball.vx = vx * 0.9;
+  ball.vy = vy * 0.9;
+  ball.x = p.x - dragOffset.x;
+  ball.y = p.y - dragOffset.y;
+  // clamp
+  ball.x = Math.max(ball.r, Math.min(W - ball.r, ball.x));
+  ball.y = Math.max(ball.r, Math.min(floorY - ball.r, ball.y));
+  lastPos = {x:p.x, y:p.y, t:now};
+  e.preventDefault();
+});
+canvas.addEventListener('pointerup', e=>{
+  if(dragging){
+    dragging = false;
+    // give a little boost if not running, auto start
+    if(!running){
+      running = true;
+      startTime = performance.now() - elapsed*1000;
+      startBtn.textContent = '⏸ PAUSE';
+      startBtn.classList.add('paused');
+      liveInd.classList.remove('paused');
+      liveInd.innerHTML = '<span class="dot"></span> LIVE';
+      if(!animId) loop();
+    }
+    // if velocity is tiny, give random nudge
+    if(Math.abs(ball.vx)<0.5 && Math.abs(ball.vy)<0.5){
+      ball.vx = (Math.random()-0.5)*4;
+    }
+  }
+});
+canvas.addEventListener('pointercancel', ()=> dragging=false);
+
+// also tap to boost when not dragging
+canvas.addEventListener('click', e=>{
+  if(dragging) return;
+  const p = getPos(e);
+  if(hitTest(p.x,p.y) && running){
+    ball.vy -= 6 + Math.random()*4;
+    ball.vx += (Math.random()-0.5)*6;
+    if(navigator.vibrate) navigator.vibrate(18);
+  }
+});
+
+let lastT = 0;
+let animId = null;
+
+function loop(t){
+  animId = requestAnimationFrame(loop);
+  if(!t) t = performance.now();
+  const dt = Math.min(32, t - lastT) / 16.666;
+  lastT = t;
+
+  if(running && !dragging){
+    // physics
+    ball.vy += gravity * 0.62 * dt;
+    ball.vx *= (1 - 0.002*dt); // tiny air drag
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+
+    // walls
+    if(ball.x - ball.r < 0){
+      ball.x = ball.r;
+      ball.vx *= -0.78;
+      if(Math.abs(ball.vx)>0.3) bounces++;
+    } else if(ball.x + ball.r > W){
+      ball.x = W - ball.r;
+      ball.vx *= -0.78;
+      if(Math.abs(ball.vx)>0.3) bounces++;
+    }
+    // floor
+    if(ball.y + ball.r > floorY){
+      ball.y = floorY - ball.r;
+      if(Math.abs(ball.vy) > 0.6){
+        ball.vy *= -0.74;
+        ball.vx *= 0.96;
+        bounces++;
+        bouncesEl.textContent = bounces;
+        if(bounces > best){
+          best = bounces;
+          bestEl.textContent = best;
+          localStorage.setItem('gp_best', best);
+        }
+        if(navigator.vibrate) navigator.vibrate(14);
+        // trail burst
+      } else {
+        ball.vy = 0;
+        ball.vx *= 0.92;
+        if(Math.abs(ball.vx) < 0.05) ball.vx = 0;
+      }
+    }
+    // ceiling
+    if(ball.y - ball.r < 0){
+      ball.y = ball.r;
+      ball.vy *= -0.6;
+    }
+
+    // trail
+    ball.trail.push({x:ball.x, y:ball.y});
+    if(ball.trail.length > 14) ball.trail.shift();
+
+    elapsed = (performance.now() - startTime)/1000;
+    airtimeEl.textContent = elapsed.toFixed(1) + 's';
+    bouncesEl.textContent = bounces;
+  }
+
+  draw();
+}
+
+function draw(){
+  // clear
+  ctx.clearRect(0,0,W,H);
+
+  // nebula glow
+  const g1 = ctx.createRadialGradient(W*0.3, H*0.2, 0, W*0.3, H*0.2, W*0.9);
+  g1.addColorStop(0, 'rgba(99,102,241,0.18)');
+  g1.addColorStop(0.5, 'rgba(99,102,241,0.06)');
+  g1.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g1;
+  ctx.fillRect(0,0,W,H);
+
+  const g2 = ctx.createRadialGradient(W*0.85, H*0.15, 0, W*0.85, H*0.15, W*0.6);
+  g2.addColorStop(0, 'rgba(56,189,248,0.12)');
+  g2.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g2;
+  ctx.fillRect(0,0,W,H);
+
+  // stars
+  for(const s of stars){
+    s.a += (Math.sin(performance.now()*0.001*s.tw*100)*0.002);
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(255,255,255,${Math.max(0.2, Math.min(1, s.a))})`;
+    ctx.fill();
+    if(s.r > 1){
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r*2.2, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(180,190,255,${0.08})`;
+      ctx.fill();
+    }
+  }
+
+  // floor
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  ctx.fillRect(0, floorY, W, H-floorY);
+  // floor line glow
+  const fg = ctx.createLinearGradient(0,floorY-8,0,floorY+2);
+  fg.addColorStop(0,'rgba(0,0,0,0)');
+  fg.addColorStop(0.5,'rgba(139,142,255,0.35)');
+  fg.addColorStop(1,'rgba(139,142,255,0.9)');
+  ctx.fillStyle = fg;
+  ctx.fillRect(0,floorY-1,W,2);
+  // floor reflection
+  ctx.fillStyle = 'rgba(139,142,255,0.07)';
+  ctx.fillRect(0,floorY+2,W,10);
+
+  // grid faint
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for(let x=0;x<W;x+=40){
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,floorY); ctx.stroke();
+  }
+  for(let y=0;y<floorY;y+=40){
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+
+  // trail
+  for(let i=0;i<ball.trail.length;i++){
+    const p = ball.trail[i];
+    const alpha = (i+1)/ball.trail.length * 0.35;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, ball.r * (0.4 + alpha*0.6), 0, Math.PI*2);
+    ctx.fillStyle = `rgba(255,216,110,${alpha*0.5})`;
+    ctx.fill();
+  }
+
+  // shadow
+  const shadowScale = Math.max(0.3, 1 - (floorY - ball.y)/floorY);
+  ctx.beginPath();
+  ctx.ellipse(ball.x, floorY+4, ball.r*1.6*shadowScale, 5*shadowScale, 0, 0, Math.PI*2);
+  ctx.fillStyle = `rgba(0,0,0,${0.35*shadowScale})`;
+  ctx.fill();
+
+  // ball
+  const bg = ctx.createRadialGradient(ball.x-5, ball.y-7, 4, ball.x, ball.y, ball.r+2);
+  bg.addColorStop(0, '#fff7cc');
+  bg.addColorStop(0.25, '#ffd86e');
+  bg.addColorStop(0.6, '#ff8c42');
+  bg.addColorStop(1, '#b94a2a');
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
+  ctx.fillStyle = bg;
+  ctx.fill();
+  // highlight
+  ctx.beginPath();
+  ctx.arc(ball.x-5, ball.y-6, 4.5, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fill();
+  // outer glow
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.r+6, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,140,66,0.12)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // velocity arrow when dragging
+  if(dragging && (Math.abs(ball.vx)>0.2 || Math.abs(ball.vy)>0.2)){
+    const len = Math.min(60, Math.hypot(ball.vx, ball.vy)*6);
+    const ang = Math.atan2(ball.vy, ball.vx);
+    const ex = ball.x + Math.cos(ang)* (ball.r + len);
+    const ey = ball.y + Math.sin(ang)* (ball.r + len);
+    ctx.beginPath();
+    ctx.moveTo(ball.x, ball.y);
+    ctx.lineTo(ex, ey);
+    ctx.strokeStyle = 'rgba(125,226,255,0.9)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    // arrow head
+    ctx.beginPath();
+    ctx.arc(ex, ey, 4, 0, Math.PI*2);
+    ctx.fillStyle = '#7de2ff';
+    ctx.fill();
+  }
+}
+
+window.addEventListener('resize', resize);
+updateGravityUI();
+resize();
+draw();
+liveInd.classList.add('paused');
+liveInd.innerHTML = '<span class="dot"></span> READY';
+
+// handle visibility
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden) lastT = performance.now();
+});
+
+</script>
+</body>
+</html>

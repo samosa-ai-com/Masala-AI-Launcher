@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Day Drill — Date to Weekday</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f6f7f9;--card:#ffffff;--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#111827;--ok:#059669;--bad:#dc2626;--chip:#f3f4f6}
+html,body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;min-height:100%}
+body{display:flex;justify-content:center}
+.wrap{width:100%;max-width:428px;min-width:360px;padding:12px 12px 20px}
+header{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.topline{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px;letter-spacing:.5px}
+h1{font-size:16px;letter-spacing:.2px;line-height:1}
+h1 span{font-weight:400;color:var(--muted)}
+.sub{font-size:11px;color:var(--muted);margin-top:2px}
+.iconbtn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;font-size:16px}
+.iconbtn:active{transform:scale(.97)}
+.stats3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
+.stat{background:var(--chip);border:1px solid var(--line);border-radius:12px;padding:8px 10px;text-align:center}
+.stat .k{font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.stat .v{font-size:18px;font-weight:800;margin-top:2px}
+.stat .v small{font-size:11px;font-weight:600;color:var(--muted)}
+.modes{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;box-shadow:0 2px 12px rgba(0,0,0,.04)}
+.modes h2{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip{height:36px;padding:0 12px;border-radius:20px;border:1px solid var(--line);background:var(--chip);font-size:13px;font-weight:600;color:var(--ink)}
+.chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.rangeRow{display:flex;gap:8px;margin-top:10px;align-items:center}
+.rangeRow input{flex:1;height:40px;border-radius:10px;border:1px solid var(--line);background:#fff;padding:0 10px;font-size:14px;font-weight:600;text-align:center}
+.rangeRow span{font-size:12px;color:var(--muted);font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 4px 16px rgba(0,0,0,.06);position:relative;overflow:hidden}
+.cardTop{display:flex;justify-content:space-between;align-items:center}
+.pill{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:6px 10px;border-radius:20px;background:var(--chip);border:1px solid var(--line);color:var(--muted)}
+.timer{font-size:13px;font-weight:800;letter-spacing:.3px}
+.timer.paused{color:var(--bad)}
+.dateBig{margin-top:14px;text-align:center;padding:10px 0 6px}
+.dateBig .dow{font-size:11px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);font-weight:700}
+.dateBig .date{font-size:32px;font-weight:800;letter-spacing:-.5px;line-height:1.1;margin-top:4px}
+.dateBig .year{font-size:13px;color:var(--muted);font-weight:600;margin-top:4px}
+.progress{height:6px;background:var(--chip);border-radius:20px;overflow:hidden;margin-top:12px;border:1px solid var(--line)}
+.bar{height:100%;width:0;background:var(--ink);transition:width .2s}
+.weekgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.wbtn{height:52px;border-radius:12px;border:1px solid var(--line);background:#fff;font-size:15px;font-weight:700;letter-spacing:.2px}
+.wbtn:active{transform:scale(.98)}
+.wbtn.ok{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}
+.wbtn.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+.wbtn.dim{opacity:.45}
+.controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+.btn{height:44px;border-radius:12px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn:disabled{opacity:.45}
+.splits{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;margin-top:12px;box-shadow:0 2px 12px rgba(0,0,0,.04)}
+.splits h3{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.splitGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.split{background:var(--chip);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.split .k{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);font-weight:700}
+.split .v{font-size:16px;font-weight:800;margin-top:2px}
+.split .v small{font-size:11px;color:var(--muted);font-weight:600}
+.history{margin-top:10px;max-height:120px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.hitem{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:12px}
+.hitem.ok{border-color:#a7f3d0;background:#ecfdf5}
+.hitem.bad{border-color:#fecaca;background:#fef2f2}
+.pauseOverlay{position:absolute;inset:0;background:rgba(255,255,255,.92);display:none;place-items:center;z-index:5;border-radius:16px}
+.pauseOverlay.show{display:grid}
+.pauseBox{text-align:center;padding:20px}
+.pauseBox h4{font-size:18px}
+.pauseBox p{font-size:13px;color:var(--muted);margin-top:6px}
+.footer{text-align:center;font-size:11px;color:var(--muted);margin-top:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="topline">
+      <div class="brand">
+        <div class="logo">D7</div>
+        <div>
+          <h1>DAY DRILL <span>• Date → Weekday</span></h1>
+          <div class="sub">Wide-year drill • 7-button pick • Minimal study card</div>
+        </div>
+      </div>
+      <button class="iconbtn" id="helpBtn">?</button>
+    </div>
+    <div class="stats3">
+      <div class="stat"><div class="k">Accuracy</div><div class="v" id="accV">—</div></div>
+      <div class="stat"><div class="k">Streak</div><div class="v" id="streakV">0</div></div>
+      <div class="stat"><div class="k">Total</div><div class="v" id="totalV">0</div></div>
+    </div>
+  </header>
+
+  <div class="modes">
+    <h2>Year-split practice</h2>
+    <div class="chips" id="chips">
+      <button class="chip active" data-mode="all">All 1600–2399</button>
+      <button class="chip" data-mode="1900s">1900s</button>
+      <button class="chip" data-mode="2000s">2000s</button>
+      <button class="chip" data-mode="1800s">1800s</button>
+      <button class="chip" data-mode="leap">Leap years</button>
+      <button class="chip" data-mode="recent">Recent 2015–2035</button>
+      <button class="chip" data-mode="custom">Custom</button>
+    </div>
+    <div class="rangeRow" id="customRow" style="display:none">
+      <input id="yMin" type="number" value="1600" min="1583" max="3000">
+      <span>to</span>
+      <input id="yMax" type="number" value="2399" min="1583" max="3000">
+      <button class="btn" id="applyRange" style="height:40px;padding:0 12px">Apply</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.4">Year-split filters the random date pool. Leap mode only shows Feb 29 + nearby dates. Pause freezes the timer without resetting splits.</div>
+  </div>
+
+  <div class="card" id="card">
+    <div class="pauseOverlay" id="pauseOverlay"><div class="pauseBox"><h4>⏸ Paused</h4><p>Timer frozen. Tap Resume to continue.</p><button class="btn primary" id="resumeBtn2" style="margin-top:12px;padding:0 18px;height:44px">Resume</button></div></div>
+    <div class="cardTop">
+      <div class="pill" id="qPill">Q 1 • Tap weekday</div>
+      <div class="timer" id="timer">0.0s</div>
+    </div>
+    <div class="dateBig">
+      <div class="dow" id="dowHint">What day of the week?</div>
+      <div class="date" id="dateText">—</div>
+      <div class="year" id="yearText"></div>
+    </div>
+    <div class="progress"><div class="bar" id="bar"></div></div>
+    <div class="weekgrid" id="weekGrid"></div>
+    <div class="controls">
+      <button class="btn" id="pauseBtn">⏸ Pause</button>
+      <button class="btn" id="skipBtn">Skip ↷</button>
+      <button class="btn primary" id="nextBtn" disabled>Next →</button>
+    </div>
+  </div>
+
+  <div class="splits">
+    <h3>Response-time splits</h3>
+    <div class="splitGrid">
+      <div class="split"><div class="k">Last</div><div class="v" id="lastV">—</div></div>
+      <div class="split"><div class="k">Average</div><div class="v" id="avgV">—</div></div>
+      <div class="split"><div class="k">Best</div><div class="v" id="bestV">—</div></div>
+      <div class="split"><div class="k">Worst</div><div class="v" id="worstV">—</div></div>
+    </div>
+    <div class="history" id="history"></div>
+    <div class="controls" style="margin-top:10px">
+      <button class="btn" id="resetBtn">Reset stats</button>
+      <button class="btn" id="exportBtn">Export</button>
+      <button class="btn" id="importBtn">Import</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.4">Stats auto-save. Export copies an archive code to restore on another device.</div>
+  </div>
+  <div class="footer">Minimal study-card • 44px+ targets • 360–428px portrait • No horizontal scroll</div>
+</div>
+
+<script>
+const WEEKDAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const WEEK_SHORT=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+// JS getDay: 0 Sun ... 6 Sat -> map to Mon=0
+function jsDayToMonIndex(jsDay){ return jsDay===0?6:jsDay-1; }
+
+let state={
+  mode:'all',
+  yMin:1600, yMax:2399,
+  total:0, correct:0, streak:0, bestStreak:0,
+  times:[], // seconds
+  lastTime:null,
+  qNum:1,
+  current:null, // {y,m,d, weekdayMonIndex}
+  startTime:0,
+  elapsedPaused:0,
+  paused:false,
+  pauseStart:0,
+  answered:false,
+  history:[] // {dateStr, correct, picked, actual, time}
+};
+
+const STORAGE_KEY='daydrill_v1';
+const CODE_PREFIX='DD1-';
+
+function save(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    mode:state.mode, yMin:state.yMin, yMax:state.yMax,
+    total:state.total, correct:state.correct, streak:state.streak, bestStreak:state.bestStreak,
+    times:state.times, history:state.history, qNum:state.qNum
+  }));
+}
+function load(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw) return;
+    const p=JSON.parse(raw);
+    state.mode=p.mode||'all';
+    state.yMin=p.yMin||1600; state.yMax=p.yMax||2399;
+    state.total=p.total||0; state.correct=p.correct||0; state.streak=p.streak||0; state.bestStreak=p.bestStreak||0;
+    state.times=p.times||[]; state.history=p.history||[]; state.qNum=p.qNum||1;
+  }catch(e){}
+}
+function makeCode(){
+  const data={mode:state.mode,yMin:state.yMin,yMax:state.yMax,total:state.total,correct:state.correct,streak:state.streak,bestStreak:state.bestStreak,times:state.times,history:state.history,qNum:state.qNum,v:1};
+  return CODE_PREFIX + btoa(JSON.stringify(data)).replace(/=+$/,'');
+}
+function tryImport(code){
+  code=code.trim();
+  if(code.startsWith(CODE_PREFIX)) code=code.slice(CODE_PREFIX.length);
+  try{
+    while(code.length%4) code+='=';
+    const obj=JSON.parse(atob(code));
+    state.mode=obj.mode||'all'; state.yMin=obj.yMin||1600; state.yMax=obj.yMax||2399;
+    state.total=obj.total||0; state.correct=obj.correct||0; state.streak=obj.streak||0; state.bestStreak=obj.bestStreak||0;
+    state.times=obj.times||[]; state.history=obj.history||[]; state.qNum=obj.qNum||1;
+    save(); return true;
+  }catch(e){ return false; }
+}
+
+function randomInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+function daysInMonth(y,m){ // m 1-12
+  return new Date(y, m, 0).getDate();
+}
+function makeDateForMode(){
+  let y,m,d;
+  if(state.mode==='1900s'){ y=randomInt(1900,1999); }
+  else if(state.mode==='2000s'){ y=randomInt(2000,2099); }
+  else if(state.mode==='1800s'){ y=randomInt(1800,1899); }
+  else if(state.mode==='recent'){ y=randomInt(2015,2035); }
+  else if(state.mode==='leap'){
+    // pick a leap year in range
+    let tries=0;
+    do{ y=randomInt(state.yMin, state.yMax); tries++; } while(!isLeap(y) && tries<100);
+    // 60% Feb 29, 40% random date in leap year
+    if(Math.random()<0.6){ m=2; d=29; }
+    else { m=randomInt(1,12); d=randomInt(1, daysInMonth(y,m)); }
+    return {y,m,d};
+  }
+  else if(state.mode==='custom' || state.mode==='all'){
+    y=randomInt(state.yMin, state.yMax);
+  } else {
+    y=randomInt(1600,2399);
+  }
+  m=randomInt(1,12);
+  d=randomInt(1, daysInMonth(y,m));
+  return {y,m,d};
+}
+function isLeap(y){ return (y%4===0 && y%100!==0) || (y%400===0); }
+
+function weekdayFor(y,m,d){
+  const dt=new Date(0);
+  dt.setFullYear(y, m-1, d);
+  dt.setHours(12,0,0,0);
+  return jsDayToMonIndex(dt.getDay());
+}
+function formatDate(y,m,d){
+  const dt=new Date(0); dt.setFullYear(y,m-1,d);
+  const opts={weekday:'long', year:'numeric', month:'long', day:'numeric'};
+  // manual to avoid locale issues
+  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return `${months[m-1]} ${d}, ${y}`;
+}
+
+function nextQuestion(){
+  state.current=makeDateForMode();
+  state.answered=false;
+  state.startTime=performance.now();
+  state.elapsedPaused=0;
+  state.paused=false;
+  document.getElementById('pauseOverlay').classList.remove('show');
+  document.getElementById('pauseBtn').textContent='⏸ Pause';
+  document.getElementById('timer').classList.remove('paused');
+  renderQuestion();
+  renderWeekButtons();
+  document.getElementById('nextBtn').disabled=true;
+}
+
+function renderQuestion(){
+  const c=state.current;
+  document.getElementById('qPill').textContent=`Q ${state.qNum} • ${state.mode==='leap'?'Leap focus': state.mode==='custom'? `${state.yMin}–${state.yMax}` : document.querySelector('.chip.active')?.textContent || 'All years'}`;
+  document.getElementById('dateText').textContent=formatDate(c.y,c.m,c.d);
+  document.getElementById('yearText').textContent=`${isLeap(c.y)?'Leap year • ':''}Pick the weekday`;
+  document.getElementById('dowHint').textContent='What day of the week?';
+  document.getElementById('bar').style.width='0%';
+}
+
+function renderWeekButtons(){
+  const grid=document.getElementById('weekGrid');
+  grid.innerHTML='';
+  WEEKDAYS.forEach((w,i)=>{
+    const b=document.createElement('button');
+    b.className='wbtn';
+    b.textContent=w;
+    b.setAttribute('aria-label', w);
+    b.onclick=()=> pick(i);
+    grid.appendChild(b);
+  });
+}
+
+function pick(idx){
+  if(state.answered || state.paused) return;
+  const c=state.current;
+  const actual=weekdayFor(c.y,c.m,c.d);
+  const elapsed=(performance.now() - state.startTime - state.elapsedPaused)/1000;
+  const correct= idx===actual;
+  state.answered=true;
+  state.total++;
+  if(correct){ state.correct++; state.streak++; state.bestStreak=Math.max(state.bestStreak, state.streak); }
+  else state.streak=0;
+  state.times.push(elapsed);
+  state.lastTime=elapsed;
+  state.history.unshift({
+    dateStr: formatDate(c.y,c.m,c.d),
+    picked: WEEK_SHORT[idx],
+    actual: WEEK_SHORT[actual],
+    correct,
+    time: elapsed
+  });
+  if(state.history.length>50) state.history.pop();
+  // UI feedback
+  const btns=[...document.querySelectorAll('.wbtn')];
+  btns.forEach((b,i)=>{
+    if(i===actual) b.classList.add('ok');
+    else if(i===idx && !correct) b.classList.add('bad');
+    else b.classList.add('dim');
+    b.disabled=true;
+  });
+  document.getElementById('dowHint').textContent= correct? '✓ Correct' : `✗ Was ${WEEKDAYS[actual]}`;
+  document.getElementById('dowHint').style.color= correct? 'var(--ok)' : 'var(--bad)';
+  document.getElementById('nextBtn').disabled=false;
+  // progress bar
+  document.getElementById('bar').style.width='100%';
+  document.getElementById('bar').style.background= correct? 'var(--ok)' : 'var(--bad)';
+  save();
+  renderStats();
+  renderHistory();
+  // auto next on correct after delay? No, require tap Next for study
+}
+
+function renderStats(){
+  const acc = state.total? Math.round(state.correct/state.total*100) : 0;
+  document.getElementById('accV').textContent= state.total? `${acc}%` : '—';
+  document.getElementById('accV').innerHTML= state.total? `${acc}% <small>${state.correct}/${state.total}</small>` : '—';
+  document.getElementById('streakV').textContent= state.streak;
+  document.getElementById('streakV').innerHTML= `${state.streak} <small>best ${state.bestStreak}</small>`;
+  document.getElementById('totalV').textContent= state.total;
+  // splits
+  const fmt = v=> v==null? '—' : v.toFixed(1)+'s';
+  const last = state.lastTime;
+  const avg = state.times.length? state.times.reduce((a,b)=>a+b,0)/state.times.length : null;
+  const best = state.times.length? Math.min(...state.times) : null;
+  const worst = state.times.length? Math.max(...state.times) : null;
+  document.getElementById('lastV').textContent= fmt(last);
+  document.getElementById('lastV').innerHTML= fmt(last) + (last!=null? `<br><small>${state.history[0]?.correct?'✓':'✗'} ${state.history[0]?.actual||''}</small>` : '');
+  document.getElementById('avgV').textContent= fmt(avg);
+  document.getElementById('avgV').innerHTML= fmt(avg) + `<br><small>${state.times.length} samples</small>`;
+  document.getElementById('bestV').textContent= fmt(best);
+  document.getElementById('bestV').innerHTML= fmt(best) + `<br><small>fastest</small>`;
+  document.getElementById('worstV').textContent= fmt(worst);
+  document.getElementById('worstV').innerHTML= fmt(worst) + `<br><small>slowest</small>`;
+  document.getElementById('qPill').textContent=`Q ${state.qNum} • ${state.answered?'Answered':'Tap weekday'}`;
+}
+
+function renderHistory(){
+  const h=document.getElementById('history');
+  h.innerHTML='';
+  state.history.slice(0,8).forEach(item=>{
+    const div=document.createElement('div');
+    div.className='hitem '+(item.correct?'ok':'bad');
+    div.innerHTML=`<span><b>${item.dateStr}</b> • ${item.correct?'✓':'✗'} ${item.picked} → ${item.actual}</span><span><b>${item.time.toFixed(1)}s</b></span>`;
+    h.appendChild(div);
+  });
+  if(state.history.length===0){
+    h.innerHTML='<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px">No attempts yet — pick a weekday to start.</div>';
+  }
+}
+
+function tick(){
+  if(!state.current || state.answered || state.paused) { requestAnimationFrame(tick); return; }
+  const elapsed=(performance.now() - state.startTime - state.elapsedPaused)/1000;
+  document.getElementById('timer').textContent= elapsed.toFixed(1)+'s';
+  // bar grows to 10s max
+  const pct=Math.min(100, (elapsed/10)*100);
+  document.getElementById('bar').style.width= pct+'%';
+  document.getElementById('bar').style.background='var(--ink)';
+  requestAnimationFrame(tick);
+}
+
+// chips
+document.getElementById('chips').addEventListener('click', e=>{
+  const chip=e.target.closest('.chip');
+  if(!chip) return;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  chip.classList.add('active');
+  state.mode=chip.dataset.mode;
+  document.getElementById('customRow').style.display= state.mode==='custom'?'flex':'none';
+  if(state.mode!=='custom'){
+    if(state.mode==='all'){ state.yMin=1600; state.yMax=2399; }
+    save();
+    nextQuestion();
+    state.qNum=1;
+    renderStats();
+  }
+});
+document.getElementById('applyRange').addEventListener('click', ()=>{
+  let a=parseInt(document.getElementById('yMin').value,10);
+  let b=parseInt(document.getElementById('yMax').value,10);
+  if(isNaN(a)||isNaN(b)||a>b){ alert('Enter valid year range (min ≤ max)'); return; }
+  a=Math.max(1583, Math.min(3000,a)); b=Math.max(1583, Math.min(3000,b));
+  state.yMin=a; state.yMax=b;
+  save();
+  nextQuestion();
+  state.qNum=1;
+  renderStats();
+});
+document.getElementById('pauseBtn').addEventListener('click', ()=>{
+  if(state.answered) return;
+  state.paused=!state.paused;
+  if(state.paused){
+    state.pauseStart=performance.now();
+    document.getElementById('pauseOverlay').classList.add('show');
+    document.getElementById('pauseBtn').textContent='▶ Resume';
+    document.getElementById('timer').classList.add('paused');
+  } else {
+    state.elapsedPaused += performance.now() - state.pauseStart;
+    document.getElementById('pauseOverlay').classList.remove('show');
+    document.getElementById('pauseBtn').textContent='⏸ Pause';
+    document.getElementById('timer').classList.remove('paused');
+  }
+});
+document.getElementById('resumeBtn2').addEventListener('click', ()=>{
+  state.paused=false;
+  state.elapsedPaused += performance.now() - state.pauseStart;
+  document.getElementById('pauseOverlay').classList.remove('show');
+  document.getElementById('pauseBtn').textContent='⏸ Pause';
+  document.getElementById('timer').classList.remove('paused');
+});
+document.getElementById('skipBtn').addEventListener('click', ()=>{
+  state.qNum++;
+  nextQuestion();
+});
+document.getElementById('nextBtn').addEventListener('click', ()=>{
+  if(!state.answered) return;
+  state.qNum++;
+  document.getElementById('dowHint').style.color='';
+  nextQuestion();
+});
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(!confirm('Reset accuracy and time splits?')) return;
+  state.total=0; state.correct=0; state.streak=0; state.bestStreak=0; state.times=[]; state.lastTime=null; state.history=[]; state.qNum=1;
+  save(); renderStats(); renderHistory(); nextQuestion();
+});
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const code=makeCode();
+  navigator.clipboard?.writeText(code);
+  prompt('Archive code copied (also below):', code);
+});
+document.getElementById('importBtn').addEventListener('click', ()=>{
+  const code=prompt('Paste archive code:');
+  if(!code) return;
+  if(tryImport(code)){
+    // update chip UI
+    document.querySelectorAll('.chip').forEach(c=> c.classList.toggle('active', c.dataset.mode===state.mode));
+    document.getElementById('customRow').style.display= state.mode==='custom'?'flex':'none';
+    document.getElementById('yMin').value=state.yMin; document.getElementById('yMax').value=state.yMax;
+    renderStats(); renderHistory(); nextQuestion();
+    alert('Progress restored!');
+  } else alert('Invalid code');
+});
+document.getElementById('helpBtn').addEventListener('click', ()=>{
+  alert('How to drill:\n• A random date appears — tap the correct weekday (Mon–Sun).\n• Timer starts on show, stops on pick. Splits track last / average / best / worst.\n• Year-split chips filter the pool (e.g., 1900s, Leap years, Custom range).\n• Pause freezes timer. Accuracy and streaks auto-save.');
+});
+
+// init
+load();
+document.getElementById('yMin').value=state.yMin; document.getElementById('yMax').value=state.yMax;
+document.querySelectorAll('.chip').forEach(c=> c.classList.toggle('active', c.dataset.mode===state.mode));
+document.getElementById('customRow').style.display= state.mode==='custom'?'flex':'none';
+renderStats(); renderHistory(); nextQuestion(); tick();
+</script>
+</body>
+</html>

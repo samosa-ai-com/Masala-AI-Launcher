@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Hold To Steal</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;
+  --card:#1a1d27;
+  --card2:#232738;
+  --border:#2e334d;
+  --gold:#f5c542;
+  --gold2:#ffdb6e;
+  --green:#2ecc71;
+  --red:#ff4d5a;
+  --blue:#4da3ff;
+  --text:#f2f3f7;
+  --muted:#9aa0b8;
+  --radius:16px;
+}
+html,body{height:100%}
+body{
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  display:flex;justify-content:center;
+  overflow-x:hidden;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+}
+.wrap{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100dvh;
+  padding:14px 14px 18px;
+  display:flex;flex-direction:column;gap:12px;
+}
+/* header */
+.header{
+  text-align:center;padding:6px 0 2px;
+}
+.header h1{
+  font-size:26px;letter-spacing:0.04em;font-weight:900;
+  text-transform:uppercase;line-height:1;
+}
+.header h1 span{color:var(--gold)}
+.header p{color:var(--muted);font-size:13px;margin-top:6px;letter-spacing:0.02em}
+/* stats */
+.stats{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;
+}
+.stat{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:10px 8px;text-align:center;
+}
+.stat label{font-size:10px;letter-spacing:0.12em;color:var(--muted);font-weight:700;text-transform:uppercase;display:block}
+.stat strong{font-size:22px;font-weight:900;display:block;margin-top:2px;line-height:1}
+.stat small{font-size:11px;color:var(--muted)}
+.hearts{font-size:16px;letter-spacing:2px;margin-top:2px}
+.hearts .off{opacity:0.25;filter:grayscale(1)}
+/* alert bar */
+.alertWrap{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;
+}
+.alertHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.alertHead span{font-size:11px;letter-spacing:0.1em;font-weight:800;color:var(--muted);text-transform:uppercase}
+.alertHead b{font-size:12px;font-weight:900;padding:4px 10px;border-radius:999px;background:var(--card2);border:1px solid var(--border)}
+.alertHead b.calm{color:#7ee8a8;border-color:#2a5a3e;background:#143122}
+.alertHead b.wary{color:#ffe08a;border-color:#6b5a1e;background:#3a3210}
+.alertHead b.alert{color:#ff9b4d;border-color:#7a3d14;background:#3d1f0a}
+.alertHead b.lock{color:#ff6b7a;border-color:#7a1e2a;background:#3d0f15;animation:pulse 0.6s infinite alternate}
+@keyframes pulse{from{opacity:1}to{opacity:0.7}}
+.segments{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px}
+.seg{height:10px;background:#0d0f16;border-radius:999px;border:1px solid var(--border);overflow:hidden;position:relative}
+.seg i{position:absolute;inset:0;width:0%;transition:width 0.15s linear}
+.seg:nth-child(1) i{background:#2ecc71}
+.seg:nth-child(2) i{background:#f5c542}
+.seg:nth-child(3) i{background:#ff8c2a}
+.seg:nth-child(4) i{background:#ff4d5a}
+.segLabel{display:flex;justify-content:space-between;margin-top:6px}
+.segLabel span{font-size:9px;letter-spacing:0.08em;color:var(--muted);font-weight:700;text-transform:uppercase;width:25%;text-align:center}
+.segLabel span.active{color:var(--text)}
+/* stage */
+.stage{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;
+  position:relative;overflow:hidden;
+}
+.stage::before{
+  content:"";position:absolute;inset:0;
+  background:radial-gradient(600px 200px at 50% 0%, rgba(245,197,66,0.07), transparent 70%);
+  pointer-events:none;
+}
+.trackWrap{position:relative;z-index:1}
+.trackLabel{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.trackLabel span{font-size:11px;letter-spacing:0.1em;font-weight:800;color:var(--muted);text-transform:uppercase}
+.trackLabel em{font-style:normal;font-size:11px;color:var(--gold);font-weight:800}
+.track{
+  height:44px;background:#0d0f16;border:1px solid var(--border);border-radius:12px;
+  position:relative;overflow:hidden;
+}
+.sweet{
+  position:absolute;top:6px;bottom:6px;
+  background:linear-gradient(180deg, rgba(245,197,66,0.95), rgba(245,197,66,0.55));
+  border:1px solid #ffdb6e;
+  border-radius:8px;
+  box-shadow:0 0 12px rgba(245,197,66,0.5), inset 0 1px 0 rgba(255,255,255,0.6);
+  display:flex;align-items:center;justify-content:center;
+  transition:left 0.2s, width 0.2s;
+}
+.sweet span{font-size:9px;font-weight:900;letter-spacing:0.12em;color:#1a1200;text-transform:uppercase;white-space:nowrap}
+.mark{
+  position:absolute;top:0;bottom:0;width:4px;
+  background:#fff;box-shadow:0 0 10px rgba(255,255,255,0.9), 0 0 20px rgba(255,255,255,0.4);
+  border-radius:999px;transform:translateX(-50%);
+  transition:none;
+}
+.mark::after{
+  content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:14px;height:14px;background:#fff;border-radius:50%;box-shadow:0 0 10px #fff;
+}
+.mark.inSweet{background:#fff;box-shadow:0 0 14px #fff, 0 0 24px var(--gold)}
+.meters{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.meter label{font-size:10px;letter-spacing:0.1em;font-weight:800;color:var(--muted);text-transform:uppercase;display:flex;justify-content:space-between;margin-bottom:6px}
+.meter label b{color:var(--text)}
+.bar{height:14px;background:#0d0f16;border:1px solid var(--border);border-radius:999px;overflow:hidden;position:relative}
+.bar i{position:absolute;inset:0;width:0%;border-radius:999px;transition:width 0.08s linear}
+.bar.steal i{background:linear-gradient(90deg, #f5c542, #ffdb6e);box-shadow:0 0 10px rgba(245,197,66,0.6)}
+.bar.alert i{background:linear-gradient(90deg, #2ecc71, #f5c542, #ff8c2a, #ff4d5a)}
+.bar i.glow{box-shadow:0 0 10px currentColor}
+.meterHint{font-size:11px;color:var(--muted);margin-top:4px;min-height:16px}
+.meterHint.good{color:#7ee8a8}
+.meterHint.warn{color:#ffe08a}
+.meterHint.bad{color:#ff8a8a}
+/* hold button */
+.holdArea{position:relative;z-index:1}
+.holdBtn{
+  width:100%;height:96px;
+  background:linear-gradient(180deg, #f5c542 0%, #e6a800 100%);
+  border:none;border-radius:18px;
+  font-size:20px;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;
+  color:#1a1200;
+  box-shadow:0 8px 0 #8a6200, 0 12px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.7);
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  cursor:pointer;touch-action:none;
+  transition:transform 0.06s, box-shadow 0.06s, filter 0.15s;
+}
+.holdBtn:active, .holdBtn.holding{
+  transform:translateY(6px);
+  box-shadow:0 2px 0 #8a6200, 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.5);
+  filter:brightness(1.05);
+}
+.holdBtn:disabled{opacity:0.5;filter:grayscale(0.3);cursor:not-allowed}
+.holdBtn .dot{width:12px;height:12px;background:#1a1200;border-radius:50%;display:inline-block;animation:blink 1s infinite}
+.holdBtn.holding .dot{background:#c0392b;animation:none;box-shadow:0 0 8px #c0392b}
+@keyframes blink{0%,50%{opacity:1}50.1%,100%{opacity:0.3}}
+.holdHint{text-align:center;font-size:12px;color:var(--muted);margin-top:8px;line-height:1.4}
+.holdHint strong{color:var(--gold)}
+/* legend */
+.legend{
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;
+}
+.legend div{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px;
+  font-size:11px;line-height:1.4;color:var(--muted)
+}
+.legend b{color:var(--text);font-size:12px;display:block;margin-bottom:2px}
+.legend .gold{color:var(--gold)}
+/* toasts */
+.toasts{
+  position:fixed;top:12px;left:50%;transform:translateX(-50%);
+  width:min(400px, calc(100vw - 24px));z-index:50;
+  display:flex;flex-direction:column;gap:8px;pointer-events:none;
+}
+.toast{
+  background:#1a1d27;border:1px solid var(--border);border-radius:12px;
+  padding:12px 14px;display:flex;align-items:center;gap:10px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.5);
+  animation:slideIn 0.3s ease, slideOut 0.3s ease 2s forwards;
+  font-size:13px;font-weight:700;
+}
+.toast.good{border-color:#2ecc71;background:#143122;color:#7ee8a8}
+.toast.warn{border-color:#f5c542;background:#3a3210;color:#ffe08a}
+.toast.bad{border-color:#ff4d5a;background:#3d0f15;color:#ff8a9a}
+.toast.bonus{border-color:#f5c542;background:linear-gradient(135deg, #3a3210, #4a3d0a);color:#ffdb6e}
+@keyframes slideIn{from{transform:translateY(-12px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes slideOut{from{opacity:1}to{opacity:0;transform:translateY(-8px)}}
+/* modal */
+.overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;z-index:60;padding:16px;
+}
+.overlay.show{display:flex}
+.modal{
+  width:100%;max-width:380px;background:var(--card);border:1px solid var(--border);border-radius:18px;
+  padding:20px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.6);
+}
+.modal h2{font-size:22px;font-weight:900;text-transform:uppercase;letter-spacing:0.04em}
+.modal p{color:var(--muted);font-size:13px;margin:8px 0 14px;line-height:1.5}
+.modalGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.modalGrid div{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:10px}
+.modalGrid label{font-size:10px;letter-spacing:0.1em;color:var(--muted);font-weight:800;text-transform:uppercase}
+.modalGrid strong{font-size:20px;display:block;margin-top:4px}
+.btnRow{display:flex;gap:10px;margin-top:14px}
+.btn{
+  flex:1;height:48px;border-radius:12px;border:1px solid var(--border);
+  font-size:14px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;
+}
+.btn.primary{background:var(--gold);color:#1a1200;border-color:#c99a00;box-shadow:0 4px 0 #8a6200}
+.btn.primary:active{transform:translateY(2px);box-shadow:0 2px 0 #8a6200}
+.btn.ghost{background:var(--card2);color:var(--text)}
+/* footer */
+.footer{text-align:center;font-size:11px;color:var(--muted);padding:4px 0}
+.footer span{color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="header">
+    <h1><span>Hold</span> To Steal</h1>
+    <p>Hold in the sweet spot • Release to bank • Don't get spotted</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><label>Score</label><strong id="scoreEl">0</strong><small>Best <span id="bestEl">0</span></small></div>
+    <div class="stat"><label>Streak</label><strong id="streakEl">0</strong><small id="multEl">×1.0</small></div>
+    <div class="stat"><label>Chances</label><div class="hearts" id="heartsEl">❤ ❤ ❤</div><small id="chancesEl">3 left</small></div>
+  </div>
+
+  <div class="alertWrap">
+    <div class="alertHead"><span>Alertness</span><b id="tierEl" class="calm">CALM — 0%</b></div>
+    <div class="segments">
+      <div class="seg"><i id="seg1"></i></div>
+      <div class="seg"><i id="seg2"></i></div>
+      <div class="seg"><i id="seg3"></i></div>
+      <div class="seg"><i id="seg4"></i></div>
+    </div>
+    <div class="segLabel">
+      <span id="lbl1" class="active">Calm</span><span id="lbl2">Wary</span><span id="lbl3">Alert</span><span id="lbl4">Lockdown</span>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="trackWrap">
+      <div class="trackLabel"><span>Timing Track</span><em id="speedEl">Speed ×1.0</em></div>
+      <div class="track" id="track">
+        <div class="sweet" id="sweet"><span id="sweetLabel">SWEET SPOT</span></div>
+        <div class="mark" id="mark"></div>
+      </div>
+      <div class="meters">
+        <div class="meter">
+          <label>Steal Meter <b id="stealPct">0%</b></label>
+          <div class="bar steal"><i id="stealBar"></i></div>
+          <div class="meterHint" id="stealHint">Hold to fill — release to bank</div>
+        </div>
+        <div class="meter">
+          <label>Alertness <b id="alertPct">0%</b></label>
+          <div class="bar alert"><i id="alertBar"></i></div>
+          <div class="meterHint" id="alertHint">Stay in gold to stay hidden</div>
+        </div>
+      </div>
+    </div>
+    <div class="holdArea" style="margin-top:14px">
+      <button class="holdBtn" id="holdBtn" aria-label="Hold to steal"><span class="dot"></span> HOLD TO STEAL</button>
+      <div class="holdHint" id="holdHint">Press &amp; hold <strong>only in gold</strong> — outside it, alert spikes 4× faster.<br>Release at <strong>60–95%</strong> for clean scores. Greed past 95% = bonus or bust.</div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div><b>💰 Payouts</b><span class="gold">60–85% Clean +100</span> • 85–95% Perfect +250 • 95–100% Greedy +400 • &lt;25% Timid +10</div>
+    <div><b>🔥 Streak Bonus</b>3× streak → ×1.5 • 6× → ×2.0 • 9× → ×2.5<br><b>⚠️ Spotted at 100% alert = -1 chance</b></div>
+  </div>
+
+  <div class="footer">Space to hold • Best streak <span id="bestStreakEl">0</span> • Tip: let alert cool in Calm before next steal</div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">Caught!</h2>
+    <p id="modalDesc">You got spotted. Three chances and you're out.</p>
+    <div class="modalGrid">
+      <div><label>Score</label><strong id="modalScore">0</strong></div>
+      <div><label>Best</label><strong id="modalBest">0</strong></div>
+      <div><label>Streak</label><strong id="modalStreak">0</strong></div>
+      <div><label>Heist Rating</label><strong id="modalRating">—</strong></div>
+    </div>
+    <div class="btnRow">
+      <button class="btn ghost" id="shareBtn">Share</button>
+      <button class="btn primary" id="retryBtn">Try Again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const scoreEl = $('scoreEl'), bestEl = $('bestEl'), streakEl = $('streakEl'), multEl = $('multEl');
+const heartsEl = $('heartsEl'), chancesEl = $('chancesEl'), tierEl = $('tierEl');
+const seg1=$('seg1'), seg2=$('seg2'), seg3=$('seg3'), seg4=$('seg4');
+const lbl1=$('lbl1'), lbl2=$('lbl2'), lbl3=$('lbl3'), lbl4=$('lbl4');
+const track=$('track'), sweet=$('sweet'), sweetLabel=$('sweetLabel'), mark=$('mark'), speedEl=$('speedEl');
+const stealBar=$('stealBar'), alertBar=$('alertBar'), stealPct=$('stealPct'), alertPct=$('alertPct');
+const stealHint=$('stealHint'), alertHint=$('alertHint'), holdBtn=$('holdBtn'), holdHint=$('holdHint');
+const toasts=$('toasts'), overlay=$('overlay'), modalTitle=$('modalTitle'), modalDesc=$('modalDesc');
+const modalScore=$('modalScore'), modalBest=$('modalBest'), modalStreak=$('modalStreak'), modalRating=$('modalRating');
+const bestStreakEl=$('bestStreakEl');
+
+let score=0, streak=0, chances=3, alertness=0, steal=0, isHolding=false, markPos=0, markDir=1;
+let lastTime=0, rafId=null, gameOver=false;
+let bestScore = parseInt(localStorage.getItem('hts_best')||'0',10);
+let bestStreak = parseInt(localStorage.getItem('hts_bestStreak')||'0',10);
+bestEl.textContent = bestScore;
+bestStreakEl.textContent = bestStreak;
+
+const tiers = [
+  {name:'CALM', cls:'calm', max:25, sweetW:38, speed:1.0, color:'#2ecc71'},
+  {name:'WARY', cls:'wary', max:50, sweetW:28, speed:1.35, color:'#f5c542'},
+  {name:'ALERT', cls:'alert', max:75, sweetW:18, speed:1.75, color:'#ff8c2a'},
+  {name:'LOCKDOWN', cls:'lock', max:100, sweetW:11, speed:2.2, color:'#ff4d5a'}
+];
+function getTier(a){
+  if(a<25) return tiers[0];
+  if(a<50) return tiers[1];
+  if(a<75) return tiers[2];
+  return tiers[3];
+}
+function getMult(s){
+  if(s>=9) return 2.5;
+  if(s>=6) return 2.0;
+  if(s>=3) return 1.5;
+  return 1.0;
+}
+function vibrate(p){ try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} }
+
+function toast(msg, type='good'){
+  const t=document.createElement('div');
+  t.className='toast '+type;
+  const icons={good:'✓', warn:'⚠', bad:'✕', bonus:'★'};
+  t.innerHTML=`<span style="font-size:16px">${icons[type]||'•'}</span><span>${msg}</span>`;
+  toasts.appendChild(t);
+  setTimeout(()=>{ if(t.parentNode) t.remove(); }, 2400);
+}
+
+function updateHearts(){
+  let h='';
+  for(let i=0;i<3;i++) h+= `<span class="${i<chances?'':'off'}">❤</span> `;
+  heartsEl.innerHTML=h.trim();
+  chancesEl.textContent = chances + (chances===1?' chance left':' chances left');
+}
+
+function updateUI(){
+  // tier
+  const tier=getTier(alertness);
+  tierEl.textContent = `${tier.name} — ${Math.round(alertness)}%`;
+  tierEl.className = tier.cls;
+  // segments: each 0-25
+  const s1 = Math.min(100, Math.max(0, (alertness-0)/25*100));
+  const s2 = Math.min(100, Math.max(0, (alertness-25)/25*100));
+  const s3 = Math.min(100, Math.max(0, (alertness-50)/25*100));
+  const s4 = Math.min(100, Math.max(0, (alertness-75)/25*100));
+  seg1.style.width=s1+'%'; seg2.style.width=s2+'%'; seg3.style.width=s3+'%'; seg4.style.width=s4+'%';
+  [lbl1,lbl2,lbl3,lbl4].forEach((el,i)=> el.classList.toggle('active', getTier(alertness)===tiers[i]));
+  speedEl.textContent = `Speed ×${tier.speed.toFixed(2).replace(/\.00$/,'')}`;
+  // sweet spot
+  const w = tier.sweetW;
+  const left = 50 - w/2;
+  sweet.style.left = left+'%';
+  sweet.style.width = w+'%';
+  sweetLabel.textContent = w<=18 ? 'SWEET' : 'SWEET SPOT';
+  sweetLabel.style.opacity = w<=11 ? '0.9' : '1';
+  // bars
+  stealBar.style.width = steal+'%';
+  alertBar.style.width = alertness+'%';
+  stealPct.textContent = Math.round(steal)+'%';
+  alertPct.textContent = Math.round(alertness)+'%';
+  // hints
+  if(steal<25) {stealHint.textContent='Too timid — hold longer'; stealHint.className='meterHint';}
+  else if(steal<60) {stealHint.textContent='Risky — keep going'; stealHint.className='meterHint warn';}
+  else if(steal<85) {stealHint.textContent='Clean — release now!'; stealHint.className='meterHint good';}
+  else if(steal<95) {stealHint.textContent='Perfect — release!'; stealHint.className='meterHint good';}
+  else {stealHint.textContent='GREEDY — bank or bust!'; stealHint.className='meterHint warn';}
+  if(alertness<25) {alertHint.textContent='Hidden — you’re good'; alertHint.className='meterHint good';}
+  else if(alertness<50) {alertHint.textContent='Wary — watch it'; alertHint.className='meterHint warn';}
+  else if(alertness<75) {alertHint.textContent='Alert — cool off soon'; alertHint.className='meterHint bad';}
+  else {alertHint.textContent='LOCKDOWN — release!'; alertHint.className='meterHint bad';}
+  // stats
+  scoreEl.textContent = score;
+  streakEl.textContent = streak;
+  const m=getMult(streak);
+  multEl.textContent = '×'+m.toFixed(1);
+  multEl.style.color = m>1 ? 'var(--gold)' : 'var(--muted)';
+  multEl.style.fontWeight = m>1 ? '900' : '600';
+}
+
+function isInSweet(){
+  const tier=getTier(alertness);
+  const w=tier.sweetW;
+  const left=50 - w/2, right=50 + w/2;
+  return markPos >= left && markPos <= right;
+}
+
+function onSpotted(){
+  chances--;
+  updateHearts();
+  vibrate([120,60,200]);
+  toast(`SPOTTED! -1 chance • ${chances} left`, 'bad');
+  alertness = 18;
+  steal = 0;
+  streak = 0;
+  if(chances<=0){
+    gameOver=true;
+    holdBtn.disabled=true;
+    holdBtn.classList.remove('holding');
+    isHolding=false;
+    cancelAnimationFrame(rafId);
+    // save best
+    if(score>bestScore){ bestScore=score; localStorage.setItem('hts_best', bestScore); bestEl.textContent=bestScore; }
+    if(streak>bestStreak){ /* streak already 0, but we need max streak tracked separately */ }
+    // modal
+    modalScore.textContent=score;
+    modalBest.textContent=bestScore;
+    modalStreak.textContent=bestStreak;
+    let rating='Novice Pickpocket';
+    if(score>=1200) rating='Ghost';
+    else if(score>=800) rating='Master Thief';
+    else if(score>=400) rating='Slick';
+    else if(score>=150) rating='Apprentice';
+    modalRating.textContent=rating;
+    modalTitle.textContent='Busted!';
+    modalDesc.textContent = score>=800 ? 'Legendary heist! The guards never saw you coming — until the end.' : 'You pushed your luck. Three strikes and the vault locks forever.';
+    overlay.classList.add('show');
+  } else {
+    // brief invuln flash
+    track.style.outline='2px solid var(--red)';
+    setTimeout(()=> track.style.outline='', 400);
+  }
+  updateUI();
+}
+
+let maxStreakThisRun=0;
+function bankSteal(){
+  if(steal<=0.5) return;
+  let base=0, label='', type='good';
+  if(steal<25){ base=10; label='Too timid'; type='warn'; streak=0; }
+  else if(steal<60){ base=50; label='Risky take'; type='warn'; streak=0; }
+  else if(steal<85){ base=100; label='Clean steal!'; type='good'; streak++; }
+  else if(steal<95){ base=250; label='Perfect!'; type='bonus'; streak++; }
+  else { base=400; label='Greedy bonus!'; type='bonus'; streak++; alertness = Math.min(100, alertness+8); }
+  const mult=getMult(streak);
+  const earned = Math.round(base*mult);
+  score+=earned;
+  if(streak>maxStreakThisRun) maxStreakThisRun=streak;
+  if(streak>bestStreak){ bestStreak=streak; localStorage.setItem('hts_bestStreak', bestStreak); bestStreakEl.textContent=bestStreak; }
+  if(score>bestScore){ bestScore=score; localStorage.setItem('hts_best', bestScore); bestEl.textContent=bestScore; }
+
+  // streak notifications
+  if(streak===3) { toast('Streak ×3 — ×1.5 multiplier!', 'bonus'); vibrate(40); }
+  else if(streak===6) { toast('Streak ×6 — ×2.0 multiplier! On fire!', 'bonus'); vibrate([30,40,30]); }
+  else if(streak===9) { toast('Streak ×9 — ×2.5 LEGENDARY!', 'bonus'); vibrate([30,30,30,30,80]); }
+  else {
+    if(base>=100) toast(`${label} +${earned} ${mult>1?`(×${mult.toFixed(1)})`:''}`, type);
+    else toast(`${label} +${earned}`, type);
+    if(base>=250) vibrate(50); else if(base>=100) vibrate(20);
+  }
+  // alert cool on successful bank? small reduction
+  if(base>=100) alertness = Math.max(0, alertness - 6);
+  steal=0;
+  updateUI();
+}
+
+function loop(ts){
+  if(gameOver) return;
+  if(!lastTime) lastTime=ts;
+  const dt = Math.min(0.05, (ts-lastTime)/1000);
+  lastTime=ts;
+
+  const tier=getTier(alertness);
+  // move mark
+  markPos += markDir * tier.speed * 55 * dt; // 55% per sec at 1.0
+  if(markPos>=100){ markPos=100; markDir=-1; }
+  if(markPos<=0){ markPos=0; markDir=1; }
+  mark.style.left = markPos+'%';
+  mark.classList.toggle('inSweet', isInSweet());
+
+  if(isHolding){
+    const inside=isInSweet();
+    if(inside){
+      steal = Math.min(100, steal + 52*dt); // fast fill
+      alertness = Math.min(100, alertness + 9*dt);
+    } else {
+      steal = Math.min(100, steal + 14*dt); // slow fill
+      alertness = Math.min(100, alertness + 38*dt); // spike
+    }
+    // visual feedback on button
+    holdBtn.style.filter = inside ? 'brightness(1.08)' : 'brightness(0.92) saturate(0.8)';
+    if(alertness>=100){
+      onSpotted();
+    }
+  } else {
+    // decay
+    alertness = Math.max(0, alertness - 14*dt);
+    // steal decays slowly when not holding (so you can't just wait forever)
+    if(steal>0) steal = Math.max(0, steal - 6*dt);
+    holdBtn.style.filter='';
+  }
+  updateUI();
+  rafId=requestAnimationFrame(loop);
+}
+
+function startHold(e){
+  if(e) e.preventDefault();
+  if(gameOver || isHolding) return;
+  isHolding=true;
+  holdBtn.classList.add('holding');
+  holdBtn.textContent='STEALING…';
+  holdBtn.prepend(Object.assign(document.createElement('span'),{className:'dot'}));
+  vibrate(15);
+}
+function endHold(e){
+  if(e) e.preventDefault();
+  if(!isHolding) return;
+  isHolding=false;
+  holdBtn.classList.remove('holding');
+  holdBtn.innerHTML='<span class="dot"></span> HOLD TO STEAL';
+  bankSteal();
+}
+
+// pointer events
+holdBtn.addEventListener('pointerdown', startHold);
+window.addEventListener('pointerup', endHold);
+window.addEventListener('pointercancel', endHold);
+holdBtn.addEventListener('pointerleave', (e)=>{ if(e.buttons===0) endHold(e); });
+
+// keyboard
+window.addEventListener('keydown', (e)=>{
+  if(e.code==='Space' && !e.repeat){ e.preventDefault(); startHold(); }
+});
+window.addEventListener('keyup', (e)=>{
+  if(e.code==='Space'){ e.preventDefault(); endHold(); }
+});
+
+// prevent context menu / selection
+holdBtn.addEventListener('contextmenu', e=> e.preventDefault());
+track.addEventListener('touchmove', e=> e.preventDefault(), {passive:false});
+
+// retry / share
+$('retryBtn').addEventListener('click', ()=>{
+  score=0; streak=0; chances=3; alertness=0; steal=0; isHolding=false; gameOver=false; maxStreakThisRun=0;
+  holdBtn.disabled=false;
+  holdBtn.innerHTML='<span class="dot"></span> HOLD TO STEAL';
+  holdBtn.classList.remove('holding');
+  overlay.classList.remove('show');
+  updateHearts(); updateUI();
+  lastTime=0;
+  cancelAnimationFrame(rafId);
+  rafId=requestAnimationFrame(loop);
+});
+$('shareBtn').addEventListener('click', async ()=>{
+  const text=`I scored ${score} in Hold To Steal — streak ${maxStreakThisRun} — can you beat it?`;
+  try{
+    if(navigator.share) await navigator.share({title:'Hold To Steal', text});
+    else if(navigator.clipboard) { await navigator.clipboard.writeText(text); toast('Copied to clipboard!', 'good'); }
+  }catch(e){}
+});
+
+// init
+updateHearts();
+updateUI();
+rafId=requestAnimationFrame(loop);
+
+// handle visibility
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden){ isHolding=false; holdBtn.classList.remove('holding'); holdBtn.innerHTML='<span class="dot"></span> HOLD TO STEAL'; }
+});
+</script>
+</body>
+</html>

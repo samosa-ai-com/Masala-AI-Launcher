@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Higher or Lower</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --felt1:#0a4a2a;
+  --felt2:#0f6b3a;
+  --felt3:#0a3d22;
+  --gold:#d4af37;
+  --gold2:#f0d878;
+  --gold3:#8c6b1a;
+  --card:#fffef8;
+  --card2:#f8f3e6;
+  --red:#c0392b;
+  --black:#1a1a1a;
+  --teal:#4ecdc4;
+}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  background:radial-gradient(ellipse 800px 600px at 50% 0%,#1a7a45 0%,#0a4a2a 45%,#061e12 100%);
+  color:#fff;
+  display:flex;justify-content:center;
+  min-height:100vh;min-height:100dvh;
+}
+.app{
+  width:100%;max-width:428px;min-width:360px;
+  min-height:100vh;min-height:100dvh;
+  display:flex;flex-direction:column;
+  position:relative;overflow:hidden;
+  background:
+    radial-gradient(ellipse 600px 400px at 50% -10%,rgba(255,255,255,0.08),transparent 60%),
+    radial-gradient(ellipse 500px 300px at 20% 30%,rgba(212,175,55,0.08),transparent 60%),
+    linear-gradient(180deg,var(--felt2) 0%,var(--felt1) 50%,var(--felt3) 100%);
+  border-left:1px solid rgba(212,175,55,0.15);
+  border-right:1px solid rgba(212,175,55,0.15);
+}
+.app::before{
+  content:"";position:absolute;inset:0;
+  background:
+    repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 3px),
+    repeating-linear-gradient(90deg,transparent,transparent 2px,rgba(0,0,0,0.02) 2px,rgba(0,0,0,0.02) 3px);
+  pointer-events:none;opacity:0.5;
+}
+.header{
+  position:relative;z-index:2;
+  padding:12px 14px 8px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.35),transparent);
+  border-bottom:1px solid rgba(212,175,55,0.15);
+}
+.top-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.logo{font-size:11px;letter-spacing:0.16em;text-transform:uppercase;opacity:0.9;font-weight:800;color:var(--gold2)}
+.chip{
+  font-size:10px;font-weight:800;letter-spacing:0.06em;
+  background:rgba(0,0,0,0.35);border:1px solid rgba(212,175,55,0.3);
+  padding:6px 10px;border-radius:999px;color:var(--gold2);
+}
+.title-row{text-align:center;margin-top:8px}
+h1{font-size:22px;font-weight:900;letter-spacing:-0.02em;line-height:1;text-shadow:0 2px 8px rgba(0,0,0,0.4)}
+h1 span{color:var(--gold2)}
+.subtitle{font-size:11px;opacity:0.75;margin-top:3px;font-weight:500}
+.stats{
+  position:relative;z-index:2;
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:8px;padding:10px 12px 0;
+}
+.stat{
+  background:rgba(0,0,0,0.32);backdrop-filter:blur(6px);
+  border:1px solid rgba(212,175,55,0.2);border-radius:12px;
+  padding:8px 6px;text-align:center;
+}
+.stat-label{font-size:9px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.7;font-weight:800;color:var(--gold2)}
+.stat-value{font-size:16px;font-weight:900;margin-top:2px;font-variant-numeric:tabular-nums}
+.stat-sub{font-size:10px;opacity:0.6;margin-top:1px}
+.streak-bar{
+  position:relative;z-index:2;
+  margin:10px 12px 0;
+  background:rgba(0,0,0,0.35);border:1px solid rgba(212,175,55,0.2);
+  border-radius:12px;padding:10px 12px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.streak-info{font-size:12px;font-weight:800}
+.streak-info span{color:var(--gold2)}
+.multiplier{
+  background:linear-gradient(180deg,var(--gold2),var(--gold));
+  color:#1a1200;
+  padding:6px 12px;border-radius:999px;
+  font-size:13px;font-weight:900;
+  box-shadow:0 2px 8px rgba(212,175,55,0.4);
+}
+.deck-info{
+  position:relative;z-index:2;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 14px 0;
+  font-size:11px;font-weight:700;opacity:0.8;
+}
+.deck-count{color:var(--gold2)}
+.card-area{
+  position:relative;z-index:2;
+  flex:1;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:12px 14px;
+  gap:10px;
+  min-height:280px;
+}
+.card-stack{
+  position:relative;
+  width:100%;max-width:220px;
+  aspect-ratio:2.5/3.5;
+  display:flex;align-items:center;justify-content:center;
+}
+.card{
+  position:absolute;inset:0;
+  background:linear-gradient(145deg,var(--card) 0%,var(--card2) 100%);
+  border-radius:16px;
+  border:2px solid rgba(212,175,55,0.3);
+  box-shadow:0 12px 32px rgba(0,0,0,0.4),0 2px 8px rgba(0,0,0,0.2),inset 0 1px 0 rgba(255,255,255,0.8);
+  display:flex;flex-direction:column;
+  padding:12px;
+  transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1),opacity 0.3s;
+}
+.card.back{
+  background:
+    repeating-linear-gradient(45deg,#0a4a2a 0px,#0a4a2a 8px,#0f6b3a 8px,#0f6b3a 16px),
+    linear-gradient(145deg,#0a4a2a,#0f6b3a);
+  border-color:var(--gold3);
+  display:flex;align-items:center;justify-content:center;
+}
+.card.back::before{
+  content:"♠ ♥ ♦ ♣";
+  font-size:28px;letter-spacing:6px;opacity:0.15;color:#fff;
+  transform:rotate(-12deg);
+}
+.card.back::after{
+  content:"DECK";
+  position:absolute;
+  font-size:10px;font-weight:900;letter-spacing:0.2em;color:rgba(255,255,255,0.25);
+  bottom:20px;
+}
+.card.current{
+  z-index:2;
+  transform:rotate(-1deg);
+}
+.card.next{
+  z-index:1;
+  transform:rotate(1deg) scale(0.96);
+  opacity:0.9;
+}
+.card.revealed{
+  animation:cardReveal 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes cardReveal{
+  0%{transform:rotate(1deg) scale(0.96) translateY(20px);opacity:0}
+  100%{transform:rotate(-1deg) scale(1) translateY(0);opacity:1}
+}
+.card-top,.card-bottom{
+  display:flex;flex-direction:column;align-items:center;
+  line-height:1;
+}
+.card-top{align-items:flex-start}
+.card-bottom{align-items:flex-end;transform:rotate(180deg)}
+.rank{font-size:32px;font-weight:900;letter-spacing:-0.02em}
+.suit{font-size:22px;margin-top:2px}
+.card.red .rank,.card.red .suit{color:var(--red)}
+.card.black .rank,.card.black .suit{color:var(--black)}
+.card-center{
+  flex:1;
+  display:flex;align-items:center;justify-content:center;
+  font-size:64px;
+  opacity:0.12;
+}
+.card-info{
+  text-align:center;
+  background:rgba(0,0,0,0.32);border:1px solid rgba(212,175,55,0.15);
+  border-radius:10px;padding:8px 12px;
+  width:100%;max-width:280px;
+}
+.card-name{font-size:13px;font-weight:800;color:var(--gold2)}
+.card-hint{font-size:11px;opacity:0.7;margin-top:2px}
+.controls{
+  position:relative;z-index:2;
+  padding:12px;
+  display:flex;gap:10px;
+}
+.btn{
+  flex:1;
+  min-height:64px;
+  border-radius:14px;border:none;
+  font-size:15px;font-weight:900;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  cursor:pointer;
+  transition:transform 0.08s,filter 0.15s,opacity 0.2s;
+  box-shadow:0 6px 16px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.25);
+  user-select:none;touch-action:manipulation;
+}
+.btn:active{transform:scale(0.97)}
+.btn:disabled{opacity:0.45;pointer-events:none}
+.btn-higher{
+  background:linear-gradient(180deg,#4ecdc4 0%,#2fb8af 100%);
+  color:#0a2e2b;
+}
+.btn-lower{
+  background:linear-gradient(180deg,#ff8a5b 0%,#ff6b35 100%);
+  color:#2a0f00;
+}
+.btn small{font-size:10px;font-weight:700;opacity:0.8;letter-spacing:0.06em;text-transform:uppercase}
+.history{
+  position:relative;z-index:2;
+  display:flex;gap:6px;padding:0 12px 8px;
+  overflow-x:auto;scrollbar-width:none;
+}
+.history::-webkit-scrollbar{display:none}
+.hist-card{
+  min-width:36px;height:48px;
+  background:linear-gradient(145deg,var(--card),var(--card2));
+  border:1px solid rgba(212,175,55,0.2);border-radius:6px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:10px;font-weight:800;
+  flex-shrink:0;
+  box-shadow:0 2px 6px rgba(0,0,0,0.2);
+}
+.hist-card.red{color:var(--red)}
+.hist-card.black{color:var(--black)}
+.hist-card.hit{border-color:var(--teal);box-shadow:0 0 8px rgba(78,205,196,0.4)}
+.hist-card.miss{border-color:var(--red);opacity:0.6}
+.hist-card.push{border-color:var(--gold);opacity:0.8}
+.bottom-actions{
+  position:relative;z-index:2;
+  padding:0 12px 14px;
+  display:flex;gap:8px;
+}
+.btn-secondary{
+  flex:1;min-height:44px;border-radius:10px;
+  border:1px solid rgba(212,175,55,0.25);
+  background:rgba(0,0,0,0.32);color:#fff;
+  font-size:12px;font-weight:700;cursor:pointer;
+}
+.btn-secondary:active{transform:scale(0.98)}
+.toast{
+  position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);
+  background:rgba(0,0,0,0.85);border:1px solid rgba(212,175,55,0.3);
+  padding:10px 16px;border-radius:999px;
+  font-size:13px;font-weight:800;z-index:5;
+  pointer-events:none;opacity:0;transition:opacity 0.2s,transform 0.2s;
+  white-space:nowrap;
+  box-shadow:0 4px 16px rgba(0,0,0,0.4);
+}
+.toast.show{opacity:1;transform:translate(-50%,-50%) scale(1.05)}
+.overlay{
+  position:absolute;inset:0;
+  background:rgba(6,12,8,0.82);backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;
+  padding:16px;z-index:10;
+}
+.card-modal{
+  width:100%;max-width:360px;
+  background:linear-gradient(180deg,#1a2e1a 0%,#0f1a0f 100%);
+  border:1px solid rgba(212,175,55,0.25);
+  border-radius:18px;
+  padding:18px;
+  text-align:center;
+  box-shadow:0 16px 40px rgba(0,0,0,0.6);
+}
+.card-modal h2{font-size:20px;font-weight:900;margin-bottom:6px}
+.card-modal p{font-size:12px;line-height:1.5;opacity:0.85;margin-bottom:10px}
+.badge{display:inline-block;background:rgba(212,175,55,0.15);border:1px solid rgba(212,175,55,0.3);border-radius:999px;padding:4px 10px;font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;color:var(--gold2)}
+.big{font-size:28px;font-weight:900;margin:8px 0;color:var(--gold2)}
+.btn-full{width:100%;min-height:50px;border:none;border-radius:12px;background:linear-gradient(180deg,var(--gold2),var(--gold));color:#1a1200;font-size:15px;font-weight:900;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+.btn-full:active{transform:scale(0.98)}
+.btn-ghost{width:100%;min-height:42px;margin-top:8px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:#fff;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer}
+@media (max-width:380px){
+  h1{font-size:20px}
+  .card-stack{max-width:200px}
+  .rank{font-size:28px}
+  .card-center{font-size:56px}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="header">
+    <div class="top-row">
+      <div class="logo">♠ Casino Felt • Higher or Lower</div>
+      <div class="chip" id="bestChip">Best: —</div>
+    </div>
+    <div class="title-row">
+      <h1>HIGHER <span>or</span> LOWER</h1>
+      <div class="subtitle">Build a streak — multiplier grows every hit</div>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Streak</div><div class="stat-value" id="streakEl">0</div><div class="stat-sub">in a row</div></div>
+    <div class="stat"><div class="stat-label">Score</div><div class="stat-value" id="scoreEl">0</div><div class="stat-sub" id="scoreSub">+0 next hit</div></div>
+    <div class="stat"><div class="stat-label">Best</div><div class="stat-value" id="bestEl">—</div><div class="stat-sub">all time</div></div>
+  </div>
+
+  <div class="streak-bar">
+    <div class="streak-info">Streak: <span id="streakTxt">0</span> • Next: <span id="nextPts">+10</span></div>
+    <div class="multiplier" id="multEl">x1.0</div>
+  </div>
+
+  <div class="deck-info">
+    <span>Deck: <span class="deck-count" id="deckEl">51 left</span></span>
+    <span id="roundEl">Run #1</span>
+  </div>
+
+  <div class="card-area">
+    <div class="card-stack" id="cardStack">
+      <div class="card back" id="deckBack"></div>
+      <div class="card current" id="currentCard"></div>
+    </div>
+    <div class="card-info">
+      <div class="card-name" id="cardName">—</div>
+      <div class="card-hint" id="cardHint">Guess if next card is higher or lower</div>
+    </div>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <div class="history" id="history"></div>
+
+  <div class="controls">
+    <button class="btn btn-higher" id="higherBtn" aria-label="Guess higher">
+      <span>▲ HIGHER</span>
+      <small>Next is higher</small>
+    </button>
+    <button class="btn btn-lower" id="lowerBtn" aria-label="Guess lower">
+      <span>▼ LOWER</span>
+      <small>Next is lower</small>
+    </button>
+  </div>
+
+  <div class="bottom-actions">
+    <button class="btn-secondary" id="newRunBtn">🔄 New Run</button>
+    <button class="btn-secondary" id="howBtn">📖 How to Play</button>
+  </div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="card-modal">
+      <div class="badge">Casino Felt • Streak Multiplier</div>
+      <h2>Higher or Lower</h2>
+      <p>Each tap guesses if the <b>next card is higher or lower</b> than the current one.<br>Hit = streak +1 and multiplier grows (<b>+10 × multiplier</b> per hit).<br><b>Equal = push</b> (no win/loss). Miss or empty deck ends the run.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0">
+        <div style="background:rgba(78,205,196,0.12);border:1px solid rgba(78,205,196,0.25);border-radius:10px;padding:8px">
+          <div style="font-size:10px;opacity:0.7;font-weight:800">HIT</div><div style="font-size:12px;font-weight:900;color:var(--teal)">Streak +1 • x↑</div>
+        </div>
+        <div style="background:rgba(212,175,55,0.12);border:1px solid rgba(212,175,55,0.25);border-radius:10px;padding:8px">
+          <div style="font-size:10px;opacity:0.7;font-weight:800">MULTIPLIER</div><div style="font-size:12px;font-weight:900;color:var(--gold2)">x1.0 → x6.0</div>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:8px 10px;text-align:left;font-size:11px;line-height:1.4;margin-bottom:10px">
+        <b>Values:</b> 2(2) 3 4 5 6 7 8 9 10 J(11) Q(12) K(13) A(14) — Ace is high.<br>
+        <b>Scoring:</b> 10 × multiplier per hit. Streak resets on miss.
+      </div>
+      <button class="btn-full" id="startBtn">START RUN ♠</button>
+      <p style="font-size:10px;opacity:0.5;margin-top:8px">Large tap targets • No horizontal scroll • Best score saved</p>
+    </div>
+  </div>
+
+  <div class="overlay" id="howOverlay" style="display:none">
+    <div class="card-modal">
+      <h2>How to Play</h2>
+      <p style="text-align:left">
+        • You see one big card. Guess if the <b>next card is higher or lower</b>.<br>
+        • <b>Correct:</b> Streak +1, multiplier +0.2 (x1.0 → x6.0 max), score +10×multiplier. New card becomes current.<br>
+        • <b>Equal:</b> Push — no score, streak stays, next card revealed.<br>
+        • <b>Wrong:</b> Run ends. Best score saved.<br>
+        • <b>Empty deck:</b> 52 cards total — if you clear the deck, run ends with bonus!<br>
+        • Tip: 7 is the middle — higher/lower is 50/50 there.
+      </p>
+      <button class="btn-full" id="closeHowBtn">Got it</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="endOverlay" style="display:none">
+    <div class="card-modal" id="endCard"></div>
+  </div>
+</div>
+
+<script>
+const SUITS = [
+  {s:'♠', name:'Spades', color:'black'},
+  {s:'♥', name:'Hearts', color:'red'},
+  {s:'♦', name:'Diamonds', color:'red'},
+  {s:'♣', name:'Clubs', color:'black'},
+];
+const RANKS = [
+  {r:'2', v:2, name:'2'},
+  {r:'3', v:3, name:'3'},
+  {r:'4', v:4, name:'4'},
+  {r:'5', v:5, name:'5'},
+  {r:'6', v:6, name:'6'},
+  {r:'7', v:7, name:'7'},
+  {r:'8', v:8, name:'8'},
+  {r:'9', v:9, name:'9'},
+  {r:'10', v:10, name:'10'},
+  {r:'J', v:11, name:'Jack'},
+  {r:'Q', v:12, name:'Queen'},
+  {r:'K', v:13, name:'King'},
+  {r:'A', v:14, name:'Ace'},
+];
+
+const $ = s => document.querySelector(s);
+const currentCardEl = $('#currentCard');
+const deckBackEl = $('#deckBack');
+const cardNameEl = $('#cardName');
+const cardHintEl = $('#cardHint');
+const streakEl = $('#streakEl');
+const streakTxt = $('#streakTxt');
+const multEl = $('#multEl');
+const scoreEl = $('#scoreEl');
+const scoreSub = $('#scoreSub');
+const bestEl = $('#bestEl');
+const bestChip = $('#bestChip');
+const deckEl = $('#deckEl');
+const roundEl = $('#roundEl');
+const nextPtsEl = $('#nextPts');
+const historyEl = $('#history');
+const toastEl = $('#toast');
+
+let deck = [];
+let current = null;
+let streak = 0;
+let score = 0;
+let best = 0;
+let runNum = 1;
+let playing = false;
+let multiplier = 1.0;
+let history = [];
+
+function loadBest(){
+  try{ best = parseInt(localStorage.getItem('higherLower_bestScore')||'0',10)||0; }catch(e){}
+  updateBestUI();
+}
+function saveBest(){
+  try{
+    if(score > best){ best = score; localStorage.setItem('higherLower_bestScore', String(best)); }
+  }catch(e){}
+  updateBestUI();
+}
+function updateBestUI(){
+  bestEl.textContent = best ? best : '—';
+  bestChip.textContent = best ? `Best: ${best}` : 'Best: —';
+}
+function showToast(msg, ms=1100){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(()=>toastEl.classList.remove('show'), ms);
+}
+function createDeck(){
+  deck=[];
+  for(let s of SUITS){
+    for(let r of RANKS){
+      deck.push({rank:r.r, value:r.v, rankName:r.name, suit:s.s, suitName:s.name, color:s.color});
+    }
+  }
+  // shuffle
+  for(let i=deck.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [deck[i],deck[j]]=[deck[j],deck[i]];
+  }
+}
+function cardHTML(card, small=false){
+  const cls = card.color==='red' ? 'red' : 'black';
+  if(small){
+    return `<div style="font-size:14px">${card.rank}${card.suit}</div>`;
+  }
+  return `
+    <div class="card-top ${cls}"><div class="rank">${card.rank}</div><div class="suit">${card.suit}</div></div>
+    <div class="card-center ${cls}">${card.suit}</div>
+    <div class="card-bottom ${cls}"><div class="rank">${card.rank}</div><div class="suit">${card.suit}</div></div>
+  `;
+}
+function renderCurrent(){
+  if(!current) return;
+  currentCardEl.className = `card current ${current.color}`;
+  currentCardEl.innerHTML = cardHTML(current);
+  cardNameEl.textContent = `${current.rankName} of ${current.suitName} • Value ${current.value}`;
+  // hint based on value
+  let hint='';
+  if(current.value <=4) hint='Very low — LOWER is risky, HIGHER is safe';
+  else if(current.value <=6) hint='Low card — HIGHER is favored';
+  else if(current.value===7) hint='Middle card — 50/50, trust your gut';
+  else if(current.value <=10) hint='High card — LOWER is favored';
+  else hint='Very high — LOWER is safe, HIGHER is risky';
+  cardHintEl.textContent = hint;
+  deckEl.textContent = `${deck.length} left`;
+  roundEl.textContent = `Run #${runNum}`;
+  // deck back visibility
+  deckBackEl.style.display = deck.length>0 ? 'flex' : 'none';
+  // multiplier
+  multiplier = Math.min(6.0, 1.0 + streak*0.2);
+  multEl.textContent = `x${multiplier.toFixed(1)}`;
+  streakEl.textContent = streak;
+  streakTxt.textContent = streak;
+  scoreEl.textContent = score;
+  nextPtsEl.textContent = `+${Math.round(10*multiplier)}`;
+  scoreSub.textContent = `+${Math.round(10*multiplier)} next hit`;
+  // history
+  historyEl.innerHTML='';
+  history.slice(-12).forEach(h=>{
+    const d=document.createElement('div');
+    d.className=`hist-card ${h.card.color} ${h.result}`;
+    d.innerHTML=`<div>${h.card.rank}${h.card.suit}</div><div style="font-size:8px;opacity:0.7">${h.result==='hit'?'✓':h.result==='push'?'—':'✕'}</div>`;
+    historyEl.appendChild(d);
+  });
+  if(history.length>0) historyEl.scrollLeft = historyEl.scrollWidth;
+}
+function startRun(){
+  createDeck();
+  current = deck.pop();
+  streak=0; score=0; history=[];
+  playing=true;
+  $('#startOverlay').style.display='none';
+  $('#endOverlay').style.display='none';
+  renderCurrent();
+  showToast('Run started! Guess HIGHER or LOWER', 1200);
+  if(navigator.vibrate) navigator.vibrate(20);
+}
+function endRun(reason, isDeckEmpty=false){
+  playing=false;
+  saveBest();
+  const isBest = score===best && score>0;
+  let title = 'Run Ended';
+  let msg = reason;
+  if(isDeckEmpty){
+    title='Deck Cleared! 🎉';
+    msg='You survived all 52 cards! Incredible streak.';
+    score += 100; // bonus
+    saveBest();
+  } else if(streak>=5){
+    title='Great Run!';
+  } else if(streak===0 && score===0){
+    title='Missed Early';
+  }
+  $('#endCard').innerHTML=`
+    <div class="badge">${isDeckEmpty?'Perfect Run':reason.includes('Miss')?'Miss':streak>=3?'Streak '+streak:'Run Over'}</div>
+    <h2>${title}</h2>
+    <p>${msg}</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0">
+      <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px"><div style="font-size:10px;opacity:0.6;font-weight:800">SCORE</div><div style="font-size:18px;font-weight:900;color:var(--gold2)">${score}</div></div>
+      <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px"><div style="font-size:10px;opacity:0.6;font-weight:800">STREAK</div><div style="font-size:18px;font-weight:900">${streak}</div></div>
+    </div>
+    <div style="font-size:11px;opacity:0.7;margin-bottom:8px">${isBest?'🎉 New best score!':`Best: ${best} • Multiplier peaked at x${multiplier.toFixed(1)}`}</div>
+    <button class="btn-full" id="againBtn">Play Again ♠</button>
+    <button class="btn-ghost" id="closeEndBtn">Close</button>
+  `;
+  $('#endOverlay').style.display='flex';
+  $('#againBtn').onclick=()=>{ $('#endOverlay').style.display='none'; runNum++; startRun(); };
+  $('#closeEndBtn').onclick=()=>{ $('#endOverlay').style.display='none'; };
+}
+function guess(isHigher){
+  if(!playing) return;
+  if(deck.length===0){
+    endRun('Deck empty — run complete!', true);
+    return;
+  }
+  const next = deck.pop();
+  const curVal = current.value;
+  const nextVal = next.value;
+  let result='';
+  let correct=false;
+  let push=false;
+
+  if(nextVal === curVal){
+    push=true;
+    result='push';
+    showToast(`Push! Both ${curVal} — no score`, 1100);
+  } else if(isHigher){
+    correct = nextVal > curVal;
+    result = correct ? 'hit' : 'miss';
+  } else {
+    correct = nextVal < curVal;
+    result = correct ? 'hit' : 'miss';
+  }
+
+  // animate card reveal
+  const prevCard = current;
+  // create temp next card element for animation
+  const temp = document.createElement('div');
+  temp.className=`card next ${next.color} revealed`;
+  temp.innerHTML=cardHTML(next);
+  $('#cardStack').appendChild(temp);
+  setTimeout(()=>{
+    if(temp.parentNode) temp.remove();
+    current = next;
+    if(push){
+      history.push({card:next, result:'push'});
+      renderCurrent();
+      if(deck.length===0) setTimeout(()=>endRun('Deck cleared!', true), 600);
+    } else if(correct){
+      streak++;
+      const pts = Math.round(10 * (1.0 + (streak-1)*0.2 + 0.2)); // actually use new multiplier
+      // simpler: multiplier = 1 + streak*0.2
+      const mult = Math.min(6.0, 1.0 + streak*0.2);
+      const earned = Math.round(10 * mult);
+      score += earned;
+      history.push({card:next, result:'hit'});
+      showToast(`Hit! +${earned} • Streak ${streak} x${mult.toFixed(1)}`, 1000);
+      if(navigator.vibrate) navigator.vibrate(20);
+      renderCurrent();
+      // check deck empty after hit
+      if(deck.length===0){
+        setTimeout(()=>endRun('Deck cleared! All 52 cards played.', true), 700);
+      }
+    } else {
+      history.push({card:next, result:'miss'});
+      renderCurrent();
+      showToast(`Miss! ${prevCard.rank} → ${next.rank} was ${nextVal>curVal?'higher':'lower'}`, 1300);
+      if(navigator.vibrate) navigator.vibrate([40,60,40]);
+      setTimeout(()=>endRun(`Miss — ${prevCard.rankName} → ${next.rankName} was ${nextVal>curVal?'higher':'lower'}`, false), 800);
+    }
+  }, 320);
+}
+
+// events
+$('#higherBtn').addEventListener('click', ()=>guess(true));
+$('#lowerBtn').addEventListener('click', ()=>guess(false));
+$('#higherBtn').addEventListener('touchstart', e=>{e.preventDefault(); guess(true)}, {passive:false});
+$('#lowerBtn').addEventListener('touchstart', e=>{e.preventDefault(); guess(false)}, {passive:false});
+
+$('#startBtn').onclick = startRun;
+$('#newRunBtn').onclick = ()=>{ runNum++; startRun(); };
+$('#howBtn').onclick = ()=> $('#howOverlay').style.display='flex';
+$('#closeHowBtn').onclick = ()=> $('#howOverlay').style.display='none';
+$('#howOverlay').onclick = e=>{ if(e.target.id==='howOverlay') e.currentTarget.style.display='none'; };
+
+// keyboard
+window.addEventListener('keydown', e=>{
+  if(e.key==='ArrowUp') guess(true);
+  if(e.key==='ArrowDown') guess(false);
+  if(e.key===' ') { e.preventDefault(); if(!playing) startRun(); }
+});
+
+loadBest();
+// init deck preview
+createDeck();
+current = deck.pop();
+renderCurrent();
+playing=false;
+
+// prevent zoom
+document.addEventListener('touchmove', e=>{ if(e.scale!==1) e.preventDefault(); }, {passive:false});
+let lastTouch=0;
+document.addEventListener('touchend', e=>{
+  const now=Date.now();
+  if(now-lastTouch<300) e.preventDefault();
+  lastTouch=now;
+}, {passive:false});
+</script>
+</body>
+</html>

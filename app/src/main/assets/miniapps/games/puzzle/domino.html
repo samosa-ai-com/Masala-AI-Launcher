@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>Domino Course</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0f172a;--card:#1e293b;--accent:#f59e0b;--accent2:#22c55e;--muted:#94a3b8;--danger:#ef4444}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:#f1f5f9;overflow-x:hidden;min-height:100vh;display:flex;flex-direction:column;align-items:center}
+.wrap{width:100%;max-width:428px;min-width:360px;padding:8px 10px 12px;display:flex;flex-direction:column;gap:8px}
+.topbar{background:var(--card);border-radius:16px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.brand{font-weight:800;font-size:18px;letter-spacing:.5px}
+.brand span{color:var(--accent)}
+.pill{background:#0f172a;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:700;display:flex;gap:8px;align-items:center}
+.pill b{color:var(--accent)}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.stat{background:var(--card);border-radius:12px;padding:8px 6px;text-align:center}
+.stat .k{font-size:10px;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;font-weight:700}
+.stat .v{font-size:16px;font-weight:800;margin-top:2px}
+.stat .v.warn{color:var(--danger)}
+.stat .v.good{color:var(--accent2)}
+.levelTitle{font-size:13px;font-weight:800;text-align:center;color:#fde68a;letter-spacing:.4px}
+.canvasCard{background:#e2e8f0;border-radius:18px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);position:relative;overflow:hidden}
+#gameCanvas{width:100%;height:auto;display:block;border-radius:12px;background:#f8fafc;touch-action:none}
+.hudRow{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+.btn{appearance:none;border:none;border-radius:12px;padding:12px 14px;font-size:14px;font-weight:800;min-height:48px;min-width:48px;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;flex:1 1 auto;transition:transform .08s,opacity .2s}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#1a1a1a;box-shadow:0 4px 0 #b45309}
+.btn-green{background:var(--accent2);color:#052e16;box-shadow:0 4px 0 #15803d}
+.btn-dark{background:#334155;color:#f1f5f9;box-shadow:0 4px 0 #0f172a}
+.btn-ghost{background:#0f172a;color:#e2e8f0;border:1px solid #334155}
+.btn:disabled{opacity:.45;pointer-events:none}
+.btn.small{padding:10px 10px;font-size:13px;min-height:44px}
+.controlsGrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.controlsGrid .btn{flex:none}
+.actionRow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.modeActive{outline:3px solid var(--accent);outline-offset:1px}
+.dots{display:flex;gap:6px;justify-content:center;padding:4px}
+.dot{width:10px;height:10px;border-radius:50%;background:#334155}
+.dot.on{background:var(--accent);box-shadow:0 0 8px rgba(245,158,11,.6)}
+.dot.done{background:var(--accent2)}
+.help{background:var(--card);border-radius:12px;padding:10px 12px;font-size:12px;line-height:1.5;color:#cbd5e1}
+.help b{color:#fde68a}
+.modal{position:absolute;inset:0;background:rgba(15,23,42,.92);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10;border-radius:18px}
+.modalCard{background:#f8fafc;color:#0f172a;border-radius:16px;padding:18px 14px;width:100%;max-width:360px;text-align:center;box-shadow:0 12px 32px rgba(0,0,0,.4)}
+.modalCard h2{font-size:20px;margin-bottom:6px}
+.modalCard p{font-size:13px;color:#475569;line-height:1.5;margin-bottom:12px}
+.badge{display:inline-block;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:800;margin-bottom:8px}
+.scoreBig{font-size:28px;font-weight:900;color:#0f172a}
+.stars{font-size:22px;letter-spacing:4px;margin:6px 0}
+.footer{font-size:11px;color:var(--muted);text-align:center;padding:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">DOMINO<span>COURSE</span></div>
+    <div class="pill"><span>★ <b id="totalScore">0</b></span><span>🏆 <b id="bestOverall">0</b></span></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">Level</div><div class="v" id="levelLabel">1 / 5</div></div>
+    <div class="stat"><div class="k">Time</div><div class="v" id="timeLabel">45s</div></div>
+    <div class="stat"><div class="k">Pieces</div><div class="v" id="piecesLabel">6</div></div>
+  </div>
+  <div class="levelTitle" id="levelName">Straight Shot — Lay a clean line!</div>
+
+  <div class="canvasCard" id="canvasCard">
+    <canvas id="gameCanvas" width="400" height="560"></canvas>
+    <!-- modals injected here -->
+    <div id="modalRoot"></div>
+  </div>
+
+  <div class="controlsGrid">
+    <button class="btn btn-dark small modeActive" id="btnPlace">● Place</button>
+    <button class="btn btn-dark small" id="btnRotateL">↺ Left</button>
+    <button class="btn btn-dark small" id="btnRotateR">↻ Right</button>
+  </div>
+  <div class="controlsGrid">
+    <button class="btn btn-ghost small" id="btnSelect">◎ Select</button>
+    <button class="btn btn-ghost small" id="btnErase">⌫ Erase</button>
+    <button class="btn btn-ghost small" id="btnUndo">↩ Undo</button>
+  </div>
+  <div class="actionRow">
+    <button class="btn btn-green" id="btnPush">▶ PUSH!</button>
+    <button class="btn btn-dark" id="btnReset">↻ Reset</button>
+  </div>
+
+  <div class="dots" id="levelDots"></div>
+
+  <div class="help">
+    <b>How to play:</b> Tap empty floor to place dominoes from START (green) to TARGET (flag). Tap a domino to select it (gold ring) then rotate to aim its fall arrow. Chain must reach the flag! <b>Orange = in range</b>, <b>red = too far</b>. PUSH to topple. Beat the timer with limited pieces for ★★★.
+  </div>
+  <div class="footer">Best scores saved locally • Sound on • Portrait 360-428px</div>
+</div>
+
+<script>
+const LEVELS = [
+  {id:1, name:"Straight Shot", time:45, pieces:6, start:{x:200,y:500}, target:{x:200,y:60}, obstacles:[], desc:"A clean line to the flag"},
+  {id:2, name:"The Bend", time:50, pieces:8, start:{x:60,y:500}, target:{x:340,y:60}, obstacles:[{x:120,y:260,w:160,h:22},{x:120,y:260,w:22,h:160}], desc:"Go around the L-wall"},
+  {id:3, name:"Gap Jump", time:55, pieces:9, start:{x:200,y:520}, target:{x:200,y:50}, obstacles:[{x:0,y:300,w:140,h:18},{x:260,y:300,w:140,h:18},{x:0,y:180,w:140,h:18},{x:260,y:180,w:140,h:18}], desc:"Bridge the two gaps"},
+  {id:4, name:"Maze Runner", time:60, pieces:11, start:{x:50,y:520}, target:{x:350,y:70}, obstacles:[{x:80,y:420,w:240,h:16},{x:80,y:320,w:240,h:16},{x:80,y:220,w:240,h:16},{x:0,y:420,w:16,h:100},{x:384,y:320,w:16,h:100}], desc:"Weave through the maze"},
+  {id:5, name:"Final Spiral", time:70, pieces:14, start:{x:200,y:520}, target:{x:200,y:280}, obstacles:[{x:100,y:400,w:200,h:14},{x:100,y:400,w:14,h:120},{x:286,y:400,w:14,h:120},{x:100,y:506,w:200,h:14},{x:140,y:440,w:120,h:14}], desc:"Spiral inward to the center!"}
+];
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const card = document.getElementById('canvasCard');
+let W=400,H=560;
+let dpr = Math.min(2, window.devicePixelRatio||1);
+
+let state = {
+  levelIdx:0,
+  dominoes:[],
+  selected:-1,
+  mode:'place', // place, select, erase
+  timeLeft:45,
+  timer:null,
+  isSimulating:false,
+  score:0,
+  bestScores: JSON.parse(localStorage.getItem('dominoBest')||'{}'),
+  totalScore:0,
+  history:[]
+};
+
+const TOPPLE_DIST = 78;
+const TOPPLE_ANGLE = 62; // degrees cone
+const FALL_DURATION = 220; // ms
+
+let audioCtx=null;
+function ensureAudio(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); }
+function tone(freq, dur, type='sine', vol=0.25, slideTo){
+  ensureAudio();
+  const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+  o.type=type; o.frequency.value=freq;
+  o.connect(g); g.connect(audioCtx.destination);
+  g.gain.value=vol;
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+dur);
+  if(slideTo){ o.frequency.linearRampToValueAtTime(slideTo, audioCtx.currentTime+dur); }
+  o.start(); o.stop(audioCtx.currentTime+dur);
+}
+function sfxPlace(){ tone(600,0.12,'square',0.15,900); }
+function sfxRotate(){ tone(400,0.08,'sine',0.2,600); }
+function sfxErase(){ tone(200,0.15,'sawtooth',0.15,120); }
+function sfxTick(){ tone(800,0.07,'sine',0.12); }
+function sfxTopple(i){ tone(180+ i*18,0.18,'square',0.18, 90); }
+function sfxWin(){ [0,2,4,7].forEach((n,i)=>setTimeout(()=>tone(300+n*40,0.25,'sine',0.22), i*120)); }
+function sfxFail(){ tone(180,0.4,'sawtooth',0.2,80); tone(120,0.4,'sawtooth',0.15); }
+
+function resizeCanvas(){
+  const maxW = Math.min(428, window.innerWidth) - 20;
+  const cssW = Math.max(340, Math.min(maxW, 400));
+  const cssH = Math.round(cssW * 1.4);
+  canvas.style.width = cssW+'px';
+  canvas.style.height = cssH+'px';
+  W = 400; H = 560;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  draw();
+}
+window.addEventListener('resize', resizeCanvas);
+
+function currentLevel(){ return LEVELS[state.levelIdx]; }
+
+function initLevel(idx){
+  if(idx!==undefined) state.levelIdx=idx;
+  const lvl=currentLevel();
+  state.dominoes=[];
+  state.selected=-1;
+  state.timeLeft=lvl.time;
+  state.isSimulating=false;
+  state.history=[];
+  clearInterval(state.timer);
+  state.timer=setInterval(()=>{
+    if(state.isSimulating) return;
+    state.timeLeft--;
+    updateHUD();
+    if(state.timeLeft<=5 && state.timeLeft>0) sfxTick();
+    if(state.timeLeft<=0){
+      clearInterval(state.timer);
+      showModal('Time Up!','You ran out of time. Try a faster route.', false, 0);
+      sfxFail();
+    }
+  },1000);
+  updateHUD();
+  renderDots();
+  hideModal();
+  draw();
+}
+
+function updateHUD(){
+  const lvl=currentLevel();
+  document.getElementById('levelLabel').textContent = (state.levelIdx+1)+' / '+LEVELS.length;
+  document.getElementById('levelName').textContent = lvl.name+' — '+lvl.desc;
+  const tEl=document.getElementById('timeLabel');
+  tEl.textContent = state.timeLeft+'s';
+  tEl.className='v'+(state.timeLeft<=10?' warn': state.timeLeft<=20?'':' good');
+  const piecesLeft = lvl.pieces - state.dominoes.length;
+  const pEl=document.getElementById('piecesLabel');
+  pEl.textContent = piecesLeft + ' left';
+  pEl.className='v'+(piecesLeft<0?' warn': piecesLeft===0?'':' good');
+  document.getElementById('totalScore').textContent = calcTotalScore();
+  document.getElementById('bestOverall').textContent = bestOverall();
+  document.getElementById('btnPush').disabled = state.dominoes.length===0 || state.isSimulating;
+  // mode buttons
+  document.getElementById('btnPlace').classList.toggle('modeActive', state.mode==='place');
+  document.getElementById('btnSelect').classList.toggle('modeActive', state.mode==='select');
+  document.getElementById('btnErase').classList.toggle('modeActive', state.mode==='erase');
+}
+
+function calcTotalScore(){
+  let s=0; for(let k in state.bestScores) s+=state.bestScores[k];
+  return s;
+}
+function bestOverall(){
+  let m=0; for(let k in state.bestScores) m=Math.max(m, state.bestScores[k]);
+  return m;
+}
+function renderDots(){
+  const c=document.getElementById('levelDots');
+  c.innerHTML='';
+  LEVELS.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='dot'+(i===state.levelIdx?' on': (state.bestScores[i]?' done':'' ));
+    d.onclick=()=>{ initLevel(i); };
+    c.appendChild(d);
+  });
+}
+
+function canvasToWorld(e){
+  const rect=canvas.getBoundingClientRect();
+  const touch = e.touches ? e.touches[0] : e;
+  const x = (touch.clientX - rect.left) / rect.width * W;
+  const y = (touch.clientY - rect.top) / rect.height * H;
+  return {x,y};
+}
+
+function isInsideObstacle(x,y){
+  const lvl=currentLevel();
+  for(let o of lvl.obstacles){
+    if(x>=o.x && x<=o.x+o.w && y>=o.y && y<=o.y+o.h) return true;
+  }
+  // borders
+  if(x<8 || x>W-8 || y<8 || y>H-8) return true;
+  // start/target pads are allowed but not overlapping center
+  return false;
+}
+function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+function angleDiff(a,b){ let d=Math.abs(a-b)%360; return d>180?360-d:d; }
+function angleTo(from,to){ return (Math.atan2(to.x-from.x, from.y-to.y)*180/Math.PI+360)%360; // 0=up
+}
+function lineIntersectsObstacles(p1,p2){
+  const lvl=currentLevel();
+  for(let o of lvl.obstacles){
+    // simple segment vs rect
+    const r={x:o.x,y:o.y,w:o.w,h:o.h};
+    if(segmentsIntersect(p1,p2,{x:r.x,y:r.y},{x:r.x+r.w,y:r.y})) return true;
+    if(segmentsIntersect(p1,p2,{x:r.x+r.w,y:r.y},{x:r.x+r.w,y:r.y+r.h})) return true;
+    if(segmentsIntersect(p1,p2,{x:r.x+r.w,y:r.y+r.h},{x:r.x,y:r.y+r.h})) return true;
+    if(segmentsIntersect(p1,p2,{x:r.x,y:r.y+r.h},{x:r.x,y:r.y})) return true;
+    // also if midpoint inside
+    const mx=(p1.x+p2.x)/2, my=(p1.y+p2.y)/2;
+    if(mx>=r.x && mx<=r.x+r.w && my>=r.y && my<=r.y+r.h) return true;
+  }
+  return false;
+}
+function segmentsIntersect(a,b,c,d){
+  function ccw(p1,p2,p3){ return (p3.y-p1.y)*(p2.x-p1.x) > (p2.y-p1.y)*(p3.x-p1.x); }
+  return ccw(a,c,d)!==ccw(b,c,d) && ccw(a,b,c)!==ccw(a,b,d);
+}
+
+function findDominoAt(x,y){
+  for(let i=state.dominoes.length-1;i>=0;i--){
+    const d=state.dominoes[i];
+    if(Math.hypot(d.x-x, d.y-y) < 22) return i;
+  }
+  return -1;
+}
+
+function placeDomino(x,y){
+  const lvl=currentLevel();
+  if(state.dominoes.length >= lvl.pieces){
+    // allow but warn
+    tone(150,0.2,'square',0.2);
+    return;
+  }
+  if(isInsideObstacle(x,y)) { tone(120,0.15,'sawtooth',0.2); return; }
+  // not too close to existing
+  for(let d of state.dominoes) if(dist(d,{x,y})<18) return;
+  // default angle toward target
+  let ang = angleTo({x,y}, lvl.target);
+  // if near another domino, aim from nearest
+  if(state.dominoes.length>0){
+    let nearest = state.dominoes.reduce((best,cur)=> dist(cur,{x,y})<dist(best,{x,y})?cur:best, state.dominoes[0]);
+    if(dist(nearest,{x,y})<120) ang = angleTo(nearest,{x,y});
+  }
+  state.history.push(JSON.stringify(state.dominoes));
+  state.dominoes.push({x,y, angle:ang, state:'standing', fallProgress:0, fallDir:ang});
+  state.selected = state.dominoes.length-1;
+  sfxPlace();
+  updateHUD(); draw();
+}
+
+function rotateSelected(dir){
+  if(state.selected<0) return;
+  state.dominoes[state.selected].angle = (state.dominoes[state.selected].angle + dir*15 +360)%360;
+  state.dominoes[state.selected].fallDir = state.dominoes[state.selected].angle;
+  sfxRotate(); draw();
+}
+function eraseAt(x,y){
+  const idx=findDominoAt(x,y);
+  if(idx>=0){
+    state.history.push(JSON.stringify(state.dominoes));
+    state.dominoes.splice(idx,1);
+    if(state.selected===idx) state.selected=-1;
+    else if(state.selected>idx) state.selected--;
+    sfxErase(); updateHUD(); draw();
+    return true;
+  }
+  return false;
+}
+
+canvas.addEventListener('pointerdown', (e)=>{
+  e.preventDefault();
+  ensureAudio();
+  const p=canvasToWorld(e);
+  if(state.isSimulating) return;
+  if(state.mode==='erase'){
+    eraseAt(p.x,p.y);
+    return;
+  }
+  const hit=findDominoAt(p.x,p.y);
+  if(hit>=0){
+    // select it
+    state.selected=hit;
+    if(state.mode==='place'){
+      // toggle to select mode visually but keep place
+    }
+    draw();
+    // if double tap quickly, rotate? we have buttons
+    return;
+  }
+  if(state.mode==='select'){
+    state.selected=-1; draw(); return;
+  }
+  // place mode
+  placeDomino(p.x,p.y);
+});
+
+let dragStart=null;
+canvas.addEventListener('pointermove', (e)=>{
+  if(!e.buttons) return;
+  // drag to rotate selected
+  if(state.selected>=0 && state.mode!=='erase'){
+    const p=canvasToWorld(e);
+    const d=state.dominoes[state.selected];
+    const ang=angleTo(d,p);
+    // only if finger far enough
+    if(dist(d,p)>18){
+      d.angle=ang; d.fallDir=ang; draw();
+    }
+  }
+});
+
+// Buttons
+document.getElementById('btnPlace').onclick=()=>{ state.mode='place'; updateHUD(); };
+document.getElementById('btnSelect').onclick=()=>{ state.mode='select'; updateHUD(); draw(); };
+document.getElementById('btnErase').onclick=()=>{ state.mode='erase'; updateHUD(); };
+document.getElementById('btnRotateL').onclick=()=>rotateSelected(-1);
+document.getElementById('btnRotateR').onclick=()=>rotateSelected(1);
+document.getElementById('btnUndo').onclick=()=>{
+  if(state.history.length){
+    state.dominoes=JSON.parse(state.history.pop());
+    state.selected=-1; updateHUD(); draw(); sfxErase();
+  }
+};
+document.getElementById('btnReset').onclick=()=>{ initLevel(); };
+document.getElementById('btnPush').onclick=()=>push();
+
+function push(){
+  if(state.dominoes.length===0) return;
+  ensureAudio();
+  const lvl=currentLevel();
+  // find starter: closest to start
+  let starterIdx=0, bestDist=Infinity;
+  state.dominoes.forEach((d,i)=>{
+    const dd=dist(d,lvl.start);
+    if(dd<bestDist){bestDist=dd; starterIdx=i;}
+  });
+  // if starter too far from start, still allow but warn
+  state.dominoes.forEach(d=>{ d.state='standing'; d.fallProgress=0; });
+  state.isSimulating=true;
+  state.selected=-1;
+  clearInterval(state.timer);
+  // start falling
+  const starter=state.dominoes[starterIdx];
+  starter.state='falling';
+  starter.fallStart=performance.now();
+  // slight nudge toward target if angle is off
+  const ideal=angleTo(starter,lvl.target);
+  if(angleDiff(starter.angle, ideal)>90){
+    // auto-correct a bit for fun
+    starter.fallDir = ideal;
+  }
+  tone(500,0.15,'square',0.3,300);
+  simulate();
+}
+
+let animId=null;
+let toppleCount=0;
+function simulate(){
+  const lvl=currentLevel();
+  let startTime=performance.now();
+  toppleCount=0;
+  let lastToppleTime=performance.now();
+  let finished=false;
+
+  function step(now){
+    let anyFalling=false;
+    let newlyFalling=[];
+    state.dominoes.forEach((d,i)=>{
+      if(d.state==='falling'){
+        anyFalling=true;
+        let elapsed = now - d.fallStart;
+        d.fallProgress = Math.min(1, elapsed / FALL_DURATION);
+        if(d.fallProgress>=1){
+          d.state='fallen';
+          d.fallProgress=1;
+        }
+        // trigger neighbors at 0.55 progress
+        if(d.fallProgress>=0.55 && !d.triggered){
+          d.triggered=true;
+          // find candidates
+          state.dominoes.forEach((other,j)=>{
+            if(other.state!=='standing') return;
+            const dd=dist(d,other);
+            if(dd>TOPPLE_DIST) return;
+            const vecAng=angleTo(d,other);
+            if(angleDiff(vecAng, d.fallDir) > TOPPLE_ANGLE) return;
+            if(lineIntersectsObstacles(d,other)) return;
+            // trigger
+            other.state='falling';
+            other.fallStart=now + dd*1.2; // slight delay by distance
+            other.fallDir = vecAng; // fall toward next
+            // keep original angle for visuals? use vecAng
+            newlyFalling.push(j);
+          });
+          if(newlyFalling.length>0){
+            toppleCount++;
+            sfxTopple(toppleCount);
+            lastToppleTime=now;
+          }
+        }
+      }
+    });
+    drawSim(now);
+
+    // check target reached
+    let reached=false;
+    for(let d of state.dominoes){
+      if(d.state==='fallen' || d.state==='falling'){
+        if(dist(d,lvl.target) < 34) { reached=true; break; }
+        // also if fallen domino's tip reaches target
+        const tip = getTip(d);
+        if(dist(tip,lvl.target) < 30) { reached=true; break; }
+      }
+    }
+    if(reached && !finished){
+      finished=true;
+      setTimeout(()=>finishLevel(true), 600);
+      return;
+    }
+
+    if(anyFalling){
+      // timeout if no progress for 1.2s
+      if(now - lastToppleTime > 1200){
+        // chain stopped
+        setTimeout(()=>finishLevel(false), 400);
+        return;
+      }
+      animId=requestAnimationFrame(step);
+    } else {
+      // no more falling, check if reached
+      setTimeout(()=>finishLevel(reached), 300);
+    }
+  }
+  animId=requestAnimationFrame(step);
+}
+
+function getTip(d){
+  const len=18;
+  const rad=d.fallDir*Math.PI/180;
+  return {x: d.x + Math.sin(rad)*len, y: d.y - Math.cos(rad)*len};
+}
+
+function finishLevel(success){
+  state.isSimulating=false;
+  cancelAnimationFrame(animId);
+  const lvl=currentLevel();
+  const fallen = state.dominoes.filter(d=>d.state==='fallen').length;
+  const total = state.dominoes.length;
+  const clean = fallen===total && total>0;
+  const timeUsed = lvl.time - state.timeLeft;
+  let score=0;
+  if(success){
+    const base=800;
+    const timeBonus=Math.max(0, (lvl.time - timeUsed)*12);
+    const pieceBonus=Math.max(0, (lvl.pieces - total)*40);
+    const cleanBonus= clean? 300:0;
+    const efficiencyBonus= total<=6?100:0;
+    score = base + timeBonus + pieceBonus + cleanBonus + efficiencyBonus;
+    // stars
+    let stars=1;
+    if(clean && timeUsed < lvl.time*0.7) stars=2;
+    if(clean && total <= lvl.pieces-1 && timeUsed < lvl.time*0.6) stars=3;
+    // save best
+    const prev=state.bestScores[state.levelIdx]||0;
+    if(score>prev){
+      state.bestScores[state.levelIdx]=score;
+      localStorage.setItem('dominoBest', JSON.stringify(state.bestScores));
+    }
+    sfxWin();
+    showModal(success? 'Course Cleared!':'Almost!', success? `You reached the flag with ${fallen}/${total} dominoes!` : `Chain stopped at ${fallen}/${total}. Adjust angles and gaps!`, true, score, stars, clean);
+  } else {
+    sfxFail();
+    showModal('Chain Broken', `Only ${fallen}/${total} toppled. The flag wasn't reached. Try tighter spacing and aim each domino's arrow at the next one.`, false, 0);
+  }
+  updateHUD();
+  draw();
+}
+
+function showModal(title, msg, isWin, score, stars, clean){
+  const root=document.getElementById('modalRoot');
+  let starsHtml = stars? '★'.repeat(stars)+'☆'.repeat(3-stars) : '';
+  let html=`
+  <div class="modal" id="gameModal">
+    <div class="modalCard">
+      <div class="badge">${isWin? 'LEVEL '+(state.levelIdx+1)+' COMPLETE' : 'TRY AGAIN'}</div>
+      <h2>${title}</h2>
+      <p>${msg}</p>
+      ${isWin? `<div class="scoreBig">${score} pts</div><div class="stars">${starsHtml}</div><div style="font-size:12px;color:#64748b">${clean? '✨ Clean sweep! All dominoes fell':'Good chain!' } • Time left: ${state.timeLeft}s</div>` : ''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+        <button class="btn btn-dark" onclick="hideModal();initLevel()">↻ Retry</button>
+        ${isWin? `<button class="btn btn-green" onclick="nextLevel()">${state.levelIdx < LEVELS.length-1 ? 'Next →' : 'Replay'}</button>` : `<button class="btn btn-ghost" onclick="hideModal();resumeTimer()">Continue</button>`}
+      </div>
+      ${isWin? `<button class="btn btn-ghost" style="margin-top:8px;width:100%" onclick="hideModal();initLevel()">Keep Editing</button>`:''}
+    </div>
+  </div>`;
+  root.innerHTML=html;
+}
+function hideModal(){
+  document.getElementById('modalRoot').innerHTML='';
+  draw();
+}
+function resumeTimer(){
+  hideModal();
+  const lvl=currentLevel();
+  // reset dominoes to standing
+  state.dominoes.forEach(d=>{d.state='standing'; d.fallProgress=0; delete d.triggered; delete d.fallStart;});
+  state.isSimulating=false;
+  // restart timer if not finished
+  clearInterval(state.timer);
+  state.timer=setInterval(()=>{
+    if(state.isSimulating) return;
+    state.timeLeft--; updateHUD();
+    if(state.timeLeft<=0){ clearInterval(state.timer); showModal('Time Up!','Out of time!',false,0); sfxFail(); }
+  },1000);
+  draw();
+}
+function nextLevel(){
+  hideModal();
+  if(state.levelIdx < LEVELS.length-1){
+    state.levelIdx++;
+    initLevel();
+  } else {
+    // show final celebration
+    const total=calcTotalScore();
+    document.getElementById('modalRoot').innerHTML=`
+    <div class="modal"><div class="modalCard">
+      <div class="badge">🏆 ALL LEVELS CLEARED</div>
+      <h2>Domino Master!</h2>
+      <p>You've toppled every course. Total score: <b>${total}</b></p>
+      <div class="stars">★★★</div>
+      <button class="btn btn-green" style="width:100%;margin-top:12px" onclick="state.levelIdx=0;initLevel();">Play Again</button>
+    </div></div>`;
+    sfxWin();
+  }
+}
+window.hideModal=hideModal;
+window.initLevel=initLevel;
+window.nextLevel=nextLevel;
+window.resumeTimer=resumeTimer;
+
+// Drawing
+function draw(){
+  drawSim(performance.now());
+}
+function drawSim(now){
+  ctx.clearRect(0,0,W,H);
+  // background
+  ctx.fillStyle='#f1f5f9';
+  ctx.fillRect(0,0,W,H);
+  // grid
+  ctx.strokeStyle='#e2e8f0';
+  ctx.lineWidth=1;
+  for(let x=0;x<W;x+=20){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for(let y=0;y<H;y+=20){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  const lvl=currentLevel();
+  // obstacles
+  ctx.fillStyle='#334155';
+  ctx.strokeStyle='#0f172a';
+  ctx.lineWidth=2;
+  lvl.obstacles.forEach(o=>{
+    ctx.fillRect(o.x,o.y,o.w,o.h);
+    ctx.strokeRect(o.x,o.y,o.w,o.h);
+    // wood grain
+    ctx.fillStyle='rgba(255,255,255,.08)';
+    for(let i=0;i<3;i++) ctx.fillRect(o.x+4, o.y+4+i*6, o.w-8, 2);
+    ctx.fillStyle='#334155';
+  });
+
+  // start pad
+  ctx.fillStyle='#22c55e';
+  ctx.beginPath(); ctx.roundRect(lvl.start.x-28, lvl.start.y-18, 56, 36, 8); ctx.fill();
+  ctx.fillStyle='#052e16'; ctx.font='700 11px system-ui'; ctx.textAlign='center'; ctx.fillText('START', lvl.start.x, lvl.start.y+4);
+  // pulse
+  if(!state.isSimulating){
+    ctx.strokeStyle='rgba(34,197,94,.35)'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.roundRect(lvl.start.x-32, lvl.start.y-22, 64,44,10); ctx.stroke();
+  }
+
+  // target flag
+  const t=lvl.target;
+  // glow
+  ctx.fillStyle='rgba(245,158,11,.18)';
+  ctx.beginPath(); ctx.arc(t.x,t.y,34,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#f59e0b';
+  ctx.beginPath(); ctx.arc(t.x,t.y,22,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.font='18px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('⚑', t.x, t.y+1);
+  ctx.fillStyle='#92400e'; ctx.font='700 9px system-ui'; ctx.fillText('TARGET', t.x, t.y+32);
+
+  // connection hints (range lines)
+  if(!state.isSimulating && state.dominoes.length>0){
+    ctx.lineWidth=1.5;
+    for(let i=0;i<state.dominoes.length;i++){
+      for(let j=i+1;j<state.dominoes.length;j++){
+        const a=state.dominoes[i], b=state.dominoes[j];
+        const d=dist(a,b);
+        if(d<TOPPLE_DIST+6){
+          const ang=angleTo(a,b);
+          const ok = angleDiff(ang, a.angle) <= TOPPLE_ANGLE && !lineIntersectsObstacles(a,b);
+          if(ok){
+            ctx.strokeStyle='rgba(245,158,11,.55)';
+            ctx.setLineDash([4,4]);
+            ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+            ctx.setLineDash([]);
+          } else if(d<TOPPLE_DIST){
+            // red if too far angle or blocked
+            if(lineIntersectsObstacles(a,b)){
+              ctx.strokeStyle='rgba(239,68,68,.35)';
+              ctx.setLineDash([2,6]);
+              ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+              ctx.setLineDash([]);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // dominoes
+  state.dominoes.forEach((d,idx)=>{
+    const isSelected = idx===state.selected && !state.isSimulating;
+    // shadow
+    ctx.fillStyle='rgba(15,23,42,.12)';
+    ctx.beginPath(); ctx.ellipse(d.x+2, d.y+6, 14, 6, 0,0,Math.PI*2); ctx.fill();
+
+    ctx.save();
+    ctx.translate(d.x,d.y);
+    let rot = d.angle * Math.PI/180;
+    let scaleY=1, alpha=1;
+    if(d.state==='falling' || d.state==='fallen'){
+      // animate falling: rotate out of plane + fade
+      const p=d.fallProgress;
+      // tilt forward
+      rot = d.fallDir * Math.PI/180;
+      // squash effect
+      scaleY = 1 - p*0.6;
+      alpha = 1 - p*0.15;
+      ctx.rotate(rot);
+      ctx.globalAlpha=alpha;
+      // draw fallen elongated
+      ctx.fillStyle = d.state==='fallen' ? '#94a3b8' : '#f59e0b';
+      ctx.strokeStyle='#0f172a';
+      ctx.lineWidth=1.5;
+      const w=14, h=22 - p*8;
+      ctx.beginPath(); ctx.roundRect(-w/2, -h/2 - p*10, w, h, 3); ctx.fill(); ctx.stroke();
+      // dots
+      ctx.fillStyle='#0f172a';
+      if(p<0.9){
+        ctx.beginPath(); ctx.arc(0,-4,2,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(0,4,2,0,Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+      // tip indicator
+      if(d.state==='falling'){
+        const tip=getTip(d);
+        ctx.fillStyle='rgba(245,158,11,.9)';
+        ctx.beginPath(); ctx.arc(tip.x,tip.y,2.5,0,Math.PI*2); ctx.fill();
+      }
+      // selection ring not for falling
+      return;
+    } else {
+      ctx.rotate(rot);
+    }
+
+    // standing domino
+    const w=14, h=24;
+    // body
+    ctx.fillStyle = isSelected ? '#fde68a' : '#ffffff';
+    ctx.strokeStyle = isSelected ? '#f59e0b' : '#0f172a';
+    ctx.lineWidth = isSelected ? 2.5 : 1.8;
+    ctx.beginPath(); ctx.roundRect(-w/2, -h/2, w, h, 3); ctx.fill(); ctx.stroke();
+    // center line
+    ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(-w/2+2,0); ctx.lineTo(w/2-2,0); ctx.stroke();
+    // dots
+    ctx.fillStyle='#0f172a';
+    ctx.beginPath(); ctx.arc(0,-6,2.2,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0,6,2.2,0,Math.PI*2); ctx.fill();
+    // direction arrow
+    ctx.fillStyle= isSelected ? '#d97706' : '#f59e0b';
+    ctx.beginPath();
+    ctx.moveTo(0, -h/2 -6);
+    ctx.lineTo(-4, -h/2 +1);
+    ctx.lineTo(4, -h/2 +1);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=0.8; ctx.stroke();
+
+    ctx.restore();
+
+    // selection ring
+    if(isSelected){
+      ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.arc(d.x,d.y,20,0,Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+      // angle label
+      ctx.fillStyle='#92400e'; ctx.font='700 9px system-ui'; ctx.textAlign='center';
+      ctx.fillText(Math.round(d.angle)+'°', d.x, d.y-28);
+    }
+
+    // number
+    ctx.fillStyle='#334155'; ctx.font='700 8px system-ui'; ctx.textAlign='center';
+    ctx.fillText(idx+1, d.x, d.y+22);
+  });
+
+  // border
+  ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=3; ctx.strokeRect(2,2,W-4,H-4);
+
+  // pieces left warning
+  if(!state.isSimulating && state.dominoes.length > currentLevel().pieces){
+    ctx.fillStyle='rgba(239,68,68,.92)'; ctx.fillRect(0, H/2-18, W, 36);
+    ctx.fillStyle='#fff'; ctx.font='800 13px system-ui'; ctx.textAlign='center'; ctx.fillText('Too many pieces! Remove some', W/2, H/2+4);
+  }
+}
+
+// initial
+resizeCanvas();
+initLevel(0);
+updateHUD();
+
+// intro modal
+setTimeout(()=>{
+  if(!localStorage.getItem('dominoSeen')){
+    document.getElementById('modalRoot').innerHTML=`
+    <div class="modal"><div class="modalCard">
+      <div class="badge">WELCOME TO DOMINO COURSE</div>
+      <h2>Chain the Topple!</h2>
+      <p>Place dominoes from <b style="color:#16a34a">START</b> to the <b style="color:#d97706">TARGET flag</b>. Each domino falls in the direction of its <b>orange arrow</b>. Keep gaps under the orange dotted line!</p>
+      <p style="font-size:12px;color:#64748b">Tap to place • Tap domino to select • Drag to aim • Use ↺↻ to fine-tune • PUSH to topple!</p>
+      <button class="btn btn-green" style="width:100%" onclick="localStorage.setItem('dominoSeen','1');hideModal()">Let's Play ▶</button>
+    </div></div>`;
+  }
+}, 300);
+</script>
+</body>
+</html>

@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Opposites Rush</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f111a;
+  --card:#1a1d2e;
+  --card2:#232742;
+  --accent:#ff3b6e;
+  --accent2:#00e5cc;
+  --accent3:#ffcc00;
+  --text:#ffffff;
+  --muted:#9aa0c3;
+  --radius:20px;
+}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: radial-gradient(1200px 600px at 50% -10%, #1e2450 0%, #0f111a 60%);
+  color:var(--text);
+  display:flex;justify-content:center;
+  -webkit-tap-highlight-color:transparent;
+}
+.wrap{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100dvh;
+  display:flex;flex-direction:column;
+  padding:12px 14px 18px;
+  position:relative;
+}
+.header{
+  display:flex;justify-content:space-between;align-items:center;
+  gap:8px;
+  padding:10px 2px 12px;
+}
+.pill{
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:999px;
+  padding:8px 12px;
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;font-weight:700;letter-spacing:0.02em;
+  backdrop-filter:blur(8px);
+}
+.pill b{color:var(--accent3);font-size:15px}
+.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--accent2);box-shadow:0 0 8px var(--accent2)}
+.pill.best b{color:var(--accent2)}
+.topbar{
+  display:flex;gap:8px;align-items:center;
+}
+.scoreBox{
+  flex:1;
+  background:linear-gradient(135deg, #1e2450, #1a1d2e);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;
+  padding:10px 12px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.scoreBox .label{font-size:11px;letter-spacing:0.12em;color:var(--muted);font-weight:700}
+.scoreBox .val{font-size:22px;font-weight:900;letter-spacing:-0.02em}
+.streakBadge{
+  background:linear-gradient(135deg, #ff3b6e, #ff7a3d);
+  color:white;
+  border-radius:14px;
+  padding:10px 14px;
+  text-align:center;
+  min-width:86px;
+  box-shadow:0 8px 20px rgba(255,59,110,0.35);
+}
+.streakBadge .label{font-size:10px;letter-spacing:0.12em;opacity:0.9;font-weight:800}
+.streakBadge .val{font-size:20px;font-weight:900}
+.streakBadge.pulse{animation:pulse 0.35s ease}
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+
+.card{
+  background:linear-gradient(180deg, var(--card) 0%, #15182a 100%);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:24px;
+  padding:16px;
+  margin-top:10px;
+  box-shadow:0 20px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+  position:relative;
+  overflow:hidden;
+}
+.card::before{
+  content:"";
+  position:absolute;inset:0;
+  background:radial-gradient(600px 200px at 50% 0%, rgba(0,229,204,0.08), transparent 70%);
+  pointer-events:none;
+}
+.levelRow{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:12px;font-weight:800;letter-spacing:0.08em;color:var(--muted);
+  margin-bottom:10px;
+}
+.levelDots{display:flex;gap:6px}
+.ldot{width:22px;height:6px;border-radius:999px;background:rgba(255,255,255,0.12)}
+.ldot.on{background:var(--accent2);box-shadow:0 0 10px rgba(0,229,204,0.6)}
+.wordWrap{
+  text-align:center;
+  padding:10px 0 14px;
+  position:relative;
+}
+.wordLabel{font-size:11px;letter-spacing:0.18em;color:var(--muted);font-weight:800;margin-bottom:6px}
+.word{
+  font-size:42px;font-weight:900;letter-spacing:-0.03em;line-height:1;
+  text-transform:uppercase;
+  text-shadow:0 4px 20px rgba(0,0,0,0.4);
+}
+.wordSub{font-size:13px;color:var(--muted);margin-top:6px;font-weight:600}
+.timerTrack{
+  height:10px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;
+  margin:6px 0 16px;
+  position:relative;
+}
+.timerFill{
+  height:100%;width:100%;border-radius:999px;
+  background:linear-gradient(90deg, var(--accent2), var(--accent3));
+  transform-origin:left;
+  transition:width 0.05s linear;
+  box-shadow:0 0 12px rgba(0,229,204,0.6);
+}
+.timerFill.warn{background:linear-gradient(90deg, #ffcc00, #ff3b6e);box-shadow:0 0 12px rgba(255,59,110,0.7)}
+.timerFill.danger{background:#ff3b6e;animation:blink 0.3s infinite alternate}
+@keyframes blink{from{opacity:1}to{opacity:0.6}}
+
+.choices{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;
+}
+.choice{
+  min-height:64px;
+  background:var(--card2);
+  border:2px solid rgba(255,255,255,0.06);
+  border-radius:18px;
+  font-size:17px;font-weight:800;letter-spacing:-0.01em;
+  color:var(--text);
+  display:flex;align-items:center;justify-content:center;
+  text-align:center;
+  padding:12px 8px;
+  cursor:pointer;
+  user-select:none;
+  transition:transform 0.08s ease, border-color 0.15s, background 0.15s;
+  position:relative;
+  overflow:hidden;
+  line-height:1.2;
+}
+.choice:active{transform:scale(0.96)}
+.choice.correct{border-color:var(--accent2);background:rgba(0,229,204,0.15)}
+.choice.wrong{border-color:var(--accent);background:rgba(255,59,110,0.15);animation:shake 0.35s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-4px)}}
+
+.pointsFloat{
+  position:absolute;left:50%;top:40%;
+  transform:translate(-50%, -50%);
+  font-size:28px;font-weight:900;color:var(--accent3);
+  text-shadow:0 4px 12px rgba(0,0,0,0.6);
+  pointer-events:none;
+  animation:floatUp 0.7s ease forwards;
+}
+@keyframes floatUp{
+  0%{opacity:0;transform:translate(-50%, -20%) scale(0.8)}
+  20%{opacity:1;transform:translate(-50%, -50%) scale(1.1)}
+  100%{opacity:0;transform:translate(-50%, -90%) scale(1)}
+}
+
+.footer{
+  margin-top:14px;
+  display:flex;gap:10px;
+}
+.btn{
+  flex:1;
+  min-height:56px;
+  border-radius:18px;
+  border:none;
+  font-size:16px;font-weight:900;letter-spacing:0.02em;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  cursor:pointer;
+  transition:transform 0.08s, opacity 0.2s;
+}
+.btn:active{transform:scale(0.97)}
+.btnPrimary{
+  background:linear-gradient(135deg, #ff3b6e, #ff6b3d);
+  color:white;
+  box-shadow:0 10px 24px rgba(255,59,110,0.35);
+}
+.btnGhost{
+  background:rgba(255,255,255,0.08);
+  color:white;
+  border:1px solid rgba(255,255,255,0.1);
+}
+.hint{
+  text-align:center;
+  font-size:12px;color:var(--muted);font-weight:600;
+  margin-top:10px;line-height:1.4;
+}
+
+/* Overlays */
+.overlay{
+  position:absolute;inset:12px 14px 18px;
+  background:rgba(15,17,26,0.92);
+  backdrop-filter:blur(12px);
+  border-radius:24px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px 20px;
+  text-align:center;
+  z-index:10;
+  border:1px solid rgba(255,255,255,0.08);
+}
+.overlay h1{
+  font-size:36px;font-weight:900;letter-spacing:-0.03em;line-height:0.9;
+  margin-bottom:8px;
+}
+.overlay h1 span{background:linear-gradient(135deg, var(--accent2), var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.overlay p{color:var(--muted);font-size:14px;line-height:1.5;font-weight:600;max-width:320px}
+.badgeRow{display:flex;gap:10px;margin:16px 0;flex-wrap:wrap;justify-content:center}
+.miniBadge{
+  background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.08);
+  border-radius:14px;padding:10px 14px;min-width:90px;
+}
+.miniBadge .k{font-size:10px;letter-spacing:0.12em;color:var(--muted);font-weight:800}
+.miniBadge .v{font-size:18px;font-weight:900;margin-top:2px}
+.rules{
+  text-align:left;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px;
+  padding:14px;
+  margin:14px 0;
+  width:100%;max-width:340px;
+}
+.rules li{font-size:13px;line-height:1.4;margin:6px 0 6px 18px;color:#d6d9f0;font-weight:600}
+.rules li b{color:white}
+.bigPlay{
+  width:100%;max-width:340px;
+  min-height:62px;
+  font-size:18px;
+  margin-top:10px;
+}
+.subActions{display:flex;gap:10px;width:100%;max-width:340px;margin-top:10px}
+.subActions .btn{min-height:48px;font-size:14px}
+
+canvas#particles{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  pointer-events:none;
+  z-index:5;
+  border-radius:24px;
+}
+.hidden{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <div class="header">
+    <div class="pill"><span class="dot"></span> OPPOSITES RUSH</div>
+    <div class="pill best">★ BEST <b id="bestScoreTop">0</b></div>
+  </div>
+
+  <div class="topbar">
+    <div class="scoreBox">
+      <div>
+        <div class="label">SCORE</div>
+        <div class="val" id="scoreVal">0</div>
+      </div>
+      <div style="text-align:right">
+        <div class="label">BEST STREAK</div>
+        <div class="val" id="bestStreakVal" style="font-size:16px;color:var(--accent2)">0</div>
+      </div>
+    </div>
+    <div class="streakBadge" id="streakBadge">
+      <div class="label">STREAK</div>
+      <div class="val" id="streakVal">0×</div>
+    </div>
+  </div>
+
+  <div class="card" id="card">
+    <canvas id="particles"></canvas>
+    <div class="levelRow">
+      <span id="levelLabel">LEVEL 1 — WARM UP</span>
+      <div class="levelDots" id="levelDots">
+        <div class="ldot on"></div><div class="ldot"></div><div class="ldot"></div><div class="ldot"></div>
+      </div>
+    </div>
+
+    <div class="wordWrap">
+      <div class="wordLabel">FIND THE OPPOSITE</div>
+      <div class="word" id="wordEl">READY?</div>
+      <div class="wordSub" id="wordSub">Tap the opposite before time runs out</div>
+    </div>
+
+    <div class="timerTrack"><div class="timerFill" id="timerFill"></div></div>
+
+    <div class="choices" id="choices">
+      <button class="choice">—</button>
+      <button class="choice">—</button>
+      <button class="choice">—</button>
+      <button class="choice">—</button>
+    </div>
+
+    <div class="footer">
+      <button class="btn btnGhost" id="howBtn">HOW TO PLAY</button>
+      <button class="btn btnPrimary" id="startBtnFooter">▶ PLAY</button>
+    </div>
+    <div class="hint">One mistake or timeout ends the run. Faster taps = more points + streak bonus.</div>
+  </div>
+
+  <!-- Start Overlay -->
+  <div class="overlay" id="startOverlay">
+    <h1>OPPOSITES<br><span>RUSH</span></h1>
+    <p>How fast can you flip the meaning? Hit the <b style="color:white">exact opposite</b> before the bar drains.</p>
+    <div class="badgeRow">
+      <div class="miniBadge"><div class="k">BEST SCORE</div><div class="v" id="bestScoreOverlay">0</div></div>
+      <div class="miniBadge"><div class="k">BEST STREAK</div><div class="v" id="bestStreakOverlay">0</div></div>
+      <div class="miniBadge"><div class="k">LEVEL REACHED</div><div class="v" id="bestLevelOverlay">1</div></div>
+    </div>
+    <div class="rules">
+      <li><b>Draining timer</b> — bar shrinks every word, faster as you level up</li>
+      <li><b>Speed bonus</b> — up to +100 for instant taps</li>
+      <li><b>Streak bonus</b> — +25 per streak, particles burst on fire streaks</li>
+      <li><b>Sudden death</b> — wrong tap or timeout = game over</li>
+    </div>
+    <button class="btn btnPrimary bigPlay" id="playBtn">▶ PLAY NOW</button>
+    <div class="subActions">
+      <button class="btn btnGhost" id="resetBestBtn">RESET BEST</button>
+      <button class="btn btnGhost" id="guideBtn">GUIDE</button>
+    </div>
+  </div>
+
+  <!-- Game Over Overlay -->
+  <div class="overlay hidden" id="gameOverOverlay">
+    <h1 id="gameOverTitle">TIME'S UP!</h1>
+    <p id="gameOverMsg">You missed the window.</p>
+    <div class="badgeRow">
+      <div class="miniBadge"><div class="k">SCORE</div><div class="v" id="finalScore">0</div></div>
+      <div class="miniBadge"><div class="k">STREAK</div><div class="v" id="finalStreak">0</div></div>
+      <div class="miniBadge"><div class="k">LEVEL</div><div class="v" id="finalLevel">1</div></div>
+    </div>
+    <div class="miniBadge" id="newBestBadge" style="background:linear-gradient(135deg, #00e5cc, #00b8ff);color:#0f111a;border:none;display:none"><div class="k" style="color:rgba(0,0,0,0.6)">NEW BEST!</div><div class="v">★ <span id="newBestVal">0</span></div></div>
+    <button class="btn btnPrimary bigPlay" id="replayBtn">↻ PLAY AGAIN</button>
+    <div class="subActions">
+      <button class="btn btnGhost" id="homeBtn">HOME</button>
+      <button class="btn btnGhost" id="shareBtn">SHARE SCORE</button>
+    </div>
+  </div>
+
+  <!-- How to Play Overlay -->
+  <div class="overlay hidden" id="howOverlay">
+    <h1 style="font-size:28px">HOW TO PLAY</h1>
+    <div class="rules" style="max-width:360px">
+      <li><b>Timer:</b> 3.2s at start → 1.4s at max. Bar color warns you (teal → yellow → red blink).</li>
+      <li><b>Scoring:</b> 100 base + time left (0-100) + streak×25. Example: 2.8s left on 5 streak = 100+87+125=312</li>
+      <li><b>Difficulty:</b> Every 5 correct → harder words (Easy → Medium → Hard → Expert). Timer shortens 150ms per level.</li>
+      <li><b>Storage:</b> Best score, streak & level saved locally (localStorage). No login.</li>
+      <li><b>Particles:</b> Canvas confetti on correct, screen shake on wrong.</li>
+      <li><b>Targets:</b> All buttons ≥56px, 16px+ text, no zoom needed.</li>
+    </div>
+    <button class="btn btnPrimary bigPlay" id="closeHowBtn">GOT IT</button>
+  </div>
+
+</div>
+
+<script>
+const pools = {
+  easy: [
+    {w:"HOT", opp:"COLD"}, {w:"BIG", opp:"SMALL"}, {w:"UP", opp:"DOWN"}, {w:"IN", opp:"OUT"},
+    {w:"FAST", opp:"SLOW"}, {w:"HAPPY", opp:"SAD"}, {w:"LIGHT", opp:"DARK"}, {w:"DAY", opp:"NIGHT"},
+    {w:"OPEN", opp:"CLOSED"}, {w:"LOUD", opp:"QUIET"}, {w:"HARD", opp:"SOFT"}, {w:"NEW", opp:"OLD"},
+    {w:"FULL", opp:"EMPTY"}, {w:"WIN", opp:"LOSE"}, {w:"START", opp:"END"}, {w:"STRONG", opp:"WEAK"},
+    {w:"TALL", opp:"SHORT"}, {w:"HEAVY", opp:"LIGHT"}, {w:"EARLY", opp:"LATE"}, {w:"RICH", opp:"POOR"},
+    {w:"LOVE", opp:"HATE"}, {w:"TRUE", opp:"FALSE"}, {w:"FRONT", opp:"BACK"}, {w:"LEFT", opp:"RIGHT"},
+    {w:"HIGH", opp:"LOW"}, {w:"WET", opp:"DRY"}, {w:"CLEAN", opp:"DIRTY"}, {w:"EASY", opp:"HARD"},
+    {w:"NEAR", opp:"FAR"}, {w:"ALIVE", opp:"DEAD"}
+  ],
+  medium: [
+    {w:"ANCIENT", opp:"MODERN"}, {w:"BRAVE", opp:"COWARDLY"}, {w:"GENEROUS", opp:"SELFISH"},
+    {w:"ARRIVE", opp:"DEPART"}, {w:"CREATE", opp:"DESTROY"}, {w:"INCREASE", opp:"DECREASE"},
+    {w:"VICTORY", opp:"DEFEAT"}, {w:"INCLUDE", opp:"EXCLUDE"}, {w:"MAJOR", opp:"MINOR"},
+    {w:"OPTIMIST", opp:"PESSIMIST"}, {w:"SCARCE", opp:"ABUNDANT"}, {w:"HUMBLE", opp:"ARROGANT"},
+    {w:"CALM", opp:"ANXIOUS"}, {w:"SHARP", opp:"BLUNT"}, {w:"FLEXIBLE", opp:"RIGID"},
+    {w:"PRESENT", opp:"ABSENT"}, {w:"ATTACK", opp:"DEFEND"}, {w:"EXPAND", opp:"SHRINK"},
+    {w:"PRAISE", opp:"CRITICIZE"}, {w:"UNITY", opp:"DIVISION"}, {w:"PERMANENT", opp:"TEMPORARY"},
+    {w:"COMPLEX", opp:"SIMPLE"}, {w:"VISIBLE", opp:"INVISIBLE"}, {w:"VOLUNTARY", opp:"MANDATORY"}
+  ],
+  hard: [
+    {w:"EPHEMERAL", opp:"ETERNAL"}, {w:"BENEVOLENT", opp:"MALEVOLENT"}, {w:"CANDID", opp:"DECEITFUL"},
+    {w:"DILIGENT", opp:"NEGLIGENT"}, {w:"LUCID", opp:"OBSCURE"}, {w:"PRUDENT", opp:"RECKLESS"},
+    {w:"VIVID", opp:"DULL"}, {w:"COHERENT", opp:"INCOHERENT"}, {w:"ABUNDANT", opp:"SCARCE"},
+    {w:"AMIABLE", opp:"HOSTILE"}, {w:"FRUGAL", opp:"EXTRAVAGANT"}, {w:"HASTY", opp:"DELIBERATE"},
+    {w:"MITIGATE", opp:"AGGRAVATE"}, {w:"NOVICE", opp:"EXPERT"}, {w:"STAGNANT", opp:"FLOWING"},
+    {w:"TEDIOUS", opp:"ENGAGING"}, {w:"VIRTUOUS", opp:"WICKED"}, {w:"ZEALOUS", opp:"APATHETIC"},
+    {w:"LITERAL", opp:"FIGURATIVE"}, {w:"OBJECTIVE", opp:"SUBJECTIVE"}
+  ],
+  expert: [
+    {w:"UBIQUITOUS", opp:"RARE"}, {w:"ESOTERIC", opp:"COMMON"}, {w:"LACONIC", opp:"VERBOSE"},
+    {w:"SAGACIOUS", opp:"FOOLISH"}, {w:"PERFIDIOUS", opp:"LOYAL"}, {w:"PUSILLANIMOUS", opp:"VALIANT"},
+    {w:"RECALCITRANT", opp:"COMPLIANT"}, {w:"TACITURN", opp:"TALKATIVE"}, {w:"VENERATE", opp:"DESPISE"},
+    {w:"ABSTRUSE", opp:"CLEAR"}, {w:"ENIGMATIC", opp:"OBVIOUS"}, {w:"MERCURIAL", opp:"STABLE"},
+    {w:"OBSEQUIOUS", opp:"DEFIANT"}, {w:"PERFUNCTORY", opp:"THOROUGH"}, {w:"SURREPTITIOUS", opp:"OPEN"}
+  ]
+};
+
+const levelNames = ["WARM UP","GETTING WARM","ON FIRE","BLAZING","INFERNO","GOD MODE"];
+const allWords = [...pools.easy, ...pools.medium, ...pools.hard, ...pools.expert];
+
+let score=0, streak=0, bestScore=0, bestStreak=0, bestLevel=1, level=1, correctCount=0;
+let timerDuration=3200, timeLeft=3200, raf=null, startTime=0, running=false, current=null;
+
+const els = {
+  scoreVal: document.getElementById('scoreVal'),
+  streakVal: document.getElementById('streakVal'),
+  streakBadge: document.getElementById('streakBadge'),
+  bestScoreTop: document.getElementById('bestScoreTop'),
+  bestScoreOverlay: document.getElementById('bestScoreOverlay'),
+  bestStreakOverlay: document.getElementById('bestStreakOverlay'),
+  bestLevelOverlay: document.getElementById('bestLevelOverlay'),
+  bestStreakVal: document.getElementById('bestStreakVal'),
+  wordEl: document.getElementById('wordEl'),
+  wordSub: document.getElementById('wordSub'),
+  timerFill: document.getElementById('timerFill'),
+  choices: document.getElementById('choices'),
+  levelLabel: document.getElementById('levelLabel'),
+  levelDots: document.getElementById('levelDots'),
+  startOverlay: document.getElementById('startOverlay'),
+  gameOverOverlay: document.getElementById('gameOverOverlay'),
+  howOverlay: document.getElementById('howOverlay'),
+  card: document.getElementById('card'),
+  finalScore: document.getElementById('finalScore'),
+  finalStreak: document.getElementById('finalStreak'),
+  finalLevel: document.getElementById('finalLevel'),
+  newBestBadge: document.getElementById('newBestBadge'),
+  newBestVal: document.getElementById('newBestVal'),
+};
+
+// storage
+function loadBest(){
+  try{
+    bestScore = parseInt(localStorage.getItem('opp_bestScore')||'0');
+    bestStreak = parseInt(localStorage.getItem('opp_bestStreak')||'0');
+    bestLevel = parseInt(localStorage.getItem('opp_bestLevel')||'1');
+  }catch(e){}
+  updateBestUI();
+}
+function saveBest(){
+  try{
+    localStorage.setItem('opp_bestScore', bestScore);
+    localStorage.setItem('opp_bestStreak', bestStreak);
+    localStorage.setItem('opp_bestLevel', bestLevel);
+  }catch(e){}
+}
+function updateBestUI(){
+  els.bestScoreTop.textContent = bestScore;
+  els.bestScoreOverlay.textContent = bestScore;
+  els.bestStreakOverlay.textContent = bestStreak;
+  els.bestLevelOverlay.textContent = bestLevel;
+  els.bestStreakVal.textContent = bestStreak;
+}
+
+// particles
+const canvas = document.getElementById('particles');
+const ctx = canvas.getContext('2d');
+let particles=[];
+function resizeCanvas(){
+  const rect = els.card.getBoundingClientRect();
+  canvas.width = rect.width * devicePixelRatio;
+  canvas.height = rect.height * devicePixelRatio;
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function burst(x,y, colorSet){
+  const rect = canvas.getBoundingClientRect();
+  // x,y in card coords
+  for(let i=0;i<18;i++){
+    particles.push({
+      x: x, y: y,
+      vx: (Math.random()-0.5)*14,
+      vy: (Math.random()-0.5)*14 - 2,
+      r: Math.random()*5+3,
+      life: 1,
+      decay: 0.04 + Math.random()*0.03,
+      color: colorSet[Math.floor(Math.random()*colorSet.length)],
+      rot: Math.random()*Math.PI,
+      vr: (Math.random()-0.5)*0.4
+    });
+  }
+}
+function tickParticles(){
+  ctx.clearRect(0,0,canvas.width, canvas.height);
+  particles = particles.filter(p=>p.life>0);
+  particles.forEach(p=>{
+    p.x += p.vx; p.y += p.vy; p.vy += 0.45; p.vx *= 0.98; p.life -= p.decay; p.rot+=p.vr;
+    ctx.globalAlpha = Math.max(0,p.life);
+    ctx.fillStyle = p.color;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.fillRect(-p.r/2, -p.r/2, p.r, p.r);
+    ctx.restore();
+  });
+  ctx.globalAlpha=1;
+  requestAnimationFrame(tickParticles);
+}
+tickParticles();
+
+function getPool(){
+  if(level<=2) return pools.easy;
+  if(level<=4) return pools.medium;
+  if(level<=6) return pools.hard;
+  return pools.expert;
+}
+function pickWord(){
+  const pool = getPool();
+  // avoid repeat
+  let candidate;
+  let tries=0;
+  do{
+    candidate = pool[Math.floor(Math.random()*pool.length)];
+    tries++;
+  }while(current && candidate.w===current.w && tries<10);
+  return candidate;
+}
+function generateChoices(correctOpp, word){
+  const distractors = new Set();
+  while(distractors.size<3){
+    const r = allWords[Math.floor(Math.random()*allWords.length)];
+    if(r.opp!==correctOpp && r.w!==word && r.opp!==word) distractors.add(r.opp);
+  }
+  const arr = [correctOpp, ...distractors];
+  // shuffle
+  for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  return arr;
+}
+function updateLevelUI(){
+  const name = levelNames[Math.min(level-1, levelNames.length-1)];
+  els.levelLabel.textContent = `LEVEL ${level} — ${name}`;
+  const dots = els.levelDots.children;
+  for(let i=0;i<dots.length;i++){
+    dots[i].classList.toggle('on', i < Math.min(level,4));
+  }
+}
+function computeDuration(){
+  // base 3200 - level*150 - streak*18, min 1400
+  let d = 3200 - (level-1)*150 - streak*18;
+  return Math.max(1400, d);
+}
+function startGame(){
+  score=0; streak=0; level=1; correctCount=0;
+  els.scoreVal.textContent=0;
+  els.streakVal.textContent="0×";
+  updateLevelUI();
+  els.startOverlay.classList.add('hidden');
+  els.gameOverOverlay.classList.add('hidden');
+  els.howOverlay.classList.add('hidden');
+  nextRound();
+}
+function nextRound(){
+  current = pickWord();
+  els.wordEl.textContent = current.w;
+  els.wordSub.textContent = `opposite is...`;
+  timerDuration = computeDuration();
+  timeLeft = timerDuration;
+  const choices = generateChoices(current.opp, current.w);
+  els.choices.innerHTML='';
+  choices.forEach(text=>{
+    const btn=document.createElement('button');
+    btn.className='choice';
+    btn.textContent=text;
+    btn.onclick=()=>handleChoice(btn, text);
+    els.choices.appendChild(btn);
+  });
+  startTimer();
+}
+function startTimer(){
+  running=true;
+  startTime=performance.now();
+  cancelAnimationFrame(raf);
+  const loop=(now)=>{
+    if(!running) return;
+    const elapsed = now - startTime;
+    timeLeft = Math.max(0, timerDuration - elapsed);
+    const pct = (timeLeft / timerDuration)*100;
+    els.timerFill.style.width = pct + '%';
+    els.timerFill.classList.remove('warn','danger');
+    if(pct<35) els.timerFill.classList.add('danger');
+    else if(pct<60) els.timerFill.classList.add('warn');
+    if(timeLeft<=0){
+      running=false;
+      gameOver("TIME'S UP!", "The bar drained before you tapped.");
+      // haptic
+      if(navigator.vibrate) navigator.vibrate([80,40,80]);
+    } else {
+      raf=requestAnimationFrame(loop);
+    }
+  };
+  raf=requestAnimationFrame(loop);
+}
+function handleChoice(btn, text){
+  if(!running) return;
+  running=false;
+  cancelAnimationFrame(raf);
+  const isCorrect = text===current.opp;
+  if(isCorrect){
+    // scoring
+    const timeBonus = Math.round((timeLeft / timerDuration)*100);
+    const streakBonus = streak*25;
+    const gained = 100 + timeBonus + streakBonus;
+    score += gained;
+    streak++;
+    correctCount++;
+    // level up every 5
+    const newLevel = Math.floor(correctCount/5)+1;
+    if(newLevel!==level){ level=newLevel; updateLevelUI(); }
+    els.scoreVal.textContent=score;
+    els.streakVal.textContent=streak+"×";
+    els.streakBadge.classList.remove('pulse'); void els.streakBadge.offsetWidth; els.streakBadge.classList.add('pulse');
+    // best streak live
+    if(streak>bestStreak){ bestStreak=streak; updateBestUI(); }
+
+    // visual
+    btn.classList.add('correct');
+    // points float
+    const float=document.createElement('div');
+    float.className='pointsFloat';
+    float.textContent='+'+gained;
+    els.card.appendChild(float);
+    setTimeout(()=>float.remove(),700);
+
+    // particles
+    const rect = btn.getBoundingClientRect();
+    const cardRect = els.card.getBoundingClientRect();
+    const x = rect.left - cardRect.left + rect.width/2;
+    const y = rect.top - cardRect.top + rect.height/2;
+    const colors = streak>=5 ? ['#ff3b6e','#ffcc00','#00e5cc','#ffffff'] : ['#00e5cc','#00b8ff','#ffffff'];
+    burst(x,y, colors);
+    if(navigator.vibrate) navigator.vibrate(20);
+
+    // next
+    setTimeout(nextRound, 380);
+  } else {
+    btn.classList.add('wrong');
+    // highlight correct
+    [...els.choices.children].forEach(c=>{
+      if(c.textContent===current.opp) c.classList.add('correct');
+    });
+    if(navigator.vibrate) navigator.vibrate([60,30,60]);
+    els.card.animate([{transform:'translateX(0)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],{duration:300});
+    setTimeout(()=>gameOver("WRONG!", `"${current.w}" ≠ "${text}" — it's "${current.opp}"`), 500);
+  }
+}
+function gameOver(title, msg){
+  running=false;
+  cancelAnimationFrame(raf);
+  els.timerFill.style.width='0%';
+  document.getElementById('gameOverTitle').textContent=title;
+  document.getElementById('gameOverMsg').textContent=msg;
+  els.finalScore.textContent=score;
+  els.finalStreak.textContent=streak;
+  els.finalLevel.textContent=level;
+  let isNewBest=false;
+  if(score>bestScore){ bestScore=score; isNewBest=true; }
+  if(streak>bestStreak) bestStreak=streak;
+  if(level>bestLevel) bestLevel=level;
+  saveBest(); updateBestUI();
+  els.newBestBadge.style.display = isNewBest ? 'block' : 'none';
+  if(isNewBest) els.newBestVal.textContent=bestScore;
+  els.gameOverOverlay.classList.remove('hidden');
+  // burst on new best
+  if(isNewBest){
+    const cardRect=els.card.getBoundingClientRect();
+    burst(cardRect.width/2, 80, ['#ffcc00','#ff3b6e','#00e5cc']);
+  }
+}
+
+// events
+document.getElementById('playBtn').onclick=startGame;
+document.getElementById('replayBtn').onclick=startGame;
+document.getElementById('startBtnFooter').onclick=startGame;
+document.getElementById('homeBtn').onclick=()=>{
+  els.gameOverOverlay.classList.add('hidden');
+  els.startOverlay.classList.remove('hidden');
+};
+document.getElementById('howBtn').onclick=()=>els.howOverlay.classList.remove('hidden');
+document.getElementById('guideBtn').onclick=()=>els.howOverlay.classList.remove('hidden');
+document.getElementById('closeHowBtn').onclick=()=>els.howOverlay.classList.add('hidden');
+document.getElementById('resetBestBtn').onclick=()=>{
+  if(confirm('Reset best score & streak?')){
+    bestScore=0;bestStreak=0;bestLevel=1;saveBest();updateBestUI();
+  }
+};
+document.getElementById('shareBtn').onclick=()=>{
+  const text=`Opposites Rush — Score ${score} | Streak ${streak}× | Level ${level}`;
+  if(navigator.share) navigator.share({title:'Opposites Rush', text}).catch(()=>{});
+  else if(navigator.clipboard) { navigator.clipboard.writeText(text); alert('Copied: '+text); }
+  else alert(text);
+};
+
+// init
+loadBest();
+updateLevelUI();
+resizeCanvas();
+</script>
+</body>
+</html>

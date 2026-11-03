@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Neon Arena Battler</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#070712;color:#e8f0ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow-x:hidden}
+.app{width:100%;max-width:428px;min-width:360px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;background:radial-gradient(120% 80% at 50% 0%,#1a1a4a 0%,#0a0a1e 55%,#050510 100%);position:relative}
+header{padding:10px 12px 8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.brand{font-weight:900;letter-spacing:0.08em;font-size:15px;color:#00f0ff;text-shadow:0 0 8px #00f0ff,0 0 18px #00f0ff88}
+.brand span{color:#ff2e93;text-shadow:0 0 8px #ff2e93}
+.stats{display:flex;gap:6px;font-size:11px}
+.pill{background:#11112a;border:1px solid #2a2a5a;border-radius:999px;padding:4px 8px;line-height:1;white-space:nowrap}
+.pill b{color:#00f0ff}
+.pill b.pink{color:#ff2e93}
+.hud{display:flex;align-items:center;gap:8px;padding:6px 10px}
+.fighterHud{flex:1}
+.nameRow{display:flex;justify-content:space-between;font-size:11px;font-weight:800;letter-spacing:0.06em;margin-bottom:4px}
+.nameRow .p1{color:#00f0ff}
+.nameRow .p2{color:#ff2e93}
+.bar{height:14px;background:#0f0f2a;border:1px solid #2a2a5a;border-radius:999px;overflow:hidden;position:relative;box-shadow:inset 0 0 6px #0008}
+.fill{height:100%;width:100%;transition:width 0.18s ease;position:relative}
+.fill.p1fill{background:linear-gradient(90deg,#00f0ff,#00c8ff);box-shadow:0 0 10px #00f0ff88}
+.fill.p2fill{background:linear-gradient(90deg,#ff2e93,#ff6b35);box-shadow:0 0 10px #ff2e9388}
+.fill::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#fff5 0%,transparent 60%)}
+.centerHud{width:54px;text-align:center}
+.roundLabel{font-size:10px;letter-spacing:0.12em;color:#aab0ff}
+.scoreBig{font-size:18px;font-weight:900;line-height:1}
+.scoreBig span{color:#555}
+.canvasWrap{margin:6px 10px 0;position:relative;border-radius:14px;overflow:hidden;border:1px solid #2a2a6a;box-shadow:0 0 0 1px #00f0ff22,0 0 18px #00f0ff22,0 0 28px #ff2e9311;background:#050510}
+canvas{display:block;width:100%;height:auto;aspect-ratio:360/210;background:linear-gradient(180deg,#0b0b2a 0%,#0e0e2e 45%,#0a0a1e 100%)}
+.banner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;text-align:center;padding:12px}
+.bannerCard{background:linear-gradient(180deg,#0f0f2aee,#0a0a1eee);border:1px solid #00f0ff66;border-radius:14px;padding:12px 16px;box-shadow:0 0 18px #00f0ff44,0 0 28px #ff2e9322;min-width:200px}
+.bannerCard h2{font-size:20px;font-weight:900;letter-spacing:0.08em;color:#fff;text-shadow:0 0 10px #00f0ff}
+.bannerCard p{font-size:12px;color:#aab0ff;margin-top:4px;letter-spacing:0.06em}
+.bannerCard .bigBtn{pointer-events:auto;margin-top:10px;background:linear-gradient(180deg,#00f0ff,#00b8ff);color:#001018;border:none;border-radius:999px;padding:10px 18px;font-weight:900;font-size:14px;letter-spacing:0.06em;box-shadow:0 0 12px #00f0ff88;min-height:44px;min-width:120px}
+.bannerCard .bigBtn:active{transform:scale(0.97)}
+.comboHud{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:#0008;border:1px solid #00f0ff44;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800;letter-spacing:0.06em;color:#fff;display:none;backdrop-filter:blur(4px)}
+.comboHud.show{display:block;animation:pop 0.2s ease}
+.comboHud b{color:#ffeb3b;text-shadow:0 0 6px #ffeb3b}
+@keyframes pop{0%{transform:translateX(-50%) scale(0.8)}100%{transform:translateX(-50%) scale(1)}}
+.controls{padding:10px 10px 12px;display:flex;justify-content:space-between;align-items:end;gap:10px}
+.dpad{display:grid;grid-template-columns:56px 56px 56px;grid-template-rows:56px 56px;gap:6px;justify-items:center;align-items:center}
+.dpad .spacer{width:56px;height:56px}
+.cbtn{width:56px;height:56px;border-radius:14px;border:1px solid #2a2a5a;background:linear-gradient(180deg,#1a1a3a,#12122a);color:#e8f0ff;font-size:18px;font-weight:800;display:flex;align-items:center;justify-content:center;user-select:none;touch-action:manipulation;box-shadow:0 4px 0 #0a0a1e,0 0 10px #0006}
+.cbtn:active,.cbtn.pressed{background:linear-gradient(180deg,#2a2a5a,#1e1e3e);transform:translateY(2px);box-shadow:0 2px 0 #0a0a1e;border-color:#00f0ff66}
+.cbtn.attack{width:84px;height:84px;border-radius:22px;background:linear-gradient(180deg,#ff2e93,#d81a6a);border-color:#ff6b9a;color:#fff;font-size:13px;letter-spacing:0.08em;flex-direction:column;gap:2px;box-shadow:0 6px 0 #7a0a3a,0 0 16px #ff2e9366}
+.cbtn.attack:active,.cbtn.attack.pressed{transform:translateY(3px);box-shadow:0 3px 0 #7a0a3a}
+.cbtn.attack span:first-child{font-size:22px;line-height:1}
+.rightSide{display:flex;flex-direction:column;align-items:center;gap:8px}
+.hint{font-size:10px;color:#7a7ab0;letter-spacing:0.06em;text-align:center;line-height:1.3}
+.footer{padding:6px 10px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.smallBtn{background:#11112a;border:1px solid #2a2a5a;color:#aab0ff;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:700;min-height:36px}
+.smallBtn:active{transform:scale(0.97)}
+.shake{animation:shake 0.18s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}50%{transform:translateX(4px)}75%{transform:translateX(-3px)}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="brand">NEON <span>ARENA</span></div>
+    <div class="stats">
+      <div class="pill">BEST COMBO <b id="bestCombo">0</b></div>
+      <div class="pill">WINS <b class="pink" id="wins">0</b>-<b id="losses">0</b></div>
+    </div>
+  </header>
+
+  <div class="hud">
+    <div class="fighterHud">
+      <div class="nameRow"><span class="p1">YOU</span><span id="p1pct">100%</span></div>
+      <div class="bar"><div class="fill p1fill" id="p1fill"></div></div>
+    </div>
+    <div class="centerHud">
+      <div class="roundLabel" id="roundLabel">ROUND 1</div>
+      <div class="scoreBig"><span id="p1wins">0</span> : <span id="p2wins">0</span></div>
+    </div>
+    <div class="fighterHud">
+      <div class="nameRow"><span id="p2pct">100%</span><span class="p2">CPU</span></div>
+      <div class="bar"><div class="fill p2fill" id="p2fill"></div></div>
+    </div>
+  </div>
+
+  <div class="canvasWrap" id="wrap">
+    <canvas id="c" width="360" height="210"></canvas>
+    <div class="comboHud" id="comboHud">COMBO <b id="comboN">0</b> ×</div>
+    <div class="banner" id="banner">
+      <div class="bannerCard" id="bannerCard">
+        <h2 id="bannerTitle">NEON ARENA</h2>
+        <p id="bannerSub">First to 2 rounds wins. Build combos!</p>
+        <button class="bigBtn" id="startBtn">▶ FIGHT!</button>
+        <div class="hint" style="margin-top:8px">Move ◀▶ Jump ▲ Block ▼ + ATTACK</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="dpad" id="dpad">
+      <div class="spacer"></div>
+      <button class="cbtn" data-dir="up" aria-label="Up">▲</button>
+      <div class="spacer"></div>
+      <button class="cbtn" data-dir="left" aria-label="Left">◀</button>
+      <button class="cbtn" data-dir="down" aria-label="Down">▼</button>
+      <button class="cbtn" data-dir="right" aria-label="Right">▶</button>
+    </div>
+    <div class="rightSide">
+      <button class="cbtn attack" id="atkBtn" aria-label="Attack"><span>✦</span><span>ATTACK</span></button>
+      <div class="hint">SPACE / TAP<br>to strike</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button class="smallBtn" id="resetBtn">↺ Reset Match</button>
+    <div class="hint">Keys: Arrows + Space &nbsp;|&nbsp; Hold ▼ to block</div>
+  </div>
+</div>
+
+<script>
+(() => {
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+const wrap = document.getElementById('wrap');
+const banner = document.getElementById('banner');
+const bannerTitle = document.getElementById('bannerTitle');
+const bannerSub = document.getElementById('bannerSub');
+const startBtn = document.getElementById('startBtn');
+const p1fill = document.getElementById('p1fill');
+const p2fill = document.getElementById('p2fill');
+const p1pct = document.getElementById('p1pct');
+const p2pct = document.getElementById('p2pct');
+const p1winsEl = document.getElementById('p1wins');
+const p2winsEl = document.getElementById('p2wins');
+const roundLabel = document.getElementById('roundLabel');
+const comboHud = document.getElementById('comboHud');
+const comboN = document.getElementById('comboN');
+const bestComboEl = document.getElementById('bestCombo');
+const winsEl = document.getElementById('wins');
+const lossesEl = document.getElementById('losses');
+
+const W=360, H=210;
+const FLOOR_Y = 168;
+const GRAV=0.72;
+const SPEED=2.6;
+const JUMP=-9.2;
+
+let bestCombo = parseInt(localStorage.getItem('neon_bestCombo')||'0',10);
+let totalWins = parseInt(localStorage.getItem('neon_wins')||'0',10);
+let totalLosses = parseInt(localStorage.getItem('neon_losses')||'0',10);
+bestComboEl.textContent=bestCombo;
+winsEl.textContent=totalWins;
+lossesEl.textContent=totalLosses;
+
+let state='ready'; // ready, fighting, roundEnd, matchEnd
+let round=1, p1RoundWins=0, p2RoundWins=0;
+let shakeT=0, flashT=0;
+
+const keys={left:false,right:false,up:false,down:false,attack:false};
+
+const player={
+  x:70, y:FLOOR_Y-48, vx:0, vy:0, w:26, h:48, facing:1,
+  health:100, max:100,
+  onGround:true, blocking:false, attacking:false, atkTime:0, atkCooldown:0,
+  hitStun:0, combo:0, lastHit:0
+};
+const enemy={
+  x:260, y:FLOOR_Y-48, vx:0, vy:0, w:26, h:48, facing:-1,
+  health:100, max:100,
+  onGround:true, blocking:false, attacking:false, atkTime:0, atkCooldown:0,
+  hitStun:0
+};
+
+let particles=[];
+let hitTexts=[];
+let lastTime=0;
+
+function resetRound(){
+  player.x=70; player.y=FLOOR_Y-player.h; player.vx=0; player.vy=0; player.health=100; player.hitStun=0; player.attacking=false; player.atkTime=0; player.atkCooldown=0; player.blocking=false; player.facing=1; player.onGround=true;
+  enemy.x=260; enemy.y=FLOOR_Y-enemy.h; enemy.vx=0; enemy.vy=0; enemy.health=100; enemy.hitStun=0; enemy.attacking=false; enemy.atkTime=0; enemy.atkCooldown=0; enemy.blocking=false; enemy.facing=-1; enemy.onGround=true;
+  particles=[]; hitTexts=[]; shakeT=0; flashT=0;
+  player.combo=0; updateComboHud();
+  updateHud();
+}
+
+function updateHud(){
+  p1fill.style.width = Math.max(0,player.health)+'%';
+  p2fill.style.width = Math.max(0,enemy.health)+'%';
+  p1pct.textContent = Math.max(0,Math.round(player.health))+'%';
+  p2pct.textContent = Math.max(0,Math.round(enemy.health))+'%';
+  p1winsEl.textContent=p1RoundWins;
+  p2winsEl.textContent=p2RoundWins;
+  roundLabel.textContent='ROUND '+round;
+}
+
+function updateComboHud(){
+  if(player.combo>1){
+    comboHud.classList.add('show');
+    comboN.textContent=player.combo;
+  } else {
+    comboHud.classList.remove('show');
+  }
+}
+
+function showBanner(title, sub, btnText, showBtn){
+  bannerTitle.textContent=title;
+  bannerSub.textContent=sub;
+  if(showBtn){
+    startBtn.style.display='inline-block';
+    startBtn.textContent=btnText||'▶ FIGHT!';
+  } else {
+    startBtn.style.display='none';
+  }
+  banner.style.display='flex';
+}
+function hideBanner(){ banner.style.display='none'; }
+
+function startFight(){
+  if(state==='ready' || state==='roundEnd'){
+    state='fighting';
+    hideBanner();
+  } else if(state==='matchEnd'){
+    // new match
+    round=1; p1RoundWins=0; p2RoundWins=0;
+    resetRound();
+    state='fighting';
+    hideBanner();
+    updateHud();
+  }
+}
+
+function nextRound(winner){
+  if(winner==='p1') p1RoundWins++; else p2RoundWins++;
+  updateHud();
+  if(p1RoundWins>=2 || p2RoundWins>=2){
+    // match end
+    state='matchEnd';
+    const youWon = p1RoundWins>=2;
+    if(youWon) totalWins++; else totalLosses++;
+    localStorage.setItem('neon_wins', totalWins);
+    localStorage.setItem('neon_losses', totalLosses);
+    winsEl.textContent=totalWins; lossesEl.textContent=totalLosses;
+    showBanner(youWon?'VICTORY!':'DEFEAT', youWon?'You dominated the neon arena!':'CPU takes the title. Rematch?', '↺ PLAY AGAIN', true);
+  } else {
+    state='roundEnd';
+    round++;
+    showBanner(winner==='p1'?'ROUND WON!':'ROUND LOST', (winner==='p1'?'You took the round.':'CPU strikes back.')+' Next round...', '▶ NEXT ROUND', true);
+    // prepare next round after banner, but reset now for preview
+    resetRound();
+    updateHud();
+  }
+}
+
+function tryAttack(attacker, defender){
+  if(attacker.atkCooldown>0 || attacker.hitStun>0) return;
+  attacker.attacking=true;
+  attacker.atkTime=14; // frames
+  attacker.atkCooldown=22;
+  // check hit after short delay - we check immediately with extended range
+  // hitbox in front of attacker
+  const range = 38;
+  const ax = attacker.facing===1 ? attacker.x + attacker.w : attacker.x - range;
+  const ay = attacker.y + 10;
+  const ah = 22;
+  // defender box
+  const dx = defender.x, dy=defender.y, dw=defender.w, dh=defender.h;
+  const hit = ax < dx+dw && ax+range > dx && ay < dy+dh && ay+ah > dy;
+  // also require facing and distance
+  const dist = Math.abs((attacker.x+attacker.w/2)-(defender.x+defender.w/2));
+  const facingOk = (attacker.facing===1 && defender.x > attacker.x) || (attacker.facing===-1 && defender.x < attacker.x);
+  if(hit && dist<52 && facingOk){
+    let dmg = 13 + Math.random()*5;
+    let isBlocked = defender.blocking && defender.onGround && ((defender.facing===1 && attacker.x < defender.x) || (defender.facing===-1 && attacker.x > defender.x) || true);
+    // blocking only if defender is holding down and facing attacker
+    // simplify: if defender.blocking then reduce
+    if(defender.blocking){
+      dmg = 3;
+      defender.hitStun=6;
+      spawnHitText(defender.x+defender.w/2, defender.y-6, 'BLOCKED!', '#7af0ff');
+      spawnParticles(defender.x+defender.w/2, defender.y+18, 6, '#00f0ff');
+      defender.vx += attacker.facing * 1.2;
+    } else {
+      // real hit
+      defender.health = Math.max(0, defender.health - dmg);
+      defender.hitStun=14;
+      defender.vx += attacker.facing * 3.2;
+      defender.vy = -1.2;
+      shakeT=10;
+      flashT=4;
+      spawnParticles(defender.x+defender.w/2, defender.y+20, 10, attacker===player ? '#ff2e93' : '#00f0ff');
+      // combo only for player
+      if(attacker===player){
+        const now=performance.now();
+        if(now - attacker.lastHit < 1100) attacker.combo++;
+        else attacker.combo=1;
+        attacker.lastHit=now;
+        if(attacker.combo>bestCombo){
+          bestCombo=attacker.combo;
+          localStorage.setItem('neon_bestCombo', bestCombo);
+          bestComboEl.textContent=bestCombo;
+        }
+        updateComboHud();
+        if(attacker.combo>1) spawnHitText(defender.x+defender.w/2, defender.y-10, attacker.combo+' HIT!', '#ffeb3b');
+        else spawnHitText(defender.x+defender.w/2, defender.y-10, 'HIT!', '#fff');
+      } else {
+        // enemy hit player - reset player combo if time passed
+        spawnHitText(defender.x+defender.w/2, defender.y-10, 'HIT!', '#fff');
+      }
+      updateHud();
+      if(defender.health<=0){
+        // KO
+        spawnParticles(defender.x+defender.w/2, defender.y+20, 18, '#fff');
+        setTimeout(()=> nextRound(attacker===player?'p1':'p2'), 420);
+        state='roundEnd'; // prevent further hits
+      }
+    }
+  } else {
+    // whiff - small cooldown already
+  }
+}
+
+function spawnParticles(x,y,n,color){
+  for(let i=0;i<n;i++){
+    particles.push({
+      x:x, y:y,
+      vx:(Math.random()-0.5)*6,
+      vy:(Math.random()-0.5)*6 -1,
+      life:18+Math.random()*10,
+      max:18+Math.random()*10,
+      color:color,
+      size:2+Math.random()*3
+    });
+  }
+}
+function spawnHitText(x,y,txt,color){
+  hitTexts.push({x,y,txt,color,life:28, vy:-1.2});
+}
+
+// Input
+function setKey(k,v){ keys[k]=v; }
+
+window.addEventListener('keydown', e=>{
+  if(e.code==='ArrowLeft') { setKey('left',true); e.preventDefault(); }
+  if(e.code==='ArrowRight') { setKey('right',true); e.preventDefault(); }
+  if(e.code==='ArrowUp') { setKey('up',true); e.preventDefault(); }
+  if(e.code==='ArrowDown') { setKey('down',true); e.preventDefault(); }
+  if(e.code==='Space') { if(!keys.attack){ tryAttack(player, enemy); } setKey('attack',true); e.preventDefault(); }
+  if(e.code==='KeyA') { if(!keys.attack){ tryAttack(player, enemy); } }
+});
+window.addEventListener('keyup', e=>{
+  if(e.code==='ArrowLeft') setKey('left',false);
+  if(e.code==='ArrowRight') setKey('right',false);
+  if(e.code==='ArrowUp') setKey('up',false);
+  if(e.code==='ArrowDown') setKey('down',false);
+  if(e.code==='Space') setKey('attack',false);
+  if(e.code==='KeyA') setKey('attack',false);
+});
+
+// Touch buttons
+document.querySelectorAll('.cbtn[data-dir]').forEach(btn=>{
+  const dir=btn.dataset.dir;
+  const map={left:'left',right:'right',up:'up',down:'down'};
+  const k=map[dir];
+  const down=(e)=>{ e.preventDefault(); setKey(k,true); btn.classList.add('pressed'); };
+  const up=(e)=>{ e.preventDefault(); setKey(k,false); btn.classList.remove('pressed'); };
+  btn.addEventListener('pointerdown', down);
+  btn.addEventListener('pointerup', up);
+  btn.addEventListener('pointercancel', up);
+  btn.addEventListener('pointerleave', up);
+});
+const atkBtn=document.getElementById('atkBtn');
+const atkDown=(e)=>{ e.preventDefault(); atkBtn.classList.add('pressed'); if(state==='fighting') tryAttack(player, enemy); else if(state!=='fighting') startFight(); };
+const atkUp=(e)=>{ e.preventDefault(); atkBtn.classList.remove('pressed'); };
+atkBtn.addEventListener('pointerdown', atkDown);
+atkBtn.addEventListener('pointerup', atkUp);
+atkBtn.addEventListener('pointercancel', atkUp);
+
+startBtn.addEventListener('click', startFight);
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  round=1; p1RoundWins=0; p2RoundWins=0;
+  resetRound();
+  state='ready';
+  showBanner('NEON ARENA','First to 2 rounds wins. Build combos!','▶ FIGHT!',true);
+  updateHud();
+});
+
+// Enemy AI
+let aiTimer=0;
+function updateAI(dt){
+  if(state!=='fighting') return;
+  aiTimer-=dt;
+  if(aiTimer>0) return;
+  aiTimer= 18 + Math.random()*22; // frames
+
+  const dist = enemy.x - player.x;
+  const absDist = Math.abs(dist);
+  const enemyFacingPlayer = (dist>0 && enemy.facing===-1) || (dist<0 && enemy.facing===1);
+
+  // face player
+  enemy.facing = dist>0 ? -1 : 1;
+
+  // decide
+  if(enemy.hitStun>0) return;
+
+  if(absDist>48){
+    // approach
+    enemy.vx = (dist>0 ? -1 : 1) * (0.9 + Math.random()*0.6) * SPEED * 0.55;
+    // occasional jump
+    if(Math.random()<0.08 && enemy.onGround) { enemy.vy=JUMP*0.9; enemy.onGround=false; }
+  } else {
+    // in range - attack or block
+    enemy.vx *= 0.7;
+    const r=Math.random();
+    if(r<0.55){
+      if(enemy.atkCooldown<=0) tryAttack(enemy, player);
+    } else if(r<0.72){
+      enemy.blocking=true;
+      setTimeout(()=> enemy.blocking=false, 380+Math.random()*300);
+    } else if(r<0.82 && enemy.onGround){
+      enemy.vy=JUMP; enemy.onGround=false;
+      enemy.vx = (dist>0?-1:1)*1.2;
+    } else {
+      // strafe
+      enemy.vx = (Math.random()<0.5?-1:1)*SPEED*0.5;
+    }
+  }
+}
+
+function updatePhysics(obj){
+  // horizontal input only for player, enemy uses vx set by AI
+  if(obj===player){
+    if(obj.hitStun>0){
+      obj.vx *= 0.88;
+    } else {
+      let mv=0;
+      if(keys.left) mv-=1;
+      if(keys.right) mv+=1;
+      if(mv!==0){
+        obj.facing = mv>0?1:-1;
+        obj.vx = mv * SPEED;
+      } else {
+        obj.vx *= 0.78;
+        if(Math.abs(obj.vx)<0.1) obj.vx=0;
+      }
+      // block
+      obj.blocking = keys.down && obj.onGround && obj.hitStun<=0 && !obj.attacking;
+      // jump
+      if(keys.up && obj.onGround && obj.hitStun<=0 && !obj.blocking){
+        obj.vy=JUMP;
+        obj.onGround=false;
+        keys.up=false; // prevent hold
+      }
+    }
+  } else {
+    // enemy physics damping
+    if(obj.hitStun<=0) obj.vx *= 0.92;
+    else obj.vx *= 0.88;
+  }
+
+  obj.x += obj.vx;
+  obj.y += obj.vy;
+  obj.vy += GRAV;
+
+  // floor
+  if(obj.y + obj.h >= FLOOR_Y){
+    obj.y = FLOOR_Y - obj.h;
+    obj.vy=0;
+    obj.onGround=true;
+  } else {
+    obj.onGround=false;
+  }
+
+  // walls
+  obj.x = Math.max(4, Math.min(W - obj.w -4, obj.x));
+
+  // timers
+  if(obj.atkTime>0){ obj.atkTime--; if(obj.atkTime<=0) obj.attacking=false; }
+  if(obj.atkCooldown>0) obj.atkCooldown--;
+  if(obj.hitStun>0) obj.hitStun--;
+
+  // push apart if overlapping
+  // handled in main loop
+}
+
+function handleOverlap(){
+  const a=player,b=enemy;
+  const overlap = (a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y);
+  if(overlap){
+    const mid = (a.x + b.x)/2;
+    // push
+    if(a.x < b.x){ a.x = Math.max(4, b.x - a.w -1); b.x = Math.min(W-b.w-4, a.x + a.w +1); }
+    else { b.x = Math.max(4, a.x - b.w -1); a.x = Math.min(W-a.w-4, b.x + b.w +1); }
+    // damp velocities toward each other
+    if(a.vx>0 && b.vx<0){ a.vx*=0.5; b.vx*=0.5; }
+  }
+}
+
+function draw(){
+  // clear
+  ctx.clearRect(0,0,W,H);
+
+  // neon grid floor perspective
+  // sky gradient already via canvas bg, draw arena
+  // top glow line
+  ctx.fillStyle='#0a0a2a';
+  ctx.fillRect(0,0,W,H);
+
+  // vertical neon haze
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#0e0e3a');
+  g.addColorStop(0.45,'#0b0b2a');
+  g.addColorStop(0.75,'#0a0a1e');
+  g.addColorStop(1,'#050510');
+  ctx.fillStyle=g;
+  ctx.fillRect(0,0,W,H);
+
+  // crowd silhouettes
+  ctx.fillStyle='#080820';
+  ctx.beginPath();
+  ctx.moveTo(0,62);
+  for(let x=0;x<W;x+=14){
+    ctx.lineTo(x+7, 52+Math.sin(x*0.2)*4);
+    ctx.lineTo(x+14,62);
+  }
+  ctx.lineTo(W,62); ctx.lineTo(W,78); ctx.lineTo(0,78); ctx.closePath();
+  ctx.fill();
+
+  // arena lights
+  ctx.fillStyle='#00f0ff18';
+  ctx.beginPath(); ctx.ellipse(90, 38, 42, 10, 0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#ff2e9318';
+  ctx.beginPath(); ctx.ellipse(270, 38, 42, 10, 0,0,Math.PI*2); ctx.fill();
+
+  // floor grid
+  ctx.strokeStyle='#00f0ff22';
+  ctx.lineWidth=1;
+  for(let i=0;i<=8;i++){
+    const y=FLOOR_Y + i*6;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+  ctx.strokeStyle='#ff2e9322';
+  for(let x=0;x<W;x+=28){
+    ctx.beginPath(); ctx.moveTo(x, FLOOR_Y); ctx.lineTo(x-18, H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, FLOOR_Y); ctx.lineTo(x+18, H); ctx.stroke();
+  }
+  // floor base
+  ctx.fillStyle='#0f0f2a';
+  ctx.fillRect(0,FLOOR_Y,W,H-FLOOR_Y);
+  ctx.fillStyle='#00f0ff';
+  ctx.fillRect(0,FLOOR_Y,W,2);
+  ctx.fillStyle='#ff2e93';
+  ctx.fillRect(0,FLOOR_Y+2,W,1);
+
+  // ropes / arena border glow
+  ctx.strokeStyle='#00f0ff33';
+  ctx.strokeRect(1,1,W-2,H-2);
+  ctx.strokeStyle='#ff2e9311';
+  ctx.strokeRect(3,3,W-6,H-6);
+
+  // flash
+  if(flashT>0){
+    ctx.fillStyle=`rgba(255,255,255,${flashT*0.07})`;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  // fighters
+  drawFighter(player, '#00f0ff', '#00e5ff');
+  drawFighter(enemy, '#ff2e93', '#ff4a8a');
+
+  // particles
+  particles.forEach(p=>{
+    ctx.globalAlpha = p.life/p.max;
+    ctx.fillStyle=p.color;
+    ctx.shadowColor=p.color;
+    ctx.shadowBlur=6;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.globalAlpha=1;
+  });
+  // hit texts
+  hitTexts.forEach(t=>{
+    ctx.font='900 13px system-ui';
+    ctx.fillStyle=t.color;
+    ctx.shadowColor=t.color;
+    ctx.shadowBlur=6;
+    ctx.textAlign='center';
+    ctx.fillText(t.txt, t.x, t.y);
+    ctx.shadowBlur=0;
+  });
+
+  // shake handled via wrap transform
+}
+
+function drawFighter(f, col, col2){
+  const x=f.x, y=f.y, w=f.w, h=f.h;
+  const cx=x+w/2, cy=y+h/2;
+
+  // shadow
+  ctx.fillStyle='#0006';
+  ctx.beginPath(); ctx.ellipse(cx, FLOOR_Y-1, w*0.9, 4, 0,0,Math.PI*2); ctx.fill();
+
+  // hit stun flash
+  let bodyColor = f.hitStun>0 ? '#ffffff' : col;
+  let glow = col;
+
+  // blocking pose
+  let drawH=h, drawY=y;
+  if(f.blocking){
+    drawH = h*0.82;
+    drawY = y + h - drawH;
+    // shield
+    ctx.fillStyle=col+'33';
+    ctx.fillRect(x-4, drawY+6, w+8, drawH-6);
+    ctx.strokeStyle=col;
+    ctx.lineWidth=1.5;
+    ctx.strokeRect(x-4, drawY+6, w+8, drawH-6);
+  }
+
+  // body
+  ctx.shadowColor=glow;
+  ctx.shadowBlur=10;
+  ctx.fillStyle=bodyColor;
+  // torso
+  ctx.fillRect(x+6, drawY+14, w-12, drawH-22);
+  // head
+  ctx.beginPath(); ctx.arc(cx, drawY+8, 9, 0, Math.PI*2); ctx.fill();
+  // eyes
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#001018';
+  ctx.beginPath(); ctx.arc(cx-3, drawY+7, 1.6,0,Math.PI*2); ctx.arc(cx+3, drawY+7,1.6,0,Math.PI*2); ctx.fill();
+  // visor line
+  ctx.fillStyle=col2;
+  ctx.fillRect(cx-7, drawY+9, 14, 1.5);
+
+  // arms
+  ctx.shadowBlur=8; ctx.shadowColor=glow;
+  ctx.fillStyle=bodyColor;
+  if(f.attacking){
+    // extended punch
+    const px = f.facing===1 ? x+w-2 : x-12;
+    ctx.fillRect(px, drawY+16, 14, 7);
+    // fist glow
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(px + (f.facing===1?12:2), drawY+19.5, 5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=bodyColor;
+    ctx.shadowBlur=0;
+    // trail
+    ctx.fillStyle=col+'66';
+    ctx.fillRect(px - f.facing*6, drawY+17, 10, 5);
+  } else {
+    // guard arms
+    ctx.fillRect(x+2, drawY+18, 6, 14);
+    ctx.fillRect(x+w-8, drawY+18, 6, 14);
+  }
+  ctx.shadowBlur=0;
+
+  // legs
+  ctx.fillStyle=bodyColor;
+  ctx.fillRect(x+7, drawY+drawH-10, 6, 10);
+  ctx.fillRect(x+w-13, drawY+drawH-10, 6, 10);
+
+  // facing indicator small arrow
+  ctx.fillStyle='#fff8';
+  ctx.font='7px system-ui';
+  ctx.textAlign='center';
+  // health bar tiny above head when low?
+}
+
+function loop(t){
+  requestAnimationFrame(loop);
+  const dt = Math.min(32, t - lastTime);
+  lastTime=t;
+  if(state==='fighting'){
+    updateAI(1);
+    updatePhysics(player);
+    updatePhysics(enemy);
+    handleOverlap();
+
+    // combo timeout
+    if(player.combo>0 && performance.now() - player.lastHit > 1100){
+      player.combo=0;
+      updateComboHud();
+    }
+  }
+  // particles update
+  particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.22; p.life--; });
+  particles=particles.filter(p=>p.life>0);
+  hitTexts.forEach(h=>{ h.y+=h.vy; h.vy+=0.06; h.life--; });
+  hitTexts=hitTexts.filter(h=>h.life>0);
+  if(shakeT>0){ shakeT--; wrap.classList.add('shake'); } else wrap.classList.remove('shake');
+  if(flashT>0) flashT--;
+
+  draw();
+}
+requestAnimationFrame(loop);
+draw();
+updateHud();
+
+// prevent scrolling on buttons
+document.addEventListener('touchmove', e=>{ if(e.target.closest('.cbtn')) e.preventDefault(); }, {passive:false});
+
+// init banner
+showBanner('NEON ARENA','First to 2 rounds wins. Build combos!','▶ FIGHT!',true);
+})();
+</script>
+</body>
+</html>

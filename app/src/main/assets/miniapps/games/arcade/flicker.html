@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Candle Guard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0f1220;--card:#1e2340;--accent:#ffb84d;--accent2:#ff6b6b;--text:#fff8e7;--muted:#a8b0d6}
+html,body{height:100%;background:#0a0c18;color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow-x:hidden}
+.app{max-width:428px;width:100%;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:radial-gradient(120% 80% at 50% 0%, #1e2a5a 0%, #0f1220 55%, #080a14 100%);overflow-x:hidden;position:relative}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 8px;gap:8px}
+.brand{display:flex;align-items:center;gap:8px}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#ffb84d,#ff6b35);display:grid;place-items:center;font-size:20px;box-shadow:0 4px 12px rgba(255,184,77,.4)}
+.brand h1{font-size:15px;line-height:1;font-weight:800;letter-spacing:.3px}
+.brand p{font-size:10px;color:var(--muted);letter-spacing:.6px;text-transform:uppercase}
+.stats{display:flex;gap:6px}
+.stat{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px 8px;min-width:58px;text-align:center}
+.stat b{display:block;font-size:13px;line-height:1}
+.stat span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.lives{display:flex;gap:4px;align-items:center;background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.25);border-radius:999px;padding:5px 10px}
+.heart{font-size:14px;filter:drop-shadow(0 1px 4px rgba(255,107,107,.6));transition:.2s}
+.heart.lost{opacity:.25;filter:grayscale(1)}
+.hud2{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;gap:8px}
+.level-badge{background:linear-gradient(135deg,#4facfe,#00f2fe);color:#00111a;font-weight:800;font-size:12px;padding:6px 10px;border-radius:999px;letter-spacing:.4px}
+.gust-indicator{flex:1;display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:6px 10px;min-height:36px}
+.gust-dot{width:10px;height:10px;border-radius:50%;background:#3dd68c;box-shadow:0 0 8px #3dd68c;flex-shrink:0}
+.gust-dot.warn{background:#ffb84d;box-shadow:0 0 10px #ffb84d;animation:pulse 0.6s infinite alternate}
+.gust-dot.danger{background:#ff3b3b;box-shadow:0 0 12px #ff3b3b;animation:pulse 0.3s infinite alternate}
+@keyframes pulse{to{transform:scale(1.25)}}
+.gust-text{font-size:11px;font-weight:700;letter-spacing:.3px}
+.gust-text small{font-weight:600;color:var(--muted);font-size:10px}
+.wind-arrow{font-size:16px;animation:windSlide 0.5s linear infinite}
+@keyframes windSlide{0%{transform:translateX(-4px)}100%{transform:translateX(4px)}}
+.game-wrap{margin:8px 12px 0;position:relative;height:500px;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.12);background:
+ radial-gradient(120% 60% at 20% 10%, rgba(255,220,120,.18) 0%, transparent 50%),
+ radial-gradient(90% 50% at 80% 15%, rgba(120,160,255,.12) 0%, transparent 50%),
+ linear-gradient(180deg, #1a2040 0%, #151a33 35%, #1e264d 55%, #2a1f2e 100%);
+box-shadow:0 12px 30px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);touch-action:none;user-select:none}
+.room-decor{position:absolute;inset:0;pointer-events:none}
+.window{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:170px;height:110px;background:linear-gradient(180deg,#0b1028 0%, #1a2a5a 60%, #2a3a6a 100%);border:3px solid #3d2b1f;border-radius:10px 10px 6px 6px;overflow:hidden;box-shadow:inset 0 0 20px rgba(0,0,0,.6), 0 4px 12px rgba(0,0,0,.4)}
+.window::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg, transparent 48%, rgba(61,43,31,.9) 49%, rgba(61,43,31,.9) 51%, transparent 52%), linear-gradient(transparent 48%, rgba(61,43,31,.9) 49%, rgba(61,43,31,.9) 51%, transparent 52%)}
+.moon{position:absolute;top:18px;right:22px;width:28px;height:28px;background:radial-gradient(circle at 30% 30%, #fff8c0, #f0d060);border-radius:50%;box-shadow:0 0 16px rgba(255,248,180,.8)}
+.stars{position:absolute;inset:0}
+.star{position:absolute;width:2px;height:2px;background:#fff;border-radius:50%;opacity:.7;animation:twinkle 2s infinite alternate}
+@keyframes twinkle{to{opacity:1;transform:scale(1.4)}}
+.curtain{position:absolute;top:14px;width:28px;height:110px;background:linear-gradient(90deg,#5a2a2a,#7a3a3a);opacity:.9}
+.curtain.left{left:calc(50% - 85px);border-radius:8px 0 0 6px}
+.curtain.right{right:calc(50% - 85px);border-radius:0 8px 6px 0}
+.table{position:absolute;bottom:0;left:0;right:0;height:148px;background:linear-gradient(180deg,#4a3728 0%, #3d2b1f 30%, #2e1f14 100%);border-top:4px solid #5a432f;box-shadow:inset 0 8px 16px rgba(0,0,0,.4)}
+.table::before{content:'';position:absolute;top:0;left:0;right:0;height:18px;background:linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent)}
+.rug{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);width:86%;height:22px;background:radial-gradient(ellipse at center, rgba(120,60,30,.5), transparent 70%);border-radius:50%}
+.wind-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.wind-streak{position:absolute;height:3px;background:linear-gradient(90deg, transparent, rgba(180,220,255,.85), transparent);border-radius:999px;opacity:0}
+.wind-streak.on{animation:streakMove 0.7s linear infinite}
+@keyframes streakMove{0%{transform:translateX(-120px);opacity:0}15%{opacity:.9}85%{opacity:.9}100%{transform:translateX(420px);opacity:0}}
+.candle-spot{position:absolute;transform:translate(-50%,-100%);width:96px;height:120px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;pointer-events:none}
+.candle-hit{position:absolute;inset:-12px -10px -8px -10px;border-radius:18px;pointer-events:auto}
+.candle-body{width:42px;height:58px;background:linear-gradient(90deg,#f5e6c8 0%, #fff8e0 25%, #e8d5a8 55%, #c9b48a 100%);border-radius:8px 8px 4px 4px;position:relative;box-shadow:inset -4px 0 6px rgba(0,0,0,.15), 0 4px 10px rgba(0,0,0,.4);border:1px solid rgba(0,0,0,.15)}
+.candle-body::before{content:'';position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:4px;height:10px;background:#1a1a1a;border-radius:2px}
+.wax-drip{position:absolute;top:6px;right:6px;width:8px;height:18px;background:rgba(255,255,255,.45);border-radius:0 0 8px 8px}
+.flame-wrap{position:absolute;bottom:58px;left:50%;transform:translateX(-50%);width:30px;height:42px;display:grid;place-items:center;transition:opacity .3s, transform .3s}
+.flame-wrap.out{opacity:0;transform:translateX(-50%) scale(.2)}
+.flame{width:18px;height:28px;background:radial-gradient(ellipse at 35% 30%, #fffbe0 0%, #ffe27a 25%, #ff9a2e 55%, #ff3b1f 85%);border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;animation:flameFlicker .18s infinite alternate;transform-origin:bottom center;box-shadow:0 0 12px rgba(255,154,46,.9), 0 0 22px rgba(255,90,30,.5)}
+.flame.gust{animation:flameGust .12s infinite alternate}
+.flame.smother{opacity:.5;filter:brightness(.7) blur(.5px)}
+@keyframes flameFlicker{0%{transform:scaleX(.95) scaleY(1) rotate(-1deg)}100%{transform:scaleX(1.05) scaleY(1.08) rotate(1deg)}}
+@keyframes flameGust{0%{transform:scaleX(1.3) scaleY(.85) skewX(-12deg)}100%{transform:scaleX(1.4) scaleY(.9) skewX(-18deg)}}
+.glow{position:absolute;bottom:52px;left:50%;transform:translateX(-50%);width:70px;height:70px;background:radial-gradient(circle, rgba(255,180,60,.35) 0%, rgba(255,120,30,.15) 40%, transparent 70%);border-radius:50%;pointer-events:none;transition:opacity .3s}
+.glow.dim{opacity:.15}
+.shield{position:absolute;bottom:44px;left:50%;transform:translateX(-50%);width:78px;height:78px;border-radius:50% 50% 40% 40% / 60% 60% 40% 40%;background:radial-gradient(ellipse at 50% 30%, rgba(120,200,255,.28), rgba(80,160,255,.18) 45%, rgba(80,160,255,0) 72%);border:2px solid rgba(120,200,255,.55);box-shadow:0 0 16px rgba(120,200,255,.5), inset 0 0 12px rgba(255,255,255,.25);display:none;align-items:flex-start;justify-content:center;padding-top:8px;backdrop-filter:blur(1px)}
+.shield.on{display:flex;animation:shieldIn .18s ease}
+@keyframes shieldIn{from{transform:translateX(-50%) scale(.7);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
+.shield-hands{font-size:22px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));letter-spacing:2px}
+.smoke{position:absolute;bottom:62px;left:50%;width:2px;height:40px;background:linear-gradient(180deg, rgba(180,180,180,.6), transparent);border-radius:999px;opacity:0;transform:translateX(-50%)}
+.smoke.on{animation:smokeRise 1.2s ease forwards}
+@keyframes smokeRise{0%{opacity:.7;transform:translateX(-50%) translateY(0) scaleX(1)}100%{opacity:0;transform:translateX(-50%) translateY(-50px) scaleX(1.8)}}
+.bars{position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);width:64px;display:flex;flex-direction:column;gap:3px}
+.bar{height:6px;background:rgba(0,0,0,.45);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,.15);position:relative}
+.bar-fill{height:100%;border-radius:999px;transition:width .15s linear}
+.bar.health .bar-fill{background:linear-gradient(90deg,#3dd68c,#2eb872)}
+.bar.health.warn .bar-fill{background:linear-gradient(90deg,#ffb84d,#ff7a00)}
+.bar.health.danger .bar-fill{background:linear-gradient(90deg,#ff5a5a,#cc0000)}
+.bar.smother .bar-fill{background:linear-gradient(90deg,#7ab8ff,#3a7bff)}
+.bar-label{position:absolute;inset:0;display:grid;place-items:center;font-size:6px;font-weight:800;letter-spacing:.4px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+.candle-label{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:800;letter-spacing:.6px;color:rgba(255,255,255,.7);background:rgba(0,0,0,.35);padding:2px 6px;border-radius:999px;white-space:nowrap}
+.touch-hint{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);color:#fff8e7;font-size:11px;font-weight:700;padding:7px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;gap:6px;pointer-events:none;backdrop-filter:blur(6px)}
+.controls{padding:10px 12px;display:flex;gap:8px;align-items:center}
+.btn{flex:1;min-height:48px;border-radius:12px;border:none;font-weight:800;font-size:14px;letter-spacing:.3px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;touch-action:manipulation;transition:transform .08s, filter .15s}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:linear-gradient(135deg,#ffb84d,#ff7a35);color:#1a0f00;box-shadow:0 6px 16px rgba(255,154,46,.4)}
+.btn-ghost{background:rgba(255,255,255,.08);color:var(--text);border:1px solid rgba(255,255,255,.14)}
+.btn-small{flex:0 0 auto;min-width:72px;padding:0 14px}
+.tip{margin:0 12px 10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:flex-start}
+.tip-ic{width:32px;height:32px;border-radius:8px;background:rgba(255,184,77,.15);display:grid;place-items:center;font-size:16px;flex-shrink:0}
+.tip b{font-size:12px}
+.tip p{font-size:11px;color:var(--muted);line-height:1.4;margin-top:2px}
+.overlay{position:absolute;inset:0;background:rgba(8,10,20,.72);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:18px;z-index:5}
+.card{background:linear-gradient(180deg,#1e2340,#171b33);border:1px solid rgba(255,255,255,.14);border-radius:18px;padding:18px;width:100%;max-width:340px;box-shadow:0 16px 40px rgba(0,0,0,.6);text-align:center}
+.card h2{font-size:20px;margin-bottom:6px}
+.card p{font-size:12px;color:var(--muted);line-height:1.5}
+.card .big{font-size:36px;font-weight:900;color:var(--accent);margin:8px 0 2px}
+.card .sub{font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase}
+.row{display:flex;gap:8px;margin-top:14px}
+.badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:6px 10px;font-size:11px;font-weight:700}
+.hidden{display:none !important}
+.shake{animation:shake .35s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-4px)}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">🕯️</div>
+      <div><h1>CANDLE GUARD</h1><p>Night Watch • Cozy Survival</p></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="scoreEl">0</b><span>Score</span></div>
+      <div class="stat"><b id="bestEl">0</b><span>Best</span></div>
+    </div>
+  </div>
+  <div class="hud2">
+    <div class="level-badge" id="levelEl">LVL 1</div>
+    <div class="gust-indicator" id="gustEl">
+      <div class="gust-dot" id="gustDot"></div>
+      <div class="gust-text" id="gustText">Calm night <small>• cover flames when wind comes</small></div>
+      <div class="wind-arrow hidden" id="windArrow">»»</div>
+    </div>
+    <div class="lives" id="livesEl"><span class="heart">❤️</span><span class="heart">❤️</span><span class="heart">❤️</span></div>
+  </div>
+
+  <div class="game-wrap" id="gameArea">
+    <div class="room-decor">
+      <div class="window"><div class="moon"></div><div class="stars" id="stars"></div></div>
+      <div class="curtain left"></div><div class="curtain right"></div>
+      <div class="table"></div><div class="rug"></div>
+    </div>
+    <div class="wind-layer" id="windLayer"></div>
+    <!-- candles injected here -->
+    <div class="touch-hint" id="touchHint">👆 Hold over flames to shield • Release to breathe</div>
+
+    <div class="overlay" id="startOverlay">
+      <div class="card">
+        <div style="font-size:38px">🌙🕯️✨</div>
+        <h2>Guard the Flames</h2>
+        <p>Cup your fingers over candles to block wind gusts.<br>Hold too long and you'll <b style="color:#7ab8ff">smother</b> them — let them breathe!</p>
+        <div style="display:flex;gap:6px;justify-content:center;margin:12px 0;flex-wrap:wrap">
+          <span class="badge">👆 Multi-touch: shield 2-3 at once</span>
+          <span class="badge">💨 Gusts get stronger each level</span>
+        </div>
+        <div class="row">
+          <button class="btn btn-primary" id="startBtn" style="flex:1">▶ START NIGHT</button>
+        </div>
+        <p style="margin-top:10px;font-size:10px;opacity:.7">Best: <b id="bestStart">0</b> • Tip: quick taps beat long holds</p>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="pauseOverlay">
+      <div class="card">
+        <h2>⏸ Paused</h2><p>The night waits for you.</p>
+        <div class="row">
+          <button class="btn btn-primary" id="resumeBtn">▶ RESUME</button>
+          <button class="btn btn-ghost" id="restartBtn2">↻ RESTART</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="overOverlay">
+      <div class="card" id="overCard">
+        <div style="font-size:36px" id="overIcon">💨</div>
+        <h2 id="overTitle">Winds Won</h2>
+        <div class="big" id="overScore">0</div>
+        <div class="sub">Score • <span id="overBest">Best 0</span></div>
+        <p id="overMsg" style="margin-top:8px">All flames went out. The night grows cold.</p>
+        <div class="row">
+          <button class="btn btn-primary" id="againBtn">🔥 TRY AGAIN</button>
+          <button class="btn btn-ghost" id="shareBtn">Share</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-ghost btn-small" id="pauseBtn">⏸ Pause</button>
+    <button class="btn btn-ghost" id="howBtn">How to play</button>
+    <button class="btn btn-primary" id="shieldAllBtn">🤲 Shield All</button>
+  </div>
+  <div class="tip" id="tipBox">
+    <div class="tip-ic">💡</div>
+    <div><b>How to survive</b><p><b style="color:#ffb84d">Wind:</b> flames flicker hard & health drops fast — cover them. <b style="color:#7ab8ff">Smother:</b> blue bar fills while covered — release to let oxygen in. Survive gusts for bonus points!</p></div>
+  </div>
+</div>
+
+<script>
+const LS_BEST='candleGuardBest_v2';
+const gameArea=document.getElementById('gameArea');
+const windLayer=document.getElementById('windLayer');
+const scoreEl=document.getElementById('scoreEl');
+const bestEl=document.getElementById('bestEl');
+const bestStart=document.getElementById('bestStart');
+const levelEl=document.getElementById('levelEl');
+const gustDot=document.getElementById('gustDot');
+const gustText=document.getElementById('gustText');
+const windArrow=document.getElementById('windArrow');
+const livesEl=document.getElementById('livesEl');
+const startOverlay=document.getElementById('startOverlay');
+const pauseOverlay=document.getElementById('pauseOverlay');
+const overOverlay=document.getElementById('overOverlay');
+const touchHint=document.getElementById('touchHint');
+
+let best=+localStorage.getItem(LS_BEST)||0;
+bestEl.textContent=best; bestStart.textContent=best;
+
+let state={
+  playing:false, paused:false,
+  score:0, level:1, lives:3, time:0,
+  candles:[],
+  gust:{active:false, timer:0, cooldown:3, strength:0, dir:1, warn:0},
+  windParticles:[],
+  last:0
+};
+
+// stars
+const starsEl=document.getElementById('stars');
+for(let i=0;i<14;i++){
+  const s=document.createElement('div'); s.className='star';
+  s.style.left=(5+Math.random()*90)+'%'; s.style.top=(8+Math.random()*70)+'%';
+  s.style.animationDelay=(Math.random()*2)+'s'; starsEl.appendChild(s);
+}
+
+// create wind streaks
+for(let i=0;i<10;i++){
+  const d=document.createElement('div'); d.className='wind-streak';
+  d.style.top=(18+Math.random()*52)+'%'; d.style.width=(60+Math.random()*80)+'px';
+  d.style.animationDelay=(Math.random()*0.7)+'s'; d.style.animationDuration=(0.5+Math.random()*0.4)+'s';
+  windLayer.appendChild(d);
+}
+const streaks=[...document.querySelectorAll('.wind-streak')];
+
+function makeCandles(){
+  // remove old
+  document.querySelectorAll('.candle-spot').forEach(e=>e.remove());
+  const positions=[
+    {x:22, y:78, label:'A'},
+    {x:50, y:74, label:'B'},
+    {x:78, y:78, label:'C'}
+  ];
+  state.candles=positions.map((p,i)=>({
+    id:i, x:p.x, y:p.y, label:p.label,
+    health:100, smother:0, shielded:false, out:false, outTimer:0,
+    el:null, flameEl:null, glowEl:null, shieldEl:null, smokeEl:null, hFill:null, sFill:null, hBar:null
+  }));
+  state.candles.forEach(c=>{
+    const wrap=document.createElement('div');
+    wrap.className='candle-spot';
+    wrap.style.left=c.x+'%'; wrap.style.top=c.y+'%';
+    wrap.innerHTML=`
+      <div class="candle-hit" data-id="${c.id}"></div>
+      <div class="flame-wrap"><div class="flame"></div></div>
+      <div class="glow"></div>
+      <div class="shield"><span class="shield-hands">🤲</span></div>
+      <div class="smoke"></div>
+      <div class="candle-body"><div class="wax-drip"></div></div>
+      <div class="bars">
+        <div class="bar health"><div class="bar-fill" style="width:100%"></div><div class="bar-label">❤</div></div>
+        <div class="bar smother"><div class="bar-fill" style="width:0%"></div><div class="bar-label">💨</div></div>
+      </div>
+      <div class="candle-label">CANDLE ${c.label}</div>
+    `;
+    gameArea.appendChild(wrap);
+    c.el=wrap;
+    c.flameEl=wrap.querySelector('.flame');
+    c.flameWrap=wrap.querySelector('.flame-wrap');
+    c.glowEl=wrap.querySelector('.glow');
+    c.shieldEl=wrap.querySelector('.shield');
+    c.smokeEl=wrap.querySelector('.smoke');
+    c.hFill=wrap.querySelector('.bar.health .bar-fill');
+    c.sFill=wrap.querySelector('.bar.smother .bar-fill');
+    c.hBar=wrap.querySelector('.bar.health');
+  });
+}
+makeCandles();
+
+function updateLives(){
+  [...livesEl.children].forEach((h,i)=>{
+    h.classList.toggle('lost', i>=state.lives);
+  });
+}
+function setGustUI(mode, txt){
+  gustDot.className='gust-dot'+(mode?' '+mode:'');
+  gustText.innerHTML=txt;
+  windArrow.classList.toggle('hidden', mode!=='danger');
+  if(mode==='danger') windArrow.textContent=state.gust.dir===1?'»»»':'«««';
+}
+
+function resetGame(){
+  state.score=0; state.level=1; state.lives=3; state.time=0;
+  state.gust={active:false,timer:0,cooldown:2.5+Math.random()*1.5,strength:0.9,dir:1,warn:0};
+  state.candles.forEach(c=>{c.health=100;c.smother=0;c.shielded=false;c.out=false;c.outTimer=0});
+  updateLives(); setGustUI('', 'Calm night <small>• cover flames when wind comes</small>');
+  scoreEl.textContent='0'; levelEl.textContent='LVL 1';
+  streaks.forEach(s=>s.classList.remove('on'));
+  touchHint.style.display='flex';
+  makeCandles();
+}
+
+let raf=0;
+function loop(ts){
+  if(!state.playing || state.paused){ state.last=ts; raf=requestAnimationFrame(loop); return; }
+  if(!state.last) state.last=ts;
+  let dt=Math.min(0.05, (ts-state.last)/1000);
+  state.last=ts;
+  state.time+=dt;
+
+  // level up every 22s
+  let newLvl=Math.floor(state.time/22)+1;
+  if(newLvl!==state.level){
+    state.level=newLvl;
+    levelEl.textContent='LVL '+state.level;
+    levelEl.animate([{transform:'scale(1)'},{transform:'scale(1.15)'},{transform:'scale(1)'}],{duration:300});
+    if(navigator.vibrate) navigator.vibrate(40);
+  }
+
+  // gust logic
+  if(!state.gust.active){
+    state.gust.cooldown-=dt;
+    if(state.gust.warn>0){
+      state.gust.warn-=dt;
+      if(state.gust.warn<=0) setGustUI('', 'Calm night <small>• cover flames when wind comes</small>');
+    }
+    if(state.gust.cooldown<=0){
+      // start gust
+      state.gust.active=true;
+      state.gust.timer=1.8 + Math.min(2.2, 0.25*state.level) + Math.random()*0.8;
+      state.gust.strength=0.85 + state.level*0.18 + Math.random()*0.35;
+      state.gust.dir=Math.random()>0.5?1:-1;
+      setGustUI('danger', `GUST LVL ${state.level} <small>• HOLD to shield!</small>`);
+      streaks.forEach(s=>s.classList.add('on'));
+      gameArea.classList.add('shake');
+      setTimeout(()=>gameArea.classList.remove('shake'),400);
+      if(navigator.vibrate) navigator.vibrate(30);
+    }
+  } else {
+    state.gust.timer-=dt;
+    // wind damage & visuals
+    state.candles.forEach(c=>{
+      if(c.out) return;
+      if(!c.shielded){
+        c.health -= state.gust.strength * 22 * dt;
+        c.flameEl.classList.add('gust');
+      } else {
+        c.flameEl.classList.remove('gust');
+      }
+    });
+    if(state.gust.timer<=0){
+      state.gust.active=false;
+      state.gust.cooldown=Math.max(1.1, 3.6 - state.level*0.28) + Math.random()*1.2;
+      state.gust.warn=1.2;
+      setGustUI('warn','Wind passed <small>• +'+(40*state.level)+' pts if all safe</small>');
+      streaks.forEach(s=>s.classList.remove('on'));
+      state.candles.forEach(c=>c.flameEl.classList.remove('gust'));
+      // bonus if all survived
+      let allAlive=state.candles.every(c=>!c.out && c.health>0);
+      if(allAlive){
+        state.score+=40*state.level;
+        scoreEl.textContent=Math.floor(state.score);
+        scoreEl.animate([{transform:'scale(1)'},{transform:'scale(1.2)',color:'#3dd68c'},{transform:'scale(1)'}],{duration:400});
+      }
+      if(navigator.vibrate) navigator.vibrate(20);
+    }
+  }
+
+  // per candle smother & recovery
+  state.candles.forEach(c=>{
+    if(c.out){
+      c.outTimer-=dt;
+      if(c.outTimer<=0 && state.lives>0){
+        c.out=false; c.health=62; c.smother=0;
+        c.flameWrap.classList.remove('out'); c.glowEl.classList.remove('dim');
+        c.smokeEl.classList.remove('on');
+      }
+      return;
+    }
+    if(c.shielded){
+      c.smother=Math.min(100, c.smother + 28*dt + state.level*1.2*dt);
+      // smother damage
+      if(c.smother>72){
+        c.health -= (c.smother-72)*0.35 * dt * 18;
+        c.flameEl.classList.add('smother');
+      } else c.flameEl.classList.remove('smother');
+      c.shieldEl.classList.add('on');
+    } else {
+      c.smother=Math.max(0, c.smother - 38*dt);
+      c.flameEl.classList.remove('smother');
+      c.shieldEl.classList.remove('on');
+      // recovery when calm
+      if(!state.gust.active && c.health<100 && c.smother<30){
+        c.health=Math.min(100, c.health + 7*dt);
+      }
+    }
+    c.health=Math.max(0, Math.min(100,c.health));
+    // update bars
+    c.hFill.style.width=c.health+'%';
+    c.sFill.style.width=c.smother+'%';
+    c.hBar.classList.remove('warn','danger');
+    if(c.health<55) c.hBar.classList.add('warn');
+    if(c.health<28) c.hBar.classList.add('danger');
+    // flicker intensity based on health
+    let flick= c.health<30 ? .35 : c.health<60 ? .22 : .18;
+    c.flameEl.style.animationDuration=flick+'s';
+    c.glowEl.style.opacity= c.shielded ? .55 : (0.35 + c.health/180);
+    // check death
+    if(c.health<=0 && !c.out){
+      c.out=true; c.outTimer=2.1; c.health=0;
+      c.flameWrap.classList.add('out'); c.glowEl.classList.add('dim');
+      c.smokeEl.classList.remove('on'); void c.smokeEl.offsetWidth; c.smokeEl.classList.add('on');
+      c.hFill.style.width='0%';
+      state.lives=Math.max(0, state.lives-1);
+      updateLives();
+      gameArea.animate([{transform:'translateX(0)'},{transform:'translateX(-5px)'},{transform:'translateX(5px)'},{transform:'translateX(0)'}],{duration:280});
+      if(navigator.vibrate) navigator.vibrate([40,30,60]);
+      if(state.lives<=0){
+        gameOver();
+        return;
+      }
+    }
+  });
+
+  // score tick
+  state.score += dt * (10 + state.level*2.2);
+  scoreEl.textContent=Math.floor(state.score);
+  if(Math.floor(state.score)>best){ best=Math.floor(state.score); bestEl.textContent=best; localStorage.setItem(LS_BEST,best); bestStart.textContent=best; }
+
+  raf=requestAnimationFrame(loop);
+}
+
+function gameOver(){
+  state.playing=false;
+  document.getElementById('overScore').textContent=Math.floor(state.score);
+  document.getElementById('overBest').textContent='Best '+best;
+  const msg=document.getElementById('overMsg');
+  if(state.score>best-1 && state.score>80) msg.textContent='New best! You kept the night alive. ✨';
+  else if(state.level>=4) msg.textContent='Brave guard — you reached level '+state.level+'!';
+  else msg.textContent='All flames went out. The wind was too strong.';
+  document.getElementById('overIcon').textContent= state.level>=3 ? '🌬️' : '💨';
+  document.getElementById('overTitle').textContent= state.score>best-1 ? 'Night Saved!' : 'Winds Won';
+  overOverlay.classList.remove('hidden');
+  touchHint.style.display='none';
+}
+
+function startGame(){
+  resetGame();
+  state.playing=true; state.paused=false; state.last=0;
+  startOverlay.classList.add('hidden'); pauseOverlay.classList.add('hidden'); overOverlay.classList.add('hidden');
+  cancelAnimationFrame(raf); raf=requestAnimationFrame(loop);
+}
+function togglePause(){
+  if(!state.playing) return;
+  state.paused=!state.paused;
+  pauseOverlay.classList.toggle('hidden', !state.paused);
+  if(!state.paused){ state.last=0; raf=requestAnimationFrame(loop); }
+}
+
+// input handling - multi-touch
+let mouseDown=false;
+function updateShieldsFromTouches(touches){
+  state.candles.forEach(c=>c.shielded=false);
+  if(!touches || touches.length===0) return;
+  const rect=gameArea.getBoundingClientRect();
+  for(let t of touches){
+    let x=(t.clientX - rect.left)/rect.width*100;
+    let y=(t.clientY - rect.top)/rect.height*100;
+    // find closest candle within radius
+    let best=null, bestD=1e9;
+    state.candles.forEach(c=>{
+      let d=Math.hypot(x-c.x, y-c.y);
+      if(d<bestD){bestD=d; best=c}
+    });
+    if(best && bestD<20) best.shielded=true;
+  }
+}
+function onTouch(e){
+  if(!state.playing || state.paused) return;
+  e.preventDefault();
+  updateShieldsFromTouches(e.touches);
+}
+gameArea.addEventListener('touchstart', onTouch, {passive:false});
+gameArea.addEventListener('touchmove', onTouch, {passive:false});
+gameArea.addEventListener('touchend', onTouch, {passive:false});
+gameArea.addEventListener('touchcancel', onTouch, {passive:false});
+
+gameArea.addEventListener('mousedown', e=>{
+  if(!state.playing || state.paused) return;
+  mouseDown=true;
+  updateShieldsFromTouches([{clientX:e.clientX, clientY:e.clientY}]);
+});
+window.addEventListener('mousemove', e=>{
+  if(!mouseDown) return;
+  updateShieldsFromTouches([{clientX:e.clientX, clientY:e.clientY}]);
+});
+window.addEventListener('mouseup', ()=>{
+  if(mouseDown){ mouseDown=false; state.candles.forEach(c=>c.shielded=false); }
+});
+gameArea.addEventListener('mouseleave', ()=>{ if(mouseDown){mouseDown=false; state.candles.forEach(c=>c.shielded=false);} });
+
+// buttons
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('againBtn').addEventListener('click', startGame);
+document.getElementById('pauseBtn').addEventListener('click', togglePause);
+document.getElementById('resumeBtn').addEventListener('click', togglePause);
+document.getElementById('restartBtn2').addEventListener('click', startGame);
+document.getElementById('shieldAllBtn').addEventListener('click', ()=>{
+  if(!state.playing) return;
+  // quick shield all for 0.9s
+  state.candles.forEach(c=>{ if(!c.out) c.shielded=true; });
+  setTimeout(()=>{ if(mouseDown) return; state.candles.forEach(c=>c.shielded=false); }, 900);
+});
+document.getElementById('howBtn').addEventListener('click', ()=>{
+  if(state.playing && !state.paused) togglePause();
+  else { startOverlay.classList.remove('hidden'); }
+});
+document.getElementById('shareBtn').addEventListener('click', async()=>{
+  const txt=`🕯️ Candle Guard — I scored ${Math.floor(state.score)} (Lvl ${state.level}) guarding flames! Can you beat it?`;
+  try{ if(navigator.share) await navigator.share({text:txt}); else { await navigator.clipboard.writeText(txt); alert('Copied!'); } }catch{}
+});
+document.addEventListener('keydown', e=>{
+  if(e.code==='Space'){ e.preventDefault(); if(!state.playing) startGame(); else togglePause(); }
+  if(e.code==='KeyR') startGame();
+  // 1,2,3 shield individual
+  if(['Digit1','Digit2','Digit3'].includes(e.code)){
+    let idx=+e.code.slice(-1)-1; if(state.candles[idx]) state.candles[idx].shielded=true;
+  }
+});
+document.addEventListener('keyup', e=>{
+  if(['Digit1','Digit2','Digit3'].includes(e.code)){
+    let idx=+e.code.slice(-1)-1; if(state.candles[idx]) state.candles[idx].shielded=false;
+  }
+});
+
+// init best display
+updateLives();
+</script>
+</body>
+</html>

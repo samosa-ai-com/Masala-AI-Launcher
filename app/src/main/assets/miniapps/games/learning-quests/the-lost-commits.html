@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Stratigraphy Dig</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:#1a0f0a;height:100%;overflow-x:hidden}
+body{display:flex;justify-content:center;font-family:Georgia,'Times New Roman',serif;color:#3e2723}
+#app{width:100%;max-width:428px;min-width:360px;min-height:100vh;background:linear-gradient(180deg,#5d4037 0%,#4e342e 35%,#3e2723 100%);display:flex;flex-direction:column;position:relative;overflow-x:hidden}
+header{background:#fdf6e3;border-bottom:4px solid #8d6e63;padding:10px 12px;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.head-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.brand{font-weight:900;letter-spacing:.04em;font-size:18px;line-height:1}
+.brand span{font-weight:400;font-size:11px;display:block;letter-spacing:.12em;text-transform:uppercase;color:#6d4c41}
+.pill{background:#3e2723;color:#ffecb3;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+.progress{height:8px;background:#d7ccc8;border-radius:999px;overflow:hidden;border:1px solid #bcaaa4}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,#ff8f00,#ffd54f);width:0%;transition:width .4s}
+.layer-head{background:#fff8e1;border:1px solid #d7ccc8;border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.layer-head h2{margin:0;font-size:15px;line-height:1.1}
+.layer-head p{margin:2px 0 0;font-size:12px;color:#6d4c41}
+.btn{appearance:none;border:none;border-radius:12px;padding:12px 14px;font-family:inherit;font-weight:800;font-size:14px;min-height:48px;min-width:48px;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;touch-action:manipulation}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:#3e2723;color:#ffecb3;box-shadow:0 3px 0 #1a0f0a}
+.btn-ghost{background:#fdf6e3;color:#3e2723;border:2px solid #bcaaa4}
+.btn-soil{background:#8d6e63;color:#fff;border:2px solid #4e342e}
+.btn-small{padding:8px 10px;min-height:40px;font-size:13px;border-radius:10px}
+main{flex:1;display:flex;flex-direction:column;gap:10px;padding:10px 10px 14px;overflow-x:hidden}
+.card{background:#fdf6e3;border:2px solid #d7ccc8;border-radius:16px;box-shadow:0 6px 16px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.8);overflow:hidden}
+.card h3{margin:0;padding:10px 12px 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#4e342e;border-bottom:1px dashed #d7ccc8;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card h3 b{font-size:11px;background:#3e2723;color:#ffecb3;padding:4px 8px;border-radius:999px}
+.grid{padding:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tile{aspect-ratio:1;background:radial-gradient(circle at 30% 30%,#a1887f,#6d4c41 60%,#4e342e 100%);border:3px solid #3e2723;border-radius:14px;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;overflow:hidden;min-height:78px;box-shadow:inset 0 4px 8px rgba(255,255,255,.25), 0 4px 8px rgba(0,0,0,.3)}
+.tile::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(45deg,rgba(0,0,0,.06) 0 6px,transparent 6px 12px);opacity:.5}
+.tile b{font-size:28px;z-index:1;filter:drop-shadow(0 2px 2px rgba(0,0,0,.5))}
+.tile.excavated{background:#efebe9;border-color:#bcaaa4;box-shadow:inset 0 2px 8px rgba(0,0,0,.15)}
+.tile.excavated::after{opacity:0}
+.tile.pit{background:#3e2723;border-style:dashed;border-color:#8d6e63}
+.tile.pit b{opacity:.35}
+.fragment{position:absolute;inset:6px;background:#fffef6;border:1.5px solid #d7ccc8;border-radius:10px;padding:6px 7px;display:flex;flex-direction:column;gap:4px;z-index:2;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.fragment .meta{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:#8d6e63;font-family:system-ui,sans-serif;font-weight:700}
+.fragment .txt{font-size:11.5px;line-height:1.25;font-weight:700;color:#3e2723;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.fragment .tag{font-size:9px;padding:2px 6px;border-radius:999px;background:#ffecb3;border:1px solid #ffcc80;align-self:flex-start;font-family:system-ui,sans-serif;font-weight:800}
+.fragment.decoy{background:#fff3e0;border-color:#ffab91}
+.fragment.decoy .tag{background:#ffccbc}
+.tray{padding:8px 10px 10px;display:flex;flex-wrap:wrap;gap:8px;min-height:56px}
+.empty-note{width:100%;text-align:center;color:#8d6e63;font-size:13px;padding:10px;font-style:italic}
+.inv-item{flex:1 1 calc(50% - 8px);min-width:150px;background:#fffef6;border:2px solid #d7ccc8;border-radius:12px;padding:8px 8px 6px;display:flex;flex-direction:column;gap:4px;position:relative;cursor:pointer;min-height:84px}
+.inv-item.selected{border-color:#ff8f00;background:#fff8e1;box-shadow:0 0 0 3px rgba(255,143,0,.25)}
+.inv-item.fused{border-color:#4caf50;background:#f1f8e9}
+.inv-item .meta{font-size:9px;color:#8d6e63;font-family:system-ui,sans-serif;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.inv-item .txt{font-size:12px;line-height:1.3;font-weight:800}
+.inv-item .actions{display:flex;gap:6px;margin-top:2px}
+.mini-btn{flex:1;border:none;border-radius:8px;padding:8px 6px;font-size:11px;font-weight:800;min-height:36px;cursor:pointer}
+.mini-btn.place{background:#3e2723;color:#ffecb3}
+.mini-btn.sel{background:#efebe9;color:#3e2723;border:1px solid #bcaaa4}
+.table-slots{padding:10px;display:flex;gap:8px;overflow-x:hidden}
+.slot{flex:1;min-height:92px;background:#efebe9;border:2px dashed #bcaaa4;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;position:relative;cursor:pointer}
+.slot.filled{background:#fffef6;border-style:solid;border-color:#8d6e63;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.slot.correct{border-color:#2e7d32;background:#e8f5e9}
+.slot.wrong{border-color:#c62828;background:#ffebee}
+.slot .num{position:absolute;top:4px;left:6px;font-size:10px;font-weight:900;color:#8d6e63;background:#fff;padding:1px 5px;border-radius:999px;border:1px solid #d7ccc8}
+.slot .txt{font-size:11px;font-weight:800;text-align:center;line-height:1.25}
+.slot .meta{font-size:8px;color:#8d6e63;text-align:center;margin-top:3px;font-family:system-ui,sans-serif}
+.controls{display:flex;flex-wrap:wrap;gap:8px;padding:0 2px}
+.controls .btn{flex:1 1 calc(50% - 8px)}
+.hint{font-size:12px;color:#ffecb3;background:rgba(0,0,0,.25);padding:8px 10px;border-radius:10px;line-height:1.4;border:1px solid rgba(255,255,255,.15)}
+.hint b{color:#ffd54f}
+.modal{position:fixed;inset:0;background:rgba(20,10,5,.72);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+.sheet{width:100%;max-width:400px;background:#fdf6e3;border:3px solid #8d6e63;border-radius:18px;box-shadow:0 12px 32px rgba(0,0,0,.5);overflow:hidden;max-height:90vh;display:flex;flex-direction:column}
+.sheet-head{background:linear-gradient(180deg,#fff8e1,#ffecb3);padding:14px 16px;border-bottom:2px solid #d7ccc8}
+.sheet-head h2{margin:0;font-size:18px}
+.sheet-head p{margin:4px 0 0;font-size:12px;color:#6d4c41;letter-spacing:.06em;text-transform:uppercase;font-family:system-ui,sans-serif;font-weight:700}
+.sheet-body{padding:14px 16px;overflow:auto;font-size:14px;line-height:1.5}
+.sheet-body .parch{background:#fffef6;border:1px solid #d7ccc8;border-radius:12px;padding:12px;font-style:italic}
+.sheet-foot{padding:12px 16px;display:flex;gap:8px;border-top:1px solid #d7ccc8;background:#fff8e1}
+.badge{font-size:11px;padding:4px 8px;border-radius:999px;background:#efebe9;border:1px solid #d7ccc8;font-family:system-ui,sans-serif;font-weight:700}
+.kbd{font-family:system-ui,sans-serif;font-size:11px;background:#3e2723;color:#ffecb3;padding:2px 6px;border-radius:6px}
+.footer{padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;color:#ffecb3;font-size:11px;font-family:system-ui,sans-serif}
+.footer a{color:#ffd54f;text-decoration:underline;cursor:pointer}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#3e2723;color:#ffecb3;padding:10px 14px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 6px 16px rgba(0,0,0,.4);z-index:30;display:none;max-width:90%;text-align:center}
+@media (max-width:380px){.grid{gap:8px}.tile{min-height:72px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="head-top">
+      <div class="brand">STRATIGRAPHY <span>Version-History Excavation</span></div>
+      <div class="pill" id="scorePill">★ 0 pts</div>
+    </div>
+    <div class="progress"><i id="progBar"></i></div>
+    <div class="layer-head">
+      <div>
+        <h2 id="layerTitle">Layer I: Topsoil</h2>
+        <p id="layerSub">The Vanishing README • 12 tiles buried</p>
+      </div>
+      <button class="btn btn-ghost btn-small" id="storyBtn">📜 Story</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="card">
+      <h3>◉ Dig Site — tap to lift <b id="excavatedCount">0/12 lifted</b></h3>
+      <div class="grid" id="grid"></div>
+      <div class="hint" id="hintBox"><b>How to dig:</b> Lift tiles to find fragments. <span class="kbd">Catalog</span> true versions, <span class="kbd">Shatter</span> fakes. Arrange them in time-order on the table below, then <b>Verify</b>.</div>
+    </div>
+
+    <div class="card">
+      <h3>⬢ Catalog Tray — your finds <b id="trayCount">0 items</b></h3>
+      <div class="tray" id="tray"></div>
+      <div style="padding:0 10px 10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-soil btn-small" id="fuseBtn" style="flex:1;opacity:.5;pointer-events:none">🔗 Fuse (select 2 consecutive)</button>
+        <button class="btn btn-soil btn-small" id="rewriteBtn" style="flex:1;opacity:.5;pointer-events:none">✎ Rewrite</button>
+        <button class="btn btn-ghost btn-small" id="shatterBtn" style="flex:1;opacity:.5;pointer-events:none">◈ Shatter fake</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>▤ Dig Table — rebuild sequence <b id="tableHint">oldest → newest</b></h3>
+      <div class="table-slots" id="tableSlots"></div>
+      <div style="padding:0 10px 10px;display:flex;gap:8px">
+        <button class="btn btn-primary" id="verifyBtn" style="flex:1">⛏ Verify Stratigraphy</button>
+        <button class="btn btn-ghost" id="clearBtn" style="flex:0 0 96px">Clear</button>
+      </div>
+      <div class="hint" id="verifyHint" style="margin:0 10px 10px;display:none"></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-ghost" id="resetBtn">↺ Reset Layer</button>
+      <button class="btn btn-ghost" id="nextBtn" style="display:none">Next Layer →</button>
+    </div>
+    <div class="footer">
+      <span id="persistNote">Progress saved locally</span>
+      <a id="wipeSave">wipe save</a>
+    </div>
+  </main>
+</div>
+
+<div class="modal" id="storyModal" style="display:none">
+  <div class="sheet">
+    <div class="sheet-head">
+      <p id="storyKicker">Field Note #1 • Layer I</p>
+      <h2 id="storyTitle">The Vanishing README</h2>
+    </div>
+    <div class="sheet-body">
+      <div class="parch" id="storyText"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <span class="badge">◉ Lift tiles</span><span class="badge">⬢ Catalog</span><span class="badge">🔗 Fuse</span><span class="badge">✎ Rewrite</span><span class="badge">◈ Shatter</span>
+      </div>
+      <p style="font-size:12px;color:#6d4c41;margin-top:10px;line-height:1.4"><b>Mechanics:</b> Each layer hides 5 true fragments + 2 decoys in 12 soil tiles. Corrupted fragments show garbled text — <b>Rewrite</b> to restore. Select two consecutive versions and <b>Fuse</b> to make a stable block (bonus). <b>Shatter</b> removes fakes. Place in chronological order on the Dig Table and <b>Verify</b>.</p>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn btn-primary" id="closeStory" style="flex:1">Start Digging ⛏</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="inspectModal" style="display:none">
+  <div class="sheet" style="max-width:380px">
+    <div class="sheet-head">
+      <p id="inspectKicker">Unearthed Fragment</p>
+      <h2 id="inspectTitle" style="font-size:15px"></h2>
+    </div>
+    <div class="sheet-body" id="inspectBody"></div>
+    <div class="sheet-foot" id="inspectFoot"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const LEVELS=[
+  {id:1,title:"Layer I: Topsoil",subtitle:"The Vanishing README",kicker:"Field Note #1 • Topsoil",storyTitle:"The Vanishing README",story:"We found the surface scattered with early commits. The README was rewritten five times before it was abandoned. Wind and bad merges corrupted one entry. Two forgeries were planted to mislead. Restore its true chronology — oldest at left, newest at right.",fragments:[
+    {order:1,text:"v0.1 — INIT: 'hello world' single line",meta:"2021·03·01 · Ada · a1f3",corrupted:false},
+    {order:2,text:"v0.4 — Added install steps + badge",meta:"2021·03·14 · Ada · b7c2",corrupted:true,garbled:"v0.4 — Add#d inst@ll st#ps + b@dge"},
+    {order:3,text:"v0.7 — Usage examples with demo gif",meta:"2021·04·02 · Jon · c9e1",corrupted:false},
+    {order:4,text:"v1.0 — License MIT + contributors",meta:"2021·05·19 · Ada · d4a8",corrupted:false},
+    {order:5,text:"v1.2 — Archived: 'moved to new repo'",meta:"2021·06·30 · Ada · e2f6",corrupted:false}
+  ],decoys:[
+    {text:"v9.9 — AI rewrote everything (fake)",meta:"2022·01·01 · ??? · xxxx",decoy:true},
+    {text:"v0.5 — Deleted all docs (fake)",meta:"2021·03·20 · ??? · yyyy",decoy:true}
+  ]},
+  {id:2,title:"Layer II: Clay Bed",subtitle:"The Config Schism",kicker:"Field Note #2 • Clay Bed",storyTitle:"The Config Schism",story:"Deeper, the config.json fractured. Two authors fought over formatting. One commit was half-erased by a faulty drive. Fuse the split commits to heal the timeline — fused blocks are stronger and score more.",fragments:[
+    {order:1,text:"cfg v1 — { port: 3000 }",meta:"2022·01·10 · Maya · f1a2",corrupted:false},
+    {order:2,text:"cfg v2 — added env + db url",meta:"2022·01·18 · Maya · f3b4",corrupted:true,garbled:"cfg v2 — @dded env + db u_l"},
+    {order:3,text:"cfg v3 — prettier reformatted all",meta:"2022·02·01 · Luis · g5c6",corrupted:false},
+    {order:4,text:"cfg v4 — secrets moved to .env",meta:"2022·02·14 · Maya · h7d8",corrupted:false},
+    {order:5,text:"cfg v5 — final: validated schema",meta:"2022·03·01 · Luis · i9e0",corrupted:false}
+  ],decoys:[
+    {text:"cfg vX — rm -rf / (malicious)",meta:"2022·02·20 · ??? · zzzz",decoy:true},
+    {text:"cfg v0 — empty file (fake)",meta:"2022·01·01 · ??? · wwww",decoy:true}
+  ]},
+  {id:3,title:"Layer III: Bedrock",subtitle:"The Core Algorithm",kicker:"Field Note #3 • Bedrock",storyTitle:"The Core Algorithm",story:"At bedrock lies the algorithm itself. Five true versions, two heavily corrupted by time. Rewrite them, shatter the forgeries, and fuse where you can. This is the origin sequence — get it right and the whole site is solved.",fragments:[
+    {order:1,text:"algo v1 — brute force O(n²)",meta:"2020·11·11 · Dr.K · j1k2",corrupted:true,garbled:"algo v1 — br#te f#rce O(n²)"},
+    {order:2,text:"algo v2 — memoization added",meta:"2020·12·05 · Dr.K · k3l4",corrupted:false},
+    {order:3,text:"algo v3 — divide & conquer",meta:"2021·01·22 · Priya · l5m6",corrupted:true,garbled:"algo v3 — div#de & c#nquer"},
+    {order:4,text:"algo v4 — parallel workers",meta:"2021·02·28 · Priya · m7n8",corrupted:false},
+    {order:5,text:"algo v5 — O(n log n) proven",meta:"2021·04·10 · Dr.K · n9o0",corrupted:false}
+  ],decoys:[
+    {text:"algo vX — quantum magic (fake)",meta:"2021·05·01 · ??? · qqqq",decoy:true},
+    {text:"algo v0 — hello world (fake)",meta:"2020·10·01 · ??? · pppp",decoy:true}
+  ]}
+];
+const STORAGE_KEY='stratigraphy_save_v2';
+let state={
+  levelIndex:0,
+  score:0,
+  tiles:[],
+  inventory:[],
+  table:[null,null,null,null,null],
+  selectedIds:[],
+  excavated:0,
+  verified:false,
+  unlocked:1
+};
+function uid(){return Math.random().toString(36).slice(2,9)}
+function load(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(raw){ const s=JSON.parse(raw); if(s && typeof s.levelIndex==='number'){ state={...state,...s}; state.selectedIds=[]; } }
+  }catch(e){}
+}
+function save(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    levelIndex:state.levelIndex,score:state.score,tiles:state.tiles,inventory:state.inventory,table:state.table,excavated:state.excavated,verified:state.verified,unlocked:state.unlocked
+  }));
+  document.getElementById('persistNote').textContent='Progress saved • '+new Date().toLocaleTimeString();
+}
+function currentLevel(){return LEVELS[state.levelIndex]}
+function buildTiles(){
+  const lvl=currentLevel();
+  let pool=[];
+  lvl.fragments.forEach(f=>{
+    pool.push({id:uid(),kind:'fragment',order:f.order,text:f.text,meta:f.meta,corrupted:!!f.corrupted,garbled:f.garbled||'',decoy:false,revealed:false,excavated:false})
+  });
+  lvl.decoys.forEach(d=>{
+    pool.push({id:uid(),kind:'decoy',order:99,text:d.text,meta:d.meta,corrupted:false,decoy:true,revealed:false,excavated:false})
+  });
+  while(pool.length<12) pool.push({id:uid(),kind:'empty',revealed:false,excavated:false});
+  // shuffle
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}
+  state.tiles=pool;
+  state.inventory=[];
+  state.table=[null,null,null,null,null];
+  state.selectedIds=[];
+  state.excavated=0;
+  state.verified=false;
+}
+function ensureTiles(){
+  if(!state.tiles || state.tiles.length!==12 || state.tiles[0].kind===undefined){
+    buildTiles(); save();
+  }
+}
+function renderHeader(){
+  const lvl=currentLevel();
+  document.getElementById('layerTitle').textContent=lvl.title;
+  document.getElementById('layerSub').textContent=lvl.subtitle+' • 12 tiles buried';
+  document.getElementById('scorePill').textContent='★ '+state.score+' pts';
+  const totalLevels=LEVELS.length;
+  const prog=((state.levelIndex + (state.verified?1:0))/totalLevels)*100;
+  document.getElementById('progBar').style.width=prog+'%';
+  document.getElementById('excavatedCount').textContent=state.excavated+'/12 lifted';
+  document.getElementById('trayCount').textContent=state.inventory.length+' items';
+  document.getElementById('nextBtn').style.display= state.verified && state.levelIndex < LEVELS.length-1 ? 'inline-flex' : 'none';
+  document.getElementById('verifyBtn').textContent= state.verified ? '✓ Layer Solved' : '⛏ Verify Stratigraphy';
+  document.getElementById('verifyBtn').style.opacity= state.verified ? '.6' : '1';
+}
+function renderGrid(){
+  const g=document.getElementById('grid');
+  g.innerHTML='';
+  state.tiles.forEach((t,idx)=>{
+    const d=document.createElement('div');
+    d.className='tile'+(t.excavated?' excavated':'' )+(t.excavated && t.kind==='empty'?' pit':'');
+    d.dataset.idx=idx;
+    if(!t.excavated){
+      d.innerHTML='<b>▓</b>';
+    } else {
+      if(t.kind==='empty'){
+        d.innerHTML='<b>·</b>';
+      } else {
+        const frag=document.createElement('div');
+        frag.className='fragment'+(t.decoy?' decoy':'');
+        frag.innerHTML=`<div class="meta">${t.decoy?'⚠ decoy':'◉ fragment'} • ${t.meta||''}</div><div class="txt">${escapeHtml(t.corrupted && t.garbled ? t.garbled : t.text)}</div><div class="tag">${t.decoy?'FAKE':'v'+(t.order||'?')}</div>`;
+        d.appendChild(frag);
+      }
+    }
+    d.addEventListener('click',()=>onTileTap(idx));
+    g.appendChild(d);
+  });
+}
+function renderTray(){
+  const tray=document.getElementById('tray');
+  tray.innerHTML='';
+  if(state.inventory.length===0){
+    tray.innerHTML='<div class="empty-note">No finds yet — lift tiles to catalog fragments. Tap a tile with a fragment to inspect.</div>';
+  } else {
+    state.inventory.forEach(item=>{
+      const el=document.createElement('div');
+      const isSel=state.selectedIds.includes(item.id);
+      el.className='inv-item'+(isSel?' selected':'')+(item.fused?' fused':'');
+      el.dataset.id=item.id;
+      const displayText=item.fused ? item.text : (item.corrupted && item.garbled ? item.garbled : item.text);
+      const tag=item.fused ? '🔗 FUSED '+item.orders.join('+') : (item.decoy?'⚠ DECOY':'v'+item.order)+(item.corrupted?' • corrupted':'');
+      el.innerHTML=`<div class="meta">${escapeHtml(item.meta)} • ${tag}</div><div class="txt">${escapeHtml(displayText)}</div><div class="actions"><button class="mini-btn sel">${isSel?'✓ Selected':'Select'}</button><button class="mini-btn place">↓ To Table</button></div>`;
+      el.addEventListener('click',(e)=>{
+        const isPlace=e.target.classList.contains('place');
+        if(isPlace){ placeToTable(item.id); } else { toggleSelect(item.id); }
+      });
+      tray.appendChild(el);
+    });
+  }
+  // update action buttons
+  const selItems=state.inventory.filter(i=>state.selectedIds.includes(i.id));
+  const fuseBtn=document.getElementById('fuseBtn');
+  const rewriteBtn=document.getElementById('rewriteBtn');
+  const shatterBtn=document.getElementById('shatterBtn');
+  // fuse enabled if 2 selected consecutive
+  let canFuse=false;
+  if(selItems.length===2 && !selItems.some(s=>s.decoy||s.fused)){
+    const a=selItems[0].order, b=selItems[1].order;
+    if(Math.abs(a-b)===1) canFuse=true;
+  }
+  fuseBtn.style.opacity=canFuse?'1':'.5';
+  fuseBtn.style.pointerEvents=canFuse?'auto':'none';
+  // rewrite enabled if 1 selected corrupted
+  let canRewrite= selItems.length===1 && selItems[0].corrupted;
+  rewriteBtn.style.opacity=canRewrite?'1':'.5';
+  rewriteBtn.style.pointerEvents=canRewrite?'auto':'none';
+  // shatter enabled if 1 selected decoy
+  let canShatter= selItems.length===1 && selItems[0].decoy;
+  shatterBtn.style.opacity=canShatter?'1':'.5';
+  shatterBtn.style.pointerEvents=canShatter?'auto':'none';
+}
+function renderTable(){
+  const c=document.getElementById('tableSlots');
+  c.innerHTML='';
+  state.table.forEach((item,idx)=>{
+    const s=document.createElement('div');
+    s.className='slot'+(item?' filled':'');
+    s.dataset.idx=idx;
+    s.innerHTML=`<span class="num">#${idx+1}</span>`+(item?`<div class="txt">${escapeHtml(item.fused? item.text : (item.corrupted && item.garbled? item.garbled : item.text))}</div><div class="meta">${escapeHtml(item.meta)}${item.fused?' • fused':''}</div>`:`<div style="font-size:12px;color:#8d6e63;text-align:center">Empty<br><span style="font-size:10px">tap tray →</span></div>`);
+    s.addEventListener('click',()=>onSlotTap(idx));
+    c.appendChild(s);
+  });
+}
+function escapeHtml(s){return (s||'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function onTileTap(idx){
+  const t=state.tiles[idx];
+  if(t.excavated){
+    if(t.kind==='fragment' || t.kind==='decoy'){
+      openInspect(idx);
+    } else {
+      toast('Empty soil — keep digging nearby');
+    }
+    return;
+  }
+  t.excavated=true;
+  t.revealed=true;
+  state.excavated++;
+  if(t.kind==='empty'){
+    toast('Just soil and dust…');
+  } else {
+    openInspect(idx);
+  }
+  renderAll(); save();
+}
+function openInspect(idx){
+  const t=state.tiles[idx];
+  if(!t || (t.kind!=='fragment' && t.kind!=='decoy')) return;
+  const modal=document.getElementById('inspectModal');
+  modal.style.display='flex';
+  document.getElementById('inspectKicker').textContent= t.decoy ? '⚠ Possible Forgery' : '◉ Fragment Unearthed';
+  document.getElementById('inspectTitle').textContent= t.decoy ? t.text : ('Order hint hidden • '+t.meta);
+  const body=document.getElementById('inspectBody');
+  const isCorrupted=t.corrupted;
+  body.innerHTML=`
+    <div class="parch" style="font-style:normal">
+      <div style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#8d6e63;font-family:system-ui,sans-serif;font-weight:800">${escapeHtml(t.meta)}</div>
+      <div style="font-size:15px;font-weight:900;margin:8px 0;line-height:1.3">${escapeHtml(isCorrupted && t.garbled ? t.garbled : t.text)}</div>
+      ${isCorrupted?'<div style="font-size:12px;color:#c62828;background:#ffebee;padding:6px 8px;border-radius:8px;border:1px solid #ef9a9a">✎ Corrupted — use <b>Rewrite</b> after cataloging to restore</div>':''}
+      ${t.decoy?'<div style="font-size:12px;color:#e65100;background:#fff3e0;padding:6px 8px;border-radius:8px;border:1px solid #ffcc80;margin-top:6px">◈ This looks like a decoy. You can <b>Shatter</b> it after cataloging.</div>':''}
+      <div style="margin-top:8px;font-size:12px;color:#6d4c41">Actions: <b>Catalog</b> keeps it in your tray. <b>Shatter</b> destroys a fake for points. <b>Leave</b> keeps it in the pit.</div>
+    </div>
+  `;
+  const foot=document.getElementById('inspectFoot');
+  const alreadyInTray=state.inventory.some(i=>i.sourceTile===idx);
+  foot.innerHTML='';
+  if(alreadyInTray){
+    foot.innerHTML=`<button class="btn btn-ghost" id="inspectClose" style="flex:1">Close</button><span style="font-size:12px;color:#6d4c41;align-self:center">Already cataloged</span>`;
+  } else {
+    foot.innerHTML=`<button class="btn btn-ghost" id="inspectClose" style="flex:1">Leave</button><button class="btn btn-primary" id="inspectCatalog" style="flex:1">⬢ Catalog</button>${t.decoy?'<button class="btn btn-soil" id="inspectShatter" style="flex:1">◈ Shatter</button>':''}`;
+  }
+  document.getElementById('inspectClose').onclick=()=> modal.style.display='none';
+  const cat=document.getElementById('inspectCatalog');
+  if(cat) cat.onclick=()=>{
+    catalogFromTile(idx);
+    modal.style.display='none';
+  };
+  const sh=document.getElementById('inspectShatter');
+  if(sh) sh.onclick=()=>{
+    // shatter directly from pit
+    state.tiles[idx].kind='empty';
+    state.tiles[idx].text='';
+    state.score+=15;
+    toast('◈ Forgery shattered! +15 pts');
+    modal.style.display='none';
+    renderAll(); save();
+  };
+}
+function catalogFromTile(idx){
+  const t=state.tiles[idx];
+  if(!t || (t.kind!=='fragment' && t.kind!=='decoy')) return;
+  const item={
+    id:uid(),
+    sourceTile:idx,
+    order:t.order,
+    text:t.text,
+    meta:t.meta,
+    corrupted:!!t.corrupted,
+    garbled:t.garbled||'',
+    decoy:!!t.decoy,
+    fused:false
+  };
+  state.inventory.push(item);
+  // turn tile into pit after catalog
+  t.kind='empty';
+  t.text='';
+  toast('⬢ Cataloged — find it in your tray');
+  renderAll(); save();
+}
+function toggleSelect(id){
+  const idx=state.selectedIds.indexOf(id);
+  if(idx>=0) state.selectedIds.splice(idx,1);
+  else {
+    if(state.selectedIds.length>=2) state.selectedIds.shift();
+    state.selectedIds.push(id);
+  }
+  renderTray(); save();
+}
+function placeToTable(invId){
+  const invIdx=state.inventory.findIndex(i=>i.id===invId);
+  if(invIdx<0) return;
+  const item=state.inventory[invIdx];
+  const emptyIdx=state.table.findIndex(s=>s===null);
+  if(emptyIdx<0){ toast('Table full — tap a slot to remove'); return; }
+  state.table[emptyIdx]=item;
+  state.inventory.splice(invIdx,1);
+  state.selectedIds=state.selectedIds.filter(x=>x!==invId);
+  toast('Placed on table #'+(emptyIdx+1));
+  renderAll(); save();
+}
+function onSlotTap(idx){
+  const item=state.table[idx];
+  if(!item){ toast('Empty slot — send from tray'); return; }
+  // return to inventory
+  state.table[idx]=null;
+  state.inventory.push(item);
+  toast('Returned to tray');
+  renderAll(); save();
+}
+function doFuse(){
+  const sel=state.inventory.filter(i=>state.selectedIds.includes(i.id));
+  if(sel.length!==2) return;
+  const orders=sel.map(s=>s.order).sort((a,b)=>a-b);
+  if(Math.abs(orders[0]-orders[1])!==1){ toast('Fuse needs consecutive versions'); return; }
+  const fused={
+    id:uid(),
+    order:orders[0],
+    orders:orders,
+    text: sel.sort((a,b)=>a.order-b.order).map(s=> s.corrupted && s.garbled ? s.text : s.text).join(' → '),
+    meta: sel[0].meta.split('·')[0]+'· fused '+orders.join('-'),
+    corrupted:false,
+    decoy:false,
+    fused:true
+  };
+  // remove originals
+  state.inventory=state.inventory.filter(i=>!state.selectedIds.includes(i.id));
+  state.inventory.push(fused);
+  state.selectedIds=[];
+  state.score+=20;
+  toast('🔗 Fused v'+orders.join(' + v')+'! +20 pts');
+  renderAll(); save();
+}
+function doRewrite(){
+  const sel=state.inventory.filter(i=>state.selectedIds.includes(i.id));
+  if(sel.length!==1 || !sel[0].corrupted) return;
+  sel[0].corrupted=false;
+  sel[0].garbled='';
+  state.score+=10;
+  state.selectedIds=[];
+  toast('✎ Rewritten — text restored! +10 pts');
+  renderAll(); save();
+}
+function doShatter(){
+  const sel=state.inventory.filter(i=>state.selectedIds.includes(i.id));
+  if(sel.length!==1 || !sel[0].decoy) return;
+  state.inventory=state.inventory.filter(i=>i.id!==sel[0].id);
+  state.selectedIds=[];
+  state.score+=15;
+  toast('◈ Shattered fake! +15 pts');
+  renderAll(); save();
+}
+function verify(){
+  if(state.verified){ toast('Layer already solved — go to next layer'); return; }
+  // need 5 slots filled (or fused covering)
+  const filled=state.table.filter(Boolean);
+  if(filled.length===0){ toast('Place fragments on the table first'); return; }
+  // expand fused
+  let expanded=[];
+  state.table.forEach(slot=>{
+    if(!slot) expanded.push(null);
+    else if(slot.fused) {
+      // fused occupies one slot but represents two orders — we treat as two sequential entries
+      // For verification, we expand to two entries but need to handle slot count mismatch
+      // Simpler: fused counts as covering its orders in order, but we still require 5 logical positions
+      // So we push both orders sequentially
+      slot.orders.forEach(o=> expanded.push(o));
+    } else {
+      expanded.push(slot.order);
+    }
+  });
+  // If fused present, expanded length may be >5. We need to check logical sequence 1..5
+  // Build logical sequence by flattening table in order, skipping nulls
+  let seq=[];
+  state.table.forEach(slot=>{
+    if(!slot) return;
+    if(slot.fused) seq.push(...slot.orders);
+    else seq.push(slot.order);
+  });
+  // Also check for decoys in table
+  const hasDecoy=state.table.some(s=>s && s.decoy);
+  const hintEl=document.getElementById('verifyHint');
+  hintEl.style.display='block';
+  if(hasDecoy){
+    hintEl.innerHTML='❌ <b>Decoy detected</b> on the table — shatter fakes before verifying.';
+    hintEl.style.background='#ffebee'; hintEl.style.color='#4e342e';
+    // mark wrong slots
+    markSlots();
+    return;
+  }
+  if(seq.length!==5){
+    hintEl.innerHTML='⛏ Need <b>5 versions</b> on the table. You have '+seq.length+'. Fuse can combine two into one slot, but you still need all 5 logical versions.';
+    hintEl.style.background='#fff8e1'; hintEl.style.color='#4e342e';
+    markSlots();
+    return;
+  }
+  const correct=[1,2,3,4,5];
+  let correctCount=0;
+  for(let i=0;i<5;i++) if(seq[i]===correct[i]) correctCount++;
+  markSlots(seq);
+  if(correctCount===5){
+    state.verified=true;
+    state.score+=50 + (state.excavated<=7?20:0);
+    state.unlocked=Math.max(state.unlocked, state.levelIndex+2);
+    hintEl.innerHTML='✅ <b>Stratigraphy confirmed!</b> Perfect sequence. +50 pts'+(state.excavated<=7?' +20 efficient dig bonus':'')+'. Read the next field note.';
+    hintEl.style.background='#e8f5e9'; hintEl.style.color='#1b5e20';
+    toast('✅ Layer solved!');
+    if(state.levelIndex < LEVELS.length-1){
+      document.getElementById('nextBtn').style.display='inline-flex';
+    } else {
+      hintEl.innerHTML+='<br>🏆 <b>All layers excavated!</b> You rebuilt the true history.';
+    }
+  } else {
+    hintEl.innerHTML=`❌ <b>${correctCount}/5 in place.</b> Green = correct layer, red = wrong. Check dates and authors — oldest left, newest right.`;
+    hintEl.style.background='#fff3e0'; hintEl.style.color='#4e342e';
+  }
+  renderAll(); save();
+}
+function markSlots(seq){
+  const slots=document.querySelectorAll('.slot');
+  const correct=[1,2,3,4,5];
+  // Build per-slot correctness: for non-fused, compare single order; for fused, check both orders match expected positions
+  let logicalIdx=0;
+  state.table.forEach((slot,slotIdx)=>{
+    const el=slots[slotIdx];
+    if(!el) return;
+    el.classList.remove('correct','wrong');
+    if(!slot) return;
+    if(slot.decoy){ el.classList.add('wrong'); return; }
+    if(slot.fused){
+      const expected=correct.slice(logicalIdx, logicalIdx+slot.orders.length);
+      const ok= slot.orders.every((o,i)=> o===expected[i]);
+      el.classList.add(ok?'correct':'wrong');
+      logicalIdx+=slot.orders.length;
+    } else {
+      const ok= slot.order===correct[logicalIdx];
+      el.classList.add(ok?'correct':'wrong');
+      logicalIdx+=1;
+    }
+  });
+}
+function renderAll(){
+  renderHeader();
+  renderGrid();
+  renderTray();
+  renderTable();
+}
+function showStory(){
+  const lvl=currentLevel();
+  const m=document.getElementById('storyModal');
+  document.getElementById('storyKicker').textContent=lvl.kicker;
+  document.getElementById('storyTitle').textContent=lvl.storyTitle;
+  document.getElementById('storyText').textContent=lvl.story;
+  m.style.display='flex';
+}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.display='block';
+  clearTimeout(t._h);
+  t._h=setTimeout(()=> t.style.display='none',2200);
+}
+function resetLayer(){
+  buildTiles();
+  document.getElementById('verifyHint').style.display='none';
+  document.querySelectorAll('.slot').forEach(s=>s.classList.remove('correct','wrong'));
+  toast('Layer reset — tiles reshuffled');
+  renderAll(); save();
+}
+function nextLayer(){
+  if(state.levelIndex >= LEVELS.length-1) return;
+  state.levelIndex++;
+  buildTiles();
+  document.getElementById('verifyHint').style.display='none';
+  renderAll(); save();
+  showStory();
+}
+// events
+document.getElementById('storyBtn').addEventListener('click',showStory);
+document.getElementById('closeStory').addEventListener('click',()=> document.getElementById('storyModal').style.display='none');
+document.getElementById('storyModal').addEventListener('click',(e)=>{ if(e.target.id==='storyModal') e.currentTarget.style.display='none'; });
+document.getElementById('inspectModal').addEventListener('click',(e)=>{ if(e.target.id==='inspectModal') e.currentTarget.style.display='none'; });
+document.getElementById('fuseBtn').addEventListener('click',doFuse);
+document.getElementById('rewriteBtn').addEventListener('click',doRewrite);
+document.getElementById('shatterBtn').addEventListener('click',doShatter);
+document.getElementById('verifyBtn').addEventListener('click',verify);
+document.getElementById('clearBtn').addEventListener('click',()=>{
+  // return all table to tray
+  state.table.forEach(item=>{ if(item) state.inventory.push(item); });
+  state.table=[null,null,null,null,null];
+  document.getElementById('verifyHint').style.display='none';
+  document.querySelectorAll('.slot').forEach(s=>s.classList.remove('correct','wrong'));
+  renderAll(); save();
+});
+document.getElementById('resetBtn').addEventListener('click',resetLayer);
+document.getElementById('nextBtn').addEventListener('click',nextLayer);
+document.getElementById('wipeSave').addEventListener('click',()=>{
+  if(confirm('Wipe all progress?')){ localStorage.removeItem(STORAGE_KEY); location.reload(); }
+});
+// init
+load();
+ensureTiles();
+renderAll();
+// show story on first load or when level not yet verified and no excavation
+if(state.excavated===0 && !state.verified) setTimeout(showStory,400);
+</script>
+</body>
+</html>

@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Tile Match Stack</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f172a;--card:#1e293b;--accent:#f59e0b;--accent2:#f97316;--text:#f1f5f9;--muted:#94a3b8;--ok:#10b981;--bad:#ef4444}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:radial-gradient(1000px 500px at 20% -10%,#1e3a5f 0%,transparent 60%),radial-gradient(900px 400px at 90% 0%,#4a1f6e 0%,transparent 60%),var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+header{position:sticky;top:0;z-index:10;background:rgba(15,23,42,0.9);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,0.08);padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#f59e0b,#f97316);display:grid;place-items:center;font-size:18px}
+.brand h1{font-size:15px;line-height:1}
+.brand p{font-size:11px;color:var(--muted)}
+.stats{display:flex;gap:6px;flex-wrap:wrap}
+.pill{background:#1e293b;border:1px solid rgba(255,255,255,0.08);padding:6px 9px;border-radius:999px;font-size:11px;display:flex;gap:5px;align-items:center}
+.pill b{color:var(--accent)}
+.pill.time.warn{border-color:#f59e0b;color:#fde68a}
+.pill.time.danger{border-color:#ef4444;color:#fecaca;animation:pulse 0.8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}
+main{flex:1;max-width:720px;width:100%;margin:0 auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.card{background:linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:12px}
+.controls{display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.btn{appearance:none;border:1px solid rgba(255,255,255,0.12);background:#1e293b;color:var(--text);padding:7px 12px;border-radius:999px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn.primary{background:linear-gradient(135deg,#f59e0b,#f97316);border-color:transparent;color:#0f172a}
+.btn.ghost{background:transparent}
+.btn.small{padding:5px 9px;font-size:11px}
+.btn.active{background:linear-gradient(135deg,#f59e0b,#f97316);color:#0f172a;border-color:transparent}
+.diffs{display:flex;gap:6px}
+.boardWrap{background:radial-gradient(800px 400px at 50% 0%,rgba(245,158,11,0.08),transparent 60%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:10px;position:relative}
+.board{position:relative;width:100%;height:420px;background:rgba(15,23,42,0.65);border-radius:12px;border:1px solid rgba(255,255,255,0.06);overflow:hidden;touch-action:manipulation}
+@media(min-width:600px){.board{height:480px}}
+.tile{position:absolute;width:56px;height:68px;border-radius:8px;background:linear-gradient(180deg,#ffffff,#f1f5f9);border:1px solid #cbd5e1;box-shadow:0 3px 0 #94a3b8,0 6px 12px rgba(0,0,0,0.25);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:transform 0.12s, box-shadow 0.12s, opacity 0.2s, filter 0.2s;user-select:none}
+.tile .topbar{position:absolute;top:0;left:0;right:0;height:6px;border-radius:8px 8px 0 0}
+.tile .icon{font-size:22px;line-height:1;margin-top:4px}
+.tile .label{font-size:8px;font-weight:800;letter-spacing:0.06em;color:#334155;margin-top:2px;text-transform:uppercase}
+.tile .id{position:absolute;bottom:2px;right:4px;font-size:7px;color:#94a3b8}
+.tile.blocked{opacity:0.45;filter:grayscale(0.4) brightness(0.85);cursor:not-allowed;box-shadow:0 2px 0 #64748b,0 4px 8px rgba(0,0,0,0.2)}
+.tile.blocked::after{content:'';position:absolute;inset:0;background:rgba(15,23,42,0.35);border-radius:8px}
+.tile.selected{transform:translateY(-6px) scale(1.06);box-shadow:0 6px 0 #f59e0b,0 10px 20px rgba(245,158,11,0.4);border-color:#f59e0b;z-index:999!important}
+.tile.matched{animation:pop 0.35s forwards}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.15)}100%{transform:scale(0);opacity:0}}
+.tile.hintPulse{animation:hintPulse 0.9s infinite}
+@keyframes hintPulse{0%,100%{box-shadow:0 3px 0 #94a3b8,0 0 0 0 rgba(245,158,11,0.6)}50%{box-shadow:0 3px 0 #94a3b8,0 0 0 8px rgba(245,158,11,0)}}
+.footer{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;font-size:11px;color:var(--muted)}
+.comboToast{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(0.8);background:linear-gradient(135deg,#f59e0b,#f97316);color:#0f172a;padding:8px 14px;border-radius:999px;font-weight:800;font-size:14px;box-shadow:0 8px 20px rgba(0,0,0,0.3);opacity:0;pointer-events:none;transition:all 0.2s;z-index:20}
+.comboToast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(80px);background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:var(--text);padding:10px 14px;border-radius:999px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,0.4);opacity:0;transition:all 0.3s;pointer-events:none;z-index:50}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.modal{position:fixed;inset:0;background:rgba(2,6,23,0.7);backdrop-filter:blur(6px);display:grid;place-items:center;padding:16px;z-index:40;opacity:0;pointer-events:none;transition:0.2s}
+.modal.open{opacity:1;pointer-events:auto}
+.modalCard{background:linear-gradient(180deg,#1e293b,#0f172a);border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:20px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.modalCard h3{font-size:20px;margin-bottom:6px}
+.modalCard p{font-size:13px;color:var(--muted);line-height:1.5}
+.badge{display:inline-block;background:linear-gradient(135deg,#f59e0b,#f97316);color:#0f172a;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+<div class="brand"><div class="logo">🀄</div><div><h1>Tile Match Stack</h1><p>Pair open tiles • Clear the stack</p></div></div>
+<div class="stats">
+<div class="pill">⭐ <b id="scoreEl">0</b></div>
+<div class="pill time" id="timePill">⏱ <b id="timeEl">180</b>s</div>
+<div class="pill">🏆 <b id="bestEl">0</b></div>
+<div class="pill">🧩 <b id="pairsEl">0/0</b></div>
+</div>
+</header>
+<main>
+<div class="card controls">
+<div style="display:flex;gap:6px;flex-wrap:wrap">
+<button class="btn primary" onclick="newGame()">↻ New</button>
+<button class="btn" onclick="shuffleBoard()">🔀 Shuffle <span style="opacity:0.7;font-size:10px">-25</span></button>
+<button class="btn" onclick="doHint()">💡 Hint</button>
+</div>
+<div class="diffs">
+<button class="btn small" id="btnEasy" onclick="setDiff('easy')">Easy</button>
+<button class="btn small active" id="btnMedium" onclick="setDiff('medium')">Medium</button>
+<button class="btn small" id="btnHard" onclick="setDiff('hard')">Hard</button>
+</div>
+</div>
+
+<div class="boardWrap">
+<div class="board" id="board"></div>
+<div class="comboToast" id="comboToast"></div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;color:var(--muted)">
+<span id="statusEl">Tap two matching open tiles (bright) to clear</span>
+<span id="openEl"></span>
+</div>
+</div>
+
+<div class="card footer">
+<div>Moves: <b id="movesEl" style="color:var(--text)">0</b> • Combo: <b id="comboEl" style="color:var(--accent)">x1</b> <span id="comboInfo" style="opacity:0.7"></span></div>
+<div id="msgEl">Bright = open • Dim = blocked (covered or boxed in)</div>
+</div>
+</main>
+
+<div class="toast" id="toast"></div>
+<div class="modal" id="winModal"><div class="modalCard"><div style="font-size:36px">🎉</div><h3 id="winTitle">Stack Cleared!</h3><p id="winText"></p><div id="winBadge"></div><div style="display:flex;gap:8px;justify-content:center;margin-top:14px"><button class="btn ghost" onclick="closeModal('winModal')">Close</button><button class="btn primary" onclick="closeModal('winModal');newGame()">Play Again ↻</button></div></div></div>
+<div class="modal" id="loseModal"><div class="modalCard"><div style="font-size:36px">⏱</div><h3>Time Up!</h3><p id="loseText"></p><div style="display:flex;gap:8px;justify-content:center;margin-top:14px"><button class="btn ghost" onclick="closeModal('loseModal')">Close</button><button class="btn primary" onclick="closeModal('loseModal');newGame()">Try Again ↻</button></div></div></div>
+
+<script>
+const TILE_TYPES=[
+{icon:'🌸',label:'Blossom',color:'#f43f5e'},
+{icon:'🎋',label:'Bamboo',color:'#10b981'},
+{icon:'🀄',label:'Dragon',color:'#ef4444'},
+{icon:'🌙',label:'Moon',color:'#8b5cf6'},
+{icon:'⭐',label:'Star',color:'#f59e0b'},
+{icon:'🍀',label:'Clover',color:'#22c55e'},
+{icon:'🔷',label:'Gem',color:'#06b6d4'},
+{icon:'🍁',label:'Maple',color:'#f97316'},
+{icon:'🐢',label:'Turtle',color:'#14b8a6'},
+{icon:'🦋',label:'Butterfly',color:'#ec4899'},
+{icon:'⚡',label:'Bolt',color:'#eab308'},
+{icon:'❄️',label:'Snow',color:'#38bdf8'},
+{icon:'🍒',label:'Cherry',color:'#f43f5e'},
+{icon:'🌊',label:'Wave',color:'#0ea5e9'},
+{icon:'🔥',label:'Flame',color:'#f97316'},
+{icon:'💎',label:'Diamond',color:'#a78bfa'},
+{icon:'🌿',label:'Leaf',color:'#22c55e'},
+{icon:'🎯',label:'Target',color:'#ef4444'},
+{icon:'🌟',label:'Spark',color:'#facc15'},
+{icon:'🍄',label:'Shroom',color:'#a3e635'}
+];
+const LAYOUTS={
+easy:{time:120, cols:8, rows:6, positions:[]},
+medium:{time:180, cols:10, rows:7, positions:[]},
+hard:{time:210, cols:12, rows:8, positions:[]}
+};
+// Generate positions programmatically for crisp reproducible boards
+function genPositions(cols, rows, layers){
+  const pos=[];
+  for(let z=0; z<layers; z++){
+    const inset = z; // shrink each layer
+    const c = cols - inset*2;
+    const r = rows - inset*2;
+    if(c<=0||r<=0) continue;
+    for(let y=inset; y<inset+r; y++){
+      for(let x=inset; x<inset+c; x++){
+        // checker sparse for higher layers to create stacking
+        if(z>0 && (x+y)%2===1 && Math.random()<0.3) continue;
+        // keep even total later, just generate
+        pos.push({x:x*2, y:y*2, z:z});
+      }
+    }
+  }
+  return pos;
+}
+// Fixed seed generation for reproducibility - use deterministic pseudo-random
+function seededPositions(){
+  // Easy: 20 tiles (10 pairs) - 2 layers
+  LAYOUTS.easy.positions=[
+    {x:2,y:2,z:0},{x:4,y:2,z:0},{x:6,y:2,z:0},{x:8,y:2,z:0},{x:10,y:2,z:0},
+    {x:2,y:4,z:0},{x:4,y:4,z:0},{x:6,y:4,z:0},{x:8,y:4,z:0},{x:10,y:4,z:0},
+    {x:2,y:6,z:0},{x:4,y:6,z:0},{x:6,y:6,z:0},{x:8,y:6,z:0},{x:10,y:6,z:0},
+    {x:4,y:3,z:1},{x:6,y:3,z:1},{x:8,y:3,z:1},{x:6,y:5,z:1},{x:8,y:5,z:1}
+  ];
+  // Medium: 34 tiles (17 pairs) - 3 layers
+  LAYOUTS.medium.positions=[
+    {x:0,y:0,z:0},{x:2,y:0,z:0},{x:4,y:0,z:0},{x:6,y:0,z:0},{x:8,y:0,z:0},{x:10,y:0,z:0},{x:12,y:0,z:0},{x:14,y:0,z:0},
+    {x:0,y:2,z:0},{x:2,y:2,z:0},{x:4,y:2,z:0},{x:6,y:2,z:0},{x:8,y:2,z:0},{x:10,y:2,z:0},{x:12,y:2,z:0},{x:14,y:2,z:0},
+    {x:0,y:4,z:0},{x:2,y:4,z:0},{x:4,y:4,z:0},{x:6,y:4,z:0},{x:8,y:4,z:0},{x:10,y:4,z:0},{x:12,y:4,z:0},{x:14,y:4,z:0},
+    {x:2,y:6,z:0},{x:4,y:6,z:0},{x:6,y:6,z:0},{x:8,y:6,z:0},{x:10,y:6,z:0},{x:12,y:6,z:0},
+    {x:4,y:1,z:1},{x:6,y:1,z:1},{x:8,y:1,z:1},{x:10,y:1,z:1},
+    {x:6,y:3,z:1},{x:8,y:3,z:1}
+  ];
+  // Hard: 62 tiles (31 pairs) - 4 layers
+  LAYOUTS.hard.positions=[
+    {x:0,y:0,z:0},{x:2,y:0,z:0},{x:4,y:0,z:0},{x:6,y:0,z:0},{x:8,y:0,z:0},{x:10,y:0,z:0},{x:12,y:0,z:0},{x:14,y:0,z:0},{x:16,y:0,z:0},{x:18,y:0,z:0},
+    {x:0,y:2,z:0},{x:2,y:2,z:0},{x:4,y:2,z:0},{x:6,y:2,z:0},{x:8,y:2,z:0},{x:10,y:2,z:0},{x:12,y:2,z:0},{x:14,y:2,z:0},{x:16,y:2,z:0},{x:18,y:2,z:0},
+    {x:0,y:4,z:0},{x:2,y:4,z:0},{x:4,y:4,z:0},{x:6,y:4,z:0},{x:8,y:4,z:0},{x:10,y:4,z:0},{x:12,y:4,z:0},{x:14,y:4,z:0},{x:16,y:4,z:0},{x:18,y:4,z:0},
+    {x:0,y:6,z:0},{x:2,y:6,z:0},{x:4,y:6,z:0},{x:6,y:6,z:0},{x:8,y:6,z:0},{x:10,y:6,z:0},{x:12,y:6,z:0},{x:14,y:6,z:0},{x:16,y:6,z:0},{x:18,y:6,z:0},
+    {x:0,y:8,z:0},{x:2,y:8,z:0},{x:4,y:8,z:0},{x:6,y:8,z:0},{x:8,y:8,z:0},{x:10,y:8,z:0},{x:12,y:8,z:0},{x:14,y:8,z:0},{x:16,y:8,z:0},{x:18,y:8,z:0},
+    {x:4,y:1,z:1},{x:6,y:1,z:1},{x:8,y:1,z:1},{x:10,y:1,z:1},{x:12,y:1,z:1},{x:14,y:1,z:1},
+    {x:4,y:3,z:1},{x:6,y:3,z:1},{x:8,y:3,z:1},{x:10,y:3,z:1},{x:12,y:3,z:1},{x:14,y:3,z:1},
+    {x:6,y:5,z:1},{x:8,y:5,z:1},{x:10,y:5,z:1},{x:12,y:5,z:1},
+    {x:8,y:2,z:2},{x:10,y:2,z:2},{x:8,y:4,z:2},{x:10,y:4,z:2}
+  ];
+}
+seededPositions();
+
+const STORAGE_KEY='tileMatchBest_v2';
+let difficulty='medium';
+let tiles=[], selected=null, score=0, moves=0, combo=1, lastMatchAt=0, timeLeft=180, timer=null, pairsTotal=0, hintClear=null;
+
+function loadBest(){try{const r=localStorage.getItem(STORAGE_KEY);if(r) return JSON.parse(r)}catch(e){} return {easy:{score:0,time:0,moves:0},medium:{score:0,time:0,moves:0},hard:{score:0,time:0,moves:0}}}
+let best=loadBest();
+function saveBest(){localStorage.setItem(STORAGE_KEY,JSON.stringify(best))}
+
+function setDiff(d){
+  difficulty=d;
+  document.querySelectorAll('.diffs .btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn'+d.charAt(0).toUpperCase()+d.slice(1)).classList.add('active');
+  newGame();
+}
+function shuffleArr(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+function isCovered(t){
+  return tiles.some(o=>!o.removed && o.z>t.z && o.x < t.x+2 && o.x+2 > t.x && o.y < t.y+2 && o.y+2 > t.y);
+}
+function isSideBlocked(t, dir){
+  const nx = dir==='left'? t.x-2 : t.x+2;
+  return tiles.some(o=>!o.removed && o.z===t.z && o.x===nx && o.y===t.y);
+}
+function isOpen(t){
+  if(t.removed) return false;
+  if(isCovered(t)) return false;
+  const leftBlocked=isSideBlocked(t,'left');
+  const rightBlocked=isSideBlocked(t,'right');
+  return !(leftBlocked && rightBlocked);
+}
+function getOpenTiles(){return tiles.filter(isOpen)}
+function hasMove(){
+  const open=getOpenTiles();
+  const counts={};
+  open.forEach(t=>{counts[t.typeIdx]=(counts[t.typeIdx]||0)+1});
+  return Object.values(counts).some(c=>c>=2);
+}
+
+function newGame(){
+  clearInterval(timer);
+  const layout=LAYOUTS[difficulty];
+  timeLeft=layout.time;
+  score=0; moves=0; combo=1; lastMatchAt=0; selected=null;
+  pairsTotal=layout.positions.length/2;
+  // create types: need pairs
+  const need=layout.positions.length;
+  const types=[];
+  for(let i=0;i<need/2;i++){const ti=i % TILE_TYPES.length; types.push(ti,ti)}
+  shuffleArr(types);
+  tiles=layout.positions.map((p,i)=>({id:i,x:p.x,y:p.y,z:p.z,typeIdx:types[i],removed:false}));
+  // ensure has move, reshuffle types until true (max 20 tries)
+  let tries=0;
+  while(!hasMove() && tries<20){shuffleArr(types);tiles.forEach((t,i)=>t.typeIdx=types[i]);tries++}
+  updateHeader();
+  renderBoard();
+  startTimer();
+  toast('New board dealt — find open pairs!');
+}
+function startTimer(){
+  clearInterval(timer);
+  updateTimeUI();
+  timer=setInterval(()=>{
+    timeLeft--;
+    updateTimeUI();
+    if(timeLeft<=0){clearInterval(timer);timeLeft=0;updateTimeUI();showLose()}
+  },1000);
+}
+function updateTimeUI(){
+  document.getElementById('timeEl').textContent=timeLeft;
+  const pill=document.getElementById('timePill');
+  pill.classList.remove('warn','danger');
+  if(timeLeft<=15) pill.classList.add('danger');
+  else if(timeLeft<=30) pill.classList.add('warn');
+}
+function updateHeader(){
+  document.getElementById('scoreEl').textContent=score;
+  document.getElementById('bestEl').textContent=best[difficulty].score||0;
+  const remaining=tiles.filter(t=>!t.removed).length/2;
+  document.getElementById('pairsEl').textContent=(pairsTotal-remaining)+'/'+pairsTotal;
+  document.getElementById('movesEl').textContent=moves;
+  document.getElementById('comboEl').textContent='x'+combo;
+  document.getElementById('comboInfo').textContent=combo>1?` (${combo} streak)`:''; 
+  document.getElementById('openEl').textContent=getOpenTiles().length+' open';
+  updateTimeUI();
+}
+function renderBoard(){
+  const board=document.getElementById('board');
+  board.innerHTML='';
+  // sort for stacking: lower z first, then y, then x
+  const sorted=[...tiles].filter(t=>!t.removed).sort((a,b)=> a.z!==b.z? a.z-b.z : a.y!==b.y? a.y-b.y : a.x-b.x);
+  // compute bounds to center
+  const layout=LAYOUTS[difficulty];
+  const maxX=Math.max(...tiles.map(t=>t.x))+2;
+  const maxY=Math.max(...tiles.map(t=>t.y))+2;
+  // scale to fit board
+  const boardW=board.clientWidth||340;
+  const boardH=board.clientHeight||420;
+  const tileW=56, tileH=68;
+  const OFF_X=7, OFF_Y=7;
+  // estimate content size
+  const contentW = maxX* (tileW/2) + 20;
+  const contentH = maxY* (tileH/2) + 20;
+  const scale=Math.min(1, boardW/contentW, boardH/contentH, 1);
+  // center offset
+  const offsetX=(boardW - contentW*scale)/2;
+  const offsetY=(boardH - contentH*scale)/2;
+
+  sorted.forEach(t=>{
+    const el=document.createElement('div');
+    const open=isOpen(t);
+    el.className='tile'+(open?'':' blocked')+(selected && selected.id===t.id?' selected':'');
+    el.dataset.id=t.id;
+    const tt=TILE_TYPES[t.typeIdx];
+    el.innerHTML=`<div class="topbar" style="background:${tt.color}"></div><div class="icon">${tt.icon}</div><div class="label">${tt.label}</div><div class="id">${t.z>0?'L'+(t.z+1):''}</div>`;
+    // position: x* (tileW/2) + z*OFF, y* (tileH/2) + z*OFF
+    const left = t.x * (tileW/2) * scale + t.z*OFF_X*scale + offsetX;
+    const top = t.y * (tileH/2) * scale + t.z*OFF_Y*scale + offsetY;
+    el.style.left=left+'px';
+    el.style.top=top+'px';
+    el.style.transform=`scale(${scale})` + (selected && selected.id===t.id? ' translateY(-6px) scale('+(scale*1.06)+')' : '');
+    // z-index
+    el.style.zIndex= t.z*100 + t.y*10 + t.x;
+    el.onclick=()=>onTileClick(t);
+    board.appendChild(el);
+  });
+  updateHeader();
+  // check win/lose conditions
+  if(tiles.length && tiles.every(t=>t.removed)){
+    clearInterval(timer);
+    showWin();
+  } else if(tiles.filter(t=>!t.removed).length>0 && !hasMove()){
+    document.getElementById('statusEl').textContent='No moves — tap Shuffle!';
+    document.getElementById('statusEl').style.color='#f59e0b';
+  } else {
+    document.getElementById('statusEl').textContent='Tap two matching open tiles (bright) to clear';
+    document.getElementById('statusEl').style.color='';
+  }
+}
+function onTileClick(t){
+  if(t.removed) return;
+  if(!isOpen(t)){toast('Blocked — clear covering tiles or free a side');shake(t.id);return}
+  if(selected && selected.id===t.id){selected=null;renderBoard();return}
+  if(!selected){selected=t;renderBoard();return}
+  // second pick
+  if(selected.typeIdx===t.typeIdx){
+    // match!
+    const now=Date.now();
+    const delta= lastMatchAt? (now-lastMatchAt)/1000 : 999;
+    let bonus=0;
+    if(delta<1.2) bonus=100;
+    else if(delta<2.5) bonus=50;
+    // combo
+    if(delta<3) combo=Math.min(5, combo+0.5); else combo=1;
+    const mult=combo;
+    const gained=Math.round((100+bonus)*mult);
+    score+=gained;
+    moves++;
+    lastMatchAt=now;
+    // fast bonus time
+    if(bonus>0){timeLeft=Math.min(LAYOUTS[difficulty].time, timeLeft+2)}
+    // animate
+    const sId=selected.id, tId=t.id;
+    selected=null;
+    // mark removed after animation
+    setTimeout(()=>{
+      tiles.find(x=>x.id===sId).removed=true;
+      tiles.find(x=>x.id===tId).removed=true;
+      renderBoard();
+      showCombo(gained, bonus, mult);
+      updateHeader();
+    },120);
+    // visual pop
+    document.querySelectorAll('.tile').forEach(el=>{
+      if(el.dataset.id==sId || el.dataset.id==tId) el.classList.add('matched');
+    });
+  } else {
+    // mismatch
+    combo=1;
+    moves++;
+    toast('Not a match — try another pair');
+    selected=t;
+    renderBoard();
+    updateHeader();
+  }
+}
+function shake(id){
+  const el=document.querySelector(`.tile[data-id="${id}"]`);
+  if(!el) return;
+  el.animate([{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:200});
+}
+function showCombo(gained, bonus, mult){
+  const el=document.getElementById('comboToast');
+  let txt=`+${gained}`;
+  if(bonus) txt+=` ⚡+${bonus}`;
+  if(mult>1) txt+=` ×${mult}`;
+  el.textContent=txt;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),900);
+}
+function shuffleBoard(){
+  const remaining=tiles.filter(t=>!t.removed);
+  if(remaining.length===0) return;
+  const types=remaining.map(t=>t.typeIdx);
+  shuffleArr(types);
+  remaining.forEach((t,i)=>t.typeIdx=types[i]);
+  let tries=0;
+  while(!hasMove() && tries<20){shuffleArr(types);remaining.forEach((t,i)=>t.typeIdx=types[i]);tries++}
+  score=Math.max(0, score-25);
+  selected=null;
+  renderBoard();
+  toast('Board reshuffled (-25)');
+}
+function doHint(){
+  const open=getOpenTiles();
+  const byType={};
+  open.forEach(t=>{if(!byType[t.typeIdx]) byType[t.typeIdx]=[];byType[t.typeIdx].push(t)});
+  const pairType=Object.keys(byType).find(k=>byType[k].length>=2);
+  if(!pairType){toast('No open pairs — shuffle!');return}
+  const pair=byType[pairType].slice(0,2);
+  pair.forEach(t=>{
+    const el=document.querySelector(`.tile[data-id="${t.id}"]`);
+    if(el) el.classList.add('hintPulse');
+  });
+  if(hintClear) clearTimeout(hintClear);
+  hintClear=setTimeout(()=>{document.querySelectorAll('.hintPulse').forEach(e=>e.classList.remove('hintPulse'))},1800);
+  const tt=TILE_TYPES[pair[0].typeIdx];
+  toast(`Hint: ${tt.icon} ${tt.label} ×2 is open`);
+}
+function showWin(){
+  const timeBonus=timeLeft*10;
+  const finalScore=score+timeBonus;
+  score=finalScore;
+  updateHeader();
+  const isBest=finalScore > (best[difficulty].score||0);
+  if(isBest){best[difficulty]={score:finalScore,time:timeLeft,moves:moves};saveBest()}
+  document.getElementById('winTitle').textContent='Stack Cleared!';
+  document.getElementById('winText').innerHTML=`Score <b>${finalScore}</b> (time bonus +${timeBonus})<br>Moves: ${moves} • Time left: ${timeLeft}s • Combo max x${combo}`;
+  document.getElementById('winBadge').innerHTML=isBest?'<span class="badge">🏆 New Best!</span>':'';
+  document.getElementById('winModal').classList.add('open');
+}
+function showLose(){
+  document.getElementById('loseText').innerHTML=`Score <b>${score}</b> • Pairs cleared ${pairsTotal - tiles.filter(t=>!t.removed).length/2}/${pairsTotal}<br>Try a faster strategy or shuffle early!`;
+  document.getElementById('loseModal').classList.add('open');
+}
+function closeModal(id){document.getElementById(id).classList.remove('open')}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+window.addEventListener('resize', renderBoard);
+// init
+newGame();
+</script>
+</body>
+</html>

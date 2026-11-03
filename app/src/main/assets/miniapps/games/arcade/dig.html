@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Beach Dig Dash</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background:#7ec8e3;
+  display:flex;justify-content:center;
+  -webkit-tap-highlight-color:transparent;
+}
+.app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100vh;
+  background: linear-gradient(180deg, #87d4f7 0%, #b8e6f9 18%, #ffe9a8 32%, #f5d6a0 45%, #e8c48a 70%, #d9b07a 100%);
+  display:flex;flex-direction:column;
+  position:relative;
+  overflow:hidden;
+}
+/* header */
+.header{
+  padding:14px 16px 10px;
+  text-align:center;
+  position:relative;
+}
+.header h1{
+  font-size:26px;
+  font-weight:900;
+  color:#5a3200;
+  letter-spacing:0.5px;
+  text-shadow:0 2px 0 #fff8, 0 3px 6px #0002;
+  line-height:1.1;
+}
+.header h1 span{font-size:28px}
+.sub{
+  font-size:12px;
+  color:#6b4a1a;
+  font-weight:600;
+  margin-top:4px;
+  opacity:0.9;
+}
+.best-badge{
+  position:absolute;right:12px;top:12px;
+  background:#fff;
+  border:2px solid #e8b84b;
+  border-radius:999px;
+  padding:4px 10px;
+  font-size:11px;
+  font-weight:800;
+  color:#7a4a00;
+  box-shadow:0 2px 8px #0001;
+}
+.best-badge b{color:#d48a00}
+/* stats */
+.stats{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  padding:10px 12px;
+}
+.stat{
+  background:#fffef8;
+  border:2px solid #e8c98a;
+  border-radius:14px;
+  padding:8px 10px;
+  display:flex;align-items:center;justify-content:space-between;
+  box-shadow:0 2px 6px #0001;
+}
+.stat-label{font-size:11px;font-weight:800;color:#8a6a2e;letter-spacing:0.6px;text-transform:uppercase}
+.stat-val{font-size:18px;font-weight:900;color:#3b2500}
+.stat-val.lives{font-size:16px;letter-spacing:2px}
+.stat-val.time{color:#0a7a3a}
+.stat-val.time.warn{color:#d11a1a;animation:pulse 0.6s infinite alternate}
+@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.08)}}
+.combo-bar{
+  margin:0 12px;
+  background:#5a3200;
+  color:#ffe9a8;
+  border-radius:999px;
+  padding:6px 12px;
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:12px;font-weight:800;
+  min-height:32px;
+}
+.combo-bar span:last-child{color:#ffd54f}
+.level-up{
+  text-align:center;
+  font-size:12px;font-weight:900;color:#5a3200;
+  background:#fff6;
+  margin:6px 12px 0;
+  border-radius:999px;
+  padding:4px;
+}
+/* beach scene */
+.beach-wrap{
+  flex:1;
+  padding:12px 12px 8px;
+  display:flex;flex-direction:column;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+  background: linear-gradient(180deg, #f5e0b0 0%, #e8c48a 100%);
+  border:3px solid #d9a85a;
+  border-radius:20px;
+  padding:12px;
+  box-shadow:inset 0 4px 12px #0001, 0 6px 16px #0002;
+  position:relative;
+}
+.mound{
+  position:relative;
+  aspect-ratio:1;
+  min-height:92px;
+  background: radial-gradient(ellipse at 50% 30%, #fff6d6 0%, #f5d6a0 35%, #e8b86a 65%, #c99a4a 100%);
+  border-radius:50% 50% 45% 45% / 60% 60% 40% 40%;
+  border:2px solid #c99a4a;
+  box-shadow:inset 0 6px 10px #fff8, inset 0 -8px 12px #0002, 0 4px 8px #0001;
+  overflow:hidden;
+  cursor:pointer;
+  user-select:none;
+  -webkit-user-select:none;
+  touch-action:manipulation;
+  display:flex;align-items:center;justify-content:center;
+}
+.mound:active{transform:scale(0.97)}
+.mound.empty::after{
+  content:"";
+  position:absolute;
+  bottom:18%;
+  left:50%;transform:translateX(-50%);
+  width:56%;height:18%;
+  background:#8a5a1a;
+  border-radius:50%;
+  opacity:0.35;
+  filter:blur(1px);
+}
+.mound-hole{
+  position:absolute;
+  bottom:12%;
+  left:50%;transform:translateX(-50%);
+  width:62%;height:22%;
+  background: radial-gradient(ellipse at 50% 40%, #6b3f0a 0%, #4a2a00 70%);
+  border-radius:50%;
+  opacity:0;
+  transition:opacity 0.15s;
+}
+.mound.active .mound-hole{opacity:1}
+.entity{
+  position:absolute;
+  inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  animation:pop 0.28s cubic-bezier(0.34,1.56,0.64,1);
+  z-index:2;
+}
+@keyframes pop{from{transform:translateY(40%) scale(0.5);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+.entity-emoji{
+  font-size:38px;
+  line-height:1;
+  filter:drop-shadow(0 3px 4px #0003);
+  animation:wiggle 0.6s ease-in-out infinite alternate;
+}
+@keyframes wiggle{from{transform:rotate(-4deg)}to{transform:rotate(4deg)}}
+.entity-label{
+  margin-top:2px;
+  font-size:10px;font-weight:900;
+  background:#fff;
+  padding:1px 6px;
+  border-radius:999px;
+  border:1px solid #0001;
+  color:#5a3200;
+  box-shadow:0 1px 4px #0002;
+}
+.mound.bad .entity-emoji{animation:shake 0.3s infinite}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px) rotate(-3deg)}75%{transform:translateX(2px) rotate(3deg)}}
+.mound.thief .entity-emoji{animation:dart 0.5s ease-in-out infinite alternate}
+@keyframes dart{from{transform:translateX(-4px)}to{transform:translateX(4px)}}
+
+/* floats */
+.float{
+  position:absolute;
+  left:50%;top:18%;
+  transform:translateX(-50%);
+  font-size:16px;font-weight:900;
+  color:#fff;
+  text-shadow:0 1px 0 #000, 0 2px 6px #0005;
+  pointer-events:none;
+  animation:floatUp 0.85s ease-out forwards;
+  z-index:10;
+  white-space:nowrap;
+}
+.float.good{color:#0a7a00; text-shadow:0 1px 0 #fff, 0 2px 6px #0003}
+.float.bad{color:#d11a1a}
+.float.steal{color:#7a3a00; background:#fff; padding:2px 8px; border-radius:999px; font-size:12px; box-shadow:0 2px 8px #0002}
+@keyframes floatUp{0%{transform:translateX(-50%) translateY(0) scale(1);opacity:1}100%{transform:translateX(-50%) translateY(-48px) scale(1.1);opacity:0}}
+
+/* controls */
+.controls{
+  display:flex;gap:8px;
+  padding:10px 12px;
+}
+.btn{
+  flex:1;
+  min-height:48px;
+  border:none;
+  border-radius:14px;
+  font-size:15px;font-weight:900;
+  cursor:pointer;
+  touch-action:manipulation;
+  box-shadow:0 3px 8px #0002;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.btn-primary{background:linear-gradient(180deg,#ff8a2a,#e86a00);color:#fff;border:2px solid #c95a00}
+.btn-primary:active{transform:scale(0.98)}
+.btn-secondary{background:#fff;color:#5a3200;border:2px solid #e8c98a}
+.btn:disabled{opacity:0.5;pointer-events:none}
+.hint{
+  text-align:center;
+  font-size:11px;font-weight:700;color:#6b4a1a;
+  padding:0 12px 6px;
+  line-height:1.4;
+}
+.legend{
+  display:flex;flex-wrap:wrap;gap:6px;
+  justify-content:center;
+  padding:6px 12px 10px;
+}
+.legend span{
+  background:#fff;
+  border:1px solid #e8c98a;
+  border-radius:999px;
+  padding:4px 8px;
+  font-size:11px;font-weight:700;color:#5a3200;
+  display:flex;align-items:center;gap:4px;
+}
+.legend i{font-style:normal;font-size:14px}
+
+/* overlay */
+.overlay{
+  position:absolute;inset:0;
+  background:#0006;
+  backdrop-filter:blur(2px);
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+  z-index:20;
+}
+.card{
+  background:#fffef8;
+  border:3px solid #e8b84b;
+  border-radius:20px;
+  padding:20px 16px;
+  text-align:center;
+  width:100%;
+  max-width:340px;
+  box-shadow:0 12px 32px #0003;
+}
+.card h2{font-size:22px;color:#5a3200;margin-bottom:6px}
+.card p{font-size:13px;color:#6b4a1a;line-height:1.5;margin-bottom:12px}
+.card .big{font-size:36px;font-weight:900;color:#e86a00;margin:8px 0}
+.card .row{display:flex;gap:8px;margin-top:10px}
+.shake{animation:screenShake 0.35s}
+@keyframes screenShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <h1><span>🏖️</span> BEACH DIG DASH <span>⛱️</span></h1>
+    <div class="sub">Tap treasure before thieves steal it!</div>
+    <div class="best-badge">BEST <b id="bestVal">0</b> ⭐</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><span class="stat-label">Score</span><span class="stat-val" id="scoreVal">0</span></div>
+    <div class="stat"><span class="stat-label">Time</span><span class="stat-val time" id="timeVal">60s</span></div>
+    <div class="stat"><span class="stat-label">Lives</span><span class="stat-val lives" id="livesVal">❤️❤️❤️</span></div>
+    <div class="stat"><span class="stat-label">Level</span><span class="stat-val" id="levelVal">1</span></div>
+  </div>
+
+  <div class="combo-bar" id="comboBar">
+    <span>COMBO <span id="comboVal">x1</span></span>
+    <span id="comboInfo">Tap streak!</span>
+  </div>
+  <div class="level-up" id="levelInfo">Level 1 — Find the treasure!</div>
+
+  <div class="beach-wrap">
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-primary" id="startBtn">▶ START DIGGING</button>
+    <button class="btn btn-secondary" id="pauseBtn" disabled>⏸ PAUSE</button>
+    <button class="btn btn-secondary" id="resetBtn">↻ RESET</button>
+  </div>
+  <div class="hint">💡 Tap 🦀🦪⭐🪙🐚 for points • Catch 🥷 thieves for bonus • AVOID 💣🦔 — they cost a life!</div>
+  <div class="legend">
+    <span><i>🦀</i>15</span><span><i>🦪</i>10</span><span><i>⭐</i>20</span><span><i>🪙</i>25</span><span><i>🐚</i>12</span>
+    <span><i>🥷</i>+20</span><span><i>💣</i>-1❤️</span><span><i>🦔</i>-1❤️</span>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="card" id="card">
+      <h2>🏝️ Ready to Dig?</h2>
+      <p>Sand mounds hide treasure! Tap them the moment they pop up. Thieves dart in to steal — catch them for bonus points. Bombs & urchins will cost you a life!</p>
+      <p style="font-size:12px;background:#fff3d6;padding:8px;border-radius:10px;border:1px dashed #e8b84b">60 seconds • 3 lives • Level up every 110 pts<br>Build a combo for up to <b>5×</b> multiplier!</p>
+      <div class="row">
+        <button class="btn btn-primary" style="flex:1" id="playBtn">🏖️ PLAY NOW</button>
+      </div>
+      <p style="margin-top:10px;font-size:11px;opacity:0.7">Best score saved on this phone</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const gridEl = document.getElementById('grid');
+const scoreVal = document.getElementById('scoreVal');
+const bestVal = document.getElementById('bestVal');
+const livesVal = document.getElementById('livesVal');
+const timeVal = document.getElementById('timeVal');
+const levelVal = document.getElementById('levelVal');
+const levelInfo = document.getElementById('levelInfo');
+const comboVal = document.getElementById('comboVal');
+const comboInfo = document.getElementById('comboInfo');
+const comboBar = document.getElementById('comboBar');
+const overlay = document.getElementById('overlay');
+const card = document.getElementById('card');
+const startBtn = document.getElementById('startBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const resetBtn = document.getElementById('resetBtn');
+const playBtn = document.getElementById('playBtn');
+const appEl = document.getElementById('app');
+
+// entities
+const TREASURES = [
+  {emoji:'🦀', label:'CRAB', pts:15},
+  {emoji:'🦪', label:'CLAM', pts:10},
+  {emoji:'⭐', label:'STAR', pts:20},
+  {emoji:'🪙', label:'COIN', pts:25},
+  {emoji:'🐚', label:'SHELL', pts:12},
+];
+const THIEF = {emoji:'🥷', label:'THIEF', pts:20, isThief:true};
+const BOMB = {emoji:'💣', label:'BOMB', pts:-10, isBad:true};
+const URCHIN = {emoji:'🦔', label:'URCHIN', pts:-10, isBad:true};
+
+let score=0, best=0, lives=3, level=1, timeLeft=60, combo=0, maxCombo=0;
+let gameState='idle'; // idle, playing, paused, over
+let spawnTimer=null, countdownTimer=null;
+let activeMounds = new Map(); // index -> {timeout, entity}
+
+try{ best = parseInt(localStorage.getItem('beachDigBest')||'0')||0 }catch(e){}
+bestVal.textContent = best;
+
+function buildGrid(){
+  gridEl.innerHTML='';
+  for(let i=0;i<9;i++){
+    const b=document.createElement('button');
+    b.className='mound empty';
+    b.setAttribute('aria-label','Sand mound '+(i+1));
+    b.innerHTML='<div class="mound-hole"></div>';
+    b.addEventListener('click',()=>handleTap(i));
+    b.addEventListener('touchstart',()=>{}, {passive:true});
+    gridEl.appendChild(b);
+  }
+}
+buildGrid();
+function mounds(){ return [...gridEl.children]; }
+
+function updateUI(){
+  scoreVal.textContent=score;
+  livesVal.textContent = '❤️'.repeat(lives) + '🤍'.repeat(3-lives);
+  if(lives===1) livesVal.style.color='#d11a1a'; else livesVal.style.color='';
+  levelVal.textContent=level;
+  timeVal.textContent=timeLeft+'s';
+  timeVal.classList.toggle('warn', timeLeft<=10 && gameState==='playing');
+  let mult = Math.min(5, 1 + Math.floor(combo/3));
+  comboVal.textContent='x'+mult;
+  if(combo>=3) comboInfo.textContent= combo>=9 ? '🔥 BLAZING!' : combo>=6 ? '⚡ ON FIRE!' : '✨ COMBO!';
+  else comboInfo.textContent='Tap streak!';
+  comboBar.style.background = combo>=6 ? '#b71c1c' : combo>=3 ? '#e65100' : '#5a3200';
+  levelInfo.textContent = `Level ${level} — ${level===1?'Find the treasure!': level===2?'Faster tides!': level>=5?'🏴‍☠️ Pirate frenzy!':'Thieves are quicker!'}`;
+  if(score>best){ best=score; bestVal.textContent=best; try{localStorage.setItem('beachDigBest', best)}catch(e){} }
+}
+
+function getMultiplier(){ return Math.min(5, 1 + Math.floor(combo/3)); }
+
+function showFloat(moundEl, text, cls){
+  const f=document.createElement('div');
+  f.className='float '+cls;
+  f.textContent=text;
+  moundEl.appendChild(f);
+  setTimeout(()=>f.remove(), 900);
+}
+
+function shakeScreen(){
+  appEl.classList.remove('shake');
+  void appEl.offsetWidth;
+  appEl.classList.add('shake');
+  if(navigator.vibrate) navigator.vibrate(80);
+}
+
+function pickEntity(){
+  const r=Math.random();
+  if(r<0.08) return BOMB;
+  if(r<0.16) return URCHIN;
+  if(r<0.32) return THIEF;
+  // treasure
+  return TREASURES[Math.floor(Math.random()*TREASURES.length)];
+}
+
+function spawnOne(){
+  if(gameState!=='playing') return;
+  const available = mounds().map((_,i)=>i).filter(i=>!activeMounds.has(i));
+  if(available.length===0) return;
+  const idx = available[Math.floor(Math.random()*available.length)];
+  const ent = pickEntity();
+  const moundEl = mounds()[idx];
+  moundEl.classList.remove('empty');
+  moundEl.classList.add('active');
+  if(ent.isBad) moundEl.classList.add('bad');
+  if(ent.isThief) moundEl.classList.add('thief');
+
+  const eDiv=document.createElement('div');
+  eDiv.className='entity';
+  eDiv.innerHTML=`<div class="entity-emoji">${ent.emoji}</div><div class="entity-label">${ent.label}</div>`;
+  moundEl.appendChild(eDiv);
+
+  const visibleDur = Math.max(650, 1350 - level*95 - Math.random()*120);
+  const timeout = setTimeout(()=>{
+    // missed
+    if(!activeMounds.has(idx)) return;
+    activeMounds.delete(idx);
+    eDiv.remove();
+    moundEl.classList.remove('active','bad','thief');
+    moundEl.classList.add('empty');
+    if(ent.isThief){
+      score = Math.max(0, score-15);
+      combo=0;
+      showFloat(moundEl, 'STOLEN -15', 'steal');
+      shakeScreen();
+    } else if(!ent.isBad){
+      combo=0;
+      showFloat(moundEl, 'MISSED!', 'steal');
+    }
+    // bad ones just disappear safely
+    updateUI();
+  }, visibleDur);
+
+  activeMounds.set(idx, {timeout, entity:ent, el:eDiv});
+}
+
+function scheduleSpawn(){
+  if(gameState!=='playing') return;
+  const base = Math.max(380, 950 - level*85);
+  const jitter = Math.random()*220;
+  const delay = base + jitter;
+  spawnTimer = setTimeout(()=>{
+    spawnOne();
+    // at higher levels chance double spawn
+    if(level>=3 && Math.random()<0.28) setTimeout(spawnOne, 120);
+    if(level>=5 && Math.random()<0.18) setTimeout(spawnOne, 180);
+    scheduleSpawn();
+  }, delay);
+}
+
+function handleTap(idx){
+  if(gameState!=='playing') return;
+  const data = activeMounds.get(idx);
+  if(!data) {
+    // tapped empty mound - small penalty? just break combo slightly? keep forgiving
+    return;
+  }
+  clearTimeout(data.timeout);
+  activeMounds.delete(idx);
+  const moundEl = mounds()[idx];
+  data.el.remove();
+  moundEl.classList.remove('active','bad','thief');
+  moundEl.classList.add('empty');
+
+  const ent = data.entity;
+  if(ent.isBad){
+    lives--;
+    score = Math.max(0, score + ent.pts);
+    combo=0;
+    showFloat(moundEl, ent.emoji+' -1 LIFE!', 'bad');
+    shakeScreen();
+    if(lives<=0){
+      updateUI();
+      endGame('💥 Ouch! Bombs got you!');
+      return;
+    }
+  } else if(ent.isThief){
+    const mult=getMultiplier();
+    const pts = ent.pts * mult;
+    score += pts;
+    combo++;
+    maxCombo=Math.max(maxCombo, combo);
+    showFloat(moundEl, `CAUGHT +${pts}!`, 'good');
+    if(navigator.vibrate) navigator.vibrate(30);
+  } else {
+    const mult=getMultiplier();
+    const pts = ent.pts * mult;
+    score += pts;
+    combo++;
+    maxCombo=Math.max(maxCombo, combo);
+    showFloat(moundEl, `+${pts}`, 'good');
+    if(navigator.vibrate) navigator.vibrate(20);
+  }
+
+  // level up check
+  const newLevel = Math.floor(score/110)+1;
+  if(newLevel!==level){
+    level=newLevel;
+    showFloat(moundEl, `LEVEL ${level}!`, 'good');
+  }
+  updateUI();
+}
+
+function startCountdown(){
+  clearInterval(countdownTimer);
+  countdownTimer=setInterval(()=>{
+    if(gameState!=='playing') return;
+    timeLeft--;
+    updateUI();
+    if(timeLeft<=0){
+      endGame('⏰ Time\'s up!');
+    }
+  },1000);
+}
+
+function startGame(){
+  // reset
+  score=0; lives=3; level=1; timeLeft=60; combo=0; maxCombo=0;
+  activeMounds.forEach(d=>clearTimeout(d.timeout));
+  activeMounds.clear();
+  mounds().forEach(m=>{
+    m.classList.remove('active','bad','thief');
+    m.classList.add('empty');
+    [...m.querySelectorAll('.entity,.float')].forEach(e=>e.remove());
+  });
+  gameState='playing';
+  overlay.style.display='none';
+  startBtn.textContent='⏸ PAUSE';
+  startBtn.disabled=false;
+  pauseBtn.disabled=false;
+  pauseBtn.textContent='⏸ PAUSE';
+  updateUI();
+  scheduleSpawn();
+  startCountdown();
+}
+
+function pauseGame(){
+  if(gameState==='playing'){
+    gameState='paused';
+    clearTimeout(spawnTimer);
+    clearInterval(countdownTimer);
+    // freeze active timeouts - we keep them but pause visually
+    activeMounds.forEach(d=>clearTimeout(d.timeout));
+    overlay.style.display='flex';
+    card.innerHTML=`
+      <h2>⏸️ Paused</h2>
+      <p>Take a breath — the beach waits!</p>
+      <div class="big">${score} pts</div>
+      <p>Level ${level} • ${timeLeft}s left • ${lives} lives</p>
+      <div class="row">
+        <button class="btn btn-primary" style="flex:1" onclick="resumeGame()">▶ RESUME</button>
+        <button class="btn btn-secondary" style="flex:1" onclick="resetGame()">↻ RESTART</button>
+      </div>
+    `;
+    startBtn.textContent='▶ RESUME';
+    pauseBtn.textContent='▶ RESUME';
+  } else if(gameState==='paused'){
+    resumeGame();
+  }
+}
+window.resumeGame = ()=>{
+  if(gameState!=='paused') return;
+  gameState='playing';
+  overlay.style.display='none';
+  startBtn.textContent='⏸ PAUSE';
+  pauseBtn.textContent='⏸ PAUSE';
+  // respawn timers for remaining entities with short duration
+  activeMounds.forEach((d, idx)=>{
+    const moundEl=mounds()[idx];
+    const dur=800;
+    d.timeout=setTimeout(()=>{
+      if(!activeMounds.has(idx)) return;
+      activeMounds.delete(idx);
+      d.el.remove();
+      moundEl.classList.remove('active','bad','thief');
+      moundEl.classList.add('empty');
+      if(d.entity.isThief){ score=Math.max(0,score-15); combo=0; showFloat(moundEl,'STOLEN -15','steal'); shakeScreen(); }
+      else if(!d.entity.isBad){ combo=0; showFloat(moundEl,'MISSED!','steal'); }
+      updateUI();
+    }, dur);
+  });
+  scheduleSpawn();
+  startCountdown();
+}
+window.resetGame = ()=>{
+  clearTimeout(spawnTimer);
+  clearInterval(countdownTimer);
+  activeMounds.forEach(d=>clearTimeout(d.timeout));
+  activeMounds.clear();
+  gameState='idle';
+  score=0; lives=3; level=1; timeLeft=60; combo=0;
+  mounds().forEach(m=>{
+    m.classList.remove('active','bad','thief');
+    m.classList.add('empty');
+    [...m.querySelectorAll('.entity,.float')].forEach(e=>e.remove());
+  });
+  updateUI();
+  overlay.style.display='flex';
+  card.innerHTML=`
+      <h2>🏝️ Ready to Dig?</h2>
+      <p>Sand mounds hide treasure! Tap them the moment they pop up. Thieves dart in to steal — catch them for bonus points. Bombs & urchins will cost you a life!</p>
+      <p style="font-size:12px;background:#fff3d6;padding:8px;border-radius:10px;border:1px dashed #e8b84b">60 seconds • 3 lives • Level up every 110 pts<br>Build a combo for up to <b>5×</b> multiplier!</p>
+      <div class="row">
+        <button class="btn btn-primary" style="flex:1" id="playBtn2">🏖️ PLAY NOW</button>
+      </div>
+      <p style="margin-top:10px;font-size:11px;opacity:0.7">Best: ${best} ⭐</p>
+  `;
+  document.getElementById('playBtn2').addEventListener('click', startGame);
+  startBtn.textContent='▶ START DIGGING';
+  pauseBtn.textContent='⏸ PAUSE';
+  pauseBtn.disabled=true;
+}
+
+function endGame(reason){
+  gameState='over';
+  clearTimeout(spawnTimer);
+  clearInterval(countdownTimer);
+  activeMounds.forEach(d=>clearTimeout(d.timeout));
+  // keep board but disable
+  const isNewBest = score===best && score>0;
+  overlay.style.display='flex';
+  card.innerHTML=`
+    <h2>${lives<=0?'💔 Game Over':'🏖️ Beach Break!'}</h2>
+    <p>${reason}</p>
+    <div class="big">${score} pts</div>
+    <p>Level ${level} • Best combo x${Math.min(5,1+Math.floor(maxCombo/3))} • Max streak ${maxCombo}</p>
+    ${isNewBest?'<p style="background:#ffe9a8;padding:6px;border-radius:999px;font-weight:900;color:#7a4a00">🎉 NEW BEST! 🎉</p>':`<p style="font-size:12px">Best: <b>${best}</b> ⭐</p>`}
+    <div class="row">
+      <button class="btn btn-primary" style="flex:1" onclick="startGame()">↻ PLAY AGAIN</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="resetGame()">HOME</button>
+    </div>
+  `;
+  startBtn.textContent='▶ PLAY AGAIN';
+  pauseBtn.disabled=true;
+  updateUI();
+}
+
+// events
+startBtn.addEventListener('click', ()=>{
+  if(gameState==='idle' || gameState==='over') startGame();
+  else if(gameState==='playing') pauseGame();
+  else if(gameState==='paused') resumeGame();
+});
+pauseBtn.addEventListener('click', pauseGame);
+resetBtn.addEventListener('click', ()=>resetGame());
+playBtn.addEventListener('click', startGame);
+
+// init
+updateUI();
+</script>
+</body>
+</html>
+

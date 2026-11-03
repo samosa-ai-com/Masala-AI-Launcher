@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="theme-color" content="#163d44" />
+    <title>Runway Stylist</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink:#17343a; --muted:#607376; --paper:#f4f2ec; --white:#fffdfa;
+        --teal:#176c72; --deep:#123e46; --red:#c65343; --gold:#dca52e; --line:#cbd4ce; --green:#3e805d;
+      }
+      * { box-sizing:border-box; }
+      html,body { margin:0; min-height:100%; background:#dfe6df; color:var(--ink); font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; }
+      button,textarea { font:inherit; }
+      button { min-height:42px; border:1px solid #a9bbb5; border-radius:7px; background:var(--white); color:var(--ink); font-weight:700; cursor:pointer; }
+      button:hover { border-color:var(--teal); }
+      button:focus-visible,textarea:focus-visible { outline:3px solid rgba(220,165,46,.42); outline-offset:2px; }
+      button:disabled { opacity:.43; cursor:not-allowed; }
+      .app { min-height:100vh; }
+      .topbar { min-height:67px; padding:10px clamp(12px,3vw,32px); display:flex; align-items:center; justify-content:space-between; gap:16px; background:var(--deep); color:white; border-bottom:4px solid var(--gold); }
+      .brand h1 { margin:0; font-size:clamp(20px,2.4vw,29px); letter-spacing:0; }
+      .brand p { margin:2px 0 0; color:#c8e0dc; font-size:13px; }
+      .top-actions { display:flex; gap:7px; }
+      .top-actions button { width:43px; min-height:40px; padding:0; background:#185861; border-color:#6d9999; color:white; font-size:18px; }
+      .workspace { width:min(1320px,100%); margin:0 auto; padding:clamp(10px,2vw,22px); display:grid; grid-template-columns:minmax(360px,.82fr) minmax(520px,1.18fr); gap:clamp(12px,2vw,22px); align-items:start; }
+      .preview { overflow:hidden; border:1px solid #78918d; border-radius:8px; background:#153f46; box-shadow:0 12px 32px rgba(25,55,57,.14); }
+      .preview-head { min-height:77px; padding:13px 16px; display:flex; justify-content:space-between; align-items:center; gap:12px; color:white; background:#195b62; border-bottom:1px solid #76a3a0; }
+      .kicker { margin:0 0 3px; color:#f0c968; font-size:12px; font-weight:800; }
+      .preview-head h2 { margin:0; font-size:clamp(19px,2vw,26px); letter-spacing:0; }
+      .stars { min-width:92px; color:#ffd65b; text-align:right; font-size:25px; letter-spacing:0; }
+      .canvas-wrap { min-height:552px; display:grid; place-items:center; padding:10px; background:#d7e0d9; }
+      canvas { display:block; width:100%; max-width:560px; height:auto; aspect-ratio:4/5; }
+      .desk { display:grid; gap:11px; }
+      .section { padding:13px; border-top:4px solid var(--teal); background:var(--white); box-shadow:0 5px 17px rgba(27,54,56,.07); }
+      .section h3 { margin:0 0 9px; font-size:15px; letter-spacing:0; }
+      .brief-line { display:grid; grid-template-columns:repeat(3,1fr); border:1px solid var(--line); }
+      .brief-stat { min-width:0; padding:9px 6px; text-align:center; border-right:1px solid var(--line); }
+      .brief-stat:last-child { border-right:0; }
+      .brief-stat b { display:block; color:var(--deep); font-size:18px; }
+      .brief-stat span { display:block; margin-top:2px; color:var(--muted); font-size:11px; }
+      .brief-copy { margin:9px 0 0; color:#486165; line-height:1.5; font-size:13px; }
+      .chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
+      .chip { padding:4px 7px; border:1px solid #b5c5be; border-radius:4px; color:#36565a; background:#edf1ec; font-size:11px; }
+      .swatch { width:22px; height:22px; display:inline-block; border:2px solid white; outline:1px solid #aab6af; border-radius:4px; }
+      .score-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:5px; }
+      .score-item { min-width:0; padding:7px 4px; text-align:center; background:#edf1ec; border-bottom:3px solid #9eaea8; }
+      .score-item.good { background:#e4f1e7; border-bottom-color:var(--green); }
+      .score-item b { display:block; color:var(--deep); font-size:15px; }
+      .score-item span { color:var(--muted); font-size:10px; }
+      .score-total { margin-top:8px; display:flex; justify-content:space-between; gap:10px; color:var(--muted); font-size:12px; }
+      .score-total strong { color:var(--deep); font-size:18px; }
+      .tabs { display:grid; grid-template-columns:repeat(5,1fr); gap:5px; margin-bottom:8px; }
+      .tabs button { min-height:38px; padding:4px; font-size:12px; }
+      .tabs button.active { border-color:var(--teal); background:var(--teal); color:white; }
+      .wardrobe { min-height:222px; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+      .piece { position:relative; min-width:0; min-height:103px; padding:8px 5px 6px; display:grid; align-content:center; justify-items:center; gap:2px; text-align:center; }
+      .piece.selected { border-color:var(--gold); box-shadow:inset 0 0 0 2px var(--gold); background:#fff7dd; }
+      .piece .icon { font-size:27px; line-height:1; }
+      .piece strong { max-width:100%; font-size:12px; overflow-wrap:anywhere; }
+      .piece small { color:var(--muted); font-size:10px; }
+      .piece .mini-swatch { position:absolute; top:6px; right:6px; width:12px; height:12px; border:1px solid rgba(20,40,40,.28); border-radius:3px; }
+      .actions { display:grid; grid-template-columns:1fr 1fr 1.3fr; gap:7px; margin-top:9px; }
+      .actions .primary { border-color:var(--red); background:var(--red); color:white; }
+      .hint-line { min-height:20px; margin-top:7px; color:var(--muted); text-align:center; font-size:12px; }
+      dialog { width:min(900px,calc(100% - 24px)); max-height:calc(100vh - 24px); padding:0; border:1px solid #6e8a86; border-radius:8px; color:var(--ink); background:var(--paper); box-shadow:0 24px 70px rgba(13,41,45,.38); }
+      dialog::backdrop { background:rgba(8,29,32,.72); }
+      .dialog-head { padding:15px 17px; display:flex; align-items:center; justify-content:space-between; gap:10px; color:white; background:var(--deep); border-bottom:4px solid var(--gold); }
+      .dialog-head h2 { margin:0; font-size:21px; letter-spacing:0; }
+      .close { width:42px; min-height:38px; padding:0; border-color:#72999a; background:#185861; color:white; font-size:21px; }
+      .dialog-body { padding:15px; overflow:auto; }
+      .issue-title { margin:15px 0 7px; color:var(--deep); font-size:14px; }
+      .issue-title:first-child { margin-top:0; }
+      .issue-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
+      .issue { min-height:82px; padding:9px; display:grid; align-content:space-between; text-align:left; }
+      .issue.active { border-color:var(--gold); box-shadow:inset 0 0 0 2px var(--gold); }
+      .issue strong { font-size:13px; }
+      .issue span { color:var(--muted); font-size:10px; }
+      .issue em { color:#b67900; font-style:normal; font-size:16px; }
+      .archive-note { margin:0 0 9px; color:var(--muted); line-height:1.55; }
+      .archive-box { width:100%; min-height:145px; resize:vertical; padding:10px; border:1px solid #9eafa9; border-radius:6px; background:white; color:var(--ink); word-break:break-all; }
+      .dialog-actions { margin-top:10px; display:flex; justify-content:flex-end; gap:7px; flex-wrap:wrap; }
+      .dialog-actions .primary { border-color:var(--teal); background:var(--teal); color:white; }
+      .result { text-align:center; }
+      .result h3 { margin:3px 0; font-size:25px; }
+      .result-stars { margin:8px 0; color:#d68b00; font-size:45px; line-height:1; }
+      .breakdown { margin:12px 0; display:grid; grid-template-columns:repeat(5,1fr); gap:5px; }
+      .breakdown div { padding:8px 4px; background:#e9eee8; }
+      .breakdown b { display:block; color:var(--deep); }
+      .feedback { max-width:650px; margin:10px auto; color:var(--muted); line-height:1.55; }
+      @media(max-width:980px) {
+        .workspace { grid-template-columns:1fr; }
+        .canvas-wrap { min-height:0; }
+        .preview { width:min(650px,100%); margin:0 auto; }
+      }
+      @media(max-width:560px) {
+        .brand h1 { font-size:16px; }
+        .brand p { display:none; }
+        .top-actions { gap:4px; }
+        .top-actions button { width:40px; }
+        .workspace { padding:8px; gap:8px; }
+        .preview-head { min-height:65px; padding:10px 12px; }
+        .canvas-wrap { padding:4px; }
+        .section { padding:10px; }
+        .score-grid { grid-template-columns:repeat(3,1fr); }
+        .score-grid .score-item:nth-child(4),.score-grid .score-item:nth-child(5) { grid-column:span 1; }
+        .tabs { grid-template-columns:repeat(5,1fr); }
+        .tabs button { padding:2px; font-size:11px; }
+        .wardrobe { grid-template-columns:repeat(2,minmax(0,1fr)); min-height:414px; }
+        .piece { min-height:96px; }
+        .issue-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .breakdown { grid-template-columns:repeat(3,1fr); }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div class="brand"><h1>Editor-in-Chief: Twelve Cover Commissions</h1><p>Fixed editorial briefs - five-axis transparent scoring - STYLE2 editor archive</p></div>
+        <div class="top-actions">
+          <button id="issueButton" title="Choose Commission" aria-label="Choose Commission">▦</button>
+          <button id="archiveButton" title="Editor Archive" aria-label="Editor Archive">⇄</button>
+          <button id="muteButton" title="Sound" aria-label="Toggle sound">♪</button>
+        </div>
+      </header>
+      <div class="workspace">
+        <section class="preview" aria-label="Look Preview">
+          <div class="preview-head"><div><p class="kicker" id="chapterText"></p><h2 id="briefName"></h2></div><div class="stars" id="savedStars">☆☆☆</div></div>
+          <div class="canvas-wrap" id="canvasWrap"><canvas id="lookCanvas" width="640" height="800" aria-label="Cover Look Preview"></canvas></div>
+        </section>
+        <section class="desk">
+          <div class="section">
+            <h3>Editorial Brief</h3>
+            <div class="brief-line">
+              <div class="brief-stat"><b id="styleText">--</b><span>Style Direction</span></div>
+              <div class="brief-stat"><b id="budgetText">0/0</b><span>Production Budget</span></div>
+              <div class="brief-stat"><b id="totalStars">0/36</b><span>Editor Stars</span></div>
+            </div>
+            <p class="brief-copy" id="briefCopy"></p>
+            <div class="chips" id="briefChips"></div>
+          </div>
+          <div class="section">
+            <h3>Live Review</h3>
+            <div class="score-grid" id="scoreGrid"></div>
+            <div class="score-total"><span id="selectionText">Selected 0/5</span><span>Estimate <strong id="scoreText">0</strong>/100</span></div>
+          </div>
+          <div class="section">
+            <h3>Styling Wardrobe</h3>
+            <div class="tabs" id="slotTabs"></div>
+            <div class="wardrobe" id="wardrobe"></div>
+            <div class="actions"><button id="clearButton">Clear</button><button id="hintButton">Editor Tip</button><button id="submitButton" class="primary">Submit Cover</button></div>
+            <div class="hint-line" id="hintLine">Pick one item from each of the five categories</div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <dialog id="issueDialog"><div class="dialog-head"><h2>Twelve fixed commissions</h2><button class="close" data-close="issueDialog" aria-label="Close">×</button></div><div class="dialog-body" id="issueGrid"></div></dialog>
+    <dialog id="archiveDialog"><div class="dialog-head"><h2>STYLE2 Editor Archive</h2><button class="close" data-close="archiveDialog" aria-label="Close">×</button></div><div class="dialog-body"><p class="archive-note" id="archiveMessage"></p><textarea class="archive-box" id="archiveText" aria-label="STYLE2 Archive Code"></textarea><div class="dialog-actions"><button id="copyArchive">Copy</button><button id="importArchive">Import & Verify</button><button class="primary" data-close="archiveDialog">Back to Desk</button></div></div></dialog>
+    <dialog id="resultDialog"><div class="dialog-head"><h2>Cover Review</h2><button class="close" data-close="resultDialog" aria-label="Close">×</button></div><div class="dialog-body result"><p class="kicker">This Issue Review Result</p><h3 id="resultTitle"></h3><div class="result-stars" id="resultStars"></div><p><strong id="resultScore"></strong></p><div class="breakdown" id="resultBreakdown"></div><p class="feedback" id="resultFeedback"></p><div class="dialog-actions"><button id="retryResult">Restyle</button><button id="nextResult" class="primary">Next Issue</button></div></div></dialog>
+
+    <script>
+      (()=>{
+        "use strict";
+        const COLORS={ Red:"#bd5144",Black:"#303638",White:"#f4f2e8",Blue:"#347b9c",Yellow:"#e3b432",Gold:"#c9972d",Green:"#4f8766",Cream:"#cdbb98",Pink:"#d98fa6" };
+        const slots=[{id:"top",name:"Tops"},{id:"bottom",name:"Bottoms"},{id:"outer",name:"Outerwear"},{id:"shoe",name:"Footwear"},{id:"acc",name:"Accessories"}];
+        const items=[
+          ["silk-blouse","Silk Blouse","👚","top","Pink",22,["Elegant","Romantic"],"Silk","Soft"],["white-shirt","White Shirt","👔","top","White",18,["Formal","Minimalist"],"Cotton","Crisp"],["neon-tee","Neon Tee","👕","top","Blue",16,["Street","Sporty"],"Utility","Relaxed"],["sport-top","Racing Top","🎽","top","Yellow",18,["Sporty","Utility"],"Utility","Slim"],["velvet-top","Velvet Top","👚","top","Red",28,["Glamorous","Elegant"],"Velvet","Slim"],["linen-shirt","Linen Shirt","👕","top","Green",20,["Natural","Adventurous"],"Linen","Relaxed"],["black-knit","Black Knit","👕","top","Black",24,["Minimalist","Formal"],"Wool","Slim"],["gold-cami","Gilded Cami","🎽","top","Gold",30,["Glamorous","Party"],"Satin","Slim"],
+          ["satin-skirt","Satin Maxi Skirt","👗","bottom","Red",32,["Elegant","Romantic"],"Satin","Flowing"],["tailored-trouser","Tailored Trousers","👖","bottom","Black",30,["Formal","Minimalist"],"Wool","Crisp"],["cargo-pants","Cargo Pants","👖","bottom","Green",24,["Street","Utility"],"Cotton","Relaxed"],["sport-shorts","Sport Shorts","🩳","bottom","Yellow",16,["Sporty","Street"],"Utility","Slim"],["wide-jeans","Wide-Leg Jeans","👖","bottom","Blue",22,["Street","Natural"],"Denim","Relaxed"],["linen-pants","Linen Wide Pants","👖","bottom","Cream",25,["Natural","Adventurous"],"Linen","Flowing"],["sequin-skirt","Sequin Mini Skirt","👗","bottom","Gold",34,["Glamorous","Party"],"Sequin","Slim"],["white-skirt","White Maxi Skirt","👗","bottom","White",26,["Minimalist","Elegant"],"Cotton","Flowing"],
+          ["red-coat","Red Long Coat","🧥","outer","Red",45,["Elegant","Formal"],"Wool","Crisp"],["black-blazer","Black Blazer","🧥","outer","Black",38,["Formal","Minimalist"],"Wool","Crisp"],["denim-jacket","Denim Jacket","🧥","outer","Blue",28,["Street","Natural"],"Denim","Relaxed"],["track-jacket","Track Jacket","🧥","outer","Yellow",25,["Sporty","Street"],"Utility","Slim"],["leather-jacket","Leather Jacket","🧥","outer","Black",42,["Street","Party"],"Leather","Slim"],["trench","Sand Trench","🧥","outer","Cream",36,["Adventurous","Formal"],"Cotton","Crisp"],["cape","Gilded Cape","🦸","outer","Gold",48,["Glamorous","Elegant"],"Velvet","Flowing"],["pink-cardigan","Pink Cardigan","🧥","outer","Pink",27,["Romantic","Natural"],"Wool","Relaxed"],
+          ["red-heels","Crimson Heels","👠","shoe","Red",22,["Elegant","Glamorous"],"Leather","Slim"],["oxford","Black Oxfords","👞","shoe","Black",20,["Formal","Minimalist"],"Leather","Crisp"],["sneaker","White Sneakers","👟","shoe","White",17,["Street","Sporty"],"Utility","Relaxed"],["trail-boot","Trail Boots","🥾","shoe","Green",26,["Adventurous","Utility"],"Leather","Rugged"],["gold-pump","Gilded Pumps","👠","shoe","Gold",27,["Glamorous","Party"],"Satin","Slim"],["sandal","Pink Sandals","👡","shoe","Pink",19,["Romantic","Natural"],"Leather","Soft"],["loafer","Sand Loafers","👞","shoe","Cream",21,["Natural","Formal"],"Leather","Crisp"],["blue-runner","Blue Runners","👟","shoe","Blue",18,["Sporty","Street"],"Utility","Slim"],
+          ["pearl","Pearl Earrings","⚪","acc","White",18,["Elegant","Romantic"],"Pearl","Delicate"],["tie","Ocean Tie","👔","acc","Blue",12,["Formal","Minimalist"],"Silk","Crisp"],["visor","Black Sunglasses","🕶️","acc","Black",14,["Street","Sporty"],"Utility","Sharp"],["utility-bag","Utility Crossbody","🎒","acc","Green",16,["Utility","Adventurous"],"Canvas","Rugged"],["gold-crown","Gilded Headpiece","👑","acc","Gold",32,["Glamorous","Party"],"Metal","Bold"],["pink-flower","Pink Flower Pin","🌸","acc","Pink",13,["Romantic","Natural"],"Floral","Soft"],["silver-watch","Silver Watch","⌚","acc","White",20,["Formal","Sporty"],"Metal","Delicate"],["red-scarf","Crimson Scarf","🧣","acc","Red",15,["Elegant","Adventurous"],"Silk","Flowing"]
+        ].map(([id,name,icon,slot,color,cost,styles,material,shape])=>({id,name,icon,slot,color,cost,styles,material,shape}));
+        const briefs=[
+          ["premiere","Vol.1 - City Covers","Red-Carpet Premiere","A full look with camera impact for a night premiere, still high-end in texture.",["Elegant","Glamorous"],["Red","Gold","White"],155,[["top","material","Velvet"],["bottom","shape","Flowing"]],["velvet-top","satin-skirt","red-coat","red-heels","pearl"]],
+          ["boardroom","Vol.1 - City Covers","Boardroom Close-Up","Build trust with restrained lines; keep only calm black, white and blue.",["Formal","Minimalist"],["Black","White","Blue"],125,[["outer","material","Wool"],["bottom","shape","Crisp"]],["white-shirt","tailored-trouser","black-blazer","oxford","tie"]],
+          ["festival","Vol.1 - City Covers","Street Sounds Live","Festival shots need free movement; blue, white and black layer a crisp city look.",["Street","Sporty"],["Blue","White","Black"],105,[["outer","material","Denim"],["shoe","material","Utility"]],["neon-tee","wide-jeans","denim-jacket","sneaker","visor"]],
+          ["sprint","Vol.2 - Motion Stories","Racing Ad","Emphasize body lines and sport utility; yellow, blue and white make a high-recognition ad palette.",["Sporty","Street"],["Yellow","Blue","White"],100,[["top","material","Utility"],["outer","shape","Slim"]],["sport-top","sport-shorts","track-jacket","blue-runner","silver-watch"]],
+          ["coast","Vol.2 - Motion Stories","Postcard from the Coast","An afternoon sea-breeze theme needs relaxed nature and soft romance; avoid heavy darks.",["Natural","Romantic"],["Pink","Cream","White"],116,[["bottom","material","Linen"],["outer","shape","Relaxed"]],["silk-blouse","linen-pants","pink-cardigan","sandal","pearl"]],
+          ["expedition","Vol.2 - Motion Stories","The Voyager","Outdoor stories balance explorer spirit with real carrying capacity; keep earthy green, cream and black.",["Adventurous","Utility"],["Green","Cream","Black"],130,[["shoe","material","Leather"],["outer","shape","Crisp"]],["linen-shirt","cargo-pants","trench","trail-boot","utility-bag"]],
+          ["mono","Vol.3 - Screen Narratives","Black-and-White Silent Film","Recreate a silent-film portrait with minimalist structure; keep elegant movement in black and white.",["Minimalist","Elegant"],["Black","White"],130,[["top","material","Wool"],["bottom","shape","Flowing"]],["black-knit","white-skirt","black-blazer","oxford","pearl"]],
+          ["gala","Vol.3 - Screen Narratives","Midnight Gala","Push glamour and party mood center-frame; gold fabrics must survive close-ups.",["Glamorous","Party"],["Gold","Black","Red"],180,[["bottom","material","Sequin"],["acc","material","Metal"]],["gold-cami","sequin-skirt","cape","gold-pump","gold-crown"]],
+          ["urban","Vol.3 - Screen Narratives","Chasing City Lights","Night street shots need rugged utility layering; green, blue and black unify the streetscape.",["Street","Utility"],["Green","Blue","Black"],130,[["outer","material","Leather"],["bottom","shape","Relaxed"]],["neon-tee","cargo-pants","leather-jacket","trail-boot","utility-bag"]],
+          ["heritage","Vol.4 - Annual Issue","Old Town Journey","A travel feature needs formal silhouette plus adventurous detail in walkable fabrics.",["Formal","Adventurous"],["Cream","Green","Red"],125,[["outer","material","Cotton"],["acc","material","Silk"]],["linen-shirt","linen-pants","trench","loafer","red-scarf"]],
+          ["romance","Vol.4 - Annual Issue","Blossom Film","A romantic movie poster in pink, red and white; let soft fabrics and elegant lines share the frame.",["Romantic","Elegant"],["Pink","Red","White"],120,[["top","material","Silk"],["acc","material","Floral"]],["silk-blouse","satin-skirt","pink-cardigan","red-heels","pink-flower"]],
+          ["finale","Vol.4 - Annual Issue","Annual Gold Issue","The finale cover needs glamour, elegance and fabric close-ups at once; the budget has no room to waste.",["Glamorous","Elegant"],["Gold","Red","White"],160,[["outer","material","Velvet"],["shoe","material","Satin"]],["velvet-top","satin-skirt","cape","gold-pump","pearl"]]
+        ].map(([id,chapter,name,copy,styles,palette,budget,details,reference])=>({id,chapter,name,copy,styles,palette,budget,details:details.map(([slot,field,value])=>({slot,field,value})),reference}));
+        const byId=Object.fromEntries(items.map((item)=>[item.id,item]));
+        const ui=Object.fromEntries([...document.querySelectorAll("[id]")].map((node)=>[node.id,node]));
+        const archivePrefix="STYLE2";
+        let muted=false,audioContext=null,dpr=1,drawWidth=560,drawHeight=700;
+        let profile=loadProfile(),activeSlot="top",look=null;
+        function freshProfile(){return{version:2,issue:0,stars:Array(12).fill(0),bestScores:Array(12).fill(0),bestCosts:Array(12).fill(0),clears:Array(12).fill(0)}}
+        function normalizeProfile(value){const base=freshProfile();if(!value||typeof value!=="object")return base;base.issue=clamp(Number(value.issue)||0,0,11);for(const key of ["stars","bestScores","bestCosts","clears"]){if(Array.isArray(value[key]))base[key]=base[key].map((_,i)=>clamp(Number(value[key][i])||0,0,key==="stars"?3:99999))}return base}
+        function loadProfile(){try{return normalizeProfile(JSON.parse(localStorage.getItem("runway_stylist_v2")||"null"))}catch{return freshProfile()}}
+        function saveProfile(){localStorage.setItem("runway_stylist_v2",JSON.stringify(profile))}
+        function checksum(text){let hash=2166136261;for(let i=0;i<text.length;i+=1){hash^=text.charCodeAt(i);hash=Math.imul(hash,16777619)}return(hash>>>0).toString(36)}
+        function encodeArchive(value=profile){const json=JSON.stringify(normalizeProfile(value)),bytes=new TextEncoder().encode(json);let binary="";bytes.forEach((byte)=>binary+=String.fromCharCode(byte));const payload=btoa(binary).replaceAll("+","-").replaceAll("/","_").replaceAll("=","");return`${archivePrefix}.${payload}.${checksum(payload)}`}
+        function decodeArchive(code){const[prefix,payload,signature,...extra]=String(code).trim().split(".");if(prefix!==archivePrefix||!payload||!signature||extra.length||checksum(payload)!==signature)throw new Error("Archive verification failed");try{const padded=payload.replaceAll("-","+").replaceAll("_","/")+"=".repeat((4-payload.length%4)%4),bytes=Uint8Array.from(atob(padded),(char)=>char.charCodeAt(0));return normalizeProfile(JSON.parse(new TextDecoder().decode(bytes)))}catch{throw new Error("Archive content invalid")}}
+        function freshLook(testing=false){return{selection:{},hints:0,submitted:false,result:null,testing}}
+        function begin(index=profile.issue,options={}){profile.issue=clamp(index,0,11);look=freshLook(Boolean(options.testing));activeSlot="top";if(!look.testing){saveProfile();updateUi();draw()}return look}
+        function selectedItems(){return slots.map((slot)=>byId[look.selection[slot.id]]).filter(Boolean)}
+        function evaluate(selection=look.selection,index=profile.issue){
+          const brief=briefs[index],chosen=slots.map((slot)=>byId[selection[slot.id]]).filter(Boolean),complete=chosen.length===5,cost=chosen.reduce((sum,item)=>sum+item.cost,0);
+          const styleHits=brief.styles.map((style)=>chosen.some((item)=>item.styles.includes(style))),theme=Math.round(styleHits.filter(Boolean).length/brief.styles.length*30);
+          const paletteHits=chosen.filter((item)=>brief.palette.includes(item.color)).length,palette=paletteHits*4;
+          const detailHits=brief.details.map((rule)=>{const item=byId[selection[rule.slot]];return Boolean(item&&item[rule.field]===rule.value)}),details=detailHits.filter(Boolean).length*10;
+          const budget=complete?Math.max(0,15-Math.ceil(Math.max(0,cost-brief.budget)/3)):Math.round(15*chosen.length/5);
+          const coherent=chosen.filter((item)=>item.styles.some((style)=>brief.styles.includes(style))).length,cohesion=coherent*3;
+          const score=theme+palette+details+budget+cohesion;
+          return{score,cost,complete,theme,palette,details,budget,cohesion,styleHits,paletteHits,detailHits,coherent,passed:complete&&score>=70};
+        }
+        function starsFor(evaluation,hints=look.hints){if(!evaluation.passed)return 0;return 1+Number(evaluation.score>=85&&evaluation.cost<=briefs[profile.issue].budget)+Number(evaluation.score>=95&&hints===0)}
+        function selectItem(id){const item=byId[id];if(!item||look.submitted)return false;look.selection[item.slot]=id;activeSlot=item.slot;if(!look.testing){tone(360,.04,"sine",.02);updateUi();draw()}return true}
+        function clearLook(){look.selection={};look.hints=0;look.submitted=false;look.result=null;ui.hintLine.textContent="Current look cleared";updateUi();draw()}
+        function hint(){if(look.submitted)return;const brief=briefs[profile.issue],missing=brief.reference.find((id)=>look.selection[byId[id].slot]!==id);if(!missing){ui.hintLine.textContent="Current styling already matches the reference direction";return}look.hints+=1;selectItem(missing);activeSlot=byId[missing].slot;updateUi();ui.hintLine.textContent=`Editor suggests: ${byId[missing].name}Fits this issue`;draw()}
+        function submit(){const evaluation=evaluate();if(!evaluation.complete){ui.hintLine.textContent="Select all five categories before submitting";tone(140,.06,"square",.025);return null}const stars=starsFor(evaluation);look.submitted=true;look.result={...evaluation,stars};if(!look.testing){const index=profile.issue;profile.clears[index]+=1;if(evaluation.passed){profile.stars[index]=Math.max(profile.stars[index],stars);profile.bestScores[index]=Math.max(profile.bestScores[index],evaluation.score);profile.bestCosts[index]=profile.bestCosts[index]?Math.min(profile.bestCosts[index],evaluation.cost):evaluation.cost}saveProfile();updateUi();draw();tone(evaluation.passed?523:175,.12,evaluation.passed?"triangle":"square",.04);showResult()}return look.result}
+        function unlocked(index){return index===0||(profile.stars[index-1]||0)>0}
+        function totalStars(){return profile.stars.reduce((sum,value)=>sum+value,0)}
+        function updateUi(){const brief=briefs[profile.issue],evaluation=evaluate();ui.chapterText.textContent=brief.chapter;ui.briefName.textContent=`${String(profile.issue+1).padStart(2,"0")} ${brief.name}`;ui.savedStars.textContent="★".repeat(profile.stars[profile.issue])+"☆".repeat(3-profile.stars[profile.issue]);ui.styleText.textContent=brief.styles.join(" / ");ui.budgetText.textContent=`${evaluation.cost}/${brief.budget}`;ui.totalStars.textContent=`${totalStars()}/36`;ui.briefCopy.textContent=brief.copy;ui.briefChips.innerHTML=`${brief.palette.map((color)=>`<span class="swatch" style="background:${COLORS[color]}" title="${color}"></span>`).join("")}${brief.details.map((rule)=>`<span class="chip">${slots.find((slot)=>slot.id===rule.slot).name} · ${rule.value}</span>`).join("")}`;
+          const scores=[{name:"Style",value:evaluation.theme,max:30},{name:"Palette",value:evaluation.palette,max:20},{name:"Detail",value:evaluation.details,max:20},{name:"Budget",value:evaluation.budget,max:15},{name:"Cohesion",value:evaluation.cohesion,max:15}];ui.scoreGrid.innerHTML=scores.map((score)=>`<div class="score-item ${score.value===score.max?"good":""}"><b>${score.value}/${score.max}</b><span>${score.name}</span></div>`).join("");ui.selectionText.textContent=`Selected  ${selectedItems().length}/5${look.hints?`  - hint  ${look.hints}`:""}`;ui.scoreText.textContent=evaluation.score;renderTabs();renderWardrobe();renderIssues();ui.submitButton.disabled=evaluation.complete===false||look.submitted}
+        function renderTabs(){ui.slotTabs.innerHTML=slots.map((slot)=>`<button data-slot="${slot.id}" class="${activeSlot===slot.id?"active":""}">${slot.name}${look.selection[slot.id]?" ✓":""}</button>`).join("");ui.slotTabs.querySelectorAll("[data-slot]").forEach((button)=>button.addEventListener("click",()=>{activeSlot=button.dataset.slot;updateUi()}))}
+        function renderWardrobe(){const brief=briefs[profile.issue];ui.wardrobe.innerHTML=items.filter((item)=>item.slot===activeSlot).map((item)=>`<button class="piece ${look.selection[item.slot]===item.id?"selected":""}" data-item="${item.id}"><span class="mini-swatch" style="background:${COLORS[item.color]}"></span><span class="icon">${item.icon}</span><strong>${item.name}</strong><small>${item.styles.join("/")} · ${item.cost}</small></button>`).join("");ui.wardrobe.querySelectorAll("[data-item]").forEach((button)=>button.addEventListener("click",()=>selectItem(button.dataset.item)));const current=byId[look.selection[activeSlot]];ui.hintLine.textContent=current?`${current.name} · ${current.material} · ${current.shape} · ${brief.palette.includes(current.color)?"In palette":"Off this issue palette"}`:"Pick one item from this category"}
+        function renderIssues(){const chapters=[...new Set(briefs.map((brief)=>brief.chapter))];ui.issueGrid.innerHTML=chapters.map((chapter)=>`<h3 class="issue-title">${chapter}</h3><div class="issue-grid">${briefs.map((brief,index)=>({brief,index})).filter((entry)=>entry.brief.chapter===chapter).map(({brief,index})=>{const open=unlocked(index),stars=profile.stars[index]||0;return`<button class="issue ${profile.issue===index?"active":""}" data-issue="${index}" ${open?"":"disabled"}><strong>${String(index+1).padStart(2,"0")} ${brief.name}</strong><span>${open?brief.styles.join(" / "):"Unlocks after finishing the previous issue"}</span><em>${open?"★".repeat(stars)+"☆".repeat(3-stars):"Locked"}</em></button>`}).join("")}</div>`).join("");ui.issueGrid.querySelectorAll("[data-issue]").forEach((button)=>button.addEventListener("click",()=>{ui.issueDialog.close();begin(Number(button.dataset.issue))}))}
+        function showResult(){const result=look.result,brief=briefs[profile.issue];ui.resultTitle.textContent=`${String(profile.issue+1).padStart(2,"0")} ${brief.name}`;ui.resultStars.textContent="★".repeat(result.stars)+"☆".repeat(3-result.stars);ui.resultScore.textContent=`${result.score}  pts - production cost  ${result.cost}/${brief.budget}`;ui.resultBreakdown.innerHTML=[["Style",result.theme,30],["Palette",result.palette,20],["Detail",result.details,20],["Budget",result.budget,15],["Cohesion",result.cohesion,15]].map(([name,value,max])=>`<div><b>${value}/${max}</b><span>${name}</span></div>`).join("");const notes=[];if(!result.passed)notes.push("Total under the 70-pt approval line");if(result.theme<30)notes.push("Theme styles not fully covered yet");if(result.palette<20)notes.push("An item is off the required palette");if(result.details<20)notes.push("Fabric or cut close-up requirement unmet");if(result.cost>brief.budget)notes.push("Production cost over budget");if(result.cohesion<15)notes.push("Some items link weakly to the lead style");if(!notes.length)notes.push(look.hints?"All editorial conditions met; use fewer hints to chase three stars":"All editorial conditions met; the look is ready for the cover shoot");ui.resultFeedback.textContent=notes.join("; ")+".";ui.nextResult.textContent=profile.issue===11?"View Issues":"Next Issue";ui.resultDialog.showModal()}
+        function showArchive(message=""){ui.archiveMessage.textContent=message||"Archive holds twelve issues of stars, best scores and lowest costs; import across devices. Tampered content is rejected.";ui.archiveText.value=encodeArchive();if(!ui.archiveDialog.open)ui.archiveDialog.showModal()}
+        function ensureAudio(){if(!audioContext){const Audio=window.AudioContext||window.webkitAudioContext;if(Audio)audioContext=new Audio()}if(audioContext?.state==="suspended")audioContext.resume()}
+        function tone(frequency,duration,type="sine",volume=.025,delay=0){if(muted||look?.testing)return;ensureAudio();if(!audioContext)return;const oscillator=audioContext.createOscillator(),gain=audioContext.createGain(),start=audioContext.currentTime+delay;oscillator.type=type;oscillator.frequency.setValueAtTime(frequency,start);gain.gain.setValueAtTime(volume,start);gain.gain.exponentialRampToValueAtTime(.001,start+duration);oscillator.connect(gain);gain.connect(audioContext.destination);oscillator.start(start);oscillator.stop(start+duration)}
+        function clamp(value,min,max){return Math.max(min,Math.min(max,value))}
+        function resize(){const rect=ui.canvasWrap.getBoundingClientRect();drawWidth=Math.max(300,Math.min(560,rect.width-8));drawHeight=drawWidth*1.25;dpr=Math.min(devicePixelRatio||1,2);ui.lookCanvas.width=Math.round(drawWidth*dpr);ui.lookCanvas.height=Math.round(drawHeight*dpr);ui.lookCanvas.style.width=`${drawWidth}px`;ui.lookCanvas.style.height=`${drawHeight}px`;ui.lookCanvas.getContext("2d").setTransform(dpr,0,0,dpr,0,0);draw()}
+        function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r)}
+        function draw(){if(!look)return;const ctx=ui.lookCanvas.getContext("2d"),brief=briefs[profile.issue],selected=Object.fromEntries(slots.map((slot)=>[slot.id,byId[look.selection[slot.id]]]));ctx.clearRect(0,0,drawWidth,drawHeight);ctx.fillStyle="#e7e4dc";ctx.fillRect(0,0,drawWidth,drawHeight);ctx.fillStyle="#163f46";ctx.fillRect(0,0,drawWidth,drawHeight*.13);ctx.fillStyle="#fff";ctx.font=`800 ${Math.max(18,drawWidth*.055)}px system-ui`;ctx.textAlign="left";ctx.fillText("MIRROR EDIT",drawWidth*.06,drawHeight*.078);ctx.fillStyle="#d9a72e";ctx.fillRect(drawWidth*.06,drawHeight*.098,drawWidth*.28,4);ctx.fillStyle="#f9f7f0";ctx.fillRect(drawWidth*.06,drawHeight*.16,drawWidth*.88,drawHeight*.73);ctx.strokeStyle="#b8c3bb";ctx.lineWidth=1;ctx.strokeRect(drawWidth*.06+.5,drawHeight*.16+.5,drawWidth*.88-1,drawHeight*.73-1);
+          ctx.fillStyle="rgba(22,108,114,.08)";for(let i=0;i<8;i+=1){ctx.beginPath();ctx.arc(drawWidth*(.12+i*.11),drawHeight*.22,drawWidth*.025,0,Math.PI*2);ctx.fill()}
+          const cx=drawWidth*.5,top=drawHeight*.245,scale=drawWidth/560;ctx.fillStyle="rgba(30,55,55,.14)";ctx.beginPath();ctx.ellipse(cx,drawHeight*.825,drawWidth*.2,drawHeight*.025,0,0,Math.PI*2);ctx.fill();
+          ctx.strokeStyle="#b98569";ctx.lineWidth=12*scale;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(cx-35*scale,top+170*scale);ctx.lineTo(cx-70*scale,top+300*scale);ctx.moveTo(cx+35*scale,top+170*scale);ctx.lineTo(cx+70*scale,top+300*scale);ctx.stroke();ctx.beginPath();ctx.moveTo(cx-26*scale,top+310*scale);ctx.lineTo(cx-35*scale,top+455*scale);ctx.moveTo(cx+26*scale,top+310*scale);ctx.lineTo(cx+35*scale,top+455*scale);ctx.stroke();
+          ctx.fillStyle="#b98569";ctx.beginPath();ctx.arc(cx,top+45*scale,36*scale,0,Math.PI*2);ctx.fill();ctx.fillStyle="#2d3738";ctx.beginPath();ctx.arc(cx,top+34*scale,38*scale,Math.PI,Math.PI*2);ctx.fill();
+          const topColor=COLORS[selected.top?.color||"White"],bottomColor=COLORS[selected.bottom?.color||"Cream"],outerColor=COLORS[selected.outer?.color||"White"],shoeColor=COLORS[selected.shoe?.color||"Black"];
+          ctx.fillStyle=topColor;roundRect(ctx,cx-48*scale,top+85*scale,96*scale,125*scale,18*scale);ctx.fill();ctx.fillStyle=bottomColor;ctx.beginPath();if(selected.bottom?.shape==="Flowing"){ctx.moveTo(cx-42*scale,top+202*scale);ctx.lineTo(cx+42*scale,top+202*scale);ctx.lineTo(cx+70*scale,top+342*scale);ctx.lineTo(cx-70*scale,top+342*scale)}else{ctx.rect(cx-48*scale,top+202*scale,42*scale,145*scale);ctx.rect(cx+6*scale,top+202*scale,42*scale,145*scale)}ctx.fill();
+          if(selected.outer){ctx.strokeStyle=outerColor;ctx.lineWidth=25*scale;ctx.beginPath();ctx.moveTo(cx-47*scale,top+103*scale);ctx.lineTo(cx-58*scale,top+250*scale);ctx.moveTo(cx+47*scale,top+103*scale);ctx.lineTo(cx+58*scale,top+250*scale);ctx.stroke();ctx.lineWidth=7*scale;ctx.beginPath();ctx.moveTo(cx-40*scale,top+85*scale);ctx.lineTo(cx,top+205*scale);ctx.lineTo(cx+40*scale,top+85*scale);ctx.stroke()}
+          ctx.fillStyle=shoeColor;roundRect(ctx,cx-57*scale,top+448*scale,43*scale,19*scale,7*scale);ctx.fill();roundRect(ctx,cx+14*scale,top+448*scale,43*scale,19*scale,7*scale);ctx.fill();
+          ctx.fillStyle=COLORS[selected.acc?.color||"White"];ctx.beginPath();ctx.arc(cx+39*scale,top+52*scale,9*scale,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.stroke();
+          ctx.fillStyle="#173e45";ctx.font=`700 ${Math.max(13,drawWidth*.03)}px system-ui`;ctx.textAlign="center";ctx.fillText(brief.name,cx,drawHeight*.925);ctx.fillStyle="#607376";ctx.font=`${Math.max(10,drawWidth*.022)}px system-ui`;ctx.fillText(selectedItems().length===5?selectedItems().map((item)=>item.name).join(" · "):"Pick one item from each of the five categories",cx,drawHeight*.958);
+        }
+        function validateContent(){if(items.length!==40||briefs.length!==12||slots.length!==5)throw new Error("Look content incomplete");if(new Set(items.map((item)=>item.id)).size!==40||new Set(briefs.map((brief)=>brief.id)).size!==12)throw new Error("Duplicate item or commission id");const references=briefs.map((brief,index)=>{const selection=Object.fromEntries(brief.reference.map((id)=>[byId[id].slot,id])),evaluation=evaluate(selection,index);if(Object.keys(selection).length!==5||evaluation.score!==100||evaluation.cost>brief.budget)throw new Error(`${brief.name} Reference look invalid`);return{id:brief.id,score:evaluation.score,cost:evaluation.cost,budget:brief.budget}});return{briefs:12,chapters:new Set(briefs.map((brief)=>brief.chapter)).size,items:40,slots:5,styles:new Set(items.flatMap((item)=>item.styles)).size,materials:new Set(items.map((item)=>item.material)).size,references}}
+        function runReferenceBrief(index){const previousProfile=profile,previousLook=look;profile=freshProfile();profile.issue=index;begin(index,{testing:true});for(const id of briefs[index].reference)selectItem(id);const result=submit();profile=previousProfile;look=previousLook;return{id:briefs[index].id,passed:result.passed,stars:result.stars,score:result.score,cost:result.cost,budget:briefs[index].budget}}
+        window.__runwayStylistTest={items,briefs,slots,freshProfile,encodeArchive,decodeArchive,evaluate,validateContent,runReferenceBrief,begin(index=0,options={testing:true}){return begin(index,options)},select:selectItem,submit,getState(){const evaluation=evaluate();return{issue:profile.issue,selection:{...look.selection},hints:look.hints,submitted:look.submitted,evaluation,result:look.result}}};
+        ui.issueButton.addEventListener("click",()=>{renderIssues();ui.issueDialog.showModal()});ui.archiveButton.addEventListener("click",()=>showArchive());ui.clearButton.addEventListener("click",clearLook);ui.hintButton.addEventListener("click",hint);ui.submitButton.addEventListener("click",submit);ui.muteButton.addEventListener("click",()=>{muted=!muted;ui.muteButton.textContent=muted?"×":"♪";if(!muted)tone(440,.06)});document.querySelectorAll("[data-close]").forEach((button)=>button.addEventListener("click",()=>document.getElementById(button.dataset.close).close()));ui.copyArchive.addEventListener("click",async()=>{ui.archiveText.select();try{await navigator.clipboard.writeText(ui.archiveText.value)}catch{document.execCommand("copy")}showArchive("Archive copied")});ui.importArchive.addEventListener("click",()=>{try{profile=decodeArchive(ui.archiveText.value);saveProfile();begin(profile.issue);showArchive("Archive imported and verified")}catch(error){showArchive(error.message||"Archive invalid")}});ui.retryResult.addEventListener("click",()=>{ui.resultDialog.close();begin(profile.issue)});ui.nextResult.addEventListener("click",()=>{ui.resultDialog.close();if(profile.issue<11)begin(profile.issue+1);else{renderIssues();ui.issueDialog.showModal()}});window.addEventListener("resize",resize);begin(profile.issue);resize();
+      })();
+    </script>
+  </body>
+</html>

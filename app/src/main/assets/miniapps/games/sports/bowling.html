@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pocket Lane Bowling</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0e0f14;
+  --card:#1a1c24;
+  --card2:#232634;
+  --border:#2d3042;
+  --accent:#ff3b30;
+  --accent2:#ff9500;
+  --green:#30d158;
+  --blue:#0a84ff;
+  --yellow:#ffd60a;
+  --text:#f5f5f7;
+  --muted:#9a9aaf;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center}
+.wrap{width:100%;max-width:428px;min-width:360px;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);overflow-x:hidden}
+header{padding:12px 14px 10px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,#1e2030 0%,#0e0f14 100%);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-badge{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-size:20px;font-weight:900;box-shadow:0 4px 12px rgba(255,59,48,0.35)}
+.logo h1{font-size:14px;letter-spacing:0.06em;line-height:1.1}
+.logo h1 span{color:var(--accent);display:block;font-size:10px;letter-spacing:0.14em;font-weight:700}
+.hdr-stats{display:flex;gap:8px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:7px 12px;text-align:center;min-width:74px}
+.stat label{font-size:9px;letter-spacing:0.12em;color:var(--muted);display:block;margin-bottom:2px}
+.stat b{font-size:18px;font-weight:900}
+.stat.score b{color:var(--yellow)}
+.stat.best b{color:var(--green)}
+
+.subbar{padding:8px 14px;display:flex;justify-content:space-between;align-items:center;background:var(--card);border-bottom:1px solid var(--border);font-size:12px}
+.subbar .left{color:var(--muted);display:flex;gap:12px;align-items:center}
+.subbar .left b{color:var(--text)}
+.pill{background:var(--card2);border:1px solid var(--border);border-radius:999px;padding:4px 10px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:6px}
+.pill.strike{background:linear-gradient(135deg,var(--yellow),var(--accent2));color:#1a1a00;border-color:transparent}
+.pill.spare{background:linear-gradient(135deg,var(--blue),#5e5ce6);color:white;border-color:transparent}
+
+main{flex:1;padding:12px 14px 16px;display:flex;flex-direction:column;gap:12px}
+.canvas-card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;position:relative}
+.canvas-wrap{position:relative;width:100%;display:flex;justify-content:center;background:radial-gradient(ellipse at 50% 0%, #2a2d3a 0%, #0e0f14 70%);padding:10px 0 8px}
+canvas{display:block;touch-action:none;max-width:100%}
+.hud{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none}
+.hud-badge{background:rgba(0,0,0,0.65);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.12);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:6px}
+.hud-badge.aim{color:var(--yellow)}
+.hud-badge.pins{color:var(--text)}
+.aim-line-hint{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.1);border-radius:999px;padding:4px 10px;font-size:10px;letter-spacing:0.08em;color:var(--muted);pointer-events:none}
+
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{height:56px;border-radius:14px;border:none;font-size:15px;font-weight:900;letter-spacing:0.04em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform 0.08s, box-shadow 0.2s, opacity 0.2s;user-select:none;-webkit-tap-highlight-color:transparent}
+.btn:active{transform:scale(0.97)}
+.btn:disabled{opacity:0.45;cursor:not-allowed;transform:none}
+.btn-aim{background:var(--card2);border:1px solid var(--border);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,0.2)}
+.btn-aim span{font-size:18px}
+.btn-roll{grid-column:1/-1;height:62px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;box-shadow:0 8px 20px rgba(255,59,48,0.35);font-size:17px;letter-spacing:0.06em}
+.btn-roll.rolling{background:linear-gradient(135deg,#555,#333);box-shadow:none}
+.btn-restart{grid-column:1/-1;height:52px;background:var(--card2);border:1px solid var(--border);color:var(--text);font-size:14px}
+.btn-restart.primary{background:linear-gradient(135deg,var(--blue),#5e5ce6);border-color:transparent;color:white;box-shadow:0 6px 16px rgba(10,132,255,0.35)}
+
+.result-banner{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.82);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.14);border-radius:16px;padding:14px 18px;text-align:center;min-width:200px;pointer-events:none;opacity:0;transition:opacity 0.3s, transform 0.3s;z-index:5}
+.result-banner.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.result-banner h3{font-size:20px;margin-bottom:4px}
+.result-banner p{font-size:12px;color:var(--muted)}
+.result-banner.strike{border-color:var(--yellow);box-shadow:0 8px 24px rgba(255,214,10,0.25)}
+.result-banner.strike h3{color:var(--yellow)}
+
+.footer-note{text-align:center;font-size:11px;color:var(--muted);padding:4px 0}
+.footer-actions{display:flex;gap:8px}
+.btn-small{flex:1;height:44px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:13px;font-weight:700;cursor:pointer}
+.btn-small:active{transform:scale(0.98)}
+
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.72);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
+.overlay.show{display:flex}
+.modal{width:100%;max-width:380px;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;text-align:center}
+.modal h2{font-size:18px;margin-bottom:8px}
+.modal p{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px}
+.modal .big{font-size:44px;margin-bottom:8px}
+.help-list{text-align:left;font-size:12px;line-height:1.6;color:var(--muted);margin:10px 0}
+.help-list b{color:var(--text)}
+.kbd{display:inline-block;background:var(--card2);border:1px solid var(--border);border-bottom-width:2px;border-radius:6px;padding:1px 6px;font-size:11px;font-weight:700;color:var(--text)}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <div class="logo">
+      <div class="logo-badge">🎳</div>
+      <h1>POCKET LANE<span>BOWLING</span></h1>
+    </div>
+    <div class="hdr-stats">
+      <div class="stat score"><label>SCORE</label><b id="scoreEl">0</b></div>
+      <div class="stat best"><label>BEST</label><b id="bestEl">0</b></div>
+    </div>
+  </header>
+
+  <div class="subbar">
+    <div class="left">
+      <span>🎯 Aim: <b id="aimEl">0°</b></span>
+      <span>📌 Down: <b id="downEl">0 / 10</b></span>
+    </div>
+    <div class="pill" id="statusPill">● Ready to roll</div>
+  </div>
+
+  <main>
+    <div class="canvas-card">
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="lane" width="320" height="520"></canvas>
+        <div class="hud">
+          <div class="hud-badge aim" id="hudAim">◀ 0° ▶</div>
+          <div class="hud-badge pins" id="hudPins">10 pins standing</div>
+        </div>
+        <div class="aim-line-hint">← SWIPE LANE TO AIM →</div>
+        <div class="result-banner" id="resultBanner">
+          <h3 id="resultTitle">STRIKE!</h3>
+          <p id="resultDesc">10 pins down</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-aim" id="btnLeft"><span>◀</span> LEFT</button>
+      <button class="btn btn-aim" id="btnRight">RIGHT <span>▶</span></button>
+      <button class="btn btn-roll" id="btnRoll">🎳 ROLL BALL</button>
+      <button class="btn btn-restart" id="btnRestart">↻ RESTART GAME</button>
+    </div>
+
+    <div class="footer-actions">
+      <button class="btn-small" id="btnHelp">❔ How to Play</button>
+      <button class="btn-small" id="btnResetBest">♻️ Reset Best</button>
+    </div>
+    <div class="footer-note">Best score saves on this device • No horizontal scroll • 360–428px portrait</div>
+  </main>
+</div>
+
+<div class="overlay" id="helpOverlay">
+  <div class="modal">
+    <div class="big">🎳</div>
+    <h2>How to Play</h2>
+    <div class="help-list">
+      <p><b>1. Aim:</b> Tap <span class="kbd">◀ LEFT</span> / <span class="kbd">RIGHT ▶</span> or <b>swipe on the lane</b> to set angle (-30° to +30°). Yellow line shows your path.</p>
+      <p><b>2. Roll:</b> Tap <span class="kbd">🎳 ROLL BALL</span>. Ball launches with physics and knocks pins with chain reactions.</p>
+      <p><b>3. Score:</b> Fallen pins = your score (0–10). Strike = all 10 down!</p>
+      <p><b>4. Restart:</b> Tap <span class="kbd">↻ RESTART</span> for a new game. Best score persists.</p>
+      <p style="margin-top:8px;color:var(--muted)"><b>Tip:</b> Center aim (0°) is most consistent. Edges risk the gutter!</p>
+    </div>
+    <button class="btn-small" id="btnCloseHelp" style="width:100%;height:44px;background:linear-gradient(135deg,var(--blue),#5e5ce6);border-color:transparent;color:white;margin-top:10px">Got it</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('lane');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvasWrap');
+
+// DPR scaling
+function setupDPR(){
+  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  const rect = canvas.getBoundingClientRect();
+  // keep logical size 320x520, scale backing store
+  canvas.width = 320 * dpr;
+  canvas.height = 520 * dpr;
+  canvas.style.width = '320px';
+  canvas.style.height = '520px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+setupDPR();
+window.addEventListener('resize', setupDPR);
+
+// Game state
+let aim = 0; // -30 to 30
+let score = 0;
+let best = 0;
+let gameState = 'ready'; // ready, rolling, scored
+let ball = null;
+let pins = [];
+let animationId = null;
+let fallenCount = 0;
+
+const LANE = {
+  left: 30,
+  right: 290,
+  top: 0,
+  bottom: 520,
+  width: 260,
+  gutter: 14
+};
+const BALL_R = 13;
+const PIN_R = 9;
+const PIN_SPACING_X = 22;
+const PIN_SPACING_Y = 20;
+
+function loadBest(){
+  try{ best = parseInt(localStorage.getItem('bowling_best')||'0',10)||0; }catch(e){}
+  document.getElementById('bestEl').textContent = best;
+}
+function saveBest(){
+  try{ localStorage.setItem('bowling_best', String(best)); }catch(e){}
+}
+loadBest();
+
+function createPins(){
+  pins = [];
+  // Standard 10-pin triangle, tip at top
+  // Row 0: 1 pin (head pin)
+  // Row 1: 2 pins
+  // Row 2: 3 pins
+  // Row 3: 4 pins
+  const centerX = 160;
+  const headY = 78;
+  const rows = [
+    [{x:0, y:0}],
+    [{x:-0.5, y:1}, {x:0.5, y:1}],
+    [{x:-1, y:2}, {x:0, y:2}, {x:1, y:2}],
+    [{x:-1.5, y:3}, {x:-0.5, y:3}, {x:0.5, y:3}, {x:1.5, y:3}],
+  ];
+  rows.forEach(row=>{
+    row.forEach(p=>{
+      pins.push({
+        x: centerX + p.x * PIN_SPACING_X,
+        y: headY + p.y * PIN_SPACING_Y,
+        ox: centerX + p.x * PIN_SPACING_X,
+        oy: headY + p.y * PIN_SPACING_Y,
+        fallen: false,
+        fallProgress: 0,
+        vx: 0, vy: 0,
+        rot: 0,
+        wobble: 0
+      });
+    });
+  });
+  fallenCount = 0;
+}
+
+function createBall(){
+  ball = {
+    x: 160,
+    y: 470,
+    vx: 0, vy: 0,
+    rolling: false,
+    trail: []
+  };
+}
+
+function resetGame(){
+  cancelAnimationFrame(animationId);
+  score = 0;
+  aim = 0;
+  gameState = 'ready';
+  createPins();
+  createBall();
+  fallenCount = 0;
+  updateUI();
+  hideResult();
+  document.getElementById('btnRoll').disabled = false;
+  document.getElementById('btnRoll').classList.remove('rolling');
+  document.getElementById('btnRoll').textContent = '🎳 ROLL BALL';
+  document.getElementById('statusPill').textContent = '● Ready to roll';
+  document.getElementById('statusPill').className = 'pill';
+  draw();
+}
+
+function updateUI(){
+  document.getElementById('scoreEl').textContent = score;
+  document.getElementById('bestEl').textContent = best;
+  document.getElementById('aimEl').textContent = (aim>0?'+':'')+aim+'°';
+  document.getElementById('hudAim').textContent = '◀ '+ (aim>0?'+':'')+aim+'° ▶';
+  document.getElementById('downEl').textContent = fallenCount+' / 10';
+  document.getElementById('hudPins').textContent = (10-fallenCount)+' standing';
+  if(fallenCount===10) document.getElementById('hudPins').textContent = 'All down!';
+}
+
+function setAim(delta){
+  if(gameState==='rolling') return;
+  aim = Math.max(-30, Math.min(30, aim + delta));
+  updateUI();
+  draw();
+}
+
+function rollBall(){
+  if(gameState==='rolling') return;
+  if(gameState==='scored'){
+    resetGame();
+    return;
+  }
+  gameState = 'rolling';
+  const rad = aim * Math.PI/180;
+  const speed = 7.2;
+  ball.vx = Math.sin(rad) * speed;
+  ball.vy = -Math.cos(rad) * speed;
+  ball.rolling = true;
+  ball.trail = [];
+  document.getElementById('btnRoll').disabled = true;
+  document.getElementById('btnRoll').classList.add('rolling');
+  document.getElementById('btnRoll').textContent = '● Rolling...';
+  document.getElementById('statusPill').textContent = '● Ball rolling';
+  document.getElementById('statusPill').className = 'pill';
+  loop();
+}
+
+function showResult(){
+  const banner = document.getElementById('resultBanner');
+  const title = document.getElementById('resultTitle');
+  const desc = document.getElementById('resultDesc');
+  let text='', sub='', cls='';
+  if(fallenCount===10){ text='STRIKE! 🎉'; sub='Perfect — 10 pins down!'; cls='strike'; }
+  else if(fallenCount>=7){ text='Great Shot!'; sub=fallenCount+' pins down'; }
+  else if(fallenCount>=4){ text='Nice Roll'; sub=fallenCount+' pins down'; }
+  else if(fallenCount>=1){ text='Keep Trying'; sub=fallenCount+' pin'+(fallenCount>1?'s':'')+' down'; }
+  else { text='Gutter Ball'; sub='0 pins — aim center next time!'; }
+  title.textContent = text;
+  desc.textContent = sub;
+  banner.className = 'result-banner show ' + cls;
+  document.getElementById('statusPill').textContent = fallenCount===10?'★ STRIKE!': fallenCount===0?'○ Gutter':'● '+fallenCount+' pins';
+  document.getElementById('statusPill').className = 'pill ' + (fallenCount===10?'strike': fallenCount>=7?'spare':'');
+  document.getElementById('btnRoll').disabled = false;
+  document.getElementById('btnRoll').classList.remove('rolling');
+  document.getElementById('btnRoll').textContent = '↻ PLAY AGAIN';
+  gameState='scored';
+}
+
+function hideResult(){
+  document.getElementById('resultBanner').className='result-banner';
+}
+
+// Physics loop
+function loop(){
+  updatePhysics();
+  draw();
+  // check end conditions
+  const ballOut = ball.y < -20 || ball.y > 540 || (Math.abs(ball.vx)<0.1 && Math.abs(ball.vy)<0.1 && ball.y < 120);
+  const allFallen = fallenCount===10;
+  // if ball stopped or out and pins settled
+  let pinsMoving = pins.some(p=>p.fallen && (Math.abs(p.vx)>0.1 || Math.abs(p.vy)>0.1));
+  if((ballOut || allFallen) && !pinsMoving){
+    // settle
+    ball.rolling = false;
+    // count final
+    score = fallenCount;
+    if(score > best){ best = score; saveBest(); }
+    updateUI();
+    showResult();
+    return;
+  }
+  // timeout after 4s rolling
+  animationId = requestAnimationFrame(loop);
+}
+
+function updatePhysics(){
+  if(!ball.rolling) return;
+  // trail
+  ball.trail.push({x:ball.x, y:ball.y});
+  if(ball.trail.length>10) ball.trail.shift();
+
+  ball.x += ball.vx;
+  ball.y += ball.vy;
+
+  // wall / gutter
+  if(ball.x < LANE.left + BALL_R){
+    ball.x = LANE.left + BALL_R;
+    ball.vx *= -0.55;
+    ball.vx *= 0.9;
+  }
+  if(ball.x > LANE.right - BALL_R){
+    ball.x = LANE.right - BALL_R;
+    ball.vx *= -0.55;
+    ball.vx *= 0.9;
+  }
+
+  // friction
+  ball.vx *= 0.998;
+  ball.vy *= 0.998;
+
+  // pin collisions
+  pins.forEach(pin=>{
+    if(pin.fallen) return;
+    const dx = ball.x - pin.x;
+    const dy = ball.y - pin.y;
+    const dist = Math.hypot(dx,dy);
+    if(dist < BALL_R + PIN_R){
+      // hit!
+      pin.fallen = true;
+      pin.fallProgress = 0;
+      // velocity based on ball
+      const angle = Math.atan2(dy,dx);
+      const push = 3.5 + Math.random()*1.5;
+      pin.vx = Math.cos(angle)*push + ball.vx*0.5;
+      pin.vy = Math.sin(angle)*push + ball.vy*0.2;
+      pin.rot = (Math.random()-0.5)*2;
+      pin.wobble = Math.random()*0.3;
+      fallenCount++;
+      // ball deflection
+      ball.vx += (Math.random()-0.5)*0.8;
+      ball.vx *= 0.96;
+      // slight slow
+      ball.vy *= 0.985;
+      updateUI();
+    }
+  });
+
+  // pin-pin chain reaction
+  pins.forEach(a=>{
+    if(!a.fallen || (Math.abs(a.vx)<0.2 && Math.abs(a.vy)<0.2)) return;
+    // move fallen pin
+    a.x += a.vx;
+    a.y += a.vy;
+    a.vx *= 0.96;
+    a.vy *= 0.96;
+    a.rot += a.vx*0.08;
+    a.fallProgress = Math.min(1, a.fallProgress + 0.08);
+
+    // collide with standing pins
+    pins.forEach(b=>{
+      if(b.fallen) return;
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      const dist = Math.hypot(dx,dy);
+      if(dist < PIN_R*2 + 4){
+        // chain knock
+        if(Math.random() < 0.85){
+          b.fallen = true;
+          b.fallProgress = 0;
+          const ang = Math.atan2(dy,dx);
+          b.vx = Math.cos(ang)*2.5 + a.vx*0.4 + (Math.random()-0.5);
+          b.vy = Math.sin(ang)*2.5 + a.vy*0.3;
+          b.rot = (Math.random()-0.5)*3;
+          fallenCount++;
+          updateUI();
+        }
+      }
+    });
+
+    // keep fallen pins inside lane
+    if(a.x < LANE.left+PIN_R) { a.x=LANE.left+PIN_R; a.vx*=-0.4; }
+    if(a.x > LANE.right-PIN_R) { a.x=LANE.right-PIN_R; a.vx*=-0.4; }
+  });
+
+  // ball slow down naturally after passing pins
+  if(ball.y < 60){
+    ball.vy *= 0.97;
+    ball.vx *= 0.97;
+    if(Math.abs(ball.vy)<0.5) ball.vy = -0.5;
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,320,520);
+
+  // Background lane wood
+  // Gutters
+  ctx.fillStyle = '#1a1c24';
+  ctx.fillRect(0,0,320,520);
+
+  // Lane base
+  const laneGrad = ctx.createLinearGradient(LANE.left,0,LANE.right,0);
+  laneGrad.addColorStop(0,'#8d6e3f');
+  laneGrad.addColorStop(0.15,'#c9a86a');
+  laneGrad.addColorStop(0.5,'#e8c99a');
+  laneGrad.addColorStop(0.85,'#c9a86a');
+  laneGrad.addColorStop(1,'#8d6e3f');
+  ctx.fillStyle = laneGrad;
+  ctx.fillRect(LANE.left,0,LANE.width,520);
+
+  // Wood planks
+  ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+  ctx.lineWidth = 1;
+  for(let x=LANE.left+20; x<LANE.right; x+=28){
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,520); ctx.stroke();
+  }
+  // Horizontal boards
+  for(let y=80; y<520; y+=80){
+    ctx.beginPath(); ctx.moveTo(LANE.left,y); ctx.lineTo(LANE.right,y); ctx.stroke();
+  }
+
+  // Gutter shadows
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillRect(LANE.left-6,0,6,520);
+  ctx.fillRect(LANE.right,0,6,520);
+  // Gutter lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(LANE.left,0); ctx.lineTo(LANE.left,520); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(LANE.right,0); ctx.lineTo(LANE.right,520); ctx.stroke();
+
+  // Foul line
+  ctx.strokeStyle = '#ff3b30';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(LANE.left, 430); ctx.lineTo(LANE.right,430); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,59,48,0.12)';
+  ctx.fillRect(LANE.left,430,LANE.width,3);
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = '700 8px system-ui';
+  ctx.textAlign='center';
+  ctx.fillText('FOUL LINE',160,442);
+
+  // Arrows on lane
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  const arrows = [{x:160,y:320},{x:130,y:360},{x:190,y:360}];
+  arrows.forEach(a=>{
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(a.x-7, a.y+10);
+    ctx.lineTo(a.x+7, a.y+10);
+    ctx.closePath(); ctx.fill();
+  });
+
+  // Pin deck area
+  ctx.fillStyle = 'rgba(0,0,0,0.08)';
+  ctx.fillRect(LANE.left, 40, LANE.width, 90);
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth=1;
+  ctx.strokeRect(LANE.left,40,LANE.width,90);
+
+  // Aim line (only when ready)
+  if(gameState==='ready'){
+    const rad = aim * Math.PI/180;
+    const len = 140;
+    const ex = ball.x + Math.sin(rad)*len;
+    const ey = ball.y - Math.cos(rad)*len;
+    // dashed line
+    ctx.save();
+    ctx.strokeStyle = aim===0 ? 'rgba(255,214,10,0.95)' : 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([8,6]);
+    ctx.beginPath(); ctx.moveTo(ball.x, ball.y); ctx.lineTo(ex,ey); ctx.stroke();
+    ctx.setLineDash([]);
+    // target dot
+    ctx.fillStyle = aim===0 ? '#ffd60a' : 'white';
+    ctx.beginPath(); ctx.arc(ex,ey,5,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,0.3)'; ctx.lineWidth=1.5; ctx.stroke();
+    // angle arc at ball
+    ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(ball.x, ball.y, 22, -Math.PI/2 + rad -0.3, -Math.PI/2 + rad +0.3); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Ball trail
+  if(ball.trail.length>1){
+    ctx.strokeStyle='rgba(255,59,48,0.25)';
+    ctx.lineWidth=3; ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.beginPath();
+    ball.trail.forEach((p,i)=>{
+      if(i===0) ctx.moveTo(p.x,p.y);
+      else ctx.lineTo(p.x,p.y);
+    });
+    ctx.stroke();
+  }
+
+  // Pins
+  pins.forEach(pin=>{
+    ctx.save();
+    ctx.translate(pin.x, pin.y);
+    if(pin.fallen){
+      // fallen animation: scale down, rotate, fade
+      const prog = pin.fallProgress;
+      ctx.rotate(pin.rot * prog);
+      ctx.globalAlpha = 1 - prog*0.35;
+      const scale = 1 - prog*0.25;
+      ctx.scale(scale, scale);
+      // shadow
+      ctx.fillStyle='rgba(0,0,0,0.25)';
+      ctx.beginPath(); ctx.ellipse(0,4, PIN_R+2, PIN_R*0.6,0,0,Math.PI*2); ctx.fill();
+    } else {
+      // standing shadow
+      ctx.fillStyle='rgba(0,0,0,0.2)';
+      ctx.beginPath(); ctx.ellipse(0,6, PIN_R+1, 4,0,0,Math.PI*2); ctx.fill();
+    }
+
+    // Pin body
+    if(pin.fallen){
+      // fallen pin - on side
+      ctx.fillStyle='#f5f5f7';
+      ctx.strokeStyle='#d0d0d8';
+      ctx.lineWidth=1;
+      // draw as horizontal capsule
+      const w = 18, h= 10;
+      ctx.beginPath();
+      ctx.roundRect(-w/2, -h/2, w, h, 5);
+      ctx.fill(); ctx.stroke();
+      // stripes
+      ctx.fillStyle='#ff3b30';
+      ctx.fillRect(-w/2+4, -h/2, 3, h);
+      ctx.fillRect(w/2-7, -h/2, 3, h);
+      // number dot
+      ctx.fillStyle='#1a1c24';
+      ctx.beginPath(); ctx.arc(0,0,2,0,Math.PI*2); ctx.fill();
+    } else {
+      // standing pin - classic shape
+      // body
+      ctx.fillStyle='#ffffff';
+      ctx.strokeStyle='#e0e0e8';
+      ctx.lineWidth=1.2;
+      ctx.beginPath();
+      // pin shape: head + neck + body + base
+      ctx.moveTo(0, -PIN_R-2);
+      ctx.arc(0, -PIN_R+1, 4.5, -Math.PI*0.85, Math.PI*0.85);
+      ctx.lineTo(3.5, 2);
+      ctx.lineTo(4.5, 6);
+      ctx.lineTo(-4.5, 6);
+      ctx.lineTo(-3.5, 2);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      // red stripes
+      ctx.fillStyle='#ff3b30';
+      ctx.fillRect(-4.2, -1, 8.4, 2);
+      ctx.fillRect(-3.8, 2.5, 7.6, 1.2);
+      // highlight
+      ctx.fillStyle='rgba(255,255,255,0.9)';
+      ctx.beginPath(); ctx.ellipse(-1.5, -3, 1.2, 2, -0.2,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  });
+
+  // Ball
+  ctx.save();
+  ctx.translate(ball.x, ball.y);
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.3)';
+  ctx.beginPath(); ctx.ellipse(0,8, BALL_R+1, 5,0,0,Math.PI*2); ctx.fill();
+  // ball body
+  const ballGrad = ctx.createRadialGradient(-4,-4,2, 0,0,BALL_R);
+  ballGrad.addColorStop(0,'#ff6b6b');
+  ballGrad.addColorStop(0.5,'#ff3b30');
+  ballGrad.addColorStop(1,'#8a1a14');
+  ctx.fillStyle=ballGrad;
+  ctx.beginPath(); ctx.arc(0,0,BALL_R,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1.2; ctx.stroke();
+  // finger holes
+  ctx.fillStyle='rgba(0,0,0,0.85)';
+  ctx.beginPath(); ctx.arc(-3,-2,2,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(3,-2,2,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0,3,2,0,Math.PI*2); ctx.fill();
+  // highlight
+  ctx.fillStyle='rgba(255,255,255,0.35)';
+  ctx.beginPath(); ctx.ellipse(-4,-5,3,2, -0.4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // Lane dots
+  ctx.fillStyle='rgba(255,255,255,0.5)';
+  [140,160,180].forEach(x=>{
+    ctx.beginPath(); ctx.arc(x, 400, 2,0,Math.PI*2); ctx.fill();
+  });
+}
+
+// Controls
+document.getElementById('btnLeft').addEventListener('click', ()=>setAim(-5));
+document.getElementById('btnRight').addEventListener('click', ()=>setAim(5));
+document.getElementById('btnRoll').addEventListener('click', rollBall);
+document.getElementById('btnRestart').addEventListener('click', resetGame);
+document.getElementById('btnHelp').addEventListener('click', ()=>document.getElementById('helpOverlay').classList.add('show'));
+document.getElementById('btnCloseHelp').addEventListener('click', ()=>document.getElementById('helpOverlay').classList.remove('show'));
+document.getElementById('helpOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('helpOverlay')) e.currentTarget.classList.remove('show'); });
+document.getElementById('btnResetBest').addEventListener('click', ()=>{
+  if(confirm('Reset best score?')){
+    best=0; saveBest(); updateUI();
+  }
+});
+
+// Swipe to aim
+let startX=null;
+canvas.addEventListener('touchstart', e=>{
+  startX = e.touches[0].clientX;
+  e.preventDefault();
+},{passive:false});
+canvas.addEventListener('touchmove', e=>{
+  if(startX===null || gameState==='rolling') return;
+  const curX = e.touches[0].clientX;
+  const dx = curX - startX;
+  // sensitivity: 8px per degree
+  if(Math.abs(dx) > 8){
+    const steps = Math.round(dx/12);
+    if(steps!==0){
+      setAim(steps);
+      startX = curX;
+    }
+  }
+  e.preventDefault();
+},{passive:false});
+canvas.addEventListener('touchend', ()=>{ startX=null; });
+
+// Mouse drag for desktop
+let mouseDown=false;
+canvas.addEventListener('mousedown', e=>{ mouseDown=true; startX=e.clientX; });
+canvas.addEventListener('mousemove', e=>{
+  if(!mouseDown || gameState==='rolling') return;
+  const dx = e.clientX - startX;
+  if(Math.abs(dx)>8){
+    const steps = Math.round(dx/12);
+    if(steps!==0){ setAim(steps); startX=e.clientX; }
+  }
+});
+canvas.addEventListener('mouseup', ()=>{ mouseDown=false; startX=null; });
+canvas.addEventListener('mouseleave', ()=>{ mouseDown=false; });
+
+// Keyboard
+document.addEventListener('keydown', e=>{
+  if(e.key==='ArrowLeft') setAim(-5);
+  if(e.key==='ArrowRight') setAim(5);
+  if(e.key===' ' || e.key==='Enter'){ e.preventDefault(); rollBall(); }
+  if(e.key==='r' || e.key==='R') resetGame();
+});
+
+// Init
+createPins();
+createBall();
+updateUI();
+draw();
+
+// Handle visibility
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden) cancelAnimationFrame(animationId);
+});
+</script>
+</body>
+</html>

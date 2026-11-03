@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Forty Rush Lottery</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f0a1e;--card:#1a1230;--card2:#241845;--line:#3a2a6a;--gold:#facc15;--gold2:#fde68a;--accent:#a78bfa;--ok:#22c55e;--bad:#ef4444;--muted:#a99bc7}
+html,body{background:var(--bg);color:#ede9fe;font-family:Inter,system-ui,sans-serif;min-height:100%}
+body{display:flex;justify-content:center}
+.wrap{width:100%;max-width:420px;min-height:100vh;display:flex;flex-direction:column;gap:10px;padding:10px 10px 18px}
+.topbar{background:linear-gradient(135deg,#241845 0%,#1a1230 100%);border:1px solid var(--line);border-radius:16px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand h1{font-size:16px;font-weight:900;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+.badge{font-size:10px;background:var(--gold);color:#1a0a2e;padding:4px 8px;border-radius:999px;font-weight:900;letter-spacing:.7px}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+.stat{flex:1;min-width:68px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:7px;text-align:center}
+.stat .k{font-size:9px;letter-spacing:.7px;color:var(--muted);font-weight:800}
+.stat .v{font-size:14px;font-weight:900;margin-top:2px}
+.stat.timer{border-color:rgba(250,204,21,.4)}
+.phaseCard{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.phaseHead{padding:10px 12px;background:linear-gradient(180deg,#2a1c4a,#1a1230);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.phaseHead h2{font-size:13px;font-weight:900;letter-spacing:.5px}
+.phaseHead .pill{font-size:11px;background:var(--gold);color:#1a0a2e;padding:4px 8px;border-radius:999px;font-weight:900}
+.timerBar{height:8px;background:#0f0a1e;border-bottom:1px solid var(--line);position:relative;overflow:hidden}
+.timerFill{height:100%;width:100%;background:linear-gradient(90deg,var(--ok),var(--gold),var(--bad));transition:width .3s linear}
+.grid{padding:12px;display:grid;grid-template-columns:repeat(5,1fr);gap:8px;background:radial-gradient(600px 300px at 50% 0%,#241845 0%,#0f0a1e 70%)}
+.cell{aspect-ratio:1;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:#ede9fe;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;position:relative;user-select:none}
+.cell:active{transform:scale(.92)}
+.cell.picked{background:linear-gradient(180deg,var(--gold2),var(--gold));color:#1a0a2e;border-color:var(--gold);box-shadow:0 4px 12px rgba(250,204,21,.4);transform:translateY(-1px)}
+.cell.drawn{border-color:var(--accent);box-shadow:0 0 0 2px rgba(167,139,250,.3)}
+.cell.hit{background:linear-gradient(180deg,#4ade80,#22c55e);color:#052e16;border-color:var(--ok);box-shadow:0 4px 16px rgba(34,197,94,.5);animation:pop .4s}
+.cell.miss{opacity:.5}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
+.drawRow{padding:10px 12px;background:#0f0a1e;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.drawHead{display:flex;justify-content:space-between;align-items:center}
+.drawHead h3{font-size:11px;letter-spacing:.7px;color:var(--gold2);font-weight:900}
+.drawHead .count{font-size:11px;background:var(--card2);border:1px solid var(--line);padding:3px 8px;border-radius:999px;font-weight:800}
+.balls{display:flex;flex-wrap:wrap;gap:6px;min-height:36px}
+.ball{width:36px;height:36px;border-radius:50%;background:linear-gradient(180deg,#ede9fe,#a78bfa);color:#1a0a2e;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,0,0,.2);box-shadow:0 3px 8px rgba(0,0,0,.3);animation:drop .4s}
+.ball.hit{background:linear-gradient(180deg,#4ade80,#16a34a);color:#052e16;border-color:var(--ok);box-shadow:0 0 0 2px rgba(34,197,94,.4)}
+@keyframes drop{0%{transform:translateY(-20px) scale(.8);opacity:0}100%{transform:translateY(0) scale(1);opacity:1}}
+.payout{padding:10px 12px;background:var(--card2);border-top:1px solid var(--line);display:flex;gap:6px;flex-wrap:wrap}
+.pay{flex:1;min-width:52px;background:#0f0a1e;border:1px solid var(--line);border-radius:8px;padding:6px;text-align:center}
+.pay.hit{border-color:var(--ok);background:rgba(34,197,94,.12)}
+.pay.jackpot{border-color:var(--gold);background:rgba(250,204,21,.15)}
+.pay .k{font-size:9px;letter-spacing:.6px;color:var(--muted);font-weight:800}
+.pay .v{font-size:11px;font-weight:900;margin-top:2px}
+.controls{display:flex;gap:8px;padding:10px 12px;background:var(--card);border-top:1px solid var(--line)}
+.btn{flex:1;min-height:48px;border-radius:12px;border:1px solid var(--line);font-weight:900;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:.15s}
+.btn:active{transform:scale(.97)}
+.btnPrimary{background:linear-gradient(180deg,var(--gold2),var(--gold));color:#1a0a2e;border-color:var(--gold);box-shadow:0 6px 16px rgba(250,204,21,.35)}
+.btnGhost{background:#0f0a1e;color:#ede9fe}
+.btnQuick{background:#241845;color:var(--gold2);border-color:var(--line)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.footer{display:flex;gap:8px}
+.info{flex:1;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center}
+.info .k{font-size:9px;letter-spacing:.7px;color:var(--muted);font-weight:800}
+.info .v{font-size:12px;font-weight:900;margin-top:3px}
+.particles{position:fixed;inset:0;pointer-events:none;z-index:40}
+.p{position:absolute;width:8px;height:8px;border-radius:50%;animation:fall 1s forwards}
+@keyframes fall{0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+.overlay{position:fixed;inset:0;background:rgba(8,5,20,.75);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+.overlay.show{display:flex}
+.modal{width:100%;max-width:380px;background:linear-gradient(180deg,#241845,#1a1230);border:1px solid var(--line);border-radius:18px;padding:18px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.6)}
+.modal h3{font-size:18px;font-weight:900}
+.modal p{font-size:13px;color:var(--muted);margin:8px 0;line-height:1.5}
+.stars{font-size:20px;letter-spacing:3px;margin:6px 0}
+.codeBox{background:#0f0a1e;border:1px dashed var(--line);border-radius:10px;padding:10px;font-family:monospace;font-size:11px;color:var(--gold2);margin:8px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <h1><span>🎰</span> FORTY RUSH <span style="font-size:10px;background:#0f0a1e;border:1px solid var(--line);padding:3px 7px;border-radius:999px;letter-spacing:.7px">LOTTERY</span></h1>
+      <div class="badge" id="levelBadge">LEVEL 1</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="k">LIVES</div><div class="v" id="livesEl">♥♥♥</div></div>
+      <div class="stat timer"><div class="k">CLOCK</div><div class="v" id="clockEl">15s</div></div>
+      <div class="stat"><div class="k">SCORE</div><div class="v" id="scoreEl">$0</div></div>
+      <div class="stat"><div class="k">BEST</div><div class="v" id="bestEl">$0</div></div>
+    </div>
+  </div>
+
+  <div class="phaseCard">
+    <div class="phaseHead">
+      <h2 id="phaseTitle">PICK 6 NUMBERS — 15s!</h2>
+      <div class="pill" id="pickCount">0/6 picked</div>
+    </div>
+    <div class="timerBar"><div class="timerFill" id="timerFill"></div></div>
+    <div class="grid" id="grid"></div>
+    <div class="drawRow">
+      <div class="drawHead"><h3>● DRAWN NUMBERS (15)</h3><div class="count" id="drawCount">0/15</div></div>
+      <div class="balls" id="balls"></div>
+    </div>
+    <div class="payout" id="payout"></div>
+    <div class="controls">
+      <button class="btn btnQuick" id="quickBtn">🎲 Quick Pick</button>
+      <button class="btn btnGhost" id="clearBtn">↺ Clear</button>
+      <button class="btn btnPrimary" id="lockBtn">LOCK IN →</button>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="info"><div class="k">LEVEL</div><div class="v" id="levelEl">1</div></div>
+    <div class="info"><div class="k">MATCHES</div><div class="v" id="matchesEl">—</div></div>
+    <div class="info"><div class="k">WIN STREAK</div><div class="v" id="streakEl">0</div></div>
+    <div class="info"><div class="k">JACKPOTS</div><div class="v" id="jackpotEl">0</div></div>
+  </div>
+  <div style="text-align:center;font-size:10px;color:var(--muted);letter-spacing:.6px;padding:4px">TAP 6 CELLS IN 15s • 15 BALLS DROP ONE BY ONE • 6/6 = JACKPOT!</div>
+</div>
+<div class="particles" id="particles"></div>
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+<script>
+const PAYOUTS={0:0,1:0,2:5,3:25,4:150,5:2000,6:10000};
+let level=1,lives=3,score=0,best=0,streak=0,jackpots=0,picks=new Set(),drawn=[],matches=0,phase='pick',clock=15,clockId=null,drawId=null;
+
+const grid=document.getElementById('grid'),balls=document.getElementById('balls'),payout=document.getElementById('payout'),clockEl=document.getElementById('clockEl'),timerFill=document.getElementById('timerFill'),pickCount=document.getElementById('pickCount'),phaseTitle=document.getElementById('phaseTitle'),levelBadge=document.getElementById('levelBadge'),livesEl=document.getElementById('livesEl'),scoreEl=document.getElementById('scoreEl'),bestEl=document.getElementById('bestEl'),levelEl=document.getElementById('levelEl'),matchesEl=document.getElementById('matchesEl'),streakEl=document.getElementById('streakEl'),jackpotEl=document.getElementById('jackpotEl'),drawCount=document.getElementById('drawCount'),overlay=document.getElementById('overlay'),modal=document.getElementById('modal');
+
+function load(){try{const s=JSON.parse(localStorage.getItem('fortyRushSave')||'{}');if(s.best) best=s.best;if(s.level) level=s.level;if(s.jackpots) jackpots=s.jackpots;}catch(e){}}
+function save(){localStorage.setItem('fortyRushSave',JSON.stringify({best,level,jackpots}));}
+function updateStats(){
+  livesEl.textContent='♥'.repeat(lives)+'♡'.repeat(3-lives);livesEl.style.color=lives===1?'var(--bad)':lives===2?'var(--gold)':'#ff6b9d';
+  scoreEl.textContent='$'+score.toLocaleString();bestEl.textContent='$'+best.toLocaleString();levelEl.textContent=level;levelBadge.textContent='LEVEL '+level;
+  matchesEl.textContent=phase==='result'?matches+'/6':'—';streakEl.textContent=streak;jackpotEl.textContent=jackpots;
+  pickCount.textContent=picks.size+'/6 picked';pickCount.style.background=picks.size===6?'var(--ok)':'var(--gold)';pickCount.style.color=picks.size===6?'#fff':'#1a0a2e';
+  drawCount.textContent=drawn.length+'/15';
+}
+function buildGrid(){
+  grid.innerHTML='';
+  for(let i=1;i<=40;i++){
+    const c=document.createElement('button');c.className='cell';c.textContent=i;c.dataset.n=i;
+    c.onclick=()=>togglePick(i);
+    grid.appendChild(c);
+  }
+  renderPayout();
+}
+function renderPayout(){
+  payout.innerHTML='';
+  [2,3,4,5,6].forEach(m=>{
+    const d=document.createElement('div');d.className='pay'+(matches===m?' hit':'')+(m===6?' jackpot':'');
+    const mult=level;const val=PAYOUTS[m]*mult;
+    d.innerHTML=`<div class="k">${m} MATCH${m>1?'ES':''}</div><div class="v">$${val.toLocaleString()}</div>`;
+    payout.appendChild(d);
+  });
+}
+function togglePick(n){
+  if(phase!=='pick') return;
+  if(picks.has(n)) picks.delete(n);
+  else { if(picks.size>=6){toast('Max 6 picks — tap to remove');return;} picks.add(n); }
+  renderGridState();updateStats();
+  if(navigator.vibrate) navigator.vibrate(15);
+}
+function renderGridState(){
+  document.querySelectorAll('.cell').forEach(c=>{
+    const n=parseInt(c.dataset.n);
+    c.classList.toggle('picked',picks.has(n));
+    c.classList.toggle('hit',phase==='result'&&picks.has(n)&&drawn.includes(n));
+    c.classList.toggle('drawn',drawn.includes(n));
+    c.classList.toggle('miss',phase==='result'&&picks.has(n)&&!drawn.includes(n));
+  });
+}
+function startClock(){
+  clearInterval(clockId);clock=15;phase='pick';phaseTitle.textContent='PICK 6 NUMBERS — 15s!';timerFill.style.width='100%';timerFill.style.background='linear-gradient(90deg,var(--ok),var(--gold),var(--bad))';
+  clockId=setInterval(()=>{
+    clock--;clockEl.textContent=clock+'s';timerFill.style.width=(clock/15*100)+'%';
+    if(clock<=5) timerFill.style.background='var(--bad)';
+    else if(clock<=10) timerFill.style.background='var(--gold)';
+    if(clock<=0){clearInterval(clockId);autoLock();}
+  },1000);
+}
+function autoLock(){
+  if(picks.size===0){ // quick pick if none
+    quickPick();
+  } else if(picks.size<6){
+    // fill remaining randomly
+    while(picks.size<6){
+      const r=Math.floor(Math.random()*40)+1;
+      picks.add(r);
+    }
+    renderGridState();updateStats();
+  }
+  lockIn(true);
+}
+function quickPick(){
+  if(phase!=='pick') return;
+  picks.clear();
+  while(picks.size<6){picks.add(Math.floor(Math.random()*40)+1);}
+  renderGridState();updateStats();toast('Quick Pick! 🎲');
+}
+function lockIn(isAuto=false){
+  if(phase!=='pick') return;
+  if(picks.size!==6){toast('Pick 6 numbers first!');return;}
+  clearInterval(clockId);
+  phase='draw';
+  const bonus=isAuto?0:Math.max(0,clock*2);
+  if(bonus) toast(`Speed bonus +$${bonus}!`);
+  phaseTitle.textContent='DRAWING 15 BALLS...';
+  // generate 15 unique drawn numbers 1-40
+  drawn=[];
+  const pool=[...Array(40)].map((_,i)=>i+1).sort(()=>Math.random()-0.5);
+  drawn=pool.slice(0,15);
+  balls.innerHTML='';drawCount.textContent='0/15';
+  let idx=0;
+  drawId=setInterval(()=>{
+    const n=drawn[idx];
+    const b=document.createElement('div');b.className='ball'+(picks.has(n)?' hit':'');b.textContent=n;balls.appendChild(b);
+    // mark grid
+    document.querySelectorAll('.cell').forEach(c=>{if(parseInt(c.dataset.n)===n) c.classList.add('drawn');});
+    if(picks.has(n)){b.classList.add('hit');document.querySelectorAll('.cell').forEach(c=>{if(parseInt(c.dataset.n)===n) c.classList.add('hit');});particlesAt(b);}
+    drawCount.textContent=(idx+1)+'/15';
+    idx++;
+    if(idx>=15){clearInterval(drawId);setTimeout(showResult,600);}
+  },400);
+}
+function particlesAt(el){
+  const rect=el.getBoundingClientRect();
+  for(let i=0;i<8;i++){
+    const p=document.createElement('div');p.className='p';p.style.left=(rect.left+rect.width/2)+'px';p.style.top=(rect.top)+'px';
+    p.style.background=['#facc15','#22c55e','#a78bfa','#f472b6'][Math.floor(Math.random()*4)];
+    p.style.transform=`translate(${(Math.random()-0.5)*80}px,0)`;
+    document.getElementById('particles').appendChild(p);
+    setTimeout(()=>p.remove(),1000);
+  }
+}
+function confetti(){
+  for(let i=0;i<30;i++){
+    const p=document.createElement('div');p.className='p';p.style.left=Math.random()*100+'vw';p.style.top='-10px';
+    p.style.background=['#facc15','#22c55e','#a78bfa','#f472b6','#38bdf8'][Math.floor(Math.random()*5)];
+    p.style.animationDuration=(0.8+Math.random()*0.6)+'s';
+    document.getElementById('particles').appendChild(p);
+    setTimeout(()=>p.remove(),1400);
+  }
+}
+function showResult(){
+  phase='result';
+  matches=[...picks].filter(n=>drawn.includes(n)).length;
+  const base=PAYOUTS[matches]||0;
+  const mult=level;
+  const win=base*mult;
+  const isJackpot=matches===6;
+  if(isJackpot) jackpots++;
+  score+=win;
+  if(score>best) best=score;
+  renderGridState();renderPayout();updateStats();save();
+  if(matches>=2){streak++; if(win>=100) confetti();} else {lives--; streak=0;}
+  let title='',msg='',stars=0;
+  if(isJackpot){title='🎉 JACKPOT!!!';msg=`Perfect 6/6! You hit the jackpot for $${win.toLocaleString()}!`;stars=3;}
+  else if(matches===5){title='💎 AMAZING!';msg=`5 matches! $${win.toLocaleString()} — one away from jackpot!`;stars=3;}
+  else if(matches===4){title='🔥 GREAT!';msg=`4 matches! $${win.toLocaleString()} keeps you alive.`;stars=2;}
+  else if(matches>=2){title='✅ WIN!';msg=`${matches} matches — $${win.toLocaleString()}!`;stars=1;}
+  else {title=lives<=0?'💀 BUSTED!':'😢 NO WIN';msg=matches===1?`Only 1 match — no payout. ${lives} lives left.`:`0 matches — no payout. ${lives} lives left.`;stars=0;}
+  if(lives<=0){
+    const html=`<div style="font-size:36px">💀</div><h3>GAME OVER</h3><p>Out of lives! Final score $${score.toLocaleString()} • Best $${best.toLocaleString()}</p><div class="stars">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</div><div class="codeBox">Level ${level} • Jackpots ${jackpots} • Streak ${streak}</div><button class="btn btnPrimary" style="width:100%;margin-top:12px" onclick="restartGame()">PLAY AGAIN ↺</button><button class="btn btnGhost" style="width:100%;margin-top:8px" onclick="closeModal()">CLOSE</button>`;
+    showModal(html);
+  } else {
+    const nextLevel=matches>=3;
+    if(nextLevel) level++;
+    const html=`<div style="font-size:36px">${isJackpot?'🎉':matches>=2?'✅':'😢'}</div><h3>${title}</h3><p>${msg}</p><div class="stars">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</div><div class="codeBox">${matches}/6 matches • 15 drawn: ${drawn.join(', ')}<br>Your picks: ${[...picks].join(', ')} • Level ${level} • Lives ${'♥'.repeat(lives)}</div><button class="btn btnPrimary" style="width:100%;margin-top:12px" onclick="nextRound()">${nextLevel?'NEXT LEVEL →':'TRY AGAIN →'}</button><button class="btn btnGhost" style="width:100%;margin-top:8px" onclick="closeModal()">REVIEW BOARD</button>`;
+    showModal(html);
+    if(nextLevel) save();
+  }
+  updateStats();
+}
+function nextRound(){
+  closeModal();picks.clear();drawn=[];balls.innerHTML='';drawCount.textContent='0/15';phase='pick';
+  document.querySelectorAll('.cell').forEach(c=>c.className='cell');
+  renderPayout();updateStats();startClock();
+}
+function restartGame(){
+  closeModal();level=1;lives=3;score=0;streak=0;picks.clear();drawn=[];balls.innerHTML='';drawCount.textContent='0/15';phase='pick';
+  document.querySelectorAll('.cell').forEach(c=>c.className='cell');
+  renderPayout();updateStats();save();startClock();
+}
+function showModal(html){modal.innerHTML=html;overlay.classList.add('show');}
+window.closeModal=()=>overlay.classList.remove('show');
+window.nextRound=nextRound;window.restartGame=restartGame;
+overlay.onclick=(e)=>{if(e.target===overlay) closeModal();};
+function toast(msg){
+  const t=document.createElement('div');t.textContent=msg;t.style.cssText='position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#241845;color:#fff;padding:10px 14px;border-radius:999px;font-size:13px;font-weight:800;border:1px solid var(--line);z-index:60';
+  document.body.appendChild(t);setTimeout(()=>t.remove(),1600);
+}
+document.getElementById('quickBtn').onclick=quickPick;
+document.getElementById('clearBtn').onclick=()=>{if(phase!=='pick') return;picks.clear();renderGridState();updateStats();};
+document.getElementById('lockBtn').onclick=()=>lockIn(false);
+load();buildGrid();renderGridState();updateStats();startClock();
+</script>
+</body>
+</html>

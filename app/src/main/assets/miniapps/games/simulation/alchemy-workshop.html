@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Alchemy Recipe Lab</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f1410;--card:#1b2420;--card2:#222e28;--accent:#e8b44a;--accent2:#4ecdc4;--accent3:#a78bfa;--text:#f1efe6;--muted:#9aa89e;--danger:#ef6b6b;--success:#5dd39e;--border:#2d3a33}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif;overflow-x:hidden}
+body{max-width:428px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column}
+button{font:inherit}
+.topbar{position:sticky;top:0;z-index:10;background:rgba(15,20,16,0.95);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:10px;background:radial-gradient(circle at 30% 30%, #ffe9a8, #e8b44a 45%, #8a5a12 100%);display:grid;place-items:center;font-size:18px;box-shadow:0 2px 10px rgba(232,180,74,0.4)}
+.brand h1{font-size:15px;letter-spacing:0.04em;line-height:1}
+.brand p{font-size:11px;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase}
+.stars-badge{background:var(--card);border:1px solid var(--border);border-radius:999px;padding:6px 10px;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700}
+.stars-badge span{color:var(--accent)}
+.tabs{display:flex;gap:6px;padding:10px 12px;background:var(--bg);border-bottom:1px solid var(--border)}
+.tab{flex:1;padding:10px 6px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-weight:700;font-size:13px;text-align:center;cursor:pointer;min-height:44px}
+.tab.active{background:var(--accent);color:#1a1200;border-color:var(--accent);box-shadow:0 4px 12px rgba(232,180,74,0.3)}
+.view{flex:1;padding:12px;display:none;flex-direction:column;gap:12px}
+.view.active{display:flex}
+.commission-strip{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.commission-strip::-webkit-scrollbar{display:none}
+.cchip{min-width:72px;flex-shrink:0;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:8px 6px;text-align:center;cursor:pointer;position:relative}
+.cchip.active{border-color:var(--accent);background:#2a2412;box-shadow:0 0 0 2px rgba(232,180,74,0.25)}
+.cchip .num{font-size:11px;color:var(--muted);font-weight:700}
+.cchip .cname{font-size:11px;font-weight:700;line-height:1.2;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cchip .cstars{font-size:10px;margin-top:3px;letter-spacing:1px}
+.cchip.locked{opacity:0.45}
+.cchip .lock{position:absolute;top:4px;right:6px;font-size:10px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
+.card h2{font-size:16px;line-height:1.2}
+.card .subtitle{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
+.targets{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
+.target{border-radius:12px;padding:10px 8px;text-align:center;border:1px solid var(--border);background:var(--card2)}
+.target .tlabel{font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.target .tval{font-size:14px;font-weight:800;margin-top:4px}
+.target .tbar{height:6px;background:#0f1410;border-radius:99px;margin-top:6px;overflow:hidden}
+.target .tfill{height:100%;border-radius:99px;transition:width 0.4s}
+.sliders{display:flex;flex-direction:column;gap:14px}
+.slider-group{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
+.sg-head{display:flex;justify-content:space-between;align-items:center}
+.sg-head label{font-size:13px;font-weight:800;letter-spacing:0.02em}
+.sg-head .val{font-size:13px;font-weight:800;background:var(--card2);border:1px solid var(--border);padding:4px 10px;border-radius:999px;min-width:52px;text-align:center}
+.sg-head .icon{font-size:16px}
+input[type=range]{width:100%;appearance:none;height:44px;background:transparent;margin-top:6px}
+input[type=range]::-webkit-slider-runnable-track{height:10px;border-radius:99px;background:#0f1410;border:1px solid var(--border)}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:28px;height:28px;border-radius:50%;background:var(--accent);border:3px solid #fff;margin-top:-10px;box-shadow:0 2px 8px rgba(0,0,0,0.4)}
+.heat::-webkit-slider-thumb{background:#ff7a45 !important}
+.time::-webkit-slider-thumb{background:#4ecdc4 !important}
+.apparatus::-webkit-slider-thumb{background:#a78bfa !important}
+.scale{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);font-weight:600;margin-top:-8px}
+.desc{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{padding:14px 12px;border-radius:14px;border:1px solid var(--border);font-weight:800;font-size:14px;cursor:pointer;min-height:48px;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn:active{transform:scale(0.98)}
+.btn-ghost{background:var(--card);color:var(--text)}
+.btn-primary{background:var(--accent);color:#1a1200;border-color:var(--accent)}
+.btn-teal{background:#1a3a38;color:#b8fff8;border-color:#2a5a57}
+.btn:disabled{opacity:0.5;pointer-events:none}
+.result{border-radius:16px;padding:14px;border:1px solid var(--border);background:var(--card2);display:none}
+.result.show{display:block}
+.result h3{font-size:13px;letter-spacing:0.06em;text-transform:uppercase}
+.meters{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+.meter{text-align:center}
+.meter .mlabel{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase}
+.meter .mval{font-size:18px;font-weight:900;margin-top:2px}
+.meter .mbar{height:8px;background:#0f1410;border-radius:99px;margin-top:6px;overflow:hidden;border:1px solid var(--border)}
+.meter .mfill{height:100%;border-radius:99px;transition:width 0.5s}
+.flavor{font-size:12px;color:var(--muted);line-height:1.5;margin-top:10px;font-style:italic;background:rgba(0,0,0,0.2);padding:10px;border-radius:10px;border-left:3px solid var(--accent)}
+.stars-row{font-size:20px;letter-spacing:4px;text-align:center;margin-top:8px}
+.ledger-item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.ledger-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800}
+.ledger-meta{font-size:11px;color:var(--muted);line-height:1.4}
+.badge{font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;border:1px solid var(--border)}
+.badge-trial{background:#1a2a2e;color:#7ee8e0}
+.badge-assay{background:#2a2412;color:var(--accent);border-color:rgba(232,180,74,0.4)}
+.code-box{background:#0f1410;border:1px solid var(--border);border-radius:12px;padding:12px;font-family:monospace;font-size:11px;word-break:break-all;color:var(--muted);max-height:120px;overflow:auto}
+.mentor{background:linear-gradient(135deg, #1e2a24, #1b2420);border:1px solid #2d3a33;border-radius:16px;padding:14px;position:relative;overflow:hidden}
+.mentor::before{content:"";position:absolute;top:-20px;right:-20px;width:80px;height:80px;background:radial-gradient(circle, rgba(232,180,74,0.15), transparent 70%)}
+.mentor h4{font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent)}
+.mentor p{font-size:12px;line-height:1.5;color:#cbd8d0;margin-top:6px}
+.mentor .quote{border-left:3px solid var(--accent2);padding-left:10px;margin-top:8px;font-style:italic;color:var(--muted)}
+.small{font-size:11px;color:var(--muted);line-height:1.4}
+.kbd{display:inline-block;background:#0f1410;border:1px solid var(--border);border-bottom-width:2px;padding:2px 6px;border-radius:6px;font-size:11px;font-weight:700}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#1a1200;color:#ffe9a8;border:1px solid var(--accent);padding:10px 16px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,0.5);display:none;z-index:20}
+.toast.show{display:block;animation:pop 0.3s}
+@keyframes pop{from{transform:translateX(-50%) translateY(10px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">
+    <div class="logo">⚗️</div>
+    <div><h1>ALCHEMY LAB</h1><p>Commissions • Trials • Assay</p></div>
+  </div>
+  <div class="stars-badge">⭐ <span id="totalStars">0</span> / 36</div>
+</div>
+<div class="tabs">
+  <button class="tab active" data-tab="lab">🧪 Lab</button>
+  <button class="tab" data-tab="ledger">📜 Ledger</button>
+  <button class="tab" data-tab="codex">📖 Codex</button>
+</div>
+
+<!-- LAB VIEW -->
+<div class="view active" id="view-lab">
+  <div class="commission-strip" id="strip"></div>
+  <div class="card" id="commissionCard"></div>
+  <div class="sliders">
+    <div class="slider-group">
+      <div class="sg-head"><label><span class="icon">🔥</span> Heat</label><span class="val" id="vHeat">50</span></div>
+      <input type="range" min="0" max="100" value="50" id="sHeat" class="heat">
+      <div class="scale"><span>Gentle</span><span>Kiln</span><span>Inferno</span></div>
+      <div class="desc" id="dHeat">Low heat preserves volatiles; high heat forces reactions but risks scorching.</div>
+    </div>
+    <div class="slider-group">
+      <div class="sg-head"><label><span class="icon">⏳</span> Time</label><span class="val" id="vTime">50</span></div>
+      <input type="range" min="0" max="100" value="50" id="sTime" class="time">
+      <div class="scale"><span>Flash</span><span>Steep</span><span>Overnight</span></div>
+      <div class="desc" id="dTime">Short brews are cheap and bright; long digestions deepen potency at cost.</div>
+    </div>
+    <div class="slider-group">
+      <div class="sg-head"><label><span class="icon">⚙️</span> Apparatus</label><span class="val" id="vApp">50</span></div>
+      <input type="range" min="0" max="100" value="50" id="sApp" class="apparatus">
+      <div class="scale"><span>Mortar</span><span>Alembic</span><span>Retort Array</span></div>
+      <div class="desc" id="dApp">Simple tools are cheap; refined apparatus boosts purity but adds expense.</div>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn btn-ghost" id="btnUndo">↩️ Undo</button>
+    <button class="btn btn-ghost" id="btnReset">♻️ Reset</button>
+  </div>
+  <div class="actions">
+    <button class="btn btn-teal" id="btnTrial">🔬 Run Trial</button>
+    <button class="btn btn-primary" id="btnAssay">📦 Submit Batch</button>
+  </div>
+  <div class="result" id="resultBox"></div>
+  <div class="mentor" id="mentorBox"></div>
+  <div class="small" style="text-align:center;padding:8px">Tip: Run Trial is free and safe. Submit Batch is judged for stars. Undo reverses your last slider move.</div>
+</div>
+
+<!-- LEDGER VIEW -->
+<div class="view" id="view-ledger">
+  <div class="card">
+    <h2>Reaction Ledger</h2>
+    <p class="subtitle">Every trial and assay is recorded. Stars persist on this device.</p>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-ghost" style="flex:1" id="btnExport">📋 Copy Save Code</button>
+      <button class="btn btn-ghost" style="flex:1" id="btnImport">📥 Import Code</button>
+    </div>
+    <div class="code-box" id="codeBox" style="margin-top:10px;display:none"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-ghost" style="flex:1;font-size:12px" id="btnClearLedger">Clear Ledger</button>
+      <button class="btn btn-ghost" style="flex:1;font-size:12px;color:var(--danger)" id="btnWipe">Wipe Progress</button>
+    </div>
+  </div>
+  <div id="ledgerList" style="display:flex;flex-direction:column;gap:8px"></div>
+</div>
+
+<!-- CODEX VIEW -->
+<div class="view" id="view-codex">
+  <div class="card">
+    <h2>📖 Mentor Codex</h2>
+    <p class="subtitle">Master Aldric's marginalia — tap a commission in Lab to see its specific note.</p>
+  </div>
+  <div class="mentor">
+    <h4>⚗️ The Three Levers</h4>
+    <p><b>Heat</b> drives potency but burns purity if too high. <b>Time</b> deepens extraction; too long wastes coin. <b>Apparatus</b> refines purity and stabilizes, but the finest glass costs dearly.</p>
+    <p class="quote">"A good alchemist does not chase perfection — she meets the contract." — Aldric</p>
+  </div>
+  <div class="mentor">
+    <h4>🎯 Reading Targets</h4>
+    <p>Each commission lists <b>Potency ≥</b>, <b>Purity ≥</b>, and <b>Cost ≤</b>. Meet 1 for ⭐, 2 for ⭐⭐, all 3 for ⭐⭐⭐. Cost is in drams; lower is cheaper.</p>
+    <p class="quote">"The client pays for what they asked, not for your masterpiece."</p>
+  </div>
+  <div class="mentor">
+    <h4>🧪 Trial vs Assay</h4>
+    <p><b>Run Trial</b> simulates in your own crucible — no penalty, no stars. <b>Submit Batch</b> sends to the Guild Assayer; it is logged and scored. Use trials to bracket the sweet spot.</p>
+  </div>
+  <div class="mentor">
+    <h4>🔓 Unlocking</h4>
+    <p>Commissions 1–3 are open. Earn at least ⭐ on a commission to unlock the next. Commission 12, the Panacea, requires 24 total stars.</p>
+  </div>
+  <div class="mentor">
+    <h4>💾 Save Codes</h4>
+    <p>Your stars and ledger live in this browser. Use <b>Copy Save Code</b> in Ledger to back up or move devices. Paste it back with Import.</p>
+  </div>
+  <div class="card">
+    <h2>Structure & Features</h2>
+    <p class="subtitle" style="line-height:1.6">
+      <b>12 Commissions</b> with escalating trade-offs.<br>
+      <b>3 Sliders</b> (Heat/Time/Apparatus 0–100) with live values.<br>
+      <b>Trial</b> → preview meters + flavor text.<br>
+      <b>Assay</b> → scored vs targets, stars awarded, ledger entry.<br>
+      <b>Mentor hint</b> per commission + general Codex.<br>
+      <b>Undo</b> (last slider state) & <b>Reset</b> (to 50/50/50).<br>
+      <b>Persist</b> stars + ledger in localStorage + exportable save code.<br>
+      Mobile-first: 360–428px, ≥44px touch targets, no horizontal scroll.
+    </p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const COMMISSIONS = [
+  {id:1, name:"Soothing Draught", client:"Village Infirmary", desc:"A gentle sleep aid for restless children. Must be pure and cheap.", ideal:{h:30,t:35,a:40}, targets:{potency:55,purity:70,cost:55}, hint:"Keep heat low. The infirmary cannot afford retort arrays — stay near Mortar/Alembic."},
+  {id:2, name:"Iron Tonic", client:"City Guard", desc:"Fortify recruits before march. Potency matters more than finesse.", ideal:{h:65,t:55,a:30}, targets:{potency:70,purity:50,cost:60}, hint:"Push heat and time. Purity can be rough — guards care about strength."},
+  {id:3, name:"Glass Polish", client:"Lensmakers' Guild", desc:"Ultra-pure solvent. Cost is secondary to flawless clarity.", ideal:{h:25,t:70,a:85}, targets:{potency:50,purity:80,cost:75}, hint:"Apparatus is everything. Low heat, long steep, finest glass."},
+  {id:4, name:"Ember Oil", client:"Forge Masters", desc:"Fuel additive that must burn hot and stay stable.", ideal:{h:85,t:40,a:60}, targets:{potency:75,purity:60,cost:65}, hint:"High heat is non-negotiable. Balance with moderate apparatus to keep it from fouling."},
+  {id:5, name:"River Antidote", client:"Baron's Court", desc:"Counteract riverblight. All three specs are tight.", ideal:{h:45,t:60,a:65}, targets:{potency:68,purity:68,cost:58}, hint:"The middle path. No extreme — 40–65 on all levers, then fine-tune."},
+  {id:6, name:"Glimmer Ink", client:"Archivists", desc:"Luminescent ink for vault sigils. Purity and cost both strict.", ideal:{h:35,t:80,a:75}, targets:{potency:60,purity:75,cost:55}, hint:"Long time + good apparatus, but keep heat gentle or the glow dulls."},
+  {id:7, name:"Storm Vial", client:"Sky Captains", desc:"Lightning in a bottle. Extreme potency, purity can slip.", ideal:{h:90,t:75,a:50}, targets:{potency:82,purity:55,cost:70}, hint:"Max heat and long brew. Apparatus only needs to contain it."},
+  {id:8, name:"Hollow Honey", client:"Confectioners", desc:"Sweetener that never crystallizes. Cheap and pure.", ideal:{h:40,t:45,a:55}, targets:{potency:58,purity:72,cost:50}, hint:"Cost is king here. Pull apparatus back — a simple alembic will do."},
+  {id:9, name:"Wraith Veil", client:"Theatre Nocturne", desc:"Smoke that hangs without scent. Demands purity.", ideal:{h:30,t:65,a:90}, targets:{potency:62,purity:85,cost:68}, hint:"Apparatus near max, heat low. Time is your friend."},
+  {id:10, name:"Sunsteel Quench", client:"Armourers", desc:"Quenching brine for sunsteel. Potency and cost both high bars.", ideal:{h:75,t:50,a:70}, targets:{potency:78,purity:65,cost:55}, hint:"Hot and precise. You must be potent yet cheap — shave apparatus to 60–70."},
+  {id:11, name:"Memory Mead", client:"Monastery", desc:"Recall draught for elders. Balanced, but all thresholds high.", ideal:{h:50,t:70,a:70}, targets:{potency:74,purity:74,cost:60}, hint:"True balance — 50/70/70 is close. Nudge heat last."},
+  {id:12, name:"Panacea Attempt", client:"Guild Master", desc:"The impossible commission. Meet every spec or fail gloriously.", ideal:{h:55,t:60,a:80}, targets:{potency:80,purity:80,cost:55}, hint:"The final exam. High purity + low cost is brutal — you need near-perfect tuning. Good luck, apprentice."}
+];
+
+const STORAGE_KEY = "alchemyLab_v2";
+let state = {
+  current:1,
+  sliders:{h:50,t:50,a:50},
+  stars:{}, // id -> 0-3
+  ledger:[],
+  undoStack:[]
+};
+
+function load(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(raw){ const p=JSON.parse(raw); state.stars=p.stars||{}; state.ledger=p.ledger||[]; state.current=p.current||1; }
+  }catch(e){}
+}
+function save(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({stars:state.stars, ledger:state.ledger, current:state.current}));
+}
+function totalStars(){ return Object.values(state.stars).reduce((a,b)=>a+b,0); }
+function isUnlocked(id){
+  if(id<=3) return true;
+  if(id===12) return totalStars()>=24;
+  // need at least 1 star on previous
+  return (state.stars[id-1]||0) >=1;
+}
+function compute(comm, h,t,a){
+  // distance based
+  const dh = Math.abs(h - comm.ideal.h);
+  const dt = Math.abs(t - comm.ideal.t);
+  const da = Math.abs(a - comm.ideal.a);
+  // potency: heat+time weighted
+  let potency = 100 - (dh*0.55 + dt*0.45 + da*0.15);
+  // purity: apparatus + heat inverse
+  let purity = 100 - (da*0.6 + dh*0.35 + dt*0.15);
+  // cost: base + sliders
+  let cost = 20 + h*0.22 + t*0.28 + a*0.32;
+  // clamp
+  potency = Math.max(0, Math.min(100, Math.round(potency)));
+  purity = Math.max(0, Math.min(100, Math.round(purity)));
+  cost = Math.max(0, Math.min(100, Math.round(cost)));
+  return {potency,purity,cost};
+}
+function starsFor(comm, res){
+  let s=0;
+  if(res.potency >= comm.targets.potency) s++;
+  if(res.purity >= comm.targets.purity) s++;
+  if(res.cost <= comm.targets.cost) s++;
+  return s;
+}
+function flavorText(comm,res){
+  if(res.potency<40) return "The crucible sputters weakly. The mixture is thin and unconvincing.";
+  if(res.purity<40) return "A cloudy precipitate swirls — impurities cloud the draught.";
+  if(res.cost>80) return "The retort array gleams, but the bursar will faint at the bill.";
+  if(res.potency>=comm.targets.potency && res.purity>=comm.targets.purity && res.cost<=comm.targets.cost) return "✨ Perfect balance! The liquid sings clear and bright. The Guild will be pleased.";
+  if(res.potency>=comm.targets.potency && res.purity>=comm.targets.purity) return "Potent and pure, but dear. Can you trim cost without losing quality?";
+  if(res.potency>=comm.targets.potency) return "Strong brew! Now refine its clarity.";
+  if(res.purity>=comm.targets.purity) return "Crystal clear — but does it have enough bite?";
+  return "A decent attempt. Adjust one lever at a time and trial again.";
+}
+
+function renderStrip(){
+  const el=document.getElementById('strip');
+  el.innerHTML="";
+  COMMISSIONS.forEach(c=>{
+    const unlocked=isUnlocked(c.id);
+    const s=state.stars[c.id]||0;
+    const div=document.createElement('button');
+    div.className='cchip'+(state.current===c.id?' active':'')+(unlocked?'':' locked');
+    div.innerHTML=`<div class="num">#${c.id}</div><div class="cname">${c.name}</div><div class="cstars">${'★'.repeat(s)}${'☆'.repeat(3-s)}</div>${unlocked?'':'<span class="lock">🔒</span>'}`;
+    div.onclick=()=>{
+      if(!unlocked){ toast(unlockedReason(c.id)); return; }
+      state.current=c.id; save(); renderAll();
+    };
+    el.appendChild(div);
+  });
+}
+function unlockedReason(id){
+  if(id===12) return `Panacea requires 24⭐ (you have ${totalStars()})`;
+  return `Earn ⭐ on #${id-1} to unlock`;
+}
+function renderCommission(){
+  const c=COMMISSIONS[state.current-1];
+  const unlocked=isUnlocked(c.id);
+  const card=document.getElementById('commissionCard');
+  const s=state.stars[c.id]||0;
+  card.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
+      <div><div style="font-size:11px;color:var(--accent);font-weight:800;letter-spacing:0.08em">#${c.id} • ${c.client.toUpperCase()}</div><h2>${c.name}</h2><p class="subtitle">${c.desc}</p></div>
+      <div style="text-align:right"><div style="font-size:12px;font-weight:800">${'★'.repeat(s)}${'☆'.repeat(3-s)}</div><div style="font-size:10px;color:var(--muted)">${s? s+'/3 stars':'Not yet assayed'}</div></div>
+    </div>
+    <div class="targets">
+      <div class="target"><div class="tlabel">Potency ≥</div><div class="tval" style="color:var(--accent2)">${c.targets.potency}</div><div class="tbar"><div class="tfill" style="width:${c.targets.potency}%;background:var(--accent2)"></div></div></div>
+      <div class="target"><div class="tlabel">Purity ≥</div><div class="tval" style="color:var(--accent3)">${c.targets.purity}</div><div class="tbar"><div class="tfill" style="width:${c.targets.purity}%;background:var(--accent3)"></div></div></div>
+      <div class="target"><div class="tlabel">Cost ≤</div><div class="tval" style="color:var(--accent)">${c.targets.cost} ¤</div><div class="tbar"><div class="tfill" style="width:${c.targets.cost}%;background:var(--accent)"></div></div></div>
+    </div>
+    ${!unlocked?`<div style="margin-top:10px;background:#2a1a1a;border:1px solid #4a2a2a;padding:8px;border-radius:10px;font-size:12px;text-align:center">🔒 Locked — ${unlockedReason(c.id)}</div>`:''}
+  `;
+  // mentor
+  const m=document.getElementById('mentorBox');
+  m.innerHTML=`<h4>🧙 Mentor Aldric on #${c.id}</h4><p>${c.hint}</p><p class="quote">Ideal rumored near Heat ${c.ideal.h} · Time ${c.ideal.t} · Apparatus ${c.ideal.a} — but the contract is what matters.</p>`;
+}
+function renderSliders(){
+  document.getElementById('vHeat').textContent=state.sliders.h;
+  document.getElementById('vTime').textContent=state.sliders.t;
+  document.getElementById('vApp').textContent=state.sliders.a;
+  document.getElementById('sHeat').value=state.sliders.h;
+  document.getElementById('sTime').value=state.sliders.t;
+  document.getElementById('sApp').value=state.sliders.a;
+}
+function renderLedger(){
+  const list=document.getElementById('ledgerList');
+  list.innerHTML="";
+  if(state.ledger.length===0){
+    list.innerHTML=`<div class="small" style="text-align:center;padding:20px">No trials yet. Go brew something!</div>`;
+    return;
+  }
+  [...state.ledger].reverse().forEach(e=>{
+    const div=document.createElement('div');
+    div.className='ledger-item';
+    const c=COMMISSIONS.find(x=>x.id===e.commission);
+    div.innerHTML=`
+      <div class="ledger-head"><span>#${e.commission} ${c?c.name:''}</span><span class="badge ${e.type==='assay'?'badge-assay':'badge-trial'}">${e.type==='assay'? 'ASSAY '+ '★'.repeat(e.stars) : 'TRIAL'}</span></div>
+      <div class="ledger-meta">H ${e.h} · T ${e.t} · A ${e.a} &nbsp;|&nbsp; Pot ${e.potency} · Pur ${e.purity} · Cost ${e.cost}¤<br>${new Date(e.at).toLocaleString()} — ${e.note||''}</div>
+    `;
+    list.appendChild(div);
+  });
+}
+function renderAll(){
+  document.getElementById('totalStars').textContent=totalStars();
+  renderStrip(); renderCommission(); renderSliders(); renderLedger();
+  // result stays
+}
+function pushUndo(){
+  state.undoStack.push({...state.sliders});
+  if(state.undoStack.length>20) state.undoStack.shift();
+}
+function showResult(res, comm, isAssay){
+  const box=document.getElementById('resultBox');
+  const s=isAssay? starsFor(comm,res) : null;
+  const potPct=res.potency, purPct=res.purity, costPct=100-res.cost; // invert cost for bar (lower cost = fuller)
+  box.className='result show';
+  box.innerHTML=`
+    <h3>${isAssay? '📦 Guild Assay Result' : '🔬 Trial Simulation'}</h3>
+    <div class="meters">
+      <div class="meter"><div class="mlabel">Potency</div><div class="mval" style="color:${res.potency>=comm.targets.potency?'var(--success)':'var(--danger)'}">${res.potency}</div><div class="mbar"><div class="mfill" style="width:${potPct}%;background:var(--accent2)"></div></div><div style="font-size:10px;color:var(--muted)">need ≥${comm.targets.potency}</div></div>
+      <div class="meter"><div class="mlabel">Purity</div><div class="mval" style="color:${res.purity>=comm.targets.purity?'var(--success)':'var(--danger)'}">${res.purity}</div><div class="mbar"><div class="mfill" style="width:${purPct}%;background:var(--accent3)"></div></div><div style="font-size:10px;color:var(--muted)">need ≥${comm.targets.purity}</div></div>
+      <div class="meter"><div class="mlabel">Cost</div><div class="mval" style="color:${res.cost<=comm.targets.cost?'var(--success)':'var(--danger)'}">${res.cost}¤</div><div class="mbar"><div class="mfill" style="width:${costPct}%;background:var(--accent)"></div></div><div style="font-size:10px;color:var(--muted)">need ≤${comm.targets.cost}</div></div>
+    </div>
+    ${isAssay? `<div class="stars-row">${'★'.repeat(s)}${'☆'.repeat(3-s)} &nbsp; ${s===3?'Perfect!': s===2?'Good work': s===1?'Passable':'Failed'}</div>`:''}
+    <div class="flavor">${flavorText(comm,res)}</div>
+  `;
+  box.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+// events
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+['sHeat','sTime','sApp'].forEach(id=>{
+  const el=document.getElementById(id);
+  el.addEventListener('pointerdown', ()=>pushUndo());
+  el.addEventListener('input', ()=>{
+    state.sliders.h=parseInt(document.getElementById('sHeat').value);
+    state.sliders.t=parseInt(document.getElementById('sTime').value);
+    state.sliders.a=parseInt(document.getElementById('sApp').value);
+    renderSliders();
+  });
+});
+
+document.getElementById('btnUndo').onclick=()=>{
+  if(state.undoStack.length===0){ toast("Nothing to undo"); return; }
+  state.sliders=state.undoStack.pop();
+  renderSliders(); toast("↩️ Undid last move");
+};
+document.getElementById('btnReset').onclick=()=>{
+  pushUndo();
+  state.sliders={h:50,t:50,a:50};
+  renderSliders();
+  document.getElementById('resultBox').className='result';
+  toast("Reset to 50/50/50");
+};
+document.getElementById('btnTrial').onclick=()=>{
+  const c=COMMISSIONS[state.current-1];
+  if(!isUnlocked(c.id)){ toast(unlockedReason(c.id)); return; }
+  const res=compute(c, state.sliders.h, state.sliders.t, state.sliders.a);
+  state.ledger.push({type:'trial', commission:c.id, h:state.sliders.h, t:state.sliders.t, a:state.sliders.a, potency:res.potency, purity:res.purity, cost:res.cost, at:Date.now(), note:'Trial'});
+  save(); renderLedger();
+  showResult(res,c,false);
+};
+document.getElementById('btnAssay').onclick=()=>{
+  const c=COMMISSIONS[state.current-1];
+  if(!isUnlocked(c.id)){ toast(unlockedReason(c.id)); return; }
+  const res=compute(c, state.sliders.h, state.sliders.t, state.sliders.a);
+  const s=starsFor(c,res);
+  const prev=state.stars[c.id]||0;
+  if(s>prev) state.stars[c.id]=s;
+  state.ledger.push({type:'assay', commission:c.id, h:state.sliders.h, t:state.sliders.t, a:state.sliders.a, potency:res.potency, purity:res.purity, cost:res.cost, stars:s, at:Date.now(), note: s===3?'Masterwork': s===2?'Approved': s===1?'Barely passed':'Rejected'});
+  save(); renderAll();
+  showResult(res,c,true);
+  if(s>prev) toast(`⭐ Earned ${s} stars!`);
+  else if(s===0) toast("No stars — try a trial first");
+  else toast(`Assay: ${s}★ (best remains ${prev}★)`);
+};
+
+// save codes
+document.getElementById('btnExport').onclick=()=>{
+  const code=btoa(unescape(encodeURIComponent(JSON.stringify({stars:state.stars, ledger:state.ledger}))));
+  const box=document.getElementById('codeBox');
+  box.style.display='block';
+  box.textContent=code;
+  navigator.clipboard.writeText(code).then(()=>toast("📋 Save code copied!"),()=>toast("Code ready — long-press to copy"));
+};
+document.getElementById('btnImport').onclick=()=>{
+  const code=prompt("Paste your save code:");
+  if(!code) return;
+  try{
+    const obj=JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+    if(obj.stars) state.stars=obj.stars;
+    if(obj.ledger) state.ledger=obj.ledger;
+    save(); renderAll(); toast("✅ Progress imported");
+  }catch(e){ toast("❌ Invalid code"); }
+};
+document.getElementById('btnClearLedger').onclick=()=>{
+  if(confirm("Clear ledger entries? Stars kept.")){ state.ledger=[]; save(); renderAll(); toast("Ledger cleared"); }
+};
+document.getElementById('btnWipe').onclick=()=>{
+  if(confirm("Wipe ALL stars and ledger? This cannot be undone.")){ state.stars={}; state.ledger=[]; state.current=1; save(); renderAll(); toast("Progress wiped"); }
+};
+
+load(); renderAll();
+</script>
+</body>
+</html>

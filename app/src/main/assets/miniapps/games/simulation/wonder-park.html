@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Park Builder: World Tour</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0f172a;--card:#1e293b;--accent:#f59e0b;--accent2:#06b6d4;--success:#10b981;--danger:#ef4444;--text:#f1f5f9;--muted:#94a3b8;--border:#334155}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);max-width:428px;margin:0 auto;min-height:100vh;overflow-x:hidden}
+button{font-family:inherit}
+.topbar{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:10px 12px 8px;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:20}
+.topbar-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.logo{font-weight:900;font-size:18px;letter-spacing:-0.5px}
+.logo span{color:var(--accent)}
+.stats{display:flex;gap:6px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px 8px;text-align:center;min-width:62px}
+.stat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700}
+.stat-val{font-size:14px;font-weight:800}
+.stat-val.money{color:#4ade80}
+.stat-val.sat{color:#fbbf24}
+.meters{display:flex;gap:8px;margin-top:8px}
+.meter{flex:1;background:var(--card);border-radius:10px;padding:6px 8px;border:1px solid var(--border)}
+.meter-head{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px}
+.meter-bar{height:8px;background:#0f172a;border-radius:99px;overflow:hidden}
+.meter-fill{height:100%;border-radius:99px;transition:width 0.4s}
+.fill-clean{background:linear-gradient(90deg,#06b6d4,#10b981)}
+.fill-queue{background:linear-gradient(90deg,#10b981,#f59e0b,#ef4444)}
+.fill-happy{background:linear-gradient(90deg,#ef4444,#f59e0b,#10b981)}
+.timebar{display:flex;align-items:center;gap:8px;margin-top:8px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px 8px}
+.timebar-left{flex:1}
+.time-label{font-size:11px;color:var(--muted);font-weight:700}
+.time-track{height:6px;background:#0f172a;border-radius:99px;overflow:hidden;margin-top:3px;position:relative}
+.time-progress{height:100%;background:linear-gradient(90deg,var(--accent),#f97316);width:0%;transition:width 0.3s}
+.event-dot{position:absolute;top:50%;transform:translate(-50%,-50%);width:10px;height:10px;background:#fff;border:2px solid var(--accent);border-radius:50%;cursor:pointer}
+.time-controls{display:flex;gap:6px}
+.btn-ctrl{width:44px;height:44px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.btn-ctrl.active{background:var(--accent);color:#000;border-color:var(--accent)}
+.screen{padding:10px 10px 90px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px;margin-bottom:10px}
+.card-title{font-size:14px;font-weight:800;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.cities{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.city{border-radius:14px;padding:10px;border:2px solid var(--border);background:linear-gradient(135deg,#1e293b,#0f172a);cursor:pointer;position:relative;overflow:hidden;min-height:132px;display:flex;flex-direction:column}
+.city.locked{opacity:0.55;filter:grayscale(0.6)}
+.city.active{border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,158,11,0.2)}
+.city-badge{position:absolute;top:6px;right:6px;background:var(--accent);color:#000;font-size:10px;font-weight:800;padding:2px 6px;border-radius:99px}
+.city-lock{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.6);font-size:22px}
+.city-emoji{font-size:28px;margin-bottom:4px}
+.city-name{font-weight:800;font-size:13px;line-height:1.1}
+.city-country{font-size:11px;color:var(--muted)}
+.city-goals{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}
+.goal{font-size:10px;background:#0f172a;border:1px solid var(--border);padding:2px 6px;border-radius:99px}
+.stars{color:var(--accent);letter-spacing:1px;font-size:12px;margin-top:4px}
+.best{font-size:10px;color:var(--muted);margin-top:2px}
+.park-wrap{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:8px}
+.park-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap}
+.park-title{font-weight:800;font-size:14px}
+.park-sub{font-size:11px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;background:#0f172a;padding:6px;border-radius:12px;border:1px solid var(--border);touch-action:manipulation}
+.cell{aspect-ratio:1;background:#1e293b;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;position:relative;cursor:pointer;user-select:none;border:1px solid transparent;min-height:38px}
+.cell.path{background:#334155;border-color:#475569}
+.cell.path::after{content:"";position:absolute;inset:6px;background:repeating-linear-gradient(45deg,#475569 0 4px,#64748b 4px 8px);border-radius:3px;opacity:0.5}
+.cell.ride{background:linear-gradient(135deg,#f59e0b,#f97316);color:#000;font-weight:800;border-color:#fbbf24;flex-direction:column;font-size:14px;line-height:1}
+.cell.ride.facility{background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff}
+.cell.entrance{background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-size:12px;font-weight:800;border-color:#34d399}
+.cell.queue-dot::before{content:"";position:absolute;top:2px;right:2px;width:8px;height:8px;background:var(--danger);border-radius:50%;border:1px solid #fff;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
+.cell-label{font-size:7px;font-weight:800;position:absolute;bottom:1px;left:50%;transform:translateX(-50%);white-space:nowrap;background:rgba(0,0,0,0.6);color:#fff;padding:0 3px;border-radius:3px;max-width:90%;overflow:hidden;text-overflow:ellipsis}
+.toolbar{display:flex;gap:6px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:none}
+.toolbar::-webkit-scrollbar{display:none}
+.tool{flex:0 0 auto;min-width:72px;height:64px;background:var(--card);border:2px solid var(--border);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;padding:4px}
+.tool.active{border-color:var(--accent);background:rgba(245,158,11,0.15)}
+.tool-ico{font-size:20px}
+.tool-name{font-size:10px;font-weight:800;text-align:center;line-height:1}
+.tool-cost{font-size:9px;color:var(--muted)}
+.rides-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.ride-btn{background:#0f172a;border:2px solid var(--border);border-radius:12px;padding:8px;display:flex;gap:8px;align-items:center;cursor:pointer;text-align:left}
+.ride-btn.active{border-color:var(--accent);background:rgba(245,158,11,0.12)}
+.ride-btn:disabled{opacity:0.4}
+.ride-ico{font-size:22px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:var(--card);border-radius:8px;flex-shrink:0}
+.ride-info{flex:1;min-width:0}
+.ride-name{font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ride-meta{font-size:10px;color:var(--muted)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.control{flex:1;min-width:140px;background:#0f172a;border:1px solid var(--border);border-radius:12px;padding:8px}
+.control-label{font-size:11px;font-weight:800;color:var(--muted);display:flex;justify-content:space-between}
+.control-val{font-size:18px;font-weight:900;color:var(--accent)}
+.slider{width:100%;margin-top:6px;accent-color:var(--accent);height:28px}
+.btn{border:none;border-radius:12px;padding:12px 14px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;font-size:14px}
+.btn-primary{background:var(--accent);color:#000;flex:1}
+.btn-ghost{background:var(--card);color:var(--text);border:1px solid var(--border)}
+.btn-success{background:var(--success);color:#fff}
+.btn-danger{background:var(--danger);color:#fff}
+.btn:disabled{opacity:0.5}
+.staff-row{display:flex;gap:6px;margin-top:8px}
+.staff-card{flex:1;background:#0f172a;border:1px solid var(--border);border-radius:12px;padding:8px;text-align:center}
+.staff-num{font-size:20px;font-weight:900}
+.staff-label{font-size:11px;color:var(--muted);font-weight:700}
+.visitors{display:flex;gap:6px;overflow-x:auto;padding:4px 0;scrollbar-width:none}
+.visitor{flex:0 0 auto;background:#0f172a;border:1px solid var(--border);border-radius:10px;padding:6px 8px;min-width:86px;text-align:center}
+.visitor-emo{font-size:18px}
+.visitor-type{font-size:10px;font-weight:800}
+.visitor-want{font-size:9px;color:var(--muted)}
+.goals-list{display:grid;gap:6px}
+.goal-row{display:flex;justify-content:space-between;align-items:center;background:#0f172a;border:1px solid var(--border);border-radius:10px;padding:8px 10px}
+.goal-row.done{border-color:var(--success);background:rgba(16,185,129,0.1)}
+.goal-check{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px}
+.goal-row.done .goal-check{background:var(--success);border-color:var(--success);color:#fff}
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:428px;background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);border-top:1px solid var(--border);display:flex;gap:6px;padding:8px 10px 10px;z-index:30}
+.nav-btn{flex:1;height:48px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-weight:800;font-size:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer}
+.nav-btn.active{background:var(--accent);color:#000;border-color:var(--accent)}
+.nav-ico{font-size:16px}
+.toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:12px;font-size:13px;font-weight:700;z-index:50;max-width:90%;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.4)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:40}
+.modal-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;max-width:400px;width:100%;max-height:90vh;overflow:auto}
+.badge{font-size:10px;font-weight:800;padding:3px 8px;border-radius:99px;background:var(--accent);color:#000}
+.legend{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:6px}
+.legend span{display:flex;align-items:center;gap:4px}
+.dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-row">
+    <div class="logo">🎢 PARK<span>WORLD</span> <span style="font-size:11px;background:var(--accent);color:#000;padding:2px 6px;border-radius:99px;vertical-align:middle">TOUR</span></div>
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Balance</div><div class="stat-val money" id="balanceVal">$2,500</div></div>
+      <div class="stat"><div class="stat-label">Visitors</div><div class="stat-val" id="visitorsVal">0</div></div>
+      <div class="stat"><div class="stat-label">Rating</div><div class="stat-val sat" id="ratingVal">★☆☆</div></div>
+    </div>
+  </div>
+  <div class="meters">
+    <div class="meter"><div class="meter-head"><span>🧹 Clean</span><span id="cleanPct">100%</span></div><div class="meter-bar"><div class="meter-fill fill-clean" id="cleanBar" style="width:100%"></div></div></div>
+    <div class="meter"><div class="meter-head"><span>⏳ Queue</span><span id="queuePct">0%</span></div><div class="meter-bar"><div class="meter-fill fill-queue" id="queueBar" style="width:0%"></div></div></div>
+    <div class="meter"><div class="meter-head"><span>😊 Happy</span><span id="happyPct">80%</span></div><div class="meter-bar"><div class="meter-fill fill-happy" id="happyBar" style="width:80%"></div></div></div>
+  </div>
+  <div class="timebar">
+    <div class="timebar-left">
+      <div class="time-label">Day Time — <span id="timeLabel">09:00</span> • <span id="eventLabel">Next: Tea Ceremony 10:00</span></div>
+      <div class="time-track" id="timeTrack"><div class="time-progress" id="timeProgress"></div></div>
+    </div>
+    <div class="time-controls">
+      <button class="btn-ctrl" id="pauseBtn">⏸️</button>
+      <button class="btn-ctrl" id="speedBtn">1×</button>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="screenCampaign">
+  <div class="card">
+    <div class="card-title">🌍 World Tour Campaign <span class="badge" id="progressBadge">1/6 Unlocked</span></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Build parks in 6 cities. Earn stars to unlock the next city. Stars persist locally. Tap a city to play.</div>
+    <div class="cities" id="citiesGrid"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">How to Play</div>
+    <div style="font-size:12px;line-height:1.5;color:var(--muted)">
+      <b style="color:var(--text)">1. Lay paths</b> from the green entrance so guests can reach rides.<br>
+      <b style="color:var(--text)">2. Place rides</b> next to paths — match visitor preferences (Thrill / Family / Chill).<br>
+      <b style="color:var(--text)">3. Set ticket price</b> — too high scares guests, too low hurts profit.<br>
+      <b style="color:var(--text)">4. Manage queues & cleanliness</b> — hire staff, add bins & restrooms.<br>
+      <b style="color:var(--text)">5. Hit event schedules</b> — events bring crowds at fixed times. Be ready!<br>
+      <b style="color:var(--text)">Stars:</b> ★ = meet 1 goal, ★★ = meet 2, ★★★ = meet all 3 before day ends.
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="screenPark" style="display:none">
+  <div class="park-wrap">
+    <div class="park-head">
+      <div>
+        <div class="park-title" id="parkTitle">Kyoto Sakura Park</div>
+        <div class="park-sub" id="parkSub">Lay paths from entrance • Tap to build</div>
+      </div>
+      <button class="btn btn-ghost" style="min-height:36px;padding:8px 12px;font-size:12px" onclick="exitPark()">← Cities</button>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="legend">
+      <span><i class="dot" style="background:#10b981"></i> Entrance</span>
+      <span><i class="dot" style="background:#334155"></i> Path</span>
+      <span><i class="dot" style="background:#f59e0b"></i> Ride</span>
+      <span><i class="dot" style="background:#06b6d4"></i> Facility</span>
+    </div>
+    <div class="toolbar" id="toolbar"></div>
+    <div id="ridePicker"></div>
+    <div class="controls">
+      <div class="control">
+        <div class="control-label"><span>🎟️ Ticket Price</span><span class="control-val" id="ticketVal">$15</span></div>
+        <input type="range" min="5" max="50" value="15" step="1" class="slider" id="ticketSlider">
+        <div style="font-size:10px;color:var(--muted);margin-top:4px" id="ticketHint">Sweet spot: $12-18 for this city</div>
+      </div>
+      <div class="control">
+        <div class="control-label"><span>📅 Event Schedule</span><span style="color:var(--accent);font-size:10px" id="eventCountdown">Next in 1:00</span></div>
+        <div id="eventList" style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"></div>
+      </div>
+    </div>
+    <div class="staff-row">
+      <div class="staff-card">
+        <div class="staff-num" id="janitorNum">0</div><div class="staff-label">🧹 Janitors</div>
+        <div style="display:flex;gap:4px;margin-top:6px"><button class="btn btn-ghost" style="flex:1;min-height:36px;padding:6px" onclick="hire('janitor')">Hire $100</button><button class="btn btn-ghost" style="flex:1;min-height:36px;padding:6px" onclick="fire('janitor')">-1</button></div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">$5/sec wage</div>
+      </div>
+      <div class="staff-card">
+        <div class="staff-num" id="mechanicNum">0</div><div class="staff-label">🔧 Mechanics</div>
+        <div style="display:flex;gap:4px;margin-top:6px"><button class="btn btn-ghost" style="flex:1;min-height:36px;padding:6px" onclick="hire('mechanic')">Hire $150</button><button class="btn btn-ghost" style="flex:1;min-height:36px;padding:6px" onclick="fire('mechanic')">-1</button></div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">$7/sec wage • cuts queues</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🎯 Park Goals <span style="font-size:11px;color:var(--muted)" id="goalsHint">Hit before 18:00</span></div>
+    <div class="goals-list" id="goalsList"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🧑‍🤝‍🧑 Visitors in Park <span style="font-size:11px;color:var(--muted)" id="visitorCount">0 guests</span></div>
+    <div class="visitors" id="visitorsStrip"></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px" id="prefHint">Visitor mix: Family 50% • Thrill 20% • Chill 30%</div>
+  </div>
+
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-ghost" onclick="resetPark()">🔄 Reset Park</button>
+    <button class="btn btn-primary" onclick="finishDay()">🏁 End Day & Rate</button>
+  </div>
+</div>
+
+<div class="bottom-nav">
+  <button class="nav-btn active" id="navCampaign" onclick="showScreen('campaign')"><span class="nav-ico">🌍</span>Campaign</button>
+  <button class="nav-btn" id="navPark" onclick="showScreen('park')"><span class="nav-ico">🎢</span>Park</button>
+  <button class="nav-btn" onclick="openStats()"><span class="nav-ico">📊</span>Stats</button>
+  <button class="nav-btn" onclick="openHelp()"><span class="nav-ico">❓</span>Help</button>
+</div>
+
+<div id="toast" style="display:none" class="toast"></div>
+
+<script>
+const CITIES = [
+  {id:1, name:"Kyoto Sakura", country:"Japan", emoji:"🌸", color:"#ff6b9d", difficulty:"Easy", desc:"Cherry blossoms & calm guests. Learn the basics.", goals:{visitors:35, balance:3500, satisfaction:78}, ticketSweet:[12,18], mix:{thrill:20,family:50,chill:30}, events:[{t:60,name:"Tea Ceremony",bonus:12},{t:150,name:"Sakura Parade",bonus:20},{t:210,name:"Lantern Show",bonus:15}]},
+  {id:2, name:"Dubai Mirage", country:"UAE", emoji:"🏜️", color:"#f59e0b", difficulty:"Medium", desc:"Desert heat — cleanliness is everything.", goals:{visitors:50, balance:5000, satisfaction:80}, ticketSweet:[18,26], mix:{thrill:35,family:30,chill:35}, events:[{t:45,name:"Fountain Show",bonus:15},{t:120,name:"Desert Parade",bonus:18},{t:200,name:"Fireworks",bonus:25}]},
+  {id:3, name:"Berlin Electro", country:"Germany", emoji:"🎧", color:"#8b5cf6", difficulty:"Medium", desc:"Music festival crowds. Queues will explode.", goals:{visitors:65, balance:6000, satisfaction:82}, ticketSweet:[15,22], mix:{thrill:45,family:20,chill:35}, events:[{t:30,name:"DJ Set",bonus:14},{t:90,name:"Laser Show",bonus:16},{t:160,name:"Midnight Rave",bonus:28}]},
+  {id:4, name:"Rio Carnival", country:"Brazil", emoji:"🎭", color:"#10b981", difficulty:"Hard", desc:"Non-stop carnival. Huge crowds, tight schedule.", goals:{visitors:80, balance:7000, satisfaction:85}, ticketSweet:[10,16], mix:{thrill:30,family:40,chill:30}, events:[{t:40,name:"Samba Parade",bonus:20},{t:100,name:"Street Party",bonus:22},{t:170,name:"Carnival Finale",bonus:30}]},
+  {id:5, name:"New York Skyline", country:"USA", emoji:"🗽", color:"#3b82f6", difficulty:"Hard", desc:"Expensive land. Price tickets smartly.", goals:{visitors:70, balance:8500, satisfaction:84}, ticketSweet:[22,32], mix:{thrill:40,family:25,chill:35}, events:[{t:50,name:"Broadway Flash",bonus:18},{t:110,name:"Harbor Lights",bonus:20},{t:190,name:"NYE Preview",bonus:26}]},
+  {id:6, name:"Reykjavik Aurora", country:"Iceland", emoji:"❄️", color:"#06b6d4", difficulty:"Expert", desc:"Winter wonder. Guests crave cozy & thrill.", goals:{visitors:60, balance:7500, satisfaction:88}, ticketSweet:[16,24], mix:{thrill:50,family:15,chill:35}, events:[{t:35,name:"Ice Sculptures",bonus:16},{t:95,name:"Aurora Reveal",bonus:24},{t:180,name:"Viking Fire",bonus:22}]}
+];
+
+const RIDES = [
+  {id:"coaster", name:"Dragon Coaster", cost:800, income:6, thrill:90, cap:4, dur:8, icon:"🎢", cat:"thrill"},
+  {id:"ferris", name:"Sky Wheel", cost:500, income:4, thrill:30, cap:6, dur:10, icon:"🎡", cat:"chill"},
+  {id:"carousel", name:"Carousel", cost:300, income:2, thrill:20, cap:8, dur:6, icon:"🎠", cat:"family"},
+  {id:"haunted", name:"Haunted House", cost:600, income:5, thrill:75, cap:5, dur:9, icon:"👻", cat:"thrill"},
+  {id:"splash", name:"Splash Falls", cost:700, income:5, thrill:80, cap:4, dur:7, icon:"💦", cat:"thrill"},
+  {id:"teacups", name:"Tea Cups", cost:350, income:3, thrill:25, cap:6, dur:6, icon:"☕", cat:"family"},
+];
+
+const FACILITIES = [
+  {id:"food", name:"Food Court", cost:400, income:3, icon:"🍔", cat:"facility", desc:"+happiness"},
+  {id:"toilet", name:"Restrooms", cost:200, income:0, icon:"🚻", cat:"facility", desc:"+clean"},
+  {id:"bin", name:"Trash Bin", cost:50, income:0, icon:"🗑️", cat:"facility", desc:"-litter"},
+  {id:"bench", name:"Benches", cost:80, income:0, icon:"🪑", cat:"facility", desc:"+comfort"},
+];
+
+const TOOLS = [
+  {id:"path", name:"Lay Path", ico:"🟫", cost:10, desc:"Connect entrance to rides"},
+  {id:"bulldoze", name:"Bulldoze", ico:"🧹", cost:0, desc:"Remove tile"},
+  {id:"rides", name:"Rides", ico:"🎢", cost:0, desc:"Place thrill rides"},
+  {id:"facilities", name:"Facilities", ico:"🍔", cost:0, desc:"Food, toilets, bins"},
+];
+
+let save = JSON.parse(localStorage.getItem('parkWorldSave')||'null') || {
+  unlocks:{1:true}, stars:{}, bestBalance:{}, bestStars:{}
+};
+function persist(){ localStorage.setItem('parkWorldSave', JSON.stringify(save)); }
+
+let currentCityId = 1;
+let balance = 2500;
+let ticketPrice = 15;
+let janitors = 0, mechanics = 0;
+let cleanliness = 100, queueStress = 0, happiness = 80;
+let visitors = [];
+let totalVisitors = 0;
+let time = 0; // 0-240 seconds = 09:00-18:00
+let dayLength = 240;
+let paused = false, speed = 1;
+let gridData = [];
+let selectedTool = 'path';
+let selectedRideId = 'coaster';
+let tickInterval = null;
+let spawnAccum = 0;
+
+const ROWS=10, COLS=8;
+const ENTRANCE = {r:9,c:3}; // bottom row
+
+function init(){
+  renderCities();
+  setupGrid();
+  setupToolbar();
+  setupTicket();
+  setupTimeControls();
+  updateMeters();
+  startLoop();
+  showScreen('campaign');
+}
+
+function renderCities(){
+  const g=document.getElementById('citiesGrid');
+  g.innerHTML='';
+  let unlockedCount = Object.keys(save.unlocks).length;
+  document.getElementById('progressBadge').textContent = unlockedCount+'/6 Unlocked';
+  CITIES.forEach(city=>{
+    const unlocked = !!save.unlocks[city.id];
+    const stars = save.stars[city.id]||0;
+    const best = save.bestBalance[city.id];
+    const el=document.createElement('div');
+    el.className='city'+(unlocked?'':' locked')+(currentCityId===city.id?' active':'');
+    el.innerHTML=`
+      ${unlocked?`<div class="city-badge">${city.difficulty}</div>`:''}
+      <div class="city-emoji">${city.emoji}</div>
+      <div class="city-name">${city.name}</div>
+      <div class="city-country">${city.country}</div>
+      <div class="city-goals">
+        <span class="goal">👥 ${city.goals.visitors}</span>
+        <span class="goal">💰 $${city.goals.balance}</span>
+        <span class="goal">😊 ${city.goals.satisfaction}%</span>
+      </div>
+      <div class="stars">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</div>
+      ${best?`<div class="best">Best: $${best.toLocaleString()}</div>`:''}
+      ${!unlocked?`<div class="city-lock">🔒</div>`:''}
+    `;
+    el.onclick=()=>{ if(!unlocked){ toast('Earn ★ in previous city to unlock!'); return; } loadCity(city.id); showScreen('park'); };
+    g.appendChild(el);
+  });
+}
+
+function loadCity(id){
+  currentCityId=id;
+  const city=CITIES.find(c=>c.id===id);
+  balance=2500; if(id>1) balance=2800; if(id>4) balance=3200;
+  ticketPrice=city.ticketSweet[0]+2;
+  document.getElementById('ticketSlider').value=ticketPrice;
+  document.getElementById('ticketVal').textContent='$'+ticketPrice;
+  document.getElementById('ticketHint').textContent=`Sweet spot: $${city.ticketSweet[0]}-$${city.ticketSweet[1]} for ${city.name}`;
+  document.getElementById('parkTitle').textContent=city.emoji+' '+city.name+' Park';
+  document.getElementById('parkSub').textContent=city.desc;
+  document.getElementById('prefHint').textContent=`Visitor mix: Family ${city.mix.family}% • Thrill ${city.mix.thrill}% • Chill ${city.mix.chill}%`;
+  janitors=0; mechanics=0; cleanliness=100; queueStress=0; happiness=80; visitors=[]; totalVisitors=0; time=0;
+  document.getElementById('janitorNum').textContent='0';
+  document.getElementById('mechanicNum').textContent='0';
+  setupGrid(true);
+  renderGoals();
+  renderEvents();
+  updateMeters();
+  renderCities();
+  toast(`Welcome to ${city.name}! Lay paths from entrance.`);
+}
+
+function setupGrid(reset=false){
+  gridData=[];
+  for(let r=0;r<ROWS;r++){
+    let row=[];
+    for(let c=0;c<COLS;c++){
+      let type='empty';
+      if(r===ENTRANCE.r && c===ENTRANCE.c) type='entrance';
+      row.push({type, ride:null, queue:0, served:0});
+    }
+    gridData.push(row);
+  }
+  // starter path
+  gridData[8][3].type='path';
+  renderGrid();
+}
+
+function renderGrid(){
+  const el=document.getElementById('grid');
+  el.innerHTML='';
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const cell=gridData[r][c];
+      const d=document.createElement('div');
+      d.className='cell';
+      if(cell.type==='entrance'){ d.classList.add('entrance'); d.innerHTML='GATE<br>↗'; }
+      else if(cell.type==='path'){ d.classList.add('path'); }
+      else if(cell.type==='ride'){
+        d.classList.add('ride');
+        if(cell.ride && FACILITIES.find(f=>f.id===cell.ride.id)) d.classList.add('facility');
+        d.innerHTML=`<span>${cell.ride.icon}</span><span class="cell-label">${cell.ride.name.split(' ')[0]}</span>`;
+        if(cell.queue>3) d.classList.add('queue-dot');
+      }
+      d.onclick=()=>handleCell(r,c);
+      // drag for paths
+      d.ontouchmove=(e)=>{ e.preventDefault(); const t=document.elementFromPoint(e.touches[0].clientX,e.touches[0].clientY); if(t&&t.dataset.r) handleCell(parseInt(t.dataset.r),parseInt(t.dataset.c),true); };
+      d.dataset.r=r; d.dataset.c=c;
+      el.appendChild(d);
+    }
+  }
+}
+
+function setupToolbar(){
+  const tb=document.getElementById('toolbar');
+  tb.innerHTML='';
+  TOOLS.forEach(t=>{
+    const b=document.createElement('button');
+    b.className='tool'+(selectedTool===t.id?' active':'');
+    b.innerHTML=`<div class="tool-ico">${t.ico}</div><div class="tool-name">${t.name}</div><div class="tool-cost">${t.cost?`$${t.cost}`:t.desc}</div>`;
+    b.onclick=()=>{ selectedTool=t.id; document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active')); b.classList.add('active'); renderRidePicker(); };
+    tb.appendChild(b);
+  });
+  renderRidePicker();
+}
+
+function renderRidePicker(){
+  const el=document.getElementById('ridePicker');
+  if(selectedTool==='rides'){
+    el.innerHTML=`<div class="rides-grid">${RIDES.map(r=>`
+      <button class="ride-btn ${selectedRideId===r.id?'active':''}" onclick="pickRide('${r.id}')">
+        <div class="ride-ico">${r.icon}</div>
+        <div class="ride-info"><div class="ride-name">${r.name}</div><div class="ride-meta">$${r.cost} • $${r.income}/guest • ${r.cat}</div></div>
+      </button>`).join('')}</div>`;
+  } else if(selectedTool==='facilities'){
+    el.innerHTML=`<div class="rides-grid">${FACILITIES.map(r=>`
+      <button class="ride-btn ${selectedRideId===r.id?'active':''}" onclick="pickRide('${r.id}')">
+        <div class="ride-ico">${r.icon}</div>
+        <div class="ride-info"><div class="ride-name">${r.name}</div><div class="ride-meta">$${r.cost} • ${r.desc}</div></div>
+      </button>`).join('')}</div>`;
+  } else {
+    el.innerHTML=`<div style="font-size:11px;color:var(--muted);margin-top:6px">${selectedTool==='path'?'Tap empty tiles to lay paths ($10 each). Paths must connect entrance to rides.':'Tap a tile to bulldoze and refund half.'}</div>`;
+  }
+}
+function pickRide(id){ selectedRideId=id; renderRidePicker(); }
+
+function handleCell(r,c,isDrag){
+  const cell=gridData[r][c];
+  if(cell.type==='entrance') return;
+  if(selectedTool==='path'){
+    if(cell.type==='empty'){
+      if(balance<10){ toast('Not enough money!'); return; }
+      balance-=10; cell.type='path'; updateBalance(); renderGrid();
+    }
+  } else if(selectedTool==='bulldoze'){
+    if(cell.type!=='empty'){
+      let refund=0;
+      if(cell.type==='path') refund=5;
+      if(cell.type==='ride') refund=Math.floor(cell.ride.cost/2);
+      balance+=refund; cell.type='empty'; cell.ride=null; cell.queue=0;
+      updateBalance(); renderGrid(); toast(refund?`Bulldozed +$${refund}`:'Cleared');
+    }
+  } else if(selectedTool==='rides' || selectedTool==='facilities'){
+    const all=[...RIDES,...FACILITIES];
+    const ride=all.find(x=>x.id===selectedRideId);
+    if(!ride) return;
+    if(cell.type!=='empty'){ toast('Need empty tile next to a path'); return; }
+    // must be adjacent to path or entrance
+    const adj=[[r-1,c],[r+1,c],[r,c-1],[r,c+1]].some(([rr,cc])=> rr>=0&&rr<ROWS&&cc>=0&&cc<COLS && (gridData[rr][cc].type==='path' || gridData[rr][cc].type==='entrance'));
+    if(!adj){ toast('Place next to a path!'); return; }
+    if(balance<ride.cost){ toast(`Need $${ride.cost}`); return; }
+    balance-=ride.cost; cell.type='ride'; cell.ride=ride; cell.queue=0; cell.served=0;
+    updateBalance(); renderGrid(); toast(`${ride.name} placed!`);
+  }
+}
+
+function setupTicket(){
+  const s=document.getElementById('ticketSlider');
+  s.addEventListener('input', e=>{
+    ticketPrice=parseInt(e.target.value);
+    document.getElementById('ticketVal').textContent='$'+ticketPrice;
+  });
+}
+
+function setupTimeControls(){
+  document.getElementById('pauseBtn').onclick=()=>{
+    paused=!paused;
+    document.getElementById('pauseBtn').textContent=paused?'▶️':'⏸️';
+    document.getElementById('pauseBtn').classList.toggle('active',paused);
+  };
+  document.getElementById('speedBtn').onclick=()=>{
+    speed=speed===1?2:speed===2?3:1;
+    document.getElementById('speedBtn').textContent=speed+'×';
+  };
+}
+
+function renderGoals(){
+  const city=CITIES.find(c=>c.id===currentCityId);
+  const el=document.getElementById('goalsList');
+  const g1 = totalVisitors >= city.goals.visitors;
+  const g2 = balance >= city.goals.balance;
+  const g3 = happiness >= city.goals.satisfaction;
+  el.innerHTML=`
+    <div class="goal-row ${g1?'done':''}"><div><b>👥 ${city.goals.visitors} Total Guests</b><div style="font-size:11px;color:var(--muted)">${totalVisitors} / ${city.goals.visitors}</div></div><div class="goal-check">${g1?'✓':''}</div></div>
+    <div class="goal-row ${g2?'done':''}"><div><b>💰 $${city.goals.balance.toLocaleString()} Balance</b><div style="font-size:11px;color:var(--muted)">$${balance.toLocaleString()} now</div></div><div class="goal-check">${g2?'✓':''}</div></div>
+    <div class="goal-row ${g3?'done':''}"><div><b>😊 ${city.goals.satisfaction}% Satisfaction</b><div style="font-size:11px;color:var(--muted)">${Math.round(happiness)}% now</div></div><div class="goal-check">${g3?'✓':''}</div></div>
+  `;
+}
+
+function renderEvents(){
+  const city=CITIES.find(c=>c.id===currentCityId);
+  const el=document.getElementById('eventList');
+  el.innerHTML=city.events.map(e=>{
+    const done = time>e.t;
+    const next = !done && e.t===city.events.find(ev=>ev.t>time)?.t;
+    return `<span style="font-size:11px;padding:4px 8px;border-radius:99px;border:1px solid ${done?'var(--success)':next?'var(--accent)':'var(--border)'};background:${done?'rgba(16,185,129,0.15)':next?'rgba(245,158,11,0.15)':'#0f172a'};font-weight:700">${done?'✓ ':next?'▶ ':''}${e.name} ${Math.floor(e.t/60*60+9)}:00</span>`;
+  }).join('');
+  // time track dots
+  const track=document.getElementById('timeTrack');
+  track.querySelectorAll('.event-dot').forEach(d=>d.remove());
+  city.events.forEach(e=>{
+    const dot=document.createElement('div');
+    dot.className='event-dot';
+    dot.style.left=(e.t/dayLength*100)+'%';
+    dot.title=e.name;
+    track.appendChild(dot);
+  });
+}
+
+function updateBalance(){
+  document.getElementById('balanceVal').textContent='$'+balance.toLocaleString();
+  renderGoals();
+}
+
+function updateMeters(){
+  document.getElementById('cleanPct').textContent=Math.round(cleanliness)+'%';
+  document.getElementById('cleanBar').style.width=cleanliness+'%';
+  document.getElementById('queuePct').textContent=Math.round(queueStress)+'%';
+  document.getElementById('queueBar').style.width=queueStress+'%';
+  document.getElementById('happyPct').textContent=Math.round(happiness)+'%';
+  document.getElementById('happyBar').style.width=happiness+'%';
+  document.getElementById('visitorsVal').textContent=visitors.length;
+  document.getElementById('visitorCount').textContent=visitors.length+' guests in park';
+  document.getElementById('janitorNum').textContent=janitors;
+  document.getElementById('mechanicNum').textContent=mechanics;
+  // rating
+  const city=CITIES.find(c=>c.id===currentCityId);
+  let stars=0;
+  if(totalVisitors>=city.goals.visitors) stars++;
+  if(balance>=city.goals.balance) stars++;
+  if(happiness>=city.goals.satisfaction) stars++;
+  document.getElementById('ratingVal').textContent='★'.repeat(stars)+'☆'.repeat(3-stars);
+}
+
+function hire(type){
+  if(type==='janitor'){
+    if(balance<100){ toast('Need $100'); return; }
+    balance-=100; janitors++; toast('Janitor hired! 🧹');
+  } else {
+    if(balance<150){ toast('Need $150'); return; }
+    balance-=150; mechanics++; toast('Mechanic hired! 🔧');
+  }
+  updateBalance(); updateMeters();
+}
+function fire(type){
+  if(type==='janitor' && janitors>0){ janitors--; balance+=50; toast('Janitor let go'); }
+  if(type==='mechanic' && mechanics>0){ mechanics--; balance+=75; toast('Mechanic let go'); }
+  updateBalance(); updateMeters();
+}
+
+function getReachableRides(){
+  // BFS from entrance through paths
+  const visited=Array.from({length:ROWS},()=>Array(COLS).fill(false));
+  const q=[[ENTRANCE.r,ENTRANCE.c]];
+  visited[ENTRANCE.r][ENTRANCE.c]=true;
+  const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+  while(q.length){
+    const [r,c]=q.shift();
+    for(let [dr,dc] of dirs){
+      let nr=r+dr,nc=c+dc;
+      if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&!visited[nr][nc]&&gridData[nr][nc].type==='path'){
+        visited[nr][nc]=true; q.push([nr,nc]);
+      }
+    }
+  }
+  let rides=[];
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) if(gridData[r][c].type==='ride'){
+    let adj=dirs.some(([dr,dc])=>{ let nr=r+dr,nc=c+dc; return nr>=0&&nr<ROWS&&nc>=0&&nc<COLS && (visited[nr][nc] || (nr===ENTRANCE.r&&nc===ENTRANCE.c)); });
+    if(adj) rides.push({r,c,cell:gridData[r][c]});
+  }
+  return rides;
+}
+
+function startLoop(){
+  if(tickInterval) clearInterval(tickInterval);
+  tickInterval=setInterval(tick, 100);
+}
+
+function tick(){
+  if(paused) return;
+  const city=CITIES.find(c=>c.id===currentCityId);
+  // time advance
+  time += 0.1 * speed;
+  if(time>dayLength) time=dayLength;
+  const pct=(time/dayLength*100);
+  document.getElementById('timeProgress').style.width=pct+'%';
+  const hours = 9 + Math.floor(time/60*9); // 9 to 18
+  const mins = Math.floor((time%60)/60*60);
+  // better: 9:00 + time/240*9h
+  const totalMins = 9*60 + Math.floor(time/dayLength*540);
+  const h=Math.floor(totalMins/60), m=totalMins%60;
+  document.getElementById('timeLabel').textContent=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  // next event
+  const nextEv=city.events.find(e=>e.t>time);
+  if(nextEv){
+    const minsLeft=Math.ceil((nextEv.t-time)/dayLength*540);
+    document.getElementById('eventLabel').textContent=`Next: ${nextEv.name} in ${minsLeft}m`;
+    document.getElementById('eventCountdown').textContent=`Next in ${minsLeft}m`;
+  } else {
+    document.getElementById('eventLabel').textContent='No more events today';
+    document.getElementById('eventCountdown').textContent='Day ending';
+  }
+  // event trigger
+  city.events.forEach(e=>{
+    if(Math.abs(time-e.t)<0.15){
+      // event bonus: spawn burst
+      for(let i=0;i<6;i++) spawnVisitor(true);
+      balance+= e.bonus*5;
+      happiness=Math.min(100,happiness+5);
+      toast(`🎉 ${e.name} started! +crowd +$${e.bonus*5}`);
+      updateBalance();
+    }
+  });
+
+  // spawn visitors
+  const reachable=getReachableRides();
+  const rideCount=reachable.length;
+  const ticketFactor = Math.max(0.2, 1 - Math.abs(ticketPrice - (city.ticketSweet[0]+city.ticketSweet[1])/2)/30 );
+  const spawnRate = (0.08 + rideCount*0.04) * ticketFactor * (1 + happiness/200) * speed;
+  // cleanliness affects spawn
+  const cleanFactor = cleanliness/100;
+  spawnAccum+=spawnRate * cleanFactor;
+  while(spawnAccum>=1){
+    spawnAccum-=1;
+    if(visitors.length<40 && rideCount>0) spawnVisitor();
+  }
+
+  // update visitors: each visitor picks a ride, queues, rides, leaves
+  visitors.forEach(v=>{
+    v.life+=0.1*speed;
+    if(v.state==='queuing'){
+      v.wait+=0.1*speed;
+      // find ride cell
+      const cell=gridData[v.rideR][v.rideC];
+      if(cell.queue>0 && Math.random()< (0.15 + mechanics*0.08)*speed*0.1){
+        // board ride
+        cell.queue=Math.max(0,cell.queue-1);
+        v.state='riding'; v.rideTime=cell.ride.dur;
+        balance+= ticketPrice*0.3 + cell.ride.income;
+        cell.served++;
+        updateBalance();
+      }
+      if(v.wait>12){ // leave queue frustrated
+        const cell2=gridData[v.rideR][v.rideC];
+        cell2.queue=Math.max(0,cell2.queue-1);
+        v.state='leaving'; happiness=Math.max(0,happiness-0.5);
+      }
+    } else if(v.state==='riding'){
+      v.rideTime-=0.1*speed;
+      if(v.rideTime<=0){
+        // pick next ride or leave
+        if(Math.random()<0.6 && reachable.length>0){
+          pickRideForVisitor(v, reachable);
+        } else {
+          v.state='leaving';
+        }
+      }
+    } else if(v.state==='leaving'){
+      v.leaving+=0.1*speed;
+      if(v.leaving>3) v.remove=true;
+    }
+  });
+  visitors=visitors.filter(v=>!v.remove);
+
+  // cleanliness decay
+  let litterRate = visitors.length*0.03 + rideCount*0.01;
+  let cleanGain = janitors*0.08 + reachable.filter(r=>r.cell.ride.id==='bin').length*0.02 + reachable.filter(r=>r.cell.ride.id==='toilet').length*0.04;
+  cleanliness += (cleanGain - litterRate)*speed*0.1;
+  cleanliness=Math.max(0,Math.min(100,cleanliness));
+
+  // queue stress
+  let totalQueue=0;
+  reachable.forEach(r=> totalQueue+=r.cell.queue);
+  queueStress = Math.min(100, (totalQueue / Math.max(1,reachable.length*4))*100 );
+  // happiness
+  let targetHappy = 80 - queueStress*0.4 - (100-cleanliness)*0.3 + (balance>3000?5:0) - (ticketPrice>city.ticketSweet[1]+8?15:0);
+  // facilities boost
+  const foodCount=reachable.filter(r=>r.cell.ride.id==='food').length;
+  targetHappy+= foodCount*3;
+  happiness += (targetHappy - happiness)*0.02*speed;
+  happiness=Math.max(0,Math.min(100,happiness));
+
+  // wages
+  if(Math.floor(time*10)%10===0){
+    const wage = (janitors*5 + mechanics*7)*0.1*speed;
+    if(wage>0){ balance-=wage; if(balance<0) balance=0; updateBalance(); }
+  }
+
+  // queue processing for rides without visitors (auto)
+  reachable.forEach(r=>{
+    if(r.cell.queue>0 && Math.random()<0.02*speed) r.cell.queue=Math.max(0,r.cell.queue-0.5);
+  });
+
+  updateMeters();
+  renderVisitorsStrip();
+  renderGoals();
+  renderEvents();
+
+  if(time>=dayLength){
+    paused=true;
+    finishDay(true);
+  }
+}
+
+function spawnVisitor(isEventBurst){
+  const city=CITIES.find(c=>c.id===currentCityId);
+  const reachable=getReachableRides();
+  if(reachable.length===0) return;
+  const types=['thrill','family','chill'];
+  // weighted by city mix
+  const r=Math.random()*100;
+  let type='family';
+  if(r<city.mix.thrill) type='thrill';
+  else if(r<city.mix.thrill+city.mix.family) type='family';
+  else type='chill';
+  const v={id:Date.now()+Math.random(), type, state:'queuing', wait:0, life:0, leaving:0, rideTime:0, remove:false};
+  pickRideForVisitor(v, reachable);
+  if(v.rideR!==undefined){
+    visitors.push(v);
+    totalVisitors++;
+    // add to queue
+    gridData[v.rideR][v.rideC].queue++;
+  }
+}
+
+function pickRideForVisitor(v, reachable){
+  // prefer rides matching type, with shorter queues
+  let candidates=reachable.filter(r=> r.cell.ride.cat===v.type || r.cell.ride.cat==='facility');
+  if(candidates.length===0) candidates=reachable;
+  // score by queue length and thrill match
+  candidates.sort((a,b)=> a.cell.queue - b.cell.queue);
+  // pick from top 3 randomly
+  const pool=candidates.slice(0,3);
+  const pick=pool[Math.floor(Math.random()*pool.length)];
+  v.rideR=pick.r; v.rideC=pick.c;
+  v.wait=0; v.state='queuing';
+}
+
+function renderVisitorsStrip(){
+  const el=document.getElementById('visitorsStrip');
+  if(visitors.length===0){ el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:8px">No guests yet — lay paths and place rides to attract visitors!</div>'; return; }
+  el.innerHTML=visitors.slice(0,12).map(v=>{
+    const emo=v.type==='thrill'?'🤘':v.type==='family'?'👨‍👩‍👧':'😌';
+    const stateIcon=v.state==='queuing'?'⏳':v.state==='riding'?'🎢':'🚶';
+    return `<div class="visitor"><div class="visitor-emo">${emo} ${stateIcon}</div><div class="visitor-type">${v.type}</div><div class="visitor-want">${v.state}</div></div>`;
+  }).join('') + (visitors.length>12?`<div class="visitor" style="display:flex;align-items:center;justify-content:center;font-weight:800">+${visitors.length-12}</div>`:'');
+}
+
+function showScreen(which){
+  document.getElementById('screenCampaign').style.display=which==='campaign'?'block':'none';
+  document.getElementById('screenPark').style.display=which==='park'?'block':'none';
+  document.getElementById('navCampaign').classList.toggle('active',which==='campaign');
+  document.getElementById('navPark').classList.toggle('active',which==='park');
+  if(which==='park' && !save.unlocks[currentCityId]) loadCity(1);
+  window.scrollTo(0,0);
+}
+function exitPark(){ showScreen('campaign'); paused=true; }
+
+function resetPark(){
+  if(!confirm('Reset this park? You will lose progress for today.')) return;
+  loadCity(currentCityId);
+  paused=false;
+}
+
+function finishDay(auto){
+  const city=CITIES.find(c=>c.id===currentCityId);
+  let stars=0;
+  if(totalVisitors>=city.goals.visitors) stars++;
+  if(balance>=city.goals.balance) stars++;
+  if(happiness>=city.goals.satisfaction) stars++;
+  const prevStars=save.stars[currentCityId]||0;
+  if(stars>prevStars) save.stars[currentCityId]=stars;
+  if(!save.bestBalance[currentCityId] || balance>save.bestBalance[currentCityId]) save.bestBalance[currentCityId]=Math.floor(balance);
+  // unlock next
+  if(stars>=1 && currentCityId<6){
+    save.unlocks[currentCityId+1]=true;
+  }
+  persist();
+  renderCities();
+
+  const title = stars===3?'🌟 Perfect Park!':stars===2?'🎉 Great Job!':stars===1?'👍 Good Start':'💪 Keep Trying';
+  const nextUnlock = stars>=1 && currentCityId<6 ? `<div style="margin-top:8px;background:rgba(16,185,129,0.15);border:1px solid var(--success);padding:8px;border-radius:10px;font-size:12px">🔓 ${CITIES[currentCityId].name} unlocked!</div>` : currentCityId===6 && stars>0 ? `<div style="margin-top:8px;background:var(--accent);color:#000;padding:8px;border-radius:10px;font-size:12px;font-weight:800">🏆 World Tour Complete!</div>` : '';
+
+  const modal=document.createElement('div');
+  modal.className='modal';
+  modal.innerHTML=`<div class="modal-card">
+    <div style="text-align:center">
+      <div style="font-size:32px">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</div>
+      <div style="font-weight:900;font-size:18px;margin-top:4px">${title}</div>
+      <div style="font-size:12px;color:var(--muted)">${city.emoji} ${city.name} • Day ended at 18:00</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:12px">
+      <div style="background:#0f172a;border:1px solid var(--border);border-radius:10px;padding:8px;text-align:center"><div style="font-size:11px;color:var(--muted)">Guests</div><div style="font-weight:800">${totalVisitors}/${city.goals.visitors}</div><div style="font-size:10px;color:${totalVisitors>=city.goals.visitors?'var(--success)':'var(--danger)'}">${totalVisitors>=city.goals.visitors?'✓ Pass':'✗ Fail'}</div></div>
+      <div style="background:#0f172a;border:1px solid var(--border);border-radius:10px;padding:8px;text-align:center"><div style="font-size:11px;color:var(--muted)">Balance</div><div style="font-weight:800">$${Math.floor(balance).toLocaleString()}</div><div style="font-size:10px;color:${balance>=city.goals.balance?'var(--success)':'var(--danger)'}">${balance>=city.goals.balance?'✓ Pass':'✗ Fail'}</div></div>
+      <div style="background:#0f172a;border:1px solid var(--border);border-radius:10px;padding:8px;text-align:center"><div style="font-size:11px;color:var(--muted)">Happy</div><div style="font-weight:800">${Math.round(happiness)}%</div><div style="font-size:10px;color:${happiness>=city.goals.satisfaction?'var(--success)':'var(--danger)'}">${happiness>=city.goals.satisfaction?'✓ Pass':'✗ Fail'}</div></div>
+    </div>
+    <div style="margin-top:10px;background:#0f172a;border:1px solid var(--border);border-radius:10px;padding:8px;display:flex;justify-content:space-between;font-size:12px"><span>Best Balance</span><b>$${save.bestBalance[currentCityId].toLocaleString()}</b></div>
+    ${nextUnlock}
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-ghost" style="flex:1" onclick="this.closest('.modal').remove();showScreen('campaign')">🌍 Campaign</button>
+      <button class="btn btn-primary" style="flex:1" onclick="this.closest('.modal').remove();loadCity(${currentCityId});paused=false;">🔄 Replay</button>
+      ${currentCityId<6 && save.unlocks[currentCityId+1] ? `<button class="btn btn-success" style="flex:1" onclick="this.closest('.modal').remove();loadCity(${currentCityId+1});showScreen('park');paused=false;">Next →</button>` : ''}
+    </div>
+  </div>`;
+  modal.onclick=(e)=>{ if(e.target===modal) modal.remove(); };
+  document.body.appendChild(modal);
+  paused=true;
+}
+
+function openStats(){
+  const totalStars=Object.values(save.stars).reduce((a,b)=>a+b,0);
+  const modal=document.createElement('div');
+  modal.className='modal';
+  modal.innerHTML=`<div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center"><b>📊 Your Stats</b><button class="btn btn-ghost" style="min-height:32px;padding:6px 10px" onclick="this.closest('.modal').remove()">✕</button></div>
+    <div style="margin-top:10px;display:grid;gap:8px">
+      <div style="background:linear-gradient(135deg,#f59e0b,#f97316);color:#000;padding:12px;border-radius:12px;text-align:center"><div style="font-size:28px;font-weight:900">${totalStars}/18 ★</div><div style="font-size:12px;font-weight:700">Total Stars Collected</div></div>
+      ${CITIES.map(c=>{
+        const s=save.stars[c.id]||0;
+        const b=save.bestBalance[c.id];
+        const unlocked=!!save.unlocks[c.id];
+        return `<div style="display:flex;justify-content:space-between;align-items:center;background:#0f172a;border:1px solid var(--border);padding:8px 10px;border-radius:10px;opacity:${unlocked?1:0.5}">
+          <div><b>${c.emoji} ${c.name}</b><div style="font-size:11px;color:var(--muted)">${unlocked?'Unlocked':'Locked'}</div></div>
+          <div style="text-align:right"><div style="color:var(--accent)">${'★'.repeat(s)}${'☆'.repeat(3-s)}</div><div style="font-size:11px">${b?'$'+b.toLocaleString():''}</div></div>
+        </div>`;
+      }).join('')}
+      <button class="btn btn-danger" onclick="if(confirm('Reset all progress?')){localStorage.removeItem('parkWorldSave');location.reload();}">🗑️ Reset All Progress</button>
+    </div>
+  </div>`;
+  modal.onclick=(e)=>{ if(e.target===modal) modal.remove(); };
+  document.body.appendChild(modal);
+}
+
+function openHelp(){
+  const modal=document.createElement('div');
+  modal.className='modal';
+  modal.innerHTML=`<div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center"><b>❓ How to Master Each City</b><button class="btn btn-ghost" style="min-height:32px;padding:6px 10px" onclick="this.closest('.modal').remove()">✕</button></div>
+    <div style="font-size:12px;line-height:1.6;color:var(--muted);margin-top:8px">
+      <b style="color:var(--text)">Paths:</b> Must connect entrance (green) to rides. No path = no guests.<br>
+      <b style="color:var(--text)">Rides:</b> Match city mix. Kyoto loves Family, Berlin loves Thrill.<br>
+      <b style="color:var(--text)">Ticket:</b> Stay in sweet spot. Too high = fewer guests, too low = poor profit.<br>
+      <b style="color:var(--text)">Queues:</b> Hire Mechanics to speed rides. Long queues kill happiness.<br>
+      <b style="color:var(--text)">Cleanliness:</b> Hire Janitors, place Bins & Restrooms. Dirty parks lose guests.<br>
+      <b style="color:var(--text)">Events:</b> Fixed schedule — they bring crowds. Have enough rides & staff ready!<br>
+      <b style="color:var(--text)">Stars:</b> You need 1★ to unlock next city. 3★ needs all 3 goals.<br><br>
+      <b style="color:var(--text)">Tips:</b> Start with 2-3 cheap rides, add Food Court early, keep ticket in sweet spot, hire 1 janitor before first event.
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="this.closest('.modal').remove()">Got it!</button>
+  </div>`;
+  modal.onclick=(e)=>{ if(e.target===modal) modal.remove(); };
+  document.body.appendChild(modal);
+}
+
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.display='block';
+  clearTimeout(t._timer); t._timer=setTimeout(()=>t.style.display='none',2200);
+}
+
+init();
+</script>
+</body>
+</html>

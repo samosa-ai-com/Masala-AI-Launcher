@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Pond Fishing - Cast & Hook</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Nunito, sans-serif;
+  background:#87d7ff;
+  display:flex;justify-content:center;
+  color:#1a2a3a;
+}
+.app{
+  width:100%;max-width:428px;min-width:360px;
+  height:100dvh;max-height:920px;
+  background:#e6f7ff;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  position:relative;
+  box-shadow:0 0 0 1px rgba(0,0,0,0.08);
+}
+.header{
+  background:#fff;
+  padding:10px 14px 8px;
+  border-bottom:3px solid #0ea5e9;
+  flex-shrink:0;
+}
+.top-row{
+  display:flex;justify-content:space-between;align-items:center;gap:8px;
+}
+.logo{
+  font-weight:900;font-size:18px;letter-spacing:-0.5px;line-height:1;
+  color:#0c4a6e;
+}
+.logo span{color:#f59e0b}
+.stats{
+  display:flex;gap:8px;
+}
+.stat{
+  background:#f0f9ff;border:2px solid #bae6fd;border-radius:12px;
+  padding:6px 10px;min-width:62px;text-align:center;
+}
+.stat-label{font-size:10px;font-weight:800;letter-spacing:0.6px;color:#0369a1;text-transform:uppercase}
+.stat-val{font-size:16px;font-weight:900;color:#0c4a6e;line-height:1}
+.substats{
+  margin-top:6px;display:flex;justify-content:space-between;
+  font-size:12px;font-weight:700;color:#475569;
+  background:#f8fafc;border-radius:8px;padding:6px 10px;
+}
+.pond-wrap{
+  flex:1;position:relative;overflow:hidden;
+  background: linear-gradient(to bottom, #87d7ff 0%, #a5e6ff 32%, #7dd3a0 32%, #4ade80 38%, #22c55e 42%, #0ea5e9 42%, #0284c7 100%);
+  display:flex;flex-direction:column;
+}
+.sky-deco{
+  height:92px;position:relative;flex-shrink:0;
+}
+.cloud{
+  position:absolute;background:#fff;border-radius:20px;opacity:0.95;
+  box-shadow:0 2px 0 rgba(0,0,0,0.06);
+}
+.cloud::after,.cloud::before{content:"";position:absolute;background:#fff;border-radius:50%}
+.c1{width:70px;height:28px;left:18px;top:18px}
+.c1::before{width:36px;height:36px;left:8px;top:-10px}
+.c1::after{width:28px;height:28px;left:32px;top:-6px}
+.c2{width:56px;height:22px;right:28px;top:28px}
+.c2::before{width:28px;height:28px;left:6px;top:-8px}
+.c3{width:44px;height:18px;left:50%;top:12px;transform:translateX(-10px)}
+.hills{
+  position:absolute;bottom:-2px;left:0;right:0;height:38px;
+  display:flex;align-items:flex-end;justify-content:center;gap:-10px;
+}
+.hill{
+  width:180px;height:36px;background:#4ade80;border-radius:100px 100px 0 0;
+  border:3px solid #16a34a;border-bottom:none;margin:0 -12px;
+}
+.hill:nth-child(2){background:#22c55e;height:42px;width:200px}
+.tree{
+  position:absolute;bottom:18px;font-size:28px;line-height:1;
+}
+.t1{left:14px}
+.t2{right:18px}
+.t3{left:42%;font-size:22px;bottom:22px;opacity:0.9}
+.pond-area{
+  flex:1;position:relative;
+  background: radial-gradient(ellipse at 50% 0%, #38bdf8 0%, #0ea5e9 35%, #0284c7 70%, #075985 100%);
+  overflow:hidden;
+  border-top:4px solid #16a34a;
+}
+.wave{
+  position:absolute;left:0;right:0;height:14px;
+  background: rgba(255,255,255,0.18);
+  border-radius:50%;
+}
+.w1{top:18%;width:90%;left:5%;opacity:0.5}
+.w2{top:38%;width:80%;left:10%;opacity:0.35}
+.w3{top:62%;width:92%;left:4%;opacity:0.25}
+.lilypad{
+  position:absolute;width:54px;height:34px;background:#22c55e;
+  border:3px solid #15803d;border-radius:50%;
+  box-shadow:inset -6px -4px 0 rgba(0,0,0,0.12);
+}
+.lilypad::after{
+  content:"";position:absolute;right:-2px;top:50%;width:0;height:0;
+  border-left:14px solid #0284c7;border-top:8px solid transparent;border-bottom:8px solid transparent;
+  transform:translateY(-50%);
+}
+.lp1{left:18px;top:14px;transform:rotate(-8deg)}
+.lp2{right:22px;top:28px;transform:rotate(12deg) scale(0.9)}
+.lp3{left:32%;bottom:22px;transform:rotate(5deg) scale(1.1)}
+.lp4{right:32%;bottom:42px;transform:rotate(-12deg) scale(0.85)}
+.flower{position:absolute;font-size:14px;left:50%;top:50%;transform:translate(-50%,-50%)}
+.bobber-wrap{
+  position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;gap:0;
+  transition: top 0.25s ease;
+  z-index:5;
+}
+.line{
+  width:2px;height:72px;background:rgba(255,255,255,0.95);
+  box-shadow:0 0 2px rgba(0,0,0,0.2);
+  transform-origin:top;
+}
+.bobber{
+  width:36px;height:48px;position:relative;
+  filter:drop-shadow(0 4px 6px rgba(0,0,0,0.25));
+  transition: transform 0.15s;
+}
+.bobber-top{
+  width:36px;height:26px;background:linear-gradient(to bottom, #ef4444, #dc2626);
+  border:3px solid #7f1d1d;border-bottom:none;border-radius:18px 18px 6px 6px;
+  position:relative;
+}
+.bobber-top::after{
+  content:"";position:absolute;left:6px;top:6px;width:8px;height:8px;background:rgba(255,255,255,0.7);border-radius:50%;
+}
+.bobber-bottom{
+  width:36px;height:22px;background:linear-gradient(to bottom, #fff, #e2e8f0);
+  border:3px solid #334155;border-top:none;border-radius:6px 6px 18px 18px;
+  position:relative;
+}
+.bobber-tip{
+  width:4px;height:10px;background:#facc15;border:2px solid #a16207;
+  margin:0 auto;border-radius:2px;position:relative;top:-2px;
+}
+.ripple{
+  position:absolute;left:50%;top:100%;transform:translateX(-50%);
+  width:60px;height:18px;border:2px solid rgba(255,255,255,0.7);border-radius:50%;
+  opacity:0;pointer-events:none;
+}
+.ripple.show{animation:ripple 0.6s ease-out}
+@keyframes ripple{0%{transform:translateX(-50%) scale(0.4);opacity:0.9}100%{transform:translateX(-50%) scale(1.6);opacity:0}}
+.bobber.idle{animation:float 1.8s ease-in-out infinite}
+.bobber.nibble{animation:nibble 0.25s ease-in-out 2}
+.bobber.bite{animation:bite 0.35s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@keyframes nibble{0%,100%{transform:translateY(0)}25%{transform:translateY(6px)}50%{transform:translateY(-2px)}75%{transform:translateY(5px)}}
+@keyframes bite{0%{transform:translateY(0) scale(1)}50%{transform:translateY(14px) scale(0.98)}100%{transform:translateY(0) scale(1)}}
+.splash{
+  position:absolute;left:50%;top:58%;transform:translate(-50%,-50%);
+  font-size:42px;opacity:0;pointer-events:none;z-index:6;
+}
+.splash.show{animation:splashPop 0.7s ease-out forwards}
+@keyframes splashPop{0%{transform:translate(-50%,-50%) scale(0.3);opacity:0}30%{opacity:1;transform:translate(-50%,-50%) scale(1.2)}100%{transform:translate(-50%,-70%) scale(1);opacity:0}}
+.meter-wrap{
+  position:absolute;left:12px;right:12px;top:10px;
+  background:rgba(255,255,255,0.96);border:3px solid #0c4a6e;border-radius:14px;
+  padding:8px 10px;z-index:10;
+  box-shadow:0 4px 12px rgba(0,0,0,0.15);
+  display:none;
+}
+.meter-wrap.active{display:block}
+.meter-label{
+  font-size:11px;font-weight:900;letter-spacing:0.5px;color:#0c4a6e;
+  display:flex;justify-content:space-between;margin-bottom:6px;
+}
+.meter-track{
+  height:18px;background:#e2e8f0;border-radius:10px;position:relative;overflow:hidden;
+  border:2px solid #94a3b8;
+}
+.meter-zone{
+  position:absolute;top:0;bottom:0;
+}
+.zone-ok{left:0;right:0;background:linear-gradient(to right, #fde68a, #facc15)}
+.zone-good{left:22%;right:22%;background:linear-gradient(to right, #86efac, #22c55e)}
+.zone-perfect{left:42%;right:42%;background:linear-gradient(to right, #f472b6, #ec4899, #f472b6);border-left:2px solid #fff;border-right:2px solid #fff}
+.meter-indicator{
+  position:absolute;top:-2px;bottom:-2px;width:6px;background:#0c4a6e;border:2px solid #fff;
+  border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,0.3);
+  left:0;
+}
+.meter-ticks{
+  display:flex;justify-content:space-between;font-size:9px;font-weight:800;color:#64748b;margin-top:4px;
+}
+.message-bubble{
+  position:absolute;left:50%;top:14px;transform:translateX(-50%);
+  background:#fff;border:3px solid #0c4a6e;border-radius:14px;
+  padding:8px 14px;min-width:200px;max-width:92%;
+  text-align:center;z-index:9;
+  box-shadow:0 4px 10px rgba(0,0,0,0.15);
+}
+.msg-title{font-size:14px;font-weight:900;color:#0c4a6e;line-height:1.1}
+.msg-sub{font-size:12px;font-weight:700;color:#475569;margin-top:2px}
+.msg-title.bite{color:#dc2626;animation:blink 0.4s steps(2) infinite}
+@keyframes blink{0%{opacity:1}50%{opacity:0.4}}
+.controls{
+  background:#fff;padding:12px 14px 14px;
+  border-top:3px solid #0ea5e9;
+  display:flex;flex-direction:column;gap:10px;
+  flex-shrink:0;
+}
+.main-btn{
+  width:100%;height:64px;
+  border:none;border-radius:16px;
+  font-size:20px;font-weight:900;letter-spacing:0.5px;
+  color:#fff;cursor:pointer;
+  box-shadow:0 4px 0 rgba(0,0,0,0.18), 0 6px 16px rgba(0,0,0,0.12);
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.15s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  user-select:none;touch-action:manipulation;
+}
+.main-btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,0.18)}
+.main-btn.cast{background:linear-gradient(to bottom, #38bdf8, #0284c7);border:3px solid #0c4a6e}
+.main-btn.hook{background:linear-gradient(to bottom, #4ade80, #16a34a);border:3px solid #14532d;animation:pulseHook 0.7s ease-in-out infinite}
+.main-btn.waiting{background:#e2e8f0;color:#64748b;border:3px solid #94a3b8;box-shadow:none;cursor:default}
+@keyframes pulseHook{0%,100%{transform:scale(1);box-shadow:0 4px 0 rgba(0,0,0,0.18),0 0 0 0 rgba(34,197,94,0.5)}50%{transform:scale(1.02);box-shadow:0 4px 0 rgba(0,0,0,0.18),0 0 0 10px rgba(34,197,94,0)}}
+.secondary-row{display:flex;gap:10px}
+.sec-btn{
+  flex:1;height:44px;border-radius:12px;border:2px solid #cbd5e1;
+  background:#f8fafc;font-size:13px;font-weight:800;color:#334155;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  cursor:pointer;touch-action:manipulation;
+}
+.sec-btn:active{transform:scale(0.97)}
+.sec-btn:disabled{opacity:0.45}
+.catch-log{
+  background:#f1f5f9;border-top:2px solid #e2e8f0;
+  max-height:110px;overflow-y:auto;padding:8px 10px;
+  display:flex;flex-direction:column;gap:6px;
+  flex-shrink:0;
+}
+.catch-log:empty::before{
+  content:"No catches yet — time your cast, watch the bobber!";
+  font-size:12px;font-weight:600;color:#94a3b8;text-align:center;padding:10px;
+}
+.catch-item{
+  background:#fff;border:2px solid #e2e8f0;border-radius:10px;
+  padding:6px 10px;display:flex;justify-content:space-between;align-items:center;
+  font-size:12px;font-weight:700;animation:slideIn 0.3s ease;
+}
+@keyframes slideIn{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+.catch-left{display:flex;align-items:center;gap:8px}
+.catch-emoji{font-size:18px}
+.catch-name{font-weight:900;color:#0c4a6e}
+.catch-meta{font-size:11px;color:#64748b}
+.catch-points{font-weight:900;color:#0ea5e9;font-size:14px}
+.overlay{
+  position:absolute;inset:0;background:rgba(12,74,110,0.72);backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;padding:16px;z-index:20;
+}
+.card{
+  background:#fff;border-radius:20px;border:4px solid #0c4a6e;
+  padding:18px 16px;width:100%;max-width:360px;
+  text-align:center;box-shadow:0 12px 32px rgba(0,0,0,0.25);
+}
+.card h2{font-size:22px;font-weight:900;color:#0c4a6e;line-height:1}
+.card p{font-size:13px;font-weight:600;color:#475569;margin-top:6px;line-height:1.4}
+.big-score{font-size:36px;font-weight:900;color:#0ea5e9;margin:8px 0 2px}
+.card-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.mini-stat{background:#f0f9ff;border:2px solid #bae6fd;border-radius:12px;padding:8px}
+.mini-stat b{display:block;font-size:18px;color:#0c4a6e}
+.mini-stat span{font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:0.5px}
+.card .main-btn{margin-top:10px}
+.howto{ text-align:left;background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:10px 12px;margin:10px 0;font-size:12px;line-height:1.5;color:#334155}
+.howto b{color:#0c4a6e}
+.howto ol{margin-left:16px;margin-top:4px}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="top-row">
+      <div class="logo">POND <span>FISHING</span> 🎣</div>
+      <div class="stats">
+        <div class="stat"><div class="stat-label">Score</div><div class="stat-val" id="score">0</div></div>
+        <div class="stat"><div class="stat-label">Time</div><div class="stat-val" id="time">60</div></div>
+        <div class="stat"><div class="stat-label">Best</div><div class="stat-val" id="best">0</div></div>
+      </div>
+    </div>
+    <div class="substats">
+      <span>🐟 Fish: <b id="fishCount">0</b></span>
+      <span>📏 Biggest: <b id="biggest">—</b></span>
+      <span>⭐ Streak: <b id="streak">0</b></span>
+    </div>
+  </div>
+
+  <div class="pond-wrap">
+    <div class="sky-deco">
+      <div class="cloud c1"></div>
+      <div class="cloud c2"></div>
+      <div class="cloud c3"></div>
+      <div class="hills"><div class="hill"></div><div class="hill"></div><div class="hill"></div></div>
+      <div class="tree t1">🌳</div>
+      <div class="tree t2">🌲</div>
+      <div class="tree t3">🌳</div>
+    </div>
+    <div class="pond-area" id="pondArea">
+      <div class="wave w1"></div>
+      <div class="wave w2"></div>
+      <div class="wave w3"></div>
+      <div class="lilypad lp1"><span class="flower">🌸</span></div>
+      <div class="lilypad lp2"><span class="flower">🌼</span></div>
+      <div class="lilypad lp3"></div>
+      <div class="lilypad lp4"></div>
+
+      <div class="meter-wrap" id="meterWrap">
+        <div class="meter-label"><span>⏱ TIMING METER</span><span id="meterHint">TAP IN GREEN!</span></div>
+        <div class="meter-track" id="meterTrack">
+          <div class="meter-zone zone-ok"></div>
+          <div class="meter-zone zone-good"></div>
+          <div class="meter-zone zone-perfect"></div>
+          <div class="meter-indicator" id="meterIndicator"></div>
+        </div>
+        <div class="meter-ticks"><span>OK</span><span>GOOD</span><span>PERFECT</span><span>GOOD</span><span>OK</span></div>
+      </div>
+
+      <div class="message-bubble" id="msgBubble">
+        <div class="msg-title" id="msgTitle">Tap CAST to start!</div>
+        <div class="msg-sub" id="msgSub">Time the green zone for rare fish</div>
+      </div>
+
+      <div class="bobber-wrap" id="bobberWrap">
+        <div class="line" id="line"></div>
+        <div class="bobber idle" id="bobber">
+          <div class="bobber-tip"></div>
+          <div class="bobber-top"></div>
+          <div class="bobber-bottom"></div>
+          <div class="ripple" id="ripple"></div>
+        </div>
+      </div>
+      <div class="splash" id="splash">💦</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="main-btn cast" id="mainBtn">🎣 CAST</button>
+    <div class="secondary-row">
+      <button class="sec-btn" id="recastBtn">↻ Instant Recast</button>
+      <button class="sec-btn" id="howBtn">❓ How to Play</button>
+    </div>
+  </div>
+
+  <div class="catch-log" id="catchLog"></div>
+
+  <!-- Start overlay -->
+  <div class="overlay" id="startOverlay">
+    <div class="card">
+      <h2>🎣 Pond Fishing</h2>
+      <p>Time your cast & hook-set to land the biggest catch!</p>
+      <div class="howto">
+        <b>How to play (60s round):</b>
+        <ol>
+          <li><b>CAST:</b> Tap when the bar is in <span style="color:#ec4899">PINK</span> = Perfect! Green = Good.</li>
+          <li><b>WATCH:</b> Bobber bobs → 1-3 tiny nibbles → big <b>DIP!</b></li>
+          <li><b>HOOK:</b> Tap <b>HOOK!</b> instantly when it dips. Too early = spook!</li>
+          <li><b>SCORE:</b> Rarer fish + bigger size + faster hook = more points.</li>
+        </ol>
+      </div>
+      <button class="main-btn cast" id="startBtn" style="height:56px">▶ START ROUND</button>
+      <p style="font-size:11px;margin-top:8px">Tip: Use <b>Instant Recast</b> if the wait is long</p>
+    </div>
+  </div>
+
+  <!-- End overlay -->
+  <div class="overlay" id="endOverlay" style="display:none">
+    <div class="card">
+      <h2 id="endTitle">Time's Up!</h2>
+      <div class="big-score" id="endScore">0</div>
+      <p id="endSub">Great fishing!</p>
+      <div class="card-grid">
+        <div class="mini-stat"><b id="endFish">0</b><span>Fish Caught</span></div>
+        <div class="mini-stat"><b id="endBiggest">—</b><span>Biggest</span></div>
+        <div class="mini-stat"><b id="endBest">0</b><span>Best Catch</span></div>
+        <div class="mini-stat"><b id="endStreak">0</b><span>Best Streak</span></div>
+      </div>
+      <button class="main-btn cast" id="restartBtn" style="height:56px">🔄 PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <!-- How to overlay -->
+  <div class="overlay" id="howOverlay" style="display:none">
+    <div class="card">
+      <h2>How to Play</h2>
+      <div class="howto">
+        <b>1. Cast Timing</b><br>
+        Tap CAST → meter moves. Tap again in <span style="color:#ec4899;font-weight:900">PINK</span> for Perfect cast (trophy fish chance ↑).<br><br>
+        <b>2. Read the Bobber</b><br>
+        Wait for gentle bobs → small nibbles (ignore!) → <b style="color:#dc2626">BIG DIP + HOOK!</b> That's the bite.<br><br>
+        <b>3. Hook-Set</b><br>
+        Tap HOOK fast! Perfect &lt;0.3s = +30 pts & bigger fish. Early tap = fish spooked.<br><br>
+        <b>4. Scoring</b><br>
+        Each fish: base points + size bonus (cm × 0.6) + hook bonus. Fill 60s with as many as you can!
+      </div>
+      <button class="main-btn cast" id="closeHowBtn" style="height:52px">Got it!</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const scoreEl = $('score'), timeEl = $('time'), bestEl = $('best');
+const fishCountEl = $('fishCount'), biggestEl = $('biggest'), streakEl = $('streak');
+const mainBtn = $('mainBtn'), recastBtn = $('recastBtn'), howBtn = $('howBtn');
+const msgTitle = $('msgTitle'), msgSub = $('msgSub'), msgBubble = $('msgBubble');
+const bobber = $('bobber'), bobberWrap = $('bobberWrap'), lineEl = $('line'), ripple = $('ripple'), splash = $('splash');
+const meterWrap = $('meterWrap'), meterIndicator = $('meterIndicator'), meterHint = $('meterHint');
+const catchLog = $('catchLog');
+const startOverlay = $('startOverlay'), endOverlay = $('endOverlay'), howOverlay = $('howOverlay');
+
+let score=0, fishCount=0, biggest=0, biggestName='—', streak=0, bestStreak=0, bestScore=0;
+let timeLeft=60, timer=null, gameActive=false;
+let state='idle'; // idle, metering, casting, waiting, nibbling, biting, hooked, roundOver
+let castQuality='ok'; // ok, good, perfect
+let meterPos=0, meterDir=1, meterRaf=null;
+let biteTimeout=null, nibbleTimeout=null, hookWindowTimeout=null;
+let biteStartTime=0;
+let bestCatchPoints=0;
+
+const FISH = [
+  {name:'Minnow', emoji:'🐟', base:20, min:12, max:18, weight:0.3, rarity: 30},
+  {name:'Bluegill', emoji:'🐠', base:35, min:15, max:24, weight:0.6, rarity: 25},
+  {name:'Perch', emoji:'🐡', base:45, min:18, max:28, weight:0.8, rarity: 20},
+  {name:'Bass', emoji:'🎣', base:70, min:28, max:42, weight:1.4, rarity: 14},
+  {name:'Catfish', emoji:'🦈', base:90, min:35, max:55, weight:2.2, rarity: 7},
+  {name:'Golden Koi', emoji:'✨', base:140, min:40, max:62, weight:3.0, rarity: 3},
+  {name:'Trophy Pike', emoji:'👑', base:200, min:55, max:78, weight:4.5, rarity: 1},
+];
+
+try{ bestScore = parseInt(localStorage.getItem('pondBest')||'0'); }catch(e){}
+bestEl.textContent = bestScore;
+
+function setMessage(title, sub, isBite=false){
+  msgTitle.textContent = title;
+  msgSub.textContent = sub;
+  msgTitle.className = 'msg-title' + (isBite ? ' bite' : '');
+}
+
+function updateStats(){
+  scoreEl.textContent = score;
+  fishCountEl.textContent = fishCount;
+  biggestEl.textContent = biggest ? biggest + 'cm ' + biggestName : '—';
+  streakEl.textContent = streak;
+  bestEl.textContent = bestScore;
+}
+
+function setMainBtn(text, cls){
+  mainBtn.textContent = text;
+  mainBtn.className = 'main-btn ' + cls;
+}
+
+function resetBobber(){
+  bobber.className = 'bobber idle';
+  bobberWrap.style.top = '46%';
+  ripple.classList.remove('show');
+}
+
+function startMeter(){
+  state='metering';
+  meterWrap.classList.add('active');
+  setMainBtn('⏱ TAP NOW!', 'cast');
+  setMessage('Time your cast...', 'Tap when in PINK for Perfect!');
+  meterPos=0; meterDir=1;
+  const speed = 1.9; // % per frame ~ 60fps
+  function tick(){
+    meterPos += meterDir * speed;
+    if(meterPos >= 100){ meterPos=100; meterDir=-1; }
+    if(meterPos <= 0){ meterPos=0; meterDir=1; }
+    meterIndicator.style.left = `calc(${meterPos}% - 3px)`;
+    if(meterPos > 42 && meterPos < 58) meterHint.textContent = 'PERFECT!';
+    else if(meterPos > 22 && meterPos < 78) meterHint.textContent = 'GOOD';
+    else meterHint.textContent = 'OK';
+    meterRaf = requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function stopMeter(){
+  cancelAnimationFrame(meterRaf);
+  meterWrap.classList.remove('active');
+  // determine quality
+  if(meterPos >= 42 && meterPos <= 58) castQuality='perfect';
+  else if(meterPos >= 22 && meterPos <= 78) castQuality='good';
+  else castQuality='ok';
+  doCast();
+}
+
+function doCast(){
+  state='casting';
+  setMainBtn('🎣 Casting...', 'waiting');
+  mainBtn.disabled=true;
+  let qText = castQuality==='perfect' ? 'PERFECT CAST! 🌟' : castQuality==='good' ? 'Good cast!' : 'OK cast';
+  let qSub = castQuality==='perfect' ? 'Trophy fish chance ↑↑' : castQuality==='good' ? 'Nice timing' : 'You can still catch!';
+  setMessage(qText, qSub);
+  // animate bobber cast
+  bobberWrap.style.top = '38%';
+  bobber.className='bobber idle';
+  lineEl.style.height='88px';
+  setTimeout(()=>{
+    // splash
+    splash.textContent='💦';
+    splash.classList.remove('show'); void splash.offsetWidth; splash.classList.add('show');
+    ripple.classList.remove('show'); void ripple.offsetWidth; ripple.classList.add('show');
+    bobberWrap.style.top='46%';
+    lineEl.style.height='72px';
+    mainBtn.disabled=false;
+    startWaiting();
+  }, 520);
+}
+
+function startWaiting(){
+  state='waiting';
+  setMainBtn('● ● ● Waiting...', 'waiting');
+  setMessage('Watch the bobber...', 'Wait for the BIG dip — ignore nibbles!');
+  resetBobber();
+  // schedule nibbles then bite
+  const waitBase = 1200 + Math.random()*1800;
+  clearTimeout(biteTimeout); clearTimeout(nibbleTimeout); clearTimeout(hookWindowTimeout);
+  biteTimeout = setTimeout(()=>{
+    startNibbles();
+  }, waitBase);
+}
+
+function startNibbles(){
+  if(state!=='waiting') return;
+  state='nibbling';
+  const nibbleCount = 1 + Math.floor(Math.random()*3); // 1-3
+  let done=0;
+  function doNibble(){
+    if(state!=='nibbling') return;
+    setMessage('Nibble... wait!', 'Not yet — wait for the DIP!');
+    bobber.className='bobber nibble';
+    ripple.classList.remove('show'); void ripple.offsetWidth; ripple.classList.add('show');
+    setTimeout(()=>{ if(state==='nibbling') bobber.className='bobber idle'; }, 400);
+    done++;
+    if(done < nibbleCount){
+      nibbleTimeout = setTimeout(doNibble, 500 + Math.random()*700);
+    } else {
+      nibbleTimeout = setTimeout(triggerBite, 600 + Math.random()*500);
+    }
+  }
+  doNibble();
+}
+
+function triggerBite(){
+  if(state!=='nibbling') return;
+  state='biting';
+  biteStartTime = performance.now();
+  setMessage('HOOK! TAP NOW! 🎣', 'TAP the green button FAST!', true);
+  setMainBtn('💥 HOOK! TAP!', 'hook');
+  bobber.className='bobber bite';
+  bobberWrap.style.top='52%';
+  // ripple burst
+  ripple.classList.remove('show'); void ripple.offsetWidth; ripple.classList.add('show');
+  // auto miss if not tapped
+  hookWindowTimeout = setTimeout(()=>{
+    if(state==='biting'){
+      missFish('Too slow — fish got away!');
+    }
+  }, 1100);
+}
+
+function handleMainTap(){
+  if(!gameActive && state!=='metering') return;
+  if(state==='idle'){
+    startMeter();
+    return;
+  }
+  if(state==='metering'){
+    stopMeter();
+    return;
+  }
+  if(state==='waiting' || state==='nibbling'){
+    // early tap = spook
+    clearTimeout(biteTimeout); clearTimeout(nibbleTimeout); clearTimeout(hookWindowTimeout);
+    missFish('Too early! You spooked it 😬');
+    return;
+  }
+  if(state==='biting'){
+    const reaction = performance.now() - biteStartTime;
+    clearTimeout(hookWindowTimeout);
+    catchFish(reaction);
+    return;
+  }
+  if(state==='hooked' || state==='casting'){
+    // ignore or instant recast handled elsewhere
+    return;
+  }
+}
+
+function missFish(reason){
+  state='hooked'; // brief lock
+  streak=0; updateStats();
+  setMessage('Missed! 💨', reason);
+  setMainBtn('↻ Recast', 'cast');
+  bobber.className='bobber idle';
+  bobberWrap.style.top='46%';
+  // allow quick recast
+  setTimeout(()=>{
+    if(gameActive && state==='hooked'){
+      state='idle';
+      setMessage('Tap CAST to try again', 'Time the pink zone!');
+      setMainBtn('🎣 CAST', 'cast');
+    }
+  }, 900);
+}
+
+function pickFish(){
+  // weighted by rarity, boosted by castQuality
+  let pool = FISH.map(f=> ({...f}));
+  // boost rare fish on perfect/good
+  pool.forEach(f=>{
+    if(castQuality==='perfect'){
+      if(f.rarity <= 7) f.rarity *= 3.5;
+      else if(f.rarity <=14) f.rarity *= 1.8;
+    } else if(castQuality==='good'){
+      if(f.rarity <=7) f.rarity *= 1.9;
+    }
+  });
+  // also hook speed will affect size later, not species
+  const total = pool.reduce((s,f)=>s+f.rarity,0);
+  let r = Math.random()*total;
+  for(let f of pool){
+    r-=f.rarity;
+    if(r<=0) return f;
+  }
+  return pool[0];
+}
+
+function catchFish(reactionMs){
+  state='hooked';
+  const fish = pickFish();
+  // size: base random in range, bonus for perfect cast and fast hook
+  let size = fish.min + Math.random()*(fish.max - fish.min);
+  let hookBonus=0, hookLabel='';
+  if(reactionMs < 300){ hookBonus=30; hookLabel='PERFECT HOOK!'; size+= 6 + Math.random()*6; }
+  else if(reactionMs < 600){ hookBonus=15; hookLabel='Good hook!'; size+= 2 + Math.random()*4; }
+  else { hookBonus=5; hookLabel='Late hook'; }
+  if(castQuality==='perfect') size+= 3;
+  size = Math.min(fish.max+4, size);
+  size = Math.round(size*10)/10;
+  const weight = (size * fish.weight / 30).toFixed(1);
+  const sizeBonus = Math.round(size * 0.6);
+  const points = fish.base + sizeBonus + hookBonus;
+
+  score += points;
+  fishCount++;
+  streak++;
+  bestStreak = Math.max(bestStreak, streak);
+  bestCatchPoints = Math.max(bestCatchPoints, points);
+  if(size > biggest){ biggest=size; biggestName=fish.name; }
+
+  if(score > bestScore){ bestScore=score; try{localStorage.setItem('pondBest', bestScore);}catch(e){} }
+
+  updateStats();
+
+  // visuals
+  bobber.className='bobber idle';
+  bobberWrap.style.top='40%';
+  splash.textContent='✨';
+  splash.classList.remove('show'); void splash.offsetWidth; splash.classList.add('show');
+
+  setMessage(`${hookLabel} ${fish.emoji} ${fish.name}!`, `+${points} pts • ${size}cm • ${weight}kg`);
+  setMainBtn('🎣 CAST AGAIN', 'cast');
+
+  // log
+  const item = document.createElement('div');
+  item.className='catch-item';
+  item.innerHTML = `<div class="catch-left"><span class="catch-emoji">${fish.emoji}</span><div><div class="catch-name">${fish.name}</div><div class="catch-meta">${size}cm • ${weight}kg • ${hookLabel}</div></div></div><div class="catch-points">+${points}</div>`;
+  catchLog.prepend(item);
+  // keep log short
+  while(catchLog.children.length > 12) catchLog.removeChild(catchLog.lastChild);
+
+  // auto ready for next cast after short delay
+  setTimeout(()=>{
+    if(gameActive){
+      state='idle';
+      setMessage('Nice catch! Cast again', castQuality==='perfect' ? 'Perfect cast bonus active!' : 'Time the pink zone for trophies');
+      setMainBtn('🎣 CAST', 'cast');
+      resetBobber();
+    }
+  }, 900);
+}
+
+function instantRecast(){
+  if(!gameActive) return;
+  clearTimeout(biteTimeout); clearTimeout(nibbleTimeout); clearTimeout(hookWindowTimeout);
+  cancelAnimationFrame(meterRaf);
+  meterWrap.classList.remove('active');
+  state='idle';
+  setMessage('Recast! 🎣', 'Time the pink zone!');
+  setMainBtn('🎣 CAST', 'cast');
+  resetBobber();
+}
+
+function startRound(){
+  score=0; fishCount=0; biggest=0; biggestName='—'; streak=0; bestStreak=0; bestCatchPoints=0;
+  timeLeft=60; gameActive=true; state='idle'; castQuality='ok';
+  updateStats();
+  timeEl.textContent=timeLeft;
+  catchLog.innerHTML='';
+  startOverlay.style.display='none';
+  endOverlay.style.display='none';
+  setMessage('Tap CAST to start!', 'Time the green zone for rare fish');
+  setMainBtn('🎣 CAST', 'cast');
+  resetBobber();
+  clearInterval(timer);
+  timer = setInterval(()=>{
+    timeLeft--;
+    timeEl.textContent=timeLeft;
+    if(timeLeft<=0){
+      endRound();
+    }
+  }, 1000);
+}
+
+function endRound(){
+  clearInterval(timer);
+  clearTimeout(biteTimeout); clearTimeout(nibbleTimeout); clearTimeout(hookWindowTimeout);
+  cancelAnimationFrame(meterRaf);
+  gameActive=false;
+  state='roundOver';
+  meterWrap.classList.remove('active');
+  setMainBtn('Round Over', 'waiting');
+  // fill end card
+  $('endScore').textContent = score;
+  $('endFish').textContent = fishCount;
+  $('endBiggest').textContent = biggest ? biggest+'cm' : '—';
+  $('endBest').textContent = bestCatchPoints;
+  $('endStreak').textContent = bestStreak;
+  let title='Time\'s Up!';
+  let sub='Great fishing!';
+  if(score >= 800) {title='Legendary Angler! 👑'; sub='Incredible haul — pond master!';}
+  else if(score >= 500) {title='Pro Fisher! 🌟'; sub='Excellent timing and reflexes!';}
+  else if(score >= 250) {title='Nice Catch! 🎣'; sub='You\'re getting the hang of it!';}
+  else if(fishCount===0) {title='The One That Got Away... 💨'; sub='Watch for the BIG dip, not nibbles!';}
+  $('endTitle').textContent=title;
+  $('endSub').textContent=sub;
+  endOverlay.style.display='flex';
+}
+
+// events
+mainBtn.addEventListener('click', handleMainTap);
+mainBtn.addEventListener('touchstart', e=>{e.preventDefault();}, {passive:false});
+$('pondArea').addEventListener('click', (e)=>{
+  if(state==='biting' || state==='waiting' || state==='nibbling') handleMainTap();
+});
+recastBtn.addEventListener('click', instantRecast);
+howBtn.addEventListener('click', ()=> howOverlay.style.display='flex');
+$('closeHowBtn').addEventListener('click', ()=> howOverlay.style.display='none');
+howOverlay.addEventListener('click', (e)=>{ if(e.target===howOverlay) howOverlay.style.display='none'; });
+$('startBtn').addEventListener('click', startRound);
+$('restartBtn').addEventListener('click', startRound);
+
+// keyboard for testing
+document.addEventListener('keydown', e=>{
+  if(e.code==='Space'){ e.preventDefault(); handleMainTap(); }
+  if(e.code==='KeyR') instantRecast();
+});
+
+updateStats();
+</script>
+</body>
+</html>

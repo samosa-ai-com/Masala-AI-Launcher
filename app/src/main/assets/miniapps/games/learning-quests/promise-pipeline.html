@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Boilerworks: Async Foundry</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--brass:#c9a86a;--brass-light:#e8c99a;--copper:#b87333;--copper-dark:#8a4a1a;--bg:#1a1207;--bg2:#2a1e0f;--bg3:#3d2b14;--cream:#f5e6c8;--cream-dim:#c9b896;--teal:#4ecdc4;--teal-dark:#2a9d8f;--red:#e76f51;--green:#a7c957;--gear:#4a3a1a}
+html,body{height:100%;background:var(--bg);color:var(--cream);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.5;overflow-x:hidden}
+body{display:flex;justify-content:center}
+.app{width:100%;max-width:428px;min-height:100vh;background:linear-gradient(180deg,#1a1207 0%,#231a0a 100%);display:flex;flex-direction:column;position:relative;overflow-x:hidden}
+.header{padding:14px 16px 10px;background:linear-gradient(180deg,#2a1e0f 0%,#1f160a 100%);border-bottom:3px solid var(--brass);position:sticky;top:0;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.5)}
+.header-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.logo{display:flex;align-items:center;gap:10px}
+.gear{width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 30% 30%,var(--brass-light),var(--brass) 40%,var(--copper-dark) 100%);display:grid;place-items:center;font-size:18px;animation:spin 8s linear infinite;border:2px solid var(--bg3)}
+@keyframes spin{to{transform:rotate(360deg)}}
+h1{font-size:18px;letter-spacing:0.08em;text-transform:uppercase;color:var(--brass-light);line-height:1.1}
+h1 span{display:block;font-size:11px;letter-spacing:0.18em;color:var(--cream-dim);font-weight:600;margin-top:2px}
+.progress{display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--gear);border-radius:999px;padding:6px 12px;min-height:36px}
+.progress-dots{display:flex;gap:4px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--bg);border:1px solid var(--gear);transition:all 0.3s}
+.dot.cleared{background:var(--green);border-color:var(--green);box-shadow:0 0 6px var(--green)}
+.dot.active{border-color:var(--brass)}
+.progress-text{font-size:12px;font-weight:700;color:var(--cream-dim);white-space:nowrap}
+.intro{padding:12px 16px;background:var(--bg2);border-bottom:1px solid var(--gear);font-size:13px;color:var(--cream-dim);line-height:1.5}
+.intro strong{color:var(--brass-light)}
+.boiler-grid{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.boiler-card{background:linear-gradient(180deg,#2e2110 0%,#1e1508 100%);border:2px solid var(--gear);border-radius:14px;padding:12px;position:relative;overflow:hidden;cursor:pointer;transition:transform 0.15s,border-color 0.15s;min-height:148px;display:flex;flex-direction:column}
+.boiler-card:active{transform:scale(0.98)}
+.boiler-card.unlocked{border-color:var(--brass)}
+.boiler-card.cleared{border-color:var(--green);background:linear-gradient(180deg,#25310f 0%,#1a2208 100%)}
+.boiler-card.locked{opacity:0.55;cursor:not-allowed}
+.boiler-card.locked:active{transform:none}
+.card-num{font-size:10px;letter-spacing:0.14em;color:var(--brass);font-weight:800}
+.card-name{font-size:13px;font-weight:800;color:var(--cream);line-height:1.2;margin:4px 0 6px;min-height:32px}
+.card-obj{font-size:11px;color:var(--cream-dim);line-height:1.4;flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card-status{margin-top:8px;display:flex;align-items:center;justify-content:space-between}
+.badge{font-size:10px;font-weight:800;letter-spacing:0.08em;padding:4px 8px;border-radius:999px;text-transform:uppercase}
+.badge-ready{background:var(--brass);color:var(--bg)}
+.badge-cleared{background:var(--green);color:#0f1a05}
+.badge-locked{background:var(--bg3);color:var(--cream-dim);border:1px solid var(--gear)}
+.card-icon{font-size:18px;opacity:0.9}
+.pipe-deco{position:absolute;right:-8px;top:18px;width:40px;height:60px;opacity:0.12;pointer-events:none}
+.pipe-deco::before{content:"";position:absolute;width:8px;height:100%;background:var(--brass);left:12px;border-radius:4px}
+.pipe-deco::after{content:"";position:absolute;width:24px;height:8px;background:var(--brass);top:20px;left:0;border-radius:4px}
+.detail{position:fixed;inset:0;background:var(--bg);z-index:20;display:none;flex-direction:column;max-width:428px;margin:0 auto;overflow:hidden}
+.detail.open{display:flex}
+.detail-header{padding:12px 16px;background:linear-gradient(180deg,#2a1e0f 0%,#1f160a 100%);border-bottom:3px solid var(--brass);display:flex;align-items:center;gap:12px}
+.back-btn{width:44px;height:44px;border-radius:10px;background:var(--bg3);border:1px solid var(--brass);color:var(--brass-light);font-size:20px;display:grid;place-items:center;cursor:pointer;flex-shrink:0}
+.detail-title{flex:1}
+.detail-title h2{font-size:15px;color:var(--brass-light);letter-spacing:0.06em;text-transform:uppercase;line-height:1.1}
+.detail-title p{font-size:11px;color:var(--cream-dim);letter-spacing:0.08em;text-transform:uppercase;font-weight:700}
+.detail-body{flex:1;overflow-y:auto;padding:14px 16px 16px;display:flex;flex-direction:column;gap:14px}
+.mission{background:linear-gradient(180deg,#2e2110 0%,#231a0a 100%);border:1px solid var(--brass);border-radius:12px;padding:12px;position:relative}
+.mission-label{font-size:10px;letter-spacing:0.14em;color:var(--brass);font-weight:800;text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.mission-text{font-size:13px;color:var(--cream);line-height:1.5}
+.mission-concept{margin-top:8px;display:inline-flex;align-items:center;gap:6px;background:rgba(78,205,196,0.12);border:1px solid rgba(78,205,196,0.3);color:var(--teal);font-size:11px;font-weight:700;padding:4px 8px;border-radius:999px}
+.schematic{background:#0f0b04;border:1px solid var(--gear);border-radius:12px;padding:12px}
+.schematic-label{font-size:10px;letter-spacing:0.12em;color:var(--cream-dim);font-weight:800;text-transform:uppercase;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.schematic-svg{width:100%;height:86px;background:radial-gradient(ellipse at center,#1e1508 0%,#0f0b04 100%);border-radius:8px;border:1px solid #2a1e0f;display:block}
+.valve-group{background:var(--bg2);border:1px solid var(--gear);border-radius:12px;padding:12px}
+.valve-label{font-size:12px;font-weight:800;color:var(--brass-light);letter-spacing:0.04em;margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.valve-hint{font-size:11px;color:var(--cream-dim);margin-bottom:8px}
+.valve-options{display:flex;flex-direction:column;gap:8px}
+.valve-btn{width:100%;min-height:48px;padding:10px 12px;border-radius:10px;border:2px solid var(--gear);background:var(--bg3);color:var(--cream);font-size:14px;font-weight:600;text-align:left;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;transition:all 0.15s}
+.valve-btn:active{transform:scale(0.99)}
+.valve-btn.selected{border-color:var(--brass);background:linear-gradient(180deg,#3d2b14 0%,#2a1e0f 100%);color:var(--brass-light);box-shadow:0 0 0 2px rgba(201,168,106,0.2)}
+.valve-btn.correct{border-color:var(--green);background:rgba(167,201,87,0.15)}
+.valve-btn .check{width:22px;height:22px;border-radius:50%;border:2px solid var(--gear);display:grid;place-items:center;font-size:12px;flex-shrink:0;background:var(--bg)}
+.valve-btn.selected .check{border-color:var(--brass);background:var(--brass);color:var(--bg)}
+.log{background:#080500;border:1px solid var(--gear);border-radius:12px;overflow:hidden}
+.log-header{padding:8px 12px;background:var(--bg3);border-bottom:1px solid var(--gear);display:flex;align-items:center;justify-content:space-between}
+.log-title{font-size:10px;letter-spacing:0.12em;color:var(--cream-dim);font-weight:800;text-transform:uppercase;display:flex;align-items:center;gap:6px}
+.log-light{width:8px;height:8px;border-radius:50%;background:var(--gear);transition:all 0.3s}
+.log-light.running{background:var(--teal);box-shadow:0 0 8px var(--teal);animation:pulse 0.8s infinite}
+.log-light.success{background:var(--green);box-shadow:0 0 8px var(--green)}
+.log-light.fault{background:var(--red);box-shadow:0 0 8px var(--red);animation:pulse 0.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.log-body{padding:10px 12px;min-height:110px;max-height:160px;overflow-y:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;line-height:1.6;color:var(--cream-dim)}
+.log-line{opacity:0;transform:translateY(4px);animation:lineIn 0.3s forwards}
+@keyframes lineIn{to{opacity:1;transform:none}}
+.log-line.fault{color:var(--red);font-weight:700}
+.log-line.success{color:var(--green);font-weight:700}
+.log-line.dim{color:#8a7d60}
+.controls{display:flex;gap:8px;padding:12px 16px;background:var(--bg2);border-top:1px solid var(--gear);position:sticky;bottom:0}
+.btn{flex:1;min-height:48px;border-radius:10px;border:none;font-size:14px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all 0.15s}
+.btn:active{transform:scale(0.98)}
+.btn-run{background:linear-gradient(180deg,var(--brass-light) 0%,var(--brass) 100%);color:var(--bg);border:2px solid var(--brass-light);box-shadow:0 4px 12px rgba(201,168,106,0.3)}
+.btn-run:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+.btn-ghost{background:var(--bg3);color:var(--cream-dim);border:1px solid var(--gear)}
+.btn-ghost:active{background:var(--bg)}
+.result{padding:10px 12px;border-radius:10px;font-size:13px;line-height:1.5;display:none}
+.result.show{display:block}
+.result.success{background:rgba(167,201,87,0.12);border:1px solid var(--green);color:var(--green)}
+.result.fault{background:rgba(231,111,81,0.12);border:1px solid var(--red);color:var(--red)}
+.result strong{display:block;margin-bottom:4px}
+.footer{padding:10px 16px;text-align:center;font-size:11px;color:var(--cream-dim);border-top:1px solid var(--gear);background:var(--bg2)}
+.footer button{background:none;border:none;color:var(--brass);font-size:11px;font-weight:700;text-decoration:underline;cursor:pointer;padding:4px}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="header">
+    <div class="header-top">
+      <div class="logo">
+        <div class="gear">⚙</div>
+        <h1>Boilerworks<span>Async Foundry • 6 Boilers</span></h1>
+      </div>
+      <div class="progress" aria-label="Progress">
+        <div class="progress-dots" id="progressDots"></div>
+        <div class="progress-text" id="progressText">0/6</div>
+      </div>
+    </div>
+  </header>
+  <div class="intro">
+    <strong>Chief Engineer,</strong> route asynchronous steam-flows through brass valves. Pick the right async pattern for each boiler — wrong configs cause <em>faults</em>. Clear all six to master the Foundry.
+  </div>
+  <div class="boiler-grid" id="grid"></div>
+  <div class="footer">
+    Progress saves automatically • <button id="resetAllBtn">Reset Foundry</button>
+  </div>
+</div>
+
+<div class="detail" id="detail" aria-hidden="true">
+  <div class="detail-header">
+    <button class="back-btn" id="backBtn" aria-label="Back">‹</button>
+    <div class="detail-title">
+      <h2 id="detailName">Boiler</h2>
+      <p id="detailSub">Mission</p>
+    </div>
+    <div class="gear" style="width:32px;height:32px;font-size:16px">⚙</div>
+  </div>
+  <div class="detail-body">
+    <div class="mission">
+      <div class="mission-label">◉ Mission Objective</div>
+      <div class="mission-text" id="missionText"></div>
+      <div class="mission-concept" id="missionConcept"></div>
+    </div>
+    <div class="schematic">
+      <div class="schematic-label"><span>▦ Schematic</span><span id="schematicStatus" style="color:var(--brass);font-size:10px">IDLE</span></div>
+      <svg class="schematic-svg" id="schematicSvg" viewBox="0 0 360 86" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+    </div>
+    <div id="valvesContainer"></div>
+    <div class="log">
+      <div class="log-header">
+        <div class="log-title"><span class="log-light" id="logLight"></span> Schematic Log</div>
+        <span style="font-size:10px;color:var(--cream-dim)" id="logHint">Tap RUN to test</span>
+      </div>
+      <div class="log-body" id="logBody"><div class="log-line dim" style="opacity:1;transform:none">— Awaiting valve configuration —<br>Set valves above, then RUN.</div></div>
+    </div>
+    <div class="result" id="resultBox"></div>
+  </div>
+  <div class="controls">
+    <button class="btn btn-ghost" id="resetBtn">↺ Reset</button>
+    <button class="btn btn-run" id="runBtn">▶ Run</button>
+    <button class="btn btn-ghost" id="retryBtn" style="display:none">↻ Retry</button>
+  </div>
+</div>
+
+<script>
+const BOILERS = [
+  {
+    id:1, name:"I. The Priming Kettle", sub:"Sequential Flow • Await Chain",
+    objective:"Three chambers must fill IN ORDER: A → B → C. The kettle feeds one chamber at a time. If you burst all at once, pressure spikes and pipes rupture.",
+    concept:"💧 await in sequence",
+    valves:[
+      {id:"flow", label:"Flow Regulator", hint:"How steam enters chambers", options:["Parallel Burst","Sequential Chain","Race First"], correct:"Sequential Chain"},
+      {id:"release", label:"Release Valve", hint:"When to open the outlet", options:["Immediate Vent","Await Drain"], correct:"Await Drain"}
+    ],
+    svg: (state)=>`
+      <defs><linearGradient id="g1" x1="0" x2="1"><stop offset="0%" stop-color="#c9a86a"/><stop offset="100%" stop-color="#b87333"/></linearGradient></defs>
+      <rect x="10" y="28" width="70" height="30" rx="8" fill="${state==="success"?"#a7c957":state==="fault"?"#e76f51":"#2a1e0f"}" stroke="#c9a86a" stroke-width="1.5"/>
+      <text x="45" y="46" text-anchor="middle" fill="#f5e6c8" font-size="11" font-weight="800">A</text>
+      <rect x="145" y="28" width="70" height="30" rx="8" fill="${state==="success"?"#a7c957":state==="fault"?"#e76f51":"#2a1e0f"}" stroke="#c9a86a" stroke-width="1.5"/>
+      <text x="180" y="46" text-anchor="middle" fill="#f5e6c8" font-size="11" font-weight="800">B</text>
+      <rect x="280" y="28" width="70" height="30" rx="8" fill="${state==="success"?"#a7c957":state==="fault"?"#e76f51":"#2a1e0f"}" stroke="#c9a86a" stroke-width="1.5"/>
+      <text x="315" y="46" text-anchor="middle" fill="#f5e6c8" font-size="11" font-weight="800">C</text>
+      <line x1="80" y1="43" x2="145" y2="43" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" ${state==="running"?'stroke-dasharray="6 4"':''}/>
+      <polygon points="140,38 150,43 140,48" fill="#c9a86a"/>
+      <line x1="215" y1="43" x2="280" y2="43" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" ${state==="running"?'stroke-dasharray="6 4"':''}/>
+      <polygon points="275,38 285,43 275,48" fill="#c9a86a"/>
+      <text x="112" y="22" text-anchor="middle" fill="#c9a86a" font-size="8" font-weight="700">await</text>
+      <text x="247" y="22" text-anchor="middle" fill="#c9a86a" font-size="8" font-weight="700">await</text>
+    `,
+    check: (cfg)=> cfg.flow==="Sequential Chain" && cfg.release==="Await Drain",
+    logs: {
+      success:["[00:00] Igniting pilot — kettle primed","[00:01] Chamber A pressurized ✓ (await)"," [00:02] Chamber B pressurized ✓ (await)","[00:03] Chamber C pressurized ✓ (await)","[00:04] All chambers stable — BOILER CLEAR ✔"],
+      faults: (cfg)=>{
+        if(cfg.flow==="Parallel Burst") return ["[00:00] Parallel burst initiated!","[00:01] Chambers A,B,C flooding simultaneously!","[00:01] ⚠ FAULT: Pressure Spike — pipes ruptured!","→ Fix: Use Sequential Chain (await each chamber)."];
+        if(cfg.flow==="Race First") return ["[00:00] Race mode: first chamber wins","[00:01] Chamber B won race, A & C starved","[00:01] ⚠ FAULT: Starvation — incomplete sequence","→ Fix: Sequential Chain ensures all chambers fill."];
+        if(cfg.release==="Immediate Vent") return ["[00:00] Sequential flow started","[00:01] Chamber A filled but vented early","[00:01] ⚠ FAULT: Premature Release — outlet opened before drain","→ Fix: Use Await Drain to wait for each chamber."];
+        return ["[00:00] Unknown fault — check valves"];
+      }
+    }
+  },
+  {
+    id:2, name:"II. Twin Condensers", sub:"Parallel Join • Promise.all",
+    objective:"Two condensers (X & Y) run in parallel. The boiler must wait for BOTH to finish before releasing. Releasing on the first one wastes half the steam.",
+    concept:"⚙ Promise.all — wait for all",
+    valves:[
+      {id:"join", label:"Join Valve", hint:"When to release combined steam", options:["Wait for All","First Wins (Race)","Any One"], correct:"Wait for All"},
+      {id:"mode", label:"Execution Mode", hint:"How condensers run", options:["Sequential (slow)","Parallel"], correct:"Parallel"}
+    ],
+    svg: (state)=>`
+      <rect x="20" y="10" width="90" height="28" rx="8" fill="${state==="success"?"#a7c957":state==="fault"?"#e76f51":"#2a1e0f"}" stroke="#c9a86a" stroke-width="1.5"/>
+      <text x="65" y="28" text-anchor="middle" fill="#f5e6c8" font-size="11" font-weight="800">Condenser X</text>
+      <rect x="20" y="48" width="90" height="28" rx="8" fill="${state==="success"?"#a7c957":state==="fault"?"#e76f51":"#2a1e0f"}" stroke="#c9a86a" stroke-width="1.5"/>
+      <text x="65" y="66" text-anchor="middle" fill="#f5e6c8" font-size="11" font-weight="800">Condenser Y</text>
+      <line x1="110" y1="24" x2="150" y2="24" stroke="#c9a86a" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="110" y1="62" x2="150" y2="62" stroke="#c9a86a" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="150" y1="24" x2="150" y2="62" stroke="#c9a86a" stroke-width="2.5"/>
+      <line x1="150" y1="43" x2="210" y2="43" stroke="#c9a86a" stroke-width="3" stroke-linecap="round"/>
+      <polygon points="205,38 215,43 205,48" fill="#c9a86a"/>
+      <rect x="210" y="18" width="110" height="50" rx="10" fill="${state==="success"?"#a7c957":state==="fault"?"#e76f51":"#3d2b14"}" stroke="#c9a86a" stroke-width="1.5"/>
+      <text x="265" y="38" text-anchor="middle" fill="#f5e6c8" font-size="10" font-weight="800">JOIN</text>
+      <text x="265" y="50" text-anchor="middle" fill="#f5e6c8" font-size="8">Release</text>
+      <text x="130" y="18" text-anchor="middle" fill="#4ecdc4" font-size="7" font-weight="700">PARALLEL</text>
+    `,
+    check: (cfg)=> cfg.join==="Wait for All" && cfg.mode==="Parallel",
+    logs: {
+      success:["[00:00] Both condensers firing in parallel","[00:01] Condenser X condensing...","[00:01] Condenser Y condensing...","[00:02] X complete ✓  Y complete ✓","[00:02] Join valve: all resolved — releasing","[00:03] Full pressure delivered — BOILER CLEAR ✔"],
+      faults: (cfg)=>{
+        if(cfg.join==="First Wins (Race)") return ["[00:00] Race mode armed","[00:01] Condenser X finished first — releasing!","[00:01] Condenser Y still running — steam wasted","[00:01] ⚠ FAULT: Partial Release — half pressure lost","→ Fix: Use Wait for All (Promise.all)."];
+        if(cfg.join==="Any One") return ["[00:00] Any-one mode","[00:01] One condenser done, releasing early","[00:01] ⚠ FAULT: Incomplete Join — need both","→ Fix: Wait for All."];
+        if(cfg.mode==="Sequential (slow)") return ["[00:00] Sequential mode: X then Y","[00:02] X done, starting Y...","[00:04] Y done — but deadline missed","[00:04] ⚠ FAULT: Timeout — too slow","→ Fix: Run in Parallel."];
+        return ["[00:00] Fault — check join valve"];
+      }
+    }
+  },
+  {
+    id:3, name:"III. Pressure Relief", sub:"Timeout • Race with Timer",
+    objective:"The main valve sometimes jams (deadlock). Install a timeout so if it doesn't open in 2s, the relief valve fires. Waiting forever will overheat the boiler.",
+    concept:"⏱ Promise.race + timeout",
+    valves:[
+      {id:"timeout", label:"Relief Timer", hint:"How long to wait for main valve", options:["Wait Forever","2s Timeout","0.2s Timeout"], correct:"2s Timeout"},
+      {id:"action", label:"On Timeout", hint:"What relief does", options:["Do Nothing","Vent & Continue","Abort All"], correct:"Vent & Continue"}
+    ],
+    svg: (state)=>`
+      <rect x="30" y="20" width="100" height="46" rx="10" fill="${state==="fault"?"#e76f51":"#2a1e0f"}" stroke="#c9a86a" stroke-width="1.5"/>
+      <text x="80" y="40" text-anchor="middle" fill="#f5e6c8" font-size="10" font-weight="800">Main Valve</text>
+      <text x="80" y="52" text-anchor="middle" fill="${state==="fault"?"#fff":"#c9a86a"}" font-size="8" font-weight="700">${state==="fault"?"JAMMED":"● WAITING"}</text>
+      <line x1="130" y1="43" x2="190" y2="43" stroke="#c9a86a" stroke-width="3" stroke-dasharray="${state==="running"?"6 4":"0"}" stroke-linecap="round"/>
+      <rect x="190" y="20" width="100" height="46" rx="10" fill="${state==="success"?"#a7c957":"#3d2b14"}" stroke="#c9a86a" stroke-width="1.5"/>
+      <text x="240" y="40" text-anchor="middle" fill="#f5e6c8" font-size="10" font-weight="800">Relief Valve</text>
+      <text x="240" y="52" text-anchor="middle" fill="#4ecdc4" font-size="8" font-weight="700">⏱ 2s TIMER</text>
+      <text x="160" y="18" text-anchor="middle" fill="#c9a86a" font-size="7" font-weight="700">RACE</text>
+    `,
+    check: (cfg)=> cfg.timeout==="2s Timeout" && cfg.action==="Vent & Continue",
+    logs: {
+      success:["[00:00] Main valve requested — starting 2s timer","[00:01] Main valve still jammed...","[00:02] ⏱ Timeout! Relief valve firing","[00:02] Vent & Continue — pressure safe","[00:03] Boiler stabilized — BOILER CLEAR ✔"],
+      faults: (cfg)=>{
+        if(cfg.timeout==="Wait Forever") return ["[00:00] Waiting for main valve...","[00:02] Still waiting...","[00:05] Still waiting...","[00:05] ⚠ FAULT: Deadlock — boiler overheated!","→ Fix: Use 2s Timeout to race against jam."];
+        if(cfg.timeout==="0.2s Timeout") return ["[00:00] 0.2s timeout armed","[00:00] Timeout fired instantly — main valve never tried","[00:00] ⚠ FAULT: Premature Timeout — too aggressive","→ Fix: 2s Timeout balances safety & patience."];
+        if(cfg.action==="Do Nothing") return ["[00:02] Timeout reached but relief does nothing","[00:03] Pressure building...","[00:03] ⚠ FAULT: No Relief Action","→ Fix: Vent & Continue."];
+        if(cfg.action==="Abort All") return ["[00:02] Timeout — aborting all","[00:02] ⚠ FAULT: Over-abort — killed healthy flows","→ Fix: Vent & Continue keeps system alive."];
+        return ["[00:00] Fault"];
+      }
+    }
+  },
+  {
+    id:4, name:"IV. Recirculation Loop", sub:"Retry • Exponential Backoff",
+    objective:"The filter clogs randomly. The pump must retry up to 3 times with increasing delay (backoff). No retry = failure. No backoff = hammering a clogged filter.",
+    concept:"🔁 retry + backoff",
+    valves:[
+      {id:"retries", label:"Retry Count", hint:"How many re-attempts", options:["No Retry","Retry ×1","Retry ×3"], correct:"Retry ×3"},
+      {id:"backoff", label:"Backoff Strategy", hint:"Delay between retries", options:["No Delay","Exponential Backoff","Fixed 5s"], correct:"Exponential Backoff"}
+    ],
+    svg: (state)=>`
+      <rect x="20" y="28" width="80" height="30" rx="8" fill="#2a1e0f" stroke="#c9a86a" stroke-width="1.5"/>
+      <text x="60" y="46" text-anchor="middle" fill="#f5e6c8" font-size="10" font-weight="800">Pump</text>
+      <path d="M100 43 L140 43 L140 20 L200 20 L200 43 L240 43" fill="none" stroke="#c9a86a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" ${state==="running"?'stroke-dasharray="6 4"':''}/>
+      <rect x="140" y="10" width="60" height="22" rx="6" fill="${state==="fault"?"#e76f51":"#3d2b14"}" stroke="#c9a86a" stroke-width="1.2"/>
+      <text x="170" y="24" text-anchor="middle" fill="#f5e6c8" font-size="7" font-weight="800">FILTER</text>
+      <rect x="240" y="28" width="80" height="30" rx="8" fill="${state==="success"?"#a7c957":"#2a1e0f"}" stroke="#c9a86a" stroke-width="1.5"/>
+      <text x="280" y="46" text-anchor="middle" fill="#f5e6c8" font-size="10" font-weight="800">Boiler</text>
+      <path d="M280 58 L280 72 L60 72 L60 58" fill="none" stroke="#4ecdc4" stroke-width="2" stroke-dasharray="4 4" stroke-linecap="round"/>
+      <text x="170" y="80" text-anchor="middle" fill="#4ecdc4" font-size="7" font-weight="700">RETRY LOOP ↺</text>
+    `,
+    check: (cfg)=> cfg.retries==="Retry ×3" && cfg.backoff==="Exponential Backoff",
+    logs: {
+      success:["[00:00] Pump → Filter: attempt 1","[00:00] Filter clogged — retrying...","[00:01] Backoff 1s → attempt 2","[00:01] Still clogged — backoff 2s","[00:03] Attempt 3 — filter cleared!","[00:03] Flow restored — BOILER CLEAR ✔"],
+      faults: (cfg)=>{
+        if(cfg.retries==="No Retry") return ["[00:00] Pump → Filter: attempt 1","[00:00] Filter clogged","[00:00] ⚠ FAULT: No Retry — flow stopped permanently","→ Fix: Retry ×3 gives filter time to clear."];
+        if(cfg.retries==="Retry ×1") return ["[00:00] Attempt 1 failed","[00:01] Retry 1 failed — out of retries","[00:01] ⚠ FAULT: Insufficient Retries","→ Fix: Retry ×3 needed for stubborn clogs."];
+        if(cfg.backoff==="No Delay") return ["[00:00] Retrying instantly...","[00:00] Hammering clogged filter","[00:00] ⚠ FAULT: Filter Damaged — no backoff","→ Fix: Exponential Backoff eases pressure."];
+        if(cfg.backoff==="Fixed 5s") return ["[00:00] Fixed 5s delay","[00:05] Retry 1... still clogged","[00:10] Retry 2... deadline exceeded","[00:10] ⚠ FAULT: Too Slow — fixed delay wastes time","→ Fix: Exponential Backoff is adaptive."];
+        return ["[00:00] Fault"];
+      }
+    }
+  },
+  {
+    id:5, name:"V. Governor's Throttle", sub:"Throttle & Debounce",
+    objective:"The governor sends 10 rapid signals per second. Without throttling, the piston hammers itself to death. Throttle to 1 per second. Debounce would drop needed signals.",
+    concept:"🎛 throttle vs debounce",
+    valves:[
+      {id:"limit", label:"Flow Limiter", hint:"How to handle rapid signals", options:["Unthrottled","Throttle 1/s","Debounce 1s"], correct:"Throttle 1/s"},
+      {id:"queue", label:"Overflow Policy", hint:"What to do with excess", options:["Drop Excess","Queue All","Crash"], correct:"Drop Excess"}
+    ],
+    svg: (state)=>`
+      <text x="20" y="16" fill="#c9a86a" font-size="8" font-weight="700">10 signals/s →</text>
+      <rect x="20" y="22" width="100" height="36" rx="8" fill="#2a1e0f" stroke="#c9a86a" stroke-width="1.5"/>
+      <text x="70" y="38" text-anchor="middle" fill="#f5e6c8" font-size="9" font-weight="800">Governor</text>
+      <text x="70" y="50" text-anchor="middle" fill="#c9a86a" font-size="7">⚡⚡⚡⚡⚡</text>
+      <line x1="120" y1="40" x2="170" y2="40" stroke="#c9a86a" stroke-width="3" stroke-linecap="round"/>
+      <rect x="170" y="22" width="80" height="36" rx="8" fill="${state==="success"?"#a7c957":state==="fault"?"#e76f51":"#3d2b14"}" stroke="#c9a86a" stroke-width="1.5"/>
+      <text x="210" y="38" text-anchor="middle" fill="#f5e6c8" font-size="8" font-weight="800">Throttle</text>
+      <text x="210" y="50" text-anchor="middle" fill="#4ecdc4" font-size="7" font-weight="700">1/s ✓</text>
+      <line x1="250" y1="40" x2="300" y2="40" stroke="#c9a86a" stroke-width="3" stroke-linecap="round"/>
+      <rect x="300" y="22" width="50" height="36" rx="8" fill="#2a1e0f" stroke="#c9a86a" stroke-width="1.5"/>
+      <text x="325" y="38" text-anchor="middle" fill="#f5e6c8" font-size="8" font-weight="800">Piston</text>
+      <text x="325" y="50" text-anchor="middle" fill="${state==="fault"?"#e76f51":"#a7c957"}" font-size="7">${state==="fault"?"💥":"✓"}</text>
+    `,
+    check: (cfg)=> cfg.limit==="Throttle 1/s" && cfg.queue==="Drop Excess",
+    logs: {
+      success:["[00:00] Governor firing 10/s","[00:00] Throttle: allowing 1/s, dropping excess","[00:01] Piston stroke 1 ✓","[00:02] Piston stroke 2 ✓","[00:03] Steady rhythm — BOILER CLEAR ✔"],
+      faults: (cfg)=>{
+        if(cfg.limit==="Unthrottled") return ["[00:00] 10 signals/s → piston","[00:00] Piston hammering at 10Hz!","[00:01] ⚠ FAULT: Mechanical Overload — piston shattered","→ Fix: Throttle 1/s limits rate."];
+        if(cfg.limit==="Debounce 1s") return ["[00:00] Debounce waiting for quiet...","[00:01] Governor never quiet — no signal sent","[00:01] ⚠ FAULT: Starvation — debounce waits forever","→ Fix: Throttle passes regularly, debounce waits."];
+        if(cfg.queue==="Queue All") return ["[00:00] Queueing all 10/s","[00:02] Queue size 20 — memory overflow","[00:02] ⚠ FAULT: Overflow — queue exploded","→ Fix: Drop Excess."];
+        if(cfg.queue==="Crash") return ["[00:00] Excess → crash","[00:00] ⚠ FAULT: Unhandled Overflow","→ Fix: Drop Excess gracefully."];
+        return ["[00:00] Fault"];
+      }
+    }
+  },
+  {
+    id:6, name:"VI. Grand Manifold", sub:"Final Exam • All Patterns",
+    objective:"The Grand Manifold combines everything: fetch two resources in parallel, race against a 3s timeout, retry once on failure, and throttle output. One wrong valve fails the whole foundry.",
+    concept:"🏭 all patterns combined",
+    valves:[
+      {id:"fetch", label:"Resource Fetch", hint:"How to get Iron & Coal", options:["Sequential","Parallel (all)","Race"], correct:"Parallel (all)"},
+      {id:"timeout", label:"Safety Timeout", hint:"Deadlock protection", options:["None","3s Timeout"], correct:"3s Timeout"},
+      {id:"retry", label:"Failure Policy", hint:"If a resource fails", options:["Fail Fast","Retry ×1"], correct:"Retry ×1"}
+    ],
+    svg: (state)=>`
+      <rect x="10" y="12" width="70" height="24" rx="6" fill="#2a1e0f" stroke="#c9a86a" stroke-width="1.2"/>
+      <text x="45" y="27" text-anchor="middle" fill="#f5e6c8" font-size="7" font-weight="800">Iron</text>
+      <rect x="10" y="50" width="70" height="24" rx="6" fill="#2a1e0f" stroke="#c9a86a" stroke-width="1.2"/>
+      <text x="45" y="65" text-anchor="middle" fill="#f5e6c8" font-size="7" font-weight="800">Coal</text>
+      <line x1="80" y1="24" x2="110" y2="24" stroke="#c9a86a" stroke-width="2" stroke-linecap="round"/>
+      <line x1="80" y1="62" x2="110" y2="62" stroke="#c9a86a" stroke-width="2" stroke-linecap="round"/>
+      <line x1="110" y1="24" x2="110" y2="62" stroke="#c9a86a" stroke-width="2"/>
+      <rect x="110" y="30" width="70" height="26" rx="6" fill="${state==="success"?"#a7c957":state==="fault"?"#e76f51":"#3d2b14"}" stroke="#c9a86a" stroke-width="1.2"/>
+      <text x="145" y="42" text-anchor="middle" fill="#f5e6c8" font-size="6" font-weight="800">JOIN+TIMEOUT</text>
+      <text x="145" y="50" text-anchor="middle" fill="#4ecdc4" font-size="6" font-weight="700">3s ⏱</text>
+      <line x1="180" y1="43" x2="210" y2="43" stroke="#c9a86a" stroke-width="2.5" stroke-linecap="round"/>
+      <rect x="210" y="20" width="60" height="46" rx="8" fill="#2a1e0f" stroke="#c9a86a" stroke-width="1.2"/>
+      <text x="240" y="38" text-anchor="middle" fill="#f5e6c8" font-size="7" font-weight="800">Retry</text>
+      <text x="240" y="48" text-anchor="middle" fill="#c9a86a" font-size="6">↺ ×1</text>
+      <line x1="270" y1="43" x2="300" y2="43" stroke="#c9a86a" stroke-width="2.5" stroke-linecap="round"/>
+      <rect x="300" y="28" width="50" height="30" rx="8" fill="${state==="success"?"#a7c957":"#2a1e0f"}" stroke="#c9a86a" stroke-width="1.5"/>
+      <text x="325" y="46" text-anchor="middle" fill="#f5e6c8" font-size="8" font-weight="800">OUT</text>
+    `,
+    check: (cfg)=> cfg.fetch==="Parallel (all)" && cfg.timeout==="3s Timeout" && cfg.retry==="Retry ×1",
+    logs: {
+      success:["[00:00] Fetching Iron & Coal in parallel (Promise.all)","[00:01] Iron ✓  Coal retrying...","[00:01] Coal retry ×1 → success ✓","[00:01] Join complete within 3s timeout","[00:02] Throttled output — foundry humming","[00:03] GRAND MANIFOLD STABLE — FOUNDRY MASTER ✔"],
+      faults: (cfg)=>{
+        if(cfg.fetch!=="Parallel (all)") return ["[00:00] Fetch mode: "+cfg.fetch,"[00:01] Resources not both ready","[00:01] ⚠ FAULT: Incomplete Fetch — need Parallel (all)","→ Fix: Promise.all for both resources."];
+        if(cfg.timeout==="None") return ["[00:00] No timeout armed","[00:03] Coal jammed — waiting forever","[00:05] ⚠ FAULT: Deadlock — no timeout","→ Fix: 3s Timeout."];
+        if(cfg.retry==="Fail Fast") return ["[00:00] Iron ✓  Coal failed","[00:00] Fail-fast — aborting","[00:00] ⚠ FAULT: No Resilience — one failure killed all","→ Fix: Retry ×1."];
+        return ["[00:00] Fault — check manifold valves"];
+      }
+    }
+  }
+];
+
+let cleared = JSON.parse(localStorage.getItem("boilerworks_cleared")||"[]");
+let currentId = null;
+let currentCfg = {};
+let running = false;
+
+const grid = document.getElementById("grid");
+const progressDots = document.getElementById("progressDots");
+const progressText = document.getElementById("progressText");
+const detail = document.getElementById("detail");
+const detailName = document.getElementById("detailName");
+const detailSub = document.getElementById("detailSub");
+const missionText = document.getElementById("missionText");
+const missionConcept = document.getElementById("missionConcept");
+const schematicSvg = document.getElementById("schematicSvg");
+const schematicStatus = document.getElementById("schematicStatus");
+const valvesContainer = document.getElementById("valvesContainer");
+const logBody = document.getElementById("logBody");
+const logLight = document.getElementById("logLight");
+const logHint = document.getElementById("logHint");
+const resultBox = document.getElementById("resultBox");
+const runBtn = document.getElementById("runBtn");
+const resetBtn = document.getElementById("resetBtn");
+const retryBtn = document.getElementById("retryBtn");
+const backBtn = document.getElementById("backBtn");
+
+function save(){ localStorage.setItem("boilerworks_cleared", JSON.stringify(cleared)); }
+
+function renderGrid(){
+  grid.innerHTML="";
+  progressDots.innerHTML="";
+  BOILERS.forEach(b=>{
+    const isCleared = cleared.includes(b.id);
+    const isUnlocked = b.id===1 || cleared.includes(b.id-1) || isCleared;
+    const dot = document.createElement("div");
+    dot.className="dot"+(isCleared?" cleared":"")+(currentId===b.id?" active":"");
+    progressDots.appendChild(dot);
+  });
+  progressText.textContent = cleared.length+"/6";
+  if(cleared.length===6) progressText.textContent="6/6 MASTER";
+
+  BOILERS.forEach(b=>{
+    const isCleared = cleared.includes(b.id);
+    const isUnlocked = b.id===1 || cleared.includes(b.id-1) || isCleared;
+    const card = document.createElement("div");
+    card.className="boiler-card "+(isCleared?"cleared":isUnlocked?"unlocked":"locked");
+    card.innerHTML=`
+      <div class="pipe-deco"></div>
+      <div class="card-num">BOILER 0${b.id} ${isCleared?"✔":""}</div>
+      <div class="card-name">${b.name}</div>
+      <div class="card-obj">${b.objective}</div>
+      <div class="card-status">
+        <span class="badge ${isCleared?"badge-cleared":isUnlocked?"badge-ready":"badge-locked"}">${isCleared?"Cleared":isUnlocked?"Ready":"Locked"}</span>
+        <span class="card-icon">${isCleared?"✅":isUnlocked?"⚙":"🔒"}</span>
+      </div>
+    `;
+    card.addEventListener("click",()=>{
+      if(!isUnlocked) {
+        logBody.innerHTML=`<div class="log-line fault" style="opacity:1;transform:none">Boiler ${b.id} locked — clear Boiler ${b.id-1} first.</div>`;
+        return;
+      }
+      openBoiler(b.id);
+    });
+    grid.appendChild(card);
+  });
+}
+
+function openBoiler(id){
+  currentId=id;
+  const b = BOILERS.find(x=>x.id===id);
+  detailName.textContent=b.name;
+  detailSub.textContent=b.sub;
+  missionText.textContent=b.objective;
+  missionConcept.textContent=b.concept;
+  schematicSvg.innerHTML=b.svg("idle");
+  schematicStatus.textContent="IDLE";
+  schematicStatus.style.color="var(--brass)";
+  // init cfg
+  currentCfg={};
+  b.valves.forEach(v=> currentCfg[v.id]=v.options[0]);
+  renderValves();
+  resetLog();
+  resultBox.className="result";
+  resultBox.style.display="none";
+  retryBtn.style.display="none";
+  runBtn.style.display="flex";
+  runBtn.disabled=false;
+  runBtn.textContent="▶ Run";
+  detail.classList.add("open");
+  detail.setAttribute("aria-hidden","false");
+  renderGrid();
+}
+
+function renderValves(){
+  const b = BOILERS.find(x=>x.id===currentId);
+  valvesContainer.innerHTML="";
+  b.valves.forEach(v=>{
+    const group=document.createElement("div");
+    group.className="valve-group";
+    group.innerHTML=`
+      <div class="valve-label">◆ ${v.label}</div>
+      <div class="valve-hint">${v.hint}</div>
+      <div class="valve-options" id="opts-${v.id}"></div>
+    `;
+    valvesContainer.appendChild(group);
+    const opts = group.querySelector(`#opts-${v.id}`);
+    v.options.forEach(opt=>{
+      const btn=document.createElement("button");
+      btn.className="valve-btn"+(currentCfg[v.id]===opt?" selected":"");
+      btn.innerHTML=`<span>${opt}</span><span class="check">${currentCfg[v.id]===opt?"✓":""}</span>`;
+      btn.addEventListener("click",()=>{
+        currentCfg[v.id]=opt;
+        renderValves();
+        resetLog(false);
+      });
+      opts.appendChild(btn);
+    });
+  });
+}
+
+function resetLog(clearResult=true){
+  logBody.innerHTML=`<div class="log-line dim" style="opacity:1;transform:none">— Awaiting valve configuration —<br>Set valves above, then RUN.</div>`;
+  logLight.className="log-light";
+  logHint.textContent="Tap RUN to test";
+  schematicStatus.textContent="IDLE";
+  schematicStatus.style.color="var(--brass)";
+  const b=BOILERS.find(x=>x.id===currentId);
+  if(b) schematicSvg.innerHTML=b.svg("idle");
+  if(clearResult){
+    resultBox.className="result";
+    resultBox.style.display="none";
+    retryBtn.style.display="none";
+    runBtn.style.display="flex";
+  }
+}
+
+async function runTest(){
+  if(running) return;
+  running=true;
+  const b=BOILERS.find(x=>x.id===currentId);
+  runBtn.disabled=true;
+  runBtn.textContent="⏳ Running...";
+  logBody.innerHTML="";
+  logLight.className="log-light running";
+  logHint.textContent="Running...";
+  schematicStatus.textContent="RUNNING";
+  schematicStatus.style.color="var(--teal)";
+  schematicSvg.innerHTML=b.svg("running");
+  resultBox.style.display="none";
+
+  const isSuccess = b.check(currentCfg);
+  const lines = isSuccess ? b.logs.success : b.logs.faults(currentCfg);
+
+  for(let i=0;i<lines.length;i++){
+    await new Promise(r=>setTimeout(r, 380));
+    const div=document.createElement("div");
+    div.className="log-line"+(lines[i].includes("FAULT")?" fault":lines[i].includes("CLEAR")||lines[i].includes("✔")?" success":"");
+    div.textContent=lines[i];
+    logBody.appendChild(div);
+    logBody.scrollTop=logBody.scrollHeight;
+  }
+
+  if(isSuccess){
+    logLight.className="log-light success";
+    logHint.textContent="Success";
+    schematicStatus.textContent="CLEAR ✓";
+    schematicStatus.style.color="var(--green)";
+    schematicSvg.innerHTML=b.svg("success");
+    resultBox.className="result success show";
+    resultBox.style.display="block";
+    resultBox.innerHTML=`<strong>✔ Boiler Cleared!</strong> Perfect async routing. This boiler is now marked cleared and stays saved.`;
+    if(!cleared.includes(b.id)){
+      cleared.push(b.id);
+      save();
+      renderGrid();
+    }
+    if(cleared.length===6){
+      resultBox.innerHTML+=`<br><br><strong style="color:var(--brass-light)">🏆 FOUNDRY MASTER — All 6 boilers stable!</strong>`;
+    }
+    runBtn.style.display="none";
+    retryBtn.style.display="flex";
+    retryBtn.textContent="↺ Reset";
+  } else {
+    logLight.className="log-light fault";
+    logHint.textContent="Fault";
+    schematicStatus.textContent="FAULT";
+    schematicStatus.style.color="var(--red)";
+    schematicSvg.innerHTML=b.svg("fault");
+    resultBox.className="result fault show";
+    resultBox.style.display="block";
+    const faultLine = lines.find(l=>l.includes("FAULT"))||"Fault detected";
+    resultBox.innerHTML=`<strong>⚠ Fault Detected</strong>${faultLine.replace("⚠ FAULT: ","")}<br><span style="opacity:0.9">${lines[lines.length-1].replace("→ Fix: ","Fix: ")}</span>`;
+    runBtn.disabled=false;
+    runBtn.textContent="▶ Retry";
+  }
+  running=false;
+}
+
+resetBtn.addEventListener("click",()=>{
+  const b=BOILERS.find(x=>x.id===currentId);
+  b.valves.forEach(v=> currentCfg[v.id]=v.options[0]);
+  renderValves();
+  resetLog();
+  runBtn.disabled=false;
+  runBtn.textContent="▶ Run";
+});
+
+retryBtn.addEventListener("click",()=>{
+  const b=BOILERS.find(x=>x.id===currentId);
+  b.valves.forEach(v=> currentCfg[v.id]=v.options[0]);
+  renderValves();
+  resetLog();
+  runBtn.disabled=false;
+  runBtn.textContent="▶ Run";
+});
+
+runBtn.addEventListener("click", runTest);
+backBtn.addEventListener("click",()=>{
+  detail.classList.remove("open");
+  detail.setAttribute("aria-hidden","true");
+  currentId=null;
+  renderGrid();
+});
+
+document.getElementById("resetAllBtn").addEventListener("click",()=>{
+  if(confirm("Reset all cleared boilers? Progress will be lost.")){
+    cleared=[];
+    save();
+    renderGrid();
+    if(currentId) openBoiler(currentId);
+  }
+});
+
+renderGrid();
+</script>
+</body>
+</html>

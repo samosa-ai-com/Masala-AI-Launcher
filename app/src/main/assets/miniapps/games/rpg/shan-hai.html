@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Mythic Realms</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden;background:#070a14}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e8e6e3;-webkit-tap-highlight-color:transparent}
+#wrap{max-width:428px;min-width:360px;width:100%;margin:0 auto;min-height:100vh;background:linear-gradient(180deg,#0f1428 0%,#0a0e1a 60%,#070a14 100%);display:flex;flex-direction:column;position:relative;overflow-x:hidden}
+header{padding:10px 12px 8px;display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.35);border-bottom:1px solid #2a2f4a;position:sticky;top:0;z-index:5;backdrop-filter:blur(6px)}
+.hud{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pill{background:#1a1f3a;border:1px solid #2e365e;border-radius:999px;padding:6px 10px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
+.pill.hp{background:#2a1a1a;border-color:#5a2a2a}
+.pill.silver{background:#2a2410;border-color:#6a5a1a;color:#f5d76e}
+.pill.floor{background:#1a2a1a;border-color:#2a5a3a}
+.btn{appearance:none;border:none;border-radius:12px;padding:12px 16px;font-size:16px;font-weight:800;cursor:pointer;min-height:48px;min-width:48px;display:inline-flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:linear-gradient(180deg,#f5d76e,#c9a227);color:#1a1200;box-shadow:0 4px 12px rgba(245,215,110,.3)}
+.btn-ghost{background:#1e2442;color:#cbd5ff;border:1px solid #2e365e}
+.btn-dark{background:#0f1428;color:#e8e6e3;border:1px solid #2e365e}
+.btn-small{padding:10px 12px;font-size:14px;min-height:44px}
+.btn-block{width:100%}
+.screen{flex:1;display:none;flex-direction:column;padding:14px 12px 16px;gap:12px}
+.screen.active{display:flex}
+.title{font-size:28px;font-weight:900;letter-spacing:.5px;line-height:1.1;text-align:center;background:linear-gradient(180deg,#fff,#f5d76e);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{font-size:14px;color:#9aa3c7;text-align:center;line-height:1.4}
+.card-grid{display:grid;grid-template-columns:1fr;gap:10px}
+.hero-card{background:linear-gradient(180deg,#1a1f3a,#12162b);border:1px solid #2e365e;border-radius:16px;padding:14px;display:flex;gap:12px;align-items:center;cursor:pointer;min-height:84px}
+.hero-card.selected{border-color:#f5d76e;box-shadow:0 0 0 2px rgba(245,215,110,.4)}
+.hero-icon{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0}
+.hero-info{flex:1}
+.hero-name{font-weight:900;font-size:17px}
+.hero-desc{font-size:13px;color:#9aa3c7;margin-top:2px}
+.hero-stats{font-size:12px;color:#f5d76e;margin-top:4px;font-weight:700}
+.realm-bar{display:flex;gap:6px;align-items:center;justify-content:center;padding:8px;background:rgba(0,0,0,.3);border-radius:12px;border:1px solid #1e2442}
+.realm-dot{width:10px;height:10px;border-radius:50%;background:#2e365e}
+.realm-dot.done{background:#4caf50}
+.realm-dot.active{background:#f5d76e;box-shadow:0 0 8px #f5d76e}
+.realm-dot.boss{width:14px;height:14px;border:2px solid #f5d76e}
+.floor-track{display:flex;gap:4px;justify-content:center;flex-wrap:wrap}
+.floor-node{width:28px;height:28px;border-radius:8px;background:#1a1f3a;border:1px solid #2e365e;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800}
+.floor-node.done{background:#1e3a2a;border-color:#2e7d32;color:#81c784}
+.floor-node.cur{background:#f5d76e;color:#1a1200;border-color:#f5d76e;box-shadow:0 2px 8px rgba(245,215,110,.4)}
+.floor-node.boss{border-color:#c45a3c}
+.action-card{background:linear-gradient(180deg,#1a1f3a,#12162b);border:1px solid #2e365e;border-radius:16px;padding:16px;text-align:center}
+.action-icon{font-size:36px;margin-bottom:8px}
+.action-title{font-size:18px;font-weight:900}
+.action-desc{font-size:13px;color:#9aa3c7;margin:6px 0 12px;line-height:1.4}
+.battle-area{background:linear-gradient(180deg,#1a1f3a 0%,#0f1428 100%);border:1px solid #2e365e;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.enemy-box{background:rgba(0,0,0,.3);border-radius:12px;padding:10px;border:1px solid #2a2f4a}
+.enemy-top{display:flex;justify-content:space-between;align-items:center}
+.enemy-name{font-weight:900;font-size:15px}
+.enemy-intent{font-size:12px;font-weight:800;padding:6px 10px;border-radius:999px;background:#2a1a1a;border:1px solid #5a2a2a;color:#ff8a80}
+.enemy-intent.block{background:#1a2a1a;border-color:#2e7d32;color:#81c784}
+.hpbar{height:10px;background:#0a0e1a;border-radius:999px;overflow:hidden;border:1px solid #2a2f4a;margin-top:8px}
+.hpfill{height:100%;background:linear-gradient(90deg,#ef5350,#c62828);transition:width .3s}
+.hpfill.player{background:linear-gradient(90deg,#66bb6a,#2e7d32)}
+.status-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.status{font-size:12px;font-weight:800;padding:5px 8px;border-radius:999px;background:#1a1f3a;border:1px solid #2e365e;display:flex;align-items:center;gap:4px}
+.status.block{background:#1a2a3a;border-color:#2e5a7d;color:#81d4fa}
+.status.charge{background:#2a2410;border-color:#6a5a1a;color:#ffe082}
+.status.burn{background:#2a1a10;border-color:#6a3a1a;color:#ffab91}
+.hand{display:flex;gap:8px;overflow-x:auto;padding:8px 2px 4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+.hand::-webkit-scrollbar{display:none}
+.card{flex:0 0 118px;min-height:148px;background:linear-gradient(180deg,#232a4a,#1a1f3a);border:1px solid #3a4270;border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:6px;scroll-snap-align:start;position:relative;cursor:pointer;user-select:none}
+.card.disabled{opacity:.45;pointer-events:none}
+.card.selected{border-color:#f5d76e;box-shadow:0 0 0 2px rgba(245,215,110,.5);transform:translateY(-4px)}
+.card-cost{position:absolute;top:-6px;left:-6px;width:28px;height:28px;border-radius:50%;background:#f5d76e;color:#1a1200;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;border:2px solid #1a1f3a}
+.card-name{font-size:13px;font-weight:900;line-height:1.1;margin-top:6px;text-align:center}
+.card-type{font-size:10px;font-weight:800;letter-spacing:.6px;color:#9aa3c7;text-align:center;text-transform:uppercase}
+.card-desc{font-size:11px;line-height:1.3;color:#cbd5ff;text-align:center;flex:1;display:flex;align-items:center;justify-content:center}
+.card-stats{font-size:11px;font-weight:800;text-align:center;color:#ffe082}
+.card.upgraded{border-color:#81c784}
+.card.upgraded .card-name{color:#a5d6a7}
+.energy-row{display:flex;gap:6px;align-items:center;justify-content:center}
+.energy{width:28px;height:28px;border-radius:50%;background:#1a1f3a;border:2px solid #2e365e;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px}
+.energy.on{background:#f5d76e;border-color:#f5d76e;color:#1a1200;box-shadow:0 0 8px rgba(245,215,110,.6)}
+.turn-btns{display:flex;gap:8px}
+.turn-btns .btn{flex:1}
+.reward-grid{display:grid;grid-template-columns:1fr;gap:8px}
+.reward-card{background:#1a1f3a;border:1px solid #2e365e;border-radius:14px;padding:12px;display:flex;gap:10px;align-items:center;cursor:pointer;min-height:72px}
+.reward-card:hover{border-color:#f5d76e}
+.shop-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.shop-item{background:#1a1f3a;border:1px solid #2e365e;border-radius:12px;padding:10px;text-align:center}
+.modal{position:fixed;inset:0;background:rgba(5,7,18,.85);display:none;align-items:center;justify-content:center;padding:12px;z-index:20}
+.modal.open{display:flex}
+.modal-box{background:#12162b;border:1px solid #2e365e;border-radius:16px;max-width:400px;width:100%;max-height:90vh;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.codex-tabs{display:flex;gap:6px;overflow-x:auto}
+.codex-tabs button{flex:0 0 auto}
+.badge{font-size:11px;font-weight:800;padding:4px 8px;border-radius:999px;background:#1e2442;border:1px solid #2e365e;color:#9aa3c7}
+.diff-row{display:flex;gap:6px}
+.diff-btn{flex:1;min-height:48px;border-radius:12px;border:1px solid #2e365e;background:#1a1f3a;color:#9aa3c7;font-weight:800;font-size:13px}
+.diff-btn.active{background:#f5d76e;color:#1a1200;border-color:#f5d76e}
+.log{font-size:12px;color:#9aa3c7;background:rgba(0,0,0,.3);border-radius:8px;padding:8px;max-height:80px;overflow:auto;line-height:1.4}
+.kv{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid #1e2442}
+.kv:last-child{border:none}
+input.code-input{width:100%;background:#0a0e1a;border:1px solid #2e365e;border-radius:10px;padding:12px;color:#e8e6e3;font-size:13px;min-height:48px}
+.relic-row{display:flex;gap:6px;flex-wrap:wrap}
+.relic{font-size:12px;font-weight:800;padding:6px 10px;border-radius:999px;background:#1a1f3a;border:1px solid #3a4270;display:flex;align-items:center;gap:6px}
+.footer{padding:10px 12px;display:flex;gap:8px;justify-content:center;background:rgba(0,0,0,.2);border-top:1px solid #1e2442}
+.small{font-size:12px;color:#7a819e;text-align:center;line-height:1.4}
+</style>
+</head>
+<body>
+<div id="wrap">
+<header>
+<div class="hud" id="hudLeft">
+<span class="pill hp" id="hpPill">❤ 0/0</span>
+<span class="pill floor" id="floorPill">F1/18</span>
+</div>
+<div class="hud">
+<span class="pill silver" id="silverPill">◈ 0</span>
+<button class="btn btn-ghost btn-small" onclick="openSave()" style="min-height:36px;padding:6px 10px;font-size:12px">Save</button>
+</div>
+</header>
+
+<!-- TITLE / HERO SELECT -->
+<div class="screen active" id="screenTitle">
+<div style="text-align:center;padding:8px 0 4px">
+<div class="title">MYTHIC REALMS</div>
+<div class="subtitle">18 floors • 3 realms • Draft • Relics • Tactical Battles</div>
+</div>
+<div class="diff-row" id="diffRow">
+<button class="diff-btn active" data-d="mortal" onclick="setDiff('mortal')">MORTAL<br><span style="font-weight:600;font-size:11px">Easy • 0.85×</span></button>
+<button class="diff-btn" data-d="heroic" onclick="setDiff('heroic')">HEROIC<br><span style="font-weight:600;font-size:11px">Normal • 1×</span></button>
+<button class="diff-btn" data-d="mythic" onclick="setDiff('mythic')">MYTHIC<br><span style="font-weight:600;font-size:11px">Hard • 1.3×</span></button>
+</div>
+<div class="card-grid" id="heroGrid"></div>
+<div style="display:flex;gap:8px">
+<button class="btn btn-primary btn-block" onclick="startRun()">▶ Begin Expedition</button>
+</div>
+<div style="display:flex;gap:8px">
+<button class="btn btn-ghost" style="flex:1" onclick="openCodex()">📖 Codex</button>
+<button class="btn btn-ghost" style="flex:1" onclick="openLoad()">📥 Load Code</button>
+</div>
+<div class="small">Pick a hero. Block negates damage • Charge empowers attacks • Burns tick each turn • Combos reward attack chains.</div>
+</div>
+
+<!-- MAP / PROGRESSION -->
+<div class="screen" id="screenMap">
+<div class="realm-bar" id="realmBar"></div>
+<div class="floor-track" id="floorTrack"></div>
+<div class="action-card" id="actionCard"></div>
+<div class="relic-row" id="relicRowMap"></div>
+<div class="log" id="mapLog"></div>
+<div style="display:flex;gap:8px">
+<button class="btn btn-ghost" style="flex:1" onclick="showScreen('screenTitle')">Menu</button>
+<button class="btn btn-primary" style="flex:1" id="proceedBtn" onclick="proceed()">Proceed</button>
+</div>
+</div>
+
+<!-- BATTLE -->
+<div class="screen" id="screenBattle">
+<div class="battle-area">
+<div class="enemy-box">
+<div class="enemy-top">
+<div>
+<div class="enemy-name" id="enemyName">Enemy</div>
+<div style="font-size:12px;color:#9aa3c7" id="enemyRealm">Realm</div>
+</div>
+<div class="enemy-intent" id="enemyIntent">Attack 9</div>
+</div>
+<div class="hpbar"><div class="hpfill" id="enemyHpFill" style="width:100%"></div></div>
+<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;color:#9aa3c7"><span id="enemyHpText">0/0</span><span id="enemyBlockText"></span></div>
+<div class="status-row" id="enemyStatus"></div>
+</div>
+<div style="background:rgba(0,0,0,.25);border-radius:12px;padding:10px;border:1px solid #1e2442">
+<div style="display:flex;justify-content:space-between;align-items:center">
+<div style="font-weight:900;font-size:14px" id="playerName">Hero</div>
+<div class="status-row" style="margin:0" id="playerStatus"></div>
+</div>
+<div class="hpbar"><div class="hpfill player" id="playerHpFill" style="width:100%"></div></div>
+<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;color:#9aa3c7"><span id="playerHpText">0/0</span><span id="playerBlockText"></span></div>
+<div class="energy-row" id="energyRow" style="margin-top:8px"></div>
+</div>
+<div class="log" id="battleLog" style="max-height:70px"></div>
+</div>
+<div class="hand" id="hand"></div>
+<div class="turn-btns">
+<button class="btn btn-ghost" onclick="endTurn()">End Turn ↻</button>
+<button class="btn btn-primary" onclick="tryPlaySelected()">Play Card</button>
+</div>
+<div style="display:flex;gap:8px">
+<button class="btn btn-dark btn-small" style="flex:1" onclick="fleeBattle()">Flee (-10 HP)</button>
+<button class="btn btn-dark btn-small" style="flex:1" onclick="openCodex()">Codex</button>
+</div>
+</div>
+
+<div class="footer">
+<span class="small">Offline • Single file • No external requests • Save codes share progress</span>
+</div>
+</div>
+
+<!-- MODALS -->
+<div class="modal" id="modalReward">
+<div class="modal-box">
+<div style="font-weight:900;font-size:18px;text-align:center" id="rewardTitle">Victory!</div>
+<div class="small" id="rewardDesc">Choose a card to add to your deck</div>
+<div class="reward-grid" id="rewardGrid"></div>
+<div style="display:flex;gap:8px">
+<button class="btn btn-ghost" style="flex:1" onclick="skipReward()">Skip</button>
+<button class="btn btn-dark" style="flex:1" onclick="closeModal('modalReward')">Close</button>
+</div>
+</div>
+</div>
+
+<div class="modal" id="modalShop">
+<div class="modal-box">
+<div style="font-weight:900;font-size:18px">🛒 Wayfarer's Shop — <span id="shopSilver">0</span> ◈</div>
+<div class="shop-grid" id="shopGrid"></div>
+<div style="display:flex;gap:8px">
+<button class="btn btn-ghost" style="flex:1" onclick="healShop()">Heal 30% (25◈)</button>
+<button class="btn btn-primary" style="flex:1" onclick="closeModal('modalShop')">Leave</button>
+</div>
+</div>
+</div>
+
+<div class="modal" id="modalRest">
+<div class="modal-box">
+<div style="font-weight:900;font-size:18px;text-align:center">🔥 Campfire Rest</div>
+<div class="small">Choose one: recover or hone your deck</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<button class="btn btn-primary btn-block" onclick="doRest('heal')">Rest — Heal 30% HP</button>
+<button class="btn btn-ghost btn-block" onclick="doRest('upgrade')">Meditate — Upgrade a card</button>
+<button class="btn btn-dark btn-block" onclick="closeModal('modalRest')">Leave</button>
+</div>
+<div id="upgradeList" class="reward-grid"></div>
+</div>
+</div>
+
+<div class="modal" id="modalEvent">
+<div class="modal-box">
+<div style="font-weight:900;font-size:18px" id="eventTitle">Event</div>
+<div class="small" id="eventDesc"></div>
+<div id="eventChoices" style="display:flex;flex-direction:column;gap:8px"></div>
+</div>
+</div>
+
+<div class="modal" id="modalCodex">
+<div class="modal-box" style="max-width:420px">
+<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:900;font-size:18px">📖 Codex</div><button class="btn btn-ghost btn-small" onclick="closeModal('modalCodex')">✕</button></div>
+<div class="codex-tabs">
+<button class="btn btn-ghost btn-small" onclick="codexTab('heroes')">Heroes</button>
+<button class="btn btn-ghost btn-small" onclick="codexTab('cards')">Cards</button>
+<button class="btn btn-ghost btn-small" onclick="codexTab('relics')">Relics</button>
+<button class="btn btn-ghost btn-small" onclick="codexTab('enemies')">Foes</button>
+<button class="btn btn-ghost btn-small" onclick="codexTab('mechanics')">Mechanics</button>
+</div>
+<div id="codexBody" style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto"></div>
+</div>
+</div>
+
+<div class="modal" id="modalSave">
+<div class="modal-box">
+<div style="font-weight:900;font-size:18px">Save Code</div>
+<div class="small">Copy this code to resume later on any device. It encodes hero, floor, deck, relics, silver, difficulty.</div>
+<input class="code-input" id="saveCodeInput" readonly>
+<div style="display:flex;gap:8px">
+<button class="btn btn-primary" style="flex:1" onclick="copySave()">Copy</button>
+<button class="btn btn-ghost" style="flex:1" onclick="closeModal('modalSave')">Close</button>
+</div>
+<div style="height:1px;background:#1e2442"></div>
+<div style="font-weight:800;font-size:14px">Load Code</div>
+<input class="code-input" id="loadCodeInput" placeholder="Paste code here">
+<button class="btn btn-ghost btn-block" onclick="loadFromCode()">Load & Resume</button>
+<div class="small" id="saveMsg"></div>
+</div>
+</div>
+
+<script>
+const HEROES=[
+{id:'warden',name:'Iron Warden',hp:84,icon:'🛡️',color:'#3a6ea5',desc:'Stalwart defender. Starts with Iron Wall & Bash.',deck:['strike','strike','strike','strike','defend','defend','defend','defend','bash','ironwall']},
+{id:'pyro',name:'Ember Mage',hp:68,icon:'🔥',color:'#c45a3c',desc:'Burn specialist. Firebolt & Flame Wave scorch foes.',deck:['strike','strike','strike','defend','defend','defend','firebolt','firebolt','kindle','flamewave']},
+{id:'rogue',name:'Storm Rogue',hp:74,icon:'⚡',color:'#7a6ab5',desc:'Charge & combo assassin. Quick Cut chains.',deck:['strike','strike','strike','strike','defend','defend','defend','quickcut','quickcut','chargeup']}
+];
+const CARDS={
+strike:{name:'Strike',cost:1,type:'attack',dmg:6,desc:'Deal 6 damage.'},
+defend:{name:'Defend',cost:1,type:'skill',block:5,desc:'Gain 5 Block.'},
+bash:{name:'Bash',cost:2,type:'attack',dmg:9,block:5,desc:'9 dmg +5 Block.'},
+ironwall:{name:'Iron Wall',cost:2,type:'skill',block:12,charge:1,desc:'12 Block +1 Charge.'},
+firebolt:{name:'Firebolt',cost:1,type:'attack',dmg:7,burn:2,desc:'7 dmg +2 Burn.'},
+kindle:{name:'Kindle',cost:1,type:'skill',charge:2,desc:'Gain 2 Charge.'},
+flamewave:{name:'Flame Wave',cost:2,type:'attack',dmg:10,burn:3,desc:'10 dmg +3 Burn.'},
+quickcut:{name:'Quick Cut',cost:0,type:'attack',dmg:4,combo:3,desc:'4 dmg. Combo +3 if last was Attack.'},
+chargeup:{name:'Charge Up',cost:1,type:'skill',block:3,charge:2,desc:'3 Block +2 Charge.'},
+heavy:{name:'Heavy Blow',cost:2,type:'attack',dmg:14,desc:'14 damage.'},
+shieldbash:{name:'Shield Bash',cost:1,type:'attack',dmg:5,block:7,desc:'5 dmg +7 Block.'},
+ignite:{name:'Ignite',cost:1,type:'skill',burn:4,desc:'Apply 4 Burn.'},
+lightning:{name:'Lightning',cost:1,type:'attack',dmg:8,charge:1,desc:'8 dmg +1 Charge.'},
+cleave:{name:'Cleave',cost:1,type:'attack',dmg:8,desc:'8 damage.'},
+barrier:{name:'Barrier',cost:1,type:'skill',block:8,desc:'Gain 8 Block.'}
+};
+const RELICS=[
+{id:'embersigil',name:'Ember Sigil',icon:'🔥',desc:'Fire cards apply +1 Burn.'},
+{id:'ironsigil',name:'Iron Sigil',icon:'🛡️',desc:'Start battle with +6 Block.'},
+{id:'coinsack',name:'Coin Purse',icon:'💰',desc:'Gain +25% Silver.'},
+{id:'chargecore',name:'Charge Core',icon:'⚡',desc:'Start battle with +1 Charge.'},
+{id:'lifecharm',name:'Life Charm',icon:'💚',desc:'Heal 4 HP after each battle.'},
+{id:'comboband',name:'Combo Band',icon:'🌀',desc:'Combo bonus +2 extra damage.'}
+];
+const ENEMIES={
+slime:{name:'Gloom Slime',hp:28,dmg:7,icon:'🟢'},
+wolf:{name:'Dire Wolf',hp:32,dmg:9,icon:'🐺'},
+thorn:{name:'Thorn Guardian',hp:58,dmg:12,icon:'🌿',elite:true},
+grove:{name:'Grove Titan',hp:88,dmg:14,icon:'🌳',boss:true},
+wraith:{name:'Frost Wraith',hp:38,dmg:10,icon:'👻'},
+yeti:{name:'Frost Yeti',hp:44,dmg:12,icon:'❄️'},
+frostknight:{name:'Frost Knight',hp:68,dmg:15,icon:'🗡️',elite:true},
+wyrm:{name:'Avalanche Wyrm',hp:105,dmg:16,icon:'🐉',boss:true},
+cultist:{name:'Void Cultist',hp:42,dmg:11,icon:'🧙'},
+eye:{name:'Abyssal Eye',hp:48,dmg:13,icon:'👁️'},
+herald:{name:'Void Herald',hp:78,dmg:17,icon:'🕯️',elite:true},
+sovereign:{name:'Eclipsed Sovereign',hp:130,dmg:18,icon:'👑',boss:true}
+};
+const REALMS=[
+{name:'Emberwood Wilds',range:[1,6],color:'#2a4a2a',enemies:['slime','wolf'],elite:'thorn',boss:'grove'},
+{name:'Frostpeak Expanse',range:[7,12],color:'#1e3a4a',enemies:['wraith','yeti'],elite:'frostknight',boss:'wyrm'},
+{name:'Void Sanctum',range:[13,18],color:'#2a1e3a',enemies:['cultist','eye'],elite:'herald',boss:'sovereign'}
+];
+let difficulty='mortal';
+let selectedHero='warden';
+let G=null;
+let battle=null;
+let selectedCardIdx=-1;
+let floorType='battle';
+
+function diffMult(){return difficulty==='mortal'?0.85:difficulty==='mythic'?1.3:1}
+function realmForFloor(f){return REALMS.find(r=>f>=r.range[0]&&f<=r.range[1])||REALMS[2]}
+function setDiff(d){difficulty=d;document.querySelectorAll('.diff-btn').forEach(b=>b.classList.toggle('active',b.dataset.d===d))}
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
+function renderHeroes(){
+const g=document.getElementById('heroGrid');g.innerHTML='';
+HEROES.forEach(h=>{
+const d=document.createElement('div');d.className='hero-card'+(h.id===selectedHero?' selected':'');d.onclick=()=>{selectedHero=h.id;renderHeroes()};
+d.innerHTML=`<div class="hero-icon" style="background:${h.color}">${h.icon}</div><div class="hero-info"><div class="hero-name">${h.name}</div><div class="hero-desc">${h.desc}</div><div class="hero-stats">HP ${h.hp} • Deck ${h.deck.length}</div></div><div style="font-size:20px">${h.id===selectedHero?'✓':'›'}</div>`;
+g.appendChild(d);
+});
+}
+function startRun(codeData){
+let hero=HEROES.find(h=>h.id===selectedHero);
+let deck, hp, maxHp, floor, relics, silver;
+if(codeData){
+hero=HEROES.find(h=>h.id===codeData.hero)||hero;
+deck=codeData.deck; hp=codeData.hp; maxHp=codeData.maxHp; floor=codeData.floor; relics=codeData.relics; silver=codeData.silver; difficulty=codeData.difficulty||difficulty;
+setDiff(difficulty);
+}else{
+deck=hero.deck.map(id=>({id,up:false}));
+hp=hero.hp; maxHp=hero.hp; floor=1; relics=[]; silver=0;
+}
+G={heroId:hero.id,heroName:hero.name,heroIcon:hero.icon,maxHp,hp,deck,relics,silver,floor,difficulty};
+updateHud();
+prepareFloor();
+showScreen('screenMap');
+logMap(`Expedition begins with ${hero.name} in ${realmForFloor(floor).name}.`);
+}
+function updateHud(){
+if(!G)return;
+document.getElementById('hpPill').textContent=`❤ ${G.hp}/${G.maxHp}`;
+document.getElementById('floorPill').textContent=`F${G.floor}/18`;
+document.getElementById('silverPill').textContent=`◈ ${G.silver}`;
+}
+function prepareFloor(){
+if(!G)return;
+if(G.floor>18){victory();return}
+const realm=realmForFloor(G.floor);
+const isBoss=[6,12,18].includes(G.floor);
+const isElite=G.floor%3===0 && !isBoss;
+const isRest=G.floor===5||G.floor===11||G.floor===17;
+const isShop=G.floor===4||G.floor===10||G.floor===16;
+let type='battle', icon='⚔️', title=`Floor ${G.floor} — Encounter`, desc='A foe blocks the path.';
+if(isBoss){type='boss';icon='👑';title=`Floor ${G.floor} — BOSS: ${ENEMIES[realm.boss].name}`;desc='A realm guardian awakens!';}
+else if(isElite){type='elite';icon='⚡';title=`Floor ${G.floor} — Elite`;desc='A powerful elite hunts you.';}
+else if(isRest){type='rest';icon='🔥';title=`Floor ${G.floor} — Campfire`;desc='Rest and mend, or hone your deck.';}
+else if(isShop){type='shop';icon='🛒';title=`Floor ${G.floor} — Wayfarer`;desc='Trade silver for cards, relics, and healing.';}
+else if(G.floor%5===2){type='event';icon='❓';title=`Floor ${G.floor} — Strange Shrine`;desc='An event offers risk and reward.';}
+floorType=type;
+renderRealmBar();
+renderFloorTrack();
+const card=document.getElementById('actionCard');
+card.innerHTML=`<div class="action-icon">${icon}</div><div class="action-title">${title}</div><div class="action-desc">${desc}</div><div class="badge">${realm.name}</div>`;
+document.getElementById('proceedBtn').textContent=type==='battle'||type==='elite'||type==='boss'?'Fight ⚔️':type==='shop'?'Enter Shop':type==='rest'?'Rest 🔥':'Investigate';
+document.getElementById('relicRowMap').innerHTML=G.relics.map(r=>{
+const re=RELICS.find(x=>x.id===r);return `<span class="relic">${re?re.icon:'✦'} ${re?re.name:r}</span>`;
+}).join('')||'<span class="small">No relics yet — elites drop them.</span>';
+updateHud();
+}
+function renderRealmBar(){
+const bar=document.getElementById('realmBar');bar.innerHTML='';
+REALMS.forEach((r,i)=>{
+const cur=realmForFloor(G.floor).name===r.name;
+bar.innerHTML+=`<span class="badge" style="${cur?'background:#f5d76e;color:#1a1200;border-color:#f5d76e':''}">${r.name}</span>`;
+});
+}
+function renderFloorTrack(){
+const t=document.getElementById('floorTrack');t.innerHTML='';
+for(let i=1;i<=18;i++){
+let cls='floor-node';if(i<G.floor)cls+=' done';if(i===G.floor)cls+=' cur';if([6,12,18].includes(i))cls+=' boss';
+t.innerHTML+=`<div class="${cls}">${i<G.floor?'✓':i}</div>`;
+}
+}
+function logMap(msg){const l=document.getElementById('mapLog');l.innerHTML+=`<div>› ${msg}</div>`;l.scrollTop=l.scrollHeight}
+function proceed(){
+if(floorType==='battle'||floorType==='elite'||floorType==='boss') startBattle();
+else if(floorType==='shop') openShop();
+else if(floorType==='rest') openRest();
+else if(floorType==='event') openEvent();
+}
+function startBattle(){
+const realm=realmForFloor(G.floor);
+let eid;
+if(floorType==='boss') eid=realm.boss;
+else if(floorType==='elite') eid=realm.elite;
+else {
+const pool=realm.enemies; eid=pool[Math.floor(Math.random()*pool.length)];
+}
+const base=ENEMIES[eid];
+const mult=diffMult()*(floorType==='elite'?1.25:floorType==='boss'?1.5:1);
+const maxHp=Math.round(base.hp*mult);
+battle={
+eid,enemy:{...base},enemyHp:maxHp,enemyMaxHp:maxHp,enemyBlock:0,enemyIntentDmg:Math.round(base.dmg*mult),enemyIntent:'attack',burn:0,
+playerHp:G.hp,playerMaxHp:G.maxHp,playerBlock:0,charge:0,combo:0,lastWasAttack:false,energy:3,maxEnergy:3,turn:1,
+drawPile:[],discard:[],hand:[],exhaust:[]
+};
+// relic start bonuses
+if(G.relics.includes('ironsigil')) battle.playerBlock+=6;
+if(G.relics.includes('chargecore')) battle.charge+=1;
+// build draw pile from deck
+battle.drawPile=G.deck.map(c=>({...c})).sort(()=>Math.random()-.5);
+battle.hand=[];battle.discard=[];
+drawCards(5);
+updateBattleIntent();
+showScreen('screenBattle');
+renderBattle();
+logBattle(`Encounter: ${base.icon} ${base.name} — Floor ${G.floor}`);
+}
+function drawCards(n){
+for(let i=0;i<n;i++){
+if(battle.drawPile.length===0){
+if(battle.discard.length===0) break;
+battle.drawPile=battle.discard.splice(0).sort(()=>Math.random()-.5);
+}
+battle.hand.push(battle.drawPile.pop());
+}
+}
+function updateBattleIntent(){
+if(!battle)return;
+const r=Math.random();
+if(r<0.65) {battle.enemyIntent='attack';}
+else if(r<0.85){battle.enemyIntent='defend';battle.enemyBlock+=6;}
+else {battle.enemyIntent='heavy';}
+}
+function renderBattle(){
+if(!battle)return;
+document.getElementById('enemyName').textContent=battle.enemy.icon+' '+battle.enemy.name;
+document.getElementById('enemyRealm').textContent=realmForFloor(G.floor).name+(battle.enemy.elite?' • Elite':'')+(battle.enemy.boss?' • Boss':'');
+document.getElementById('enemyHpText').textContent=`${battle.enemyHp}/${battle.enemyMaxHp}`;
+document.getElementById('enemyHpFill').style.width=(100*battle.enemyHp/battle.enemyMaxHp)+'%';
+document.getElementById('enemyBlockText').textContent=battle.enemyBlock?`🛡️ ${battle.enemyBlock}`:'';
+let intentTxt='';
+if(battle.enemyIntent==='attack') intentTxt=`⚔️ Attack ${battle.enemyIntentDmg}`;
+else if(battle.enemyIntent==='defend') intentTxt=`🛡️ Defend`;
+else intentTxt=`💥 Heavy ${Math.round(battle.enemyIntentDmg*1.4)}`;
+document.getElementById('enemyIntent').textContent=intentTxt;
+document.getElementById('enemyIntent').className='enemy-intent'+(battle.enemyIntent==='defend'?' block':'');
+document.getElementById('enemyStatus').innerHTML=(battle.burn?`<span class="status burn">🔥 Burn ${battle.burn}</span>`:'')+(battle.enemyBlock?`<span class="status block">🛡️ ${battle.enemyBlock}</span>`:'');
+document.getElementById('playerName').textContent=G.heroIcon+' '+G.heroName;
+document.getElementById('playerHpText').textContent=`${battle.playerHp}/${battle.playerMaxHp}`;
+document.getElementById('playerHpFill').style.width=(100*battle.playerHp/battle.playerMaxHp)+'%';
+document.getElementById('playerBlockText').textContent=battle.playerBlock?`🛡️ ${battle.playerBlock}`:'';
+document.getElementById('playerStatus').innerHTML=
+(battle.playerBlock?`<span class="status block">🛡️ ${battle.playerBlock}</span>`:'')+
+(battle.charge?`<span class="status charge">⚡ ${battle.charge}</span>`:'')+
+(battle.combo?`<span class="status">🌀 Combo ${battle.combo}</span>`:'');
+const er=document.getElementById('energyRow');er.innerHTML='';
+for(let i=0;i<battle.maxEnergy;i++) er.innerHTML+=`<div class="energy ${i<battle.energy?'on':''}">${i<battle.energy?'⚡':''}</div>`;
+er.innerHTML+=`<span style="font-size:13px;font-weight:800;color:#f5d76e;margin-left:6px">${battle.energy}/${battle.maxEnergy} Energy</span>`;
+const handEl=document.getElementById('hand');handEl.innerHTML='';
+battle.hand.forEach((c,idx)=>{
+const def=CARDS[c.id]; if(!def) return;
+const up=c.up;
+const dmg=def.dmg?def.dmg+(up?3:0):0;
+const block=def.block?def.block+(up?3:0):0;
+const burn=def.burn||0;
+const charge=def.charge||0;
+let extra='';
+if(def.combo) extra=`Combo +${def.combo + (G.relics.includes('comboband')?2:0)}`;
+const can=battle.energy>=def.cost;
+const sel=selectedCardIdx===idx;
+const el=document.createElement('div');
+el.className='card'+(can?'':' disabled')+(sel?' selected':'')+(up?' upgraded':'');
+el.onclick=()=>{if(!can)return;selectedCardIdx=sel?-1:idx;renderBattle()};
+el.innerHTML=`<div class="card-cost">${def.cost}</div><div class="card-name">${def.name}${up?' +':''}</div><div class="card-type">${def.type}</div><div class="card-desc">${def.desc}</div><div class="card-stats">${dmg?`⚔️${dmg} `:''}${block?`🛡️${block} `:''}${burn?`🔥${burn} `:''}${charge?`⚡${charge} `:''}${extra}</div>`;
+handEl.appendChild(el);
+});
+updateHud();
+}
+function logBattle(msg){const l=document.getElementById('battleLog');l.innerHTML+=`<div>› ${msg}</div>`;l.scrollTop=l.scrollHeight}
+function tryPlaySelected(){
+if(selectedCardIdx<0||!battle) return;
+playCard(selectedCardIdx);
+}
+function playCard(idx){
+const c=battle.hand[idx];const def=CARDS[c.id];
+if(battle.energy<def.cost) return;
+battle.energy-=def.cost;
+battle.hand.splice(idx,1);battle.discard.push(c);
+selectedCardIdx=-1;
+let dmg=def.dmg||0; if(c.up&&dmg) dmg+=3;
+let block=def.block||0; if(c.up&&block) block+=3;
+let burn=def.burn||0;
+let charge=def.charge||0;
+// relic ember sigil
+if(burn && G.relics.includes('embersigil')) burn+=1;
+// charge empowers attacks
+if(dmg && battle.charge>0){
+dmg+=battle.charge*3;
+battle.charge=Math.max(0,battle.charge-1);
+logBattle(`Charge empowers +${battle.charge*3} dmg!`);
+}
+// combo logic
+if(def.type==='attack'){
+if(def.combo && battle.lastWasAttack){
+let bonus=def.combo + (G.relics.includes('comboband')?2:0);
+dmg+=bonus;
+logBattle(`Combo! +${bonus} dmg`);
+}
+battle.combo++;
+battle.lastWasAttack=true;
+}else{
+battle.lastWasAttack=false;
+}
+if(block){battle.playerBlock+=block;logBattle(`Gained ${block} Block`)}
+if(charge){battle.charge+=charge;logBattle(`Gained ${charge} Charge`)}
+if(burn){battle.burn+=burn;logBattle(`Applied ${burn} Burn`)}
+if(dmg){
+let actual=dmg;
+if(battle.enemyBlock>0){const blocked=Math.min(battle.enemyBlock,actual);actual-=blocked;battle.enemyBlock-=blocked;logBattle(`Enemy Block absorbs ${blocked}`)}
+if(actual>0){battle.enemyHp=Math.max(0,battle.enemyHp-actual);logBattle(`Dealt ${actual} damage`)}
+}
+renderBattle();
+if(battle.enemyHp<=0){winBattle();return}
+if(battle.hand.length===0 && battle.energy>0) logBattle('No cards left — End Turn');
+}
+function endTurn(){
+if(!battle) return;
+// enemy burn tick
+if(battle.burn>0){
+const burnDmg=battle.burn*2;
+battle.enemyHp=Math.max(0,battle.enemyHp-burnDmg);
+logBattle(`Burn deals ${burnDmg} damage (${battle.burn} stacks)`);
+battle.burn=Math.max(0,battle.burn-1);
+if(battle.enemyHp<=0){winBattle();return}
+}
+// enemy action
+let dmg=battle.enemyIntentDmg;
+if(battle.enemyIntent==='heavy') dmg=Math.round(dmg*1.4);
+if(battle.enemyIntent!=='defend'){
+let actual=dmg;
+if(battle.playerBlock>0){const blocked=Math.min(battle.playerBlock,actual);actual-=blocked;battle.playerBlock-=blocked;logBattle(`Your Block absorbs ${blocked}`)}
+if(actual>0){battle.playerHp=Math.max(0,battle.playerHp-actual);logBattle(`Enemy hits for ${actual}`)}
+if(battle.playerHp<=0){loseRun();return}
+}else{
+logBattle('Enemy defends');
+}
+// reset block at turn start? Keep half? Classic: block resets to 0 at start of player turn
+battle.playerBlock=0;
+battle.turn++;
+battle.energy=battle.maxEnergy;
+// draw
+drawCards(5-battle.hand.length);
+if(battle.hand.length===0) drawCards(3);
+updateBattleIntent();
+renderBattle();
+}
+function winBattle(){
+const isBoss=[6,12,18].includes(G.floor);
+const isElite=floorType==='elite';
+let silverGain=isBoss?45:isElite?35:20;
+if(G.relics.includes('coinsack')) silverGain=Math.round(silverGain*1.25);
+G.silver+=silverGain;
+G.hp=battle.playerHp;
+if(G.relics.includes('lifecharm')){G.hp=Math.min(G.maxHp,G.hp+4)}
+logMap(`Victory vs ${battle.enemy.name}! +${silverGain} ◈`);
+if(isElite||isBoss){
+const pool=RELICS.filter(r=>!G.relics.includes(r.id));
+if(pool.length){const re=pool[Math.floor(Math.random()*pool.length)];G.relics.push(re.id);logMap(`Found Relic: ${re.icon} ${re.name} — ${re.desc}`)}
+}
+updateHud();
+if(G.floor===18){victory();return}
+showReward();
+}
+function showReward(){
+const isBoss=[6,12,18].includes(G.floor);
+const title=isBoss?'Boss Vanquished!':'Victory!';
+const desc='Draft one card into your deck. Your deck grows stronger each floor.';
+document.getElementById('rewardTitle').textContent=title;
+document.getElementById('rewardDesc').textContent=desc;
+const grid=document.getElementById('rewardGrid');grid.innerHTML='';
+const poolKeys=Object.keys(CARDS);
+let choices=[];
+for(let i=0;i<3;i++){
+let id=poolKeys[Math.floor(Math.random()*poolKeys.length)];
+choices.push(id);
+}
+choices.forEach(id=>{
+const def=CARDS[id];
+const el=document.createElement('div');el.className='reward-card';el.onclick=()=>pickReward(id);
+el.innerHTML=`<div style="font-size:28px">${def.type==='attack'?'⚔️':def.type==='skill'?'🛡️':'✨'}</div><div style="flex:1"><div style="font-weight:900">${def.name} <span style="color:#9aa3c7;font-size:12px">${def.cost}⚡</span></div><div style="font-size:12px;color:#9aa3c7">${def.desc}</div><div style="font-size:12px;color:#f5d76e;font-weight:800">${def.dmg?`⚔️${def.dmg} `:''}${def.block?`🛡️${def.block} `:''}${def.burn?`🔥${def.burn} `:''}${def.charge?`⚡${def.charge} `:''}</div></div><div style="font-size:18px">＋</div>`;
+grid.appendChild(el);
+});
+openModal('modalReward');
+}
+function pickReward(id){
+G.deck.push({id,up:false});
+logMap(`Drafted ${CARDS[id].name}`);
+closeModal('modalReward');
+advanceFloor();
+}
+function skipReward(){closeModal('modalReward');advanceFloor()}
+function advanceFloor(){
+G.floor++;
+if(G.floor>18){victory();return}
+prepareFloor();
+showScreen('screenMap');
+}
+function openShop(){
+document.getElementById('shopSilver').textContent=G.silver;
+const grid=document.getElementById('shopGrid');grid.innerHTML='';
+const shopCards=['heavy','shieldbash','ignite','lightning','cleave','barrier'];
+for(let i=0;i<4;i++){
+const id=shopCards[Math.floor(Math.random()*shopCards.length)];
+const def=CARDS[id];
+const el=document.createElement('div');el.className='shop-item';
+el.innerHTML=`<div style="font-weight:900;font-size:14px">${def.name}</div><div style="font-size:11px;color:#9aa3c7">${def.desc}</div><div style="font-size:12px;color:#f5d76e;font-weight:800;margin:6px 0">${def.cost}⚡</div><button class="btn btn-primary btn-small btn-block" onclick="buyCard('${id}',30)">Buy 30◈</button>`;
+grid.appendChild(el);
+}
+const relicPool=RELICS.filter(r=>!G.relics.includes(r.id)).slice(0,2);
+relicPool.forEach(r=>{
+const el=document.createElement('div');el.className='shop-item';
+el.innerHTML=`<div style="font-size:22px">${r.icon}</div><div style="font-weight:900;font-size:13px">${r.name}</div><div style="font-size:11px;color:#9aa3c7">${r.desc}</div><button class="btn btn-ghost btn-small btn-block" onclick="buyRelic('${r.id}',50)">Buy 50◈</button>`;
+grid.appendChild(el);
+});
+openModal('modalShop');
+}
+function buyCard(id,cost){
+if(G.silver<cost){alert('Not enough silver');return}
+G.silver-=cost;G.deck.push({id,up:false});updateHud();logMap(`Bought ${CARDS[id].name}`);openShop();
+}
+function buyRelic(id,cost){
+if(G.silver<cost){alert('Not enough silver');return}
+G.silver-=cost;G.relics.push(id);updateHud();logMap(`Bought relic ${id}`);openShop();
+}
+function healShop(){
+if(G.silver<25){alert('Need 25 ◈');return}
+G.silver-=25;G.hp=Math.min(G.maxHp,Math.round(G.hp+G.maxHp*0.3));updateHud();logMap('Healed 30%');openShop();
+}
+function openRest(){
+document.getElementById('upgradeList').innerHTML='';
+openModal('modalRest');
+}
+function doRest(type){
+if(type==='heal'){
+G.hp=Math.min(G.maxHp,Math.round(G.hp+G.maxHp*0.3));
+logMap('Rested: healed 30%');
+closeModal('modalRest');advanceFloor();
+}else{
+const list=document.getElementById('upgradeList');list.innerHTML='';
+G.deck.forEach((c,i)=>{
+if(c.up) return;
+const def=CARDS[c.id];
+const el=document.createElement('div');el.className='reward-card';el.onclick=()=>{
+c.up=true;logMap(`Upgraded ${def.name}+`);closeModal('modalRest');advanceFloor();
+};
+el.innerHTML=`<div style="font-size:22px">✨</div><div style="flex:1"><div style="font-weight:900">${def.name}</div><div style="font-size:12px;color:#9aa3c7">${def.desc}</div></div><div style="font-weight:800;color:#81c784">Upgrade</div>`;
+list.appendChild(el);
+});
+if(list.innerHTML==='') list.innerHTML='<div class="small">All cards already upgraded!</div>';
+}
+}
+function openEvent(){
+const events=[
+{title:'Ember Shrine',desc:'A flame offers power at a price.',choices:[{t:'Touch flame: +1 Burn to random card, gain 20 ◈',act:()=>{G.silver+=20;logMap('Shrine: +20 ◈')}},{t:'Leave',act:()=>{}}]},
+{title:'Lost Cache',desc:'You find a buried cache.',choices:[{t:'Open (gain 15 ◈, 10% lose 6 HP)',act:()=>{if(Math.random()<0.1){G.hp=Math.max(1,G.hp-6);logMap('Trap! -6 HP')}G.silver+=15;logMap('+15 ◈')}},{t:'Leave',act:()=>{}}]},
+{title:'Wandering Smith',desc:'A smith offers to hone a card for 15 ◈.',choices:[{t:'Pay 15 ◈ to upgrade random card',act:()=>{if(G.silver>=15){G.silver-=15;const c=G.deck.filter(x=>!x.up)[0];if(c){c.up=true;logMap('Upgraded '+CARDS[c.id].name)}}else logMap('Not enough silver')}},{t:'Decline',act:()=>{}}]}
+];
+const ev=events[Math.floor(Math.random()*events.length)];
+document.getElementById('eventTitle').textContent=ev.title;
+document.getElementById('eventDesc').textContent=ev.desc;
+const ch=document.getElementById('eventChoices');ch.innerHTML='';
+ev.choices.forEach(c=>{
+const b=document.createElement('button');b.className='btn btn-ghost btn-block';b.textContent=c.t;b.onclick=()=>{c.act();closeModal('modalEvent');advanceFloor();updateHud()};
+ch.appendChild(b);
+});
+openModal('modalEvent');
+}
+function fleeBattle(){
+if(!battle) return;
+G.hp=Math.max(1,battle.playerHp-10);
+logMap('Fled battle -10 HP');
+showScreen('screenMap');
+battle=null;
+}
+function loseRun(){
+alert('Defeated! Your expedition ends at Floor '+G.floor);
+G=null;showScreen('screenTitle');
+}
+function victory(){
+alert('Victory! You conquered all 18 floors and defeated the Eclipsed Sovereign! Final Silver: '+G.silver);
+G=null;showScreen('screenTitle');
+}
+function openModal(id){document.getElementById(id).classList.add('open')}
+function closeModal(id){document.getElementById(id).classList.remove('open')}
+function openCodex(){renderCodex('heroes');openModal('modalCodex')}
+function codexTab(t){renderCodex(t)}
+function renderCodex(tab){
+const body=document.getElementById('codexBody');body.innerHTML='';
+if(tab==='heroes'){
+HEROES.forEach(h=>{
+const d=document.createElement('div');d.className='action-card';d.style.textAlign='left';
+d.innerHTML=`<div style="display:flex;gap:10px;align-items:center"><div style="font-size:28px">${h.icon}</div><div><div style="font-weight:900">${h.name} — ${h.hp} HP</div><div style="font-size:12px;color:#9aa3c7">${h.desc}</div><div style="font-size:12px;color:#f5d76e">Deck: ${h.deck.map(id=>CARDS[id]?.name).join(', ')}</div></div></div>`;
+body.appendChild(d);
+});
+}else if(tab==='cards'){
+Object.entries(CARDS).forEach(([id,def])=>{
+const d=document.createElement('div');d.className='reward-card';d.style.cursor='default';
+d.innerHTML=`<div style="font-size:22px">${def.type==='attack'?'⚔️':'🛡️'}</div><div style="flex:1"><div style="font-weight:900">${def.name} <span style="color:#f5d76e">${def.cost}⚡</span> <span style="font-size:11px;color:#9aa3c7">${def.type}</span></div><div style="font-size:12px;color:#cbd5ff">${def.desc}</div></div>`;
+body.appendChild(d);
+});
+body.innerHTML+=`<div class="small">Upgrade: +3 dmg or +3 block. Draft after battles, buy in shop, upgrade at campfires.</div>`;
+}else if(tab==='relics'){
+RELICS.forEach(r=>{
+const d=document.createElement('div');d.className='reward-card';d.style.cursor='default';
+d.innerHTML=`<div style="font-size:24px">${r.icon}</div><div style="flex:1"><div style="font-weight:900">${r.name}</div><div style="font-size:12px;color:#9aa3c7">${r.desc}</div></div>`;
+body.appendChild(d);
+});
+}else if(tab==='enemies'){
+Object.entries(ENEMIES).forEach(([id,e])=>{
+const d=document.createElement('div');d.className='reward-card';d.style.cursor='default';
+d.innerHTML=`<div style="font-size:24px">${e.icon}</div><div style="flex:1"><div style="font-weight:900">${e.name} ${e.elite?'• Elite':''} ${e.boss?'• Boss':''}</div><div style="font-size:12px;color:#9aa3c7">HP ${e.hp} • Dmg ${e.dmg}</div></div>`;
+body.appendChild(d);
+});
+}else{
+body.innerHTML=`
+<div class="action-card" style="text-align:left">
+<div style="font-weight:900">Mechanics</div>
+<div class="kv"><span>Block</span><span>Negates damage until next turn</span></div>
+<div class="kv"><span>Charge ⚡</span><span>+3 dmg to next attack, consumes 1</span></div>
+<div class="kv"><span>Burn 🔥</span><span>2 dmg per stack at enemy turn start, -1 stack/turn</span></div>
+<div class="kv"><span>Combo 🌀</span><span>Attack after attack gains bonus (Quick Cut etc.)</span></div>
+<div class="kv"><span>Energy</span><span>3 per turn, refreshes each turn</span></div>
+<div class="kv"><span>Realms</span><span>6 floors each: Emberwood → Frostpeak → Void</span></div>
+<div class="kv"><span>Difficulty</span><span>Mortal 0.85× / Heroic 1× / Mythic 1.3× enemy stats</span></div>
+<div class="kv"><span>Save Codes</span><span>Base64 JSON of run — copy to share/resume</span></div>
+</div>`;
+}
+}
+function openSave(){
+if(!G){document.getElementById('saveCodeInput').value='Start a run first';document.getElementById('saveMsg').textContent='';openModal('modalSave');return}
+const data={hero:G.heroId,floor:G.floor,hp:G.hp,maxHp:G.maxHp,deck:G.deck,relics:G.relics,silver:G.silver,difficulty:G.difficulty||difficulty};
+const code=btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+document.getElementById('saveCodeInput').value=code;
+document.getElementById('saveMsg').textContent='Code copied to clipboard if permitted.';
+openModal('modalSave');
+try{navigator.clipboard.writeText(code)}catch(e){}
+}
+function openLoad(){document.getElementById('saveMsg').textContent='';openModal('modalSave')}
+function copySave(){const v=document.getElementById('saveCodeInput').value;if(!v)return;try{navigator.clipboard.writeText(v);document.getElementById('saveMsg').textContent='Copied!'}catch(e){document.getElementById('saveMsg').textContent='Select and copy manually'}} 
+function loadFromCode(){
+const code=document.getElementById('loadCodeInput').value.trim();
+if(!code){document.getElementById('saveMsg').textContent='Paste a code first';return}
+try{
+const json=decodeURIComponent(escape(atob(code)));
+const data=JSON.parse(json);
+if(!data.hero||!data.deck) throw new Error('bad');
+closeModal('modalSave');
+startRun(data);
+}catch(e){document.getElementById('saveMsg').textContent='Invalid code'}
+}
+renderHeroes();
+</script>
+</body>
+</html>

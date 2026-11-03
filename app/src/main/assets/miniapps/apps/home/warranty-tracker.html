@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CoverTrack Warranty Tracker</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#0c0f16;color:#eef1f6}
+.wrap{max-width:430px;margin:0 auto;padding:16px 16px 40px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:22px;margin:0}
+.mutebtn{min-width:44px;min-height:44px;border-radius:12px;border:1px solid #2b3348;background:#171c28;color:#fff;font-size:19px;cursor:pointer}
+.summary{background:#171c28;border:1px solid #2b3348;border-radius:16px;padding:14px;margin:12px 0;font-size:15px;text-align:center}
+.card{background:#171c28;border:1px solid #2b3348;border-radius:16px;padding:14px;margin:12px 0}
+label{font-size:13px;opacity:.85}
+input{width:100%;min-height:48px;border-radius:12px;border:1px solid #2b3348;background:#0c0f16;color:#fff;font-size:16px;padding:0 12px;margin:4px 0 8px}
+.row2{display:flex;gap:8px}.row2 div{flex:1;min-width:0}
+button.add{width:100%;min-height:52px;border-radius:14px;border:none;background:#38bdf8;color:#08232f;font-size:17px;font-weight:800;cursor:pointer}
+.item{background:#0c0f16;border:1px solid #2b3348;border-radius:12px;padding:12px;margin:8px 0}
+.item.exp{border-color:#7f1d1d}
+.item .top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.item b{font-size:16px}
+.badge{font-size:12px;font-weight:800;border-radius:9px;padding:4px 10px;white-space:nowrap}
+.ok{background:#123a24;color:#4ade80}
+.soon{background:#3a2c12;color:#fbbf24}
+.expB{background:#3a1512;color:#f87171}
+.meta{font-size:13px;opacity:.8;margin-top:4px}
+.del{min-width:44px;min-height:44px;border-radius:10px;border:1px solid #5b2323;background:transparent;color:#f87171;font-size:16px;cursor:pointer;margin-top:8px}
+.empty{text-align:center;opacity:.65;padding:16px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>CoverTrack Items</h1><button class="mutebtn" id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="summary" id="summary"></div>
+<div class="card">
+<label for="nameIn">Item</label><input id="nameIn" maxlength="40" placeholder="e.g. Air purifier">
+<div class="row2">
+<div><label for="dateIn">Purchase date</label><input id="dateIn" type="date"></div>
+<div><label for="moIn">Warranty (months)</label><input id="moIn" type="number" min="1" max="120" value="12"></div>
+</div>
+<button class="add" id="addBtn">Track item</button>
+</div>
+<div id="list"></div>
+</div>
+<script>
+(function(){
+"use strict";
+var K="warranty-tracker-v1",MK="warranty-tracker-mute";
+var items=[];try{items=JSON.parse(localStorage.getItem(K)||"[]");if(!Array.isArray(items))items=[];}catch(e){items=[];}
+var muted=localStorage.getItem(MK)==="1",AC=null;
+function click(f){if(muted)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume();var o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.frequency.value=f||700;var t=AC.currentTime;g.gain.setValueAtTime(0.07,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.07);o.start(t);o.stop(t+0.07);}catch(e){}}
+function save(){localStorage.setItem(K,JSON.stringify(items));}
+var muteBtn=document.getElementById("muteBtn");
+muteBtn.textContent=muted?"🔇":"🔊";
+muteBtn.addEventListener("click",function(){muted=!muted;localStorage.setItem(MK,muted?"1":"0");muteBtn.textContent=muted?"🔇":"🔊";click(700);});
+document.getElementById("dateIn").value=new Date().toISOString().slice(0,10);
+function expiry(it){var d=new Date(it.date+"T12:00:00");d.setMonth(d.getMonth()+it.months);return d;}
+function dayDiff(a,b){return Math.round((b-a)/86400000);}
+function fmtD(d){return d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});}
+function render(){
+var now=new Date();now.setHours(0,0,0,0);
+var sorted=items.map(function(x,i){return {x:x,i:i,e:expiry(x)};}).sort(function(a,b){return a.e-b.e;});
+var expN=sorted.filter(function(o){return dayDiff(now,o.e)<0;}).length;
+var soonN=sorted.filter(function(o){var d=dayDiff(now,o.e);return d>=0&&d<=30;}).length;
+document.getElementById("summary").textContent=items.length?("🛡 "+items.length+" items · "+expN+" expired · "+soonN+" expiring within 30 days"):"🛡 Track warranties so expiry never surprises you.";
+var list=document.getElementById("list");
+list.innerHTML=items.length?"":'<div class="empty">No items yet. Add your first purchase above.</div>';
+sorted.forEach(function(o){
+var dEl=document.createElement("div");var left=dayDiff(now,o.e);
+var cls,txt;
+if(left<0){cls="expB";txt="EXPIRED "+(-left)+"d ago";dEl.className="item exp";}
+else if(left===0){cls="soon";txt="EXPIRES TODAY";dEl.className="item";}
+else if(left<=30){cls="soon";txt=left+"d left";dEl.className="item";}
+else{cls="ok";txt=left+"d left";dEl.className="item";}
+var t=document.createElement("div");t.className="top";
+var nm=document.createElement("b");nm.textContent=o.x.name;t.appendChild(nm);
+var badge=document.createElement("span");badge.className="badge "+cls;badge.textContent=txt;t.appendChild(badge);
+dEl.appendChild(t);
+var m=document.createElement("div");m.className="meta";m.textContent="Bought "+new Date(o.x.date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+" · "+o.x.months+"-month warranty · expires "+fmtD(o.e);dEl.appendChild(m);
+var del=document.createElement("button");del.className="del";del.textContent="Remove";
+del.addEventListener("click",function(){if(confirm("Remove "+items[o.i].name+"?")){click(440);items.splice(o.i,1);save();render();}});
+dEl.appendChild(del);list.appendChild(dEl);
+});
+}
+document.getElementById("addBtn").addEventListener("click",function(){
+var n=document.getElementById("nameIn").value.trim();
+if(!n){alert("Enter the item name.");return;}
+var dt=document.getElementById("dateIn").value||new Date().toISOString().slice(0,10);
+var mo=Math.min(120,Math.max(1,+document.getElementById("moIn").value||12));
+click(880);items.push({name:n.slice(0,40),date:dt,months:mo});
+document.getElementById("nameIn").value="";save();render();
+});
+render();
+})();
+</script>
+</body>
+</html>

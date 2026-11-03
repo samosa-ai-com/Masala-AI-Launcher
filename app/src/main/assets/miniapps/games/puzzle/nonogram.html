@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Cozy Picto Grid</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#fdf8f0;--card:#ffffff;--ink:#2b2a28;--muted:#8a857e;--line:#ece6da;--accent:#d9a679;--accent2:#7aa99e;--fill:#2b2a28;--fill2:#3d5a54;--xcol:#d9a679;--radius:18px}
+html,body{height:100%;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow-x:hidden}
+.app{width:100%;max-width:428px;min-width:360px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:var(--bg)}
+header{padding:14px 16px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;background:var(--bg);z-index:10}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:38px;height:38px;border-radius:12px;background:var(--ink);display:grid;place-items:center;color:var(--bg);font-size:18px}
+.brand h1{font-size:16px;letter-spacing:.04em;font-weight:800;line-height:1}
+.brand h1 span{font-weight:400;color:var(--muted);font-size:12px;letter-spacing:.06em;display:block;margin-top:2px}
+.pill{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 12px;display:flex;align-items:center;gap:8px;box-shadow:0 2px 8px rgba(43,42,40,.06)}
+.pill b{font-size:13px}
+.pill label{font-size:10px;letter-spacing:.1em;color:var(--muted);font-weight:700}
+.topbar{padding:0 16px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{flex:1;min-height:44px;border-radius:999px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:13px;touch-action:manipulation}
+.chip.active{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip:active{transform:scale(.98)}
+.stats{padding:0 16px 10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;text-align:center}
+.stat label{font-size:10px;letter-spacing:.1em;color:var(--muted);font-weight:700;display:block}
+.stat strong{font-size:16px;display:block;margin-top:2px}
+.stat span{font-size:11px;color:var(--muted)}
+.board-wrap{padding:0 16px 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:0 8px 24px rgba(43,42,40,.06)}
+.card-head{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);background:#fffcf6}
+.card-head h2{font-size:13px;letter-spacing:.06em}
+.card-head p{font-size:12px;color:var(--muted)}
+.puzzle-meta{padding:10px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);background:#fdf8f0}
+.puzzle-meta .tag{font-size:11px;font-weight:700;letter-spacing:.06em;background:var(--ink);color:var(--bg);padding:6px 10px;border-radius:999px}
+.puzzle-meta .hint{font-size:12px;color:var(--muted)}
+.nonogram{padding:12px;display:flex;flex-direction:column;align-items:center;gap:0;overflow:hidden}
+.clues-top{display:flex;gap:2px;margin-left:42px}
+.clues-top-col{width:28px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;min-height:48px}
+.clues-top-col span{font-size:11px;font-weight:700;line-height:1;color:var(--ink);background:#fdf8f0;border-radius:6px;min-width:18px;text-align:center;padding:2px 0}
+.row{display:flex;gap:2px;align-items:center}
+.clues-left{width:42px;display:flex;gap:2px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+.clues-left span{font-size:11px;font-weight:700;background:#fdf8f0;border-radius:6px;min-width:18px;text-align:center;padding:3px 4px}
+.grid{display:grid;gap:2px;background:var(--line);padding:2px;border-radius:10px}
+.cell{width:28px;height:28px;border-radius:7px;background:#fff;display:grid;place-items:center;font-weight:800;font-size:14px;touch-action:manipulation;user-select:none;border:1px solid transparent;transition:all .08s}
+.cell.filled{background:var(--fill);color:#fff;border-color:var(--fill);box-shadow:inset 0 1px 0 rgba(255,255,255,.15)}
+.cell.marked{background:#fff7ed;color:var(--xcol);border-color:#f0d9bf}
+.cell:active{transform:scale(.96)}
+.cell.hint-wrong{animation:shake .3s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
+.controls{padding:12px 16px;display:grid;gap:8px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{min-height:48px;border-radius:14px;border:1px solid var(--line);background:var(--card);font-weight:800;font-size:13px;letter-spacing:.02em;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.accent{background:var(--accent2);color:#fff;border-color:var(--accent2)}
+.btn.ghost{background:#fdf8f0}
+.btn:active{transform:scale(.98)}
+.modes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.mode{min-height:48px;border-radius:14px;border:2px solid var(--line);background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-weight:800;font-size:12px}
+.mode.active{border-color:var(--ink);background:var(--ink);color:var(--bg)}
+.mode span{font-size:10px;font-weight:600;opacity:.8;letter-spacing:.06em}
+.progress{height:6px;background:#ece6da;border-radius:999px;overflow:hidden;margin:0 16px}
+.progress i{display:block;height:100%;background:var(--accent2);width:0%;transition:width .3s}
+.footer{padding:12px 16px 18px;text-align:center;color:var(--muted);font-size:11px;line-height:1.5}
+.overlay{position:fixed;inset:0;background:rgba(43,42,40,.45);backdrop-filter:blur(6px);display:none;place-items:center;padding:20px;z-index:50}
+.overlay.open{display:grid}
+.sheet{width:100%;max-width:400px;background:var(--card);border-radius:20px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.2);border:1px solid var(--line)}
+.sheet-head{padding:16px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
+.sheet-body{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.sheet-body p{font-size:13px;line-height:1.5;color:var(--muted)}
+.big{font-size:28px;text-align:center}
+@media(max-width:380px){.cell{width:26px;height:26px}.clues-top-col{width:26px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand">
+    <div class="logo">◧</div>
+    <div><h1>PICTO GRID <span>cozy picture logic</span></h1></div>
+  </div>
+  <div class="pill"><label>SCORE</label><b id="score">0</b></div>
+</header>
+
+<div class="topbar">
+  <button class="chip active" data-size="5">5×5 Easy</button>
+  <button class="chip" data-size="10">10×10 Cozy</button>
+  <button class="chip" data-size="15">15×15 Calm</button>
+</div>
+
+<div class="stats">
+  <div class="stat"><label>TIME</label><strong id="time">00:00</strong><span>elapsed</span></div>
+  <div class="stat"><label>FILLED</label><strong id="filled">0%</strong><span id="filledSub">0 / 0</span></div>
+  <div class="stat"><label>PUZZLE</label><strong id="puzzleNo">#1</strong><span id="puzzleName">Little Cat</span></div>
+</div>
+
+<div class="progress"><i id="progress"></i></div>
+
+<div class="board-wrap">
+  <div class="card">
+    <div class="card-head">
+      <h2 id="title">LITTLE CAT</h2>
+      <p id="subtitle">Tap to paint • Reveal the image</p>
+    </div>
+    <div class="puzzle-meta">
+      <span class="tag" id="tag">10×10</span>
+      <span class="hint" id="metaHint">Row & column numbers tell you the runs to fill</span>
+    </div>
+    <div class="nonogram" id="nonogram"></div>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="modes">
+    <button class="mode active" id="modePaint">■ PAINT<span>FILL SQUARE</span></button>
+    <button class="mode" id="modeX">✕ MARK<span>EMPTY</span></button>
+    <button class="mode" id="modeErase">⌫ ERASE<span>CLEAR</span></button>
+  </div>
+  <div class="row2">
+    <button class="btn ghost" id="btnCheck">✓ CHECK</button>
+    <button class="btn ghost" id="btnHint">💡 HINT</button>
+  </div>
+  <div class="row2">
+    <button class="btn" id="btnRestart">↺ RESTART</button>
+    <button class="btn primary" id="btnNew">✦ NEW PUZZLE</button>
+  </div>
+</div>
+
+<div class="footer">Numbered clues = consecutive filled blocks. “3 1” means 3 filled, gap, 1 filled. Fill all correctly to reveal the cozy pixel art.</div>
+</div>
+
+<div class="overlay" id="overlayWin">
+  <div class="sheet">
+    <div class="sheet-head"><h3 style="font-size:14px;letter-spacing:.06em">PICTURE REVEALED!</h3><button class="btn" style="min-height:36px;padding:0 12px" onclick="closeWin()">✕</button></div>
+    <div class="sheet-body">
+      <div class="big" id="winEmoji">🐱</div>
+      <div style="text-align:center"><strong id="winTitle">Little Cat</strong><p id="winDesc">You painted it perfectly in 01:23</p></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center">
+        <div class="stat"><label>SCORE</label><strong id="winScore">0</strong></div>
+        <div class="stat"><label>TIME</label><strong id="winTime">00:00</strong></div>
+      </div>
+      <button class="btn primary" id="btnNextWin" style="width:100%">NEXT COZY PUZZLE →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PUZZLES={
+ 5:[
+  {name:"Heart",emoji:"💛",sol:["01110","11111","11111","01110","00100"]},
+  {name:"Star",emoji:"⭐",sol:["00100","01110","11111","01110","00100"]},
+  {name:"Leaf",emoji:"🍃",sol:["00100","01110","11111","01110","00100"]},
+  {name:"House",emoji:"🏠",sol:["00100","01110","11111","11011","11111"]},
+  {name:"Smile",emoji:"☺",sol:["01110","10001","10101","10001","01110"]},
+ ],
+ 10:[
+  {name:"Little Cat",emoji:"🐱",sol:["0011111000","0111111100","1111111110","1110111110","1111111111","0111111110","0011111000","0001110000","0001110000","0000100000"]},
+  {name:"Coffee Cup",emoji:"☕",sol:["0000000000","0011111000","0111111100","0111111100","0111111100","0111111100","0011111000","0001110000","0001110000","0011111000"]},
+  {name:"Mushroom",emoji:"🍄",sol:["0001111000","0011111100","0111111110","1111111111","1101110111","1111111111","0011111000","0001110000","0001110000","0011111000"]},
+  {name:"Tulip",emoji:"🌷",sol:["0000101000","0001111100","0011111100","0011111100","0001111000","0001111000","0001111000","0011111000","0001110000","0001110000"]},
+  {name:"Whale",emoji:"🐳",sol:["0000000000","0011111000","0111111110","1111111111","1111111111","1111111110","0111111000","0001100000","0000000000","0000000000"]},
+  {name:"Sunny Day",emoji:"☀️",sol:["0100000100","0010001000","0001110000","0111111100","0111111100","0111111100","0001110000","0010001000","0100000100","0000000000"]},
+ ],
+ 15:[
+  {name:"Cozy Cabin",emoji:"🏡",sol:["000000010000000","000000111000000","000001111100000","000011111110000","000111111111000","001111111111100","011111111111110","111111111111111","101111111111101","101100111001101","101100111001101","111111111111111","111111111111111","011111111111110","001111111111100"]},
+  {name:"Fox Friend",emoji:"🦊",sol:["000110000011000","001111000111100","011111101111110","111111111111111","111111111111111","111011111110111","111111111111111","011111111111110","001111111111100","000111111111000","000011111110000","000001111100000","000001111100000","000000111000000","000000010000000"]},
+ ]
+};
+
+let size=10, puzzleIndex=0, puzzle=null, grid=[], solution=[], cluesRow=[], cluesCol=[], score=0, startTime=Date.now(), timer=null, mode='paint';
+
+const elNonogram=document.getElementById('nonogram');
+const elScore=document.getElementById('score');
+const elTime=document.getElementById('time');
+const elFilled=document.getElementById('filled');
+const elFilledSub=document.getElementById('filledSub');
+const elProgress=document.getElementById('progress');
+
+function parseSol(sol){ return sol.map(row=> row.split('').map(ch=> ch==='1'?1:0)); }
+function computeClues(sol){
+  const n=sol.length, m=sol[0].length;
+  const rows=[], cols=[];
+  for(let y=0;y<n;y++){
+    const run=[]; let c=0;
+    for(let x=0;x<m;x++){ if(sol[y][x]) c++; else { if(c) run.push(c); c=0; } }
+    if(c) run.push(c); rows.push(run.length?run:[0]);
+  }
+  for(let x=0;x<m;x++){
+    const run=[]; let c=0;
+    for(let y=0;y<n;y++){ if(sol[y][x]) c++; else { if(c) run.push(c); c=0; } }
+    if(c) run.push(c); cols.push(run.length?run:[0]);
+  }
+  return {rows,cols};
+}
+function pickPuzzle(){
+  const list=PUZZLES[size];
+  puzzle=list[puzzleIndex % list.length];
+  solution=parseSol(puzzle.sol);
+  const c=computeClues(solution);
+  cluesRow=c.rows; cluesCol=c.cols;
+  grid=Array.from({length:size},()=>Array(size).fill(0));
+  document.getElementById('title').textContent=puzzle.name.toUpperCase();
+  document.getElementById('puzzleName').textContent=puzzle.name;
+  document.getElementById('puzzleNo').textContent='#'+(puzzleIndex+1);
+  document.getElementById('tag').textContent=size+'×'+size;
+  document.getElementById('winEmoji').textContent=puzzle.emoji;
+  startTime=Date.now();
+  render();
+  updateStats();
+}
+function render(){
+  elNonogram.innerHTML='';
+  // top clues
+  const top=document.createElement('div'); top.className='clues-top';
+  for(let x=0;x<size;x++){
+    const col=document.createElement('div'); col.className='clues-top-col';
+    cluesCol[x].forEach(v=>{
+      const s=document.createElement('span'); s.textContent=v===0?'–':v; if(v===0) s.style.opacity=.4; col.appendChild(s);
+    });
+    top.appendChild(col);
+  }
+  elNonogram.appendChild(top);
+  // rows
+  const gridWrap=document.createElement('div'); gridWrap.className='grid';
+  gridWrap.style.gridTemplateColumns=`repeat(${size},1fr)`;
+  // we will create row by row with left clues
+  for(let y=0;y<size;y++){
+    const row=document.createElement('div'); row.className='row';
+    const left=document.createElement('div'); left.className='clues-left';
+    cluesRow[y].forEach(v=>{
+      const s=document.createElement('span'); s.textContent=v===0?'–':v; if(v===0) s.style.opacity=.4; left.appendChild(s);
+    });
+    row.appendChild(left);
+    const rowGrid=document.createElement('div'); rowGrid.className='grid'; rowGrid.style.gridTemplateColumns=`repeat(${size},28px)`; rowGrid.style.background='transparent'; rowGrid.style.padding='0'; rowGrid.style.gap='2px';
+    // adjust for 15
+    if(size===15) rowGrid.style.gridTemplateColumns=`repeat(${size},22px)`;
+    for(let x=0;x<size;x++){
+      const cell=document.createElement('button'); cell.className='cell'; cell.dataset.x=x; cell.dataset.y=y;
+      if(size===15){ cell.style.width='22px'; cell.style.height='22px'; cell.style.borderRadius='6px'; }
+      const v=grid[y][x];
+      if(v===1) cell.classList.add('filled');
+      else if(v===2) cell.classList.add('marked');
+      cell.textContent= v===2 ? '×' : '';
+      cell.addEventListener('click',()=> onCell(y,x));
+      // drag paint
+      cell.addEventListener('pointerenter',e=>{ if(e.buttons===1) onCell(y,x,true); });
+      rowGrid.appendChild(cell);
+    }
+    row.appendChild(rowGrid);
+    elNonogram.appendChild(row);
+  }
+}
+function onCell(y,x,isDrag){
+  const cur=grid[y][x];
+  let next=cur;
+  if(mode==='paint') next=1;
+  else if(mode==='x') next=2;
+  else if(mode==='erase') next=0;
+  // toggle if same and not drag
+  if(!isDrag && cur===next) next=0;
+  grid[y][x]=next;
+  // score: +5 for correct fill, -3 for wrong fill
+  const correct=solution[y][x]===1;
+  if(next===1 && correct) score+=10;
+  else if(next===1 && !correct) score=Math.max(0,score-4);
+  else if(next===0 && cur===1 && correct) score=Math.max(0,score-2);
+  elScore.textContent=score;
+  render();
+  updateStats();
+  checkWin(false);
+}
+function updateStats(){
+  const total=solution.flat().filter(v=>v===1).length;
+  const filled=grid.flat().filter((v,i)=>{
+    const y=Math.floor(i/size), x=i%size;
+    return v===1 && solution[y][x]===1;
+  }).length;
+  const pct= total? Math.round(filled/total*100):0;
+  elFilled.textContent=pct+'%';
+  elFilledSub.textContent=filled+' / '+total;
+  elProgress.style.width=pct+'%';
+  const elapsed=Math.floor((Date.now()-startTime)/1000);
+  const mm=String(Math.floor(elapsed/60)).padStart(2,'0');
+  const ss=String(elapsed%60).padStart(2,'0');
+  elTime.textContent=mm+':'+ss;
+}
+function checkWin(showAlert=true){
+  let ok=true;
+  for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+    if(solution[y][x]===1 && grid[y][x]!==1) ok=false;
+    if(solution[y][x]===0 && grid[y][x]===1) ok=false;
+  }
+  if(ok){
+    const elapsed=Math.floor((Date.now()-startTime)/1000);
+    const mm=String(Math.floor(elapsed/60)).padStart(2,'0');
+    const ss=String(elapsed%60).padStart(2,'0');
+    score+=50 + Math.max(0, 100 - elapsed);
+    elScore.textContent=score;
+    document.getElementById('winTitle').textContent=puzzle.name;
+    document.getElementById('winDesc').textContent=`You painted it perfectly in ${mm}:${ss}`;
+    document.getElementById('winScore').textContent=score;
+    document.getElementById('winTime').textContent=mm+':'+ss;
+    document.getElementById('overlayWin').classList.add('open');
+    if(timer) clearInterval(timer);
+    return true;
+  }
+  if(showAlert){
+    // highlight wrong
+    let wrong=0;
+    for(let y=0;y<size;y++) for(let x=0;x<size;x++) if(grid[y][x]===1 && solution[y][x]===0) wrong++;
+    if(wrong===0) alert('Almost! Keep filling the remaining squares.');
+    else alert(wrong+' square'+(wrong>1?'s':'')+' should be empty. Check the clues!');
+  }
+  return false;
+}
+function doHint(){
+  // find first incorrect or missing
+  const candidates=[];
+  for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+    if(solution[y][x]===1 && grid[y][x]!==1) candidates.push([y,x]);
+  }
+  if(!candidates.length) return;
+  const [y,x]=candidates[Math.floor(Math.random()*candidates.length)];
+  grid[y][x]=1;
+  score=Math.max(0,score-8);
+  elScore.textContent=score;
+  render(); updateStats();
+}
+function closeWin(){ document.getElementById('overlayWin').classList.remove('open'); }
+
+document.querySelectorAll('.chip').forEach(ch=>{
+  ch.addEventListener('click',()=>{
+    document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    ch.classList.add('active');
+    size=parseInt(ch.dataset.size);
+    puzzleIndex=0;
+    pickPuzzle();
+  });
+});
+document.getElementById('modePaint').addEventListener('click',()=>{mode='paint'; updateModes();});
+document.getElementById('modeX').addEventListener('click',()=>{mode='x'; updateModes();});
+document.getElementById('modeErase').addEventListener('click',()=>{mode='erase'; updateModes();});
+function updateModes(){
+  document.querySelectorAll('.mode').forEach(m=>m.classList.remove('active'));
+  if(mode==='paint') document.getElementById('modePaint').classList.add('active');
+  if(mode==='x') document.getElementById('modeX').classList.add('active');
+  if(mode==='erase') document.getElementById('modeErase').classList.add('active');
+}
+document.getElementById('btnCheck').addEventListener('click',()=>checkWin(true));
+document.getElementById('btnHint').addEventListener('click',doHint);
+document.getElementById('btnRestart').addEventListener('click',()=>{
+  grid=Array.from({length:size},()=>Array(size).fill(0));
+  score=Math.max(0,score-5);
+  elScore.textContent=score;
+  startTime=Date.now();
+  render(); updateStats();
+});
+document.getElementById('btnNew').addEventListener('click',()=>{
+  puzzleIndex++;
+  pickPuzzle();
+});
+document.getElementById('btnNextWin').addEventListener('click',()=>{
+  closeWin();
+  puzzleIndex++;
+  pickPuzzle();
+});
+timer=setInterval(updateStats,1000);
+pickPuzzle();
+</script>
+</body>
+</html>

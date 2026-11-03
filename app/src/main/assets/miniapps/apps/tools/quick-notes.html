@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PinPad — Quick Notes</title>
+<style>
+:root{--bg:#faf7ef;--card:#fff;--acc:#7c4dff;--txt:#221d33;--mut:#7d7591}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;min-height:100vh}
+.wrap{max-width:480px;margin:0 auto;padding:16px 14px 32px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}
+.sub{color:var(--mut);font-size:13px;margin:2px 0 0}
+#muteBtn{background:var(--card);border:1px solid #e3dcc9;color:var(--txt);border-radius:12px;min-width:48px;min-height:44px;font-size:18px}
+.card{background:var(--card);border:1px solid #e3dcc9;border-radius:16px;padding:14px;margin:12px 0}
+#newNote{width:100%;min-height:88px;border-radius:12px;border:1px solid #cfc6ae;font-size:15px;padding:10px;font-family:inherit;resize:vertical}
+.meta{display:flex;align-items:center;gap:10px;margin-top:8px}
+#charCount{color:var(--mut);font-size:12px;flex:1}
+#addBtn{min-height:48px;padding:0 20px;border:0;border-radius:12px;background:var(--acc);color:#fff;font-size:16px;font-weight:700}
+#search{width:100%;min-height:48px;border-radius:12px;border:1px solid #cfc6ae;font-size:15px;padding:0 12px}
+.note{border:1px solid #e3dcc9;border-radius:12px;padding:10px 12px;margin:8px 0;background:#fffdf6}
+.note.pinned{border-color:var(--acc);background:#f4efff}
+.note p{margin:4px 0 8px;white-space:pre-wrap;word-break:break-word;font-size:15px}
+.note .row{display:flex;align-items:center;gap:6px}
+.note .cc{font-size:11px;color:var(--mut);flex:1}
+.note button{min-height:44px;min-width:44px;border-radius:10px;border:1px solid #e3dcc9;background:#fff;font-size:14px}
+.note button.pinOn{background:var(--acc);color:#fff;border-color:var(--acc)}
+.empty{text-align:center;color:var(--mut);font-size:14px;padding:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div><h1>PinPad</h1><p class="sub">Fast notes that stick</p></div><button id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="card"><textarea id="newNote" maxlength="2000" placeholder="Type a note…"></textarea>
+<div class="meta"><span id="charCount">0 chars</span><button id="addBtn">Save note</button></div></div>
+<div class="card"><input type="search" id="search" placeholder="Search notes…"></div>
+<div id="list"></div>
+</div>
+<script>
+(function(){
+"use strict";
+var KEY="pinpad-v1";
+var store={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+var muted=store.get("muted-quick-notes",false);
+var muteBtn=document.getElementById("muteBtn");
+function paintMute(){muteBtn.textContent=muted?"🔇":"🔊";}paintMute();
+var actx=null;
+function beep(f){if(muted)return;try{var C=window.AudioContext||window.webkitAudioContext;if(!C)return;if(!actx)actx=new C();if(actx.state==="suspended")actx.resume();var o=actx.createOscillator(),g=actx.createGain();o.type="sine";o.frequency.value=f||660;g.gain.value=0.05;o.connect(g);g.connect(actx.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.08);o.stop(actx.currentTime+0.09);}catch(e){}}
+muteBtn.addEventListener("click",function(){muted=!muted;store.set("muted-quick-notes",muted);paintMute();beep(720);});
+var notes=store.get(KEY,[]);
+if(!Array.isArray(notes))notes=[];
+var box=document.getElementById("newNote"),cc=document.getElementById("charCount"),
+list=document.getElementById("list"),search=document.getElementById("search");
+box.addEventListener("input",function(){cc.textContent=box.value.length+" chars";});
+document.getElementById("addBtn").addEventListener("click",function(){
+var t=box.value.trim();if(!t){beep(300);box.focus();return;}
+notes.unshift({id:Date.now(),text:t,pinned:false,ts:Date.now()});
+store.set(KEY,notes);box.value="";cc.textContent="0 chars";beep(780);draw();});
+search.addEventListener("input",draw);
+function copyText(t,btn){function done(){var o=btn.textContent;btn.textContent="✓";beep(840);setTimeout(function(){btn.textContent=o;},900);}
+if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,fallback);}else fallback();
+function fallback(){try{var ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta);}catch(e){}done();}}
+function draw(){
+var q=search.value.trim().toLowerCase();
+var shown=notes.filter(function(n){return !q||n.text.toLowerCase().indexOf(q)>=0;});
+shown.sort(function(a,b){return (b.pinned-a.pinned)||(b.ts-a.ts);});
+list.innerHTML="";
+if(!shown.length){list.innerHTML="<div class='empty'>"+(notes.length?"No notes match your search.":"No notes yet — save your first one above.")+"</div>";return;}
+shown.forEach(function(n){
+var d=document.createElement("div");d.className="note"+(n.pinned?" pinned":"");
+var p=document.createElement("p");p.textContent=n.text;
+var row=document.createElement("div");row.className="row";
+var c=document.createElement("span");c.className="cc";c.textContent=n.text.length+" chars";
+var pin=document.createElement("button");pin.textContent=n.pinned?"★":"☆";if(n.pinned)pin.className="pinOn";pin.setAttribute("aria-label","Pin note");
+pin.addEventListener("click",function(){n.pinned=!n.pinned;store.set(KEY,notes);beep(n.pinned?860:480);draw();});
+var cp=document.createElement("button");cp.textContent="⧉ Copy";cp.setAttribute("aria-label","Copy note");
+cp.addEventListener("click",function(){copyText(n.text,cp);});
+var del=document.createElement("button");del.textContent="✕";del.setAttribute("aria-label","Delete note");
+del.addEventListener("click",function(){if(!window.confirm("Delete this note?"))return;beep(340);notes=notes.filter(function(x){return x.id!==n.id;});store.set(KEY,notes);draw();});
+row.appendChild(c);row.appendChild(pin);row.appendChild(cp);row.appendChild(del);
+d.appendChild(p);d.appendChild(row);list.appendChild(d);});
+}
+draw();
+})();
+</script>
+</body>
+</html>
