@@ -34,7 +34,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -96,6 +100,8 @@ fun HomeScreen(
     applyWindowInsets: Boolean = true,
     /** True while any finger is down on home, false once every finger is up (or tracking ends). */
     onFingerActive: (Boolean) -> Unit = {},
+    /** Blurs the layout (API 31+) while a sheet over home is up; 0 draws it sharp. */
+    blur: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     val swipeThreshold = with(LocalDensity.current) { 64.dp.toPx() }
     val swipeUpLabel = stringResource(R.string.home_swipe_up_description)
@@ -317,9 +323,17 @@ fun HomeScreen(
                     CustomAccessibilityAction(openSettingsLabel) { onOpenSettings(); true },
                 )
             }
+            // Before the insets, so it reaches under the navigation bar: the dock and pill read on light pictures.
+            .drawBehind {
+                val height = BOTTOM_SCRIM.toPx().coerceAtMost(size.height)
+                drawRect(
+                    Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f)), startY = size.height - height, endY = size.height),
+                    topLeft = Offset(0f, size.height - height),
+                )
+            }
             .then(if (applyWindowInsets) Modifier.systemBarsPadding() else Modifier),
     ) {
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().then(if (blur > 0.dp) Modifier.blur(blur) else Modifier)) {
             if (!isDefault) DefaultBanner(onSetDefault)
             LayoutRenderer(layout, render, Modifier.weight(1f), resetSignal = homePresses, aboveDock = aboveDock, entrySignal = entrySignal) {
                 if (pinnedShortcuts.isNotEmpty()) {
@@ -334,6 +348,9 @@ fun HomeScreen(
         }
     }
 }
+
+/** How far up home's bottom scrim reaches: the dock, the search pill and a little air. */
+private val BOTTOM_SCRIM = 220.dp
 
 @Composable
 private fun DefaultBanner(onSetDefault: () -> Unit) {    Card(Modifier.fillMaxWidth().padding(16.dp)) {

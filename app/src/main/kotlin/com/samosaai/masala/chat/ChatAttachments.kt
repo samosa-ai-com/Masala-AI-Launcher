@@ -91,20 +91,31 @@ fun AttachmentStrip(
             androidx.compose.runtime.LaunchedEffect(a.id) {
                 thumb = withContextThumb(a.jpegBase64)
             }
-            Box(Modifier.size(64.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
-                thumb?.let {
-                    Image(
-                        it,
-                        a.name,
-                        modifier = Modifier.matchParentSize(),
-                        contentScale = ContentScale.Crop,
+            // The thumbnail with a round remove badge over its corner (plan reply-sheet-refresh).
+            Box(Modifier.size(64.dp)) {
+                Box(Modifier.align(Alignment.BottomStart).size(56.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainer)) {
+                    thumb?.let {
+                        Image(
+                            it,
+                            a.name,
+                            modifier = Modifier.matchParentSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                    }
+                }
+                Box(
+                    Modifier.align(Alignment.TopEnd).size(24.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(MaterialTheme.colorScheme.onSurface)
+                        .clickable(role = androidx.compose.ui.semantics.Role.Button) { onRemove(a.id) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Rounded.Close,
+                        androidx.compose.ui.res.stringResource(com.samosaai.masala.R.string.chat_remove_image),
+                        tint = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.size(14.dp),
                     )
                 }
-                Icon(
-                    Icons.Rounded.Close, "Remove",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.align(Alignment.TopEnd).clickable { onRemove(a.id) }.padding(2.dp).size(20.dp),
-                )
             }
         }
     }

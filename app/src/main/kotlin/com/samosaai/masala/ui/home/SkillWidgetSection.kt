@@ -90,7 +90,13 @@ interface SkillWidgetSource {
  * quick text field when the skill takes text, otherwise a button. Tapping opens the skill sheet.
  */
 @Composable
-fun SkillWidgetCard(section: SkillWidgetSection, source: SkillWidgetSource, onAction: (MasalaAction) -> Unit) {
+fun SkillWidgetCard(
+    section: SkillWidgetSection,
+    source: SkillWidgetSource,
+    onAction: (MasalaAction) -> Unit,
+    /** The home gutter by default; a grid cell, already inset, passes none. */
+    modifier: Modifier = Modifier.padding(horizontal = HOME_GUTTER),
+) {
     val skill = remember(section.skillId) { source.skill(section.skillId) }
     if (skill == null) {
         Placeholder(section.skillId, stringResource(R.string.home_skill_widget_placeholder), null)
@@ -123,12 +129,12 @@ fun SkillWidgetCard(section: SkillWidgetSection, source: SkillWidgetSource, onAc
         )
     }
     Card(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(20.dp),
+        modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(com.samosaai.masala.ui.components.Radii.card),
         // The translucent container matches no theme colour, so the text colour has to be set.
         // Glass on the wallpaper (UI refresh U3), always light text whatever the scheme.
         colors = CardDefaults.cardColors(containerColor = com.samosaai.masala.ui.theme.MasalaTheme.tokens.wallpaperGlass, contentColor = com.samosaai.masala.ui.theme.MasalaColors.Text),
-        border = androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.10f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, com.samosaai.masala.ui.components.LitEdge),
     ) {
         Column(
             Modifier.clickable(role = Role.Button, onClick = open).padding(16.dp).heightIn(min = 48.dp),

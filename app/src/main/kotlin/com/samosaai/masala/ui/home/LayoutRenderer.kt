@@ -81,6 +81,8 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.ui.platform.LocalContext
 import com.samosaai.masala.masala
 import com.samosaai.masala.ui.components.IconTile
+import com.samosaai.masala.ui.components.Radii
+import com.samosaai.masala.ui.components.wallpaperGlass
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -293,7 +295,7 @@ private fun CellDropIndicator(target: CellDrop?, cell: com.samosaai.masala.core.
         val left = grid.box.left + target.x * grid.cellWidth - origin.x + inset
         val top = grid.box.top + target.y * grid.cellHeight - origin.y + inset
         val size = Size(cell.w * grid.cellWidth - 2 * inset, cell.h * grid.cellHeight - 2 * inset)
-        val corner = androidx.compose.ui.geometry.CornerRadius(26.dp.toPx())
+        val corner = androidx.compose.ui.geometry.CornerRadius(Radii.card.toPx())
         drawRoundRect(accent.copy(alpha = 0.18f), Offset(left, top), size, corner)
         drawRoundRect(accent, Offset(left, top), size, corner, style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
     }
@@ -459,11 +461,14 @@ private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: Render
                 // The real menu comes from sectionDrag at MENU_HOLD_MS; a move cancels it.
                 // WidgetCard's own combinedClickable (onClick + the no-op) consumes the press.
                 val cardSource = if (draggable) source.copy(onLongPress = {}) else if (menu == null) source else source.copy(onLongPress = { menu(it, section.id) })
-                val cardModifier = if (draggable) {
-                    Modifier.dropSection(section.id, ctx, pageId)
-                        .sectionDrag(section.id, pageId!!, { menu!!(it, section.id) }, ctx)
-                        .graphicsLayer { alpha = if (ctx.drag?.draggingSection == section.id) 0.3f else 1f }
-                } else Modifier
+                // The home gutter first, so the drop box is the card itself.
+                val cardModifier = Modifier.padding(horizontal = HOME_GUTTER).then(
+                    if (draggable) {
+                        Modifier.dropSection(section.id, ctx, pageId)
+                            .sectionDrag(section.id, pageId!!, { menu!!(it, section.id) }, ctx)
+                            .graphicsLayer { alpha = if (ctx.drag?.draggingSection == section.id) 0.3f else 1f }
+                    } else Modifier,
+                )
                 com.samosaai.masala.ui.home.widgets.WidgetCard(
                     it, layout.widgetRows[section.id], cardSource, cardModifier, enabled = enabled,
                 )
@@ -474,11 +479,13 @@ private fun SectionContent(section: Section, layout: ResolvedLayout, ctx: Render
                 val menu = ctx.onWidgetMenu
                 val draggable = menu != null && pageId != null && ctx.drag != null && ctx.onWidgetDrop != null && !ctx.locked && ctx.isBaseSection(section.id)
                 val cardSource = if (draggable) source.copy(onLongPress = {}) else if (menu == null) source else source.copy(onLongPress = { menu(it, section.id) })
-                val cardModifier = if (draggable) {
-                    Modifier.dropSection(section.id, ctx, pageId)
-                        .sectionDrag(section.id, pageId!!, { menu!!(it, section.id) }, ctx)
-                        .graphicsLayer { alpha = if (ctx.drag?.draggingSection == section.id) 0.3f else 1f }
-                } else Modifier
+                val cardModifier = Modifier.padding(horizontal = HOME_GUTTER).then(
+                    if (draggable) {
+                        Modifier.dropSection(section.id, ctx, pageId)
+                            .sectionDrag(section.id, pageId!!, { menu!!(it, section.id) }, ctx)
+                            .graphicsLayer { alpha = if (ctx.drag?.draggingSection == section.id) 0.3f else 1f }
+                    } else Modifier,
+                )
                 com.samosaai.masala.ui.home.widgets.StackCard(
                     section.widgets, layout.widgetRows[section.id], cardSource, cardModifier, enabled = enabled,
                 )
@@ -527,8 +534,7 @@ private fun ModeChip(name: String, onClick: (() -> Unit)?) {
     val tokens = MasalaTheme.tokens
     val shape = RoundedCornerShape(50)
     Row(
-        Modifier.padding(bottom = 18.dp).heightIn(min = 34.dp).clip(shape).background(tokens.wallpaperGlass)
-            .border(1.dp, Color.White.copy(alpha = 0.12f), shape)
+        Modifier.padding(bottom = 18.dp).heightIn(min = 34.dp).wallpaperGlass(shape)
             .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .padding(start = 10.dp, end = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -598,7 +604,8 @@ private fun CellContentView(cell: com.samosaai.masala.core.contract.Cell, gridId
         }
         is com.samosaai.masala.core.contract.CellContent.SkillCell -> {
             val section = SkillWidgetSection(cell.id, content.skillId)
-            ctx.skillWidgets?.let { SkillWidgetCard(section, it, ctx.onAction) }
+            // The grid already insets its cells: no gutter of its own.
+            ctx.skillWidgets?.let { SkillWidgetCard(section, it, ctx.onAction, Modifier) }
                 ?: Placeholder(content.skillId, stringResource(R.string.home_skill_widget_placeholder), rows)
         }
         is com.samosaai.masala.core.contract.CellContent.HtmlCell -> ctx.htmlWidget(content.appId)?.let { row ->
@@ -638,7 +645,8 @@ private fun ResizeHandle(cell: com.samosaai.masala.core.contract.Cell, columns: 
             .offset(x = cellWidth * cell.x, y = CELL_HEIGHT * cell.y)
             .size(cellWidth * w, CELL_HEIGHT * h)
             .padding(2.dp)
-            .border(2.dp, accent, RoundedCornerShape(28.dp)),
+            // Concentric with the card: its radius plus the 2 dp the frame sits outside it.
+            .border(2.dp, accent, RoundedCornerShape(Radii.card + 2.dp)),
     ) {
         Box(
             Modifier
@@ -780,10 +788,10 @@ private fun ItemGrid(sectionId: String, title: String?, items: List<Item>, colum
 
 @Composable
 private fun Dock(section: DockSection, ctx: RenderContext, pageId: String? = null) {
-    val shape = RoundedCornerShape(30.dp)
+    // No slab: the icons sit on the wallpaper, over home's bottom scrim (plan home-visual-polish).
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).heightIn(min = 78.dp).dropSection(section.id, ctx, pageId).clip(shape)
-            .background(MasalaTheme.tokens.wallpaperGlass).border(1.dp, Color.White.copy(alpha = 0.09f), shape).padding(horizontal = 8.dp),
+        Modifier.fillMaxWidth().padding(horizontal = HOME_GUTTER, vertical = 8.dp).heightIn(min = 78.dp).dropSection(section.id, ctx, pageId)
+            .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1134,19 +1142,28 @@ internal fun SymbolDisc(icon: ImageVector, tint: Color?, size: Int) {
 
 @Composable
 internal fun Placeholder(title: String, note: String, rows: Int?) {
-    WallpaperCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = ((rows ?: 2) * 48).dp)) {
+    WallpaperCard(Modifier.fillMaxWidth().padding(horizontal = HOME_GUTTER).heightIn(min = ((rows ?: 2) * 48).dp)) {
         Text(title, style = MaterialTheme.typography.titleMedium, color = OnWallpaper)
         Spacer(Modifier.height(4.dp))
         Text(note, style = MaterialTheme.typography.bodyMedium, color = MasalaTheme.tokens.onWallpaperMedium)
     }
 }
 
-/** A glass card straight on the wallpaper (home boards): 26 dp corners, stronger glass, white hairline. */
+/** Side margin for everything on home: cards, the search pill, the dock (plan `docs/plans/home-visual-polish.md`). */
+internal val HOME_GUTTER = 16.dp
+
+/** A glass card straight on the wallpaper (home boards): card corners, stronger glass, white hairline. */
 @Composable
-internal fun WallpaperCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    val shape = RoundedCornerShape(26.dp)
+internal fun WallpaperCard(
+    modifier: Modifier = Modifier,
+    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val shape = RoundedCornerShape(Radii.card)
     Column(
-        modifier.clip(shape).background(MasalaTheme.tokens.wallpaperGlass).border(1.dp, Color.White.copy(alpha = 0.10f), shape).padding(18.dp),
+        // 14 dp top and bottom: a one-cell card (88 dp) still fits a title and a value.
+        modifier.wallpaperGlass(shape).padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalArrangement = verticalArrangement,
         content = content,
     )
 }

@@ -25,6 +25,14 @@ import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.samosaai.masala.ui.home.DrawerDrag
@@ -318,6 +326,9 @@ class HomeActivity : ComponentActivity() {
         var entrySignal by remember { mutableStateOf(0) }
         var undoOffer by remember { mutableStateOf(false) }
         var undoing by remember { mutableStateOf(false) }
+        // The search pill's top and the toast layer's bottom (root px): the undo pills sit just above the pill.
+        var pillTop by remember { mutableStateOf<Float?>(null) }
+        var toastLayerBottom by remember { mutableStateOf<Float?>(null) }
         LaunchedEffect(currentVersion) {
             val before = lastVersion
             lastVersion = currentVersion
@@ -663,7 +674,16 @@ class HomeActivity : ComponentActivity() {
             )
         }
         // Faded out under the open drawer and hidden from TalkBack; the drawer above takes the touches.
-        Isolated { Box(
+        Isolated {
+            // Home recedes while the typing sheet is up (plan reply-sheet-refresh step 3): its icons and
+            // widgets blur (API 31+; below that only the backdrop's dim shows).
+            val askState by app.commands.state.collectAsStateWithLifecycle()
+            val askMinimized by app.commands.minimized.collectAsStateWithLifecycle()
+            val homeBlur by androidx.compose.animation.core.animateDpAsState(
+                if (askState == CommandState.Input && !askMinimized && !drawerOpen) 10.dp else 0.dp,
+                label = "homeBlur",
+            )
+            Box(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
@@ -680,6 +700,7 @@ class HomeActivity : ComponentActivity() {
         ) { HomeScreen(
             layout = layout,
             render = render,
+            blur = homeBlur,
             pinnedShortcuts = pinnedShortcuts,
             isDefault = isDefault,
             onSetDefault = { HomeRole.requestIntent(this@HomeActivity)?.let(roleRequest::launch) ?: HomeRole.openSettings(this@HomeActivity) },
@@ -710,6 +731,7 @@ class HomeActivity : ComponentActivity() {
                 val resumable = pillMinimized && command != CommandState.Idle
                 if (command == CommandState.Idle || pillMinimized) {
                     SearchPill(
+                        modifier = Modifier.onGloballyPositioned { pillTop = it.boundsInRoot().top },
                         onSearch = {
                             if (resumable) openSession(activeId) else { drawerOpen = true; searchRequests++ }
                         },
@@ -749,10 +771,20 @@ class HomeActivity : ComponentActivity() {
             val elapsedMs by app.commands.listeningElapsed.collectAsStateWithLifecycle()
             val voiceReady by app.commands.listeningReady.collectAsStateWithLifecycle()
             if (hidden) Unit else when (val c = command) {
-                CommandState.Input -> Box(
-                    Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(),
-                    contentAlignment = Alignment.BottomCenter,
-                ) { ReplyCard(app, settings.readRepliesAloud, sheets = true, character = settings.character) }
+                CommandState.Input -> Box(Modifier.fillMaxSize()) {
+                    // The dimmed home above the sheet; a tap there closes it like a swipe down. Closing
+                    // only minimizes (the state stays Input), so the backdrop goes with the sheet: left
+                    // up, it would dim home and swallow every tap on it.
+                    val inputMinimized by app.commands.minimized.collectAsStateWithLifecycle()
+                    if (!inputMinimized) com.samosaai.masala.ui.home.AskBackdrop(onDismiss = { app.stopSpeaking(); app.commands.minimize() })
+                    Box(
+                        // The docked sheet pads itself for the navigation bar and runs under it; only
+                        // the keyboard's height above that lifts it.
+                        Modifier.fillMaxSize().statusBarsPadding()
+                            .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars)),
+                        contentAlignment = Alignment.BottomCenter,
+                    ) { ReplyCard(app, settings.readRepliesAloud, sheets = true, character = settings.character) }
+                }
                 else -> if (chatOpen) ChatSurface(
                     session = turns.takeIf { it.isNotEmpty() }?.let {
                         com.samosaai.masala.chat.ChatSession(id = activeId.orEmpty(), title = sessionTitle, turns = it)
@@ -864,10 +896,18 @@ class HomeActivity : ComponentActivity() {
                 onDismiss = { showHistory = false },
             )
             if ((undoOffer || hiddenUndo != null) && !hidden) {
-                Box(Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = 150.dp), contentAlignment = Alignment.BottomCenter) {
+                // 12 dp above the search pill once both are measured; before that, the old fixed offset.
+                val density = LocalDensity.current
+                val lift = pillTop?.let { top -> toastLayerBottom?.let { with(density) { (it - top).toDp() } + 12.dp } }
+                Box(
+                    Modifier.fillMaxSize()
+                        .onGloballyPositioned { toastLayerBottom = it.boundsInRoot().bottom }
+                        .then(if (lift != null) Modifier.padding(bottom = lift) else Modifier.navigationBarsPadding().padding(bottom = 150.dp)),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         if (undoOffer) {
-                            com.samosaai.masala.ui.components.GlassPill {
+                            com.samosaai.masala.ui.components.GlassPill(fill = com.samosaai.masala.ui.theme.MasalaTheme.tokens.wallpaperGlass) {
                                 Text(getString(R.string.layout_applied), color = com.samosaai.masala.ui.theme.MasalaColors.Text)
                                 androidx.compose.material3.TextButton(onClick = {
                                     undoOffer = false
@@ -877,7 +917,7 @@ class HomeActivity : ComponentActivity() {
                             }
                         }
                         hiddenUndo?.let { (entry, hadHome) ->
-                            com.samosaai.masala.ui.components.GlassPill {
+                            com.samosaai.masala.ui.components.GlassPill(fill = com.samosaai.masala.ui.theme.MasalaTheme.tokens.wallpaperGlass) {
                                 Text(getString(R.string.menu_hidden_pill, entry.label), color = com.samosaai.masala.ui.theme.MasalaColors.Text)
                                 // Where it went, and how to get it back later: one tap to the list.
                                 androidx.compose.material3.TextButton(onClick = {

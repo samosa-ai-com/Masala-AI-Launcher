@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.compositeOver
@@ -78,12 +79,29 @@ fun GlassSurface(
     )
 }
 
+/**
+ * The edge of glass on the wallpaper: lit along the top and fading down the sides, the way light catches
+ * a pane, instead of an even hairline that outlines the card like a box.
+ */
+val LitEdge: Brush = Brush.verticalGradient(
+    0f to Color.White.copy(alpha = 0.22f),
+    0.5f to Color.White.copy(alpha = 0.05f),
+    1f to Color.White.copy(alpha = 0.03f),
+)
+
+/** Glass straight on the wallpaper (home cards, search pill, mode chip): the strong fill and the [LitEdge]. */
+@Composable
+fun Modifier.wallpaperGlass(shape: Shape): Modifier =
+    clip(shape).background(MasalaTheme.tokens.wallpaperGlass).border(1.dp, LitEdge, shape)
+
 /** A glass pill: the search-or-ask bar, chips, the mode chip. */
 @Composable
 fun GlassPill(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     height: Dp = 52.dp,
+    /** Pills straight on the wallpaper (home's undo toast) pass the stronger wallpaper glass. */
+    fill: Color = MasalaTheme.tokens.glassFill,
     content: @Composable RowScope.() -> Unit,
 ) {
     val tokens = MasalaTheme.tokens
@@ -94,7 +112,7 @@ fun GlassPill(
             .heightIn(min = height)
             .then(if (onClick != null) Modifier.pressScale(interaction) else Modifier)
             .clip(shape)
-            .background(tokens.glassFill)
+            .background(fill)
             .border(1.dp, tokens.hairline, shape)
             .then(if (onClick != null) Modifier.clickable(interaction, indication = null, role = Role.Button, onClick = onClick) else Modifier)
             .padding(horizontal = 18.dp),

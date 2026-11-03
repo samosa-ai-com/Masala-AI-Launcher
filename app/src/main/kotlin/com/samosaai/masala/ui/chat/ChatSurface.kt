@@ -42,11 +42,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bolt
-import androidx.compose.material.icons.rounded.AddPhotoAlternate
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
@@ -62,6 +60,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -102,7 +103,6 @@ import com.samosaai.masala.masala
 import com.samosaai.masala.miniapps.openMiniApp
 import com.samosaai.masala.ui.character.CharacterState
 import com.samosaai.masala.ui.character.MasalaCharacter
-import com.samosaai.masala.ui.home.MicButton
 import com.samosaai.masala.ui.settings.SettingsActivity
 import com.samosaai.masala.ui.theme.MasalaColors
 import com.samosaai.masala.ui.theme.MasalaTheme
@@ -182,6 +182,7 @@ fun ChatSurface(
             // before the height, so the sheet's share is of the space above the keyboard, not
             // of the screen with the keyboard taken out of it (that left only the header).
             Modifier.fillMaxWidth().padding(horizontal = 8.dp).imePadding().fillMaxHeight(threadHeight)
+                .workingGlow(listening || paused, thinking, level, tokens.accent)
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                 .background(Color(0xFF15171E))
                 .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
@@ -227,6 +228,43 @@ fun ChatSurface(
                 Controls(listening, paused, ready, elapsedMs, mic, level, onSend, onContinue, onAsk, onClose, onCancel = onStop, prefill, prefillNonce, onPrefillConsumed)
             }
         }
+    }
+}
+
+/**
+ * The sheet's top edge while Masala listens or works (plan reply-sheet-refresh step 5): a soft gold
+ * glow rising above the edge and a thin gold line along it. Listening, it follows the mic level;
+ * thinking, it breathes. Off otherwise. Drawn before the sheet's clip so the glow can leave the sheet.
+ */
+@Composable
+private fun Modifier.workingGlow(listening: Boolean, thinking: Boolean, level: () -> Float, accent: Color): Modifier {
+    if (!listening && !thinking) return this
+    val breath by androidx.compose.animation.core.rememberInfiniteTransition(label = "glow").animateFloat(
+        0f, 1f,
+        androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1400), androidx.compose.animation.core.RepeatMode.Reverse),
+        label = "breath",
+    )
+    return drawWithContent {
+        // Draw-phase reads only: the level and the breath redraw without recomposing.
+        val strength = if (listening) 0.35f + 0.65f * level().coerceIn(0f, 1f) else 0.45f + 0.55f * breath
+        // A flat ellipse of light centred on the edge, fading out in every direction (a rectangle
+        // showed hard sides over home); the sheet drawn on top hides its lower half.
+        val radius = size.width / 2f
+        val center = androidx.compose.ui.geometry.Offset(size.width / 2f, 0f)
+        scale(scaleX = 1f, scaleY = 40.dp.toPx() / radius, pivot = center) {
+            drawCircle(
+                Brush.radialGradient(listOf(accent.copy(alpha = 0.38f * strength), accent.copy(alpha = 0f)), center = center, radius = radius),
+                radius = radius,
+                center = center,
+            )
+        }
+        drawContent()
+        val inset = 28.dp.toPx()
+        drawRect(
+            Brush.horizontalGradient(listOf(accent.copy(alpha = 0f), accent.copy(alpha = strength), accent.copy(alpha = 0f)), startX = inset, endX = size.width - inset),
+            topLeft = androidx.compose.ui.geometry.Offset(inset, 0f),
+            size = androidx.compose.ui.geometry.Size(size.width - 2 * inset, 2.dp.toPx()),
+        )
     }
 }
 
@@ -921,6 +959,10 @@ private fun Controls(
     val scope = rememberCoroutineScope()
     val tooManyText = stringResource(R.string.chat_too_many_images, com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE)
     val badImageText = stringResource(R.string.chat_bad_image)
+    // Above the listening branches on purpose: a draft and its photos survive tapping the mic, so
+    // switching to voice mid-sentence never throws away what was typed.
+    var text by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue("")) }
+    var queued by remember { mutableStateOf(listOf<com.samosaai.masala.chat.AttachedImage>()) }
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         if (listening && elapsedMs >= com.samosaai.masala.audio.SttEngine.CAP_WARN_MS) {
             Text(
@@ -968,8 +1010,6 @@ private fun Controls(
                     Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
                 }
             } else {
-                var text by remember { mutableStateOf("") }
-                var queued by remember { mutableStateOf(listOf<com.samosaai.masala.chat.AttachedImage>()) }
                 var cameraTarget by remember { mutableStateOf<android.net.Uri?>(null) }
                 // A revert drops the message back here for editing; the nonce re-applies
                 // even when the same words are reverted twice in a row. Consuming it
@@ -977,7 +1017,7 @@ private fun Controls(
                 // (mic, drawer, reopen) or leaking into another chat.
                 LaunchedEffect(prefillNonce) {
                     if (prefillNonce > 0) {
-                        text = prefill
+                        text = androidx.compose.ui.text.input.TextFieldValue(prefill, androidx.compose.ui.text.TextRange(prefill.length))
                         onPrefillConsumed()
                     }
                 }
@@ -1006,61 +1046,37 @@ private fun Controls(
                 val takePhoto = androidx.activity.compose.rememberLauncherForActivityResult(
                     androidx.activity.result.contract.ActivityResultContracts.TakePicture(),
                 ) { ok -> if (ok) cameraTarget?.let { addUri(it, "photo") } }
-                Column(Modifier.weight(1f)) {
-                com.samosaai.masala.chat.AttachmentStrip(queued, onRemove = { id -> queued = queued.filterNot { it.id == id } })
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    IconButton(
-                        onClick = {
-                            if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
-                                android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
-                            } else pickImage.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
-                        },
-                        modifier = Modifier.size(44.dp),
-                    ) {
-                        Icon(Icons.Rounded.AddPhotoAlternate, stringResource(R.string.chat_attach_image), tint = tokens.textMedium)
-                    }
-                    IconButton(
-                        onClick = {
-                            if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
-                                android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
-                                return@IconButton
-                            }
+                // The same pill as the typing sheet on home (plan reply-sheet-refresh step 5).
+                ComposerPill(
+                    value = text,
+                    onValueChange = { text = it },
+                    images = queued,
+                    onRemoveImage = { id -> queued = queued.filterNot { it.id == id } },
+                    onPickPhoto = {
+                        if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                            android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
+                        } else pickImage.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    },
+                    onTakePhoto = {
+                        if (queued.size >= com.samosaai.masala.chat.MAX_IMAGES_PER_MESSAGE) {
+                            android.widget.Toast.makeText(context, tooManyText, android.widget.Toast.LENGTH_SHORT).show()
+                        } else {
                             val dir = java.io.File(context.filesDir, "work").apply { mkdirs() }
                             val file = com.samosaai.masala.tools.PhotoTool.photoFile(dir)
                             val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
                             cameraTarget = uri
                             takePhoto.launch(uri)
-                        },
-                        modifier = Modifier.size(44.dp),
-                    ) {
-                        Icon(Icons.Rounded.PhotoCamera, stringResource(R.string.chat_take_photo), tint = tokens.textMedium)
-                    }
-                    androidx.compose.material3.OutlinedTextField(
-                        value = text,
-                        onValueChange = { text = it },
-                        modifier = Modifier.weight(1f),
-                        placeholder = { Text(stringResource(R.string.command_hint)) },
-                        minLines = 1,
-                        maxLines = 5,
-                        shape = RoundedCornerShape(24.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    if (text.isBlank() && queued.isEmpty()) {
-                        MicButton(mic, level = level, size = 52.dp)
-                    } else {
-                        IconButton(
-                            onClick = {
-                                onAsk(text.trim(), queued.map { it.jpegBase64 })
-                                text = ""
-                                queued = emptyList()
-                            },
-                            modifier = Modifier.size(52.dp).clip(CircleShape).background(tokens.accent),
-                        ) {
-                            Icon(Icons.Rounded.Send, stringResource(R.string.chat_send_now), tint = tokens.onAccent)
                         }
-                    }
-                }
-                }
+                    },
+                    onMic = mic,
+                    micLevel = level,
+                    onSend = {
+                        onAsk(text.text.trim(), queued.map { it.jpegBase64 })
+                        text = androidx.compose.ui.text.input.TextFieldValue("")
+                        queued = emptyList()
+                    },
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
