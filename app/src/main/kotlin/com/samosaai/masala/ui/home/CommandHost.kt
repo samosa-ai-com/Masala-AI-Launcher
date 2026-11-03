@@ -66,7 +66,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -261,8 +261,11 @@ fun ReplyCard(
         border = BorderStroke(1.dp, MasalaTheme.tokens.hairline),
     ) {
         Column(
-            // Docked, the sheet runs under the navigation bar; its content stays above it.
-            if (docked) Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp) else Modifier.padding(16.dp),
+            // Docked, the sheet runs under the navigation bar; its content stays above it. The raw bar
+            // height, not windowInsetsPadding: the container already lifted the sheet by the keyboard
+            // minus the bar and marked that consumed, which zeroed a consuming nav-bar padding here
+            // and left the field under a docked keyboard (seen on the Redmi).
+            if (docked) Modifier.padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()).padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp) else Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(if (docked) 10.dp else 8.dp),
         ) {
             if (docked) {
