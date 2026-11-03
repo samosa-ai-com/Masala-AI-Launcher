@@ -1,0 +1,105 @@
+package com.samosaai.masala.tools
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class SegmentVideoToolTest {
+    private val multiFrame =
+        "<0f>0<|box;x1=199;y1=366;x2=260;y2=438;w=768;h=768|><|mask;x=0;y=0;data=1|>" +
+            "<1f>0<|box;x1=210;y1=360;x2=272;y2=440;w=768;h=768|>" +
+            "<2f>0<|box;x1=300;y1=100;x2=350;y2=150;w=768;h=768|>" +
+            "1<|box;x1=400;y1=200;x2=450;y2=250;w=768;h=768|>"
+
+    @Test
+    fun `parseVideoFrames splits multi-frame groups`() {
+        val frames = SamShared.parseVideoFrames(multiFrame)
+        assertEquals(3, frames.size)
+        assertEquals(0, frames[0].frame)
+        assertEquals(1, frames[1].frame)
+        assertEquals(2, frames[2].frame)
+        assertEquals(
+            SamShared.RichBox(199, 366, 260, 438, 768, 768),
+            frames[0].boxes.single(),
+        )
+        assertEquals(1, frames[1].boxes.size)
+        assertEquals(2, frames[2].boxes.size)
+        assertEquals(SamShared.RichBox(400, 200, 450, 250, 768, 768), frames[2].boxes[1])
+    }
+
+    @Test
+    fun `parseVideoFrames reads one frame`() {
+        val frames = SamShared.parseVideoFrames(
+            "<0f>0<|box;x1=80;y1=120;x2=240;y2=180;w=320;h=240|>",
+        )
+        assertEquals(1, frames.size)
+        assertEquals(0, frames[0].frame)
+        assertEquals(SamShared.RichBox(80, 120, 240, 180, 320, 240), frames[0].boxes.single())
+    }
+
+    @Test
+    fun `parseVideoFrames is empty with no boxes`() {
+        assertTrue(SamShared.parseVideoFrames("").isEmpty())
+        assertTrue(SamShared.parseVideoFrames("no matches here").isEmpty())
+        assertTrue(SamShared.parseVideoFrames("<0f>2<|eos|>").all { it.boxes.isEmpty() })
+    }
+
+    @Test
+    fun `contactTimesMs spreads across the clip`() {
+        assertEquals(listOf(2250L, 4500L, 6750L), SamShared.contactTimesMs(9000L, 3))
+        assertEquals(listOf(4500L), SamShared.contactTimesMs(9000L, 1))
+        assertTrue(SamShared.contactTimesMs(0L, 3).isEmpty())
+        assertTrue(SamShared.contactTimesMs(9000L, 0).isEmpty())
+    }
+
+    @Test
+    fun `contactFrameIndexes picks first middle last`() {
+        assertEquals(listOf(0, 9, 19), SamShared.contactFrameIndexes(20))
+        assertEquals(listOf(0, 1), SamShared.contactFrameIndexes(2))
+        assertEquals(listOf(0), SamShared.contactFrameIndexes(1))
+        assertTrue(SamShared.contactFrameIndexes(0).isEmpty())
+    }
+
+    @Test
+    fun `checkVideoSize refuses over 20 MB`() {
+        assertNotNull(SamShared.checkVideoSize(21L * 1024 * 1024))
+        assertNull(SamShared.checkVideoSize(20L * 1024 * 1024))
+        assertNull(SamShared.checkVideoSize(1024))
+    }
+
+    @Test
+    fun `clampMaxFrames defaults and caps`() {
+        assertEquals(8, SamShared.clampMaxFrames(null))
+        assertEquals(16, SamShared.clampMaxFrames(100))
+        assertEquals(1, SamShared.clampMaxFrames(0))
+        assertEquals(4, SamShared.clampMaxFrames(4))
+    }
+
+    @Test
+    fun `videoMimeFor maps extensions`() {
+        assertEquals("video/mp4", SamShared.videoMimeFor("clip.MP4"))
+        assertEquals("video/quicktime", SamShared.videoMimeFor("clip.mov"))
+        assertEquals("video/webm", SamShared.videoMimeFor("clip.webm"))
+        assertEquals("video/mp4", SamShared.videoMimeFor("clip.unknown"))
+    }
+
+    @Test
+    fun `scaleBox maps model space onto the frame`() {
+        val scaled = SamShared.scaleBox(SamShared.RichBox(199, 366, 260, 438, 768, 768), 384, 384)
+        assertEquals(99.5f, scaled[0])
+        assertEquals(183f, scaled[1])
+        assertEquals(130f, scaled[2])
+        assertEquals(219f, scaled[3])
+    }
+
+    @Test
+    fun `framesJson writes frame box lists`() {
+        val frames = SamShared.parseVideoFrames(multiFrame).filter { it.boxes.isNotEmpty() }
+        val parsed = SamShared.framesJson(frames)
+        assertTrue(parsed.startsWith("[{\"frame\":0,"))
+        assertTrue(parsed.contains("\"x1\":199"))
+        assertTrue(parsed.contains("\"frame\":2"))
+    }
+}

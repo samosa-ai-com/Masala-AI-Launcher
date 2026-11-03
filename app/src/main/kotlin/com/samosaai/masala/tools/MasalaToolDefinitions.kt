@@ -189,6 +189,40 @@ object MasalaToolDefinitions {
         }
     )
 
+    val segmentVideo = tool(
+        "segment_video",
+        "Track one thing through a VIDEO file with SAM 3.1 (configured image endpoint, no extra " +
+            "setup): pass a video file path (e.g. /sdcard/DCIM/Camera/VID_0001.mp4) and a short " +
+            "noun phrase like 'red bicycle'. Returns per-frame boxes: a contact-sheet preview " +
+            "(sampled frames with boxes drawn) plus the full frame-to-boxes list in a JSON file. " +
+            "max_frames (default 8, max 16) is only a hint — the API samples its own frames. " +
+            "For a still image use segment_image instead.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("path") {
+                    put("type", "string")
+                    put("description", "Video file path, e.g. /sdcard/DCIM/Camera/VID_0001.mp4.")
+                }
+                putJsonObject("prompt") {
+                    put("type", "string")
+                    put("description", "One short noun phrase naming the thing, e.g. 'yellow school bus'.")
+                }
+                putJsonObject("max_frames") {
+                    put("type", "integer")
+                    put("description", "Hint for how many frames to report (default 8, max 16). The API samples its own frames.")
+                }
+                putJsonObject("mode") {
+                    put("type", "string")
+                    put("description", "Reserved for future tracking modes; recorded only, tracking is the same.")
+                }
+            }
+            putJsonArray("required") {
+                add("path")
+                add("prompt")
+            }
+        }
+    )
+
     val speakText = tool(
         "speak_text",
         "Read text aloud with the configured voice and save the audio file. Uses the same " +
@@ -1724,6 +1758,7 @@ object MasalaToolDefinitions {
         generateImage,
         editImage,
         segmentImage,
+        segmentVideo,
         speakText,
         listCalendarEvents,
         createCalendarEvent,
