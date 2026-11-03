@@ -119,8 +119,11 @@ class ConsultService(
                 failure = e.message ?: e::class.java.simpleName
             }
 
-            val text = answer
-            val reason = failure ?: "It didn't answer."
+            // What the expert saved goes into the text the main agent reads and the consult replays:
+            // `produced` alone only reaches the chat UI, so a follow-up consult rebuilt the same app.
+            val made = producedNote(produced)
+            val text = answer?.let { if (made.isEmpty()) it else it.trimEnd() + "\n\n" + made }
+            val reason = (failure ?: "It didn't answer.") + if (made.isEmpty()) "" else " $made"
             // One write: the question and its outcome land together or not at all.
             val turns = if (text != null) {
                 listOf(ConsultTurn(TurnRole.USER, asked), ConsultTurn(TurnRole.MASALA, text))
@@ -195,6 +198,15 @@ class ConsultService(
             }
         }.trimEnd()
     }
+
+    /** One line naming what the consult saved, with ids, so nobody creates it a second time. */
+    internal fun producedNote(produced: List<com.samosaai.masala.core.tool.Produced>): String =
+        if (produced.isEmpty()) {
+            ""
+        } else {
+            "Already saved in this consult (don't create again; change it by id): " +
+                produced.joinToString("; ") { "${it.kind} '${it.title}' id ${it.ref}" } + "."
+        }
 
     private fun oneLine(text: String) = text.replace('\n', ' ').replace(Regex("\\s+"), " ").trim().take(60)
 
