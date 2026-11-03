@@ -867,11 +867,20 @@ class HomeActivity : ComponentActivity() {
                     },
                     onAskExpert = { expert ->
                         // Seeded, not sent: the user finishes the sentence, the agent does the rest.
-                        app.commands.openInput(getString(R.string.search_ask_expert, expert.title))
-                        chatOpen = true
-                        expanded = true
+                        if (app.commands.openInput(getString(R.string.search_ask_expert, expert.title))) {
+                            chatOpen = true
+                            expanded = true
+                        } else {
+                            chatBusyToast()
+                        }
                     },
                     onRevertTurn = { index ->
+                        // Reverting replaces the thread; a live turn would be cancelled and its
+                        // reply lost. Stop first, then edit.
+                        if (app.commands.busy.value) {
+                            chatBusyToast()
+                            return@ChatSurface
+                        }
                         val id = activeId ?: return@ChatSurface
                         // The prompt being redone, before the store drops it.
                         val redone = turns.getOrNull(index) ?: return@ChatSurface
@@ -919,7 +928,11 @@ class HomeActivity : ComponentActivity() {
                 },
                 onRename = { id, title -> app.scope.launch { app.chats.rename(id, title) } },
                 onDelete = { id ->
-                    app.scope.launch {
+                    // Deleting the thread that is replying would cancel the turn; another
+                    // conversation can be deleted freely.
+                    if (activeId == id && app.commands.busy.value) {
+                        chatBusyToast()
+                    } else app.scope.launch {
                         app.chats.delete(id)
                         if (activeId == id) {
                             app.activeChatId.value = null
@@ -1392,8 +1405,9 @@ class HomeActivity : ComponentActivity() {
 
     /** `MasalaAction.AskMasala`; an empty prompt (the Ask gesture) opens the reply card for typing. */
     private fun askMasala(prompt: String) {
-        masala.commands.ask(prompt)
-        drawerOpen = false
+        // A refused ask (a turn already running) keeps the drawer open and says why; closing it
+        // would look like the request was accepted.
+        if (masala.commands.ask(prompt)) drawerOpen = false else chatBusyToast()
     }
 
     private fun openSettings() {

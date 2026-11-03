@@ -97,6 +97,18 @@ class RoutineEvaluatorTest {
     }
 
     @Test
+    fun `a default never shadows another routine's matching rule`() {
+        // Ordering is by edit time, so a routine's fallback must not swallow a later rule: the
+        // rules are considered as a group, then the defaults.
+        val withDefault = routine(id = "a", default = "asset:fallback.webp", rules = emptyList())
+        val later = routine(id = "b", rules = listOf(dayRule("06:00", "10:00", "asset:later.webp")))
+        val match = RoutineEvaluator.choose(listOf(withDefault, later), snapshot())
+        assertEquals("asset:later.webp", match?.source)
+        assertEquals("b", match?.routineId)
+        assertEquals("asset:fallback.webp", RoutineEvaluator.choose(listOf(withDefault), snapshot())?.source)
+    }
+
+    @Test
     fun `the next boundary is the next window edge, today or tomorrow`() {
         val r = routine(rules = listOf(dayRule("22:00", "06:00")))
         val next = RoutineEvaluator.nextBoundary(listOf(r), morning)

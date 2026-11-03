@@ -40,13 +40,17 @@ object RoutineEvaluator {
      * change. Order is the user's: earlier routines win.
      */
     fun choose(routines: List<WallpaperRoutine>, snapshot: ContextSnapshot): Match? {
-        for (routine in routines) {
-            if (!routine.enabled) continue
+        val enabled = routines.filter { it.enabled }
+        // Every routine's matching rules are considered before any routine's default, so a
+        // routine's fallback can never shadow a later routine's real match. A default is only a
+        // fallback for the whole set.
+        for (routine in enabled) {
             val index = routine.rules.indexOfFirst { matches(it.conditions, snapshot) }
             if (index >= 0) return Match(routine.id, index, routine.rules[index].source)
-            routine.defaultSource?.let { return Match(routine.id, null, it) }
         }
-        return null
+        return enabled.firstNotNullOfOrNull { routine ->
+            routine.defaultSource?.let { Match(routine.id, null, it) }
+        }
     }
 
     /**

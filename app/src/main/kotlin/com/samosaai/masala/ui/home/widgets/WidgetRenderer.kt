@@ -88,6 +88,8 @@ data class WidgetSource(
     val approved: (widgetId: String) -> Set<String> = { emptySet() },
     /** Values only the app can read, keyed for `second_brain` bindings ("notes", "latest"). */
     val extra: () -> Map<String, String> = { emptyMap() },
+    /** False keeps animated pieces (the globe) still, for long lists that render off screen. */
+    val animate: Boolean = true,
 )
 
 /**
@@ -259,6 +261,7 @@ private fun Component(
                 value = raw?.let { trim(it) } ?: component.binding?.let { WidgetValues.textOf(it, storage, snapshot, extra) },
                 label = component.label,
                 accent = accent,
+                animate = source.animate,
             )
         }
         is WidgetComponent.Row -> {
@@ -326,7 +329,9 @@ private fun MediaNote(note: String) {
 
 @Composable
 private fun TimerRow(component: WidgetComponent.Timer, widgetId: String, storage: Map<String, String>, source: WidgetSource, showLabel: Boolean = true) {
-    val deadline = storage[component.key]?.toLongOrNull()
+    // A stopped timer has no deadline (empty, not "0"): "0" is an elapsed deadline and used to
+    // ring the chime the moment someone pressed Stop.
+    val deadline = storage[component.key]?.toLongOrNull()?.takeIf { it > 0 }
     // The shown time has to be state, not a clock read: composition only redraws when state
     // changes, so a bare System.currentTimeMillis() left the digits frozen until something else
     // refreshed the card (seen as a half-minute jump). The effect below advances it every second
@@ -362,7 +367,11 @@ private fun TimerRow(component: WidgetComponent.Timer, widgetId: String, storage
         }
         FilledIconButton(
             onClick = {
-                source.store.set(widgetId, component.key, if (running) "0" else (System.currentTimeMillis() + component.seconds * 1000L).toString())
+                source.store.set(
+                    widgetId,
+                    component.key,
+                    if (running) "" else (System.currentTimeMillis() + component.seconds * 1000L).toString(),
+                )
             },
             modifier = Modifier.size(48.dp),
         ) {
@@ -380,16 +389,21 @@ private fun TimerRow(component: WidgetComponent.Timer, widgetId: String, storage
  * the card is off screen.
  */
 @Composable
-private fun Globe(value: String?, label: String?, accent: Color) {
-    val spin by rememberInfiniteTransition(label = "globe").animateFloat(
-        initialValue = 0f,
-        targetValue = (2.0 * Math.PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 9_000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "spin",
-    )
+private fun Globe(value: String?, label: String?, accent: Color, animate: Boolean) {
+    // A still card keeps a readable angle instead of starting an animation nothing can see.
+    val spin by if (animate) {
+        rememberInfiniteTransition(label = "globe").animateFloat(
+            initialValue = 0f,
+            targetValue = (2.0 * Math.PI).toFloat(),
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 9_000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "spin",
+        )
+    } else {
+        remember { androidx.compose.runtime.mutableFloatStateOf(0.5f) }
+    }
     androidx.compose.foundation.layout.Box(
         Modifier.fillMaxWidth().height(118.dp),
         contentAlignment = Alignment.Center,

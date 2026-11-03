@@ -69,6 +69,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import com.samosaai.masala.ui.home.widgets.WidgetPreview
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -422,12 +424,8 @@ class SettingsActivity : ComponentActivity() {
     private fun WidgetsPage(onBack: () -> Unit) {
         val scope = rememberCoroutineScope()
         val entries by remember { masala.widgetLibrary.watch() }.collectAsStateWithLifecycle(emptyList())
-        val snapshot by masala.contextService.snapshot.collectAsStateWithLifecycle()
         val base by masala.layouts.base.collectAsStateWithLifecycle()
         fun toast(text: String) = android.widget.Toast.makeText(this@SettingsActivity, text, android.widget.Toast.LENGTH_SHORT).show()
-        val source = remember(snapshot) {
-            WidgetSource(snapshot = { snapshot }, store = masala.widgetStates, onAction = { toast(getString(R.string.widgets_preview_note)) }, streams = masala.streamSources, http = masala.httpValues, approved = { masala.httpApproval.approved(it) })
-        }
         // Template blurbs by widget id, so the Templates tab can say what each one does.
         val templatesByWidgetId = remember {
             runCatching { com.samosaai.masala.core.widgets.WidgetTemplates.all().associateBy { it.widget.id } }.getOrDefault(emptyMap())
@@ -457,6 +455,7 @@ class SettingsActivity : ComponentActivity() {
             val mine = tab == 0
             var filter by rememberSaveable { mutableStateOf("") }
             var shelf by rememberSaveable { mutableStateOf<String?>(null) }
+            LaunchedEffect(tab) { if (tab == 0) shelf = null }
             val shelves = remember(entries, mine, templatesByWidgetId) {
                 if (mine) emptyList()
                 else com.samosaai.masala.core.widgets.WidgetTemplates.categories.filter { category ->
@@ -467,7 +466,7 @@ class SettingsActivity : ComponentActivity() {
                 val q = filter.trim().lowercase()
                 val template = templatesByWidgetId
                 entries.filter { (it.createdBy != "template") == mine }
-                    .filter { shelf == null || template[it.spec.id]?.category == shelf }
+                    .filter { mine || shelf == null || template[it.spec.id]?.category == shelf }
                     .filter {
                         q.isEmpty() || it.spec.id.lowercase().contains(q) ||
                             (it.spec.title?.lowercase()?.contains(q) == true) ||
@@ -545,7 +544,9 @@ class SettingsActivity : ComponentActivity() {
                     else com.samosaai.masala.widgets.HttpApproval.needingApproval(spec, masala.httpApproval.approved(spec.id))
                 }
                 Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    WidgetCard(spec, rows = null, source = source)
+                    // A still, isolated preview: the manager used to render the live card with the
+                    // real widget store, so a tap here changed what home shows.
+                    WidgetPreview(spec, rows = spec.size.default.coerceAtMost(2), animate = false)
                     if (!mine) {
                         templatesByWidgetId[spec.id]?.description?.let { blurb ->
                             Text(

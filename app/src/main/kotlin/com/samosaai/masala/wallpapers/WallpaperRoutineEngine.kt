@@ -114,10 +114,17 @@ class WallpaperRoutineEngine(
             )
             return@withLock
         }
-        val file = WallpaperSources.resolve(context, match.source) { id ->
+        val resolved = WallpaperSources.resolve(context, match.source) { id ->
             runCatching { wallpapers.byId(id)?.file }.getOrNull()
         }
-        if (file == null || !file.canRead()) {
+        // The tool also accepts a url or a readable path; asset: and id: must resolve here.
+        val target = when {
+            resolved != null -> resolved.absolutePath
+            match.source.startsWith("http://") || match.source.startsWith("https://") ||
+                match.source.startsWith("/") -> match.source
+            else -> null
+        }
+        if (target == null) {
             _status.value = Status(
                 routineName = name,
                 ruleIndex = match.ruleIndex,
@@ -127,7 +134,7 @@ class WallpaperRoutineEngine(
             )
             return@withLock
         }
-        val result = runCatching { tool.setWallpaper(file.absolutePath, "home") }
+        val result = runCatching { tool.setWallpaper(target, "home") }
             .getOrElse { ActionResult.error(it.message ?: "Couldn't set the wallpaper") }
         if (!result.success) {
             _status.value = Status(
@@ -157,6 +164,9 @@ class WallpaperRoutineEngine(
         val waitMs = Duration.between(LocalDateTime.now(), next).toMillis().coerceIn(5_000L, MAX_WAIT_MS)
         timerJob = scope.launch {
             delay(waitMs + 5_000L)
+            // This job is the one that fired: forget it before applying, or scheduleNext() would
+            // cancel the very coroutine doing the work and the boundary change would be skipped.
+            timerJob = null
             apply("boundary")
         }
     }

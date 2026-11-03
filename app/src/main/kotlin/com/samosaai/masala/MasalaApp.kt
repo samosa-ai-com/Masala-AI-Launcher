@@ -135,6 +135,23 @@ class MasalaApp : Application() {
             store = wallpaperRoutines,
             refresh = { wallpaperRoutineEngine.refresh("saved") },
             statusOf = { wallpaperRoutineEngine.status.value },
+            validateSource = { source ->
+                when {
+                    source.startsWith("id:") -> {
+                        val id = source.removePrefix("id:").toLongOrNull()
+                        if (id == null || runCatching { wallpapers.byId(id) }.getOrNull() == null) {
+                            "there is no wallpaper with that id; generate one first, or use asset:<file>"
+                        } else null
+                    }
+                    source.startsWith("asset:") -> {
+                        val name = source.removePrefix("asset:")
+                        val ok = name.isNotBlank() && '/' !in name &&
+                            runCatching { assets.open("wallpapers/$name").close() }.isSuccess
+                        if (ok) null else "no bundled wallpaper named '$name'"
+                    }
+                    else -> null
+                }
+            },
         )
     }
     val settings by lazy { SettingsStore(this) }

@@ -37,6 +37,8 @@ fun WidgetPreview(
     spec: WidgetSpec,
     modifier: Modifier = Modifier,
     rows: Int = spec.size.default,
+    /** False for a long list: a globe otherwise keeps drawing below the fold. */
+    animate: Boolean = true,
 ) {
     val app = LocalContext.current.masala
     val scope = rememberCoroutineScope()
@@ -52,6 +54,7 @@ fun WidgetPreview(
             store = store,
             onAction = {},
             extra = { app.brainFacts().ifEmpty { SAMPLE_EXTRA } },
+            animate = animate,
         )
     }
     Box(

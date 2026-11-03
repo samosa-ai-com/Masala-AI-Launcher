@@ -115,6 +115,38 @@ class WallpaperRoutineTest {
     }
 
     @Test
+    fun `a source that does not exist is refused before it is saved`() = runBlocking {
+        val store = WallpaperRoutineStore(FakeDao())
+        val tools = WallpaperRoutineTools(
+            store,
+            validateSource = { source ->
+                when (source) {
+                    "asset:missing.webp" -> "no bundled wallpaper named 'missing.webp'"
+                    "id:99" -> "there is no wallpaper with that id"
+                    else -> null
+                }
+            },
+        )
+        val bad = buildJsonObject {
+            put("name", "Gone")
+            putJsonArray("rules") {
+                add(
+                    buildJsonObject {
+                        put("source", "asset:missing.webp")
+                        putJsonObject("when") { put("from", "06:00"); put("to", "10:00") }
+                    },
+                )
+            }
+            put("defaultSource", "id:99")
+        }
+        val refused = tools.set(bad)
+        assertFalse(refused.success)
+        assertTrue(refused.message.contains("missing.webp"), refused.message)
+        assertTrue(refused.message.contains("no wallpaper"), refused.message)
+        assertTrue(store.all().isEmpty())
+    }
+
+    @Test
     fun `status explains what is showing, or that nothing is`() = runBlocking {
         val store = WallpaperRoutineStore(FakeDao())
         val empty = WallpaperRoutineTools(store)

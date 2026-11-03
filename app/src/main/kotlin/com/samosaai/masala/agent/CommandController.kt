@@ -241,7 +241,9 @@ class CommandController(
     fun stop() {
         val thinking = _state.value as? CommandState.Thinking
         dismiss()
-        if (thinking == null) return
+        // A blank prompt is the "Transcribing…" state between Send and the transcript: nothing
+        // has been sent to the model yet, so there is no turn to note (and no steps of its own).
+        if (thinking == null || thinking.prompt.isBlank()) return
         val steps = if (thinking.steps.isNotEmpty()) thinking.steps else turnSteps
         onTurn?.invoke(
             com.samosaai.masala.chat.ChatTurn(
@@ -324,9 +326,12 @@ class CommandController(
         job?.cancel()
         // The specific reason first; async errors during listening update the card too.
         var reason: String? = null
-        val async: (String) -> Unit = { reason = it; publish(CommandState.Error("", it)) }
+        // The engine may report the failure through this callback *and* return false; the card
+        // must get one error, not a duplicate turn.
+        var reported = false
+        val async: (String) -> Unit = { reason = it; reported = true; publish(CommandState.Error("", it)) }
         if (!input.start(async)) {
-            publish(CommandState.Error("", reason ?: "Speech recognition isn't available"))
+            if (!reported) publish(CommandState.Error("", reason ?: "Speech recognition isn't available"))
             return false
         }
         // A take that ends by itself must still leave Listening: a dead capture shows
@@ -484,6 +489,8 @@ class CommandController(
         // Sending is not instantaneous: the take still has to be transcribed and cleaned.
         // A blank-prompt Thinking is the "Transcribing…" row until the text lands.
         _state.value = CommandState.Thinking("")
+        // No model turn has started: a Stop here must not report the previous turn's steps.
+        turnSteps = emptyList()
         job = scope.launch {
             input.stop()
                 .onSuccess { heard ->

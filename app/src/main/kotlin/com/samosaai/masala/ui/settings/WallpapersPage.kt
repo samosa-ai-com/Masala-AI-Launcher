@@ -207,7 +207,13 @@ fun WallpapersPage(
             loadThumb = { decodeFileThumb(w.file.absolutePath, 1080) },
             onSet = { target ->
                 pickedGenerated = null
-                scope.launch { toast(app.wallpaperTool.setWallpaper(w.file.absolutePath, target).message) }
+                scope.launch {
+                    val result = app.wallpaperTool.setWallpaper(w.file.absolutePath, target)
+                    // A picked wallpaper is the user's choice: let the next routine trigger
+                    // re-decide instead of treating the previous rule as still applied.
+                    if (result.success) app.wallpaperRoutineEngine.forgetApplied()
+                    toast(result.message)
+                }
             },
             onExtra = {
                 TextButton(onClick = {
@@ -239,7 +245,13 @@ fun WallpapersPage(
                 pickedBundled = null
                 scope.launch {
                     val f = withContext(Dispatchers.IO) { runCatching { bundledFile() }.getOrNull() }
-                    toast(if (f == null) saveFailedText else app.wallpaperTool.setWallpaper(f.absolutePath, target).message)
+                    if (f == null) {
+                        toast(saveFailedText)
+                    } else {
+                        val result = app.wallpaperTool.setWallpaper(f.absolutePath, target)
+                        if (result.success) app.wallpaperRoutineEngine.forgetApplied()
+                        toast(result.message)
+                    }
                 }
             },
             onExtra = {
@@ -262,7 +274,11 @@ fun WallpapersPage(
             loadThumb = { decodeUriThumb(context, uri, 1080) },
             onSet = { target ->
                 pickedDeviceUri = null
-                scope.launch { toast(app.wallpaperTool.setWallpaper(uri.toString(), target).message) }
+                scope.launch {
+                    val result = app.wallpaperTool.setWallpaper(uri.toString(), target)
+                    if (result.success) app.wallpaperRoutineEngine.forgetApplied()
+                    toast(result.message)
+                }
             },
             onExtra = {},
             onDismiss = { pickedDeviceUri = null },

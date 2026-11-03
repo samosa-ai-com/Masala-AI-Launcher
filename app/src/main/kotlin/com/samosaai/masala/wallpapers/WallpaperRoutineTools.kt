@@ -21,6 +21,11 @@ class WallpaperRoutineTools(
     private val refresh: () -> Unit = {},
     /** The engine's last decision, for `wallpaper_routine_status`. */
     private val statusOf: () -> WallpaperRoutineEngine.Status = { WallpaperRoutineEngine.Status() },
+    /**
+     * Why a source can't be used on this phone (unknown bundled file, no such generated
+     * wallpaper), or null when it looks fine. Cheaper than saving a routine that fails at 06:00.
+     */
+    private val validateSource: suspend (String) -> String? = { null },
 ) {
 
     /** `set_wallpaper_routine`: replaces the routine with the same id, or adds a new one. */
@@ -38,7 +43,13 @@ class WallpaperRoutineTools(
         }.getOrElse {
             return ActionResult.error("That routine isn't valid JSON: ${it.message?.lineSequence()?.firstOrNull()}")
         }
-        val problems = RoutineChecker.check(routine)
+        val problems = RoutineChecker.check(routine).toMutableList()
+        val sources = routine.rules.map { it.source } + listOfNotNull(routine.defaultSource)
+        sources.forEachIndexed { index, source ->
+            validateSource(source)?.let { reason ->
+                problems += com.samosaai.masala.core.wallpaper.RoutineProblem("$.sources[$index]", reason)
+            }
+        }
         if (problems.isNotEmpty()) {
             return ActionResult.error(
                 "The routine was not saved:\n" + problems.joinToString("\n") { "- ${it.path}: ${it.message}" },
