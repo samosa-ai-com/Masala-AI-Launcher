@@ -23,6 +23,8 @@ import java.io.File
  * - `fetch('masala://media/speak?text=..')` → `{ok, message}` (plays on host speakers)
  * - `fetch('masala://media/capabilities')` → `{image,edit,segment,speak,transcribe}`
  *
+ * Those URLs are rewritten in the page to the same-origin [PATH] (see [miniAppMediaShim]),
+ * because WebView's fetch never lets a custom scheme reach the interceptor.
  * The host proxies through the same tools chat uses ([GenerateImageTool],
  * [SamSegmentTool], [SpeakTool]); the API key never enters the JS context.
  * [EditImageTool] is intentionally not exposed yet: mini-apps hold no files to
@@ -40,11 +42,29 @@ object MiniAppMediaBridge {
     fun probeDenial(): WebResourceResponse =
         json(200, """{"ok":false,"error":"media not available in preview"}""")
 
-    fun intercept(app: MasalaApp, appId: String, url: String): WebResourceResponse? {        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return null
-        if (uri.scheme != SCHEME || uri.host != HOST) return null
+    /**
+     * WebView's `fetch` and XHR refuse custom schemes before `shouldInterceptRequest` runs
+     * ("URL scheme "masala" is not supported"), so [miniAppMediaShim] rewrites `masala://media/<op>`
+     * to this same-origin path, which the host intercepts like the documented form.
+     */
+    const val PATH = "/__masala/media/"
+
+    /** True for a bridge call: the documented `masala://media/...` form, or [PATH] on the app's own [host]. */
+    fun isBridgeUrl(url: String, host: String): Boolean {
+        if (url.startsWith("$SCHEME://$HOST/")) return true
+        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
+        return uri.host == host && uri.path.orEmpty().startsWith(PATH)
+    }
+
+    fun intercept(app: MasalaApp, appId: String, url: String): WebResourceResponse? {
+        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return null
+        val op = when {
+            uri.scheme == SCHEME && uri.host == HOST -> uri.pathSegments.firstOrNull().orEmpty()
+            uri.path.orEmpty().startsWith(PATH) -> uri.path.orEmpty().removePrefix(PATH).substringBefore('/')
+            else -> return null
+        }
         val allowed = runBlocking { runCatching { app.miniApps.mediaAllowed(appId) }.getOrDefault(false) }
         if (!allowed) return json(403, """{"ok":false,"error":"media not allowed for this app"}""")
-        val op = uri.pathSegments.firstOrNull().orEmpty()
         return when (op) {
             "capabilities" -> json(200, """{"ok":true,"image":true,"edit":false,"segment":true,"speak":true,"transcribe":false}""")
             "generate" -> generate(app, uri.getQueryParameter("prompt").orEmpty(), uri.getQueryParameter("style"))
