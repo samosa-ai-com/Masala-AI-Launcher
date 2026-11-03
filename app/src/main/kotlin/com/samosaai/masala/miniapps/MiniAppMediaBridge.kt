@@ -19,7 +19,7 @@ import java.io.File
  * Mini-app JS has no keys and no network to the model endpoints. When Masala
  * allows it for an app ([MiniAppStore.mediaAllowed]), the app can call:
  * - `fetch('masala://media/generate?prompt=..&style=..')` → `{ok, ref, dataUrl, message}`
- * - `fetch('masala://media/segment?ref=..&prompt=..')` → `{ok, ref, dataUrl, message}`
+ * - `fetch('masala://media/segment?ref=..&prompt=..')` → `{ok, ref, dataUrl, cutoutRef, cutoutDataUrl, message}`
  * - `fetch('masala://media/speak?text=..')` → `{ok, message}` (plays on host speakers)
  * - `fetch('masala://media/capabilities')` → `{image,edit,segment,speak,transcribe}`
  *
@@ -98,7 +98,11 @@ object MiniAppMediaBridge {
         if (!result.success) return json(502, """{"ok":false,"error":${jsonStr(result.message.take(300))}}""")
         val annotated = result.produced.firstOrNull { it.kind == "segmentation" }?.ref.orEmpty()
         val dataUrl = runCatching { thumbDataUrl(annotated) }.getOrNull().orEmpty()
-        return json(200, """{"ok":true,"ref":${jsonStr(annotated)},"dataUrl":${jsonStr(dataUrl)},"message":${jsonStr(result.message.take(500))}}""")
+        // The transparent cut-out of the first object, kept PNG so a sticker app gets real transparency
+        // (the overlay alone made "stickers" that were the whole photo with a tint).
+        val cutout = result.produced.firstOrNull { it.kind == "image" && it.title.startsWith("cutout") }?.ref.orEmpty()
+        val cutoutUrl = runCatching { thumbDataUrl(cutout, png = true) }.getOrNull().orEmpty()
+        return json(200, """{"ok":true,"ref":${jsonStr(annotated)},"dataUrl":${jsonStr(dataUrl)},"cutoutRef":${jsonStr(cutout)},"cutoutDataUrl":${jsonStr(cutoutUrl)},"message":${jsonStr(result.message.take(500))}}""")
     }
 
     private fun speak(app: MasalaApp, text: String): WebResourceResponse {
@@ -123,7 +127,7 @@ object MiniAppMediaBridge {
         return runCatching { f.canonicalPath.startsWith(base) && f.exists() }.getOrDefault(false)
     }
 
-    private fun thumbDataUrl(path: String): String {
+    private fun thumbDataUrl(path: String, png: Boolean = false): String {
         val f = File(path)
         if (!f.exists()) return ""
         val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -134,9 +138,11 @@ object MiniAppMediaBridge {
         val bmp = android.graphics.BitmapFactory.decodeFile(f.absolutePath, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
             ?: return ""
         val bos = java.io.ByteArrayOutputStream()
-        bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 72, bos)
+        if (png) bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, bos)
+        else bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 72, bos)
         if (!bmp.isRecycled()) bmp.recycle()
-        return "data:image/jpeg;base64," + android.util.Base64.encodeToString(bos.toByteArray(), android.util.Base64.NO_WRAP)
+        val mime = if (png) "image/png" else "image/jpeg"
+        return "data:$mime;base64," + android.util.Base64.encodeToString(bos.toByteArray(), android.util.Base64.NO_WRAP)
     }
 
     private fun json(status: Int, body: String): WebResourceResponse =
