@@ -1,5 +1,6 @@
 package com.samosaai.masala.actions
 
+import com.samosaai.masala.core.tool.FunctionTool
 import com.samosaai.masala.core.tool.Tool
 import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.core.tool.ToolSensitivity
@@ -13,6 +14,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.coroutineContext
 
 /**
  * Asks the user before anything that isn't read-only runs (arch §3.6, plan Phase 2). The home screen shows
@@ -39,8 +44,21 @@ class ConfirmationGate(
     private val _pending = MutableStateFlow<Request?>(null)
     val pending: StateFlow<Request?> = _pending.asStateFlow()
 
-    suspend fun confirm(summary: String, destructive: Boolean = false, subject: String = "action"): Decision =
-        queue.withLock {
+    /**
+     * A chat's "Allow all" switch, carried in the coroutine context of that chat's turn so it never
+     * reaches other chats or background runs. Read at ask time, so flipping it mid-turn applies to the
+     * next question. Destructive questions are always asked.
+     */
+    class AllowAll(val enabled: () -> Boolean) : AbstractCoroutineContextElement(AllowAll) {
+        companion object Key : CoroutineContext.Key<AllowAll>
+    }
+
+    suspend fun confirm(summary: String, destructive: Boolean = false, subject: String = "action"): Decision {
+        if (!destructive && coroutineContext[AllowAll]?.enabled?.invoke() == true) {
+            record("confirm:$subject", summary, ToolResult.Success("allowed (allow all)"))
+            return Decision.ALLOWED
+        }
+        return queue.withLock {
             val request = Request(summary, destructive)
             _pending.value = request
             val answer = try {
@@ -60,6 +78,7 @@ class ConfirmationGate(
             )
             decision
         }
+    }
 
     /** The user's tap on the sheet. */
     fun answer(allowed: Boolean) {
@@ -68,7 +87,7 @@ class ConfirmationGate(
 
     override suspend fun check(tool: Tool, args: JsonObject): ToolResult? {
         val decision = confirm(
-            summary = "${tool.definition.name} ${args}".trim(),
+            summary = (tool as? FunctionTool)?.confirmSummary?.invoke(args) ?: summarize(tool.definition.name, args),
             destructive = tool.sensitivity == ToolSensitivity.DESTRUCTIVE,
             subject = tool.definition.name,
         )
@@ -81,5 +100,33 @@ class ConfirmationGate(
 
     companion object {
         const val DEFAULT_TIMEOUT_MS = 60_000L
+        private const val MAX_VALUE_CHARS = 120
+
+        /**
+         * The tool and its arguments as the sheet shows them. A long text value (a mini app's HTML, a
+         * layout) is cut to its start and its size, so the sheet's buttons stay on screen.
+         */
+        internal fun summarize(name: String, args: JsonObject): String {
+            fun arg(key: String): String? =
+                (args[key] as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim()?.takeIf { it.isNotEmpty() }
+            // Making an app is confirmed in the user's words, not as a wall of HTML.
+            if (name == "create_mini_app") {
+                val title = (args["title"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                    ?.trim()?.take(60)?.takeIf { it.isNotEmpty() }
+                return if (title != null) "Add \"$title\" to your home screen as an app"
+                else "Add a new app to your home screen"
+            }
+            if (name == "update_mini_app") return "Change that app"
+            if (name == "place_widget") return arg("id")?.let { "Put \"$it\" on home" } ?: "Put a widget on home"
+            if (name == "remove_widget") return arg("id")?.let { "Take \"$it\" off home" } ?: "Take a widget off home"
+            if (name == "delete_widget") return arg("id")?.let { "Delete the \"$it\" widget everywhere" } ?: "Delete a widget everywhere"
+            if (name == "add_stream_source") return arg("name")?.let { "Add the \"$it\" camera" } ?: "Add a camera or stream"
+            val shown = JsonObject(args.mapValues { (_, value) ->
+                val text = (value as? JsonPrimitive)?.takeIf { it.isString }?.content ?: value.toString()
+                if (text.length <= MAX_VALUE_CHARS) value
+                else JsonPrimitive(text.take(MAX_VALUE_CHARS) + "… (${text.length} characters)")
+            })
+            return "$name $shown".trim()
+        }
     }
 }

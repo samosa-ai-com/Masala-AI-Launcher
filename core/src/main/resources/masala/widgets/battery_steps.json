@@ -1,0 +1,46 @@
+{
+  "id": "battery_steps",
+  "name": "Battery and steps",
+  "description": "Two rings side by side: battery level and steps against a goal.",
+  "category": "Home",
+  "widget": {
+    "id": "battery_steps",
+    "components": [
+      {
+        "type": "row",
+        "children": [
+          {
+            "type": "gauge",
+            "label": "Battery",
+            "binding": {
+              "source": "battery"
+            },
+            "max": 100,
+            "style": {
+              "tint": "green"
+            }
+          },
+          {
+            "type": "gauge",
+            "label": "Steps",
+            "binding": {
+              "source": "steps"
+            },
+            "max": 8000,
+            "style": {
+              "tint": "orange"
+            }
+          }
+        ]
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 2,
+      "max": 3,
+      "minW": 2,
+      "defaultW": 4,
+      "maxW": 4
+    }
+  }
+}

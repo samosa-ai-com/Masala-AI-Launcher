@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Hoop Flick</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0f172a;--card:#1e293b;--accent:#f97316;--accent2:#fb923c;--text:#f8fafc;--muted:#94a3b8;--success:#22c55e;--rim:#ef4444}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center;background:radial-gradient(1200px 600px at 50% -10%, #1e3a5f 0%, #0f172a 60%)}
+.wrap{width:100%;max-width:428px;min-width:360px;min-height:100vh;display:flex;flex-direction:column;padding:12px 12px 16px;gap:10px}
+header{background:rgba(30,41,59,0.9);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.top-row{display:flex;justify-content:space-between;align-items:center}
+.logo{display:flex;align-items:center;gap:8px;font-weight:800;letter-spacing:0.5px;font-size:18px}
+.logo-badge{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),#ea580c);border-radius:9px;display:grid;place-items:center;font-size:18px}
+.stats{display:flex;gap:8px}
+.stat{background:#0f172a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:6px 10px;min-width:72px;text-align:center}
+.stat-label{font-size:10px;letter-spacing:0.8px;color:var(--muted);font-weight:700}
+.stat-value{font-size:16px;font-weight:800;line-height:1.1}
+.stat-value.combo{color:var(--accent2)}
+.timer-bar{height:8px;background:#0f172a;border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06)}
+.timer-fill{height:100%;width:100%;background:linear-gradient(90deg,#22c55e,#f97316);transition:width 0.2s linear}
+.timer-text{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;font-weight:600}
+.game-card{background:linear-gradient(180deg,#1e293b 0%,#0f172a 100%);border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;position:relative;flex:1;display:flex;flex-direction:column;min-height:520px}
+.canvas-wrap{position:relative;flex:1;display:flex;justify-content:center;align-items:stretch;background:radial-gradient(600px 400px at 50% 20%, #1e3a5f 0%, #0f172a 70%)}
+canvas{width:100%;height:100%;display:block;touch-action:none;max-height:560px}
+.hud-overlay{position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:10px}
+.combo-popup{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(0.8);background:rgba(249,115,22,0.95);color:white;padding:8px 14px;border-radius:999px;font-weight:900;font-size:14px;opacity:0;transition:all 0.3s;pointer-events:none;white-space:nowrap;box-shadow:0 8px 20px rgba(0,0,0,0.3)}
+.combo-popup.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.score-float{position:absolute;left:50%;top:30%;transform:translateX(-50%);font-weight:900;font-size:28px;color:#facc15;text-shadow:0 2px 10px rgba(0,0,0,0.5);opacity:0;transition:all 0.6s;pointer-events:none}
+.score-float.show{opacity:1;transform:translateX(-50%) translateY(-20px)}
+.controls{background:rgba(15,23,42,0.95);border-top:1px solid rgba(255,255,255,0.08);padding:12px;display:flex;flex-direction:column;gap:10px}
+.power-row{display:flex;align-items:center;gap:10px}
+.power-label{font-size:11px;font-weight:800;letter-spacing:0.8px;color:var(--muted);min-width:52px}
+.power-track{flex:1;height:12px;background:#0f172a;border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);position:relative}
+.power-fill{height:100%;width:0%;background:linear-gradient(90deg,#22c55e,#facc15,#ef4444);transition:width 0.05s}
+.power-dot{position:absolute;top:50%;transform:translate(-50%,-50%);width:14px;height:14px;background:white;border-radius:50%;left:0%;box-shadow:0 2px 6px rgba(0,0,0,0.3);transition:left 0.05s}
+.btn-row{display:flex;gap:10px}
+.btn{flex:1;height:52px;border-radius:14px;border:none;font-weight:800;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation}
+.btn:active{transform:scale(0.98)}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#ea580c);color:white;box-shadow:0 6px 16px rgba(249,115,22,0.35)}
+.btn-secondary{background:#1e293b;color:var(--text);border:1px solid rgba(255,255,255,0.1)}
+.btn:disabled{opacity:0.5;pointer-events:none}
+.instructions{font-size:12px;color:var(--muted);text-align:center;line-height:1.4;padding:2px 4px}
+.modal{position:absolute;inset:0;background:rgba(15,23,42,0.92);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10}
+.modal-card{background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:20px;width:100%;max-width:340px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.4)}
+.modal-card h2{font-size:22px;margin-bottom:6px}
+.modal-card p{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:14px}
+.big-score{font-size:42px;font-weight:900;color:var(--accent2);line-height:1}
+.badge{display:inline-block;background:rgba(249,115,22,0.15);color:var(--accent2);padding:4px 10px;border-radius:999px;font-size:12px;font-weight:800;margin:6px 0}
+.hidden{display:none !important}
+.aim-line{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);color:white;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:700;pointer-events:none;opacity:0;transition:opacity 0.2s}
+.aim-line.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top-row">
+      <div class="logo"><div class="logo-badge">🏀</div> HOOP FLICK</div>
+      <div class="stats">
+        <div class="stat"><div class="stat-label">SCORE</div><div class="stat-value" id="scoreEl">0</div></div>
+        <div class="stat"><div class="stat-label">BEST</div><div class="stat-value" id="bestEl">0</div></div>
+        <div class="stat"><div class="stat-label">COMBO</div><div class="stat-value combo" id="comboEl">x1</div></div>
+      </div>
+    </div>
+    <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
+    <div class="timer-text"><span>⏱ Time left</span><span id="timerText">45.0s</span></div>
+  </header>
+
+  <div class="game-card" id="gameCard">
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="gameCanvas" width="360" height="520"></canvas>
+      <div class="combo-popup" id="comboPopup">SWISH! +10</div>
+      <div class="score-float" id="scoreFloat">+2</div>
+      <div class="aim-line" id="aimLine">Drag back to aim • Release to shoot</div>
+      <div class="hud-overlay">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="background:rgba(0,0,0,0.5);padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700">ROUND <span id="roundEl">1</span>/3</span>
+          <span style="background:rgba(34,197,94,0.9);padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;color:white" id="statusEl">AIM & FLICK!</span>
+        </div>
+      </div>
+      <!-- Start Modal -->
+      <div class="modal" id="startModal">
+        <div class="modal-card">
+          <div style="font-size:40px;margin-bottom:8px">🏀🔥</div>
+          <h2>Hoop Flick</h2>
+          <p>Drag <b>backwards</b> from the ball to aim. Longer drag = more power. Release to shoot! Chain <b>swishes</b> (clean shots) for combo bonuses.</p>
+          <div class="badge">45s per round • 3 rounds</div>
+          <div style="display:flex;gap:10px;margin-top:14px">
+            <button class="btn btn-primary" id="playBtn" style="flex:1">▶ PLAY NOW</button>
+          </div>
+          <p style="margin-top:10px;font-size:11px">Best: <b id="modalBest">0</b> • Tip: aim slightly above the rim</p>
+        </div>
+      </div>
+      <!-- End Round Modal -->
+      <div class="modal hidden" id="endModal">
+        <div class="modal-card">
+          <div style="font-size:36px" id="endEmoji">⏰</div>
+          <h2 id="endTitle">Time's Up!</h2>
+          <div class="big-score" id="endScore">0</div>
+          <p id="endDesc">Great shooting!</p>
+          <div class="badge" id="endBadge">Round 1 complete</div>
+          <div style="display:flex;gap:10px;margin-top:14px">
+            <button class="btn btn-secondary" id="homeBtn">HOME</button>
+            <button class="btn btn-primary" id="nextBtn" style="flex:1">NEXT ROUND →</button>
+          </div>
+        </div>
+      </div>
+      <!-- Game Over Modal -->
+      <div class="modal hidden" id="gameOverModal">
+        <div class="modal-card">
+          <div style="font-size:40px">🏆</div>
+          <h2>Game Over!</h2>
+          <div class="big-score" id="finalScore">0</div>
+          <p>Final score across 3 rounds</p>
+          <div class="badge" id="finalBadge">New Best!</div>
+          <div style="display:flex;gap:10px;margin-top:14px">
+            <button class="btn btn-secondary" id="shareBtn">SHARE</button>
+            <button class="btn btn-primary" id="replayBtn" style="flex:1">PLAY AGAIN</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="power-row">
+        <span class="power-label">POWER</span>
+        <div class="power-track"><div class="power-fill" id="powerFill"></div><div class="power-dot" id="powerDot"></div></div>
+        <span style="font-size:11px;font-weight:800;color:var(--muted);min-width:36px;text-align:right" id="powerText">0%</span>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="resetBallBtn">↺ RESET</button>
+        <button class="btn btn-primary" id="shootBtn">🏀 SHOOT</button>
+      </div>
+      <div class="instructions">Touch & drag the ball backwards to aim. The dotted line shows your trajectory. Swish = no rim touch = bonus!</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('scoreEl');
+const bestEl = document.getElementById('bestEl');
+const comboEl = document.getElementById('comboEl');
+const timerFill = document.getElementById('timerFill');
+const timerText = document.getElementById('timerText');
+const roundEl = document.getElementById('roundEl');
+const statusEl = document.getElementById('statusEl');
+const powerFill = document.getElementById('powerFill');
+const powerDot = document.getElementById('powerDot');
+const powerText = document.getElementById('powerText');
+const comboPopup = document.getElementById('comboPopup');
+const scoreFloat = document.getElementById('scoreFloat');
+const aimLine = document.getElementById('aimLine');
+
+const startModal = document.getElementById('startModal');
+const endModal = document.getElementById('endModal');
+const gameOverModal = document.getElementById('gameOverModal');
+
+let W=360, H=520;
+function resizeCanvas(){
+  const wrap = document.getElementById('canvasWrap');
+  const rect = wrap.getBoundingClientRect();
+  // keep internal resolution 360x520 but scale via CSS width
+  // adjust for DPR for crispness
+  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  canvas.width = 360 * dpr;
+  canvas.height = 520 * dpr;
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  W=360; H=520;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Game state
+let score=0, best=parseInt(localStorage.getItem('hoopBest')||'0'), combo=0, swishStreak=0;
+let round=1, maxRounds=3;
+let timeLeft=45, gameState='idle'; // idle, playing, paused, roundEnd, gameOver
+let timerId=null;
+let ball, hoop, canShoot=true, hasScoredThisShot=false, rimTouched=false;
+
+bestEl.textContent = best;
+document.getElementById('modalBest').textContent = best;
+
+const BALL_START = {x:180, y:440};
+const HOOP = {x:180, y:150, w:96, h:10, rimThickness:8, poleW:10};
+
+function resetBall(){
+  ball = {
+    x: BALL_START.x, y: BALL_START.y,
+    vx:0, vy:0,
+    r:16,
+    isDragging:false,
+    isFlying:false,
+    dragStart:null,
+    dragCurrent:null,
+    power:0,
+    angle:0
+  };
+  canShoot=true;
+  hasScoredThisShot=false;
+  rimTouched=false;
+  updatePowerUI(0);
+  statusEl.textContent = 'AIM & FLICK!';
+  statusEl.style.background = 'rgba(34,197,94,0.9)';
+}
+resetBall();
+
+function updatePowerUI(p){
+  const pct = Math.round(p*100);
+  powerFill.style.width = pct+'%';
+  powerDot.style.left = pct+'%';
+  powerText.textContent = pct+'%';
+  if(p>0.85) powerFill.style.filter='brightness(1.1)';
+  else powerFill.style.filter='none';
+}
+
+function showCombo(text){
+  comboPopup.textContent=text;
+  comboPopup.classList.add('show');
+  setTimeout(()=>comboPopup.classList.remove('show'), 900);
+}
+function showScoreFloat(text){
+  scoreFloat.textContent=text;
+  scoreFloat.classList.add('show');
+  setTimeout(()=>scoreFloat.classList.remove('show'), 700);
+}
+
+function addScore(isSwish){
+  let base = isSwish ? 3 : 2;
+  // combo bonus: swish streak increases multiplier
+  if(isSwish){
+    swishStreak++;
+    combo = swishStreak;
+    let mult = 1;
+    if(combo===2) mult=1.5;
+    else if(combo===3) mult=2;
+    else if(combo>=4) mult=2.5;
+    let pts = Math.round(base*mult);
+    score += pts;
+    showCombo(combo>=2 ? `SWISH x${combo}! +${pts}` : `SWISH! +${pts}`);
+    showScoreFloat(`+${pts}`);
+    statusEl.textContent = combo>=3 ? `ON FIRE x${combo}!` : 'SWISH!';
+    statusEl.style.background = 'rgba(249,115,22,0.95)';
+  } else {
+    swishStreak=0;
+    combo=0;
+    score+=base;
+    showScoreFloat(`+${base}`);
+    statusEl.textContent='SCORE!';
+    statusEl.style.background='rgba(34,197,94,0.9)';
+  }
+  scoreEl.textContent=score;
+  comboEl.textContent='x'+(combo>0? (combo===1?1: combo===2?1.5: combo===3?2:2.5) :1);
+  if(score>best){
+    best=score;
+    bestEl.textContent=best;
+    localStorage.setItem('hoopBest', best);
+    document.getElementById('modalBest').textContent=best;
+  }
+  // haptic
+  if(navigator.vibrate) navigator.vibrate(isSwish? [30,40,30] : 30);
+}
+
+function startTimer(){
+  clearInterval(timerId);
+  timerId=setInterval(()=>{
+    if(gameState!=='playing') return;
+    timeLeft-=0.1;
+    if(timeLeft<=0){
+      timeLeft=0;
+      endRound();
+    }
+    updateTimerUI();
+  },100);
+}
+function updateTimerUI(){
+  timerText.textContent=timeLeft.toFixed(1)+'s';
+  const pct = (timeLeft/45)*100;
+  timerFill.style.width=pct+'%';
+  if(timeLeft<10) timerFill.style.background='linear-gradient(90deg,#ef4444,#f97316)';
+  else timerFill.style.background='linear-gradient(90deg,#22c55e,#f97316)';
+}
+
+function startGame(){
+  score=0; round=1; swishStreak=0; combo=0;
+  scoreEl.textContent=0;
+  comboEl.textContent='x1';
+  startRound();
+}
+function startRound(){
+  timeLeft=45;
+  roundEl.textContent=round;
+  gameState='playing';
+  startModal.classList.add('hidden');
+  endModal.classList.add('hidden');
+  gameOverModal.classList.add('hidden');
+  resetBall();
+  updateTimerUI();
+  startTimer();
+}
+function endRound(){
+  clearInterval(timerId);
+  gameState='roundEnd';
+  // check if game over
+  if(round>=maxRounds){
+    setTimeout(showGameOver, 600);
+  } else {
+    document.getElementById('endScore').textContent=score;
+    document.getElementById('endTitle').textContent = score>20 ? 'Hot Hand!' : "Time's Up!";
+    document.getElementById('endEmoji').textContent = score>20 ? '🔥' : '⏰';
+    document.getElementById('endDesc').textContent = `Round ${round} finished. Keep chaining swishes!`;
+    document.getElementById('endBadge').textContent = `Round ${round} • Score ${score}`;
+    document.getElementById('nextBtn').textContent = `NEXT ROUND → ${round+1}/${maxRounds}`;
+    endModal.classList.remove('hidden');
+  }
+}
+function showGameOver(){
+  gameState='gameOver';
+  document.getElementById('finalScore').textContent=score;
+  const isNewBest = score>=best && score>0;
+  document.getElementById('finalBadge').textContent = isNewBest ? '🎉 New Best!' : `Best: ${best}`;
+  document.getElementById('finalBadge').style.background = isNewBest ? 'rgba(34,197,94,0.2)' : 'rgba(249,115,22,0.15)';
+  document.getElementById('finalBadge').style.color = isNewBest ? '#22c55e' : '#fb923c';
+  gameOverModal.classList.remove('hidden');
+}
+
+// Input handling - drag from ball
+function getPos(e){
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches ? e.touches[0] : e;
+  const scaleX = W / rect.width;
+  const scaleY = H / rect.height;
+  return {
+    x: (touch.clientX - rect.left) * scaleX,
+    y: (touch.clientY - rect.top) * scaleY
+  };
+}
+function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+
+canvas.addEventListener('pointerdown', (e)=>{
+  if(gameState!=='playing') return;
+  if(ball.isFlying) return;
+  const p = getPos(e);
+  // allow drag if near ball (60px radius for large touch target)
+  if(dist(p, ball) < 70){
+    ball.isDragging=true;
+    ball.dragStart={x:p.x, y:p.y};
+    ball.dragCurrent={x:p.x, y:p.y};
+    aimLine.classList.add('show');
+    canvas.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
+});
+canvas.addEventListener('pointermove', (e)=>{
+  if(!ball.isDragging) return;
+  const p = getPos(e);
+  ball.dragCurrent={x:p.x, y:p.y};
+  // vector from current to start (drag back to aim forward)
+  let dx = ball.dragStart.x - p.x;
+  let dy = ball.dragStart.y - p.y;
+  // limit drag distance 120px
+  let len = Math.hypot(dx,dy);
+  const maxLen=110;
+  if(len>maxLen){
+    const s=maxLen/len;
+    dx*=s; dy*=s;
+    len=maxLen;
+  }
+  // only allow upward aim (dy negative means drag down -> shoot up)
+  // Actually dx,dy as defined: drag back opposite direction. If user drags down, dy negative? Let's compute: start - current. If current is below start, dy negative, we want to shoot up => vy negative. So dy is correct.
+  // Clamp to not shoot downwards too much
+  ball.power = len / maxLen;
+  ball.angle = Math.atan2(dy, dx);
+  updatePowerUI(ball.power);
+  e.preventDefault();
+});
+canvas.addEventListener('pointerup', (e)=>{
+  if(!ball.isDragging) return;
+  ball.isDragging=false;
+  aimLine.classList.remove('show');
+  if(ball.power>0.08){
+    shoot();
+  } else {
+    updatePowerUI(0);
+  }
+});
+canvas.addEventListener('pointercancel', ()=>{
+  ball.isDragging=false;
+  aimLine.classList.remove('show');
+  updatePowerUI(0);
+});
+
+document.getElementById('shootBtn').addEventListener('click', ()=>{
+  if(gameState!=='playing') return;
+  if(ball.isFlying) return;
+  if(ball.power>0.05){
+    shoot();
+  } else {
+    // auto shoot with medium power if no drag
+    ball.power=0.65;
+    ball.angle = -Math.PI/2 + (Math.random()-0.5)*0.2; // straight up with slight variance
+    updatePowerUI(ball.power);
+    shoot();
+  }
+});
+document.getElementById('resetBallBtn').addEventListener('click', ()=>{
+  if(ball.isFlying) return;
+  resetBall();
+});
+
+function shoot(){
+  if(!canShoot) return;
+  canShoot=false;
+  ball.isFlying=true;
+  hasScoredThisShot=false;
+  rimTouched=false;
+  // convert power/angle to velocity
+  const powerFactor = 14; // tuned
+  const vx = Math.cos(ball.angle) * ball.power * powerFactor;
+  const vy = Math.sin(ball.angle) * ball.power * powerFactor;
+  ball.vx = vx;
+  ball.vy = vy;
+  // if angle is near horizontal, add upward bias
+  if(ball.vy > -2) ball.vy = -2 - ball.power*4;
+  statusEl.textContent='SHOOT!';
+  statusEl.style.background='rgba(59,130,246,0.9)';
+  updatePowerUI(0);
+  if(navigator.vibrate) navigator.vibrate(20);
+}
+
+// Physics loop
+const gravity = 0.38;
+const friction = 0.995;
+const bounceDamp = 0.62;
+
+function updatePhysics(){
+  if(ball.isFlying){
+    ball.vy += gravity;
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+    ball.vx *= friction;
+    // wall collisions
+    if(ball.x - ball.r < 4){
+      ball.x = 4 + ball.r;
+      ball.vx *= -bounceDamp;
+      rimTouched=true;
+    }
+    if(ball.x + ball.r > W-4){
+      ball.x = W-4 - ball.r;
+      ball.vx *= -bounceDamp;
+      rimTouched=true;
+    }
+    // ceiling
+    if(ball.y - ball.r < 2){
+      ball.y = 2 + ball.r;
+      ball.vy *= -bounceDamp;
+    }
+    // floor - reset if ball settles
+    if(ball.y + ball.r > H-6){
+      ball.y = H-6 - ball.r;
+      ball.vy *= -bounceDamp;
+      ball.vx *= 0.85;
+      if(Math.abs(ball.vy) < 0.8 && Math.abs(ball.vx) < 0.8){
+        // ball stopped, reset after delay
+        ball.isFlying=false;
+        setTimeout(()=>{
+          if(gameState==='playing' && !ball.isDragging){
+            resetBall();
+          }
+        }, 500);
+      }
+      // if ball is on floor and not scored, break combo? No, only on miss we keep streak? Actually miss should reset? We reset streak on non-swish score, but miss keeps streak? Let's reset streak on miss after 2 sec? Simpler: miss doesn't affect streak until next score is not swish.
+    }
+
+    // Hoop collisions
+    // Backboard: vertical rect at hoop x + w/2
+    const boardX = HOOP.x + HOOP.w/2 + 6;
+    const boardY1 = HOOP.y - 40;
+    const boardY2 = HOOP.y + 30;
+    if(ball.x + ball.r > boardX - HOOP.poleW/2 && ball.x - ball.r < boardX + HOOP.poleW/2){
+      if(ball.y + ball.r > boardY1 && ball.y - ball.r < boardY2){
+        // collision with backboard
+        if(ball.vx > 0 && ball.x < boardX){
+          ball.x = boardX - HOOP.poleW/2 - ball.r -1;
+          ball.vx *= -bounceDamp;
+          rimTouched=true;
+          if(navigator.vibrate) navigator.vibrate(15);
+        }
+      }
+    }
+    // Rim left and right posts
+    const rimY = HOOP.y;
+    const rimLeft = {x: HOOP.x - HOOP.w/2, y: rimY};
+    const rimRight = {x: HOOP.x + HOOP.w/2, y: rimY};
+    [rimLeft, rimRight].forEach(pt=>{
+      const dx = ball.x - pt.x;
+      const dy = ball.y - pt.y;
+      const d = Math.hypot(dx,dy);
+      const minD = ball.r + HOOP.rimThickness/2;
+      if(d < minD && d>0){
+        // push out
+        const nx = dx/d, ny=dy/d;
+        ball.x = pt.x + nx*minD;
+        ball.y = pt.y + ny*minD;
+        // reflect velocity
+        const dot = ball.vx*nx + ball.vy*ny;
+        ball.vx -= 2*dot*nx * 0.85;
+        ball.vy -= 2*dot*ny * 0.85;
+        ball.vx *= bounceDamp;
+        ball.vy *= bounceDamp;
+        rimTouched=true;
+      }
+    });
+
+    // Scoring detection: ball center passes through hoop plane going down
+    // Need ball to be within rim width and moving down, and y crossing rimY
+    if(!hasScoredThisShot && ball.vy > 0){
+      const prevY = ball.y - ball.vy; // approx previous y
+      if(prevY < rimY && ball.y >= rimY){
+        if(ball.x > HOOP.x - HOOP.w/2 + 8 && ball.x < HOOP.x + HOOP.w/2 - 8){
+          // scored!
+          hasScoredThisShot=true;
+          const isSwish = !rimTouched;
+          addScore(isSwish);
+          // let ball continue falling, but prevent double score
+          // flash rim
+          flashRim(isSwish);
+        }
+      }
+    }
+
+    // Out of bounds bottom - if ball falls below canvas, reset
+    if(ball.y - ball.r > H+40){
+      ball.isFlying=false;
+      setTimeout(()=>{ if(gameState==='playing') resetBall(); }, 300);
+    }
+  }
+}
+
+let rimFlash=0, rimFlashSwish=false;
+function flashRim(isSwish){
+  rimFlash=20;
+  rimFlashSwish=isSwish;
+}
+
+// Rendering
+function draw(){
+  // clear
+  ctx.clearRect(0,0,W,H);
+
+  // court gradient floor
+  const grad = ctx.createLinearGradient(0, H-80, 0, H);
+  grad.addColorStop(0, '#1e293b');
+  grad.addColorStop(1, '#0f172a');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0, H-80, W, 80);
+  // floor line
+  ctx.strokeStyle='rgba(255,255,255,0.08)';
+  ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(0,H-80); ctx.lineTo(W,H-80); ctx.stroke();
+  // wood planks
+  ctx.strokeStyle='rgba(255,255,255,0.04)';
+  ctx.lineWidth=1;
+  for(let y=H-70; y<H; y+=14){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  // crowd silhouette
+  ctx.fillStyle='rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.moveTo(0, 90);
+  for(let x=0;x<W;x+=18){
+    ctx.lineTo(x, 70 + Math.sin(x*0.08)*6);
+  }
+  ctx.lineTo(W,90); ctx.lineTo(W,110); ctx.lineTo(0,110); ctx.closePath(); ctx.fill();
+
+  // hoop shadow
+  ctx.fillStyle='rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(HOOP.x, HOOP.y+28, 50, 8, 0,0,Math.PI*2); ctx.fill();
+
+  // pole
+  const poleX = HOOP.x + HOOP.w/2 + 6;
+  ctx.fillStyle='#334155';
+  ctx.fillRect(poleX - HOOP.poleW/2, HOOP.y-40, HOOP.poleW, H - (HOOP.y-40) -80);
+  // pole highlight
+  ctx.fillStyle='rgba(255,255,255,0.1)';
+  ctx.fillRect(poleX - HOOP.poleW/2, HOOP.y-40, 3, H - (HOOP.y-40) -80);
+
+  // backboard
+  ctx.fillStyle='#e2e8f0';
+  ctx.strokeStyle='rgba(0,0,0,0.15)';
+  ctx.lineWidth=2;
+  const boardW=6, boardH=70;
+  const boardX = poleX;
+  ctx.fillRect(boardX - boardW/2, HOOP.y-45, boardW, boardH);
+  ctx.strokeRect(boardX - boardW/2, HOOP.y-45, boardW, boardH);
+  // backboard inner square
+  ctx.strokeStyle='#ef4444';
+  ctx.lineWidth=1.5;
+  ctx.strokeRect(boardX - boardW/2 -8, HOOP.y-12, 16, 18);
+
+  // net
+  ctx.strokeStyle='rgba(255,255,255,0.85)';
+  ctx.lineWidth=1.2;
+  const netTopY = HOOP.y;
+  const netBottomY = HOOP.y + 32;
+  const netW = HOOP.w - 6;
+  for(let i=-netW/2; i<=netW/2; i+=10){
+    ctx.beginPath();
+    const topX = HOOP.x + i;
+    const bottomX = HOOP.x + i*0.55;
+    ctx.moveTo(topX, netTopY);
+    // wavy net
+    ctx.bezierCurveTo(topX, netTopY+12, bottomX, netTopY+18, bottomX, netBottomY);
+    ctx.stroke();
+  }
+  // horizontal net lines
+  ctx.strokeStyle='rgba(255,255,255,0.35)';
+  ctx.lineWidth=0.8;
+  for(let y=netTopY+8; y<netBottomY; y+=7){
+    ctx.beginPath();
+    ctx.moveTo(HOOP.x - netW/2* (1 - (y-netTopY)/50*0.45), y);
+    ctx.lineTo(HOOP.x + netW/2* (1 - (y-netTopY)/50*0.45), y);
+    ctx.stroke();
+  }
+
+  // rim
+  ctx.strokeStyle = rimFlash>0 ? (rimFlashSwish ? '#22c55e' : '#facc15') : '#ef4444';
+  ctx.lineWidth = HOOP.rimThickness;
+  ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(HOOP.x - HOOP.w/2, HOOP.y);
+  ctx.lineTo(HOOP.x + HOOP.w/2, HOOP.y);
+  ctx.stroke();
+  // rim front highlight
+  ctx.strokeStyle='rgba(255,255,255,0.3)';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(HOOP.x - HOOP.w/2, HOOP.y-1);
+  ctx.lineTo(HOOP.x + HOOP.w/2, HOOP.y-1);
+  ctx.stroke();
+  if(rimFlash>0) rimFlash--;
+
+  // trajectory preview when dragging
+  if(ball.isDragging && ball.power>0.05){
+    const steps=18;
+    let tx = BALL_START.x;
+    let ty = BALL_START.y;
+    let tvx = Math.cos(ball.angle) * ball.power * 14;
+    let tvy = Math.sin(ball.angle) * ball.power * 14;
+    ctx.fillStyle='rgba(255,255,255,0.9)';
+    for(let i=0;i<steps;i++){
+      tvy += gravity;
+      tx += tvx;
+      ty += tvy;
+      tvx *= 0.998;
+      if(ty> H-80) break;
+      const alpha = 1 - i/steps;
+      ctx.globalAlpha = alpha*0.9;
+      ctx.beginPath();
+      ctx.arc(tx, ty, i%2===0?3.5:2, 0, Math.PI*2);
+      ctx.fill();
+      // small arrow at end
+      if(i===steps-1 || ty> HOOP.y+40){
+        // continue but fade
+      }
+    }
+    ctx.globalAlpha=1;
+    // power arrow
+    const ax = BALL_START.x + Math.cos(ball.angle)* ball.power*40;
+    const ay = BALL_START.y + Math.sin(ball.angle)* ball.power*40;
+    ctx.strokeStyle='rgba(249,115,22,0.9)';
+    ctx.lineWidth=2;
+    ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(BALL_START.x, BALL_START.y); ctx.lineTo(ax, ay); ctx.stroke();
+    ctx.setLineDash([]);
+    // arrow head
+    ctx.fillStyle='#f97316';
+    ctx.beginPath();
+    const ang = ball.angle;
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(ax - Math.cos(ang-0.5)*10, ay - Math.sin(ang-0.5)*10);
+    ctx.lineTo(ax - Math.cos(ang+0.5)*10, ay - Math.sin(ang+0.5)*10);
+    ctx.closePath(); ctx.fill();
+  }
+
+  // ball shadow
+  ctx.fillStyle='rgba(0,0,0,0.25)';
+  ctx.beginPath(); ctx.ellipse(ball.x, H-80+6, 18, 6, 0,0,Math.PI*2); ctx.fill();
+
+  // ball
+  // ball body
+  const ballGrad = ctx.createRadialGradient(ball.x-5, ball.y-6, 4, ball.x, ball.y, ball.r);
+  ballGrad.addColorStop(0, '#fb923c');
+  ballGrad.addColorStop(0.5, '#f97316');
+  ballGrad.addColorStop(1, '#c2410c');
+  ctx.fillStyle=ballGrad;
+  ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
+  // ball lines
+  ctx.strokeStyle='rgba(0,0,0,0.35)';
+  ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r-1, -0.6, 0.6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ball.x- ball.r+2, ball.y); ctx.quadraticCurveTo(ball.x, ball.y-4, ball.x+ball.r-2, ball.y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ball.x, ball.y-ball.r+2); ctx.quadraticCurveTo(ball.x+3, ball.y, ball.x, ball.y+ball.r-2); ctx.stroke();
+  // highlight
+  ctx.fillStyle='rgba(255,255,255,0.35)';
+  ctx.beginPath(); ctx.ellipse(ball.x-5, ball.y-6, 5, 3, -0.4, 0, Math.PI*2); ctx.fill();
+
+  // drag handle when idle
+  if(!ball.isFlying && !ball.isDragging && gameState==='playing'){
+    ctx.strokeStyle='rgba(255,255,255,0.5)';
+    ctx.lineWidth=1.5;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.arc(ball.x, ball.y, 28, 0, Math.PI*2); ctx.stroke();
+    ctx.setLineDash([]);
+    // pulse
+    const pulse = (Date.now()%1000)/1000;
+    ctx.globalAlpha=0.3*(1-pulse);
+    ctx.beginPath(); ctx.arc(ball.x, ball.y, 28+ pulse*12, 0, Math.PI*2); ctx.stroke();
+    ctx.globalAlpha=1;
+    // finger hint
+    ctx.font='700 10px system-ui';
+    ctx.fillStyle='rgba(255,255,255,0.9)';
+    ctx.textAlign='center';
+    ctx.fillText('DRAG', ball.x, ball.y+34);
+  }
+
+  requestAnimationFrame(loop);
+}
+
+function loop(){
+  updatePhysics();
+  draw();
+}
+loop();
+
+// Buttons
+document.getElementById('playBtn').addEventListener('click', startGame);
+document.getElementById('nextBtn').addEventListener('click', ()=>{
+  round++;
+  startRound();
+});
+document.getElementById('homeBtn').addEventListener('click', ()=>{
+  endModal.classList.add('hidden');
+  startModal.classList.remove('hidden');
+  gameState='idle';
+  clearInterval(timerId);
+  resetBall();
+  score=0; scoreEl.textContent=0;
+});
+document.getElementById('replayBtn').addEventListener('click', startGame);
+document.getElementById('shareBtn').addEventListener('click', ()=>{
+  const text = `I scored ${score} in Hoop Flick! Can you beat it? 🏀🔥`;
+  if(navigator.share){ navigator.share({title:'Hoop Flick', text}); }
+  else { navigator.clipboard.writeText(text); alert('Score copied! '+text); }
+});
+
+// Prevent scrolling while playing
+document.body.addEventListener('touchmove', (e)=>{
+  if(gameState==='playing') e.preventDefault();
+}, {passive:false});
+
+// init timer UI
+updateTimerUI();
+</script>
+</body>
+</html>

@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>Star Lanes Tour</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#05071a;color:#eef2ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+body{display:flex;justify-content:center}
+.app{width:100%;max-width:428px;min-width:360px;height:100dvh;display:flex;flex-direction:column;background:radial-gradient(1200px 600px at 50% -10%,#1a2450 0%,#070a1f 45%,#040510 100%);position:relative;overflow:hidden}
+header{padding:10px 12px 8px;display:flex;flex-direction:column;gap:8px;flex-shrink:0}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.logo{font-weight:900;letter-spacing:0.04em;font-size:18px;line-height:1}
+.logo span{color:#7af0ff}
+.scores{display:flex;gap:8px}
+.pill{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:999px;padding:6px 10px;font-size:13px;font-weight:700;min-width:78px;text-align:center;backdrop-filter:blur(6px)}
+.pill b{color:#ffe66e}
+.checklist{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.checklist::-webkit-scrollbar{display:none}
+.planet-chip{flex:0 0 auto;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:999px;padding:5px 8px;font-size:12px;font-weight:700;opacity:0.55;transition:all .25s}
+.planet-chip.visited{opacity:1;background:rgba(122,240,255,0.15);border-color:rgba(122,240,255,0.5);box-shadow:0 0 10px rgba(122,240,255,0.35)}
+.dot{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,0.9);position:relative;flex-shrink:0}
+.dot::after{content:"";position:absolute;left:-3px;right:-3px;top:50%;height:3px;background:inherit;border-radius:999px;transform:translateY(-50%) rotate(-12deg);opacity:0.9}
+.canvas-wrap{flex:1;position:relative;margin:0 10px;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,0.14);background:#02030a;box-shadow:0 10px 30px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.06)}
+canvas{display:block;width:100%;height:100%}
+.hud{position:absolute;left:10px;right:10px;top:10px;display:flex;justify-content:space-between;align-items:center;pointer-events:none}
+.hearts{display:flex;gap:4px;font-size:18px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6))}
+.progress{font-size:12px;font-weight:800;background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.15);padding:6px 10px;border-radius:999px;backdrop-filter:blur(6px)}
+.lane-label{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:0.12em;font-weight:800;opacity:0.7;background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,0.12)}
+.controls{padding:10px 12px 12px;display:grid;grid-template-columns:1fr 1fr;gap:12px;flex-shrink:0}
+.btn{height:72px;border-radius:18px;border:1px solid rgba(255,255,255,0.14);background:linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04));color:#fff;font-size:28px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;user-select:none;touch-action:manipulation;box-shadow:0 6px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.2)}
+.btn:active{transform:scale(0.97);background:rgba(122,240,255,0.2)}
+.btn small{font-size:12px;opacity:0.8;letter-spacing:0.08em}
+.btn.pressed{background:rgba(122,240,255,0.28);border-color:rgba(122,240,255,0.6)}
+.secondary-row{display:flex;gap:8px;padding:0 12px 10px;flex-shrink:0}
+.sbtn{flex:1;height:44px;border-radius:12px;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);color:#eef2ff;font-weight:800;font-size:14px}
+.sbtn.primary{background:linear-gradient(180deg,#7af0ff,#4da3ff);color:#05101a;border:none;box-shadow:0 6px 14px rgba(77,163,255,0.4)}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:radial-gradient(600px 400px at 50% 30%,rgba(122,240,255,0.18),transparent 70%), linear-gradient(180deg,rgba(5,7,26,0.55),rgba(5,7,26,0.85));backdrop-filter:blur(4px);z-index:5}
+.card{width:100%;max-width:360px;background:linear-gradient(180deg,#0f1433,#0a0e26);border:1px solid rgba(122,240,255,0.25);border-radius:20px;padding:18px;box-shadow:0 20px 40px rgba(0,0,0,0.5);text-align:center}
+.card h1{font-size:22px;line-height:1.1;margin-bottom:6px}
+.card h1 em{color:#7af0ff;font-style:normal}
+.card p{font-size:14px;line-height:1.45;opacity:0.85;margin-bottom:12px}
+.badges{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:12px}
+.badge{font-size:11px;font-weight:800;letter-spacing:0.06em;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12)}
+.bigplay{width:100%;height:56px;border-radius:14px;border:none;background:linear-gradient(180deg,#ffe66e,#ffb84d);color:#1a1200;font-weight:900;font-size:18px;box-shadow:0 8px 18px rgba(255,184,77,0.4)}
+.hint{font-size:12px;opacity:0.7;margin-top:8px}
+.hidden{display:none !important}
+.toast{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.15);padding:8px 12px;border-radius:999px;font-weight:800;font-size:13px;pointer-events:none;opacity:0;transition:opacity .2s}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="topbar">
+      <div class="logo">STAR <span>LANES</span> TOUR</div>
+      <div class="scores">
+        <div class="pill">SCORE <b id="scoreEl">0</b></div>
+        <div class="pill">BEST <b id="bestEl">0</b></div>
+      </div>
+    </div>
+    <div class="checklist" id="checklist"></div>
+  </header>
+
+  <div class="canvas-wrap" id="wrap">
+    <canvas id="c"></canvas>
+    <div class="hud">
+      <div class="hearts" id="hearts"></div>
+      <div class="progress" id="progress">0 / 6 PLANETS</div>
+    </div>
+    <div class="lane-label">◀ RING LANES ▶</div>
+    <div class="toast" id="toast"></div>
+
+    <div class="overlay" id="startOverlay">
+      <div class="card">
+        <h1>Pilot the <em>Ring Runner</em></h1>
+        <p>Visit <b>all 6 ringed planets</b> to complete the tour. Steer between the 3 lanes, collect planets, dodge asteroids!</p>
+        <div class="badges">
+          <span class="badge">◀ ▶ STEER LANES</span>
+          <span class="badge">🪐 VISIT = +150</span>
+          <span class="badge">☄️ HIT = -1 ♥</span>
+        </div>
+        <button class="bigplay" id="playBtn">▶ START TOUR</button>
+        <div class="hint">Tip: Stay in lane to collect. Planets sparkle when visited. Best score saves automatically.</div>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="overOverlay">
+      <div class="card">
+        <h1 id="overTitle">Tour Complete!</h1>
+        <p id="overMsg">You visited every planet.</p>
+        <div class="badges">
+          <span class="badge" id="overScore">SCORE 0</span>
+          <span class="badge" id="overBest">BEST 0</span>
+        </div>
+        <button class="bigplay" id="replayBtn">↻ FLY AGAIN</button>
+        <div class="hint">All progress saved on this device.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="secondary-row">
+    <button class="sbtn" id="pauseBtn">⏸ Pause</button>
+    <button class="sbtn" id="resetBtn">↺ Reset Best</button>
+  </div>
+  <div class="controls">
+    <button class="btn" id="leftBtn" aria-label="Move left"><span>◀</span> <small>LEFT</small></button>
+    <button class="btn" id="rightBtn" aria-label="Move right"><small>RIGHT</small> <span>▶</span></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const wrap = document.getElementById('wrap');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('scoreEl');
+  const bestEl = document.getElementById('bestEl');
+  const heartsEl = document.getElementById('hearts');
+  const progressEl = document.getElementById('progress');
+  const checklistEl = document.getElementById('checklist');
+  const toastEl = document.getElementById('toast');
+  const startOverlay = document.getElementById('startOverlay');
+  const overOverlay = document.getElementById('overOverlay');
+  const overTitle = document.getElementById('overTitle');
+  const overMsg = document.getElementById('overMsg');
+  const overScore = document.getElementById('overScore');
+  const overBest = document.getElementById('overBest');
+
+  // Persistence
+  const BEST_KEY = 'starLanesBest_v2';
+  let best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0;
+  bestEl.textContent = best;
+
+  // Planet definitions - 6 unique to visit
+  const PLANETS = [
+    { id:'aurelia', name:'AURELIA', color:'#ff7a7a', ring:'#ffb3b3', accent:'#ff3b3b' },
+    { id:'oceara', name:'OCEARA', color:'#4dd2ff', ring:'#a6e8ff', accent:'#0a7abf' },
+    { id:'verdant', name:'VERDANT', color:'#7cff7c', ring:'#b8ffb8', accent:'#1a8a1a' },
+    { id:'solara', name:'SOLARA', color:'#ffd23b', ring:'#ffeaa0', accent:'#c47a00' },
+    { id:'nebulon', name:'NEBULON', color:'#b07cff', ring:'#d8b8ff', accent:'#5a2abf' },
+    { id:'frostia', name:'FROSTIA', color:'#7af0ff', ring:'#d0ffff', accent:'#0a6a7a' },
+  ];
+
+  // Game state
+  let W=0,H=0,dpr=1;
+  let running=false, paused=false;
+  let score=0, lives=3, lane=1, targetLane=1;
+  let shipX=0, shipY=0;
+  let speed=2.6;
+  let distance=0;
+  let objects=[]; // {type:'planet'|'hazard', lane, y, x, visited, planetIdx, size, rot, pulse}
+  let stars=[];
+  let visited = new Array(6).fill(false);
+  let spawnTimer=0;
+  let invuln=0;
+  let animId=0;
+  let lastTime=0;
+
+  function resize(){
+    const rect = wrap.getBoundingClientRect();
+    W = rect.width;
+    H = rect.height;
+    dpr = Math.min(window.devicePixelRatio||1, 2);
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W+'px';
+    canvas.style.height = H+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    shipY = H - 78;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function laneX(l){
+    // 3 lanes with padding
+    const pad = 18;
+    const usable = W - pad*2;
+    const step = usable / 3;
+    return pad + step*(l+0.5);
+  }
+
+  function buildChecklist(){
+    checklistEl.innerHTML='';
+    PLANETS.forEach((p,i)=>{
+      const chip=document.createElement('div');
+      chip.className='planet-chip'+(visited[i]?' visited':'');
+      chip.id='chip-'+i;
+      chip.innerHTML=`<span class="dot" style="background:${p.color};border-color:${p.ring}"></span> ${p.name} ${visited[i]?'✓':''}`;
+      checklistEl.appendChild(chip);
+    });
+    const count = visited.filter(Boolean).length;
+    progressEl.textContent = `${count} / 6 PLANETS`;
+    progressEl.style.color = count===6 ? '#7af0ff' : '#fff';
+    progressEl.style.borderColor = count===6 ? 'rgba(122,240,255,0.6)' : 'rgba(255,255,255,0.15)';
+  }
+
+  function updateHearts(){
+    heartsEl.innerHTML='';
+    for(let i=0;i<3;i++){
+      const s=document.createElement('span');
+      s.textContent = i < lives ? '❤' : '♡';
+      s.style.opacity = i < lives ? '1' : '0.35';
+      heartsEl.appendChild(s);
+    }
+  }
+
+  function showToast(msg){
+    toastEl.textContent=msg;
+    toastEl.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t=setTimeout(()=>toastEl.classList.remove('show'), 900);
+  }
+
+  function initStars(){
+    stars=[];
+    for(let i=0;i<90;i++){
+      stars.push({
+        x: Math.random()*W,
+        y: Math.random()*H,
+        r: Math.random()*1.4+0.3,
+        s: Math.random()*1.8+0.4,
+        a: Math.random()*0.6+0.4
+      });
+    }
+  }
+  initStars();
+
+  function resetGame(){
+    score=0; lives=3; lane=1; targetLane=1; distance=0; speed=2.6;
+    objects=[]; visited=[false,false,false,false,false,false];
+    spawnTimer=0; invuln=0;
+    scoreEl.textContent='0';
+    buildChecklist(); updateHearts();
+    // pre-spawn a few
+    for(let i=0;i<3;i++) spawnObject(true);
+  }
+
+  function spawnObject(initial=false){
+    // Decide planet vs hazard: ensure planets appear regularly
+    const needPlanets = visited.filter(v=>!v).length;
+    const planetChance = needPlanets>0 ? 0.55 : 0.25;
+    const isPlanet = Math.random() < planetChance;
+    const l = Math.floor(Math.random()*3);
+    const y = initial ? - (Math.random()*H*0.8 + 40) : -60;
+    if(isPlanet){
+      // pick an unvisited planet more often, but allow duplicates for score
+      let idx;
+      const unvisitedIdx = visited.map((v,i)=>!v?i:null).filter(v=>v!==null);
+      if(unvisitedIdx.length && Math.random()<0.75){
+        idx = unvisitedIdx[Math.floor(Math.random()*unvisitedIdx.length)];
+      } else {
+        idx = Math.floor(Math.random()*6);
+      }
+      objects.push({type:'planet', lane:l, y, x:laneX(l), planetIdx:idx, size: 34+Math.random()*6, rot: Math.random()*Math.PI, pulse:0, visited:false});
+    } else {
+      objects.push({type:'hazard', lane:l, y, x:laneX(l), size: 28+Math.random()*8, rot: Math.random()*Math.PI*2, spin:(Math.random()-0.5)*0.12});
+    }
+  }
+
+  function setLane(dir){
+    if(!running || paused) return;
+    targetLane = Math.max(0, Math.min(2, targetLane + dir));
+    // haptic
+    if(navigator.vibrate) navigator.vibrate(20);
+  }
+
+  // Input
+  const leftBtn=document.getElementById('leftBtn');
+  const rightBtn=document.getElementById('rightBtn');
+  function bindHold(btn, dir){
+    let t=null;
+    const down=(e)=>{
+      e.preventDefault();
+      btn.classList.add('pressed');
+      setLane(dir);
+      // allow hold to repeat after 300ms
+      clearInterval(t);
+      t=setInterval(()=>setLane(dir), 280);
+    };
+    const up=()=>{
+      btn.classList.remove('pressed');
+      clearInterval(t);
+    };
+    btn.addEventListener('touchstart', down, {passive:false});
+    btn.addEventListener('touchend', up);
+    btn.addEventListener('touchcancel', up);
+    btn.addEventListener('mousedown', down);
+    window.addEventListener('mouseup', up);
+  }
+  bindHold(leftBtn, -1);
+  bindHold(rightBtn, 1);
+
+  // Keyboard
+  window.addEventListener('keydown', e=>{
+    if(e.key==='ArrowLeft') { setLane(-1); leftBtn.classList.add('pressed'); setTimeout(()=>leftBtn.classList.remove('pressed'),120); }
+    if(e.key==='ArrowRight') { setLane(1); rightBtn.classList.add('pressed'); setTimeout(()=>rightBtn.classList.remove('pressed'),120); }
+    if(e.key===' '){ e.preventDefault(); togglePause(); }
+  });
+
+  document.getElementById('playBtn').addEventListener('click', startGame);
+  document.getElementById('replayBtn').addEventListener('click', startGame);
+  document.getElementById('pauseBtn').addEventListener('click', togglePause);
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    if(confirm('Reset best score?')){
+      best=0; localStorage.setItem(BEST_KEY,'0'); bestEl.textContent='0';
+      showToast('Best reset');
+    }
+  });
+
+  function togglePause(){
+    if(!running) return;
+    paused=!paused;
+    document.getElementById('pauseBtn').textContent = paused ? '▶ Resume' : '⏸ Pause';
+    if(!paused){ lastTime=performance.now(); loop(lastTime); }
+    else showToast('Paused');
+  }
+
+  function startGame(){
+    resetGame();
+    running=true; paused=false;
+    document.getElementById('pauseBtn').textContent='⏸ Pause';
+    startOverlay.classList.add('hidden');
+    overOverlay.classList.add('hidden');
+    lastTime=performance.now();
+    cancelAnimationFrame(animId);
+    loop(lastTime);
+    showToast('Tour started!');
+  }
+
+  function endGame(win){
+    running=false;
+    overOverlay.classList.remove('hidden');
+    if(win){
+      overTitle.textContent='Tour Complete! ★';
+      overMsg.textContent=`You visited all 6 planets in ${Math.floor(distance/10)} light-years!`;
+    } else {
+      overTitle.textContent='Ship Damaged';
+      overMsg.textContent=`You visited ${visited.filter(Boolean).length}/6 planets. Try again, pilot!`;
+    }
+    overScore.textContent=`SCORE ${score}`;
+    if(score>best){ best=score; localStorage.setItem(BEST_KEY, String(best)); }
+    bestEl.textContent=best;
+    overBest.textContent=`BEST ${best}`;
+  }
+
+  function drawStarfield(){
+    // lanes background
+    // vertical lane guides
+    ctx.save();
+    // starfield
+    for(const s of stars){
+      ctx.globalAlpha = s.a * 0.9;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+    // lane lines - subtle glowing
+    ctx.save();
+    ctx.strokeStyle='rgba(122,240,255,0.18)';
+    ctx.lineWidth=2;
+    ctx.setLineDash([8,10]);
+    for(let i=1;i<3;i++){
+      const x = 18 + (W-36)/3 * i;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // lane glow at bottom
+    const grad=ctx.createLinearGradient(0,H-120,0,H);
+    grad.addColorStop(0,'rgba(122,240,255,0)');
+    grad.addColorStop(1,'rgba(122,240,255,0.08)');
+    ctx.fillStyle=grad;
+    ctx.fillRect(0,H-120,W,120);
+  }
+
+  function drawPlanet(o){
+    const p = PLANETS[o.planetIdx];
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    ctx.rotate(o.rot*0.15);
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(3,6,o.size*0.55, o.size*0.5,0,0,Math.PI*2); ctx.fill();
+    // ring behind
+    ctx.save();
+    ctx.rotate(-0.25);
+    ctx.strokeStyle=p.ring;
+    ctx.lineWidth=5;
+    ctx.globalAlpha=0.95;
+    ctx.beginPath(); ctx.ellipse(0,0,o.size*0.85, o.size*0.32,0,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.35)';
+    ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.ellipse(0,0,o.size*0.85, o.size*0.32,0,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+    // planet body
+    const g=ctx.createRadialGradient(-6,-8,4,0,0,o.size*0.5);
+    g.addColorStop(0,'#ffffff');
+    g.addColorStop(0.25,p.color);
+    g.addColorStop(1,p.accent);
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.arc(0,0,o.size*0.5,0,Math.PI*2); ctx.fill();
+    // highlight
+    ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.beginPath(); ctx.ellipse(-7,-7, o.size*0.18, o.size*0.12, -0.6,0,Math.PI*2); ctx.fill();
+    // ring front (only bottom half)
+    ctx.save();
+    ctx.rotate(-0.25);
+    ctx.strokeStyle=p.ring;
+    ctx.lineWidth=5;
+    ctx.beginPath(); ctx.ellipse(0,0,o.size*0.85, o.size*0.32,0,0.15,Math.PI-0.15); ctx.stroke();
+    ctx.restore();
+    // visited pulse
+    if(o.pulse>0){
+      ctx.globalAlpha=o.pulse;
+      ctx.strokeStyle='#7af0ff';
+      ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(0,0,o.size*0.5+8*(1-o.pulse),0,Math.PI*2); ctx.stroke();
+    }
+    // label
+    ctx.fillStyle='rgba(255,255,255,0.95)';
+    ctx.font='700 9px system-ui';
+    ctx.textAlign='center';
+    ctx.fillText(p.name, 0, o.size*0.5+12);
+    ctx.restore();
+  }
+
+  function drawHazard(o){
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    ctx.rotate(o.rot);
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(2,4,o.size*0.5,o.size*0.45,0,0,Math.PI*2); ctx.fill();
+    // rock shape
+    ctx.fillStyle='#8a8f9e';
+    ctx.strokeStyle='#d0d4de';
+    ctx.lineWidth=1.2;
+    ctx.beginPath();
+    const pts=7;
+    for(let i=0;i<pts;i++){
+      const ang=(i/pts)*Math.PI*2;
+      const r=o.size*0.5 * (0.85 + Math.sin(i*1.7)*0.12);
+      const x=Math.cos(ang)*r, y=Math.sin(ang)*r;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // craters
+    ctx.fillStyle='rgba(0,0,0,0.25)';
+    ctx.beginPath(); ctx.arc(-6,-4,5,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(7,5,3.5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.15)';
+    ctx.beginPath(); ctx.arc(-4,-6,2,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawShip(){
+    ctx.save();
+    ctx.translate(shipX, shipY);
+    // invuln blink
+    if(invuln>0 && Math.floor(invuln*10)%2===0) ctx.globalAlpha=0.35;
+    // engine flame
+    const flameH = 14 + Math.sin(performance.now()*0.02)*3;
+    ctx.fillStyle='#ff9d00';
+    ctx.beginPath(); ctx.moveTo(-8,12); ctx.lineTo(0,12+flameH); ctx.lineTo(8,12); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#ffe66e';
+    ctx.beginPath(); ctx.moveTo(-5,12); ctx.lineTo(0,12+flameH*0.7); ctx.lineTo(5,12); ctx.closePath(); ctx.fill();
+    // ship body
+    ctx.fillStyle='#e6eefc';
+    ctx.strokeStyle='#7af0ff';
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.moveTo(0,-18);
+    ctx.lineTo(-12,14);
+    ctx.lineTo(-4,10);
+    ctx.lineTo(4,10);
+    ctx.lineTo(12,14);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // cockpit
+    const cg=ctx.createRadialGradient(0,-4,1,0,-4,8);
+    cg.addColorStop(0,'#7af0ff'); cg.addColorStop(1,'#0a3a6b');
+    ctx.fillStyle=cg;
+    ctx.beginPath(); ctx.ellipse(0,-2,6,7,0,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=1; ctx.stroke();
+    // wings detail
+    ctx.fillStyle='#4da3ff';
+    ctx.fillRect(-11,2,4,6);
+    ctx.fillRect(7,2,4,6);
+    ctx.restore();
+  }
+
+  function loop(now){
+    if(!running || paused) return;
+    const dt = Math.min(32, now - lastTime);
+    lastTime = now;
+    const dtFactor = dt / 16.67;
+
+    // update ship lane interpolation
+    shipX += (laneX(targetLane) - shipX) * 0.18 * dtFactor;
+    if(Math.abs(shipX - laneX(targetLane)) < 1) lane = targetLane;
+
+    // speed ramp
+    speed = 2.6 + Math.min(3.5, score/1200);
+    distance += speed * dtFactor;
+
+    // stars
+    for(const s of stars){
+      s.y += s.s * (speed*0.35) * dtFactor;
+      if(s.y > H){ s.y = -4; s.x = Math.random()*W; }
+    }
+
+    // spawn
+    spawnTimer += dtFactor * speed * 0.06;
+    if(spawnTimer > 1.1){
+      spawnTimer=0;
+      spawnObject(false);
+      // occasional double spawn for challenge
+      if(Math.random()<0.22) spawnObject(false);
+    }
+
+    // update objects
+    for(const o of objects){
+      o.y += speed * dtFactor;
+      o.x = laneX(o.lane);
+      if(o.type==='hazard') o.rot += o.spin * dtFactor;
+      if(o.type==='planet' && o.pulse>0) o.pulse -= 0.04 * dtFactor;
+    }
+    // cull offscreen
+    objects = objects.filter(o=> o.y < H+80);
+
+    // collisions
+    if(invuln>0) invuln -= 0.016 * dtFactor * 60/60;
+    for(const o of objects){
+      const dy = Math.abs(o.y - shipY);
+      const sameLane = o.lane === targetLane && Math.abs(shipX - laneX(o.lane)) < 18;
+      if(dy < 34 && sameLane){
+        if(o.type==='planet' && !o.visited){
+          o.visited=true;
+          o.pulse=1;
+          const idx=o.planetIdx;
+          const wasVisited = visited[idx];
+          visited[idx]=true;
+          score += wasVisited ? 80 : 150;
+          scoreEl.textContent=score;
+          buildChecklist();
+          // chip flash
+          const chip=document.getElementById('chip-'+idx);
+          if(chip){ chip.animate([{transform:'scale(1.15)'},{transform:'scale(1)'}],{duration:300}); }
+          showToast(wasVisited ? `+80 ${PLANETS[idx].name}` : `★ VISITED ${PLANETS[idx].name} +150`);
+          if(navigator.vibrate) navigator.vibrate(30);
+          // check win
+          if(visited.every(Boolean)){
+            score += 500;
+            scoreEl.textContent=score;
+            showToast('ALL PLANETS VISITED! +500');
+            setTimeout(()=>endGame(true), 600);
+          }
+        } else if(o.type==='hazard' && invuln<=0){
+          lives--;
+          updateHearts();
+          invuln=1.6;
+          score = Math.max(0, score-40);
+          scoreEl.textContent=score;
+          showToast('HIT! -1 ♥');
+          if(navigator.vibrate) navigator.vibrate([40,30,40]);
+          // knockback visual
+          shipY += 6;
+          setTimeout(()=>{ shipY = H-78; }, 120);
+          if(lives<=0){
+            setTimeout(()=>endGame(false), 400);
+          }
+          // remove hazard after hit to avoid multi-hit
+          o.y = H+100;
+        }
+      }
+    }
+
+    // passive score
+    if(Math.floor(distance) % 20 === 0){
+      // tiny trickle
+    }
+
+    // draw
+    ctx.clearRect(0,0,W,H);
+    drawStarfield();
+    // draw objects
+    for(const o of objects){
+      if(o.type==='planet') drawPlanet(o);
+      else drawHazard(o);
+    }
+    drawShip();
+
+    // lane indicator
+    // score tick
+    if(Math.floor(distance/10) % 5 ===0 && distance>10){
+      // occasional +1
+    }
+
+    animId=requestAnimationFrame(loop);
+  }
+
+  // initial draw
+  buildChecklist(); updateHearts();
+  // draw once for start screen
+  function idleDraw(){
+    if(running) return;
+    ctx.clearRect(0,0,W,H);
+    drawStarfield();
+    // demo planets floating
+    const t=performance.now()*0.001;
+    for(let i=0;i<3;i++){
+      const demo={x: laneX(i), y: 120 + Math.sin(t+i)*10 + i*90, planetIdx:(i*2)%6, size:32, rot: t*0.3+i, pulse:0};
+      drawPlanet(demo);
+    }
+    shipX = laneX(1);
+    drawShip();
+    requestAnimationFrame(idleDraw);
+  }
+  resize();
+  idleDraw();
+
+  // prevent scroll
+  document.addEventListener('touchmove', e=>{ if(e.target.closest('.checklist')) return; e.preventDefault(); }, {passive:false});
+
+})();
+</script>
+</body>
+</html>

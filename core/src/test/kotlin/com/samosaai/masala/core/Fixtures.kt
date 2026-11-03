@@ -5,6 +5,7 @@ import com.samosaai.masala.core.contract.LayoutDoc
 import com.samosaai.masala.core.contract.MasalaJson
 import com.samosaai.masala.core.contract.MasalaSkill
 import com.samosaai.masala.core.contract.ModePatch
+import com.samosaai.masala.core.migration.LayoutMigrations
 import java.time.LocalDateTime
 
 object Fixtures {
@@ -15,7 +16,8 @@ object Fixtures {
     fun text(path: String): String =
         checkNotNull(javaClass.getResource("/masala/$path")) { "Missing resource $path" }.readText()
 
-    fun layout(name: String): LayoutDoc = MasalaJson.strict.decodeFromString(text("examples/$name.json"))
+    /** Read the way the app reads a saved layout: migrated to the current schema first. */
+    fun layout(name: String): LayoutDoc = LayoutMigrations.decode(MasalaJson.strict.parseToJsonElement(text("examples/$name.json")))
     fun mode(name: String): ModePatch = MasalaJson.strict.decodeFromString(text("examples/$name.json"))
     fun skill(name: String): MasalaSkill = MasalaJson.lenient.decodeFromString(text("skills/$name.json"))
 

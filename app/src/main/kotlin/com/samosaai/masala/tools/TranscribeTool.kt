@@ -2,10 +2,12 @@ package com.samosaai.masala.tools
 
 import com.samosaai.masala.core.tool.ActionResult
 import com.samosaai.masala.core.tool.ToolFiles
+import com.samosaai.masala.audio.AndroidTranscriber
 import com.samosaai.masala.audio.AudioApi
 import com.samosaai.masala.audio.AudioModel
 import com.samosaai.masala.audio.ModelCategory
 import com.samosaai.masala.audio.SpeechConfig
+import com.samosaai.masala.core.audio.DiarizedTranscript
 import java.io.File
 
 /**
@@ -25,6 +27,7 @@ import java.io.File
  * content leaves the device for the configured STT endpoint.
  */
 class TranscribeTool(
+    private val context: android.content.Context,
     private val resolver: ToolFiles,
     private val loadSettings: () -> SpeechConfig = { SpeechConfig.default },
     private val onUnauthorized: (() -> Unit)? = null,
@@ -33,16 +36,25 @@ class TranscribeTool(
     }
 ) {
 
-    /** The two calls transcription needs from the STT API, extracted for tests. */
+    /** The calls transcription needs from the STT API, extracted for tests. */
     interface SttBackend {
         fun listModels(): List<AudioModel>
         fun transcribe(file: File, model: String, language: String?, contentType: String): Result<String>
+
+        /**
+         * Speaker-labelled transcription. Default fails instead of returning one unlabelled turn, so
+         * a fake written before diarization existed does not silently claim speakers.
+         */
+        fun transcribeDiarized(file: File, model: String, language: String?): Result<DiarizedTranscript> =
+            Result.failure(UnsupportedOperationException("this STT backend has no speaker mode"))
     }
 
     private class ApiSttBackend(private val api: AudioApi) : SttBackend {
         override fun listModels(): List<AudioModel> = api.listAudioModels()
         override fun transcribe(file: File, model: String, language: String?, contentType: String): Result<String> =
-            api.transcribe(file, model, language, contentType)
+            api.transcribeWav(file, model, language)
+        override fun transcribeDiarized(file: File, model: String, language: String?): Result<DiarizedTranscript> =
+            api.transcribeDiarized(file, model, language)
     }
 
 
@@ -58,6 +70,10 @@ class TranscribeTool(
         const val MAX_TRANSCRIPT_CHARS = 30_000
 
         private const val STT_TIMEOUT_SECONDS = 300L
+
+        /** Set once this endpoint proves it has no transcription route, for the rest of the process. */
+        @Volatile
+        private var apiUnsupported = false
         private const val ERROR_DETAIL_CHARS = 200
 
         /** Extension → MIME type for the multipart upload. Also the supported-format list. */
@@ -74,10 +90,19 @@ class TranscribeTool(
         )
     }
 
+    /**
+     * [speakers] asks for the speaker-labelled mode. The plain path is unchanged and is what every
+     * existing caller (dictation, voice memos, skills) still gets.
+     */
     @Suppress("ReturnCount")
-    fun transcribe(path: String, model: String? = null, language: String? = null): ActionResult {
+    suspend fun transcribe(
+        path: String,
+        model: String? = null,
+        language: String? = null,
+        speakers: Boolean = false,
+    ): ActionResult {
+        if (speakers) return transcribeLabelled(path, model, language)
         val settings = loadSettings()
-        credentialError(settings)?.let { return it }
 
         val file = when (val r = resolver.resolveForRead(path)) {
             is ToolFiles.ResolveResult.PermissionNeeded -> return r.result
@@ -93,21 +118,73 @@ class TranscribeTool(
                     ". Convert it first with media_convert."
             )
 
-        val backend = sttBackendFactory(settings.baseUrl, settings.apiKey)
-        val resolvedModel = resolveModel(model, settings, backend)
-            ?: return ActionResult.error(
-                "No STT model is configured and none could be discovered from the API. Pass model " +
-                    "explicitly, or set MASALA_STT_MODEL."
-            )
-        val resolvedLanguage = (language ?: settings.sttLanguage).trim().ifBlank { null }
-
-        val transcript = backend.transcribe(file, resolvedModel, resolvedLanguage, contentType)
-            .getOrElse { e ->
-                return ActionResult.error(
-                    "Transcription failed: ${e.message?.take(ERROR_DETAIL_CHARS) ?: "no detail"}. " +
-                        "The file was not modified."
+        // No endpoint, or none with a transcription model: use Android's own speech service,
+        // which can read a file through RecognizerIntent.EXTRA_AUDIO_SOURCE (API 33+).
+        val backend = if (settings.baseUrl.isBlank() || apiUnsupported) null
+        else sttBackendFactory(settings.baseUrl, settings.apiKey)
+        val resolvedModel = backend?.let { resolveModel(model, settings, it) }
+        if (backend == null || resolvedModel == null) {
+            val local = AndroidTranscriber.transcribe(context, file, language ?: settings.sttLanguage)
+            if (local != null) {
+                return local.fold(
+                    onSuccess = { text -> transcriptResult(file, text, engine = "Android's built-in speech service") },
+                    onFailure = { e ->
+                        ActionResult.error(
+                            "Android's built-in transcription failed (${e.message?.take(ERROR_DETAIL_CHARS)}). " +
+                                "The file was not modified.",
+                        )
+                    },
                 )
             }
+            return ActionResult.error(
+                "No transcription is available. Configure a working STT endpoint with " +
+                    "MASALA_STT_BASE_URL and MASALA_STT_API_KEY (the endpoint must serve " +
+                    "POST <base>/asr/transcribe, e.g. /v1/asr/transcribe), or use a device whose speech service can read a file " +
+                    "(Android 13+; this one can't).",
+            )
+        }
+        val resolvedLanguage = (language ?: settings.sttLanguage).trim().ifBlank { null }
+
+        // The endpoint accepts only mono 16-bit PCM WAV; recordings here are AAC/m4a.
+        val wav = File(context.cacheDir, "asr-${file.nameWithoutExtension}.wav")
+        // The WAV is only for the upload: deleted however conversion or upload ends.
+        val apiResult = try {
+            if (!AndroidTranscriber.toWav(file, wav)) return notConverted(file, resolvedLanguage)
+            backend.transcribe(wav, resolvedModel, resolvedLanguage, "audio/wav")
+        } finally {
+            runCatching { wav.delete() }
+        }
+        val transcript = apiResult.getOrElse { e ->
+            // A proxy can list a model and not serve the route (this one answers 404). Remember
+            // that, so the next call doesn't spend a round-trip and a scary 404 on it.
+            val message = e.message.orEmpty()
+            if (message.contains("404") || message.contains("405") || message.contains("not found", true)) {
+                apiUnsupported = true
+            }
+            // The endpoint can list a transcription model and not serve the route at all (this
+            // one returns 404). Android's own speech service reads the file instead, so a
+            // configured-but-unusable endpoint does not leave transcription broken.
+            val local = AndroidTranscriber.transcribe(context, file, resolvedLanguage)
+            if (local != null) {
+                return local.fold(
+                    onSuccess = { text -> transcriptResult(file, text, "Android's built-in speech service") },
+                    onFailure = { localError ->
+                        ActionResult.error(
+                            "Transcription failed both ways. The API said: " +
+                                "${e.message?.take(ERROR_DETAIL_CHARS) ?: "no detail"}; Android's speech " +
+                                "service said: ${localError.message?.take(ERROR_DETAIL_CHARS)}. " +
+                                "The file was not modified.",
+                        )
+                    },
+                )
+            }
+            return ActionResult.error(
+                "Transcription failed: ${e.message?.take(ERROR_DETAIL_CHARS) ?: "no detail"}. " +
+                    "Android's speech service on this phone can't read a file, and the endpoint " +
+                    "doesn't transcribe. Set MASALA_STT_BASE_URL and MASALA_STT_API_KEY to an " +
+                    "endpoint that serves POST <base>/asr/transcribe (e.g. /v1/asr/transcribe). The file was not modified.",
+            )
+        }
         if (transcript.isBlank()) {
             return ActionResult.error(
                 "The STT endpoint returned an empty transcript for '${file.name}' — the file may contain " +
@@ -128,8 +205,119 @@ class TranscribeTool(
         )
     }
 
-    private fun credentialError(settings: SpeechConfig): ActionResult? =
-        if (settings.baseUrl.isBlank()) ActionResult.error("No speech-to-text endpoint is configured.") else null
+    /**
+     * Speaker-labelled transcription of a file. Same upload, `DIARIZATION` mode: the endpoint answers
+     * with turns and per-request speaker labels. Android's speech service cannot label speakers, so a
+     * failed endpoint falls back to the plain transcript and says so rather than losing the audio.
+     */
+    @Suppress("ReturnCount")
+    private suspend fun transcribeLabelled(path: String, model: String?, language: String?): ActionResult {
+        val settings = loadSettings()
+        val file = when (val r = resolver.resolveForRead(path)) {
+            is ToolFiles.ResolveResult.PermissionNeeded -> return r.result
+            is ToolFiles.ResolveResult.Error -> return ActionResult.error(r.message)
+            is ToolFiles.ResolveResult.Ok -> r.file
+        }
+        resolver.checkReadPermission(file)?.let { return it }
+        fileError(file, path)?.let { return it }
+        if (CONTENT_TYPES[file.extension.lowercase()] == null) {
+            return ActionResult.error(
+                "'.${file.extension}' is not a format this tool can send for transcription. Supported: " +
+                    CONTENT_TYPES.keys.sorted().joinToString(", ") { ".$it" } + ".",
+            )
+        }
+        if (settings.baseUrl.isBlank() || apiUnsupported) {
+            return ActionResult.error(
+                "Speaker-labelled transcription needs an API STT endpoint (Settings → Voice, or the " +
+                    "chat provider): the phone's own speech service cannot tell speakers apart.",
+            )
+        }
+        val backend = sttBackendFactory(settings.baseUrl, settings.apiKey)
+        val resolvedModel = resolveModel(model, settings, backend) ?: return ActionResult.error(
+            "No transcription model is configured or advertised, so speakers cannot be detected. " +
+                "Set one in Settings → Models & keys.",
+        )
+        val resolvedLanguage = (language ?: settings.sttLanguage).trim().ifBlank { null }
+        val wav = File(context.cacheDir, "asr-${file.nameWithoutExtension}.wav")
+        val result = try {
+            if (!AndroidTranscriber.toWav(file, wav)) {
+                return ActionResult.error("Couldn't convert '${file.name}' to WAV for transcription.")
+            }
+            backend.transcribeDiarized(wav, resolvedModel, resolvedLanguage)
+        } finally {
+            runCatching { wav.delete() }
+        }
+        val transcript = result.getOrElse { error ->
+            val message = error.message.orEmpty()
+            if (message.contains("404") || message.contains("405") || message.contains("not found", true)) {
+                apiUnsupported = true
+            }
+            // A plain transcript beats no transcript; say why the speakers are missing.
+            val plain = transcribe(path, model, language)
+            val note = "Speaker labels were unavailable (${message.take(ERROR_DETAIL_CHARS)}).\n\n"
+            return if (plain.success) ActionResult.ok(note + plain.message)
+            else ActionResult.error(note + plain.message)
+        }
+        if (transcript.turns.isEmpty()) {
+            return ActionResult.error(
+                "The STT endpoint returned no speech for '${file.name}' — the file may be silent, or " +
+                    "the model/language may not match it.",
+            )
+        }
+        val speakers = transcript.speakers
+        val header = "Transcript of '${file.name}' (${resolver.formatSize(file.length())}; " +
+            "${speakers.size} speaker${if (speakers.size == 1) "" else "s"}" +
+            (speakers.takeIf { it.isNotEmpty() }?.joinToString(", ")?.let { ": $it" } ?: "") +
+            "; spoken content sent to the configured STT API; the file itself was not modified):"
+        val body = transcript.toMarkdown()
+        val clipped = body.length > MAX_TRANSCRIPT_CHARS
+        val text = if (clipped) body.take(MAX_TRANSCRIPT_CHARS) else body
+        val truncation = if (clipped) {
+            "\n\n[Transcript truncated at $MAX_TRANSCRIPT_CHARS characters — the audio continues beyond " +
+                "this point. Trim the file with media_edit and transcribe the rest separately if needed.]"
+        } else {
+            ""
+        }
+        return ActionResult.ok("$header\n\n$text$truncation")
+    }
+
+    /** The file couldn't become the WAV the endpoint takes: Android's own speech service is the last try. */
+    private suspend fun notConverted(file: File, language: String?): ActionResult {
+        val local = AndroidTranscriber.transcribe(context, file, language)
+        return if (local != null) {
+            local.fold(
+                onSuccess = { text -> transcriptResult(file, text, "Android's built-in speech service") },
+                onFailure = { e ->
+                    ActionResult.error(
+                        "Couldn't convert '${file.name}' to WAV for the transcription endpoint " +
+                            "(${e.message?.take(ERROR_DETAIL_CHARS)}).",
+                    )
+                },
+            )
+        } else {
+            ActionResult.error(
+                "Couldn't convert '${file.name}' to the WAV the endpoint needs, and this device " +
+                    "can't transcribe a file itself.",
+            )
+        }
+    }
+
+    private fun transcriptResult(file: File, transcript: String, engine: String): ActionResult {
+        if (transcript.isBlank()) {
+            return ActionResult.error("No speech was recognised in '${file.name}'.")
+        }
+        val clipped = transcript.length > MAX_TRANSCRIPT_CHARS
+        val text = if (clipped) transcript.take(MAX_TRANSCRIPT_CHARS) else transcript
+        val truncationNote = if (clipped) {
+            "\n\n[Transcript truncated at $MAX_TRANSCRIPT_CHARS characters.]"
+        } else {
+            ""
+        }
+        return ActionResult.ok(
+            "Transcript of '${file.name}' via $engine (the file itself was not modified):\n\n$text$truncationNote",
+        )
+    }
+
 
     private fun fileError(file: File, path: String): ActionResult? = when {
         !file.exists() -> ActionResult.error(

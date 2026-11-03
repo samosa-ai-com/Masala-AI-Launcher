@@ -7,7 +7,13 @@ import com.samosaai.masala.core.contract.ItemSection
 import com.samosaai.masala.core.contract.LayoutDoc
 import com.samosaai.masala.core.contract.ModePatch
 import com.samosaai.masala.core.contract.NextEvent
+import com.samosaai.masala.core.contract.Page
+import com.samosaai.masala.core.contract.SizeRange
 import com.samosaai.masala.core.contract.StackSection
+import com.samosaai.masala.core.contract.WidgetComponent
+import com.samosaai.masala.core.contract.WidgetRef
+import com.samosaai.masala.core.contract.WidgetSection
+import com.samosaai.masala.core.contract.WidgetSpec
 import com.samosaai.masala.core.layout.LayoutResolver
 import com.samosaai.masala.core.layout.OverlayMerge
 import kotlin.test.Test
@@ -89,10 +95,36 @@ class OverlayAndResolverTest {
         val soon = at("09:00").copy(nextEvent = NextEvent("Standup", at("09:40").now))
         val r1 = LayoutResolver.resolve(workday, emptyList(), soon)
         assertTrue("next-event-card" in r1.layout.sectionIds("today"))
-        assertEquals(1, r1.widgetRows["next-event"])
+        assertEquals(1, r1.widgetRows["next-event-card"])
 
         val imminent = soon.copy(now = at("09:30").now)
-        assertEquals(2, LayoutResolver.resolve(workday, emptyList(), imminent).widgetRows["next-event"])
+        assertEquals(2, LayoutResolver.resolve(workday, emptyList(), imminent).widgetRows["next-event-card"])
+    }
+
+    @Test
+    fun `two placements of one widget keep their own heights`() {
+        // Review fix: rows used to be keyed by widget id, so two placements shared one height.
+        val lib = mapOf(
+            "w" to WidgetSpec(
+                "w", "W",
+                listOf(WidgetComponent.Counter("n", "N")),
+                SizeRange(1, 1, 2),
+            ),
+        )
+        val doc = LayoutDoc(
+            pages = listOf(
+                Page(
+                    "home",
+                    sections = listOf(
+                        WidgetSection("a", ref = WidgetRef("w")),
+                        WidgetSection("b", ref = WidgetRef("w", rowsOverride = 2)),
+                    ),
+                ),
+            ),
+        )
+        val rows = LayoutResolver.resolve(doc, emptyList(), at("12:00"), lib).widgetRows
+        assertEquals(1, rows["a"])
+        assertEquals(2, rows["b"])
     }
 
     @Test

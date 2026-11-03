@@ -1,6 +1,13 @@
 package com.samosaai.masala.core
 
+import com.samosaai.masala.core.contract.GridSection
+import com.samosaai.masala.core.contract.IconRef
+import com.samosaai.masala.core.contract.Item
+import com.samosaai.masala.core.contract.LayoutDoc
+import com.samosaai.masala.core.contract.MasalaAction
+import com.samosaai.masala.core.contract.MasalaJson
 import com.samosaai.masala.core.contract.MasalaSkill
+import com.samosaai.masala.core.contract.Page
 import com.samosaai.masala.core.migration.LayoutMigrations
 import com.samosaai.masala.core.tool.DefaultToolRegistry
 import com.samosaai.masala.core.tool.FileAccess
@@ -19,16 +26,29 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class MigrationAndPolicyTest {
 
     @Test
-    fun `version 1 needs no migration, and a missing version means 1`() {
+    fun `version 1 upgrades to the current schema unchanged, and a missing version means 1`() {
         val classic = Json.parseToJsonElement(Fixtures.text("examples/classic.json"))
-        assertEquals(Fixtures.layout("classic"), LayoutMigrations.decode(classic))
+        assertEquals(1, MasalaJson.strict.decodeFromJsonElement(LayoutDoc.serializer(), classic).schemaVersion)
+        val upgraded = MasalaJson.strict.decodeFromJsonElement(LayoutDoc.serializer(), classic).copy(schemaVersion = LayoutDoc.CURRENT_SCHEMA_VERSION)
+        assertEquals(upgraded, LayoutMigrations.decode(classic))
 
         val unversioned = JsonObject((classic as JsonObject) - "schemaVersion")
-        assertEquals(Fixtures.layout("classic"), LayoutMigrations.decode(unversioned))
+        assertEquals(upgraded, LayoutMigrations.decode(unversioned))
+    }
+
+    @Test
+    fun `a layout with a folder round-trips`() {
+        val child = Item("cam", "Camera", IconRef.Symbol("camera"), MasalaAction.OpenDrawer)
+        val folder = Item("f", "Folder", IconRef.Symbol("folder"), MasalaAction.OpenFolder(listOf(child)))
+        val doc = LayoutDoc(pages = listOf(Page("home", sections = listOf(GridSection("g", items = listOf(folder))))))
+        val json = MasalaJson.strict.encodeToString(LayoutDoc.serializer(), doc)
+        assertTrue("\"open_folder\"" in json)
+        assertEquals(doc, LayoutMigrations.decode(Json.parseToJsonElement(json)))
     }
 
     @Test
@@ -55,9 +75,9 @@ class MigrationAndPolicyTest {
             override fun outputDir() = File(".")
         },
     ).apply {
-        register(FakeTool("wiki_read", readsPrivateData = true))
-        register(FakeTool("calendar_read", readsPrivateData = true))
-        register(FakeTool("weather", usesNetwork = true))
+        register(FakeTool("memory_read", readsPrivateData = true))
+        register(FakeTool("list_calendar_events", readsPrivateData = true))
+        register(FakeTool("weather", readsPrivateData = true, usesNetwork = true))
         register(FakeTool("websearch", usesNetwork = true))
         register(FakeTool("webfetch", usesNetwork = true))
         register(FakeTool("file_search", origin = ToolOrigin.PRO, readsPrivateData = true))
@@ -72,7 +92,7 @@ class MigrationAndPolicyTest {
         assertIs<Decision.Reject>(HubSkillPolicy.decide(skill(listOf("file_search")), registry))
         assertIs<Decision.Reject>(HubSkillPolicy.decide(skill(listOf("send_sms")), registry))
         assertIs<Decision.Reject>(HubSkillPolicy.decide(skill(emptyList(), platforms = listOf("prototype")), registry))
-        assertIs<Decision.UserOnly>(HubSkillPolicy.decide(skill(listOf("wiki_read", "webfetch")), registry))
+        assertIs<Decision.UserOnly>(HubSkillPolicy.decide(skill(listOf("memory_read", "webfetch")), registry))
     }
 
     @Test

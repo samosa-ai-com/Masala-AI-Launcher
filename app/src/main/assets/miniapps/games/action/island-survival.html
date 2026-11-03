@@ -1,0 +1,1253 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Ten Days Adrift</title>
+    <style>
+      :root {
+        --bg: #062c32;
+        --panel: #0d4a50;
+        --panel2: #08363d;
+        --line: #5ba7a0;
+        --ink: #effff8;
+        --muted: #b8dcd6;
+        --gold: #f2d16e;
+        --red: #e77878;
+        --green: #7fe0a4;
+        --cyan: #78d9e3;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 9% 0, #1d6f79 0, transparent 30%),
+          radial-gradient(circle at 92% 5%, #345663 0, transparent 27%),
+          linear-gradient(145deg, #05242b, #0b4449 64%, #152f37);
+        color: var(--ink);
+        font-family: system-ui, "Microsoft YaHei", sans-serif;
+      }
+      .app {
+        width: min(1420px, calc(100% - 22px));
+        margin: 11px auto;
+      }
+      .top,
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(13, 74, 80, 0.97);
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
+      }
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        padding: 15px 18px;
+      }
+      .eyebrow {
+        margin: 0 0 4px;
+        color: var(--cyan);
+        font-size: 12px;
+        font-weight: 950;
+        letter-spacing: 0.14em;
+      }
+      .top h1 {
+        margin: 0;
+        font-size: clamp(26px, 4vw, 42px);
+        line-height: 1;
+      }
+      .sub {
+        margin: 7px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .actions,
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      button,
+      textarea {
+        font: inherit;
+      }
+      .btn {
+        min-height: 42px;
+        padding: 0 13px;
+        border: 1px solid #76b9b0;
+        border-radius: 8px;
+        background: #1d6970;
+        color: white;
+        font-weight: 900;
+        cursor: pointer;
+      }
+      .btn.gold {
+        border-color: #aa8c43;
+        background: #80652a;
+      }
+      .btn.red {
+        border-color: #a84f53;
+        background: #7b373e;
+      }
+      .btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 390px;
+        gap: 12px;
+        margin-top: 12px;
+        align-items: start;
+      }
+      .island {
+        position: relative;
+        min-height: 700px;
+        overflow: hidden;
+        background: linear-gradient(
+          #67c9e1 0 24%,
+          #ddcf87 24% 43%,
+          #3e9661 43%
+        );
+        border-radius: 14px;
+      }
+      .island:before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at 18% 55%, #2b7c4e 0 8%, transparent 8.5%),
+          radial-gradient(circle at 72% 49%, #2e8050 0 11%, transparent 11.5%),
+          radial-gradient(circle at 88% 73%, #266f4b 0 8%, transparent 8.5%);
+        opacity: 0.75;
+      }
+      .weather {
+        position: absolute;
+        right: 7%;
+        top: 7%;
+        font-size: 56px;
+        z-index: 1;
+      }
+      .camp {
+        position: absolute;
+        left: 43%;
+        top: 43%;
+        font-size: 80px;
+        z-index: 1;
+        filter: drop-shadow(0 4px 2px #214c3b);
+      }
+      .island-label {
+        position: absolute;
+        left: 7%;
+        top: 8%;
+        z-index: 1;
+        padding: 8px 10px;
+        border: 1px solid #ffffff66;
+        border-radius: 8px;
+        background: #06434bb8;
+        font-size: 12px;
+      }
+      .island-actions {
+        position: absolute;
+        left: 5%;
+        right: 5%;
+        bottom: 18px;
+        z-index: 2;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .action {
+        min-height: 58px;
+        background: #17666c;
+        border-color: #7bbcb3;
+      }
+      .action.eat {
+        background: #6a5a28;
+        border-color: #c0a34d;
+      }
+      .event {
+        position: absolute;
+        inset: 20% 10% 26%;
+        z-index: 3;
+        padding: 20px;
+        border: 1px solid #9bd7c7;
+        border-radius: 13px;
+        background: #073f46ee;
+        box-shadow: 0 20px 50px #00202799;
+      }
+      .event.hidden {
+        display: none;
+      }
+      .event h2 {
+        margin: 0 0 8px;
+      }
+      .event p {
+        color: #cae8e0;
+        line-height: 1.55;
+      }
+      .event-choices {
+        display: grid;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .event-choices button {
+        text-align: left;
+        min-height: 48px;
+      }
+      .bars {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding: 9px 11px;
+        background: #063239;
+        border: 1px solid #4b918c;
+        border-radius: 9px;
+      }
+      .bar {
+        min-width: 110px;
+        flex: 1;
+      }
+      .bar small {
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .track {
+        height: 9px;
+        margin-top: 3px;
+        border-radius: 9px;
+        background: #153d40;
+        overflow: hidden;
+      }
+      .track i {
+        display: block;
+        height: 100%;
+        background: var(--green);
+      }
+      .track.bad i {
+        background: var(--red);
+      }
+      .side {
+        padding: 12px;
+        display: grid;
+        gap: 10px;
+        max-height: calc(100vh - 105px);
+        overflow: auto;
+      }
+      .block {
+        padding: 11px;
+        border: 1px solid #4d938d;
+        border-radius: 10px;
+        background: var(--panel2);
+      }
+      .block h2,
+      .block h3 {
+        margin: 0 0 8px;
+      }
+      .block h2 {
+        font-size: 20px;
+      }
+      .block h3 {
+        font-size: 14px;
+        color: var(--gold);
+      }
+      .routes {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 5px;
+      }
+      .route {
+        min-height: 58px;
+        padding: 5px;
+        border: 1px solid #5e9d96;
+        border-radius: 8px;
+        background: #14545a;
+        color: white;
+        cursor: pointer;
+      }
+      .route.active {
+        outline: 3px solid var(--gold);
+      }
+      .route:disabled {
+        opacity: 0.38;
+      }
+      .route b,
+      .route small {
+        display: block;
+      }
+      .route small {
+        font-size: 9px;
+        color: var(--muted);
+        margin-top: 3px;
+      }
+      .stars {
+        color: var(--gold);
+        font-size: 10px;
+      }
+      .bag {
+        display: grid;
+        gap: 4px;
+      }
+      .item {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px;
+        border-bottom: 1px solid #ffffff17;
+        font-size: 11px;
+      }
+      .crafts {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+      }
+      .craft {
+        min-height: 45px;
+        padding: 6px;
+        background: #725c2a;
+        border-color: #b49953;
+      }
+      .goals {
+        display: grid;
+        gap: 5px;
+      }
+      .goal {
+        padding: 7px;
+        border: 1px solid #508981;
+        border-radius: 7px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .goal.pass {
+        border-color: #4f9d70;
+        background: #173e31;
+        color: #ddf5e5;
+      }
+      .log {
+        height: 145px;
+        overflow: auto;
+        color: #b9d9d3;
+        font-size: 11px;
+        line-height: 1.5;
+      }
+      .career {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+      }
+      .career div {
+        padding: 7px;
+        border: 1px solid #4d8d88;
+        border-radius: 8px;
+        background: #12484e;
+        text-align: center;
+      }
+      .career b {
+        display: block;
+        font-size: 19px;
+      }
+      .career small {
+        font-size: 9px;
+        color: var(--muted);
+      }
+      .tip {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .archive {
+        position: fixed;
+        inset: 0;
+        z-index: 9;
+        display: grid;
+        place-items: center;
+        padding: 18px;
+        background: #021316dd;
+      }
+      .archive.hidden {
+        display: none;
+      }
+      .dialog {
+        width: min(620px, 100%);
+        padding: 18px;
+        border: 1px solid #64a69d;
+        border-radius: 14px;
+        background: #0d4850;
+      }
+      .dialog h2 {
+        margin: 0 0 8px;
+      }
+      .dialog textarea {
+        width: 100%;
+        min-height: 125px;
+        padding: 10px;
+        border: 1px solid #5b9b94;
+        border-radius: 8px;
+        background: #052b31;
+        color: white;
+        resize: vertical;
+      }
+      .feedback {
+        min-height: 20px;
+        margin-top: 7px;
+        color: var(--gold);
+        font-size: 12px;
+        font-weight: 850;
+      }
+      @media (max-width: 920px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        .side {
+          max-height: none;
+        }
+        .top {
+          align-items: flex-start;
+        }
+      }
+      @media (max-width: 560px) {
+        .app {
+          width: min(100% - 12px, 1420px);
+          margin: 6px auto;
+        }
+        .top {
+          display: grid;
+          padding: 12px;
+        }
+        .top h1 {
+          font-size: 26px;
+        }
+        .island {
+          min-height: 610px;
+        }
+        .event {
+          inset: 17% 5% 30%;
+          padding: 14px;
+        }
+        .island-actions {
+          left: 4%;
+          right: 4%;
+          bottom: 12px;
+          gap: 5px;
+        }
+        .action {
+          min-height: 52px;
+          padding: 5px 4px;
+          font-size: 12px;
+        }
+        .side {
+          padding: 8px;
+        }
+        .bars {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <header class="top">
+        <div>
+          <p class="eyebrow">DETERMINISTIC SURVIVAL ROUTES</p>
+          <h1>Ten Days Adrift: Tide-Mark Survival</h1>
+          <p class="sub">
+            Three routes · 30 scheduled events · Fixed weather & resources · Crafting & event choices ·
+            `ISLAND2` Profile
+          </p>
+        </div>
+        <div class="actions">
+          <button class="btn red" id="restartBtn">Restart route</button
+          ><button class="btn gold" id="archiveBtn">Survival profile</button>
+        </div>
+      </header>
+      <section class="layout">
+        <section class="panel">
+          <div class="bars">
+            <div class="bar">
+              <small><span>HP</span><b id="hpText"></b></small>
+              <div class="track"><i id="hpBar"></i></div>
+            </div>
+            <div class="bar">
+              <small><span>Hunger</span><b id="hungerText"></b></small>
+              <div class="track bad"><i id="hungerBar"></i></div>
+            </div>
+            <div class="bar">
+              <small><span>Thirst</span><b id="thirstText"></b></small>
+              <div class="track bad"><i id="thirstBar"></i></div>
+            </div>
+            <div class="bar">
+              <small><span>Signal</span><b id="signalText"></b></small>
+              <div class="track"><i id="signalBar"></i></div>
+            </div>
+          </div>
+          <div class="island">
+            <div class="island-label">
+              <b id="routeTitle"></b><br /><span
+                >Day <b id="day"></b>/10 · Actions <b id="ap"></b>/4 ·
+                <span id="weatherName"></span
+              ></span>
+            </div>
+            <div class="weather" id="weatherIcon"></div>
+            <div class="camp" id="camp">🏕️</div>
+            <div class="island-actions">
+              <button class="action" data-action="wood">🪵 Gather wood</button
+              ><button class="action" data-action="food">🥥 Find food</button
+              ><button class="action" data-action="water">💧 Find water</button
+              ><button class="action" data-action="explore">🧭 Explore coast</button
+              ><button class="action eat" data-action="eat">🍲 Eat & drink</button
+              ><button class="action" id="sleepBtn">🌙 End day</button>
+            </div>
+            <div class="event hidden" id="eventPanel">
+              <h2 id="eventTitle"></h2>
+              <p id="eventText"></p>
+              <div class="event-choices" id="eventChoices"></div>
+            </div>
+          </div>
+          <div class="feedback" id="message">
+            Pick a route to start day one. Fixed resources and weather make every retry reviewable.
+          </div>
+        </section>
+        <aside class="panel side">
+          <section class="block">
+            <h3>Three routes</h3>
+            <div class="routes" id="routeList"></div>
+          </section>
+          <section class="block">
+            <h2 id="goalTitle"></h2>
+            <p class="tip" id="goalText"></p>
+            <div class="goals" id="goals"></div>
+          </section>
+          <section class="block">
+            <h3>Backpack</h3>
+            <div class="bag" id="bag"></div>
+          </section>
+          <section class="block">
+            <h3>Crafting & facilities</h3>
+            <div class="crafts">
+              <button class="craft" data-craft="shelter">Upgrade shelter</button
+              ><button class="craft" data-craft="filter">Craft filter</button
+              ><button class="craft" data-craft="fire">Light the signal fire</button
+              ><button class="craft" data-craft="radio">Repair the radio</button>
+            </div>
+          </section>
+          <section class="block">
+            <h3>Survival log</h3>
+            <div class="log" id="log"></div>
+          </section>
+          <section class="block">
+            <h3>Career stats</h3>
+            <div class="career">
+              <div><b id="totalStars">0</b><small>Total stars</small></div>
+              <div><b id="clears">0</b><small>DoneRoute</small></div>
+              <div><b id="bestHealth">0</b><small>BestHP</small></div>
+            </div>
+          </section>
+        </aside>
+      </section>
+    </main>
+    <div class="archive hidden" id="archiveModal">
+      <div class="dialog">
+        <h2>Cross-device survival profile</h2>
+        <p class="tip">ProfileHolds three-route stars, best HP, unlocks and career records.</p>
+        <textarea id="archiveText" spellcheck="false"></textarea>
+        <div class="row" style="justify-content: flex-end; margin-top: 8px">
+          <button class="btn" id="closeArchiveBtn">Close</button
+          ><button class="btn" id="importBtn">Import</button
+          ><button class="btn gold" id="exportBtn">Generate & copy</button>
+        </div>
+        <div class="feedback" id="archiveFeedback"></div>
+      </div>
+    </div>
+    <script>
+      (() => {
+        const WEATHER = [
+          ["Clear", "☀️"],
+          ["Showers", "🌦️"],
+          ["Storm", "⛈️"],
+          ["Heat", "🔥"],
+          ["Spring tide", "🌊"],
+        ];
+        const ROUTES = [
+          {
+            name: "Coral shallows",
+            subtitle: "Fresh water is easy to find, but storms destroy unupgraded shelters.",
+            target: 70,
+            events: Array.from(
+              { length: 10 },
+              (_, i) =>
+                [
+                  {
+                    title: "Driftwood crate on the tide line",
+                    text: "Supply crates lie among the rocks; they may hold parts \u2014 or wash away with the tide.",
+                    choices: [
+                      [
+                        "Pry it open (gain parts, lose 5 HP)",
+                        { scrap: 1, hp: -5 },
+                      ],
+                      [
+                        "Brace with wood (1 wood, gain 2 food)",
+                        { wood: -1, food: 2 },
+                      ],
+                    ],
+                  },
+                  {
+                    title: "A distant fishing light",
+                    text: "A fishing light glows in the night; answering it would expose the camp.",
+                    choices: [
+                      ["Light a reply fire (Signal +12)", { signal: 12, eventsHelped: 1 }],
+                      ["Stay hidden (HP +4)", { hp: 4 }],
+                    ],
+                  },
+                  {
+                    title: "Dripping fresh water",
+                    text: "Dripping echoes deep in the cave, but loose rocks shift near the entrance.",
+                    choices: [
+                      [
+                        "Enter the cave (fresh water +3, -4 HP)",
+                        { water: 3, hp: -4 },
+                      ],
+                      ["Gather dew outside (fresh water +1)", { water: 1 }],
+                    ],
+                  },
+                ][i % 3],
+            ),
+          },
+          {
+            name: "Mangrove Maze",
+            subtitle: "Food is plenty but mosquitoes swarm; explore and heal with extra caution.",
+            target: 76,
+            events: Array.from(
+              { length: 10 },
+              (_, i) =>
+                [
+                  {
+                    title: "Mangrove High Tide",
+                    text: "The channel will flood soon; the retreat fits only one supply.",
+                    choices: [
+                      [
+                        "Haul parts (parts +2, -1 Action)",
+                        { scrap: 2, ap: -1, eventsHelped: 1 },
+                      ],
+                      ["Haul food (food +3)", { food: 3 }],
+                    ],
+                  },
+                  {
+                    title: "Feverish Ankle",
+                    text: "The long trek has swollen your ankle; tonight you must decide whether to rest.",
+                    choices: [
+                      ["Bandage and rest (HP +12, Signal -4)", { hp: 12, signal: -4 }],
+                      ["Push on (Signal +8, HP -8)", { signal: 8, hp: -8 }],
+                    ],
+                  },
+                  {
+                    title: "Black Box in the Tree",
+                    text: "The black box may still ping a weak position fix, but it needs parts for wiring.",
+                    choices: [
+                      [
+                        "Wire a repair (parts -1, Signal +22)",
+                        { scrap: -1, signal: 22, eventsHelped: 1 },
+                      ],
+                      [
+                        "Strip the battery (parts +1, Signal -3)",
+                        { scrap: 1, signal: -3 },
+                      ],
+                    ],
+                  },
+                ][i % 3],
+            ),
+          },
+          {
+            name: "Volcano Lee Slope",
+            subtitle: "Wood is scarce but geothermal heat runs strong; reading the weather right boosts Signal fast.",
+            target: 82,
+            events: Array.from(
+              { length: 10 },
+              (_, i) =>
+                [
+                  {
+                    title: "Geothermal Steam",
+                    text: "Cracks breathe hot steam \u2014 good for purifying water, bad for an unguarded pack.",
+                    choices: [
+                      [
+                        "Boil a pot (fresh water +3, costs 1 wood)",
+                        { water: 3, wood: -1 },
+                      ],
+                      ["Detour around it (+1 Action)", { ap: 1 }],
+                    ],
+                  },
+                  {
+                    title: "Ash Veil",
+                    text: "Ash hides the sun, so the signal fire\u2019s smoke stands out more.",
+                    choices: [
+                      [
+                        "Light it under cover (Signal +18, HP -5)",
+                        { signal: 18, hp: -5, eventsHelped: 1 },
+                      ],
+                      ["Save fuel (wood +1)", { wood: 1 }],
+                    ],
+                  },
+                  {
+                    title: "Cooling Lava Tube",
+                    text: "Metal scraps hide inside the lava tube, but the floor is still hot.",
+                    choices: [
+                      ["Search the debris (parts +2, HP -7)", { scrap: 2, hp: -7 }],
+                      ["Watch the exit (Signal +5)", { signal: 5 }],
+                    ],
+                  },
+                ][i % 3],
+            ),
+          },
+        ];
+        const ACTION_NAMES = {
+          wood: "Gather wood",
+          food: "Find food",
+          water: "Find water",
+          explore: "Explore coast",
+          eat: "Eat & drink",
+        };
+        const KEY = "mini_island_routes_v2",
+          $ = (id) => document.getElementById(id),
+          els = {
+            routeList: $("routeList"),
+            routeTitle: $("routeTitle"),
+            goalTitle: $("goalTitle"),
+            goalText: $("goalText"),
+            goals: $("goals"),
+            day: $("day"),
+            ap: $("ap"),
+            weather: $("weatherName"),
+            weatherIcon: $("weatherIcon"),
+            camp: $("camp"),
+            hpText: $("hpText"),
+            hungerText: $("hungerText"),
+            thirstText: $("thirstText"),
+            signalText: $("signalText"),
+            hpBar: $("hpBar"),
+            hungerBar: $("hungerBar"),
+            thirstBar: $("thirstBar"),
+            signalBar: $("signalBar"),
+            bag: $("bag"),
+            log: $("log"),
+            message: $("message"),
+            event: $("eventPanel"),
+            eventTitle: $("eventTitle"),
+            eventText: $("eventText"),
+            eventChoices: $("eventChoices"),
+            sleep: $("sleepBtn"),
+            totalStars: $("totalStars"),
+            clears: $("clears"),
+            bestHealth: $("bestHealth"),
+            archive: $("archiveModal"),
+            archiveText: $("archiveText"),
+            archiveFeedback: $("archiveFeedback"),
+          };
+        const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+        function defaults() {
+          return {
+            v: 2,
+            unlocked: 0,
+            stars: [0, 0, 0],
+            bestHealth: [0, 0, 0],
+            clears: 0,
+          };
+        }
+        function load() {
+          try {
+            const v = JSON.parse(localStorage.getItem(KEY) || "null");
+            if (v && v.v === 2)
+              return {
+                ...defaults(),
+                ...v,
+                unlocked: clamp(Math.floor(Number(v.unlocked) || 0), 0, 2),
+                clears: clamp(Math.floor(Number(v.clears) || 0), 0, 1000000),
+                stars: Array.from({ length: 3 }, (_, i) =>
+                  clamp(+v.stars?.[i] || 0, 0, 3),
+                ),
+                bestHealth: Array.from({ length: 3 }, (_, i) =>
+                  Math.max(0, +v.bestHealth?.[i] || 0),
+                ),
+              };
+          } catch (_) {}
+          return defaults();
+        }
+        let profile = load(),
+          routeIndex = Math.min(profile.unlocked, 2),
+          state = makeState();
+        function route() {
+          return ROUTES[routeIndex];
+        }
+        function totalStars() {
+          return profile.stars.reduce((a, b) => a + b, 0);
+        }
+        function save() {
+          try {
+            localStorage.setItem(KEY, JSON.stringify(profile));
+          } catch (_) {
+            // Private browsing / a full disk must not interrupt a survival turn.
+          }
+        }
+        function makeState() {
+          const first = route().events[0];
+          return {
+            mode: "event",
+            day: 1,
+            ap: 4,
+            hp: 100,
+            hunger: 15,
+            thirst: 15,
+            signal: 0,
+            wood: 1,
+            food: 2,
+            water: 2,
+            scrap: 0,
+            shelter: 0,
+            filter: 0,
+            radio: 0,
+            fire: 0,
+            weather: routeWeather(1),
+            event: first,
+            eventIndex: 0,
+            eventsHelped: 0,
+            history: [],
+            events: [
+              {
+                seq: 1,
+                type: "START",
+                detail: "Waves wash you ashore. Fixed routes record every choice.",
+              },
+            ],
+            logs: ["Waves wash you ashore. Fixed routes record every choice."],
+            result: "",
+            replaying: false,
+          };
+        }
+        function record(type, detail, payload = {}) {
+          state.events.push({
+            seq: state.events.length + 1,
+            type,
+            detail,
+            ...payload,
+          });
+          state.logs.unshift(`[${type}] ${detail}`);
+          state.logs = state.logs.slice(0, 16);
+        }
+        function message(s) {
+          state.result = s;
+          els.message.textContent = s;
+        }
+        function routeWeather(day) {
+          return [
+            [0, 1, 2, 0, 4, 1, 3, 2, 0, 4],
+            [1, 4, 1, 3, 2, 0, 4, 1, 2, 3],
+            [3, 0, 4, 3, 2, 0, 3, 4, 2, 1],
+          ][routeIndex][(day - 1) % 10];
+        }
+        function apply(delta) {
+          for (const [k, v] of Object.entries(delta)) {
+            if (k in state && typeof state[k] === "number") state[k] += v;
+          }
+          state.hp = clamp(state.hp, 0, 100);
+          state.hunger = clamp(state.hunger, 0, 120);
+          state.thirst = clamp(state.thirst, 0, 120);
+          state.signal = clamp(state.signal, 0, 100);
+          state.ap = Math.max(0, state.ap);
+        }
+        function action(kind) {
+          if (state.mode !== "play" || state.ap <= 0) return;
+          const base = {
+            wood: 1 + ((routeIndex + state.day) % 3),
+            food: 1 + (state.day % 2),
+            water: 1 + (state.weather === 1 ? 2 : 0) + (state.filter ? 1 : 0),
+            explore: state.day % 2 ? { scrap: 1, food: 1 } : { scrap: 2 },
+            eat: { food: -1, water: -1, hunger: -34, thirst: -42 },
+          }[kind];
+          if (base === undefined) return;
+          if (kind === "eat" && (state.food < 1 || state.water < 1)) {
+            message("Short on food or fresh water \u2014 can\u2019t eat & drink.");
+            return;
+          }
+          state.ap--;
+          apply(typeof base === "number" ? { [kind]: base } : base);
+          record("ACTION", `${ACTION_NAMES[kind]} done.`, {
+            kind,
+            day: state.day,
+          });
+          message(`${ACTION_NAMES[kind]} done; actions left: ${state.ap}.`);
+          renderAll();
+        }
+        function craft(kind) {
+          if (state.mode !== "play") return;
+          const costs = {
+            shelter: { wood: -(3 + state.shelter * 2), shelter: 1 },
+            filter: { wood: -3, scrap: -1, filter: 1 },
+            fire: { wood: -5, signal: 25, fire: 1 },
+            radio: { scrap: -3, signal: 35, radio: 1 },
+          };
+          const d = costs[kind];
+          if (!d) return;
+          if (kind === "shelter" && state.shelter >= 2)
+            return message("Shelter at max level.");
+          if (kind === "filter" && state.filter)
+            return message("Water filter already built.");
+          if (kind === "radio" && state.radio)
+            return message("Radio already fixed.");
+          if (
+            (d.wood < 0 && state.wood < Math.abs(d.wood)) ||
+            (d.scrap < 0 && state.scrap < Math.abs(d.scrap))
+          )
+            return message("Short on materials \u2014 gather or explore first.");
+          apply(d);
+          record(
+            "CRAFT",
+            `Done: ${kind === "shelter" ? "Shelter upgrade" : kind === "filter" ? "Water filter" : kind === "fire" ? "Signal fire" : "Radio"}.`,
+            { kind },
+          );
+          renderAll();
+        }
+        function endDay() {
+          if (state.mode !== "play") return;
+          state.ap = 0;
+          state.day++;
+          state.hunger += 18;
+          state.thirst += 24;
+          if (state.hunger >= 100) state.hp -= 15;
+          if (state.thirst >= 100) state.hp -= 24;
+          state.weather = routeWeather(state.day);
+          if (state.weather === 2 && state.shelter < 2)
+            state.hp -= 12 - state.shelter * 4;
+          if (state.radio) state.signal += 6;
+          record(
+            "NIGHT",
+            `Day ${state.day - 1} ends; weather turns ${WEATHER[state.weather][0]}.`,
+            { day: state.day },
+          );
+          if (state.hp <= 0) return lose("HP depleted.");
+          if (state.day > 10) return finish();
+          state.ap = 4;
+          state.eventIndex = state.day - 1;
+          state.event = route().events[state.eventIndex];
+          state.mode = "event";
+          renderAll();
+        }
+        function chooseEvent(index) {
+          if (state.mode !== "event") return;
+          const choice = state.event?.choices[index];
+          if (!choice) return;
+          const delta = { ...choice[1] };
+          for (const key of ["wood", "food", "water", "scrap"]) {
+            if ((delta[key] || 0) < 0 && state[key] < Math.abs(delta[key])) {
+              message(`Short on resources \u2014 can\u2019t pick "${choice[0]}".`);
+              return;
+            }
+          }
+          apply(delta);
+          record("EVENT", `${state.event.title}: ${choice[0]}`, {
+            event: state.eventIndex,
+            choice: index,
+          });
+          state.event = null;
+          state.mode = "play";
+          message(`Event resolved; back to day ${state.day}.`);
+          renderAll();
+        }
+        function finish() {
+          state.mode = "result";
+          const r = route(),
+            stars =
+              state.signal >= r.target
+                ? 1 +
+                  (state.hp >= 65 ? 1 : 0) +
+                  (state.eventsHelped >= 3 ? 1 : 0)
+                : 0;
+          if (stars && !state.replaying) {
+            profile.stars[routeIndex] = Math.max(
+              profile.stars[routeIndex],
+              stars,
+            );
+            profile.bestHealth[routeIndex] = Math.max(
+              profile.bestHealth[routeIndex],
+              state.hp,
+            );
+            profile.unlocked = Math.max(
+              profile.unlocked,
+              Math.min(2, routeIndex + 1),
+            );
+            profile.clears++;
+            save();
+          }
+          state.result = stars
+            ? `Rescued: ${"★".repeat(stars)}${"☆".repeat(3 - stars)}, HP ${state.hp}, Signal ${state.signal}.`
+            : `Rescue failed: Signal ${state.signal}/${r.target}, goal missed.`;
+          record("END", state.result, { stars });
+          message(state.result);
+          renderAll();
+          return stars;
+        }
+        function lose(s) {
+          state.mode = "failed";
+          state.result = `Survival failed: ${s}`;
+          record("FAIL", state.result);
+          message(state.result);
+          renderAll();
+          return 0;
+        }
+        function selectRoute(i) {
+          if (i > profile.unlocked) return;
+          routeIndex = i;
+          state = makeState();
+          renderAll();
+        }
+        function dispatch(command, recordCommand = true) {
+          if (recordCommand) state.history.push({ ...command });
+          if (command.type === "ACTION") action(command.kind);
+          else if (command.type === "CRAFT") craft(command.kind);
+          else if (command.type === "END_DAY") endDay();
+          else if (command.type === "EVENT") chooseEvent(command.choice);
+        }
+        function digest(s) {
+          return JSON.stringify({
+            mode: s.mode,
+            day: s.day,
+            ap: s.ap,
+            hp: s.hp,
+            hunger: s.hunger,
+            thirst: s.thirst,
+            signal: s.signal,
+            wood: s.wood,
+            food: s.food,
+            water: s.water,
+            scrap: s.scrap,
+            shelter: s.shelter,
+            filter: s.filter,
+            radio: s.radio,
+            fire: s.fire,
+            eventIndex: s.eventIndex,
+            eventsHelped: s.eventsHelped,
+          });
+        }
+        function replay(commands, index = routeIndex) {
+          const old = routeIndex,
+            live = state;
+          routeIndex = index;
+          state = makeState();
+          state.replaying = true;
+          for (const c of commands) dispatch(c, false);
+          const out = digest(state);
+          state = live;
+          routeIndex = old;
+          renderAll();
+          return out;
+        }
+        function renderAll() {
+          const r = route(),
+            w = WEATHER[state.weather];
+          els.routeTitle.textContent = r.name;
+          els.goalTitle.textContent = `${r.name} · Day ${state.day > 10 ? 10 : state.day}/10`;
+          els.goalText.textContent = r.subtitle;
+          els.day.textContent = Math.min(10, state.day);
+          els.ap.textContent = state.ap;
+          els.weather.textContent = w[0];
+          els.weatherIcon.textContent = w[1];
+          els.camp.textContent = ["🏕️", "🛖", "🏠"][state.shelter];
+          for (const [x, v] of [
+            [els.hpText, state.hp],
+            [els.hungerText, state.hunger],
+            [els.thirstText, state.thirst],
+            [els.signalText, state.signal],
+          ])
+            x.textContent = `${Math.round(v)}%`;
+          for (const [x, v] of [
+            [els.hpBar, state.hp],
+            [els.hungerBar, state.hunger],
+            [els.thirstBar, state.thirst],
+            [els.signalBar, state.signal],
+          ])
+            x.style.width = `${clamp(v, 0, 100)}%`;
+          els.bag.innerHTML = [
+            ["Wood", state.wood],
+            ["Food", state.food],
+            ["Fresh water", state.water],
+            ["Parts", state.scrap],
+            ["Shelter", `${state.shelter}/2`],
+            ["Water filter", state.filter ? "Done" : "Not built"],
+            ["Signal fire", state.fire ? "Lit" : "Unlit"],
+            ["Radio", state.radio ? "Fixed" : "Broken"],
+          ]
+            .map(
+              (x) =>
+                `<div class="item"><span>${x[0]}</span><b>${x[1]}</b></div>`,
+            )
+            .join("");
+          els.goals.innerHTML = `<div class="goal ${state.signal >= r.target ? "pass" : ""}">Signal goal: ${state.signal}/${r.target}</div><div class="goal ${state.hp >= 65 ? "pass" : ""}">Health bar: ${state.hp}/65</div><div class="goal ${state.eventsHelped >= 3 ? "pass" : ""}">Good event picks: ${state.eventsHelped}/3</div>`;
+          els.log.innerHTML = state.logs
+            .map((x) => `<div>• ${x}</div>`)
+            .join("");
+          els.routeList.innerHTML = ROUTES.map(
+            (x, i) =>
+              `<button class="route ${i === routeIndex ? "active" : ""}" data-route="${i}" ${i > profile.unlocked ? "disabled" : ""}><b>${i + 1}. ${x.name}</b><small>SignalGoal ${x.target}</small><span class="stars">${"★".repeat(profile.stars[i])}${"☆".repeat(3 - profile.stars[i])}</span></button>`,
+          ).join("");
+          els.routeList
+            .querySelectorAll("[data-route]")
+            .forEach((b) => (b.onclick = () => selectRoute(+b.dataset.route)));
+          els.event.classList.toggle("hidden", state.mode !== "event");
+          if (state.mode === "event" && state.event) {
+            els.eventTitle.textContent = state.event.title;
+            els.eventText.textContent = state.event.text;
+            els.eventChoices.innerHTML = state.event.choices
+              .map(
+                (c, i) =>
+                  `<button class="btn" data-choice="${i}">${c[0]}</button>`,
+              )
+              .join("");
+            els.eventChoices
+              .querySelectorAll("[data-choice]")
+              .forEach(
+                (b) =>
+                  (b.onclick = () =>
+                    dispatch({ type: "EVENT", choice: +b.dataset.choice })),
+              );
+          }
+          document
+            .querySelectorAll("[data-action]")
+            .forEach(
+              (b) => (b.disabled = state.mode !== "play" || state.ap <= 0),
+            );
+          document
+            .querySelectorAll("[data-craft]")
+            .forEach((b) => (b.disabled = state.mode !== "play"));
+          els.sleep.disabled = state.mode !== "play";
+          els.totalStars.textContent = totalStars();
+          els.clears.textContent = profile.clears;
+          els.bestHealth.textContent = Math.max(...profile.bestHealth);
+        }
+        document
+          .querySelectorAll("[data-action]")
+          .forEach(
+            (b) =>
+              (b.onclick = () =>
+                dispatch({ type: "ACTION", kind: b.dataset.action })),
+          );
+        document
+          .querySelectorAll("[data-craft]")
+          .forEach(
+            (b) =>
+              (b.onclick = () =>
+                dispatch({ type: "CRAFT", kind: b.dataset.craft })),
+          );
+        els.sleep.onclick = () => dispatch({ type: "END_DAY" });
+        $("restartBtn").onclick = () => {
+          state = makeState();
+          renderAll();
+        };
+        function checksum(s) {
+          let h = 2166136261;
+          for (let i = 0; i < s.length; i++) {
+            h ^= s.charCodeAt(i);
+            h = Math.imul(h, 16777619);
+          }
+          return (h >>> 0).toString(36);
+        }
+        function encode() {
+          const p = btoa(
+            unescape(
+              encodeURIComponent(
+                JSON.stringify({
+                  v: 2,
+                  u: profile.unlocked,
+                  s: profile.stars,
+                  b: profile.bestHealth,
+                  c: profile.clears,
+                }),
+              ),
+            ),
+          );
+          return `ISLAND2.${p}.${checksum(p)}`;
+        }
+        function decode(code) {
+          const p = code.trim().split(".");
+          if (p.length !== 3 || p[0] !== "ISLAND2" || checksum(p[1]) !== p[2])
+            throw Error("Survival profile check failed");
+          const v = JSON.parse(decodeURIComponent(escape(atob(p[1]))));
+          if (v.v !== 2 || !Array.isArray(v.s)) throw Error("Profile version incompatible");
+          return {
+            v: 2,
+            unlocked: clamp(Math.floor(+v.u || 0), 0, 2),
+            stars: Array.from({ length: 3 }, (_, i) =>
+              clamp(+v.s[i] || 0, 0, 3),
+            ),
+            bestHealth: Array.from({ length: 3 }, (_, i) =>
+              Math.max(0, +v.b?.[i] || 0),
+            ),
+            clears: Math.max(0, +v.c || 0),
+          };
+        }
+        $("archiveBtn").onclick = () => {
+          els.archive.classList.remove("hidden");
+          els.archiveText.value = encode();
+          els.archiveFeedback.textContent = "";
+        };
+        $("closeArchiveBtn").onclick = () =>
+          els.archive.classList.add("hidden");
+        $("exportBtn").onclick = async () => {
+          els.archiveText.value = encode();
+          els.archiveText.select();
+          try {
+            await navigator.clipboard.writeText(els.archiveText.value);
+            els.archiveFeedback.textContent = "Survival profile copied.";
+          } catch (_) {
+            els.archiveFeedback.textContent = "Profile generated, please copy it manually.";
+          }
+        };
+        $("importBtn").onclick = () => {
+          try {
+            profile = decode(els.archiveText.value);
+            save();
+            routeIndex = Math.min(profile.unlocked, 2);
+            state = makeState();
+            renderAll();
+            els.archiveFeedback.textContent = "Imported.";
+          } catch (e) {
+            els.archiveFeedback.textContent = e.message;
+          }
+        };
+        function validateContent() {
+          const errors = [];
+          if (ROUTES.length !== 3) errors.push("route count");
+          if (ROUTES.some((r) => r.events.length !== 10))
+            errors.push("event count");
+          if (ROUTES.some((r) => r.target < 60)) errors.push("target");
+          return {
+            valid: !errors.length,
+            errors,
+            routes: ROUTES.length,
+            events: ROUTES.reduce((n, r) => n + r.events.length, 0),
+            actions: Object.keys(ACTION_NAMES).length,
+          };
+        }
+        window.__islandSurvival = {
+          ROUTES,
+          WEATHER,
+          profile: () => profile,
+          state: () => state,
+          dispatch,
+          replay,
+          digest,
+          finish,
+          selectRoute,
+          encode,
+          decode,
+          validateContent,
+          renderAll,
+        };
+        renderAll();
+      })();
+    </script>
+  </body>
+</html>

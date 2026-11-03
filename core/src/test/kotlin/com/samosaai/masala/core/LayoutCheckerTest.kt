@@ -93,7 +93,10 @@ class LayoutCheckerTest {
             SkillWidgetSection("s", "nope"),
         )
         assertEquals(listOf("$.pages[0].sections[0].items[0].icon.name", "$.pages[0].sections[1].skillId"), paths(l))
-        assertTrue(KnownSymbols.names.all { Regex("[a-z_]+").matches(it) })
+        assertTrue(KnownSymbols.all.all { Regex("[a-z_]+").matches(it) })
+        // The model may only name the smaller promptable set, and that set must stay drawable.
+        assertTrue(KnownSymbols.promptable.all { Regex("[a-z_]+").matches(it) })
+        assertTrue(KnownSymbols.all.containsAll(KnownSymbols.promptable))
     }
 
     @Test
@@ -157,5 +160,133 @@ class LayoutCheckerTest {
         val parsed = LayoutChecker.parse("""{"schemaVersion":99,"pages":[]}""")
         assertNull(parsed.layout)
         assertTrue("newer" in parsed.problems.single().message)
+    }
+
+    private fun folder(id: String, children: List<Item>) = item(id, MasalaAction.OpenFolder(children))
+
+    private fun folderProblems(vararg items: Item) =
+        LayoutChecker.check(layout(GridSection("g", items = items.toList())), env)
+
+    @Test
+    fun `a valid folder has no problems`() {
+        assertEquals(emptyList(), folderProblems(folder("f", listOf(item("a"), item("b")))))
+    }
+
+    @Test
+    fun `a folder holds at most 16 items`() {
+        val problems = folderProblems(folder("f", (1..17).map { item("c$it") }))
+        assertEquals(listOf("$.pages[0].sections[0].items[0].action.items"), problems.map { it.path })
+    }
+
+    @Test
+    fun `folders can't contain folders`() {
+        val problems = folderProblems(folder("f", listOf(item("a"), folder("inner", listOf(item("b"))))))
+        assertEquals(listOf("$.pages[0].sections[0].items[0].action.items[1].action"), problems.map { it.path })
+    }
+
+    @Test
+    fun `items in a folder can't have rules`() {
+        val ruled = item("a", rules = listOf(Rule(Condition.Charging(), Effect.Show)))
+        val problems = folderProblems(folder("f", listOf(ruled)))
+        assertEquals(listOf("$.pages[0].sections[0].items[0].action.items[0].rules"), problems.map { it.path })
+    }
+
+    @Test
+    fun `a folder child's id must not repeat a section item's id`() {
+        val problems = folderProblems(item("a"), folder("f", listOf(item("a"))))
+        assertEquals(listOf("$.pages[0].sections[0].items[1].action.items[0].id"), problems.map { it.path })
+    }
+
+    @Test
+    fun `a folder name over the limit is a problem`() {
+        val long = folder("f", listOf(item("a"))).copy(label = "x".repeat(LayoutChecker.MAX_FOLDER_LABEL + 1))
+        assertEquals(listOf("$.pages[0].sections[0].items[0].label"), folderProblems(long).map { it.path })
+    }
+
+    @Test
+    fun `a folder in a widget button is a problem`() {
+        val button = WidgetComponent.Button("Open", MasalaAction.OpenFolder(listOf(item("a"))))
+        val l = layout(com.samosaai.masala.core.contract.WidgetSection("ws", WidgetSpec("w", components = listOf(button))))
+        assertEquals(listOf("$.pages[0].sections[0].widget.components[0].action"), paths(l))
+    }
+
+    @Test
+    fun `an html section needs a known app, sane rows, and at most two per page`() {        val rich = env.copy(miniAppIds = setOf("dice"))
+        assertEquals(emptyList(), LayoutChecker.check(layout(com.samosaai.masala.core.contract.HtmlSection("h", "dice", rows = 3)), rich))
+        assertEquals(
+            listOf("$.pages[0].sections[0].appId"),
+            LayoutChecker.check(layout(com.samosaai.masala.core.contract.HtmlSection("h", "gone")), rich).map { it.path },
+        )
+        assertEquals(
+            listOf("$.pages[0].sections[0].appId"),
+            LayoutChecker.check(layout(com.samosaai.masala.core.contract.HtmlSection("h", "")), rich).map { it.path },
+        )
+        assertEquals(
+            listOf("$.pages[0].sections", "$.pages[0].sections[0].rows"),
+            LayoutChecker.check(layout(com.samosaai.masala.core.contract.HtmlSection("h", "dice", rows = 9)), rich).map { it.path },
+        )
+        val three = layout(
+            com.samosaai.masala.core.contract.HtmlSection("h1", "dice"),
+            com.samosaai.masala.core.contract.HtmlSection("h2", "dice"),
+            com.samosaai.masala.core.contract.HtmlSection("h3", "dice"),
+        )
+        assertEquals(listOf("$.pages[0].sections"), LayoutChecker.check(three, rich).map { it.path })
+    }
+
+    @Test
+    fun `a page holds at most eight declared widget rows`() {
+        fun widget(sectionId: String, id: String, default: Int) = com.samosaai.masala.core.contract.WidgetSection(
+            sectionId,
+            com.samosaai.masala.core.contract.WidgetSpec(id, components = listOf(com.samosaai.masala.core.contract.WidgetComponent.Text("x")), size = com.samosaai.masala.core.contract.SizeRange(1, default, 8)),
+        )
+        val full = layout(widget("sa", "a", 4), widget("sb", "b", 4))
+        assertEquals(emptyList(), LayoutChecker.check(full, env))
+        val over = layout(widget("sa", "a", 5), widget("sb", "b", 4))
+        assertEquals(listOf("$.pages[0].sections"), LayoutChecker.check(over, env).map { it.path })
+    }
+
+    private fun cell(id: String, x: Int, y: Int, w: Int = 1, h: Int = 1, content: com.samosaai.masala.core.contract.CellContent =
+        com.samosaai.masala.core.contract.CellContent.ItemCell(item("i$id"))) =
+        com.samosaai.masala.core.contract.Cell(id, x, y, w, h, content)
+
+    private fun cells(vararg c: com.samosaai.masala.core.contract.Cell) =
+        layout(com.samosaai.masala.core.contract.CellGridSection("g", cells = c.toList()))
+
+    @Test
+    fun `a cell grid with icons and a skill widget side by side passes`() {
+        val skill = com.samosaai.masala.core.contract.CellContent.SkillCell("chef")
+        assertEquals(emptyList(), paths(cells(cell("a", 0, 0), cell("b", 1, 0), cell("s", 2, 0, w = 2, h = 2, content = skill))))
+    }
+
+    @Test
+    fun `overlapping, out of bounds and stretched icon cells are rejected`() {
+        assertEquals(listOf("$.pages[0].sections[0].cells[1]"), paths(cells(cell("a", 0, 0), cell("b", 0, 0))))
+        assertEquals(listOf("$.pages[0].sections[0].cells[0]"), paths(cells(cell("a", 3, 0, w = 2, content = com.samosaai.masala.core.contract.CellContent.SkillCell("chef")))))
+        assertEquals(listOf("$.pages[0].sections[0].cells[0]"), paths(cells(cell("a", 0, 0, w = 2))))
+    }
+
+    @Test
+    fun `a widget cell must fit its width range`() {
+        val spec = WidgetSpec("w", components = listOf(com.samosaai.masala.core.contract.WidgetComponent.Text(text = "hi")), size = SizeRange(maxW = 2, defaultW = 2))
+        val withLib = env.copy(widgets = mapOf("w" to spec))
+        val wide = cells(cell("a", 0, 0, w = 4, content = com.samosaai.masala.core.contract.CellContent.WidgetCell(com.samosaai.masala.core.contract.WidgetRef("w"))))
+        assertEquals(listOf("$.pages[0].sections[0].cells[0].w"), LayoutChecker.check(wide, withLib).map { it.path })
+    }
+
+    @Test
+    fun `HTML cells count toward the per-page WebView cap`() {
+        val html = { app: String -> com.samosaai.masala.core.contract.CellContent.HtmlCell(app) }
+        assertEquals(emptyList(), paths(cells(cell("a", 0, 0, content = html("x")), cell("b", 1, 0, content = html("y")))))
+        val withSection = layout(
+            com.samosaai.masala.core.contract.HtmlSection("h", appId = "z"),
+            com.samosaai.masala.core.contract.CellGridSection("g", cells = listOf(cell("a", 0, 0, content = html("x")), cell("b", 1, 0, content = html("y")))),
+        )
+        assertEquals(listOf("$.pages[0].sections"), paths(withSection))
+    }
+
+    @Test
+    fun `a cell past the grid's row limit is rejected`() {
+        val far = cell("a", 0, LayoutChecker.MAX_GRID_ROWS, content = com.samosaai.masala.core.contract.CellContent.SkillCell("chef"))
+        assertEquals(listOf("$.pages[0].sections[0].cells[0]"), paths(cells(far)))
     }
 }

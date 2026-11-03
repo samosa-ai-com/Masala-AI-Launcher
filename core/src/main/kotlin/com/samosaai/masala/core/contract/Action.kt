@@ -77,6 +77,37 @@ sealed interface MasalaAction {
     @SerialName("run_skill")
     data class RunSkill(val skillId: String, val prompt: String? = null) : MasalaAction
 
+    /**
+     * Reloads the widget's own web values in place. The phone fills in a blank [widgetId] with the
+     * widget holding the button; only hosts the user already approved are fetched, so it never asks.
+     */
+    @Serializable
+    @SerialName("refresh_widget")
+    data class RefreshWidget(val widgetId: String = "") : MasalaAction
+
+    /**
+     * A coin flip or a dice roll, resolved on the card: the result is written to the widget's
+     * storage under [key], so the card shows it instead of opening chat. [kind] is `coin` or
+     * `dice`.
+     */
+    @Serializable
+    @SerialName("flip")
+    data class Flip(val key: String, val kind: String) : MasalaAction
+
+    /**
+     * Opens one page of Masala's settings (Daily brief for weather/place, Widgets for cameras and
+     * web hosts, Permissions for calendar/health). A widget's "set this up" note uses it, so a card
+     * that needs a permission can point at the exact screen.
+     */
+    @Serializable
+    @SerialName("open_settings")
+    data class OpenSettings(val page: String) : MasalaAction
+
+    /** Click feedback on a widget button. Only "click" exists; unknown kinds are rejected. */
+    @Serializable
+    @SerialName("play_sound")
+    data class PlaySound(val kind: String = "click") : MasalaAction
+
     @Serializable
     @SerialName("open_mini_app")
     data class OpenMiniApp(val id: String) : MasalaAction
@@ -84,6 +115,34 @@ sealed interface MasalaAction {
     @Serializable
     @SerialName("run_tool")
     data class RunTool(val name: String, val args: JsonObject = JsonObject(emptyMap())) : MasalaAction
+
+    /** A folder on home: tapping it shows [items]. Opened by the home screen, never dispatched. */
+    /**
+     * Starts a meeting recording. The phone opens the meeting screen when the app is not in front:
+     * Android 14+ refuses to start a microphone foreground service from a widget's background tap,
+     * and that is the only place the microphone may be opened.
+     */
+    @Serializable
+    @SerialName("meeting_start")
+    data object MeetingStart : MasalaAction
+
+    /** Pause a running meeting, or resume a paused one. One widget button, one decision. */
+    @Serializable
+    @SerialName("meeting_toggle")
+    data object MeetingToggle : MasalaAction
+
+    @Serializable
+    @SerialName("meeting_stop")
+    data object MeetingStop : MasalaAction
+
+    /** Opens the meeting app, on [id] when one is named and on the list otherwise. */
+    @Serializable
+    @SerialName("open_meeting")
+    data class OpenMeeting(val id: String? = null) : MasalaAction
+
+    @Serializable
+    @SerialName("open_folder")
+    data class OpenFolder(val items: List<Item>) : MasalaAction
 }
 
 /**
@@ -97,7 +156,10 @@ fun MasalaAction.sensitivity(toolSensitivity: (String) -> ToolSensitivity?): Too
     is MasalaAction.RunTool -> toolSensitivity(name) ?: ToolSensitivity.DESTRUCTIVE
     is MasalaAction.SetAlarm,
     is MasalaAction.StartTimer,
-    is MasalaAction.SetMode -> ToolSensitivity.CHANGES_SOMETHING
+    is MasalaAction.SetMode,
+    MasalaAction.MeetingStart,
+    MasalaAction.MeetingToggle,
+    MasalaAction.MeetingStop -> ToolSensitivity.CHANGES_SOMETHING
     is MasalaAction.LaunchApp,
     is MasalaAction.LaunchShortcut,
     is MasalaAction.OpenUrl,
@@ -108,5 +170,11 @@ fun MasalaAction.sensitivity(toolSensitivity: (String) -> ToolSensitivity?): Too
     is MasalaAction.Search,
     is MasalaAction.AskMasala,
     is MasalaAction.RunSkill,
-    is MasalaAction.OpenMiniApp -> ToolSensitivity.READ_ONLY
+    is MasalaAction.RefreshWidget,
+    is MasalaAction.PlaySound,
+    is MasalaAction.OpenMiniApp,
+    is MasalaAction.OpenSettings,
+    is MasalaAction.Flip,
+    is MasalaAction.OpenMeeting,
+    is MasalaAction.OpenFolder -> ToolSensitivity.READ_ONLY
 }

@@ -1,9 +1,35 @@
 package com.samosaai.masala.ui.drawer
 
+import com.samosaai.masala.ui.theme.MasalaTheme
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.PushPin
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.AddHome
+import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import android.content.pm.ShortcutInfo
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -31,6 +57,7 @@ import com.samosaai.masala.core.apps.AppEntry
 import com.samosaai.masala.core.apps.ProfileKind
 import com.samosaai.masala.core.apps.Visibility
 import com.samosaai.masala.launcher.AppActions
+import com.samosaai.masala.launcher.AppIconTile
 import com.samosaai.masala.launcher.IconCache
 import com.samosaai.masala.launcher.rememberAppIcon
 import com.samosaai.masala.launcher.rememberShortcutIcon
@@ -45,6 +72,7 @@ interface AppMenuActions {
     fun pinShortcut(shortcut: ShortcutInfo)
     fun setPinned(entry: AppEntry, pinned: Boolean)
     fun rename(entry: AppEntry)
+    fun changeIcon(entry: AppEntry)
     fun setVisibility(entry: AppEntry, visibility: Visibility)
     fun appInfo(entry: AppEntry)
     fun uninstall(entry: AppEntry)
@@ -54,7 +82,7 @@ interface AppMenuActions {
  * The long-press menu (Olauncher §2.11): the app's shortcuts, pin to home, rename, the three
  * visibility levels, app info and uninstall.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AppMenu(
     entry: AppEntry,
@@ -68,78 +96,105 @@ fun AppMenu(
     LaunchedEffect(entry.key) { shortcuts = withContext(Dispatchers.IO) { actions.shortcuts(entry.key) } }
     val canUseShortcuts = remember { actions.canUseShortcuts() }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    val tokens = MasalaTheme.tokens
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainer) {
         Column(
             Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
-                .padding(bottom = 16.dp),
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // Header: the app, where it is, and App info (app menu board).
             val subtitle = listOfNotNull(
+                stringResource(R.string.menu_on_home).takeIf { entry.pinned },
                 stringResource(R.string.menu_work_badge).takeIf { entry.profile == ProfileKind.WORK },
                 stringResource(R.string.menu_renamed_from, entry.originalLabel).takeIf { entry.renamed },
             ).joinToString(" · ").ifEmpty { null }
-            LauncherRow(
-                label = entry.label,
-                icon = rememberAppIcon(icons, entry.key),
-                subtitle = subtitle,
-                onClick = { menu.launch(entry) },
-                onLongClick = null,
-                longClickLabel = null,
-                textStyle = MaterialTheme.typography.titleLarge,
-                iconSize = 48,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).clickable(role = Role.Button) { menu.launch(entry) }) {
+                    AppIconTile(icons, entry.key, entry.label, 48.dp)
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(entry.label, style = MaterialTheme.typography.titleLarge)
+                    subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
+                IconButton(onClick = { menu.appInfo(entry) }, modifier = Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.07f))) {
+                    Icon(Icons.Rounded.Info, stringResource(R.string.menu_app_info))
+                }
+            }
 
             if (!canUseShortcuts) {
-                Text(
-                    stringResource(R.string.menu_shortcuts_need_default),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                )
+                Text(stringResource(R.string.menu_shortcuts_need_default), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            shortcuts.orEmpty().forEach { shortcut ->
-                val label = (shortcut.shortLabel ?: shortcut.longLabel ?: shortcut.id).toString()
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    LauncherRow(
-                        label = label,
-                        icon = rememberShortcutIcon(icons, shortcut),
-                        onClick = { menu.launchShortcut(shortcut) },
-                        onLongClick = { menu.pinShortcut(shortcut) },
-                        longClickLabel = stringResource(R.string.menu_shortcut_pin, label),
-                        textStyle = MaterialTheme.typography.bodyLarge,
-                        iconSize = 32,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(onClick = { menu.pinShortcut(shortcut) }) { Text(stringResource(R.string.menu_pin)) }
+            val list = shortcuts.orEmpty()
+            if (list.isNotEmpty()) {
+                val shape = RoundedCornerShape(20.dp)
+                Column(Modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh).border(1.dp, tokens.hairline, shape)) {
+                    list.forEach { shortcut ->
+                        val label = (shortcut.shortLabel ?: shortcut.longLabel ?: shortcut.id).toString()
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            LauncherRow(
+                                label = label,
+                                icon = rememberShortcutIcon(icons, shortcut),
+                                onClick = { menu.launchShortcut(shortcut) },
+                                onLongClick = { menu.pinShortcut(shortcut) },
+                                longClickLabel = stringResource(R.string.menu_shortcut_pin, label),
+                                textStyle = MaterialTheme.typography.bodyLarge,
+                                iconSize = 32,
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(onClick = { menu.pinShortcut(shortcut) }) {
+                                Icon(Icons.Rounded.PushPin, stringResource(R.string.menu_shortcut_pin, label), tint = tokens.textMedium)
+                            }
+                        }
+                    }
                 }
             }
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
 
-            MenuButton(stringResource(if (entry.pinned) R.string.menu_unpin else R.string.menu_pin)) {
-                menu.setPinned(entry, !entry.pinned)
+            // Pinned means the app is somewhere in the home layout (any grid section), so the
+            // button reads as removing it rather than the vaguer "unpin".
+            // Five actions: three to a row, so the labels stay readable at large text sizes.
+            FlowRow(Modifier.fillMaxWidth(), maxItemsInEachRow = 3, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ActionTile(Icons.Rounded.OpenInNew, stringResource(R.string.menu_open_action), Modifier.weight(1f)) { menu.launch(entry) }
+                ActionTile(if (entry.pinned) Icons.Rounded.PushPin else Icons.Rounded.AddHome, stringResource(if (entry.pinned) R.string.menu_remove_from_home else R.string.menu_pin), Modifier.weight(1f)) {
+                    menu.setPinned(entry, !entry.pinned)
+                }
+                ActionTile(Icons.Rounded.Edit, stringResource(R.string.menu_rename), Modifier.weight(1f)) { menu.rename(entry) }
+                ActionTile(Icons.Rounded.Palette, stringResource(R.string.menu_change_icon), Modifier.weight(1f)) { menu.changeIcon(entry) }
+                ActionTile(Icons.Rounded.VisibilityOff, stringResource(R.string.menu_hide), Modifier.weight(1f)) { menu.setVisibility(entry, Visibility.HIDDEN) }
+                if (canUninstall) ActionTile(Icons.Rounded.Delete, stringResource(R.string.menu_uninstall), Modifier.weight(1f), danger = true) { menu.uninstall(entry) }
+                // Without uninstall the last row holds two tiles: a blank keeps them at a third each.
+                else Spacer(Modifier.weight(1f))
             }
-            MenuButton(stringResource(R.string.menu_rename)) { menu.rename(entry) }
 
+            Text(stringResource(R.string.menu_visibility), style = MaterialTheme.typography.labelLarge)
+            Segmented(Visibility.entries.map { visibilityLabel(it) }, Visibility.entries.indexOf(entry.visibility)) {
+                menu.setVisibility(entry, Visibility.entries[it])
+            }
             Text(
-                stringResource(R.string.menu_visibility),
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.padding(start = 20.dp, top = 8.dp),
+                stringResource(R.string.menu_visibility_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Visibility.entries.forEach { level ->
-                    FilterChip(
-                        selected = entry.visibility == level,
-                        onClick = { menu.setVisibility(entry, level) },
-                        label = { Text(visibilityLabel(level)) },
-                    )
-                }
-            }
-
-            MenuButton(stringResource(R.string.menu_app_info)) { menu.appInfo(entry) }
-            if (canUninstall) MenuButton(stringResource(R.string.menu_uninstall)) { menu.uninstall(entry) }
         }
+    }
+}
+
+@Composable
+private fun ActionTile(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, modifier: Modifier, danger: Boolean = false, onClick: () -> Unit) {
+    val tokens = MasalaTheme.tokens
+    val tint = if (danger) tokens.alert else tokens.textHigh
+    val shape = RoundedCornerShape(18.dp)
+    Column(
+        modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh).border(1.dp, tokens.hairline, shape)
+            .clickable(role = Role.Button, onClick = onClick).padding(vertical = 12.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
+        Text(label, style = MaterialTheme.typography.labelMedium, color = tint, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
 

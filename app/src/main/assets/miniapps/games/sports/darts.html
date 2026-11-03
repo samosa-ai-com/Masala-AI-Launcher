@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Bullseye Darts</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#0b1220;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+body{display:flex;justify-content:center;align-items:stretch;touch-action:none;overscroll-behavior:none}
+.app{width:100%;min-width:360px;max-width:428px;height:100dvh;display:flex;flex-direction:column;background:linear-gradient(180deg,#0f1a2e 0%,#0b1220 55%,#0a0f1c 100%);position:relative;overflow:hidden}
+.topbar{padding:10px 12px 8px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-shrink:0}
+.brand{font-weight:800;letter-spacing:0.5px;font-size:18px;line-height:1}
+.brand span{color:#facc15}
+.brand small{display:block;font-weight:600;font-size:11px;letter-spacing:1px;color:#94a3b8;margin-top:2px}
+.pill{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:999px;padding:6px 10px;display:flex;align-items:center;gap:6px;backdrop-filter:blur(6px)}
+.pill b{font-size:13px}
+.pill em{font-style:normal;font-size:11px;color:#cbd5e1}
+.scoreRow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:0 12px 8px;flex-shrink:0}
+.card{background:linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.04));border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:8px 10px;text-align:center}
+.card label{font-size:10px;letter-spacing:0.8px;color:#94a3b8;font-weight:700;display:block}
+.card strong{font-size:18px;line-height:1.1;display:block;margin-top:2px}
+.card strong.gold{color:#facc15}
+.card strong.sky{color:#38bdf8}
+.canvasWrap{flex:1;position:relative;margin:0 12px;background:radial-gradient(600px 400px at 50% 0%,#1e2a4a 0%,#0f1a2e 60%,#0b1220 100%);border-radius:18px;border:1px solid rgba(255,255,255,0.08);overflow:hidden;display:flex;flex-direction:column}
+canvas{width:100%;height:100%;display:block;touch-action:none}
+.hint{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:rgba(15,23,42,0.9);border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;font-size:12px;font-weight:600;padding:6px 10px;border-radius:999px;pointer-events:none;white-space:nowrap;backdrop-filter:blur(8px)}
+.hint b{color:#facc15}
+.toast{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%) scale(0.9);background:#facc15;color:#0f172a;font-weight:900;font-size:28px;padding:10px 18px;border-radius:14px;opacity:0;pointer-events:none;transition:all 0.25s ease;box-shadow:0 10px 30px rgba(0,0,0,0.4);text-align:center;line-height:1}
+.toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.toast small{display:block;font-size:12px;font-weight:800;letter-spacing:0.6px;margin-top:2px}
+.controls{padding:10px 12px 12px;display:flex;gap:10px;flex-shrink:0}
+.btn{flex:1;height:54px;border-radius:14px;border:none;font-weight:800;font-size:15px;letter-spacing:0.3px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;touch-action:manipulation}
+.btn:active{transform:scale(0.98)}
+.btn-primary{background:#facc15;color:#0f172a;box-shadow:0 6px 16px rgba(250,204,21,0.3)}
+.btn-ghost{background:rgba(255,255,255,0.08);color:#e2e8f0;border:1px solid rgba(255,255,255,0.12)}
+.dartsBar{display:flex;gap:6px;justify-content:center;padding:6px 0 2px}
+.dartMini{width:28px;height:28px;border-radius:999px;display:grid;place-items:center;font-size:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0}
+.dartMini.used{opacity:0.25;filter:grayscale(1)}
+.dartMini.active{outline:2px solid #facc15;outline-offset:1px;background:rgba(250,204,21,0.15)}
+.overlay{position:absolute;inset:0;background:rgba(2,6,23,0.78);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:5}
+.sheet{width:100%;max-width:360px;background:#0f172a;border:1px solid rgba(255,255,255,0.12);border-radius:18px;padding:18px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.5)}
+.sheet h2{font-size:22px;line-height:1.1}
+.sheet p{font-size:13px;color:#cbd5e1;line-height:1.5;margin:8px 0 14px}
+.sheet ul{text-align:left;background:rgba(255,255,255,0.06);border-radius:12px;padding:10px 12px 10px 22px;font-size:12.5px;color:#e2e8f0;line-height:1.6;margin-bottom:14px}
+.sheet ul li{margin:2px 0}
+.badge{display:inline-block;background:#facc15;color:#0f172a;font-weight:900;font-size:11px;letter-spacing:0.8px;padding:4px 8px;border-radius:999px;margin-bottom:8px}
+.powerTrack{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:8px;height:140px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:999px;overflow:hidden;display:none}
+.powerFill{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(180deg,#facc15,#f97316);border-radius:999px;transition:height 0.05s linear}
+.powerLabel{position:absolute;left:50%;transform:translateX(-50%);top:-18px;font-size:10px;font-weight:800;color:#facc15;white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="brand">BULLSEYE<span> DARTS</span><small>DRAG • AIM • RELEASE</small></div>
+    <div class="pill"><em>BEST</em> <b id="bestEl">0</b> <span style="color:#facc15">★</span></div>
+  </div>
+  <div class="scoreRow">
+    <div class="card"><label>TOTAL SCORE</label><strong class="gold" id="totalEl">0</strong></div>
+    <div class="card"><label>LAST THROW</label><strong class="sky" id="lastEl">—</strong></div>
+    <div class="card"><label>ROUND</label><strong id="roundEl">1 / 3</strong></div>
+  </div>
+  <div class="canvasWrap" id="wrap">
+    <canvas id="c" width="400" height="520"></canvas>
+    <div class="hint" id="hint"><b>●</b> Drag dart back to aim — release to throw</div>
+    <div class="toast" id="toast">+50<small>BULLSEYE!</small></div>
+    <div class="powerTrack" id="powerTrack"><div class="powerLabel" id="powerLabel">0%</div><div class="powerFill" id="powerFill" style="height:0%"></div></div>
+    <div class="overlay" id="overlay">
+      <div class="sheet">
+        <div class="badge">MOBILE-FIRST • 360–428PX</div>
+        <h2>Hit the Bullseye!</h2>
+        <p>Drag the dart to move the crosshair. Pull farther for more power. Release to let it fly — closer to center = more points.</p>
+        <ul>
+          <li><b style="color:#facc15">100</b> — Bullseye (gold center)</li>
+          <li><b style="color:#ef4444">50</b> — Inner ring</li>
+          <li><b style="color:#38bdf8">30 / 20</b> — Middle rings</li>
+          <li><b style="color:#94a3b8">10 / 5</b> — Outer rings • <b>0</b> miss</li>
+          <li>3 darts per round — beat your best!</li>
+        </ul>
+        <button class="btn btn-primary" id="playBtn" style="width:100%;height:54px">🎯 START THROWING</button>
+        <div style="font-size:11px;color:#94a3b8;margin-top:8px">Tip: Use arrow keys + Space on keyboard too</div>
+      </div>
+    </div>
+  </div>
+  <div class="dartsBar" id="dartsBar"></div>
+  <div class="controls">
+    <button class="btn btn-ghost" id="restartBtn">↺ Restart</button>
+    <button class="btn btn-primary" id="throwBtn">🎯 THROW</button>
+  </div>
+</div>
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('wrap');
+  const totalEl = document.getElementById('totalEl');
+  const lastEl = document.getElementById('lastEl');
+  const roundEl = document.getElementById('roundEl');
+  const bestEl = document.getElementById('bestEl');
+  const hint = document.getElementById('hint');
+  const toast = document.getElementById('toast');
+  const overlay = document.getElementById('overlay');
+  const playBtn = document.getElementById('playBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const throwBtn = document.getElementById('throwBtn');
+  const dartsBar = document.getElementById('dartsBar');
+  const powerTrack = document.getElementById('powerTrack');
+  const powerFill = document.getElementById('powerFill');
+  const powerLabel = document.getElementById('powerLabel');
+
+  let W=400, H=520, dpr=1;
+  let board = {x:200, y:150, r:118};
+  let state = {
+    total:0,
+    last: null,
+    dartsLeft:3,
+    round:1,
+    best: parseInt(localStorage.getItem('darts-best')||'0',10),
+    dartsOnBoard:[],
+    isDragging:false,
+    dragStart:null,
+    aim:{x:200,y:150},
+    power:0,
+    flying:false,
+    t:0,
+    startPos:null,
+    targetPos:null,
+    crosshair:{x:200,y:150},
+    showAim:false
+  };
+
+  bestEl.textContent = state.best;
+
+  function resize(){
+    const rect = wrap.getBoundingClientRect();
+    W = rect.width;
+    H = rect.height;
+    dpr = Math.min(window.devicePixelRatio||1, 2);
+    canvas.width = Math.round(W*dpr);
+    canvas.height = Math.round(H*dpr);
+    canvas.style.width = W+'px';
+    canvas.style.height = H+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    board.x = W/2;
+    board.y = Math.min(155, H*0.32);
+    board.r = Math.min(118, Math.min(W*0.32, H*0.26));
+    if(!state.flying && !state.isDragging){
+      state.crosshair.x = board.x;
+      state.crosshair.y = board.y;
+      state.aim.x = board.x;
+      state.aim.y = board.y;
+    }
+  }
+
+  const rings = [
+    {frac:0.12, score:100, color:'#facc15', label:'100'},
+    {frac:0.22, score:50, color:'#ef4444', label:'50'},
+    {frac:0.38, score:30, color:'#38bdf8', label:'30'},
+    {frac:0.58, score:20, color:'#22c55e', label:'20'},
+    {frac:0.78, score:10, color:'#a78bfa', label:'10'},
+    {frac:1.00, score:5,  color:'#e2e8f0', label:'5'}
+  ];
+
+  function scoreForDist(d){
+    const r = board.r;
+    for(let i=0;i<rings.length;i++){
+      if(d <= r*rings[i].frac) return rings[i];
+    }
+    return {score:0, color:'#64748b', label:'MISS'};
+  }
+
+  function drawBoard(){
+    // wood outer
+    ctx.save();
+    ctx.fillStyle='#1a2338';
+    ctx.fillRect(0,0,W,H);
+    // subtle vignette
+    const g = ctx.createRadialGradient(board.x, board.y, board.r*0.2, board.x, board.y, board.r*2.2);
+    g.addColorStop(0,'rgba(255,255,255,0.06)');
+    g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;
+    ctx.fillRect(0,0,W,H);
+
+    // board shadow
+    ctx.beginPath();
+    ctx.arc(board.x+6, board.y+8, board.r+10, 0, Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,0.35)';
+    ctx.fill();
+
+    // outer wood ring
+    ctx.beginPath();
+    ctx.arc(board.x, board.y, board.r+14, 0, Math.PI*2);
+    ctx.fillStyle='#3f2a14';
+    ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.08)';
+    ctx.lineWidth=2;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(board.x, board.y, board.r+10, 0, Math.PI*2);
+    ctx.fillStyle='#5a3a1a';
+    ctx.fill();
+
+    // rings from outer to inner
+    for(let i=rings.length-1;i>=0;i--){
+      const rr = board.r * rings[i].frac;
+      ctx.beginPath();
+      ctx.arc(board.x, board.y, rr, 0, Math.PI*2);
+      ctx.fillStyle=rings[i].color;
+      // add slight inner shadow for depth
+      ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,0.18)';
+      ctx.lineWidth=2;
+      ctx.stroke();
+      // highlight
+      ctx.beginPath();
+      ctx.arc(board.x-rr*0.15, board.y-rr*0.15, rr*0.92, 0, Math.PI*2);
+      ctx.strokeStyle='rgba(255,255,255,0.12)';
+      ctx.lineWidth=1;
+      ctx.stroke();
+    }
+    // center dot
+    ctx.beginPath();
+    ctx.arc(board.x, board.y, 4, 0, Math.PI*2);
+    ctx.fillStyle='#0f172a';
+    ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.9)';
+    ctx.lineWidth=1.5;
+    ctx.stroke();
+
+    // numbers around
+    ctx.fillStyle='rgba(255,255,255,0.9)';
+    ctx.font='700 11px system-ui';
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    const nums = [5,10,20,30,50,100];
+    for(let i=0;i<6;i++){
+      const ang = -Math.PI/2 + i*(Math.PI*2/6);
+      const rr = board.r+26;
+      const x = board.x + Math.cos(ang)*rr;
+      const y = board.y + Math.sin(ang)*rr;
+      // pill bg
+      const txt = String(nums[i]);
+      const w = ctx.measureText(txt).width+10;
+      ctx.fillStyle='rgba(15,23,42,0.9)';
+      ctx.beginPath();
+      ctx.roundRect(x-w/2, y-9, w, 18, 9);
+      ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,0.12)';
+      ctx.stroke();
+      ctx.fillStyle = i===5 ? '#facc15' : '#e2e8f0';
+      ctx.fillText(txt, x, y);
+    }
+
+    // board shine
+    ctx.beginPath();
+    ctx.arc(board.x, board.y, board.r, 0, Math.PI*2);
+    ctx.strokeStyle='rgba(255,255,255,0.08)';
+    ctx.lineWidth=1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawDartsOnBoard(){
+    state.dartsOnBoard.forEach(d=>{
+      const ring = scoreForDist(Math.hypot(d.x-board.x, d.y-board.y));
+      // shadow
+      ctx.beginPath();
+      ctx.ellipse(d.x+3, d.y+4, 10, 4, 0, 0, Math.PI*2);
+      ctx.fillStyle='rgba(0,0,0,0.25)';
+      ctx.fill();
+      // dart
+      ctx.save();
+      ctx.translate(d.x, d.y);
+      ctx.rotate(d.angle||0);
+      // flight
+      ctx.fillStyle = ring.score>=50 ? '#facc15' : ring.score>=20 ? '#38bdf8' : '#e2e8f0';
+      ctx.beginPath();
+      ctx.moveTo(-14,-6); ctx.lineTo(-2,-6); ctx.lineTo(-2,6); ctx.lineTo(-14,6); ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,0.2)'; ctx.lineWidth=1; ctx.stroke();
+      // body
+      ctx.fillStyle='#0f172a';
+      ctx.fillRect(-2,-2,16,4);
+      // tip
+      ctx.fillStyle='#e2e8f0';
+      ctx.beginPath();
+      ctx.moveTo(14,0); ctx.lineTo(18,0); ctx.lineTo(14,-3); ctx.lineTo(14,3);
+      ctx.closePath(); ctx.fill();
+      // highlight
+      ctx.fillStyle='rgba(255,255,255,0.6)';
+      ctx.fillRect(-2,-2,16,1);
+      ctx.restore();
+
+      // score bubble
+      if(d.just){
+        ctx.fillStyle='rgba(15,23,42,0.95)';
+        ctx.beginPath();
+        ctx.roundRect(d.x+12, d.y-22, 28, 16, 8);
+        ctx.fill();
+        ctx.fillStyle = ring.score===100 ? '#facc15' : '#fff';
+        ctx.font='800 11px system-ui';
+        ctx.textAlign='center';
+        ctx.fillText('+'+ring.score, d.x+26, d.y-11);
+      }
+    });
+  }
+
+  function drawAiming(){
+    if(state.flying) return;
+    // crosshair
+    const cx = state.crosshair.x;
+    const cy = state.crosshair.y;
+    // trajectory preview when dragging
+    if(state.isDragging){
+      const sx = W/2;
+      const sy = H - 86;
+      ctx.save();
+      ctx.strokeStyle='rgba(250,204,21,0.9)';
+      ctx.setLineDash([6,6]);
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      // bezier arc to crosshair
+      const mx = (sx+cx)/2;
+      const my = Math.min(sy, cy) - 40 - state.power*60;
+      ctx.quadraticCurveTo(mx, my, cx, cy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // power dot
+      ctx.fillStyle='#facc15';
+      ctx.beginPath(); ctx.arc(mx, my, 4, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+    // crosshair
+    ctx.save();
+    ctx.translate(cx, cy);
+    const pulse = 1 + Math.sin(Date.now()*0.006)*0.08;
+    ctx.scale(pulse,pulse);
+    ctx.strokeStyle = state.isDragging ? '#facc15' : 'rgba(255,255,255,0.95)';
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(-14,0); ctx.lineTo(-6,0);
+    ctx.moveTo(6,0); ctx.lineTo(14,0);
+    ctx.moveTo(0,-14); ctx.lineTo(0,-6);
+    ctx.moveTo(0,6); ctx.lineTo(0,14);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0,0,10,0,Math.PI*2);
+    ctx.strokeStyle= state.isDragging ? 'rgba(250,204,21,0.9)' : 'rgba(255,255,255,0.7)';
+    ctx.lineWidth=1.5;
+    ctx.stroke();
+    ctx.fillStyle= state.isDragging ? '#facc15' : '#fff';
+    ctx.beginPath(); ctx.arc(0,0,3,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+
+    // dart at bottom (ready)
+    const dx = W/2;
+    const dy = H - 86;
+    ctx.save();
+    ctx.translate(dx, dy);
+    // wobble when aiming
+    const wob = state.isDragging ? (state.power-0.5)*6 : 0;
+    ctx.rotate((-0.15 + wob*0.02));
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,0.25)';
+    ctx.beginPath(); ctx.ellipse(4,10,18,6,0,0,Math.PI*2); ctx.fill();
+    // flight
+    ctx.fillStyle = state.isDragging ? '#facc15' : '#e2e8f0';
+    ctx.beginPath();
+    ctx.moveTo(-18,-8); ctx.lineTo(2,-8); ctx.lineTo(2,8); ctx.lineTo(-18,8); ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,0.15)'; ctx.stroke();
+    // body
+    ctx.fillStyle='#0f172a';
+    ctx.fillRect(2,-3,22,6);
+    ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.fillRect(2,-3,22,1.5);
+    // tip
+    ctx.fillStyle='#f1f5f9';
+    ctx.beginPath(); ctx.moveTo(24,0); ctx.lineTo(32,0); ctx.lineTo(24,-4); ctx.lineTo(24,4); ctx.closePath(); ctx.fill();
+    // grip hint
+    if(!state.isDragging){
+      ctx.fillStyle='rgba(250,204,21,0.95)';
+      ctx.font='700 10px system-ui';
+      ctx.textAlign='center';
+      ctx.fillText('DRAG ME', 0, -16);
+    }
+    ctx.restore();
+  }
+
+  function drawFlying(){
+    if(!state.flying) return;
+    const sx = state.startPos.x;
+    const sy = state.startPos.y;
+    const tx = state.targetPos.x;
+    const ty = state.targetPos.y;
+    const t = state.t;
+    // parabolic arc: height peaks mid-flight
+    const arcH = 70 + state.power*40;
+    const x = sx + (tx - sx)*t;
+    const y = sy + (ty - sy)*t - Math.sin(Math.PI*t)*arcH;
+    const angle = Math.atan2((ty - sy) - Math.cos(Math.PI*t)*Math.PI*arcH*0.02, (tx - sx));
+    // trail
+    ctx.fillStyle='rgba(250,204,21,0.25)';
+    for(let i=0;i<3;i++){
+      const tt = Math.max(0, t - i*0.06);
+      const xx = sx + (tx - sx)*tt;
+      const yy = sy + (ty - sy)*tt - Math.sin(Math.PI*tt)*arcH;
+      ctx.beginPath(); ctx.arc(xx, yy, 3-i, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(angle);
+    ctx.fillStyle='#facc15';
+    ctx.beginPath(); ctx.moveTo(-14,-6); ctx.lineTo(-2,-6); ctx.lineTo(-2,6); ctx.lineTo(-14,6); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#0f172a'; ctx.fillRect(-2,-2,16,4);
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.moveTo(14,0); ctx.lineTo(18,0); ctx.lineTo(14,-3); ctx.lineTo(14,3); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    // store for hit effect
+    state._flyPos = {x,y};
+  }
+
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    drawBoard();
+    drawDartsOnBoard();
+    drawFlying();
+    drawAiming();
+  }
+
+  function updateUI(){
+    totalEl.textContent = state.total;
+    lastEl.textContent = state.last===null ? '—' : (state.last===0 ? 'MISS' : '+'+state.last);
+    roundEl.textContent = state.dartsLeft===0 ? 'Done' : state.dartsLeft + ' left';
+    bestEl.textContent = state.best;
+    // darts bar
+    dartsBar.innerHTML='';
+    for(let i=0;i<3;i++){
+      const el=document.createElement('div');
+      el.className='dartMini '+(i < (3-state.dartsLeft) ? 'used' : (i===3-state.dartsLeft ? 'active' : ''));
+      el.textContent='🎯';
+      dartsBar.appendChild(el);
+    }
+    throwBtn.disabled = state.flying || state.dartsLeft===0;
+    throwBtn.style.opacity = throwBtn.disabled ? '0.5' : '1';
+    throwBtn.textContent = state.dartsLeft===0 ? 'ROUND OVER' : '🎯 THROW';
+  }
+
+  function showToast(score, label){
+    toast.innerHTML = (score===0? 'MISS' : '+'+score) + '<small>'+label+'</small>';
+    toast.style.background = score===100 ? '#facc15' : score>=30 ? '#38bdf8' : score===0 ? '#334155' : '#e2e8f0';
+    toast.style.color = score===0 ? '#fff' : '#0f172a';
+    toast.classList.add('show');
+    setTimeout(()=>toast.classList.remove('show'), 900);
+    if(navigator.vibrate) navigator.vibrate(score===100 ? [30,40,30] : score===0 ? [80] : [30]);
+  }
+
+  function finishThrow(){
+    const hit = state.targetPos;
+    const dist = Math.hypot(hit.x-board.x, hit.y-board.y);
+    const ring = scoreForDist(dist);
+    state.last = ring.score;
+    state.total += ring.score;
+    if(state.total > state.best){
+      state.best = state.total;
+      localStorage.setItem('darts-best', String(state.best));
+    }
+    // add dart to board with slight stick offset
+    state.dartsOnBoard.forEach(d=>d.just=false);
+    state.dartsOnBoard.push({x:hit.x, y:hit.y, angle: Math.atan2(hit.y-board.y, hit.x-board.x)*0.15, just:true});
+    state.dartsLeft -= 1;
+    state.flying=false;
+    state.t=0;
+    state.power=0;
+    powerTrack.style.display='none';
+    hint.style.display = state.dartsLeft===0 ? 'none' : 'block';
+    hint.innerHTML = state.dartsLeft===0 ? '' : '<b>●</b> Drag dart back to aim — release to throw';
+    showToast(ring.score, ring.score===100?'BULLSEYE!': ring.score===50?'INNER BULL!': ring.score===0?'TRY AGAIN': ring.label+' PTS');
+    updateUI();
+    if(state.dartsLeft===0){
+      setTimeout(()=>{
+        hint.innerHTML = 'Round over — tap Restart for new round';
+        hint.style.display='block';
+      }, 1000);
+    } else {
+      // reset crosshair to center
+      state.crosshair.x = board.x;
+      state.crosshair.y = board.y;
+    }
+    render();
+  }
+
+  function launch(){
+    if(state.flying || state.dartsLeft===0) return;
+    // compute target with power-based accuracy: sweet spot 0.45-0.75 gives best accuracy
+    const ideal = 0.6;
+    const offIdeal = Math.abs(state.power - ideal);
+    const wobble = offIdeal * 90 + (1-state.power)*10; // more wobble when too weak/strong
+    const ang = Math.random()*Math.PI*2;
+    const rad = Math.random()*wobble;
+    let tx = state.crosshair.x + Math.cos(ang)*rad;
+    let ty = state.crosshair.y + Math.sin(ang)*rad;
+    // clamp to canvas
+    tx = Math.max(board.x-board.r-6, Math.min(board.x+board.r+6, tx));
+    ty = Math.max(board.y-board.r-6, Math.min(board.y+board.r+6, ty));
+    // if power very low, miss more
+    if(state.power < 0.15){
+      tx = board.x + (Math.random()-0.5)*board.r*2.2;
+      ty = board.y + (Math.random()-0.5)*board.r*2.2;
+    }
+    state.targetPos = {x:tx, y:ty};
+    state.startPos = {x:W/2, y:H-86};
+    state.flying=true;
+    state.t=0;
+    state.isDragging=false;
+    powerTrack.style.display='none';
+    hint.style.display='none';
+    // animate
+    const step = () => {
+      if(!state.flying) return;
+      state.t += 0.045 + state.power*0.015;
+      if(state.t >= 1){
+        state.t=1;
+        render();
+        finishThrow();
+        return;
+      }
+      render();
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  // pointer handling
+  let pointerId=null;
+  function getPos(e){
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX ?? e.touches?.[0]?.clientX) - rect.left;
+    const y = (e.clientY ?? e.touches?.[0]?.clientY) - rect.top;
+    return {x,y};
+  }
+
+  function onDown(e){
+    if(state.flying || state.dartsLeft===0) return;
+    if(overlay.style.display!=='none' && overlay.style.display!=='') return;
+    const p = getPos(e);
+    // only start if near bottom dart area or anywhere (for accessibility, allow anywhere)
+    const dartArea = {x:W/2, y:H-86, r:60};
+    const d = Math.hypot(p.x-dartArea.x, p.y-dartArea.y);
+    // allow drag from anywhere in lower half for large touch target
+    if(p.y < H*0.45 && d>80) return; // ignore top taps unless near dart
+    state.isDragging=true;
+    state.dragStart={x:p.x, y:p.y};
+    state.showAim=true;
+    powerTrack.style.display='block';
+    hint.innerHTML='<b>●</b> Pull back for power — release to fire';
+    if(e.cancelable) e.preventDefault();
+  }
+  function onMove(e){
+    if(!state.isDragging || state.flying) return;
+    const p = getPos(e);
+    const dx = state.dragStart.x - p.x;
+    const dy = state.dragStart.y - p.y;
+    // map drag to crosshair movement: drag left/right moves crosshair left/right, drag down moves down etc.
+    // scale: 1px drag = 0.9px crosshair
+    const scale = 0.85;
+    let cx = board.x + dx*scale;
+    let cy = board.y + dy*scale*0.9;
+    // clamp to board area + margin
+    cx = Math.max(board.x-board.r*1.15, Math.min(board.x+board.r*1.15, cx));
+    cy = Math.max(board.y-board.r*1.15, Math.min(board.y+board.r*1.15, cy));
+    state.crosshair.x = cx;
+    state.crosshair.y = cy;
+    // power from drag distance
+    const dist = Math.hypot(dx, dy);
+    const maxDist = 110;
+    state.power = Math.min(1, Math.max(0, dist / maxDist));
+    powerFill.style.height = (state.power*100)+'%';
+    powerLabel.textContent = Math.round(state.power*100)+'%';
+    powerLabel.style.color = state.power>0.85 ? '#ef4444' : state.power>0.45 ? '#facc15' : '#94a3b8';
+    render();
+    if(e.cancelable) e.preventDefault();
+  }
+  function onUp(e){
+    if(!state.isDragging) return;
+    state.isDragging=false;
+    // if power too low, treat as cancel unless moved enough
+    if(state.power < 0.08){
+      powerTrack.style.display='none';
+      hint.innerHTML='<b>●</b> Drag dart back to aim — release to throw';
+      render();
+      return;
+    }
+    launch();
+    if(e && e.cancelable) e.preventDefault();
+  }
+
+  // mouse/touch/pointer
+  canvas.addEventListener('pointerdown', onDown);
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  canvas.addEventListener('touchstart', onDown, {passive:false});
+  canvas.addEventListener('touchmove', onMove, {passive:false});
+  canvas.addEventListener('touchend', onUp, {passive:false});
+
+  // keyboard
+  window.addEventListener('keydown', (e)=>{
+    if(overlay.style.display!=='none' && overlay.style.display!=='') return;
+    if(state.flying) return;
+    const step=8;
+    if(e.key==='ArrowLeft') { state.crosshair.x = Math.max(board.x-board.r*1.15, state.crosshair.x-step); render(); }
+    if(e.key==='ArrowRight') { state.crosshair.x = Math.min(board.x+board.r*1.15, state.crosshair.x+step); render(); }
+    if(e.key==='ArrowUp') { state.crosshair.y = Math.max(board.y-board.r*1.15, state.crosshair.y-step); render(); }
+    if(e.key==='ArrowDown') { state.crosshair.y = Math.min(board.y+board.r*1.15, state.crosshair.y+step); render(); }
+    if(e.key===' ' || e.key==='Enter'){ e.preventDefault(); state.power=0.65; powerTrack.style.display='block'; powerFill.style.height='65%'; launch(); }
+  });
+
+  throwBtn.addEventListener('click', ()=>{
+    if(state.dartsLeft===0){ doRestart(); return; }
+    // auto throw with current aim
+    if(!state.isDragging) state.power=0.62;
+    launch();
+  });
+  restartBtn.addEventListener('click', doRestart);
+  playBtn.addEventListener('click', ()=>{
+    overlay.style.display='none';
+    render();
+  });
+
+  function doRestart(){
+    state.total=0;
+    state.last=null;
+    state.dartsLeft=3;
+    state.dartsOnBoard=[];
+    state.flying=false;
+    state.t=0;
+    state.power=0;
+    state.crosshair.x=board.x;
+    state.crosshair.y=board.y;
+    powerTrack.style.display='none';
+    hint.style.display='block';
+    hint.innerHTML='<b>●</b> Drag dart back to aim — release to throw';
+    updateUI();
+    render();
+  }
+
+  // init
+  resize();
+  window.addEventListener('resize', resize);
+  updateUI();
+  render();
+  // ensure overlay visible on load
+  overlay.style.display='flex';
+
+  // prevent scroll
+  document.body.addEventListener('touchmove', (e)=>{ if(e.target.closest('canvas')) e.preventDefault(); }, {passive:false});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Tug Duel - Tap War</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow-x:hidden}
+  body{
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, sans-serif;
+    background:#0f172a;
+    color:#f1f5f9;
+    display:flex;justify-content:center;
+    padding:0;
+    overscroll-behavior:none;
+  }
+  .app{
+    width:100%;
+    max-width:428px;
+    min-height:100dvh;
+    background:linear-gradient(180deg,#1e293b 0%,#0f172a 100%);
+    display:flex;flex-direction:column;
+    padding:12px 14px 18px;
+    position:relative;
+  }
+  /* Header */
+  .header{
+    text-align:center;
+    padding:8px 0 10px;
+  }
+  .logo{
+    font-weight:900;letter-spacing:0.08em;font-size:22px;line-height:1;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .logo span{color:#facc15}
+  .logo i{font-style:normal;background:#facc15;color:#0f172a;padding:2px 6px;border-radius:6px;font-size:14px;letter-spacing:0.04em}
+  .subtitle{font-size:11px;letter-spacing:0.12em;color:#94a3b8;margin-top:4px;font-weight:600}
+  /* Top stats */
+  .topbar{
+    display:flex;gap:8px;margin-top:10px;
+  }
+  .stat-card{
+    flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);
+    border-radius:12px;padding:8px 10px;text-align:center;
+  }
+  .stat-label{font-size:10px;letter-spacing:0.1em;color:#94a3b8;font-weight:700}
+  .stat-value{font-size:15px;font-weight:800;margin-top:2px;color:#f8fafc}
+  .stat-value small{font-weight:600;color:#94a3b8;font-size:11px}
+  /* Difficulty */
+  .section-label{font-size:11px;letter-spacing:0.12em;color:#94a3b8;font-weight:700;margin:14px 0 8px;text-align:center}
+  .diff-row{display:flex;gap:8px}
+  .diff-btn{
+    flex:1;padding:10px 0;border-radius:12px;border:2px solid rgba(255,255,255,0.1);
+    background:rgba(255,255,255,0.05);color:#cbd5e1;font-weight:800;font-size:13px;
+    cursor:pointer;transition:all .15s;
+  }
+  .diff-btn.active{
+    background:#facc15;color:#0f172a;border-color:#facc15;
+    box-shadow:0 4px 12px rgba(250,204,21,0.3);
+  }
+  .diff-btn:active{transform:scale(0.97)}
+  /* Scoreboard */
+  .scoreboard{
+    margin-top:14px;background:#0b1222;border:1px solid rgba(255,255,255,0.08);
+    border-radius:16px;padding:12px 14px;
+  }
+  .score-row{
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .player{
+    text-align:center;flex:1;
+  }
+  .player-name{font-size:11px;letter-spacing:0.1em;font-weight:800;color:#94a3b8}
+  .player-name.you{color:#4ade80}
+  .player-name.cpu{color:#f87171}
+  .score-num{font-size:28px;font-weight:900;line-height:1;margin-top:4px}
+  .vs{font-size:12px;font-weight:800;color:#475569;padding:0 8px}
+  .dots{display:flex;gap:6px;justify-content:center;margin-top:6px}
+  .dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.1)}
+  .dot.win-you{background:#4ade80;box-shadow:0 0 8px rgba(74,222,128,0.6);border-color:#4ade80}
+  .dot.win-cpu{background:#f87171;box-shadow:0 0 8px rgba(248,113,113,0.6);border-color:#f87171}
+  .match-info{text-align:center;font-size:11px;color:#64748b;margin-top:8px;font-weight:600;letter-spacing:0.04em}
+  /* Timer */
+  .timer-wrap{margin-top:14px}
+  .timer-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .timer-label{font-size:11px;letter-spacing:0.1em;font-weight:800;color:#e2e8f0}
+  .timer-time{font-size:13px;font-weight:900;color:#facc15}
+  .timer-bar{height:10px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06)}
+  .timer-fill{height:100%;width:100%;background:linear-gradient(90deg,#facc15,#f59e0b);border-radius:999px;transition:width 0.1s linear}
+  .timer-fill.warn{background:linear-gradient(90deg,#f87171,#ef4444)}
+  /* Arena */
+  .arena{
+    margin-top:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);
+    border-radius:16px;padding:14px 12px;
+  }
+  .arena-head{display:flex;justify-content:space-between;font-size:10px;letter-spacing:0.08em;font-weight:800;color:#94a3b8;margin-bottom:10px}
+  .arena-head span.cpu{color:#f87171}
+  .arena-head span.you{color:#4ade80}
+  .rope-track{
+    position:relative;height:28px;background:#1e293b;border-radius:999px;
+    border:2px solid rgba(255,255,255,0.08);overflow:hidden;
+    box-shadow:inset 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .win-zone{
+    position:absolute;top:0;bottom:0;width:14%;display:flex;align-items:center;justify-content:center;
+    font-size:9px;font-weight:900;letter-spacing:0.06em;
+  }
+  .win-zone.left{left:0;background:rgba(248,113,113,0.18);color:#fca5a5;border-right:1px dashed rgba(248,113,113,0.4)}
+  .win-zone.right{right:0;background:rgba(74,222,128,0.18);color:#86efac;border-left:1px dashed rgba(74,222,128,0.4)}
+  .center-line{
+    position:absolute;left:50%;top:0;bottom:0;width:2px;background:rgba(255,255,255,0.9);transform:translateX(-50%);
+    box-shadow:0 0 6px rgba(255,255,255,0.5);
+  }
+  .center-tick{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:14px;height:14px;background:#f8fafc;border:2px solid #0f172a;border-radius:50%;
+  }
+  .rope{
+    position:absolute;top:50%;height:6px;background:linear-gradient(90deg,#e2b07a,#f5d0a0,#e2b07a);
+    border-radius:999px;transform:translateY(-50%);left:12%;right:12%;
+    box-shadow:0 1px 4px rgba(0,0,0,0.5);
+  }
+  .knot{
+    position:absolute;top:50%;width:36px;height:36px;transform:translate(-50%,-50%);
+    background:radial-gradient(circle at 30% 30%, #facc15, #eab308);
+    border:3px solid #0f172a;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:16px;box-shadow:0 4px 12px rgba(0,0,0,0.5), 0 0 0 4px rgba(250,204,21,0.25);
+    transition:left 0.08s linear;z-index:2;
+  }
+  .knot.you-ahead{box-shadow:0 4px 12px rgba(0,0,0,0.5), 0 0 0 4px rgba(74,222,128,0.35)}
+  .knot.cpu-ahead{box-shadow:0 4px 12px rgba(0,0,0,0.5), 0 0 0 4px rgba(248,113,113,0.35)}
+  .rope-pos-label{
+    display:flex;justify-content:space-between;margin-top:8px;font-size:11px;font-weight:800;
+  }
+  .rope-pos-label span{color:#94a3b8}
+  .rope-pos-label b{color:#f8fafc}
+  .live-row{
+    display:flex;gap:8px;margin-top:10px;
+  }
+  .live-chip{
+    flex:1;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);
+    border-radius:10px;padding:7px 8px;display:flex;justify-content:space-between;align-items:center;
+  }
+  .live-chip span{font-size:10px;letter-spacing:0.08em;color:#94a3b8;font-weight:700}
+  .live-chip b{font-size:13px;font-weight:900}
+  /* TAP button */
+  .tap-area{margin-top:16px}
+  .tap-btn{
+    width:100%;height:132px;border-radius:20px;border:none;
+    background:linear-gradient(180deg,#4ade80 0%,#16a34a 100%);
+    color:#052e16;font-weight:900;font-size:28px;letter-spacing:0.06em;
+    box-shadow:0 8px 0 #14532d, 0 12px 24px rgba(22,163,74,0.35);
+    cursor:pointer;user-select:none;touch-action:manipulation;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    transition:transform 0.05s, box-shadow 0.05s, filter 0.1s;
+    position:relative;overflow:hidden;
+  }
+  .tap-btn small{font-size:12px;letter-spacing:0.12em;opacity:0.8;font-weight:800}
+  .tap-btn:active:not(:disabled){
+    transform:translateY(6px);
+    box-shadow:0 2px 0 #14532d, 0 4px 12px rgba(22,163,74,0.35);
+  }
+  .tap-btn:disabled{
+    background:linear-gradient(180deg,#334155,#1e293b);color:#64748b;
+    box-shadow:0 4px 0 #0f172a;cursor:not-allowed;
+  }
+  .tap-btn.pulse{animation:pulse 0.18s ease}
+  @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(0.98)}100%{transform:scale(1)}}
+  .tap-hint{text-align:center;font-size:11px;color:#64748b;margin-top:8px;font-weight:600}
+  /* Controls */
+  .controls{display:flex;gap:10px;margin-top:14px}
+  .btn{
+    flex:1;padding:14px 0;border-radius:14px;border:2px solid transparent;
+    font-weight:800;font-size:14px;letter-spacing:0.04em;cursor:pointer;
+    transition:all .15s;
+  }
+  .btn-primary{
+    background:#facc15;color:#0f172a;border-color:#facc15;
+    box-shadow:0 4px 12px rgba(250,204,21,0.3);
+  }
+  .btn-primary:active{transform:scale(0.97)}
+  .btn-secondary{
+    background:rgba(255,255,255,0.06);color:#e2e8f0;border-color:rgba(255,255,255,0.1);
+  }
+  .btn-secondary:active{transform:scale(0.97)}
+  .btn:disabled{opacity:0.45;pointer-events:none}
+  /* Overlay */
+  .overlay{
+    position:absolute;inset:0;background:rgba(2,6,23,0.88);backdrop-filter:blur(6px);
+    display:none;align-items:center;justify-content:center;padding:20px;z-index:10;
+    border-radius:0;
+  }
+  .overlay.show{display:flex}
+  .modal{
+    width:100%;max-width:360px;background:#1e293b;border:1px solid rgba(255,255,255,0.1);
+    border-radius:20px;padding:20px;text-align:center;
+    box-shadow:0 20px 40px rgba(0,0,0,0.5);
+  }
+  .modal-emoji{font-size:42px;margin-bottom:8px}
+  .modal-title{font-size:22px;font-weight:900;letter-spacing:0.02em}
+  .modal-sub{font-size:13px;color:#94a3b8;margin-top:6px;line-height:1.5;font-weight:600}
+  .modal-stats{
+    display:flex;gap:8px;margin:14px 0;
+  }
+  .modal-stat{flex:1;background:rgba(255,255,255,0.05);border-radius:12px;padding:10px 6px;border:1px solid rgba(255,255,255,0.06)}
+  .modal-stat span{font-size:10px;letter-spacing:0.08em;color:#94a3b8;font-weight:700;display:block}
+  .modal-stat b{font-size:16px;font-weight:900;margin-top:2px;display:block}
+  .modal-actions{display:flex;gap:10px;margin-top:14px}
+  .modal-actions .btn{padding:12px 0;font-size:13px}
+  /* Toast */
+  .toast{
+    position:absolute;top:14px;left:50%;transform:translateX(-50%) translateY(-20px);
+    background:#facc15;color:#0f172a;padding:8px 14px;border-radius:999px;
+    font-size:12px;font-weight:800;letter-spacing:0.04em;opacity:0;pointer-events:none;
+    transition:all .25s;z-index:20;white-space:nowrap;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  /* Footer */
+  .footer{margin-top:auto;padding-top:14px;text-align:center;font-size:10px;letter-spacing:0.08em;color:#475569;font-weight:600}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="toast" id="toast"></div>
+
+  <div class="header">
+    <div class="logo">⚔️ TUG <span>DUEL</span> <i>TAP WAR</i></div>
+    <div class="subtitle">RAPID TAP TO PULL • FIRST TO 2 WINS</div>
+  </div>
+
+  <div class="topbar">
+    <div class="stat-card">
+      <div class="stat-label">🏆 BEST TIME</div>
+      <div class="stat-value" id="bestTime">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">🔥 WIN STREAK</div>
+      <div class="stat-value" id="streakVal">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">MATCHES</div>
+      <div class="stat-value" id="matchesVal">0 W</div>
+    </div>
+  </div>
+
+  <div class="section-label">DIFFICULTY</div>
+  <div class="diff-row" id="diffRow">
+    <button class="diff-btn" data-diff="easy">EASY</button>
+    <button class="diff-btn active" data-diff="med">MED</button>
+    <button class="diff-btn" data-diff="hard">HARD</button>
+  </div>
+
+  <div class="scoreboard">
+    <div class="score-row">
+      <div class="player">
+        <div class="player-name you">YOU</div>
+        <div class="score-num" id="youScore">0</div>
+        <div class="dots" id="youDots"><div class="dot"></div><div class="dot"></div></div>
+      </div>
+      <div class="vs">VS</div>
+      <div class="player">
+        <div class="player-name cpu">CPU RIVAL</div>
+        <div class="score-num" id="cpuScore">0</div>
+        <div class="dots" id="cpuDots"><div class="dot"></div><div class="dot"></div></div>
+      </div>
+    </div>
+    <div class="match-info" id="matchInfo">Choose difficulty → START ROUND</div>
+  </div>
+
+  <div class="timer-wrap">
+    <div class="timer-head">
+      <span class="timer-label">⏱ ROUND TIMER</span>
+      <span class="timer-time" id="timerTime">15.0s</span>
+    </div>
+    <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
+  </div>
+
+  <div class="arena">
+    <div class="arena-head"><span class="cpu">◀ CPU PULL</span><span>ROPE</span><span class="you">YOU PULL ▶</span></div>
+    <div class="rope-track" id="ropeTrack">
+      <div class="win-zone left">WIN</div>
+      <div class="win-zone right">WIN</div>
+      <div class="rope"></div>
+      <div class="center-line"><div class="center-tick"></div></div>
+      <div class="knot" id="knot">🪢</div>
+    </div>
+    <div class="rope-pos-label">
+      <span>CPU <b id="cpuPct">0%</b></span>
+      <span id="posLabel" style="color:#facc15">CENTER</span>
+      <span>YOU <b id="youPct">0%</b></span>
+    </div>
+    <div class="live-row">
+      <div class="live-chip"><span>ROPE</span><b id="ropePct" style="color:#facc15">0%</b></div>
+      <div class="live-chip"><span>TAPS / SEC</span><b id="tapsPerSec" style="color:#4ade80">0.0</b></div>
+      <div class="live-chip"><span>CPU RATE</span><b id="cpuRate" style="color:#f87171">—</b></div>
+    </div>
+  </div>
+
+  <div class="tap-area">
+    <button class="tap-btn" id="tapBtn" disabled>
+      <span id="tapMain">TAP TO PULL!</span>
+      <small id="tapSub">HAMMER IT FAST</small>
+    </button>
+    <div class="tap-hint">💡 Tip: Use two thumbs alternately • Spacebar works too</div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-secondary" id="resetBtn">RESET</button>
+    <button class="btn btn-primary" id="startBtn">START ROUND</button>
+  </div>
+
+  <div class="footer">TUG DUEL • Best of 3 • High score saved on this phone</div>
+
+  <!-- Overlays -->
+  <div class="overlay" id="roundOverlay">
+    <div class="modal">
+      <div class="modal-emoji" id="roundEmoji">🎉</div>
+      <div class="modal-title" id="roundTitle">ROUND WON!</div>
+      <div class="modal-sub" id="roundSub">You dragged the knot into the win zone</div>
+      <div class="modal-stats">
+        <div class="modal-stat"><span>TIME LEFT</span><b id="roundTimeLeft">—</b></div>
+        <div class="modal-stat"><span>ROPE</span><b id="roundRope">—</b></div>
+        <div class="modal-stat"><span>SCORE</span><b id="roundScore">—</b></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="nextRoundBtn" style="flex:1">NEXT ROUND →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="matchOverlay">
+    <div class="modal">
+      <div class="modal-emoji" id="matchEmoji">🏆</div>
+      <div class="modal-title" id="matchTitle">MATCH WON!</div>
+      <div class="modal-sub" id="matchSub">First to 2 — you took it!</div>
+      <div class="modal-stats">
+        <div class="modal-stat"><span>MATCH TIME</span><b id="matchTime">—</b></div>
+        <div class="modal-stat"><span>BEST TIME</span><b id="matchBest">—</b></div>
+        <div class="modal-stat"><span>STREAK</span><b id="matchStreak">—</b></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="shareBtn">SHARE</button>
+        <button class="btn btn-primary" id="newMatchBtn">NEW MATCH</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const $ = s => document.getElementById(s);
+const knot = $('knot');
+const tapBtn = $('tapBtn');
+const startBtn = $('startBtn');
+const resetBtn = $('resetBtn');
+const timerFill = $('timerFill');
+const timerTime = $('timerTime');
+
+// State
+let difficulty = 'med';
+let youWins = 0, cpuWins = 0;
+let ropePos = 0; // -1 (cpu win) to +1 (you win)
+let velocity = 0;
+let roundActive = false;
+let matchActive = false;
+let matchStartTime = 0;
+let roundStartTime = 0;
+let roundDuration = 15000;
+let rafId = null;
+let cpuInterval = null;
+let tapTimes = [];
+let lastTapCount = 0;
+
+// Config per difficulty
+const DIFF = {
+  easy: { label:'EASY', interval:190, power:0.065, friction:0.92, centerPull:0.008, tapPower:0.11, winAt:0.82, time:15000, cpuLabel:'3.2/s' },
+  med:  { label:'MED',  interval:150, power:0.082, friction:0.915, centerPull:0.01, tapPower:0.122, winAt:0.85, time:15000, cpuLabel:'4.8/s' },
+  hard: { label:'HARD', interval:115, power:0.105, friction:0.91, centerPull:0.012, tapPower:0.135, winAt:0.88, time:12000, cpuLabel:'6.5/s' }
+};
+
+// Storage
+const LS_BEST = 'tug_highscore_v2';
+const LS_STREAK = 'tug_streak_v2';
+const LS_BEST_STREAK = 'tug_bestStreak_v2';
+const LS_MATCHES = 'tug_matches_v2';
+
+function loadStats(){
+  const best = localStorage.getItem(LS_BEST);
+  const streak = parseInt(localStorage.getItem(LS_STREAK)||'0');
+  const bestStreak = parseInt(localStorage.getItem(LS_BEST_STREAK)||'0');
+  const matches = JSON.parse(localStorage.getItem(LS_MATCHES)||'{"w":0,"l":0}');
+  $('bestTime').textContent = best ? (parseFloat(best).toFixed(1)+'s') : '—';
+  $('bestTime').innerHTML = best ? parseFloat(best).toFixed(1)+'s <small>2-0</small>' : '—';
+  $('streakVal').textContent = streak;
+  if(bestStreak>0) $('streakVal').innerHTML = streak + '<small style="color:#facc15"> best '+bestStreak+'</small>';
+  $('matchesVal').textContent = matches.w + ' W';
+  $('matchesVal').innerHTML = matches.w+' W <small>'+matches.l+' L</small>';
+  return {best, streak, bestStreak, matches};
+}
+loadStats();
+
+function saveWin(matchTimeSec, isPerfect){
+  let matches = JSON.parse(localStorage.getItem(LS_MATCHES)||'{"w":0,"l":0}');
+  matches.w++;
+  localStorage.setItem(LS_MATCHES, JSON.stringify(matches));
+  let streak = parseInt(localStorage.getItem(LS_STREAK)||'0')+1;
+  localStorage.setItem(LS_STREAK, streak);
+  let bestStreak = parseInt(localStorage.getItem(LS_BEST_STREAK)||'0');
+  if(streak>bestStreak) localStorage.setItem(LS_BEST_STREAK, streak);
+  if(isPerfect){
+    const prevBest = parseFloat(localStorage.getItem(LS_BEST)||'9999');
+    if(matchTimeSec < prevBest){
+      localStorage.setItem(LS_BEST, matchTimeSec.toFixed(1));
+      showToast('🏆 NEW BEST TIME: '+matchTimeSec.toFixed(1)+'s!');
+    }
+  }
+  loadStats();
+  return streak;
+}
+function saveLoss(){
+  let matches = JSON.parse(localStorage.getItem(LS_MATCHES)||'{"w":0,"l":0}');
+  matches.l++;
+  localStorage.setItem(LS_MATCHES, JSON.stringify(matches));
+  localStorage.setItem(LS_STREAK, '0');
+  loadStats();
+}
+
+function setDifficulty(d){
+  difficulty = d;
+  document.querySelectorAll('.diff-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.diff===d);
+  });
+  const cfg = DIFF[d];
+  roundDuration = cfg.time;
+  $('cpuRate').textContent = cfg.cpuLabel;
+  timerTime.textContent = (roundDuration/1000).toFixed(1)+'s';
+  if(!roundActive) updateRopeVisual();
+}
+document.querySelectorAll('.diff-btn').forEach(b=>{
+  b.addEventListener('click', ()=> setDifficulty(b.dataset.diff));
+});
+setDifficulty('med');
+
+function updateScoreboard(){
+  $('youScore').textContent = youWins;
+  $('cpuScore').textContent = cpuWins;
+  const youDots = $('youDots').children;
+  const cpuDots = $('cpuDots').children;
+  for(let i=0;i<2;i++){
+    youDots[i].className = 'dot' + (i < youWins ? ' win-you' : '');
+    cpuDots[i].className = 'dot' + (i < cpuWins ? ' win-cpu' : '');
+  }
+  if(!matchActive && youWins===0 && cpuWins===0){
+    $('matchInfo').textContent = 'Choose difficulty → START ROUND';
+  } else if(roundActive){
+    $('matchInfo').textContent = `ROUND ${youWins+cpuWins+1} • First to 2 wins`;
+  } else if(youWins>0 || cpuWins>0){
+    $('matchInfo').textContent = `SCORE ${youWins} - ${cpuWins} • Next round ready`;
+  }
+}
+
+function updateRopeVisual(){
+  // map -1..1 to 12%..88%
+  const pct = (ropePos + 1)/2; // 0..1
+  const left = 12 + pct * 76;
+  knot.style.left = left + '%';
+  // color
+  knot.className = 'knot' + (ropePos > 0.08 ? ' you-ahead' : ropePos < -0.08 ? ' cpu-ahead' : '');
+  // labels
+  const youP = Math.max(0, ropePos) * 100;
+  const cpuP = Math.max(0, -ropePos) * 100;
+  $('youPct').textContent = Math.round(youP) + '%';
+  $('cpuPct').textContent = Math.round(cpuP) + '%';
+  const abs = Math.abs(ropePos);
+  let label = 'CENTER';
+  if(ropePos > 0.5) label = 'YOU LEAD!';
+  else if(ropePos > 0.15) label = 'YOU AHEAD';
+  else if(ropePos < -0.5) label = 'CPU LEAD!';
+  else if(ropePos < -0.15) label = 'CPU AHEAD';
+  $('posLabel').textContent = label;
+  $('posLabel').style.color = ropePos>0.15 ? '#4ade80' : ropePos<-0.15 ? '#f87171' : '#facc15';
+  $('ropePct').textContent = (ropePos>0?'+':'') + Math.round(ropePos*100) + '%';
+  $('ropePct').style.color = ropePos>0.15 ? '#4ade80' : ropePos<-0.15 ? '#f87171' : '#facc15';
+  // taps per sec
+  const now = Date.now();
+  tapTimes = tapTimes.filter(t=> now - t < 1000);
+  const tps = tapTimes.length;
+  $('tapsPerSec').textContent = tps.toFixed(1);
+}
+
+function showToast(msg){
+  const t=$('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+function startMatchIfNeeded(){
+  if(!matchActive){
+    matchActive = true;
+    matchStartTime = Date.now();
+    youWins=0; cpuWins=0;
+    updateScoreboard();
+  }
+}
+
+function startRound(){
+  startMatchIfNeeded();
+  const cfg = DIFF[difficulty];
+  roundDuration = cfg.time;
+  ropePos = 0;
+  velocity = 0;
+  roundActive = true;
+  roundStartTime = Date.now();
+  tapTimes = [];
+  startBtn.disabled = true;
+  startBtn.textContent = 'FIGHTING...';
+  tapBtn.disabled = false;
+  $('tapMain').textContent = 'TAP TO PULL!';
+  $('tapSub').textContent = 'HAMMER IT FAST';
+  $('roundOverlay').classList.remove('show');
+  $('matchOverlay').classList.remove('show');
+  updateScoreboard();
+  updateRopeVisual();
+
+  // CPU interval
+  clearInterval(cpuInterval);
+  cpuInterval = setInterval(()=>{
+    if(!roundActive) return;
+    const cfg = DIFF[difficulty];
+    let power = cfg.power;
+    // rubber band when behind
+    if(ropePos > 0.2) power *= 1.15;
+    if(ropePos > 0.5) power *= 1.12;
+    // add jitter
+    power *= (0.85 + Math.random()*0.3);
+    velocity -= power;
+    // occasional burst
+    if(Math.random()<0.08) velocity -= power*1.6;
+  }, cfg.interval);
+
+  // loop
+  cancelAnimationFrame(rafId);
+  loop();
+}
+
+function loop(){
+  if(!roundActive) return;
+  const cfg = DIFF[difficulty];
+  const elapsed = Date.now() - roundStartTime;
+  const remaining = Math.max(0, roundDuration - elapsed);
+  const pct = remaining / roundDuration;
+  timerFill.style.width = (pct*100)+'%';
+  timerFill.classList.toggle('warn', remaining < 5000);
+  timerTime.textContent = (remaining/1000).toFixed(1)+'s';
+
+  // physics
+  velocity *= cfg.friction;
+  velocity -= ropePos * cfg.centerPull;
+  ropePos += velocity * 0.18;
+  ropePos = Math.max(-1, Math.min(1, ropePos));
+
+  updateRopeVisual();
+
+  // win check
+  if(ropePos >= cfg.winAt){
+    endRound('you');
+    return;
+  }
+  if(ropePos <= -cfg.winAt){
+    endRound('cpu');
+    return;
+  }
+  // time out
+  if(remaining <= 0){
+    if(Math.abs(ropePos) < 0.08){
+      // draw - replay
+      endRound('draw');
+    } else if(ropePos > 0){
+      endRound('you');
+    } else {
+      endRound('cpu');
+    }
+    return;
+  }
+
+  rafId = requestAnimationFrame(loop);
+}
+
+function handleTap(e){
+  if(e) e.preventDefault();
+  if(!roundActive) return;
+  const cfg = DIFF[difficulty];
+  // diminishing returns for autoclicker: if >10 taps/sec, reduce power
+  const now = Date.now();
+  tapTimes.push(now);
+  tapTimes = tapTimes.filter(t=> now - t < 1000);
+  let power = cfg.tapPower;
+  if(tapTimes.length > 10) power *= 0.65;
+  else if(tapTimes.length > 8) power *= 0.85;
+  power *= (0.9 + Math.random()*0.2);
+  velocity += power;
+  // visual feedback
+  tapBtn.classList.remove('pulse');
+  void tapBtn.offsetWidth;
+  tapBtn.classList.add('pulse');
+  if(navigator.vibrate) navigator.vibrate(12);
+  updateRopeVisual();
+}
+
+tapBtn.addEventListener('touchstart', handleTap, {passive:false});
+tapBtn.addEventListener('mousedown', handleTap);
+tapBtn.addEventListener('touchend', e=>e.preventDefault());
+
+// also allow tapping anywhere on tapBtn with pointer
+document.addEventListener('keydown', e=>{
+  if(e.code==='Space'){
+    e.preventDefault();
+    handleTap();
+  }
+});
+
+function endRound(winner){
+  roundActive = false;
+  clearInterval(cpuInterval);
+  cancelAnimationFrame(rafId);
+  const elapsed = Date.now() - roundStartTime;
+  const timeLeft = Math.max(0, roundDuration - elapsed)/1000;
+
+  if(winner==='you'){
+    youWins++;
+    if(navigator.vibrate) navigator.vibrate([30,40,30]);
+  } else if(winner==='cpu'){
+    cpuWins++;
+    if(navigator.vibrate) navigator.vibrate([80]);
+  } else {
+    // draw
+    if(navigator.vibrate) navigator.vibrate([20,30,20]);
+  }
+
+  updateScoreboard();
+  startBtn.disabled = false;
+  startBtn.textContent = (youWins>=2 || cpuWins>=2) ? 'MATCH OVER' : 'START ROUND';
+  tapBtn.disabled = true;
+
+  // check match over
+  if(youWins>=2 || cpuWins>=2){
+    setTimeout(()=> showMatchResult(), 400);
+    return;
+  }
+
+  // show round overlay
+  const isDraw = winner==='draw';
+  $('roundEmoji').textContent = isDraw ? '🤝' : winner==='you' ? '💪' : '😤';
+  $('roundTitle').textContent = isDraw ? 'DRAW!' : winner==='you' ? 'ROUND WON!' : 'ROUND LOST!';
+  $('roundTitle').style.color = isDraw ? '#facc15' : winner==='you' ? '#4ade80' : '#f87171';
+  $('roundSub').textContent = isDraw ? 'Too close to call — replay!' : winner==='you' ? 'You dragged the knot into the WIN zone!' : 'CPU overpowered you — tap faster!';
+  $('roundTimeLeft').textContent = timeLeft.toFixed(1)+'s';
+  $('roundRope').textContent = (ropePos>0?'+':'')+Math.round(ropePos*100)+'%';
+  $('roundScore').textContent = youWins+' - '+cpuWins;
+  $('nextRoundBtn').textContent = isDraw ? 'REPLAY →' : 'NEXT ROUND →';
+  $('roundOverlay').classList.add('show');
+}
+
+function showMatchResult(){
+  const totalTime = (Date.now() - matchStartTime)/1000;
+  const youWon = youWins>=2;
+  const isPerfect = youWon && cpuWins===0;
+  let streak = 0;
+  if(youWon){
+    streak = saveWin(totalTime, isPerfect);
+  } else {
+    saveLoss();
+  }
+  const best = localStorage.getItem(LS_BEST);
+  $('matchEmoji').textContent = youWon ? (isPerfect ? '👑' : '🏆') : '💀';
+  $('matchTitle').textContent = youWon ? (isPerfect ? 'PERFECT 2-0!' : 'MATCH WON!') : 'MATCH LOST';
+  $('matchTitle').style.color = youWon ? '#4ade80' : '#f87171';
+  $('matchSub').textContent = youWon ? (isPerfect ? 'Flawless victory! New best if fastest.' : 'First to 2 — you took it!') : 'CPU took the match 2-'+youWins+' — try again!';
+  $('matchTime').textContent = totalTime.toFixed(1)+'s';
+  $('matchBest').textContent = best ? best+'s' : '—';
+  $('matchStreak').textContent = youWon ? streak : '0';
+  $('matchOverlay').classList.add('show');
+  matchActive = false;
+  startBtn.textContent = 'START ROUND';
+  startBtn.disabled = false;
+}
+
+function resetAll(){
+  clearInterval(cpuInterval);
+  cancelAnimationFrame(rafId);
+  roundActive=false;
+  matchActive=false;
+  youWins=0; cpuWins=0;
+  ropePos=0; velocity=0;
+  tapTimes=[];
+  timerFill.style.width='100%';
+  timerFill.classList.remove('warn');
+  timerTime.textContent=(DIFF[difficulty].time/1000).toFixed(1)+'s';
+  $('roundOverlay').classList.remove('show');
+  $('matchOverlay').classList.remove('show');
+  startBtn.disabled=false;
+  startBtn.textContent='START ROUND';
+  tapBtn.disabled=true;
+  $('tapMain').textContent='TAP TO PULL!';
+  updateScoreboard();
+  updateRopeVisual();
+  showToast('↺ Match reset');
+}
+
+// Buttons
+startBtn.addEventListener('click', ()=>{
+  if(youWins>=2 || cpuWins>=2){
+    resetAll();
+    startRound();
+  } else {
+    startRound();
+  }
+});
+resetBtn.addEventListener('click', resetAll);
+$('nextRoundBtn').addEventListener('click', ()=>{
+  $('roundOverlay').classList.remove('show');
+  startBtn.textContent='START ROUND';
+});
+$('newMatchBtn').addEventListener('click', ()=>{
+  $('matchOverlay').classList.remove('show');
+  resetAll();
+});
+$('shareBtn').addEventListener('click', ()=>{
+  const best = localStorage.getItem(LS_BEST)||'—';
+  const text = `TUG DUEL: I won ${youWins}-${cpuWins} on ${DIFF[difficulty].label}! Best 2-0 time: ${best}s — can you beat it?`;
+  if(navigator.share){
+    navigator.share({title:'Tug Duel', text}).catch(()=>{});
+  } else if(navigator.clipboard){
+    navigator.clipboard.writeText(text);
+    showToast('📋 Copied to clipboard!');
+  } else {
+    showToast(text);
+  }
+});
+
+// init visual
+updateRopeVisual();
+updateScoreboard();
+</script>
+</body>
+</html>

@@ -2,11 +2,13 @@ package com.samosaai.masala.skills
 
 import com.samosaai.masala.core.contract.MasalaJson
 import com.samosaai.masala.core.contract.MasalaSkill
+import com.samosaai.masala.agent.AgentTools
+import com.samosaai.masala.agent.MemoryTools
 import com.samosaai.masala.core.tool.SkillImportValidator
+import com.samosaai.masala.tools.MasalaToolDefinitions
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /** Plan Phase 1 tests: every bundled skill decodes with the lenient reader and passes the validator. */
@@ -16,12 +18,39 @@ class BundledSkillsTest {
     private val skills = files.map { MasalaJson.lenient.decodeFromString<MasalaSkill>(it.readText()) }
 
     @Test
-    fun `the six personas are bundled`() {
+    fun `the nine experts are bundled and only the daily brief is a job`() {
         assertEquals(
-            setOf("chef", "doctor", "fitness_coach", "handyman", "travel_planner", "tutor"),
-            skills.map { it.id }.toSet(),
+            setOf(
+                "chef", "doctor", "fitness_coach", "handyman", "travel_planner",
+                "software_engineer", "researcher", "editor", "widget_maker",
+            ),
+            skills.filter { it.persona != null }.map { it.id }.toSet(),
         )
-        skills.forEach { assertNotNull(it.persona, "${it.id} has no persona") }
+        // App making is an expert's job now (the software engineer), so the only job left is the brief.
+        assertEquals(setOf("daily_brief"), skills.filter { it.persona == null }.map { it.id }.toSet())
+    }
+
+    @Test
+    fun `every tool a bundled skill asks for is one Masala has`() {
+        val memory = listOf(MemoryTools.read, MemoryTools.search, MemoryTools.write, MemoryTools.edit, MemoryTools.delete, MemoryTools.link)
+        val agent = listOf(AgentTools.editLayout, AgentTools.setMode, AgentTools.runSkill, AgentTools.composeMessage)
+        val known = (MasalaToolDefinitions.all + memory + agent).map { it.name }.toSet()
+        skills.forEach { skill ->
+            assertEquals(emptyList(), skill.requiresTools.filterNot { it in known }, "${skill.id} names tools Masala doesn't have")
+        }
+    }
+
+    @Test
+    fun `the daily brief's contract example in core matches the shipped skill`() {
+        // :core keeps a copy for its contract tests; the two must not drift.
+        assertEquals(File("src/main/assets/skills/daily_brief.json").readText(), File("../core/src/main/resources/masala/skills/daily_brief.json").readText())
+    }
+
+    @Test
+    fun `the daily brief runs on a schedule and shows Markdown`() {
+        val brief = skills.single { it.id == "daily_brief" }
+        assertEquals("daily 07:30", brief.schedule?.default)
+        assertEquals(com.samosaai.masala.core.contract.SkillOutput.MARKDOWN, brief.widget?.output)
     }
 
     @Test

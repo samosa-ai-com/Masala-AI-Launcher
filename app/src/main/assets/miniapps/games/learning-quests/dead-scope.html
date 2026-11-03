@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Sanity Debug</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#080a14;--card:#14182b;--card2:#1c2140;--line:#2a2f5a;--accent:#8b5cf6;--accent2:#10b981;--danger:#ef4444;--warn:#f59e0b;--text:#eef0ff;--muted:#9aa0c3}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center}
+.app{width:100%;max-width:428px;min-width:360px;min-height:100dvh;background:radial-gradient(600px 400px at 50% -10%, #2a1a5a 0%, transparent 70%), radial-gradient(500px 300px at 100% 0%, #0f3a2e 0%, transparent 60%), var(--bg);display:flex;flex-direction:column;position:relative;overflow-x:hidden}
+header{padding:12px 14px 10px;position:sticky;top:0;z-index:10;background:rgba(8,10,20,0.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.top-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{display:flex;align-items:center;gap:8px}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#8b5cf6,#10b981);display:grid;place-items:center;font-size:18px;box-shadow:0 4px 16px rgba(139,92,246,.4)}
+.brand h1{font-size:15px;letter-spacing:.04em;line-height:1}
+.brand p{font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.stats{display:flex;gap:8px}
+.pill{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;display:flex;align-items:center;gap:6px;min-height:32px}
+.pill b{color:#fff}
+.sanity-wrap{margin-top:10px}
+.sanity-head{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.bar{height:10px;background:#0f1226;border-radius:999px;overflow:hidden;border:1px solid var(--line);position:relative}
+.bar-fill{height:100%;width:100%;background:linear-gradient(90deg,#10b981,#8b5cf6);transition:width .4s ease;position:relative}
+.bar-fill.low{background:linear-gradient(90deg,#ef4444,#f59e0b)}
+.bar-fill.crit{background:#ef4444;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
+.level-dots{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.dot{width:22px;height:6px;border-radius:999px;background:#1e2347;border:1px solid var(--line);transition:.3s}
+.dot.done{background:var(--accent2);border-color:var(--accent2)}
+.dot.active{background:var(--accent);border-color:var(--accent);box-shadow:0 0 8px rgba(139,92,246,.6)}
+.dot.fail{background:var(--danger);opacity:.6}
+main{flex:1;padding:14px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;overflow-x:hidden}
+.card{background:linear-gradient(180deg,var(--card),#0f1330);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.card-head{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+.card-head h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.timer-badge{display:flex;align-items:center;gap:6px;background:#0f1226;border:1px solid var(--line);padding:6px 10px;border-radius:999px;font-weight:700;font-size:13px;min-width:72px;justify-content:center}
+.timer-badge.warn{border-color:var(--warn);color:var(--warn);animation:shake .4s infinite alternate}
+.timer-badge.danger{border-color:var(--danger);color:var(--danger);background:rgba(239,68,68,.12)}
+@keyframes shake{from{transform:translateX(-1px)}to{transform:translateX(1px)}}
+.timer-line{height:4px;background:#0f1226}
+.timer-line-fill{height:100%;background:linear-gradient(90deg,#8b5cf6,#10b981);transition:width 1s linear}
+.timer-line-fill.warn{background:var(--warn)}
+.timer-line-fill.danger{background:var(--danger)}
+.code-block{margin:12px 14px;background:#0a0d1f;border:1px solid #252a5a;border-radius:12px;overflow:hidden}
+.code-top{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#0f1330;border-bottom:1px solid #252a5a;font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.code-top span:last-child{color:var(--warn)}
+pre{padding:12px 12px 14px;overflow-x:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px;line-height:1.5;white-space:pre;max-width:100%}
+.kw{color:#c084fc}.fn{color:#60a5fa}.str{color:#34d399}.num{color:#fbbf24}.com{color:#6b7280;font-style:italic}.err{color:#f87171;text-decoration:wavy underline}
+.question{padding:0 14px 6px;font-size:15px;line-height:1.4;font-weight:600}
+.hint-box{margin:8px 14px;background:rgba(245,158,11,.08);border:1px dashed rgba(245,158,11,.4);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.4;display:none}
+.hint-box.show{display:block}
+.options{padding:10px 14px 14px;display:grid;gap:10px}
+.opt{width:100%;text-align:left;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:12px 12px;display:flex;align-items:center;gap:12px;min-height:56px;cursor:pointer;transition:.15s;color:var(--text);font-size:14px;line-height:1.3}
+.opt:active{transform:scale(.98)}
+.opt:disabled{opacity:.6;cursor:not-allowed}
+.letter{width:32px;height:32px;border-radius:9px;background:#0f1226;border:1px solid var(--line);display:grid;place-items:center;font-weight:800;font-size:13px;flex-shrink:0}
+.opt.correct{border-color:var(--accent2);background:rgba(16,185,129,.12)}
+.opt.wrong{border-color:var(--danger);background:rgba(239,68,68,.12);animation:shake .3s}
+.opt .check{margin-left:auto;font-size:16px}
+.actions{display:flex;gap:10px;padding:0 14px 14px}
+.btn{flex:1;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--text);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:linear-gradient(135deg,#8b5cf6,#6d28d9);border-color:#7c3aed;box-shadow:0 6px 16px rgba(139,92,246,.35)}
+.btn-ghost{background:transparent}
+.btn:disabled{opacity:.5}
+.feedback{margin:0 14px 14px;padding:12px;border-radius:12px;font-size:13px;line-height:1.4;display:none}
+.feedback.show{display:block}
+.feedback.ok{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.4);color:#a7f3d0}
+.feedback.bad{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#fecaca}
+.screen{flex:1;display:flex;flex-direction:column;gap:14px}
+.hero{padding:18px 16px;text-align:center}
+.hero h2{font-size:26px;line-height:1.1;margin-bottom:8px}
+.hero h2 span{background:linear-gradient(90deg,#8b5cf6,#10b981);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{color:var(--muted);font-size:14px;line-height:1.5}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center}
+.stat b{font-size:20px;display:block}
+.stat span{font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.rules{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.rules h3{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.rules li{list-style:none;display:flex;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;line-height:1.4}
+.rules li:last-child{border:0}
+.badge{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:14px;flex-shrink:0}
+.cta{display:grid;gap:10px}
+.cta .btn{min-height:52px;font-size:15px}
+.small{font-size:12px;color:var(--muted);text-align:center;line-height:1.4}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
+.overlay.show{display:flex}
+.modal{width:100%;max-width:400px;background:linear-gradient(180deg,#1a1f44,#12152e);border:1px solid var(--line);border-radius:18px;padding:18px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.6)}
+.modal h3{font-size:20px;margin-bottom:6px}
+.modal p{color:var(--muted);font-size:13px;line-height:1.5;margin-bottom:14px}
+.modal .row{display:flex;gap:10px}
+.sanity-float{position:fixed;left:50%;top:90px;transform:translateX(-50%);background:#1f1230;border:1px solid #7c3aed;color:#e9d5ff;padding:8px 12px;border-radius:999px;font-weight:800;font-size:13px;pointer-events:none;opacity:0;transition:.3s;z-index:30}
+.sanity-float.show{opacity:1;transform:translateX(-50%) translateY(-8px)}
+.footer{padding:10px 14px 16px;display:flex;justify-content:space-between;gap:10px}
+.footer .btn{font-size:12px;min-height:40px}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+<header>
+  <div class="top-row">
+    <div class="brand">
+      <div class="logo">👁️</div>
+      <div><h1>SANITY DEBUG</h1><p>Haunted Code Quiz</p></div>
+    </div>
+    <div class="stats">
+      <div class="pill">🎯 <b id="acc">0%</b></div>
+      <div class="pill">📊 <b id="lvlTxt">1/8</b></div>
+    </div>
+  </div>
+  <div class="sanity-wrap">
+    <div class="sanity-head"><span>🧠 Sanity</span><span id="sanityTxt">100 / 100</span></div>
+    <div class="bar"><div class="bar-fill" id="sanityBar" style="width:100%"></div></div>
+    <div class="level-dots" id="dots"></div>
+  </div>
+</header>
+
+<main>
+  <!-- START -->
+  <section class="screen" id="startScreen">
+    <div class="hero">
+      <h2>Debug the <span>Haunted Code</span> before it debugs you.</h2>
+      <p>Each bug hides in plain sight. Answer fast — the clock drains, wrong answers shatter sanity, and hints cost your mind.</p>
+    </div>
+    <div class="stats-grid">
+      <div class="stat"><b id="sAcc">0%</b><span>Accuracy</span></div>
+      <div class="stat"><b id="sSan">100</b><span>Sanity</span></div>
+      <div class="stat"><b id="sLvl">0/8</b><span>Progress</span></div>
+    </div>
+    <div class="rules">
+      <h3>How it works</h3>
+      <li><span class="badge" style="background:rgba(139,92,246,.2)">⏳</span><span><b>30s countdown</b> per level. Time out = -20 sanity.</span></li>
+      <li><span class="badge" style="background:rgba(239,68,68,.15)">💔</span><span><b>Wrong answer = -18 sanity</b> + screen shake. Correct = +6 sanity (max 100).</span></li>
+      <li><span class="badge" style="background:rgba(245,158,11,.15)">💡</span><span><b>Hint = -12 sanity.</b> Use wisely — it reveals the bug's whisper.</span></li>
+      <li><span class="badge" style="background:rgba(16,185,129,.15)">💾</span><span><b>Auto-save</b> after every move. Close & return — your sanity persists.</span></li>
+    </div>
+    <div class="cta">
+      <button class="btn btn-primary" id="btnContinue" style="display:none">▶ Continue — Level <span id="contLvl">1</span></button>
+      <button class="btn btn-primary" id="btnStart">▶ New Descent</button>
+      <button class="btn" id="btnReset">↺ Reset Progress</button>
+      <p class="small">Mobile-first • 360–428px • Large 48px+ touch targets • No horizontal scroll • localStorage persistence</p>
+    </div>
+  </section>
+
+  <!-- GAME -->
+  <section class="screen" id="gameScreen" style="display:none">
+    <div class="card" id="qCard">
+      <div class="card-head">
+        <h2 id="qTitle">Level 1 — The Loop That Never Ends</h2>
+        <div class="timer-badge" id="timerBadge">⏳ 30s</div>
+      </div>
+      <div class="timer-line"><div class="timer-line-fill" id="timerFill" style="width:100%"></div></div>
+      <div class="code-block">
+        <div class="code-top"><span id="codeLang">javascript • haunted.js</span><span>👁️ cursed</span></div>
+        <pre id="codePre"></pre>
+      </div>
+      <div class="question" id="qText"></div>
+      <div class="hint-box" id="hintBox"></div>
+      <div class="feedback" id="feedback"></div>
+      <div class="options" id="options"></div>
+      <div class="actions">
+        <button class="btn" id="btnHint">💡 Hint (-12 sanity)</button>
+        <button class="btn" id="btnSkip">⏭️ Skip (-8)</button>
+      </div>
+    </div>
+    <div class="footer">
+      <button class="btn btn-ghost" id="btnQuit">← Quit</button>
+      <button class="btn btn-ghost" id="btnNext" disabled>Next →</button>
+    </div>
+  </section>
+
+  <!-- END -->
+  <section class="screen" id="endScreen" style="display:none">
+    <div class="hero">
+      <h2 id="endTitle">You Escaped</h2>
+      <p id="endDesc">The code is quiet... for now.</p>
+    </div>
+    <div class="stats-grid">
+      <div class="stat"><b id="eAcc">0%</b><span>Accuracy</span></div>
+      <div class="stat"><b id="eSan">0</b><span>Sanity Left</span></div>
+      <div class="stat"><b id="eScore">0</b><span>Score</span></div>
+    </div>
+    <div class="card" style="padding:14px">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase">Run Summary</div>
+      <div id="summary" style="font-size:13px;line-height:1.6"></div>
+    </div>
+    <div class="cta">
+      <button class="btn btn-primary" id="btnReplay">↻ Play Again</button>
+      <button class="btn" id="btnShare">📋 Copy Results</button>
+    </div>
+  </section>
+</main>
+<div class="sanity-float" id="float">-18 sanity</div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3 id="modalTitle">Sanity Shattered</h3>
+    <p id="modalDesc">Your mind couldn't take it.</p>
+    <div class="row">
+      <button class="btn" id="modalCancel">Keep Trying</button>
+      <button class="btn btn-primary" id="modalOk">View Results</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const LEVELS=[
+{title:"The Loop That Never Ends",lang:"javascript • loop.js",code:`<span class="kw">for</span> (<span class="kw">let</span> i=<span class="num">0</span>; i &lt; items.<span class="fn">length</span>; i++) {
+  <span class="fn">setTimeout</span>(() => {
+    <span class="fn">console</span>.<span class="fn">log</span>(items[i]);
+  }, <span class="num">100</span>);
+}
+<span class="com">// Expected: 0,1,2 — Got: undefined x3</span>`,q:"Why does this log undefined three times?",opts:["var vs let scoping — i is shared","setTimeout is synchronous","console.log is hoisted","items.length is 0"],a:0,hint:"The bug is about closure over a loop variable. Think about what i equals when the timeout fires.",exp:"With var, i is function-scoped and ends at 3. All timeouts see the final i. Use let or capture i."},
+{title:"Off-By-One in the Crypt",lang:"javascript • crypt.js",code:`<span class="kw">function</span> <span class="fn">getLast</span>(arr){
+  <span class="kw">return</span> arr[arr.<span class="fn">length</span>];
+}
+<span class="fn">getLast</span>([<span class="str">'a'</span>,<span class="str">'b'</span>,<span class="str">'c'</span>]) <span class="com">// → undefined</span>`,q:"What's the bug?",opts:["Should be arr.length - 1","Need arr.slice(-1)","Array is empty","Return needs await"],a:0,hint:"Arrays are 0-indexed. The last valid index is one less than length.",exp:"arr[arr.length] is out of bounds. Correct is arr[arr.length-1] or arr.at(-1)."},
+{title:"The Phantom Promise",lang:"javascript • async.js",code:`<span class="kw">async</span> <span class="kw">function</span> <span class="fn">load</span>(){
+  users.<span class="fn">forEach</span>(<span class="kw">async</span> u => {
+    <span class="kw">await</span> <span class="fn">save</span>(u);
+  });
+  <span class="fn">console</span>.<span class="fn">log</span>(<span class="str">'done'</span>);
+}
+<span class="com">// 'done' logs before saves finish</span>`,q:"Why doesn't forEach wait?",opts:["forEach doesn't await async callbacks","Missing return in save","console.log is async","Need Promise.all but forEach is fine"],a:0,hint:"forEach fires callbacks and ignores returned promises. It never waits.",exp:"Use for...of with await, or await Promise.all(users.map(u=>save(u)))."},
+{title:"Equality Séance",lang:"javascript • equal.js",code:`<span class="kw">if</span> (input == <span class="num">0</span>) {
+  <span class="fn">unlock</span>();
+}
+<span class="com">// input = "" also unlocks!?</span>`,q:"Why does empty string unlock?",opts:["== does type coercion: '' == 0 is true","0 is falsy so if fails","input is null","unlock() is hoisted"],a:0,hint:"Loose equality coerces types. '' becomes 0 when compared to a number.",exp:"Use === to avoid coercion. '' === 0 is false."},
+{title:"The Mutating Potion",lang:"javascript • potion.js",code:`<span class="kw">const</span> base = { hp:<span class="num">100</span>, buffs:[] };
+<span class="kw">const</span> player = base;
+player.<span class="fn">hp</span> -= <span class="num">20</span>;
+<span class="com">// base.hp is now 80 — why?</span>`,q:"Why did base change?",opts:["Objects are references — player points to same object","const prevents mutation but not here","hp is a getter","Spread is missing"],a:0,hint:"Assignment doesn't clone objects. Both variables point to the same memory.",exp:"Clone: const player = {...base, buffs:[...base.buffs]} or structuredClone(base)."},
+{title:"CSS Ghost Click",lang:"css • ghost.css",code:`<span class="fn">.modal</span> { <span class="kw">z-index</span>: <span class="num">10</span>; }
+<span class="fn">.tooltip</span> { <span class="kw">z-index</span>: <span class="num">999</span>; }
+<span class="com">/* tooltip still under modal */</span>`,q:"Why is tooltip still hidden?",opts:["Parent stacking context traps z-index","z-index needs position","999 is too high","Modal has !important"],a:0,hint:"z-index only works inside its stacking context. A parent with opacity/transform creates one.",exp:"Move tooltip outside modal's stacking context or remove transform/opacity on parent."},
+{title:"The Leaking Interval",lang:"javascript • leak.js",code:`<span class="kw">useEffect</span>(() => {
+  <span class="fn">setInterval</span>(<span class="fn">tick</span>, <span class="num">1000</span>);
+}, []);
+<span class="com">// Interval doubles on every hot-reload</span>`,q:"What's missing?",opts:["Cleanup: return () => clearInterval(id)","Need dependency [tick]","setInterval should be setTimeout","useEffect needs async"],a:0,hint:"Effects that create intervals must clean them up, or they stack.",exp:"const id=setInterval(tick,1000); return ()=>clearInterval(id);"},
+{title:"SQL Injection Specter",lang:"sql • specter.sql",code:`query = <span class="str">"SELECT * FROM users WHERE name = '"</span> + input + <span class="str">"'"</span>
+<span class="com">-- input: ' OR '1'='1</span>`,q:"What does this input do?",opts:["Bypasses auth — returns all users","Causes syntax error only","Deletes the table","Is safely escaped"],a:0,hint:"String concatenation lets attackers close the quote and inject logic.",exp:"Use parameterized queries / prepared statements. Never concat user input."}
+];
+
+const STORAGE_KEY="spookyDebug_v1";
+let state={sanity:100, idx:0, correct:0, wrong:0, hints:0, skips:0, streak:0, bestStreak:0, started:false};
+let timer=null, timeLeft=30, hintUsed=false, answered=false;
+
+const $=s=>document.getElementById(s);
+const els={
+  acc:$('acc'), lvlTxt:$('lvlTxt'), sanityTxt:$('sanityTxt'), sanityBar:$('sanityBar'), dots:$('dots'),
+  startScreen:$('startScreen'), gameScreen:$('gameScreen'), endScreen:$('endScreen'),
+  sAcc:$('sAcc'), sSan:$('sSan'), sLvl:$('sLvl'), contLvl:$('contLvl'), btnContinue:$('btnContinue'),
+  qTitle:$('qTitle'), timerBadge:$('timerBadge'), timerFill:$('timerFill'), codePre:$('codePre'), codeLang:$('codeLang'),
+  qText:$('qText'), hintBox:$('hintBox'), feedback:$('feedback'), options:$('options'),
+  btnHint:$('btnHint'), btnSkip:$('btnSkip'), btnNext:$('btnNext'), float:$('float'),
+  overlay:$('overlay'), modalTitle:$('modalTitle'), modalDesc:$('modalDesc')
+};
+
+function load(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw) return null;
+    const d=JSON.parse(raw);
+    if(typeof d.sanity==='number') return d;
+  }catch(e){}
+  return null;
+}
+function save(){
+  const data={...state, time:Date.now()};
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+function resetState(){
+  state={sanity:100, idx:0, correct:0, wrong:0, hints:0, skips:0, streak:0, bestStreak:0, started:true};
+  save();
+}
+function accuracy(){
+  const t=state.correct+state.wrong;
+  return t? Math.round(state.correct/t*100):0;
+}
+function updateHeader(){
+  const acc=accuracy();
+  els.acc.textContent=acc+'%';
+  els.lvlTxt.textContent=(Math.min(state.idx+1, LEVELS.length))+'/'+LEVELS.length;
+  els.sanityTxt.textContent=state.sanity+' / 100';
+  els.sanityBar.style.width=state.sanity+'%';
+  els.sanityBar.className='bar-fill'+(state.sanity<=25?' crit':state.sanity<=45?' low':'');
+  // dots
+  els.dots.innerHTML='';
+  LEVELS.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='dot'+(i<state.idx?' done':i===state.idx?' active':'')+(i<state.idx && state['fail_'+i]?' fail':'');
+    els.dots.appendChild(d);
+  });
+  // start stats
+  els.sAcc.textContent=acc+'%';
+  els.sSan.textContent=state.sanity;
+  els.sLvl.textContent=state.idx+'/'+LEVELS.length;
+  const saved=load();
+  if(saved && saved.idx>0 && saved.idx<LEVELS.length && saved.sanity>0){
+    els.btnContinue.style.display='flex';
+    els.contLvl.textContent=saved.idx+1;
+  } else els.btnContinue.style.display='none';
+}
+function showFloat(txt, bad=true){
+  els.float.textContent=txt;
+  els.float.style.background=bad?'rgba(239,68,68,.15)':'rgba(16,185,129,.15)';
+  els.float.style.borderColor=bad?'#ef4444':'#10b981';
+  els.float.style.color=bad?'#fecaca':'#a7f3d0';
+  els.float.classList.add('show');
+  setTimeout(()=>els.float.classList.remove('show'),1200);
+  if(navigator.vibrate) navigator.vibrate(bad? [60,30,60]:30);
+}
+function changeSanity(delta){
+  state.sanity=Math.max(0, Math.min(100, state.sanity+delta));
+  updateHeader(); save();
+  if(delta<0) showFloat(delta+' sanity', true);
+  else if(delta>0) showFloat('+'+delta+' sanity', false);
+  if(state.sanity<=0){
+    clearInterval(timer);
+    setTimeout(()=>showModal(true), 400);
+  }
+}
+function showModal(isDead){
+  els.modalTitle.textContent=isDead?'Sanity Shattered 💀':'Level Complete';
+  els.modalDesc.textContent=isDead?'Your mind fractured. View your descent or cling to one more try.':'You survived this floor of the haunted stack.';
+  $('modalCancel').textContent=isDead?'Try Again (Restore 30)':'Continue';
+  $('modalOk').textContent=isDead?'View Results':'View Results';
+  els.overlay.classList.add('show');
+  els.overlay.dataset.dead=isDead?'1':'0';
+}
+function hideModal(){ els.overlay.classList.remove('show'); }
+
+function renderLevel(){
+  const lvl=LEVELS[state.idx];
+  if(!lvl){ endGame(false); return; }
+  answered=false; hintUsed=false; timeLeft=30;
+  els.qTitle.textContent=`Level ${state.idx+1} — ${lvl.title}`;
+  els.codeLang.textContent=lvl.lang;
+  els.codePre.innerHTML=lvl.code;
+  els.qText.textContent=lvl.q;
+  els.hintBox.textContent='👁️ Whisper: '+lvl.hint;
+  els.hintBox.classList.remove('show');
+  els.feedback.className='feedback'; els.feedback.style.display='none';
+  els.btnHint.disabled=false; els.btnSkip.disabled=false; els.btnNext.disabled=true;
+  els.btnHint.textContent='💡 Hint (-12 sanity)';
+  // options
+  els.options.innerHTML='';
+  lvl.opts.forEach((o,i)=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=`<span class="letter">${String.fromCharCode(65+i)}</span><span>${o}</span>`;
+    b.onclick=()=>choose(i);
+    els.options.appendChild(b);
+  });
+  updateHeader();
+  startTimer();
+}
+function startTimer(){
+  clearInterval(timer);
+  updateTimerUI();
+  timer=setInterval(()=>{
+    timeLeft--;
+    updateTimerUI();
+    if(timeLeft<=0){
+      clearInterval(timer);
+      if(!answered) handleTimeout();
+    }
+  },1000);
+}
+function updateTimerUI(){
+  els.timerBadge.textContent='⏳ '+timeLeft+'s';
+  els.timerBadge.className='timer-badge'+(timeLeft<=8?' danger':timeLeft<=15?' warn':'');
+  els.timerFill.style.width=(timeLeft/30*100)+'%';
+  els.timerFill.className='timer-line-fill'+(timeLeft<=8?' danger':timeLeft<=15?' warn':'');
+}
+function choose(i){
+  if(answered) return;
+  answered=true;
+  clearInterval(timer);
+  const lvl=LEVELS[state.idx];
+  const opts=[...els.options.children];
+  const isCorrect=i===lvl.a;
+  opts.forEach((b,idx)=>{
+    b.disabled=true;
+    if(idx===lvl.a) b.classList.add('correct');
+    if(idx===i && !isCorrect) b.classList.add('wrong');
+  });
+  if(isCorrect){
+    state.correct++; state.streak++; state.bestStreak=Math.max(state.bestStreak, state.streak);
+    els.feedback.textContent='✅ Correct! '+lvl.exp;
+    els.feedback.className='feedback ok show'; els.feedback.style.display='block';
+    changeSanity(6);
+  } else {
+    state.wrong++; state.streak=0; state['fail_'+state.idx]=true;
+    els.feedback.textContent='❌ Wrong. '+lvl.exp;
+    els.feedback.className='feedback bad show'; els.feedback.style.display='block';
+    changeSanity(-18);
+    // shake card
+    const c=$('qCard'); c.animate([{transform:'translateX(0)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],{duration:300});
+  }
+  save(); updateHeader();
+  els.btnNext.disabled=false;
+  els.btnHint.disabled=true; els.btnSkip.disabled=true;
+  if(state.sanity<=0) return;
+  // auto advance hint
+  els.btnNext.focus();
+}
+function handleTimeout(){
+  if(answered) return;
+  answered=true;
+  state.wrong++; state.streak=0; state['fail_'+state.idx]=true;
+  els.feedback.textContent='⏰ Time up! The code consumed your focus. '+LEVELS[state.idx].exp;
+  els.feedback.className='feedback bad show'; els.feedback.style.display='block';
+  [...els.options.children].forEach((b,idx)=>{ b.disabled=true; if(idx===LEVELS[state.idx].a) b.classList.add('correct'); });
+  changeSanity(-20);
+  save(); updateHeader();
+  els.btnNext.disabled=false; els.btnHint.disabled=true; els.btnSkip.disabled=true;
+}
+function useHint(){
+  if(hintUsed || answered) return;
+  hintUsed=true;
+  els.hintBox.classList.add('show');
+  state.hints++;
+  changeSanity(-12);
+  save(); updateHeader();
+  els.btnHint.disabled=true;
+  els.btnHint.textContent='💡 Revealed';
+}
+function skip(){
+  if(answered) return;
+  clearInterval(timer);
+  answered=true;
+  state.skips++; state.wrong++; state.streak=0;
+  els.feedback.textContent='⏭️ Skipped. Answer: '+LEVELS[state.idx].opts[LEVELS[state.idx].a]+' — '+LEVELS[state.idx].exp;
+  els.feedback.className='feedback bad show'; els.feedback.style.display='block';
+  [...els.options.children].forEach((b,idx)=>{ b.disabled=true; if(idx===LEVELS[state.idx].a) b.classList.add('correct'); });
+  changeSanity(-8);
+  save(); updateHeader();
+  els.btnNext.disabled=false; els.btnHint.disabled=true; els.btnSkip.disabled=true;
+}
+function next(){
+  if(state.sanity<=0){ endGame(true); return; }
+  state.idx++;
+  save();
+  if(state.idx>=LEVELS.length){ endGame(false); return; }
+  renderLevel();
+}
+function endGame(dead){
+  clearInterval(timer);
+  els.gameScreen.style.display='none';
+  els.startScreen.style.display='none';
+  els.endScreen.style.display='flex';
+  const acc=accuracy();
+  const score=Math.round(state.correct*120 + state.sanity*2 - state.hints*10 - state.skips*15);
+  $('eAcc').textContent=acc+'%';
+  $('eSan').textContent=state.sanity;
+  $('eScore').textContent=Math.max(0,score);
+  $('endTitle').textContent=dead?'Consumed by Bugs 💀': state.sanity>=70?'Flawless Exorcism ✨': state.sanity>=40?'You Escaped':'Barely Alive';
+  $('endDesc').textContent=dead?'Sanity hit zero. The haunted stack wins this time.':`Cleared ${state.correct}/${LEVELS.length} levels with ${state.hints} hints and ${state.skips} skips.`;
+  $('summary').innerHTML=`
+    <div>✅ Correct: <b>${state.correct}</b> &nbsp; ❌ Wrong: <b>${state.wrong}</b> &nbsp; 💡 Hints: <b>${state.hints}</b></div>
+    <div>🔥 Best streak: <b>${state.bestStreak}</b> &nbsp; ⏭️ Skips: <b>${state.skips}</b></div>
+    <div>🧠 Final sanity: <b>${state.sanity}/100</b> &nbsp; 🎯 Accuracy: <b>${acc}%</b></div>
+    <div style="margin-top:8px;color:var(--muted)">Progress is saved. Replay to beat your score.</div>
+  `;
+  updateHeader();
+}
+function goStart(){
+  els.endScreen.style.display='none';
+  els.gameScreen.style.display='none';
+  els.startScreen.style.display='flex';
+  updateHeader();
+}
+function goGame(){
+  els.startScreen.style.display='none';
+  els.endScreen.style.display='none';
+  els.gameScreen.style.display='flex';
+  renderLevel();
+}
+
+// events
+$('btnStart').onclick=()=>{ resetState(); goGame(); };
+$('btnContinue').onclick=()=>{
+  const d=load();
+  if(d){ Object.assign(state,d); state.started=true; goGame(); }
+};
+$('btnReset').onclick=()=>{
+  if(confirm('Reset all progress? Sanity will be restored to 100.')){
+    localStorage.removeItem(STORAGE_KEY);
+    state={sanity:100, idx:0, correct:0, wrong:0, hints:0, skips:0, streak:0, bestStreak:0, started:false};
+    updateHeader();
+  }
+};
+$('btnHint').onclick=useHint;
+$('btnSkip').onclick=skip;
+$('btnNext').onclick=next;
+$('btnQuit').onclick=()=>{
+  clearInterval(timer);
+  if(confirm('Quit to menu? Progress is saved.')) goStart();
+  else startTimer();
+};
+$('btnReplay').onclick=()=>{ resetState(); goGame(); };
+$('btnShare').onclick=async()=>{
+  const txt=`Sanity Debug — ${state.correct}/${LEVELS.length} correct, ${accuracy()}% accuracy, ${state.sanity} sanity left. Can you beat it?`;
+  try{ await navigator.clipboard.writeText(txt); showFloat('Copied!', false);}catch{ prompt('Copy:',txt); }
+};
+$('modalCancel').onclick=()=>{
+  hideModal();
+  if(els.overlay.dataset.dead==='1'){
+    state.sanity=30; save(); updateHeader(); renderLevel();
+  } else next();
+};
+$('modalOk').onclick=()=>{ hideModal(); endGame(state.sanity<=0); };
+els.overlay.onclick=(e)=>{ if(e.target===els.overlay) hideModal(); };
+
+// init
+(function init(){
+  const saved=load();
+  if(saved && typeof saved.idx==='number'){
+    // keep saved for continue, but show start screen
+    // don't auto-apply, just show stats from saved
+    const acc=saved.correct+saved.wrong? Math.round(saved.correct/(saved.correct+saved.wrong)*100):0;
+    els.sAcc.textContent=acc+'%';
+    els.sSan.textContent=saved.sanity;
+    els.sLvl.textContent=saved.idx+'/'+LEVELS.length;
+    if(saved.idx>0) { els.btnContinue.style.display='flex'; els.contLvl.textContent=saved.idx+1; }
+  }
+  updateHeader();
+  // keyboard
+  document.addEventListener('keydown',e=>{
+    if(els.gameScreen.style.display==='none') return;
+    if(e.key>='1' && e.key<='4' && !answered){
+      const idx=parseInt(e.key)-1;
+      if(idx < LEVELS[state.idx].opts.length) choose(idx);
+    }
+    if(e.key==='h' && !hintUsed && !answered) useHint();
+    if(e.key==='Enter' && !els.btnNext.disabled) next();
+  });
+})();
+</script>
+</body>
+</html>

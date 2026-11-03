@@ -175,4 +175,26 @@ class ManifestPolicyTest {
             forbiddenProImports(sources),
         )
     }
+
+    @Test
+    fun jdk21ListCallsAreFoundOutsideComments() {
+        val sources = mapOf(
+            "app/src/main/kotlin/Hull.kt" to """
+                fun f(l: MutableList<Int>, d: ArrayDeque<Int>) {
+                    l.removeLast()
+                    // l.removeFirst() in a comment is fine
+                    d.addFirst(1) // and a trailing comment doesn't hide the call
+                    l.removeAt(l.lastIndex)
+                    d.add(2)
+                }
+            """.trimIndent(),
+        )
+        assertEquals(
+            listOf(
+                "app/src/main/kotlin/Hull.kt:2: removeLast()",
+                "app/src/main/kotlin/Hull.kt:4: addFirst()",
+            ),
+            newApiListCalls(sources),
+        )
+    }
 }

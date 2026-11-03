@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Twin Courier</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#1e293b;border-bottom:1px solid #334155}
+header h1{font-size:13px;letter-spacing:1px}
+header h1 span{color:#38bdf8}
+.tot{background:#0ea5e9;color:#fff;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700}
+#levelBar{display:flex;align-items:center;gap:6px;padding:8px 10px;background:#1e293b;border-bottom:1px solid #334155;flex-wrap:wrap}
+.navBtn{width:32px;height:32px;border:none;background:#334155;color:#fff;border-radius:8px;font-size:16px}
+.lvlBtn{width:28px;height:28px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#cbd5e1;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;position:relative}
+.lvlBtn.active{border-color:#38bdf8;background:#0284c7;color:#fff}
+.lvlBtn.locked{opacity:.35}
+.starMini{position:absolute;bottom:-4px;font-size:7px;color:#facc15}
+#levelInfo{width:100%;display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-top:4px}
+#timelineToggle{display:flex;gap:6px;padding:8px 10px;background:#0f172a;border-bottom:1px solid #1e293b}
+.tBtn{flex:1;padding:10px;border-radius:12px;border:2px solid #334155;background:#1e293b;color:#94a3b8;font-weight:800;letter-spacing:1px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px}
+.tBtn.activePast{background:#0c4a6e;border-color:#38bdf8;color:#7dd3fc;box-shadow:0 0 12px rgba(56,189,248,.4)}
+.tBtn.activeFuture{background:#451a03;border-color:#f59e0b;color:#fcd34d;box-shadow:0 0 12px rgba(245,158,11,.4)}
+#stats{display:flex;gap:6px;padding:8px 10px;background:#0f172a;border-bottom:1px solid #1e293b}
+.stat{flex:1;background:#1e293b;border-radius:10px;padding:6px;text-align:center}
+.stat b{display:block;font-size:15px;color:#fff}
+.stat span{font-size:10px;color:#94a3b8}
+#mapWrap{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px;background:#0f172a;overflow:auto}
+#grid{display:grid;gap:3px;background:#1e293b;padding:6px;border-radius:14px;border:1px solid #334155}
+.cell{width:42px;height:42px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;position:relative;user-select:none}
+.cell.wall{background:#020617;border:1px solid #1e293b}
+.cell.road{background:#1e293b;border:1px solid #334155}
+.cell.locked{background:#1e293b;border:2px dashed #f59e0b;opacity:.6}
+.cell.locked::after{content:"🔒";position:absolute;font-size:10px;bottom:1px;right:2px}
+.cell.unlocked{background:#1e293b;border:1px solid #22c55e}
+.cell.startPast{outline:2px solid #38bdf8}
+.cell.startFuture{outline:2px solid #f59e0b}
+.cell.courierPast{background:#0c4a6e;border-color:#38bdf8;box-shadow:0 0 10px rgba(56,189,248,.6)}
+.cell.courierFuture{background:#451a03;border-color:#f59e0b;box-shadow:0 0 10px rgba(245,158,11,.6)}
+.cell.delivery{font-size:16px}
+.cell.delivery.collected{opacity:.25}
+.cell.walkable{box-shadow:inset 0 0 0 2px rgba(56,189,248,.5)}
+.dot{width:8px;height:8px;background:#38bdf8;border-radius:50%;position:absolute;bottom:4px}
+.legend{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px;font-size:11px;color:#94a3b8}
+.legend span{display:flex;align-items:center;gap:4px;background:#1e293b;padding:4px 8px;border-radius:999px;border:1px solid #334155}
+#violations{margin:8px 10px;background:#1e293b;border-radius:12px;padding:8px;border:1px solid #334155}
+#violations h3{font-size:12px;color:#94a3b8;margin-bottom:6px;display:flex;justify-content:space-between}
+.vItem{font-size:12px;padding:5px 8px;background:#0f172a;border-radius:8px;margin-bottom:4px;border-left:3px solid #334155}
+.vItem.done{border-left-color:#22c55e;color:#86efac}
+.vItem.todo{border-left-color:#f59e0b}
+#controls{display:flex;gap:6px;padding:10px;background:#1e293b;border-top:1px solid #334155;flex-wrap:wrap}
+.btn{padding:10px 8px;border:none;border-radius:10px;font-weight:700;font-size:12px;flex:1}
+.btn.sec{background:#334155;color:#e2e8f0}
+.btn.pri{background:#0ea5e9;color:#fff}
+.btn.ghost{background:transparent;color:#94a3b8;border:1px solid #334155}
+.btn.future{background:#f59e0b;color:#fff}
+.btn.past{background:#0284c7;color:#fff}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:20;padding:20px}
+#modal.show{display:flex}
+.modalBox{background:#1e293b;border-radius:16px;padding:18px;max-width:340px;width:100%;text-align:center;border:1px solid #334155}
+.stars{font-size:26px;letter-spacing:4px;margin:8px 0}
+</style>
+</head>
+<body>
+<header><h1>◈ TWIN <span>COURIER</span> — TIME ROUTES</h1><div class="tot" id="totalStars">⭐ 0/24</div></header>
+<div id="levelBar">
+<button class="navBtn" id="prevBtn">‹</button>
+<div id="levelGrid" style="display:flex;gap:4px;flex-wrap:wrap;flex:1"></div>
+<button class="navBtn" id="nextBtn">›</button>
+<div id="levelInfo"><span id="levelName">—</span><span id="levelPar">Par —</span></div>
+</div>
+<div id="timelineToggle">
+<button class="tBtn activePast" id="pastBtn">◆ PAST <span id="pastCount">0/0</span></button>
+<button class="tBtn" id="futureBtn">◇ FUTURE <span id="futureCount">0/0</span></button>
+</div>
+<div id="stats">
+<div class="stat"><b id="movesEl">0</b><span>MOVES</span></div>
+<div class="stat"><b id="parEl">—</b><span>PAR</span></div>
+<div class="stat"><b id="bestEl">—</b><span>BEST</span></div>
+<div class="stat"><b id="eraEl">PAST</b><span>ERA</span></div>
+</div>
+<div id="mapWrap">
+<div id="grid"></div>
+<div class="legend">
+<span>🔵 Past courier</span><span>🟠 Future courier</span><span>◆ Delivery</span><span>🔓 Unlocks road</span><span>⬤ Walkable</span>
+</div>
+</div>
+<div id="violations"><h3><span>Roster Check</span><span id="violBadge">0/0</span></h3><div id="violList"></div></div>
+<div id="controls">
+<button class="btn sec" id="undoBtn">UNDO</button>
+<button class="btn sec" id="waitBtn">WAIT</button>
+<button class="btn sec" id="resetBtn">RESET</button>
+<button class="btn past" id="switchBtn">TO FUTURE →</button>
+</div>
+<div id="modal"><div class="modalBox">
+<h2 id="modalTitle">Route Complete!</h2>
+<div class="stars" id="modalStars">★★★</div>
+<p id="modalMsg" style="color:#94a3b8;font-size:13px"></p>
+<button class="btn pri" id="modalNext" style="width:100%;margin-top:10px">Next Route</button>
+<button class="btn ghost" id="modalClose" style="width:100%;margin-top:6px">Stay</button>
+</div></div>
+<script>
+const KEY='twinCourierSave_v1';
+let save=JSON.parse(localStorage.getItem(KEY)||'null')||{levels:{}};
+
+// 8 levels, small town maps 6x6 to 7x7
+// Each level: w,h, walls (indices), pastDeliveries [{pos, unlocks:[wallIdx]}], futureDeliveries [{pos}], startPast, startFuture, par
+// walls are blocked cells; locked walls are subset that start locked in future and unlock when past delivery collected
+const LEVELS=[
+{id:1,name:"Main Street",par:14,w:6,h:6,
+ walls:[7,8,10,15,21,27,28],
+ lockedWalls:[16,22],
+ pastDeliveries:[{pos:2,unlocks:[16]},{pos:34,unlocks:[22]}],
+ futureDeliveries:[{pos:4},{pos:31}],
+ startPast:0, startFuture:5},
+{id:2,name:"Old Quarter",par:18,w:6,h:6,
+ walls:[1,7,13,14,20,26],
+ lockedWalls:[8,15,21],
+ pastDeliveries:[{pos:2,unlocks:[8]},{pos:30,unlocks:[15]},{pos:35,unlocks:[21]}],
+ futureDeliveries:[{pos:4},{pos:10},{pos:33}],
+ startPast:0, startFuture:5},
+{id:3,name:"Harbor Loop",par:22,w:7,h:6,
+ walls:[8,9,10,15,22,29,30,31],
+ lockedWalls:[16,23,24],
+ pastDeliveries:[{pos:1,unlocks:[16]},{pos:6,unlocks:[23]},{pos:41,unlocks:[24]}],
+ futureDeliveries:[{pos:3},{pos:13},{pos:34},{pos:38}],
+ startPast:0, startFuture:6},
+{id:4,name:"Market Cross",par:26,w:7,h:7,
+ walls:[8,9,15,16,22,30,32,33,40],
+ lockedWalls:[17,23,31,38],
+ pastDeliveries:[{pos:2,unlocks:[17]},{pos:6,unlocks:[23]},{pos:42,unlocks:[31]},{pos:48,unlocks:[38]}],
+ futureDeliveries:[{pos:4},{pos:12},{pos:36},{pos:45}],
+ startPast:0, startFuture:6},
+{id:5,name:"Station Row",par:30,w:7,h:7,
+ walls:[1,8,14,21,28,35,29,30],
+ lockedWalls:[9,15,22,36],
+ pastDeliveries:[{pos:2,unlocks:[9]},{pos:13,unlocks:[15]},{pos:41,unlocks:[22]},{pos:48,unlocks:[36]}],
+ futureDeliveries:[{pos:5},{pos:11},{pos:34},{pos:45},{pos:47}],
+ startPast:0, startFuture:6},
+{id:6,name:"Canal Side",par:34,w:7,h:7,
+ walls:[7,8,14,20,27,34,36,37],
+ lockedWalls:[9,15,21,28,35],
+ pastDeliveries:[{pos:1,unlocks:[9]},{pos:5,unlocks:[15]},{pos:42,unlocks:[21]},{pos:48,unlocks:[28]},{pos:2,unlocks:[35]}],
+ futureDeliveries:[{pos:3},{pos:12},{pos:18},{pos:41},{pos:45}],
+ startPast:0, startFuture:6},
+{id:7,name:"Hill Town",par:38,w:7,h:7,
+ walls:[8,9,10,16,22,29,31,38,40],
+ lockedWalls:[15,17,23,30,39],
+ pastDeliveries:[{pos:1,unlocks:[15]},{pos:6,unlocks:[17]},{pos:13,unlocks:[23]},{pos:42,unlocks:[30]},{pos:48,unlocks:[39]}],
+ futureDeliveries:[{pos:4},{pos:11},{pos:20},{pos:34},{pos:45},{pos:47}],
+ startPast:0, startFuture:6},
+{id:8,name:"Twin Terminus",par:42,w:7,h:7,
+ walls:[7,14,21,28,35,9,16,23,30],
+ lockedWalls:[8,15,22,29,36,37],
+ pastDeliveries:[{pos:1,unlocks:[8]},{pos:5,unlocks:[15]},{pos:13,unlocks:[22]},{pos:41,unlocks:[29]},{pos:45,unlocks:[36]},{pos:48,unlocks:[37]}],
+ futureDeliveries:[{pos:3},{pos:11},{pos:18},{pos:34},{pos:42},{pos:47}],
+ startPast:0, startFuture:6},
+];
+LEVELS.forEach(l=>{ if(!save.levels[l.id]) save.levels[l.id]={stars:0,best:null,unlocked:l.id===1}; });
+function persist(){ localStorage.setItem(KEY, JSON.stringify(save)); }
+
+let curId=1, era='past', moves=0, history=[];
+let posPast=0, posFuture=5, collectedPast=new Set(), collectedFuture=new Set(), unlockedWalls=new Set();
+
+function getLevel(id){ return LEVELS.find(l=>l.id===id); }
+function idxToRC(idx,w){ return [Math.floor(idx/w), idx%w]; }
+function rcToIdx(r,c,w){ return r*w+c; }
+function neighbors(idx,lvl){
+ const w=lvl.w, h=lvl.h, r=Math.floor(idx/w), c=idx%w;
+ const out=[];
+ [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr,dc])=>{
+  const nr=r+dr,nc=c+dc;
+  if(nr<0||nr>=h||nc<0||nc>=w) return;
+  out.push(nr*w+nc);
+ });
+ return out;
+}
+function isWall(idx,lvl,forEra){
+ if(lvl.walls.includes(idx)) return true;
+ if(forEra==='future' && lvl.lockedWalls.includes(idx) && !unlockedWalls.has(idx)) return true;
+ return false;
+}
+function canWalk(from,to,lvl,forEra){
+ if(isWall(to,lvl,forEra)) return false;
+ return neighbors(from,lvl).includes(to);
+}
+
+function loadLevel(id){
+ curId=id; const lvl=getLevel(id);
+ era='past'; moves=0; history=[];
+ posPast=lvl.startPast; posFuture=lvl.startFuture;
+ collectedPast=new Set(); collectedFuture=new Set(); unlockedWalls=new Set();
+ // check starting cells for deliveries
+ checkDeliveries();
+ render();
+}
+function pushHistory(){
+ history.push({posPast,posFuture,era,collectedPast:[...collectedPast],collectedFuture:[...collectedFuture],unlockedWalls:[...unlockedWalls],moves});
+}
+function undo(){
+ if(!history.length) return;
+ const h=history.pop();
+ posPast=h.posPast; posFuture=h.posFuture; era=h.era;
+ collectedPast=new Set(h.collectedPast); collectedFuture=new Set(h.collectedFuture); unlockedWalls=new Set(h.unlockedWalls); moves=h.moves;
+ render();
+}
+function checkDeliveries(){
+ const lvl=getLevel(curId);
+ lvl.pastDeliveries.forEach(d=>{
+  if(posPast===d.pos && !collectedPast.has(d.pos)){
+   collectedPast.add(d.pos);
+   d.unlocks.forEach(w=>unlockedWalls.add(w));
+  }
+ });
+ lvl.futureDeliveries.forEach(d=>{
+  if(posFuture===d.pos && !collectedFuture.has(d.pos)){
+   collectedFuture.add(d.pos);
+  }
+ });
+}
+function tryMove(toIdx){
+ const lvl=getLevel(curId);
+ const curPos=era==='past'?posPast:posFuture;
+ if(!canWalk(curPos,toIdx,lvl,era)) return;
+ pushHistory();
+ if(era==='past') posPast=toIdx; else posFuture=toIdx;
+ moves++;
+ checkDeliveries();
+ render();
+ checkWin();
+}
+function waitTurn(){
+ pushHistory(); moves++; checkDeliveries(); render(); checkWin();
+}
+function switchEra(){
+ pushHistory();
+ era=era==='past'?'future':'past';
+ render();
+}
+function checkWin(){
+ const lvl=getLevel(curId);
+ if(collectedPast.size===lvl.pastDeliveries.length && collectedFuture.size===lvl.futureDeliveries.length){
+  // stars
+  let stars=1;
+  if(moves<=lvl.par) stars=3;
+  else if(moves<=lvl.par+4) stars=2;
+  const rec=save.levels[curId];
+  if(rec.best==null || moves<rec.best) rec.best=moves;
+  if(stars>rec.stars) rec.stars=stars;
+  if(curId<LEVELS.length) save.levels[curId+1].unlocked=true;
+  persist();
+  document.getElementById('modalTitle').textContent='Roster Complete!';
+  document.getElementById('modalStars').textContent='★'.repeat(stars)+'☆'.repeat(3-stars);
+  document.getElementById('modalMsg').textContent=`${lvl.name} cleared in ${moves} moves (par ${lvl.par}). Best: ${rec.best}. ${curId<LEVELS.length?'Next route unlocked.':'All routes done!'}`;
+  document.getElementById('modal').classList.add('show');
+  render();
+ }
+}
+
+function render(){
+ const lvl=getLevel(curId);
+ // level bar
+ const grid=document.getElementById('levelGrid'); grid.innerHTML='';
+ LEVELS.forEach(l=>{
+  const s=save.levels[l.id];
+  const b=document.createElement('button');
+  b.className='lvlBtn '+(l.id===curId?'active ':'')+(s.unlocked?'':'locked');
+  b.textContent=s.unlocked?l.id:'🔒';
+  if(s.unlocked) b.onclick=()=>loadLevel(l.id);
+  if(s.stars>0){ const sm=document.createElement('span'); sm.className='starMini'; sm.textContent='★'.repeat(s.stars); b.appendChild(sm); }
+  grid.appendChild(b);
+ });
+ document.getElementById('levelName').textContent=lvl.name;
+ document.getElementById('levelPar').textContent='Par '+lvl.par+' • Route '+lvl.id+'/8';
+ document.getElementById('parEl').textContent=lvl.par;
+ document.getElementById('movesEl').textContent=moves;
+ document.getElementById('bestEl').textContent=save.levels[curId].best??'—';
+ document.getElementById('eraEl').textContent=era.toUpperCase();
+ document.getElementById('pastCount').textContent=collectedPast.size+'/'+lvl.pastDeliveries.length;
+ document.getElementById('futureCount').textContent=collectedFuture.size+'/'+lvl.futureDeliveries.length;
+ document.getElementById('pastBtn').className='tBtn '+(era==='past'?'activePast':'');
+ document.getElementById('futureBtn').className='tBtn '+(era==='future'?'activeFuture':'');
+ document.getElementById('switchBtn').textContent=era==='past'?'TO FUTURE →':'← TO PAST';
+ document.getElementById('switchBtn').className='btn '+(era==='past'?'future':'past');
+ document.getElementById('prevBtn').disabled=curId===1;
+ document.getElementById('nextBtn').disabled=curId===LEVELS.length || !save.levels[curId+1].unlocked;
+ let total=0; Object.values(save.levels).forEach(v=>total+=v.stars);
+ document.getElementById('totalStars').textContent='⭐ '+total+'/24';
+
+ // grid
+ const g=document.getElementById('grid');
+ g.style.gridTemplateColumns=`repeat(${lvl.w}, 42px)`;
+ g.innerHTML='';
+ const curPos=era==='past'?posPast:posFuture;
+ const walkable=new Set(neighbors(curPos,lvl).filter(n=>!isWall(n,lvl,era)));
+ for(let i=0;i<lvl.w*lvl.h;i++){
+  const cell=document.createElement('div');
+  const wall=isWall(i,lvl,era);
+  const isLockedFuture=lvl.lockedWalls.includes(i);
+  const isUnlocked=unlockedWalls.has(i);
+  let cls='cell ';
+  if(wall){
+   if(isLockedFuture && !isUnlocked && era==='future') cls+='locked';
+   else cls+='wall';
+  } else {
+   if(isLockedFuture && isUnlocked) cls+='unlocked ';
+   else cls+='road ';
+   if(walkable.has(i)) cls+='walkable ';
+  }
+  // courier
+  if(era==='past' && i===posPast) cls+='courierPast ';
+  if(era==='future' && i===posFuture) cls+='courierFuture ';
+  cell.className=cls;
+  // content
+  const pastDel=lvl.pastDeliveries.find(d=>d.pos===i);
+  const futDel=lvl.futureDeliveries.find(d=>d.pos===i);
+  if(era==='past' && pastDel){
+   cell.classList.add('delivery');
+   if(collectedPast.has(i)) cell.classList.add('collected');
+   cell.textContent=collectedPast.has(i)?'✓':'◆';
+   cell.style.color=collectedPast.has(i)?'#22c55e':'#38bdf8';
+   if(!collectedPast.has(i)) cell.title='Delivers → unlocks '+pastDel.unlocks.join(',');
+  } else if(era==='future' && futDel){
+   cell.classList.add('delivery');
+   if(collectedFuture.has(i)) cell.classList.add('collected');
+   cell.textContent=collectedFuture.has(i)?'✓':'◇';
+   cell.style.color=collectedFuture.has(i)?'#22c55e':'#f59e0b';
+  } else if(era==='past' && futDel){
+   // show future deliveries faint in past? no
+  }
+  // start markers
+  if(i===lvl.startPast && era==='past') cell.style.outline='2px solid #38bdf8';
+  if(i===lvl.startFuture && era==='future') cell.style.outline='2px solid #f59e0b';
+  // courier emoji
+  if(era==='past' && i===posPast) cell.textContent='🔵';
+  if(era==='future' && i===posFuture) cell.textContent='🟠';
+  // walkable dot
+  if(walkable.has(i) && !wall){
+   const d=document.createElement('div'); d.className='dot'; cell.appendChild(d);
+  }
+  cell.addEventListener('click',()=>{ if(walkable.has(i)) tryMove(i); });
+  // swipe
+  cell.addEventListener('touchstart',e=>{ cell._sx=e.touches[0].clientX; cell._sy=e.touches[0].clientY; },{passive:true});
+  cell.addEventListener('touchend',e=>{
+   if(cell._sx==null) return;
+   const dx=e.changedTouches[0].clientX-cell._sx, dy=e.changedTouches[0].clientY-cell._sy;
+   if(Math.abs(dx)<20&&Math.abs(dy)<20) return;
+   const w=lvl.w;
+   let target=null;
+   if(Math.abs(dx)>Math.abs(dy)) target=dx>0?curPos+1:curPos-1;
+   else target=dy>0?curPos+w:curPos-w;
+   if(target!=null) tryMove(target);
+  });
+  g.appendChild(cell);
+ }
+ // violations/roster
+ const vList=document.getElementById('violList'); vList.innerHTML='';
+ const totalDeliveries=lvl.pastDeliveries.length+lvl.futureDeliveries.length;
+ const done=collectedPast.size+collectedFuture.size;
+ document.getElementById('violBadge').textContent=done+'/'+totalDeliveries;
+ const items=[];
+ lvl.pastDeliveries.forEach(d=>{
+  const doneP=collectedPast.has(d.pos);
+  items.push({text:`PAST ◆ at ${d.pos} ${doneP?'✓':'→ unlocks '+d.unlocks.join(',')}`,done:doneP});
+ });
+ lvl.futureDeliveries.forEach(d=>{
+  const doneF=collectedFuture.has(d.pos);
+  const locked=lvl.lockedWalls.includes(d.pos) && !unlockedWalls.has(d.pos);
+  items.push({text:`FUTURE ◇ at ${d.pos} ${doneF?'✓':locked?'🔒 blocked':''}`,done:doneF});
+ });
+ // balance hint
+ if(unlockedWalls.size>0) items.push({text:`🔓 ${unlockedWalls.size} future road(s) opened by past deliveries`,done:true});
+ items.forEach(it=>{
+  const div=document.createElement('div'); div.className='vItem '+(it.done?'done':'todo'); div.textContent=it.text; vList.appendChild(div);
+ });
+ document.getElementById('undoBtn').disabled=history.length===0;
+}
+
+document.getElementById('pastBtn').onclick=()=>{ if(era!=='past') switchEra(); };
+document.getElementById('futureBtn').onclick=()=>{ if(era!=='future') switchEra(); };
+document.getElementById('switchBtn').onclick=switchEra;
+document.getElementById('undoBtn').onclick=undo;
+document.getElementById('waitBtn').onclick=waitTurn;
+document.getElementById('resetBtn').onclick=()=>loadLevel(curId);
+document.getElementById('prevBtn').onclick=()=>{ if(curId>1) loadLevel(curId-1); };
+document.getElementById('nextBtn').onclick=()=>{ if(curId<LEVELS.length && save.levels[curId+1].unlocked) loadLevel(curId+1); };
+document.getElementById('modalNext').onclick=()=>{
+ document.getElementById('modal').classList.remove('show');
+ if(curId<LEVELS.length && save.levels[curId+1].unlocked) loadLevel(curId+1);
+};
+document.getElementById('modalClose').onclick=()=>document.getElementById('modal').classList.remove('show');
+window.addEventListener('keydown',e=>{
+ const lvl=getLevel(curId);
+ const curPos=era==='past'?posPast:posFuture;
+ const w=lvl.w;
+ let t=null;
+ if(e.key==='ArrowUp'||e.key==='w'||e.key==='W') t=curPos-w;
+ if(e.key==='ArrowDown'||e.key==='s'||e.key==='S') t=curPos+w;
+ if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A') t=curPos-1;
+ if(e.key==='ArrowRight'||e.key==='d'||e.key==='D') t=curPos+1;
+ if(t!=null){ e.preventDefault(); tryMove(t); }
+ if(e.key==='f'||e.key==='F') switchEra();
+ if(e.key===' ') { e.preventDefault(); waitTurn(); }
+ if(e.key==='u'||e.key==='U') undo();
+});
+
+// init
+loadLevel(1);
+let highest=1; LEVELS.forEach(l=>{ if(save.levels[l.id].unlocked) highest=l.id; });
+if(highest!==1) loadLevel(highest);
+</script>
+</body>
+</html>

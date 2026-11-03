@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>Roping Roundup</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#87CEEB;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+body{display:flex;justify-content:center;background:linear-gradient(#87CEEB 0%, #a8e0ff 40%, #f6d28a 40%, #e8b86a 100%)}
+.app{width:100%;max-width:428px;min-width:360px;height:100dvh;display:flex;flex-direction:column;background:linear-gradient(#87CEEB 0%, #bfe9ff 35%, #f7d9a0 35%, #d9a05a 100%);position:relative;overflow:hidden}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(92,46,14,0.92);color:#fff;gap:6px;flex-shrink:0}
+.stat{background:rgba(255,255,255,0.15);border-radius:10px;padding:6px 8px;text-align:center;min-width:62px;flex:1}
+.stat b{display:block;font-size:18px;line-height:1;color:#ffeb3b;text-shadow:0 1px 0 #000}
+.stat span{font-size:10px;letter-spacing:0.6px;opacity:0.9;text-transform:uppercase;font-weight:700}
+.combo-badge{position:absolute;left:50%;top:62px;transform:translateX(-50%);background:#ff3b30;color:#fff;padding:4px 12px;border-radius:20px;font-weight:900;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.3);display:none;z-index:5}
+.combo-badge.show{display:block;animation:pop 0.3s}
+@keyframes pop{0%{transform:translateX(-50%) scale(0.5)}100%{transform:translateX(-50%) scale(1)}}
+.canvas-wrap{flex:1;position:relative;overflow:hidden}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.hud-target{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.35);color:#fff;font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;letter-spacing:0.5px;pointer-events:none}
+.controls{padding:10px 12px 12px;background:linear-gradient(#5c2e0e,#3d1e08);display:flex;gap:10px;align-items:center;flex-shrink:0}
+.hold-btn{flex:1;height:78px;border-radius:18px;border:4px solid #ffcc33;background:radial-gradient(circle at 30% 30%, #ffeb3b, #ff9800);color:#3d1e08;font-weight:900;font-size:22px;letter-spacing:0.5px;box-shadow:0 6px 0 #b36b00, 0 8px 16px rgba(0,0,0,0.3);touch-action:none;user-select:none;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;transition:transform 0.05s, filter 0.1s}
+.hold-btn:active{transform:translateY(4px);box-shadow:0 2px 0 #b36b00}
+.hold-btn.charging{filter:brightness(1.15);animation:shake 0.12s infinite}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-1px)}75%{transform:translateX(1px)}}
+.hold-btn small{font-size:11px;opacity:0.8;font-weight:800}
+.charge-col{width:54px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.charge-track{width:14px;height:78px;background:rgba(255,255,255,0.2);border-radius:10px;overflow:hidden;border:2px solid rgba(255,255,255,0.3);position:relative}
+.charge-fill{position:absolute;bottom:0;left:0;right:0;height:0%;background:linear-gradient(#00e676,#00c853);transition:height 0.05s}
+.charge-label{color:#fff;font-size:9px;font-weight:800;letter-spacing:0.5px;text-align:center}
+.overlay{position:absolute;inset:0;background:rgba(20,12,4,0.55);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:18px;z-index:10}
+.card{background:#fffdf0;border-radius:20px;padding:18px 16px;width:100%;max-width:360px;text-align:center;box-shadow:0 12px 32px rgba(0,0,0,0.35);border:3px solid #ffcc33}
+.card h1{font-size:28px;color:#5c2e0e;line-height:1;margin-bottom:4px}
+.card h1 span{color:#ff6f00}
+.card p{font-size:13px;color:#6d4c2a;line-height:1.4;margin:6px 0}
+.badges{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:10px 0}
+.badge{background:#fff3c4;border:2px solid #ffcc33;border-radius:10px;padding:6px 8px;font-size:11px;font-weight:800;color:#5c2e0e;min-width:78px}
+.badge i{font-style:normal;font-size:16px;display:block}
+.btn{width:100%;padding:14px;background:linear-gradient(#ff9800,#ff6f00);color:#fff;border:none;border-radius:14px;font-weight:900;font-size:18px;letter-spacing:0.5px;box-shadow:0 4px 0 #b36b00;margin-top:10px}
+.btn:active{transform:translateY(2px);box-shadow:0 2px 0 #b36b00}
+.btn.secondary{background:#fff;border:2px solid #ff9800;color:#ff6f00;box-shadow:none}
+.row2{display:flex;gap:8px}
+.row2 .btn{flex:1}
+.score-pop{position:absolute;color:#fff;font-weight:900;font-size:18px;text-shadow:0 2px 0 #000, 0 0 6px #000;pointer-events:none;animation:floatUp 0.8s forwards;z-index:6}
+@keyframes floatUp{0%{transform:translateY(0) scale(1);opacity:1}100%{transform:translateY(-40px) scale(1.1);opacity:0}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="stat"><span>Score</span><b id="scoreEl">0</b></div>
+    <div class="stat"><span>Time</span><b id="timeEl">60.0</b></div>
+    <div class="stat"><span>Wave</span><b id="waveEl">1</b></div>
+    <div class="stat"><span>Caught</span><b id="caughtEl">0</b></div>
+  </div>
+  <div class="combo-badge" id="comboEl">COMBO x1</div>
+  <div class="canvas-wrap" id="wrap">
+    <canvas id="c"></canvas>
+    <div class="hud-target">⭐ TIME IT IN THE GOLD ZONE FOR COMBO!</div>
+  </div>
+  <div class="controls">
+    <button class="hold-btn" id="holdBtn">HOLD TO SPIN<span>● RELEASE TO TOSS ●</span><small id="hint">DRAG TO AIM</small></button>
+    <div class="charge-col">
+      <div class="charge-track"><div class="charge-fill" id="chargeFill"></div></div>
+      <div class="charge-label">POWER</div>
+    </div>
+  </div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="card">
+      <h1>🤠 ROPING <span>ROUNDUP</span></h1>
+      <p><b>60 seconds</b> to rope the herd! Hold to spin & charge, drag to aim, release to toss.</p>
+      <div class="badges">
+        <div class="badge"><i>🐄</i>Cow 100pts</div>
+        <div class="badge"><i>🐎</i>Horse 150pts</div>
+        <div class="badge"><i>🐂</i>Bull 200pts</div>
+        <div class="badge"><i>✨</i>Golden x5!</div>
+      </div>
+      <p style="background:#fff3c4;border-radius:10px;padding:8px;font-weight:700">🎯 Catch inside the moving <span style="color:#ff6f00">GOLD ZONE</span> for combo multipliers! Waves get faster!</p>
+      <button class="btn" id="playBtn">🤠 GIDDY UP! PLAY</button>
+      <p id="bestLine" style="font-size:12px;font-weight:800;color:#b36b00">🏆 Best score: 0</p>
+      <p style="font-size:11px;opacity:0.7">Tip: Full power = longer throw & bigger lasso!</p>
+    </div>
+  </div>
+
+  <div class="overlay" id="overOverlay" style="display:none">
+    <div class="card">
+      <h1 id="overTitle">TIME'S UP!</h1>
+      <p id="overMsg" style="font-size:16px;font-weight:800;color:#5c2e0e"></p>
+      <div class="badges" id="overStats"></div>
+      <button class="btn" id="againBtn">🔁 PLAY AGAIN</button>
+      <div class="row2"><button class="btn secondary" id="shareBtn">Share Score</button></div>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('wrap');
+const scoreEl = document.getElementById('scoreEl');
+const timeEl = document.getElementById('timeEl');
+const waveEl = document.getElementById('waveEl');
+const caughtEl = document.getElementById('caughtEl');
+const comboEl = document.getElementById('comboEl');
+const chargeFill = document.getElementById('chargeFill');
+const holdBtn = document.getElementById('holdBtn');
+const startOverlay = document.getElementById('startOverlay');
+const overOverlay = document.getElementById('overOverlay');
+
+let W=360,H=600,dpr=1;
+function resize(){
+  const rect = wrap.getBoundingClientRect();
+  W = Math.max(360, Math.min(428, rect.width));
+  H = rect.height;
+  dpr = Math.min(2, window.devicePixelRatio||1);
+  canvas.width = W*dpr;
+  canvas.height = H*dpr;
+  canvas.style.width = W+'px';
+  canvas.style.height = H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Audio
+let actx;
+function ensureAudio(){
+  if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+  if(actx.state==='suspended') actx.resume();
+}
+function tone(freq, dur, type='sine', vol=0.3, slideTo){
+  if(!actx) return;
+  const o=actx.createOscillator(), g=actx.createGain();
+  o.type=type; o.frequency.value=freq;
+  o.connect(g); g.connect(actx.destination);
+  g.gain.value=vol;
+  g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime+dur);
+  if(slideTo){ o.frequency.linearRampToValueAtTime(slideTo, actx.currentTime+dur); }
+  o.start(); o.stop(actx.currentTime+dur);
+}
+function sfxThrow(power){ tone(180+power*200,0.18,'square',0.25, 80); setTimeout(()=>tone(300,0.08,'sine',0.2),60); }
+function sfxCatch(){ tone(500,0.12,'sine',0.35,700); setTimeout(()=>tone(800,0.12,'sine',0.3),80); }
+function sfxGolden(){ tone(600,0.15,'sine',0.4,900); setTimeout(()=>tone(900,0.15,'sine',0.4,1200),100); setTimeout(()=>tone(1200,0.25,'sine',0.35),200); }
+function sfxMiss(){ tone(120,0.2,'sawtooth',0.2,60); }
+function sfxCombo(c){ tone(400+c*80,0.18,'triangle',0.3, 500+c*80); }
+function sfxTick(){ tone(1000,0.05,'sine',0.15); }
+
+// Game state
+let score=0, caught=0, combo=0, maxCombo=0, timeLeft=60, wave=1, running=false, gameTime=0;
+let animals=[], lassos=[], particles=[], scorePops=[];
+let bestScore=0; try{bestScore=parseInt(localStorage.getItem('lasso-best')||'0',10)||0;}catch(e){}
+const bestLine=document.getElementById('bestLine'); if(bestLine) bestLine.textContent='🏆 Best score: '+bestScore;
+let targetZone={x: W/2, w: 110, dir:1, speed: 90};
+let player={x: W/2, y: H-38};
+let isCharging=false, charge=0, aimX=W/2, aimY=H*0.35, spinAngle=0, lastThrow=0;
+let spawnTimer=0, spawnInterval=900;
+
+const types = {
+  cow:{pts:100, size:44, speed: 60, color:'#fff', emoji:'🐄'},
+  horse:{pts:150, size:48, speed: 95, color:'#8d5524', emoji:'🐎'},
+  bull:{pts:200, size:52, speed: 75, color:'#3e2723', emoji:'🐂'}
+};
+const typeKeys=['cow','horse','bull'];
+
+function resetGame(){
+  score=0; caught=0; combo=0; maxCombo=0; timeLeft=60; wave=1; gameTime=0;
+  animals=[]; lassos=[]; particles=[]; scorePops=[];
+  targetZone.x=W/2; targetZone.w=110; targetZone.dir=1; targetZone.speed=90;
+  spawnTimer=0; spawnInterval=900;
+  charge=0; isCharging=false; spinAngle=0;
+  updateHUD();
+}
+
+function updateHUD(){
+  scoreEl.textContent=score;
+  timeEl.textContent=timeLeft.toFixed(1);
+  waveEl.textContent=wave;
+  caughtEl.textContent=caught;
+  if(combo>1){
+    comboEl.textContent=`COMBO x${combo} 🔥`;
+    comboEl.classList.add('show');
+    comboEl.style.background = combo>=5 ? '#ff1744' : combo>=3 ? '#ff6f00' : '#ff3b30';
+  } else {
+    comboEl.classList.remove('show');
+  }
+  chargeFill.style.height = (charge*100)+'%';
+  chargeFill.style.background = charge>0.85 ? 'linear-gradient(#ff1744,#ff6f00)' : charge>0.5 ? 'linear-gradient(#ffeb3b,#ff9800)' : 'linear-gradient(#00e676,#00c853)';
+}
+
+function spawnAnimal(){
+  const isGolden = Math.random() < 0.08; // 8% rare
+  const tk = typeKeys[Math.floor(Math.random()*typeKeys.length)];
+  const t = types[tk];
+  const fromLeft = Math.random()<0.5;
+  const y = 90 + Math.random()*(H*0.55);
+  const x = fromLeft ? -40 : W+40;
+  const vx = (fromLeft?1:-1) * t.speed * (0.8 + Math.random()*0.6) * (1 + wave*0.18);
+  animals.push({
+    x,y, vx, vy:(Math.random()-0.5)*20,
+    type:tk, pts:t.pts, size:t.size, golden:isGolden,
+    bob: Math.random()*Math.PI*2, caught:false, catchTime:0, scale:1
+  });
+}
+
+function throwLasso(){
+  if(Date.now()-lastThrow < 180) return;
+  lastThrow=Date.now();
+  const power = Math.min(1, charge);
+  // lasso start at player
+  const tx = aimX, ty = aimY;
+  // clamp target inside play area
+  const clampedY = Math.max(70, Math.min(H-80, ty));
+  const clampedX = Math.max(20, Math.min(W-20, tx));
+  const dist = Math.hypot(clampedX-player.x, clampedY-player.y);
+  const maxDist = 120 + power*220;
+  // if beyond maxDist, scale back
+  let fx=clampedX, fy=clampedY;
+  if(dist>maxDist){
+    const ang=Math.atan2(clampedY-player.y, clampedX-player.x);
+    fx = player.x + Math.cos(ang)*maxDist;
+    fy = player.y + Math.sin(ang)*maxDist;
+  }
+  const duration = 180 + power*220;
+  lassos.push({
+    x: player.x, y: player.y-18,
+    sx: player.x, sy: player.y-18,
+    tx: fx, ty: fy,
+    t:0, dur: duration, power,
+    radius: 14 + power*18,
+    state:'fly', // fly, hold, return
+    holdTime:0
+  });
+  sfxThrow(power);
+  // haptic
+  if(navigator.vibrate) navigator.vibrate(30);
+}
+
+function checkCatch(lasso){
+  let hit=null, bestDist=999;
+  for(const a of animals){
+    if(a.caught) continue;
+    const d = Math.hypot(a.x - lasso.tx, a.y - lasso.ty);
+    const hitR = a.size*0.55 + lasso.radius*0.6;
+    if(d < hitR && d < bestDist){
+      bestDist=d; hit=a;
+    }
+  }
+  if(hit){
+    hit.caught=true; hit.catchTime=gameTime;
+    caught++;
+    // check golden zone
+    const inZone = Math.abs(hit.x - targetZone.x) < targetZone.w/2;
+    let pts = hit.pts;
+    if(hit.golden) pts *= 5;
+    let mult = 1;
+    if(inZone){
+      combo++;
+      maxCombo=Math.max(maxCombo, combo);
+      mult = 1 + combo*0.5;
+      if(combo>=2) sfxCombo(combo); else sfxCatch();
+      if(hit.golden) sfxGolden();
+    } else {
+      if(combo>0) { /* keep? reset on miss only */ }
+      // outside zone still gives points but no combo increment
+      // if you had combo and miss zone, keep combo? Let's reset only on miss
+      sfxCatch();
+      if(hit.golden) sfxGolden();
+    }
+    // golden bonus extra
+    if(hit.golden) pts += 250;
+    const finalPts = Math.round(pts * mult);
+    score += finalPts;
+    // particles
+    for(let i=0;i< (hit.golden?18:10); i++){
+      particles.push({x:hit.x, y:hit.y, vx:(Math.random()-0.5)*240, vy:(Math.random()-0.5)*240 -40, life:0.6, t:0, color: hit.golden?'#ffeb3b':'#fff', size: hit.golden?5:3});
+    }
+    // score pop
+    addScorePop(hit.x, hit.y-30, `+${finalPts}` + (inZone?` x${mult.toFixed(1)}`:'') + (hit.golden?' ✨GOLDEN!':''), hit.golden);
+    // lasso hold
+    lasso.state='hold';
+    lasso.caughtAnimal=hit;
+    lasso.holdTime=0;
+    if(navigator.vibrate) navigator.vibrate(hit.golden?[40,30,60]:40);
+  } else {
+    // miss
+    combo=0;
+    sfxMiss();
+    addScorePop(lasso.tx, lasso.ty, 'MISS!', false, true);
+    lasso.state='return';
+  }
+  updateHUD();
+}
+
+function addScorePop(x,y,text,golden,miss){
+  const el=document.createElement('div');
+  el.className='score-pop';
+  el.textContent=text;
+  el.style.left=(x-40)+'px';
+  el.style.top=(y)+'px';
+  el.style.color= miss ? '#ff3b30' : golden ? '#ffeb3b' : '#fff';
+  el.style.fontSize= golden ? '20px' : '16px';
+  wrap.appendChild(el);
+  setTimeout(()=>el.remove(),800);
+}
+
+function update(dt){
+  if(!running) return;
+  gameTime+=dt;
+  timeLeft-=dt;
+  if(timeLeft<=0){ timeLeft=0; endGame(); return; }
+  if(timeLeft<10 && Math.floor(gameTime*2)%2===0) sfxTick();
+
+  // wave
+  const newWave = Math.floor(gameTime/8)+1;
+  if(newWave!==wave){
+    wave=newWave;
+    targetZone.speed = 90 + wave*18;
+    spawnInterval = Math.max(380, 900 - wave*70);
+    // wave flash
+    addScorePop(W/2, H*0.5, `WAVE ${wave}!`, false);
+    tone(700,0.3,'square',0.3,900);
+  }
+
+  // target zone move
+  targetZone.x += targetZone.dir * targetZone.speed * dt;
+  if(targetZone.x - targetZone.w/2 < 0){ targetZone.x=targetZone.w/2; targetZone.dir=1; }
+  if(targetZone.x + targetZone.w/2 > W){ targetZone.x=W-targetZone.w/2; targetZone.dir=-1; }
+
+  // charging
+  if(isCharging){
+    charge = Math.min(1, charge + dt*1.1);
+    spinAngle += dt*18 + charge*10;
+    updateHUD();
+  }
+
+  // spawn
+  spawnTimer+=dt*1000;
+  if(spawnTimer>spawnInterval){
+    spawnTimer=0;
+    spawnAnimal();
+    if(wave>2 && Math.random()<0.4) spawnAnimal();
+  }
+
+  // animals update
+  for(let i=animals.length-1;i>=0;i--){
+    const a=animals[i];
+    if(a.caught){
+      // pulled towards player
+      const l = lassos.find(l=>l.caughtAnimal===a);
+      if(l){
+        a.x += (l.x - a.x)*0.18;
+        a.y += (l.y - a.y)*0.18;
+        a.scale = Math.max(0.4, a.scale - dt*1.2);
+        if(a.scale<=0.45){
+          // remove
+          animals.splice(i,1);
+        }
+      } else {
+        animals.splice(i,1);
+      }
+      continue;
+    }
+    a.x += a.vx*dt;
+    a.y += a.vy*dt;
+    a.bob += dt*6;
+    // bounce vertical
+    if(a.y<90 || a.y>H*0.62) a.vy*=-1;
+    // slight wander
+    a.vy += (Math.random()-0.5)*40*dt;
+    a.vy = Math.max(-40, Math.min(40, a.vy));
+    // remove offscreen far
+    if((a.vx>0 && a.x>W+80) || (a.vx<0 && a.x<-80)){
+      animals.splice(i,1);
+    }
+  }
+
+  // lassos
+  for(let i=lassos.length-1;i>=0;i--){
+    const l=lassos[i];
+    if(l.state==='fly'){
+      l.t += dt*1000;
+      const p = Math.min(1, l.t / l.dur);
+      // ease out
+      const e = 1 - Math.pow(1-p, 3);
+      l.x = l.sx + (l.tx - l.sx)*e;
+      l.y = l.sy + (l.ty - l.sy)*e - Math.sin(p*Math.PI)* (30 + l.power*30);
+      if(p>=1){
+        checkCatch(l);
+      }
+    } else if(l.state==='hold'){
+      l.holdTime+=dt;
+      // lasso stays at catch point briefly then returns
+      if(l.holdTime>0.35){
+        l.state='return';
+        l.t=0; l.sx=l.x; l.sy=l.y;
+      }
+    } else if(l.state==='return'){
+      l.t+=dt*1000;
+      const p=Math.min(1, l.t/180);
+      l.x = l.tx + (player.x - l.tx)*p;
+      l.y = l.ty + (player.y - l.ty)*p;
+      if(p>=1) lassos.splice(i,1);
+    }
+  }
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.t+=dt;
+    p.x+=p.vx*dt;
+    p.y+=p.vy*dt;
+    p.vy+=600*dt;
+    p.life-=dt;
+    if(p.life<=0) particles.splice(i,1);
+  }
+
+  updateHUD();
+}
+
+function draw(){
+  // clear
+  ctx.clearRect(0,0,W,H);
+
+  // sky & ground
+  // sky gradient already via CSS, but draw canvas details
+  // sun
+  ctx.save();
+  ctx.fillStyle='#ffeb3b';
+  ctx.beginPath(); ctx.arc(W-38, 38, 22, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,235,59,0.25)';
+  ctx.beginPath(); ctx.arc(W-38,38,34,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  // clouds
+  ctx.fillStyle='rgba(255,255,255,0.9)';
+  drawCloud(40,30, 1); drawCloud(120,22,0.8); drawCloud(200,28,0.9);
+  // distant hills
+  ctx.fillStyle='#c8a86a';
+  ctx.beginPath();
+  ctx.moveTo(0, 78); ctx.quadraticCurveTo(W*0.25, 58, W*0.5, 78); ctx.quadraticCurveTo(W*0.75, 98, W, 78); ctx.lineTo(W, 92); ctx.lineTo(0,92); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#b8935a';
+  ctx.beginPath();
+  ctx.moveTo(0, 92); ctx.quadraticCurveTo(W*0.3, 72, W*0.6, 92); ctx.quadraticCurveTo(W*0.85, 108, W, 92); ctx.lineTo(W, 110); ctx.lineTo(0,110); ctx.closePath(); ctx.fill();
+  // ground
+  ctx.fillStyle='#e8c07a';
+  ctx.fillRect(0, 110, W, H-110);
+  // ground texture dots
+  ctx.fillStyle='rgba(180,140,70,0.25)';
+  for(let i=0;i<30;i++){
+    const x=(i*67)%W, y=120 + (i*43)%(H-130);
+    ctx.beginPath(); ctx.arc(x,y,1.5,0,Math.PI*2); ctx.fill();
+  }
+  // fence
+  ctx.fillStyle='#8d6e3a';
+  ctx.fillRect(0, 108, W, 6);
+  for(let x=12;x<W;x+=48){
+    ctx.fillStyle='#6d4c1a';
+    ctx.fillRect(x, 88, 8, 32);
+    ctx.fillStyle='#a67c2e';
+    ctx.fillRect(x-2, 96, 12, 4);
+  }
+  // cacti
+  drawCactus(18, 102, 0.9); drawCactus(W-28, 100, 1.1);
+
+  // target zone - moving gold zone
+  const zx = targetZone.x - targetZone.w/2;
+  // zone base
+  ctx.save();
+  ctx.fillStyle='rgba(255,215,0,0.22)';
+  ctx.strokeStyle='rgba(255,180,0,0.9)';
+  ctx.lineWidth=3;
+  ctx.setLineDash([8,6]);
+  // rounded rect
+  roundRect(zx, 78, targetZone.w, H*0.58, 12);
+  ctx.fill(); ctx.stroke();
+  ctx.setLineDash([]);
+  // zone label
+  ctx.fillStyle='rgba(255,140,0,0.95)';
+  ctx.font='900 10px system-ui';
+  ctx.textAlign='center';
+  ctx.fillText('★ GOLD ZONE ★', targetZone.x, 92);
+  // arrows
+  ctx.fillStyle='rgba(255,180,0,0.9)';
+  ctx.beginPath();
+  if(targetZone.dir>0){
+    ctx.moveTo(targetZone.x+targetZone.w/2-8, 100); ctx.lineTo(targetZone.x+targetZone.w/2+6, 108); ctx.lineTo(targetZone.x+targetZone.w/2-8, 116);
+  } else {
+    ctx.moveTo(targetZone.x-targetZone.w/2+8, 100); ctx.lineTo(targetZone.x-targetZone.w/2-6, 108); ctx.lineTo(targetZone.x-targetZone.w/2+8, 116);
+  }
+  ctx.fill();
+  ctx.restore();
+
+  // animals
+  for(const a of animals){
+    drawAnimal(a);
+  }
+
+  // player shadow
+  ctx.fillStyle='rgba(0,0,0,0.15)';
+  ctx.beginPath(); ctx.ellipse(player.x, player.y+8, 28, 8, 0,0,Math.PI*2); ctx.fill();
+
+  // lassos
+  for(const l of lassos){
+    drawLasso(l);
+  }
+
+  // player
+  drawPlayer();
+
+  // charging indicator
+  if(isCharging){
+    // aim line
+    ctx.save();
+    ctx.strokeStyle= charge>0.85 ? '#ff1744' : charge>0.5 ? '#ff9800' : '#00c853';
+    ctx.lineWidth=2; ctx.setLineDash([6,6]);
+    ctx.beginPath(); ctx.moveTo(player.x, player.y-18); ctx.lineTo(aimX, aimY); ctx.stroke();
+    ctx.setLineDash([]);
+    // aim target
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(aimX, aimY, 14 + charge*8, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle= charge>0.85 ? '#ff1744' : '#ff9800';
+    ctx.beginPath(); ctx.arc(aimX, aimY, 4,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // particles
+  for(const p of particles){
+    ctx.globalAlpha = Math.max(0, p.life/0.6);
+    ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // power text near player when charging
+  if(isCharging){
+    ctx.fillStyle='#fff';
+    ctx.font='900 11px system-ui';
+    ctx.textAlign='center';
+    ctx.strokeStyle='rgba(0,0,0,0.6)'; ctx.lineWidth=3;
+    const txt = charge<0.3?'SPINNING...': charge<0.7?'CHARGING!':'MAX POWER!!';
+    ctx.strokeText(txt, player.x, player.y-52);
+    ctx.fillText(txt, player.x, player.y-52);
+  }
+}
+
+function drawCloud(x,y,s){
+  ctx.beginPath();
+  ctx.arc(x,y,12*s,0,Math.PI*2); ctx.arc(x+14*s,y,10*s,0,Math.PI*2); ctx.arc(x+7*s,y-8*s,9*s,0,Math.PI*2); ctx.arc(x+22*s,y+2*s,8*s,0,Math.PI*2);
+  ctx.fill();
+}
+function drawCactus(x,y,s){
+  ctx.fillStyle='#5a8f3a';
+  ctx.fillRect(x, y-18*s, 8*s, 22*s);
+  ctx.fillRect(x-6*s, y-10*s, 6*s, 10*s);
+  ctx.fillRect(x+8*s, y-12*s, 6*s, 12*s);
+  ctx.fillStyle='#4a7a2e';
+  ctx.fillRect(x+2*s, y-18*s, 2*s, 22*s);
+}
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function drawAnimal(a){
+  ctx.save();
+  ctx.translate(a.x, a.y);
+  const bobY = Math.sin(a.bob)*3;
+  ctx.translate(0,bobY);
+  // in zone glow
+  const inZone = Math.abs(a.x - targetZone.x) < targetZone.w/2;
+  if(inZone && !a.caught){
+    ctx.fillStyle='rgba(255,215,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(0, 8, a.size*0.7, a.size*0.45, 0,0,Math.PI*2); ctx.fill();
+  }
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.12)';
+  ctx.beginPath(); ctx.ellipse(0, 14, a.size*0.5, 6, 0,0,Math.PI*2); ctx.fill();
+
+  const s = a.size/44;
+  // body
+  if(a.golden){
+    // golden sparkle
+    ctx.fillStyle='#ffeb3b';
+    ctx.strokeStyle='#ff9800'; ctx.lineWidth=2;
+  } else {
+    if(a.type==='cow'){ ctx.fillStyle='#fff'; ctx.strokeStyle='#222'; ctx.lineWidth=1.5; }
+    else if(a.type==='horse'){ ctx.fillStyle='#8d5524'; ctx.strokeStyle='#4a2a0a'; ctx.lineWidth=1.5; }
+    else { ctx.fillStyle='#3e2723'; ctx.strokeStyle='#1a0f0a'; ctx.lineWidth=1.5; }
+  }
+  // body ellipse
+  ctx.beginPath(); ctx.ellipse(0,0, 18*s, 12*s, 0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  // spots for cow
+  if(a.type==='cow' && !a.golden){
+    ctx.fillStyle='#222';
+    ctx.beginPath(); ctx.ellipse(-6*s, -2*s, 5*s,4*s,0.3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(6*s, 3*s, 4*s,3*s,-0.2,0,Math.PI*2); ctx.fill();
+  }
+  // head
+  ctx.fillStyle = a.golden ? '#ffeb3b' : (a.type==='cow'?'#fff': a.type==='horse'?'#a66a2e':'#2b1a12');
+  ctx.beginPath(); ctx.ellipse(14*s, -4*s, 10*s, 9*s, 0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  // muzzle
+  ctx.fillStyle = a.golden ? '#ffe082' : '#ffccbc';
+  ctx.beginPath(); ctx.ellipse(20*s, -1*s, 6*s,5*s,0,0,Math.PI*2); ctx.fill();
+  // nostrils
+  ctx.fillStyle='#4a2a0a';
+  ctx.beginPath(); ctx.arc(22*s, -2*s, 1.2*s,0,Math.PI*2); ctx.arc(22*s, 1*s,1.2*s,0,Math.PI*2); ctx.fill();
+  // eyes
+  ctx.fillStyle='#000';
+  ctx.beginPath(); ctx.arc(12*s, -7*s, 2*s,0,Math.PI*2); ctx.arc(16*s, -7*s,2*s,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(12.7*s, -7.7*s,0.8*s,0,Math.PI*2); ctx.arc(16.7*s,-7.7*s,0.8*s,0,Math.PI*2); ctx.fill();
+  // horns for cow/bull
+  if(a.type==='cow' || a.type==='bull'){
+    ctx.fillStyle='#ffecb3'; ctx.strokeStyle='#b8935a'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(10*s,-10*s); ctx.lineTo(6*s,-16*s); ctx.lineTo(8*s,-16*s); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(18*s,-10*s); ctx.lineTo(22*s,-16*s); ctx.lineTo(20*s,-16*s); ctx.closePath(); ctx.fill(); ctx.stroke();
+    if(a.type==='bull'){
+      ctx.fillStyle='#ff3b30';
+      ctx.beginPath(); ctx.arc(20*s,1*s,2.2*s,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
+    }
+  }
+  // mane for horse
+  if(a.type==='horse' && !a.golden){
+    ctx.fillStyle='#4a2a0a';
+    ctx.beginPath(); ctx.ellipse(6*s,-10*s,10*s,4*s, -0.4,0,Math.PI*2); ctx.fill();
+  }
+  // legs
+  ctx.fillStyle = a.golden ? '#ffca28' : (a.type==='horse'?'#6d4c1a':'#222');
+  const legY=8*s;
+  for(let lx of [-8*s, -2*s, 4*s, 10*s]){
+    ctx.fillRect(lx, legY, 3*s, 6*s);
+  }
+  // tail
+  ctx.strokeStyle= a.golden ? '#ff9800' : '#4a2a0a'; ctx.lineWidth=2*s;
+  ctx.beginPath(); ctx.moveTo(-16*s,0); ctx.quadraticCurveTo(-20*s,4*s,-18*s,8*s); ctx.stroke();
+
+  // golden sparkles
+  if(a.golden){
+    ctx.fillStyle='#fff';
+    for(let k=0;k<3;k++){
+      const sx = (Math.sin(gameTime*4 + k)*8);
+      const sy = (Math.cos(gameTime*5 + k*1.3)*6)-6;
+      ctx.beginPath(); ctx.arc(sx,sy,1.5,0,Math.PI*2); ctx.fill();
+    }
+    // label
+    ctx.fillStyle='#ff6f00'; ctx.font='800 8px system-ui'; ctx.textAlign='center';
+    ctx.fillText('GOLDEN!',0,-18*s);
+  }
+
+  ctx.restore();
+}
+function drawPlayer(){
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  // hat
+  ctx.fillStyle='#5c2e0e';
+  ctx.beginPath(); ctx.ellipse(0,-18,22,6,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#8d5524';
+  ctx.fillRect(-12,-28,24,12);
+  ctx.fillStyle='#ffcc33';
+  ctx.fillRect(-12,-20,24,3);
+  // face
+  ctx.fillStyle='#ffcc99';
+  ctx.beginPath(); ctx.arc(0,-10,10,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#000';
+  ctx.beginPath(); ctx.arc(-3,-11,1.5,0,Math.PI*2); ctx.arc(3,-11,1.5,0,Math.PI*2); ctx.fill();
+  // smile
+  ctx.strokeStyle='#5c2e0e'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(0,-7,4,0.2,Math.PI-0.2); ctx.stroke();
+  // body
+  ctx.fillStyle='#d32f2f';
+  ctx.fillRect(-10,0,20,14);
+  ctx.fillStyle='#ffcc33';
+  ctx.fillRect(-2,0,4,14);
+  // arms
+  ctx.fillStyle='#ffcc99';
+  ctx.fillRect(-16,2,6,10); ctx.fillRect(10,2,6,10);
+  // lasso spin when charging
+  if(isCharging){
+    ctx.save();
+    ctx.translate(0,-6);
+    ctx.rotate(spinAngle);
+    ctx.strokeStyle= charge>0.85 ? '#ff1744' : '#8d6e3a';
+    ctx.lineWidth=3;
+    const r= 14 + charge*12;
+    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*1.7); ctx.stroke();
+    // knot
+    ctx.fillStyle='#5c2e0e';
+    ctx.beginPath(); ctx.arc(r,0,4,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    // power ring
+    ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(0,-6, 18+charge*10, -Math.PI/2, -Math.PI/2 + Math.PI*2*charge); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawLasso(l){
+  ctx.save();
+  // rope line
+  ctx.strokeStyle='#8d6e3a';
+  ctx.lineWidth=3; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(player.x, player.y-6);
+  // curve
+  const midX=(player.x + l.x)/2, midY=(player.y + l.y)/2 - 12;
+  ctx.quadraticCurveTo(midX, midY, l.x, l.y);
+  ctx.stroke();
+  // loop
+  const loopR = l.radius * (l.state==='fly' ? (0.6 + l.t/l.dur*0.4) : 1);
+  ctx.strokeStyle= l.power>0.85 ? '#ff1744' : '#5c2e0e';
+  ctx.lineWidth=3;
+  ctx.beginPath(); ctx.arc(l.x, l.y, loopR, 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.15)';
+  ctx.beginPath(); ctx.arc(l.x,l.y,loopR,0,Math.PI*2); ctx.fill();
+  // inner highlight
+  ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(l.x,l.y, loopR*0.6, 0, Math.PI*2); ctx.stroke();
+  ctx.restore();
+}
+
+// Input
+function getPos(e){
+  const rect=canvas.getBoundingClientRect();
+  const t=e.touches?e.touches[0]:e;
+  return {x: (t.clientX-rect.left), y: (t.clientY-rect.top)};
+}
+let pointerId=null;
+function onDown(e){
+  if(!running) return;
+  e.preventDefault();
+  ensureAudio();
+  isCharging=true; charge=0; spinAngle=0;
+  const p=getPos(e);
+  aimX=p.x; aimY=p.y;
+  holdBtn.classList.add('charging');
+  holdBtn.textContent='SPINNING...';
+}
+function onMove(e){
+  if(!isCharging) return;
+  e.preventDefault();
+  const p=getPos(e);
+  aimX=p.x; aimY=p.y;
+}
+function onUp(e){
+  if(!isCharging) return;
+  e.preventDefault();
+  isCharging=false;
+  holdBtn.classList.remove('charging');
+  holdBtn.innerHTML='HOLD TO SPIN<span>● RELEASE TO TOSS ●</span><small>DRAG TO AIM</small>';
+  throwLasso();
+  charge=0; updateHUD();
+}
+canvas.addEventListener('pointerdown', onDown);
+canvas.addEventListener('pointermove', onMove);
+canvas.addEventListener('pointerup', onUp);
+canvas.addEventListener('pointercancel', onUp);
+holdBtn.addEventListener('pointerdown', onDown);
+holdBtn.addEventListener('pointermove', onMove);
+holdBtn.addEventListener('pointerup', onUp);
+holdBtn.addEventListener('touchstart', onDown, {passive:false});
+holdBtn.addEventListener('touchmove', onMove, {passive:false});
+holdBtn.addEventListener('touchend', onUp, {passive:false});
+// also allow dragging on whole wrap
+wrap.addEventListener('touchstart', (e)=>{ if(running && e.target===canvas) onDown(e); }, {passive:false});
+wrap.addEventListener('touchmove', onMove, {passive:false});
+wrap.addEventListener('touchend', onUp, {passive:false});
+
+// Game loop
+let last=0;
+function loop(ts){
+  if(!last) last=ts;
+  const dt=Math.min(0.033, (ts-last)/1000);
+  last=ts;
+  if(running) update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// Start / End
+function startGame(){
+  ensureAudio();
+  resetGame();
+  running=true;
+  startOverlay.style.display='none';
+  overOverlay.style.display='none';
+  // initial spawns
+  for(let i=0;i<3;i++) setTimeout(spawnAnimal, i*400);
+  tone(400,0.2,'square',0.3,600);
+}
+function endGame(){
+  running=false;
+  const rank = score>=5000?'🤠 LEGEND!': score>=3000?'🌟 WRANGLER!': score>=1500?'👍 COWPOKE!':'🌵 TRY AGAIN';
+  document.getElementById('overTitle').textContent= rank;
+  if(score>bestScore){bestScore=score; try{localStorage.setItem('lasso-best',String(score));}catch(e){} if(bestLine) bestLine.textContent='🏆 Best score: '+bestScore;}
+  document.getElementById('overMsg').textContent=`Score ${score} • Caught ${caught} • Best Combo x${maxCombo} • 🏆 Best ${bestScore}`;
+  document.getElementById('overStats').innerHTML=`
+    <div class="badge"><i>${score}</i>Points</div>
+    <div class="badge"><i>${caught}</i>Caught</div>
+    <div class="badge"><i>x${maxCombo}</i>Best Combo</div>
+    <div class="badge"><i>${wave}</i>Wave Reached</div>
+  `;
+  overOverlay.style.display='flex';
+  tone(300,0.4,'sawtooth',0.3,150); setTimeout(()=>tone(200,0.5,'sine',0.3),300);
+}
+
+document.getElementById('playBtn').addEventListener('click', startGame);
+document.getElementById('againBtn').addEventListener('click', startGame);
+document.getElementById('shareBtn').addEventListener('click', ()=>{
+  const text=`🤠 I scored ${score} in Roping Roundup! Caught ${caught} with x${maxCombo} combo!`;
+  if(navigator.share) navigator.share({title:'Roping Roundup', text}).catch(()=>{});
+  else if(navigator.clipboard) navigator.clipboard.writeText(text).then(()=>alert('Copied: '+text));
+  else alert(text);
+});
+
+// keyboard for testing
+window.addEventListener('keydown', e=>{
+  if(e.code==='Space'){
+    if(!isCharging) onDown({preventDefault(){}, touches:[{clientX: W/2, clientY: H*0.3}]});
+  }
+});
+window.addEventListener('keyup', e=>{
+  if(e.code==='Space') onUp({preventDefault(){}});
+});
+
+// initial draw
+draw();
+})();
+</script>
+</body>
+</html>

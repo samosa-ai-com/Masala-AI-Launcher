@@ -54,6 +54,35 @@ class LayoutSchemaTest {
         }
     }
 
+    /** The same `$defs` with `WidgetSpec` as the root: what the widget library stores. */
+    private val widgetSchema: JsonSchema = factory.getSchema(
+        schemaJson.deepCopy().apply {
+            listOf("properties", "required", "additionalProperties", "type").forEach { remove(it) }
+            put("\$ref", "#/\$defs/WidgetSpec")
+        },
+    )
+
+    @Test
+    fun `widget templates and what Kotlin writes for them pass the schema`() {
+        for (template in com.samosaai.masala.core.widgets.WidgetTemplates.all()) {
+            val raw = mapper.readTree(com.samosaai.masala.core.widgets.WidgetTemplates.text(template.id)).get("widget")
+            assertTrue(widgetSchema.validate(raw).isEmpty(), "${template.id}: ${widgetSchema.validate(raw)}")
+            val written = MasalaJson.strict.encodeToString(template.widget)
+            assertTrue(widgetSchema.validate(mapper.readTree(written)).isEmpty(), template.id)
+        }
+    }
+
+    @Test
+    fun `schema 3 sections take a ref or an inline widget, not both`() {
+        val ref = """{"schemaVersion":3,"pages":[{"id":"p","sections":[{"type":"widget","id":"w","ref":{"widgetId":"water","rowsOverride":2}},
+            {"type":"stack","id":"s","refs":[{"widgetId":"a"},{"widgetId":"b"}]}]}]}"""
+        assertTrue(layoutSchema.validate(mapper.readTree(ref)).isEmpty(), layoutSchema.validate(mapper.readTree(ref)).toString())
+        val both = """{"pages":[{"id":"p","sections":[{"type":"widget","id":"w","ref":{"widgetId":"x"},
+            "widget":{"id":"x","components":[{"type":"text","text":"hi"}]}}]}]}"""
+        val neither = """{"pages":[{"id":"p","sections":[{"type":"widget","id":"w"}]}]}"""
+        for (json in listOf(both, neither)) assertTrue(layoutSchema.validate(mapper.readTree(json)).isNotEmpty(), json)
+    }
+
     @Test
     fun `schema rejects unknown fields and types`() {
         val unknownField = """{"pages":[{"id":"p","sections":[{"type":"header","id":"h","colour":"red"}]}]}"""
@@ -63,5 +92,22 @@ class LayoutSchemaTest {
         for (json in listOf(unknownField, unknownType, badTime)) {
             assertTrue(layoutSchema.validate(mapper.readTree(json)).isNotEmpty(), json)
         }
+    }
+
+    @Test
+    fun `a cell grid Kotlin writes passes the schema`() {
+        val item = com.samosaai.masala.core.contract.Item("i", "Mail", com.samosaai.masala.core.contract.IconRef.Symbol("mail"), com.samosaai.masala.core.contract.MasalaAction.OpenDrawer)
+        val grid = com.samosaai.masala.core.contract.CellGridSection(
+            "g",
+            cells = listOf(
+                com.samosaai.masala.core.contract.Cell("a", 0, 0, 2, 2, com.samosaai.masala.core.contract.CellContent.WidgetCell(com.samosaai.masala.core.contract.WidgetRef("water"))),
+                com.samosaai.masala.core.contract.Cell("b", 2, 0, content = com.samosaai.masala.core.contract.CellContent.ItemCell(item)),
+                com.samosaai.masala.core.contract.Cell("c", 3, 0, content = com.samosaai.masala.core.contract.CellContent.HtmlCell("dice")),
+            ),
+        )
+        val doc = com.samosaai.masala.core.contract.LayoutDoc(pages = listOf(com.samosaai.masala.core.contract.Page("home", sections = listOf(grid))))
+        val json = com.samosaai.masala.core.contract.MasalaJson.strict.encodeToString(com.samosaai.masala.core.contract.LayoutDoc.serializer(), doc)
+        val errors = layoutSchema.validate(mapper.readTree(json))
+        assertTrue(errors.isEmpty(), "$errors")
     }
 }

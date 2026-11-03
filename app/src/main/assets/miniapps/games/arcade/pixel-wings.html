@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Wind Gates</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#0a0e1a;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+.wrap{position:relative;width:100%;max-width:428px;height:100dvh;max-height:920px;margin:0 auto;overflow:hidden;background:#87CEEB;display:flex;flex-direction:column;touch-action:manipulation}
+canvas{display:block;width:100%;height:100%;touch-action:manipulation}
+.hud{position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column}
+.topbar{pointer-events:auto;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));gap:8px}
+.pill{background:rgba(0,0,0,0.72);color:#fff;border-radius:999px;padding:7px 12px;font-size:13px;font-weight:700;letter-spacing:0.3px;display:flex;align-items:center;gap:6px;backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.15)}
+.pill b{color:#FFD93D}
+.pill.shield{transition:all .2s}
+.pill.shield.on{background:linear-gradient(135deg,#00d4ff,#5b8def);border-color:#fff;box-shadow:0 0 12px rgba(0,212,255,0.7);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.scoreRow{display:flex;justify-content:space-between;align-items:flex-start;padding:0 12px;margin-top:2px}
+.scoreBox{background:rgba(0,0,0,0.55);border-radius:14px;padding:8px 14px;color:#fff;min-width:92px;border:1px solid rgba(255,255,255,0.12)}
+.scoreBox .lbl{font-size:10px;letter-spacing:1px;opacity:0.8;text-transform:uppercase}
+.scoreBox .val{font-size:22px;font-weight:900;line-height:1}
+.scoreBox .sub{font-size:11px;opacity:0.9}
+.comboBox{text-align:right}
+.comboVal{font-size:18px;font-weight:900;color:#FFD93D;text-shadow:0 2px 0 rgba(0,0,0,0.4)}
+.zoneTag{margin:8px auto 0;background:rgba(255,255,255,0.92);color:#1a1a2e;border-radius:999px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.6px;box-shadow:0 4px 12px rgba(0,0,0,0.2)}
+.center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;pointer-events:auto}
+.card{background:rgba(255,255,255,0.97);border-radius:20px;padding:22px 18px;width:100%;max-width:360px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.35);border:2px solid #fff}
+.card h1{font-size:28px;font-weight:900;letter-spacing:-0.5px;color:#0f172a;line-height:1}
+.card h1 span{background:linear-gradient(135deg,#ff7e5f,#feb47b);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.card p{font-size:14px;color:#475569;margin:8px 0 14px;line-height:1.5}
+.badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}
+.badge{font-size:11px;font-weight:700;padding:6px 10px;border-radius:999px;background:#f1f5f9;color:#334155;border:1px solid #e2e8f0}
+.badge.gold{background:#fef3c7;color:#92400e;border-color:#fcd34d}
+.badge.blue{background:#dbeafe;color:#1e40af;border-color:#93c5fd}
+.btn{appearance:none;border:none;border-radius:14px;padding:14px 18px;font-size:17px;font-weight:900;letter-spacing:0.3px;width:100%;cursor:pointer;touch-action:manipulation;min-height:52px}
+.btn-primary{background:linear-gradient(135deg,#ff7e5f,#feb47b);color:#fff;box-shadow:0 8px 20px rgba(255,126,95,0.4)}
+.btn-primary:active{transform:scale(0.98)}
+.btn-ghost{background:#0f172a;color:#fff;margin-top:8px}
+.btn-small{padding:10px 14px;font-size:14px;min-height:44px;width:auto}
+.hint{font-size:12px;color:#64748b;margin-top:10px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.stat{background:#f8fafc;border-radius:12px;padding:10px;border:1px solid #e2e8f0}
+.stat .k{font-size:10px;letter-spacing:0.8px;color:#64748b;text-transform:uppercase;font-weight:700}
+.stat .v{font-size:18px;font-weight:900;color:#0f172a}
+.controls{position:absolute;bottom:0;left:0;right:0;padding:12px;padding-bottom:max(12px,env(safe-area-inset-bottom));display:flex;gap:10px;pointer-events:auto;background:linear-gradient(transparent,rgba(0,0,0,0.35))}
+.flapBtn{flex:1;background:rgba(255,255,255,0.96);border:2px solid #fff;border-radius:16px;padding:14px;font-size:18px;font-weight:900;color:#0f172a;box-shadow:0 8px 20px rgba(0,0,0,0.25);min-height:56px}
+.flapBtn:active{transform:scale(0.97);background:#fff}
+.iconBtn{width:56px;min-height:56px;border-radius:16px;border:2px solid rgba(255,255,255,0.9);background:rgba(0,0,0,0.55);color:#fff;font-size:20px;display:grid;place-items:center;backdrop-filter:blur(6px)}
+.hidden{display:none !important}
+.toast{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);color:#fff;padding:10px 16px;border-radius:999px;font-weight:800;font-size:14px;pointer-events:none;opacity:0;transition:opacity .2s}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <canvas id="c"></canvas>
+  <div class="hud">
+    <div class="topbar">
+      <div class="pill" id="bestPill">★ Best <b id="bestVal">0</b></div>
+      <div class="pill shield" id="shieldPill">◈ Shield <span id="shieldVal">OFF</span></div>
+      <button class="iconBtn" id="pauseBtn" aria-label="Pause">⏸</button>
+    </div>
+    <div class="scoreRow">
+      <div class="scoreBox">
+        <div class="lbl">Score</div>
+        <div class="val" id="scoreVal">0</div>
+        <div class="sub" id="gatesVal">0 gates</div>
+      </div>
+      <div class="scoreBox comboBox">
+        <div class="lbl">Combo</div>
+        <div class="comboVal" id="comboVal">1.0×</div>
+        <div class="sub" id="comboSub">thread center!</div>
+      </div>
+    </div>
+    <div class="zoneTag" id="zoneTag">MEADOW DAY • Speed 1.0×</div>
+    <div class="toast" id="toast"></div>
+    <div class="controls">
+      <button class="flapBtn" id="flapBtn">▲ TAP TO FLAP</button>
+      <button class="iconBtn" id="restartBtn" aria-label="Restart">↻</button>
+    </div>
+  </div>
+
+  <div class="center" id="startScreen">
+    <div class="card">
+      <h1>⛩ <span>WIND GATES</span></h1>
+      <p>Tap, click or <b>Space</b> to flap. Thread the <b>white sparkle</b> center to build combo. Golden gates are narrow but pay <b>double</b>.</p>
+      <div class="badges">
+        <span class="badge">◈ Feather = Shield</span>
+        <span class="badge gold">⬢ Golden 2×</span>
+        <span class="badge blue">⛅ Zone every 10</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="k">Best Score</div><div class="v" id="cardBest">0</div></div>
+        <div class="stat"><div class="k">Best Combo</div><div class="v" id="cardCombo">0×</div></div>
+      </div>
+      <button class="btn btn-primary" id="playBtn">▶ PLAY NOW</button>
+      <button class="btn btn-ghost" id="howBtn">How to play</button>
+      <div class="hint">Portrait 360–428px • No zoom needed • Best saved on device</div>
+    </div>
+  </div>
+
+  <div class="center hidden" id="overScreen">
+    <div class="card">
+      <h1 id="overTitle">CRASH!</h1>
+      <p id="overDesc">You hit a wind gate.</p>
+      <div class="stats">
+        <div class="stat"><div class="k">Score</div><div class="v" id="overScore">0</div></div>
+        <div class="stat"><div class="k">Gates</div><div class="v" id="overGates">0</div></div>
+        <div class="stat"><div class="k">Max Combo</div><div class="v" id="overCombo">0×</div></div>
+        <div class="stat"><div class="k">Best</div><div class="v" id="overBest">0</div></div>
+      </div>
+      <button class="btn btn-primary" id="againBtn">↻ FLAP AGAIN</button>
+      <div class="hint" id="newBestHint"></div>
+    </div>
+  </div>
+
+  <div class="center hidden" id="pauseScreen">
+    <div class="card">
+      <h1>Paused</h1>
+      <p>Take a breath. The wind waits.</p>
+      <button class="btn btn-primary" id="resumeBtn">▶ RESUME</button>
+      <button class="btn btn-ghost" id="quitBtn">Quit to menu</button>
+    </div>
+  </div>
+</div>
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const wrap=document.getElementById('wrap');
+let W,H,dpr;
+function resize(){
+  dpr=Math.min(2, window.devicePixelRatio||1);
+  W=wrap.clientWidth;
+  H=wrap.clientHeight;
+  canvas.width=W*dpr;
+  canvas.height=H*dpr;
+  canvas.style.width=W+'px';
+  canvas.style.height=H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize',resize);
+resize();
+
+// storage
+const BEST_KEY='windgates_best_v2';
+const COMBO_KEY='windgates_combo_v2';
+let bestScore=parseInt(localStorage.getItem(BEST_KEY)||'0',10);
+let bestCombo=parseFloat(localStorage.getItem(COMBO_KEY)||'0');
+
+const els={
+  scoreVal:document.getElementById('scoreVal'),
+  gatesVal:document.getElementById('gatesVal'),
+  comboVal:document.getElementById('comboVal'),
+  comboSub:document.getElementById('comboSub'),
+  bestVal:document.getElementById('bestVal'),
+  shieldPill:document.getElementById('shieldPill'),
+  shieldVal:document.getElementById('shieldVal'),
+  zoneTag:document.getElementById('zoneTag'),
+  cardBest:document.getElementById('cardBest'),
+  cardCombo:document.getElementById('cardCombo'),
+  toast:document.getElementById('toast'),
+  startScreen:document.getElementById('startScreen'),
+  overScreen:document.getElementById('overScreen'),
+  pauseScreen:document.getElementById('pauseScreen'),
+  overScore:document.getElementById('overScore'),
+  overGates:document.getElementById('overGates'),
+  overCombo:document.getElementById('overCombo'),
+  overBest:document.getElementById('overBest'),
+  overTitle:document.getElementById('overTitle'),
+  overDesc:document.getElementById('overDesc'),
+  newBestHint:document.getElementById('newBestHint'),
+};
+
+function updateHUD(){
+  els.bestVal.textContent=bestScore;
+  els.cardBest.textContent=bestScore;
+  els.cardCombo.textContent=bestCombo.toFixed(1)+'×';
+}
+
+updateHUD();
+
+let state='menu'; // menu, playing, paused, over
+let player, gates, feather, particles, score, gatesPassed, combo, multiplier, maxComboThisRun, speedBase, zoneIdx, frame, lastGapY, featherCounter, lightningTimer;
+
+const zones=[
+  {name:'MEADOW DAY', bgTop:'#87CEEB', bgBot:'#E0F6FF', hill:'#7AC74F', hill2:'#5BAE34', cloudA:0.9, rain:false},
+  {name:'CANYON DUSK', bgTop:'#FF7E5F', bgBot:'#4A2C6A', hill:'#C07A3A', hill2:'#8B5A2B', cloudA:0.7, rain:false},
+  {name:'MOUNTAIN STORM', bgTop:'#2C3E50', bgBot:'#5D7A9A', hill:'#3A4452', hill2:'#2A3441', cloudA:0.5, rain:true},
+  {name:'VOID TEMPEST', bgTop:'#0F0C29', bgBot:'#302B63', hill:'#1B1B2F', hill2:'#0F0F1E', cloudA:0.35, rain:true, lightning:true},
+];
+
+function resetGame(){
+  player={x: Math.min(90, W*0.22), y:H*0.45, vy:0, r:13, wing:0};
+  gates=[];
+  particles=[];
+  feather=null;
+  score=0;
+  gatesPassed=0;
+  combo=0;
+  multiplier=1;
+  maxComboThisRun=1;
+  speedBase=2.7;
+  zoneIdx=0;
+  frame=0;
+  lastGapY=H*0.5;
+  featherCounter=0;
+  lightningTimer=0;
+  // initial gates
+  for(let i=0;i<3;i++){
+    spawnGate(W + i*220 + 120);
+  }
+  updateScoreUI();
+  updateZoneUI();
+  updateShieldUI();
+}
+
+function spawnGate(x){
+  const isGolden=Math.random()<0.18;
+  const gapH=isGolden?108:158;
+  // smooth gapY
+  let gapY=lastGapY + (Math.random()*120-60);
+  const minY=70+gapH/2, maxY=H-90-gapH/2;
+  gapY=Math.max(minY, Math.min(maxY, gapY));
+  lastGapY=gapY;
+  gates.push({x, gapY, gapH, w:56, isGolden, passed:false, perfect:false});
+  featherCounter++;
+  if(featherCounter>=7 && !feather){
+    // spawn feather in this gate's center
+    feather={x: x+18, y: gapY, vy:0, t:0, collected:false};
+    featherCounter=0;
+  }
+}
+
+function currentSpeed(){
+  return speedBase + Math.floor(gatesPassed/10)*0.62;
+}
+function currentZone(){
+  return zones[Math.min(zones.length-1, Math.floor(gatesPassed/10))];
+}
+
+function flap(){
+  if(state==='menu'){ startGame(); return; }
+  if(state==='over'){ startGame(); return; }
+  if(state==='paused') return;
+  if(state==='playing'){
+    player.vy=-8.4;
+    player.wing=1;
+    spawnFlapParticles();
+    // haptic
+    if(navigator.vibrate) navigator.vibrate(12);
+  }
+}
+function spawnFlapParticles(){
+  for(let i=0;i<3;i++){
+    particles.push({x:player.x-6, y:player.y+4, vx:Math.random()*-1.5-0.5, vy:Math.random()*2-1, life:12, max:12, c:'#ffffff'});
+  }
+}
+
+function startGame(){
+  resetGame();
+  state='playing';
+  els.startScreen.classList.add('hidden');
+  els.overScreen.classList.add('hidden');
+  els.pauseScreen.classList.add('hidden');
+  showToast('GO!');
+}
+
+function gameOver(){
+  state='over';
+  // persist
+  let isNewBest=false;
+  if(score>bestScore){ bestScore=score; localStorage.setItem(BEST_KEY,String(bestScore)); isNewBest=true; }
+  if(maxComboThisRun>bestCombo){ bestCombo=maxComboThisRun; localStorage.setItem(COMBO_KEY,String(bestCombo)); }
+  updateHUD();
+  els.overScore.textContent=score;
+  els.overGates.textContent=gatesPassed;
+  els.overCombo.textContent=maxComboThisRun.toFixed(1)+'×';
+  els.overBest.textContent=bestScore;
+  if(isNewBest){
+    els.overTitle.textContent='NEW BEST!';
+    els.overDesc.textContent='You tamed the wind!';
+    els.newBestHint.textContent='★ Saved on this device';
+  } else {
+    els.overTitle.textContent='CRASH!';
+    els.overDesc.textContent=gatesPassed<5?'Keep flapping — thread the sparkle!':'Great run! Thread centers for combo.';
+    els.newBestHint.textContent='';
+  }
+  els.overScreen.classList.remove('hidden');
+  if(navigator.vibrate) navigator.vibrate([30,40,60]);
+}
+
+function showToast(msg){
+  els.toast.textContent=msg;
+  els.toast.classList.add('show');
+  setTimeout(()=>els.toast.classList.remove('show'),900);
+}
+
+function updateScoreUI(){
+  els.scoreVal.textContent=score;
+  els.gatesVal.textContent=gatesPassed+' gates';
+  els.comboVal.textContent=multiplier.toFixed(1)+'×';
+  els.comboVal.style.color= combo>=3 ? '#FFD93D' : combo>=1 ? '#FFE99A' : '#fff';
+  els.comboSub.textContent= combo>=4 ? 'ON FIRE!' : combo>=2 ? combo+' combo!' : 'thread center!';
+  if(combo>=2) els.comboVal.style.transform='scale(1.08)';
+  else els.comboVal.style.transform='scale(1)';
+}
+function updateZoneUI(){
+  const z=currentZone();
+  const sp=currentSpeed();
+  els.zoneTag.textContent=`${z.name} • Speed ${sp.toFixed(1)}×`;
+}
+function updateShieldUI(){
+  const has=player && player.hasShield;
+  if(has){
+    els.shieldPill.classList.add('on');
+    els.shieldVal.textContent='ON';
+  } else {
+    els.shieldPill.classList.remove('on');
+    els.shieldVal.textContent='OFF';
+  }
+}
+
+// input
+document.getElementById('playBtn').addEventListener('click', startGame);
+document.getElementById('againBtn').addEventListener('click', startGame);
+document.getElementById('flapBtn').addEventListener('pointerdown', e=>{e.preventDefault(); flap();});
+document.getElementById('restartBtn').addEventListener('click', ()=>{ if(state==='playing') resetGame(); else startGame(); });
+document.getElementById('pauseBtn').addEventListener('click', ()=>{
+  if(state==='playing'){ state='paused'; els.pauseScreen.classList.remove('hidden'); }
+  else if(state==='paused'){ state='playing'; els.pauseScreen.classList.add('hidden'); }
+});
+document.getElementById('resumeBtn').addEventListener('click', ()=>{ state='playing'; els.pauseScreen.classList.add('hidden'); });
+document.getElementById('quitBtn').addEventListener('click', ()=>{ state='menu'; els.pauseScreen.classList.add('hidden'); els.startScreen.classList.remove('hidden'); });
+document.getElementById('howBtn').addEventListener('click', ()=>{
+  showToast('Thread sparkle = combo • Gold = 2× • Feather = shield');
+});
+
+wrap.addEventListener('pointerdown', e=>{
+  // ignore if clicking buttons
+  if(e.target.closest('button')) return;
+  e.preventDefault();
+  flap();
+}, {passive:false});
+canvas.addEventListener('pointerdown', e=>{ e.preventDefault(); flap(); }, {passive:false});
+window.addEventListener('keydown', e=>{
+  if(e.code==='Space'){ e.preventDefault(); flap(); }
+  if(e.code==='KeyP' && state==='playing'){ state='paused'; els.pauseScreen.classList.remove('hidden'); }
+  if(e.code==='Escape' && state==='paused'){ state='playing'; els.pauseScreen.classList.add('hidden'); }
+});
+
+// game loop
+let lastTime=0;
+function loop(t){
+  requestAnimationFrame(loop);
+  const dt=Math.min(32, t-lastTime);
+  lastTime=t;
+  frame++;
+
+  if(state!=='playing'){
+    draw();
+    return;
+  }
+
+  // physics
+  player.vy+=0.42;
+  if(player.vy>9) player.vy=9;
+  player.y+=player.vy;
+  player.wing=Math.max(0, player.wing-0.12);
+  player.rot= Math.max(-0.6, Math.min(0.9, player.vy*0.06));
+
+  // bounds
+  if(player.y - player.r < 0){ player.y=player.r; player.vy=0; }
+  if(player.y + player.r > H-56){ // above controls
+    // hit ground
+    if(player.hasShield){
+      player.hasShield=false;
+      player.y=H-56-player.r;
+      player.vy=-6;
+      updateShieldUI();
+      showToast('Shield blocked!');
+      for(let i=0;i<12;i++) particles.push({x:player.x,y:player.y,vx:Math.random()*6-3,vy:Math.random()*-4-1,life:18,max:18,c:'#00d4ff'});
+    } else {
+      gameOver();
+    }
+  }
+
+  const speed=currentSpeed();
+  // move gates
+  for(let g of gates) g.x-=speed;
+  // remove offscreen and spawn
+  if(gates.length && gates[0].x < -80){
+    gates.shift();
+  }
+  if(gates.length){
+    const last=gates[gates.length-1];
+    if(last.x < W-190){
+      spawnGate(W+10);
+    }
+  } else {
+    spawnGate(W+10);
+  }
+
+  // feather
+  if(feather){
+    feather.x-=speed;
+    feather.t+=0.12;
+    feather.y+=Math.sin(feather.t)*0.6;
+    // collect
+    const dx=player.x-feather.x, dy=player.y-feather.y;
+    if(Math.hypot(dx,dy) < 22){
+      player.hasShield=true;
+      score+=5;
+      showToast('Shield +5');
+      updateShieldUI();
+      updateScoreUI();
+      for(let i=0;i<10;i++) particles.push({x:feather.x,y:feather.y,vx:Math.random()*4-2,vy:Math.random()*4-2,life:16,max:16,c:'#ffffff'});
+      feather=null;
+    } else if(feather.x < -40) feather=null;
+  }
+
+  // collisions & scoring
+  for(let g of gates){
+    // collision if overlapping x
+    if(player.x+player.r > g.x && player.x-player.r < g.x+g.w){
+      const topEnd=g.gapY - g.gapH/2;
+      const botStart=g.gapY + g.gapH/2;
+      if(player.y - player.r < topEnd || player.y + player.r > botStart){
+        // hit
+        if(player.hasShield){
+          player.hasShield=false;
+          updateShieldUI();
+          showToast('Shield blocked!');
+          // push through
+          player.vy=-4;
+          for(let i=0;i<14;i++) particles.push({x:player.x,y:player.y,vx:Math.random()*6-3,vy:Math.random()*6-3,life:20,max:20,c:g.isGolden?'#FFD93D':'#ff6b6b'});
+          // nudge gate away visually
+          g.x-=12;
+        } else {
+          // crash
+          for(let i=0;i<16;i++) particles.push({x:player.x,y:player.y,vx:Math.random()*8-4,vy:Math.random()*8-4,life:22,max:22,c:'#ff6b6b'});
+          gameOver();
+          break;
+        }
+      }
+    }
+    // passing
+    if(!g.passed && player.x > g.x+g.w){
+      g.passed=true;
+      gatesPassed++;
+      // perfect check: within 15% of gapH from center
+      const dist=Math.abs(player.y - g.gapY);
+      const perfectThresh=g.gapH*0.15;
+      const isPerfect=dist < perfectThresh;
+      let base=g.isGolden?20:10;
+      if(isPerfect){
+        combo++;
+        multiplier=Math.min(4, 1 + combo*0.5);
+        maxComboThisRun=Math.max(maxComboThisRun, multiplier);
+        const pts=Math.round(base*multiplier);
+        score+=pts;
+        showToast(g.isGolden?`PERFECT GOLD +${pts}`:`PERFECT +${pts}`);
+        // particles
+        for(let i=0;i<8;i++) particles.push({x:g.x+g.w/2,y:g.gapY,vx:Math.random()*3-1.5,vy:Math.random()*3-1.5,life:14,max:14,c:g.isGolden?'#FFD93D':'#7CFF7C'});
+      } else {
+        // reset combo if not perfect
+        if(combo>0) showToast('Combo lost');
+        combo=0;
+        multiplier=1;
+        score+=base;
+      }
+      updateScoreUI();
+      updateZoneUI();
+      // zone change toast
+      if(gatesPassed%10===0){
+        const z=currentZone();
+        showToast(z.name+'!');
+        // flash
+        lightningTimer=6;
+      }
+    }
+  }
+
+  // particles
+  for(let p of particles){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.18; p.life--; }
+  particles=particles.filter(p=>p.life>0);
+
+  // lightning
+  if(lightningTimer>0) lightningTimer--;
+
+  draw();
+}
+
+function draw(){
+  const z=currentZone();
+  // sky gradient
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,z.bgTop);
+  grad.addColorStop(1,z.bgBot);
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,W,H);
+
+  // lightning flash
+  if(lightningTimer>0 && z.lightning && Math.random()<0.4){
+    ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.fillRect(0,0,W,H);
+  }
+
+  // pixel hills - draw as stepped
+  drawHills(z);
+
+  // clouds
+  drawClouds(z);
+
+  // rain
+  if(z.rain){
+    ctx.strokeStyle='rgba(255,255,255,0.35)';
+    ctx.lineWidth=1;
+    for(let i=0;i<28;i++){
+      const x=(frame*4 + i*53)%W;
+      const y=(frame*6 + i*37)%(H-80);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x-6, y+12);
+      ctx.stroke();
+    }
+  }
+
+  // gates
+  for(let g of gates) drawGate(g);
+
+  // feather
+  if(feather) drawFeather(feather);
+
+  // particles
+  for(let p of particles){
+    const a=p.life/p.max;
+    ctx.globalAlpha=a;
+    ctx.fillStyle=p.c;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y, 3*a+1,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // player
+  if(player) drawBird(player);
+
+  // ground
+  ctx.fillStyle='rgba(0,0,0,0.18)';
+  ctx.fillRect(0,H-56,W,56);
+  ctx.fillStyle='#2b2b2b';
+  ctx.fillRect(0,H-14,W,14);
+  // pixel ground detail
+  ctx.fillStyle='#3a3a3a';
+  for(let x=0;x<W;x+=16) ctx.fillRect(x, H-56, 8, 4);
+
+  // menu idle bird bob
+  if(state==='menu' && player){
+    // gentle bob for preview
+    player.y = H*0.45 + Math.sin(frame*0.04)*6;
+  }
+}
+
+function drawHills(z){
+  // far hills
+  ctx.fillStyle=z.hill;
+  ctx.beginPath();
+  ctx.moveTo(0, H-120);
+  for(let x=0;x<=W;x+=40){
+    const h=Math.sin(x*0.015 + frame*0.002)*18 + Math.cos(x*0.008)*12;
+    ctx.lineTo(x, H-120 + h);
+  }
+  ctx.lineTo(W, H);
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  ctx.fill();
+  // nearer hills darker
+  ctx.fillStyle=z.hill2;
+  ctx.beginPath();
+  ctx.moveTo(0, H-90);
+  for(let x=0;x<=W;x+=30){
+    const h=Math.sin(x*0.02 - frame*0.003)*14;
+    ctx.lineTo(x, H-90 + h);
+  }
+  ctx.lineTo(W,H);
+  ctx.lineTo(0,H);
+  ctx.closePath();
+  ctx.fill();
+  // pixel squares on hills for pixel feel
+  ctx.fillStyle='rgba(0,0,0,0.08)';
+  for(let x=0;x<W;x+=24){
+    for(let y=H-110;y<H-60;y+=24){
+      if((x+y)%48===0) ctx.fillRect(x, y, 6,6);
+    }
+  }
+}
+
+function drawClouds(z){
+  ctx.fillStyle=`rgba(255,255,255,${z.cloudA})`;
+  const cloudCount= z.name==='MEADOW DAY'?5:3;
+  for(let i=0;i<cloudCount;i++){
+    const cx=( (i*140 - frame*0.6)% (W+200) + W+200)%(W+200) -100;
+    const cy=60 + i*28 + Math.sin(frame*0.01+i)*6;
+    drawPixelCloud(cx, cy, 1.1);
+  }
+}
+function drawPixelCloud(x,y,s){
+  ctx.fillRect(x, y, 28*s, 10*s);
+  ctx.fillRect(x+6, y-6, 20*s, 8*s);
+  ctx.fillRect(x+10, y-10, 12*s, 6*s);
+  ctx.fillRect(x-6, y+4, 10*s, 6*s);
+}
+
+function drawGate(g){
+  const topH=g.gapY - g.gapH/2;
+  const botY=g.gapY + g.gapH/2;
+  const botH=H - botY -56;
+  // gate colors
+  const isGold=g.isGolden;
+  const col=isGold?'#FFD93D':'#E2E8F0';
+  const colDark=isGold?'#E6A800':'#94A3B8';
+  const colMid=isGold?'#FFF7CC':'#F8FAFC';
+
+  // top pillar
+  drawPillar(g.x, 0, g.w, topH, col, colDark, colMid, isGold);
+  // bottom pillar
+  drawPillar(g.x, botY, g.w, botH, col, colDark, colMid, isGold);
+
+  // center sparkle line
+  if(!g.passed){
+    ctx.fillStyle=isGold?'#FFD93D':'#ffffff';
+    ctx.globalAlpha=0.95;
+    // sparkle diamond
+    const sx=g.x+g.w/2, sy=g.gapY;
+    ctx.save();
+    ctx.translate(sx,sy);
+    ctx.rotate(Math.PI/4);
+    ctx.fillRect(-6,-6,12,12);
+    ctx.fillStyle=isGold?'#fff':'#FFD93D';
+    ctx.fillRect(-3,-3,6,6);
+    ctx.restore();
+    // thin center line hint
+    ctx.globalAlpha=0.25;
+    ctx.fillStyle='#fff';
+    ctx.fillRect(g.x+g.w/2-1, g.gapY- g.gapH*0.15, 2, g.gapH*0.30);
+    ctx.globalAlpha=1;
+    // golden shimmer
+    if(isGold){
+      ctx.fillStyle='rgba(255,255,255,0.6)';
+      const sh=(frame*2)%(g.w+20)-10;
+      ctx.fillRect(g.x+sh, 0, 8, topH);
+      ctx.fillRect(g.x+sh, botY, 8, botH);
+    }
+  }
+}
+function drawPillar(x,y,w,h,col,dark,mid,isGold){
+  if(h<=0) return;
+  // main
+  ctx.fillStyle=col;
+  ctx.fillRect(x,y,w,h);
+  // inner
+  ctx.fillStyle=mid;
+  ctx.fillRect(x+6,y+6,w-12,h-12);
+  // border
+  ctx.fillStyle=dark;
+  ctx.fillRect(x,y,w,4);
+  ctx.fillRect(x,y,4,h);
+  ctx.fillRect(x+w-4,y,4,h);
+  ctx.fillRect(x,y+h-4,w,4);
+  // pixel rivets
+  ctx.fillStyle=dark;
+  for(let py=y+10; py<y+h-10; py+=18){
+    ctx.fillRect(x+2, py, 3,3);
+    ctx.fillRect(x+w-5, py, 3,3);
+  }
+  // wind lines
+  ctx.fillStyle='rgba(0,0,0,0.08)';
+  for(let py=y+14; py<y+h-14; py+=12){
+    ctx.fillRect(x+10, py, w-20, 2);
+  }
+  if(isGold){
+    ctx.fillStyle='#FFD93D';
+    ctx.fillRect(x-2,y,w+4,6);
+    ctx.fillRect(x-2,y+h-6,w+4,6);
+  }
+}
+
+function drawFeather(f){
+  const x=f.x, y=f.y;
+  // glow
+  ctx.fillStyle='rgba(255,255,255,0.35)';
+  ctx.beginPath();
+  ctx.arc(x,y,18,0,Math.PI*2);
+  ctx.fill();
+  // feather shape - pixel
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(Math.sin(f.t*0.8)*0.25);
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(-2,-14,4,28);
+  ctx.fillRect(-6,-10,12,4);
+  ctx.fillRect(-8,-6,16,4);
+  ctx.fillRect(-7,-2,14,4);
+  ctx.fillRect(-5,2,10,4);
+  ctx.fillRect(-3,6,6,4);
+  // stem
+  ctx.fillStyle='#0ea5e9';
+  ctx.fillRect(-1,-14,2,28);
+  ctx.restore();
+  // bob shadow
+  ctx.fillStyle='rgba(0,0,0,0.15)';
+  ctx.beginPath();
+  ctx.ellipse(x, y+16, 10, 3, 0,0,Math.PI*2);
+  ctx.fill();
+}
+
+function drawBird(p){
+  ctx.save();
+  ctx.translate(p.x,p.y);
+  ctx.rotate(p.rot);
+  // shield ring
+  if(p.hasShield){
+    ctx.strokeStyle='#00d4ff';
+    ctx.lineWidth=3;
+    ctx.globalAlpha=0.9+Math.sin(frame*0.2)*0.1;
+    ctx.beginPath();
+    ctx.arc(0,0,20,0,Math.PI*2);
+    ctx.stroke();
+    ctx.globalAlpha=0.25;
+    ctx.fillStyle='#00d4ff';
+    ctx.beginPath();
+    ctx.arc(0,0,20,0,Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha=1;
+  }
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.ellipse(2,8,14,6,0,0,Math.PI*2);
+  ctx.fill();
+  // body
+  ctx.fillStyle='#FF6B6B';
+  ctx.fillRect(-10,-8,20,14);
+  ctx.fillStyle='#FFE066';
+  ctx.fillRect(-14,-4,8,8); // beak
+  ctx.fillStyle='#1a1a2e';
+  ctx.fillRect(-16,-2,3,4);
+  // eye
+  ctx.fillStyle='#fff';
+  ctx.fillRect(2,-6,6,6);
+  ctx.fillStyle='#0f172a';
+  ctx.fillRect(4,-4,3,3);
+  ctx.fillStyle='#fff';
+  ctx.fillRect(5,-3,1,1);
+  // wing flap
+  const wingY= p.wing>0 ? -4 - p.wing*6 : -2;
+  ctx.fillStyle='#E53E3E';
+  ctx.fillRect(-6, wingY, 12, 6);
+  ctx.fillStyle='#fff';
+  ctx.fillRect(-4, wingY+1, 8,2);
+  // tail
+  ctx.fillStyle='#FF8E8E';
+  ctx.fillRect(-12,-3,4,6);
+  ctx.restore();
+}
+
+// init
+resetGame();
+draw();
+requestAnimationFrame(loop);
+
+// prevent scroll
+document.body.addEventListener('touchmove', e=>{ if(e.target.closest('.wrap')) e.preventDefault(); }, {passive:false});
+</script>
+</body>
+</html>

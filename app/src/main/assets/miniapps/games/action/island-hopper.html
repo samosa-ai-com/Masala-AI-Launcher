@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>Fruit Hopper</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: linear-gradient(180deg,#87e0ff 0%,#a8e6ff 30%,#fff6a0 75%,#ffd86b 100%);
+  display:flex;justify-content:center;align-items:flex-start;
+  min-height:100vh;
+}
+.wrap{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  padding:10px 10px 14px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.header{
+  background: linear-gradient(135deg,#ffffff 0%,#fff7cc 100%);
+  border-radius:18px;
+  padding:10px 14px;
+  display:flex;justify-content:space-between;align-items:center;
+  box-shadow:0 6px 18px rgba(0,0,0,.12);
+  border:2px solid #fff;
+}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{
+  width:42px;height:42px;border-radius:12px;
+  background: linear-gradient(135deg,#ff6b6b,#ff9a3c);
+  display:grid;place-items:center;font-size:22px;
+  box-shadow:0 4px 10px rgba(255,107,107,.4);
+}
+.brand h1{font-size:18px;line-height:1;color:#2d2a26;letter-spacing:.2px}
+.brand p{font-size:11px;color:#7a6f5a;font-weight:600}
+.scores{display:flex;gap:8px}
+.pill{
+  background:#2d2a26;color:#fff;border-radius:12px;padding:7px 10px;min-width:72px;text-align:center;
+}
+.pill small{display:block;font-size:9px;opacity:.8;letter-spacing:.6px;font-weight:700}
+.pill b{font-size:16px;line-height:1}
+.pill.best{background: linear-gradient(135deg,#6a5cff,#8a7dff);}
+
+.canvas-card{
+  background:#fff;border-radius:20px;padding:8px;
+  box-shadow:0 10px 28px rgba(0,0,0,.15);border:2px solid #fff;
+  position:relative;
+}
+canvas{
+  display:block;width:100%;height:520px;
+  border-radius:14px;
+  background: linear-gradient(180deg,#7dd8ff 0%,#b8ecff 55%,#fff9c4 100%);
+  touch-action:none;
+}
+.hud{
+  position:absolute;left:16px;right:16px;top:16px;
+  display:flex;justify-content:space-between;align-items:center;
+  pointer-events:none;
+}
+.hud-left{
+  background:rgba(255,255,255,.92);border-radius:12px;padding:6px 10px;
+  display:flex;align-items:center;gap:6px;font-weight:800;color:#2d2a26;
+  box-shadow:0 4px 12px rgba(0,0,0,.12);font-size:13px;
+}
+.hud-right{
+  background:rgba(45,42,38,.9);color:#fff;border-radius:12px;padding:6px 10px;font-size:12px;font-weight:700;
+}
+.controls{
+  display:flex;gap:10px;align-items:center;
+}
+.cbtn{
+  flex:1;height:72px;border-radius:18px;border:none;
+  font-size:26px;font-weight:900;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  box-shadow:0 6px 0 rgba(0,0,0,.15),0 8px 18px rgba(0,0,0,.12);
+  user-select:none;touch-action:manipulation;
+  transition:transform .06s, box-shadow .06s;
+}
+.cbtn:active{transform:translateY(4px);box-shadow:0 2px 0 rgba(0,0,0,.15),0 4px 10px rgba(0,0,0,.12)}
+.cbtn span{font-size:13px;letter-spacing:.5px}
+#leftBtn,#rightBtn{background:#ffffff;color:#2d2a26;border:2px solid #ffe08a}
+#jumpBtn{
+  flex:1.35;
+  background: linear-gradient(180deg,#ffe53b 0%,#ffb800 100%);
+  color:#2d2a26;border:2px solid #fff;
+  font-size:28px;
+}
+#jumpBtn small{font-size:11px;display:block;line-height:1}
+.jump-inner{display:flex;flex-direction:column;align-items:center;line-height:1}
+.overlay{
+  position:absolute;inset:8px;border-radius:14px;
+  background: linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(255,246,160,.96) 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:20px;gap:10px;
+  box-shadow:inset 0 0 0 2px #fff;
+}
+.overlay h2{font-size:28px;color:#2d2a26}
+.overlay p{font-size:14px;color:#5a4e3a;max-width:260px;line-height:1.4}
+.bigScore{font-size:42px;font-weight:900;color:#ff6b6b;line-height:1}
+.bigScore small{font-size:13px;color:#2d2a26;display:block;font-weight:700}
+.btn-primary{
+  margin-top:6px;
+  background: linear-gradient(135deg,#ff6b6b,#ff9a3c);
+  color:#fff;border:none;border-radius:16px;
+  padding:16px 28px;font-size:18px;font-weight:900;
+  box-shadow:0 6px 0 #d94a3a,0 10px 20px rgba(255,107,107,.35);
+  width:100%;max-width:260px;
+}
+.btn-primary:active{transform:translateY(4px);box-shadow:0 2px 0 #d94a3a,0 6px 12px rgba(255,107,107,.35)}
+.hint{
+  background:rgba(255,255,255,.85);border-radius:14px;padding:8px 12px;
+  font-size:12px;color:#6b5e44;text-align:center;font-weight:600;
+  border:1px dashed #ffd86b;
+}
+.hidden{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="brand">
+      <div class="logo">🍎</div>
+      <div>
+        <h1>Fruit Hopper</h1>
+        <p>BOUNCE • COLLECT • DON'T FALL!</p>
+      </div>
+    </div>
+    <div class="scores">
+      <div class="pill"><small>SCORE</small><b id="scoreEl">0</b></div>
+      <div class="pill best"><small>BEST</small><b id="bestEl">0</b></div>
+    </div>
+  </div>
+
+  <div class="canvas-card" id="card">
+    <canvas id="c" width="400" height="520"></canvas>
+    <div class="hud">
+      <div class="hud-left">🍓 <span id="hudScore">0</span> pts</div>
+      <div class="hud-right" id="hudDist">0 m</div>
+    </div>
+    <div id="startOverlay" class="overlay">
+      <div style="font-size:44px">🌈🦊🍒</div>
+      <h2>Ready to Hop?</h2>
+      <p>Use <b>◀ ▶</b> to run and <b>JUMP</b> to bounce across floating ledges. Grab fruit for points — don't fall!</p>
+      <button class="btn-primary" id="startBtn">TAP TO PLAY ▶</button>
+      <div style="font-size:11px;color:#8a7a5a;font-weight:700">Large buttons • Portrait perfect • One-tap restart</div>
+    </div>
+    <div id="gameOverOverlay" class="overlay hidden">
+      <div style="font-size:40px">💫😵‍💫</div>
+      <h2>Oops! You Fell!</h2>
+      <div class="bigScore"><span id="finalScore">0</span><small>points collected</small></div>
+      <p id="finalMsg">Great hops! Try to beat your best.</p>
+      <button class="btn-primary" id="restartBtn">PLAY AGAIN ↻</button>
+      <div style="font-size:11px;color:#8a7a5a;font-weight:700" id="bestMsg"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="cbtn" id="leftBtn" aria-label="Move left">◀<span>LEFT</span></button>
+    <button class="cbtn" id="jumpBtn" aria-label="Jump"><span class="jump-inner">▲<small>JUMP</small></span></button>
+    <button class="cbtn" id="rightBtn" aria-label="Move right"><span>RIGHT</span>▶</button>
+  </div>
+  <div class="hint">💡 Tip: Hold an arrow to run, tap JUMP at the edge for the farthest leap!</div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('scoreEl');
+  const bestEl = document.getElementById('bestEl');
+  const hudScore = document.getElementById('hudScore');
+  const hudDist = document.getElementById('hudDist');
+  const startOverlay = document.getElementById('startOverlay');
+  const gameOverOverlay = document.getElementById('gameOverOverlay');
+  const finalScore = document.getElementById('finalScore');
+  const finalMsg = document.getElementById('finalMsg');
+  const bestMsg = document.getElementById('bestMsg');
+
+  let W=400, H=520, dpr=1;
+  function resize(){
+    const rect = canvas.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio||1, 2);
+    W = rect.width;
+    H = rect.height;
+    canvas.width = Math.round(W*dpr);
+    canvas.height = Math.round(H*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Game state
+  let hero, platforms, fruits, particles, cameraX, score, best, gameState, leftDown, rightDown, dist;
+  let lastTime=0, timeAcc=0;
+
+  best = parseInt(localStorage.getItem('fruitHopperBest')||'0',10);
+  bestEl.textContent = best;
+
+  const GRAVITY = 0.68;
+  const JUMP_V = -13.8;
+  const MOVE_SPEED = 4.2;
+  const FRICTION = 0.88;
+
+  function createHero(){
+    return {x:60, y:H-90, w:28, h:32, vx:0, vy:0, onGround:false, dir:1, coyote:0, anim:0};
+  }
+
+  function genLevel(){
+    platforms=[];
+    fruits=[];
+    // ground
+    platforms.push({x:-400, y:H-36, w:3000, h:40, type:'ground'});
+    let lastX=120, lastY=H-110;
+    for(let i=0;i<40;i++){
+      let nx = lastX + 150 + Math.random()*90;
+      let ny = lastY + (Math.random()-0.5)*110;
+      ny = Math.max(H-380, Math.min(H-90, ny));
+      // ensure not too high jump
+      if(ny < lastY - 95) ny = lastY - 95;
+      let w = 78 + Math.random()*68;
+      // occasional small platform
+      if(Math.random()<0.15) w=56;
+      platforms.push({x:nx, y:ny, w:w, h:14, type:'float'});
+      // fruit above platform
+      fruits.push({x: nx + w/2 -10, y: ny - 30, w:20, h:20, taken:false, bob: Math.random()*Math.PI*2, kind: Math.random()<0.5?'apple':'orange'});
+      // occasional extra floating fruit
+      if(Math.random()<0.25){
+        fruits.push({x: nx + w + 18, y: ny - 55 - Math.random()*20, w:18, h:18, taken:false, bob: Math.random()*6, kind:'berry'});
+      }
+      lastX = nx;
+      lastY = ny;
+    }
+  }
+
+  function resetGame(){
+    hero = createHero();
+    genLevel();
+    particles=[];
+    cameraX=0;
+    score=0;
+    dist=0;
+    gameState='playing';
+    updateScore();
+    startOverlay.classList.add('hidden');
+    gameOverOverlay.classList.add('hidden');
+  }
+
+  function updateScore(){
+    scoreEl.textContent = score;
+    hudScore.textContent = score;
+    hudDist.textContent = Math.max(0, Math.floor(dist)) + ' m';
+  }
+
+  // Input
+  leftDown=false; rightDown=false;
+  const leftBtn=document.getElementById('leftBtn');
+  const rightBtn=document.getElementById('rightBtn');
+  const jumpBtn=document.getElementById('jumpBtn');
+
+  function bindHold(btn, onDown, onUp){
+    const down = (e)=>{ e.preventDefault(); onDown(); };
+    const up = (e)=>{ e.preventDefault(); onUp(); };
+    btn.addEventListener('pointerdown', down);
+    btn.addEventListener('pointerup', up);
+    btn.addEventListener('pointercancel', up);
+    btn.addEventListener('pointerleave', up);
+    // prevent context menu
+    btn.addEventListener('contextmenu', e=>e.preventDefault());
+  }
+  bindHold(leftBtn, ()=>leftDown=true, ()=>leftDown=false);
+  bindHold(rightBtn, ()=>rightDown=true, ()=>rightDown=false);
+
+  function doJump(){
+    if(gameState!=='playing') return;
+    // coyote time + onGround
+    if(hero.onGround || hero.coyote>0){
+      hero.vy = JUMP_V;
+      hero.onGround=false;
+      hero.coyote=0;
+      spawnParticles(hero.x+hero.w/2, hero.y+hero.h, 6, '#ffffff');
+      playBeep(440,0.08,0.12);
+    }
+  }
+  jumpBtn.addEventListener('pointerdown', (e)=>{e.preventDefault(); doJump();});
+  jumpBtn.addEventListener('click', (e)=>{e.preventDefault();});
+
+  // keyboard
+  window.addEventListener('keydown', e=>{
+    if(e.code==='ArrowLeft') leftDown=true;
+    if(e.code==='ArrowRight') rightDown=true;
+    if(e.code==='Space' || e.code==='ArrowUp') { e.preventDefault(); doJump(); }
+  });
+  window.addEventListener('keyup', e=>{
+    if(e.code==='ArrowLeft') leftDown=false;
+    if(e.code==='ArrowRight') rightDown=false;
+  });
+
+  // touch prevent scroll on canvas
+  canvas.addEventListener('touchmove', e=>e.preventDefault(), {passive:false});
+
+  // Audio beeps
+  let audioCtx;
+  function playBeep(freq, dur, vol=0.2){
+    try{
+      if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+      if(audioCtx.state==='suspended') audioCtx.resume();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type='sine'; o.frequency.value=freq;
+      o.connect(g); g.connect(audioCtx.destination);
+      g.gain.value=vol;
+      o.start();
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+dur);
+      o.stop(audioCtx.currentTime+dur);
+    }catch(e){}
+  }
+
+  function spawnParticles(x,y,n,color){
+    for(let i=0;i<n;i++){
+      particles.push({
+        x:x, y:y,
+        vx:(Math.random()-0.5)*6,
+        vy:(Math.random()-0.5)*6 -1,
+        life:1, decay:0.06+Math.random()*0.05,
+        r:2+Math.random()*3, color:color
+      });
+    }
+  }
+
+  function rectCollide(a,b){
+    return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+  }
+
+  function update(dt){
+    if(gameState!=='playing') return;
+    // input
+    let move = 0;
+    if(leftDown) move -=1;
+    if(rightDown) move +=1;
+    if(move!==0) hero.dir = move;
+
+    // horizontal with smoothing
+    let targetVX = move * MOVE_SPEED;
+    hero.vx += (targetVX - hero.vx)*0.35;
+    if(Math.abs(move)<0.1) hero.vx *= FRICTION;
+    if(Math.abs(hero.vx)<0.05) hero.vx=0;
+
+    hero.vy += GRAVITY;
+    if(hero.vy>14) hero.vy=14;
+
+    // coyote
+    if(hero.onGround) hero.coyote=6;
+    else if(hero.coyote>0) hero.coyote--;
+
+    let nextX = hero.x + hero.vx;
+    let nextY = hero.y + hero.vy;
+
+    // horizontal collision with platforms (side)
+    // simple: check if new X collides with platform sides when overlapping vertically
+    let wasOnGround = hero.onGround;
+    hero.onGround=false;
+
+    // X move
+    hero.x = nextX;
+
+    // Y move with platform landing
+    hero.y = nextY;
+
+    // platform collisions
+    for(let p of platforms){
+      // AABB for hero
+      let hx = hero.x, hy = hero.y, hw=hero.w, hh=hero.h;
+      if(hx+hw > p.x && hx < p.x+p.w){
+        // landing on top
+        if(hero.vy >=0 && hy+hh >= p.y && hy+hh - hero.vy <= p.y+8){
+          hero.y = p.y - hh;
+          hero.vy = 0;
+          hero.onGround = true;
+        } else if(hero.vy <0 && hy <= p.y+p.h && hy - hero.vy >= p.y+p.h -6){
+          // hit from below
+          hero.y = p.y + p.h;
+          hero.vy = 1;
+        }
+      }
+    }
+
+    // keep inside left bound
+    if(hero.x < cameraX - 20) hero.x = cameraX -20;
+    // camera follow
+    let targetCam = hero.x - W*0.32;
+    if(targetCam <0) targetCam=0;
+    cameraX += (targetCam - cameraX)*0.12;
+    dist = Math.max(dist, hero.x);
+
+    // fruit collect
+    for(let f of fruits){
+      if(f.taken) continue;
+      let fr = {x:f.x, y:f.y + Math.sin(performance.now()*0.003 + f.bob)*4, w:f.w, h:f.h};
+      if(rectCollide({x:hero.x, y:hero.y, w:hero.w, h:hero.h}, fr)){
+        f.taken=true;
+        score += (f.kind==='berry'? 50 : 100);
+        updateScore();
+        spawnParticles(f.x+f.w/2, f.y+f.h/2, 8, f.kind==='apple'?'#ff4d4d': f.kind==='orange'?'#ff9a3c':'#a78bfa');
+        playBeep(f.kind==='berry'? 880: 660, 0.12, 0.18);
+      }
+    }
+
+    // particles
+    for(let i=particles.length-1;i>=0;i--){
+      let p=particles[i];
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.25; p.life-=p.decay;
+      if(p.life<=0) particles.splice(i,1);
+    }
+
+    hero.anim += 0.18 + Math.abs(hero.vx)*0.04;
+
+    // fall death
+    if(hero.y > H + 60){
+      gameOver();
+    }
+
+    // extend level if near end
+    let lastPlat = platforms[platforms.length-1];
+    if(hero.x > lastPlat.x - W*1.2){
+      // generate more
+      let lastX = lastPlat.x, lastY = lastPlat.y;
+      for(let i=0;i<12;i++){
+        let nx = lastX + 150 + Math.random()*90;
+        let ny = lastY + (Math.random()-0.5)*110;
+        ny = Math.max(H-380, Math.min(H-90, ny));
+        if(ny < lastY -95) ny = lastY-95;
+        let w = 78 + Math.random()*68;
+        platforms.push({x:nx, y:ny, w:w, h:14, type:'float'});
+        fruits.push({x: nx + w/2 -10, y: ny -30, w:20, h:20, taken:false, bob: Math.random()*6, kind: Math.random()<0.5?'apple':'orange'});
+        if(Math.random()<0.25) fruits.push({x: nx + w + 18, y: ny -55 -Math.random()*20, w:18, h:18, taken:false, bob: Math.random()*6, kind:'berry'});
+        lastX=nx; lastY=ny;
+      }
+    }
+  }
+
+  function gameOver(){
+    gameState='over';
+    finalScore.textContent = score;
+    if(score > best){
+      best = score;
+      localStorage.setItem('fruitHopperBest', best);
+      bestEl.textContent = best;
+      finalMsg.textContent = '🎉 NEW BEST! You are a hopping legend!';
+      bestMsg.textContent = 'Best saved in browser ✓';
+      playBeep(880,0.3,0.25);
+      setTimeout(()=>playBeep(1100,0.3,0.25),120);
+    } else {
+      finalMsg.textContent = score===0 ? 'You slipped right away — try a running jump!' : score<300 ? 'Nice hops! Keep collecting fruit!' : 'Amazing run! So close to your best!';
+      bestMsg.textContent = 'Best: '+best+' pts • Tap to try again';
+      playBeep(220,0.4,0.2);
+    }
+    gameOverOverlay.classList.remove('hidden');
+  }
+
+  function draw(){
+    // clear
+    ctx.clearRect(0,0,W,H);
+
+    // sky gradient
+    let g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#7dd8ff');
+    g.addColorStop(0.55,'#b8ecff');
+    g.addColorStop(1,'#fff9c4');
+    ctx.fillStyle=g;
+    ctx.fillRect(0,0,W,H);
+
+    // sun
+    ctx.save();
+    ctx.globalAlpha=0.9;
+    ctx.fillStyle='#ffe53b';
+    ctx.beginPath(); ctx.arc(W-46, 56, 28, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.7)';
+    ctx.beginPath(); ctx.arc(W-52, 48, 6, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+
+    // clouds parallax
+    ctx.fillStyle='rgba(255,255,255,.95)';
+    let cloudOff = cameraX*0.18;
+    for(let i=0;i<5;i++){
+      let cx = (i*220 - (cloudOff % 220) + W) % (W+220) - 40;
+      let cy = 70 + i*18 % 60;
+      drawCloud(cx, cy, 0.9 + (i%2)*0.2);
+    }
+
+    // distant hills
+    ctx.fillStyle='rgba(120,200,120,.18)';
+    ctx.beginPath();
+    ctx.moveTo(0, H-120);
+    for(let x=0;x<=W;x+=20){
+      let wx = x + cameraX*0.3;
+      let y = Math.sin(wx*0.008)*18 + Math.cos(wx*0.015)*10;
+      ctx.lineTo(x, H-120 + y);
+    }
+    ctx.lineTo(W, H); ctx.lineTo(0,H); ctx.closePath(); ctx.fill();
+
+    ctx.save();
+    ctx.translate(-cameraX, 0);
+
+    // platforms
+    for(let p of platforms){
+      let px = p.x, py=p.y;
+      // shadow
+      ctx.fillStyle='rgba(0,0,0,.08)';
+      ctx.beginPath(); ctx.roundRect(px+3, py+4, p.w, p.h, 7); ctx.fill();
+      // body
+      let pg = ctx.createLinearGradient(px, py, px, py+p.h);
+      if(p.type==='ground'){
+        pg.addColorStop(0,'#8be28a'); pg.addColorStop(0.35,'#5ec95e'); pg.addColorStop(1,'#3a8a3a');
+      } else {
+        pg.addColorStop(0,'#a8f0a0'); pg.addColorStop(0.5,'#6bcf6b'); pg.addColorStop(1,'#4a9a4a');
+      }
+      ctx.fillStyle=pg;
+      ctx.beginPath(); ctx.roundRect(px, py, p.w, p.h, 7); ctx.fill();
+      // top grass highlight
+      ctx.fillStyle='#d0ffcc';
+      ctx.beginPath(); ctx.roundRect(px, py, p.w, 5, 4); ctx.fill();
+      // little grass tufts
+      ctx.fillStyle='#7be07b';
+      for(let t=0;t<Math.floor(p.w/18);t++){
+        let tx = px + 8 + t*18;
+        ctx.beginPath(); ctx.moveTo(tx, py); ctx.lineTo(tx+4, py-5); ctx.lineTo(tx+8, py); ctx.fill();
+      }
+      // underside
+      ctx.fillStyle='rgba(0,0,0,.12)';
+      ctx.fillRect(px+2, py+p.h-3, p.w-4, 3);
+    }
+
+    // fruits
+    for(let f of fruits){
+      if(f.taken) continue;
+      let bob = Math.sin(performance.now()*0.003 + f.bob)*4;
+      let fx = f.x, fy = f.y + bob;
+      ctx.save();
+      // shadow
+      ctx.fillStyle='rgba(0,0,0,.12)';
+      ctx.beginPath(); ctx.ellipse(fx+f.w/2, fy+f.h+6, f.w*0.5, 3, 0,0,Math.PI*2); ctx.fill();
+      if(f.kind==='apple'){
+        // apple
+        ctx.fillStyle='#ff3b3b';
+        ctx.beginPath(); ctx.arc(fx+10, fy+11, 10, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle='#ff6b6b';
+        ctx.beginPath(); ctx.arc(fx+7, fy+8, 3.5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle='#7a3a00';
+        ctx.fillRect(fx+9, fy-1, 2, 5);
+        ctx.fillStyle='#5ec95e';
+        ctx.beginPath(); ctx.ellipse(fx+13, fy+1, 5, 3, -0.4, 0, Math.PI*2); ctx.fill();
+      } else if(f.kind==='orange'){
+        ctx.fillStyle='#ff9a1a';
+        ctx.beginPath(); ctx.arc(fx+10, fy+11, 10, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle='#ffcc6b';
+        ctx.beginPath(); ctx.arc(fx+7, fy+8, 3, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle='#2d7a2d';
+        ctx.beginPath(); ctx.ellipse(fx+10, fy-1, 4, 2, 0,0,Math.PI*2); ctx.fill();
+      } else {
+        // berry cluster
+        ctx.fillStyle='#8a5cff';
+        ctx.beginPath(); ctx.arc(fx+6, fy+8, 6, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(fx+12, fy+8, 6, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(fx+9, fy+13, 6, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle='#c4b5ff';
+        ctx.beginPath(); ctx.arc(fx+5, fy+6, 2, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // hero
+    drawHero(hero.x, hero.y, hero.w, hero.h, hero.dir, hero.onGround, hero.anim, hero.vy);
+
+    // particles
+    for(let p of particles){
+      ctx.globalAlpha = Math.max(0,p.life);
+      ctx.fillStyle=p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+
+    ctx.restore();
+
+    // vignette
+    ctx.fillStyle='rgba(0,0,0,.04)';
+    ctx.beginPath(); ctx.roundRect(0,0,W,H,14); ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=2; ctx.stroke();
+  }
+
+  function drawCloud(x,y,s){
+    ctx.beginPath();
+    ctx.arc(x, y, 18*s, 0, Math.PI*2);
+    ctx.arc(x+18*s, y+4*s, 14*s, 0, Math.PI*2);
+    ctx.arc(x-16*s, y+6*s, 12*s, 0, Math.PI*2);
+    ctx.arc(x+6*s, y-8*s, 10*s, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  function drawHero(x,y,w,h,dir,onGround,anim,vy){
+    ctx.save();
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,.15)';
+    ctx.beginPath(); ctx.ellipse(x+w/2, y+h+4, 12, 4, 0,0,Math.PI*2); ctx.fill();
+
+    let bob = onGround ? Math.sin(anim)*1.2 : 0;
+    let squish = onGround ? 0 : Math.min(4, Math.abs(vy)*0.15);
+
+    // legs
+    let legSwing = onGround ? Math.sin(anim*1.2)*4 : 0;
+    ctx.fillStyle='#2d2a26';
+    // left leg
+    ctx.fillRect(x+7 + (dir<0? -legSwing: legSwing), y+h-6 + bob, 6, 6);
+    // right leg
+    ctx.fillRect(x+15 + (dir<0? legSwing: -legSwing), y+h-6 + bob, 6, 6);
+    // shoes
+    ctx.fillStyle='#ff6b6b';
+    ctx.beginPath(); ctx.roundRect(x+5 + (dir<0? -legSwing: legSwing), y+h-2 + bob, 10, 5, 3); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(x+13 + (dir<0? legSwing: -legSwing), y+h-2 + bob, 10, 5, 3); ctx.fill();
+
+    // body
+    ctx.fillStyle='#6a5cff';
+    ctx.beginPath(); ctx.roundRect(x+4, y+12 + bob - squish*0.5, w-8, 14, 6); ctx.fill();
+    // belly
+    ctx.fillStyle='#8a7dff';
+    ctx.beginPath(); ctx.ellipse(x+w/2, y+19 + bob, 7, 6, 0,0,Math.PI*2); ctx.fill();
+    // arms
+    ctx.fillStyle='#ffcc8a';
+    let armSwing = onGround ? Math.sin(anim*1.2+1)*3 : -2;
+    ctx.beginPath(); ctx.roundRect(x+1 + armSwing*0.5, y+14 + bob, 5, 9, 3); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(x+w-6 - armSwing*0.5, y+14 + bob, 5, 9, 3); ctx.fill();
+
+    // head
+    ctx.fillStyle='#ffdbac';
+    ctx.beginPath(); ctx.arc(x+w/2, y+8 + bob, 11, 0, Math.PI*2); ctx.fill();
+    // cap
+    ctx.fillStyle='#ff3b3b';
+    ctx.beginPath(); ctx.arc(x+w/2, y+5 + bob, 11, Math.PI, 0); ctx.fill();
+    ctx.fillStyle='#ffe53b';
+    ctx.beginPath(); ctx.ellipse(x+w/2, y+2 + bob, 12, 3, 0,0,Math.PI*2); ctx.fill();
+    // eyes
+    ctx.fillStyle='#2d2a26';
+    let eyeX = dir>0 ? 3 : -3;
+    ctx.beginPath(); ctx.arc(x+w/2 + eyeX -3, y+9 + bob, 1.8, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+w/2 + eyeX +3, y+9 + bob, 1.8, 0, Math.PI*2); ctx.fill();
+    // eye shine
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(x+w/2 + eyeX -2.2, y+8.2 + bob, 0.7, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+w/2 + eyeX +3.8, y+8.2 + bob, 0.7, 0, Math.PI*2); ctx.fill();
+    // smile
+    ctx.strokeStyle='#c97a3a'; ctx.lineWidth=1.4; ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(x+w/2 + eyeX*0.3, y+12 + bob, 3, 0.2, Math.PI-0.2); ctx.stroke();
+    // cheek
+    ctx.fillStyle='rgba(255,107,107,.35)';
+    ctx.beginPath(); ctx.arc(x+w/2 -6, y+11 + bob, 2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+w/2 +6, y+11 + bob, 2, 0, Math.PI*2); ctx.fill();
+
+    ctx.restore();
+  }
+
+  function loop(t){
+    requestAnimationFrame(loop);
+    if(!lastTime) lastTime=t;
+    let dt = Math.min(32, t-lastTime);
+    lastTime=t;
+    // fixed step 16ms
+    timeAcc += dt;
+    while(timeAcc >= 16){
+      update(16);
+      timeAcc -=16;
+    }
+    draw();
+  }
+  requestAnimationFrame(loop);
+
+  // buttons
+  document.getElementById('startBtn').addEventListener('click', resetGame);
+  document.getElementById('restartBtn').addEventListener('click', resetGame);
+
+  // init draw once
+  hero = createHero(); genLevel(); cameraX=0; score=0; dist=0; particles=[]; gameState='start';
+  // show start overlay initially
+  // ensure best displayed
+  bestEl.textContent = best;
+
+  // prevent double-tap zoom on buttons
+  document.addEventListener('touchstart', e=>{ if(e.touches.length>1) e.preventDefault(); }, {passive:false});
+}
+)();
+</script>
+</body>
+</html>

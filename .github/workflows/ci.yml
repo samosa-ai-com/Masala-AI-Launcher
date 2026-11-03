@@ -7,6 +7,11 @@ on:
   push:
     branches: [main]
   pull_request:
+    # A docs-only change can't break the build, and every run costs minutes.
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "HANDOFF.md"
   workflow_dispatch:
 
 concurrency:
@@ -15,11 +20,18 @@ concurrency:
 
 jobs:
   check:
-    # GitHub-hosted runners come with the Android SDK and ANDROID_HOME set.
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # CI self-hosted — 0 minutes, same box as the private prototype's runs.
+    runs-on: [self-hosted, ci]
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      # Self-hosted only: the checkout has no local.properties (gitignored),
+      # so Gradle needs ANDROID_HOME. GitHub-hosted images set it already.
+      - name: Point at CI Android SDK
+        run: |
+          echo "ANDROID_HOME=~/Android/Sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=~/Android/Sdk" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v4
         with:
@@ -28,8 +40,19 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Only what a PR can break, in the variants we ship: unit tests, lint on debug (release and
+      # androidTest lint duplicate it), and the manifest/import guards. `check` also ran the release
+      # unit tests and every lint variant, which doubled the bill for the same signal.
       - name: Check
-        run: ./gradlew check --console=plain
+        run: >
+          ./gradlew --parallel --console=plain
+          :core:test
+          :app:testDebugUnitTest
+          :app:lintDebug
+          :app:checkDebugManifestPolicy
+          :app:checkProfileManifestPolicy
+          :app:checkProImports
+          :app:checkListCalls
 
       # The readiness report goes in the job summary rather than an artifact, so reading it needs no
       # artifact storage.

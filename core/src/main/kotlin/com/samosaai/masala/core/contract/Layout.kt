@@ -11,7 +11,7 @@ data class LayoutDoc(
 ) {
     companion object {
         /** Bump with a migration in [com.samosaai.masala.core.migration.LayoutMigrations]. */
-        const val CURRENT_SCHEMA_VERSION = 1
+        const val CURRENT_SCHEMA_VERSION = 4
     }
 }
 
@@ -90,28 +90,56 @@ data class DockSection(
     override fun withItems(items: List<Item>) = copy(items = items)
 }
 
+/**
+ * One generated widget. Schema 3 points at the widget library with [ref]; an inline [widget] is still
+ * read for one schema so older exports import (exactly one of the two is set, the checker says so).
+ * A resolved layout ([com.samosaai.masala.core.layout.LayoutResolver]) always carries [widget], with
+ * [ref] kept so the home screen knows which library widget it is drawing.
+ */
 @Serializable
 @SerialName("widget")
 data class WidgetSection(
     override val id: String,
-    val widget: WidgetSpec,
+    val widget: WidgetSpec? = null,
+    val ref: WidgetRef? = null,
     override val rules: List<Rule> = emptyList(),
-) : Section
+) : Section {
+    /** The library or inline widget id; empty only for a section the checker rejects. */
+    val widgetId: String get() = ref?.widgetId ?: widget?.id.orEmpty()
+}
 
-/** Widgets shown one at a time, ordered by rule priority, then tap weight (arch §3.3). */
+/**
+ * Widgets shown one at a time, ordered by rule priority, then tap weight (arch §3.3). Schema 3 uses
+ * [refs]; inline [widgets] are still read for one schema. A resolved stack carries [widgets] in
+ * display order, with [refs] (when the stack had them) in the same order.
+ */
 @Serializable
 @SerialName("stack")
 data class StackSection(
     override val id: String,
-    val widgets: List<WidgetSpec>,
+    val widgets: List<WidgetSpec> = emptyList(),
+    val refs: List<WidgetRef> = emptyList(),
+    override val rules: List<Rule> = emptyList(),
+) : Section {
+    val widgetIds: List<String> get() = if (refs.isNotEmpty()) refs.map { it.widgetId } else widgets.map { it.id }
+}
+
+/** A generated HTML mini-app drawn at widget size (plan `docs/plans/widget-maker.md` §3.3). */
+@Serializable
+@SerialName("html")
+data class HtmlSection(
+    override val id: String,
+    /** The mini app to draw; sandboxed exactly like on its own screen, no phone data. */
+    val appId: String,
+    /** Height in rows. */
+    val rows: Int = 2,
     override val rules: List<Rule> = emptyList(),
 ) : Section
 
 /** A Pro or hub skill's widget (arch §3.9). Not drawn by the generated-widget renderer. */
 @Serializable
 @SerialName("skill_widget")
-data class SkillWidgetSection(
-    override val id: String,
+data class SkillWidgetSection(    override val id: String,
     val skillId: String,
     val size: SkillWidgetSize = SkillWidgetSize.MEDIUM,
     override val rules: List<Rule> = emptyList(),
@@ -122,6 +150,59 @@ enum class SkillWidgetSize {
     @SerialName("small") SMALL,
     @SerialName("medium") MEDIUM,
     @SerialName("large") LARGE,
+}
+
+/**
+ * A launcher grid inside a page (plan `docs/plans/home-cell-grid.md`): icons and widgets each sit at
+ * a cell with a span, so small widgets share a row and a drag lands on a cell. Rows grow as needed.
+ */
+@Serializable
+@SerialName("cells")
+data class CellGridSection(
+    override val id: String,
+    val columns: Int = 4,
+    val cells: List<Cell>,
+    override val rules: List<Rule> = emptyList(),
+) : Section {
+    /** Rows in use: one past the lowest cell's bottom edge. */
+    val rows: Int get() = cells.maxOfOrNull { it.y + it.h } ?: 0
+}
+
+/** One thing on a [CellGridSection]: top-left at ([x], [y]), [w] × [h] cells, 0-based. */
+@Serializable
+data class Cell(
+    val id: String,
+    val x: Int,
+    val y: Int,
+    val w: Int = 1,
+    val h: Int = 1,
+    val content: CellContent,
+    val rules: List<Rule> = emptyList(),
+)
+
+@Serializable
+sealed interface CellContent {
+    /** An icon; always 1 × 1. */
+    @Serializable
+    @SerialName("item")
+    data class ItemCell(val item: Item) : CellContent
+
+    @Serializable
+    @SerialName("widget")
+    data class WidgetCell(val ref: WidgetRef, val widget: WidgetSpec? = null) : CellContent
+
+    /** Like [StackSection]: [widgets] is filled in when resolved, in display order. */
+    @Serializable
+    @SerialName("stack")
+    data class StackCell(val refs: List<WidgetRef>, val widgets: List<WidgetSpec> = emptyList()) : CellContent
+
+    @Serializable
+    @SerialName("html")
+    data class HtmlCell(val appId: String) : CellContent
+
+    @Serializable
+    @SerialName("skill")
+    data class SkillCell(val skillId: String) : CellContent
 }
 
 /** A label, an icon and an action. Not always an app: "Gym" can be an action with a symbol icon. */

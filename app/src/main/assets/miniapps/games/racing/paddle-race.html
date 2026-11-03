@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>River Sprint — Paddle Dash</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#e0f7ff;--card:#ffffff;--ink:#0f2a44;--muted:#5a7a9a;--line:#cfe8ff;--accent:#0ea5e9;--ok:#059669;--bad:#dc2626;--gold:#f59e0b}
+html,body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;min-height:100%}
+body{display:flex;justify-content:center}
+.wrap{width:100%;max-width:428px;min-width:360px;padding:10px 10px 16px}
+header{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 12px;box-shadow:0 2px 12px rgba(14,165,233,.12)}
+.topline{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#0ea5e9,#06b6d4);color:#fff;display:grid;place-items:center;font-weight:800;font-size:16px}
+h1{font-size:15px;letter-spacing:.2px;line-height:1}
+h1 span{font-weight:400;color:var(--muted)}
+.sub{font-size:11px;color:var(--muted);margin-top:2px}
+.iconbtn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;font-size:16px}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-top:10px}
+.stat{background:#f0f9ff;border:1px solid var(--line);border-radius:12px;padding:6px 8px;text-align:center}
+.stat .k{font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:700}
+.stat .v{font-size:14px;font-weight:800;margin-top:1px}
+.levelbar{display:flex;gap:6px;margin-top:10px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.levelbar::-webkit-scrollbar{display:none}
+.lv{flex:0 0 auto;width:32px;height:32px;border-radius:10px;border:1px solid var(--line);background:#f0f9ff;display:grid;place-items:center;font-weight:800;font-size:12px}
+.lv.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.lv.done{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}
+.gameCard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px;margin-top:10px;box-shadow:0 4px 16px rgba(14,165,233,.12)}
+.gameTop{display:flex;justify-content:space-between;align-items:center}
+.pill{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:6px 10px;border-radius:20px;background:#f0f9ff;border:1px solid var(--line);color:var(--muted)}
+.hearts{font-size:16px;letter-spacing:2px}
+.canvasWrap{position:relative;margin-top:10px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:linear-gradient(180deg,#7dd3fc 0%,#0ea5e9 50%,#0284c7 100%);touch-action:none}
+canvas{display:block;width:100%;height:280px}
+.touchZones{position:absolute;inset:0;display:grid;grid-template-rows:1fr 1fr;pointer-events:none}
+.zone{display:grid;place-items:center;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:rgba(255,255,255,.85);text-shadow:0 1px 4px rgba(0,0,0,.3)}
+.zone:first-child{border-bottom:1px dashed rgba(255,255,255,.4)}
+.controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+.btn{height:48px;border-radius:12px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.gold{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#0f2a44;border-color:#f59e0b}
+.btn:disabled{opacity:.45}
+.progress{height:8px;background:#f0f9ff;border-radius:20px;overflow:hidden;margin-top:10px;border:1px solid var(--line);position:relative}
+.bar{height:100%;background:linear-gradient(90deg,#0ea5e9,#06b6d4);width:0;transition:width .1s}
+.rivalDot{position:absolute;top:0;bottom:0;width:3px;background:#ef4444;transition:left .1s}
+.msg{margin-top:10px;padding:10px;border-radius:12px;border:1px solid var(--line);text-align:center;font-size:13px;font-weight:600;display:none}
+.msg.show{display:block}
+.msg.ok{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}
+.msg.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+.splits{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;margin-top:10px;box-shadow:0 2px 12px rgba(14,165,233,.08)}
+.splits h3{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.splitGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.split{background:#f0f9ff;border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.split .k{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);font-weight:700}
+.split .v{font-size:14px;font-weight:800;margin-top:2px}
+.footer{text-align:center;font-size:11px;color:var(--muted);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="topline">
+      <div class="brand">
+        <div class="logo">≋</div>
+        <div>
+          <h1>RIVER SPRINT <span>• Paddle Dash</span></h1>
+          <div class="sub">Hold top/bottom to steer • 3 lanes • Bright river</div>
+        </div>
+      </div>
+      <button class="iconbtn" id="helpBtn">?</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="k">Distance</div><div class="v" id="distV">0m</div></div>
+      <div class="stat"><div class="k">Time</div><div class="v" id="timeV">0.0s</div></div>
+      <div class="stat"><div class="k">Buoys</div><div class="v" id="buoyV">0</div></div>
+      <div class="stat"><div class="k">Best</div><div class="v" id="bestV">—</div></div>
+    </div>
+    <div class="levelbar" id="levelBar"></div>
+  </header>
+
+  <div class="gameCard">
+    <div class="gameTop">
+      <div class="pill" id="levelPill">Level 1 • 800m</div>
+      <div class="hearts" id="hearts">♥♥♥</div>
+    </div>
+    <div class="canvasWrap" id="canvasWrap">
+      <canvas id="canvas" width="400" height="280"></canvas>
+      <div class="touchZones"><div class="zone">▲ Hold to go UP</div><div class="zone">▼ Hold to go DOWN</div></div>
+    </div>
+    <div class="progress"><div class="bar" id="bar"></div><div class="rivalDot" id="rivalDot"></div></div>
+    <div class="controls">
+      <button class="btn" id="restartBtn">↻ Restart</button>
+      <button class="btn primary" id="startBtn">▶ Start</button>
+      <button class="btn gold" id="pauseBtn">⏸ Pause</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div class="splits">
+    <h3>Levels & Best Times</h3>
+    <div class="splitGrid" id="bestGrid"></div>
+  </div>
+  <div class="footer">Bright river style • Hold top/bottom half to steer • 360–428px portrait</div>
+</div>
+
+<script>
+const LEVELS=[
+  {id:1, dist:800, speed:2.2, obstacles:14},
+  {id:2, dist:1000, speed:2.4, obstacles:18},
+  {id:3, dist:1200, speed:2.6, obstacles:22},
+  {id:4, dist:1400, speed:2.8, obstacles:26},
+  {id:5, dist:1600, speed:3.0, obstacles:30},
+  {id:6, dist:1800, speed:3.2, obstacles:34},
+];
+let state={
+  level:1,
+  lives:3,
+  dist:0,
+  time:0,
+  buoys:0,
+  running:false,
+  paused:false,
+  playerLane:1, // 0 top,1 mid,2 bottom
+  targetLane:1,
+  rivalLane:1,
+  rivalDist:0,
+  obstacles:[], // {x, lane, type}
+  buoyObjs:[],
+  best:{}, // levelId -> best time
+  crashCooldown:0
+};
+const STORAGE_KEY='riversprint_v1';
+function save(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({level:state.level, best:state.best}));
+}
+function load(){
+  try{
+    const p=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');
+    if(p.level) state.level=p.level;
+    if(p.best) state.best=p.best;
+  }catch(e){}
+}
+const canvas=document.getElementById('canvas');
+const ctx=canvas.getContext('2d');
+const W=400, H=280;
+const laneH=H/3;
+const playerX=60;
+
+function resetLevel(){
+  const lv=LEVELS.find(l=>l.id===state.level);
+  state.dist=0; state.time=0; state.buoys=0; state.lives=3;
+  state.playerLane=1; state.targetLane=1; state.rivalLane=1; state.rivalDist=0;
+  state.obstacles=[]; state.buoyObjs=[]; state.crashCooldown=0;
+  // generate obstacles along distance
+  for(let i=0;i<lv.obstacles;i++){
+    const d= 100 + Math.random()*(lv.dist-200);
+    const lane=Math.floor(Math.random()*3);
+    const type=['log','rock','barrel'][Math.floor(Math.random()*3)];
+    state.obstacles.push({d, lane, type, x:0});
+  }
+  // buoys
+  for(let i=0;i<8;i++){
+    const d= 150 + Math.random()*(lv.dist-250);
+    const lane=Math.floor(Math.random()*3);
+    state.buoyObjs.push({d, lane, collected:false});
+  }
+  state.obstacles.sort((a,b)=>a.d-b.d);
+  state.buoyObjs.sort((a,b)=>a.d-b.d);
+  renderLevelBar(); renderBestGrid(); updateHUD();
+  draw();
+}
+function renderLevelBar(){
+  const bar=document.getElementById('levelBar');
+  bar.innerHTML='';
+  LEVELS.forEach(lv=>{
+    const b=document.createElement('button');
+    b.className='lv'+(lv.id===state.level?' active':'')+(state.best[lv.id]?' done':'');
+    b.textContent=lv.id;
+    b.onclick=()=>{ state.level=lv.id; save(); resetLevel(); };
+    bar.appendChild(b);
+  });
+  document.getElementById('levelPill').textContent=`Level ${state.level} • ${LEVELS.find(l=>l.id===state.level).dist}m`;
+}
+function renderBestGrid(){
+  const g=document.getElementById('bestGrid');
+  g.innerHTML='';
+  LEVELS.forEach(lv=>{
+    const d=document.createElement('div');
+    d.className='split';
+    d.innerHTML=`<div class="k">Level ${lv.id} • ${lv.dist}m</div><div class="v">${state.best[lv.id]? state.best[lv.id].toFixed(1)+'s' : '—'}</div>`;
+    g.appendChild(d);
+  });
+}
+function updateHUD(){
+  document.getElementById('distV').textContent=Math.floor(state.dist)+'m';
+  document.getElementById('timeV').textContent=state.time.toFixed(1)+'s';
+  document.getElementById('buoyV').textContent=state.buoys;
+  const best=state.best[state.level];
+  document.getElementById('bestV').textContent= best? best.toFixed(1)+'s' : '—';
+  document.getElementById('hearts').textContent='♥'.repeat(state.lives) + '♡'.repeat(3-state.lives);
+  const lv=LEVELS.find(l=>l.id===state.level);
+  const pct=Math.min(100, state.dist/lv.dist*100);
+  document.getElementById('bar').style.width=pct+'%';
+  const rivalPct=Math.min(100, state.rivalDist/lv.dist*100);
+  document.getElementById('rivalDot').style.left=rivalPct+'%';
+}
+function draw(){
+  // water
+  ctx.clearRect(0,0,W,H);
+  // river gradient
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'#7dd3fc'); grad.addColorStop(0.5,'#0ea5e9'); grad.addColorStop(1,'#0284c7');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,W,H);
+  // lane lines
+  ctx.strokeStyle='rgba(255,255,255,.35)';
+  ctx.setLineDash([8,8]);
+  ctx.lineWidth=2;
+  for(let i=1;i<3;i++){
+    ctx.beginPath(); ctx.moveTo(0, i*laneH); ctx.lineTo(W, i*laneH); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  // waves
+  ctx.strokeStyle='rgba(255,255,255,.15)';
+  ctx.lineWidth=1;
+  for(let y=10;y<H;y+=30){
+    ctx.beginPath();
+    for(let x=0;x<W;x+=20){
+      const wy=y + Math.sin((x+state.dist*2)*0.02)*4;
+      if(x===0) ctx.moveTo(x,wy); else ctx.lineTo(x,wy);
+    }
+    ctx.stroke();
+  }
+  // obstacles
+  const lv=LEVELS.find(l=>l.id===state.level);
+  const viewStart=state.dist - 20;
+  const viewEnd=state.dist + 120;
+  state.obstacles.forEach(o=>{
+    if(o.d < viewStart || o.d > viewEnd) return;
+    const x = playerX + (o.d - state.dist)*3;
+    const y = o.lane*laneH + laneH/2;
+    ctx.save();
+    ctx.translate(x,y);
+    if(o.type==='log'){
+      ctx.fillStyle='#92400e'; ctx.fillRect(-18,-8,36,16); ctx.fillStyle='#78350f'; ctx.fillRect(-18,-8,36,4);
+    } else if(o.type==='rock'){
+      ctx.fillStyle='#57534e'; ctx.beginPath(); ctx.arc(0,0,14,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#44403c'; ctx.beginPath(); ctx.arc(-4,-3,6,0,Math.PI*2); ctx.fill();
+    } else {
+      ctx.fillStyle='#f59e0b'; ctx.fillRect(-12,-12,24,24); ctx.fillStyle='#d97706'; ctx.fillRect(-12,-12,24,6);
+      ctx.strokeStyle='#92400e'; ctx.lineWidth=1; ctx.strokeRect(-12,-12,24,24);
+    }
+    ctx.restore();
+  });
+  // buoys
+  state.buoyObjs.forEach(b=>{
+    if(b.collected || b.d < viewStart || b.d > viewEnd) return;
+    const x = playerX + (b.d - state.dist)*3;
+    const y = b.lane*laneH + laneH/2;
+    ctx.save(); ctx.translate(x,y);
+    ctx.fillStyle='#facc15'; ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#eab308'; ctx.beginPath(); ctx.arc(0,0,6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font='10px system-ui'; ctx.textAlign='center'; ctx.fillText('★',0,3);
+    ctx.restore();
+  });
+  // rival
+  const rivalX = playerX + (state.rivalDist - state.dist)*3;
+  const rivalY = state.rivalLane*laneH + laneH/2;
+  ctx.save(); ctx.translate(rivalX, rivalY);
+  ctx.fillStyle='#ef4444'; ctx.fillRect(-16,-10,32,20); ctx.fillStyle='#991b1b'; ctx.fillRect(-16,-10,32,5);
+  ctx.fillStyle='#fff'; ctx.font='10px system-ui'; ctx.textAlign='center'; ctx.fillText('RIVAL',0,4);
+  ctx.restore();
+  // player
+  const py = state.playerLane*laneH + laneH/2;
+  // smooth lane transition
+  const targetY = state.targetLane*laneH + laneH/2;
+  const curY = py + (targetY - py)*0.2;
+  // we store lane as integer but animate via targetLane
+  ctx.save(); ctx.translate(playerX, curY);
+  // kayak
+  ctx.fillStyle='#0f2a44'; ctx.fillRect(-18,-12,36,24); ctx.fillStyle='#1e40af'; ctx.fillRect(-18,-12,36,6);
+  ctx.fillStyle='#fbbf24'; ctx.beginPath(); ctx.arc(12,0,4,0,Math.PI*2); ctx.fill();
+  // paddle
+  ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(-20,-14); ctx.lineTo(20,14); ctx.stroke();
+  ctx.restore();
+  // crash flash
+  if(state.crashCooldown>0){
+    ctx.fillStyle='rgba(239,68,68,.25)';
+    ctx.fillRect(0,0,W,H);
+  }
+}
+
+let lastTime=0;
+function loop(t){
+  requestAnimationFrame(loop);
+  if(!state.running || state.paused) { lastTime=t; return; }
+  const dt=Math.min(0.05, (t-lastTime)/1000 || 0.016);
+  lastTime=t;
+  const lv=LEVELS.find(l=>l.id===state.level);
+  // move
+  const speed= lv.speed * (1 + state.buoys*0.02);
+  state.dist += speed * 60 * dt * 0.6;
+  state.rivalDist += (lv.speed*0.98 + Math.random()*0.4) * 60 * dt * 0.6;
+  state.time += dt;
+  if(state.crashCooldown>0) state.crashCooldown-=dt;
+  // lane steering smoothing
+  if(state.playerLane!==state.targetLane){
+    // move 1 lane per 0.15s
+    // we use simple lerp via targetLane, but need to update playerLane when close
+    // For simplicity, snap after 120ms
+    if(!state._laneTimer) state._laneTimer=0;
+    state._laneTimer+=dt;
+    if(state._laneTimer>0.12){
+      if(state.targetLane>state.playerLane) state.playerLane++;
+      else state.playerLane--;
+      state._laneTimer=0;
+    }
+  } else state._laneTimer=0;
+
+  // collisions
+  state.obstacles.forEach(o=>{
+    if(Math.abs(o.d - state.dist) < 6 && o.lane===state.playerLane && state.crashCooldown<=0){
+      state.lives--;
+      state.time+=2; // cost time
+      state.crashCooldown=0.8;
+      if(navigator.vibrate) navigator.vibrate(40);
+      showMsg(`Crash! +2s penalty • ${state.lives} lives left`, 'bad');
+      if(state.lives<=0){
+        state.running=false;
+        showMsg('Out of lives! Tap Restart.', 'bad');
+      }
+    }
+  });
+  // buoys
+  state.buoyObjs.forEach(b=>{
+    if(!b.collected && Math.abs(b.d - state.dist) < 6 && b.lane===state.playerLane){
+      b.collected=true; state.buoys++; state.time-=0.5; // bonus
+      if(state.time<0) state.time=0;
+      showMsg('Buoy! -0.5s bonus', 'ok');
+      if(navigator.vibrate) navigator.vibrate(10);
+    }
+  });
+  // finish
+  if(state.dist >= lv.dist){
+    state.running=false;
+    state.dist=lv.dist;
+    const won = state.dist >= state.rivalDist;
+    const best=state.best[lv.id];
+    if(!best || state.time < best){
+      state.best[lv.id]=state.time;
+      save();
+    }
+    showMsg(won? `You win! ${state.time.toFixed(1)}s • Best: ${state.best[lv.id].toFixed(1)}s` : `Finished! Rival won by ${(state.rivalDist-state.dist).toFixed(0)}m • ${state.time.toFixed(1)}s`, won?'ok':'bad');
+    renderLevelBar(); renderBestGrid();
+    if(won && lv.id<6){
+      setTimeout(()=>{
+        if(confirm(`Level ${lv.id} cleared! Go to Level ${lv.id+1}?`)){
+          state.level=lv.id+1; save(); resetLevel();
+        }
+      },600);
+    }
+  }
+  updateHUD(); draw();
+}
+function showMsg(text, type){
+  const m=document.getElementById('msg');
+  m.textContent=text; m.className='msg show '+(type||'');
+  setTimeout(()=>{ m.className='msg'; }, 1800);
+}
+
+// input: hold top/bottom half
+const wrap=document.getElementById('canvasWrap');
+let holding=null;
+function setLaneFromY(y){
+  const rect=wrap.getBoundingClientRect();
+  const relY=y - rect.top;
+  const half=rect.height/2;
+  if(relY < half){
+    // up
+    state.targetLane=Math.max(0, state.targetLane-1);
+  } else {
+    state.targetLane=Math.min(2, state.targetLane+1);
+  }
+}
+let holdInterval=null;
+function startHold(e){
+  if(!state.running) return;
+  const y=e.touches? e.touches[0].clientY : e.clientY;
+  setLaneFromY(y);
+  holding=y;
+  if(holdInterval) clearInterval(holdInterval);
+  holdInterval=setInterval(()=>{
+    if(holding!=null) setLaneFromY(holding);
+  }, 180);
+}
+function moveHold(e){
+  if(holding==null) return;
+  holding=e.touches? e.touches[0].clientY : e.clientY;
+}
+function endHold(){
+  holding=null;
+  if(holdInterval) clearInterval(holdInterval);
+}
+wrap.addEventListener('mousedown', startHold);
+wrap.addEventListener('mousemove', moveHold);
+wrap.addEventListener('mouseup', endHold);
+wrap.addEventListener('mouseleave', endHold);
+wrap.addEventListener('touchstart', startHold, {passive:false});
+wrap.addEventListener('touchmove', moveHold, {passive:false});
+wrap.addEventListener('touchend', endHold);
+// also keyboard
+window.addEventListener('keydown', e=>{
+  if(e.key==='ArrowUp') state.targetLane=Math.max(0, state.targetLane-1);
+  if(e.key==='ArrowDown') state.targetLane=Math.min(2, state.targetLane+1);
+});
+
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  if(state.running) return;
+  // if finished, reset
+  const lv=LEVELS.find(l=>l.id===state.level);
+  if(state.dist>=lv.dist || state.lives<=0) resetLevel();
+  state.running=true; state.paused=false;
+  document.getElementById('startBtn').textContent='▶ Racing';
+  showMsg('Go! Hold top/bottom to steer', 'ok');
+});
+document.getElementById('pauseBtn').addEventListener('click', ()=>{
+  if(!state.running) return;
+  state.paused=!state.paused;
+  document.getElementById('pauseBtn').textContent= state.paused?'▶ Resume':'⏸ Pause';
+  showMsg(state.paused?'Paused':'Resumed', 'ok');
+});
+document.getElementById('restartBtn').addEventListener('click', ()=>{
+  state.running=false; state.paused=false;
+  document.getElementById('startBtn').textContent='▶ Start';
+  resetLevel();
+  showMsg('Restarted', 'ok');
+});
+document.getElementById('helpBtn').addEventListener('click', ()=>{
+  alert('How to play:\n• Side-view sprint over fixed distance vs rival.\n• Hold TOP half to steer up, BOTTOM half to steer down (3 lanes).\n• Dodge logs/rocks/barrels — crash = +2s and -1 life (3 lives).\n• Collect yellow buoys for -0.5s bonus.\n• 6 levels (800m→1800m), best times save automatically.');
+});
+
+load(); resetLevel(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>

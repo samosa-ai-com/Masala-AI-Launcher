@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Number Logic Academy</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden;background:#0b1220;color:#eef2ff;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{display:flex;justify-content:center}
+.app{width:100%;max-width:428px;min-width:360px;min-height:100vh;background:linear-gradient(180deg,#0f1b33 0%,#0b1220 100%);display:flex;flex-direction:column;position:relative;overflow-x:hidden}
+header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:rgba(15,23,42,.9);backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;z-index:10}
+.h-left{display:flex;align-items:center;gap:10px}
+.icon-btn{width:44px;height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:18px;display:grid;place-items:center;cursor:pointer}
+.brand h1{font-size:16px;letter-spacing:.04em;font-weight:800;line-height:1}
+.brand p{font-size:11px;opacity:.7;letter-spacing:.08em}
+.h-right{display:flex;align-items:center;gap:10px}
+.pill{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);padding:8px 10px;border-radius:999px;font-size:13px;font-weight:700}
+.pill.mist{color:#fecaca}
+.pill.time{color:#fde68a;font-variant-numeric:tabular-nums}
+.lesson-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:linear-gradient(90deg,#1e293b,#0f172a);border-bottom:1px solid rgba(255,255,255,.06)}
+.lesson-bar .title{font-size:14px;font-weight:800}
+.lesson-bar .sub{font-size:11px;opacity:.7}
+.badge{font-size:10px;font-weight:800;letter-spacing:.08em;padding:6px 8px;border-radius:999px;border:1px solid transparent}
+.badge.classic{background:#1d4ed8;color:#dbeafe;border-color:#3b82f6}
+.badge.diagonal{background:#6d28d9;color:#ede9fe;border-color:#8b5cf6}
+.badge.cage{background:#92400e;color:#fef3c7;border-color:#f59e0b}
+.grid-wrap{padding:12px 12px 8px;display:flex;justify-content:center;position:relative}
+.grid-outer{width:100%;max-width:360px;aspect-ratio:1;background:#f8fafc;border-radius:14px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.4), inset 0 0 0 1px rgba(0,0,0,.08);position:relative}
+.grid{display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);gap:0;width:100%;height:100%;background:#0f172a;border:2px solid #0f172a;border-radius:10px;overflow:hidden;position:relative}
+.cell{position:relative;background:#ffffff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#0f172a;cursor:pointer;user-select:none;border:1px solid #cbd5e1}
+.cell.given{background:#eef2ff;color:#1e293b;font-weight:800}
+.cell.selected{background:#fef3c7 !important;box-shadow:inset 0 0 0 2px #f59e0b}
+.cell.highlight-diag{background:#f5f3ff}
+.cell.highlight-same{filter:brightness(.96)}
+.cell.error{animation:shake .3s}
+.cell.mistake-flash{background:#fee2e2 !important}
+.cell .cage-sum{position:absolute;top:1px;left:2px;font-size:8px;font-weight:800;color:#92400e;line-height:1;pointer-events:none}
+.cell .notes{position:absolute;inset:2px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:0}
+.cell .notes span{font-size:7px;font-weight:700;color:#334155;display:grid;place-items:center;line-height:1}
+.cell .main{font-size:20px}
+.cell.box-right{border-right:2px solid #0f172a}
+.cell.box-bottom{border-bottom:2px solid #0f172a}
+.cell.diag-main{box-shadow:inset 0 0 0 999px rgba(139,92,246,.08)}
+.cell.diag-anti{box-shadow:inset 0 0 0 999px rgba(139,92,246,.08)}
+.cell.diag-both{box-shadow:inset 0 0 0 999px rgba(139,92,246,.14)}
+.cage-border{pointer-events:none}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:8px 12px}
+.ctrl{height:48px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#e2e8f0;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer}
+.ctrl.active{background:#f59e0b;color:#0b1220;border-color:#f59e0b}
+.ctrl:disabled{opacity:.4}
+.numpad{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:8px 12px 10px}
+.numpad button{height:52px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:#1e293b;color:#fff;font-size:20px;font-weight:800;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.3)}
+.numpad button:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.3)}
+.numpad button.sel{outline:2px solid #f59e0b;background:#334155}
+.bottom{display:flex;gap:8px;padding:0 12px 12px}
+.bottom button{flex:1;height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#e2e8f0;font-weight:700;font-size:13px;cursor:pointer}
+.lessons{padding:10px 12px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.lesson-card{border-radius:14px;padding:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);cursor:pointer;position:relative;min-height:92px;display:flex;flex-direction:column;justify-content:space-between}
+.lesson-card.locked{opacity:.45;filter:grayscale(.3)}
+.lesson-card.active{outline:2px solid #f59e0b;background:rgba(245,158,11,.12)}
+.lesson-card .lc-top{font-size:10px;font-weight:800;letter-spacing:.06em;opacity:.8}
+.lesson-card .lc-title{font-size:12px;font-weight:800;line-height:1.2;margin-top:4px}
+.lesson-card .lc-stars{font-size:12px;letter-spacing:2px;margin-top:6px}
+.lesson-card .lc-foot{font-size:10px;opacity:.7;margin-top:4px}
+.overlay{position:fixed;inset:0;background:rgba(2,6,23,.72);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+.overlay.open{display:flex}
+.modal{width:100%;max-width:380px;background:#0f172a;border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:16px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.modal h2{font-size:18px;font-weight:900}
+.modal p{font-size:13px;opacity:.85;line-height:1.5;margin-top:6px}
+.modal .row{display:flex;gap:8px;margin-top:12px}
+.btn{flex:1;height:48px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.08);color:#fff;font-weight:800;cursor:pointer}
+.btn.primary{background:#f59e0b;color:#0b1220;border-color:#f59e0b}
+.btn.ghost{background:transparent}
+.codebox{width:100%;min-height:80px;background:#020617;color:#e2e8f0;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px;font-size:12px;word-break:break-all;margin-top:10px}
+.hint-pulse{animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{box-shadow:inset 0 0 0 2px #f59e0b}50%{box-shadow:inset 0 0 0 4px #f59e0b}}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#020617;color:#fff;padding:10px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.12);font-size:13px;font-weight:700;display:none;z-index:60}
+.toast.show{display:block}
+.kbd{font-size:10px;opacity:.6;text-align:center;padding:4px}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="h-left">
+      <button class="icon-btn" id="menuBtn" aria-label="Lessons">☰</button>
+      <div class="brand"><h1>NUMBER LOGIC ACADEMY</h1><p>12 LESSONS • CLASSIC → DIAGONAL → CAGE</p></div>
+    </div>
+    <div class="h-right">
+      <div class="pill time" id="timerPill">⏱ 00:00</div>
+      <div class="pill mist" id="mistPill">● ● ●</div>
+    </div>
+  </header>
+  <div class="lesson-bar">
+    <div><div class="title" id="lessonTitle">Lesson 1 — Foundations</div><div class="sub" id="lessonSub">Classic 9×9 • Learn rows, columns & boxes</div></div>
+    <div class="badge classic" id="lessonBadge">CLASSIC</div>
+  </div>
+  <div class="grid-wrap">
+    <div class="grid-outer"><div class="grid" id="grid"></div></div>
+  </div>
+  <div class="controls">
+    <button class="ctrl" id="undoBtn">↩ Undo</button>
+    <button class="ctrl" id="redoBtn">↪ Redo</button>
+    <button class="ctrl" id="noteBtn">✎ Note: OFF</button>
+    <button class="ctrl" id="eraseBtn">⌫ Eraser</button>
+    <button class="ctrl" id="hintBtn">💡 Hint</button>
+    <button class="ctrl" id="checkBtn">✓ Check</button>
+  </div>
+  <div class="numpad" id="numpad">
+    <button data-n="1">1</button><button data-n="2">2</button><button data-n="3">3</button><button data-n="4">4</button><button data-n="5">5</button>
+    <button data-n="6">6</button><button data-n="7">7</button><button data-n="8">8</button><button data-n="9">9</button><button data-n="0" style="background:#334155">✕</button>
+  </div>
+  <div class="kbd">Tap a cell → tap a number • Note = pencil marks • 3 mistakes max • Diagonal = purple tint • Cages show sums</div>
+  <div class="bottom">
+    <button id="lessonsBtn">📚 Lessons</button>
+    <button id="helpBtn">❔ How to Play</button>
+    <button id="archiveBtn">⧉ Archive</button>
+  </div>
+  <div id="lessonDrawer" style="display:none;padding:0 12px 12px">
+    <div class="lessons" id="lessonsGrid"></div>
+  </div>
+</div>
+
+<div class="overlay" id="winOverlay">
+  <div class="modal">
+    <h2 id="winTitle">Lesson Complete!</h2>
+    <p id="winText"></p>
+    <div id="winStars" style="font-size:28px;letter-spacing:6px;text-align:center;margin-top:8px"></div>
+    <div class="row"><button class="btn ghost" id="winLessons">Lessons</button><button class="btn primary" id="winNext">Next Lesson →</button></div>
+  </div>
+</div>
+<div class="overlay" id="failOverlay">
+  <div class="modal">
+    <h2>Out of Insight</h2>
+    <p>3 mistakes reached. Review the board and try again — mistakes reset on retry. Use Check and Hint to learn candidate elimination.</p>
+    <div class="row"><button class="btn ghost" id="failLessons">Lessons</button><button class="btn primary" id="failRetry">Retry Lesson</button></div>
+  </div>
+</div>
+<div class="overlay" id="helpOverlay">
+  <div class="modal">
+    <h2>How to Play</h2>
+    <p><b>Goal:</b> Fill 9×9 so each row, column and 3×3 box contains 1-9.<br>
+    <b>Diagonal (5-8):</b> Both main diagonals also 1-9 (purple tint).<br>
+    <b>Cage (9-12):</b> Dashed cages show sum — numbers in cage must add to that sum (no repeat in cage).<br>
+    <b>Notes:</b> Toggle Note to place pencil marks for candidate elimination.<br>
+    <b>Stars:</b> 3★ = 0 mistakes, 2★ = 1 mistake, 1★ = 2 mistakes. 3 mistakes = fail.<br>
+    <b>Hint:</b> Highlights the most constrained empty cell.<br>
+    <b>Undo/Redo:</b> Full stack. Timer and mistakes save automatically.</p>
+    <div class="row"><button class="btn primary" id="helpClose">Got it</button></div>
+  </div>
+</div>
+<div class="overlay" id="archiveOverlay">
+  <div class="modal">
+    <h2>Archive Codes</h2>
+    <p>Export copies progress as a shareable code. Import restores it on any device. Saved automatically in this browser.</p>
+    <textarea class="codebox" id="codeBox" placeholder="Paste code here to import..."></textarea>
+    <div class="row"><button class="btn ghost" id="copyCode">Copy</button><button class="btn" id="exportCode">Export</button><button class="btn primary" id="importCode">Import</button></div>
+    <div class="row"><button class="btn ghost" id="archiveClose">Close</button><button class="btn ghost" id="resetProgress">Reset All</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const LESSONS_META=[
+  {id:1,title:"Foundations",type:"classic",desc:"Learn rows, columns & boxes",clues:40},
+  {id:2,title:"Crosshatch",type:"classic",desc:"Scanning & cross-hatching",clues:36},
+  {id:3,title:"Candidates",type:"classic",desc:"Pencil marks & elimination",clues:32},
+  {id:4,title:"Hidden Singles",type:"classic",desc:"Find the only place",clues:28},
+  {id:5,title:"X Intro",type:"diagonal",desc:"Both diagonals 1-9",clues:38},
+  {id:6,title:"Diagonal Scan",type:"diagonal",desc:"Use the X to narrow",clues:34},
+  {id:7,title:"X-Wing Lite",type:"diagonal",desc:"Diagonal constraints",clues:30},
+  {id:8,title:"Master X",type:"diagonal",desc:"Hard diagonal puzzle",clues:26},
+  {id:9,title:"Cages Intro",type:"cage",desc:"Killer sums — no repeat in cage",clues:36},
+  {id:10,title:"Cage Combos",type:"cage",desc:"Sum combos & elimination",clues:32},
+  {id:11,title:"Killer Logic",type:"cage",desc:"Cage + box interaction",clues:28},
+  {id:12,title:"Grandmaster",type:"cage",desc:"Final exam — all techniques",clues:24},
+];
+const STORAGE_KEY="numberLogicAcademySave";
+let state={
+  progress: LESSONS_META.map(()=>({stars:0,bestTime:0,completed:false})),
+  current:0,
+  board:null, solution:null, given:null, cages:null, cageMap:null,
+  notes:null, selected:null, noteMode:false, eraseMode:false,
+  mistakes:0, elapsed:0, timer:null, running:false,
+  undoStack:[], redoStack:[], hintCell:null
+};
+
+function deepCopy(o){return JSON.parse(JSON.stringify(o))}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
+function formatTime(s){const m=Math.floor(s/60).toString().padStart(2,'0'),sec=(s%60).toString().padStart(2,'0');return m+':'+sec}
+
+// Sudoku generation
+function isValid(grid,r,c,n,isDiag){
+  for(let i=0;i<9;i++) if(grid[r][i]===n) return false;
+  for(let i=0;i<9;i++) if(grid[i][c]===n) return false;
+  const br=Math.floor(r/3)*3, bc=Math.floor(c/3)*3;
+  for(let dr=0;dr<3;dr++) for(let dc=0;dc<3;dc++) if(grid[br+dr][bc+dc]===n) return false;
+  if(isDiag){
+    if(r===c){ for(let i=0;i<9;i++) if(grid[i][i]===n) return false; }
+    if(r+c===8){ for(let i=0;i<9;i++) if(grid[i][8-i]===n) return false; }
+  }
+  return true;
+}
+function findEmpty(grid){
+  let best=null, min=10;
+  for(let r=0;r<9;r++) for(let c=0;c<9;c++) if(grid[r][c]===0){
+    // count candidates quickly for MRV
+    let cnt=0;
+    for(let n=1;n<=9;n++) if(isValid(grid,r,c,n,window._isDiag)) cnt++;
+    if(cnt<min){min=cnt; best=[r,c]; if(min===1) return best;}
+  }
+  return best;
+}
+function solveRec(grid,isDiag){
+  const pos=findEmpty(grid);
+  if(!pos) return true;
+  const [r,c]=pos;
+  const nums=[1,2,3,4,5,6,7,8,9];
+  // shuffle
+  for(let i=nums.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[nums[i],nums[j]]=[nums[j],nums[i]]}
+  for(const n of nums){
+    if(isValid(grid,r,c,n,isDiag)){ grid[r][c]=n; if(solveRec(grid,isDiag)) return true; grid[r][c]=0; }
+  }
+  return false;
+}
+function generateSolution(type){
+  const isDiag = type==='diagonal';
+  window._isDiag=isDiag;
+  const grid=Array.from({length:9},()=>Array(9).fill(0));
+  // seed with random diagonal to speed up
+  // place random first row
+  const first=[1,2,3,4,5,6,7,8,9].sort(()=>Math.random()-.5);
+  for(let c=0;c<9;c++) grid[0][c]=first[c];
+  // solve rest
+  const ok=solveRec(grid,isDiag);
+  if(!ok){
+    // fallback: empty solve
+    const g2=Array.from({length:9},()=>Array(9).fill(0));
+    window._isDiag=isDiag;
+    solveRec(g2,isDiag);
+    return g2;
+  }
+  return grid;
+}
+function generatePuzzle(solution, clues){
+  const puzzle=deepCopy(solution);
+  const cells=[];
+  for(let r=0;r<9;r++) for(let c=0;c<9;c++) cells.push([r,c]);
+  cells.sort(()=>Math.random()-.5);
+  let toRemove=81-clues;
+  for(const [r,c] of cells){
+    if(toRemove<=0) break;
+    puzzle[r][c]=0;
+    toRemove--;
+  }
+  return puzzle;
+}
+function generateCages(solution){
+  const cageMap=Array.from({length:9},()=>Array(9).fill(-1));
+  const cages=[];
+  const cells=[];
+  for(let r=0;r<9;r++) for(let c=0;c<9;c++) cells.push([r,c]);
+  cells.sort(()=>Math.random()-.5);
+  let cid=0;
+  const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+  for(const [sr,sc] of cells){
+    if(cageMap[sr][sc]!==-1) continue;
+    // start new cage
+    const size = 2 + Math.floor(Math.random()*3); // 2-4
+    const queue=[[sr,sc]];
+    const members=[[sr,sc]];
+    cageMap[sr][sc]=cid;
+    let attempts=0;
+    while(members.length<size && queue.length && attempts<20){
+      const [r,c]=queue[Math.floor(Math.random()*queue.length)];
+      const shuffled=[...dirs].sort(()=>Math.random()-.5);
+      let grew=false;
+      for(const [dr,dc] of shuffled){
+        const nr=r+dr,nc=c+dc;
+        if(nr<0||nr>=9||nc<0||nc>=9) continue;
+        if(cageMap[nr][nc]!==-1) continue;
+        // avoid making cage too large that it crosses box too much? allow
+        cageMap[nr][nc]=cid;
+        members.push([nr,nc]);
+        queue.push([nr,nc]);
+        grew=true;
+        break;
+      }
+      if(!grew) attempts++;
+      if(members.length>=size) break;
+    }
+    // compute sum
+    let sum=0;
+    for(const [r,c] of members) sum+=solution[r][c];
+    cages.push({id:cid,cells:members,sum});
+    cid++;
+  }
+  // merge tiny singletons
+  // ensure no cage has duplicate numbers (in killer, cage cannot have repeat; our random cages might have duplicates if they share row/col/box but that's okay for puzzle? We should ensure no duplicate in cage by checking solution values uniqueness in cage)
+  // If duplicate, split cage into singles
+  const finalCages=[];
+  const finalMap=Array.from({length:9},()=>Array(9).fill(-1));
+  let nid=0;
+  for(const cage of cages){
+    const vals=cage.cells.map(([r,c])=>solution[r][c]);
+    const uniq=new Set(vals);
+    if(uniq.size!==vals.length){
+      // split into singles
+      for(const [r,c] of cage.cells){
+        finalCages.push({id:nid,cells:[[r,c]],sum:solution[r][c]});
+        finalMap[r][c]=nid; nid++;
+      }
+    } else {
+      finalCages.push({id:nid,cells:cage.cells,sum:cage.sum});
+      for(const [r,c] of cage.cells) finalMap[r][c]=nid;
+      nid++;
+    }
+  }
+  return {cages:finalCages,cageMap:finalMap};
+}
+
+function save(){
+  const data={progress:state.progress,current:state.current,elapsed:state.elapsed,mistakes:state.mistakes,board:state.board,notes:state.notes,selected:state.selected,lessonId:LESSONS_META[state.current].id};
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+function load(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw) return;
+    const d=JSON.parse(raw);
+    if(d.progress && d.progress.length===12) state.progress=d.progress;
+    if(typeof d.current==='number') state.current=d.current;
+  }catch(e){}
+}
+
+function startTimer(){
+  if(state.timer) clearInterval(state.timer);
+  state.timer=setInterval(()=>{
+    if(!state.running) return;
+    state.elapsed++;
+    document.getElementById('timerPill').textContent='⏱ '+formatTime(state.elapsed);
+    if(state.elapsed%5===0) save();
+  },1000);
+}
+function resetTimer(){ state.elapsed=0; document.getElementById('timerPill').textContent='⏱ 00:00'; }
+
+function updateMistPill(){
+  const remain=3-state.mistakes;
+  let dots='';
+  for(let i=0;i<3;i++) dots+= i < state.mistakes ? '●' : '○';
+  // color
+  const el=document.getElementById('mistPill');
+  el.textContent=dots.split('').join(' ');
+  el.style.color = state.mistakes===0 ? '#bbf7d0' : state.mistakes===1 ? '#fde68a' : state.mistakes===2 ? '#fdba74' : '#fecaca';
+}
+
+function candidatesFor(r,c){
+  if(state.board[r][c]!==0) return [];
+  const used=new Set();
+  for(let i=0;i<9;i++) if(state.board[r][i]!==0) used.add(state.board[r][i]);
+  for(let i=0;i<9;i++) if(state.board[i][c]!==0) used.add(state.board[i][c]);
+  const br=Math.floor(r/3)*3, bc=Math.floor(c/3)*3;
+  for(let dr=0;dr<3;dr++) for(let dc=0;dc<3;dc++) if(state.board[br+dr][bc+dc]!==0) used.add(state.board[br+dr][bc+dc]);
+  const meta=LESSONS_META[state.current];
+  if(meta.type==='diagonal'){
+    if(r===c) for(let i=0;i<9;i++) if(state.board[i][i]!==0) used.add(state.board[i][i]);
+    if(r+c===8) for(let i=0;i<9;i++) if(state.board[i][8-i]!==0) used.add(state.board[i][8-i]);
+  }
+  const res=[];
+  for(let n=1;n<=9;n++) if(!used.has(n)) res.push(n);
+  return res;
+}
+
+function renderGrid(){
+  const grid=document.getElementById('grid');
+  grid.innerHTML='';
+  const meta=LESSONS_META[state.current];
+  const isDiag=meta.type==='diagonal';
+  const isCage=meta.type==='cage';
+  for(let r=0;r<9;r++){
+    for(let c=0;c<9;c++){
+      const cell=document.createElement('div');
+      cell.className='cell';
+      if(state.given[r][c]) cell.classList.add('given');
+      if(state.selected && state.selected[0]===r && state.selected[1]===c) cell.classList.add('selected');
+      if(state.hintCell && state.hintCell[0]===r && state.hintCell[1]===c) cell.classList.add('hint-pulse');
+      // box borders
+      if((c+1)%3===0 && c!==8) cell.classList.add('box-right');
+      if((r+1)%3===0 && r!==8) cell.classList.add('box-bottom');
+      // diagonal tint
+      if(isDiag){
+        const onMain=r===c, onAnti=r+c===8;
+        if(onMain && onAnti) cell.classList.add('diag-both');
+        else if(onMain) cell.classList.add('diag-main');
+        else if(onAnti) cell.classList.add('diag-anti');
+      }
+      // cage borders
+      if(isCage && state.cageMap){
+        const cid=state.cageMap[r][c];
+        // determine borders: if neighbor same cage, no border, else dashed
+        // we use outline via box-shadow per side using inline style
+        let style='';
+        const same=(nr,nc)=> nr>=0&&nr<9&&nc>=0&&nc<9 && state.cageMap[nr][nc]===cid;
+        const topSame=same(r-1,c), bottomSame=same(r+1,c), leftSame=same(r,c-1), rightSame=same(r,c+1);
+        // use border styles
+        cell.style.borderTop = topSame ? '1px dashed transparent' : '1px dashed #f59e0b';
+        cell.style.borderLeft = leftSame ? '1px dashed transparent' : '1px dashed #f59e0b';
+        cell.style.borderRight = rightSame ? '1px dashed transparent' : '1px dashed #f59e0b';
+        cell.style.borderBottom = bottomSame ? '1px dashed transparent' : '1px dashed #f59e0b';
+        // keep box thick borders on top
+        if((c+1)%3===0 && c!==8) cell.style.borderRight='2px solid #0f172a';
+        if((r+1)%3===0 && r!==8) cell.style.borderBottom='2px solid #0f172a';
+        // cage sum in first cell (topmost leftmost)
+        const cage=state.cages.find(x=>x.id===cid);
+        if(cage){
+          const sorted=[...cage.cells].sort((a,b)=> a[0]-b[0] || a[1]-b[1]);
+          if(sorted[0][0]===r && sorted[0][1]===c){
+            const sumEl=document.createElement('div');
+            sumEl.className='cage-sum';
+            sumEl.textContent=cage.sum;
+            cell.appendChild(sumEl);
+          }
+        }
+      }
+      const val=state.board[r][c];
+      if(val!==0){
+        const m=document.createElement('div');
+        m.className='main';
+        m.textContent=val;
+        cell.appendChild(m);
+      } else {
+        const notes=state.notes[r][c];
+        if(notes && notes.length){
+          const nWrap=document.createElement('div');
+          nWrap.className='notes';
+          for(let n=1;n<=9;n++){
+            const s=document.createElement('span');
+            s.textContent=notes.includes(n)? n : '';
+            nWrap.appendChild(s);
+          }
+          cell.appendChild(nWrap);
+        }
+      }
+      cell.addEventListener('click',()=>selectCell(r,c));
+      grid.appendChild(cell);
+    }
+  }
+  // update badge
+  const badge=document.getElementById('lessonBadge');
+  badge.textContent=meta.type.toUpperCase();
+  badge.className='badge '+meta.type;
+  document.getElementById('lessonTitle').textContent=`Lesson ${meta.id} — ${meta.title}`;
+  document.getElementById('lessonSub').textContent=`${meta.type==='classic'?'Classic 9×9':meta.type==='diagonal'?'Diagonal X • both diagonals 1-9':'Cage Killer • sums must match'} • ${meta.desc}`;
+  updateMistPill();
+  document.getElementById('timerPill').textContent='⏱ '+formatTime(state.elapsed);
+  // controls state
+  document.getElementById('noteBtn').classList.toggle('active', state.noteMode);
+  document.getElementById('noteBtn').textContent = state.noteMode ? '✎ Note: ON' : '✎ Note: OFF';
+  document.getElementById('eraseBtn').classList.toggle('active', state.eraseMode);
+  document.getElementById('undoBtn').disabled = state.undoStack.length===0;
+  document.getElementById('redoBtn').disabled = state.redoStack.length===0;
+}
+
+function selectCell(r,c){
+  // if given and not empty? allow selection for highlighting but not editing
+  state.selected=[r,c];
+  state.hintCell=null;
+  // highlight same number
+  renderGrid();
+  save();
+}
+
+function pushUndo(){
+  state.undoStack.push({board:deepCopy(state.board),notes:deepCopy(state.notes),mistakes:state.mistakes,elapsed:state.elapsed});
+  if(state.undoStack.length>80) state.undoStack.shift();
+  state.redoStack=[];
+}
+
+function placeNumber(n){
+  if(!state.selected) { showToast('Tap a cell first'); return; }
+  const [r,c]=state.selected;
+  if(state.given[r][c]) { showToast('Given clue — cannot change'); return; }
+  if(state.eraseMode || n===0){
+    if(state.board[r][c]===0 && (!state.notes[r][c] || state.notes[r][c].length===0)) return;
+    pushUndo();
+    state.board[r][c]=0;
+    state.notes[r][c]=[];
+    state.eraseMode=false;
+    renderGrid(); save(); checkWin(); return;
+  }
+  if(state.noteMode){
+    pushUndo();
+    let arr=state.notes[r][c]||[];
+    if(arr.includes(n)) arr=arr.filter(x=>x!==n);
+    else arr.push(n), arr.sort((a,b)=>a-b);
+    state.notes[r][c]=arr;
+    // if cell had main value, clear it? keep notes only when empty
+    if(state.board[r][c]!==0) state.board[r][c]=0;
+    renderGrid(); save(); return;
+  }
+  // normal placement: check against solution
+  const correct=state.solution[r][c];
+  if(n!==correct){
+    state.mistakes++;
+    updateMistPill();
+    // flash
+    const idx=r*9+c;
+    const cells=document.querySelectorAll('.cell');
+    if(cells[idx]){ cells[idx].classList.add('mistake-flash'); setTimeout(()=>cells[idx].classList.remove('mistake-flash'),400); cells[idx].classList.add('error'); setTimeout(()=>cells[idx].classList.remove('error'),300); }
+    showToast(`Mistake ${state.mistakes}/3 — ${n} ≠ solution`);
+    if(state.mistakes>=3){
+      state.running=false;
+      document.getElementById('failOverlay').classList.add('open');
+      save();
+      return;
+    }
+    // do not place wrong number (teaching)
+    save(); renderGrid();
+    return;
+  }
+  // correct
+  pushUndo();
+  state.board[r][c]=n;
+  state.notes[r][c]=[];
+  state.running=true;
+  // auto-clear notes that contain this number in row/col/box/diag
+  for(let i=0;i<9;i++){
+    if(state.notes[r][i] && state.notes[r][i].includes(n)) state.notes[r][i]=state.notes[r][i].filter(x=>x!==n);
+    if(state.notes[i][c] && state.notes[i][c].includes(n)) state.notes[i][c]=state.notes[i][c].filter(x=>x!==n);
+  }
+  const br=Math.floor(r/3)*3, bc=Math.floor(c/3)*3;
+  for(let dr=0;dr<3;dr++) for(let dc=0;dc<3;dc++){
+    const rr=br+dr, cc=bc+dc;
+    if(state.notes[rr][cc] && state.notes[rr][cc].includes(n)) state.notes[rr][cc]=state.notes[rr][cc].filter(x=>x!==n);
+  }
+  if(LESSONS_META[state.current].type==='diagonal'){
+    if(r===c) for(let i=0;i<9;i++) if(state.notes[i][i] && state.notes[i][i].includes(n)) state.notes[i][i]=state.notes[i][i].filter(x=>x!==n);
+    if(r+c===8) for(let i=0;i<9;i++) if(state.notes[i][8-i] && state.notes[i][8-i].includes(n)) state.notes[i][8-i]=state.notes[i][8-i].filter(x=>x!==n);
+  }
+  renderGrid(); save(); checkWin();
+}
+
+function checkWin(){
+  for(let r=0;r<9;r++) for(let c=0;c<9;c++) if(state.board[r][c]!==state.solution[r][c]) return;
+  // win
+  state.running=false;
+  const mistakes=state.mistakes;
+  let stars=1;
+  if(mistakes===0) stars=3;
+  else if(mistakes===1) stars=2;
+  else stars=1;
+  const prog=state.progress[state.current];
+  if(stars > prog.stars) prog.stars=stars;
+  prog.completed=true;
+  if(!prog.bestTime || state.elapsed < prog.bestTime) prog.bestTime=state.elapsed;
+  // unlock next
+  save();
+  renderLessons();
+  document.getElementById('winTitle').textContent = stars===3 ? 'Flawless Clear! ★★★' : stars===2 ? 'Great Work! ★★☆' : 'Lesson Complete! ★☆☆';
+  document.getElementById('winText').textContent = `Time ${formatTime(state.elapsed)} • Mistakes ${mistakes}/3 • ${stars===3?'No mistakes — perfect candidate elimination!':stars===2?'One slip — almost flawless.':'Completed — try for fewer mistakes next time.'}`;
+  document.getElementById('winStars').textContent = '★'.repeat(stars) + '☆'.repeat(3-stars);
+  document.getElementById('winOverlay').classList.add('open');
+  // confetti toast
+  showToast(`Lesson ${LESSONS_META[state.current].id} cleared — ${stars}★`);
+}
+
+function doHint(){
+  // find empty cell with fewest candidates
+  let best=null, bestCands=null;
+  for(let r=0;r<9;r++) for(let c=0;c<9;c++) if(state.board[r][c]===0){
+    const cands=candidatesFor(r,c);
+    if(cands.length===0) continue;
+    if(!best || cands.length < bestCands.length){ best=[r,c]; bestCands=cands; }
+  }
+  if(!best){ showToast('No hint — board full or stuck'); return; }
+  state.selected=best;
+  state.hintCell=best;
+  renderGrid();
+  const [r,c]=best;
+  showToast(`Hint: cell R${r+1}C${c+1} has ${bestCands.length} candidates: ${bestCands.join(', ')}`);
+}
+
+function doCheck(){
+  let errors=0;
+  for(let r=0;r<9;r++) for(let c=0;c<9;c++) if(state.board[r][c]!==0 && state.board[r][c]!==state.solution[r][c]) errors++;
+  if(errors===0) showToast('No mistakes on board — keep going!');
+  else showToast(`${errors} filled cell(s) are wrong (not counted as mistakes)`);
+  // highlight wrong
+  const cells=document.querySelectorAll('.cell');
+  for(let r=0;r<9;r++) for(let c=0;c<9;c++){
+    const idx=r*9+c;
+    if(state.board[r][c]!==0 && state.board[r][c]!==state.solution[r][c]){
+      cells[idx].classList.add('mistake-flash');
+      setTimeout(()=>cells[idx].classList.remove('mistake-flash'),800);
+    }
+  }
+}
+
+function undo(){
+  if(!state.undoStack.length) return;
+  state.redoStack.push({board:deepCopy(state.board),notes:deepCopy(state.notes),mistakes:state.mistakes,elapsed:state.elapsed});
+  const prev=state.undoStack.pop();
+  state.board=prev.board; state.notes=prev.notes; state.mistakes=prev.mistakes;
+  renderGrid(); save();
+}
+function redo(){
+  if(!state.redoStack.length) return;
+  state.undoStack.push({board:deepCopy(state.board),notes:deepCopy(state.notes),mistakes:state.mistakes,elapsed:state.elapsed});
+  const nxt=state.redoStack.pop();
+  state.board=nxt.board; state.notes=nxt.notes; state.mistakes=nxt.mistakes;
+  renderGrid(); save();
+}
+
+function loadLesson(idx){
+  const meta=LESSONS_META[idx];
+  state.current=idx;
+  // try to restore saved board for this lesson if exists and matches lessonId
+  let restored=false;
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const d=JSON.parse(raw);
+      if(d.lessonId===meta.id && d.board && d.board.length===9){
+        // restore but need solution/cages regenerated? We need to store solution too? For now regenerate solution and check if board is compatible? Simpler: regenerate fresh and if d.board exists, use it as board but regenerate solution fresh — may mismatch. So we should store solution as well.
+        // Let's store solution in save if we have it
+        if(d.solution && d.cages!==undefined){
+          state.solution=d.solution; state.cages=d.cages; state.cageMap=d.cageMap; state.given=d.given; state.board=d.board; state.notes=d.notes||Array.from({length:9},()=>Array(9).fill(null).map(()=>[])); state.mistakes=d.mistakes||0; state.elapsed=d.elapsed||0; restored=true;
+        }
+      }
+    }
+  }catch(e){}
+  if(!restored){
+    state.solution=generateSolution(meta.type);
+    const puzzle=generatePuzzle(state.solution, meta.clues);
+    state.board=deepCopy(puzzle);
+    state.given=puzzle.map(row=>row.map(v=>v!==0));
+    state.notes=Array.from({length:9},()=>Array(9).fill(null).map(()=>[]));
+    state.mistakes=0; state.elapsed=0;
+    if(meta.type==='cage'){
+      const {cages,cageMap}=generateCages(state.solution);
+      state.cages=cages; state.cageMap=cageMap;
+    } else { state.cages=null; state.cageMap=null; }
+    state.undoStack=[]; state.redoStack=[]; state.selected=null; state.hintCell=null;
+  } else {
+    // ensure notes shape
+    if(!state.notes) state.notes=Array.from({length:9},()=>Array(9).fill(null).map(()=>[]));
+  }
+  state.running=false;
+  // save with solution
+  saveWithSolution();
+  renderGrid(); renderLessons(); resetTimerView();
+  document.getElementById('lessonDrawer').style.display='none';
+}
+function saveWithSolution(){
+  const data={progress:state.progress,current:state.current,elapsed:state.elapsed,mistakes:state.mistakes,board:state.board,notes:state.notes,selected:state.selected,lessonId:LESSONS_META[state.current].id,solution:state.solution,cages:state.cages,cageMap:state.cageMap,given:state.given};
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+// override save to include solution
+const _origSave=save;
+save=saveWithSolution;
+
+function resetTimerView(){ document.getElementById('timerPill').textContent='⏱ '+formatTime(state.elapsed); }
+
+function renderLessons(){
+  const grid=document.getElementById('lessonsGrid');
+  grid.innerHTML='';
+  LESSONS_META.forEach((m,i)=>{
+    const prog=state.progress[i];
+    const locked = i>0 && !state.progress[i-1].completed;
+    const card=document.createElement('div');
+    card.className='lesson-card'+(i===state.current?' active':'')+(locked?' locked':'');
+    card.innerHTML=`<div><div class="lc-top">${m.type.toUpperCase()} • LESSON ${m.id}</div><div class="lc-title">${m.title}</div><div class="lc-foot">${m.desc}</div></div><div class="lc-stars">${'★'.repeat(prog.stars)}${'☆'.repeat(3-prog.stars)} ${prog.completed? '• '+formatTime(prog.bestTime): locked?'• Locked':''}</div>`;
+    card.addEventListener('click',()=>{
+      if(locked){ showToast('Complete previous lesson to unlock'); return; }
+      loadLesson(i);
+    });
+    grid.appendChild(card);
+  });
+}
+
+function exportArchive(){
+  const payload={progress:state.progress,current:state.current,version:1,ts:Date.now()};
+  const code=btoa(JSON.stringify(payload));
+  document.getElementById('codeBox').value=code;
+  showToast('Archive code exported');
+}
+function importArchive(){
+  const code=document.getElementById('codeBox').value.trim();
+  if(!code){ showToast('Paste a code first'); return; }
+  try{
+    const payload=JSON.parse(atob(code));
+    if(!payload.progress || payload.progress.length!==12) throw new Error('bad');
+    state.progress=payload.progress;
+    if(typeof payload.current==='number') state.current=payload.current;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({progress:state.progress,current:state.current}));
+    renderLessons();
+    showToast('Archive imported — progress restored');
+    document.getElementById('archiveOverlay').classList.remove('open');
+    loadLesson(state.current);
+  }catch(e){ showToast('Invalid code'); }
+}
+
+// events
+document.getElementById('numpad').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  const n=parseInt(b.dataset.n,10);
+  placeNumber(n);
+});
+document.getElementById('noteBtn').addEventListener('click',()=>{ state.noteMode=!state.noteMode; state.eraseMode=false; renderGrid(); });
+document.getElementById('eraseBtn').addEventListener('click',()=>{ state.eraseMode=!state.eraseMode; state.noteMode=false; renderGrid(); if(state.eraseMode) showToast('Eraser: tap number or cell to erase'); });
+document.getElementById('undoBtn').addEventListener('click',undo);
+document.getElementById('redoBtn').addEventListener('click',redo);
+document.getElementById('hintBtn').addEventListener('click',doHint);
+document.getElementById('checkBtn').addEventListener('click',doCheck);
+document.getElementById('menuBtn').addEventListener('click',()=>{ const d=document.getElementById('lessonDrawer'); d.style.display=d.style.display==='none'?'block':'none'; });
+document.getElementById('lessonsBtn').addEventListener('click',()=>{ const d=document.getElementById('lessonDrawer'); d.style.display=d.style.display==='none'?'block':'none'; window.scrollTo({top:0,behavior:'smooth'}); });
+document.getElementById('helpBtn').addEventListener('click',()=>document.getElementById('helpOverlay').classList.add('open'));
+document.getElementById('helpClose').addEventListener('click',()=>document.getElementById('helpOverlay').classList.remove('open'));
+document.getElementById('archiveBtn').addEventListener('click',()=>document.getElementById('archiveOverlay').classList.add('open'));
+document.getElementById('archiveClose').addEventListener('click',()=>document.getElementById('archiveOverlay').classList.remove('open'));
+document.getElementById('exportCode').addEventListener('click',exportArchive);
+document.getElementById('copyCode').addEventListener('click',()=>{ const v=document.getElementById('codeBox').value; if(!v) exportArchive(); navigator.clipboard.writeText(document.getElementById('codeBox').value).then(()=>showToast('Copied')).catch(()=>showToast('Copy manually')); });
+document.getElementById('importCode').addEventListener('click',importArchive);
+document.getElementById('resetProgress').addEventListener('click',()=>{ if(confirm('Reset all progress?')){ localStorage.removeItem(STORAGE_KEY); state.progress=LESSONS_META.map(()=>({stars:0,bestTime:0,completed:false})); state.current=0; renderLessons(); loadLesson(0); showToast('Progress reset'); document.getElementById('archiveOverlay').classList.remove('open'); }});
+document.getElementById('winNext').addEventListener('click',()=>{
+  document.getElementById('winOverlay').classList.remove('open');
+  if(state.current<11){ loadLesson(state.current+1); } else { document.getElementById('lessonDrawer').style.display='block'; }
+});
+document.getElementById('winLessons').addEventListener('click',()=>{ document.getElementById('winOverlay').classList.remove('open'); document.getElementById('lessonDrawer').style.display='block'; });
+document.getElementById('failRetry').addEventListener('click',()=>{
+  document.getElementById('failOverlay').classList.remove('open');
+  // reset mistakes but keep board
+  state.mistakes=0; updateMistPill(); save(); renderGrid();
+});
+document.getElementById('failLessons').addEventListener('click',()=>{ document.getElementById('failOverlay').classList.remove('open'); document.getElementById('lessonDrawer').style.display='block'; });
+document.getElementById('helpOverlay').addEventListener('click',e=>{ if(e.target.id==='helpOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('archiveOverlay').addEventListener('click',e=>{ if(e.target.id==='archiveOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('winOverlay').addEventListener('click',e=>{ if(e.target.id==='winOverlay') e.currentTarget.classList.remove('open'); });
+document.getElementById('failOverlay').addEventListener('click',e=>{ if(e.target.id==='failOverlay') e.currentTarget.classList.remove('open'); });
+
+// keyboard
+window.addEventListener('keydown',e=>{
+  if(e.key>='1' && e.key<='9') placeNumber(parseInt(e.key,10));
+  if(e.key==='Backspace' || e.key==='Delete' || e.key==='0') placeNumber(0);
+  if(e.key==='n' || e.key==='N') { state.noteMode=!state.noteMode; renderGrid(); }
+  if(e.key==='u' && (e.ctrlKey||e.metaKey)) { e.preventDefault(); undo(); }
+  if(e.key==='z' && (e.ctrlKey||e.metaKey)) { e.preventDefault(); if(e.shiftKey) redo(); else undo(); }
+  if(e.key==='ArrowUp' || e.key==='ArrowDown' || e.key==='ArrowLeft' || e.key==='ArrowRight'){
+    if(!state.selected) state.selected=[4,4];
+    let [r,c]=state.selected;
+    if(e.key==='ArrowUp') r=Math.max(0,r-1);
+    if(e.key==='ArrowDown') r=Math.min(8,r+1);
+    if(e.key==='ArrowLeft') c=Math.max(0,c-1);
+    if(e.key==='ArrowRight') c=Math.min(8,c+1);
+    state.selected=[r,c]; renderGrid(); e.preventDefault();
+  }
+});
+
+// init
+load();
+renderLessons();
+loadLesson(state.current);
+startTimer();
+</script>
+</body>
+</html>

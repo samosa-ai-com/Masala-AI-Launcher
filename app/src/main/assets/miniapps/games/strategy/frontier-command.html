@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>Dustfront War-Room</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --sand:#e9dcc0;--sand2:#d8c99b;--desert:#b89a6a;--olive:#3d4a2e;--olive2:#556b44;--rust:#8e3b1f;--rust2:#b54a24;--ink:#1e2a1e;--paper:#f4ead2;--line:#2b3a2b;--grid:rgba(43,58,43,.12);
+  --ok:#2e7d32;--warn:#b7791f;--bad:#8e1e1e;
+}
+html,body{height:100%;background:#1a2218;color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center;background:radial-gradient(1200px 600px at 50% -10%, #5a6b4a 0%, #1a2218 60%), #1a2218}
+.app{width:100%;max-width:428px;min-height:100dvh;background:var(--paper);position:relative;display:flex;flex-direction:column;overflow-x:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.2), 0 20px 60px rgba(0,0,0,.5)}
+/* top brass bar */
+.topbar{background:linear-gradient(180deg,#2f3d2a,#1e2a1e);color:#e9dcc0;padding:8px 10px 6px;border-bottom:3px solid #0f160f;position:sticky;top:0;z-index:20}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand h1{font-size:15px;letter-spacing:.14em;font-weight:900;text-transform:uppercase;line-height:1}
+.brand h1 span{color:var(--sand2)}
+.brand small{font-size:10px;letter-spacing:.12em;opacity:.8;display:block;margin-top:2px}
+.iconBtn{width:44px;height:44px;border-radius:10px;border:1.5px solid #c2b48a;background:#f4ead2;color:#1e2a1e;display:grid;place-items:center;font-weight:900;font-size:14px;cursor:pointer}
+.resRow{display:flex;gap:6px;margin-top:8px}
+.res{flex:1;background:rgba(244,234,210,.12);border:1px solid rgba(233,220,192,.25);border-radius:10px;padding:6px 8px;display:flex;align-items:center;justify-content:space-between}
+.res b{font-size:13px}
+.res em{font-style:normal;font-size:10px;letter-spacing:.08em;opacity:.8}
+.res i{font-style:normal;font-size:11px;background:#f4ead2;color:#1e2a1e;border-radius:999px;padding:2px 6px;font-weight:800}
+.hpbar{height:8px;background:#0f160f;border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,.15);margin-top:6px}
+.hpbar>div{height:100%;background:linear-gradient(90deg,#4caf50,#8bc34a);width:100%;transition:width .3s}
+.chipRow{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.chip{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:6px 8px;border-radius:999px;border:1.5px solid #2b3a2b;background:#fff;color:#2b3a2b;cursor:pointer;min-height:32px}
+.chip.active{background:#2b3a2b;color:#f4ead2}
+.chip:disabled{opacity:.45}
+/* doctrine */
+.doctrineBar{display:flex;gap:6px;padding:8px 10px;background:var(--sand2);border-bottom:2px solid #a68c5a;overflow-x:auto;scrollbar-width:none}
+.doctrineBar::-webkit-scrollbar{display:none}
+.dBtn{flex:1;min-width:110px;min-height:44px;border-radius:10px;border:2px solid #2b3a2b;background:#fff;padding:6px 8px;text-align:left;cursor:pointer}
+.dBtn.active{background:#2b3a2b;color:#f4ead2}
+.dBtn b{font-size:11px;letter-spacing:.06em;text-transform:uppercase;display:block}
+.dBtn span{font-size:10px;opacity:.8;line-height:1.2;display:block}
+/* battlefield */
+.battleWrap{padding:10px;background:
+  linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg,var(--grid) 1px, transparent 1px),
+  linear-gradient(180deg,#e9dcc0,#d8c99b);
+  background-size:22px 22px,22px 22px, auto;
+  border-bottom:3px solid #2b3a2b;
+}
+.battleHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.battleHead h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+.battleHead .waveTag{font-size:11px;font-weight:900;background:#1e2a1e;color:#f4ead2;padding:6px 10px;border-radius:999px;border:1px solid #c2b48a}
+.lanes{display:flex;flex-direction:column;gap:8px}
+.lane{position:relative;height:96px;background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(233,220,192,.9));border:2px solid #2b3a2b;border-radius:12px;overflow:hidden;display:flex;align-items:stretch}
+.lane::before{content:"";position:absolute;inset:0;background:
+  linear-gradient(90deg, transparent 49.5%, rgba(43,58,43,.18) 50%, transparent 50.5%),
+  repeating-linear-gradient(90deg, transparent 0 18px, rgba(43,58,43,.07) 18px 19px);
+  pointer-events:none}
+.laneLabel{width:44px;background:#2b3a2b;color:#f4ead2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;z-index:2;border-right:2px solid #1e2a1e}
+.laneLabel b{font-size:13px}
+.laneLabel em{font-size:9px;letter-spacing:.1em;opacity:.8;font-style:normal}
+.track{flex:1;position:relative;overflow:hidden}
+.base{position:absolute;left:0;top:0;bottom:0;width:56px;background:linear-gradient(180deg,#3d4a2e,#1e2a1e);border-right:3px solid #c2b48a;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#f4ead2;z-index:3}
+.base b{font-size:10px;letter-spacing:.08em}
+.base span{font-size:16px}
+.turretSlot{position:absolute;left:58px;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:8px;border:2px dashed #8e3b1f;background:rgba(142,59,31,.08);display:grid;place-items:center;font-size:14px;z-index:2}
+.turretSlot.has{border-style:solid;background:#fff}
+.entity{position:absolute;top:50%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:9px;border:2px solid #1e2a1e;display:grid;place-items:center;font-size:14px;font-weight:900;z-index:4;transition:filter .15s}
+.entity.friendly{background:#fff;color:#1e2a1e;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.entity.enemy{background:#1e2a1e;color:#f4ead2;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.entity .hp{position:absolute;left:2px;right:2px;bottom:-6px;height:4px;background:#0f160f;border-radius:999px;overflow:hidden;border:1px solid #fff}
+.entity .hp>div{height:100%;background:#4caf50;width:100%}
+.proj{position:absolute;top:50%;width:8px;height:8px;border-radius:50%;background:#ff3b30;border:1px solid #fff;transform:translate(-50%,-50%);z-index:5;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.laneBtns{position:absolute;right:6px;top:6px;bottom:6px;display:flex;flex-direction:column;gap:4px;z-index:6}
+.miniDeploy{width:44px;height:28px;border-radius:8px;border:1.5px solid #2b3a2b;background:#fff;font-size:10px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:2px}
+.miniDeploy:disabled{opacity:.35}
+.miniDeploy b{font-size:11px}
+/* controls */
+.controls{padding:10px;display:flex;flex-direction:column;gap:10px;background:#f4ead2}
+.panel{background:#fff;border:2px solid #2b3a2b;border-radius:12px;overflow:hidden}
+.panelHead{padding:8px 10px;background:linear-gradient(180deg,#e9dcc0,#d8c99b);border-bottom:2px solid #2b3a2b;display:flex;align-items:center;justify-content:space-between}
+.panelHead h3{font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.panelHead span{font-size:10px;font-weight:800;opacity:.7}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px}
+.actionBtn{min-height:64px;border-radius:10px;border:2px solid #2b3a2b;background:#fff;padding:8px 8px;text-align:left;cursor:pointer;position:relative;overflow:hidden}
+.actionBtn:disabled{opacity:.45}
+.actionBtn b{font-size:12px;display:block;line-height:1.1}
+.actionBtn em{font-size:10px;opacity:.75;font-style:normal;display:block;margin-top:2px;line-height:1.2}
+.actionBtn i{position:absolute;right:6px;top:6px;font-style:normal;font-size:10px;background:#1e2a1e;color:#f4ead2;padding:3px 6px;border-radius:999px;font-weight:800}
+.cost{font-size:10px;font-weight:800;margin-top:4px;display:flex;gap:6px}
+.cost s{opacity:.6}
+.tacticRow{display:flex;gap:8px;padding:8px}
+.tacticBtn{flex:1;min-height:56px;border-radius:10px;border:2px solid #2b3a2b;background:linear-gradient(180deg,#fff,#e9dcc0);cursor:pointer;padding:6px 8px;text-align:center}
+.tacticBtn b{font-size:11px;display:block}
+.tacticBtn em{font-size:10px;opacity:.7;font-style:normal}
+.tacticBtn .cd{font-size:10px;font-weight:900;color:var(--rust)}
+.chapterGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px}
+.chBtn{min-height:72px;border-radius:12px;border:2px solid #2b3a2b;background:#fff;padding:8px;cursor:pointer;text-align:left;position:relative}
+.chBtn.locked{opacity:.5}
+.chBtn.active{outline:3px solid #2b3a2b; background:#e9dcc0}
+.chBtn b{font-size:12px;display:block}
+.chBtn span{font-size:10px;opacity:.7;display:block;line-height:1.3}
+.stars{color:#b7791f;letter-spacing:1px;font-size:12px}
+.bigAction{width:100%;min-height:48px;border-radius:12px;border:2px solid #1e2a1e;background:#1e2a1e;color:#f4ead2;font-weight:900;letter-spacing:.08em;text-transform:uppercase;font-size:13px;cursor:pointer}
+.bigAction.secondary{background:#fff;color:#1e2a1e}
+.bigAction:disabled{opacity:.5}
+.banner{margin:8px 10px;padding:10px 12px;border-radius:12px;border:2px solid #2b3a2b;background:linear-gradient(180deg,#fff,#e9dcc0);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.banner b{font-size:12px}
+.banner span{font-size:11px;opacity:.8}
+.footer{padding:10px;display:flex;gap:8px;flex-wrap:wrap}
+.footer .iconBtn{flex:1;min-width:44px}
+.modal{position:fixed;inset:0;background:rgba(15,22,15,.72);display:none;align-items:center;justify-content:center;padding:12px;z-index:50}
+.modal.open{display:flex}
+.sheet{width:100%;max-width:428px;background:#f4ead2;border:2px solid #1e2a1e;border-radius:16px;overflow:hidden;max-height:92dvh;display:flex;flex-direction:column}
+.sheetHead{padding:12px;background:#1e2a1e;color:#f4ead2;display:flex;align-items:center;justify-content:space-between}
+.sheetHead h3{font-size:13px;letter-spacing:.08em;text-transform:uppercase}
+.sheetBody{padding:12px;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.kv{display:flex;justify-content:space-between;font-size:12px;background:#fff;border:1px solid #c2b48a;border-radius:10px;padding:8px 10px}
+.input{width:100%;min-height:44px;border-radius:10px;border:2px solid #2b3a2b;padding:8px 10px;font-size:13px;background:#fff}
+.help{font-size:11px;line-height:1.4;background:#fff;border:1px dashed #a68c5a;border-radius:10px;padding:8px 10px}
+.counterHint{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:#2b3a2b;color:#f4ead2;padding:4px 6px;border-radius:999px;display:inline-flex;align-items:center;gap:4px}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#1e2a1e;color:#f4ead2;padding:10px 14px;border-radius:999px;font-size:12px;font-weight:800;border:1px solid #c2b48a;z-index:60;display:none}
+.toast.show{display:block}
+@media (max-width:360px){.brand h1{font-size:13px}.lane{height:88px}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="brand">
+      <div>
+        <h1>DUSTFRONT <span>WAR-ROOM</span></h1>
+        <small>3-LANE DEFENSE • 5 CHAPTERS • ORE / POWER</small>
+      </div>
+      <button class="iconBtn" id="btnArchive" aria-label="Archive">≡</button>
+    </div>
+    <div class="resRow">
+      <div class="res"><div><em>ORE</em><b id="ore">200</b></div><i id="oreRate">+0/s</i></div>
+      <div class="res"><div><em>POWER</em><b id="power">120</b></div><i id="powerRate">+0/s</i></div>
+      <div class="res" style="flex:.9"><div><em>BASE</em><b id="baseHpTxt">100</b></div><i id="medalsTxt">★ 0</i></div>
+    </div>
+    <div class="hpbar"><div id="hpFill"></div></div>
+    <div class="chipRow">
+      <button class="chip" id="btnResearch">Research Medals</button>
+      <button class="chip" id="btnHint">Intel Hint</button>
+      <button class="chip" id="btnPause">Pause</button>
+      <span class="chip" style="background:#fff" id="doctrineTag">Doctrine: Iron</span>
+    </div>
+  </div>
+
+  <div class="doctrineBar" id="doctrineBar">
+    <button class="dBtn active" data-doc="iron"><b>⬢ Iron Doctrine</b><span>+25% bunker HP • -10% build cost</span></button>
+    <button class="dBtn" data-doc="blitz"><b>⚡ Blitz Doctrine</b><span>+20% unit speed • -15% unit cost</span></button>
+    <button class="dBtn" data-doc="fire"><b>☄ Fire Doctrine</b><span>+25% turret dmg • tactics -20% CD</span></button>
+  </div>
+
+  <div class="battleWrap">
+    <div class="battleHead">
+      <h2 id="chapterTitle">Chapter 1 — Dust Outpost</h2>
+      <div class="waveTag" id="waveTag">Wave 0 / 3 • Ready</div>
+    </div>
+    <div class="lanes" id="lanes"></div>
+    <div class="banner" id="counterBanner">
+      <div><b>Counter Matrix</b><br><span><span class="counterHint">Grunt ≻ Raider</span> <span class="counterHint">Bruiser ≻ Crusher</span> <span class="counterHint">Spectre ≻ Phantom</span></span></div>
+      <div style="text-align:right"><b id="enemyInfo">—</b><br><span>Deploy the counter for +60% damage</span></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="panel">
+      <div class="panelHead"><h3>Production & Defense</h3><span>Tap to raise</span></div>
+      <div class="grid2" id="buildGrid"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panelHead"><h3>Timed Tactics</h3><span id="tacticHint">Power to cast</span></div>
+      <div class="tacticRow" id="tacticRow"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panelHead"><h3>Campaign</h3><span id="campaignProgress">0/5 secured</span></div>
+      <div class="chapterGrid" id="chapterGrid"></div>
+      <div style="padding:0 8px 8px;display:flex;gap:8px">
+        <button class="bigAction" id="btnStartWave">▶ Start Wave</button>
+        <button class="bigAction secondary" id="btnNextChapter" style="display:none">Next Chapter →</button>
+      </div>
+      <div class="help" id="briefText">Brief: Hold the outpost. Build Extractors for ore, Solar for power. Bunkers auto-fire per lane. Deploy counter units per lane — they march and brawl. Cast tactics when overwhelmed.</div>
+    </div>
+
+    <div class="footer">
+      <button class="iconBtn" id="btnReset" title="Reset">↺</button>
+      <button class="bigAction secondary" id="btnSaveCode" style="flex:2">Copy Archive Code</button>
+      <button class="bigAction" id="btnLoadCode" style="flex:1">Load</button>
+    </div>
+  </div>
+</div>
+
+<!-- Research Modal -->
+<div class="modal" id="modalResearch">
+  <div class="sheet">
+    <div class="sheetHead"><h3>Research Medals — Permanent</h3><button class="iconBtn" data-close="modalResearch">✕</button></div>
+    <div class="sheetBody" id="researchBody"></div>
+  </div>
+</div>
+<!-- Archive Modal -->
+<div class="modal" id="modalArchive">
+  <div class="sheet">
+    <div class="sheetHead"><h3>Campaign Archive</h3><button class="iconBtn" data-close="modalArchive">✕</button></div>
+    <div class="sheetBody">
+      <div class="help">Your progress is saved on this device. Copy the archive code to carry it to another phone. Paste a code to restore.</div>
+      <div class="kv"><span>Total Stars</span><b id="archiveStars">0</b></div>
+      <div class="kv"><span>Medals Earned</span><b id="archiveMedals">0</b></div>
+      <textarea class="input" id="archiveCode" rows="3" placeholder="Archive code appears here..."></textarea>
+      <div style="display:flex;gap:8px">
+        <button class="bigAction" id="btnCopy2">Copy Code</button>
+        <button class="bigAction secondary" id="btnPasteLoad">Load Pasted</button>
+      </div>
+      <input class="input" id="pasteInput" placeholder="Paste code here to load">
+      <div class="help" id="archiveHelp">Tip: Iron is best for turtling, Blitz for rushing lanes, Fire for tactic spam.</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BUILDINGS = {
+  extractor:{name:'Extractor', icon:'⛏', desc:'+2 ore/s', ore:120, power:0, type:'prod', prod:'ore'},
+  solar:{name:'Solar Array', icon:'◍', desc:'+2 power/s', ore:100, power:0, type:'prod', prod:'power'},
+  bunker:{name:'Bunker', icon:'⌖', desc:'Auto rifle • lane turret', ore:80, power:40, type:'turret', dmg:14, range:42, rof:0.9},
+  artillery:{name:'Artillery Pit', icon:'◎', desc:'Heavy cannon • splash', ore:150, power:80, type:'turret', dmg:28, range:48, rof:1.6}
+};
+const UNITS = {
+  grunt:{name:'Grunt', icon:'⬢', ore:30, power:10, hp:70, dmg:16, speed:18, counter:'raider'},
+  bruiser:{name:'Bruiser', icon:'⬣', ore:50, power:25, hp:120, dmg:22, speed:12, counter:'crusher'},
+  spectre:{name:'Spectre', icon:'⬔', ore:40, power:30, hp:60, dmg:18, speed:26, counter:'phantom'}
+};
+const ENEMIES = {
+  raider:{name:'Raider', icon:'▣', hp:60, dmg:12, speed:14, bountyOre:14, bountyPower:6},
+  crusher:{name:'Crusher', icon:'▦', hp:130, dmg:18, speed:9, bountyOre:22, bountyPower:10},
+  phantom:{name:'Phantom', icon:'▨', hp:50, dmg:14, speed:20, bountyOre:16, bountyPower:8}
+};
+const TACTICS = {
+  barrage:{name:'Barrage', icon:'☄', cost:60, cd:12, desc:'Damage all lanes'},
+  mend:{name:'Mend', icon:'✚', cost:50, cd:14, desc:'Heal base + turrets'},
+  surge:{name:'Surge', icon:'⚡', cost:40, cd:10, desc:'+40% speed/dmg 6s'}
+};
+const CHAPTERS = [
+  {id:1, name:'Dust Outpost', waves:3, brief:'Intro: Raiders only. Learn counters.', stars:[0,0,0]},
+  {id:2, name:'Canyon Pass', waves:4, brief:'Crushers arrive. Bunkers shine.', stars:[0,0,0]},
+  {id:3, name:'Solar Flats', waves:4, brief:'Phantoms flank. Spectres counter.', stars:[0,0,0]},
+  {id:4, name:'Rust Bastion', waves:5, brief:'Mixed waves. Tactics required.', stars:[0,0,0]},
+  {id:5, name:'War-Room Prime', waves:6, brief:'Final stand. All threats, escalating.', stars:[0,0,0]},
+];
+const RESEARCH = [
+  {id:'oreEff', name:'Ore Efficiency', desc:'+1 ore/s base', max:3, cost:2},
+  {id:'powerGrid', name:'Power Grid', desc:'+1 power/s base', max:3, cost:2},
+  {id:'veteran', name:'Veteran Units', desc:'+12% unit HP/dmg', max:3, cost:3},
+  {id:'fortified', name:'Fortified Base', desc:'+20 max HP', max:2, cost:3},
+];
+
+let state = {
+  ore:200, power:120, baseHp:100, baseMax:100,
+  oreRate:0, powerRate:0,
+  doctrine:'iron',
+  chapter:1, wave:0, waveActive:false, paused:false,
+  turrets:[null,null,null], // per lane
+  prod:{extractor:0, solar:0},
+  research:{oreEff:0,powerGrid:0,veteran:0,fortified:0},
+  stars:[0,0,0,0,0], unlocked:1, medals:0, spent:0,
+  surgeUntil:0,
+  tacticCd:{barrage:0,mend:0,surge:0}
+};
+let entities = {enemies:[], friendlies:[], projs:[]};
+let waveQueue = [];
+let lastT=0, accOre=0, accPower=0;
+let raf=0;
+
+const $ = s=>document.querySelector(s);
+const lanesEl = $('#lanes');
+const oreEl=$('#ore'), powerEl=$('#power'), oreRateEl=$('#oreRate'), powerRateEl=$('#powerRate');
+const hpFill=$('#hpFill'), baseHpTxt=$('#baseHpTxt'), medalsTxt=$('#medalsTxt');
+const waveTag=$('#waveTag'), chapterTitle=$('#chapterTitle'), briefText=$('#briefText');
+const doctrineTag=$('#doctrineTag');
+
+function save(){
+  localStorage.setItem('dustfront_v2', JSON.stringify({state}));
+}
+function load(){
+  try{
+    const d=JSON.parse(localStorage.getItem('dustfront_v2')||'null');
+    if(d && d.state){ state={...state, ...d.state}; // keep defaults for missing
+      state.tacticCd = {...{barrage:0,mend:0,surge:0}, ...(d.state.tacticCd||{})};
+      state.turrets = d.state.turrets||[null,null,null];
+      state.prod = {...{extractor:0,solar:0}, ...(d.state.prod||{})};
+      state.research = {...{oreEff:0,powerGrid:0,veteran:0,fortified:0}, ...(d.state.research||{})};
+      state.stars = d.state.stars||[0,0,0,0,0];
+    }
+  }catch(e){}
+}
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800);
+}
+function doctrineMods(){
+  const m={buildCost:1, unitCost:1, turretDmg:1, unitSpeed:1, bunkerHp:1, tacticCd:1};
+  if(state.doctrine==='iron'){ m.buildCost=0.9; m.bunkerHp=1.25; }
+  if(state.doctrine==='blitz'){ m.unitCost=0.85; m.unitSpeed=1.2; }
+  if(state.doctrine==='fire'){ m.turretDmg=1.25; m.tacticCd=0.8; }
+  // research
+  return m;
+}
+function recalcRates(){
+  const mods=doctrineMods();
+  let oreR = state.prod.extractor*2 + state.research.oreEff*1;
+  let powerR = state.prod.solar*2 + state.research.powerGrid*1;
+  // base trickle
+  oreR += 0.6; powerR += 0.6;
+  state.oreRate = oreR;
+  state.powerRate = powerR;
+  // base max
+  state.baseMax = 100 + state.research.fortified*20;
+  if(state.baseHp>state.baseMax) state.baseHp=state.baseMax;
+}
+function costFor(buildingKey){
+  const b=BUILDINGS[buildingKey];
+  const m=doctrineMods();
+  let ore=Math.round(b.ore * (b.type==='turret'||b.type==='prod'? m.buildCost:1));
+  let power=b.power;
+  // turret also affected
+  if(b.type==='turret') ore=Math.round(ore);
+  return {ore,power};
+}
+function unitCostFor(unitKey){
+  const u=UNITS[unitKey];
+  const m=doctrineMods();
+  return {ore:Math.round(u.ore*m.unitCost), power:Math.round(u.power*m.unitCost)};
+}
+function renderTop(){
+  oreEl.textContent=Math.floor(state.ore);
+  powerEl.textContent=Math.floor(state.power);
+  oreRateEl.textContent=(state.oreRate>=0?'+':'')+state.oreRate.toFixed(1)+'/s';
+  powerRateEl.textContent=(state.powerRate>=0?'+':'')+state.powerRate.toFixed(1)+'/s';
+  baseHpTxt.textContent=Math.max(0,Math.round(state.baseHp));
+  hpFill.style.width=(Math.max(0,state.baseHp/state.baseMax*100))+'%';
+  hpFill.style.background = state.baseHp/state.baseMax>.5 ? 'linear-gradient(90deg,#4caf50,#8bc34a)' : state.baseHp/state.baseMax>.25 ? 'linear-gradient(90deg,#ffb300,#ff6f00)' : 'linear-gradient(90deg,#e53935,#8e1e1e)';
+  const totalStars=state.stars.reduce((a,b)=>a+b,0);
+  const totalMedals=Math.floor(totalStars/2); // 2 stars =1 medal
+  state.medals=totalMedals;
+  medalsTxt.textContent='★ '+totalStars;
+  doctrineTag.textContent='Doctrine: '+state.doctrine.toUpperCase();
+  $('#campaignProgress').textContent = state.stars.filter(s=>s>0).length+'/5 secured';
+  $('#archiveStars').textContent=totalStars;
+  $('#archiveMedals').textContent=totalMedals;
+}
+function renderLanes(){
+  lanesEl.innerHTML='';
+  for(let lane=0;lane<3;lane++){
+    const div=document.createElement('div');
+    div.className='lane';
+    div.innerHTML=`
+      <div class="laneLabel"><b>L${lane+1}</b><em>${['NORTH','CENTER','SOUTH'][lane]}</em></div>
+      <div class="track" data-lane="${lane}">
+        <div class="base"><span>⬢</span><b>BASE</b></div>
+        <div class="turretSlot ${state.turrets[lane]?'has':''}" data-slot="${lane}">${state.turrets[lane]? BUILDINGS[state.turrets[lane]].icon : '+'}</div>
+        <div class="laneBtns">
+          <button class="miniDeploy" data-deploy="grunt" data-lane="${lane}"><b>⬢</b> G</button>
+          <button class="miniDeploy" data-deploy="bruiser" data-lane="${lane}"><b>⬣</b> B</button>
+          <button class="miniDeploy" data-deploy="spectre" data-lane="${lane}"><b>⬔</b> S</button>
+        </div>
+      </div>
+    `;
+    lanesEl.appendChild(div);
+  }
+  // attach deploy handlers
+  lanesEl.querySelectorAll('[data-deploy]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const k=btn.dataset.deploy, lane=parseInt(btn.dataset.lane);
+      deployUnit(k,lane);
+    });
+  });
+  lanesEl.querySelectorAll('.turretSlot').forEach(slot=>{
+    slot.addEventListener('click',()=>{
+      const lane=parseInt(slot.dataset.slot);
+      if(state.turrets[lane]){
+        if(confirm('Dismantle '+BUILDINGS[state.turrets[lane]].name+'? Refund 60% ore.')){
+          const c=costFor(state.turrets[lane]);
+          state.ore+=Math.round(c.ore*0.6);
+          state.turrets[lane]=null;
+          renderLanes(); renderBuilds(); renderTop(); save();
+          toast('Turret dismantled');
+        }
+      } else {
+        // quick pick: choose cheapest affordable
+        const affordable = ['bunker','artillery'].filter(k=>{
+          const c=costFor(k); return state.ore>=c.ore && state.power>=c.power;
+        });
+        if(affordable.length===0) toast('Need ore/power for turret');
+        else placeTurret(affordable[0], lane);
+      }
+    });
+  });
+  renderEntitiesDOM();
+}
+function renderBuilds(){
+  const grid=$('#buildGrid'); grid.innerHTML='';
+  Object.entries(BUILDINGS).forEach(([key,b])=>{
+    const c=costFor(key);
+    const can = state.ore>=c.ore && state.power>=c.power;
+    const btn=document.createElement('button');
+    btn.className='actionBtn';
+    btn.disabled=!can;
+    btn.innerHTML=`<i>${b.icon}</i><b>${b.name}</b><em>${b.desc}</em><div class="cost"><span>⛏ ${c.ore}</span><span>◍ ${c.power}</span></div>`;
+    btn.addEventListener('click',()=>{
+      if(b.type==='prod') buildProd(key);
+      else {
+        // choose lane with no turret first
+        let lane = state.turrets.findIndex(t=>!t);
+        if(lane===-1) lane=0;
+        placeTurret(key,lane);
+      }
+    });
+    grid.appendChild(btn);
+  });
+  // update deploy buttons disabled state
+  document.querySelectorAll('[data-deploy]').forEach(btn=>{
+    const k=btn.dataset.deploy;
+    const c=unitCostFor(k);
+    btn.disabled = !(state.ore>=c.ore && state.power>=c.power);
+    btn.title = `⛏ ${c.ore} ◍ ${c.power}`;
+  });
+}
+function renderTactics(){
+  const row=$('#tacticRow'); row.innerHTML='';
+  Object.entries(TACTICS).forEach(([key,t])=>{
+    const cd=Math.max(0, state.tacticCd[key]||0);
+    const can = state.power>=t.cost && cd<=0.05;
+    const btn=document.createElement('button');
+    btn.className='tacticBtn';
+    btn.disabled=!can;
+    btn.innerHTML=`<b>${t.icon} ${t.name}</b><em>${t.desc}</em><div class="cost" style="justify-content:center"><span>◍ ${t.cost}</span></div><div class="cd">${cd>0? cd.toFixed(1)+'s CD' : 'READY'}</div>`;
+    btn.addEventListener('click',()=>castTactic(key));
+    row.appendChild(btn);
+  });
+}
+function renderChapters(){
+  const grid=$('#chapterGrid'); grid.innerHTML='';
+  CHAPTERS.forEach(ch=>{
+    const unlocked = ch.id<=state.unlocked;
+    const stars = state.stars[ch.id-1]||0;
+    const btn=document.createElement('button');
+    btn.className='chBtn'+(state.chapter===ch.id?' active':'')+(unlocked?'':' locked');
+    btn.disabled=!unlocked;
+    btn.innerHTML=`<b>${ch.id}. ${ch.name}</b><span>${ch.brief}</span><div class="stars">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</div><span>${ch.waves} waves • ${unlocked?'':'Locked'}</span>`;
+    btn.addEventListener('click',()=>{ selectChapter(ch.id); });
+    grid.appendChild(btn);
+  });
+  const ch=CHAPTERS[state.chapter-1];
+  chapterTitle.textContent=`Chapter ${ch.id} — ${ch.name}`;
+  briefText.textContent='Brief: '+ch.brief;
+  waveTag.textContent=`Wave ${state.wave} / ${ch.waves} • ${state.waveActive?'FIGHTING':'Ready'}`;
+  $('#btnStartWave').style.display = state.waveActive? 'none':'block';
+  $('#btnNextChapter').style.display = (!state.waveActive && state.wave>=ch.waves && state.stars[ch.id-1]>0 && ch.id<5) ? 'block':'none';
+  if(state.wave>=ch.waves && state.stars[ch.id-1]>0) $('#btnNextChapter').disabled=false;
+}
+function renderResearch(){
+  const body=$('#researchBody'); body.innerHTML='';
+  const totalMedals=Math.floor(state.stars.reduce((a,b)=>a+b,0)/2);
+  const available = totalMedals - state.spent;
+  const head=document.createElement('div');
+  head.className='kv'; head.innerHTML=`<span>Medals available</span><b>${available}</b>`;
+  body.appendChild(head);
+  RESEARCH.forEach(r=>{
+    const lvl=state.research[r.id]||0;
+    const canBuy = lvl<r.max && available>=r.cost;
+    const div=document.createElement('div');
+    div.className='panel';
+    div.innerHTML=`<div class="panelHead"><h3>${r.name} ${lvl}/${r.max}</h3><span>${r.cost} medals</span></div>
+      <div style="padding:8px"><div class="help">${r.desc} — permanent, all chapters.</div>
+      <div style="height:8px;background:#0f160f;border-radius:999px;overflow:hidden;margin-top:8px"><div style="height:100%;width:${lvl/r.max*100}%;background:#2b3a2b"></div></div>
+      <button class="bigAction" style="margin-top:8px" ${canBuy?'':'disabled'} data-buy="${r.id}">${lvl>=r.max?'Maxed':'Buy Level '+(lvl+1)}</button></div>`;
+    body.appendChild(div);
+  });
+  body.querySelectorAll('[data-buy]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const id=b.dataset.buy;
+      const r=RESEARCH.find(x=>x.id===id);
+      const total=Math.floor(state.stars.reduce((a,b)=>a+b,0)/2);
+      const avail=total-state.spent;
+      if(avail>=r.cost && state.research[id]<r.max){
+        state.research[id]++; state.spent+=r.cost;
+        recalcRates(); renderTop(); renderResearch(); renderBuilds(); save();
+        toast(r.name+' upgraded');
+      }
+    });
+  });
+}
+function renderEntitiesDOM(){
+  // clear old entities
+  document.querySelectorAll('.entity,.proj').forEach(e=>e.remove());
+  const tracks=document.querySelectorAll('.track');
+  // turret visuals
+  state.turrets.forEach((t,lane)=>{
+    if(!t) return;
+    const track=tracks[lane];
+    if(!track) return;
+    const el=document.createElement('div');
+    el.className='entity friendly';
+    el.style.left='58px';
+    el.style.top='50%';
+    el.style.width='30px'; el.style.height='30px';
+    el.textContent=BUILDINGS[t].icon;
+    el.title=BUILDINGS[t].name;
+    track.appendChild(el);
+  });
+  entities.enemies.forEach(e=>{
+    const track=tracks[e.lane];
+    if(!track) return;
+    const el=document.createElement('div');
+    el.className='entity enemy';
+    el.style.left=e.x+'%';
+    el.style.top=(50 + e.yOffset)+'px';
+    el.textContent=ENEMIES[e.type].icon;
+    el.innerHTML+=`<div class="hp"><div style="width:${Math.max(0,e.hp/e.maxHp*100)}%"></div></div>`;
+    track.appendChild(el);
+  });
+  entities.friendlies.forEach(f=>{
+    const track=tracks[f.lane];
+    if(!track) return;
+    const el=document.createElement('div');
+    el.className='entity friendly';
+    el.style.left=f.x+'%';
+    el.style.top=(50 + f.yOffset)+'px';
+    el.textContent=UNITS[f.type].icon;
+    el.innerHTML+=`<div class="hp"><div style="width:${Math.max(0,f.hp/f.maxHp*100)}%"></div></div>`;
+    track.appendChild(el);
+  });
+  entities.projs.forEach(p=>{
+    const track=tracks[p.lane];
+    if(!track) return;
+    const el=document.createElement('div');
+    el.className='proj';
+    el.style.left=p.x+'%';
+    track.appendChild(el);
+  });
+}
+
+// Game actions
+function buildProd(key){
+  const c=costFor(key);
+  if(state.ore<c.ore || state.power<c.power) return toast('Not enough resources');
+  state.ore-=c.ore; state.power-=c.power;
+  state.prod[key]=(state.prod[key]||0)+1;
+  recalcRates(); renderTop(); renderBuilds(); save();
+  toast(BUILDINGS[key].name+' raised');
+}
+function placeTurret(key,lane){
+  const c=costFor(key);
+  if(state.ore<c.ore || state.power<c.power) return toast('Need ⛏ '+c.ore+' ◍ '+c.power);
+  // if slot occupied, replace with refund
+  if(state.turrets[lane]){
+    const old=costFor(state.turrets[lane]);
+    state.ore+=Math.round(old.ore*0.5);
+  }
+  state.ore-=c.ore; state.power-=c.power;
+  state.turrets[lane]=key;
+  renderLanes(); renderTop(); renderBuilds(); save();
+  toast(BUILDINGS[key].name+' in L'+(lane+1));
+}
+function deployUnit(key,lane){
+  const c=unitCostFor(key);
+  if(state.ore<c.ore || state.power<c.power) return toast('Need ⛏ '+c.ore+' ◍ '+c.power);
+  state.ore-=c.ore; state.power-=c.power;
+  const u=UNITS[key];
+  const vet = state.research.veteran*0.12;
+  const hp = Math.round(u.hp*(1+vet));
+  const dmg = Math.round(u.dmg*(1+vet));
+  entities.friendlies.push({
+    type:key, lane, x:12, yOffset:(Math.random()*10-5),
+    hp, maxHp:hp, dmg, speed:u.speed*doctrineMods().unitSpeed, counter:u.counter
+  });
+  renderTop(); renderBuilds(); save();
+}
+function castTactic(key){
+  const t=TACTICS[key];
+  if(state.power<t.cost) return toast('Need power');
+  if((state.tacticCd[key]||0)>0) return toast('On cooldown');
+  state.power-=t.cost;
+  const cdScale=doctrineMods().tacticCd;
+  state.tacticCd[key]= t.cd*cdScale;
+  if(key==='barrage'){
+    // damage all enemies
+    entities.enemies.forEach(e=> e.hp-=35);
+    // visual shake
+    document.querySelector('.battleWrap').animate([{transform:'translateX(0)'},{transform:'translateX(3px)'},{transform:'translateX(-3px)'},{transform:'translateX(0)'}],{duration:300});
+    toast('Barrage! -35 HP all lanes');
+  } else if(key==='mend'){
+    state.baseHp=Math.min(state.baseMax, state.baseHp+28);
+    // heal friendlies a bit
+    entities.friendlies.forEach(f=> f.hp=Math.min(f.maxHp, f.hp+18));
+    toast('Mend +28 base');
+  } else if(key==='surge'){
+    state.surgeUntil=performance.now()+6000;
+    toast('Surge 6s!');
+  }
+  renderTop(); renderTactics(); save();
+}
+
+// Waves
+function buildWaveQueue(chapterId, waveNum){
+  // escalating
+  const ch=CHAPTERS[chapterId-1];
+  const difficulty = (chapterId-1)*0.35 + (waveNum-1)*0.22;
+  const count = Math.round(4 + difficulty*3 + waveNum*1.2);
+  const types = chapterId===1? ['raider'] : chapterId===2? ['raider','crusher'] : chapterId===3? ['raider','phantom'] : ['raider','crusher','phantom'];
+  const q=[];
+  for(let i=0;i<count;i++){
+    const type = types[Math.floor(Math.random()*types.length)];
+    const lane = Math.floor(Math.random()*3);
+    const delay = i* (700 - Math.min(300, difficulty*80)) + Math.random()*400;
+    q.push({type,lane,delay});
+  }
+  // add a heavy at end for later waves
+  if(waveNum>=3 && Math.random()<0.7){
+    q.push({type:'crusher', lane:Math.floor(Math.random()*3), delay: q[q.length-1].delay+800});
+  }
+  return q;
+}
+function startWave(){
+  if(state.waveActive) return;
+  const ch=CHAPTERS[state.chapter-1];
+  if(state.wave>=ch.waves) return toast('Chapter complete — go next');
+  state.wave++;
+  state.waveActive=true;
+  waveQueue = buildWaveQueue(state.chapter, state.wave);
+  waveQueue.startAt = performance.now();
+  waveQueue.idx=0;
+  renderChapters();
+  toast('Wave '+state.wave+' incoming');
+  save();
+}
+function selectChapter(id){
+  if(id>state.unlocked) return;
+  state.chapter=id;
+  state.wave=0; state.waveActive=false; waveQueue=[];
+  entities.enemies=[]; entities.friendlies=[]; entities.projs=[];
+  // keep turrets and prod? Reset per chapter? Keep prod but clear enemies
+  // reset base hp partially
+  state.baseHp = Math.min(state.baseMax, state.baseHp+30);
+  recalcRates(); renderChapters(); renderLanes(); renderTop(); save();
+}
+
+// Loop
+function update(dt){
+  if(state.paused) return;
+  // resources
+  accOre+= state.oreRate*dt;
+  accPower+= state.powerRate*dt;
+  if(accOre>=1){ state.ore+=Math.floor(accOre); accOre-=Math.floor(accOre); }
+  if(accPower>=1){ state.power+=Math.floor(accPower); accPower-=Math.floor(accPower); }
+  // clamp
+  state.ore=Math.min(9999,state.ore); state.power=Math.min(9999,state.power);
+
+  // tactic CDs
+  Object.keys(state.tacticCd).forEach(k=>{
+    if(state.tacticCd[k]>0) state.tacticCd[k]=Math.max(0, state.tacticCd[k]-dt);
+  });
+
+  // wave spawn
+  if(state.waveActive && waveQueue.length){
+    const now=performance.now();
+    while(waveQueue.idx < waveQueue.length && now - waveQueue.startAt >= waveQueue[waveQueue.idx].delay){
+      const s=waveQueue[waveQueue.idx++];
+      const eDef=ENEMIES[s.type];
+      const hp = Math.round(eDef.hp * (1 + (state.chapter-1)*0.18 + (state.wave-1)*0.12));
+      const dmg = Math.round(eDef.dmg * (1 + (state.chapter-1)*0.12));
+      entities.enemies.push({type:s.type, lane:s.lane, x:96, yOffset:(Math.random()*12-6), hp, maxHp:hp, dmg, speed:eDef.speed, bountyOre:eDef.bountyOre, bountyPower:eDef.bountyPower});
+    }
+    if(waveQueue.idx>=waveQueue.length && entities.enemies.length===0){
+      // wave cleared
+      state.waveActive=false;
+      // reward
+      const bonusOre = 40 + state.wave*12 + state.chapter*10;
+      const bonusPower = 24 + state.wave*8;
+      state.ore+=bonusOre; state.power+=bonusPower;
+      // star rating: based on base HP and time
+      const hpPct=state.baseHp/state.baseMax;
+      let stars=1;
+      if(hpPct>0.6) stars=2;
+      if(hpPct>0.85 && state.waveActive===false) stars=3;
+      // keep max
+      const idx=state.chapter-1;
+      if(stars>state.stars[idx]) state.stars[idx]=stars;
+      if(state.wave>=CHAPTERS[state.chapter-1].waves){
+        // chapter complete
+        if(state.chapter < CHAPTERS.length && state.unlocked <= state.chapter) state.unlocked = state.chapter+1;
+        toast(`Chapter ${state.chapter} secured ★${stars} +${bonusOre} ore`);
+      } else {
+        toast(`Wave ${state.wave} cleared ★${stars===3?'★★★':stars===2?'★★':'★'} +${bonusOre} ore`);
+      }
+      renderChapters(); save();
+    }
+  }
+
+  // turret shooting
+  const surgeActive = performance.now() < state.surgeUntil;
+  const turretDmgMult = doctrineMods().turretDmg * (surgeActive?1.4:1);
+  state.turrets.forEach((t,lane)=>{
+    if(!t) return;
+    const b=BUILDINGS[t];
+    // find nearest enemy in lane within range
+    const candidates = entities.enemies.filter(e=>e.lane===lane && e.x>12 && e.x< (12+b.range));
+    if(candidates.length===0) return;
+    // rate limit via lastShot
+    if(!b._last) b._last=0;
+    const now=performance.now()/1000;
+    if(now - b._last < b.rof) return;
+    b._last=now;
+    const target=candidates.sort((a,b)=>a.x-b.x)[0];
+    // spawn projectile
+    entities.projs.push({lane, x:14, target, dmg: Math.round(b.dmg*turretDmgMult), speed:55, type:'turret'});
+  });
+
+  // move friendlies right, enemies left, handle combat
+  const speedMult = surgeActive?1.4:1;
+  // friendlies
+  for(let i=entities.friendlies.length-1;i>=0;i--){
+    const f=entities.friendlies[i];
+    // find enemy ahead in same lane within 6%
+    const foe = entities.enemies.find(e=>e.lane===f.lane && Math.abs(e.x - f.x) < 6);
+    if(foe){
+      // fight
+      const counterBonus = (f.counter===foe.type)?1.6:1;
+      const dmg = f.dmg * counterBonus * (surgeActive?1.4:1) * dt * 1.2;
+      foe.hp -= dmg;
+      // foe retaliates
+      f.hp -= foe.dmg * dt * 0.9;
+      if(foe.hp<=0){
+        state.ore+=foe.bountyOre; state.power+=foe.bountyPower;
+        entities.enemies.splice(entities.enemies.indexOf(foe),1);
+      }
+      if(f.hp<=0) entities.friendlies.splice(i,1);
+    } else {
+      f.x += f.speed * speedMult * dt * 0.9;
+      if(f.x>96) f.x=96;
+    }
+    if(f.hp<=0) entities.friendlies.splice(i,1);
+  }
+  // enemies
+  for(let i=entities.enemies.length-1;i>=0;i--){
+    const e=entities.enemies[i];
+    const foe = entities.friendlies.find(f=>f.lane===e.lane && Math.abs(f.x - e.x) < 6);
+    if(foe){
+      // already handled in friendly loop, but enemy still takes damage from foe? already
+      // just hold position
+    } else {
+      e.x -= e.speed * dt * 0.9;
+      if(e.x<=6){
+        // hit base
+        state.baseHp -= e.dmg*0.6; // per hit tick? Instead instant
+        // Actually deal chunk and remove
+        state.baseHp -= 6 + (state.chapter*1.2);
+        entities.enemies.splice(i,1);
+        if(state.baseHp<=0){
+          state.baseHp=0;
+          onDefeat();
+          return;
+        }
+      }
+    }
+  }
+  // projectiles
+  for(let i=entities.projs.length-1;i>=0;i--){
+    const p=entities.projs[i];
+    p.x += p.speed * dt;
+    // hit check: if target still exists and close
+    if(p.target && entities.enemies.includes(p.target) && Math.abs(p.target.x - p.x) < 4){
+      p.target.hp -= p.dmg;
+      if(p.target.hp<=0){
+        state.ore+=p.target.bountyOre; state.power+=p.target.bountyPower;
+        entities.enemies.splice(entities.enemies.indexOf(p.target),1);
+      }
+      entities.projs.splice(i,1);
+    } else if(p.x>98){
+      entities.projs.splice(i,1);
+    }
+  }
+
+  // UI throttled
+  renderTop();
+  renderTactics();
+  renderEntitiesDOM();
+  // wave tag live
+  if(state.waveActive){
+    const remain = entities.enemies.length + (waveQueue.length - (waveQueue.idx||0));
+    $('#enemyInfo').textContent = remain+' hostiles';
+    waveTag.textContent=`Wave ${state.wave} / ${CHAPTERS[state.chapter-1].waves} • ${remain} left`;
+  }
+}
+function onDefeat(){
+  state.waveActive=false;
+  toast('Base breached! Chapter reset');
+  state.baseHp=state.baseMax;
+  state.wave=0;
+  entities.enemies=[]; entities.friendlies=[]; entities.projs=[];
+  renderChapters(); renderTop(); save();
+}
+function loop(t){
+  if(!lastT) lastT=t;
+  const dt=Math.min(0.05, (t-lastT)/1000);
+  lastT=t;
+  update(dt);
+  raf=requestAnimationFrame(loop);
+}
+
+// Init UI
+function init(){
+  load();
+  recalcRates();
+  renderLanes(); renderBuilds(); renderTactics(); renderChapters(); renderTop(); renderResearch();
+  // doctrine
+  document.querySelectorAll('.dBtn').forEach(b=>{
+    if(b.dataset.doc===state.doctrine) b.classList.add('active'); else b.classList.remove('active');
+    b.addEventListener('click',()=>{
+      state.doctrine=b.dataset.doc;
+      document.querySelectorAll('.dBtn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      recalcRates(); renderTop(); renderBuilds(); renderTactics(); save();
+      toast('Doctrine: '+state.doctrine);
+    });
+  });
+  $('#btnStartWave').addEventListener('click', startWave);
+  $('#btnNextChapter').addEventListener('click', ()=>{
+    if(state.chapter<5){ selectChapter(state.chapter+1); }
+  });
+  $('#btnResearch').addEventListener('click', ()=>{ renderResearch(); $('#modalResearch').classList.add('open'); });
+  $('#btnArchive').addEventListener('click', ()=>{ updateArchiveCode(); $('#modalArchive').classList.add('open'); });
+  $('#btnHint').addEventListener('click', ()=>{
+    const ch=CHAPTERS[state.chapter-1];
+    const tips=[
+      'Grunt beats Raider (+60% dmg).',
+      'Bruiser crushes Crusher — tank vs tank.',
+      'Spectre outruns Phantom — speed counters speed.',
+      'Build 2 Extractors early for ore snowball.',
+      'Bunkers in all 3 lanes stop leaks.',
+      'Save Barrage for 5+ enemies clumped.',
+      'Surge + mass Grunts = wave delete.',
+      'Artillery splash hits clustered foes.'
+    ];
+    toast(tips[Math.floor(Math.random()*tips.length)]);
+  });
+  $('#btnPause').addEventListener('click', ()=>{
+    state.paused=!state.paused;
+    $('#btnPause').textContent=state.paused?'Resume':'Pause';
+    toast(state.paused?'Paused':'Resumed');
+  });
+  $('#btnReset').addEventListener('click', ()=>{
+    if(confirm('Reset campaign? Keeps medals but clears progress.')){
+      state.ore=200; state.power=120; state.baseHp=state.baseMax; state.wave=0; state.waveActive=false;
+      state.prod={extractor:0,solar:0}; state.turrets=[null,null,null];
+      entities.enemies=[]; entities.friendlies=[]; entities.projs=[];
+      // keep stars? reset per request: keep stars but reset current chapter progress
+      // Actually full reset option: clear stars if holding shift? simple: keep stars
+      recalcRates(); renderLanes(); renderBuilds(); renderTop(); renderChapters(); save();
+      toast('Reset');
+    }
+  });
+  // archive
+  $('#btnSaveCode').addEventListener('click', ()=>{ updateArchiveCode(); navigator.clipboard.writeText($('#archiveCode').value).then(()=>toast('Code copied')).catch(()=>toast('Code ready — long-press to copy')); });
+  $('#btnCopy2').addEventListener('click', ()=>{ navigator.clipboard.writeText($('#archiveCode').value).then(()=>toast('Copied')).catch(()=>toast('Long-press to copy')); });
+  $('#btnLoadCode').addEventListener('click', ()=>{ $('#modalArchive').classList.add('open'); $('#pasteInput').focus(); });
+  $('#btnPasteLoad').addEventListener('click', ()=>{ loadFromCode($('#pasteInput').value.trim()); });
+  document.querySelectorAll('[data-close]').forEach(b=> b.addEventListener('click', ()=> $('#'+b.dataset.close).classList.remove('open')));
+  document.querySelectorAll('.modal').forEach(m=> m.addEventListener('click', e=>{ if(e.target===m) m.classList.remove('open'); }));
+  // start loop
+  raf=requestAnimationFrame(loop);
+  // periodic save
+  setInterval(save, 3000);
+}
+function updateArchiveCode(){
+  const payload={state, v:2};
+  const code=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  $('#archiveCode').value=code;
+}
+function loadFromCode(code){
+  if(!code) return toast('Paste a code first');
+  try{
+    const json=decodeURIComponent(escape(atob(code)));
+    const data=JSON.parse(json);
+    if(!data.state) throw new Error('bad');
+    state={...state, ...data.state};
+    state.tacticCd = {...{barrage:0,mend:0,surge:0}, ...(data.state.tacticCd||{})};
+    recalcRates(); renderLanes(); renderBuilds(); renderTactics(); renderChapters(); renderTop(); save();
+    $('#modalArchive').classList.remove('open');
+    toast('Archive restored');
+  }catch(e){ toast('Invalid code'); }
+}
+init();
+</script>
+</body>
+</html>

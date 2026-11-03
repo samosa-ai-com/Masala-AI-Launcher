@@ -1,0 +1,28 @@
+{
+  "id": "inbox_zero",
+  "name": "Daily reset",
+  "description": "Four small things that close the day.",
+  "category": "Focus",
+  "widget": {
+    "id": "inbox_zero",
+    "title": "Reset",
+    "components": [
+      {
+        "type": "checklist",
+        "key": "reset",
+        "items": [
+          "Clear inbox",
+          "Plan tomorrow",
+          "Tidy desk",
+          "Note one win"
+        ],
+        "reset": "daily"
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 2,
+      "max": 3
+    }
+  }
+}

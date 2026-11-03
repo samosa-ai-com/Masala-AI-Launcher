@@ -240,7 +240,10 @@ data class ChatRequest(
     @SerialName("prompt_cache_key")
     val promptCacheKey: String? = null,
     @SerialName("response_format")
-    val responseFormat: ResponseFormat? = null
+    val responseFormat: ResponseFormat? = null,
+    /** Cap on completion tokens. Layout calls need room to reason (model check: 3000+). */
+    @SerialName("max_tokens")
+    val maxTokens: Int? = null
 )
 
 /**

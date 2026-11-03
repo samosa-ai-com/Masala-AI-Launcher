@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Arrow Snap Trainer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background:#0a0a0a;
+  color:#fff;
+  display:flex;
+  justify-content:center;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+}
+.app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100dvh;
+  background:#0a0a0a;
+  display:flex;
+  flex-direction:column;
+  padding:14px 14px 18px;
+  position:relative;
+  overflow:hidden;
+}
+.top{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;
+  padding:6px 2px 10px;
+}
+.brand{
+  display:flex;align-items:center;gap:10px;
+}
+.logo{
+  width:38px;height:38px;border-radius:10px;
+  background:#FFD600;color:#0a0a0a;
+  display:grid;place-items:center;
+  font-weight:900;font-size:18px;letter-spacing:-0.5px;
+  border:3px solid #fff;
+  transform:rotate(-3deg);
+}
+.brand h1{
+  font-size:18px;font-weight:900;letter-spacing:-0.6px;line-height:1;
+}
+.brand p{font-size:11px;font-weight:700;letter-spacing:0.8px;color:#9a9a9a;margin-top:2px}
+.pill{
+  background:#fff;color:#0a0a0a;
+  border-radius:999px;padding:7px 12px;
+  font-size:12px;font-weight:900;letter-spacing:0.3px;
+  display:flex;align-items:center;gap:6px;
+  white-space:nowrap;
+}
+.pill span{color:#6b6b6b;font-weight:800}
+.stats{
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:10px;
+  margin-top:2px;
+}
+.stat{
+  background:#141414;
+  border:2px solid #222;
+  border-radius:16px;
+  padding:10px 10px 9px;
+  text-align:center;
+}
+.stat .k{font-size:10px;font-weight:800;letter-spacing:1px;color:#8a8a8a}
+.stat .v{font-size:22px;font-weight:900;letter-spacing:-1px;margin-top:2px;line-height:1}
+.stat.timer{border-color:#FFD600;background:#1a1a0a}
+.stat.timer .v{color:#FFD600}
+.stat.streak{position:relative;overflow:hidden}
+.stat.streak.hot{border-color:#FFD600}
+.progress{
+  height:8px;background:#1e1e1e;border-radius:999px;overflow:hidden;
+  margin:12px 2px 0;
+  border:1px solid #222;
+}
+.progress i{display:block;height:100%;width:100%;background:#FFD600;transform-origin:left;transition:width 0.1s linear}
+.stageWrap{
+  margin-top:12px;
+  background:#fff;
+  border-radius:22px;
+  padding:14px;
+  border:3px solid #111;
+  position:relative;
+  overflow:hidden;
+}
+.stageHead{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:10px;font-weight:900;letter-spacing:1px;color:#8a8a8a;
+}
+.dot{width:8px;height:8px;border-radius:50%;background:#0a0a0a;display:inline-block;margin-right:6px;vertical-align:middle}
+.dot.live{background:#00E676;box-shadow:0 0 0 6px rgba(0,230,118,0.15)}
+.stage{
+  margin-top:10px;
+  background:#0a0a0a;
+  border-radius:18px;
+  height:188px;
+  display:grid;place-items:center;
+  position:relative;
+  overflow:hidden;
+  border:3px solid #111;
+}
+.arrowBig{
+  font-size:96px;line-height:1;
+  font-weight:900;
+  color:#fff;
+  transform:scale(1);
+  transition:transform 120ms ease, opacity 120ms ease, filter 120ms ease;
+  text-shadow:0 6px 0 rgba(255,255,255,0.08);
+  will-change:transform,opacity;
+}
+.arrowBig.pop{transform:scale(1.08)}
+.arrowBig.hidden{opacity:0;transform:scale(0.85);filter:blur(2px)}
+.ghost{
+  position:absolute;inset:0;
+  display:grid;place-items:center;
+  font-size:44px;font-weight:900;color:#2a2a2a;
+  letter-spacing:2px;
+}
+.flash{
+  position:absolute;inset:0;border-radius:18px;
+  pointer-events:none;opacity:0;transition:opacity 120ms ease;
+}
+.flash.show{opacity:1}
+.flash.ok{background:rgba(0,230,118,0.18);border:3px solid #00E676}
+.flash.bad{background:rgba(255,61,87,0.18);border:3px solid #FF3D57}
+.feedbackText{
+  position:absolute;top:10px;right:10px;
+  background:#FFD600;color:#0a0a0a;
+  font-size:11px;font-weight:900;letter-spacing:0.6px;
+  padding:6px 10px;border-radius:999px;
+  transform:translateY(-6px);opacity:0;transition:all 140ms ease;
+  border:2px solid #0a0a0a;
+}
+.feedbackText.show{transform:translateY(0);opacity:1}
+.hintRow{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-top:10px;
+  font-size:11px;font-weight:800;color:#6b6b6b;
+}
+.hintRow b{color:#0a0a0a;background:#FFD600;padding:3px 8px;border-radius:999px;border:2px solid #0a0a0a}
+.pad{
+  margin-top:14px;
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+.btn{
+  height:72px;
+  border-radius:18px;
+  border:3px solid #0a0a0a;
+  background:#fff;
+  color:#0a0a0a;
+  font-size:38px;
+  font-weight:900;
+  display:grid;place-items:center;
+  cursor:pointer;
+  transition:transform 80ms ease, background 80ms ease, border-color 80ms ease, color 80ms ease;
+  box-shadow:0 6px 0 #0a0a0a;
+  touch-action:manipulation;
+}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #0a0a0a}
+.btn.ok{ background:#00E676; border-color:#0a0a0a; color:#0a0a0a}
+.btn.bad{ background:#FF3D57; border-color:#0a0a0a; color:#fff}
+.btn:disabled{opacity:0.55;pointer-events:none}
+.controls{
+  margin-top:14px;
+  display:flex;gap:10px;
+}
+.primary{
+  flex:1;
+  height:56px;
+  border-radius:16px;
+  border:3px solid #0a0a0a;
+  background:#FFD600;
+  color:#0a0a0a;
+  font-size:16px;font-weight:900;letter-spacing:-0.3px;
+  cursor:pointer;
+  box-shadow:0 6px 0 #0a0a0a;
+  transition:transform 80ms ease;
+  touch-action:manipulation;
+}
+.primary:active{transform:translateY(4px);box-shadow:0 2px 0 #0a0a0a}
+.secondary{
+  height:56px;
+  padding:0 16px;
+  border-radius:16px;
+  border:3px solid #222;
+  background:#141414;
+  color:#fff;
+  font-size:13px;font-weight:900;letter-spacing:0.4px;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.secondary:active{transform:scale(0.98)}
+.meta{
+  margin-top:12px;
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:11px;font-weight:800;color:#7a7a7a;
+  padding:0 2px;
+}
+.meta b{color:#fff}
+.kbd{font-size:10px;color:#5a5a5a;font-weight:800;letter-spacing:0.6px;text-align:center;margin-top:8px}
+.overlay{
+  position:absolute;inset:0;
+  background:rgba(10,10,10,0.92);
+  display:grid;place-items:center;
+  padding:18px;
+  z-index:5;
+}
+.card{
+  width:100%;
+  background:#fff;
+  border:3px solid #0a0a0a;
+  border-radius:22px;
+  padding:18px;
+  text-align:center;
+  box-shadow:0 10px 0 #0a0a0a;
+}
+.card h2{font-size:22px;font-weight:900;letter-spacing:-0.8px;color:#0a0a0a;line-height:1}
+.card p{font-size:13px;font-weight:700;color:#5a5a5a;margin-top:8px;line-height:1.4}
+.card .bigScore{font-size:42px;font-weight:900;letter-spacing:-1.5px;color:#0a0a0a;margin-top:10px}
+.badges{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.badge{background:#0a0a0a;color:#fff;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:900}
+.badge.accent{background:#FFD600;color:#0a0a0a;border:2px solid #0a0a0a}
+.row2{display:flex;gap:10px;margin-top:14px}
+.row2 button{flex:1}
+.sr-only{position:absolute;left:-9999px}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="top">
+    <div class="brand">
+      <div class="logo">↯</div>
+      <div>
+        <h1>ARROW SNAP</h1>
+        <p>TRAINER — BLINK FAST</p>
+      </div>
+    </div>
+    <div class="pill">BEST <span id="bestPill">0</span> ★</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">SCORE</div><div class="v" id="scoreEl">0</div></div>
+    <div class="stat streak" id="streakCard"><div class="k">STREAK</div><div class="v" id="streakEl">0</div></div>
+    <div class="stat timer"><div class="k">TIME</div><div class="v" id="timeEl">30.0</div></div>
+  </div>
+  <div class="progress" aria-hidden="true"><i id="progressBar"></i></div>
+
+  <div class="stageWrap">
+    <div class="stageHead">
+      <div><span class="dot" id="liveDot"></span><span id="modeLabel">READY</span></div>
+      <div id="roundLabel">TAP START</div>
+    </div>
+    <div class="stage" id="stage">
+      <div class="ghost" id="ghost">↕ TAP START</div>
+      <div class="arrowBig" id="arrowBig" aria-live="polite" aria-atomic="true">↑</div>
+      <div class="flash" id="flash"></div>
+      <div class="feedbackText" id="feedbackText">+1 SNAP!</div>
+    </div>
+    <div class="hintRow">
+      <span>Match the big arrow — fast!</span>
+      <b id="speedBadge">BLINK 0.6s</b>
+    </div>
+  </div>
+
+  <div class="pad" id="pad">
+    <button class="btn" data-dir="up" aria-label="Up">↑</button>
+    <button class="btn" data-dir="right" aria-label="Right">→</button>
+    <button class="btn" data-dir="down" aria-label="Down">↓</button>
+    <button class="btn" data-dir="left" aria-label="Left">←</button>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="mainBtn">START — 30s</button>
+    <button class="secondary" id="restartBtn">RESTART</button>
+  </div>
+
+  <div class="meta">
+    <div>High: <b id="highMeta">0</b> • Best streak: <b id="bestStreakMeta">0</b></div>
+    <div id="lastMeta">—</div>
+  </div>
+  <div class="kbd">TAP • CLICK • ARROWS / WASD • SPACE to start</div>
+
+  <div class="overlay" id="overlay">
+    <div class="card">
+      <h2 id="overlayTitle">READY TO SNAP?</h2>
+      <p id="overlayDesc">A big arrow flashes in the center. Tap the matching chunky button as fast as you can. 30 seconds — every correct snap scores.</p>
+      <div class="bigScore" id="overlayScore" style="display:none">0</div>
+      <div class="badges" id="overlayBadges"></div>
+      <div class="row2">
+        <button class="primary" id="overlayBtn">START</button>
+        <button class="secondary" id="overlayClose" style="display:none">CLOSE</button>
+      </div>
+      <p style="margin-top:10px;font-size:11px;color:#8a8a8a">Green = correct • Red = wrong + buzz • Streaks multiply focus</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.getElementById(s);
+  const scoreEl = $('scoreEl');
+  const streakEl = $('streakEl');
+  const timeEl = $('timeEl');
+  const progressBar = $('progressBar');
+  const arrowBig = $('arrowBig');
+  const ghost = $('ghost');
+  const flash = $('flash');
+  const feedbackText = $('feedbackText');
+  const liveDot = $('liveDot');
+  const modeLabel = $('modeLabel');
+  const roundLabel = $('roundLabel');
+  const speedBadge = $('speedBadge');
+  const bestPill = $('bestPill');
+  const highMeta = $('highMeta');
+  const bestStreakMeta = $('bestStreakMeta');
+  const lastMeta = $('lastMeta');
+  const overlay = $('overlay');
+  const overlayTitle = $('overlayTitle');
+  const overlayDesc = $('overlayDesc');
+  const overlayScore = $('overlayScore');
+  const overlayBadges = $('overlayBadges');
+  const overlayBtn = $('overlayBtn');
+  const overlayClose = $('overlayClose');
+  const mainBtn = $('mainBtn');
+  const restartBtn = $('restartBtn');
+  const streakCard = $('streakCard');
+  const pad = $('pad');
+  const stage = $('stage');
+
+  const DIRS = [
+    {id:'up', char:'↑', key:'ArrowUp', wasd:'w'},
+    {id:'right', char:'→', key:'ArrowRight', wasd:'d'},
+    {id:'down', char:'↓', key:'ArrowDown', wasd:'s'},
+    {id:'left', char:'←', key:'ArrowLeft', wasd:'a'}
+  ];
+  const DIR_MAP = Object.fromEntries(DIRS.map(d=>[d.id,d]));
+  const KEY_MAP = {};
+  DIRS.forEach(d=>{ KEY_MAP[d.key.toLowerCase()]=d.id; KEY_MAP[d.wasd]=d.id; });
+
+  const STORAGE_KEY = 'arrowSnapTrainerSave';
+  const ROUND_TIME = 30; // seconds
+  const BLINK_MS = 600; // flash duration
+  const SHOW_MS = 900; // time arrow stays before auto-hide in blink mode (we keep visible but add blink effect)
+
+  let state = {
+    score:0,
+    streak:0,
+    bestStreak:0,
+    high:0,
+    timeLeft:ROUND_TIME,
+    playing:false,
+    current:null,
+    nextTimeout:null,
+    tickId:null,
+    blinkTimeout:null,
+    hideTimeout:null,
+    round:0,
+    correct:0,
+    wrong:0
+  };
+
+  function load(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        const d = JSON.parse(raw);
+        state.high = d.high|0;
+        state.bestStreak = d.bestStreak|0;
+        if(d.lastScore!=null) lastMeta.textContent = 'Last: '+d.lastScore;
+      }
+    }catch(e){}
+    bestPill.textContent = state.high;
+    highMeta.textContent = state.high;
+    bestStreakMeta.textContent = state.bestStreak;
+  }
+  function save(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        high: state.high,
+        bestStreak: state.bestStreak,
+        lastScore: state.score
+      }));
+    }catch(e){}
+  }
+
+  function setOverlay(open){
+    overlay.style.display = open ? 'grid' : 'none';
+  }
+
+  function updateStats(){
+    scoreEl.textContent = state.score;
+    streakEl.textContent = state.streak;
+    if(state.streak>=3) streakCard.classList.add('hot');
+    else streakCard.classList.remove('hot');
+    bestPill.textContent = state.high;
+    highMeta.textContent = state.high;
+    bestStreakMeta.textContent = state.bestStreak;
+  }
+
+  function setProgress(){
+    const pct = Math.max(0, state.timeLeft / ROUND_TIME * 100);
+    progressBar.style.width = pct + '%';
+    timeEl.textContent = state.timeLeft.toFixed(1);
+    if(state.timeLeft <= 5) progressBar.style.background = '#FF3D57';
+    else progressBar.style.background = '#FFD600';
+  }
+
+  function pickDir(){
+    let n;
+    do{
+      n = DIRS[Math.floor(Math.random()*DIRS.length)];
+    } while(state.current && n.id===state.current.id && Math.random()<0.6);
+    return n;
+  }
+
+  function showArrow(dir){
+    state.current = dir;
+    arrowBig.textContent = dir.char;
+    arrowBig.classList.remove('hidden');
+    arrowBig.classList.remove('pop');
+    void arrowBig.offsetWidth;
+    arrowBig.classList.add('pop');
+    ghost.style.opacity = '0';
+    roundLabel.textContent = 'GO!';
+    modeLabel.textContent = 'LIVE';
+    liveDot.classList.add('live');
+
+    // blink effect: briefly hide after BLINK_MS to force snap memory, then show again quickly
+    clearTimeout(state.blinkTimeout);
+    clearTimeout(state.hideTimeout);
+    // keep visible for BLINK_MS, then flash hidden for 120ms, then back
+    state.blinkTimeout = setTimeout(()=>{
+      arrowBig.classList.add('hidden');
+      state.hideTimeout = setTimeout(()=>{
+        if(state.playing) arrowBig.classList.remove('hidden');
+      }, 120);
+    }, BLINK_MS);
+  }
+
+  function nextArrow(){
+    const d = pickDir();
+    showArrow(d);
+    state.round++;
+  }
+
+  function feedback(ok){
+    flash.classList.remove('ok','bad','show');
+    void flash.offsetWidth;
+    flash.classList.add(ok?'ok':'bad','show');
+    setTimeout(()=> flash.classList.remove('show'), 220);
+
+    feedbackText.textContent = ok ? (state.streak>=5 ? '🔥 '+state.streak+' STREAK!' : '+1 SNAP!') : 'MISS!';
+    feedbackText.style.background = ok ? '#00E676' : '#FF3D57';
+    feedbackText.style.color = ok ? '#0a0a0a' : '#fff';
+    feedbackText.classList.add('show');
+    setTimeout(()=> feedbackText.classList.remove('show'), 420);
+
+    // button flash
+    const btn = pad.querySelector(`[data-dir="${state.current ? state.current.id : ''}"]`);
+    // actual feedback on pressed button handled in handleInput
+
+    if(!ok){
+      try{ if(navigator.vibrate) navigator.vibrate(80); }catch(e){}
+      if(stage.animate){
+        stage.animate([{transform:'translateX(0)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],{duration:180,easing:'ease-out'});
+      }
+    } else {
+      try{ if(navigator.vibrate) navigator.vibrate(20); }catch(e){}
+    }
+  }
+
+  function handleInput(dirId){
+    if(!state.playing) {
+      // allow starting with arrow press
+      startGame();
+      return;
+    }
+    if(!state.current) return;
+    const isCorrect = dirId === state.current.id;
+    const pressedBtn = pad.querySelector(`[data-dir="${dirId}"]`);
+    if(pressedBtn){
+      pressedBtn.classList.remove('ok','bad');
+      void pressedBtn.offsetWidth;
+      pressedBtn.classList.add(isCorrect?'ok':'bad');
+      setTimeout(()=> pressedBtn.classList.remove('ok','bad'), 220);
+    }
+
+    if(isCorrect){
+      state.score++;
+      state.correct++;
+      state.streak++;
+      if(state.streak > state.bestStreak) state.bestStreak = state.streak;
+      if(state.score > state.high) state.high = state.score;
+      feedback(true);
+    } else {
+      state.wrong++;
+      state.streak = 0;
+      feedback(false);
+    }
+    updateStats();
+    setProgress();
+    // next arrow with tiny delay for readability
+    clearTimeout(state.nextTimeout);
+    state.nextTimeout = setTimeout(nextArrow, 140);
+  }
+
+  function tick(){
+    state.timeLeft = Math.max(0, state.timeLeft - 0.1);
+    setProgress();
+    if(state.timeLeft <= 0){
+      endGame();
+    }
+  }
+
+  function startGame(){
+    clearInterval(state.tickId);
+    clearTimeout(state.nextTimeout);
+    clearTimeout(state.blinkTimeout);
+    clearTimeout(state.hideTimeout);
+    state.score = 0;
+    state.streak = 0;
+    state.timeLeft = ROUND_TIME;
+    state.playing = true;
+    state.correct = 0;
+    state.wrong = 0;
+    state.round = 0;
+    updateStats();
+    setProgress();
+    setOverlay(false);
+    mainBtn.textContent = 'PLAYING…';
+    modeLabel.textContent = 'LIVE';
+    liveDot.classList.add('live');
+    speedBadge.textContent = 'BLINK 0.6s';
+    ghost.style.opacity = '0';
+    nextArrow();
+    state.tickId = setInterval(tick, 100);
+  }
+
+  function endGame(){
+    state.playing = false;
+    clearInterval(state.tickId);
+    clearTimeout(state.blinkTimeout);
+    clearTimeout(state.hideTimeout);
+    clearTimeout(state.nextTimeout);
+    liveDot.classList.remove('live');
+    modeLabel.textContent = 'DONE';
+    roundLabel.textContent = 'TIME UP';
+    arrowBig.classList.add('hidden');
+    ghost.style.opacity = '1';
+    ghost.textContent = '↻ RESTART';
+    mainBtn.textContent = 'START — 30s';
+    save();
+    updateStats();
+    setProgress();
+    lastMeta.textContent = 'Last: '+state.score;
+
+    // overlay results
+    overlayTitle.textContent = state.score >= state.high && state.score>0 ? 'NEW BEST! ★' : 'TIME UP!';
+    overlayDesc.textContent = `You snapped ${state.correct} correct • ${state.wrong} misses • Best streak ${state.bestStreak}`;
+    overlayScore.style.display = 'block';
+    overlayScore.textContent = state.score + ' PTS';
+    overlayBadges.innerHTML = '';
+    const b1 = document.createElement('div'); b1.className='badge accent'; b1.textContent = 'Score '+state.score;
+    const b2 = document.createElement('div'); b2.className='badge'; b2.textContent = 'Streak '+state.bestStreak+'🔥';
+    const b3 = document.createElement('div'); b3.className='badge'; b3.textContent = state.score>=20 ? '⚡ LIGHTNING' : state.score>=12 ? '👁 SHARP' : '🎯 KEEP GOING';
+    overlayBadges.append(b1,b2,b3);
+    overlayBtn.textContent = 'PLAY AGAIN';
+    overlayClose.style.display = 'inline-block';
+    setOverlay(true);
+  }
+
+  function resetAll(){
+    clearInterval(state.tickId);
+    clearTimeout(state.nextTimeout);
+    clearTimeout(state.blinkTimeout);
+    clearTimeout(state.hideTimeout);
+    state.score=0; state.streak=0; state.timeLeft=ROUND_TIME; state.playing=false; state.current=null;
+    updateStats();
+    setProgress();
+    arrowBig.textContent='↑';
+    arrowBig.classList.remove('hidden','pop');
+    ghost.style.opacity='1';
+    ghost.textContent='↕ TAP START';
+    modeLabel.textContent='READY';
+    roundLabel.textContent='TAP START';
+    liveDot.classList.remove('live');
+    mainBtn.textContent='START — 30s';
+    overlayTitle.textContent='READY TO SNAP?';
+    overlayDesc.textContent='A big arrow flashes in the center. Tap the matching chunky button as fast as you can. 30 seconds — every correct snap scores.';
+    overlayScore.style.display='none';
+    overlayBadges.innerHTML='';
+    overlayBtn.textContent='START';
+    overlayClose.style.display='none';
+    setOverlay(true);
+  }
+
+  // events
+  pad.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.btn');
+    if(!btn) return;
+    handleInput(btn.dataset.dir);
+  });
+  // touch feedback already via click
+
+  mainBtn.addEventListener('click', ()=>{
+    if(state.playing) {
+      // quick restart
+      endGame();
+      setTimeout(startGame, 200);
+    } else {
+      startGame();
+    }
+  });
+  restartBtn.addEventListener('click', resetAll);
+  overlayBtn.addEventListener('click', ()=>{
+    if(state.playing || overlayBtn.textContent.includes('AGAIN')) startGame();
+    else startGame();
+  });
+  overlayClose.addEventListener('click', ()=> setOverlay(false));
+  stage.addEventListener('click', ()=>{
+    if(!state.playing) startGame();
+  });
+
+  window.addEventListener('keydown', (e)=>{
+    const k = e.key.toLowerCase();
+    if(k===' '){ e.preventDefault(); if(!state.playing) startGame(); return; }
+    if(KEY_MAP[k]){ e.preventDefault(); handleInput(KEY_MAP[k]); }
+    if(k==='r'){ resetAll(); }
+  });
+
+  // init
+  load();
+  updateStats();
+  setProgress();
+  // show overlay initially
+  setOverlay(true);
+
+  // prevent scroll
+  document.addEventListener('touchmove', (e)=>{ if(e.target.closest('.app')) e.preventDefault(); }, {passive:false});
+})();
+</script>
+</body>
+</html>

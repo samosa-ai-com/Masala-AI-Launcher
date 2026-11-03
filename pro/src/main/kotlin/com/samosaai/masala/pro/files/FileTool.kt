@@ -189,10 +189,14 @@ class FileTool(private val files: ToolFiles) {
             if (opts.outWidth <= 0 || opts.outHeight <= 0) {
                 return ActionResult.error("File '${file.name}' could not be decoded as an image.")
             }
-            val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-            val displayName = file.name
+            // The protocol is colon-separated; a name like "camera:01.jpg" would shift the payload.
+            val displayName = file.name.replace(':', '_')
+            // An image is handed to the model as an attached picture by the agent, not as text:
+            // a 500 KB JPEG is ~700 KB of base64, and four of them took a request past the
+            // model's window and failed the whole turn (seen on device, 2026-11-03).
             ActionResult.ok(
-                "${ToolFiles.IMAGE_DATA_PREFIX}$mime:${opts.outWidth}x${opts.outHeight}:${bytes.size}:$displayName:$base64"
+                "${ToolFiles.IMAGE_DATA_PREFIX}$mime:${opts.outWidth}x${opts.outHeight}:${bytes.size}:$displayName:" +
+                    Base64.encodeToString(bytes, Base64.NO_WRAP)
             )
         } catch (e: Exception) {
             ActionResult.error("Could not read image '${file.name}': ${e.message}")

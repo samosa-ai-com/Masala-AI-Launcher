@@ -37,6 +37,11 @@ data class Persona(
     val systemPrompt: String,
     val starters: List<String> = emptyList(),
     val disclaimer: String? = null,
+    /**
+     * When the assistant should call this expert, in the user's terms. It is what the prompt lists
+     * for the expert, so it decides routing; empty falls back to the skill's description.
+     */
+    val whenToUse: String = "",
 )
 
 @Serializable

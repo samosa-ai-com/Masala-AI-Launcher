@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Trampoline Bounce</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;touch-action:none;user-select:none;font-family:system-ui,sans-serif}
+body{background:#0f172a;color:#fff;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:6px}
+h1{font-size:17px;color:#7dd3fc;margin:6px 0 2px;letter-spacing:1px}
+.sub{font-size:11px;opacity:.6;margin-bottom:6px;text-align:center}
+#wrap{position:relative;width:360px;max-width:95vw;height:560px;background:linear-gradient(180deg,#0ea5e9 0%,#38bdf8 40%,#e0f2fe 100%);border-radius:16px;overflow:hidden;border:2px solid #0284c7;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+canvas{display:block;width:100%;height:100%}
+#ui{position:absolute;top:0;left:0;right:0;padding:8px;display:flex;justify-content:space-between;gap:6px;pointer-events:none}
+.pill{background:rgba(0,0,0,.55);backdrop-filter:blur(6px);padding:6px 10px;border-radius:10px;font-size:12px;border:1px solid rgba(255,255,255,.2);text-align:center}
+.pill b{color:#fde047}
+#controls{position:absolute;bottom:0;left:0;right:0;height:80px;display:flex;gap:8px;padding:8px;background:linear-gradient(0deg,rgba(0,0,0,.5),transparent);pointer-events:auto}
+.cbtn{flex:1;border-radius:14px;border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.18);color:#fff;font-weight:800;font-size:18px;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.cbtn:active{transform:scale(.97);background:rgba(255,255,255,.3)}
+#overlay{position:absolute;inset:0;background:rgba(15,23,42,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;z-index:10}
+#overlay h2{font-size:24px;color:#7dd3fc;margin-bottom:6px}
+#overlay p{font-size:13px;opacity:.9;line-height:1.5;max-width:300px}
+.btn{margin-top:14px;background:#0ea5e9;color:#fff;border:none;padding:12px 24px;border-radius:12px;font-weight:800;font-size:15px}
+.btn:active{transform:scale(.97)}
+.hint{font-size:11px;opacity:.5;margin-top:8px}
+</style>
+</head>
+<body>
+<h1>🦘 TRAMPOLINE BOUNCE</h1>
+<div class="sub">Steer left & right • Bounce higher • Don't fall!</div>
+<div id="wrap">
+<canvas id="c" width="360" height="560"></canvas>
+<div id="ui">
+<div class="pill">HEIGHT<br><b id="scoreEl">0 m</b></div>
+<div class="pill">BEST<br><b id="bestEl">0 m</b></div>
+<div class="pill">BOUNCES<br><b id="bouncesEl">0</b></div>
+</div>
+<div id="controls">
+<button class="cbtn" id="leftBtn">◀</button>
+<button class="cbtn" id="rightBtn">▶</button>
+</div>
+<div id="overlay">
+<div style="font-size:36px">🦘</div>
+<h2>Trampoline Bounce</h2>
+<p>Steer your jumper left & right across <b>rising trampolines</b>!<br>
+Bounce higher to climb. Avoid the <b style="color:#f87171">spiky traps</b> and don't fall!<br>
+Collect <b style="color:#fde047">stars ⭐</b> for bonus.</p>
+<p style="font-size:11px;opacity:.7;margin-top:8px">Moving & bouncy trampolines • Tilt or drag to steer</p>
+<button class="btn" id="playBtn">BOUNCE UP 🚀</button>
+<div class="hint">← → / A D / drag / tilt • Tap to bounce</div>
+</div>
+</div>
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('scoreEl'),bestEl=document.getElementById('bestEl'),bouncesEl=document.getElementById('bouncesEl');
+const overlay=document.getElementById('overlay'),playBtn=document.getElementById('playBtn'),leftBtn=document.getElementById('leftBtn'),rightBtn=document.getElementById('rightBtn');
+let best=parseInt(localStorage.getItem('trampBest')||'0');bestEl.textContent=best+'m';
+let running=false,score=0,maxY=0,bounces=0;
+let player={x:180,y:400,vx:0,vy:0,w:28,h:32};
+let platforms=[],particles=[],stars=[],cameraY=0,keys={left:false,right:false},tilt=0;
+let lastTime=0;
+
+function reset(){
+  score=0;maxY=0;bounces=0;cameraY=0;
+  player={x:180,y:400,vx:0,vy:-8,w:28,h:32};
+  platforms=[];particles=[];stars=[];
+  // initial platforms
+  for(let i=0;i<12;i++){
+    let y=560 - i*48 - Math.random()*20;
+    let x=20+Math.random()*280;
+    let type=Math.random()<0.15?'move':Math.random()<0.12?'bouncy':Math.random()<0.08?'break':'normal';
+    if(i<3) type='normal';
+    platforms.push({x,y,w:64,h:12,type,dir:Math.random()<0.5?1:-1,speed:0.8+Math.random()*1.2,origX:x});
+  }
+  // ensure one under player
+  platforms.push({x:150,y:480,w:70,h:12,type:'normal',dir:1,speed:0});
+  // stars
+  for(let i=0;i<6;i++) stars.push({x:40+Math.random()*280,y:200+Math.random()*300,vy:0,collected:false});
+}
+
+function spawnPlatform(y){
+  let x=20+Math.random()*280;
+  let r=Math.random();
+  let type=r<0.18?'move':r<0.28?'bouncy':r<0.33?'break':r<0.38?'spike':'normal';
+  platforms.push({x,y,w:type==='spike'?64:64,h:12,type,dir:Math.random()<0.5?1:-1,speed:0.8+Math.random()*1.4,origX:x});
+  if(Math.random()<0.35) stars.push({x:x+20+Math.random()*20,y:y-30,collected:false});
+}
+
+function update(dt){
+  if(!running) return;
+  // input
+  let move=0;
+  if(keys.left) move-=1;
+  if(keys.right) move+=1;
+  move+=tilt*1.5;
+  // drag handled via keys
+  player.vx+=move*0.9;
+  player.vx*=0.88; // friction
+  player.x+=player.vx;
+  // wrap around
+  if(player.x<-20) player.x=380;
+  if(player.x>380) player.x=-20;
+
+  // gravity
+  player.vy+=0.45;
+  player.y+=player.vy;
+
+  // camera follows player up
+  let targetCam = player.y - 300;
+  if(targetCam < cameraY) cameraY += (targetCam - cameraY)*0.12;
+  // score is how high we've gone (negative cameraY)
+  let height = Math.max(0, Math.floor(-cameraY));
+  if(height>maxY) maxY=height;
+  score=maxY;
+  scoreEl.textContent=score+'m';
+  bouncesEl.textContent=bounces;
+
+  // platforms update
+  platforms.forEach(p=>{
+    if(p.type==='move'){
+      p.x+=p.dir*p.speed;
+      if(p.x<10 || p.x>286) p.dir*=-1;
+    }
+  });
+
+  // collisions - only when falling
+  if(player.vy>0){
+    for(let i=platforms.length-1;i>=0;i--){
+      let p=platforms[i];
+      let px=p.x, py=p.y - cameraY;
+      let plx=player.x, ply=player.y - cameraY;
+      // AABB check with platform top
+      if(plx+player.w/2 > px && plx-player.w/2 < px+p.w && ply+player.h/2 > py && ply+player.h/2 < py+14 && player.vy>0){
+        if(p.type==='spike'){
+          // hit spike = game over
+          gameOver();
+          return;
+        }
+        // bounce
+        let bouncePower = p.type==='bouncy'? -14 : p.type==='break'? -9 : -10.5;
+        player.vy=bouncePower;
+        player.y = p.y - player.h/2 - 2;
+        bounces++;
+        if(navigator.vibrate) navigator.vibrate(20);
+        // particles
+        for(let k=0;k<6;k++) particles.push({x:player.x,y:player.y+10,vx:(Math.random()-0.5)*4,vy:Math.random()*-3,life:0.4,max:0.4,color:p.type==='bouncy'?'#22c55e':'#38bdf8',size:3});
+        if(p.type==='break'){
+          // break after bounce
+          setTimeout(()=>{let idx=platforms.indexOf(p);if(idx>=0) platforms.splice(idx,1);},120);
+        }
+        if(p.type==='bouncy'){
+          for(let k=0;k<8;k++) particles.push({x:p.x+p.w/2,y:p.y,vx:(Math.random()-0.5)*6,vy:Math.random()*-4,life:0.5,max:0.5,color:'#fde047',size:4});
+        }
+        break;
+      }
+    }
+  }
+
+  // stars
+  stars.forEach(s=>{
+    if(s.collected) return;
+    let sy=s.y - cameraY;
+    let dx=Math.abs(player.x - s.x), dy=Math.abs((player.y - cameraY) - sy);
+    if(dx<22 && dy<22){
+      s.collected=true;
+      score+=15; maxY+=15;
+      for(let k=0;k<10;k++) particles.push({x:s.x,y:s.y-cameraY+cameraY,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5,life:0.6,max:0.6,color:'#fde047',size:4});
+      if(navigator.vibrate) navigator.vibrate(30);
+    }
+  });
+
+  // remove off-screen platforms and spawn new
+  let topY=cameraY - 40;
+  platforms=platforms.filter(p=> p.y < cameraY+600);
+  while(platforms.length<14){
+    let highest=Math.min(...platforms.map(p=>p.y));
+    spawnPlatform(highest - 45 - Math.random()*25);
+  }
+  stars=stars.filter(s=> !s.collected && s.y < cameraY+650);
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    let p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.2; p.life-=dt;
+    if(p.life<=0) particles.splice(i,1);
+  }
+
+  // fall death
+  if(player.y > cameraY+600){
+    gameOver();
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,360,560);
+  // sky gradient already via CSS, draw clouds
+  ctx.fillStyle='rgba(255,255,255,0.7)';
+  for(let i=0;i<4;i++){
+    let cy=(i*140 - cameraY*0.3)%600;
+    if(cy<0) cy+=600;
+    ctx.beginPath();
+    ctx.ellipse(60+i*80, cy, 30,14,0,0,Math.PI*2);
+    ctx.ellipse(80+i*80, cy-6, 22,12,0,0,Math.PI*2);
+    ctx.fill();
+  }
+  // platforms
+  platforms.forEach(p=>{
+    let y=p.y - cameraY;
+    if(y<-20 || y>580) return;
+    ctx.save();
+    ctx.translate(p.x,y);
+    if(p.type==='normal'){
+      ctx.fillStyle='#1e293b';
+      ctx.fillRect(0,6, p.w,6);
+      ctx.fillStyle='#38bdf8';
+      ctx.fillRect(0,0,p.w,10);
+      ctx.fillStyle='rgba(255,255,255,0.4)';
+      ctx.fillRect(2,2,p.w-4,3);
+    } else if(p.type==='move'){
+      ctx.fillStyle='#0f172a';
+      ctx.fillRect(0,6,p.w,6);
+      ctx.fillStyle='#fbbf24';
+      ctx.fillRect(0,0,p.w,10);
+      ctx.fillStyle='#fff';
+      ctx.font='10px system-ui';
+      ctx.textAlign='center';
+      ctx.fillText('↔',p.w/2,9);
+    } else if(p.type==='bouncy'){
+      ctx.fillStyle='#14532d';
+      ctx.fillRect(0,6,p.w,6);
+      ctx.fillStyle='#22c55e';
+      ctx.fillRect(0,0,p.w,10);
+      ctx.fillStyle='#fff';
+      ctx.font='bold 10px system-ui';
+      ctx.textAlign='center';
+      ctx.fillText('BOING',p.w/2,9);
+    } else if(p.type==='break'){
+      ctx.fillStyle='#7f1d1d';
+      ctx.fillRect(0,6,p.w,6);
+      ctx.fillStyle='#f87171';
+      ctx.fillRect(0,0,p.w,10);
+      // crack
+      ctx.strokeStyle='#450a0a';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(p.w*0.3,2);ctx.lineTo(p.w*0.5,8);ctx.lineTo(p.w*0.7,2);ctx.stroke();
+    } else if(p.type==='spike'){
+      ctx.fillStyle='#1e293b';
+      ctx.fillRect(0,6,p.w,6);
+      ctx.fillStyle='#475569';
+      ctx.fillRect(0,0,p.w,10);
+      ctx.fillStyle='#ef4444';
+      for(let s=6;s<p.w-4;s+=12){
+        ctx.beginPath();ctx.moveTo(s,0);ctx.lineTo(s+6,-8);ctx.lineTo(s+12,0);ctx.fill();
+      }
+    }
+    ctx.restore();
+  });
+  // stars
+  stars.forEach(s=>{
+    if(s.collected) return;
+    let y=s.y - cameraY;
+    if(y<-20||y>580) return;
+    ctx.save();
+    ctx.translate(s.x,y);
+    ctx.rotate(performance.now()*0.003);
+    ctx.fillStyle='#fde047';
+    ctx.font='18px system-ui';
+    ctx.textAlign='center';
+    ctx.fillText('⭐',0,6);
+    ctx.restore();
+  });
+  // player
+  let py=player.y - cameraY;
+  ctx.save();
+  ctx.translate(player.x,py);
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.15)';
+  ctx.beginPath();ctx.ellipse(0,16,14,5,0,0,Math.PI*2);ctx.fill();
+  // legs
+  let legSwing=Math.sin(performance.now()*0.015)*4;
+  ctx.fillStyle='#1e293b';
+  ctx.fillRect(-8,6,6,10);
+  ctx.fillRect(4,6+legSwing,6,10);
+  // body
+  ctx.fillStyle='#0ea5e9';
+  ctx.beginPath();ctx.roundRect(-12,-8,24,18,8);ctx.fill();
+  // arms
+  ctx.fillStyle='#fde68a';
+  ctx.beginPath();ctx.ellipse(-14,-2,5,7,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(14,-2,5,7,0,0,Math.PI*2);ctx.fill();
+  // head
+  ctx.fillStyle='#fde68a';
+  ctx.beginPath();ctx.arc(0,-14,11,0,Math.PI*2);ctx.fill();
+  // eyes
+  ctx.fillStyle='#0f172a';
+  ctx.beginPath();ctx.arc(-4,-14,2,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(4,-14,2,0,Math.PI*2);ctx.fill();
+  // smile
+  ctx.strokeStyle='#0f172a';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(0,-10,4,0.2,Math.PI-0.2);ctx.stroke();
+  // cap
+  ctx.fillStyle='#ef4444';
+  ctx.beginPath();ctx.arc(0,-20,11,Math.PI,0);ctx.fill();
+  ctx.fillRect(-11,-20,22,3);
+  ctx.restore();
+
+  // particles
+  particles.forEach(p=>{
+    ctx.globalAlpha=p.life/p.max;
+    ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x, p.y - cameraY, p.size,0,Math.PI*2);ctx.fill();
+  });
+  ctx.globalAlpha=1;
+}
+
+function loop(t){
+  if(!lastTime) lastTime=t;
+  let dt=Math.min(0.033,(t-lastTime)/1000);
+  lastTime=t;
+  update(dt);
+  draw();
+  if(running) requestAnimationFrame(loop);
+}
+
+function gameOver(){
+  running=false;
+  if(score>best){best=score;localStorage.setItem('trampBest',best);bestEl.textContent=best+'m';}
+  overlay.innerHTML=`<div style="font-size:36px">💥</div><h2>Fall!</h2><p>Height: <b style="color:#fde047">${score}m</b> • Bounces: ${bounces}<br>Best: ${best}m</p><button class="btn" id="againBtn" style="margin-top:14px">BOUNCE AGAIN 🚀</button><button class="btn" style="margin-top:8px;background:#334155" onclick="location.reload()">Menu</button>`;
+  overlay.style.display='flex';
+  document.getElementById('againBtn').onclick=startGame;
+}
+
+function startGame(){
+  reset();
+  running=true;
+  overlay.style.display='none';
+  lastTime=0;
+  requestAnimationFrame(loop);
+}
+
+playBtn.onclick=startGame;
+leftBtn.addEventListener('touchstart',e=>{e.preventDefault();keys.left=true});
+leftBtn.addEventListener('touchend',e=>{e.preventDefault();keys.left=false});
+leftBtn.addEventListener('mousedown',()=>keys.left=true);
+leftBtn.addEventListener('mouseup',()=>keys.left=false);
+leftBtn.addEventListener('mouseleave',()=>keys.left=false);
+rightBtn.addEventListener('touchstart',e=>{e.preventDefault();keys.right=true});
+rightBtn.addEventListener('touchend',e=>{e.preventDefault();keys.right=false});
+rightBtn.addEventListener('mousedown',()=>keys.right=true);
+rightBtn.addEventListener('mouseup',()=>keys.right=false);
+rightBtn.addEventListener('mouseleave',()=>keys.right=false);
+
+// drag to steer
+let dragging=false;
+canvas.addEventListener('pointerdown',e=>{dragging=true;let r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*360;if(x<180)keys.left=true;else keys.right=true;});
+canvas.addEventListener('pointerup',()=>{dragging=false;keys.left=false;keys.right=false;});
+canvas.addEventListener('pointercancel',()=>{dragging=false;keys.left=false;keys.right=false;});
+canvas.addEventListener('pointermove',e=>{if(!dragging) return;let r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*360;keys.left=x<180;keys.right=x>=180;});
+
+// keyboard
+addEventListener('keydown',e=>{if(e.code==='ArrowLeft'||e.code==='KeyA')keys.left=true;if(e.code==='ArrowRight'||e.code==='KeyD')keys.right=true;if(e.code==='Space'){e.preventDefault();if(player.vy>0) player.vy=-8;}});
+addEventListener('keyup',e=>{if(e.code==='ArrowLeft'||e.code==='KeyA')keys.left=false;if(e.code==='ArrowRight'||e.code==='KeyD')keys.right=false;});
+
+// tilt
+if(window.DeviceOrientationEvent){
+  window.addEventListener('deviceorientation',e=>{
+    if(e.gamma!==null) tilt=Math.max(-1,Math.min(1,e.gamma/25));
+  });
+}
+
+draw();
+</script>
+</body>
+</html>

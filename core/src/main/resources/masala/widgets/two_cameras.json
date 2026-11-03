@@ -1,0 +1,25 @@
+{
+  "id": "two_cameras",
+  "name": "Two cameras",
+  "description": "Two streams stacked, mute by default.",
+  "category": "Media",
+  "widget": {
+    "id": "two_cameras",
+    "title": "Cameras",
+    "components": [
+      {
+        "type": "snapshot",
+        "sourceId": "camera"
+      },
+      {
+        "type": "snapshot",
+        "sourceId": "camera2"
+      }
+    ],
+    "size": {
+      "min": 2,
+      "default": 3,
+      "max": 3
+    }
+  }
+}

@@ -6,6 +6,7 @@ import com.samosaai.masala.core.layout.LayoutHistory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -68,5 +69,48 @@ class LayoutHistoryTest {
         assertTrue(h.canUndo && h.canRedo)
         assertEquals("a", h.select(1)?.label)
         assertEquals(4, h.push("d", doc("d"), 4).added?.id)
+    }
+
+    @Test
+    fun `rename keeps order and current`() {
+        val h = LayoutHistory()
+        h.push("one", doc("one"), 1); h.push("two", doc("two"), 2)
+        val two = h.versions.last()
+        assertEquals("Two", h.rename(two.id, "Two")?.label)
+        assertEquals(listOf("one", "Two"), h.versions.map { it.label })
+        assertEquals("Two", h.current?.label)
+        assertNull(h.rename(999, "nope"))
+    }
+
+    @Test
+    fun `delete moves current to the predecessor`() {
+        val h = LayoutHistory()
+        h.push("one", doc("one"), 1); h.push("two", doc("two"), 2); h.push("three", doc("three"), 3)
+        h.select(h.versions[1].id)
+        val now = h.delete(h.current!!.id)
+        assertEquals("one", now?.label)
+        assertEquals(listOf("one", "three"), h.versions.map { it.label })
+    }
+
+    @Test
+    fun `delete refuses the last row and unknown ids`() {
+        val h = LayoutHistory()
+        h.push("only", doc("only"), 1)
+        assertNull(h.delete(h.current!!.id))
+        assertEquals(1, h.versions.size)
+        assertNull(h.delete(999))
+    }
+
+    @Test
+    fun `repairCurrent replaces the layout in place, redo intact`() {
+        val h = LayoutHistory()
+        h.push("one", doc("one"), 1); h.push("two", doc("two"), 2)
+        h.undo()
+        val fixed = assertNotNull(h.repairCurrent(doc("one-fixed")))
+        assertEquals("one-fixed", fixed.layout.pages.single().id)
+        assertEquals(2, h.versions.size)
+        assertTrue(h.canRedo)
+        assertEquals("two", h.redo()?.label)
+        assertNull(h.repairCurrent(h.current!!.layout))
     }
 }

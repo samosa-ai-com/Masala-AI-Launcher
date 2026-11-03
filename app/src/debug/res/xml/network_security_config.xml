@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Debug only: a local model server (LM Studio, Ollama) over plain HTTP. Release builds keep HTTPS only. -->
+<!--
+  Debug builds: any plain HTTP server, including the dev machine's model server
+  and MCP servers on the home network. Release builds use the same policy from
+  main/res/xml/network_security_config.xml; this file only documents intent.
+-->
 <network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
     <domain-config cleartextTrafficPermitted="true">
         <!-- The emulator's alias for the host machine -->
         <domain includeSubdomains="false">10.0.2.2</domain>

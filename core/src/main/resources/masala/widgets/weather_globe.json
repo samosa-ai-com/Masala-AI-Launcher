@@ -1,0 +1,29 @@
+{
+  "id": "weather_globe",
+  "name": "Weather globe",
+  "description": "The current temperature on a turning globe.",
+  "category": "Weather",
+  "widget": {
+    "id": "weather_globe",
+    "components": [
+      {
+        "type": "globe",
+        "label": "now",
+        "binding": {
+          "source": "weather"
+        },
+        "style": {
+          "tint": "blue"
+        }
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 2,
+      "max": 3,
+      "minW": 2,
+      "defaultW": 2,
+      "maxW": 2
+    }
+  }
+}

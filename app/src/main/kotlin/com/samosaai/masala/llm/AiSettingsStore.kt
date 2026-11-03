@@ -1,0 +1,197 @@
+package com.samosaai.masala.llm
+
+import android.content.Context
+import android.util.Log
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import com.samosaai.masala.audio.SpeechConfig
+import com.samosaai.masala.core.ai.AiProfile
+import com.samosaai.masala.core.ai.Endpoint
+import com.samosaai.masala.core.ai.ProviderPresets
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
+
+private val Context.aiStore by preferencesDataStore(name = "ai_settings")
+
+private const val TAG = "AiSettingsStore"
+
+/**
+ * The AI and voice choices (plan UI refresh U2): an [AiProfile] in DataStore and one API key per
+ * provider, each sealed with [KeyCipher]. Settings, the Debug screen and every model call read the same
+ * store, so they never disagree. On the first run of any build it seeds once from what the phone used
+ * before: the Debug screen's saved endpoint if any, else `local.properties` through BuildConfig (keys
+ * stay compiled in, decision 8).
+ */
+class AiSettingsStore(private val context: Context, private val cipher: KeyCipher) {
+    private object Keys {
+        val profile = stringPreferencesKey("profile")
+        val keys = stringPreferencesKey("keys")
+        val seeded = booleanPreferencesKey("seeded")
+        /** One-shot: backfill `image` for profiles stored before it existed. */
+        val imageSeeded = booleanPreferencesKey("image_seeded")
+    }
+
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val keyMap = MapSerializer(String.serializer(), String.serializer())
+
+    // The store outlives any screen, so its own scope is fine.
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private val _profile: MutableStateFlow<AiProfile>
+    private val sealed = mutableMapOf<String, String>()
+
+    /** Decrypted keys, kept in memory only. */
+    private val plain = HashMap<String, String>()
+
+    // Writers wait for the first load: otherwise a key saved in the first milliseconds would
+    // snapshot a still-empty sealed map to disk and wipe the other providers' keys for good.
+    private val loadJob = ioScope.launch { runCatching { load() }.onFailure { Log.w(TAG, "settings load failed", it) } }
+
+    init {
+        // Start from the compiled-in seed synchronously; disk and Keystore load on IO right after
+        // (loadJob), so Application.onCreate never blocks on them.
+        _profile = MutableStateFlow(seedProfile())
+    }
+
+    val profile: StateFlow<AiProfile> = _profile.asStateFlow()
+
+    /** The stored profile and keys, applied over the seed once disk and Keystore answer. */
+    private suspend fun load() {
+        val prefs = context.aiStore.data.first()
+        val stored = prefs[Keys.profile]?.let { runCatching { json.decodeFromString(AiProfile.serializer(), it) }.getOrNull() }
+        val keys = prefs[Keys.keys]?.let { runCatching { json.decodeFromString(keyMap, it) }.getOrNull() }.orEmpty()
+        synchronized(plain) {
+            // Drop lookups cached while sealed was still empty; writers join loadJob, so nothing
+            // else mutates sealed concurrently.
+            plain.clear()
+            sealed.clear()
+            sealed.putAll(keys)
+        }
+        if (stored != null) _profile.value = stored
+        if (prefs[Keys.seeded] != true || stored == null) seed()
+        // Profiles stored before image generation existed get the same seed a fresh install
+        // gets (once): the chat host when it offers image models. The flag — not nullness —
+        // marks it done, so turning image off afterwards stays off.
+        if (prefs[Keys.imageSeeded] != true) {
+            val current = _profile.value
+            val filled = current.image ?: current.chat.preset
+                .takeIf { it.capabilities.image && current.chat.baseUrl.isNotBlank() }
+                ?.let { Endpoint(current.chat.presetId, current.chat.baseUrl, it.defaultImageModel) }
+            if (filled != null && filled != current.image) {
+                _profile.value = current.copy(image = filled)
+                context.aiStore.edit {
+                    it[Keys.profile] = json.encodeToString(AiProfile.serializer(), _profile.value)
+                    it[Keys.imageSeeded] = true
+                }
+            } else {
+                context.aiStore.edit { it[Keys.imageSeeded] = true }
+            }
+        }
+    }
+
+    /** The key saved for [presetId], or blank. */
+    fun key(presetId: String): String = synchronized(plain) {
+        plain.getOrPut(presetId) { sealed[presetId]?.let(cipher::decrypt).orEmpty() }
+    }
+
+    fun hasKey(presetId: String): Boolean = key(presetId).isNotBlank()
+
+    /** Decrypts every saved key now (call off the main thread), so screens never wait on the Keystore. */
+    fun warmKeys() {
+        synchronized(plain) { sealed.keys.toList() }.forEach(::key)
+    }
+
+    suspend fun setProfile(next: AiProfile) {
+        loadJob.join()
+        _profile.value = next
+        context.aiStore.edit { it[Keys.profile] = json.encodeToString(AiProfile.serializer(), next) }
+    }
+
+    suspend fun update(change: (AiProfile) -> AiProfile) {
+        loadJob.join()
+        setProfile(change(_profile.value))
+    }
+
+    /** Saves [key] for [presetId] (blank removes it). The plain text never touches storage. */
+    suspend fun setKey(presetId: String, key: String) {
+        loadJob.join()
+        saveKey(presetId, key)
+    }
+
+    /** [setKey] without the join; only the first load (via [seed]) may use this. */
+    private suspend fun saveKey(presetId: String, key: String) {
+        val trimmed = key.trim()
+        val snapshot = synchronized(plain) {
+            if (trimmed.isEmpty()) {
+                plain.remove(presetId)
+                sealed.remove(presetId)
+            } else {
+                plain[presetId] = trimmed
+                sealed[presetId] = cipher.encrypt(trimmed)
+            }
+            sealed.toMap()
+        }
+        context.aiStore.edit { it[Keys.keys] = json.encodeToString(keyMap, snapshot) }
+    }
+
+    /** What chat calls use now. */
+    fun chatConfig(): LlmConfig = _profile.value.chat.let { LlmConfig(it.baseUrl, keyFor(it), it.model) }
+
+    /** What image generation uses now; null when unset. Blank model = ask the server. */
+    data class ImageConfig(val baseUrl: String, val apiKey: String, val imageModel: String)
+
+    /** What image generation uses now; null when unset. */
+    fun imageConfig(): ImageConfig? {
+        val p = _profile.value
+        val e = p.image ?: return null
+        return ImageConfig(e.baseUrl, keyFor(e), e.model)
+    }
+
+    /** What voice input uses now; a blank URL means "on this phone". */
+    fun speechConfig(): SpeechConfig {
+        val p = _profile.value
+        val e = p.voiceIn ?: return SpeechConfig("", "", "", p.voiceLanguage)
+        return SpeechConfig(e.baseUrl, keyFor(e), e.model, p.voiceLanguage)
+    }
+
+    fun keyFor(e: Endpoint): String = key(e.presetId)
+
+    private fun seedProfile(): AiProfile {
+        val debug = context.getSharedPreferences("debug_llm", Context.MODE_PRIVATE)
+        val llm = LlmConfig.fromBuild.let { b ->
+            LlmConfig(debug.getString("base_url", null) ?: b.baseUrl, debug.getString("api_key", null) ?: b.apiKey, debug.getString("model", null) ?: b.model)
+        }
+        val stt = SpeechConfig.fromBuild
+        val chat = Endpoint(ProviderPresets.detect(llm.baseUrl).id, llm.baseUrl, llm.model)
+        val voiceIn = stt.baseUrl.takeIf { it.isNotBlank() }?.let { Endpoint(ProviderPresets.detect(it).id, it, stt.sttModel) }
+        // Image generation rides the chat host when it offers image models (Meta does):
+        // same key, the preset's default image model.
+        val image = chat.preset.takeIf { it.capabilities.image && chat.baseUrl.isNotBlank() }
+            ?.let { Endpoint(chat.presetId, chat.baseUrl, it.defaultImageModel) }
+        return AiProfile(chat = chat, voiceIn = voiceIn, image = image)
+    }
+
+    private suspend fun seed() {
+        val p = _profile.value
+        val debug = context.getSharedPreferences("debug_llm", Context.MODE_PRIVATE)
+        val llmKey = debug.getString("api_key", null) ?: LlmConfig.fromBuild.apiKey
+        if (llmKey.isNotBlank() && !hasKey(p.chat.presetId)) saveKey(p.chat.presetId, llmKey)
+        val sttKey = SpeechConfig.fromBuild.apiKey
+        p.voiceIn?.let { if (sttKey.isNotBlank() && !hasKey(it.presetId)) saveKey(it.presetId, sttKey) }
+        context.aiStore.edit {
+            it[Keys.profile] = json.encodeToString(AiProfile.serializer(), p)
+            it[Keys.seeded] = true
+        }
+    }
+}

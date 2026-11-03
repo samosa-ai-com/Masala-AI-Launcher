@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SipRing — Water Tracker</title>
+<style>
+:root{--bg:#eef6fb;--card:#fff;--acc:#0284c7;--txt:#0f2536;--mut:#65809a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;min-height:100vh}
+.wrap{max-width:480px;margin:0 auto;padding:16px 14px 32px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}
+.sub{color:var(--mut);font-size:13px;margin:2px 0 0}
+#muteBtn{background:var(--card);border:1px solid #d3e5f1;color:var(--txt);border-radius:12px;min-width:48px;min-height:44px;font-size:18px}
+.card{background:var(--card);border:1px solid #d3e5f1;border-radius:18px;padding:16px;margin:12px 0;text-align:center}
+.ringwrap{position:relative;width:190px;height:190px;margin:6px auto}
+.ringwrap svg{transform:rotate(-90deg)}
+#ringTxt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#todayMl{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums}
+#goalTxt{font-size:13px;color:var(--mut)}
+.cups{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+.cups button{flex:1 1 20%;min-height:52px;border-radius:14px;border:1px solid #bcd9ec;background:#e8f3fa;font-size:15px;font-weight:700}
+#undoBtn{min-height:48px;border-radius:12px;border:1px solid #d3e5f1;background:#fff;font-size:14px;padding:0 18px;margin-top:10px}
+.goalrow{display:flex;align-items:center;gap:10px;justify-content:center}
+.goalrow button{width:52px;height:48px;border-radius:12px;border:1px solid #bcd9ec;background:#e8f3fa;font-size:22px;font-weight:800}
+#goalVal{font-size:20px;font-weight:800;min-width:120px;font-variant-numeric:tabular-nums}
+.hist{text-align:left;font-size:13px}
+.hist .hrow{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #e6f0f7}
+.hist .hday{min-width:86px;color:var(--mut)}
+.hist .htrack{flex:1;background:#e6f0f7;border-radius:6px;height:10px;overflow:hidden}
+.hist .hfill{background:var(--acc);height:10px;border-radius:6px}
+.hist .hamt{min-width:70px;text-align:right;font-variant-numeric:tabular-nums}
+h2{font-size:15px;margin:4px 0 6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div><h1>SipRing</h1><p class="sub">Hit your daily water goal</p></div><button id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="card">
+<div class="ringwrap">
+<svg width="190" height="190" viewBox="0 0 190 190"><circle cx="95" cy="95" r="80" fill="none" stroke="#e0edf5" stroke-width="18"/><circle id="ring" cx="95" cy="95" r="80" fill="none" stroke="#0284c7" stroke-width="18" stroke-linecap="round" stroke-dasharray="502.6" stroke-dashoffset="502.6"/></svg>
+<div id="ringTxt"><div id="todayMl">0 ml</div><div id="goalTxt">of 2000 ml</div></div>
+</div>
+<div class="cups" id="cups"></div>
+<div><button id="undoBtn">Undo last sip</button></div>
+</div>
+<div class="card"><h2>Daily goal</h2>
+<div class="goalrow"><button id="gminus" aria-label="Lower goal">−</button><div id="goalVal">2000 ml</div><button id="gplus" aria-label="Raise goal">+</button></div>
+</div>
+<div class="card hist"><h2>Last 7 days</h2><div id="hist"></div></div>
+</div>
+<script>
+(function(){
+"use strict";
+var KEY="sipring-v1";
+var store={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+var muted=store.get("muted-water-reminder",false);
+var muteBtn=document.getElementById("muteBtn");
+function paintMute(){muteBtn.textContent=muted?"🔇":"🔊";}paintMute();
+var actx=null;
+function beep(f){if(muted)return;try{var C=window.AudioContext||window.webkitAudioContext;if(!C)return;if(!actx)actx=new C();if(actx.state==="suspended")actx.resume();var o=actx.createOscillator(),g=actx.createGain();o.type="sine";o.frequency.value=f||660;g.gain.value=0.05;o.connect(g);g.connect(actx.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.08);o.stop(actx.currentTime+0.09);}catch(e){}}
+muteBtn.addEventListener("click",function(){muted=!muted;store.set("muted-water-reminder",muted);paintMute();beep(720);});
+var st=store.get(KEY,{goal:2000,log:{},stack:[]});
+if(!st.log)st.log={};if(!Array.isArray(st.stack))st.stack=[];if(!st.goal)st.goal=2000;
+function dayKey(d){return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();}
+var CIRC=502.6;
+var CUPS=[150,250,350,500];
+var cupsEl=document.getElementById("cups");
+CUPS.forEach(function(c){var b=document.createElement("button");b.textContent="🥤 "+c+" ml";b.setAttribute("aria-label","Log "+c+" milliliters");b.addEventListener("click",function(){var k=dayKey(new Date());st.log[k]=(st.log[k]||0)+c;st.stack.push({day:k,ml:c});store.set(KEY,st);beep(780);draw();});cupsEl.appendChild(b);});
+document.getElementById("undoBtn").addEventListener("click",function(){
+var last=st.stack.pop();if(!last){beep(320);return;}
+st.log[last.day]=Math.max(0,(st.log[last.day]||0)-last.ml);store.set(KEY,st);beep(420);draw();});
+document.getElementById("gminus").addEventListener("click",function(){if(st.goal>500){st.goal-=250;store.set(KEY,st);beep(500);draw();}});
+document.getElementById("gplus").addEventListener("click",function(){if(st.goal<6000){st.goal+=250;store.set(KEY,st);beep(680);draw();}});
+function draw(){
+var k=dayKey(new Date());
+var today=st.log[k]||0;
+document.getElementById("todayMl").textContent=today+" ml";
+document.getElementById("goalTxt").textContent="of "+st.goal+" ml";
+document.getElementById("goalVal").textContent=st.goal+" ml";
+var pct=Math.min(1,today/st.goal);
+document.getElementById("ring").style.strokeDashoffset=String(CIRC*(1-pct));
+var h=document.getElementById("hist");h.innerHTML="";
+for(var i=6;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);var key=dayKey(d);var v=st.log[key]||0;
+var row=document.createElement("div");row.className="hrow";
+var label=i===0?"Today":d.toLocaleDateString("en",{weekday:"short",month:"numeric",day:"numeric"});
+var p2=Math.min(100,Math.round(v/st.goal*100));
+row.innerHTML="<span class='hday'>"+label+"</span><div class='htrack'><div class='hfill' style='width:"+p2+"%'></div></div><span class='hamt'>"+v+" ml</span>";
+h.appendChild(row);}
+}
+draw();
+})();
+</script>
+</body>
+</html>

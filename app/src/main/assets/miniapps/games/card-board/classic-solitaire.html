@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Stack Shift — 7 Column Cards</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family:-apple-system, BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:#0a2e14;
+  display:flex;justify-content:center;
+  min-height:100dvh;
+}
+.app{
+  width:100%;max-width:428px;min-width:360px;min-height:100dvh;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(0,0,0,0.25) 0%, transparent 60%),
+    linear-gradient(180deg, #1a7a3a 0%, #0f5d2b 40%, #0c4a22 100%);
+  display:flex;flex-direction:column;overflow-x:hidden;position:relative;
+}
+.header{
+  background:linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
+  color:#fff;padding:14px 16px 12px;text-align:center;
+  box-shadow:0 2px 12px rgba(0,0,0,0.4);border-bottom:3px solid #c9a227;
+}
+.header h1{font-size:19px;font-weight:900;letter-spacing:0.6px;line-height:1}
+.header h1 span{color:#c9a227}
+.header p{font-size:11px;opacity:0.8;margin-top:4px;letter-spacing:0.4px}
+.stats{
+  display:flex;gap:10px;padding:12px 14px;
+}
+.stat{
+  flex:1;background:rgba(255,255,255,0.96);border-radius:12px;padding:10px 8px;text-align:center;
+  box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2px solid #c9a227;
+}
+.stat-label{font-size:10px;font-weight:800;letter-spacing:0.8px;color:#0f5d2b}
+.stat-num{font-size:22px;font-weight:900;color:#0f0f0f;line-height:1;margin-top:2px}
+.stat-sub{font-size:10px;color:#666;font-weight:600}
+.instruction{
+  margin:0 14px;background:rgba(0,0,0,0.35);backdrop-filter:blur(6px);
+  color:#fff8dc;border:1px solid rgba(201,162,39,0.4);border-radius:10px;
+  padding:10px 12px;font-size:13px;font-weight:600;text-align:center;min-height:42px;
+  display:flex;align-items:center;justify-content:center;
+}
+.instruction strong{color:#fde68a}
+.instruction.selected{background:rgba(201,162,39,0.25);border-color:#c9a227;color:#fff}
+.board-wrap{padding:12px 10px;flex:1}
+.columns{
+  display:grid;grid-template-columns:repeat(7, 1fr);gap:6px;
+  align-items:start;
+}
+.column{
+  background:rgba(0,0,0,0.18);border:2px dashed rgba(255,255,255,0.25);
+  border-radius:10px;min-height:340px;padding:6px 4px 8px;
+  display:flex;flex-direction:column;align-items:center;
+  position:relative;cursor:pointer;touch-action:manipulation;
+  transition:all 0.15s;
+}
+.column.has-cards{background:rgba(255,255,255,0.08);border-style:solid;border-color:rgba(255,255,255,0.15)}
+.column.empty-target{border-color:#c9a227;background:rgba(201,162,39,0.15);box-shadow:0 0 0 2px rgba(201,162,39,0.3) inset}
+.column.selected-source{border-color:#fde68a;background:rgba(253,230,138,0.2);box-shadow:0 0 12px rgba(253,230,138,0.4)}
+.column:active{transform:scale(0.98)}
+.col-label{
+  font-size:9px;font-weight:800;letter-spacing:0.6px;color:rgba(255,255,255,0.7);
+  margin-bottom:6px;text-transform:uppercase;
+}
+.col-count{
+  position:absolute;bottom:4px;left:50%;transform:translateX(-50%);
+  font-size:9px;font-weight:800;background:rgba(0,0,0,0.5);color:#fff;
+  padding:2px 6px;border-radius:20px;min-width:22px;text-align:center;
+}
+.stack{
+  width:100%;display:flex;flex-direction:column;align-items:center;
+  position:relative;flex:1;
+}
+.card{
+  width:46px;height:64px;background:#fff;border-radius:6px;
+  border:1.5px solid #ddd;box-shadow:0 2px 6px rgba(0,0,0,0.3);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:absolute;left:50%;transform:translateX(-50%);
+  transition:all 0.2s;user-select:none;
+}
+.card.top{cursor:pointer;touch-action:manipulation}
+.card.top:active{transform:translateX(-50%) scale(0.96)}
+.card.selected{
+  transform:translateX(-50%) translateY(-6px) scale(1.05);
+  box-shadow:0 8px 20px rgba(0,0,0,0.4), 0 0 0 3px #fde68a, 0 0 16px #c9a227;
+  z-index:10 !important; border-color:#c9a227;
+}
+.card.back{
+  background:linear-gradient(135deg, #1e3a5f 0%, #0f1f3a 50%, #1e3a5f 100%);
+  border-color:#0f1f3a;
+  background-image:
+    repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(255,255,255,0.04) 4px, rgba(255,255,255,0.04) 8px),
+    linear-gradient(135deg, #1e3a5f, #0f1f3a);
+}
+.card.back::after{
+  content:'♦';color:rgba(255,255,255,0.15);font-size:18px;
+}
+.card-rank{font-size:15px;font-weight:900;line-height:1}
+.card-suit{font-size:14px;line-height:1;margin-top:1px}
+.card.red .card-rank, .card.red .card-suit{color:#dc2626}
+.card.black .card-rank, .card.black .card-suit{color:#111}
+.card-corner{
+  position:absolute;top:3px;left:4px;font-size:8px;font-weight:800;line-height:1;text-align:center;
+}
+.card-corner.bottom{top:auto;bottom:3px;left:auto;right:4px;transform:rotate(180deg)}
+.empty-hint{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:rgba(255,255,255,0.5);font-size:10px;font-weight:700;text-align:center;
+  padding:20px 4px;gap:6px;
+}
+.empty-hint span{font-size:20px;opacity:0.6}
+.controls{display:flex;gap:10px;padding:12px 14px 14px}
+.btn{
+  flex:1;height:48px;border-radius:12px;border:none;font-size:14px;font-weight:800;
+  cursor:pointer;touch-action:manipulation;display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:transform 0.1s;
+}
+.btn:active{transform:scale(0.97)}
+.btn-primary{background:linear-gradient(180deg, #c9a227 0%, #a8841a 100%);color:#fff;box-shadow:0 3px 10px rgba(0,0,0,0.3)}
+.btn-secondary{background:rgba(255,255,255,0.95);color:#0f5d2b;border:2px solid #c9a227}
+.footer{padding:0 14px 16px;text-align:center}
+.footer p{font-size:11px;color:rgba(255,255,255,0.7);background:rgba(0,0,0,0.25);border-radius:8px;padding:8px 10px;line-height:1.4}
+.toast{
+  position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);
+  background:#111;color:#fff;padding:10px 16px;border-radius:20px;font-size:13px;font-weight:700;
+  box-shadow:0 6px 20px rgba(0,0,0,0.3);opacity:0;pointer-events:none;transition:all 0.25s;z-index:40;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@keyframes shake{0%,100%{transform:translateX(-50%)}25%{transform:translateX(-50%) translateX(-4px)}75%{transform:translateX(-50%) translateX(4px)}}
+.shake{animation:shake 0.3s}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>♠ STACK <span>SHIFT</span> ♥</h1>
+    <p>7 Columns • Tap top card → Tap empty column to move</p>
+  </div>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">SCORE</div>
+      <div class="stat-num" id="score">0</div>
+      <div class="stat-sub">+10 per move</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">MOVES</div>
+      <div class="stat-num" id="moves">0</div>
+      <div class="stat-sub" id="bestSub">best: 0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">CARDS</div>
+      <div class="stat-num" id="cardsLeft">52</div>
+      <div class="stat-sub">in play</div>
+    </div>
+  </div>
+  <div class="instruction" id="instruction">Tap a <strong>top card</strong> to select it</div>
+  <div class="board-wrap">
+    <div class="columns" id="columns"></div>
+  </div>
+  <div class="controls">
+    <button class="btn btn-secondary" id="undoBtn">↩ Undo</button>
+    <button class="btn btn-primary" id="restartBtn">🔀 Shuffle & Restart</button>
+  </div>
+  <div class="footer"><p>Green-felt table • Large tap targets • Shuffled 52-card deck • Points saved on this phone</p></div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const SUITS=[
+  {s:'♠',c:'black'},{s:'♥',c:'red'},{s:'♦',c:'red'},{s:'♣',c:'black'}
+];
+const RANKS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+
+let columns=[], selected=null, score=0, moves=0, historyStack=[], best=0;
+
+const colsEl=document.getElementById('columns');
+const scoreEl=document.getElementById('score');
+const movesEl=document.getElementById('moves');
+const bestSubEl=document.getElementById('bestSub');
+const cardsLeftEl=document.getElementById('cardsLeft');
+const instructionEl=document.getElementById('instruction');
+const undoBtn=document.getElementById('undoBtn');
+const toastEl=document.getElementById('toast');
+
+function loadBest(){
+  try{ const b=parseInt(localStorage.getItem('stackshift-best')||'0'); if(!isNaN(b)) best=b; }catch(e){}
+  bestSubEl.textContent='best: '+best;
+}
+function saveBest(){
+  if(score>best){ best=score; localStorage.setItem('stackshift-best', best); bestSubEl.textContent='best: '+best; }
+}
+
+function createDeck(){
+  const deck=[];
+  for(const suit of SUITS){
+    for(const rank of RANKS){
+      deck.push({rank, suit:suit.s, color:suit.c, id:rank+suit.s+Math.random()});
+    }
+  }
+  // shuffle
+  for(let i=deck.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [deck[i],deck[j]]=[deck[j],deck[i]];
+  }
+  return deck;
+}
+
+function deal(){
+  const deck=createDeck();
+  columns=Array.from({length:7},()=>[]);
+  // Deal to first 5 columns, leaving 2 empty for moves (as per game rule)
+  // Distribute 52 cards: 11,11,10,10,10
+  let idx=0;
+  const targets=[0,1,2,3,4];
+  // round-robin to first 5
+  for(let i=0;i<deck.length;i++){
+    const colIdx=targets[i % targets.length];
+    columns[colIdx].push(deck[i]);
+  }
+  selected=null; score=0; moves=0; historyStack=[];
+  updateStats();
+  render();
+  showToast('Deck shuffled — 2 empty columns ready!');
+}
+
+function updateStats(){
+  scoreEl.textContent=score;
+  movesEl.textContent=moves;
+  cardsLeftEl.textContent=52;
+  undoBtn.disabled=historyStack.length===0;
+  if(score>best) bestSubEl.textContent='best: '+score+' ★';
+}
+
+function render(){
+  colsEl.innerHTML='';
+  columns.forEach((col, colIdx)=>{
+    const colEl=document.createElement('div');
+    colEl.className='column';
+    if(col.length>0) colEl.classList.add('has-cards');
+    if(selected && selected.col===colIdx) colEl.classList.add('selected-source');
+    if(selected && col.length===0) colEl.classList.add('empty-target');
+    colEl.dataset.col=colIdx;
+
+    const label=document.createElement('div');
+    label.className='col-label';
+    label.textContent='Col '+(colIdx+1);
+    colEl.appendChild(label);
+
+    const stack=document.createElement('div');
+    stack.className='stack';
+    stack.style.minHeight=(col.length>0 ? (64 + (col.length-1)*22) : 80)+'px';
+
+    if(col.length===0){
+      const hint=document.createElement('div');
+      hint.className='empty-hint';
+      hint.innerHTML='<span>○</span>Empty<br>Tap to move here';
+      stack.appendChild(hint);
+    } else {
+      col.forEach((card, i)=>{
+        const cardEl=document.createElement('div');
+        const isTop=i===col.length-1;
+        cardEl.className='card '+(card.color)+' '+(isTop?'top':'');
+        if(selected && selected.col===colIdx && isTop) cardEl.classList.add('selected');
+        // stack position
+        cardEl.style.top=(i*22)+'px';
+        cardEl.style.zIndex=i;
+        // only top card shows face, others show back for depth (or face but dimmed)
+        if(!isTop){
+          // show as back with slight peek
+          cardEl.classList.add('back');
+          cardEl.innerHTML='';
+        } else {
+          cardEl.innerHTML=`
+            <div class="card-corner">${card.rank}<br>${card.suit}</div>
+            <div class="card-rank">${card.rank}</div>
+            <div class="card-suit">${card.suit}</div>
+            <div class="card-corner bottom">${card.rank}<br>${card.suit}</div>
+          `;
+          cardEl.addEventListener('click', (e)=>{
+            e.stopPropagation();
+            handleCardTap(colIdx);
+          });
+        }
+        stack.appendChild(cardEl);
+      });
+    }
+
+    const count=document.createElement('div');
+    count.className='col-count';
+    count.textContent=col.length;
+    colEl.appendChild(stack);
+    colEl.appendChild(count);
+
+    colEl.addEventListener('click', ()=> handleColumnTap(colIdx));
+    colsEl.appendChild(colEl);
+  });
+
+  // instruction
+  if(!selected){
+    instructionEl.className='instruction';
+    instructionEl.innerHTML='Tap a <strong>top card</strong> to select it';
+  } else {
+    const card=columns[selected.col][columns[selected.col].length-1];
+    instructionEl.className='instruction selected';
+    instructionEl.innerHTML=`Selected <strong>${card.rank}${card.suit}</strong> from Col ${selected.col+1} → Tap an <strong>empty column</strong>`;
+  }
+}
+
+function handleCardTap(colIdx){
+  if(columns[colIdx].length===0) return;
+  // if already selected same card, deselect
+  if(selected && selected.col===colIdx){
+    selected=null;
+    if(navigator.vibrate) navigator.vibrate(15);
+    render();
+    return;
+  }
+  selected={col:colIdx};
+  if(navigator.vibrate) navigator.vibrate(20);
+  render();
+}
+
+function handleColumnTap(colIdx){
+  if(!selected) return;
+  if(selected.col===colIdx){
+    selected=null; render(); return;
+  }
+  const sourceCol=selected.col;
+  const destCol=colIdx;
+  if(columns[destCol].length!==0){
+    // invalid - only empty columns allowed
+    showToast('Only empty columns can receive cards!');
+    // shake dest
+    const destEl=colsEl.children[destCol];
+    destEl.classList.add('shake');
+    setTimeout(()=>destEl.classList.remove('shake'),300);
+    if(navigator.vibrate) navigator.vibrate([20,30,20]);
+    return;
+  }
+  // valid move
+  const card=columns[sourceCol].pop();
+  columns[destCol].push(card);
+  historyStack.push({from:sourceCol, to:destCol, card});
+  score+=10;
+  moves++;
+  saveBest();
+  updateStats();
+  selected=null;
+  if(navigator.vibrate) navigator.vibrate(30);
+  showToast('+10 points! Moved '+card.rank+card.suit+' → Col '+(destCol+1));
+  render();
+  checkWin();
+}
+
+function checkWin(){
+  // win if no empty columns? Or all columns have cards and balanced?
+  // For this simplified game, celebrate when player has made 20 moves
+  if(moves>0 && moves%20===0){
+    showToast('Great shifting! '+moves+' moves — keep going!');
+  }
+}
+
+function undo(){
+  if(historyStack.length===0) return;
+  const last=historyStack.pop();
+  const card=columns[last.to].pop();
+  columns[last.from].push(card);
+  score=Math.max(0, score-10);
+  moves=Math.max(0, moves-1);
+  selected=null;
+  updateStats();
+  render();
+  showToast('Undone');
+  if(navigator.vibrate) navigator.vibrate(15);
+}
+
+function showToast(msg){
+  toastEl.textContent=msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastEl._t);
+  toastEl._t=setTimeout(()=>toastEl.classList.remove('show'), 1800);
+}
+
+document.getElementById('restartBtn').addEventListener('click', deal);
+undoBtn.addEventListener('click', undo);
+
+loadBest();
+deal();
+</script>
+</body>
+</html>

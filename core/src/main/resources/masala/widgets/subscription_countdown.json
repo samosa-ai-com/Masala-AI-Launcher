@@ -1,0 +1,31 @@
+{
+  "id": "subscription_countdown",
+  "name": "Subscription countdown",
+  "description": "Days until the next renewal, so it is never a surprise.",
+  "category": "Money",
+  "widget": {
+    "id": "subscription_countdown",
+    "title": "Renews in",
+    "components": [
+      {
+        "type": "counter",
+        "key": "renew",
+        "label": "Days",
+        "goal": 30,
+        "style": {
+          "tint": "orange",
+          "emphasis": "large"
+        },
+        "repeat": "monthly"
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 1,
+      "max": 2,
+      "minW": 2,
+      "defaultW": 2,
+      "maxW": 2
+    }
+  }
+}

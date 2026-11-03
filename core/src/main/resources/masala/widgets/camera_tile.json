@@ -1,0 +1,23 @@
+{
+  "id": "camera_tile",
+  "name": "Camera tile",
+  "description": "A live view from a camera stream source.",
+  "category": "Media",
+  "widget": {
+    "id": "camera_tile",
+    "title": "Camera",
+    "components": [
+      {
+        "type": "video",
+        "stream": {
+          "sourceId": "camera"
+        }
+      }
+    ],
+    "size": {
+      "min": 2,
+      "default": 3,
+      "max": 3
+    }
+  }
+}

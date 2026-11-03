@@ -1,0 +1,44 @@
+{
+  "id": "dice",
+  "name": "Dice",
+  "description": "One tap, one roll, spoken by Masala.",
+  "category": "Fun",
+  "widget": {
+    "id": "dice",
+    "title": "Dice",
+    "components": [
+      {
+        "type": "row",
+        "children": [
+          {
+            "type": "text",
+            "binding": {
+              "source": "storage",
+              "key": "last"
+            },
+            "style": {
+              "emphasis": "large"
+            }
+          },
+          {
+            "type": "button",
+            "label": "Roll",
+            "action": {
+              "type": "flip",
+              "key": "last",
+              "kind": "dice"
+            }
+          }
+        ]
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 1,
+      "max": 2,
+      "minW": 2,
+      "defaultW": 2,
+      "maxW": 2
+    }
+  }
+}

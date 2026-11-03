@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Cascade Volley</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#080c14;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e6edf5}
+body{display:flex;justify-content:center}
+.app{width:100%;max-width:428px;height:100dvh;display:flex;flex-direction:column;background:#0a0f1c;position:relative;overflow:hidden}
+header{height:64px;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#0f1729;border-bottom:1px solid #1e2a44;flex-shrink:0}
+.h-left{display:flex;gap:8px;align-items:center}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#3b82f6,#06b6d4);display:grid;place-items:center;font-weight:800;font-size:16px;color:white;letter-spacing:-0.5px}
+.h-stats{display:flex;gap:8px}
+.stat{background:#16213a;border:1px solid #223055;border-radius:12px;padding:6px 10px;min-width:64px;text-align:center}
+.stat-label{font-size:10px;letter-spacing:0.08em;color:#8ea0c2;font-weight:700;text-transform:uppercase}
+.stat-val{font-size:16px;font-weight:800;color:#fff;line-height:1.1}
+.stat-val.best{color:#facc15}
+.canvas-wrap{flex:1;position:relative;background:radial-gradient(600px 400px at 50% 0%,#13203a 0%,#0a0f1c 60%);overflow:hidden;touch-action:none}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;pointer-events:none}
+.overlay-card{background:#0f1729ee;border:1px solid #243352;border-radius:20px;padding:22px 18px;width:100%;max-width:320px;backdrop-filter:blur(8px);pointer-events:auto;box-shadow:0 20px 40px rgba(0,0,0,0.4)}
+.overlay-card h1{font-size:22px;font-weight:900;letter-spacing:-0.5px;margin-bottom:6px}
+.overlay-card p{font-size:13px;color:#9fb0d0;line-height:1.5;margin-bottom:14px}
+.btn{appearance:none;border:none;border-radius:14px;padding:14px 18px;font-weight:800;font-size:15px;cursor:pointer;min-height:48px;min-width:120px;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform .08s,opacity .2s}
+.btn:active{transform:scale(0.97)}
+.btn-primary{background:#3b82f6;color:white;box-shadow:0 8px 20px rgba(59,130,246,0.35);width:100%}
+.btn-ghost{background:#1a2744;color:#cbd5e1;border:1px solid #2a3a5e;width:100%}
+.btn-row{display:flex;gap:10px;width:100%}
+.hint{position:absolute;bottom:86px;left:50%;transform:translateX(-50%);background:#111d33;border:1px solid #243352;color:#cbd5e1;font-size:13px;font-weight:700;padding:8px 14px;border-radius:999px;pointer-events:none;white-space:nowrap;opacity:0;transition:opacity .2s}
+.hint.show{opacity:1}
+.bottom-bar{height:78px;background:#0f1729;border-top:1px solid #1e2a44;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;gap:10px;flex-shrink:0}
+.bb-left{display:flex;flex-direction:column;gap:2px}
+.bb-label{font-size:11px;font-weight:700;letter-spacing:0.08em;color:#7d8fb0;text-transform:uppercase}
+.bb-val{font-size:18px;font-weight:900;color:#fff;display:flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:50%;background:#38bdf8;box-shadow:0 0 10px rgba(56,189,248,0.6);display:inline-block}
+.bb-actions{display:flex;gap:8px}
+.icon-btn{width:48px;height:48px;border-radius:14px;border:1px solid #2a3a5e;background:#16213a;color:#e2e8f0;display:grid;place-items:center;font-size:18px;cursor:pointer}
+.icon-btn:active{transform:scale(0.96)}
+.launch-btn{flex:1;max-width:180px;height:48px;border-radius:14px;background:#22c55e;color:#052e16;font-weight:900;font-size:15px;border:none;cursor:pointer;box-shadow:0 8px 20px rgba(34,197,94,0.3)}
+.launch-btn:disabled{opacity:0.4;cursor:not-allowed;box-shadow:none}
+.traj-legend{position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:6px;align-items:center;background:#0f1729cc;border:1px solid #243352;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:700;color:#9fb0d0;pointer-events:none}
+.legend-dot{width:6px;height:6px;border-radius:50%;background:#fff;opacity:0.9}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="h-left">
+      <div class="logo">C≡</div>
+      <div style="line-height:1">
+        <div style="font-weight:900;font-size:14px;letter-spacing:-0.3px">CASCADE</div>
+        <div style="font-size:10px;color:#7d8fb0;font-weight:700;letter-spacing:0.08em">VOLLEY PUZZLER</div>
+      </div>
+    </div>
+    <div class="h-stats">
+      <div class="stat"><div class="stat-label">Level</div><div class="stat-val" id="lvl">1</div></div>
+      <div class="stat"><div class="stat-label">Balls</div><div class="stat-val" id="balls">15</div></div>
+      <div class="stat"><div class="stat-label">Best</div><div class="stat-val best" id="best">1</div></div>
+    </div>
+  </header>
+
+  <div class="canvas-wrap" id="wrap">
+    <canvas id="c"></canvas>
+    <div class="traj-legend" id="legend"><span class="legend-dot"></span> DRAG TO AIM • RELEASE TO FIRE</div>
+    <div class="hint" id="hint">Aim and release!</div>
+
+    <div class="overlay" id="startOverlay">
+      <div class="overlay-card">
+        <h1>Break the Cascade</h1>
+        <p>Drag from the launcher to aim the dotted path. Release to fire your volley. Blocks lose 1 per hit and drop one row each round. Grab <span style="color:#22c55e;font-weight:800">+1 balls</span> before they scroll off. Game over if blocks reach the red line.</p>
+        <button class="btn btn-primary" id="playBtn">▶ PLAY NOW</button>
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button class="btn btn-ghost" id="howBtn" style="flex:1">How to play</button>
+          <button class="btn btn-ghost" id="resetBestBtn" style="flex:1">Reset Best</button>
+        </div>
+        <div style="margin-top:12px;font-size:11px;color:#64748b;font-weight:600">Tip: Aim shallow for wide clears, steep for focused damage.</div>
+      </div>
+    </div>
+
+    <div class="overlay" id="gameOverOverlay" style="display:none">
+      <div class="overlay-card" style="border-color:#7f1d1d">
+        <h1 style="color:#fecaca">Cascade Reached Bottom</h1>
+        <p id="goText">You reached level 1</p>
+        <button class="btn btn-primary" id="retryBtn">↻ PLAY AGAIN</button>
+        <button class="btn btn-ghost" id="menuBtn" style="margin-top:8px">Menu</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="howOverlay" style="display:none">
+      <div class="overlay-card">
+        <h1>How to Play</h1>
+        <p style="text-align:left">
+          • <b>Drag</b> near the bottom launcher to set angle.<br>
+          • <b>Release</b> to launch balls one by one.<br>
+          • Each hit = -1 on block number.<br>
+          • Green <b>+1</b> pickups add a ball next round.<br>
+          • Every 3 levels you get <b>+2 bonus balls</b>.<br>
+          • Blocks descend 1 row per round.<br>
+          • Don't let them touch the red danger line.
+        </p>
+        <button class="btn btn-primary" id="closeHow">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-bar">
+    <div class="bb-left">
+      <div class="bb-label">Launcher</div>
+      <div class="bb-val"><span class="dot"></span> <span id="bbBalls">15 balls</span> <span style="font-size:11px;color:#7d8fb0;font-weight:700" id="bbStatus">• READY</span></div>
+    </div>
+    <div class="bb-actions">
+      <button class="icon-btn" id="pauseBtn" aria-label="Pause">⏸</button>
+      <button class="launch-btn" id="launchBtn">LAUNCH</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('wrap');
+const lvlEl = document.getElementById('lvl');
+const ballsEl = document.getElementById('balls');
+const bestEl = document.getElementById('best');
+const bbBallsEl = document.getElementById('bbBalls');
+const bbStatusEl = document.getElementById('bbStatus');
+const hintEl = document.getElementById('hint');
+const legendEl = document.getElementById('legend');
+const startOverlay = document.getElementById('startOverlay');
+const gameOverOverlay = document.getElementById('gameOverOverlay');
+const howOverlay = document.getElementById('howOverlay');
+
+const COLS = 7;
+const ROWS = 10; // rows before danger line
+const BOTTOM_MARGIN = 38;
+const BALL_R = 7;
+const PICKUP_R = 11;
+const SPEED = 9;
+const LAUNCH_INTERVAL = 70; // ms between balls
+
+let W=0,H=0, BLOCK_W=0, BLOCK_H=0, dpr=1;
+let level=1, balls=15, best=1;
+let blocks=[], pickups=[];
+let ballsInPlay=[], pendingLaunchQueue=[];
+let launchX=0, launchY=0;
+let aimAngle = Math.PI/2; // 90 deg up
+let isAiming=false, isShooting=false, canShoot=true;
+let ballsToAddNext=0;
+let returnedCount=0, totalToLaunch=0;
+let lastReturnX=null;
+let launchTimer=0;
+let paused=false;
+let animId=null;
+let dangerY=0;
+
+function loadPersist(){
+  try{
+    const b = parseInt(localStorage.getItem('cascade_best')||'1',10);
+    if(!isNaN(b)) best=b;
+    const l = parseInt(localStorage.getItem('cascade_level')||'1',10);
+    if(!isNaN(l) && l>0) level=l;
+    const bc = parseInt(localStorage.getItem('cascade_balls')||'15',10);
+    if(!isNaN(bc) && bc>0) balls=bc;
+  }catch(e){}
+  bestEl.textContent=best;
+}
+function savePersist(){
+  try{
+    localStorage.setItem('cascade_best', String(best));
+    localStorage.setItem('cascade_level', String(level));
+    localStorage.setItem('cascade_balls', String(balls));
+  }catch(e){}
+}
+
+function resize(){
+  dpr = Math.min(window.devicePixelRatio||1, 2);
+  const rect = wrap.getBoundingClientRect();
+  W = rect.width;
+  H = rect.height;
+  canvas.width = Math.round(W*dpr);
+  canvas.height = Math.round(H*dpr);
+  canvas.style.width = W+'px';
+  canvas.style.height = H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  BLOCK_W = (W - 16) / COLS;
+  BLOCK_H = BLOCK_W * 0.92;
+  dangerY = H - BOTTOM_MARGIN - 2;
+  if(!launchX) launchX = W/2;
+  launchY = H - BOTTOM_MARGIN - BALL_R - 6;
+}
+window.addEventListener('resize', resize);
+
+function updateHUD(){
+  lvlEl.textContent = level;
+  ballsEl.textContent = balls;
+  bestEl.textContent = best;
+  bbBallsEl.textContent = balls + ' balls';
+  if(isShooting) bbStatusEl.textContent = '• FIRING';
+  else if(!canShoot) bbStatusEl.textContent = '• WAIT';
+  else bbStatusEl.textContent = '• READY';
+  bbStatusEl.style.color = isShooting ? '#facc15' : canShoot ? '#22c55e' : '#94a3b8';
+  document.getElementById('launchBtn').disabled = !canShoot || isShooting;
+}
+
+function blockColor(hp, max){
+  // hp relative to level
+  const t = Math.min(1, hp / Math.max(8, level*1.2+4));
+  // interpolate from cyan -> yellow -> orange -> red
+  if(t < 0.33){
+    const k=t/0.33;
+    return `rgb(${Math.round(56+k*120)},${Math.round(189+k*20)},${Math.round(248-k*80)})`;
+  } else if(t < 0.66){
+    const k=(t-0.33)/0.33;
+    return `rgb(${Math.round(176+k*79)},${Math.round(209-k*40)},${Math.round(168-k*120)})`;
+  } else {
+    const k=(t-0.66)/0.34;
+    return `rgb(${Math.round(255)},${Math.round(169-k*110)},${Math.round(48-k*48)})`;
+  }
+}
+
+function generateRow(){
+  // shift existing down
+  for(const b of blocks) b.r += 1;
+  for(const p of pickups) p.r += 1;
+
+  // check game over after shift (before adding new row)
+  for(const b of blocks){
+    if(b.r >= ROWS){
+      return true; // game over
+    }
+  }
+  for(const p of pickups){
+    if(p.r >= ROWS){
+      // remove pickups that fell off
+    }
+  }
+  pickups = pickups.filter(p=>p.r < ROWS);
+
+  // create new row at r=0
+  const newBlocks=[];
+  const newPickups=[];
+  let hasBlock=false;
+  for(let c=0;c<COLS;c++){
+    const roll = Math.random();
+    if(roll < 0.55){
+      // block
+      const hp = Math.max(1, Math.floor(level * (0.7 + Math.random()*0.6) + Math.random()*3));
+      newBlocks.push({r:0,c:c,hp:hp,max:hp, id:Math.random().toString(36).slice(2)});
+      hasBlock=true;
+    } else if(roll < 0.62){
+      // pickup
+      newPickups.push({r:0,c:c, id:Math.random().toString(36).slice(2)});
+    }
+  }
+  if(!hasBlock){
+    const c = Math.floor(Math.random()*COLS);
+    const hp = Math.max(1, Math.floor(level*0.9+1));
+    newBlocks.push({r:0,c:c,hp:hp,max:hp,id:Math.random().toString(36).slice(2)});
+  }
+  blocks.push(...newBlocks);
+  pickups.push(...newPickups);
+  return false;
+}
+
+function startGame(){
+  level = parseInt(localStorage.getItem('cascade_level')||'1',10) || 1;
+  // if coming from menu, keep balls else reset if game over
+  if(blocks.length===0 && pickups.length===0){
+    // fresh
+    if(!balls || balls<5) balls=15;
+  }
+  blocks=[]; pickups=[];
+  // generate initial rows: 3 rows
+  for(let i=0;i<3;i++){
+    // manual gen without shift check
+    let hasBlock=false;
+    for(let c=0;c<COLS;c++){
+      const roll=Math.random();
+      if(roll<0.5){
+        const hp=Math.max(1, Math.floor((level)*0.6 + Math.random()*4 +1));
+        blocks.push({r:i,c:c,hp:hp,max:hp,id:Math.random().toString(36).slice(2)});
+        hasBlock=true;
+      } else if(roll<0.58){
+        pickups.push({r:i,c:c,id:Math.random().toString(36).slice(2)});
+      }
+    }
+    if(!hasBlock){
+      const c=Math.floor(Math.random()*COLS);
+      blocks.push({r:i,c:c,hp:Math.max(1,Math.floor(level*0.8+1)),max:Math.max(1,Math.floor(level*0.8+1)),id:Math.random().toString(36).slice(2)});
+    }
+  }
+  // normalize r to start from top: we pushed with r=i, but we want them at top rows 0..2, that's fine
+  // Actually we want them descending: keep as is
+  launchX = W/2;
+  canShoot=true; isShooting=false; isAiming=false;
+  ballsInPlay=[]; pendingLaunchQueue=[];
+  ballsToAddNext=0;
+  updateHUD();
+  hideAllOverlays();
+  savePersist();
+}
+
+function newRound(){
+  // add collected balls
+  if(ballsToAddNext>0){
+    balls += ballsToAddNext;
+    ballsToAddNext=0;
+  }
+  // extra balls over time
+  if(level % 3 === 0){
+    balls += 2;
+    showHint('+2 BONUS BALLS!', 1200);
+  }
+  level++;
+  if(level>best){ best=level; }
+  const isOver = generateRow();
+  updateHUD();
+  savePersist();
+  if(isOver){
+    triggerGameOver();
+    return;
+  }
+  // reset for next shot
+  canShoot=true;
+  isShooting=false;
+  ballsInPlay=[];
+  pendingLaunchQueue=[];
+  returnedCount=0;
+  if(lastReturnX!==null){
+    // clamp
+    launchX = Math.max(BALL_R+6, Math.min(W-BALL_R-6, lastReturnX));
+  }
+  lastReturnX=null;
+  updateHUD();
+}
+
+function triggerGameOver(){
+  canShoot=false;
+  isShooting=false;
+  document.getElementById('goText').textContent = `You reached level ${level} with ${balls} balls. Best is ${best}.`;
+  gameOverOverlay.style.display='flex';
+  savePersist();
+}
+
+function hideAllOverlays(){
+  startOverlay.style.display='none';
+  gameOverOverlay.style.display='none';
+  howOverlay.style.display='none';
+}
+
+function showHint(txt, ms=900){
+  hintEl.textContent=txt;
+  hintEl.classList.add('show');
+  setTimeout(()=>hintEl.classList.remove('show'), ms);
+}
+
+function getBlockRect(b){
+  const x = 8 + b.c * BLOCK_W;
+  const y = 8 + b.r * BLOCK_H + 28; // top offset for header inside canvas
+  return {x:x+2, y:y, w:BLOCK_W-4, h:BLOCK_H-4, cx:x+BLOCK_W/2, cy:y+BLOCK_H/2};
+}
+function getPickupPos(p){
+  const r = getBlockRect(p);
+  return {x:r.cx, y:r.cy};
+}
+
+function launchVolley(){
+  if(!canShoot || isShooting) return;
+  canShoot=false;
+  isShooting=true;
+  isAiming=false;
+  legendEl.style.opacity='0';
+  ballsInPlay=[];
+  pendingLaunchQueue=[];
+  returnedCount=0;
+  totalToLaunch=balls;
+  lastReturnX=null;
+  // queue balls
+  for(let i=0;i<balls;i++){
+    pendingLaunchQueue.push({delay:i*LAUNCH_INTERVAL});
+  }
+  launchTimer=0;
+  updateHUD();
+}
+
+let lastTime=0;
+function loop(ts){
+  animId=requestAnimationFrame(loop);
+  if(paused) { draw(); return; }
+  if(!lastTime) lastTime=ts;
+  const dt = Math.min(32, ts-lastTime);
+  lastTime=ts;
+
+  // launch queue
+  if(isShooting && pendingLaunchQueue.length>0){
+    launchTimer += dt;
+    while(pendingLaunchQueue.length>0 && launchTimer >= pendingLaunchQueue[0].delay){
+      pendingLaunchQueue.shift();
+      const ang = aimAngle;
+      const vx = Math.cos(ang)*SPEED;
+      const vy = -Math.sin(ang)*SPEED;
+      ballsInPlay.push({x:launchX, y:launchY, vx:vx, vy:vy, active:true, returned:false});
+      launchTimer = 0; // reset relative? Actually we use absolute delays, so need to handle differently
+      // Instead we used delay as absolute, so we need to track elapsed
+      // Simpler: pop one per interval
+      break;
+    }
+    // Alternative simple: if enough time passed, launch one
+    // We'll implement interval check via counter
+  }
+  // Better interval logic: use a separate counter
+  // Fix: use launchCooldown
+  updateBalls(dt);
+  draw();
+  // check round end
+  if(isShooting && pendingLaunchQueue.length===0 && ballsInPlay.length===0){
+    // all balls returned
+    isShooting=false;
+    legendEl.style.opacity='1';
+    // small delay before next round
+    setTimeout(()=>newRound(), 300);
+    updateHUD();
+  }
+}
+
+// Improved launch handling with cooldown
+let launchCooldown=0;
+function updateBalls(dt){
+  if(isShooting){
+    launchCooldown -= dt;
+    if(pendingLaunchQueue.length>0 && launchCooldown<=0){
+      pendingLaunchQueue.shift();
+      const ang = aimAngle;
+      const vx = Math.cos(ang)*SPEED;
+      const vy = -Math.sin(ang)*SPEED;
+      ballsInPlay.push({x:launchX, y:launchY, vx:vx, vy:vy, active:true, returned:false});
+      launchCooldown = LAUNCH_INTERVAL;
+      if(pendingLaunchQueue.length===0) launchCooldown=0;
+    }
+  }
+  // move balls
+  for(let i=ballsInPlay.length-1;i>=0;i--){
+    const b = ballsInPlay[i];
+    if(!b.active) continue;
+    b.x += b.vx;
+    b.y += b.vy;
+
+    // wall bounce
+    if(b.x - BALL_R < 0){ b.x = BALL_R; b.vx *= -1; }
+    if(b.x + BALL_R > W){ b.x = W - BALL_R; b.vx *= -1; }
+    if(b.y - BALL_R < 0){ b.y = BALL_R; b.vy *= -1; }
+
+    // bottom collection (danger line is at dangerY, but collection at H-BOTTOM_MARGIN)
+    if(b.y + BALL_R > H - BOTTOM_MARGIN && b.vy > 0){
+      // collect
+      b.active=false;
+      b.returned=true;
+      if(lastReturnX===null) lastReturnX = b.x;
+      else {
+        // average? use last
+        lastReturnX = b.x;
+      }
+      ballsInPlay.splice(i,1);
+      returnedCount++;
+      continue;
+    }
+
+    // block collisions
+    for(let j=blocks.length-1;j>=0;j--){
+      const blk = blocks[j];
+      const rect = getBlockRect(blk);
+      // closest point
+      const closestX = Math.max(rect.x, Math.min(b.x, rect.x+rect.w));
+      const closestY = Math.max(rect.y, Math.min(b.y, rect.y+rect.h));
+      const dx = b.x - closestX;
+      const dy = b.y - closestY;
+      const distSq = dx*dx + dy*dy;
+      if(distSq < BALL_R*BALL_R + 0.5){
+        // collision
+        const dist = Math.sqrt(distSq) || 0.001;
+        const nx = dx/dist;
+        const ny = dy/dist;
+        // reflect
+        const dot = b.vx*nx + b.vy*ny;
+        b.vx = b.vx - 2*dot*nx;
+        b.vy = b.vy - 2*dot*ny;
+        // push out
+        const overlap = BALL_R - dist + 1;
+        b.x += nx*overlap;
+        b.y += ny*overlap;
+        // damage block
+        blk.hp -= 1;
+        if(blk.hp <= 0){
+          blocks.splice(j,1);
+        }
+        break; // one block per frame per ball
+      }
+    }
+    // pickup collisions
+    for(let j=pickups.length-1;j>=0;j--){
+      const p = pickups[j];
+      const pos = getPickupPos(p);
+      const dx = b.x - pos.x;
+      const dy = b.y - pos.y;
+      if(dx*dx+dy*dy < (BALL_R+PICKUP_R)*(BALL_R+PICKUP_R)){
+        pickups.splice(j,1);
+        ballsToAddNext += 1;
+        showHint('+1 BALL', 700);
+        // update HUD preview
+        // balls will be added next round, but show pending
+      }
+    }
+  }
+}
+
+function draw(){
+  // clear
+  ctx.clearRect(0,0,W,H);
+  // top safe area
+  // danger line
+  ctx.fillStyle = 'rgba(239,68,68,0.12)';
+  ctx.fillRect(0, dangerY, W, H-dangerY);
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6,6]);
+  ctx.beginPath();
+  ctx.moveTo(0, dangerY);
+  ctx.lineTo(W, dangerY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#ef4444';
+  ctx.font = '700 10px system-ui';
+  ctx.textAlign='right';
+  ctx.fillText('DANGER LINE', W-8, dangerY-6);
+
+  // blocks
+  for(const blk of blocks){
+    const rect = getBlockRect(blk);
+    const col = blockColor(blk.hp, blk.max);
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.roundRect(rect.x, rect.y+3, rect.w, rect.h, 10);
+    ctx.fill();
+    // block
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 10);
+    ctx.fill();
+    // inner highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.beginPath();
+    ctx.roundRect(rect.x, rect.y, rect.w, 4, 10);
+    ctx.fill();
+    // number
+    ctx.fillStyle = '#0a0f1c';
+    // choose text color based on brightness
+    // use white with shadow for readability
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `900 ${Math.max(13, Math.min(18, rect.w*0.38))}px system-ui`;
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.shadowColor='rgba(0,0,0,0.4)';
+    ctx.shadowBlur=4;
+    ctx.fillText(String(blk.hp), rect.cx, rect.cy+1);
+    ctx.shadowBlur=0;
+  }
+  // pickups
+  for(const p of pickups){
+    const pos = getPickupPos(p);
+    // glow
+    ctx.fillStyle='rgba(34,197,94,0.25)';
+    ctx.beginPath(); ctx.arc(pos.x,pos.y,PICKUP_R+6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#22c55e';
+    ctx.beginPath(); ctx.arc(pos.x,pos.y,PICKUP_R,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#052e16';
+    ctx.font='900 11px system-ui';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('+1', pos.x, pos.y+0.5);
+    // ring
+    ctx.strokeStyle='rgba(255,255,255,0.9)';
+    ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(pos.x,pos.y,PICKUP_R,0,Math.PI*2); ctx.stroke();
+  }
+
+  // trajectory
+  if(canShoot && !isShooting){
+    drawTrajectory();
+  }
+
+  // launcher base
+  // track
+  ctx.fillStyle='#1e2a44';
+  ctx.fillRect(0, H-BOTTOM_MARGIN, W, BOTTOM_MARGIN);
+  ctx.fillStyle='#243352';
+  ctx.fillRect(0, H-BOTTOM_MARGIN, W, 1);
+  // launcher
+  const lx = launchX;
+  const ly = launchY;
+  // base circle
+  ctx.fillStyle='#0f1729';
+  ctx.strokeStyle='#2a3a5e';
+  ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(lx, H-16, 18, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#38bdf8';
+  ctx.shadowColor='rgba(56,189,248,0.8)';
+  ctx.shadowBlur=10;
+  ctx.beginPath(); ctx.arc(lx, H-16, 7, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0;
+  // aim line small
+  if(canShoot && !isShooting){
+    ctx.strokeStyle='rgba(56,189,248,0.9)';
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(lx, H-16);
+    const ax = lx + Math.cos(aimAngle)*22;
+    const ay = (H-16) + -Math.sin(aimAngle)*22;
+    ctx.lineTo(ax, ay);
+    ctx.stroke();
+  }
+
+  // balls in play
+  for(const b of ballsInPlay){
+    ctx.fillStyle='#e2e8f0';
+    ctx.shadowColor='rgba(255,255,255,0.5)';
+    ctx.shadowBlur=6;
+    ctx.beginPath(); ctx.arc(b.x,b.y,BALL_R,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(255,255,255,0.9)';
+    ctx.beginPath(); ctx.arc(b.x-2,b.y-2,2,0,Math.PI*2); ctx.fill();
+  }
+
+  // pending balls indicator
+  if(ballsToAddNext>0){
+    ctx.fillStyle='#22c55e';
+    ctx.font='700 11px system-ui';
+    ctx.textAlign='left';
+    ctx.fillText(`+${ballsToAddNext} next round`, 10, H-10);
+  }
+}
+
+function drawTrajectory(){
+  const dots=14;
+  const step=18;
+  let x=launchX, y=launchY;
+  let dx=Math.cos(aimAngle), dy=-Math.sin(aimAngle);
+  ctx.fillStyle='rgba(255,255,255,0.95)';
+  for(let i=0;i<dots;i++){
+    x += dx*step;
+    y += dy*step;
+    // bounce walls
+    if(x < BALL_R){ x=BALL_R; dx*=-1; }
+    if(x > W-BALL_R){ x=W-BALL_R; dx*=-1; }
+    if(y < BALL_R){ y=BALL_R; dy*=-1; }
+    if(y > dangerY-6) break;
+    const alpha = 1 - i/dots*0.6;
+    ctx.globalAlpha=alpha;
+    ctx.beginPath();
+    ctx.arc(x,y, i===0?4:3, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  // arrow head
+  const ax = launchX + Math.cos(aimAngle)*36;
+  const ay = launchY + -Math.sin(aimAngle)*36;
+  ctx.fillStyle='#38bdf8';
+  ctx.beginPath();
+  ctx.arc(ax,ay,5,0,Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle='white';
+  ctx.beginPath();
+  ctx.arc(ax,ay,2,0,Math.PI*2);
+  ctx.fill();
+}
+
+// Input handling
+function getAngleFromPoint(px,py){
+  const dx = px - launchX;
+  const dy = launchY - py; // invert y
+  let ang = Math.atan2(dy, dx);
+  // clamp to 15° .. 165°
+  const min = 15*Math.PI/180;
+  const max = 165*Math.PI/180;
+  if(ang < min) ang=min;
+  if(ang > max) ang=max;
+  return ang;
+}
+function pointerPos(e){
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return {x: t.clientX - rect.left, y: t.clientY - rect.top};
+}
+canvas.addEventListener('touchstart', (e)=>{
+  if(!canShoot || isShooting) return;
+  e.preventDefault();
+  isAiming=true;
+  const p=pointerPos(e);
+  aimAngle=getAngleFromPoint(p.x,p.y);
+}, {passive:false});
+canvas.addEventListener('touchmove', (e)=>{
+  if(!isAiming) return;
+  e.preventDefault();
+  const p=pointerPos(e);
+  aimAngle=getAngleFromPoint(p.x,p.y);
+}, {passive:false});
+canvas.addEventListener('touchend', (e)=>{
+  if(!isAiming) return;
+  e.preventDefault();
+  isAiming=false;
+  launchVolley();
+}, {passive:false});
+canvas.addEventListener('mousedown', (e)=>{
+  if(!canShoot || isShooting) return;
+  isAiming=true;
+  const p=pointerPos(e);
+  aimAngle=getAngleFromPoint(p.x,p.y);
+});
+window.addEventListener('mousemove', (e)=>{
+  if(!isAiming) return;
+  const p=pointerPos(e);
+  aimAngle=getAngleFromPoint(p.x,p.y);
+});
+window.addEventListener('mouseup', ()=>{
+  if(!isAiming) return;
+  isAiming=false;
+  launchVolley();
+});
+
+// Buttons
+document.getElementById('playBtn').addEventListener('click', ()=>{
+  startGame();
+});
+document.getElementById('retryBtn').addEventListener('click', ()=>{
+  // reset level? keep progression but reset board
+  // if game over, reset level to 1? spec says level persistence, but game over should reset to 1
+  level=1; balls=15; savePersist();
+  startGame();
+});
+document.getElementById('menuBtn').addEventListener('click', ()=>{
+  gameOverOverlay.style.display='none';
+  startOverlay.style.display='flex';
+  level=1; balls=15;
+  blocks=[]; pickups=[];
+  updateHUD();
+});
+document.getElementById('howBtn').addEventListener('click', ()=>{ howOverlay.style.display='flex'; });
+document.getElementById('closeHow').addEventListener('click', ()=>{ howOverlay.style.display='none'; });
+document.getElementById('resetBestBtn').addEventListener('click', ()=>{
+  best=1; level=1; balls=15;
+  try{ localStorage.removeItem('cascade_best'); localStorage.setItem('cascade_best','1'); localStorage.setItem('cascade_level','1'); localStorage.setItem('cascade_balls','15'); }catch(e){}
+  updateHUD(); showHint('Best reset to 1');
+});
+document.getElementById('launchBtn').addEventListener('click', launchVolley);
+document.getElementById('pauseBtn').addEventListener('click', ()=>{
+  paused=!paused;
+  document.getElementById('pauseBtn').textContent = paused ? '▶' : '⏸';
+  showHint(paused?'Paused':'Resumed', 600);
+});
+
+// init
+loadPersist();
+resize();
+updateHUD();
+draw();
+animId=requestAnimationFrame(loop);
+
+// handle visibility
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden) paused=true;
+});
+
+})();
+</script>
+</body>
+</html>

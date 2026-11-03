@@ -1,11 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Placeholder: an "M" on the brand teal until there's a real icon. -->
+<!-- App icon foreground: gold line art on the charcoal background. The Masala mark (canvas trace, decision 12), 512 grid scaled into the 66 dp safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M36,72V36h7l11,16 11,-16h7v36h-7V48l-11,15 -11,-15v24z" />
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:scaleX="0.56"
+        android:scaleY="0.56"
+        android:translateX="-1.1"
+        android:translateY="2.2">
+        <path
+            android:pathData="M255,222 L306,170 M322,222 L345,182"
+            android:strokeColor="#EBCB80"
+            android:strokeWidth="16"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <group
+            android:pivotX="339"
+            android:pivotY="156"
+            android:rotation="40">
+            <path
+                android:pathData="M330,143 H348 A13,13 0 0,1 348,169 H330 A13,13 0 0,1 330,143 Z"
+                android:strokeColor="#EBCB80"
+                android:strokeWidth="16"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round" />
+        </group>
+        <path
+            android:pathData="M146,228 A109,16 0 1,0 364,228 A109,16 0 1,0 146,228 Z"
+            android:strokeColor="#EBCB80"
+            android:strokeWidth="16"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M146,230 C146,300 195,346 255,346 C315,346 364,300 364,230 M323,266 C321,296 297,320 260,322 M208,347 L196,369 L316,369 L304,347"
+            android:strokeColor="#EBCB80"
+            android:strokeWidth="16"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
 </vector>

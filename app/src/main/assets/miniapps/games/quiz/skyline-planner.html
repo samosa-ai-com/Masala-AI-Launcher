@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>Pocket City Campaign</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0B1220;--card:#162032;--card2:#1C2B45;--line:#24344F;--accent:#38BDF8;--accent2:#22D3EE;--good:#22C55E;--warn:#F59E0B;--bad:#EF4444;--text:#E6EDF7;--muted:#8EA0BE}
+html,body{height:100%;background:#070D1A;color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;overflow-x:hidden}
+body{font-size:16px;line-height:1.45}
+.app{max-width:428px;min-height:100vh;margin:0 auto;background:linear-gradient(180deg,#0B1220 0%,#0E1A2E 100%);display:flex;flex-direction:column;position:relative;overflow-x:hidden}
+header{position:sticky;top:0;z-index:20;background:rgba(11,18,32,0.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:10px 12px 8px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#38BDF8,#6366F1);display:grid;place-items:center;font-weight:900;font-size:18px;box-shadow:0 6px 16px rgba(56,189,248,.35)}
+.brand h1{font-size:16px;line-height:1.1;font-weight:800;letter-spacing:.2px}
+.brand p{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+.headerStats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:7px 6px;text-align:center}
+.stat b{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block}
+.stat span{font-size:14px;font-weight:800;display:block;margin-top:2px}
+.stat.good{border-color:rgba(34,197,94,.35)}
+.stat.bad{border-color:rgba(239,68,68,.35)}
+.stat.warn{border-color:rgba(245,158,11,.35)}
+.tabs{display:flex;gap:6px;padding:8px 12px;background:var(--bg);border-bottom:1px solid var(--line);position:sticky;top:73px;z-index:19}
+.tab{flex:1;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--muted);font-weight:800;font-size:13px;letter-spacing:.3px;display:grid;place-items:center;cursor:pointer}
+.tab.active{background:linear-gradient(135deg,#38BDF8,#6366F1);color:white;border-color:transparent;box-shadow:0 6px 14px rgba(56,189,248,.3)}
+.view{flex:1;padding:12px 12px 18px;display:none}
+.view.active{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}
+.card h2{font-size:15px;font-weight:800}
+.card p{font-size:13px;color:var(--muted);margin-top:4px;line-height:1.5}
+.btn{height:48px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--text);font-weight:800;font-size:14px;padding:0 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;touch-action:manipulation;min-width:48px}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:linear-gradient(135deg,#38BDF8,#6366F1);border-color:transparent;color:white;box-shadow:0 8px 18px rgba(56,189,248,.28)}
+.btn.ghost{background:transparent}
+.btn.small{height:40px;font-size:13px;border-radius:10px}
+.btn.block{width:100%}
+.gridWrap{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px}
+.gridHead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.gridHead h3{font-size:13px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:var(--muted)}
+.badge{font-size:11px;font-weight:800;padding:6px 8px;border-radius:999px;background:var(--card2);border:1px solid var(--line);color:var(--muted)}
+.cityGrid{display:grid;gap:5px;background:#0A1326;padding:6px;border-radius:12px;border:1px solid var(--line)}
+.cell{aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-weight:900;font-size:18px;cursor:pointer;user-select:none;border:2px solid transparent;position:relative;overflow:hidden;min-height:44px;transition:.12s}
+.cell.empty{background:#0F1E36;border-color:#1E2F4A;color:#2A3E5E}
+.cell.R{background:linear-gradient(135deg,#7DD3FC,#38BDF8);color:#0B1220;border-color:#38BDF8}
+.cell.C{background:linear-gradient(135deg,#FDE68A,#FBBF24);color:#1F1300;border-color:#F59E0B}
+.cell.I{background:linear-gradient(135deg,#FDA4AF,#EF4444);color:white;border-color:#EF4444}
+.cell.P{background:linear-gradient(135deg,#6EE7B7,#10B981);color:#052E1A;border-color:#10B981}
+.cell.ghost{opacity:.45;outline:2px dashed #38BDF8;outline-offset:-4px}
+.cell span.lbl{font-size:9px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;opacity:.85}
+.tools{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px}
+.tool{height:64px;border-radius:14px;border:2px solid var(--line);background:var(--card2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer}
+.tool.active{border-color:#38BDF8;background:linear-gradient(135deg,rgba(56,189,248,.18),rgba(99,102,241,.18));box-shadow:0 6px 14px rgba(56,189,248,.18)}
+.tool i{font-size:18px;font-style:normal;font-weight:900}
+.tool b{font-size:11px;font-weight:800;letter-spacing:.3px}
+.tool em{font-size:10px;color:var(--muted);font-style:normal;font-weight:700}
+.meterRow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.meter{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:8px}
+.meter b{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.meter .bar{height:8px;background:#0A1326;border-radius:999px;margin-top:6px;overflow:hidden;border:1px solid var(--line)}
+.meter .fill{height:100%;border-radius:999px;transition:.3s}
+.goals{display:grid;gap:8px}
+.goal{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px}
+.goal.ok{border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.08)}
+.goal.fail{border-color:rgba(239,68,68,.45);background:rgba(239,68,68,.08)}
+.goal b{font-size:13px}
+.goal span{font-size:12px;font-weight:800;padding:6px 8px;border-radius:999px;background:var(--card);border:1px solid var(--line)}
+.campaignGrid{display:grid;gap:10px}
+.cityCard{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;cursor:pointer;position:relative;overflow:hidden}
+.cityCard.locked{opacity:.55}
+.cityCard.activeCity{border-color:#38BDF8;box-shadow:0 8px 20px rgba(56,189,248,.18)}
+.cityNum{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-weight:900;background:var(--card2);border:1px solid var(--line);flex-shrink:0}
+.cityCard.done .cityNum{background:linear-gradient(135deg,#22C55E,#16A34A);color:white;border-color:transparent}
+.cityInfo{flex:1;min-width:0}
+.cityInfo h3{font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cityInfo p{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stars{color:#FBBF24;letter-spacing:1px;font-size:12px}
+.policyGrid{display:grid;gap:8px}
+.policy{display:flex;gap:10px;align-items:center;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer}
+.policy.on{border-color:#38BDF8;background:rgba(56,189,248,.08)}
+.policy input{width:20px;height:20px;accent-color:#38BDF8}
+.policy b{font-size:13px}
+.policy p{font-size:11px;color:var(--muted)}
+.sheet{position:fixed;inset:0;background:rgba(3,8,18,.62);backdrop-filter:blur(6px);display:none;align-items:flex-end;justify-content:center;z-index:50;padding:12px}
+.sheet.open{display:flex}
+.sheetBox{width:100%;max-width:428px;background:#0F1B2E;border:1px solid var(--line);border-radius:18px 18px 0 0;max-height:86vh;overflow:auto;padding:14px}
+.sheetBox h3{font-size:16px;font-weight:900}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.kv div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.kv b{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.kv span{font-size:16px;font-weight:900;display:block;margin-top:4px}
+.divider{height:1px;background:var(--line);margin:12px 0}
+.helpList{display:grid;gap:8px;margin-top:8px}
+.helpList li{list-style:none;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px;font-size:13px;color:var(--muted)}
+.helpList li b{color:var(--text)}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#0F1B2E;border:1px solid var(--line);color:var(--text);padding:10px 14px;border-radius:999px;font-weight:800;font-size:13px;box-shadow:0 10px 24px rgba(0,0,0,.35);display:none;z-index:60;max-width:90%;text-align:center}
+.toast.show{display:block}
+textarea{width:100%;min-height:110px;background:var(--card2);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:10px;font-size:12px;font-family:ui-monospace,monospace}
+.row{display:flex;gap:8px}
+.row .btn{flex:1}
+.pill{font-size:11px;font-weight:800;padding:5px 8px;border-radius:999px;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.25);color:#7DD3FC}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">◧</div>
+      <div>
+        <h1>Pocket City Campaign</h1>
+        <p>12 Cities • Zone • Budget • Policies</p>
+      </div>
+    </div>
+    <button class="btn small" id="helpBtn">?</button>
+  </div>
+  <div class="headerStats">
+    <div class="stat" id="sYear"><b>Year</b><span>1 / 8</span></div>
+    <div class="stat" id="sReserves"><b>Reserves</b><span>$10,000</span></div>
+    <div class="stat" id="sHappy"><b>Happy</b><span>50%</span></div>
+    <div class="stat" id="sPoll"><b>Pollution</b><span>0%</span></div>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" data-tab="campaign">Campaign</button>
+  <button class="tab" data-tab="city">City</button>
+  <button class="tab" data-tab="archive">Archive</button>
+</div>
+
+<!-- CAMPAIGN VIEW -->
+<div class="view active" id="view-campaign">
+  <div class="card" style="margin-bottom:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <h2>Your Campaign</h2>
+      <span class="pill" id="progressPill">1 / 12 unlocked</span>
+    </div>
+    <p>Build each city to hit <b style="color:var(--text)">Happiness</b>, <b style="color:var(--text)">Reserves</b> and <b style="color:var(--text)">low Pollution</b>. Tap a city to play. Progress saves automatically and can be exported.</p>
+    <div class="row" style="margin-top:10px">
+      <button class="btn small" id="exportBtn">Export Archive</button>
+      <button class="btn small ghost" id="importBtn">Import</button>
+      <button class="btn small ghost" id="resetBtn">Reset</button>
+    </div>
+  </div>
+  <div class="campaignGrid" id="campaignGrid"></div>
+  <div class="card" style="margin-top:10px">
+    <h2>How to win</h2>
+    <p>Each city lasts 8 years. Zone blocks, set policies, then <b style="color:var(--text)">End Year</b> to collect budget. Bulldoze costs $100. Parks clean pollution and boost nearby homes. Works pay most but pollute. Shops need homes nearby.</p>
+  </div>
+</div>
+
+<!-- CITY VIEW -->
+<div class="view" id="view-city">
+  <div class="card" id="cityIntro" style="margin-bottom:10px"></div>
+
+  <div class="gridWrap">
+    <div class="gridHead">
+      <h3 id="cityTitle">Select a city</h3>
+      <span class="badge" id="cityMeta">—</span>
+    </div>
+    <div class="cityGrid" id="cityGrid"></div>
+
+    <div class="tools" id="tools">
+      <button class="tool active" data-tool="R"><i>⌂</i><b>Homes</b><em>$600</em></button>
+      <button class="tool" data-tool="C"><i>$</i><b>Shops</b><em>$900</em></button>
+      <button class="tool" data-tool="I"><i>⚙</i><b>Works</b><em>$1100</em></button>
+      <button class="tool" data-tool="P"><i>♣</i><b>Park</b><em>$400</em></button>
+      <button class="tool" data-tool="X"><i>✕</i><b>Clear</b><em>$100</em></button>
+    </div>
+
+    <div class="meterRow">
+      <div class="meter"><b>Yearly Income</b><div style="font-weight:900;margin-top:4px" id="mIncome">$0</div><div class="bar"><div class="fill" id="fIncome" style="width:30%;background:linear-gradient(90deg,#38BDF8,#6366F1)"></div></div></div>
+      <div class="meter"><b>Yearly Upkeep</b><div style="font-weight:900;margin-top:4px" id="mUpkeep">$0</div><div class="bar"><div class="fill" id="fUpkeep" style="width:20%;background:linear-gradient(90deg,#F59E0B,#EF4444)"></div></div></div>
+    </div>
+    <div class="meterRow">
+      <div class="meter"><b>Happiness</b><div style="font-weight:900;margin-top:4px" id="mHappy">50%</div><div class="bar"><div class="fill" id="fHappy" style="width:50%;background:linear-gradient(90deg,#22C55E,#06B6D4)"></div></div></div>
+      <div class="meter"><b>Pollution</b><div style="font-weight:900;margin-top:4px" id="mPoll">0%</div><div class="bar"><div class="fill" id="fPoll" style="width:10%;background:linear-gradient(90deg,#22C55E,#EF4444)"></div></div></div>
+    </div>
+
+    <div class="row" style="margin-top:10px">
+      <button class="btn primary" id="endYearBtn" style="flex:1.6">End Year →</button>
+      <button class="btn" id="ghostBtn">Ghost</button>
+      <button class="btn" id="replayBtn">Replay</button>
+    </div>
+    <p style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px">Tap blocks to zone. Large targets, no zoom needed. Portrait 360–428px.</p>
+  </div>
+
+  <div class="card" style="margin-top:10px">
+    <h2>Goals for this city</h2>
+    <div class="goals" id="goalsBox" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card" style="margin-top:10px">
+    <h2>Policies</h2>
+    <p>Toggle before ending the year. Costs apply yearly.</p>
+    <div class="policyGrid" id="policyGrid" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- ARCHIVE VIEW -->
+<div class="view" id="view-archive">
+  <div class="card">
+    <h2>Exportable Archive</h2>
+    <p>Your progress persists in this phone. Export to back up or move devices. Replay compares your build to the reference mayor.</p>
+    <div class="kv">
+      <div><b>Cities Done</b><span id="aDone">0</span></div>
+      <div><b>Stars Earned</b><span id="aStars">0 / 36</span></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn primary" id="aExport">Export JSON</button>
+      <button class="btn" id="aCopy">Copy</button>
+    </div>
+    <textarea id="archiveText" placeholder="Export will appear here. Paste an archive to import."></textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="aImport">Import Pasted</button>
+      <button class="btn ghost" id="aDownload">Download File</button>
+    </div>
+  </div>
+  <div class="card" style="margin-top:10px">
+    <h2>Reference Replays</h2>
+    <p>Open any completed city and tap <b style="color:var(--text)">Replay</b> to see your layout vs the reference build side-by-side with budget and happiness deltas.</p>
+    <div id="archiveList" style="margin-top:10px;display:grid;gap:8px"></div>
+  </div>
+</div>
+
+</div>
+
+<!-- SHEETS -->
+<div class="sheet" id="sheetHelp">
+  <div class="sheetBox">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>Structure & Key Features</h3>
+      <button class="btn small" onclick="closeSheet('sheetHelp')">Close</button>
+    </div>
+    <p style="color:var(--muted);font-size:13px;margin-top:6px">Mobile-first pocket builder for 360–428px portrait. No horizontal scroll, 48px+ touch targets, 16px readable text.</p>
+    <ul class="helpList">
+      <li><b>12 Scenarios:</b> Each city has unique size (6×6 to 8×8), starting reserves, 8-year limit, and goals for Happiness / Reserves / Pollution.</li>
+      <li><b>Zoning:</b> Homes (⌂), Shops ($), Works (⚙), Park (♣). Costs deducted instantly. Adjacency matters: Parks boost nearby Homes, Works hurt Homes, Shops earn more near Homes.</li>
+      <li><b>Yearly Budget:</b> Income from zones minus upkeep + policy costs = net. Reserves carry over. End Year to advance.</li>
+      <li><b>Policies:</b> Tax Relief, Green Deal, Metro Lines, Forge Subsidy. Toggle any combo; effects stack and show live in meters.</li>
+      <li><b>Bulldoze:</b> Clear tool costs $100, removes block for replanning.</li>
+      <li><b>Goals:</b> Must meet all three at year 8. Stars: 1 for win, +1 for high happiness, +1 for low pollution.</li>
+      <li><b>Replay vs Reference:</b> Ghost overlays reference layout; Replay modal compares stats and layout diff.</li>
+      <li><b>Persist & Export:</b> Auto-saves to localStorage. Archive view exports full JSON (progress + city histories) for backup.</li>
+    </ul>
+    <div class="divider"></div>
+    <p style="font-size:12px;color:var(--muted)">Tip: Early cities teach parks. Later cities need tight budgeting — don’t over-zone Works before you can afford Green Deal.</p>
+  </div>
+</div>
+
+<div class="sheet" id="sheetReplay">
+  <div class="sheetBox">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 id="replayTitle">Replay</h3>
+      <button class="btn small" onclick="closeSheet('sheetReplay')">Close</button>
+    </div>
+    <div id="replayBody" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<div class="sheet" id="sheetWin">
+  <div class="sheetBox" style="text-align:center">
+    <h3 id="winTitle">City Complete!</h3>
+    <p id="winDesc" style="color:var(--muted);font-size:13px;margin-top:6px"></p>
+    <div class="kv" id="winStats"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn ghost" onclick="closeSheet('sheetWin')">Keep Building</button>
+      <button class="btn primary" id="nextCityBtn">Next City →</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="fileInput" accept=".json,application/json" style="display:none">
+
+<script>
+const ZONES={
+  R:{label:'Homes',cost:600,upkeep:40,happy:4,poll:2,income:180,color:'#38BDF8',icon:'⌂'},
+  C:{label:'Shops',cost:900,upkeep:60,happy:2,poll:3,income:320,color:'#FBBF24',icon:'$'},
+  I:{label:'Works',cost:1100,upkeep:80,happy:-3,poll:8,income:500,color:'#EF4444',icon:'⚙'},
+  P:{label:'Park',cost:400,upkeep:20,happy:7,poll:-5,income:0,color:'#10B981',icon:'♣'},
+  empty:{label:'Empty',cost:0,upkeep:0,happy:0,poll:0,income:0,color:'#0F1E36',icon:'·'}
+};
+const POLICIES={
+  taxCut:{name:'Tax Relief',desc:'+8 Happiness, -18% income',cost:0,happy:8,incomeMult:0.82},
+  green:{name:'Green Deal',desc:'-22% pollution, -900/yr',cost:900,happy:3,pollMult:0.78},
+  transit:{name:'Metro Lines',desc:'+6 Happiness, -12% pollution, -650/yr',cost:650,happy:6,pollMult:0.88},
+  industry:{name:'Forge Subsidy',desc:'+35% Works income, +18% pollution',cost:0,happy:-4,incomeMultIndustry:1.35,pollMult:1.18}
+};
+
+const CITIES=[
+  {id:1,name:'Greenfield',sub:'Tutorial Valley',size:6,years:8,start:10000,goals:{happy:62,reserves:9000,pollMax:42},desc:'Learn zoning. Parks are your friend.'},
+  {id:2,name:'Harbor Start',sub:'Coastal Trade',size:6,years:8,start:9500,goals:{happy:65,reserves:11000,pollMax:40},desc:'Shops thrive near homes by the harbor.'},
+  {id:3,name:'Dust Bowl',sub:'Arid Outpost',size:6,years:8,start:8500,goals:{happy:60,reserves:10000,pollMax:38},desc:'Water is scarce. Parks cost more but matter more.'},
+  {id:4,name:'Tech Park',sub:'Innovation Row',size:7,years:8,start:12000,goals:{happy:70,reserves:14000,pollMax:35},desc:'High upkeep, high reward. Balance Works carefully.'},
+  {id:5,name:'Old Town',sub:'Heritage Core',size:6,years:8,start:9000,goals:{happy:72,reserves:10500,pollMax:32},desc:'Happiness is king. Preserve charm with parks.'},
+  {id:6,name:'Riverbend',sub:'Floodplain City',size:7,years:8,start:10000,goals:{happy:68,reserves:13000,pollMax:36},desc:'River parks give bonus happiness to adjacent homes.'},
+  {id:7,name:'Industrial Flats',sub:'Forge District',size:7,years:8,start:11000,goals:{happy:60,reserves:16000,pollMax:45},desc:'Works pay big. Can you keep pollution under control?'},
+  {id:8,name:'Skyline Heights',sub:'Vertical Living',size:7,years:8,start:13000,goals:{happy:74,reserves:15000,pollMax:34},desc:'Density challenge. Every block counts.'},
+  {id:9,name:'Eco Haven',sub:'Green Utopia',size:8,years:8,start:10500,goals:{happy:78,reserves:12500,pollMax:28},desc:'Strict pollution cap. Green Deal almost required.'},
+  {id:10,name:'Metro Sprawl',sub:'Commuter Belt',size:8,years:8,start:11500,goals:{happy:70,reserves:17000,pollMax:38},desc:'Sprawl needs transit. Metro Lines shine here.'},
+  {id:11,name:'Capital Core',sub:'Seat of Power',size:8,years:8,start:14000,goals:{happy:75,reserves:18000,pollMax:36},desc:'High goals on all fronts. Master budgeting.'},
+  {id:12,name:'Future Bay',sub:'Final Frontier',size:8,years:8,start:15000,goals:{happy:80,reserves:20000,pollMax:30},desc:'The ultimate test. Hit all goals to win the campaign.'}
+];
+// generate deterministic reference layouts
+function genRef(city){
+  const n=city.size*city.size;
+  let arr=new Array(n).fill('empty');
+  // simple pattern per city id
+  for(let i=0;i<n;i++){
+    const r=Math.floor(i/city.size), c=i%city.size;
+    const v=(r*7 + c*11 + city.id*13)%100;
+    if(city.id<=3){
+      if(v<28) arr[i]='R'; else if(v<45) arr[i]='C'; else if(v<58) arr[i]='I'; else if(v<78) arr[i]='P';
+    } else if(city.id<=6){
+      if(v<30) arr[i]='R'; else if(v<50) arr[i]='C'; else if(v<62) arr[i]='I'; else if(v<80) arr[i]='P';
+    } else if(city.id<=9){
+      if(v<26) arr[i]='R'; else if(v<48) arr[i]='C'; else if(v<65) arr[i]='I'; else if(v<82) arr[i]='P';
+    } else {
+      if(v<28) arr[i]='R'; else if(v<52) arr[i]='C'; else if(v<68) arr[i]='I'; else if(v<85) arr[i]='P';
+    }
+  }
+  // ensure some empties on edges for realism
+  return arr;
+}
+CITIES.forEach(c=>c.ref=genRef(c));
+
+let state=loadState();
+let currentId=null;
+let grid=[];
+let year=1;
+let reserves=10000;
+let policies={};
+let selectedTool='R';
+let ghostOn=false;
+let metrics={happy:50,poll:0,income:0,upkeep:0,net:0};
+
+function loadState(){
+  try{
+    const s=JSON.parse(localStorage.getItem('pocketCity_v3')||'null');
+    if(s) return s;
+  }catch(e){}
+  return {unlocked:1, progress:{}, history:{}};
+}
+function saveState(){
+  localStorage.setItem('pocketCity_v3', JSON.stringify(state));
+}
+function saveCityTemp(){
+  if(!currentId) return;
+  state.history[currentId]=state.history[currentId]||{};
+  state.history[currentId].grid=[...grid];
+  state.history[currentId].year=year;
+  state.history[currentId].reserves=reserves;
+  state.history[currentId].policies={...policies};
+  state.history[currentId].metrics={...metrics};
+  saveState();
+}
+
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+function calcMetrics(g, pol){
+  let happy=50, poll=0, income=0, upkeep=0;
+  let counts={R:0,C:0,I:0,P:0,empty:0};
+  g.forEach(v=>counts[v]=(counts[v]||0)+1);
+  // base sums
+  g.forEach((v,i)=>{
+    if(v==='empty') return;
+    const z=ZONES[v];
+    happy+=z.happy;
+    poll+=z.poll;
+    income+=z.income;
+    upkeep+=z.upkeep;
+  });
+  // adjacency bonuses
+  const size=Math.sqrt(g.length);
+  for(let i=0;i<g.length;i++){
+    const v=g[i]; if(v==='empty') continue;
+    const r=Math.floor(i/size), c=i%size;
+    const neigh=[ [r-1,c],[r+1,c],[r,c-1],[r,c+1] ];
+    neigh.forEach(([nr,nc])=>{
+      if(nr<0||nc<0||nr>=size||nc>=size) return;
+      const ni=nr*size+nc;
+      const nv=g[ni];
+      if(v==='R' && nv==='P') happy+=1.2;
+      if(v==='R' && nv==='I') happy-=1.5;
+      if(v==='C' && nv==='R') income+=28;
+      if(v==='P' && nv==='R') happy+=0.6;
+    });
+  }
+  // policies
+  let incomeMult=1, pollMult=1, happyAdd=0, upkeepAdd=0;
+  let industryMult=1;
+  Object.keys(pol).forEach(k=>{
+    if(!pol[k]) return;
+    const p=POLICIES[k];
+    if(p.happy) happyAdd+=p.happy;
+    if(p.incomeMult) incomeMult*=p.incomeMult;
+    if(p.pollMult) pollMult*=p.pollMult;
+    if(p.incomeMultIndustry) industryMult*=p.incomeMultIndustry;
+    if(p.cost) upkeepAdd+=p.cost;
+  });
+  // apply industry mult only to Works income
+  if(industryMult!==1){
+    let worksIncome=0;
+    g.forEach(v=>{ if(v==='I') worksIncome+=ZONES.I.income; });
+    income += worksIncome*(industryMult-1);
+  }
+  income=Math.round(income*incomeMult);
+  poll=Math.round(poll*pollMult);
+  happy=Math.round(happy+happyAdd);
+  upkeep+=upkeepAdd;
+  // clamp
+  happy=Math.max(0,Math.min(100,happy));
+  poll=Math.max(0,Math.min(100,poll));
+  let net=income - upkeep;
+  return {happy,poll,income,upkeep,net,counts};
+}
+
+function renderCampaign(){
+  const wrap=document.getElementById('campaignGrid');
+  wrap.innerHTML='';
+  CITIES.forEach(city=>{
+    const prog=state.progress[city.id];
+    const locked=city.id>state.unlocked;
+    const done=prog && prog.won;
+    const stars=prog?prog.stars:0;
+    const el=document.createElement('div');
+    el.className='cityCard'+(locked?' locked':'')+(done?' done':'')+(currentId===city.id?' activeCity':'');
+    el.innerHTML=`
+      <div class="cityNum">${done?'✓':city.id}</div>
+      <div class="cityInfo">
+        <h3>${city.name} <span style="font-weight:600;color:var(--muted);font-size:12px">• ${city.size}×${city.size}</span></h3>
+        <p>${city.sub} — ${city.desc}</p>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:4px">
+          <span class="stars">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</span>
+          <span style="font-size:11px;color:var(--muted);font-weight:700">${locked?'Locked':done?'Done':'Play'}</span>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;font-weight:800;color:var(--muted)">GOALS</div>
+        <div style="font-size:11px;font-weight:800">😊 ${city.goals.happy}% • ${city.goals.reserves.toLocaleString()} • ☁ ≤${city.goals.pollMax}%</div>
+      </div>
+    `;
+    el.onclick=()=>{
+      if(locked){ toast('Finish previous city to unlock'); return; }
+      openCity(city.id);
+      switchTab('city');
+    };
+    wrap.appendChild(el);
+  });
+  document.getElementById('progressPill').textContent=`${state.unlocked} / 12 unlocked`;
+  // archive stats
+  let doneCount=0, starSum=0;
+  Object.values(state.progress).forEach(p=>{ if(p.won) doneCount++; starSum+=p.stars||0; });
+  document.getElementById('aDone').textContent=doneCount;
+  document.getElementById('aStars').textContent=starSum+' / 36';
+  const list=document.getElementById('archiveList');
+  list.innerHTML='';
+  CITIES.forEach(c=>{
+    const p=state.progress[c.id];
+    if(!p) return;
+    const d=document.createElement('div');
+    d.className='goal';
+    d.innerHTML=`<div><b>${c.name}</b><div style="font-size:11px;color:var(--muted)">${p.won?'Won':'Played'} • Year ${p.year||8} • ${p.stars||0}★</div></div><span>$${(p.reserves||0).toLocaleString()} • ${p.happy||0}% • ${p.poll||0}%</span>`;
+    list.appendChild(d);
+  });
+  if(!list.innerHTML) list.innerHTML='<p style="font-size:13px;color:var(--muted)">No cities completed yet. Your archive will appear here.</p>';
+}
+
+function openCity(id){
+  const city=CITIES.find(c=>c.id===id);
+  currentId=id;
+  const hist=state.history[id];
+  if(hist && hist.grid){
+    grid=[...hist.grid];
+    year=hist.year||1;
+    reserves=hist.reserves!=null?hist.reserves:city.start;
+    policies={...hist.policies}||{};
+  } else {
+    grid=new Array(city.size*city.size).fill('empty');
+    year=1;
+    reserves=city.start;
+    policies={};
+  }
+  ghostOn=false;
+  renderCity();
+  renderCampaign();
+}
+
+function renderCity(){
+  const city=CITIES.find(c=>c.id===currentId);
+  if(!city){
+    document.getElementById('cityTitle').textContent='Select a city';
+    document.getElementById('cityMeta').textContent='—';
+    document.getElementById('cityIntro').innerHTML='<h2>Pick a city from Campaign</h2><p>Tap any unlocked city to start building. You have 8 years to hit all three goals.</p>';
+    document.getElementById('cityGrid').innerHTML='<div style="padding:18px;text-align:center;color:var(--muted);font-weight:700">No city loaded</div>';
+    updateHeader();
+    return;
+  }
+  document.getElementById('cityTitle').textContent=city.name+' — '+city.sub;
+  document.getElementById('cityMeta').textContent=city.size+'×'+city.size+' • Year '+year+'/'+city.years;
+  document.getElementById('cityIntro').innerHTML=`
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+      <h2>${city.name} <span style="color:var(--muted);font-weight:700">#${city.id}</span></h2>
+      <span class="pill">Goal: ${city.goals.happy}% 😊 • $${city.goals.reserves.toLocaleString()} • ≤${city.goals.pollMax}% ☁</span>
+    </div>
+    <p>${city.desc} Starting reserves $${city.start.toLocaleString()}. You have ${city.years} years. Zone wisely — each placement costs money now, pays yearly.</p>
+  `;
+  // grid
+  const gEl=document.getElementById('cityGrid');
+  gEl.style.gridTemplateColumns=`repeat(${city.size},1fr)`;
+  gEl.innerHTML='';
+  grid.forEach((v,i)=>{
+    const cell=document.createElement('button');
+    cell.className='cell '+v;
+    const z=ZONES[v]||ZONES.empty;
+    const refVal=city.ref[i];
+    const showGhost=ghostOn && v==='empty' && refVal!=='empty';
+    if(showGhost){
+      cell.classList.add('ghost');
+      const rz=ZONES[refVal];
+      cell.innerHTML=`<span style="opacity:.7">${rz.icon}</span><span class="lbl">${rz.label}</span>`;
+      cell.title='Reference: '+rz.label;
+    } else {
+      cell.innerHTML=`<span>${z.icon}</span><span class="lbl">${z.label}</span>`;
+    }
+    cell.onclick=()=>placeZone(i);
+    // touch feedback
+    cell.ontouchstart=()=>cell.style.transform='scale(.96)';
+    cell.ontouchend=()=>cell.style.transform='';
+    gEl.appendChild(cell);
+  });
+  // metrics
+  metrics=calcMetrics(grid, policies);
+  document.getElementById('mIncome').textContent='$'+metrics.income.toLocaleString();
+  document.getElementById('mUpkeep').textContent='$'+metrics.upkeep.toLocaleString();
+  document.getElementById('mHappy').textContent=metrics.happy+'%';
+  document.getElementById('mPoll').textContent=metrics.poll+'%';
+  document.getElementById('fIncome').style.width=Math.min(100, (metrics.income/9000*100))+'%';
+  document.getElementById('fUpkeep').style.width=Math.min(100, (metrics.upkeep/4000*100))+'%';
+  document.getElementById('fHappy').style.width=metrics.happy+'%';
+  document.getElementById('fHappy').style.background=metrics.happy>=70?'linear-gradient(90deg,#22C55E,#06B6D4)':metrics.happy>=50?'linear-gradient(90deg,#F59E0B,#FBBF24)':'linear-gradient(90deg,#EF4444,#F97316)';
+  document.getElementById('fPoll').style.width=metrics.poll+'%';
+  document.getElementById('fPoll').style.background=metrics.poll<=30?'linear-gradient(90deg,#22C55E,#06B6D4)':metrics.poll<=50?'linear-gradient(90deg,#F59E0B,#FBBF24)':'linear-gradient(90deg,#EF4444,#991B1B)';
+  // goals
+  const goalsBox=document.getElementById('goalsBox');
+  goalsBox.innerHTML='';
+  const g=city.goals;
+  const goals=[
+    {label:'Happiness', val:metrics.happy+'%', need:g.happy+'%', ok:metrics.happy>=g.happy},
+    {label:'Reserves', val:'$'+reserves.toLocaleString(), need:'$'+g.reserves.toLocaleString(), ok:reserves>=g.reserves},
+    {label:'Pollution ≤', val:metrics.poll+'%', need:g.pollMax+'%', ok:metrics.poll<=g.pollMax},
+  ];
+  goals.forEach(it=>{
+    const d=document.createElement('div');
+    d.className='goal '+(it.ok?'ok':'fail');
+    d.innerHTML=`<div><b>${it.label}</b><div style="font-size:11px;color:var(--muted)">Need ${it.need}</div></div><span>${it.val} ${it.ok?'✓':'•'}</span>`;
+    goalsBox.appendChild(d);
+  });
+  // policies
+  const pg=document.getElementById('policyGrid');
+  pg.innerHTML='';
+  Object.keys(POLICIES).forEach(k=>{
+    const p=POLICIES[k];
+    const on=!!policies[k];
+    const el=document.createElement('label');
+    el.className='policy '+(on?'on':'');
+    el.innerHTML=`<input type="checkbox" ${on?'checked':''}><div style="flex:1"><b>${p.name}</b><p>${p.desc}</p></div><span style="font-size:11px;font-weight:800;color:var(--muted)">${p.cost?'-$'+p.cost+'/yr':'Free'}</span>`;
+    el.querySelector('input').onchange=(e)=>{
+      policies[k]=e.target.checked;
+      saveCityTemp();
+      renderCity();
+      updateHeader();
+    };
+    pg.appendChild(el);
+  });
+  updateHeader();
+  saveCityTemp();
+}
+
+function placeZone(idx){
+  const city=CITIES.find(c=>c.id===currentId);
+  if(!city) { toast('Pick a city first'); return; }
+  const cur=grid[idx];
+  let cost=0, next=cur;
+  if(selectedTool==='X'){
+    if(cur==='empty'){ toast('Already empty'); return; }
+    cost=100;
+    next='empty';
+  } else {
+    if(cur===selectedTool){ toast('Already '+ZONES[cur].label); return; }
+    cost=ZONES[selectedTool].cost;
+    // if replacing, add bulldoze cost
+    if(cur!=='empty') cost+=100;
+    next=selectedTool;
+  }
+  if(reserves < cost){
+    toast('Need $'+cost.toLocaleString()+' — not enough reserves');
+    // vibrate if available
+    if(navigator.vibrate) navigator.vibrate(80);
+    return;
+  }
+  reserves-=cost;
+  grid[idx]=next;
+  if(navigator.vibrate) navigator.vibrate(20);
+  renderCity();
+}
+
+function updateHeader(){
+  const city=currentId?CITIES.find(c=>c.id===currentId):null;
+  const years=city?city.years:8;
+  document.getElementById('sYear').querySelector('span').textContent=year+' / '+years;
+  document.getElementById('sReserves').querySelector('span').textContent='$'+reserves.toLocaleString();
+  document.getElementById('sHappy').querySelector('span').textContent=metrics.happy+'%';
+  document.getElementById('sPoll').querySelector('span').textContent=metrics.poll+'%';
+  // color coding
+  const sR=document.getElementById('sReserves');
+  sR.className='stat '+(reserves<2000?'bad':reserves<6000?'warn':'good');
+  const sH=document.getElementById('sHappy');
+  sH.className='stat '+(metrics.happy>=65?'good':metrics.happy<45?'bad':'');
+  const sP=document.getElementById('sPoll');
+  sP.className='stat '+(metrics.poll<=35?'good':metrics.poll>50?'bad':'warn');
+}
+
+function endYear(){
+  const city=CITIES.find(c=>c.id===currentId);
+  if(!city){ toast('Select a city first'); return; }
+  if(year>city.years){ toast('City finished — check goals'); return; }
+  // apply yearly net
+  metrics=calcMetrics(grid, policies);
+  reserves+=metrics.net;
+  year++;
+  // clamp reserves not negative? allow negative but warn
+  if(reserves<0) reserves=0;
+  // save progress snapshot
+  saveCityTemp();
+  renderCity();
+  if(year>city.years){
+    evaluateCity();
+  } else {
+    toast('Year '+(year-1)+' closed • Net '+(metrics.net>=0?'+':'')+'$'+metrics.net.toLocaleString());
+  }
+}
+
+function evaluateCity(){
+  const city=CITIES.find(c=>c.id===currentId);
+  metrics=calcMetrics(grid, policies);
+  const g=city.goals;
+  const won= metrics.happy>=g.happy && reserves>=g.reserves && metrics.poll<=g.pollMax;
+  let stars=0;
+  if(won) stars=1;
+  if(metrics.happy>=g.happy+8) stars++;
+  if(metrics.poll<=g.pollMax-8) stars++;
+  stars=Math.min(3,stars);
+  // save progress
+  const prev=state.progress[city.id]||{};
+  const bestStars=Math.max(prev.stars||0, stars);
+  const bestReserves=Math.max(prev.reserves||0, reserves);
+  state.progress[city.id]={won: won||prev.won, stars: bestStars, reserves: bestReserves, happy: metrics.happy, poll: metrics.poll, year: city.years, grid:[...grid]};
+  if(won && state.unlocked===city.id && city.id<12){
+    state.unlocked=city.id+1;
+  } else if(won && city.id===12 && state.unlocked===12){
+    state.unlocked=12;
+  }
+  saveState();
+  renderCampaign();
+  // show win sheet
+  const winTitle=document.getElementById('winTitle');
+  const winDesc=document.getElementById('winDesc');
+  const winStats=document.getElementById('winStats');
+  if(won){
+    winTitle.textContent='City Complete! ★'.repeat(1)+' '+city.name;
+    winDesc.textContent=`You hit all goals in ${city.years} years. Stars: ${stars}/3. Next city unlocked!`;
+    winStats.innerHTML=`<div><b>Reserves</b><span>$${reserves.toLocaleString()}</span></div><div><b>Happiness</b><span>${metrics.happy}%</span></div><div><b>Pollution</b><span>${metrics.poll}%</span></div><div><b>Stars</b><span>${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</span></div>`;
+  } else {
+    winTitle.textContent='Term Ended — Try Again';
+    winDesc.textContent=`You missed a goal. Happiness ${metrics.happy}% (need ${g.happy}%), Reserves $${reserves.toLocaleString()} (need $${g.reserves.toLocaleString()}), Pollution ${metrics.poll}% (max ${g.pollMax}%). Adjust zones/policies and replay.`;
+    winStats.innerHTML=`<div><b>Reserves</b><span>$${reserves.toLocaleString()}</span></div><div><b>Happiness</b><span>${metrics.happy}%</span></div><div><b>Pollution</b><span>${metrics.poll}%</span></div><div><b>Result</b><span style="color:var(--bad)">Not yet</span></div>`;
+  }
+  document.getElementById('nextCityBtn').style.display= won && city.id<12 ? 'inline-flex' : 'none';
+  document.getElementById('nextCityBtn').onclick=()=>{
+    closeSheet('sheetWin');
+    if(city.id<12) openCity(city.id+1);
+    switchTab('city');
+  };
+  openSheet('sheetWin');
+}
+
+function showReplay(){
+  const city=CITIES.find(c=>c.id===currentId);
+  if(!city){ toast('Pick a city first'); return; }
+  const myMetrics=calcMetrics(grid, policies);
+  const refMetrics=calcMetrics(city.ref, {});
+  const myCounts=myMetrics.counts, refCounts=refMetrics.counts;
+  const body=document.getElementById('replayBody');
+  document.getElementById('replayTitle').textContent='Replay vs Reference — '+city.name;
+  body.innerHTML=`
+    <div class="kv">
+      <div><b>Your Reserves</b><span>$${reserves.toLocaleString()}</span><div style="font-size:11px;color:var(--muted)">Net $${myMetrics.net.toLocaleString()}/yr</div></div>
+      <div><b>Reference</b><span>$${(city.start + refMetrics.net*city.years).toLocaleString()}</span><div style="font-size:11px;color:var(--muted)">Net $${refMetrics.net.toLocaleString()}/yr</div></div>
+      <div><b>Your Happy</b><span>${myMetrics.happy}%</span></div>
+      <div><b>Ref Happy</b><span>${refMetrics.happy}%</span></div>
+      <div><b>Your Poll</b><span>${myMetrics.poll}%</span></div>
+      <div><b>Ref Poll</b><span>${refMetrics.poll}%</span></div>
+    </div>
+    <div class="divider"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div>
+        <div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Your Build</div>
+        <div class="cityGrid" style="grid-template-columns:repeat(${city.size},1fr)" id="replayMy"></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">Homes ${myCounts.R||0} • Shops ${myCounts.C||0} • Works ${myCounts.I||0} • Parks ${myCounts.P||0}</div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Reference Mayor</div>
+        <div class="cityGrid" style="grid-template-columns:repeat(${city.size},1fr)" id="replayRef"></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">Homes ${refCounts.R||0} • Shops ${refCounts.C||0} • Works ${refCounts.I||0} • Parks ${refCounts.P||0}</div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:10px;background:var(--card2)">
+      <h2>Delta</h2>
+      <p>Happiness <b style="color:${myMetrics.happy>=refMetrics.happy?'var(--good)':'var(--bad)'}">${myMetrics.happy-refMetrics.happy>=0?'+':''}${myMetrics.happy-refMetrics.happy}%</b> • Pollution <b style="color:${myMetrics.poll<=refMetrics.poll?'var(--good)':'var(--bad)'}">${myMetrics.poll-refMetrics.poll>=0?'+':''}${myMetrics.poll-refMetrics.poll}%</b> • Income <b style="color:${myMetrics.income>=refMetrics.income?'var(--good)':'var(--bad)'}">${myMetrics.income-refMetrics.income>=0?'+':''}$${(myMetrics.income-refMetrics.income).toLocaleString()}</b></p>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn primary" onclick="closeSheet('sheetReplay');ghostOn=true;renderCity();toast('Ghost on — empty blocks show reference')">Show Ghost in City</button>
+      <button class="btn" onclick="closeSheet('sheetReplay')">Close</button>
+    </div>
+  `;
+  // fill grids
+  setTimeout(()=>{
+    const myEl=document.getElementById('replayMy');
+    const refEl=document.getElementById('replayRef');
+    if(myEl){
+      myEl.innerHTML='';
+      grid.forEach(v=>{
+        const z=ZONES[v]||ZONES.empty;
+        const d=document.createElement('div');
+        d.className='cell '+v; d.style.minHeight='32px'; d.style.fontSize='14px';
+        d.innerHTML=`<span>${z.icon}</span>`;
+        myEl.appendChild(d);
+      });
+    }
+    if(refEl){
+      refEl.innerHTML='';
+      city.ref.forEach(v=>{
+        const z=ZONES[v]||ZONES.empty;
+        const d=document.createElement('div');
+        d.className='cell '+v; d.style.minHeight='32px'; d.style.fontSize='14px';
+        d.innerHTML=`<span>${z.icon}</span>`;
+        refEl.appendChild(d);
+      });
+    }
+  },30);
+  openSheet('sheetReplay');
+}
+
+// tabs
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-'+name));
+  if(name==='campaign') renderCampaign();
+  if(name==='city') renderCity();
+  if(name==='archive'){
+    renderCampaign();
+    document.getElementById('archiveText').value=JSON.stringify({exportedAt:new Date().toISOString(), state},null,2);
+  }
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));
+
+// tools
+document.querySelectorAll('.tool').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    selectedTool=b.dataset.tool;
+  };
+});
+
+// buttons
+document.getElementById('endYearBtn').onclick=endYear;
+document.getElementById('ghostBtn').onclick=()=>{
+  if(!currentId){ toast('Pick a city first'); return; }
+  ghostOn=!ghostOn;
+  renderCity();
+  toast(ghostOn?'Ghost on — reference shown':'Ghost off');
+};
+document.getElementById('replayBtn').onclick=showReplay;
+document.getElementById('helpBtn').onclick=()=>openSheet('sheetHelp');
+document.getElementById('exportBtn').onclick=doExport;
+document.getElementById('aExport').onclick=doExport;
+document.getElementById('aCopy').onclick=()=>{
+  const t=document.getElementById('archiveText');
+  t.select(); document.execCommand('copy');
+  toast('Archive copied');
+};
+document.getElementById('aDownload').onclick=()=>{
+  const data=JSON.stringify({exportedAt:new Date().toISOString(), state},null,2);
+  const blob=new Blob([data],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='pocket-city-archive.json'; a.click();
+  URL.revokeObjectURL(url);
+};
+document.getElementById('importBtn').onclick=()=>document.getElementById('fileInput').click();
+document.getElementById('aImport').onclick=()=>{
+  const txt=document.getElementById('archiveText').value.trim();
+  if(!txt){ toast('Paste JSON first'); return; }
+  tryImport(txt);
+};
+document.getElementById('resetBtn').onclick=()=>{
+  if(confirm('Reset entire campaign? This clears all progress.')){
+    localStorage.removeItem('pocketCity_v3');
+    state=loadState();
+    currentId=null; grid=[]; year=1; reserves=10000; policies={};
+    renderCampaign(); renderCity(); toast('Campaign reset');
+  }
+};
+document.getElementById('fileInput').onchange=(e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>tryImport(r.result);
+  r.readAsText(f);
+};
+
+function doExport(){
+  const data=JSON.stringify({exportedAt:new Date().toISOString(), state},null,2);
+  document.getElementById('archiveText').value=data;
+  switchTab('archive');
+  toast('Archive ready — copy or download');
+}
+function tryImport(txt){
+  try{
+    const obj=JSON.parse(txt);
+    const s=obj.state||obj;
+    if(!s.unlocked) throw new Error('Invalid archive');
+    state=s;
+    saveState();
+    renderCampaign(); renderCity();
+    toast('Archive imported!');
+    switchTab('campaign');
+  }catch(e){
+    toast('Import failed: '+e.message);
+  }
+}
+function openSheet(id){ document.getElementById(id).classList.add('open'); }
+function closeSheet(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.sheet').forEach(s=>s.addEventListener('click',e=>{ if(e.target===s) s.classList.remove('open'); }));
+
+// init
+renderCampaign();
+renderCity();
+updateHeader();
+</script>
+</body>
+</html>

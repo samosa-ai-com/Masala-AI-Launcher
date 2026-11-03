@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hex Cat Trap</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f1410;--card:#1a221a;--card2:#232e23;--line:#2d3a2d;--accent:#4ade80;--accent2:#facc15;--bad:#f87171;--text:#e8f0e8;--muted:#8aa08a;--blocked:#3a2a2a;--cat:#facc15}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{max-width:428px;margin:0 auto;overflow-x:hidden}
+button{font:inherit}
+.header{position:sticky;top:0;z-index:10;background:rgba(15,20,16,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#4ade80,#22c55e);display:grid;place-items:center;font-size:18px}
+.brand h1{font-size:14px;line-height:1.1}
+.brand p{font-size:11px;color:var(--muted)}
+.pill{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.pill b{color:var(--text)}
+.iconBtn{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text);display:grid;place-items:center;font-size:18px}
+.wrap{padding:12px 12px 18px}
+.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
+.hudItem{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.hudItem b{font-size:18px;display:block}
+.hudItem span{font-size:11px;color:var(--muted)}
+.canvasWrap{position:relative;background:radial-gradient(600px 400px at 50% 20%,#1a221a 0%,#0f1410 70%);border:1px solid var(--line);border-radius:16px;overflow:hidden;padding:8px}
+canvas{display:block;width:100%;height:auto;touch-action:none}
+.controls{display:flex;gap:8px;margin-top:10px}
+.controls .btn{flex:1}
+.btn{border:0;border-radius:12px;padding:12px 14px;font-weight:700;font-size:14px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btnPrimary{background:linear-gradient(135deg,#4ade80,#22c55e);color:#0a1a0f}
+.btnGhost{background:var(--card2);border:1px solid var(--line);color:var(--text)}
+.btnSmall{padding:8px 10px;min-height:36px;font-size:12px;border-radius:10px}
+.tip{font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px;line-height:1.4;text-align:center}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(15,20,16,.78);padding:16px;text-align:center}
+.overlay h2{font-size:20px;margin-bottom:6px}
+.overlay p{font-size:13px;color:var(--muted);line-height:1.4;margin-bottom:12px}
+.hidden{display:none !important}
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="brand">
+    <div class="logo">🐱</div>
+    <div>
+      <h1>Hex Cat Trap</h1>
+      <p>Block tiles • Trap the cat</p>
+    </div>
+  </div>
+  <div style="display:flex;gap:6px;align-items:center">
+    <div class="pill">Wins <b id="winsEl">0</b></div>
+    <button class="iconBtn" id="helpBtn">?</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="hud">
+    <div class="hudItem"><b id="movesEl">0</b><span>Moves</span></div>
+    <div class="hudItem"><b id="statusEl">Playing</b><span>Status</span></div>
+    <div class="hudItem"><b id="catEl">🐱</b><span>Cat</span></div>
+  </div>
+
+  <div class="canvasWrap" id="gameWrap">
+    <canvas id="cv" width="360" height="360"></canvas>
+    <div class="overlay hidden" id="winOverlay">
+      <div>
+        <h2 id="winTitle">Trapped!</h2>
+        <p id="winDesc">You trapped the cat in 12 moves</p>
+        <button class="btn btnPrimary" id="winNextBtn" style="width:100%;min-height:48px">✦ New Game</button>
+        <button class="btn btnGhost" id="winResetBtn" style="width:100%;margin-top:8px">↺ Play Again</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btnGhost" id="undoBtn">↩ Undo</button>
+    <button class="btn btnGhost" id="resetBtn">↺ Reset</button>
+    <button class="btn btnPrimary" id="newBtn">✦ New Game</button>
+  </div>
+
+  <div class="tip">
+    💡 Tap light tiles to block them (×). After each block the cat moves 1 step toward the edge. Trap it before it escapes! The cat thinks 3 moves ahead.
+  </div>
+</div>
+
+<div class="overlay hidden" id="helpOverlay" style="position:fixed;z-index:20">
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;max-width:360px;text-align:left">
+    <h3 style="font-size:16px">How to Play</h3>
+    <p style="font-size:13px;color:var(--muted);margin-top:8px;line-height:1.5">
+      • Hex grid — cat starts in center.<br>
+      • Tap any light tile to block it. Cat then moves 1 hex toward the nearest edge.<br>
+      • Cat uses BFS to find shortest path and dodges your blocks.<br>
+      • <b>Trap</b> = cat has no moves. <b>Escape</b> = cat reaches red border.<br>
+      • <b>Reset</b> retries same board, <b>New Game</b> randomizes blocks.<br>
+      • <b>Undo</b> takes back your last block + cat move.
+    </p>
+    <button class="btn btnPrimary" style="width:100%;margin-top:12px" id="closeHelp">Got it</button>
+  </div>
+</div>
+
+<script>
+const cv=document.getElementById('cv');
+const ctx=cv.getContext('2d');
+const W=360, H=360;
+const COLS=11, ROWS=11;
+const HEX_R=15; // radius
+const HEX_W=HEX_R*2;
+const HEX_H=Math.sqrt(3)*HEX_R;
+let grid=[], cat={r:5,c:5}, moves=0, wins=0, history=[], playing=true, startBlocked=[];
+
+function loadWins(){
+  wins=parseInt(localStorage.getItem('hexcat-wins')||'0',10);
+  document.getElementById('winsEl').textContent=wins;
+}
+function saveWins(){
+  localStorage.setItem('hexcat-wins', wins);
+  document.getElementById('winsEl').textContent=wins;
+}
+
+function initGrid(newGame=true){
+  grid=Array.from({length:ROWS},()=>Array(COLS).fill(0)); // 0 empty, 1 blocked, 2 cat
+  cat={r:5,c:5};
+  moves=0; playing=true; history=[];
+  if(newGame){
+    startBlocked=[];
+    // random 10-14 blocked tiles, not near cat
+    let count=12;
+    while(count>0){
+      const r=Math.floor(Math.random()*ROWS);
+      const c=Math.floor(Math.random()*COLS);
+      if(grid[r][c]!==0) continue;
+      if(Math.abs(r-5)<=1 && Math.abs(c-5)<=1) continue;
+      grid[r][c]=1;
+      startBlocked.push([r,c]);
+      count--;
+    }
+  } else {
+    // reset same board
+    for(const [r,c] of startBlocked) grid[r][c]=1;
+  }
+  grid[cat.r][cat.c]=2;
+  updateHud();
+  draw();
+  document.getElementById('winOverlay').classList.add('hidden');
+}
+
+function neighbors(r,c){
+  // odd-r offset (pointy top)
+  const even = r%2===0;
+  const dirs = even ? [[-1,-1],[-1,0],[0,-1],[0,1],[1,-1],[1,0]] : [[-1,0],[-1,1],[0,-1],[0,1],[1,0],[1,1]];
+  const res=[];
+  for(const [dr,dc] of dirs){
+    const nr=r+dr, nc=c+dc;
+    if(nr>=0 && nr<ROWS && nc>=0 && nc<COLS) res.push([nr,nc]);
+  }
+  return res;
+}
+
+function isEdge(r,c){
+  return r===0 || r===ROWS-1 || c===0 || c===COLS-1;
+}
+
+function bfsPath(startR,startC){
+  // BFS to nearest edge, avoiding blocked
+  const q=[[startR,startC]];
+  const visited=Array.from({length:ROWS},()=>Array(COLS).fill(false));
+  const prev=Array.from({length:ROWS},()=>Array(COLS).fill(null));
+  visited[startR][startC]=true;
+  let found=null;
+  while(q.length){
+    const [r,c]=q.shift();
+    if(isEdge(r,c)){ found=[r,c]; break; }
+    for(const [nr,nc] of neighbors(r,c)){
+      if(visited[nr][nc]) continue;
+      if(grid[nr][nc]===1) continue; // blocked
+      visited[nr][nc]=true;
+      prev[nr][nc]=[r,c];
+      q.push([nr,nc]);
+    }
+  }
+  if(!found) return null;
+  // reconstruct path
+  const path=[found];
+  let cur=found;
+  while(cur[0]!==startR || cur[1]!==startC){
+    cur=prev[cur[0]][cur[1]];
+    if(!cur) break;
+    path.unshift(cur);
+  }
+  return path;
+}
+
+function catMove(){
+  if(!playing) return;
+  // if cat already on edge, escape
+  if(isEdge(cat.r,cat.c)){
+    playing=false;
+    showResult(false);
+    return;
+  }
+  const path=bfsPath(cat.r,cat.c);
+  if(!path || path.length<2){
+    // trapped - no path
+    playing=false;
+    wins++; saveWins();
+    showResult(true);
+    return;
+  }
+  // move one step
+  const [nr,nc]=path[1];
+  grid[cat.r][cat.c]=0;
+  cat.r=nr; cat.c=nc;
+  grid[cat.r][cat.c]=2;
+  // check if reached edge after move
+  if(isEdge(cat.r,cat.c)){
+    playing=false;
+    showResult(false);
+  }
+  draw();
+}
+
+function showResult(won){
+  document.getElementById('winTitle').textContent=won?'Trapped! 🎉':'Escaped! 😿';
+  document.getElementById('winDesc').textContent=won?`You trapped the cat in ${moves} moves`:`Cat escaped in ${moves} moves`;
+  document.getElementById('winOverlay').classList.remove('hidden');
+  document.getElementById('statusEl').textContent=won?'Trapped':'Escaped';
+}
+
+function updateHud(){
+  document.getElementById('movesEl').textContent=moves;
+  document.getElementById('statusEl').textContent=playing?'Playing': (isEdge(cat.r,cat.c)?'Escaped':'Trapped');
+}
+
+function hexCenter(r,c){
+  const x = c*HEX_W*0.75 + HEX_R + 8;
+  const y = r*HEX_H + HEX_R + 8 + (c%2===1? HEX_H/2 : 0); // offset for odd-r? Actually row offset depends on col? Let's use odd-r: even rows shifted
+  // For odd-r, even rows: x = c*1.5R + R, odd rows: x = c*1.5R + R + 0.75R
+  // Simpler: use axial conversion
+  const ox = (r%2===1? HEX_W*0.375 : 0);
+  return {x: c*HEX_W*0.75 + HEX_R + 10 + ox, y: r*HEX_H*0.5 + HEX_R + 10};
+  // Actually hex grid with pointy top: y step = HEX_H*0.75? Let's just compute properly
+}
+
+function drawHex(x,y,r, fill, stroke){
+  ctx.beginPath();
+  for(let i=0;i<6;i++){
+    const ang = Math.PI/3 * i - Math.PI/6; // pointy top
+    const px = x + Math.cos(ang)*r;
+    const py = y + Math.sin(ang)*r;
+    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.closePath();
+  if(fill){ ctx.fillStyle=fill; ctx.fill(); }
+  if(stroke){ ctx.strokeStyle=stroke; ctx.lineWidth=1.5; ctx.stroke(); }
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // bg
+  ctx.fillStyle='#0f1410'; ctx.fillRect(0,0,W,H);
+  // draw hexes
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const {x,y}=hexPos(r,c);
+      const isCat = grid[r][c]===2;
+      const isBlocked = grid[r][c]===1;
+      const edge = isEdge(r,c);
+      let fill='#1a221a';
+      let stroke='#2d3a2d';
+      if(edge) stroke='#f87171';
+      if(isBlocked){ fill='#3a2a2a'; stroke='#5a3a3a'; }
+      if(isCat){ fill='#facc15'; stroke='#eab308'; }
+      drawHex(x,y,HEX_R-1, fill, stroke);
+      // content
+      if(isBlocked){
+        ctx.fillStyle='#f87171'; ctx.font='700 14px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText('×', x, y+1);
+      } else if(isCat){
+        ctx.font='16px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText('🐱', x, y+1);
+      } else {
+        // dot for empty
+        ctx.fillStyle='rgba(138,160,138,.15)';
+        ctx.beginPath(); ctx.arc(x,y,2,0,Math.PI*2); ctx.fill();
+      }
+    }
+  }
+  // move readout
+  ctx.fillStyle='rgba(232,240,232,.7)'; ctx.font='11px system-ui'; ctx.textAlign='left';
+  ctx.fillText(`Moves: ${moves} • Cat at ${cat.r},${cat.c}`, 8, H-8);
+}
+
+function hexPos(r,c){
+  // odd-r offset, pointy top
+  const x = 14 + c * (HEX_R*1.5) + (r%2===1? HEX_R*0.75 : 0);
+  const y = 14 + r * (HEX_H*0.5) + HEX_R;
+  // Actually need proper spacing: y step = HEX_H *0.75? Let's tune to fit 11x11 in 360
+  // Use: x = c*1.5R + offset, y = r*0.866*2R*0.5? Let's compute to fit
+  // Simpler: use axial with scaling to fit
+  // We'll compute with tighter fit
+  const sx = 10 + c * 28 + (r%2===1? 14 : 0);
+  const sy = 14 + r * 24;
+  return {x:sx, y:sy};
+}
+
+function handleTap(e){
+  if(!playing) return;
+  const rect=cv.getBoundingClientRect();
+  const scaleX=W/rect.width, scaleY=H/rect.height;
+  const t=e.touches? e.touches[0]: e;
+  const x=(t.clientX-rect.left)*scaleX;
+  const y=(t.clientY-rect.top)*scaleY;
+  // find nearest hex
+  let best=null, bestD=999;
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    const p=hexPos(r,c);
+    const d=Math.hypot(p.x-x, p.y-y);
+    if(d<bestD){ bestD=d; best=[r,c]; }
+  }
+  if(!best) return;
+  const [r,c]=best;
+  if(bestD>18) return; // miss
+  if(grid[r][c]!==0) return; // already blocked or cat
+  // save history
+  history.push({r,c, catR:cat.r, catC:cat.c, moves});
+  if(history.length>50) history.shift();
+  grid[r][c]=1;
+  moves++;
+  updateHud();
+  draw();
+  // cat moves after short delay
+  setTimeout(catMove, 180);
+}
+
+function undo(){
+  if(!history.length || !playing) return;
+  const h=history.pop();
+  grid[h.r][h.c]=0;
+  // revert cat
+  grid[cat.r][cat.c]=0;
+  cat.r=h.catR; cat.c=h.catC;
+  grid[cat.r][cat.c]=2;
+  moves=h.moves;
+  updateHud(); draw();
+}
+
+// events
+cv.addEventListener('click', handleTap);
+cv.addEventListener('touchstart', e=>{ e.preventDefault(); handleTap(e); },{passive:false});
+
+document.getElementById('undoBtn').onclick=undo;
+document.getElementById('resetBtn').onclick=()=>initGrid(false);
+document.getElementById('newBtn').onclick=()=>initGrid(true);
+document.getElementById('winNextBtn').onclick=()=>initGrid(true);
+document.getElementById('winResetBtn').onclick=()=>initGrid(false);
+document.getElementById('helpBtn').onclick=()=>document.getElementById('helpOverlay').classList.remove('hidden');
+document.getElementById('closeHelp').onclick=()=>document.getElementById('helpOverlay').classList.add('hidden');
+document.getElementById('helpOverlay').addEventListener('click', e=>{ if(e.target.id==='helpOverlay') e.currentTarget.classList.add('hidden'); });
+
+loadWins(); initGrid(true);
+</script>
+</body>
+</html>

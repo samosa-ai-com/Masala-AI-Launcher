@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FairShare — Tip Splitter</title>
+<style>
+:root{--bg:#eef7f2;--card:#fff;--acc:#0e9f6e;--txt:#152b23;--mut:#64766d}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;min-height:100vh}
+.wrap{max-width:480px;margin:0 auto;padding:16px 14px 32px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}
+.sub{color:var(--mut);font-size:13px;margin:2px 0 0}
+#muteBtn{background:var(--card);border:1px solid #d5e5db;color:var(--txt);border-radius:12px;min-width:48px;min-height:44px;font-size:18px}
+.card{background:var(--card);border:1px solid #d5e5db;border-radius:18px;padding:16px;margin:12px 0}
+.hero{text-align:center}
+#perPerson{font-size:48px;font-weight:800;font-variant-numeric:tabular-nums}
+.hero small{color:var(--mut)}
+label{font-size:12px;color:var(--mut);text-transform:uppercase;display:block;margin:10px 0 4px}
+#bill{width:100%;min-height:52px;border-radius:12px;border:1px solid #bcd8c9;font-size:22px;padding:0 12px;font-variant-numeric:tabular-nums}
+.tips{display:flex;gap:8px;flex-wrap:wrap}
+.tips button{flex:1 1 28%;min-height:48px;border-radius:12px;border:1px solid #bcd8c9;background:#f0f7f3;font-size:16px;font-weight:700}
+.tips button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=range]{width:100%;min-height:44px}
+.stepper{display:flex;align-items:center;gap:12px}
+.stepper button{width:56px;height:52px;border-radius:14px;border:1px solid #bcd8c9;background:#f0f7f3;font-size:24px;font-weight:800}
+#people{font-size:26px;font-weight:800;flex:1;text-align:center}
+.tog{display:flex;align-items:center;gap:10px;min-height:52px;font-size:15px;margin-top:6px}
+.tog input{width:26px;height:26px}
+.lines{font-size:15px}
+.lines div{display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid #e3efe8;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div><h1>FairShare</h1><p class="sub">Split the bill fairly</p></div><button id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="card hero"><small>EACH PERSON PAYS</small><div id="perPerson">$0.00</div></div>
+<div class="card">
+<label for="bill">Bill amount</label><input type="number" id="bill" value="60" min="0" inputmode="decimal">
+<label>Tip</label><div class="tips" id="tips"></div>
+<div class="lenrow"><input type="range" id="tipRange" min="0" max="30" value="15" aria-label="Tip percent"></div>
+<label>People</label>
+<div class="stepper"><button id="minus" aria-label="Fewer people">−</button><div id="people">2</div><button id="plus" aria-label="More people">+</button></div>
+<div class="tog"><input type="checkbox" id="round"><span>Round each share up to the next whole dollar</span></div>
+</div>
+<div class="card lines"><div><span>Tip amount</span><b id="tipAmt">$0.00</b></div><div><span>Bill total</span><b id="grand">$0.00</b></div><div><span>Tip percent</span><b id="tipPct">15%</b></div></div>
+</div>
+<script>
+(function(){
+"use strict";
+var KEY="fairshare-v1";
+var store={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+var muted=store.get("muted-tip-splitter",false);
+var muteBtn=document.getElementById("muteBtn");
+function paintMute(){muteBtn.textContent=muted?"🔇":"🔊";}paintMute();
+var actx=null;
+function beep(f){if(muted)return;try{var C=window.AudioContext||window.webkitAudioContext;if(!C)return;if(!actx)actx=new C();if(actx.state==="suspended")actx.resume();var o=actx.createOscillator(),g=actx.createGain();o.type="sine";o.frequency.value=f||660;g.gain.value=0.05;o.connect(g);g.connect(actx.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.08);o.stop(actx.currentTime+0.09);}catch(e){}}
+muteBtn.addEventListener("click",function(){muted=!muted;store.set("muted-tip-splitter",muted);paintMute();beep(720);});
+var saved=store.get(KEY,{tip:15,people:2,round:false});
+var tip=saved.tip||15,people=saved.people||2;
+var tipsEl=document.getElementById("tips"),range=document.getElementById("tipRange"),
+billEl=document.getElementById("bill"),pplEl=document.getElementById("people"),roundEl=document.getElementById("round");
+roundEl.checked=!!saved.round;
+[10,15,18,20,25].forEach(function(t){var b=document.createElement("button");b.textContent=t+"%";b.dataset.tip=t;b.addEventListener("click",function(){beep(620);tip=t;range.value=t;calc();});tipsEl.appendChild(b);});
+function money(n){return "$"+Number(n).toFixed(2);}
+function calc(){
+var bill=parseFloat(billEl.value);if(isNaN(bill)||bill<0)bill=0;
+var tipAmt=bill*tip/100,grand=bill+tipAmt;
+var each=people>0?grand/people:0;
+if(roundEl.checked)each=Math.ceil(each);
+var bs=tipsEl.querySelectorAll("button");
+for(var i=0;i<bs.length;i++)bs[i].classList.toggle("on",parseInt(bs[i].dataset.tip,10)===tip);
+document.getElementById("perPerson").textContent=money(each);
+document.getElementById("tipAmt").textContent=money(tipAmt);
+document.getElementById("grand").textContent=money(grand);
+document.getElementById("tipPct").textContent=tip+"%";
+pplEl.textContent=people;
+store.set(KEY,{tip:tip,people:people,round:roundEl.checked});}
+range.value=tip;
+range.addEventListener("input",function(){tip=parseInt(range.value,10);calc();});
+billEl.addEventListener("input",calc);
+roundEl.addEventListener("change",function(){beep(560);calc();});
+document.getElementById("minus").addEventListener("click",function(){if(people>1){people--;beep(500);calc();}});
+document.getElementById("plus").addEventListener("click",function(){if(people<30){people++;beep(680);calc();}});
+calc();
+})();
+</script>
+</body>
+</html>

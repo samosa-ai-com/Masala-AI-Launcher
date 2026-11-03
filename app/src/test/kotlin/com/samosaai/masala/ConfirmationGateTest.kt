@@ -9,6 +9,7 @@ import com.samosaai.masala.core.tool.ToolSensitivity
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
@@ -63,6 +64,20 @@ class ConfirmationGateTest {
     }
 
     @Test
+    fun `a tool-provided summary replaces the generic one`() = runBlocking<Unit> {
+        val gate = gate()
+        val args = JsonObject(mapOf("id" to JsonPrimitive("price")))
+        val tool = com.samosaai.masala.core.tool.FunctionTool(
+            ToolDefinition("place_widget", "", JsonObject(emptyMap())),
+            ToolSensitivity.CHANGES_SOMETHING,
+            confirmSummary = { "Put \"price\" on home (fetches api.example.com every 15s)" },
+        ) { com.samosaai.masala.core.tool.ActionResult.ok("") }
+        answerWhenAsked(gate, true)
+        assertNull(gate.check(tool, args))
+        assertEquals("Put \"price\" on home (fetches api.example.com every 15s)", log.last().second)
+    }
+
+    @Test
     fun `questions are asked one at a time`() = runBlocking<Unit> {
         val gate = gate()
         val first = async { gate.confirm("first") }
@@ -77,6 +92,39 @@ class ConfirmationGateTest {
     }
 
     @Test
+    fun `allow all lets a changing tool through without asking and logs it`() = runBlocking<Unit> {
+        val gate = gate()
+        val result = withContext(ConfirmationGate.AllowAll { true }) {
+            gate.check(tool(ToolSensitivity.CHANGES_SOMETHING), JsonObject(emptyMap()))
+        }
+        assertNull(result)
+        assertNull(gate.pending.value)
+        assertEquals("confirm:set_alarm", log.single().first)
+        assertEquals("allowed (allow all)", (log.single().third as ToolResult.Success).output)
+    }
+
+    @Test
+    fun `allow all still asks before anything destructive`() = runBlocking<Unit> {
+        val gate = gate()
+        val check = async(ConfirmationGate.AllowAll { true }) {
+            gate.check(tool(ToolSensitivity.DESTRUCTIVE), JsonObject(emptyMap()))
+        }
+        while (gate.pending.value == null) delay(5)
+        assertTrue(gate.pending.value!!.destructive)
+        gate.answer(false)
+        assertEquals("The user declined.", (check.await() as ToolResult.Failure).message)
+    }
+
+    @Test
+    fun `allow all switched off asks as usual`() = runBlocking<Unit> {
+        val gate = gate()
+        val check = async(ConfirmationGate.AllowAll { false }) { gate.confirm("Turn on Focus") }
+        while (gate.pending.value == null) delay(5)
+        gate.answer(true)
+        assertEquals(Decision.ALLOWED, check.await())
+    }
+
+    @Test
     fun `a destructive tool is asked as destructive`() = runBlocking<Unit> {
         val gate = gate()
         val check = async { gate.check(tool(ToolSensitivity.DESTRUCTIVE), JsonObject(emptyMap())) }
@@ -84,5 +132,50 @@ class ConfirmationGateTest {
         assertTrue(gate.pending.value!!.destructive)
         gate.answer(false)
         check.await()
+    }
+
+    @Test
+    fun `making an app is confirmed in words, not as a wall of HTML`() {
+        val html = "<html>" + "x".repeat(20_000) + "</html>"
+        val summary = ConfirmationGate.summarize(
+            "create_mini_app",
+            JsonObject(mapOf("title" to JsonPrimitive("Snake"), "html" to JsonPrimitive(html))),
+        )
+        assertEquals("Add \"Snake\" to your home screen as an app", summary)
+        // Changing one is a short sentence too.
+        assertEquals("Change that app", ConfirmationGate.summarize("update_mini_app", JsonObject(mapOf("id" to JsonPrimitive("a1")))))
+        // A model that omits the title still gets a sentence, never the HTML.
+        assertEquals(
+            "Add a new app to your home screen",
+            ConfirmationGate.summarize("create_mini_app", JsonObject(mapOf("html" to JsonPrimitive(html)))),
+        )
+    }
+
+    @Test
+    fun `widget placement is confirmed in words, not as spec JSON`() {
+        assertEquals(
+            "Put \"water\" on home",
+            ConfirmationGate.summarize("place_widget", JsonObject(mapOf("id" to JsonPrimitive("water")))),
+        )
+        assertEquals(
+            "Take \"water\" off home",
+            ConfirmationGate.summarize("remove_widget", JsonObject(mapOf("id" to JsonPrimitive("water")))),
+        )
+        assertEquals(
+            "Delete the \"water\" widget everywhere",
+            ConfirmationGate.summarize("delete_widget", JsonObject(mapOf("id" to JsonPrimitive("water")))),
+        )
+        assertEquals(
+            "Add the \"Garage\" camera",
+            ConfirmationGate.summarize("add_stream_source", JsonObject(mapOf("name" to JsonPrimitive("Garage")))),
+        )
+    }
+
+    @Test
+    fun `a long argument is still cut in the summary so the sheet stays usable`() {
+        val layout = "{\"pages\":" + "x".repeat(20_000) + "}"
+        val summary = ConfirmationGate.summarize("edit_layout", JsonObject(mapOf("label" to JsonPrimitive("Tidy"), "layout_json" to JsonPrimitive(layout))))
+        assertTrue(summary.length < 400, summary)
+        assertTrue(summary.contains("characters)"), summary)
     }
 }

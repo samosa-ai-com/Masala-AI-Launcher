@@ -1,6 +1,8 @@
 package com.samosaai.masala.launcher
 
+import android.app.ActivityOptions
 import android.content.ActivityNotFoundException
+import android.view.View
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
@@ -15,12 +17,26 @@ import com.samosaai.masala.core.apps.AppKey
  * Starting apps and shortcuts, app info and uninstall. Everything goes through `LauncherApps`, which
  * works across profiles and asks to turn work apps on when they're paused.
  */
-class AppActions(private val context: Context, private val catalog: AppCatalog) {
+class AppActions(
+    private val context: Context,
+    private val catalog: AppCatalog,
+    /** Told about every successful app launch (the usage log behind the globe drawer). */
+    private val onLaunched: (AppKey) -> Unit = {},
+) {
     private val launcherApps = context.getSystemService(LauncherApps::class.java)
 
-    fun launch(key: AppKey, bounds: Rect? = null): Boolean = tryStart {
-        launcherApps.startMainActivity(catalog.componentName(key), catalog.user(key.user), bounds, null)
-    }
+    /**
+     * Opens the app. With the tapped icon's [bounds] it grows out of the icon
+     * (`ActivityOptions.makeScaleUpAnimation`, plan UI refresh U3).
+     */
+    fun launch(key: AppKey, bounds: Rect? = null, sourceView: View? = null): Boolean = tryStart {
+        val options = if (bounds != null && sourceView != null) {
+            ActivityOptions.makeScaleUpAnimation(sourceView, bounds.left, bounds.top, bounds.width(), bounds.height()).toBundle()
+        } else {
+            null
+        }
+        launcherApps.startMainActivity(catalog.componentName(key), catalog.user(key.user), bounds, options)
+    }.also { if (it) onLaunched(key) }
 
     fun appInfo(key: AppKey): Boolean = tryStart {
         launcherApps.startAppDetailsActivity(catalog.componentName(key), catalog.user(key.user), null, null)

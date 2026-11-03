@@ -7,6 +7,7 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 // Argument readers from the private prototype's ToolExecutor. Models send numbers as strings and leave out optional
 // arguments, so each returns null rather than throwing.
@@ -17,6 +18,10 @@ internal fun JsonObject.string(key: String): String? =
 /** Tolerates numbers sent as JSON strings. */
 internal fun JsonObject.int(key: String): Int? =
     this[key]?.jsonPrimitive?.let { it.intOrNull ?: it.content.trim().toIntOrNull() }
+
+/** Row ids (calendar events) can exceed Int range, so read them wide. */
+internal fun JsonObject.long(key: String): Long? =
+    this[key]?.jsonPrimitive?.let { it.longOrNull ?: it.content.trim().toLongOrNull() }
 
 internal fun JsonObject.double(key: String): Double? =
     this[key]?.jsonPrimitive?.let { it.doubleOrNull ?: it.content.trim().toDoubleOrNull() }

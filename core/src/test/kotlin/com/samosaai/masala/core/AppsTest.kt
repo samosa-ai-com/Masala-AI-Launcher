@@ -99,6 +99,18 @@ class AppsTest {
     }
 
     @Test
+    fun `a prepared index ranks exactly like ranking the raw labels`() {
+        val labels = listOf(
+            "Game Hub", "Google Maps", "Gmail", "Café Noir", "Chrome", "Calculator", "Clock", "Contacts",
+            "Messages", "Mail", "Maps", "WhatsApp", "Wallet", "Work mail", "Chess", "Church Hymns", "Archer",
+        )
+        val prepared = AppSearch.prepare(labels) { listOf(it) }
+        for (query in listOf("c", "ch", "chr", "gm", "ma", "cafe", "CAFÉ", "hub", "w m", "xyz", " ", "a")) {
+            assertEquals(AppSearch.rank(query, labels) { listOf(it) }, AppSearch.rank(query, prepared), "query \"$query\"")
+        }
+    }
+
+    @Test
     fun `auto-launch waits for composing text and respects a leading space`() {
         assertEquals("Maps", AppSearch.autoLaunchTarget("map", composing = false, results = listOf("Maps")))
         assertNull(AppSearch.autoLaunchTarget("微", composing = true, results = listOf("微信")))

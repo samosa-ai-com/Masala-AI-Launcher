@@ -10,9 +10,6 @@ import java.util.Locale
  */
 object AudioLanguageLabels {
 
-    /** Where the Samosa AI docs explain choosing speech providers, voices and languages. */
-    const val SPEECH_DOCS_URL = "https://example.com/prototype/docs/getting-started#5-Speech"
-
     /** Codes the JDK has no name for, or that are not language tags at all. */
     private val OVERRIDES = mapOf(
         "jw" to "Javanese", // Whisper's legacy code for `jv`

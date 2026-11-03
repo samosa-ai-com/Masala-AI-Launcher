@@ -35,6 +35,8 @@ data class AppOverride(
     val label: String? = null,
     val visibility: Visibility = Visibility.DEFAULT,
     val pinned: Boolean = false,
+    /** A chosen icon (`IconSpec`): null means the app draws its own. */
+    val icon: String? = null,
 )
 
 /** An activity as `LauncherApps` reports it, before overrides. */
@@ -48,6 +50,8 @@ data class AppEntry(
     val profile: ProfileKind,
     val visibility: Visibility,
     val pinned: Boolean,
+    /** A chosen icon (`IconSpec`), or null for the app's own. */
+    val icon: String? = null,
 ) {
     val renamed get() = label != originalLabel
 }
@@ -72,6 +76,7 @@ object AppCatalogMerge {
                 profile = app.profile,
                 visibility = o?.visibility ?: Visibility.DEFAULT,
                 pinned = o?.pinned ?: false,
+                icon = o?.icon,
             )
         }
         .sortedWith(compareBy<AppEntry> { it.profile }.thenBy(order) { it.label }.thenBy { it.key.id })

@@ -108,7 +108,7 @@ class WebFetchTool {
     }
 
     @Suppress("CyclomaticComplexMethod")
-    private fun htmlToMarkdown(doc: Document): String {
+    internal fun htmlToMarkdown(doc: Document): String {
         val sb = StringBuilder()
         val body = doc.body() ?: return doc.text()
 

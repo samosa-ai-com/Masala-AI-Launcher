@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Dice Duel</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--yellow:#FFD600;--purple:#7A5CFA;--pink:#FF5A7A;--teal:#00D1B2;--black:#111111;--cream:#FFFDF0;--orange:#FF8A00}
+html,body{width:100%;overflow-x:hidden;background:#7A5CFA;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+body{display:flex;justify-content:center;min-height:100dvh}
+.app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100dvh;
+  background:var(--cream);
+  border-left:4px solid var(--black);
+  border-right:4px solid var(--black);
+  display:flex;
+  flex-direction:column;
+  position:relative;
+  overflow:hidden;
+}
+@media(max-width:440px){.app{border-left:none;border-right:none;max-width:100%;min-width:100%}}
+/* header */
+.header{
+  background:var(--yellow);
+  border-bottom:4px solid var(--black);
+  padding:14px 16px 12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-badge{
+  width:44px;height:44px;background:var(--black);color:var(--yellow);
+  border-radius:12px;display:grid;place-items:center;font-weight:900;font-size:20px;
+  transform:rotate(-3deg);border:3px solid var(--black);box-shadow:3px 3px 0 var(--black);
+}
+.logo-text h1{font-size:20px;font-weight:900;letter-spacing:-0.5px;line-height:1}
+.logo-text p{font-size:11px;font-weight:800;opacity:0.7;letter-spacing:0.6px}
+.series-picker{
+  display:flex;background:var(--black);border-radius:999px;padding:3px;gap:2px;
+}
+.series-picker button{
+  border:none;background:transparent;color:white;font-weight:800;font-size:11px;
+  padding:7px 10px;border-radius:999px;cursor:pointer;transition:0.15s;
+}
+.series-picker button.active{background:var(--yellow);color:var(--black);box-shadow:0 2px 0 rgba(0,0,0,0.2)}
+/* scoreboard */
+.scoreboard{
+  display:grid;grid-template-columns:1fr auto 1fr;gap:10px;
+  padding:14px 16px;
+  align-items:stretch;
+}
+.score-card{
+  background:white;border:3px solid var(--black);border-radius:18px;
+  padding:10px 12px;text-align:center;box-shadow:4px 4px 0 var(--black);
+  position:relative;overflow:hidden;
+}
+.score-card.you{border-color:var(--black)}
+.score-card.rival{background:#EFE8FF}
+.score-card .label{font-size:10px;font-weight:900;letter-spacing:1px;opacity:0.6}
+.score-card .wins{font-size:32px;font-weight:900;line-height:1;margin:4px 0}
+.score-card .sub{font-size:11px;font-weight:800;background:var(--black);color:white;display:inline-block;padding:3px 8px;border-radius:999px}
+.score-card.you .sub{background:var(--teal)}
+.score-card.rival .sub{background:var(--purple)}
+.vs-badge{
+  align-self:center;
+  width:44px;height:44px;background:var(--pink);border:3px solid var(--black);
+  border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:13px;color:white;
+  box-shadow:3px 3px 0 var(--black);transform:rotate(8deg);
+}
+.round-dots{display:flex;gap:6px;justify-content:center;margin-top:6px}
+.dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--black);background:white}
+.dot.win-you{background:var(--teal)}
+.dot.win-rival{background:var(--pink)}
+.dot.tie{background:var(--yellow)}
+/* arena */
+.arena{padding:0 16px 10px;flex:1;display:flex;flex-direction:column;gap:12px}
+.player-area{
+  background:white;border:3px solid var(--black);border-radius:20px;
+  padding:14px 12px;box-shadow:5px 5px 0 var(--black);position:relative;
+}
+.player-area.you{border-left:6px solid var(--teal)}
+.player-area.rival{border-left:6px solid var(--pink)}
+.player-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.player-name{font-weight:900;font-size:14px;display:flex;align-items:center;gap:8px}
+.badge{font-size:10px;font-weight:900;padding:4px 8px;border-radius:999px;border:2px solid var(--black)}
+.badge.you{background:var(--teal);color:white}
+.badge.rival{background:var(--pink);color:white}
+.total-box{
+  background:var(--black);color:white;border-radius:12px;padding:6px 12px;
+  font-weight:900;font-size:18px;min-width:56px;text-align:center;
+}
+.total-box small{font-size:10px;opacity:0.7;display:block;font-weight:800;letter-spacing:0.5px}
+.dice-row{display:flex;gap:12px;justify-content:center;align-items:center;min-height:92px}
+.die{
+  width:78px;height:78px;background:white;border:3px solid var(--black);
+  border-radius:16px;box-shadow:4px 4px 0 var(--black);
+  display:grid;place-items:center;position:relative;overflow:hidden;
+  transition:transform 0.1s;
+}
+.die.rolling{animation:shake 0.12s infinite}
+@keyframes shake{
+  0%{transform:translate(1px,1px) rotate(-2deg)}
+  25%{transform:translate(-1px,-1px) rotate(2deg)}
+  50%{transform:translate(-1px,1px) rotate(-1deg)}
+  75%{transform:translate(1px,-1px) rotate(1deg)}
+  100%{transform:translate(1px,1px) rotate(-1deg)}
+}
+.die.pop{animation:pop 0.35s ease}
+@keyframes pop{0%{transform:scale(0.8)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+.face{
+  width:100%;height:100%;display:grid;
+  grid-template-columns:repeat(3,1fr);
+  grid-template-rows:repeat(3,1fr);
+  padding:10px;gap:2px;
+}
+.pip{width:13px;height:13px;background:var(--black);border-radius:50%;justify-self:center;align-self:center}
+.pip.empty{background:transparent}
+.pip.pink{background:var(--pink)}
+.die.rival-die .pip{background:#4B2DB3}
+.vs-divider{
+  display:flex;align-items:center;gap:10px;justify-content:center;
+  font-weight:900;font-size:12px;letter-spacing:1px;opacity:0.5;
+}
+.vs-divider::before,.vs-divider::after{content:"";height:3px;flex:1;background:var(--black);border-radius:999px;opacity:0.15}
+.result-banner{
+  background:var(--black);color:white;border-radius:16px;padding:12px 14px;
+  text-align:center;font-weight:900;font-size:15px;min-height:48px;
+  display:grid;place-items:center;border:3px solid var(--black);
+  box-shadow:4px 4px 0 var(--black);transition:0.2s;
+}
+.result-banner.win{background:var(--teal);color:var(--black);transform:rotate(-0.5deg)}
+.result-banner.lose{background:var(--pink);color:white;transform:rotate(0.5deg)}
+.result-banner.tie{background:var(--yellow);color:var(--black)}
+/* controls */
+.controls{padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px;background:transparent}
+.roll-btn{
+  width:100%;background:var(--yellow);border:4px solid var(--black);
+  border-radius:22px;padding:16px 18px;font-weight:900;font-size:20px;
+  letter-spacing:-0.5px;box-shadow:0 7px 0 var(--black);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  transition:transform 0.08s, box-shadow 0.08s, filter 0.15s;
+  user-select:none;touch-action:manipulation;
+}
+.roll-btn:active{transform:translateY(5px);box-shadow:0 2px 0 var(--black)}
+.roll-btn:disabled{opacity:0.6;filter:grayscale(0.2);transform:none;box-shadow:0 4px 0 var(--black);cursor:not-allowed}
+.roll-btn span.icon{font-size:24px}
+.secondary-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sec-btn{
+  background:white;border:3px solid var(--black);border-radius:14px;
+  padding:12px 10px;font-weight:900;font-size:13px;cursor:pointer;
+  box-shadow:3px 3px 0 var(--black);display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.sec-btn:active{transform:translateY(2px);box-shadow:1px 1px 0 var(--black)}
+.dice-toggle{display:flex;background:white;border:3px solid var(--black);border-radius:14px;overflow:hidden;box-shadow:3px 3px 0 var(--black)}
+.dice-toggle button{flex:1;border:none;background:transparent;padding:10px;font-weight:900;font-size:13px;cursor:pointer}
+.dice-toggle button.active{background:var(--black);color:white}
+/* progress */
+.progress{padding:0 16px 6px;display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:11px;letter-spacing:0.5px;opacity:0.7}
+.progress-bar{height:8px;background:#E9E2FF;border:2px solid var(--black);border-radius:999px;overflow:hidden;flex:1;margin:0 10px}
+.progress-fill{height:100%;background:var(--purple);width:0%;transition:width 0.4s ease}
+/* modal */
+.overlay{
+  position:absolute;inset:0;background:rgba(17,17,17,0.55);backdrop-filter:blur(4px);
+  display:none;place-items:center;padding:20px;z-index:20;
+}
+.overlay.show{display:grid}
+.modal{
+  background:var(--cream);border:4px solid var(--black);border-radius:24px;
+  padding:20px 16px;width:100%;max-width:360px;box-shadow:8px 8px 0 var(--black);
+  text-align:center;transform:rotate(-0.5deg);
+}
+.modal h2{font-size:26px;font-weight:900;line-height:1}
+.modal p{font-weight:700;opacity:0.7;margin:8px 0 14px;font-size:13px}
+.modal-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.stat{background:white;border:3px solid var(--black);border-radius:14px;padding:10px;box-shadow:3px 3px 0 var(--black)}
+.stat b{font-size:20px;display:block}
+.stat span{font-size:11px;font-weight:800;opacity:0.6;letter-spacing:0.5px}
+.big-btn{
+  width:100%;background:var(--yellow);border:4px solid var(--black);border-radius:16px;
+  padding:14px;font-weight:900;font-size:18px;box-shadow:0 6px 0 var(--black);cursor:pointer;margin-top:8px;
+}
+.big-btn:active{transform:translateY(4px);box-shadow:0 2px 0 var(--black)}
+.ghost-btn{margin-top:10px;background:white;border:3px solid var(--black);border-radius:12px;padding:10px;width:100%;font-weight:900;cursor:pointer}
+.confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.confetti i{position:absolute;width:10px;height:14px;top:-20px;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="logo">
+      <div class="logo-badge">⚅</div>
+      <div class="logo-text">
+        <h1>DICE DUEL</h1>
+        <p>PLAYER vs RIVAL • TAP TO ROLL</p>
+      </div>
+    </div>
+    <div class="series-picker" id="seriesPicker">
+      <button data-v="3" class="active">BO3</button>
+      <button data-v="5">BO5</button>
+      <button data-v="7">BO7</button>
+    </div>
+  </div>
+
+  <div class="progress">
+    <span id="roundLabel">ROUND 1 / 3</span>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <span id="seriesLabel">FIRST TO 2</span>
+  </div>
+
+  <div class="scoreboard">
+    <div class="score-card you">
+      <div class="label">YOU</div>
+      <div class="wins" id="youWins">0</div>
+      <div class="sub" id="youPips">0 pips</div>
+      <div class="round-dots" id="youDots"></div>
+    </div>
+    <div class="vs-badge">VS</div>
+    <div class="score-card rival">
+      <div class="label">RIVAL</div>
+      <div class="wins" id="rivalWins">0</div>
+      <div class="sub" id="rivalPips">0 pips</div>
+      <div class="round-dots" id="rivalDots"></div>
+    </div>
+  </div>
+
+  <div class="arena">
+    <div class="player-area you" id="youArea">
+      <div class="player-head">
+        <div class="player-name">😎 YOU <span class="badge you">PLAYER</span></div>
+        <div class="total-box"><small>TOTAL</small><span id="youTotal">—</span></div>
+      </div>
+      <div class="dice-row" id="youDice"></div>
+    </div>
+
+    <div class="vs-divider">ROLL • REVEAL • WIN</div>
+
+    <div class="player-area rival" id="rivalArea">
+      <div class="player-head">
+        <div class="player-name">🤖 RIVAL <span class="badge rival">CPU</span></div>
+        <div class="total-box"><small>TOTAL</small><span id="rivalTotal">—</span></div>
+      </div>
+      <div class="dice-row" id="rivalDice"></div>
+    </div>
+
+    <div class="result-banner" id="resultBanner">TAP THE BIG YELLOW BUTTON TO ROLL!</div>
+  </div>
+
+  <div class="controls">
+    <button class="roll-btn" id="rollBtn"><span class="icon">🎲</span> TAP TO ROLL! <span class="icon">🎲</span></button>
+    <div class="secondary-row">
+      <div class="dice-toggle" id="diceToggle">
+        <button data-d="1">1 DIE</button>
+        <button data-d="2" class="active">2 DICE</button>
+      </div>
+      <button class="sec-btn" id="rematchBtn">🔄 REMATCH</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="modal" id="modal">
+      <h2 id="modalTitle">YOU WIN!</h2>
+      <p id="modalSub">You took the series 2-1</p>
+      <div class="modal-stats">
+        <div class="stat"><b id="mYouWins">0</b><span>YOUR ROUNDS</span></div>
+        <div class="stat"><b id="mRivalWins">0</b><span>RIVAL ROUNDS</span></div>
+        <div class="stat"><b id="mYouPips2">0</b><span>YOUR PIPS</span></div>
+        <div class="stat"><b id="mRivalPips2">0</b><span>RIVAL PIPS</span></div>
+      </div>
+      <button class="big-btn" id="playAgainBtn">⚡ PLAY AGAIN</button>
+      <button class="ghost-btn" id="closeModalBtn">KEEP VIEWING BOARD</button>
+    </div>
+  </div>
+  <div class="confetti" id="confetti"></div>
+</div>
+
+<script>
+const $ = s => document.getElementById(s);
+const youDiceEl = $('youDice');
+const rivalDiceEl = $('rivalDice');
+const rollBtn = $('rollBtn');
+const resultBanner = $('resultBanner');
+const youWinsEl = $('youWins');
+const rivalWinsEl = $('rivalWins');
+const youPipsEl = $('youPips');
+const rivalPipsEl = $('rivalPips');
+const youTotalEl = $('youTotal');
+const rivalTotalEl = $('rivalTotal');
+const youDotsEl = $('youDots');
+const rivalDotsEl = $('rivalDots');
+const roundLabel = $('roundLabel');
+const seriesLabel = $('seriesLabel');
+const progressFill = $('progressFill');
+const overlay = $('overlay');
+
+let state = {
+  series: 5,
+  diceCount: 2,
+  youWins: 0,
+  rivalWins: 0,
+  youPips: 0,
+  rivalPips: 0,
+  round: 1,
+  isRolling: false,
+  history: []
+};
+
+function save(){
+  try{localStorage.setItem('dice-duel-v2', JSON.stringify({series:state.series,diceCount:state.diceCount}))}catch(e){}
+}
+function load(){
+  try{
+    const d=JSON.parse(localStorage.getItem('dice-duel-v2')||'{}');
+    if(d.series) state.series=d.series;
+    if(d.diceCount) state.diceCount=d.diceCount;
+  }catch(e){}
+}
+
+function pipMap(val){
+  // 9 cells, true where pip
+  const maps={
+    1:[0,0,0,0,1,0,0,0,0],
+    2:[1,0,0,0,0,0,0,0,1],
+    3:[1,0,0,0,1,0,0,0,1],
+    4:[1,0,1,0,0,0,1,0,1],
+    5:[1,0,1,0,1,0,1,0,1],
+    6:[1,0,1,1,0,1,1,0,1]
+  };
+  return maps[val]||maps[1];
+}
+
+function dieHTML(val, isRival){
+  const map = pipMap(val);
+  let cells = map.map((on,i)=> `<div class="pip ${on?'':'empty'} ${isRival?'':'pink'}"></div>`).join('');
+  return `<div class="face">${cells}</div>`;
+}
+
+function renderDice(container, values, isRival){
+  container.innerHTML = values.map(v=> `<div class="die ${isRival?'rival-die':''}"><div class="face">${pipMap(v).map(on=>`<div class="pip ${on?'':'empty'}"></div>`).join('')}</div></div>`).join('');
+}
+
+function renderPlaceholders(){
+  const ph = Array(state.diceCount).fill(1);
+  // show question style: use 1 but dim? We'll show dice with ?
+  youDiceEl.innerHTML = ph.map(()=> `<div class="die" style="background:#FFF9C4"><div style="font-weight:900;font-size:28px">?</div></div>`).join('');
+  rivalDiceEl.innerHTML = ph.map(()=> `<div class="die rival-die" style="background:#EDE7FF"><div style="font-weight:900;font-size:28px">?</div></div>`).join('');
+  youTotalEl.textContent='—';
+  rivalTotalEl.textContent='—';
+}
+
+function updateScoreboard(){
+  youWinsEl.textContent = state.youWins;
+  rivalWinsEl.textContent = state.rivalWins;
+  youPipsEl.textContent = state.youPips + ' pips';
+  rivalPipsEl.textContent = state.rivalPips + ' pips';
+  const needed = Math.ceil(state.series/2);
+  const totalRounds = state.youWins + state.rivalWins + state.history.filter(h=>h==='tie').length;
+  const maxRounds = state.series;
+  roundLabel.textContent = `ROUND ${Math.min(totalRounds+1, maxRounds)} / ${maxRounds}`;
+  seriesLabel.textContent = `FIRST TO ${needed}`;
+  progressFill.style.width = ((totalRounds)/maxRounds*100)+'%';
+
+  // dots
+  youDotsEl.innerHTML='';
+  rivalDotsEl.innerHTML='';
+  for(let i=0;i<needed;i++){
+    const d=document.createElement('div');
+    d.className='dot ' + (i < state.youWins ? 'win-you' : '');
+    youDotsEl.appendChild(d);
+  }
+  for(let i=0;i<needed;i++){
+    const d=document.createElement('div');
+    d.className='dot ' + (i < state.rivalWins ? 'win-rival' : '');
+    rivalDotsEl.appendChild(d);
+  }
+  // toggle active states
+  document.querySelectorAll('#seriesPicker button').forEach(b=>{
+    b.classList.toggle('active', parseInt(b.dataset.v)===state.series);
+  });
+  document.querySelectorAll('#diceToggle button').forEach(b=>{
+    b.classList.toggle('active', parseInt(b.dataset.d)===state.diceCount);
+  });
+}
+
+function rollValues(count){
+  return Array.from({length:count},()=> 1+Math.floor(Math.random()*6));
+}
+function sum(a){return a.reduce((x,y)=>x+y,0)}
+
+function setBanner(text, cls){
+  resultBanner.textContent=text;
+  resultBanner.className='result-banner '+(cls||'');
+}
+
+function doRoll(){
+  if(state.isRolling) return;
+  const needed = Math.ceil(state.series/2);
+  if(state.youWins>=needed || state.rivalWins>=needed){
+    resetSeries();
+  }
+  state.isRolling=true;
+  rollBtn.disabled=true;
+  rollBtn.innerHTML='<span class="icon">🎲</span> ROLLING...';
+  setBanner('SHAKING THE DICE...','tie');
+  youTotalEl.textContent='...';
+  rivalTotalEl.textContent='...';
+
+  // haptic
+  if(navigator.vibrate) navigator.vibrate(30);
+
+  let ticks=0;
+  const maxTicks=10;
+  const interval=setInterval(()=>{
+    ticks++;
+    const fakeYou = rollValues(state.diceCount);
+    const fakeRival = rollValues(state.diceCount);
+    renderDice(youDiceEl, fakeYou, false);
+    renderDice(rivalDiceEl, fakeRival, true);
+    youDiceEl.querySelectorAll('.die').forEach(d=>{d.classList.add('rolling')});
+    rivalDiceEl.querySelectorAll('.die').forEach(d=>{d.classList.add('rolling')});
+    if(ticks>=maxTicks){
+      clearInterval(interval);
+      finishRoll();
+    }
+  },80);
+}
+
+function finishRoll(){
+  const youVals = rollValues(state.diceCount);
+  const rivalVals = rollValues(state.diceCount);
+  const youSum = sum(youVals);
+  const rivalSum = sum(rivalVals);
+
+  renderDice(youDiceEl, youVals, false);
+  renderDice(rivalDiceEl, rivalVals, true);
+  youDiceEl.querySelectorAll('.die').forEach(d=>{d.classList.remove('rolling');d.classList.add('pop');setTimeout(()=>d.classList.remove('pop'),400)});
+  rivalDiceEl.querySelectorAll('.die').forEach(d=>{d.classList.remove('rolling');d.classList.add('pop');setTimeout(()=>d.classList.remove('pop'),400)});
+
+  youTotalEl.textContent = youSum;
+  rivalTotalEl.textContent = rivalSum;
+  state.youPips += youSum;
+  state.rivalPips += rivalSum;
+
+  let outcome='';
+  if(youSum > rivalSum){
+    state.youWins++;
+    state.history.push('you');
+    outcome='you';
+    setBanner(`YOU WIN THE ROUND! ${youSum} vs ${rivalSum} 🎉`,'win');
+    if(navigator.vibrate) navigator.vibrate([40,30,60]);
+    burstConfetti(['#00D1B2','#FFD600','#7A5CFA'], 18);
+  } else if(rivalSum > youSum){
+    state.rivalWins++;
+    state.history.push('rival');
+    outcome='rival';
+    setBanner(`RIVAL TAKES IT! ${rivalSum} vs ${youSum} 🤖`,'lose');
+    if(navigator.vibrate) navigator.vibrate(80);
+  } else {
+    state.history.push('tie');
+    setBanner(`TIE ROUND! BOTH ${youSum} — NO POINTS`,'tie');
+    if(navigator.vibrate) navigator.vibrate([30,30,30]);
+  }
+
+  updateScoreboard();
+  checkSeriesEnd();
+
+  state.isRolling=false;
+  rollBtn.disabled=false;
+  rollBtn.innerHTML='<span class="icon">🎲</span> TAP TO ROLL! <span class="icon">🎲</span>';
+}
+
+function checkSeriesEnd(){
+  const needed = Math.ceil(state.series/2);
+  if(state.youWins>=needed || state.rivalWins>=needed){
+    const youWon = state.youWins>state.rivalWins;
+    $('modalTitle').textContent = youWon ? 'YOU WIN! 🏆' : 'RIVAL WINS! 🤖';
+    $('modalSub').textContent = youWon ? `You took the series ${state.youWins}-${state.rivalWins}` : `Rival took it ${state.rivalWins}-${state.youWins} — rematch?`;
+    $('mYouWins').textContent = state.youWins;
+    $('mRivalWins').textContent = state.rivalWins;
+    $('mYouPips2').textContent = state.youPips;
+    $('mRivalPips2').textContent = state.rivalPips;
+    overlay.classList.add('show');
+    if(youWon) burstConfetti(['#FFD600','#FF5A7A','#00D1B2','#7A5CFA'], 28);
+    setBanner(youWon ? '🏆 SERIES WON! TAP REMATCH FOR ANOTHER!' : '💥 SERIES LOST — HIT REMATCH!', youWon?'win':'lose');
+  }
+}
+
+function resetSeries(){
+  state.youWins=0;
+  state.rivalWins=0;
+  state.youPips=0;
+  state.rivalPips=0;
+  state.history=[];
+  state.round=1;
+  overlay.classList.remove('show');
+  renderPlaceholders();
+  updateScoreboard();
+  setBanner('NEW SERIES! TAP TO ROLL!','');
+  if(navigator.vibrate) navigator.vibrate(20);
+}
+
+function burstConfetti(colors, count){
+  const c=$('confetti');
+  c.innerHTML='';
+  for(let i=0;i<count;i++){
+    const el=document.createElement('i');
+    el.style.left=(5+Math.random()*90)+'%';
+    el.style.background=colors[Math.floor(Math.random()*colors.length)];
+    el.style.transform=`rotate(${Math.random()*360}deg)`;
+    el.style.animationDuration=(0.9+Math.random()*0.8)+'s';
+    el.style.animationDelay=(Math.random()*0.2)+'s';
+    el.style.borderRadius=Math.random()>0.5?'50%':'4px';
+    c.appendChild(el);
+    setTimeout(()=>el.remove(),1800);
+  }
+}
+
+// events
+rollBtn.addEventListener('click', doRoll);
+rollBtn.addEventListener('touchstart', e=>{e.preventDefault(); doRoll();},{passive:false});
+
+$('rematchBtn').addEventListener('click', resetSeries);
+$('playAgainBtn').addEventListener('click', resetSeries);
+$('closeModalBtn').addEventListener('click', ()=> overlay.classList.remove('show'));
+overlay.addEventListener('click', (e)=>{ if(e.target===overlay) overlay.classList.remove('show') });
+
+document.getElementById('seriesPicker').addEventListener('click', e=>{
+  const b=e.target.closest('button');
+  if(!b) return;
+  state.series=parseInt(b.dataset.v);
+  save();
+  resetSeries();
+});
+document.getElementById('diceToggle').addEventListener('click', e=>{
+  const b=e.target.closest('button');
+  if(!b) return;
+  state.diceCount=parseInt(b.dataset.d);
+  save();
+  renderPlaceholders();
+  updateScoreboard();
+});
+
+// keyboard
+window.addEventListener('keydown', e=>{
+  if(e.code==='Space' || e.code==='Enter'){ e.preventDefault(); doRoll(); }
+  if(e.code==='KeyR') resetSeries();
+});
+
+// init
+load();
+renderPlaceholders();
+updateScoreboard();
+</script>
+</body>
+</html>

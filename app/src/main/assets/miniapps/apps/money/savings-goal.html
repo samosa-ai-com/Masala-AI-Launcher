@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoalMint Savings Goal</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#07120d;color:#e9f7ef}
+.wrap{max-width:430px;margin:0 auto;padding:16px 16px 40px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:22px;margin:0}
+.mutebtn{min-width:44px;min-height:44px;border-radius:12px;border:1px solid #1d3a2a;background:#0d2117;color:#fff;font-size:19px;cursor:pointer}
+.card{background:#0d2117;border:1px solid #1d3a2a;border-radius:18px;padding:18px;margin:12px 0}
+.goalrow{display:flex;gap:8px;align-items:end}
+.goalrow div{flex:1}
+label{font-size:13px;opacity:.85}
+input,select{width:100%;min-height:48px;border-radius:12px;border:1px solid #1d3a2a;background:#07120d;color:#fff;font-size:17px;padding:0 12px;margin-top:4px}
+.big{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums}
+.sub{font-size:14px;opacity:.8;margin-top:2px}
+.bar{height:16px;border-radius:9px;background:#07120d;border:1px solid #1d3a2a;margin-top:12px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#34d399,#a7f3d0);transition:width .4s}
+.pace{background:#07120d;border:1px solid #1d3a2a;border-radius:12px;padding:12px;margin-top:12px;font-size:14px}
+.log{display:grid;gap:8px;margin-top:10px}
+.entry{display:flex;align-items:center;justify-content:space-between;background:#07120d;border:1px solid #1d3a2a;border-radius:12px;padding:10px 12px}
+.entry b{font-size:17px;font-variant-numeric:tabular-nums}
+.entry span{font-size:12px;opacity:.7;display:block}
+.del{min-width:44px;min-height:44px;border-radius:10px;border:1px solid #5b2323;background:transparent;color:#f87171;font-size:16px;cursor:pointer}
+button.add{width:100%;min-height:52px;border-radius:14px;border:none;background:#34d399;color:#052e1b;font-size:17px;font-weight:800;cursor:pointer;margin-top:10px}
+.empty{text-align:center;opacity:.65;font-size:14px;padding:14px}
+h2{font-size:16px;margin:14px 0 4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>GoalMint Saver</h1><button class="mutebtn" id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="card">
+<div class="goalrow">
+<div><label for="goalIn">Goal amount ($)</label><input id="goalIn" type="number" min="1" step="1" value="1000"></div>
+<div><label for="nameIn">Goal name</label><input id="nameIn" type="text" maxlength="30" value="Holiday fund"></div>
+</div>
+<div class="big" id="savedTxt">$0</div>
+<div class="sub" id="goalTxt">of $1,000 · 0%</div>
+<div class="bar"><i id="barFill"></i></div>
+<div class="pace" id="paceTxt">Add your first contribution to see your pace.</div>
+</div>
+<div class="card">
+<h2 style="margin-top:0">Add contribution</h2>
+<div class="goalrow">
+<div><label for="amtIn">Amount ($)</label><input id="amtIn" type="number" min="1" step="1" placeholder="50"></div>
+<div><label for="dateIn">Date</label><input id="dateIn" type="date"></div>
+</div>
+<button class="add" id="addBtn">Add contribution</button>
+<h2>Contribution log</h2>
+<div class="log" id="log"></div>
+</div>
+</div>
+<script>
+(function(){
+"use strict";
+var K="savings-goal-v1",MK="savings-goal-mute";
+var store={goal:1000,name:"Holiday fund",items:[]};
+try{var s=JSON.parse(localStorage.getItem(K)||"{}");if(s.goal)store.goal=s.goal;if(s.name)store.name=s.name;if(Array.isArray(s.items))store.items=s.items;}catch(e){}
+var muted=localStorage.getItem(MK)==="1",AC=null;
+var goalIn=document.getElementById("goalIn"),nameIn=document.getElementById("nameIn"),amtIn=document.getElementById("amtIn"),dateIn=document.getElementById("dateIn");
+var savedTxt=document.getElementById("savedTxt"),goalTxt=document.getElementById("goalTxt"),barFill=document.getElementById("barFill"),paceTxt=document.getElementById("paceTxt"),log=document.getElementById("log"),muteBtn=document.getElementById("muteBtn");
+dateIn.value=new Date().toISOString().slice(0,10);
+function money(n){return "$"+Math.round(n).toLocaleString("en-US");}
+function click(f){if(muted)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume();var o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.frequency.value=f||700;var t=AC.currentTime;g.gain.setValueAtTime(0.07,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.07);o.start(t);o.stop(t+0.07);}catch(e){}}
+function save(){localStorage.setItem(K,JSON.stringify(store));}
+muteBtn.textContent=muted?"🔇":"🔊";
+muteBtn.addEventListener("click",function(){muted=!muted;localStorage.setItem(MK,muted?"1":"0");muteBtn.textContent=muted?"🔇":"🔊";click(700);});
+function render(){
+goalIn.value=store.goal;nameIn.value=store.name;
+var total=store.items.reduce(function(a,b){return a+b.amt;},0);
+var pct=store.goal>0?Math.min(100,total/store.goal*100):0;
+savedTxt.textContent=money(total);
+goalTxt.textContent="of "+money(store.goal)+" · "+Math.round(pct)+"% · "+store.name;
+barFill.style.width=pct+"%";
+if(store.items.length>=1){
+var dates=store.items.map(function(x){return new Date(x.date);}).sort(function(a,b){return a-b;});
+var days=Math.max(1,Math.round((dates[dates.length-1]-dates[0])/86400000)+1);
+var perDay=total/days,left=Math.max(0,store.goal-total);
+if(left<=0){paceTxt.textContent="Goal reached! You saved "+money(total)+". Well done.";}
+else{var eta=new Date(Date.now()+left/perDay*86400000);
+paceTxt.textContent="Pace: "+money(perDay)+" per day over "+days+" day"+(days>1?"s":"")+". At this pace you finish around "+eta.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+".";}
+}else{paceTxt.textContent="Add your first contribution to see your pace.";}
+log.innerHTML=store.items.length?"":'<div class="empty">No contributions yet. Every big goal starts with a small one.</div>';
+var sorted=store.items.map(function(x,i){return {x:x,i:i};}).sort(function(a,b){return b.x.date.localeCompare(a.x.date);});
+sorted.forEach(function(o){
+var d=document.createElement("div");d.className="entry";
+var l=document.createElement("div");var b=document.createElement("b");b.textContent=money(o.x.amt);l.appendChild(b);
+var sp=document.createElement("span");sp.textContent=new Date(o.x.date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});l.appendChild(sp);
+var del=document.createElement("button");del.className="del";del.textContent="✕";del.setAttribute("aria-label","Delete contribution");
+del.addEventListener("click",function(){if(confirm("Delete this "+money(o.x.amt)+" contribution?")){click(440);store.items.splice(o.i,1);save();render();}});
+d.appendChild(l);d.appendChild(del);log.appendChild(d);
+});
+}
+goalIn.addEventListener("change",function(){store.goal=Math.max(1,+goalIn.value||1000);save();render();});
+nameIn.addEventListener("change",function(){store.name=nameIn.value||"My goal";save();render();});
+document.getElementById("addBtn").addEventListener("click",function(){
+var a=+amtIn.value;
+if(!(a>0)){alert("Enter an amount above zero.");return;}
+click(880);
+store.items.push({amt:Math.round(a),date:dateIn.value||new Date().toISOString().slice(0,10)});
+amtIn.value="";save();render();
+});
+render();
+})();
+</script>
+</body>
+</html>

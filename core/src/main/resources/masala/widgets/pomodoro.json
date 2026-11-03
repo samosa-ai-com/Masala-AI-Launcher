@@ -1,0 +1,41 @@
+{
+  "id": "pomodoro",
+  "name": "Pomodoro",
+  "description": "25 minutes of focus, then a 5-minute break, both ringing when they end.",
+  "category": "Focus",
+  "widget": {
+    "id": "pomodoro",
+    "title": "Focus 25",
+    "components": [
+      {
+        "type": "row",
+        "children": [
+          {
+            "type": "timer",
+            "key": "work",
+            "label": "Focus",
+            "seconds": 1500,
+            "sound": true,
+            "autoStartKey": "break"
+          },
+          {
+            "type": "timer",
+            "key": "break",
+            "label": "Break",
+            "seconds": 300,
+            "sound": true,
+            "autoStartKey": "work"
+          }
+        ]
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 2,
+      "max": 3,
+      "minW": 4,
+      "defaultW": 4,
+      "maxW": 4
+    }
+  }
+}

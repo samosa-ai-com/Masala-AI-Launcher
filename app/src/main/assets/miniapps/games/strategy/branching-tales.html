@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Signal Voyage: Twelve Nights</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0f1a;
+  --paper:#f4ecd8;
+  --paper2:#e8dcc0;
+  --ink:#1a1a1e;
+  --accent:#c9a86a;
+  --accent2:#7fb8a8;
+  --muted:#8a7d6b;
+  --line:#2a3447;
+  --danger:#c45a4a;
+  --ghost:#8ea8c8;
+  --crew:#d9a679;
+  --relay:#c9a86a;
+}
+html,body{height:100%;background:var(--bg);color:var(--paper);font-family:Georgia,'Times New Roman',serif;overflow:hidden}
+body{display:flex;justify-content:center}
+.app{width:100%;max-width:428px;min-width:360px;height:100dvh;display:flex;flex-direction:column;position:relative;background:radial-gradient(ellipse at 50% -10%, #1a2a4a 0%, #0a0f1a 55%);}
+.starfield{position:absolute;inset:0;pointer-events:none;opacity:0.9}
+.topbar{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(10,15,26,0.92);border-bottom:1px solid var(--line);backdrop-filter:blur(6px)}
+.brand{display:flex;align-items:center;gap:10px}
+.mark{width:36px;height:36px;border:1px solid var(--accent);display:grid;place-items:center;background:linear-gradient(180deg,#1e2a44,#0f1729);border-radius:4px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.15), 0 2px 8px rgba(0,0,0,0.5)}
+.mark span{font-size:10px;letter-spacing:0.18em;color:var(--accent);font-weight:700}
+.brand h1{font-size:13px;letter-spacing:0.14em;text-transform:uppercase;color:var(--paper);line-height:1}
+.brand p{font-size:10px;letter-spacing:0.12em;color:var(--muted);text-transform:uppercase}
+.topActions{display:flex;gap:8px}
+.iconBtn{width:38px;height:38px;border-radius:8px;border:1px solid var(--line);background:#111a2e;color:var(--paper);display:grid;place-items:center;font-size:14px}
+.iconBtn:active{transform:scale(0.97)}
+.nightBar{position:relative;z-index:2;display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(17,26,46,0.95);border-bottom:1px solid var(--line)}
+.nightPill{font-size:11px;letter-spacing:0.14em;text-transform:uppercase;background:var(--paper);color:var(--ink);padding:6px 10px;border-radius:20px;font-weight:700}
+.nightTrack{flex:1;height:6px;background:#0d1426;border-radius:20px;overflow:hidden;border:1px solid #1e2d4a}
+.nightFill{height:100%;background:linear-gradient(90deg,var(--accent),#e8c99a);width:8%;transition:width 0.4s}
+.nightNum{font-size:12px;color:var(--accent);font-weight:700;letter-spacing:0.08em}
+.threadsStrip{position:relative;z-index:2;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px 12px;background:rgba(10,15,26,0.9);border-bottom:1px solid var(--line)}
+.threadCard{border:1px solid var(--line);background:linear-gradient(180deg,#121c33,#0e1528);border-radius:10px;padding:8px 8px 7px}
+.threadHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.threadHead b{font-size:10px;letter-spacing:0.12em;text-transform:uppercase}
+.threadHead i{font-style:normal;font-size:10px;color:var(--muted)}
+.bar{height:6px;background:#0a1224;border-radius:20px;overflow:hidden;border:1px solid #1e2d4a}
+.barFill{height:100%;border-radius:20px;transition:width 0.5s}
+.t-relay .barFill{background:var(--relay)}
+.t-ghost .barFill{background:var(--ghost)}
+.t-crew .barFill{background:var(--crew)}
+.threadCard small{font-size:10px;color:var(--muted);letter-spacing:0.06em}
+.main{position:relative;z-index:2;flex:1;overflow:hidden;display:flex;flex-direction:column}
+.view{flex:1;overflow:auto;padding:14px 12px 12px;scrollbar-width:none}
+.view::-webkit-scrollbar{display:none}
+.paperCard{background:var(--paper);color:var(--ink);border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.8);border:1px solid #d8c9a8;position:relative}
+.paperCard:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg, transparent 0 28px, rgba(0,0,0,0.03) 28px 29px);pointer-events:none}
+.paperHead{padding:14px 16px 10px;border-bottom:1px dashed #c9b896;display:flex;justify-content:space-between;align-items:center;position:relative}
+.paperHead h2{font-size:13px;letter-spacing:0.14em;text-transform:uppercase;color:#3a2f1e}
+.paperHead span{font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7d6b;background:#ede0c0;padding:4px 8px;border-radius:20px;border:1px solid #d8c9a8}
+.sceneBody{padding:16px 16px 14px;position:relative}
+.sceneBody h3{font-size:20px;line-height:1.2;color:#1a1a1e;margin-bottom:8px;font-weight:800;letter-spacing:-0.02em}
+.sceneBody .flavor{font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8a7d6b;margin-bottom:10px}
+.sceneBody p{font-size:15.5px;line-height:1.6;color:#2b2416;margin-bottom:10px}
+.sceneBody p.em{font-style:italic;color:#4a3f2e;background:#ede0c0;border-left:3px solid var(--accent);padding:8px 10px;border-radius:6px}
+.statsHint{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+.chip{font-size:10px;letter-spacing:0.08em;text-transform:uppercase;background:#1a233a;color:#c9d6f0;border:1px solid #2a3a5e;padding:5px 8px;border-radius:20px}
+.choices{padding:0 12px 14px;display:grid;gap:10px;position:relative}
+.choiceBtn{width:100%;text-align:left;background:#fffdf3;border:1.5px solid #d8c9a8;border-radius:12px;padding:12px 14px;position:relative;min-height:56px}
+.choiceBtn:active{transform:scale(0.99);background:#fff8e6}
+.choiceBtn b{display:block;font-size:14.5px;line-height:1.3;color:#1a1a1e;margin-bottom:3px}
+.choiceBtn span{display:block;font-size:12.5px;line-height:1.4;color:#6b5e44}
+.choiceBtn .tag{position:absolute;top:10px;right:10px;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;background:#0f1a33;color:#8ea8c8;border:1px solid #2a3a5e;padding:3px 6px;border-radius:20px}
+.choiceBtn.prime{border-color:var(--accent);box-shadow:0 0 0 2px rgba(201,168,106,0.15)}
+.bandwidthBox{margin:12px;background:#0f1729;border:1px solid var(--line);border-radius:12px;padding:12px}
+.bandwidthBox h4{font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;display:flex;justify-content:space-between}
+.bandwidthBox h4 em{font-style:normal;color:var(--paper);background:#1e2d4a;padding:2px 8px;border-radius:20px;font-size:11px}
+.bwRow{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1a2744}
+.bwRow:last-child{border:none}
+.bwRow strong{font-size:13px;letter-spacing:0.06em;text-transform:uppercase}
+.bwRow small{font-size:11px;color:var(--muted)}
+.bwCtrl{display:flex;align-items:center;gap:8px}
+.bwBtn{width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:#162040;color:var(--paper);font-size:18px;display:grid;place-items:center}
+.bwVal{width:28px;text-align:center;font-weight:800;color:var(--accent)}
+.operatorPick{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+.opCard{border:1px solid var(--line);background:#0f1729;border-radius:10px;padding:10px 8px;text-align:center;min-height:78px}
+.opCard.sel{border-color:var(--accent);background:#1a233a;box-shadow:0 0 0 2px rgba(201,168,106,0.2)}
+.opCard b{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;display:block}
+.opCard p{font-size:11px;color:var(--muted);line-height:1.3;margin-top:4px}
+.opCard .avatar{width:32px;height:32px;border-radius:50%;margin:0 auto 6px;display:grid;place-items:center;font-size:14px;border:1px solid var(--line);background:#162040}
+.logEntry{background:rgba(15,23,41,0.9);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.logEntry time{font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent)}
+.logEntry p{font-size:13px;line-height:1.5;color:#d6deee;margin-top:4px}
+.logEntry .meta{font-size:11px;color:var(--muted);margin-top:4px}
+.archiveCard{background:var(--paper);color:var(--ink);border-radius:12px;padding:14px;border:1px solid #d8c9a8;margin-bottom:10px}
+.archiveCard h4{font-size:13px;letter-spacing:0.1em;text-transform:uppercase}
+.archiveCard p{font-size:13px;line-height:1.5;color:#4a3f2e;margin-top:6px}
+.badge{display:inline-block;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;background:#1a233a;color:#c9d6f0;padding:4px 8px;border-radius:20px;border:1px solid #2a3a5e;margin-right:6px;margin-top:6px}
+.endingGrid{display:grid;gap:10px}
+.endingTile{border:1px solid var(--line);background:linear-gradient(180deg,#121c33,#0e1528);border-radius:12px;padding:14px;position:relative;overflow:hidden}
+.endingTile.locked{opacity:0.45}
+.endingTile h4{font-size:13px;letter-spacing:0.1em;text-transform:uppercase;color:var(--paper)}
+.endingTile p{font-size:12.5px;line-height:1.5;color:#a8b6d1;margin-top:6px}
+.endingTile .unlock{font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);margin-top:8px}
+.tabs{position:relative;z-index:2;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;padding:8px 10px;background:rgba(10,15,26,0.98);border-top:1px solid var(--line)}
+.tab{height:44px;border-radius:10px;border:1px solid var(--line);background:#111a2e;color:#8ea0c2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;font-weight:700}
+.tab.active{background:var(--paper);color:var(--ink);border-color:#d8c9a8}
+.tab small{font-size:9px;letter-spacing:0.06em;font-weight:400}
+.primaryBtn{width:100%;height:48px;border-radius:12px;border:none;background:linear-gradient(180deg,#e8c99a,#c9a86a);color:#1a1a1e;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+.ghostBtn{width:100%;height:44px;border-radius:10px;border:1px solid var(--line);background:#0f1729;color:var(--paper);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;font-size:12px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sheet{position:absolute;inset:0;z-index:10;background:rgba(5,8,16,0.72);backdrop-filter:blur(4px);display:none;align-items:end}
+.sheet.open{display:flex}
+.sheetCard{width:100%;max-width:428px;margin:0 auto;background:#f4ecd8;color:var(--ink);border-radius:16px 16px 0 0;padding:16px 14px 18px;max-height:82dvh;overflow:auto;border:1px solid #d8c9a8}
+.sheetCard h3{font-size:16px;letter-spacing:0.06em;text-transform:uppercase}
+.sheetCard p, .sheetCard li{font-size:13.5px;line-height:1.6;color:#3a2f1e}
+.sheetCard ul{padding-left:18px;margin-top:8px}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.kv div{background:#ede0c0;border:1px solid #d8c9a8;border-radius:10px;padding:10px}
+.kv b{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;display:block}
+.kv span{font-size:12px;color:#4a3f2e}
+.commsHeader{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#0f1729;border:1px solid var(--line);border-radius:10px;margin-bottom:10px}
+.commsHeader strong{font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent)}
+.letterpress{font-family:Georgia,serif;text-shadow:0 1px 0 rgba(255,255,255,0.6), 0 -1px 0 rgba(0,0,0,0.2)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+<canvas class="starfield" id="stars"></canvas>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="mark"><span>◈ SV</span></div>
+    <div>
+      <h1>Signal Voyage</h1>
+      <p>Twelve Nights • Letterpress Ed.</p>
+    </div>
+  </div>
+  <div class="topActions">
+    <button class="iconBtn" id="btnHelp" aria-label="Guide">?</button>
+    <button class="iconBtn" id="btnReset" aria-label="Reset">↺</button>
+  </div>
+</div>
+
+<div class="nightBar">
+  <div class="nightPill" id="nightPill">Night 1 / 12</div>
+  <div class="nightTrack"><div class="nightFill" id="nightFill"></div></div>
+  <div class="nightNum" id="nightNum">01</div>
+</div>
+
+<div class="threadsStrip">
+  <div class="threadCard t-relay"><div class="threadHead"><b style="color:var(--relay)">Helios Relay</b><i id="vRelay">50%</i></div><div class="bar"><div class="barFill" id="bRelay" style="width:50%"></div></div><small>Bandwidth → stability</small></div>
+  <div class="threadCard t-ghost"><div class="threadHead"><b style="color:var(--ghost)">Ghost Signal</b><i id="vGhost">50%</i></div><div class="bar"><div class="barFill" id="bGhost" style="width:50%"></div></div><small>Listen → insight</small></div>
+  <div class="threadCard t-crew"><div class="threadHead"><b style="color:var(--crew)">Crew Heart</b><i id="vCrew">50%</i></div><div class="bar"><div class="barFill" id="bCrew" style="width:50%"></div></div><small>Care → trust</small></div>
+</div>
+
+<div class="main">
+  <div class="view" id="viewStory"></div>
+  <div class="view" id="viewThreads" style="display:none"></div>
+  <div class="view" id="viewLog" style="display:none"></div>
+  <div class="view" id="viewArchive" style="display:none"></div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="story">◈<span>Story</span></button>
+  <button class="tab" data-tab="threads">≋<span>Threads</span></button>
+  <button class="tab" data-tab="log">≡<span>Comms Log</span></button>
+  <button class="tab" data-tab="archive">⬢<span>Archive</span></button>
+</div>
+
+<div class="sheet" id="sheetHelp">
+  <div class="sheetCard">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>Structure & Persistence</h3>
+      <button class="iconBtn" onclick="closeSheet('sheetHelp')" style="width:34px;height:34px;background:#ede0c0;color:#1a1a1e;border-color:#d8c9a8">✕</button>
+    </div>
+    <p style="margin-top:10px"><b>Signal Voyage</b> is 12 nights aboard the deep-space relay <i>Errant</i>. Each night you read a scene, allocate limited bandwidth, pick an operator, and choose an action. Hidden stats shift silently and thread health decides your ending.</p>
+    <ul>
+      <li><b>Nights:</b> 12 sequential scenes. You cannot replay a night without starting a new voyage. Progress auto-saves.</li>
+      <li><b>Hidden stats:</b> Integrity, Trust, Insight (0–100). Choices nudge them; you see hints, not numbers, until the finale.</li>
+      <li><b>Bandwidth threads:</b> 3 points per night to split among Helios Relay / Ghost Signal / Crew Heart. Unfunded threads decay -4 each night.</li>
+      <li><b>Operator picks:</b> Vela (Comms +Relay), Kai (Engineer +Ghost), Reyes (Medic +Crew). Operator adds +6 to their thread that night.</li>
+      <li><b>Endings (5):</b> Homeward, Contact, Heartbound, Lost Signal, Synthesis — unlocked by thread health thresholds at Night 12.</li>
+      <li><b>Persistence:</b> Saved in localStorage: <code>signalVoyage_v2</code> (current voyage), <code>signalVoyage_archive</code> (voyage history), <code>signalVoyage_endings</code> (endings unlocked). Nights cleared and endings persist across app restarts. Use Reset to wipe current voyage only; archive stays unless you clear it.</li>
+    </ul>
+    <div class="kv">
+      <div><b>Mobile-first</b><span>360–428px portrait, 44px+ touch targets, 15px+ text, no horizontal scroll.</span></div>
+      <div><b>Letterpress</b><span>Cream paper, debossed ink, dashed log lines, starfield void.</span></div>
+    </div>
+    <button class="primaryBtn" style="margin-top:12px" onclick="closeSheet('sheetHelp')">Begin Transmission</button>
+  </div>
+</div>
+
+<div class="sheet" id="sheetEnding">
+  <div class="sheetCard" id="endingCard"></div>
+</div>
+
+</div>
+
+<script>
+const STORY = [
+  {title:"Departure Burn", flavor:"Night 01 — Low Orbit, Earth receding", text:"The Errant shudders as Helios Relay ignites. Earth is a thumbnail. Comms crackle: a repeating prime sequence from nowhere, too clean to be noise. Vela looks at you: 'Do we log it as anomaly or open a thread?'", choices:[
+    {label:"Log as anomaly, hold bandwidth", hint:"Cautious", thread:{relay:4,ghost:-2,crew:2}, stats:{integrity:4,trust:2,insight:-2}, log:"Logged anomaly. Relay stable."},
+    {label:"Open Ghost thread, allocate ear", hint:"Curious", thread:{relay:-2,ghost:8,crew:-1}, stats:{integrity:-2,trust:-1,insight:6}, log:"Opened Ghost Signal thread. Prime sequence isolated."},
+    {label:"Rally crew for departure ritual", hint:"Heart", thread:{relay:1,ghost:-1,crew:7}, stats:{integrity:1,trust:5,insight:0}, log:"Crew ritual held. Morale +."}
+  ]},
+  {title:"The Quiet Hour", flavor:"Night 02 — 0.4 AU, solar wind high", text:"Solar wind batters the sail. Helios flickers. The prime sequence returns, now with a pause — as if listening. Kai wants to harden the relay. Reyes wants to check crew vitals spiking with anxiety.", choices:[
+    {label:"Harden Helios, ride out storm", hint:"Relay", thread:{relay:9,ghost:-3,crew:0}, stats:{integrity:5,trust:0,insight:-1}, log:"Helios hardened. Signal held through gust."},
+    {label:"Answer the pause with a prime", hint:"Ghost", thread:{relay:-4,ghost:9,crew:1}, stats:{integrity:-3,trust:1,insight:7}, log:"Sent reply prime. Ghost signal brightened."},
+    {label:"Run quiet hour, dim lights, breathe", hint:"Crew", thread:{relay:0,ghost:0,crew:8}, stats:{integrity:0,trust:6,insight:1}, log:"Quiet hour observed. Heart rate normalized."}
+  ]},
+  {title:"Static Bloom", flavor:"Night 03 — Relay halo forming", text:"A bloom of static flowers across the band — beautiful, dangerous. It could be a solar artifact or a message trying to bloom. Bandwidth is thin tonight.", choices:[
+    {label:"Filter bloom, protect relay", hint:"Integrity", thread:{relay:8,ghost:-4,crew:1}, stats:{integrity:6,trust:1,insight:-2}, log:"Bloom filtered. Relay clarity +."},
+    {label:"Let bloom through, record raw", hint:"Insight", thread:{relay:-3,ghost:10,crew:-1}, stats:{integrity:-2,trust:-1,insight:8}, log:"Raw bloom recorded. Pattern contains coordinates."},
+    {label:"Invite crew to watch bloom together", hint:"Trust", thread:{relay:1,ghost:2,crew:7}, stats:{integrity:1,trust:6,insight:2}, log:"Crew watched bloom. Shared awe logged."}
+  ]},
+  {title:"Operator's Doubt", flavor:"Night 04 — Mid-voyage, morale dip", text:"Vela hasn't slept. 'What if we're answering something that shouldn't be answered?' Kai counters: 'What if it's a distress call?' The log awaits your note.", choices:[
+    {label:"Order rest, Vela off-shift", hint:"Crew", thread:{relay:0,ghost:-2,crew:9}, stats:{integrity:0,trust:7,insight:-1}, log:"Vela rested. Crew trust deepened."},
+    {label:"Authorize deep listen, all ears", hint:"Ghost", thread:{relay:-5,ghost:10,crew:-2}, stats:{integrity:-4,trust:-2,insight:8}, log:"Deep listen authorized. Ghost thread surging."},
+    {label:"Run relay diagnostics together", hint:"Relay", thread:{relay:9,ghost:-1,crew:2}, stats:{integrity:6,trust:2,insight:0}, log:"Diagnostics passed. Relay health +."}
+  ]},
+  {title:"The Second Voice", flavor:"Night 05 — Two signals now", text:"A second voice appears — not prime, but a lullaby in static, matching Reyes' childhood song. Impossible. Helios strains to carry both.", choices:[
+    {label:"Isolate lullaby, protect crew", hint:"Heart", thread:{relay:-2,ghost:4,crew:8}, stats:{integrity:-1,trust:6,insight:3}, log:"Lullaby isolated. Reyes moved to tears."},
+    {label:"Triangulate both sources", hint:"Ghost", thread:{relay:-3,ghost:9,crew:0}, stats:{integrity:-2,trust:0,insight:7}, log:"Triangulation: sources are not in same space."},
+    {label:"Boost Helios to carry both", hint:"Relay", thread:{relay:10,ghost:2,crew:-2}, stats:{integrity:7,trust:-1,insight:1}, log:"Helios boosted. Power draw critical."}
+  ]},
+  {title:"Bandwidth Famine", flavor:"Night 06 — Power rationing", text:"Reactor coughs. You have only 3 bandwidth points but every thread begs. The comms log blinks: 'Choose what survives tonight.'", choices:[
+    {label:"Feed Helios, starve ghosts", hint:"Relay", thread:{relay:10,ghost:-6,crew:0}, stats:{integrity:7,trust:-1,insight:-3}, log:"Helios fed. Ghost signal dimmed."},
+    {label:"Feed Ghost, risk relay flicker", hint:"Ghost", thread:{relay:-6,ghost:11,crew:1}, stats:{integrity:-5,trust:1,insight:8}, log:"Ghost fed. Relay flickered but held."},
+    {label:"Split to crew, keep us human", hint:"Crew", thread:{relay:-1,ghost:-1,crew:10}, stats:{integrity:-1,trust:8,insight:0}, log:"Crew fed. Shared meal, stories."}
+  ]},
+  {title:"Letterpress Night", flavor:"Night 07 — Analog fallback", text:"Digital logs fail. You switch to letterpress: ink on paper, pressed by hand. Each word costs. What do you print for Earth, if anyone's listening?", choices:[
+    {label:"Print coordinates, pure data", hint:"Relay", thread:{relay:8,ghost:2,crew:-1}, stats:{integrity:6,trust:-1,insight:3}, log:"Printed coordinates. Letterpress proof archived."},
+    {label:"Print the lullaby, note for note", hint:"Ghost", thread:{relay:-2,ghost:9,crew:2}, stats:{integrity:-1,trust:2,insight:7}, log:"Printed lullaby. Ink bled like stars."},
+    {label:"Print crew names, 'we were here'", hint:"Crew", thread:{relay:0,ghost:0,crew:9}, stats:{integrity:1,trust:7,insight:1}, log:"Printed crew manifest. Heart thread strong."}
+  ]},
+  {title:"The Choice of Ears", flavor:"Night 08 — Signal asks a question", text:"Ghost signal resolves into a question in plain English: 'Do you want to be found?' Helios can answer, or stay silent. Crew holds breath.", choices:[
+    {label:"Answer: 'Yes, we are here'", hint:"Ghost", thread:{relay:-4,ghost:10,crew:2}, stats:{integrity:-3,trust:2,insight:8}, log:"Answered YES. Signal pulsed warm."},
+    {label:"Answer: 'We are passing through'", hint:"Relay", thread:{relay:8,ghost:2,crew:1}, stats:{integrity:5,trust:1,insight:2}, log:"Answered PASSING. Relay held steady."},
+    {label:"Stay silent, hold crew close", hint:"Crew", thread:{relay:1,ghost:-4,crew:9}, stats:{integrity:1,trust:7,insight:-2}, log:"Chose silence. Crew exhaled together."}
+  ]},
+  {title:"Storm Wall", flavor:"Night 09 — Helios storm", text:"A wall of charged dust slams the sail. Helios screams. You can shunt power from life support to keep relay alive — or protect crew and let signal drop.", choices:[
+    {label:"Shunt to Helios, hold signal", hint:"Relay", thread:{relay:11,ghost:1,crew:-5}, stats:{integrity:8,trust:-4,insight:1}, log:"Shunted to Helios. Crew cold, signal alive."},
+    {label:"Protect crew, let signal fade", hint:"Crew", thread:{relay:-7,ghost:-2,crew:10}, stats:{integrity:-4,trust:8,insight:-1}, log:"Protected crew. Signal faded, trust held."},
+    {label:"Balance — half and half", hint:"Balance", thread:{relay:4,ghost:4,crew:4}, stats:{integrity:2,trust:2,insight:3}, log:"Balanced load. All threads strained but alive."}
+  ]},
+  {title:"The Archive Wakes", flavor:"Night 10 — Old Earth reply", text:"Helios catches an old Earth transmission — your own launch, 12 years ago, just now arriving. Ghost signal overlaps it, harmonizing. Time feels thin.", choices:[
+    {label:"Sync Earth past with Ghost present", hint:"Ghost", thread:{relay:2,ghost:10,crew:0}, stats:{integrity:1,trust:0,insight:8}, log:"Synced timelines. Insight spike."},
+    {label:"Anchor to Earth, boost Helios home", hint:"Relay", thread:{relay:10,ghost:-3,crew:2}, stats:{integrity:7,trust:2,insight:-1}, log:"Anchored to Earth. Home vector locked."},
+    {label:"Gather crew to hear their younger selves", hint:"Crew", thread:{relay:0,ghost:2,crew:9}, stats:{integrity:0,trust:7,insight:2}, log:"Crew heard past selves. Tears, laughter."}
+  ]},
+  {title:"Three Threads, One Needle", flavor:"Night 11 — Convergence", text:"All three threads converge: Helios stable, Ghost singing, Crew holding hands in the galley. You have one night left. What do you tell the void?", choices:[
+    {label:"We are a relay, we carry", hint:"Relay", thread:{relay:9,ghost:1,crew:1}, stats:{integrity:6,trust:1,insight:1}, log:"Declared: WE CARRY."},
+    {label:"We are listeners, we learn", hint:"Ghost", thread:{relay:1,ghost:9,crew:1}, stats:{integrity:1,trust:1,insight:6}, log:"Declared: WE LISTEN."},
+    {label:"We are crew, we remain", hint:"Crew", thread:{relay:1,ghost:1,crew:9}, stats:{integrity:1,trust:6,insight:1}, log:"Declared: WE REMAIN."}
+  ]},
+  {title:"Arrival / Departure", flavor:"Night 12 — The signal breaks", text:"The signal breaks like dawn. Helios, Ghost, Crew — all three flare. Your hidden stats will now choose the ending. Choose how you step through.", choices:[
+    {label:"Step toward Earthlight", hint:"Homeward", thread:{relay:6,ghost:-2,crew:2}, stats:{integrity:4,trust:2,insight:-1}, log:"Stepped toward Earthlight."},
+    {label:"Step into the Ghost", hint:"Contact", thread:{relay:-2,ghost:8,crew:0}, stats:{integrity:-1,trust:0,insight:6}, log:"Stepped into Ghost."},
+    {label:"Step back to the galley", hint:"Heartbound", thread:{relay:0,ghost:0,crew:8}, stats:{integrity:0,trust:6,insight:0}, log:"Stepped back to crew."}
+  ]}
+];
+
+const OPERATORS = [
+  {id:'vela', name:'Vela', role:'Comms', bonus:{relay:6}, icon:'◐', desc:'+6 Helios. Steady hand on relay.'},
+  {id:'kai', name:'Kai', role:'Engineer', bonus:{ghost:6}, icon:'⬡', desc:'+6 Ghost. Tunes the unheard.'},
+  {id:'reyes', name:'Reyes', role:'Medic', bonus:{crew:6}, icon:'♡', desc:'+6 Crew. Keeps hearts beating.'}
+];
+
+const ENDINGS = [
+  {id:'homeward', name:'Homeward — The Relay Holds', need:(t)=> t.relay>=72 && t.relay>=t.ghost && t.relay>=t.crew, desc:'Helios burns bright. You punch a corridor home. Earth hears you. The Ghost fades respectfully. You chose to carry.', color:'#c9a86a'},
+  {id:'contact', name:'Contact — We Are Not Alone', need:(t)=> t.ghost>=72, desc:'You let the Ghost in. It is not hostile — it is archival, a library of lost voyages. You are catalogued, gently. Insight floods.', color:'#8ea8c8'},
+  {id:'heartbound', name:'Heartbound — The Crew Remains', need:(t)=> t.crew>=72, desc:'You turn from signals to faces. The Errant becomes home. You orbit a quiet star, growing food, printing letters. Human, together.', color:'#d9a679'},
+  {id:'synthesis', name:'Synthesis — Three Threads Braided', need:(t)=> t.relay>=60 && t.ghost>=60 && t.crew>=60, desc:'Rare balance. You braid all three: relay, ghost, crew into one transmission. Earth, Ghost, and Errant sing together. The voyage continues, transformed.', color:'#7fb8a8'},
+  {id:'lost', name:'Lost Signal — Drift', need:(t)=> t.relay<40 && t.ghost<40 && t.crew<40, desc:'Bandwidth starved, threads frayed. Helios gutters. Ghost dissolves. Crew drifts apart. You are adrift, but still transmitting — someone may yet hear.', color:'#6b7280'}
+];
+
+let state = {
+  night:0,
+  threads:{relay:50,ghost:50,crew:50},
+  stats:{integrity:50,trust:50,insight:50},
+  bandwidth:{relay:1,ghost:1,crew:1},
+  operator:'vela',
+  log:[],
+  nightsCleared:0,
+  archive:[],
+  endingsUnlocked:[]
+};
+
+function load(){
+  try{
+    const s = JSON.parse(localStorage.getItem('signalVoyage_v2')||'null');
+    const a = JSON.parse(localStorage.getItem('signalVoyage_archive')||'null');
+    const e = JSON.parse(localStorage.getItem('signalVoyage_endings')||'null');
+    if(s){ state = {...state, ...s}; }
+    if(a) state.archive = a;
+    if(e) state.endingsUnlocked = e;
+  }catch{}
+}
+function save(){
+  localStorage.setItem('signalVoyage_v2', JSON.stringify({night:state.night, threads:state.threads, stats:state.stats, bandwidth:state.bandwidth, operator:state.operator, log:state.log, nightsCleared:state.nightsCleared}));
+  localStorage.setItem('signalVoyage_archive', JSON.stringify(state.archive));
+  localStorage.setItem('signalVoyage_endings', JSON.stringify(state.endingsUnlocked));
+}
+
+function clamp(v){ return Math.max(0, Math.min(100, Math.round(v))); }
+
+function renderTop(){
+  const n = Math.min(state.night+1,12);
+  document.getElementById('nightPill').textContent = `Night ${String(n).padStart(2,'0')} / 12`;
+  document.getElementById('nightNum').textContent = String(n).padStart(2,'0');
+  document.getElementById('nightFill').style.width = (n/12*100)+'%';
+  document.getElementById('vRelay').textContent = state.threads.relay+'%';
+  document.getElementById('vGhost').textContent = state.threads.ghost+'%';
+  document.getElementById('vCrew').textContent = state.threads.crew+'%';
+  document.getElementById('bRelay').style.width = state.threads.relay+'%';
+  document.getElementById('bGhost').style.width = state.threads.ghost+'%';
+  document.getElementById('bCrew').style.width = state.threads.crew+'%';
+}
+
+function renderStory(){
+  const c = document.getElementById('viewStory');
+  if(state.night>=12){
+    const ending = evaluateEnding();
+    c.innerHTML = `
+      <div class="paperCard">
+        <div class="paperHead"><h2>Voyage Complete</h2><span>Archive Entry</span></div>
+        <div class="sceneBody">
+          <h3>${ending.name}</h3>
+          <p class="em">${ending.desc}</p>
+          <p>Threads at arrival — Helios ${state.threads.relay}%, Ghost ${state.threads.ghost}%, Crew ${state.threads.crew}%.</p>
+          <p>Hidden stats — Integrity ${state.stats.integrity}, Trust ${state.stats.trust}, Insight ${state.stats.insight}.</p>
+          <div class="statsHint"><span class="chip">Nights cleared: ${state.nightsCleared}</span><span class="chip">Endings: ${state.endingsUnlocked.length}/5</span></div>
+        </div>
+        <div style="padding:0 16px 16px;display:grid;gap:8px">
+          <button class="primaryBtn" onclick="newVoyage()">Start New Voyage</button>
+          <button class="ghostBtn" onclick="switchTab('archive')">View Archive</button>
+        </div>
+      </div>
+      <div class="bandwidthBox" style="margin-top:12px">
+        <h4>Comms Log — Final <em>${state.log.length} entries</em></h4>
+        ${state.log.slice(-4).map(e=>`<div class="logEntry"><time>Night ${e.night} • ${e.op}</time><p>${e.text}</p></div>`).join('')}
+      </div>
+    `;
+    return;
+  }
+  const night = STORY[state.night];
+  const op = OPERATORS.find(o=>o.id===state.operator);
+  c.innerHTML = `
+    <div class="paperCard">
+      <div class="paperHead"><h2>${night.title}</h2><span>${String(state.night+1).padStart(2,'0')} / 12</span></div>
+      <div class="sceneBody">
+        <div class="flavor">${night.flavor}</div>
+        <h3 class="letterpress">${night.title}</h3>
+        <p>${night.text}</p>
+        <p class="em">Operator on duty: <b>${op.name}</b> — ${op.desc} &nbsp;|&nbsp; Bandwidth: ${state.bandwidth.relay}/${state.bandwidth.ghost}/${state.bandwidth.crew} (3 pts)</p>
+        <div class="statsHint">
+          <span class="chip">◈ Helios ${state.threads.relay}%</span>
+          <span class="chip">≋ Ghost ${state.threads.ghost}%</span>
+          <span class="chip">♡ Crew ${state.threads.crew}%</span>
+        </div>
+      </div>
+      <div class="choices">
+        ${night.choices.map((ch,i)=>`
+          <button class="choiceBtn ${i===0?'prime':''}" onclick="choose(${i})">
+            <span class="tag">${ch.hint}</span>
+            <b>${ch.label}</b>
+            <span>${ch.log}</span>
+          </button>
+        `).join('')}
+      </div>
+    </div>
+    <div style="padding:10px 2px 0;display:flex;gap:8px">
+      <button class="ghostBtn" style="flex:1" onclick="switchTab('threads')">Adjust Bandwidth</button>
+      <button class="ghostBtn" style="flex:1" onclick="switchTab('log')">Comms Log</button>
+    </div>
+  `;
+}
+
+function renderThreads(){
+  const c = document.getElementById('viewThreads');
+  const total = state.bandwidth.relay + state.bandwidth.ghost + state.bandwidth.crew;
+  c.innerHTML = `
+    <div class="commsHeader"><strong>Bandwidth Allocation</strong><span style="font-size:11px;color:var(--muted)">${total}/3 points</span></div>
+    <div class="bandwidthBox">
+      <h4>Distribute 3 points <em>${total===3?'Balanced':'Need '+(3-total)+' more'}</em></h4>
+      ${['relay','ghost','crew'].map(k=>{
+        const label = k==='relay'?'Helios Relay':k==='ghost'?'Ghost Signal':'Crew Heart';
+        const sub = k==='relay'?'+ stability per point':k==='ghost'?'+ insight per point':'+ trust per point';
+        return `<div class="bwRow">
+          <div><strong style="color:${k==='relay'?'var(--relay)':k==='ghost'?'var(--ghost)':'var(--crew)'}">${label}</strong><br><small>${sub}</small></div>
+          <div class="bwCtrl">
+            <button class="bwBtn" onclick="adjustBW('${k}',-1)">−</button>
+            <div class="bwVal">${state.bandwidth[k]}</div>
+            <button class="bwBtn" onclick="adjustBW('${k}',1)">+</button>
+          </div>
+        </div>`;
+      }).join('')}
+      <p style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5">Unfunded threads decay −4 each night. Funded threads gain + (bandwidth × 3) plus choice effects. Operator adds +6 to their thread.</p>
+    </div>
+    <div class="bandwidthBox">
+      <h4>Operator Pick <em>${OPERATORS.find(o=>o.id===state.operator).name} on duty</em></h4>
+      <div class="operatorPick">
+        ${OPERATORS.map(o=>`
+          <button class="opCard ${state.operator===o.id?'sel':''}" onclick="pickOp('${o.id}')">
+            <div class="avatar">${o.icon}</div>
+            <b>${o.name}</b>
+            <p>${o.role}</p>
+            <p style="color:${o.id==='vela'?'var(--relay)':o.id==='kai'?'var(--ghost)':'var(--crew)'}">${o.desc}</p>
+          </button>
+        `).join('')}
+      </div>
+    </div>
+    <div class="bandwidthBox">
+      <h4>Thread Health</h4>
+      ${['relay','ghost','crew'].map(k=>{
+        const v = state.threads[k];
+        const col = k==='relay'?'var(--relay)':k==='ghost'?'var(--ghost)':'var(--crew)';
+        return `<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;letter-spacing:0.08em;text-transform:uppercase"><b style="color:${col}">${k}</b><span>${v}%</span></div><div class="bar" style="margin-top:4px"><div class="barFill" style="width:${v}%;background:${col}"></div></div></div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderLog(){
+  const c = document.getElementById('viewLog');
+  if(state.log.length===0){
+    c.innerHTML = `<div class="bandwidthBox"><h4>Comms Log <em>Empty</em></h4><p style="font-size:13px;color:var(--muted);line-height:1.6">No transmissions yet. Make a choice on the Story tab to begin logging.</p></div>`;
+    return;
+  }
+  c.innerHTML = `
+    <div class="commsHeader"><strong>Comms Log</strong><span style="font-size:11px;color:var(--muted)">${state.log.length} entries</span></div>
+    ${state.log.slice().reverse().map(e=>`
+      <div class="logEntry">
+        <time>Night ${String(e.night).padStart(2,'0')} • ${e.op} • ${e.thread}</time>
+        <p>${e.text}</p>
+        <div class="meta">${e.choice} — BW ${e.bw.relay}/${e.bw.ghost}/${e.bw.crew}</div>
+      </div>
+    `).join('')}
+    <button class="ghostBtn" style="margin-top:10px" onclick="clearLog()">Clear Log (keep voyage)</button>
+  `;
+}
+
+function renderArchive(){
+  const c = document.getElementById('viewArchive');
+  const endings = ENDINGS.map(e=>{
+    const unlocked = state.endingsUnlocked.includes(e.id);
+    return `<div class="endingTile ${unlocked?'':'locked'}">
+      <h4>${unlocked?'◈':'◯'} ${e.name}</h4>
+      <p>${e.desc}</p>
+      <div class="unlock">${unlocked?'Unlocked ✓':'Locked — '+ (e.id==='synthesis'?'Need 60/60/60':e.id==='lost'?'Need all <40':e.id==='homeward'?'Need Helios ≥72':e.id==='contact'?'Need Ghost ≥72':'Need Crew ≥72')}</div>
+    </div>`;
+  }).join('');
+  c.innerHTML = `
+    <div class="archiveCard">
+      <h4>Voyage Archive</h4>
+      <p>Nights cleared: <b>${state.nightsCleared}</b> &nbsp;•&nbsp; Voyages completed: <b>${state.archive.length}</b> &nbsp;•&nbsp; Endings: <b>${state.endingsUnlocked.length}/5</b></p>
+      <div style="margin-top:8px">
+        ${state.archive.length===0?'<p style="color:#8a7d6b">No voyages archived yet. Complete 12 nights to archive.</p>': state.archive.slice().reverse().map(v=>`
+          <div style="border-top:1px dashed #c9b896;margin-top:8px;padding-top:8px">
+            <div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#8a7d6b">${v.date} • Night ${v.nights}/12 • ${v.endingName}</div>
+            <div style="font-size:12px;color:#4a3f2e;margin-top:4px">Helios ${v.threads.relay}% • Ghost ${v.threads.ghost}% • Crew ${v.threads.crew}%</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="row2" style="margin-top:12px">
+        <button class="ghostBtn" onclick="exportArchive()">Export JSON</button>
+        <button class="ghostBtn" onclick="clearArchive()">Clear Archive</button>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);margin-bottom:8px">Endings Codex</div>
+      <div class="endingGrid">${endings}</div>
+    </div>
+    <div class="archiveCard" style="margin-top:12px">
+      <h4>Persistence</h4>
+      <p>Current voyage auto-saves to <code>signalVoyage_v2</code>. Archive to <code>signalVoyage_archive</code>. Endings to <code>signalVoyage_endings</code>. All in localStorage — survives app restarts. Reset wipes current voyage only.</p>
+    </div>
+  `;
+}
+
+function adjustBW(k, delta){
+  const total = state.bandwidth.relay + state.bandwidth.ghost + state.bandwidth.crew;
+  const cur = state.bandwidth[k];
+  if(delta>0 && total>=3) return;
+  if(delta<0 && cur<=0) return;
+  state.bandwidth[k] = Math.max(0, Math.min(3, cur+delta));
+  save(); renderThreads(); renderTop(); renderStory();
+}
+function pickOp(id){ state.operator=id; save(); renderThreads(); renderStory(); }
+
+function choose(idx){
+  const night = STORY[state.night];
+  const ch = night.choices[idx];
+  // apply bandwidth effects: each point gives +3 to that thread, unfunded decays -4
+  ['relay','ghost','crew'].forEach(k=>{
+    const bw = state.bandwidth[k];
+    if(bw===0) state.threads[k] -= 4;
+    else state.threads[k] += bw*3;
+  });
+  // operator bonus
+  const op = OPERATORS.find(o=>o.id===state.operator);
+  if(op.bonus.relay) state.threads.relay += op.bonus.relay;
+  if(op.bonus.ghost) state.threads.ghost += op.bonus.ghost;
+  if(op.bonus.crew) state.threads.crew += op.bonus.crew;
+  // choice thread effects
+  state.threads.relay += ch.thread.relay || 0;
+  state.threads.ghost += ch.thread.ghost || 0;
+  state.threads.crew += ch.thread.crew || 0;
+  // stats
+  state.stats.integrity += ch.stats.integrity || 0;
+  state.stats.trust += ch.stats.trust || 0;
+  state.stats.insight += ch.stats.insight || 0;
+  // clamp
+  state.threads.relay = clamp(state.threads.relay);
+  state.threads.ghost = clamp(state.threads.ghost);
+  state.threads.crew = clamp(state.threads.crew);
+  state.stats.integrity = clamp(state.stats.integrity);
+  state.stats.trust = clamp(state.stats.trust);
+  state.stats.insight = clamp(state.stats.insight);
+  // log
+  state.log.push({
+    night: state.night+1,
+    op: op.name,
+    thread: ch.hint,
+    text: ch.log,
+    choice: ch.label,
+    bw: {...state.bandwidth}
+  });
+  state.night += 1;
+  state.nightsCleared = Math.max(state.nightsCleared, state.night);
+  // if completed, archive
+  if(state.night>=12){
+    const ending = evaluateEnding();
+    if(!state.endingsUnlocked.includes(ending.id)){
+      state.endingsUnlocked.push(ending.id);
+    }
+    state.archive.push({
+      date: new Date().toLocaleDateString(),
+      nights: 12,
+      ending: ending.id,
+      endingName: ending.name,
+      threads: {...state.threads},
+      stats: {...state.stats}
+    });
+  }
+  save();
+  renderTop(); renderStory(); renderThreads(); renderLog(); renderArchive();
+  if(state.night>=12){
+    showEnding(evaluateEnding());
+  } else {
+    // subtle haptic
+    if(navigator.vibrate) navigator.vibrate(20);
+  }
+}
+
+function evaluateEnding(){
+  const t = state.threads;
+  // priority: synthesis first, then specific, then lost
+  const synth = ENDINGS.find(e=>e.id==='synthesis');
+  if(synth.need(t)) return synth;
+  // check others except lost
+  for(let e of ENDINGS){
+    if(e.id==='synthesis' || e.id==='lost') continue;
+    if(e.need(t)) return e;
+  }
+  const lost = ENDINGS.find(e=>e.id==='lost');
+  if(lost.need(t)) return lost;
+  // fallback: highest thread
+  let max = 'relay';
+  if(t.ghost > t[max]) max='ghost';
+  if(t.crew > t[max]) max='crew';
+  if(max==='relay') return ENDINGS.find(e=>e.id==='homeward');
+  if(max==='ghost') return ENDINGS.find(e=>e.id==='contact');
+  return ENDINGS.find(e=>e.id==='heartbound');
+}
+
+function showEnding(e){
+  const card = document.getElementById('endingCard');
+  card.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>Ending Unlocked</h3>
+      <button class="iconBtn" onclick="closeSheet('sheetEnding')" style="width:34px;height:34px;background:#ede0c0;color:#1a1a1e;border-color:#d8c9a8">✕</button>
+    </div>
+    <div style="margin-top:10px;background:#0f1729;color:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px">
+      <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:${e.color}">${e.id}</div>
+      <h3 style="color:var(--paper);margin-top:6px">${e.name}</h3>
+      <p style="color:#c9d6f0;margin-top:8px">${e.desc}</p>
+      <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+        <span class="badge">Helios ${state.threads.relay}%</span>
+        <span class="badge">Ghost ${state.threads.ghost}%</span>
+        <span class="badge">Crew ${state.threads.crew}%</span>
+      </div>
+    </div>
+    <button class="primaryBtn" style="margin-top:12px" onclick="closeSheet('sheetEnding');switchTab('archive')">View Archive</button>
+    <button class="ghostBtn" style="margin-top:8px;background:#ede0c0;color:#1a1a1e;border-color:#d8c9a8" onclick="newVoyage()">New Voyage</button>
+  `;
+  openSheet('sheetEnding');
+}
+
+function newVoyage(){
+  state.night=0;
+  state.threads={relay:50,ghost:50,crew:50};
+  state.stats={integrity:50,trust:50,insight:50};
+  state.bandwidth={relay:1,ghost:1,crew:1};
+  state.operator='vela';
+  state.log=[];
+  save();
+  renderTop(); renderStory(); renderThreads(); renderLog(); renderArchive();
+  closeSheet('sheetEnding');
+  switchTab('story');
+}
+
+function clearLog(){ if(confirm('Clear comms log?')){ state.log=[]; save(); renderLog(); } }
+function clearArchive(){ if(confirm('Clear entire voyage archive and endings?')){ state.archive=[]; state.endingsUnlocked=[]; save(); renderArchive(); } }
+function exportArchive(){
+  const data = JSON.stringify({archive:state.archive, endings:state.endingsUnlocked, nightsCleared:state.nightsCleared}, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='signal-voyage-archive.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(b=> b.classList.toggle('active', b.dataset.tab===tab));
+  document.getElementById('viewStory').style.display = tab==='story'?'block':'none';
+  document.getElementById('viewThreads').style.display = tab==='threads'?'block':'none';
+  document.getElementById('viewLog').style.display = tab==='log'?'block':'none';
+  document.getElementById('viewArchive').style.display = tab==='archive'?'block':'none';
+}
+document.querySelectorAll('.tab').forEach(b=> b.addEventListener('click', ()=> switchTab(b.dataset.tab)));
+
+function openSheet(id){ document.getElementById(id).classList.add('open'); }
+function closeSheet(id){ document.getElementById(id).classList.remove('open'); }
+document.getElementById('sheetHelp').addEventListener('click', e=>{ if(e.target.id==='sheetHelp') closeSheet('sheetHelp'); });
+document.getElementById('sheetEnding').addEventListener('click', e=>{ if(e.target.id==='sheetEnding') closeSheet('sheetEnding'); });
+document.getElementById('btnHelp').addEventListener('click', ()=> openSheet('sheetHelp'));
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  if(confirm('Reset current voyage? Archive and endings are kept.')){
+    newVoyage();
+  }
+});
+
+// stars
+function drawStars(){
+  const c = document.getElementById('stars');
+  const dpr = Math.min(2, window.devicePixelRatio||1);
+  const w = c.clientWidth, h = c.clientHeight;
+  c.width = w*dpr; c.height = h*dpr;
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+  for(let i=0;i<120;i++){
+    const x = Math.random()*w, y=Math.random()*h*0.7;
+    const r = Math.random()*1.2;
+    const a = Math.random()*0.6+0.2;
+    ctx.fillStyle = `rgba(201,168,106,${a})`;
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  }
+  // faint nebula
+  const g = ctx.createRadialGradient(w*0.7, h*0.15, 0, w*0.7, h*0.15, 300);
+  g.addColorStop(0,'rgba(126,184,168,0.12)');
+  g.addColorStop(1,'transparent');
+  ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+}
+
+load();
+renderTop(); renderStory(); renderThreads(); renderLog(); renderArchive();
+drawStars();
+window.addEventListener('resize', drawStars);
+</script>
+</body>
+</html>

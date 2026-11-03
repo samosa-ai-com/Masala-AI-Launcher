@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Lucky Tap Lottery</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden;width:100%}
+body{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:#1a0a2e;
+  color:#fff;
+  min-height:100dvh;
+  display:flex;
+  justify-content:center;
+}
+.wrap{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100dvh;
+  display:flex;
+  flex-direction:column;
+  background:linear-gradient(180deg,#2d1b4e 0%,#1a0a2e 50%,#0f0520 100%);
+  position:relative;
+  overflow-x:hidden;
+}
+.header{
+  padding:14px 16px 10px;
+  text-align:center;
+  background:linear-gradient(135deg,#ff6b35 0%,#f7931e 50%,#ffd23f 100%);
+  color:#1a0a2e;
+}
+.header h1{font-size:22px;font-weight:900;letter-spacing:0.5px;text-shadow:0 1px 0 rgba(255,255,255,0.4)}
+.header p{font-size:13px;font-weight:600;opacity:0.85;margin-top:2px}
+.stats{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr 1fr;
+  gap:8px;
+  padding:12px 12px;
+  background:rgba(255,255,255,0.08);
+  border-bottom:1px solid rgba(255,255,255,0.1);
+}
+.stat{
+  background:rgba(255,255,255,0.12);
+  border-radius:12px;
+  padding:8px 4px;
+  text-align:center;
+  border:1px solid rgba(255,255,255,0.15);
+}
+.stat-label{font-size:10px;letter-spacing:0.8px;text-transform:uppercase;opacity:0.7;font-weight:700}
+.stat-val{font-size:16px;font-weight:900;margin-top:2px;color:#ffd23f}
+.stat-val.total{color:#4ade80}
+.main{
+  flex:1;
+  padding:16px 16px 20px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:14px;
+}
+.ticket-card{
+  width:100%;
+  background:linear-gradient(135deg,#fff 0%,#fff8e7 100%);
+  border-radius:20px;
+  overflow:hidden;
+  box-shadow:0 12px 32px rgba(0,0,0,0.4),0 0 0 3px #ffd23f,0 0 0 6px #ff6b35;
+  color:#1a0a2e;
+  position:relative;
+}
+.ticket-top{
+  background:linear-gradient(135deg,#ff6b35 0%,#f7931e 40%,#ffd23f 100%);
+  padding:14px 16px 12px;
+  text-align:center;
+  position:relative;
+  overflow:hidden;
+}
+.ticket-top::before{
+  content:'';
+  position:absolute;inset:0;
+  background:repeating-linear-gradient(45deg,transparent 0 12px,rgba(255,255,255,0.12) 12px 24px);
+}
+.ticket-top h2{position:relative;font-size:18px;font-weight:900;letter-spacing:1px;color:#1a0a2e}
+.ticket-top .sub{position:relative;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;opacity:0.8;margin-top:2px}
+.ticket-id{position:relative;font-size:11px;font-weight:700;background:rgba(26,10,46,0.15);display:inline-block;padding:3px 10px;border-radius:20px;margin-top:6px}
+.perf{
+  height:14px;
+  background:#fff8e7;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0;
+  position:relative;
+}
+.perf::before,.perf::after{
+  content:'';position:absolute;top:50%;width:14px;height:14px;background:#1a0a2e;border-radius:50%;transform:translateY(-50%);
+}
+.perf::before{left:-7px}
+.perf::after{right:-7px}
+.perf-dots{
+  flex:1;
+  border-top:3px dashed #e8c99a;
+  margin:0 14px;
+}
+.reveal-area{
+  padding:18px 16px 16px;
+  text-align:center;
+  background:linear-gradient(180deg,#fff8e7 0%,#fff 100%);
+  min-height:148px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+}
+.prize-display{
+  width:100%;
+}
+.prize-icon{font-size:42px;line-height:1}
+.prize-text{font-size:22px;font-weight:900;margin-top:6px}
+.prize-sub{font-size:13px;font-weight:600;opacity:0.7;margin-top:4px}
+.prize-amount{font-size:32px;font-weight:900;color:#16a34a;margin-top:4px;text-shadow:0 1px 0 rgba(0,0,0,0.08)}
+.prize-amount.lose{color:#9ca3af;font-size:20px}
+.foil{
+  position:absolute;
+  inset:12px;
+  background:linear-gradient(135deg,#d1d5db 0%,#f3f4f6 20%,#9ca3af 40%,#e5e7eb 60%,#9ca3af 80%,#d1d5db 100%);
+  border-radius:14px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  border:2px dashed #9ca3af;
+  transition:transform 0.5s cubic-bezier(0.4,0,0.2,1),opacity 0.4s;
+  touch-action:manipulation;
+  user-select:none;
+  box-shadow:inset 0 2px 8px rgba(0,0,0,0.15);
+}
+.foil:active{transform:scale(0.98)}
+.foil.revealed{
+  transform:translateY(-110%) rotateX(25deg);
+  opacity:0;
+  pointer-events:none;
+}
+.foil-icon{font-size:36px;animation:pulse 1.4s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.foil-text{font-size:15px;font-weight:900;color:#374151;margin-top:6px;letter-spacing:0.5px}
+.foil-hint{font-size:12px;font-weight:600;color:#6b7280;margin-top:2px}
+.btn-row{
+  display:flex;
+  gap:10px;
+  width:100%;
+}
+.btn{
+  flex:1;
+  min-height:52px;
+  border:none;
+  border-radius:14px;
+  font-size:16px;
+  font-weight:800;
+  cursor:pointer;
+  touch-action:manipulation;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  transition:transform 0.1s,opacity 0.2s;
+}
+.btn:active{transform:scale(0.97)}
+.btn-primary{
+  background:linear-gradient(135deg,#ff6b35 0%,#f7931e 100%);
+  color:#fff;
+  box-shadow:0 4px 14px rgba(255,107,53,0.4);
+}
+.btn-secondary{
+  background:rgba(255,255,255,0.14);
+  color:#fff;
+  border:2px solid rgba(255,255,255,0.25);
+}
+.btn:disabled{opacity:0.45;pointer-events:none}
+.result-banner{
+  width:100%;
+  padding:10px 14px;
+  border-radius:12px;
+  text-align:center;
+  font-weight:800;
+  font-size:14px;
+  display:none;
+}
+.result-banner.show{display:block}
+.result-banner.win{background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;box-shadow:0 4px 12px rgba(22,163,74,0.3)}
+.result-banner.lose{background:rgba(255,255,255,0.12);color:#e5e7eb;border:1px solid rgba(255,255,255,0.15)}
+.footer{
+  text-align:center;
+  padding:8px 16px 16px;
+  font-size:11px;
+  opacity:0.5;
+  line-height:1.4;
+}
+.confetti{
+  position:absolute;
+  width:8px;height:8px;
+  pointer-events:none;
+  animation:fall 900ms ease-out forwards;
+}
+@keyframes fall{
+  0%{transform:translateY(0) rotate(0deg);opacity:1}
+  100%{transform:translateY(220px) rotate(720deg);opacity:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>🎉 LUCKY TAP LOTTERY 🎉</h1>
+    <p>Tap to reveal — win up to $50!</p>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Total Won</div><div class="stat-val total" id="totalWon">$0</div></div>
+    <div class="stat"><div class="stat-label">Tickets</div><div class="stat-val" id="tickets">0</div></div>
+    <div class="stat"><div class="stat-label">Wins</div><div class="stat-val" id="wins">0</div></div>
+    <div class="stat"><div class="stat-label">Best Prize</div><div class="stat-val" id="best">$0</div></div>
+  </div>
+  <div class="main">
+    <div class="ticket-card" id="ticketCard">
+      <div class="ticket-top">
+        <h2>✨ GOLDEN TICKET ✨</h2>
+        <div class="sub">Festive Fortune Series</div>
+        <div class="ticket-id" id="ticketId">#0001</div>
+      </div>
+      <div class="perf"><div class="perf-dots"></div></div>
+      <div class="reveal-area" id="revealArea">
+        <div class="prize-display" id="prizeDisplay">
+          <div class="prize-icon" id="prizeIcon">🎟️</div>
+          <div class="prize-text" id="prizeText">Ready to reveal?</div>
+          <div class="prize-sub" id="prizeSub">Tap the foil below</div>
+        </div>
+        <div class="foil" id="foil" role="button" tabindex="0" aria-label="Tap to reveal prize">
+          <div class="foil-icon">👆</div>
+          <div class="foil-text">TAP TO REVEAL</div>
+          <div class="foil-hint">One reveal per ticket</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-banner" id="resultBanner"></div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="revealBtn">🎲 Reveal</button>
+      <button class="btn btn-secondary" id="newBtn">🎟️ New Ticket</button>
+    </div>
+  </div>
+  <div class="footer">Modest win chance • Small $2–$10 • Medium $25–$50 • For fun only — no real money</div>
+</div>
+<script>
+const LS_KEY='lucky-tap-v2';
+let state=load();
+let ticketNum=state.tickets+1;
+let revealed=false;
+let currentPrize=null;
+
+function load(){
+  try{
+    const j=JSON.parse(localStorage.getItem(LS_KEY));
+    if(j && typeof j.tickets==='number') return j;
+  }catch(e){}
+  return {tickets:0,wins:0,total:0,best:0};
+}
+function save(){
+  localStorage.setItem(LS_KEY,JSON.stringify(state));
+}
+function updateStats(){
+  document.getElementById('totalWon').textContent='$'+state.total;
+  document.getElementById('tickets').textContent=state.tickets;
+  document.getElementById('wins').textContent=state.wins;
+  document.getElementById('best').textContent='$'+state.best;
+}
+function ticketIdStr(n){
+  return '#'+String(n).padStart(4,'0');
+}
+function generatePrize(){
+  const r=Math.random();
+  // 68% lose, 20% small, 12% medium = 32% win chance (modest)
+  if(r<0.68) return {amount:0,label:'Try Again',icon:'😢',tier:'lose'};
+  if(r<0.78) return {amount:2,label:'Small Prize!',icon:'🎈',tier:'small'};
+  if(r<0.88) return {amount:5,label:'Small Prize!',icon:'🎁',tier:'small'};
+  if(r<0.93) return {amount:10,label:'Small Prize!',icon:'⭐',tier:'small'};
+  if(r<0.97) return {amount:25,label:'Medium Prize!',icon:'💎',tier:'medium'};
+  return {amount:50,label:'Medium Prize!',icon:'👑',tier:'medium'};
+}
+function prepareTicket(){
+  revealed=false;
+  currentPrize=generatePrize();
+  document.getElementById('ticketId').textContent=ticketNum>9999 ? '#'+ticketNum : ticketIdStr(ticketNum);
+  document.getElementById('prizeIcon').textContent='🎟️';
+  document.getElementById('prizeText').textContent='Ready to reveal?';
+  document.getElementById('prizeText').style.color='#1a0a2e';
+  document.getElementById('prizeSub').textContent='Tap the foil below';
+  document.getElementById('prizeSub').style.display='block';
+  // remove amount if exists
+  const existing=document.getElementById('prizeAmount');
+  if(existing) existing.remove();
+  const foil=document.getElementById('foil');
+  foil.classList.remove('revealed');
+  foil.style.display='flex';
+  document.getElementById('revealBtn').disabled=false;
+  document.getElementById('resultBanner').className='result-banner';
+  document.getElementById('resultBanner').textContent='';
+  // reset reveal area bg
+  document.getElementById('revealArea').style.background='';
+}
+function doReveal(){
+  if(revealed) return;
+  revealed=true;
+  const foil=document.getElementById('foil');
+  foil.classList.add('revealed');
+  document.getElementById('revealBtn').disabled=true;
+
+  // update stats once per ticket
+  state.tickets++;
+  ticketNum=state.tickets+1;
+  let isWin=currentPrize.amount>0;
+  if(isWin){
+    state.wins++;
+    state.total+=currentPrize.amount;
+    if(currentPrize.amount>state.best) state.best=currentPrize.amount;
+  }
+  save();
+  updateStats();
+
+  // haptics
+  try{ navigator.vibrate(isWin?[60,40,80]:[30]); }catch(e){}
+
+  setTimeout(()=>{
+    const iconEl=document.getElementById('prizeIcon');
+    const textEl=document.getElementById('prizeText');
+    const subEl=document.getElementById('prizeSub');
+    iconEl.textContent=currentPrize.icon;
+    if(isWin){
+      textEl.textContent=currentPrize.label;
+      textEl.style.color='#16a34a';
+      subEl.textContent=currentPrize.tier==='medium' ? 'Fantastic win!' : 'Nice win!';
+      // amount
+      let amt=document.createElement('div');
+      amt.id='prizeAmount';
+      amt.className='prize-amount';
+      amt.textContent='$'+currentPrize.amount;
+      document.getElementById('prizeDisplay').appendChild(amt);
+      showBanner('🎉 You won $'+currentPrize.amount+'!','win');
+      launchConfetti();
+    } else {
+      textEl.textContent='Not this time';
+      textEl.style.color='#6b7280';
+      subEl.textContent='Try another ticket!';
+      let amt=document.createElement('div');
+      amt.id='prizeAmount';
+      amt.className='prize-amount lose';
+      amt.textContent='— No prize —';
+      document.getElementById('prizeDisplay').appendChild(amt);
+      showBanner('No win — tap New Ticket to try again','lose');
+    }
+  },320);
+}
+function showBanner(msg,type){
+  const b=document.getElementById('resultBanner');
+  b.textContent=msg;
+  b.className='result-banner show '+(type==='win'?'win':'lose');
+}
+function launchConfetti(){
+  const area=document.getElementById('revealArea');
+  const colors=['#ffd23f','#ff6b35','#22c55e','#38bdf8','#a78bfa','#f472b6'];
+  for(let i=0;i<18;i++){
+    const c=document.createElement('div');
+    c.className='confetti';
+    c.style.left=(10+Math.random()*80)+'%';
+    c.style.top='40%';
+    c.style.background=colors[i%colors.length];
+    c.style.borderRadius=Math.random()>0.5?'50%':'2px';
+    c.style.transform='rotate('+Math.random()*360+'deg)';
+    c.style.animationDelay=(Math.random()*0.2)+'s';
+    c.style.animationDuration=(700+Math.random()*400)+'ms';
+    area.appendChild(c);
+    setTimeout(()=>c.remove(),1200);
+  }
+}
+document.getElementById('foil').addEventListener('click',doReveal);
+document.getElementById('foil').addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); doReveal(); }});
+document.getElementById('revealBtn').addEventListener('click',doReveal);
+document.getElementById('newBtn').addEventListener('click',()=>{
+  // if not revealed, count as used? No, just generate new without counting
+  // But if revealed, next ticketNum already incremented; if not revealed, keep same number
+  if(!revealed){
+    // don't count, just reshuffle prize
+  } else {
+    // already counted, ticketNum already next
+  }
+  prepareTicket();
+});
+
+// init
+updateStats();
+prepareTicket();
+// set initial ticket id correctly
+document.getElementById('ticketId').textContent=ticketIdStr(state.tickets+1);
+</script>
+</body>
+</html>

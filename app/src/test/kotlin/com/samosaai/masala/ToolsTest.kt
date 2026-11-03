@@ -10,6 +10,7 @@ import com.samosaai.masala.core.tool.Tool
 import com.samosaai.masala.core.tool.ToolDefinition
 import com.samosaai.masala.core.tool.ToolResult
 import com.samosaai.masala.core.tool.ToolSensitivity
+import com.samosaai.masala.agent.AgentTools
 import com.samosaai.masala.llm.ChatMessage
 import com.samosaai.masala.llm.ChatRequest
 import com.samosaai.masala.llm.ResponseFormat
@@ -101,11 +102,44 @@ class ToolsTest {
     fun `definitions don't point the model at the private prototype tools Masala left out`() {
         val leftOut = listOf(
             "call_number", "find_contact", "read_call_log", "list_alarms", "list_timers", "edit_alarm",
-            "delete_alarm", "delete_timer", "set_brightness", "create_calendar_event",
+            "delete_alarm", "delete_timer", "set_brightness",
         )
         for (def in MasalaToolDefinitions.all) {
             assertEquals(emptyList(), leftOut.filter { it in def.description }, def.name)
         }
+    }
+
+    @Test
+    fun `consult_expert asks for an expert and a question`() {
+        val def = AgentTools.consultExpert
+        assertEquals("consult_expert", def.name)
+        val required = def.parameters["required"]!!.jsonArray.map { it.jsonPrimitive.content }
+        assertEquals(listOf("skill_id", "question"), required)
+        // The id is how a follow-up reaches the same expert, so it must be offered.
+        assertTrue(def.parameters.toString().contains("consult_id"))
+    }
+
+    @Test
+    fun `the Lane D follow-up tools are registered`() {
+        val names = MasalaToolDefinitions.all.map { it.name }.toSet()
+        for (expected in listOf(
+            "open_url", "create_calendar_event", "search_contacts",
+            "list_mini_apps", "read_mini_app", "open_mini_app", "pin_mini_app", "delete_mini_app",
+        )) {
+            assertTrue(expected in names, "missing tool $expected")
+        }
+    }
+
+    @Test
+    fun `alarm tools say plainly that a scheduled alarm cannot be deleted`() {
+        val set = MasalaToolDefinitions.all.single { it.name == "set_alarm" }
+        assertTrue("no API" in set.description, set.description)
+        assertTrue("show_alarms" in set.description, set.description)
+        // The clock app ignores the dismiss intents on real phones, so those tools were removed
+        // rather than left in the registry promising something they cannot do.
+        val names = MasalaToolDefinitions.all.map { it.name }
+        assertTrue("dismiss_alarm" !in names)
+        assertTrue("dismiss_timer" !in names)
     }
 
     @Test
@@ -136,5 +170,15 @@ class ToolsTest {
         assertEquals(ToolFiles.ALL_FILES_ACCESS, denied.result.needsPermission)
         assertTrue(files(FileScope.SHARED_STORAGE).resolveForRead("/sdcard/a.pdf") is ToolFiles.ResolveResult.Error)
         assertEquals(ToolFiles.ALL_FILES_ACCESS, Capability.ALL_FILES.marker)
+    }
+
+    @Test
+    fun `chat request carries max tokens for layout calls`() {
+        val json = Json { explicitNulls = false; encodeDefaults = false }
+        val encoded = json.encodeToString(
+            ChatRequest("m", emptyList(), responseFormat = ResponseFormat.JSON_OBJECT, maxTokens = 3000)
+        )
+        assertTrue(encoded.contains("\"max_tokens\":3000"), encoded)
+        assertTrue(encoded.contains("\"response_format\""), encoded)
     }
 }

@@ -26,8 +26,19 @@ data class ToolDefinition(
     val parameters: JsonObject,
 )
 
+/**
+ * Something a tool made that the user can open from a run: [kind] is a `SkillOutput` name (`file`,
+ * `audio`, `video`, `mini_app`, `installed_app`); [ref] is a path, a mini-app id or a package name.
+ */
+data class Produced(val kind: String, val title: String, val ref: String)
+
 sealed interface ToolResult {
-    data class Success(val output: String, val files: List<String> = emptyList()) : ToolResult
+    /** [files] are paths the tool wrote; [produced] are results with a known kind (a mini app, say). */
+    data class Success(
+        val output: String,
+        val files: List<String> = emptyList(),
+        val produced: List<Produced> = emptyList(),
+    ) : ToolResult
     data class Failure(val message: String) : ToolResult
 
     /** The tool needs a capability (permission, special access) the user hasn't granted yet. */
@@ -48,6 +59,19 @@ interface Tool {
 
     /** Sends anything off the phone: web fetch or search, MCP, uploads. */
     val usesNetwork: Boolean get() = false
+
+    /**
+     * Brings up a screen (another app, a dialer, a sheet). Needs someone at the phone, so runs nobody
+     * is watching never get it: Android blocks the screen from the background.
+     */
+    val opensScreen: Boolean get() = false
+
+    /**
+     * Whether this call goes through the confirmation gate. Every tool that isn't [ToolSensitivity.READ_ONLY]
+     * asks, except where a tool narrows it per call: memory writes apply at once (with Undo) and ask only to
+     * rewrite history. Sensitivity alone still decides what unattended runs get.
+     */
+    fun needsConfirmation(args: JsonObject): Boolean = sensitivity != ToolSensitivity.READ_ONLY
 
     suspend fun execute(args: JsonObject): ToolResult
 }

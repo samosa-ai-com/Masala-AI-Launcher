@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Geyser Hop Coast</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden;background:#0a1a2e;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif;color:#fff}
+body{display:flex;justify-content:center;background:radial-gradient(900px 600px at 50% -10%, #1e3a5f 0%, #0a1a2e 60%, #06101f 100%)}
+.app{width:100%;max-width:428px;min-height:100dvh;display:flex;flex-direction:column;position:relative;overflow:hidden;border-left:1px solid rgba(255,255,255,0.06);border-right:1px solid rgba(255,255,255,0.06)}
+header{padding:12px 14px 8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#FFD93D,#FF6B35);display:grid;place-items:center;font-size:20px;box-shadow:0 4px 16px rgba(255,217,61,0.4)}
+.logo h1{font-size:14px;letter-spacing:0.06em;font-weight:900;line-height:1}
+.logo p{font-size:10px;letter-spacing:0.12em;color:#8fb0d8;font-weight:700}
+.pills{display:flex;gap:8px}
+.pill{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);backdrop-filter:blur(8px);padding:7px 10px;border-radius:999px;text-align:center;min-width:70px}
+.pill span{font-size:9px;letter-spacing:0.1em;color:#8fb0d8;display:block;font-weight:700}
+.pill strong{font-size:15px;color:#fff}
+.pill.best strong{color:#FFD93D}
+.pill.dist strong{color:#00E5FF}
+.stage-wrap{padding:0 12px;flex:1;display:flex;flex-direction:column;gap:8px;min-height:0}
+.game-card{position:relative;background:linear-gradient(180deg, #87CEEB 0%, #4FC3F7 35%, #29B6F6 60%, #0288D1 100%);border:1px solid rgba(255,255,255,0.15);border-radius:20px;overflow:hidden;flex:1;min-height:420px;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)}
+.game-top{padding:8px 12px;display:flex;justify-content:space-between;align-items:center;font-size:10px;letter-spacing:0.08em;color:#fff;font-weight:800;background:rgba(0,0,0,0.12);backdrop-filter:blur(6px)}
+.game-top .live{display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:#00E5FF;box-shadow:0 0 8px #00E5FF;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+canvas{width:100%;height:100%;display:block;flex:1;touch-action:none}
+.hud{position:absolute;top:44px;left:0;right:0;display:flex;justify-content:space-between;padding:8px 12px;pointer-events:none;z-index:3}
+.hud-box{background:rgba(0,0,0,0.35);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.15);padding:6px 10px;border-radius:12px;text-align:center;min-width:70px}
+.hud-box span{font-size:9px;letter-spacing:0.08em;color:#fff;opacity:0.8;display:block;font-weight:700}
+.hud-box strong{font-size:16px;color:#fff}
+.speed-bar{position:absolute;bottom:0;left:0;right:0;height:4px;background:rgba(0,0,0,0.2);z-index:3}
+.speed-fill{height:100%;width:30%;background:linear-gradient(90deg,#00E5FF,#FFD93D,#FF3B30);transition:width 0.3s}
+.tap-hint{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.45);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.15);padding:8px 14px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:0.06em;color:#fff;pointer-events:none;z-index:3;display:flex;align-items:center;gap:6px}
+.controls{margin:8px 12px 12px;display:flex;gap:8px}
+.btn{flex:1;height:48px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.08);color:#fff;font-weight:800;font-size:13px;letter-spacing:0.06em;cursor:pointer;backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;gap:6px}
+.btn.primary{background:linear-gradient(135deg,#FFD93D,#FF6B35);color:#1a0f00;border-color:transparent;box-shadow:0 4px 16px rgba(255,107,53,0.4)}
+.btn:active{transform:scale(0.98)}
+.overlay{position:absolute;inset:0;background:rgba(6,16,31,0.82);backdrop-filter:blur(10px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;z-index:10}
+.overlay h2{font-size:28px;letter-spacing:0.04em;margin-bottom:8px;text-shadow:0 0 16px rgba(0,229,255,0.6)}
+.overlay p{color:#a0c0e0;font-size:13px;line-height:1.5;max-width:300px;margin-bottom:14px}
+.overlay .big{font-size:42px;font-weight:900;color:#FFD93D;text-shadow:0 0 20px rgba(255,217,61,0.6);margin:6px 0}
+.badge-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:10px 0}
+.mini-badge{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);padding:8px 12px;border-radius:999px;font-size:12px;font-weight:700}
+.mini-badge b{color:#FFD93D}
+.hint{font-size:11px;letter-spacing:0.06em;color:#7a9ab8;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+<div class="logo"><div class="logo-mark">🌊</div><div><h1>GEYSER HOP</h1><p>COAST RUN</p></div></div>
+<div class="pills">
+<div class="pill best"><span>BEST</span><strong id="bestEl">0</strong></div>
+<div class="pill dist"><span>DISTANCE</span><strong id="distEl">0m</strong></div>
+</div>
+</header>
+
+<div class="stage-wrap">
+<div class="game-card" id="gameCard">
+<div class="game-top"><span class="live"><span class="dot"></span> COAST ZONE 01</span><span id="speedLabel">SPEED 1.0x</span></div>
+<canvas id="c" width="400" height="480"></canvas>
+<div class="hud">
+<div class="hud-box"><span>DISTANCE</span><strong id="hudDist">0m</strong></div>
+<div class="hud-box"><span>SPEED</span><strong id="hudSpeed">1.0x</strong></div>
+</div>
+<div class="speed-bar"><div class="speed-fill" id="speedFill"></div></div>
+<div class="tap-hint" id="tapHint">👆 TAP TO LEAP</div>
+
+<div class="overlay" id="startOverlay">
+<h2 style="color:#00E5FF">READY TO HOP?</h2>
+<p>Leap between <b style="color:#fff">erupting water columns</b>! Ride each eruption lift, time your jumps, and don't fall!</p>
+<div class="badge-row">
+<div class="mini-badge">💦 Ride the lift</div>
+<div class="mini-badge">🏝️ Coast style</div>
+<div class="mini-badge">⚡ Speed rises</div>
+</div>
+<button class="btn primary" style="min-width:180px;height:48px;margin-top:8px;font-size:14px" id="playBtn">▶ START HOPPING</button>
+<div class="hint">Tap anywhere to jump • Hold rhythm to survive</div>
+</div>
+
+<div class="overlay" id="gameOverOverlay" style="display:none">
+<h2 style="color:#FF3B30">SPLASH!</h2>
+<div class="big" id="finalDist">0m</div>
+<p id="finalMsg">You fell into the sea!</p>
+<div class="badge-row">
+<div class="mini-badge">DISTANCE <b id="finalDist2">0m</b></div>
+<div class="mini-badge">BEST <b id="finalBest">0m</b></div>
+</div>
+<button class="btn primary" style="min-width:180px;height:48px;margin-top:12px" id="replayBtn">↻ TRY AGAIN</button>
+<button class="btn" style="min-width:180px;margin-top:8px" id="shareBtn">SHARE SCORE</button>
+</div>
+</div>
+</div>
+
+<div class="controls">
+<button class="btn" id="howBtn">HOW TO PLAY</button>
+<button class="btn primary" id="tapBtn">👆 TAP TO JUMP</button>
+</div>
+</div>
+</div>
+
+<script>
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+const gameCard=document.getElementById('gameCard');
+const bestEl=document.getElementById('bestEl'), distEl=document.getElementById('distEl');
+const hudDist=document.getElementById('hudDist'), hudSpeed=document.getElementById('hudSpeed'), speedLabel=document.getElementById('speedLabel'), speedFill=document.getElementById('speedFill');
+const startOverlay=document.getElementById('startOverlay'), gameOverOverlay=document.getElementById('gameOverOverlay');
+const tapHint=document.getElementById('tapHint');
+
+let best=0, distance=0, speed=2.6, baseSpeed=2.6, isPlaying=false, isReady=true;
+let player, geysers=[], particles=[], clouds=[], lastTime=0, gameSpeed=1;
+let audioCtx=null;
+
+function loadBest(){ try{ best=parseInt(localStorage.getItem('geyserHopBest')||'0')}catch(e){best=0} bestEl.textContent=best+'m'; }
+loadBest();
+function saveBest(){ try{ localStorage.setItem('geyserHopBest', String(best))}catch(e){} }
+
+function ensureAudio(){ if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}} if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume(); }
+function beep(f,d,v,t){ if(!audioCtx) return; const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type=t||'sine'; o.frequency.value=f; g.gain.value=v||0.15; o.connect(g); g.connect(audioCtx.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+d); o.stop(audioCtx.currentTime+d); }
+
+function resizeCanvas(){
+  const rect=canvas.getBoundingClientRect();
+  const dpr=Math.min(2, window.devicePixelRatio||1);
+  canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function resetGame(){
+  distance=0; speed=baseSpeed; gameSpeed=1;
+  const w=canvas.getBoundingClientRect().width, h=canvas.getBoundingClientRect().height;
+  const groundY=h-56;
+  player={ x:80, y:groundY-40, vy:0, w:26, h:30, onGeyser:null, facing:1 };
+  geysers=[];
+  // first geyser under player
+  geysers.push({ x:40, y:groundY, w:70, baseH:18, eruptH:36, phase:0, spd:0.09, col:'#00E5FF' });
+  let lastX=40;
+  for(let i=0;i<6;i++){
+    lastX+= 110 + Math.random()*70;
+    geysers.push({ x:lastX, y:groundY, w:56+Math.random()*24, baseH:16+Math.random()*8, eruptH:28+Math.random()*22, phase:Math.random()*Math.PI*2, spd:0.07+Math.random()*0.05, col: Math.random()>0.5?'#00E5FF':'#4FC3F7' });
+  }
+  clouds=[];
+  for(let i=0;i<5;i++) clouds.push({x:Math.random()*w, y:30+Math.random()*60, s:0.3+Math.random()*0.7, w:40+Math.random()*40});
+  particles=[];
+  updateHUD();
+}
+
+function updateHUD(){
+  const m=Math.floor(distance);
+  distEl.textContent=m+'m'; hudDist.textContent=m+'m';
+  const sp=(speed/baseSpeed).toFixed(1)+'x';
+  hudSpeed.textContent=sp; speedLabel.textContent='SPEED '+sp;
+  speedFill.style.width=Math.min(100, (speed/baseSpeed)*35 + distance*0.08)+'%';
+}
+
+function jump(){
+  if(!isPlaying){
+    if(isReady) startRun();
+    return;
+  }
+  if(player.onGeyser){
+    player.vy=-13.5;
+    player.onGeyser=null;
+    ensureAudio(); beep(620,0.12,0.18,'sine'); setTimeout(()=>beep(880,0.1,0.12,'sine'),60);
+    if(navigator.vibrate) navigator.vibrate(20);
+    // jump particles
+    for(let i=0;i<6;i++) particles.push({x:player.x+player.w/2, y:player.y+player.h, vx:(Math.random()-0.5)*4, vy:Math.random()*2+1, life:1, decay:0.06, color:'#fff', size:2+Math.random()*3});
+    tapHint.style.opacity='0';
+    setTimeout(()=>tapHint.style.opacity='1',800);
+  }
+}
+
+function startRun(){
+  ensureAudio(); resetGame(); isPlaying=true; isReady=false;
+  startOverlay.style.display='none'; gameOverOverlay.style.display='none';
+  lastTime=performance.now();
+  requestAnimationFrame(loop);
+  beep(440,0.15,0.15,'sine');
+}
+
+function endRun(){
+  isPlaying=false; isReady=false;
+  const m=Math.floor(distance);
+  if(m>best){ best=m; saveBest(); bestEl.textContent=best+'m'; }
+  document.getElementById('finalDist').textContent=m+'m';
+  document.getElementById('finalDist2').textContent=m+'m';
+  document.getElementById('finalBest').textContent=best+'m';
+  const msg=m>500?'Legendary hopper! 🏆':m>300?'Amazing rhythm! 🌊':m>150?'Great hops!':'Keep practicing!';
+  document.getElementById('finalMsg').textContent=msg;
+  gameOverOverlay.style.display='flex';
+  beep(180,0.4,0.2,'sawtooth');
+  if(navigator.vibrate) navigator.vibrate([40,30,60]);
+}
+
+function loop(now){
+  if(!isPlaying) return;
+  const dt=Math.min(0.033, (now-lastTime)/1000);
+  lastTime=now;
+  update(dt);
+  draw(now);
+  if(isPlaying) requestAnimationFrame(loop);
+}
+
+function update(dt){
+  const w=canvas.getBoundingClientRect().width, h=canvas.getBoundingClientRect().height;
+  const groundY=h-56;
+  // speed rises with distance
+  speed = baseSpeed + distance*0.012;
+  if(speed>7) speed=7;
+  distance += speed*0.6 * dt*60 *0.1; // scale to meters
+  updateHUD();
+
+  // update geysers
+  geysers.forEach(g=>{
+    g.phase += g.spd * (1 + speed*0.05);
+    g.x -= speed;
+  });
+  // recycle
+  if(geysers.length && geysers[0].x + geysers[0].w < -20){
+    geysers.shift();
+  }
+  const last=geysers[geysers.length-1];
+  if(last && last.x < w - 80){
+    const gap= 100 + Math.random()*80 + speed*4;
+    const nw= 52+Math.random()*28;
+    geysers.push({ x:last.x+gap, y:groundY, w:nw, baseH:16+Math.random()*10, eruptH:26+Math.random()*24, phase:Math.random()*Math.PI*2, spd:0.07+Math.random()*0.05, col: Math.random()>0.5?'#00E5FF':'#4FC3F7' });
+  }
+  // clouds
+  clouds.forEach(c=>{ c.x -= speed*0.15*c.s; if(c.x<-60) c.x=w+20; });
+
+  // player physics
+  const gravity=0.62;
+  let onFound=null;
+  let geyserTopY=null;
+  // check geyser tops
+  for(const g of geysers){
+    const erupt = Math.sin(g.phase)*0.5+0.5; // 0..1
+    const topY = g.y - g.baseH - g.eruptH*erupt;
+    const left=g.x, right=g.x+g.w;
+    // if player is above this geyser horizontally
+    if(player.x+player.w*0.7 > left && player.x+player.w*0.3 < right){
+      // check landing
+      const playerBottom=player.y+player.h;
+      const prevBottom=playerBottom - player.vy;
+      if(player.vy>=0 && playerBottom >= topY-6 && playerBottom <= topY+10 && prevBottom <= topY+4){
+        onFound=g; geyserTopY=topY;
+        break;
+      }
+      // if already on this geyser, keep riding
+      if(player.onGeyser===g){
+        onFound=g; geyserTopY=topY;
+        break;
+      }
+    }
+  }
+
+  if(onFound){
+    // ride eruption lift
+    const eruptVel = Math.cos(onFound.phase)*onFound.spd*onFound.eruptH*0.5;
+    // lift effect: if erupting up, push player slightly
+    player.y = geyserTopY - player.h;
+    player.vy = Math.min(0, eruptVel*0.6);
+    player.onGeyser=onFound;
+    // add lift particles when erupting strongly
+    if(Math.sin(onFound.phase)>0.7 && Math.random()<0.3){
+      particles.push({x: onFound.x+onFound.w/2 + (Math.random()-0.5)*20, y:geyserTopY, vx:(Math.random()-0.5)*2, vy:-2-Math.random()*3, life:1, decay:0.04, color:'#fff', size:2+Math.random()*2});
+    }
+  } else {
+    player.onGeyser=null;
+    player.vy += gravity;
+    player.y += player.vy;
+  }
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.12; p.life-=p.decay;
+    if(p.life<=0) particles.splice(i,1);
+  }
+
+  // fall check
+  if(player.y > h+40){
+    endRun();
+  }
+  // ceiling
+  if(player.y<0){ player.y=0; player.vy=0; }
+}
+
+function draw(now){
+  const w=canvas.getBoundingClientRect().width, h=canvas.getBoundingClientRect().height;
+  const groundY=h-56;
+  ctx.clearRect(0,0,w,h);
+
+  // sky gradient
+  const grad=ctx.createLinearGradient(0,0,0,h);
+  grad.addColorStop(0,'#87CEEB'); grad.addColorStop(0.4,'#4FC3F7'); grad.addColorStop(0.7,'#29B6F6'); grad.addColorStop(1,'#0288D1');
+  ctx.fillStyle=grad; ctx.fillRect(0,0,w,h);
+
+  // sun
+  ctx.save();
+  ctx.shadowColor='#FFD93D'; ctx.shadowBlur=20;
+  ctx.fillStyle='#FFD93D'; ctx.beginPath(); ctx.arc(w-50, 50, 22, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.arc(w-56,44,4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // clouds
+  ctx.fillStyle='rgba(255,255,255,0.9)';
+  clouds.forEach(c=>{
+    ctx.beginPath();
+    ctx.ellipse(c.x, c.y, c.w*0.6, 14, 0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(c.x+12, c.y-6, c.w*0.4, 10,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(c.x-14, c.y-4, c.w*0.35, 9,0,0,Math.PI*2); ctx.fill();
+  });
+
+  // distant sea
+  ctx.fillStyle='#01579B'; ctx.fillRect(0, groundY+28, w, h-groundY-28);
+  ctx.fillStyle='rgba(255,255,255,0.15)';
+  for(let i=0;i<w;i+=40){
+    const wave=Math.sin(now*0.002 + i*0.05)*3;
+    ctx.fillRect(i, groundY+32+wave, 24, 2);
+  }
+
+  // beach sand
+  ctx.fillStyle='#FFD54F'; ctx.fillRect(0, groundY, w, 28);
+  ctx.fillStyle='#FFB300'; ctx.fillRect(0, groundY+22, w, 6);
+  // sand texture dots
+  ctx.fillStyle='rgba(0,0,0,0.08)';
+  for(let i=0;i<w;i+=18){
+    ctx.beginPath(); ctx.arc(i+ (now*0.02+i)%18, groundY+8+Math.sin(i)*4, 1.2,0,Math.PI*2); ctx.fill();
+  }
+
+  // geysers
+  geysers.forEach(g=>{
+    const erupt=Math.sin(g.phase)*0.5+0.5;
+    const topY=g.y - g.baseH - g.eruptH*erupt;
+    const colH=g.y - topY;
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(g.x+g.w/2, g.y+2, g.w*0.5, 6,0,0,Math.PI*2); ctx.fill();
+    // water column gradient
+    const wg=ctx.createLinearGradient(g.x, topY, g.x, g.y);
+    wg.addColorStop(0,'rgba(255,255,255,0.95)'); wg.addColorStop(0.2,g.col); wg.addColorStop(1,'#0288D1');
+    ctx.fillStyle=wg;
+    ctx.beginPath();
+    const wobble=Math.sin(g.phase*1.5)*4;
+    ctx.moveTo(g.x+6, g.y);
+    ctx.lineTo(g.x+4+wobble, topY+8);
+    ctx.lineTo(g.x+g.w-4+wobble, topY+8);
+    ctx.lineTo(g.x+g.w-6, g.y);
+    ctx.closePath(); ctx.fill();
+    // highlight
+    ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.fillRect(g.x+g.w*0.3, topY+10, 6, colH*0.6);
+    // spray at top when erupting high
+    if(erupt>0.6){
+      ctx.save(); ctx.globalAlpha=(erupt-0.6)*1.2;
+      ctx.fillStyle='#fff';
+      for(let s=0;s<3;s++){
+        const sx=g.x+g.w/2 + (Math.random()-0.5)*18;
+        const sy=topY - Math.random()*12;
+        ctx.beginPath(); ctx.arc(sx,sy, 2+Math.random()*3,0,Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    }
+    // rock base
+    ctx.fillStyle='#5D4037'; ctx.strokeStyle='#3E2723'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.roundRect(g.x-2, g.y-6, g.w+4, 14, 6); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#8D6E63'; ctx.beginPath(); ctx.ellipse(g.x+g.w*0.3, g.y-1, 8,3,0,0,Math.PI*2); ctx.fill();
+    // eruption indicator ring
+    if(erupt>0.75){
+      ctx.strokeStyle='rgba(0,229,255,0.6)'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(g.x+g.w/2, topY, 14,6,0,0,Math.PI*2); ctx.stroke();
+    }
+  });
+
+  // player
+  ctx.save();
+  const px=player.x, py=player.y;
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(px+13, py+player.h+2, 10,4,0,0,Math.PI*2); ctx.fill();
+  // body
+  ctx.translate(px+13, py+15);
+  const tilt= player.vy*0.04;
+  ctx.rotate(tilt);
+  // legs
+  ctx.fillStyle='#1a237e'; ctx.fillRect(-6, 8, 5, 10); ctx.fillRect(2, 8, 5, 10);
+  ctx.fillStyle='#FF6B35'; ctx.fillRect(-7, 16, 6, 3); ctx.fillRect(1, 16, 6, 3);
+  // torso
+  ctx.fillStyle='#FFD93D'; ctx.beginPath(); ctx.roundRect(-9, -6, 18, 14, 5); ctx.fill();
+  ctx.fillStyle='#FF3B30'; ctx.fillRect(-9, -2, 18, 3);
+  // arms
+  ctx.fillStyle='#ffcc99'; ctx.beginPath(); ctx.ellipse(-11, -2, 4,6,0,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.ellipse(11, -2, 4,6,0,0,Math.PI*2); ctx.fill();
+  // head
+  ctx.fillStyle='#ffcc99'; ctx.beginPath(); ctx.arc(0, -12, 9,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#3E2723'; ctx.beginPath(); ctx.arc(0, -16, 9,0,Math.PI, true); ctx.fill();
+  // face
+  ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(-3, -12, 1.4,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(3, -12, 1.4,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#000'; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(0, -9, 3, 0.2, Math.PI-0.2); ctx.stroke();
+  // hat
+  ctx.fillStyle='#00E5FF'; ctx.beginPath(); ctx.ellipse(0, -18, 10,4,0,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // particles
+  particles.forEach(p=>{
+    ctx.globalAlpha=p.life;
+    ctx.fillStyle=p.color; ctx.shadowColor=p.color; ctx.shadowBlur=6;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1; ctx.shadowBlur=0;
+
+  // distance markers
+  ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='700 9px system-ui'; ctx.textAlign='center';
+  geysers.forEach(g=>{
+    if(g.x>w-100 && g.x<w-20){
+      ctx.fillText('↑', g.x+g.w/2, g.y- g.baseH - g.eruptH -12);
+    }
+  });
+}
+
+// input
+canvas.addEventListener('pointerdown', (e)=>{ e.preventDefault(); jump(); });
+canvas.addEventListener('touchstart', (e)=>{ e.preventDefault(); jump(); }, {passive:false});
+document.getElementById('tapBtn').addEventListener('click', jump);
+document.getElementById('tapBtn').addEventListener('touchstart', (e)=>{ e.preventDefault(); jump(); }, {passive:false});
+gameCard.addEventListener('pointerdown', (e)=>{ if(e.target.closest('button')) return; jump(); });
+
+document.getElementById('playBtn').addEventListener('click', startRun);
+document.getElementById('replayBtn').addEventListener('click', startRun);
+document.getElementById('howBtn').addEventListener('click', ()=>{
+  startOverlay.style.display='flex'; gameOverOverlay.style.display='none'; isPlaying=false; isReady=true;
+  startOverlay.querySelector('h2').textContent='HOW TO PLAY';
+  startOverlay.querySelector('p').innerHTML='Tap to <b style="color:#00E5FF">leap</b> to the next geyser. <b style="color:#FFD93D">Ride the eruption lift</b> — it pushes you up! Time jumps as speed rises. Fall = game over.';
+  document.getElementById('playBtn').textContent='▶ START HOPPING';
+});
+document.getElementById('shareBtn').addEventListener('click', ()=>{
+  const text=`Geyser Hop Coast: ${Math.floor(distance)}m! Can you beat it? 🌊`;
+  if(navigator.share) navigator.share({title:'Geyser Hop Coast', text});
+  else navigator.clipboard.writeText(text).then(()=>{ const b=document.getElementById('shareBtn'); const o=b.textContent; b.textContent='COPIED!'; setTimeout(()=>b.textContent=o,1500); });
+});
+document.addEventListener('keydown', (e)=>{ if(e.code==='Space'){ e.preventDefault(); jump(); } });
+
+resetGame(); draw(performance.now());
+</script>
+</body>
+</html>

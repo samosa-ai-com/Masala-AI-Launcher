@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NightCycle Sleep Calculator</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#0b1023;color:#e8ecff}
+.wrap{max-width:430px;margin:0 auto;padding:16px 16px 40px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:22px;margin:0}
+.mutebtn{min-width:44px;min-height:44px;border-radius:12px;border:1px solid #2c3a6e;background:#141b3a;color:#fff;font-size:19px;cursor:pointer}
+.tabs{display:flex;gap:8px;margin:14px 0}
+.tabs button{flex:1;min-height:50px;border-radius:12px;border:1px solid #2c3a6e;background:#141b3a;color:#e8ecff;font-size:14px;font-weight:700;cursor:pointer}
+.tabs button.on{background:#6366f1;border-color:#6366f1}
+.card{background:#141b3a;border:1px solid #2c3a6e;border-radius:18px;padding:18px;margin:12px 0}
+label{font-size:14px}
+input[type=time]{width:100%;min-height:56px;border-radius:12px;border:1px solid #2c3a6e;background:#0b1023;color:#fff;font-size:26px;text-align:center;margin-top:6px}
+button.big{width:100%;min-height:54px;border-radius:14px;border:none;background:#6366f1;color:#fff;font-size:18px;font-weight:700;cursor:pointer;margin-top:12px}
+.results{display:grid;gap:8px;margin-top:12px}
+.slot{display:flex;align-items:center;justify-content:space-between;background:#0b1023;border:1px solid #2c3a6e;border-radius:12px;padding:12px 14px}
+.slot b{font-size:20px;font-variant-numeric:tabular-nums}
+.slot span{font-size:13px;opacity:.75}
+.slot.best{border-color:#4ade80}
+.badge{font-size:11px;background:#4ade80;color:#052e16;border-radius:8px;padding:2px 8px;font-weight:800;margin-left:8px}
+.note{font-size:13px;opacity:.7;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>NightCycle Sleep</h1><button class="mutebtn" id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="tabs"><button id="tabWake" class="on">Wake at…</button><button id="tabBed">Sleep at…</button></div>
+<div class="card">
+<label id="timeLbl" for="timeIn">I want to wake up at</label>
+<input type="time" id="timeIn" value="06:30">
+<button class="big" id="calcBtn">Show my cycles</button>
+<div class="results" id="results"></div>
+</div>
+<p class="note">Plans in 90-minute sleep cycles plus ~15 minutes to drift off. 5–6 cycles is the sweet spot for most adults.</p>
+</div>
+<script>
+(function(){
+"use strict";
+var K="sleep-calculator-v1",MK="sleep-calculator-mute";
+var store={mode:"wake",time:"06:30"};
+try{var s=JSON.parse(localStorage.getItem(K)||"{}");if(s.mode)store.mode=s.mode;if(s.time)store.time=s.time;}catch(e){}
+var muted=localStorage.getItem(MK)==="1",AC=null;
+var tabWake=document.getElementById("tabWake"),tabBed=document.getElementById("tabBed"),timeLbl=document.getElementById("timeLbl"),timeIn=document.getElementById("timeIn"),calcBtn=document.getElementById("calcBtn"),results=document.getElementById("results"),muteBtn=document.getElementById("muteBtn");
+function click(){if(muted)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume();var o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.frequency.value=700;var t=AC.currentTime;g.gain.setValueAtTime(0.07,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.07);o.start(t);o.stop(t+0.07);}catch(e){}}
+muteBtn.textContent=muted?"🔇":"🔊";
+muteBtn.addEventListener("click",function(){muted=!muted;localStorage.setItem(MK,muted?"1":"0");muteBtn.textContent=muted?"🔇":"🔊";click();});
+function save(){localStorage.setItem(K,JSON.stringify(store));}
+function fmt(d){return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}
+function base(){var p=(timeIn.value||"06:30").split(":"),d=new Date();d.setHours(+p[0],+p[1],0,0);return d;}
+function paint(){
+tabWake.classList.toggle("on",store.mode==="wake");tabBed.classList.toggle("on",store.mode==="bed");
+timeLbl.textContent=store.mode==="wake"?"I want to wake up at":"I plan to fall asleep at";
+timeIn.value=store.time;
+}
+tabWake.addEventListener("click",function(){click();store.mode="wake";save();paint();calc();});
+tabBed.addEventListener("click",function(){click();store.mode="bed";save();paint();calc();});
+timeIn.addEventListener("change",function(){store.time=timeIn.value;save();});
+function calc(){
+click();store.time=timeIn.value||store.time;save();
+var t=base(),out="",i;
+results.innerHTML="";
+if(store.mode==="wake"){
+for(i=6;i>=3;i--){var b=new Date(t.getTime()-(i*90+15)*60000);var best=(i===5||i===6);out+='<div class="slot'+(best?' best':'')+'"><b>'+fmt(b)+(best?'<span class="badge">BEST</span>':'')+'</b><span>'+i+' cycles · '+(i*1.5)+'h</span></div>';}
+}else{
+for(i=3;i<=6;i++){var w=new Date(t.getTime()+(i*90+15)*60000);if(w.toDateString()!==t.toDateString()){var wd=w.toLocaleDateString("en-US",{weekday:"short"});}else{var wd="today";}var best2=(i===5||i===6);out+='<div class="slot'+(best2?' best':'')+'"><b>'+fmt(w)+(best2?'<span class="badge">BEST</span>':'')+'</b><span>'+i+' cycles · '+wd+'</span></div>';}
+}
+results.innerHTML=out;
+}
+calcBtn.addEventListener("click",calc);
+paint();calc();
+})();
+</script>
+</body>
+</html>

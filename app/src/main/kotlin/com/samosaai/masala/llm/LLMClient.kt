@@ -12,9 +12,9 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
-// From the private prototype's llm/LLMClient.kt. Changes: no SAMOSA_* BuildConfig or settings coupling (the caller
-// passes the endpoint, key and model, see LlmConfig), no dictation cleanup (that comes with speech),
-// and an optional response_format for structured output (plan Phase 1, lane B).
+// OpenAI-compatible chat client. The caller passes the endpoint, key and model (see LlmConfig);
+// dictation cleanup arrives with speech, and response_format is available for structured output
+// (plan Phase 1, lane B).
 
 /** the private prototype's default API timeout. */
 const val DEFAULT_API_TIMEOUT_SECONDS = 180L
@@ -85,7 +85,8 @@ class LLMClient(
             .writeTimeout(timeouts.writeSeconds, TimeUnit.SECONDS)
             .addInterceptor { chain ->
                 val builder = chain.request().newBuilder()
-                    .addHeader("Authorization", "Bearer $apiKey")
+                // Servers on the user's own network take no key; send none rather than an empty bearer.
+                if (apiKey.isNotBlank()) builder.addHeader("Authorization", "Bearer $apiKey")
                 val response = chain.proceed(builder.build())
                 if (response.code == 401) {
                     onUnauthorized?.invoke()
@@ -112,7 +113,8 @@ class LLMClient(
         temperature: Float? = null,
         sessionId: String? = null,
         modelOverride: String? = null,
-        responseFormat: ResponseFormat? = null
+        responseFormat: ResponseFormat? = null,
+        maxTokens: Int? = null
     ): ChatResponse {
         val targetModel = modelOverride ?: model
         // Safety net for histories that carried a malformed tool call before the
@@ -121,7 +123,7 @@ class LLMClient(
         // whole request and every later turn (issue #13). Runs before the cache
         // key so identical (sanitized) histories share a key.
         val sanitizedMessages = messages.map { it.withValidToolCallArguments() }
-        val cacheKey = buildCacheKey(targetModel, sanitizedMessages, tools, responseFormat)
+        val cacheKey = buildCacheKey(targetModel, sanitizedMessages, tools, responseFormat, maxTokens)
 
         if (temperature == null || temperature == 0f) {
             cache.get(cacheKey)?.let { return it }
@@ -133,7 +135,8 @@ class LLMClient(
             tools = tools.ifEmpty { null },
             temperature = temperature,
             promptCacheKey = sessionId,
-            responseFormat = responseFormat
+            responseFormat = responseFormat,
+            maxTokens = maxTokens
         )
 
         var response = apiService.chat(request, sessionId)
@@ -167,7 +170,8 @@ class LLMClient(
         model: String,
         messages: List<ChatMessage>,
         tools: List<ToolDefinition>,
-        responseFormat: ResponseFormat?
+        responseFormat: ResponseFormat?,
+        maxTokens: Int?
     ): String {
         val serialized = buildString {
             append(model)
@@ -177,6 +181,8 @@ class LLMClient(
             append(json.encodeToString(ListSerializer(ToolDefinition.serializer()), tools))
             append("|")
             if (responseFormat != null) append(json.encodeToString(ResponseFormat.serializer(), responseFormat))
+            append("|")
+            if (maxTokens != null) append(maxTokens)
         }
         val digest = MessageDigest.getInstance("SHA-256")
         return digest.digest(serialized.toByteArray())

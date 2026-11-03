@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Heist Loop</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0b0f1a;--card:#141c2e;--card2:#1a2540;--line:#243352;--gold:#f0c24b;--gold2:#d9a82a;--cyan:#3dd6d0;--red:#ff4d5a;--green:#2ee89e;--muted:#8a9bb5;--text:#e8eefc}
+html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}
+body{max-width:428px;margin:0 auto;overflow-x:hidden}
+header{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,#0f172a 0%,#0b1222 100%);border-bottom:2px solid var(--gold);padding:10px 12px 8px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{display:flex;align-items:center;gap:8px}
+.logo{width:36px;height:36px;border-radius:8px;background:radial-gradient(circle at 30% 30%,#ffe9a3,#d9a82a 60%,#8a6a12);display:grid;place-items:center;font-weight:900;color:#1a1200;font-size:18px;border:1px solid #fff3;box-shadow:0 2px 10px #0008}
+.brand h1{font-size:15px;letter-spacing:0.08em;font-weight:900;line-height:1}
+.brand h1 span{color:var(--gold)}
+.brand p{font-size:10px;letter-spacing:0.12em;color:var(--muted);font-weight:700}
+.stats{display:flex;gap:6px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 8px;min-width:56px;text-align:center}
+.stat b{display:block;font-size:13px;color:var(--gold);line-height:1}
+.stat i{font-style:normal;font-size:9px;letter-spacing:0.08em;color:var(--muted);font-weight:800}
+.levels{display:flex;gap:6px;overflow-x:auto;padding:8px 0 2px;scrollbar-width:none}
+.levels::-webkit-scrollbar{display:none}
+.lvl{flex:0 0 auto;min-width:52px;height:52px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;position:relative}
+.lvl.active{border-color:var(--gold);background:linear-gradient(180deg,#1e2a4a,#141c2e);box-shadow:0 0 0 2px #f0c24b33}
+.lvl.done{border-color:#2ee89e55}
+.lvl.locked{opacity:0.45}
+.lvl b{font-size:13px}
+.lvl span{font-size:8px;letter-spacing:0.08em;color:var(--muted);font-weight:800}
+.lvl .stars{font-size:9px;color:var(--gold);letter-spacing:1px}
+.wrap{padding:10px 12px 16px;display:flex;flex-direction:column;gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.cardHead{padding:10px 12px 8px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:linear-gradient(180deg,#1a2540,#141c2e);border-bottom:1px solid var(--line)}
+.cardHead h2{font-size:13px;letter-spacing:0.06em}
+.cardHead h2 em{font-style:normal;color:var(--gold)}
+.badge{font-size:10px;font-weight:800;letter-spacing:0.08em;padding:4px 8px;border-radius:999px;background:#0b1222;border:1px solid var(--line);color:var(--muted)}
+.badge.live{color:var(--cyan);border-color:#3dd6d055}
+.cardBody{padding:10px 12px}
+.target{background:#080c14;border:1px solid #1e2f4a;border-radius:10px;padding:8px 10px}
+.target h3{font-size:10px;letter-spacing:0.1em;color:var(--cyan);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.target h3::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+.console{background:#02060e;border-radius:8px;padding:8px 10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.5;min-height:44px;border:1px solid #0f1e33}
+.console .line{display:flex;gap:8px}
+.console .line i{font-style:normal;color:var(--muted);min-width:18px}
+.console .line b{color:var(--green);font-weight:700}
+.hintBox{margin-top:8px;background:#1a1505;border:1px solid #f0c24b33;border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.4;color:#ffe9a3;display:none}
+.hintBox.show{display:block}
+.areas{display:grid;gap:10px}
+.area{background:var(--card2);border:1px dashed #2a3a5e;border-radius:12px;padding:8px}
+.area h4{font-size:10px;letter-spacing:0.1em;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between}
+.area h4 span{color:var(--gold)}
+.drop{min-height:64px;display:flex;flex-direction:column;gap:8px}
+.block{background:linear-gradient(180deg,#1e2f55,#16233f);border:1px solid #2e4a7a;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:grab;touch-action:none;user-select:none;min-height:52px;position:relative}
+.block:active{cursor:grabbing}
+.block.sync{border-left:4px solid var(--cyan)}
+.block.microtask{border-left:4px solid #a78bfa}
+.block.promise{border-left:4px solid #f59e0b}
+.block.chain{border-left:4px solid #f97316}
+.block.async{border-left:4px solid var(--green)}
+.block.nested{border-left:4px solid #f472b6}
+.block .icon{width:28px;height:28px;border-radius:8px;background:#0b1222;border:1px solid #2a3a5e;display:grid;place-items:center;font-size:13px;flex:0 0 auto}
+.block .code{flex:1;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.3;color:#e8eefc;word-break:break-word}
+.block .code small{display:block;font-size:10px;color:var(--muted);margin-top:2px;font-family:Inter,sans-serif}
+.block .handle{width:28px;height:28px;border-radius:8px;background:#0b1222;border:1px solid #2a3a5e;display:grid;place-items:center;color:var(--muted);font-size:14px}
+.block.dragging{opacity:0.4}
+.block.ghost{opacity:0.9;box-shadow:0 8px 24px #000a}
+.drop.drag-over{outline:2px dashed var(--gold);outline-offset:2px;border-radius:10px}
+.empty{border:1px dashed #2a3a5e;border-radius:10px;padding:14px;text-align:center;color:var(--muted);font-size:12px}
+.controls{display:flex;gap:8px;flex-wrap:wrap}
+.btn{flex:1;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--text);font-weight:800;font-size:13px;letter-spacing:0.04em;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;padding:0 12px}
+.btn:active{transform:scale(0.98)}
+.btn.primary{background:linear-gradient(180deg,#f0c24b,#d9a82a);color:#1a1200;border-color:#f0c24b;box-shadow:0 4px 14px #f0c24b33}
+.btn.ghost{background:#0b1222}
+.btn.small{flex:0 0 auto;min-height:40px;font-size:12px;padding:0 10px}
+.outputCard{background:#080c14;border:1px solid #1e2f4a;border-radius:10px;padding:8px 10px}
+.outputCard h3{font-size:10px;letter-spacing:0.1em;color:var(--gold);margin-bottom:6px}
+.outConsole{background:#02060e;border-radius:8px;padding:8px 10px;font-family:ui-monospace,Menlo,monospace;font-size:13px;line-height:1.5;min-height:44px;border:1px solid #0f1e33}
+.outConsole .ok{color:var(--green)}
+.outConsole .bad{color:var(--red)}
+.meters{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.meter{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.meter h5{font-size:10px;letter-spacing:0.08em;color:var(--muted)}
+.meter .bar{height:8px;background:#0b1222;border-radius:999px;overflow:hidden;margin-top:6px;border:1px solid var(--line)}
+.meter .fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--green));width:0%;transition:width .4s}
+.meter .fill.pop{background:linear-gradient(90deg,#f0c24b,#ff7a3d)}
+.meter b{font-size:12px;color:var(--text)}
+.verdict{border-radius:12px;padding:10px 12px;text-align:center;font-weight:800;font-size:13px;display:none}
+.verdict.show{display:block}
+.verdict.ok{background:#0e2a1e;border:1px solid #2ee89e55;color:var(--green)}
+.verdict.bad{background:#2a0e14;border:1px solid #ff4d5a55;color:var(--red)}
+.footer{padding:8px 12px 14px;display:flex;gap:8px}
+.footer .btn{font-size:12px}
+.ghost-drag{position:fixed;left:0;top:0;pointer-events:none;z-index:9999;width:calc(100% - 24px);max-width:404px;transform:translate(-50%,-50%)}
+@media(min-width:430px){body{border-left:1px solid var(--line);border-right:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">◈</div>
+      <div>
+        <h1>HEIST <span>LOOP</span></h1>
+        <p>EVENT ORDER TRAINER</p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="score">0</b><i>SCORE</i></div>
+      <div class="stat"><b id="streak">0🔥</b><i>STREAK</i></div>
+      <div class="stat"><b id="best">0</b><i>BEST</i></div>
+    </div>
+  </div>
+  <div class="levels" id="levels"></div>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <div class="cardHead">
+      <h2 id="lvlTitle">01 — THE VAULT DOOR</h2>
+      <span class="badge live" id="lvlBadge">SYNC CODE</span>
+    </div>
+    <div class="cardBody">
+      <p id="lvlDesc" style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px">Arrange the crew's actions. Sync code runs top-to-bottom, immediately.</p>
+      <div class="target">
+        <h3>TARGET CONSOLE OUTPUT</h3>
+        <div class="console" id="targetOut"></div>
+        <div class="hintBox" id="hintBox"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="areas">
+    <div class="area">
+      <h4>YOUR HEIST PLAN — DRAG TO REORDER <span id="seqCount">0/0</span></h4>
+      <div class="drop" id="seqDrop"></div>
+      <div class="empty" id="seqEmpty">Tap blocks below to add them here. Drag to reorder.</div>
+    </div>
+    <div class="area">
+      <h4>AVAILABLE BLOCKS <span>TAP TO ADD</span></h4>
+      <div class="drop" id="poolDrop"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn ghost small" id="hintBtn">💡 Hint</button>
+    <button class="btn ghost small" id="resetBtn">↺ Reset</button>
+    <button class="btn primary" id="runBtn">▶ EXECUTE</button>
+  </div>
+
+  <div class="outputCard">
+    <h3>EXECUTION RESULT</h3>
+    <div class="outConsole" id="outConsole"><span style="color:var(--muted)">Arrange blocks then hit EXECUTE to run the event loop…</span></div>
+    <div class="verdict" id="verdict"></div>
+  </div>
+
+  <div class="meters">
+    <div class="meter"><h5>POPULATION — SCORE</h5><b id="popVal">0 pts</b><div class="bar"><div class="fill pop" id="popFill"></div></div></div>
+    <div class="meter"><h5>HEAT — STREAK</h5><b id="heatVal">0x streak</b><div class="bar"><div class="fill" id="heatFill"></div></div></div>
+  </div>
+
+  <div class="footer">
+    <button class="btn ghost" id="prevBtn">← Prev</button>
+    <button class="btn ghost" id="nextBtn">Next →</button>
+    <button class="btn ghost" id="clearBtn" style="flex:0 0 auto">Clear Save</button>
+  </div>
+</div>
+
+<script>
+const LEVELS=[
+  {
+    id:1,title:"THE VAULT DOOR",badge:"SYNC CODE",desc:"Arrange the crew's actions. Sync code runs top-to-bottom, immediately.",
+    target:["CREW IN","VAULT OPEN","LOOT SECURED"],
+    hint:"Sync is simple: what you write first runs first. Match the target order exactly.",
+    blocks:[
+      {uid:'1a',type:'sync',value:'CREW IN',label:"console.log('CREW IN')",sub:"sync — runs immediately"},
+      {uid:'1b',type:'sync',value:'VAULT OPEN',label:"console.log('VAULT OPEN')",sub:"sync — runs immediately"},
+      {uid:'1c',type:'sync',value:'LOOT SECURED',label:"console.log('LOOT SECURED')",sub:"sync — runs immediately"}
+    ]
+  },
+  {
+    id:2,title:"SILENT ALARM",badge:"MICROTASKS",desc:"queueMicrotask defers work until after all sync code. Sync first, microtasks after.",
+    target:["ENTER","GRAB DIAMONDS","DISABLE ALARM"],
+    hint:"ENTER and GRAB DIAMONDS are sync — they always beat the microtask. Put DISABLE ALARM last in your plan, but it will still run after sync.",
+    blocks:[
+      {uid:'2a',type:'sync',value:'ENTER',label:"console.log('ENTER')",sub:"sync"},
+      {uid:'2b',type:'microtask',value:'DISABLE ALARM',label:"queueMicrotask(()=> log('DISABLE ALARM'))",sub:"microtask — after sync"},
+      {uid:'2c',type:'sync',value:'GRAB DIAMONDS',label:"console.log('GRAB DIAMONDS')",sub:"sync"}
+    ]
+  },
+  {
+    id:3,title:"PROMISE OF ESCAPE",badge:"PROMISES",desc:"Promise.then() also queues a microtask. Same rule: sync first, then promises in order queued.",
+    target:["START ENGINE","CHECK MIRRORS","UNLOCK DOORS"],
+    hint:"START ENGINE and CHECK MIRRORS are sync. UNLOCK DOORS is a Promise.then — it queues. Order your sync blocks to match the first two lines.",
+    blocks:[
+      {uid:'3a',type:'sync',value:'START ENGINE',label:"console.log('START ENGINE')",sub:"sync"},
+      {uid:'3b',type:'promise',value:'UNLOCK DOORS',label:"Promise.resolve().then(()=> log('UNLOCK DOORS'))",sub:"promise microtask"},
+      {uid:'3c',type:'sync',value:'CHECK MIRRORS',label:"console.log('CHECK MIRRORS')",sub:"sync"}
+    ]
+  },
+  {
+    id:4,title:"CHAIN REACTION",badge:"CHAINING",desc:"Chained .then().then() queues the second handler only after the first runs. Two microtasks, sequential.",
+    target:["CUT POWER","WATCH CAMERAS","BYPASS LASERS","OPEN SAFE"],
+    hint:"CUT POWER and WATCH CAMERAS are sync. The chain BYPASS LASERS → OPEN SAFE creates two microtasks: second is enqueued after first executes.",
+    blocks:[
+      {uid:'4a',type:'sync',value:'CUT POWER',label:"console.log('CUT POWER')",sub:"sync"},
+      {uid:'4b',type:'chain',value:'BYPASS LASERS',chainNext:'OPEN SAFE',label:"Promise.resolve().then(()=> log('BYPASS LASERS')).then(()=> log('OPEN SAFE'))",sub:"promise chain — 2 microtasks"},
+      {uid:'4c',type:'sync',value:'WATCH CAMERAS',label:"console.log('WATCH CAMERAS')",sub:"sync"}
+    ]
+  },
+  {
+    id:5,title:"ASYNC INFILTRATION",badge:"ASYNC / AWAIT",desc:"async functions run sync until await, then the rest becomes a microtask. INFILTRATE is sync, EXTRACT is deferred.",
+    target:["INFILTRATE","STANDBY","JAM SIGNAL","EXTRACT"],
+    hint:"The async block logs INFILTRATE immediately, then queues EXTRACT. Put the async block first, then STANDBY (sync), then JAM SIGNAL (microtask) to get the target order.",
+    blocks:[
+      {uid:'5a',type:'async',syncVal:'INFILTRATE',asyncVal:'EXTRACT',label:"async infiltrate(){ log('INFILTRATE'); await null; log('EXTRACT') }",sub:"async — sync + deferred"},
+      {uid:'5b',type:'sync',value:'STANDBY',label:"console.log('STANDBY')",sub:"sync"},
+      {uid:'5c',type:'microtask',value:'JAM SIGNAL',label:"queueMicrotask(()=> log('JAM SIGNAL'))",sub:"microtask"}
+    ]
+  },
+  {
+    id:6,title:"THE BIG SCORE",badge:"MIXED HEIST",desc:"Combine all tricks. Sync first in plan order, then microtasks FIFO. Chain and async each add to the queue.",
+    target:["CREW READY","ENTER VAULT","SIGNAL GO","CUT WIRES","HACK VAULT","GRAB LOOT"],
+    hint:"Correct plan: CREW READY (sync) → ENTER VAULT async (logs ENTER, queues GRAB LOOT) → SIGNAL GO (sync) → CUT WIRES (microtask) → HACK VAULT (promise). Queue drains FIFO: CUT WIRES, HACK VAULT, GRAB LOOT.",
+    blocks:[
+      {uid:'6a',type:'sync',value:'CREW READY',label:"console.log('CREW READY')",sub:"sync"},
+      {uid:'6b',type:'promise',value:'HACK VAULT',label:"Promise.resolve().then(()=> log('HACK VAULT'))",sub:"promise microtask"},
+      {uid:'6c',type:'microtask',value:'CUT WIRES',label:"queueMicrotask(()=> log('CUT WIRES'))",sub:"microtask"},
+      {uid:'6d',type:'async',syncVal:'ENTER VAULT',asyncVal:'GRAB LOOT',label:"async vault(){ log('ENTER VAULT'); await hack(); log('GRAB LOOT') }",sub:"async — sync + deferred"},
+      {uid:'6e',type:'sync',value:'SIGNAL GO',label:"console.log('SIGNAL GO')",sub:"sync"}
+    ]
+  },
+  {
+    id:7,title:"FINAL GETAWAY",badge:"MASTERMIND",desc:"Master level: nested microtasks. A microtask can queue another microtask that runs after the current queue.",
+    target:["ALARM OFF","START VAN","DRIVE AWAY","DOORS OPEN","SMOKE SCREEN","LIGHTS OUT","CLEAR TRACKS"],
+    hint:"Plan: ALARM OFF (sync) → START VAN async (logs START VAN, queues DRIVE AWAY) → DOORS OPEN chain (queues DOORS OPEN → LIGHTS OUT) → SMOKE SCREEN nested (logs SMOKE SCREEN then queues CLEAR TRACKS). Queue: DRIVE AWAY, DOORS OPEN, SMOKE SCREEN → then LIGHTS OUT, CLEAR TRACKS.",
+    blocks:[
+      {uid:'7a',type:'sync',value:'ALARM OFF',label:"console.log('ALARM OFF')",sub:"sync"},
+      {uid:'7b',type:'chain',value:'DOORS OPEN',chainNext:'LIGHTS OUT',label:"Promise.resolve().then(()=> log('DOORS OPEN')).then(()=> log('LIGHTS OUT'))",sub:"promise chain"},
+      {uid:'7c',type:'async',syncVal:'START VAN',asyncVal:'DRIVE AWAY',label:"async getaway(){ log('START VAN'); await road(); log('DRIVE AWAY') }",sub:"async — sync + deferred"},
+      {uid:'7d',type:'nested',value:'SMOKE SCREEN',nested:['CLEAR TRACKS'],label:"Promise.resolve().then(()=>{ log('SMOKE SCREEN'); queueMicrotask(()=> log('CLEAR TRACKS')) })",sub:"nested microtask"}
+    ]
+  }
+];
+
+let state={
+  level:1,
+  score:0,
+  streak:0,
+  best:0,
+  done:{},
+  seq:[],
+  pool:[]
+};
+
+const LS='heist-loop-v2';
+function load(){
+  try{
+    const s=JSON.parse(localStorage.getItem(LS)||'{}');
+    if(s.score!=null) state.score=s.score;
+    if(s.streak!=null) state.streak=s.streak;
+    if(s.best!=null) state.best=s.best;
+    if(s.done) state.done=s.done;
+    if(s.level) state.level=s.level;
+  }catch(e){}
+}
+function save(){
+  localStorage.setItem(LS,JSON.stringify({score:state.score,streak:state.streak,best:state.best,done:state.done,level:state.level}));
+}
+load();
+
+function simulate(seq){
+  let output=[];
+  let queue=[];
+  for(let b of seq){
+    if(b.type==='sync'){
+      output.push(b.value);
+    } else if(b.type==='microtask' || b.type==='promise'){
+      queue.push({value:b.value});
+    } else if(b.type==='chain'){
+      queue.push({value:b.value,chainNext:b.chainNext});
+    } else if(b.type==='async'){
+      output.push(b.syncVal);
+      queue.push({value:b.asyncVal});
+    } else if(b.type==='nested'){
+      queue.push({value:b.value,nested:b.nested});
+    }
+  }
+  while(queue.length){
+    let t=queue.shift();
+    output.push(t.value);
+    if(t.chainNext) queue.push({value:t.chainNext});
+    if(t.nested) for(let n of t.nested) queue.push({value:n});
+  }
+  return output;
+}
+
+function renderLevels(){
+  const el=document.getElementById('levels');
+  el.innerHTML='';
+  LEVELS.forEach(l=>{
+    const d=document.createElement('div');
+    d.className='lvl'+(state.level===l.id?' active':'')+(state.done[l.id]?' done':'')+(l.id>1 && !state.done[l.id-1] && state.level!==l.id ?' locked':'');
+    d.innerHTML=`<b>${String(l.id).padStart(2,'0')}</b><span>${l.badge.split(' ')[0]}</span><div class="stars">${state.done[l.id]?'★'.repeat(state.done[l.id]):'☆☆☆'}</div>`;
+    d.onclick=()=>{ if(d.classList.contains('locked')) return; state.level=l.id; initLevel(); renderLevels(); };
+    el.appendChild(d);
+  });
+}
+
+function blockHTML(b){
+  const iconMap={sync:'⚡',microtask:'◐',promise:'◇',chain:'⧖',async:'⬢',nested:'⬣'};
+  return `<div class="icon">${iconMap[b.type]||'▣'}</div>
+    <div class="code">${b.label}<small>${b.sub}</small></div>
+    <div class="handle">⋮⋮</div>`;
+}
+
+function initLevel(){
+  const lvl=LEVELS[state.level-1];
+  document.getElementById('lvlTitle').textContent=String(lvl.id).padStart(2,'0')+' — '+lvl.title;
+  document.getElementById('lvlBadge').textContent=lvl.badge;
+  document.getElementById('lvlDesc').textContent=lvl.desc;
+  document.getElementById('hintBox').classList.remove('show');
+  document.getElementById('hintBox').textContent='';
+  document.getElementById('verdict').className='verdict';
+  document.getElementById('verdict').textContent='';
+  document.getElementById('outConsole').innerHTML='<span style="color:var(--muted)">Arrange blocks then hit EXECUTE to run the event loop…</span>';
+  // target
+  const t=document.getElementById('targetOut');
+  t.innerHTML=lvl.target.map((v,i)=>`<div class="line"><i>${i+1}.</i><b>${v}</b></div>`).join('');
+  // init pool/seq: shuffle pool
+  state.seq=[];
+  state.pool=[...lvl.blocks].sort(()=>Math.random()-0.5);
+  renderDrops();
+  updateStats();
+  save();
+}
+
+function renderDrops(){
+  const seqEl=document.getElementById('seqDrop');
+  const poolEl=document.getElementById('poolDrop');
+  seqEl.innerHTML='';
+  poolEl.innerHTML='';
+  state.seq.forEach((b,idx)=>{
+    const d=document.createElement('div');
+    d.className='block '+b.type;
+    d.dataset.uid=b.uid;
+    d.dataset.zone='seq';
+    d.dataset.idx=idx;
+    d.innerHTML=blockHTML(b);
+    attachDrag(d);
+    d.addEventListener('click',()=>{ // tap to return to pool
+      if(d._dragged) return;
+      state.seq.splice(idx,1);
+      state.pool.push(b);
+      renderDrops();
+    });
+    seqEl.appendChild(d);
+  });
+  state.pool.forEach((b,idx)=>{
+    const d=document.createElement('div');
+    d.className='block '+b.type;
+    d.dataset.uid=b.uid;
+    d.dataset.zone='pool';
+    d.dataset.idx=idx;
+    d.innerHTML=blockHTML(b);
+    attachDrag(d);
+    d.addEventListener('click',()=>{
+      if(d._dragged) return;
+      state.pool.splice(idx,1);
+      state.seq.push(b);
+      renderDrops();
+    });
+    poolEl.appendChild(d);
+  });
+  document.getElementById('seqEmpty').style.display=state.seq.length?'none':'block';
+  document.getElementById('seqCount').textContent=state.seq.length+'/'+LEVELS[state.level-1].blocks.length;
+}
+
+let drag={active:false,el:null,ghost:null,uid:null,fromZone:null,startY:0,startX:0,moved:false};
+
+function attachDrag(el){
+  el.addEventListener('pointerdown',onPointerDown);
+}
+
+function onPointerDown(e){
+  if(e.button!==0) return;
+  const el=e.currentTarget;
+  drag.active=true;
+  drag.el=el;
+  drag.uid=el.dataset.uid;
+  drag.fromZone=el.dataset.zone;
+  drag.startY=e.clientY;
+  drag.startX=e.clientX;
+  drag.moved=false;
+  el.setPointerCapture(e.pointerId);
+  el.addEventListener('pointermove',onPointerMove);
+  el.addEventListener('pointerup',onPointerUp);
+  el.addEventListener('pointercancel',onPointerUp);
+}
+
+function onPointerMove(e){
+  if(!drag.active) return;
+  const dy=Math.abs(e.clientY-drag.startY);
+  const dx=Math.abs(e.clientX-drag.startX);
+  if(!drag.moved && dy<8 && dx<8) return;
+  if(!drag.moved){
+    drag.moved=true;
+    drag.el._dragged=true;
+    // create ghost
+    const g=drag.el.cloneNode(true);
+    g.className='block ghost ghost-drag '+drag.el.classList[1];
+    g.style.width=drag.el.getBoundingClientRect().width+'px';
+    document.body.appendChild(g);
+    drag.ghost=g;
+    drag.el.classList.add('dragging');
+  }
+  if(drag.ghost){
+    drag.ghost.style.left=e.clientX+'px';
+    drag.ghost.style.top=e.clientY+'px';
+  }
+  // highlight drop zones
+  const seqEl=document.getElementById('seqDrop');
+  const poolEl=document.getElementById('poolDrop');
+  [seqEl,poolEl].forEach(z=>z.classList.remove('drag-over'));
+  const under=document.elementFromPoint(e.clientX,e.clientY);
+  const zone=under?.closest('.drop');
+  if(zone) zone.classList.add('drag-over');
+}
+
+function onPointerUp(e){
+  if(!drag.active) return;
+  const el=drag.el;
+  el.removeEventListener('pointermove',onPointerMove);
+  el.removeEventListener('pointerup',onPointerUp);
+  el.removeEventListener('pointercancel',onPointerUp);
+  if(drag.ghost) drag.ghost.remove();
+  document.querySelectorAll('.drop').forEach(z=>z.classList.remove('drag-over'));
+  el.classList.remove('dragging');
+  if(drag.moved){
+    // find drop target
+    const under=document.elementFromPoint(e.clientX,e.clientY);
+    const zone=under?.closest('.drop');
+    if(zone){
+      const toZone=zone.id==='seqDrop'?'seq':'pool';
+      // find block object
+      let block=null;
+      let fromArr=drag.fromZone==='seq'?state.seq:state.pool;
+      let idx=fromArr.findIndex(b=>b.uid===drag.uid);
+      if(idx>-1) block=fromArr[idx];
+      if(block){
+        // remove from source
+        fromArr.splice(idx,1);
+        // compute insert index in target
+        let toArr=toZone==='seq'?state.seq:state.pool;
+        let insertIdx=toArr.length;
+        // find closest child
+        const children=[...zone.children];
+        if(children.length){
+          for(let i=0;i<children.length;i++){
+            const r=children[i].getBoundingClientRect();
+            if(e.clientY < r.top + r.height/2){ insertIdx=i; break; }
+          }
+        }
+        toArr.splice(insertIdx,0,block);
+        renderDrops();
+      }
+    }
+    setTimeout(()=>{ if(el) el._dragged=false; },200);
+  } else {
+    // tap handled by click listener, just reset flag
+    setTimeout(()=>{ el._dragged=false; },100);
+  }
+  drag.active=false;
+  drag.el=null;
+  drag.ghost=null;
+}
+
+function updateStats(){
+  document.getElementById('score').textContent=state.score;
+  document.getElementById('streak').textContent=state.streak+'🔥';
+  document.getElementById('best').textContent=state.best;
+  document.getElementById('popVal').textContent=state.score+' pts';
+  document.getElementById('heatVal').textContent=state.streak+'x streak';
+  document.getElementById('popFill').style.width=Math.min(100, (state.score/700)*100)+'%';
+  document.getElementById('heatFill').style.width=Math.min(100, (state.streak/7)*100)+'%';
+}
+
+function run(){
+  const lvl=LEVELS[state.level-1];
+  if(state.seq.length!==lvl.blocks.length){
+    document.getElementById('outConsole').innerHTML='<span class="bad">Add all '+lvl.blocks.length+' blocks to your plan first.</span>';
+    return;
+  }
+  const out=simulate(state.seq);
+  const target=lvl.target;
+  const ok=out.length===target.length && out.every((v,i)=>v===target[i]);
+  const outEl=document.getElementById('outConsole');
+  outEl.innerHTML=out.map((v,i)=>{
+    const match=target[i]===v;
+    const cls=match?'ok':'bad';
+    return `<div class="line"><i>${i+1}.</i><b class="${cls}">${v}</b> ${match?'✓':'✗ '+ (target[i]||'—')}</div>`;
+  }).join('') + `<div style="margin-top:6px;font-size:11px;color:var(--muted)">Event loop: sync → microtask queue FIFO (chains & nested enqueue after run)</div>`;
+  const verdict=document.getElementById('verdict');
+  if(ok){
+    const pts=100 + state.streak*10;
+    state.score+=pts;
+    state.streak+=1;
+    if(state.score>state.best) state.best=state.score;
+    state.done[state.level]=Math.max(state.done[state.level]||0,3);
+    // unlock next
+    verdict.className='verdict show ok';
+    verdict.innerHTML=`✅ HEIST SUCCESS! +${pts} pts — Streak ${state.streak}🔥<br><small style="font-weight:600;color:var(--muted)">Perfect order. The event loop ran exactly as planned.</small>`;
+    // sound
+    try{ const ac=new (window.AudioContext||window.webkitAudioContext)(); const o=ac.createOscillator(); const g=ac.createGain(); o.connect(g); g.connect(ac.destination); o.frequency.value=880; g.gain.value=0.15; o.start(); g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+0.4); o.stop(ac.currentTime+0.4);}catch(e){}
+    if(state.level<LEVELS.length){
+      setTimeout(()=>{ state.level++; initLevel(); renderLevels(); },1200);
+    }
+  } else {
+    state.streak=0;
+    verdict.className='verdict show bad';
+    verdict.innerHTML=`🚨 ALARM TRIGGERED — Output mismatch<br><small style="font-weight:600;color:var(--muted)">Check sync vs microtask order. Use Hint if stuck.</small>`;
+    try{ const ac=new (window.AudioContext||window.webkitAudioContext)(); const o=ac.createOscillator(); const g=ac.createGain(); o.connect(g); g.connect(ac.destination); o.frequency.value=180; o.type='square'; g.gain.value=0.12; o.start(); g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+0.5); o.stop(ac.currentTime+0.5);}catch(e){}
+  }
+  updateStats();
+  save();
+  renderLevels();
+}
+
+document.getElementById('runBtn').onclick=run;
+document.getElementById('hintBtn').onclick=()=>{
+  const lvl=LEVELS[state.level-1];
+  const hb=document.getElementById('hintBox');
+  hb.textContent='💡 '+lvl.hint;
+  hb.classList.add('show');
+};
+document.getElementById('resetBtn').onclick=()=>initLevel();
+document.getElementById('prevBtn').onclick=()=>{
+  if(state.level>1){ state.level--; initLevel(); renderLevels(); }
+};
+document.getElementById('nextBtn').onclick=()=>{
+  if(state.level<LEVELS.length){ state.level++; initLevel(); renderLevels(); }
+};
+document.getElementById('clearBtn').onclick=()=>{
+  if(confirm('Clear all progress?')){
+    localStorage.removeItem(LS);
+    state.score=0; state.streak=0; state.best=0; state.done={}; state.level=1;
+    initLevel(); renderLevels(); updateStats();
+  }
+};
+
+renderLevels();
+initLevel();
+updateStats();
+</script>
+</body>
+</html>

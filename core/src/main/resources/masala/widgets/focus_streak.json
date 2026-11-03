@@ -1,0 +1,31 @@
+{
+  "id": "focus_streak",
+  "name": "Focus streak",
+  "description": "Tap once for every focus block you finish today.",
+  "category": "Focus",
+  "widget": {
+    "id": "focus_streak",
+    "title": "Focus streak",
+    "components": [
+      {
+        "type": "counter",
+        "key": "blocks",
+        "label": "Blocks today",
+        "goal": 5,
+        "style": {
+          "tint": "blue",
+          "emphasis": "large"
+        },
+        "reset": "daily"
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 1,
+      "max": 2,
+      "minW": 2,
+      "defaultW": 2,
+      "maxW": 2
+    }
+  }
+}

@@ -1,5 +1,6 @@
 package com.samosaai.masala.audio
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -52,5 +53,43 @@ class SttEngineTest {
     @Test
     fun `an error without a message is not benign`() {
         assertFalse(SttEngine.isBenignSttError(Exception()))
+    }
+
+    @Test
+    fun `detector speech with audio is kept`() {
+        assertTrue(SttEngine.shouldKeepRecording(speechDetected = true, userStopped = false, pcmBytes = 6400))
+    }
+
+    @Test
+    fun `user stop with audio is kept even when the detector never fired`() {
+        assertTrue(SttEngine.shouldKeepRecording(speechDetected = false, userStopped = true, pcmBytes = 6400))
+    }
+
+    @Test
+    fun `pure silence is dropped even on user stop`() {
+        assertFalse(SttEngine.shouldKeepRecording(speechDetected = false, userStopped = true, pcmBytes = 0))
+    }
+
+    @Test
+    fun `unaccepted audio without a stop is dropped`() {
+        assertFalse(SttEngine.shouldKeepRecording(speechDetected = false, userStopped = false, pcmBytes = 6400))
+    }
+
+    @Test
+    fun `warn fires before the cap`() {
+        assertTrue(SttEngine.CAP_WARN_MS < SttEngine.MAX_VAD_RECORDING_MS)
+    }
+
+    @Test
+    fun `cap is five minutes`() {
+        assertEquals(300_000L, SttEngine.MAX_VAD_RECORDING_MS)
+    }
+
+    @Test
+    fun `leading zeros fail fast only from 1_5 s`() {
+        assertFalse(SttEngine.zeroRunFailsFast(0))
+        assertFalse(SttEngine.zeroRunFailsFast(1_400))
+        assertTrue(SttEngine.zeroRunFailsFast(1_500))
+        assertTrue(SttEngine.zeroRunFailsFast(1_600))
     }
 }

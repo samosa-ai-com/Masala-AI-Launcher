@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>CHRONO GIT — Time Agent</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+body{background:#050a05;color:#33ff66;font-family:'Courier New',Courier,monospace;font-size:16px;line-height:1.5;display:flex;justify-content:center;overflow-x:hidden}
+.app{width:100%;max-width:428px;min-width:360px;min-height:100vh;display:flex;flex-direction:column;background:#0a140a;border-left:1px solid #1a3a1a;border-right:1px solid #1a3a1a;position:relative;overflow:hidden}
+.app::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(51,255,102,0.04) 0px,rgba(51,255,102,0.04) 1px,transparent 2px,transparent 4px);pointer-events:none;z-index:5;opacity:0.6}
+header{padding:12px 14px 8px;background:#071007;border-bottom:2px solid #1e4a1e;display:flex;justify-content:space-between;align-items:center;gap:8px;position:relative;z-index:2}
+.h-title{font-weight:900;letter-spacing:1px;font-size:15px;line-height:1.1;text-shadow:0 0 8px rgba(51,255,102,0.7)}
+.h-title span{color:#ffcc33}
+.h-sub{font-size:11px;color:#8fbf8f;letter-spacing:0.5px}
+.h-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.node-dots{display:flex;gap:6px}
+.dot{width:10px;height:10px;border-radius:50%;border:1px solid #33ff66;background:transparent;opacity:0.5}
+.dot.on{background:#33ff66;box-shadow:0 0 6px #33ff66;opacity:1}
+.dot.done{background:#ffcc33;border-color:#ffcc33;opacity:1}
+.stability-wrap{padding:8px 14px;background:#0d1f0d;border-bottom:1px solid #1a3a1a;position:relative;z-index:2}
+.stab-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;letter-spacing:0.8px;margin-bottom:6px}
+.stab-head b{color:#ffcc33}
+.bar{height:14px;background:#020502;border:1px solid #2a5a2a;border-radius:999px;overflow:hidden;position:relative}
+.bar-fill{height:100%;width:100%;background:linear-gradient(90deg,#33ff66 0%,#a3ff33 55%,#ffcc33 75%,#ff5533 100%);transition:width 0.4s ease;box-shadow:0 0 8px rgba(51,255,102,0.4) inset}
+.bar-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#001100;text-shadow:0 1px 0 rgba(255,255,255,0.6)}
+.mission{margin:10px 12px;padding:12px;border:1px solid #2a5a2a;background:#0f1f0f;border-radius:10px;position:relative;z-index:2;box-shadow:0 0 12px rgba(51,255,102,0.08)}
+.m-title{font-size:13px;font-weight:900;color:#ffcc33;letter-spacing:0.8px;margin-bottom:6px}
+.m-story{font-size:13px;color:#c8e6c8;line-height:1.4;margin-bottom:8px}
+.m-obj{background:#071007;border:1px dashed #2a5a2a;border-radius:8px;padding:8px 10px;font-size:13px;color:#33ff66}
+.m-obj b{color:#fff}
+.m-actions{display:flex;gap:8px;margin-top:8px}
+.btn{flex:1;min-height:44px;padding:8px 10px;border-radius:8px;border:1px solid #2a5a2a;background:#143314;color:#33ff66;font-family:inherit;font-size:13px;font-weight:700;letter-spacing:0.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;touch-action:manipulation}
+.btn:active{transform:scale(0.98);background:#1a401a}
+.btn.primary{background:#33ff66;color:#001100;border-color:#33ff66;box-shadow:0 0 10px rgba(51,255,102,0.4)}
+.btn.warn{background:#1a1a0a;border-color:#665500;color:#ffcc33}
+.btn.ghost{background:transparent}
+.graph{margin:0 12px;padding:10px 12px;background:#020502;border:1px solid #1a3a1a;border-radius:10px;position:relative;z-index:2}
+.g-head{font-size:11px;letter-spacing:0.8px;color:#8fbf8f;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.g-branches{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.branch-pill{padding:4px 8px;border-radius:999px;font-size:12px;font-weight:800;border:1px solid #2a5a2a;background:#0a140a}
+.branch-pill.on{background:#33ff66;color:#001100;border-color:#33ff66;box-shadow:0 0 6px rgba(51,255,102,0.5)}
+.branch-pill.hot{border-color:#ff5533;color:#ff8a66}
+.commits{font-size:11px;color:#8fbf8f;line-height:1.6;background:#071007;border-radius:6px;padding:8px;border:1px solid #143314;max-height:92px;overflow-y:auto}
+.commit{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.commit.head{color:#ffcc33;font-weight:800}
+.terminal{margin:10px 12px 0;flex:1;display:flex;flex-direction:column;background:#020502;border:1px solid #1a3a1a;border-radius:10px;overflow:hidden;position:relative;z-index:2;min-height:220px}
+.term-head{padding:8px 12px;background:#0d1f0d;border-bottom:1px solid #1a3a1a;display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:0.7px}
+.term-head b{color:#33ff66}
+.term-body{flex:1;padding:10px 12px;overflow-y:auto;max-height:260px;scroll-behavior:smooth}
+.line{margin-bottom:6px;word-break:break-word;white-space:pre-wrap;font-size:13px;line-height:1.4}
+.line.cmd{color:#ffcc33}
+.line.out{color:#33ff66;opacity:0.95}
+.line.err{color:#ff6b6b}
+.line.sys{color:#8fbf8f;font-style:italic}
+.input-row{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#071007;border-top:1px solid #1a3a1a}
+.prompt{color:#ffcc33;font-weight:900;font-size:14px;white-space:nowrap}
+.term-input{flex:1;background:transparent;border:none;outline:none;color:#33ff66;font-family:inherit;font-size:16px;min-width:0}
+.quick{padding:8px 12px 10px;background:#0a140a;border-top:1px solid #1a3a1a;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;position:relative;z-index:2}
+.qbtn{min-height:44px;padding:6px 4px;border-radius:8px;border:1px solid #2a5a2a;background:#0f1f0f;color:#c8e6c8;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;line-height:1.1}
+.qbtn:active{background:#143314;transform:scale(0.97)}
+.qbtn.accent{background:#143314;color:#33ff66;border-color:#33ff66}
+.qbtn.enter{background:#33ff66;color:#001100;border-color:#33ff66;font-weight:900}
+.footer{padding:8px 12px 14px;display:flex;gap:8px;align-items:center;justify-content:space-between;background:#050a05;border-top:1px solid #1a3a1a;position:relative;z-index:2}
+.footer small{font-size:11px;color:#6a8a6a;line-height:1.3}
+.icon{width:14px;height:14px;display:inline-block}
+.modal{position:absolute;inset:0;background:rgba(2,5,2,0.88);display:none;align-items:center;justify-content:center;padding:18px;z-index:20}
+.modal.on{display:flex}
+.modal-card{width:100%;max-width:360px;background:#0f1f0f;border:2px solid #33ff66;border-radius:14px;padding:18px;text-align:center;box-shadow:0 0 24px rgba(51,255,102,0.3)}
+.modal-card h2{font-size:18px;color:#ffcc33;margin-bottom:6px;text-shadow:0 0 8px rgba(255,204,51,0.6)}
+.modal-card p{font-size:13px;color:#c8e6c8;margin-bottom:12px;line-height:1.4}
+.stars{font-size:22px;letter-spacing:4px;margin-bottom:10px}
+.crt{animation:flicker 0.15s infinite alternate}
+@keyframes flicker{0%{opacity:1}100%{opacity:0.98}}
+@media(max-width:360px){.app{min-width:100%}}
+</style>
+</head>
+<body>
+<div class="app crt" id="app">
+  <header>
+    <div>
+      <div class="h-title">CHRONO <span>GIT</span> ▮</div>
+      <div class="h-sub">TIME AGENT // BRANCH REPAIR UNIT</div>
+    </div>
+    <div class="h-right">
+      <div class="node-dots" id="dots"></div>
+      <div style="font-size:11px;color:#8fbf8f" id="nodeLabel">NODE 1/5</div>
+    </div>
+  </header>
+
+  <div class="stability-wrap">
+    <div class="stab-head"><span>STABILITY</span><b id="stabText">100%</b></div>
+    <div class="bar"><div class="bar-fill" id="barFill" style="width:100%"></div><div class="bar-text" id="barText">TIMELINE STABLE</div></div>
+  </div>
+
+  <div class="mission" id="missionBox">
+    <div class="m-title" id="mTitle">NODE 01 // FRACTURE ALPHA</div>
+    <div class="m-story" id="mStory"></div>
+    <div class="m-obj" id="mObj"></div>
+    <div class="m-actions">
+      <button class="btn ghost" id="hintBtn">💡 HINT (-5%)</button>
+      <button class="btn warn" id="resetBtn">↺ RESTART</button>
+    </div>
+  </div>
+
+  <div class="graph">
+    <div class="g-head"><span>BRANCH GRAPH</span><span id="headInfo" style="color:#ffcc33;font-weight:800"></span></div>
+    <div class="g-branches" id="branches"></div>
+    <div class="commits" id="commits"></div>
+  </div>
+
+  <div class="terminal">
+    <div class="term-head"><b>◉ TERMINAL — agent@chrono</b><span style="display:flex;gap:8px;align-items:center"><button id="soundBtn" style="background:transparent;border:1px solid #2a5a2a;color:#8fbf8f;border-radius:6px;padding:4px 8px;font-family:inherit;font-size:11px;min-height:32px">🔊 SOUND ON</button><span style="color:#8fbf8f">● REC</span></span></div>
+    <div class="term-body" id="termBody"></div>
+    <div class="input-row">
+      <span class="prompt">$</span>
+      <input id="termInput" class="term-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="type git command…">
+      <button id="sendBtn" class="btn primary" style="min-width:64px;min-height:44px;padding:0 12px;flex:0 0 auto">↵</button>
+    </div>
+  </div>
+
+  <div class="quick" id="quick">
+    <button class="qbtn accent" data-insert="git status">git status</button>
+    <button class="qbtn" data-insert="git branch">git branch</button>
+    <button class="qbtn" data-insert="git log --oneline">git log</button>
+    <button class="qbtn" data-insert="clear">clear</button>
+    <button class="qbtn" data-insert="git switch ">switch</button>
+    <button class="qbtn" data-insert="git stash">stash</button>
+    <button class="qbtn" data-insert="git cherry-pick ">pick</button>
+    <button class="qbtn" data-insert="git reset --hard ">reset</button>
+    <button class="qbtn" data-insert="git checkout ">checkout</button>
+    <button class="qbtn" data-insert="git stash pop">stash pop</button>
+    <button class="qbtn" data-insert="git log --all --oneline --graph">log --all</button>
+    <button class="qbtn enter" id="enterBtn">ENTER ↵</button>
+  </div>
+
+  <div class="footer">
+    <small>Tip: Use real git commands. Wrong moves drain stability. Type <b style="color:#33ff66">help</b> for commands.</small>
+    <button class="btn ghost" id="helpBtn" style="min-width:70px;flex:0 0 auto">HELP</button>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="modal-card">
+      <div style="font-size:28px;margin-bottom:6px">✦ TIMELINE RESTORED ✦</div>
+      <h2 id="modalTitle">NODE COMPLETE</h2>
+      <div class="stars" id="modalStars">★★★</div>
+      <p id="modalText"></p>
+      <button class="btn primary" id="nextBtn" style="width:100%">NEXT NODE →</button>
+      <button class="btn ghost" id="closeModal" style="width:100%;margin-top:8px">STAY</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let audioCtx=null, soundOn=true;
+function initAudio(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); }
+function tone(freq,dur,type='square',vol=0.14){
+  if(!soundOn) return;
+  try{
+    initAudio();
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.value=vol;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+dur);
+    o.stop(audioCtx.currentTime+dur);
+  }catch(e){}
+}
+const playKey=()=>tone(900,0.06,'square',0.07);
+const playSuccess=()=>{tone(520,0.14,'sine',0.18); setTimeout(()=>tone(780,0.18,'sine',0.18),140); setTimeout(()=>tone(1040,0.22,'sine',0.16),300);};
+const playError=()=>{tone(140,0.28,'sawtooth',0.16); setTimeout(()=>tone(90,0.2,'sawtooth',0.12),120);};
+const playType=()=>tone(1400,0.03,'square',0.04);
+const playHint=()=>tone(400,0.12,'triangle',0.12);
+
+const missions=[
+  {
+    title:"NODE 01 // FRACTURE ALPHA",
+    story:"Timeline fracture detected. You’re on <b style='color:#ffcc33'>main</b> but the uncorrupted code lives on <b style='color:#33ff66'>feature</b>. Branch graph shows 3 timelines. Switch branches to investigate.",
+    obj:"<b>OBJECTIVE:</b> Switch to <b>feature</b> branch<br><span style='color:#8fbf8f'>Try: <code>git switch feature</code> or <code>git checkout feature</code></span>",
+    hint:"Use: git branch to list, then git switch feature",
+    check: (repo)=> repo.currentBranch==='feature'
+  },
+  {
+    title:"NODE 02 // STATUS ANOMALY",
+    story:"You’re on <b style='color:#33ff66'>feature</b> but chroniton residue blocks the jump. Sensors show dirty working directory. Inspect it before proceeding.",
+    obj:"<b>OBJECTIVE:</b> Inspect working directory<br><span style='color:#8fbf8f'>Run: <code>git status</code></span>",
+    hint:"Type git status to see unstaged changes to timeline.js",
+    check: (repo)=> repo.lastCmd==='status'
+  },
+  {
+    title:"NODE 03 // STASH PARADOX",
+    story:"<b style='color:#ff6b6b'>WARNING:</b> Unstaged changes to <code>timeline.js</code> will cause a paradox if you jump. Stash them safely to clean the timeline.",
+    obj:"<b>OBJECTIVE:</b> Stash working changes<br><span style='color:#8fbf8f'>Run: <code>git stash</code> or <code>git stash push</code></span>",
+    hint:"Use git stash to save changes. Then git stash list to verify.",
+    check: (repo)=> repo.stash.length>0 && repo.status.unstaged.length===0
+  },
+  {
+    title:"NODE 04 // CHERRY-PICK FIX",
+    story:"Hotfix branch holds <b style='color:#ffcc33'>x9y8z7w — Fix paradox</b> that this timeline needs. Cherry-pick it onto your current branch.",
+    obj:"<b>OBJECTIVE:</b> Cherry-pick the fix<br><span style='color:#8fbf8f'>Hint: <code>git log --all --oneline</code> to find hash, then <code>git cherry-pick x9y8z7w</code></span>",
+    hint:"Run git log --all --oneline --graph then git cherry-pick x9y8z7w",
+    check: (repo)=> repo.branches[repo.currentBranch].some(c=>c.includes('x9y8z7w'))
+  },
+  {
+    title:"NODE 05 // RESET COLLAPSE",
+    story:"Main timeline corrupted by <b style='color:#ff6b6b'>i7j8k9l Broken deploy</b>. You must reset <b>main</b> to <b style='color:#33ff66'>e4f5g6h Add core</b> — the last stable point.",
+    obj:"<b>OBJECTIVE:</b> Reset main to stable commit<br><span style='color:#8fbf8f'>Switch to main if needed, then <code>git reset --hard e4f5g6h</code></span>",
+    hint:"If not on main: git switch main, then git reset --hard e4f5g6h",
+    check: (repo)=> repo.HEAD==='e4f5g6h' && repo.currentBranch==='main'
+  }
+];
+
+let repo, stability=100, current=0, completed=false;
+function makeRepo(){
+  return {
+    branches:{
+      main:['a1b2c3d Init timeline','e4f5g6h Add core','i7j8k9l Broken deploy'],
+      feature:['a1b2c3d Init timeline','m1n2o3p Feature work'],
+      hotfix:['a1b2c3d Init timeline','e4f5g6h Add core','x9y8z7w Fix paradox']
+    },
+    branchesList:['main','feature','hotfix'],
+    currentBranch:'main',
+    status:{unstaged:['timeline.js']},
+    stash:[],
+    lastCmd:'',
+    HEAD:'i7j8k9l'
+  };
+}
+const termBody=document.getElementById('termBody');
+const termInput=document.getElementById('termInput');
+const barFill=document.getElementById('barFill');
+const barText=document.getElementById('barText');
+const stabText=document.getElementById('stabText');
+const dotsEl=document.getElementById('dots');
+const nodeLabel=document.getElementById('nodeLabel');
+const mTitle=document.getElementById('mTitle');
+const mStory=document.getElementById('mStory');
+const mObj=document.getElementById('mObj');
+const branchesEl=document.getElementById('branches');
+const commitsEl=document.getElementById('commits');
+const headInfo=document.getElementById('headInfo');
+const modal=document.getElementById('modal');
+const modalTitle=document.getElementById('modalTitle');
+const modalText=document.getElementById('modalText');
+const modalStars=document.getElementById('modalStars');
+
+function renderDots(){
+  dotsEl.innerHTML='';
+  for(let i=0;i<5;i++){
+    const d=document.createElement('div');
+    d.className='dot'+(i===current?' on': i<current?' done':'');
+    dotsEl.appendChild(d);
+  }
+  nodeLabel.textContent=`NODE ${current+1}/5`;
+}
+function renderStability(){
+  stabText.textContent=stability+'%';
+  barFill.style.width=stability+'%';
+  if(stability>60){ barText.textContent='TIMELINE STABLE'; barFill.style.filter='hue-rotate(0deg)';}
+  else if(stability>30){ barText.textContent='INSTABILITY WARNING'; barFill.style.filter='hue-rotate(30deg)';}
+  else if(stability>0){ barText.textContent='CRITICAL — ACT FAST'; barFill.style.filter='hue-rotate(60deg)';}
+  else { barText.textContent='COLLAPSE'; barFill.style.filter='hue-rotate(80deg)';}
+  if(stability<=0){ gameOver(); }
+}
+function renderMission(){
+  const m=missions[current];
+  mTitle.textContent=m.title;
+  mStory.innerHTML=m.story;
+  mObj.innerHTML=m.obj;
+  renderDots();
+}
+function renderGraph(){
+  branchesEl.innerHTML='';
+  repo.branchesList.forEach(b=>{
+    const pill=document.createElement('div');
+    pill.className='branch-pill'+(b===repo.currentBranch?' on':'')+(b==='hotfix'?' hot':'');
+    pill.textContent=(b===repo.currentBranch?'● ':'○ ')+b;
+    branchesEl.appendChild(pill);
+  });
+  headInfo.textContent='HEAD → '+repo.HEAD+' @ '+repo.currentBranch;
+  const list=repo.branches[repo.currentBranch];
+  commitsEl.innerHTML=list.map(c=>{
+    const hash=c.split(' ')[0];
+    const isHead=hash===repo.HEAD;
+    return `<div class="commit ${isHead?'head':''}">${isHead?'▶ ':''}${c}${isHead?' ← HEAD':''}</div>`;
+  }).reverse().join('');
+  if(repo.status.unstaged.length){
+    commitsEl.innerHTML+=`<div style="margin-top:6px;color:#ff6b6b">● unstaged: ${repo.status.unstaged.join(', ')} (dirty)</div>`;
+  } else {
+    commitsEl.innerHTML+=`<div style="margin-top:6px;color:#33ff66">✔ working tree clean</div>`;
+  }
+  if(repo.stash.length){
+    commitsEl.innerHTML+=`<div style="color:#ffcc33">▣ stash: ${repo.stash.length} entry</div>`;
+  }
+}
+function logLine(text, cls='out'){
+  const d=document.createElement('div');
+  d.className='line '+cls;
+  d.textContent=text;
+  termBody.appendChild(d);
+  termBody.scrollTop=termBody.scrollHeight;
+}
+function logCmd(cmd){
+  const d=document.createElement('div');
+  d.className='line cmd';
+  d.textContent='agent@chrono:~$ '+cmd;
+  termBody.appendChild(d);
+  termBody.scrollTop=termBody.scrollHeight;
+}
+function initGame(){
+  repo=makeRepo();
+  stability=100;
+  current=0;
+  completed=false;
+  termBody.innerHTML='';
+  logLine('CHRONO GIT v2.4.1 — Time Agent Terminal','sys');
+  logLine('Type help for commands. Stability drains on wrong moves.','sys');
+  logLine('Mission log updated. Good luck, Agent.','sys');
+  renderMission(); renderGraph(); renderStability();
+  termInput.value=''; termInput.focus();
+}
+function gameOver(){
+  if(completed) return;
+  logLine('✖ TIMELINE COLLAPSED — Stability 0%. Type restart or tap RESTART.','err');
+  playError();
+  modalTitle.textContent='TIMELINE COLLAPSED';
+  modalStars.textContent='☠';
+  modalText.innerHTML='Stability reached 0%. The branching history fractured.<br>Tap RESTART to try again.';
+  document.getElementById('nextBtn').textContent='RESTART TIMELINE';
+  modal.classList.add('on');
+}
+function checkProgress(){
+  const m=missions[current];
+  if(m.check(repo)){
+    playSuccess();
+    const stars = stability>=80?'★★★':stability>=50?'★★☆':'★☆☆';
+    modalTitle.textContent=`NODE ${current+1} SECURED`;
+    modalStars.textContent=stars;
+    if(current===4){
+      modalText.innerHTML=`All 5 nodes repaired!<br>Final stability: <b style="color:#33ff66">${stability}%</b><br>Timeline restored. You are a legend, Agent.`;
+      document.getElementById('nextBtn').textContent='REPLAY MISSIONS';
+      completed=true;
+    } else {
+      modalText.innerHTML=`Stability: <b style="color:#33ff66">${stability}%</b><br>${missions[current+1].title} awaiting.`;
+      document.getElementById('nextBtn').textContent='NEXT NODE →';
+    }
+    modal.classList.add('on');
+    logLine(`✔ Objective complete: ${m.title} — stability ${stability}%`,'sys');
+    renderGraph();
+  }
+}
+
+function handleCommand(raw){
+  const cmd=raw.trim();
+  if(!cmd) return;
+  logCmd(cmd);
+  const lower=cmd.toLowerCase();
+  let out='', isWrong=false;
+
+  if(lower==='help' || lower==='git help' || lower==='?'){
+    out=`COMMANDS:
+ git status              — show working tree
+ git branch              — list branches
+ git switch <branch>     — switch branch (also: git checkout <branch>)
+ git checkout -b <new>   — create & switch
+ git stash / push / pop / list
+ git log --oneline       — current branch log
+ git log --all --oneline --graph — all branches
+ git cherry-pick <hash>  — apply commit
+ git reset --hard <hash> — move HEAD
+ clear / cls             — clear terminal
+ help                    — this help`;
+  } else if(lower==='clear' || lower==='cls' || lower==='git clear'){
+    termBody.innerHTML='';
+    logLine('Terminal cleared.','sys');
+    return;
+  } else if(lower==='restart' || lower==='reset game'){
+    initGame(); return;
+  } else if(lower.startsWith('git status')){
+    repo.lastCmd='status';
+    if(repo.status.unstaged.length){
+      out=`On branch ${repo.currentBranch}
+Your branch is up to date.
+
+Changes not staged for commit:
+  (use "git add <file>" to update)
+  modified:   timeline.js
+
+no changes added to commit`;
+    } else {
+      out=`On branch ${repo.currentBranch}
+Your branch is up to date.
+
+nothing to commit, working tree clean
+HEAD -> ${repo.HEAD}`;
+    }
+  } else if(lower.startsWith('git branch')){
+    out=repo.branchesList.map(b=> (b===repo.currentBranch?`* ${b}  ← current`:`  ${b}`)).join('\n');
+  } else if(lower.startsWith('git switch ') || lower.startsWith('git checkout ')){
+    let parts=cmd.split(/\s+/);
+    // handle git checkout -b newBranch
+    let branch=null;
+    if(lower.includes('-b')){
+      const idx=parts.findIndex(p=>p==='-b');
+      branch=parts[idx+1];
+      if(branch){
+        if(repo.branchesList.includes(branch)){
+          out=`fatal: branch '${branch}' already exists`;
+          isWrong=true;
+        } else {
+          repo.branches[branch]=[...repo.branches[repo.currentBranch]];
+          repo.branchesList.push(branch);
+          repo.currentBranch=branch;
+          repo.HEAD=repo.branches[branch][repo.branches[branch].length-1].split(' ')[0];
+          out=`Switched to a new branch '${branch}'`;
+        }
+      } else { out=`error: missing branch name`; isWrong=true; }
+    } else {
+      branch=parts[2];
+      if(!branch){ out=`error: switch requires a branch name`; isWrong=true; }
+      else if(repo.branchesList.includes(branch)){
+        repo.currentBranch=branch;
+        repo.HEAD=repo.branches[branch][repo.branches[branch].length-1].split(' ')[0];
+        out=`Switched to branch '${branch}'`;
+      } else {
+        out=`error: pathspec '${branch}' did not match any file(s) known to git`;
+        isWrong=true;
+      }
+    }
+  } else if(lower.startsWith('git stash')){
+    if(lower.includes('list')){
+      out= repo.stash.length ? repo.stash.join('\n') : 'No stash entries.';
+    } else if(lower.includes('pop')){
+      if(repo.stash.length){
+        repo.status.unstaged=['timeline.js'];
+        repo.stash.pop();
+        out=`On branch ${repo.currentBranch}
+Changes restored from stash@{0}`;
+      } else { out=`No stash entries found.`; isWrong=true; }
+    } else {
+      // push
+      if(repo.status.unstaged.length){
+        repo.stash.push(`stash@{0}: WIP on ${repo.currentBranch}: ${repo.HEAD} timeline.js`);
+        repo.status.unstaged=[];
+        out=`Saved working directory and index state WIP on ${repo.currentBranch}: ${repo.HEAD}`;
+      } else { out=`No local changes to save`; isWrong=true; }
+    }
+  } else if(lower.startsWith('git log')){
+    if(lower.includes('--all')){
+      out=Object.entries(repo.branches).map(([b,cs])=>{
+        return `* [${b}] `+cs.join(' → ');
+      }).join('\n')+`\n\n--all --graph view`;
+    } else {
+      const cs=repo.branches[repo.currentBranch];
+      out=cs.map(c=>`${c.split(' ')[0]} ${c.slice(8)}`).reverse().join('\n');
+    }
+  } else if(lower.startsWith('git cherry-pick')){
+    const hash=(cmd.split(/\s+/)[2]||'').toLowerCase();
+    if(!hash){ out=`error: cherry-pick requires a commit hash`; isWrong=true; }
+    else if(['x9y8z7w','x9y8z7','x9y8z7wfix'].includes(hash)){
+      if(repo.branches[repo.currentBranch].some(c=>c.includes('x9y8z7w'))){
+        out=`On branch ${repo.currentBranch}\nCommit already applied.`;
+        isWrong=true;
+      } else {
+        repo.branches[repo.currentBranch].push('x9y8z7w Fix paradox');
+        repo.HEAD='x9y8z7w';
+        out=`[${repo.currentBranch} x9y8z7w] Fix paradox\n 1 file changed, 1 insertion(+)`;
+      }
+    } else {
+      out=`error: commit ${hash} not found\n(hint: hash is x9y8z7w on hotfix)`;
+      isWrong=true;
+    }
+  } else if(lower.startsWith('git reset')){
+    const parts=cmd.split(/\s+/);
+    let hash=parts[parts.length-1].toLowerCase();
+    const hasHard=lower.includes('--hard');
+    const hasSoft=lower.includes('--soft');
+    if(!hash || hash.startsWith('--')){ out=`error: reset requires <commit> hash`; isWrong=true; }
+    else if(['e4f5g6h','e4f5g6','e4f5g6hadd'].includes(hash)){
+      if(!hasHard){
+        out=`Hint: use --hard to fully restore timeline (git reset --hard e4f5g6h)`;
+        isWrong=true;
+      } else {
+        repo.HEAD='e4f5g6h';
+        // truncate current branch to that commit if present
+        const idx=repo.branches[repo.currentBranch].findIndex(c=>c.startsWith('e4f5g6h'));
+        if(idx>=0){
+          repo.branches[repo.currentBranch]=repo.branches[repo.currentBranch].slice(0,idx+1);
+        } else {
+          // if not found, set anyway for win condition
+          repo.branches[repo.currentBranch]=['a1b2c3d Init timeline','e4f5g6h Add core'];
+        }
+        out=`HEAD is now at e4f5g6h Add core\nTimeline reset — corruption removed.`;
+      }
+    } else {
+      out=`error: commit ${hash} not found (want e4f5g6h)`;
+      isWrong=true;
+    }
+  } else if(lower.startsWith('git ')){
+    out=`git: '${cmd.slice(4).split(' ')[0]}' is not a git command or not allowed here.\nTry 'help'`;
+    isWrong=true;
+  } else {
+    out=`bash: ${cmd.split(' ')[0]}: command not found\nTry 'help'`;
+    isWrong=true;
+  }
+
+  if(out) logLine(out, isWrong?'err':'out');
+  if(isWrong){
+    stability=Math.max(0, stability-12);
+    renderStability();
+    playError();
+  } else {
+    // small success tick if not help/clear
+    if(!lower.startsWith('help') && lower!=='clear') playKey();
+  }
+  renderGraph();
+  if(!isWrong) checkProgress();
+}
+
+termInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){
+    const v=termInput.value;
+    termInput.value='';
+    handleCommand(v);
+  } else if(e.key.length===1){
+    playType();
+  }
+});
+document.getElementById('sendBtn').addEventListener('click',()=>{
+  const v=termInput.value;
+  termInput.value='';
+  handleCommand(v);
+  termInput.focus();
+});
+document.getElementById('enterBtn').addEventListener('click',()=>{
+  const v=termInput.value;
+  termInput.value='';
+  handleCommand(v);
+  termInput.focus();
+});
+document.querySelectorAll('.qbtn[data-insert]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const ins=b.getAttribute('data-insert');
+    if(ins==='clear'){ handleCommand('clear'); return; }
+    termInput.value+=ins;
+    termInput.focus();
+    playKey();
+  });
+});
+document.getElementById('hintBtn').addEventListener('click',()=>{
+  const m=missions[current];
+  logLine('HINT: '+m.hint,'sys');
+  stability=Math.max(0, stability-5);
+  renderStability();
+  playHint();
+});
+document.getElementById('resetBtn').addEventListener('click',()=>{ initGame(); playKey(); });
+document.getElementById('helpBtn').addEventListener('click',()=>{ handleCommand('help'); });
+document.getElementById('soundBtn').addEventListener('click', (e)=>{
+  soundOn=!soundOn;
+  e.target.textContent=soundOn?'🔊 SOUND ON':'🔇 SOUND OFF';
+  if(soundOn) initAudio();
+});
+document.getElementById('nextBtn').addEventListener('click',()=>{
+  modal.classList.remove('on');
+  if(completed || stability<=0){
+    initGame();
+    document.getElementById('nextBtn').textContent='NEXT NODE →';
+    return;
+  }
+  if(current<4){
+    current++;
+    renderMission();
+    renderGraph();
+    logLine(`→ Jumped to ${missions[current].title}`,'sys');
+    playSuccess();
+  } else {
+    initGame();
+  }
+});
+document.getElementById('closeModal').addEventListener('click',()=>modal.classList.remove('on'));
+
+// history
+let hist=[], hIdx=-1;
+const origHandle=handleCommand;
+handleCommand=(function(old){
+  return function(raw){
+    if(raw.trim()){ hist.push(raw); hIdx=hist.length; }
+    return old(raw);
+  };
+})(handleCommand);
+termInput.addEventListener('keydown', e=>{
+  if(e.key==='ArrowUp'){
+    e.preventDefault();
+    if(hIdx>0){ hIdx--; termInput.value=hist[hIdx]; }
+  } else if(e.key==='ArrowDown'){
+    e.preventDefault();
+    if(hIdx<hist.length-1){ hIdx++; termInput.value=hist[hIdx]; } else { hIdx=hist.length; termInput.value=''; }
+  }
+});
+
+initGame();
+</script>
+</body>
+</html>

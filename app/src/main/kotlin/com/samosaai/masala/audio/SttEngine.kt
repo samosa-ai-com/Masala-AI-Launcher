@@ -39,9 +39,10 @@ sealed class SttOutcome {
 /**
  * From the private prototype's `SttEngine`: package, `R` and log calls only; settings come from the caller (see [SpeechConfig]).
  * Speech-to-Text engine supporting two providers.
- * Both use a push-to-talk pattern: startRecording() / stopRecording().
+ * A tap starts an open-ended take; Send (or cancel, failure, or the safety cap)
+ * ends it, and the engine reports a take that ended by itself at once.
  *
- * - API provider: records audio via MediaRecorder, transcribes via API
+ * - API provider: records 16 kHz PCM via AudioRecord, transcribes the WAV via API
  * - Android provider: uses SpeechRecognizer (live recognition)
  */
 @Suppress("TooManyFunctions")
@@ -50,19 +51,27 @@ class SttEngine(
     apiBaseUrl: String = "",
     apiKey: String = "",
     private val onUnauthorized: (() -> Unit)? = null
-) {
+) : PttEngine {
     // API STT state
     private var audioApi: AudioApi? = if (apiBaseUrl.isNotBlank()) {
         AudioApi(apiBaseUrl, apiKey, onUnauthorized = onUnauthorized)
     } else {
         null
     }
-    private var currentRecorder: MediaRecorder? = null
-    private var currentAudioFile: File? = null
 
     /** Set by [cancelListening] to abort an in-flight VAD (hands-free) recording. */
     @Volatile
     private var vadStopRequested = false
+
+    /** Set by [finishUtterance] (tap Stop): transcribe what's there even if the VAD never fired. */
+    @Volatile
+    private var vadUserStopped = false
+
+    /**
+     * Why the last [recordPcmWithVad] returned null without the user staying quiet (recorder
+     * wouldn't start, reads failed): reported instead of "no speech". Cleared on read.
+     */
+    private var vadRecordError: Exception? = null
 
     // Audio muting state
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
@@ -80,6 +89,85 @@ class SttEngine(
 
     /** Latest partial result from the current recognizer segment (not yet finalized). */
     private var currentPartialResult = ""
+
+    /**
+     * The partial a segment restart would otherwise drop: a new cycle clears
+     * [currentPartialResult] first, so the in-flight words move here and are still
+     * included if Send lands before the next segment finalizes.
+     */
+    private var pendingPartial = ""
+
+    /** True between [pauseAndroidListening] and [resumeAndroidListening]. */
+    @Volatile
+    private var androidPaused = false
+
+    private val _level = kotlinx.coroutines.flow.MutableStateFlow(0f)
+
+    /** The mic level while listening, 0..1 (UI refresh U4: Sam's rings and the level bars follow it). */
+    val level: kotlinx.coroutines.flow.StateFlow<Float> = _level
+
+    private val _captureReady = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    /**
+     * True once the live take is really capturing: the first audio window read (API) or the
+     * recognizer's ready callback (Android). The UI holds "Get ready…" until this flips, so a
+     * fast speaker's first word is never aimed at a recorder that isn't running yet.
+     */
+    override val captureReady: kotlinx.coroutines.flow.StateFlow<Boolean> = _captureReady
+
+    /** Fires once when a take crosses [CAP_WARN_MS]; the take keeps recording. Main thread. */
+    @Volatile
+    private var capWarningListener: (() -> Unit)? = null
+
+    override fun setCapWarningListener(listener: (() -> Unit)?) {
+        capWarningListener = listener
+    }
+
+    private fun postCapWarning() {
+        val listener = capWarningListener ?: return
+        capWarningListener = null
+        mainHandler.post { listener() }
+    }
+
+    /** Fires once when a take ends by itself; see [PttEngine.TakeAutoEnd]. Main thread. */
+    @Volatile
+    private var takeAutoEndListener: ((PttEngine.TakeAutoEnd) -> Unit)? = null
+
+    override fun setTakeAutoEndListener(listener: ((PttEngine.TakeAutoEnd) -> Unit)?) {
+        takeAutoEndListener = listener
+    }
+
+    /**
+     * Reports a take that ended by itself, once: the listener is cleared first so a
+     * later Send or cancel can't re-fire it. The forwarders clear their own state on
+     * stop/cancel too, so a post already in flight is dropped there as well.
+     */
+    private fun postTakeAutoEnd(end: PttEngine.TakeAutoEnd) {
+        val listener = takeAutoEndListener ?: return
+        takeAutoEndListener = null
+        mainHandler.post { listener(end) }
+    }
+
+    private val _heard = kotlinx.coroutines.flow.MutableStateFlow(0L)
+
+    /**
+     * Bumped every time new words arrive from the recognizer. Its only job is letting a
+     * caller tell "still speaking" from "gone quiet" without guessing at partial text,
+     * which the recognizer keeps around after a pause.
+     */
+    val heard: kotlinx.coroutines.flow.StateFlow<Long> = _heard
+
+    /** What the voice-activity detector currently sees; the settings test card shows it. */
+    data class VadSnapshot(val floorDb: Float, val thresholdDb: Float, val peakDb: Float, val speechHeard: Boolean)
+
+    private val _vadState = kotlinx.coroutines.flow.MutableStateFlow<VadSnapshot?>(null)
+    val vadState: kotlinx.coroutines.flow.StateFlow<VadSnapshot?> = _vadState
+
+    /** A new listening session starts from silence. */
+    fun resetLive() {
+        _level.value = 0f
+        _captureReady.value = false
+    }
 
     /** Language for the current/next Android recognizer session. */
     private var currentLanguage = Language.ENGLISH
@@ -144,6 +232,8 @@ class SttEngine(
      */
     private fun failSession(message: String) {
         isContinuousListening = false
+        androidPaused = false
+        _captureReady.value = false
         try {
             currentRecognizer?.destroy()
         } catch (_: Exception) {}
@@ -171,6 +261,9 @@ class SttEngine(
         apiSttModels
     }
 
+    /** Whether any on-device speech recognizer exists (a stub service counts as present but fails later). */
+    fun isLocalRecognitionAvailable(): Boolean = SpeechRecognizer.isRecognitionAvailable(context)
+
     /** Set API config at runtime. */
     fun configureApi(baseUrl: String, apiKey: String) {
         audioApi = if (baseUrl.isNotBlank()) {
@@ -180,40 +273,350 @@ class SttEngine(
         }
     }
 
-    // ---- API STT (MediaRecorder + transcription) ----
+    // ---- API STT (tap-to-send PCM + transcription) ----
+    //
+    // A tap starts an open-ended AudioRecord capture (16 kHz mono PCM-16, MIC
+    // source), the same capture the test card uses. The take ends on Send, on
+    // cancel, or by itself: a dead capture fails fast, the 5-minute cap pauses it
+    // with the audio kept. Both self-ends report through [takeAutoEndListener] at once,
+    // so the UI never sits on "Listening…" for a take that is already over.
 
-    /** Start recording audio for API-based STT. */
+    private var holdThread: Thread? = null
+    private var holdRecorder: AudioRecord? = null
+
+    /** Take generation: a stale thread (join timed out) must not touch the next take. */
+    @Volatile
+    private var holdGen = 0
+
+    /** Set by [stopRecording]/[cancelListening] to end the hold capture thread. */
+    @Volatile
+    private var holdStopRequested = false
+
+    /**
+     * Why the last [stopRecording] returned null without audio to send (capture
+     * wouldn't start, reads failed, the stream was all zeros). Read once, like
+     * [vadRecordError] on the hands-free path.
+     */
+    private var holdError: Exception? = null
+
+    private var holdPcm = ByteArrayOutputStream()
+
+    /** Any non-zero sample at all, like [recordPcmWithVad]'s guard. */
+    private var holdSawSignal = false
+
+    /**
+     * When the live segment started, for the warn/cap budget math. A continue restarts the
+     * thread with a fresh budget — each segment is capped on its own, never accumulated.
+     */
+    private var holdSegmentStartMs = 0L
+
+    /** The warn fired once for this take; a continue re-arms it with the fresh budget. */
+    private var holdWarned = false
+
+    /**
+     * The capture stopped but the take is alive (cap reached, or controller pause): the buffer
+     * is kept and [resumeRecording] may restart the thread. Cleared by stop/cancel/next start.
+     */
+    private var holdPaused = false
+
+    /** Start an open-ended capture; the take ends on Send, cancel, failure or cap. */
+    @SuppressLint("MissingPermission")
     fun startRecording(): Boolean {
-        return try {
-            currentAudioFile = File(context.cacheDir, "stt_recording_${System.currentTimeMillis()}.m4a")
-            val recorder = MediaRecorder().apply {
-                setAudioSource(MediaRecorder.AudioSource.MIC)
-                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                setAudioChannels(1)
-                setAudioSamplingRate(16000)
-                setOutputFile(currentAudioFile!!.absolutePath)
-                prepare()
-                start()
-            }
-            currentRecorder = recorder
-            true
-        } catch (_: Exception) { false }
-    }
-
-    /** Stop recording and return the audio file for API STT. */
-    fun stopRecording(): File? {
-        return try {
-            currentRecorder?.apply {
-                stop()
-                release()
-            }
-            currentRecorder = null
-            currentAudioFile
+        stopRecordingThread()
+        val sampleRate = 16_000
+        val windowShorts = HOLD_WINDOW_SHORTS
+        val minBuffer = AudioRecord.getMinBufferSize(
+            sampleRate,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT
+        )
+        // MIC, not VOICE_RECOGNITION: the recognition source applies the vendor's
+        // capture processing and on some devices reads back pure zeros.
+        val recorder = try {
+            AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                sampleRate,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                maxOf(minBuffer, windowShorts * 2)
+            )
         } catch (_: Exception) {
-            currentRecorder = null
             null
         }
+        if (recorder == null || recorder.state != AudioRecord.STATE_INITIALIZED) {
+            try {
+                recorder?.release()
+            } catch (_: Exception) {
+            }
+            holdError = Exception("Recording failed to start")
+            return false
+        }
+        holdStopRequested = false
+        holdError = null
+        holdPcm = ByteArrayOutputStream()
+        holdSawSignal = false
+        holdWarned = false
+        holdPaused = false
+        capWarningListener = null
+        takeAutoEndListener = null
+        resetLive()
+        _vadState.value = null
+        holdRecorder = recorder
+        holdSegmentStartMs = System.currentTimeMillis()
+        val gen = ++holdGen
+        return try {
+            recorder.startRecording()
+            holdThread = Thread {
+                recordHoldLoop(recorder, windowShorts, gen)
+            }.also {
+                it.isDaemon = true
+                it.start()
+            }
+            true
+        } catch (_: Exception) {
+            stopRecordingThread()
+            holdError = Exception("Recording failed to start")
+            false
+        }
+    }
+
+    /**
+     * The hold-capture read loop, shared by [startRecording] and [resumeRecording]: reads
+     * 200 ms windows, appends PCM, tracks the mic level, fails a dead (all-zero) capture fast,
+     * warns once near the cap, and pauses the take at the cap with the buffer kept.
+     */
+    private fun recordHoldLoop(recorder: AudioRecord, windowShorts: Int, gen: Int) {
+        val shorts = ShortArray(windowShorts)
+        val bytes = ByteArray(windowShorts * 2)
+        var zeroRunMs = 0L
+        /**
+         * Ends the take from inside the capture thread: stops the mic indicator
+         * with the take (not on the next Send or tap) and reports it. A later
+         * stop releasing the same recorder again is caught and ignored.
+         */
+        fun endTakeAlone(end: PttEngine.TakeAutoEnd) {
+            holdStopRequested = true
+            runCatching { recorder.stop() }
+            runCatching { recorder.release() }
+            // The buffer stays: Send transcribes it, Continue resumes into it.
+            if (end is PttEngine.TakeAutoEnd.CapReached) holdPaused = true
+            postTakeAutoEnd(end)
+        }
+        try {
+            while (!holdStopRequested && gen == holdGen) {
+                val count = recorder.read(shorts, 0, shorts.size)
+                if (gen != holdGen) break
+                if (count < 0) {
+                    holdError = Exception("Audio capture failed (error code $count)")
+                    endTakeAlone(PttEngine.TakeAutoEnd.Failed(holdError?.message ?: "Recording failed"))
+                    break
+                }
+                if (count == 0) continue
+                // First successful read: capture is live. The UI holds "Get ready…"
+                // until this flips, so an instant speaker's opener isn't lost.
+                if (!_captureReady.value) _captureReady.value = true
+                var allZero = true
+                for (i in 0 until count) {
+                    val sample = shorts[i].toInt()
+                    if (sample != 0) {
+                        holdSawSignal = true
+                        allZero = false
+                    }
+                    bytes[i * 2] = (sample and 0xFF).toByte()
+                    bytes[i * 2 + 1] = ((sample shr 8) and 0xFF).toByte()
+                }
+                if (gen != holdGen) break
+                holdPcm.write(bytes, 0, count * 2)
+                if (allZero && !holdSawSignal) {
+                    zeroRunMs += HOLD_WINDOW_MS
+                    // A dead capture path reads back zeros from the first
+                    // window: fail in 1.5 s, not after a full take.
+                    if (zeroRunFailsFast(zeroRunMs)) {
+                        holdError = Exception(CAPTURE_SILENCE_MESSAGE)
+                        endTakeAlone(PttEngine.TakeAutoEnd.Failed(CAPTURE_SILENCE_MESSAGE))
+                        break
+                    }
+                }
+                _level.value = ((SilenceDetector.rmsDb(shorts, count) + 60f) / 50f).coerceIn(0f, 1f)
+                val elapsedMs = System.currentTimeMillis() - holdSegmentStartMs
+                if (!holdWarned && elapsedMs > CAP_WARN_MS) {
+                    // Heads-up only: the take keeps recording. One shot per segment.
+                    holdWarned = true
+                    postCapWarning()
+                }
+                if (elapsedMs > MAX_VAD_RECORDING_MS) {
+                    // Safety cap, and it is loud about itself: what was heard
+                    // is kept for Send or Continue, and the take pauses now on its own.
+                    endTakeAlone(PttEngine.TakeAutoEnd.CapReached)
+                    break
+                }
+            }
+        } catch (e: Exception) {
+            holdError = Exception("Recording failed: ${e.message ?: e.javaClass.simpleName}")
+            endTakeAlone(PttEngine.TakeAutoEnd.Failed(holdError?.message ?: "Recording failed"))
+        } finally {
+            _level.value = 0f
+        }
+    }
+
+    /**
+     * Stop the hold capture and return its audio as a WAV file for API STT.
+     * Null when there is nothing to send; [holdError] says why. A take that
+     * already ended itself (failure or cap) stopped its thread, so this just
+     * collects what is there.
+     */
+    fun stopRecording(): File? {
+        // The thread may already be gone (self-ended take); joining a dead
+        // thread returns at once. The generation moves on either way, so a
+        // thread stuck past the join can never write into the next take.
+        takeAutoEndListener = null
+        holdStopRequested = true
+        holdGen++
+        try {
+            holdThread?.join(3000)
+        } catch (_: Exception) {
+        }
+        holdThread = null
+        try {
+            holdRecorder?.stop()
+        } catch (_: Exception) {
+        }
+        try {
+            holdRecorder?.release()
+        } catch (_: Exception) {
+        }
+        holdRecorder = null
+        _level.value = 0f
+        holdError?.let { return null }
+        val pcm = holdPcm.toByteArray()
+        return when {
+            pcm.isEmpty() -> {
+                holdError = Exception(NO_SPEECH_DETECTED)
+                null
+            }
+            !holdSawSignal -> {
+                holdError = Exception(CAPTURE_SILENCE_MESSAGE)
+                null
+            }
+            else -> writeWav(context.cacheDir, pcm, 16_000)
+        }
+    }
+
+    /**
+     * Pause the hold capture without transcribing: the thread stops, the recorder is freed,
+     * and the buffered audio stays for Send or [resumeRecording]. False when nothing is
+     * capturing (self-ended takes are already paused by the cap path).
+     */
+    fun pauseRecording(): Boolean {
+        if (holdThread == null || holdPaused) return holdPaused
+        takeAutoEndListener = null
+        holdStopRequested = true
+        holdGen++
+        try {
+            holdThread?.join(3000)
+        } catch (_: Exception) {
+        }
+        holdThread = null
+        try {
+            holdRecorder?.stop()
+        } catch (_: Exception) {
+        }
+        try {
+            holdRecorder?.release()
+        } catch (_: Exception) {
+        }
+        holdRecorder = null
+        _level.value = 0f
+        holdPaused = holdError == null && (holdPcm.size() > 0 || holdSawSignal)
+        return holdPaused
+    }
+
+    /**
+     * Continue a paused take: a fresh capture thread appends to the kept buffer with a fresh
+     * 5-minute budget. False when the recorder won't start — the kept audio is still sendable.
+     */
+    @SuppressLint("MissingPermission")
+    fun resumeRecording(): Boolean {
+        if (!holdPaused) return false
+        holdPaused = false
+        holdError = null
+        val sampleRate = 16_000
+        val windowShorts = HOLD_WINDOW_SHORTS
+        val minBuffer = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+        val recorder = try {
+            AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                sampleRate,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                maxOf(minBuffer, windowShorts * 2)
+            )
+        } catch (_: Exception) {
+            null
+        }
+        if (recorder == null || recorder.state != AudioRecord.STATE_INITIALIZED) {
+            try {
+                recorder?.release()
+            } catch (_: Exception) {
+            }
+            holdPaused = true
+            return false
+        }
+        holdStopRequested = false
+        holdWarned = false
+        holdRecorder = recorder
+        holdSegmentStartMs = System.currentTimeMillis()
+        val gen = ++holdGen
+        return try {
+            recorder.startRecording()
+            holdThread = Thread {
+                recordHoldLoop(recorder, windowShorts, gen)
+            }.also {
+                it.isDaemon = true
+                it.start()
+            }
+            true
+        } catch (_: Exception) {
+            stopRecordingThread()
+            holdPaused = true
+            false
+        }
+    }
+
+    override suspend fun pauseListening(provider: AudioProvider): Boolean = when {
+        provider.isApiBased() -> pauseRecording()
+        provider == AudioProvider.ANDROID -> pauseAndroidListening()
+        else -> false
+    }
+
+    override fun resumeListening(provider: AudioProvider): Boolean = when {
+        provider.isApiBased() -> resumeRecording()
+        provider == AudioProvider.ANDROID -> resumeAndroidListening()
+        else -> false
+    }
+
+    /** Ends the hold capture thread and frees its recorder; the take is discarded. */
+    private fun stopRecordingThread() {
+        takeAutoEndListener = null
+        capWarningListener = null
+        holdPaused = false
+        holdStopRequested = true
+        holdGen++
+        try {
+            holdThread?.join(2000)
+        } catch (_: Exception) {
+        }
+        holdThread = null
+        try {
+            holdRecorder?.stop()
+        } catch (_: Exception) {
+        }
+        try {
+            holdRecorder?.release()
+        } catch (_: Exception) {
+        }
+        holdRecorder = null
+        holdStopRequested = false
     }
 
     /** Transcribe audio using the API provider. */
@@ -224,10 +627,24 @@ class SttEngine(
         contentType: String = "audio/m4a"
     ): Result<String> = withContext(Dispatchers.IO) {
         val api = audioApi ?: return@withContext Result.failure(Exception("API not configured"))
+        // Empty means "ask the server": pick the first STT model it advertises, like TranscribeTool does.
+        val effectiveModel = model.ifBlank {
+            if (apiSttModels.isEmpty()) refreshApiModels()
+            apiSttModels.firstOrNull()?.id
+                ?: return@withContext Result.failure(
+                    Exception(
+                        if (api.lastErrorCode == 401 || api.lastErrorCode == 403) {
+                            "HTTP ${api.lastErrorCode} listing speech models: the API key was rejected"
+                        } else {
+                            "No transcription model on the configured endpoint"
+                        }
+                    )
+                )
+        }
         try {
             api.transcribe(
                 audioFile = audioFile,
-                model = model,
+                model = effectiveModel,
                 language = language,
                 contentType = contentType
             )
@@ -248,10 +665,10 @@ class SttEngine(
      *   [SilenceDetector] stops the recording after [silenceTimeoutMs] of
      *   trailing silence; the resulting WAV is transcribed through the API.
      */
-    suspend fun listenForUtterance(
+    override suspend fun listenForUtterance(
         provider: AudioProvider,
         model: String,
-        language: Language = Language.ENGLISH,
+        language: Language,
         silenceTimeoutMs: Long
     ): Result<String> = when {
         provider == AudioProvider.ANDROID -> {
@@ -268,8 +685,11 @@ class SttEngine(
         }
         provider.isApiBased() -> withContext(Dispatchers.IO) {
             val wav = recordPcmWithVad(silenceTimeoutMs)
+            vadUserStopped = false
             if (wav == null) {
-                Result.failure(Exception("No speech detected"))
+                val cause = vadRecordError
+                vadRecordError = null
+                Result.failure(cause ?: Exception("No speech detected"))
             } else {
                 transcribeApi(wav, model, language.iso639, contentType = "audio/wav")
             }
@@ -291,49 +711,79 @@ class SttEngine(
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT
         )
+        // MIC, not VOICE_RECOGNITION: the recognition source applies the vendor's
+        // capture processing and on some devices reads back pure zeros.
         val recorder = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_RECOGNITION,
+            MediaRecorder.AudioSource.MIC,
             sampleRate,
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT,
             maxOf(minBuffer, windowShorts * 2)
         )
-        if (recorder.state != AudioRecord.STATE_INITIALIZED) return null
+        if (recorder.state != AudioRecord.STATE_INITIALIZED) return null.also {
+            vadRecordError = Exception("Recording failed to start")
+        }
 
         vadStopRequested = false
+        vadUserStopped = false
+        vadRecordError = null
+        _vadState.value = null
         val detector = SilenceDetector(silenceTimeoutMs)
         val shortBuf = ShortArray(windowShorts)
         val byteBuf = ByteArray(windowShorts * 2)
         val pcm = ByteArrayOutputStream()
         val startMs = System.currentTimeMillis()
         var result: File? = null
+        var peakDb = -50f
+        // Any non-zero sample at all. rmsDb clamps at the floor, so a genuinely
+        // quiet room is indistinguishable from a broken stream by level alone.
+        var sawSignal = false
         try {
             recorder.startRecording()
             while (!vadStopRequested) {
                 val count = recorder.read(shortBuf, 0, shortBuf.size)
-                if (count < 0) break
+                if (count < 0) {
+                    // A hardware/HAL read failure is not silence: say which it was.
+                    vadRecordError = Exception("Audio capture failed (error code $count)")
+                    break
+                }
                 if (count == 0) continue
                 for (i in 0 until count) {
                     val sample = shortBuf[i].toInt()
+                    if (sample != 0) sawSignal = true
                     byteBuf[i * 2] = (sample and 0xFF).toByte()
                     byteBuf[i * 2 + 1] = ((sample shr 8) and 0xFF).toByte()
                 }
                 pcm.write(byteBuf, 0, count * 2)
                 val now = System.currentTimeMillis()
-                val decision = detector.update(SilenceDetector.rmsDb(shortBuf, count), now)
+                val db = SilenceDetector.rmsDb(shortBuf, count)
+                _level.value = ((db + 60f) / 50f).coerceIn(0f, 1f)
+                peakDb = maxOf(peakDb, db)
+                val decision = detector.update(db, now)
+                _vadState.value = VadSnapshot(detector.floorDb, detector.thresholdDb, peakDb, detector.speechDetected)
                 if (decision != SilenceDetector.Decision.CONTINUE ||
                     now - startMs > MAX_VAD_RECORDING_MS
                 ) {
                     break
                 }
             }
-            if (detector.speechDetected && pcm.size() > 0) {
+            // An explicit Stop sends whatever was captured: the VAD only controls
+            // the hands-free auto-stop, it never vetoes the user's finger. Pure
+            // silence still returns null, so an untouched mic doesn't upload
+            // 15 s of nothing.
+            if (!sawSignal && pcm.size() > 0) {
+                // Not one non-zero sample: the capture path itself is broken (the
+                // stream opened and read back only zeros). Say so, rather than
+                // blaming the user for not speaking.
+                vadRecordError = Exception(CAPTURE_SILENCE_MESSAGE)
+            } else if (shouldKeepRecording(detector.speechDetected, vadUserStopped, pcm.size())) {
                 result = writeWav(context.cacheDir, pcm.toByteArray(), sampleRate)
             }
         } catch (e: Exception) {
             // A permissions/security failure, OOM, or recorder error must not
             // look like "no speech" without a trace — log it for debugging.
             Log.w(TAG, "VAD recording failed; treating as no speech", e)
+            vadRecordError = Exception("Recording failed: ${e.message ?: e.javaClass.simpleName}")
             result = null
         } finally {
             try {
@@ -343,6 +793,8 @@ class SttEngine(
             }
             recorder.release()
             vadStopRequested = false
+            vadUserStopped = false
+            _level.value = 0f
         }
         return result
     }
@@ -360,6 +812,9 @@ class SttEngine(
     ): Boolean {
         if (isContinuousListening) return false
         androidFailure = null
+        androidPaused = false
+        pendingPartial = ""
+        _captureReady.value = false
         sessionFailure = onFailure
         sessionTag = null
         if (androidOnDeviceOnly && !AndroidSpeechInfo.hasOnDeviceRecognition(context)) {
@@ -383,7 +838,12 @@ class SttEngine(
             listenGate?.complete(buildFinalTranscript())
             return
         }
-        currentPartialResult = "" // Reset for new segment
+        // A new segment clears the live partial — the in-flight words move aside first so a
+        // Send landing between the restart and the next segment still includes them.
+        if (currentPartialResult.isNotBlank()) {
+            pendingPartial = listOf(pendingPartial, currentPartialResult).filter { it.isNotBlank() }.joinToString(" ")
+            currentPartialResult = ""
+        }
         if (recognizerStale) {
             recognizerStale = false
             try {
@@ -403,9 +863,10 @@ class SttEngine(
             newRec.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
                     MasalaLog.d(TAG) { "onReadyForSpeech" }
+                    _captureReady.value = true
                 }
                 override fun onBeginningOfSpeech() { MasalaLog.d(TAG) { "onBeginningOfSpeech" } }
-                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onRmsChanged(rmsdB: Float) { _level.value = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f) }
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEndOfSpeech() { MasalaLog.d(TAG) { "onEndOfSpeech" } }
                 override fun onError(error: Int) {
@@ -434,9 +895,13 @@ class SttEngine(
                     MasalaLog.d(TAG) { "onResults" }
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     val text = matches?.firstOrNull() ?: ""
+                    // Older first: the stash holds a previous segment's words that never
+                    // finalized; this result holds this segment's.
+                    commitPending()
                     if (text.isNotBlank()) {
                         if (continuousTranscript.isNotEmpty()) continuousTranscript.append(" ")
                         continuousTranscript.append(text)
+                        _heard.value = _heard.value + 1
                     }
                     currentPartialResult = "" // Final result supersedes partial
                     if (isContinuousListening) {
@@ -452,6 +917,7 @@ class SttEngine(
                     val text = matches?.firstOrNull() ?: ""
                     if (text.isNotBlank()) {
                         currentPartialResult = text
+                        _heard.value = _heard.value + 1
                     }
                 }
                 override fun onEvent(eventType: Int, params: Bundle?) { MasalaLog.d(TAG) { "onEvent: $eventType" } }
@@ -460,6 +926,7 @@ class SttEngine(
                     MasalaLog.d(TAG) { "onSegmentResults" }
                     val matches = segmentResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     val text = matches?.firstOrNull() ?: ""
+                    commitPending()
                     if (text.isNotBlank()) {
                         if (continuousTranscript.isNotEmpty()) continuousTranscript.append(" ")
                         continuousTranscript.append(text)
@@ -478,7 +945,7 @@ class SttEngine(
                 }
             })
         }
-        val active = recognizer ?: return
+        val active = recognizer
         listenWithInstalledTag(active, currentLanguage) { tag ->
             // Stopped, or replaced, while the recognizer was asked about its languages.
             if (isContinuousListening && currentRecognizer === active) startCycle(active, tag)
@@ -513,6 +980,7 @@ class SttEngine(
     /** Stop Android SpeechRecognizer and return the recognized text. */
     suspend fun stopAndroidListening(): String {
         isContinuousListening = false
+        androidPaused = false
         val rec = currentRecognizer
         if (rec != null) {
             rec.stopListening()
@@ -524,6 +992,16 @@ class SttEngine(
             if (gateResult != null) {
                 unmuteBeep()
                 listenGate = null
+                // The session is over: drop the recognizer so the next tap doesn't meet a
+                // stale one and fail with RECOGNIZER_BUSY.
+                mainHandler.post {
+                    try {
+                        currentRecognizer?.cancel()
+                        currentRecognizer?.destroy()
+                    } catch (_: Exception) {
+                    }
+                    currentRecognizer = null
+                }
                 return gateResult
             }
             // Timed out — force cleanup
@@ -543,10 +1021,73 @@ class SttEngine(
     }
 
     /**
-     * Build the final transcript by appending the current in-flight partial
-     * result (if any) to the accumulated finalized segments.
+     * Pause a live Android take without transcribing: the recognizer cycle stops, the
+     * accumulated transcript and stashed partial stay, and [resumeAndroidListening] picks up
+     * where it left off. True when a take was live to pause.
+     */
+    suspend fun pauseAndroidListening(): Boolean {
+        if (!isContinuousListening && currentRecognizer == null) return androidPaused
+        isContinuousListening = false
+        val rec = currentRecognizer
+        if (rec != null) {
+            rec.stopListening()
+            // Same 3 s grace as Send: the last segment still finalizes into the kept transcript.
+            runCatching {
+                kotlinx.coroutines.withTimeoutOrNull(3000L) {
+                    listenGate?.await()
+                }
+            }
+            unmuteBeep()
+            listenGate = null
+            mainHandler.post {
+                try {
+                    currentRecognizer?.cancel()
+                    currentRecognizer?.destroy()
+                } catch (_: Exception) {
+                }
+                currentRecognizer = null
+            }
+        } else {
+            unmuteBeep()
+            listenGate?.complete(buildFinalTranscript())
+            listenGate = null
+        }
+        androidPaused = true
+        return true
+    }
+
+    /**
+     * Continue a paused Android take, appending to the kept transcript. False when nothing
+     * is paused (a fresh take starts through [startAndroidListening] instead).
+     */
+    fun resumeAndroidListening(): Boolean {
+        if (!androidPaused || isContinuousListening) return false
+        androidPaused = false
+        isContinuousListening = true
+        listenGate = CompletableDeferred<String>()
+        muteBeep()
+        mainHandler.post { startContinuousListeningCycle() }
+        return true
+    }
+
+    /**
+     * Folds stashed restart words into the transcript: the segment that produced them never
+     * finalized, so committing is the only way to keep them. Called when a newer segment
+     * finalizes, and by [buildFinalTranscript] at the end of the take.
+     */
+    private fun commitPending() {
+        if (pendingPartial.isBlank()) return
+        if (continuousTranscript.isNotEmpty()) continuousTranscript.append(" ")
+        continuousTranscript.append(pendingPartial)
+        pendingPartial = ""
+    }
+
+    /**
+     * Build the final transcript by appending the stashed restart partial and the current
+     * in-flight partial (if any) to the accumulated finalized segments.
      */
     private fun buildFinalTranscript(): String {
+        commitPending()
         val base = continuousTranscript.toString()
         val partial = currentPartialResult
         currentPartialResult = ""
@@ -581,9 +1122,13 @@ class SttEngine(
                 muteBeep()
                 currentRecognizer = recognizer
                 recognizer.setRecognitionListener(object : RecognitionListener {
-                    override fun onReadyForSpeech(params: Bundle?) {}
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        _captureReady.value = true
+                    }
                     override fun onBeginningOfSpeech() {}
-                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onRmsChanged(rmsdB: Float) {
+                        _level.value = smoothed(previous = _level.value, raw = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f))
+                    }
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() {}
                     override fun onError(error: Int) {
@@ -614,6 +1159,8 @@ class SttEngine(
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE, tag)
                     // Best-effort end-of-speech hint; the platform may ignore it.
                     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, silenceTimeoutMs)
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, silenceTimeoutMs)
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, silenceTimeoutMs)
                 }
                 recognizer.startListening(intent)
             } catch (_: Exception) {
@@ -635,10 +1182,10 @@ class SttEngine(
      * Start listening with the current provider. Returns false on failure.
      * [onAndroidFailure] is passed to [startAndroidListening].
      */
-    fun startListening(
+    override fun startListening(
         provider: AudioProvider,
-        language: Language = Language.ENGLISH,
-        onAndroidFailure: ((String) -> Unit)? = null
+        language: Language,
+        onAndroidFailure: ((String) -> Unit)?
     ): Boolean {
         return when {
             provider == AudioProvider.ANDROID -> startAndroidListening(language, onAndroidFailure)
@@ -651,10 +1198,10 @@ class SttEngine(
      * Stop recording/listening and transcribe audio using [provider] and [model].
      * For API: stops the recorder, transcribes, returns the text or error.
      */
-    suspend fun stopListeningAndTranscribe(
+    override suspend fun stopListeningAndTranscribe(
         provider: AudioProvider,
         model: String,
-        language: String = ""
+        language: String
     ): Result<String> {
         return when {
             provider == AudioProvider.ANDROID -> {
@@ -668,11 +1215,24 @@ class SttEngine(
             provider.isApiBased() -> {
                 val file = stopRecording()
                 if (file == null) {
-                    return Result.failure(Exception("Recording failed"))
+                    val cause = holdError
+                    holdError = null
+                    return Result.failure(cause ?: Exception("Recording failed"))
                 }
-                transcribeApi(file, model, language)
+                transcribeApi(file, model, language, contentType = "audio/wav")
             }
             else -> Result.failure(Exception("STT not configured"))
+        }
+    }
+
+    /** Ends a [listenForUtterance] early: the recorder stops and what was said is still transcribed. */
+    override fun finishUtterance() {
+        vadUserStopped = true
+        vadStopRequested = true
+        mainHandler.post {
+            try {
+                currentRecognizer?.stopListening()
+            } catch (_: Exception) { }
         }
     }
 
@@ -680,11 +1240,14 @@ class SttEngine(
      * Abort an active listen (pause/end of a call). Handles both providers.
      * Safe to call from any thread.
      */
-    fun cancelListening(provider: AudioProvider) {
+    override fun cancelListening(provider: AudioProvider) {
         when {
             provider == AudioProvider.ANDROID -> {
                 isContinuousListening = false
+                androidPaused = false
                 currentPartialResult = ""
+                pendingPartial = ""
+                _captureReady.value = false
                 onceGate?.complete(SttOutcome.Error(ERROR_CANCELLED))
                 listenGate?.complete("")
                 listenGate = null
@@ -698,27 +1261,29 @@ class SttEngine(
                 }
             }
             provider.isApiBased() -> {
+                stopRecordingThread()
+                holdError = null
                 vadStopRequested = true
-                try {
-                    currentRecorder?.apply {
-                        stop()
-                        release()
-                    }
-                } catch (_: Exception) { }
-                currentRecorder = null
-                currentAudioFile = null
             }
             else -> {}
         }
     }
 
+    /**
+     * Silences the recognizer's own start/stop tones. Only the system stream is muted:
+     * muting music, notifications or the ringer would let a tap on the mic swallow a
+     * song or an incoming call.
+     */
+    /**
+     * A level that moves like a voice rather than flickering: the recognizer's raw value
+     * jumps several steps per second, which made the bars saturate and oscillate.
+     */
+    private fun smoothed(previous: Float, raw: Float): Float = (previous + (raw - previous) * 0.35f).coerceIn(0f, 1f)
+
     private fun muteBeep() {
         if (!isMutedForRestart) {
             try {
-                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, 0)
                 audioManager.adjustStreamVolume(AudioManager.STREAM_SYSTEM, AudioManager.ADJUST_MUTE, 0)
-                audioManager.adjustStreamVolume(AudioManager.STREAM_NOTIFICATION, AudioManager.ADJUST_MUTE, 0)
-                audioManager.adjustStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_MUTE, 0)
             } catch (_: Exception) {}
             isMutedForRestart = true
         }
@@ -727,10 +1292,7 @@ class SttEngine(
     private fun unmuteBeep() {
         if (isMutedForRestart) {
             try {
-                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0)
                 audioManager.adjustStreamVolume(AudioManager.STREAM_SYSTEM, AudioManager.ADJUST_UNMUTE, 0)
-                audioManager.adjustStreamVolume(AudioManager.STREAM_NOTIFICATION, AudioManager.ADJUST_UNMUTE, 0)
-                audioManager.adjustStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_UNMUTE, 0)
             } catch (_: Exception) {}
             isMutedForRestart = false
         }
@@ -739,11 +1301,41 @@ class SttEngine(
     companion object {
         private const val TAG = "SttEngine"
 
+        /**
+         * Whether a VAD recording is worth transcribing: the detector accepted speech,
+         * or the user pressed Stop with audio actually in the buffer. Pure silence
+         * (nothing captured, or stop tapped instantly) stays null so it never uploads
+         * or transcribes.
+         */
+        internal fun shouldKeepRecording(speechDetected: Boolean, userStopped: Boolean, pcmBytes: Int): Boolean =
+            pcmBytes > 0 && (speechDetected || userStopped)
+
         /** Synthetic error code: listening was cancelled by pause/end, not by the recognizer. */
         const val ERROR_CANCELLED = -100
 
-        /** Hard cap on a single hands-free VAD recording (90 s). */
-        private const val MAX_VAD_RECORDING_MS = 90_000L
+        /** Hold-to-talk capture window: 3,200 samples at 16 kHz is one 200 ms window. */
+        private const val HOLD_WINDOW_SHORTS = 3_200
+        private const val HOLD_WINDOW_MS = 200L
+
+        /** A capture stuck at zero fails after this long of leading silence, not a full take. */
+        internal const val FAIL_FAST_ZERO_MS = 1_500L
+
+        /**
+         * True once [zeroRunMs] of leading all-zero capture has passed: the
+         * microphone is returning silence, not the user staying quiet (a window
+         * with any signal at all resets the run, so this only fires first).
+         */
+        internal fun zeroRunFailsFast(zeroRunMs: Long): Boolean = zeroRunMs >= FAIL_FAST_ZERO_MS
+
+        /** The stream opened and read back only zeros: the capture path is broken. */
+        internal const val CAPTURE_SILENCE_MESSAGE = "Recording captured no audio (microphone returned silence)"
+
+
+        /** Hard cap on one take's capture (5 min): the take pauses with its audio kept. */
+        const val MAX_VAD_RECORDING_MS = 300_000L
+
+        /** Heads-up before the cap (4:30): the take keeps recording, the UI says so. */
+        const val CAP_WARN_MS = 270_000L
 
         /**
          * True when [error] is the benign "the user stayed quiet" outcome rather

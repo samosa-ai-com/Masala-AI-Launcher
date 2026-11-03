@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GiftNest Ideas</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#181021;color:#f3eafd}
+.wrap{max-width:430px;margin:0 auto;padding:16px 16px 40px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:22px;margin:0}
+.mutebtn{min-width:44px;min-height:44px;border-radius:12px;border:1px solid #43305e;background:#251a38;color:#fff;font-size:19px;cursor:pointer}
+.budget{background:#251a38;border:1px solid #43305e;border-radius:16px;padding:14px;margin:12px 0;text-align:center}
+.budget b{font-size:28px;font-variant-numeric:tabular-nums}
+.budget span{font-size:13px;opacity:.75;display:block}
+.addcard{background:#251a38;border:1px solid #43305e;border-radius:16px;padding:14px;margin:12px 0}
+label{font-size:13px;opacity:.85}
+input,textarea{width:100%;min-height:48px;border-radius:12px;border:1px solid #43305e;background:#181021;color:#fff;font-size:16px;padding:10px 12px;margin:4px 0 8px;font-family:inherit}
+textarea{min-height:64px;resize:vertical}
+.row2{display:flex;gap:8px}.row2 div{flex:1;min-width:0}
+button.add{width:100%;min-height:52px;border-radius:14px;border:none;background:#c084fc;color:#2a1042;font-size:17px;font-weight:800;cursor:pointer}
+.person{background:#251a38;border:1px solid #43305e;border-radius:16px;padding:12px;margin:10px 0}
+.person .head{display:flex;justify-content:space-between;align-items:center}
+.person .head b{font-size:18px}
+.idea{background:#181021;border:1px solid #43305e;border-radius:12px;padding:10px 12px;margin:8px 0}
+.idea.bought{opacity:.6}.idea.bought .inm{text-decoration:line-through}
+.idea .inm{font-size:16px;font-weight:700}
+.idea .note{font-size:13px;opacity:.8;margin-top:2px;white-space:pre-wrap}
+.idea .irow{display:flex;gap:8px;margin-top:8px}
+.idea .irow button{flex:1;min-height:44px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer}
+.toggle{border:none;background:#c084fc;color:#2a1042}
+.toggle.off{background:#334155;color:#fff}
+.ix{min-width:44px;flex:0 0 44px;border:1px solid #5b2323;background:transparent;color:#f87171;border-radius:10px;font-size:15px}
+.pdel{min-width:44px;min-height:44px;border-radius:10px;border:1px solid #5b2323;background:transparent;color:#f87171;font-size:16px;cursor:pointer}
+.iform{display:grid;gap:2px;margin-top:10px;border-top:1px dashed #43305e;padding-top:10px}
+.empty{text-align:center;opacity:.65;padding:16px;font-size:14px}
+h2{font-size:14px;margin:2px 0 6px;opacity:.85}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>GiftNest Ideas</h1><button class="mutebtn" id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="budget"><b id="budgetTxt">$0</b><span id="budgetSub"></span></div>
+<div class="addcard">
+<label for="personIn">Add a person</label>
+<div class="row2"><div><input id="personIn" maxlength="24" placeholder="e.g. Maya"></div><div style="flex:0 0 120px"><button class="add" id="addPerson">Add</button></div></div>
+</div>
+<div id="list"></div>
+</div>
+<script>
+(function(){
+"use strict";
+var K="gift-ideas-v1",MK="gift-ideas-mute";
+var people=[];try{people=JSON.parse(localStorage.getItem(K)||"[]");if(!Array.isArray(people))people=[];}catch(e){people=[];}
+var muted=localStorage.getItem(MK)==="1",AC=null;
+function click(f){if(muted)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume();var o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.frequency.value=f||700;var t=AC.currentTime;g.gain.setValueAtTime(0.07,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.07);o.start(t);o.stop(t+0.07);}catch(e){}}
+function save(){localStorage.setItem(K,JSON.stringify(people));}
+var muteBtn=document.getElementById("muteBtn");
+muteBtn.textContent=muted?"🔇":"🔊";
+muteBtn.addEventListener("click",function(){muted=!muted;localStorage.setItem(MK,muted?"1":"0");muteBtn.textContent=muted?"🔇":"🔊";click(700);});
+function money(n){return "$"+Math.round(n).toLocaleString("en-US");}
+function render(){
+var tot=0,bought=0,n=0;
+people.forEach(function(p){p.ideas.forEach(function(g){n++;if(g.price>0)tot+=g.price;if(g.done&&g.price>0)bought+=g.price;});});
+document.getElementById("budgetTxt").textContent=money(tot);
+document.getElementById("budgetSub").textContent=n+" ideas for "+people.length+" people · "+money(bought)+" purchased";
+var list=document.getElementById("list");
+list.innerHTML=people.length?"":'<div class="empty">No people yet. Add someone you want to surprise.</div>';
+people.forEach(function(p,pi){
+var card=document.createElement("div");card.className="person";
+var head=document.createElement("div");head.className="head";
+var nm=document.createElement("b");nm.textContent="🎁 "+p.name;head.appendChild(nm);
+var pd=document.createElement("button");pd.className="pdel";pd.textContent="✕";pd.setAttribute("aria-label","Remove person");
+pd.addEventListener("click",function(){if(confirm("Remove "+people[pi].name+" and all their ideas?")){click(440);people.splice(pi,1);save();render();}});
+head.appendChild(pd);card.appendChild(head);
+p.ideas.forEach(function(g,gi){
+var d=document.createElement("div");d.className="idea"+(g.done?" bought":"");
+var t=document.createElement("div");t.className="inm";t.textContent=g.name+(g.price>0?" · "+money(g.price):"");d.appendChild(t);
+if(g.note){var nt=document.createElement("div");nt.className="note";nt.textContent=g.note;d.appendChild(nt);}
+var r=document.createElement("div");r.className="irow";
+var tg=document.createElement("button");tg.className="toggle"+(g.done?" off":"");tg.textContent=g.done?"Undo purchase":"Mark purchased";
+tg.addEventListener("click",function(){click(g.done?520:880);people[pi].ideas[gi].done=!g.done;save();render();});
+var x=document.createElement("button");x.className="ix";x.textContent="✕";x.setAttribute("aria-label","Delete idea");
+x.addEventListener("click",function(){if(confirm("Delete this idea?")){click(440);people[pi].ideas.splice(gi,1);save();render();}});
+r.appendChild(tg);r.appendChild(x);d.appendChild(r);card.appendChild(d);
+});
+var f=document.createElement("div");f.className="iform";
+var h=document.createElement("h2");h.textContent="New idea for "+p.name;f.appendChild(h);
+var ni=document.createElement("input");ni.placeholder="Idea (e.g. ceramic pour-over)";ni.maxLength=60;ni.setAttribute("aria-label","Idea name");
+var pr=document.createElement("div");pr.className="row2";
+var pw=document.createElement("div");var pi2=document.createElement("input");pi2.type="number";pi2.min="0";pi2.placeholder="Price $";pi2.setAttribute("aria-label","Price");pw.appendChild(pi2);
+var nw=document.createElement("div");var nn=document.createElement("input");nn.placeholder="Note (shop, size…)";nn.maxLength=100;nn.setAttribute("aria-label","Note");nw.appendChild(nn);
+pr.appendChild(pw);pr.appendChild(nw);f.appendChild(ni);f.appendChild(pr);
+var ab=document.createElement("button");ab.className="add";ab.style.minHeight="48px";ab.textContent="Add idea";
+ab.addEventListener("click",function(){
+if(!ni.value.trim()){alert("Describe the idea first.");return;}
+click(880);people[pi].ideas.push({name:ni.value.trim().slice(0,60),price:Math.max(0,+pi2.value||0),note:nn.value.trim().slice(0,100),done:false});save();render();
+});
+f.appendChild(ab);card.appendChild(f);
+list.appendChild(card);
+});
+}
+document.getElementById("addPerson").addEventListener("click",function(){
+var v=document.getElementById("personIn").value.trim();
+if(!v){alert("Enter a name first.");return;}
+click(880);people.push({name:v.slice(0,24),ideas:[]});
+document.getElementById("personIn").value="";save();render();
+});
+render();
+})();
+</script>
+</body>
+</html>

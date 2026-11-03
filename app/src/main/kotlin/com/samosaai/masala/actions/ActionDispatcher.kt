@@ -13,7 +13,11 @@ import com.samosaai.masala.core.tool.ToolSensitivity
 import com.samosaai.masala.launcher.AppActions
 import com.samosaai.masala.launcher.LauncherModel
 import com.samosaai.masala.layout.ModeStore
+import com.samosaai.masala.miniapps.openMiniApp
+import com.samosaai.masala.skills.SkillRegistry
 import com.samosaai.masala.tools.MasalaToolExecutor
+import com.samosaai.masala.ui.settings.SettingsActivity
+import com.samosaai.masala.ui.skills.SkillSheetActivity
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -32,7 +36,13 @@ class ActionDispatcher(
     private val modes: ModeStore,
     private val gate: ConfirmationGate,
     private val registry: ToolRegistry,
+    private val skills: () -> SkillRegistry,
     private val executor: () -> MasalaToolExecutor,
+    /**
+     * Reloads one widget's approved web values in place; null where widgets don't live (tests and
+     * headless callers). False means unknown, unapproved or unreachable — the tap reports it.
+     */
+    private val refreshWidget: (suspend (widgetId: String) -> Boolean)? = null,
 ) {
     /** What the screen has to do for actions that are about the screen. */
     interface Screen {
@@ -44,6 +54,9 @@ class ActionDispatcher(
         data class Done(val message: String? = null) : Outcome
         data object Declined : Outcome
         data class Failed(val message: String) : Outcome
+
+        /** A tool stopped because a permission is missing; the caller can ask for it. */
+        data class NeedsCapability(val marker: String, val reason: String) : Outcome
     }
 
     suspend fun dispatch(action: MasalaAction, screen: Screen): Outcome = try {
@@ -91,9 +104,85 @@ class ActionDispatcher(
         is MasalaAction.AskMasala -> Outcome.Done().also { screen.ask(action.prompt) }
         is MasalaAction.SetMode -> setMode(action)
         is MasalaAction.RunTool -> tool(action.name, action.args)
-        // The agent and the skill runner arrive in Phase 4; the buttons are already wired.
-        is MasalaAction.RunSkill -> Outcome.Done().also { screen.ask(action.prompt ?: action.skillId) }
-        is MasalaAction.OpenMiniApp -> Outcome.Failed("Mini apps arrive in a later phase")
+        is MasalaAction.OpenMiniApp -> openMiniApp(action)
+        is MasalaAction.OpenFolder -> Outcome.Failed("Folders open on the home screen")
+        is MasalaAction.RunSkill ->
+            if (skills().getSkillById(action.skillId) == null) Outcome.Failed("There is no skill '${action.skillId}'")
+            else start(SkillSheetActivity.intent(context, action.skillId, action.prompt))
+        is MasalaAction.RefreshWidget -> {
+            val refresh = refreshWidget ?: return Outcome.Failed("Nothing to refresh here")
+            if (action.widgetId.isBlank()) Outcome.Failed("That button doesn't name a widget")
+            else if (refresh(action.widgetId)) Outcome.Done()
+            else Outcome.Failed("Couldn't refresh that widget yet")
+        }
+        is MasalaAction.OpenSettings -> {
+            val target = SettingsActivity::class.java
+            start(Intent(context, target).putExtra(SettingsActivity.EXTRA_PAGE, action.page))
+        }
+        // A coin/dice is resolved by the card itself (it writes the result into the widget's state);
+        // dispatched from anywhere else there is nothing for the phone to do.
+        is MasalaAction.Flip -> Outcome.Failed("A flip happens on its widget")
+        is MasalaAction.PlaySound -> playClick(action)
+        MasalaAction.MeetingStart -> {
+            // The mic foreground service may not start from a widget's background tap (Android 14+),
+            // so the meeting screen opens and starts from a visible tap.
+            start(com.samosaai.masala.ui.meetings.MeetingActivity.intent(context, start = true))
+            Outcome.Done()
+        }
+        MasalaAction.MeetingToggle -> {
+            val state = com.samosaai.masala.meetings.MeetingRecorderService.state.value
+            if (!state.active) {
+                Outcome.Failed("No meeting is recording")
+            } else {
+                val command = if (state.status == com.samosaai.masala.core.meeting.MeetingStatus.PAUSED) {
+                    com.samosaai.masala.meetings.MeetingRecorderService.ACTION_RESUME
+                } else {
+                    com.samosaai.masala.meetings.MeetingRecorderService.ACTION_PAUSE
+                }
+                runCatching {
+                    context.startService(com.samosaai.masala.meetings.MeetingRecorderService.command(context, command))
+                }
+                Outcome.Done()
+            }
+        }
+        MasalaAction.MeetingStop -> {
+            val state = com.samosaai.masala.meetings.MeetingRecorderService.state.value
+            if (!state.active) {
+                Outcome.Failed("No meeting is recording")
+            } else {
+                runCatching {
+                    context.startService(
+                        com.samosaai.masala.meetings.MeetingRecorderService.command(
+                            context,
+                            com.samosaai.masala.meetings.MeetingRecorderService.ACTION_STOP,
+                        ),
+                    )
+                }
+                Outcome.Done()
+            }
+        }
+        is MasalaAction.OpenMeeting -> {
+            // A widget's "Open notes" carries no id: open what is live, else the newest meeting.
+            val app = context.applicationContext as? com.samosaai.masala.MasalaApp
+            val id = action.id
+                ?: app?.meetings?.active?.value?.id
+                ?: app?.meetings?.latest?.value?.id
+            start(com.samosaai.masala.ui.meetings.MeetingActivity.intent(context, id))
+            Outcome.Done()
+        }
+    }
+
+    private fun playClick(action: MasalaAction.PlaySound): Outcome = when (action.kind) {
+        "click" -> {
+            com.samosaai.masala.widgets.WidgetSounds.click(context)
+            Outcome.Done()
+        }
+        // The device's notification tone: what a timer uses when it reaches zero.
+        "chime" -> {
+            com.samosaai.masala.widgets.WidgetSounds.chime(context)
+            Outcome.Done()
+        }
+        else -> Outcome.Failed("Unknown sound '${action.kind}'")
     }
 
     private suspend fun setMode(action: MasalaAction.SetMode): Outcome {
@@ -111,8 +200,14 @@ class ActionDispatcher(
 
     private suspend fun tool(name: String, args: JsonObject): Outcome = when (val r = executor().execute(name, args)) {
         is ToolResult.Success -> Outcome.Done(r.output)
-        is ToolResult.NeedsCapability -> Outcome.Failed(r.reason)
+        is ToolResult.NeedsCapability -> Outcome.NeedsCapability(r.capability, r.reason)
         is ToolResult.Failure -> if (r.message.startsWith("The user declined")) Outcome.Declined else Outcome.Failed(r.message)
+    }
+
+    private fun openMiniApp(action: MasalaAction.OpenMiniApp): Outcome {
+        // Existence is checked in the activity, which shows a "gone" state for unknown ids.
+        context.openMiniApp(action.id)
+        return Outcome.Done()
     }
 
     private fun start(intent: Intent): Outcome = try {

@@ -1,0 +1,29 @@
+{
+  "id": "battery_globe",
+  "name": "Battery globe",
+  "description": "Battery as a small, quiet instrument.",
+  "category": "Home",
+  "widget": {
+    "id": "battery_globe",
+    "components": [
+      {
+        "type": "globe",
+        "label": "battery",
+        "binding": {
+          "source": "battery"
+        },
+        "style": {
+          "tint": "green"
+        }
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 2,
+      "max": 3,
+      "minW": 2,
+      "defaultW": 2,
+      "maxW": 2
+    }
+  }
+}

@@ -31,13 +31,14 @@ object AppSearch {
             .replace(separators, " ")
             .trim()
 
-    fun match(query: String, label: String): Match? {
-        val q = normalize(query)
-        val l = normalize(label)
+    fun match(query: String, label: String): Match? = matchNormalized(normalize(query), normalize(label))
+
+    /** [match] on text that is already [normalize]d. */
+    private fun matchNormalized(q: String, l: String): Match? {
         if (q.isEmpty() || l.isEmpty()) return null
         if (l.startsWith(q)) return Match(PREFIX, 1.0, 0)
-        val wordStart = Regex("""(?<=^| )${Regex.escape(q)}""").find(l)
-        if (wordStart != null) return Match(WORD_PREFIX, 1.0, wordStart.range.first)
+        val wordStart = wordStart(l, q)
+        if (wordStart >= 0) return Match(WORD_PREFIX, 1.0, wordStart)
         val at = l.indexOf(q)
         if (at >= 0) return Match(SUBSTRING, 1.0, at)
         return fuzzy(q.replace(" ", ""), l)
@@ -76,6 +77,13 @@ object AppSearch {
 
     private fun isWordStart(l: String, i: Int) = i == 0 || l[i - 1] == ' '
 
+    /** Where [q] starts a word of [l], or -1. */
+    private fun wordStart(l: String, q: String): Int {
+        var i = l.indexOf(q)
+        while (i >= 0 && !isWordStart(l, i)) i = l.indexOf(q, i + 1)
+        return i
+    }
+
     private fun nextWordStart(l: String, c: Char, from: Int): Int {
         var i = l.indexOf(c, from)
         while (i >= 0 && !isWordStart(l, i)) i = l.indexOf(c, i + 1)
@@ -89,12 +97,40 @@ object AppSearch {
     fun <T> rank(query: String, entries: List<T>, labels: (T) -> List<String>): List<T> =
         entries.withIndex()
             .mapNotNull { (i, entry) ->
-                labels(entry).mapNotNull { match(query, it) }
-                    .maxWithOrNull(matchOrder)
-                    ?.let { Triple(entry, it, i) }
+                bestOf(labels(entry)) { match(query, it) }?.let { Triple(entry, it, i) }
             }
             .sortedWith(compareByDescending<Triple<T, Match, Int>, Match>(matchOrder) { it.second }.thenBy { it.third })
             .map { it.first }
+
+    /**
+     * Entries with their labels normalized once, for ranking on every keystroke without normalizing the
+     * whole catalog again. Build it when the catalog changes; [rank] on it orders exactly like [rank].
+     */
+    class Prepared<T> internal constructor(internal val entries: List<Pair<T, List<String>>>)
+
+    fun <T> prepare(entries: List<T>, labels: (T) -> List<String>): Prepared<T> =
+        Prepared(entries.map { entry -> entry to labels(entry).map(::normalize).filter(String::isNotEmpty) })
+
+    fun <T> rank(query: String, prepared: Prepared<T>): List<T> {
+        val q = normalize(query)
+        if (q.isEmpty()) return emptyList()
+        return prepared.entries.withIndex()
+            .mapNotNull { (i, entry) ->
+                bestOf(entry.second) { matchNormalized(q, it) }?.let { Triple(entry.first, it, i) }
+            }
+            .sortedWith(compareByDescending<Triple<T, Match, Int>, Match>(matchOrder) { it.second }.thenBy { it.third })
+            .map { it.first }
+    }
+
+    /** Best match over labels without allocating a list per entry per keystroke. */
+    private inline fun bestOf(labels: List<String>, match: (String) -> Match?): Match? {
+        var best: Match? = null
+        for (label in labels) {
+            val m = match(label) ?: continue
+            if (best == null || matchOrder.compare(m, best) > 0) best = m
+        }
+        return best
+    }
 
     private val matchOrder: Comparator<Match> =
         compareBy<Match> { it.tier }.thenBy { it.score }.thenByDescending { it.start }

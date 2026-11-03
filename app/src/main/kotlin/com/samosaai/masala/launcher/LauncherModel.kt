@@ -5,6 +5,7 @@ import com.samosaai.masala.core.apps.AppCatalogMerge
 import com.samosaai.masala.core.apps.AppEntry
 import com.samosaai.masala.core.apps.AppKey
 import com.samosaai.masala.core.apps.Visibility
+import com.samosaai.masala.core.layout.IconSpec
 import com.samosaai.masala.data.AppOverrideDao
 import com.samosaai.masala.data.AppOverrideEntity
 import kotlinx.coroutines.CoroutineScope
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -55,6 +57,11 @@ class LauncherModel(
     val pinnedShortcuts: StateFlow<List<ShortcutInfo>> =
         combine(catalog.state, catalog.shortcutsVersion, shortcutRefresh) { _, _, _ -> Unit }
             .map { actions.pinnedShortcuts() }
+            // Home comes back often (each onResume refreshes); an unchanged list must not recompose it.
+            // The key includes the label and last-changed timestamp, so an updated shortcut still refreshes.
+            .distinctUntilChangedBy { list ->
+                list.map { "${it.`package`}/${it.id}#${it.userHandle.hashCode()}:${it.lastChangedTimestamp}:${it.shortLabel}" }
+            }
             .flowOn(Dispatchers.IO)
             .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
@@ -67,6 +74,9 @@ class LauncherModel(
         edit(key) { it.copy(label = label?.trim()?.takeIf(String::isNotEmpty)) }
 
     suspend fun setVisibility(key: AppKey, visibility: Visibility) = edit(key) { it.copy(visibility = visibility) }
+
+    /** A chosen icon, or null to go back to the app's own. Refused specs are stored as "no icon". */
+    suspend fun setIcon(key: AppKey, icon: String?) = edit(key) { it.copy(icon = IconSpec.sanitize(icon)) }
 
     suspend fun setPinned(key: AppKey, pinned: Boolean) =
         edit(key) { it.copy(pinnedAt = if (pinned) it.pinnedAt ?: System.currentTimeMillis() else null) }

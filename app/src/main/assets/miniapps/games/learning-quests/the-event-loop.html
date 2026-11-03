@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>THE NIGHT SHIFT — Event Loop</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden;background:#050a05}
+body{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;color:#c8ffc8;-webkit-tap-highlight-color:transparent}
+.app{max-width:428px;min-width:360px;margin:0 auto;min-height:100vh;background:#070d07;position:relative;overflow-x:hidden;border-left:1px solid #1a2e1a;border-right:1px solid #1a2e1a;display:flex;flex-direction:column}
+.scanlines{position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(51,255,102,0.03) 3px);z-index:5}
+.glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center, rgba(51,255,102,0.06) 0%, transparent 70%);z-index:1}
+header{position:relative;z-index:2;padding:12px 14px 10px;border-bottom:1px solid #1e3a1e;background:linear-gradient(180deg,#0f1f0f,#0a140a);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.brand h1{font-size:15px;letter-spacing:0.12em;color:#33ff66;text-shadow:0 0 8px rgba(51,255,102,0.8),0 0 20px rgba(51,255,102,0.3);line-height:1}
+.brand p{font-size:10px;letter-spacing:0.14em;opacity:0.7;color:#7aff9a;margin-top:3px}
+.hdrStats{display:flex;gap:6px}
+.stat{border:1px solid #2a4a2a;background:#0f1f0f;padding:6px 8px;border-radius:8px;font-size:11px;min-width:64px;text-align:center}
+.stat b{color:#33ff66;display:block;font-size:13px;text-shadow:0 0 6px rgba(51,255,102,0.6)}
+.stat span{opacity:0.7;font-size:9px;letter-spacing:0.08em}
+.progressBar{height:6px;background:#0a1a0a;border-bottom:1px solid #1e3a1e;position:relative;z-index:2}
+.progressFill{height:100%;background:linear-gradient(90deg,#33ff66,#7aff9a);box-shadow:0 0 8px rgba(51,255,102,0.6);transition:width 0.4s}
+.sectorNav{position:relative;z-index:2;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px 10px;background:#0a140a;border-bottom:1px solid #1e3a1e}
+.sectorBtn{padding:8px 4px;border-radius:8px;border:1px solid #2a4a2a;background:#0f1f0f;color:#8fbf8f;font-size:10px;font-weight:700;letter-spacing:0.06em;text-align:center;cursor:pointer;min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.sectorBtn.active{border-color:#33ff66;background:#143214;color:#33ff66;box-shadow:0 0 10px rgba(51,255,102,0.25), inset 0 0 10px rgba(51,255,102,0.08)}
+.sectorBtn.done{border-color:#3a6a3a;background:#0f1f0f;color:#7aff9a}
+.sectorBtn.locked{opacity:0.35;pointer-events:none}
+.sectorBtn .ico{font-size:14px}
+.storyCard{position:relative;z-index:2;margin:10px 10px 0;border:1px solid #2a5a2a;background:linear-gradient(180deg,#0f1f0f,#0c1a0c);border-radius:12px;padding:12px;box-shadow:0 0 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(51,255,102,0.08)}
+.storyCard h2{font-size:13px;color:#33ff66;letter-spacing:0.1em;text-shadow:0 0 6px rgba(51,255,102,0.5);display:flex;align-items:center;gap:8px}
+.storyCard h2 .tag{font-size:9px;padding:3px 6px;border-radius:999px;background:#143214;border:1px solid #33ff66;color:#33ff66;letter-spacing:0.08em}
+.storyCard p{font-size:13px;line-height:1.5;margin-top:8px;color:#c8e6c8}
+.storyCard .objective{margin-top:10px;padding:8px 10px;background:#0a1a0a;border:1px dashed #2a5a2a;border-radius:8px;font-size:12px;line-height:1.4;color:#a8d8a8}
+.storyCard .objective b{color:#7aff9a}
+.queuesGrid{position:relative;z-index:2;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 10px 0}
+.queue{border:1px solid #2a4a2a;background:#0c1a0c;border-radius:10px;padding:8px;display:flex;flex-direction:column;min-height:132px}
+.queue h3{font-size:10px;letter-spacing:0.12em;color:#7aff9a;display:flex;align-items:center;justify-content:space-between}
+.queue h3 .hint{font-size:9px;opacity:0.6;letter-spacing:0.06em;font-weight:400}
+.queue .drop{flex:1;margin-top:6px;border:1px dashed #1e3a1e;border-radius:8px;background:#070f07;padding:6px;display:flex;flex-direction:column;gap:6px;min-height:88px;transition:all 0.2s}
+.queue .drop.dragOver{border-color:#33ff66;background:#143214;box-shadow:inset 0 0 12px rgba(51,255,102,0.15)}
+.queue.stack{border-color:#3a6a3a}
+.queue.micro{border-color:#2a8a5a}
+.queue.macro{border-color:#8a6a2a}
+.queue.render{border-color:#2a6a8a}
+.queue.stack h3{color:#7aff9a}
+.queue.micro h3{color:#33ffcc}
+.queue.macro h3{color:#ffcc33}
+.queue.render h3{color:#66b3ff}
+.placed{padding:7px 8px;border-radius:8px;font-size:11px;line-height:1.3;border:1px solid #2a4a2a;background:#0f1f0f;color:#d0ffd0;cursor:pointer;position:relative}
+.placed.wrong{border-color:#ff4444;background:#1a0f0f;animation:shake 0.3s}
+.placed.correct{border-color:#33ff66;box-shadow:0 0 8px rgba(51,255,102,0.2)}
+.placed .rm{position:absolute;top:4px;right:6px;font-size:12px;opacity:0.6}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.tray{position:relative;z-index:2;margin:10px 10px 0;border:1px solid #2a4a2a;background:#0a140a;border-radius:12px;padding:10px}
+.tray h3{font-size:10px;letter-spacing:0.12em;color:#7aff9a;display:flex;justify-content:space-between;align-items:center}
+.tray h3 span{font-size:10px;opacity:0.7;font-weight:400;letter-spacing:0.04em}
+.trayGrid{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.actionCard{flex:1 1 calc(50% - 8px);min-width:150px;max-width:100%;padding:10px 10px 8px;border-radius:10px;border:1px solid #2a4a2a;background:#0f1f0f;color:#c8ffc8;font-size:12px;line-height:1.35;cursor:pointer;min-height:64px;position:relative;text-align:left;transition:all 0.15s}
+.actionCard.selected{border-color:#33ff66;background:#143214;box-shadow:0 0 12px rgba(51,255,102,0.25);transform:translateY(-1px)}
+.actionCard.used{opacity:0.25;pointer-events:none}
+.actionCard code{color:#33ff66;font-size:11px;word-break:break-word}
+.actionCard .meta{font-size:10px;opacity:0.7;margin-top:4px}
+.actionCard .pick{position:absolute;top:6px;right:8px;font-size:10px;padding:2px 6px;border-radius:999px;background:#143214;border:1px solid #33ff66;color:#33ff66}
+.controls{position:relative;z-index:2;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px}
+.btn{padding:12px 12px;border-radius:10px;border:1px solid #2a4a2a;background:#0f1f0f;color:#c8ffc8;font-weight:800;font-size:13px;letter-spacing:0.04em;cursor:pointer;min-height:48px;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn:active{transform:scale(0.98)}
+.btn.primary{background:linear-gradient(180deg,#1a5a2a,#143214);border-color:#33ff66;color:#33ff66;box-shadow:0 0 12px rgba(51,255,102,0.25)}
+.btn.primary:disabled{opacity:0.4;pointer-events:none}
+.btn.ghost{background:#0a140a}
+.btn.warn{background:#1a1405;border-color:#8a6a2a;color:#ffcc33}
+.consoleWrap{position:relative;z-index:2;margin:0 10px 10px;border:1px solid #1e3a1e;background:#020502;border-radius:12px;overflow:hidden}
+.consoleHead{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#0a140a;border-bottom:1px solid #1e3a1e;font-size:10px;letter-spacing:0.1em;color:#7aff9a}
+.consoleHead .dot{width:8px;height:8px;border-radius:50%;background:#33ff66;box-shadow:0 0 6px #33ff66;animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.console{height:148px;overflow:auto;padding:8px 10px;font-size:11px;line-height:1.5;background:radial-gradient(ellipse at top, #0a1a0a 0%, #020502 70%);color:#33ff66}
+.console .line{opacity:0.95;white-space:pre-wrap;word-break:break-word}
+.console .line.dim{color:#6a9a6a}
+.console .line.err{color:#ff6666;text-shadow:0 0 6px rgba(255,102,102,0.4)}
+.console .line.ok{color:#7aff9a}
+.console .line.sys{color:#ffcc33}
+.console .line.muted{color:#5a7a5a}
+.tickViz{position:relative;z-index:2;margin:0 10px;border:1px solid #1e3a1e;background:#0a140a;border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:8px;overflow:hidden}
+.tickViz .step{flex:1;text-align:center;padding:6px 4px;border-radius:8px;border:1px solid #1e3a1e;background:#070f07;font-size:9px;letter-spacing:0.08em;color:#6a9a6a;min-height:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.tickViz .step.active{border-color:#33ff66;color:#33ff66;background:#143214;box-shadow:0 0 10px rgba(51,255,102,0.2)}
+.tickViz .arrow{color:#2a4a2a;font-size:12px}
+.help{position:relative;z-index:2;margin:10px;padding:10px;border:1px solid #1e3a1e;background:#0a140a;border-radius:10px;font-size:11px;line-height:1.5;color:#8fbf8f}
+.help b{color:#c8ffc8}
+.help code{color:#33ff66;background:#0f1f0f;padding:1px 4px;border-radius:4px}
+.footer{position:relative;z-index:2;padding:10px;text-align:center;font-size:10px;opacity:0.5;letter-spacing:0.06em}
+.overlay{position:fixed;inset:0;background:rgba(2,5,2,0.88);backdrop-filter:blur(4px);z-index:20;display:none;align-items:center;justify-content:center;padding:16px}
+.overlay.show{display:flex}
+.modal{width:100%;max-width:400px;background:#0a140a;border:1px solid #33ff66;border-radius:14px;padding:16px;box-shadow:0 0 30px rgba(51,255,102,0.2), 0 10px 40px rgba(0,0,0,0.6)}
+.modal h2{font-size:14px;color:#33ff66;letter-spacing:0.08em;text-shadow:0 0 8px rgba(51,255,102,0.5)}
+.modal p{font-size:13px;line-height:1.5;color:#c8e6c8;margin-top:8px}
+.modal .actions{display:flex;gap:8px;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="scanlines"></div>
+<div class="app" id="app">
+  <div class="glow"></div>
+  <header>
+    <div class="brand">
+      <h1>◉ NIGHT SHIFT</h1>
+      <p>EVENT LOOP — 11:47 PM</p>
+    </div>
+    <div class="hdrStats">
+      <div class="stat"><b id="loopCount">0</b><span>LOOPS RUN</span></div>
+      <div class="stat"><b id="chapterProg">1 / 4</b><span>SECTOR</span></div>
+    </div>
+  </header>
+  <div class="progressBar"><div class="progressFill" id="progressFill" style="width:25%"></div></div>
+  <div class="sectorNav" id="sectorNav"></div>
+
+  <div class="storyCard" id="storyCard"></div>
+
+  <div class="queuesGrid">
+    <div class="queue stack" data-q="stack"><h3>◼ STACK <span class="hint">LIFO • sync</span></h3><div class="drop" id="drop-stack"></div></div>
+    <div class="queue micro" data-q="microtask"><h3>● MICROTASK <span class="hint">FIFO • drain all</span></h3><div class="drop" id="drop-microtask"></div></div>
+    <div class="queue macro" data-q="macrotask"><h3>◆ MACROTASK <span class="hint">FIFO • one/tick</span></h3><div class="drop" id="drop-macrotask"></div></div>
+    <div class="queue render" data-q="render"><h3>◎ RENDER <span class="hint">rAF • paint</span></h3><div class="drop" id="drop-render"></div></div>
+  </div>
+
+  <div class="tray">
+    <h3>▸ INCOMING ACTIONS <span id="trayHint">tap card → tap queue</span></h3>
+    <div class="trayGrid" id="trayGrid"></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn ghost" id="btnReset">↺ RESET SORT</button>
+    <button class="btn primary" id="btnTick">▶ RUN TICK</button>
+    <button class="btn ghost" id="btnHint">? HINT</button>
+    <button class="btn warn" id="btnNext" style="display:none">NEXT SECTOR →</button>
+  </div>
+
+  <div class="tickViz" id="tickViz">
+    <div class="step" data-step="stack">◼<br>STACK</div><div class="arrow">→</div>
+    <div class="step" data-step="microtask">●<br>MICRO</div><div class="arrow">→</div>
+    <div class="step" data-step="render">◎<br>RENDER</div><div class="arrow">→</div>
+    <div class="step" data-step="macrotask">◆<br>MACRO</div>
+  </div>
+
+  <div class="consoleWrap">
+    <div class="consoleHead"><span>▮ LIVE CONSOLE — phosphor</span><span style="display:flex;align-items:center;gap:6px"><span class="dot"></span> REC</span></div>
+    <div class="console" id="console"></div>
+  </div>
+
+  <div class="help" id="helpBox">
+    <b>How the loop drains:</b> <code>Stack</code> runs first (LIFO). Then <b>all</b> <code>microtasks</code> drain (FIFO, including ones queued by microtasks). Then <code>render</code> (rAF/paint) if needed. Then <b>one</b> <code>macrotask</code>. Repeat. Starvation = microtasks never end → render/macrotask never run. Freeze = long stack task blocks everything.
+  </div>
+  <div class="footer">PERSISTS LOOP COUNT & SECTOR PROGRESS • LARGE TOUCH TARGETS • NO HORIZONTAL SCROLL</div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+const CHAPTERS = [
+  {
+    id:0, sector:"A — RECEPTION", title:"THE OVERFLOW", subtitle:"11:47 PM • The phone won't stop",
+    story:"You clock in. The reception phone rings, then rings again before you answer. Each call adds a frame to the stack. The hallway light flickers. If the stack grows without returning, it overflows — and the building goes dark.",
+    objective:"<b>Objective:</b> Sort 5 actions. <b>Stack</b> = sync code that runs now. <b>Microtask</b> = Promise.then / queueMicrotask. <b>Macrotask</b> = setTimeout / setInterval. <b>Render</b> = requestAnimationFrame.",
+    actions:[
+      {id:"a1", code:"console.log('pick up phone')", type:"stack", why:"Sync — runs immediately on stack"},
+      {id:"a2", code:"function answer(){ return answer() }", type:"stack", why:"Sync call — pushes frame; recursion risks overflow"},
+      {id:"a3", code:"Promise.resolve().then(checkVoicemail)", type:"microtask", why:"Promise.then → microtask queue"},
+      {id:"a4", code:"setTimeout(patrolHallway, 0)", type:"macrotask", why:"setTimeout → macrotask queue (even 0ms)"},
+      {id:"a5", code:"requestAnimationFrame(flickerLights)", type:"render", why:"rAF → render queue, runs before paint"},
+    ]
+  },
+  {
+    id:1, sector:"B — SERVER ROOM", title:"STARVATION", subtitle:"12:31 AM • The hum gets louder",
+    story:"Server racks blink in unison. Someone chained promises that keep queuing more promises. The render light hasn't blinked in minutes. Macrotasks are starving outside the door.",
+    objective:"<b>Objective:</b> Microtasks drain <b>completely</b> before render/macrotask. If they keep spawning, render starves. Sort to see starvation.",
+    actions:[
+      {id:"b1", code:"queueMicrotask(pollSensor)", type:"microtask", why:"queueMicrotask → microtask"},
+      {id:"b2", code:"Promise.then(() => queueMicrotask(more))", type:"microtask", why:"Microtask that queues another microtask — still drains now"},
+      {id:"b3", code:"setTimeout(openDoor, 0)", type:"macrotask", why:"Macrotask waits — starved if microtasks loop"},
+      {id:"b4", code:"requestAnimationFrame(updateDisplay)", type:"render", why:"Render waits for microtasks to empty"},
+      {id:"b5", code:"fetch('/logs').then(parse)", type:"microtask", why:".then after fetch → microtask (fetch itself is browser, then is microtask)"},
+      {id:"b6", code:"console.log('hum')", type:"stack", why:"Sync log on stack"},
+    ]
+  },
+  {
+    id:2, sector:"C — ARCHIVE", title:"THE FREEZING CALL", subtitle:"1:18 AM • The report that never ends",
+    story:"The archive printer spools an infinite report. One long sync task holds the stack. No clicks register. No paint happens. The air freezes. You must break the work into macrotasks to let the loop breathe.",
+    objective:"<b>Objective:</b> A long <b>stack</b> task blocks render. Move chunked work to <b>macrotask</b> so <b>render</b> can run between chunks.",
+    actions:[
+      {id:"c1", code:"for(let i=0;i<1e9;i++){} // block", type:"stack", why:"Long sync loop — blocks stack, freezes UI"},
+      {id:"c2", code:"setTimeout(processChunk, 0)", type:"macrotask", why:"Chunked work via setTimeout → yields to render"},
+      {id:"c3", code:"requestAnimationFrame(showProgress)", type:"render", why:"rAF lets paint happen between chunks"},
+      {id:"c4", code:"Promise.resolve().then(tick)", type:"microtask", why:"Microtask still runs before render, but not a fix for long stack"},
+      {id:"c5", code:"setInterval(heartbeat, 100)", type:"macrotask", why:"setInterval → macrotask"},
+    ]
+  },
+  {
+    id:3, sector:"D — EXECUTIVE FLOOR", title:"THE LOOP", subtitle:"2:04 AM • Survive the night",
+    story:"All sectors converge. Overflow, starvation, and freeze at once. The building tests you: sort the final night's queue correctly and run the tick in perfect order — stack → drain microtasks → render → one macrotask — or stay here forever.",
+    objective:"<b>Objective:</b> Final exam. Sort 6 actions, then watch the tick drain in spec order. Get it right to escape.",
+    actions:[
+      {id:"d1", code:"console.log('exit door')", type:"stack", why:"Sync"},
+      {id:"d2", code:"Promise.resolve().then(unlock)", type:"microtask", why:"Microtask"},
+      {id:"d3", code:"queueMicrotask(checkKeys)", type:"microtask", why:"Microtask"},
+      {id:"d4", code:"setTimeout(callElevator, 0)", type:"macrotask", why:"Macrotask — one per tick"},
+      {id:"d5", code:"requestAnimationFrame(paintHallway)", type:"render", why:"Render — after microtasks, before next macrotask"},
+      {id:"d6", code:"setTimeout(backup, 0)", type:"macrotask", why:"Second macrotask — waits for next tick"},
+    ]
+  }
+];
+
+const STORAGE_KEY="nightShift_loop_v2";
+let state = loadState();
+function loadState(){
+  try{
+    const s=JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if(s && typeof s.loopCount==="number") return s;
+  }catch(e){}
+  return {loopCount:0, unlocked:0, current:0, completed:[false,false,false,false]};
+}
+function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); updateHeader(); }
+
+let selectedId=null;
+let placed={}; // actionId -> queue
+let chapterIdx = state.current;
+let tickRunning=false;
+
+const consoleEl=document.getElementById('console');
+function log(msg, cls=""){
+  const d=document.createElement('div');
+  d.className="line "+cls;
+  d.textContent=msg;
+  consoleEl.appendChild(d);
+  consoleEl.scrollTop=consoleEl.scrollHeight;
+}
+function clearConsole(){ consoleEl.innerHTML=""; }
+
+function updateHeader(){
+  document.getElementById('loopCount').textContent=state.loopCount;
+  document.getElementById('chapterProg').textContent=(chapterIdx+1)+" / 4";
+  document.getElementById('progressFill').style.width=((state.unlocked+1)/4*100)+"%";
+  renderSectorNav();
+}
+function renderSectorNav(){
+  const nav=document.getElementById('sectorNav');
+  nav.innerHTML="";
+  CHAPTERS.forEach((ch,i)=>{
+    const btn=document.createElement('button');
+    const locked=i>state.unlocked;
+    const done=state.completed[i];
+    btn.className="sectorBtn "+(i===chapterIdx?"active": done?"done": locked?"locked":"");
+    btn.innerHTML=`<span class="ico">${["◉","⬢","⬣","⬔"][i]}</span>${ch.sector}<span style="font-size:9px;opacity:0.7">${done?"✓ CLEAR": locked?"LOCKED": i===chapterIdx?"ACTIVE":""}</span>`;
+    btn.onclick=()=>{ if(!locked){ chapterIdx=i; state.current=i; saveState(); loadChapter(); }};
+    nav.appendChild(btn);
+  });
+}
+
+function loadChapter(){
+  const ch=CHAPTERS[chapterIdx];
+  document.getElementById('storyCard').innerHTML=`
+    <h2>${ch.title} <span class="tag">${ch.sector}</span></h2>
+    <p style="font-size:11px;opacity:0.7;letter-spacing:0.06em">${ch.subtitle}</p>
+    <p>${ch.story}</p>
+    <div class="objective">${ch.objective}</div>
+  `;
+  placed={}; selectedId=null;
+  document.querySelectorAll('.drop').forEach(d=>d.innerHTML="");
+  renderTray();
+  clearConsole();
+  log(`> sector ${ch.sector} loaded — ${ch.title}`, "sys");
+  log(`> ${ch.actions.length} actions incoming. Sort them: stack / microtask / macrotask / render`, "dim");
+  log(`> tip: tap an action card, then tap a queue.`, "muted");
+  document.getElementById('btnNext').style.display="none";
+  document.getElementById('btnTick').style.display="flex";
+  document.getElementById('btnTick').disabled=false;
+  updateHeader();
+  highlightStep(null);
+}
+
+function renderTray(){
+  const ch=CHAPTERS[chapterIdx];
+  const grid=document.getElementById('trayGrid');
+  grid.innerHTML="";
+  // shuffle display order but keep stable per chapter
+  const actions=[...ch.actions].sort((a,b)=> a.id.localeCompare(b.id));
+  // simple shuffle based on chapter
+  for(let i=actions.length-1;i>0;i--){ const j=(chapterIdx*7+i*3)%(i+1); [actions[i],actions[j]]=[actions[j],actions[i]]; }
+  actions.forEach(act=>{
+    const isPlaced=placed[act.id];
+    const btn=document.createElement('button');
+    btn.className="actionCard"+(selectedId===act.id?" selected":"")+(isPlaced?" used":"");
+    btn.innerHTML=`<code>${act.code}</code><div class="meta">${act.why.split('—')[0].split('→')[0].trim()}</div>${!isPlaced?'<span class="pick">PICK</span>':''}`;
+    btn.onclick=()=>{
+      if(isPlaced) return;
+      selectedId=act.id;
+      renderTray();
+      log(`> selected: ${act.code}`, "dim");
+      // haptic
+      if(navigator.vibrate) navigator.vibrate(10);
+    };
+    grid.appendChild(btn);
+  });
+  document.getElementById('trayHint').textContent = selectedId ? "now tap a queue ↓" : "tap card → tap queue";
+}
+
+function renderPlaced(){
+  // clear drops
+  document.querySelectorAll('.drop').forEach(d=>d.innerHTML="");
+  Object.entries(placed).forEach(([aid,q])=>{
+    const ch=CHAPTERS[chapterIdx];
+    const act=ch.actions.find(a=>a.id===aid);
+    const drop=document.getElementById('drop-'+q);
+    const div=document.createElement('div');
+    div.className="placed";
+    div.innerHTML=`<code style="color:#c8ffc8;font-size:11px">${act.code}</code><span class="rm">×</span>`;
+    div.onclick=()=>{
+      delete placed[aid];
+      renderTray(); renderPlaced();
+      log(`> removed: ${act.code}`, "muted");
+    };
+    drop.appendChild(div);
+  });
+}
+
+// queue tap
+document.querySelectorAll('.queue').forEach(qEl=>{
+  qEl.addEventListener('click', ()=>{
+    if(!selectedId) {
+      log(`> pick an action first`, "err");
+      return;
+    }
+    const q=qEl.dataset.q;
+    placed[selectedId]=q;
+    const act=CHAPTERS[chapterIdx].actions.find(a=>a.id===selectedId);
+    log(`> sorted → ${q.toUpperCase()}: ${act.code}`, "ok");
+    selectedId=null;
+    renderTray(); renderPlaced();
+    if(navigator.vibrate) navigator.vibrate(15);
+  });
+  // drag over visual
+  qEl.querySelector('.drop').addEventListener('click', e=>e.stopPropagation());
+});
+
+document.getElementById('btnReset').onclick=()=>{
+  placed={}; selectedId=null;
+  renderTray(); renderPlaced();
+  clearConsole();
+  log(`> sort reset`, "sys");
+};
+
+document.getElementById('btnHint').onclick=()=>{
+  const ch=CHAPTERS[chapterIdx];
+  const unplaced=ch.actions.filter(a=>!placed[a.id]);
+  if(unplaced.length===0){ log(`> all placed — run the tick!`, "ok"); return; }
+  const a=unplaced[0];
+  showModal(`<h2>? HINT — ${ch.title}</h2><p><code style="color:#33ff66">${a.code}</code><br><br>${a.why}</p><p style="opacity:0.7;font-size:12px">Correct queue: <b style="color:#33ff66">${a.type.toUpperCase()}</b></p>`, `<button class="btn primary" onclick="hideModal()">GOT IT</button>`);
+};
+
+function highlightStep(name){
+  document.querySelectorAll('.tickViz .step').forEach(s=> s.classList.toggle('active', s.dataset.step===name));
+}
+
+async function runTick(){
+  if(tickRunning) return;
+  const ch=CHAPTERS[chapterIdx];
+  if(Object.keys(placed).length !== ch.actions.length){
+    log(`> ✗ sort all ${ch.actions.length} actions first (${Object.keys(placed).length}/${ch.actions.length})`, "err");
+    // shake unplaced
+    document.getElementById('trayGrid').animate([{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:250});
+    return;
+  }
+  // validate
+  let wrong=[];
+  ch.actions.forEach(a=>{
+    if(placed[a.id]!==a.type) wrong.push(a);
+  });
+  if(wrong.length>0){
+    log(`> ✗ ${wrong.length} mis-sorted — check console`, "err");
+    wrong.forEach(a=>{
+      log(`  ✗ "${a.code}" → you put ${placed[a.id].toUpperCase()}, should be ${a.type.toUpperCase()} — ${a.why}`, "err");
+      // mark wrong in UI
+      const drop=document.getElementById('drop-'+placed[a.id]);
+      if(drop.lastChild) drop.lastChild.classList.add('wrong');
+    });
+    log(`> fix the red cards, then run again`, "sys");
+    if(navigator.vibrate) navigator.vibrate([30,40,30]);
+    return;
+  }
+
+  // correct — animate tick
+  tickRunning=true;
+  document.getElementById('btnTick').disabled=true;
+  state.loopCount++;
+  saveState();
+  clearConsole();
+  log(`▶ TICK #${state.loopCount} — draining loop…`, "sys");
+  await sleep(400);
+
+  // Build correct order per spec: stack LIFO, micro FIFO drain all, render, macrotask one
+  const stacks = ch.actions.filter(a=>a.type==="stack").reverse(); // LIFO: last pushed runs first, but for teaching we show in reverse placement? Use reverse to show LIFO
+  const micros = ch.actions.filter(a=>a.type==="microtask");
+  const renders = ch.actions.filter(a=>a.type==="render");
+  const macros = ch.actions.filter(a=>a.type==="macrotask");
+
+  // Stack phase
+  highlightStep("stack");
+  log(`◼ STACK (LIFO) — runs now, blocks everything`, "ok");
+  for(const a of stacks){
+    log(`  → ${a.code}  // stack`, "");
+    await sleep(350);
+  }
+  if(stacks.length===0) { log(`  (empty)`, "dim"); await sleep(300); }
+
+  // Microtask drain
+  highlightStep("microtask");
+  log(`● MICROTASK queue — drain ALL (FIFO), even those queued by microtasks`, "ok");
+  for(const a of micros){
+    log(`  → ${a.code}  // microtask`, "");
+    await sleep(350);
+  }
+  if(micros.length===0) { log(`  (empty)`, "dim"); await sleep(300); }
+  if(ch.id===1) {
+    log(`  ↳ if microtasks keep queuing, render/macrotask starve!`, "sys");
+    await sleep(400);
+  }
+
+  // Render
+  highlightStep("render");
+  log(`◎ RENDER — rAF & paint (only if microtasks empty)`, "ok");
+  for(const a of renders){
+    log(`  → ${a.code}  // render`, "");
+    await sleep(350);
+  }
+  if(renders.length===0) { log(`  (no render work this tick)`, "dim"); await sleep(300); }
+  if(ch.id===2 && stacks.some(s=>s.code.includes("1e9"))){
+    log(`  ↳ long stack task would have blocked this — chunk it!`, "sys");
+    await sleep(400);
+  }
+
+  // Macrotask — one per tick
+  highlightStep("macrotask");
+  log(`◆ MACROTASK — one per tick (FIFO)`, "ok");
+  if(macros.length>0){
+    const first=macros[0];
+    log(`  → ${first.code}  // macrotask #1 runs`, "");
+    await sleep(350);
+    if(macros.length>1){
+      log(`  … ${macros.length-1} more macrotask(s) wait for next tick`, "dim");
+      await sleep(300);
+    }
+  } else {
+    log(`  (empty)`, "dim");
+  }
+
+  highlightStep(null);
+  log(`✓ tick complete — loop order: STACK → MICROTASKS* → RENDER → 1× MACROTASK`, "ok");
+  log(`> sector ${ch.sector} survived`, "sys");
+
+  // success handling
+  if(!state.completed[chapterIdx]){
+    state.completed[chapterIdx]=true;
+    if(chapterIdx===state.unlocked && state.unlocked<3) state.unlocked++;
+    saveState();
+  }
+  document.getElementById('btnNext').style.display="flex";
+  document.getElementById('btnTick').style.display="none";
+  tickRunning=false;
+
+  // chapter-specific horror payoff
+  if(chapterIdx===0){
+    showModal(`<h2>◉ SECTOR A CLEAR — OVERFLOW CONTAINED</h2><p>The phone stops. You learned: <b>stack frames push and pop LIFO</b>. Too many without return = overflow. Microtasks and macrotasks wait patiently in their queues.</p><p style="opacity:0.7">Loops run: ${state.loopCount}</p>`, `<button class="btn primary" onclick="hideModal();nextSector()">ENTER SERVER ROOM →</button><button class="btn ghost" onclick="hideModal()">STAY</button>`);
+  } else if(chapterIdx===1){
+    showModal(`<h2>⬢ SECTOR B CLEAR — STARVATION ENDED</h2><p>The hum fades. You saw it: <b>microtasks drain completely</b> before render/macrotask. A looping microtask starves the display — the lights never paint.</p>`, `<button class="btn primary" onclick="hideModal();nextSector()">ENTER ARCHIVE →</button><button class="btn ghost" onclick="hideModal()">STAY</button>`);
+  } else if(chapterIdx===2){
+    showModal(`<h2>⬣ SECTOR C CLEAR — FREEZE BROKEN</h2><p>The printer stops. Lesson: <b>a long stack task freezes the loop</b>. Break work into macrotasks (setTimeout chunks) so render can breathe between ticks.</p>`, `<button class="btn primary" onclick="hideModal();nextSector()">EXECUTIVE FLOOR →</button><button class="btn ghost" onclick="hideModal()">STAY</button>`);
+  } else if(chapterIdx===3){
+    showModal(`<h2>⬔ NIGHT COMPLETE — YOU ESCAPED</h2><p>2:04 AM. The elevator opens. You survived all four sectors. You now know the loop by heart:<br><br><b style="color:#33ff66">STACK → drain MICROTASKS → RENDER → one MACROTASK → repeat</b><br><br>Overflow, starvation, freeze — you beat them all.</p><p style="opacity:0.7">Total loops: ${state.loopCount} • All sectors clear</p>`, `<button class="btn primary" onclick="hideModal()">STAY ON DUTY</button><button class="btn ghost" onclick="resetProgress()">REPLAY NIGHT</button>`);
+  }
+  if(navigator.vibrate) navigator.vibrate([20,30,20]);
+}
+
+document.getElementById('btnTick').onclick=runTick;
+document.getElementById('btnNext').onclick=nextSector;
+function nextSector(){
+  if(chapterIdx<3){
+    chapterIdx++;
+    state.current=chapterIdx;
+    saveState();
+    loadChapter();
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+}
+function resetProgress(){
+  state={loopCount:0, unlocked:0, current:0, completed:[false,false,false,false]};
+  chapterIdx=0;
+  saveState();
+  loadChapter();
+  hideModal();
+}
+function showModal(html, actionsHtml){
+  document.getElementById('modal').innerHTML=html+`<div class="actions">${actionsHtml}</div>`;
+  document.getElementById('overlay').classList.add('show');
+}
+function hideModal(){ document.getElementById('overlay').classList.remove('show'); }
+document.getElementById('overlay').addEventListener('click', (e)=>{ if(e.target.id==="overlay") hideModal(); });
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+// init
+loadChapter();
+updateHeader();
+log(`> welcome to the night shift. sort actions, run the tick.`, "muted");
+</script>
+</body>
+</html>

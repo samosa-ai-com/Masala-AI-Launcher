@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Tickworks — Factory Logistics</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#0f1419;color:#e6edf3;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center}
+.app{width:100%;max-width:428px;min-width:360px;background:#0f1419;display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden}
+header{padding:12px 12px 8px;background:#161d26;border-bottom:1px solid #243041;position:sticky;top:0;z-index:5}
+h1{font-size:18px;letter-spacing:.04em;display:flex;align-items:center;gap:8px}
+h1 span{font-size:12px;background:#1e2a3a;border:1px solid #2a3a52;padding:2px 6px;border-radius:999px;color:#8fb0d6}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px}
+.stat{background:#0d1218;border:1px solid #223044;border-radius:10px;padding:6px 8px;text-align:center}
+.stat b{font-size:13px;display:block;color:#9ec1e6}
+.stat em{font-style:normal;font-size:16px;font-weight:800}
+.stat i{font-style:normal;font-size:11px;color:#8aa0b8}
+.tabs{display:flex;gap:6px;padding:8px 12px;background:#0f1419;border-bottom:1px solid #1e2a3a}
+.tab{flex:1;min-height:48px;border-radius:10px;border:1px solid #2a3a52;background:#16202e;color:#cfe0f5;font-weight:700;font-size:14px}
+.tab.active{background:#2a5bd7;border-color:#3a6ff0;color:#fff}
+.panel{padding:10px 12px}
+.levels{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.lvl{min-height:48px;border-radius:10px;border:1px solid #2a3a52;background:#16202e;color:#cfe0f5;font-weight:700;font-size:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.lvl small{font-size:10px;color:#8aa0b8}
+.lvl.done{border-color:#2e7d32;background:#14301a}
+.lvl.lock{opacity:.45}
+.lvl.active{outline:2px solid #3a6ff0}
+.meta{background:#111a25;border:1px solid #223044;border-radius:12px;padding:10px;margin:8px 0}
+.meta h3{font-size:14px;margin-bottom:4px}
+.meta p{font-size:12px;color:#9fb3c8;line-height:1.4}
+.gridWrap{background:#0b1016;border:1px solid #1e2a3a;border-radius:14px;padding:8px;margin:8px 0}
+.grid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;touch-action:none}
+.cell{aspect-ratio:1;background:#16202e;border:1px solid #24344d;border-radius:8px;display:flex;align-items:center;justify-content:center;position:relative;font-size:18px;min-height:44px;user-select:none}
+.cell.fixed{background:#1a2535;border-color:#2e4260}
+.cell.block{background:#0a0f14;border-color:#1a2535;color:#334155}
+.cell.hasItem{box-shadow:inset 0 0 0 2px #3a6ff0}
+.cell.hint{outline:2px dashed #f0c040}
+.dot{position:absolute;width:14px;height:14px;border-radius:50%;background:#ffcc33;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.6);pointer-events:none}
+.dot.copper{background:#ff7a3d}
+.dot.plate{background:#7dd3a0}
+.dot.ore{background:#c9a86a}
+.bufCount{position:absolute;bottom:2px;right:4px;font-size:10px;background:#0f1419;border:1px solid #2a3a52;border-radius:6px;padding:0 4px;color:#8fb0d6}
+.palette{display:flex;gap:6px;overflow-x:auto;padding:6px 0;scrollbar-width:none}
+.palette::-webkit-scrollbar{display:none}
+.pal{flex:0 0 auto;min-width:72px;min-height:48px;border-radius:10px;border:1px solid #2a3a52;background:#16202e;color:#cfe0f5;font-size:12px;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px}
+.pal.active{background:#2a5bd7;border-color:#3a6ff0;color:#fff}
+.pal small{font-size:10px;opacity:.8}
+.controls{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}
+.btn{min-height:48px;border-radius:10px;border:1px solid #2a3a52;background:#16202e;color:#e6edf3;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px}
+.btn.primary{background:#2a5bd7;border-color:#3a6ff0;color:#fff}
+.btn.ghost{background:#0d1218}
+.btn:disabled{opacity:.4}
+.btn.small{font-size:12px}
+.row{display:flex;gap:6px;margin:6px 0}
+.row .btn{flex:1}
+.speed{display:flex;gap:6px}
+.speed button{flex:1;min-height:48px;border-radius:10px;border:1px solid #2a3a52;background:#16202e;color:#cfe0f5;font-weight:700}
+.speed button.on{background:#1e2a3a;border-color:#3a6ff0;color:#fff}
+.footer{padding:10px 12px 18px;color:#8aa0b8;font-size:11px;text-align:center}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
+.modal.open{display:flex}
+.card{background:#111a25;border:1px solid #2a3a52;border-radius:14px;padding:14px;width:100%;max-width:400px}
+.card h3{font-size:16px;margin-bottom:6px}
+.card p{font-size:13px;color:#9fb3c8;line-height:1.5}
+.card textarea{width:100%;min-height:80px;background:#0b1016;border:1px solid #243041;border-radius:10px;color:#e6edf3;padding:8px;font-size:12px;margin:8px 0}
+.badge{font-size:11px;background:#1e2a3a;border:1px solid #2a3a52;padding:2px 6px;border-radius:999px;color:#8fb0d6}
+.kbd{font-size:11px;background:#0b1016;border:1px solid #2a3a52;border-bottom-width:2px;border-radius:6px;padding:2px 6px}
+.legend{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.legend span{font-size:11px;background:#0d1218;border:1px solid #223044;border-radius:999px;padding:4px 8px;color:#9fb3c8}
+.stars{color:#ffcc33;letter-spacing:2px}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+<h1>⚙️ TICKWORKS <span id="modeBadge">CONTRACTS</span></h1>
+<div class="stats">
+<div class="stat"><b>TICKS</b><em id="ticks">0 / 60</em><i id="ticksSub">—</i></div>
+<div class="stat"><b>QUOTA</b><em id="quota">0 / 5</em><i id="quotaSub">delivered</i></div>
+<div class="stat"><b>BUDGET</b><em id="budget">0 / 10</em><i id="budgetSub">material</i></div>
+</div>
+</header>
+<div class="tabs">
+<button class="tab active" id="tabContracts">Contracts</button>
+<button class="tab" id="tabFree">Endless Zone</button>
+</div>
+<div class="panel" id="contractsPanel">
+<div class="levels" id="levels"></div>
+<div class="meta" id="meta"></div>
+<div class="gridWrap">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+<div class="badge" id="levelName">Lv 1 — First Belt</div>
+<div class="badge" id="hintBadge">Tap cell to place</div>
+</div>
+<div class="grid" id="grid"></div>
+<div class="legend">
+<span>⛏️ Source</span><span>📦 Sink</span><span>⚙️ Assembler</span><span>⬛ Block</span><span>● Item</span>
+</div>
+</div>
+<div class="palette" id="palette"></div>
+<div class="row">
+<button class="btn ghost" id="rotateBtn">↻ Rotate</button>
+<button class="btn ghost" id="eraseBtn">⌫ Erase</button>
+<button class="btn ghost" id="undoBtn">↩ Undo</button>
+<button class="btn ghost" id="hintBtn">💡 Hint</button>
+</div>
+<div class="controls">
+<button class="btn" id="stepBtn">⏭ Step</button>
+<button class="btn primary" id="playBtn">▶ Play</button>
+<button class="btn" id="clearBtn">Clear</button>
+<button class="btn" id="resetBtn">Reset</button>
+</div>
+<div class="speed">
+<button data-spd="1" class="on">1×</button>
+<button data-spd="2">2×</button>
+<button data-spd="4">4×</button>
+</div>
+<div class="row" style="margin-top:8px">
+<button class="btn small" id="codeBtn">Archive Code</button>
+<button class="btn small" id="inspectBtn">Inspect ★</button>
+</div>
+</div>
+<div class="panel" id="freePanel" style="display:none">
+<div class="meta">
+<h3>Endless Free Zone — Build Anything</h3>
+<p>Miners produce ore every 3 ticks. Furnaces turn 2 ore → 1 plate. Sellers pay funds. Research Lab boosts income. No tick limit.</p>
+<div class="stats" style="margin-top:8px">
+<div class="stat"><b>FUNDS</b><em id="funds">100</em><i>credits</i></div>
+<div class="stat"><b>DELIVERED</b><em id="freeDelivered">0</em><i>plates sold</i></div>
+<div class="stat"><b>MULTIPLIER</b><em id="mult">×1.0</em><i>research</i></div>
+</div>
+</div>
+<div class="gridWrap">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+<div class="badge">Free Build 8×8</div>
+<div class="badge" id="freeHint">Place miners & furnaces</div>
+</div>
+<div class="grid" id="freeGrid"></div>
+</div>
+<div class="palette" id="freePalette"></div>
+<div class="row">
+<button class="btn ghost" id="freeRotate">↻ Rotate</button>
+<button class="btn ghost" id="freeErase">⌫ Erase</button>
+<button class="btn ghost" id="freeUndo">↩ Undo</button>
+<button class="btn ghost" id="freeClear">Clear</button>
+</div>
+<div class="controls">
+<button class="btn" id="freeStep">⏭ Step</button>
+<button class="btn primary" id="freePlay">▶ Play</button>
+<button class="btn" id="freeSpeed1">1×</button>
+<button class="btn" id="freeSpeed2">2×</button>
+</div>
+</div>
+<div class="footer">Single-step, speed control, rotate, undo, hints & archive codes. Fully offline. Progress saved locally.</div>
+</div>
+<div class="modal" id="modal">
+<div class="card">
+<h3 id="modalTitle">Archive Code</h3>
+<p id="modalText">Copy your save code or paste one to restore.</p>
+<textarea id="modalArea" placeholder="Paste code here..."></textarea>
+<div class="row">
+<button class="btn primary" id="modalCopy">Copy</button>
+<button class="btn" id="modalLoad">Load Code</button>
+<button class="btn ghost" id="modalClose">Close</button>
+</div>
+<p style="margin-top:8px;font-size:11px;color:#8aa0b8">Tip: Codes are base64 JSON. Share to continue on another device.</p>
+</div>
+</div>
+<div class="modal" id="inspectModal">
+<div class="card">
+<h3>Inspection Result</h3>
+<p id="inspectText"></p>
+<div id="inspectStars" class="stars" style="font-size:22px;text-align:center;margin:8px 0"></div>
+<div class="row">
+<button class="btn primary" id="inspectNext">Next Contract</button>
+<button class="btn" id="inspectClose">Close</button>
+</div>
+</div>
+</div>
+<script>
+const SIZE=8;
+const COST={belt:1,split:3,buf:2,miner:20,furnace:30,seller:10,lab:50};
+const DIRS=[{x:0,y:-1,n:'N'},{x:1,y:0,n:'E'},{x:0,y:1,n:'S'},{x:-1,y:0,n:'W'}];
+const ARW=['↑','→','↓','←'];
+let curLevel=0, ticks=0, delivered=0, playing=false, speed=1, timer=null, erase=false, sel='belt', dir=1, undoStack=[], showHint=false;
+let funds=100, freeDelivered=0, mult=1, freePlaying=false, freeSpeed=1, freeTimer=null, freeSel='belt', freeDir=1, freeErase=false, freeUndoStack=[], freeShowHint=false;
+let grid=[], freeGrid=[];
+const LEVELS=[
+{id:1,name:"First Belt",desc:"Straight line. Place 4 belts east from source to sink.",quota:5,ticks:60,budget:10,src:[{x:1,y:3,dir:1}],sink:[{x:6,y:3,dir:3}],asm:[],blocks:[]},
+{id:2,name:"The Turn",desc:"L-shaped route. Turn south then east. Budget tight.",quota:5,ticks:60,budget:10,src:[{x:1,y:1,dir:1}],sink:[{x:6,y:6,dir:3}],asm:[],blocks:[]},
+{id:3,name:"Blocked Path",desc:"Blocks force a detour. Go around the wall.",quota:6,ticks:70,budget:12,src:[{x:1,y:3,dir:1}],sink:[{x:6,y:3,dir:3}],asm:[],blocks:[{x:3,y:2},{x:3,y:3},{x:3,y:4},{x:4,y:4}]},
+{id:4,name:"Split Decision",desc:"One source, two sinks. Use a splitter (1→2). Alternates output.",quota:8,ticks:80,budget:14,src:[{x:1,y:3,dir:1}],sink:[{x:6,y:1,dir:3},{x:6,y:5,dir:3}],asm:[],blocks:[]},
+{id:5,name:"Surge Buffer",desc:"Source bursts every 2 ticks. Sink jams if flooded. Add buffer to smooth.",quota:8,ticks:80,budget:12,src:[{x:1,y:3,dir:1,rate:2}],sink:[{x:6,y:3,dir:3}],asm:[],blocks:[]},
+{id:6,name:"Alloy Works",desc:"Two ores → one plate. Assembler needs iron (N) + copper (W) → plate east.",quota:4,ticks:90,budget:16,src:[{x:1,y:2,dir:1,type:'ore'},{x:1,y:5,dir:1,type:'copper'}],sink:[{x:6,y:3,dir:3,need:'plate'}],asm:[{x:3,y:3,dir:1}],blocks:[]},
+{id:7,name:"Twin Furnaces",desc:"Two assemblers in series. Chain them to double output.",quota:6,ticks:100,budget:20,src:[{x:0,y:2,dir:1,type:'ore'},{x:0,y:5,dir:1,type:'copper'},{x:1,y:1,dir:1,type:'ore'}],sink:[{x:7,y:3,dir:3,need:'plate'}],asm:[{x:3,y:2,dir:1},{x:5,y:3,dir:1}],blocks:[{x:4,y:4}]},
+{id:8,name:"Lean Budget",desc:"Quota 10 but budget 10. Every belt counts. No waste.",quota:10,ticks:90,budget:10,src:[{x:1,y:3,dir:1}],sink:[{x:6,y:3,dir:3}],asm:[],blocks:[{x:3,y:2},{x:3,y:4}]},
+{id:9,name:"Race Clock",desc:"Only 50 ticks. Shortest path wins. Use straight belts.",quota:6,ticks:50,budget:14,src:[{x:1,y:1,dir:1}],sink:[{x:6,y:6,dir:3}],asm:[],blocks:[]},
+{id:10,name:"Buffer & Split",desc:"Split then buffer each branch. Handle surge to two sinks.",quota:10,ticks:100,budget:18,src:[{x:1,y:3,dir:1,rate:2}],sink:[{x:6,y:1,dir:3},{x:6,y:5,dir:3}],asm:[],blocks:[]},
+{id:11,name:"Complex Alloy",desc:"Two assemblers feeding one sink. Balance both lines.",quota:8,ticks:110,budget:22,src:[{x:0,y:1,dir:1,type:'ore'},{x:0,y:3,dir:1,type:'copper'},{x:0,y:6,dir:1,type:'ore'}],sink:[{x:7,y:3,dir:3,need:'plate'}],asm:[{x:2,y:2,dir:1},{x:2,y:5,dir:1},{x:5,y:3,dir:1}],blocks:[{x:4,y:2},{x:4,y:5}]},
+{id:12,name:"Mega Factory",desc:"Final commission. 3 sources, 2 assemblers, 2 sinks. Master logistics.",quota:12,ticks:120,budget:26,src:[{x:0,y:1,dir:1,type:'ore'},{x:0,y:4,dir:1,type:'copper'},{x:1,y:6,dir:1,type:'ore'}],sink:[{x:7,y:2,dir:3,need:'plate'},{x:7,y:5,dir:3,need:'plate'}],asm:[{x:3,y:2,dir:1},{x:3,y:5,dir:1}],blocks:[{x:4,y:3},{x:5,y:3}]},
+];
+let progress=JSON.parse(localStorage.getItem('tickworks_progress')||'{"done":[],"best":{}}');
+function saveProgress(){localStorage.setItem('tickworks_progress',JSON.stringify(progress));}
+function makeEmpty(){return Array.from({length:SIZE},()=>Array.from({length:SIZE},()=>({fixed:false,type:null,dir:1,item:null,storage:[],toggle:0,asm:null})));}
+function buildLevel(idx){
+  const L=LEVELS[idx];
+  const g=makeEmpty();
+  // blocks
+  L.blocks.forEach(b=>{g[b.y][b.x]={fixed:true,type:'block',dir:0,item:null,storage:[],toggle:0,asm:null}});
+  // sources
+  L.src.forEach(s=>{g[s.y][s.x]={fixed:true,type:'src',dir:s.dir,item:null,storage:[],toggle:0,rate:s.rate||3,itype:s.type||'ore',asm:null}});
+  // sinks
+  L.sink.forEach(s=>{g[s.y][s.x]={fixed:true,type:'sink',dir:s.dir,item:null,storage:[],toggle:0,need:s.need||'ore',asm:null}});
+  // assemblers
+  L.asm.forEach(a=>{g[a.y][a.x]={fixed:true,type:'asm',dir:a.dir,item:null,storage:[],toggle:0,asm:{inA:null,inB:null,prog:0},itype:null}});
+  return g;
+}
+function cloneGrid(g){return g.map(row=>row.map(c=>({fixed:c.fixed,type:c.type,dir:c.dir,item:c.item?{...c.item}:null,storage:c.storage.map(s=>({...s})),toggle:c.toggle,rate:c.rate,need:c.need,itype:c.itype,asm:c.asm?{...c.asm,inA:c.asm.inA?{...c.asm.inA}:null,inB:c.asm.inB?{...c.asm.inB}:null}:null})));}
+function costOf(g){let s=0;for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){const c=g[y][x];if(!c.fixed&&c.type){s+=COST[c.type]||0}}return s;}
+function inBounds(x,y){return x>=0&&x<SIZE&&y>=0&&y<SIZE}
+function getExits(c){
+  if(c.type==='belt') return [c.dir];
+  if(c.type==='split') return [c.dir, (c.dir+1)%4]; // forward and right
+  if(c.type==='buf') return [c.dir];
+  if(c.type==='src') return [c.dir];
+  if(c.type==='asm') return [c.dir];
+  return [];
+}
+function isTraversable(c){return c && (c.type==='belt'||c.type==='split'||c.type==='buf'||c.type==='sink'||c.type==='asm')}
+function render(){
+  const L=LEVELS[curLevel];
+  document.getElementById('levelName').textContent=`Lv ${L.id} — ${L.name}`;
+  document.getElementById('ticks').textContent=`${ticks} / ${L.ticks}`;
+  document.getElementById('quota').textContent=`${delivered} / ${L.quota}`;
+  document.getElementById('budget').textContent=`${costOf(grid)} / ${L.budget}`;
+  document.getElementById('ticksSub').textContent=playing?'running':'paused';
+  document.getElementById('budgetSub').textContent=costOf(grid)>L.budget?'OVER BUDGET':'material';
+  document.getElementById('quotaSub').textContent=delivered>=L.quota?'quota met':'delivered';
+  document.getElementById('meta').innerHTML=`<h3>${L.name} — ${L.quota}× to sink in ${L.ticks} ticks</h3><p>${L.desc}</p><p style="margin-top:6px"><span class="badge">Budget ${L.budget}</span> <span class="badge">Quota ${L.quota}</span> <span class="badge">${L.ticks} ticks</span></p>`;
+  const gridEl=document.getElementById('grid');
+  gridEl.innerHTML='';
+  for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
+    const c=grid[y][x];
+    const d=document.createElement('button');
+    d.className='cell'+(c.fixed?' fixed':'')+(c.type==='block'?' block':'')+(c.item?' hasItem':'')+(showHint&&hintCells.has(x+','+y)?' hint':'');
+    d.setAttribute('aria-label',`cell ${x},${y}`);
+    let icon='';
+    if(c.type==='block') icon='⬛';
+    else if(c.type==='src') icon='⛏️';
+    else if(c.type==='sink') icon='📦';
+    else if(c.type==='asm') icon='⚙️';
+    else if(c.type==='belt') icon=ARW[c.dir];
+    else if(c.type==='split') icon='⑂';
+    else if(c.type==='buf') icon='▭';
+    else icon='';
+    // show direction small
+    let sub='';
+    if(c.fixed && c.type!=='block') sub=`<span style="position:absolute;top:2px;right:4px;font-size:10px;color:#8fb0d6">${ARW[c.dir]}</span>`;
+    if(c.type==='split') sub+=`<span style="position:absolute;top:2px;right:4px;font-size:9px;color:#ffcc33">${ARW[c.dir]}${ARW[(c.dir+1)%4]}</span>`;
+    d.innerHTML=icon+sub;
+    if(c.item){
+      const dot=document.createElement('span');
+      dot.className='dot '+(c.item.kind||'ore');
+      d.appendChild(dot);
+    }
+    if(c.type==='buf'&&c.storage.length){
+      const bc=document.createElement('span');
+      bc.className='bufCount';
+      bc.textContent=c.storage.length;
+      d.appendChild(bc);
+    }
+    if(c.type==='asm'&&c.asm){
+      let t='';
+      if(c.asm.inA) t+='●';
+      if(c.asm.inB) t+='●';
+      if(t) d.innerHTML+=`<span style="position:absolute;bottom:2px;left:4px;font-size:9px;color:#7dd3a0">${t}</span>`;
+    }
+    d.onclick=()=>handleCell(x,y);
+    gridEl.appendChild(d);
+  }
+  // palette
+  const pal=document.getElementById('palette');
+  pal.innerHTML='';
+  [['belt','Belt','1'],['split','Splitter','3'],['buf','Buffer','2']].forEach(([k,label,cost])=>{
+    const b=document.createElement('button');
+    b.className='pal'+(sel===k&&!erase?' active':'');
+    b.innerHTML=`${k==='belt'?'→':k==='split'?'⑂':'▭'} ${label}<small>${cost} mat</small>`;
+    b.onclick=()=>{sel=k;erase=false;updatePal();};
+    pal.appendChild(b);
+  });
+  // levels
+  const lvEl=document.getElementById('levels');
+  lvEl.innerHTML='';
+  LEVELS.forEach((L,i)=>{
+    const b=document.createElement('button');
+    const locked=i>0 && !progress.done.includes(LEVELS[i-1].id);
+    const done=progress.done.includes(L.id);
+    b.className='lvl'+(i===curLevel?' active':'')+(done?' done':'')+(locked?' lock':'');
+    b.innerHTML=`${done?'★':i+1}<small>${L.name.split(' ')[0]}</small>`;
+    b.disabled=locked;
+    b.onclick=()=>{if(!locked){curLevel=i;loadLevel();}};
+    lvEl.appendChild(b);
+  });
+  // free panel stats
+  document.getElementById('funds').textContent=funds;
+  document.getElementById('freeDelivered').textContent=freeDelivered;
+  document.getElementById('mult').textContent='×'+mult.toFixed(1);
+  renderFree();
+}
+let hintCells=new Set();
+function updatePal(){
+  document.getElementById('eraseBtn').style.background=erase?'#3a2a2a':'';
+  document.getElementById('freeErase').style.background=freeErase?'#3a2a2a':'';
+  render();
+}
+function handleCell(x,y){
+  const c=grid[y][x];
+  if(c.fixed) return;
+  undoStack.push(cloneGrid(grid));
+  if(undoStack.length>40) undoStack.shift();
+  if(erase){c.type=null;c.dir=1;c.item=null;c.storage=[];}
+  else {
+    if(c.type===sel){
+      // rotate if same
+      c.dir=(c.dir+1)%4;
+    } else {
+      c.type=sel;c.dir=dir;
+      if(sel==='buf') c.storage=[];
+    }
+  }
+  // budget check visual only
+  render();
+  saveState();
+}
+function saveState(){
+  const data={curLevel,ticks,delivered,grid,funds,freeDelivered,mult,freeGrid};
+  localStorage.setItem('tickworks_state',JSON.stringify(data));
+}
+function loadLevel(){
+  const L=LEVELS[curLevel];
+  const saved=JSON.parse(localStorage.getItem('tickworks_state')||'null');
+  if(saved && saved.curLevel===curLevel && saved.grid){
+    grid=saved.grid.map(row=>row.map(c=>({...c,storage:c.storage||[],asm:c.asm||null})));
+    ticks=saved.ticks||0; delivered=saved.delivered||0;
+  } else {
+    grid=buildLevel(curLevel); ticks=0; delivered=0;
+  }
+  undoStack=[]; showHint=false; render();
+}
+function doTick(){
+  const L=LEVELS[curLevel];
+  ticks++;
+  // 1) sources generate
+  for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
+    const c=grid[y][x];
+    if(c.type==='src'){
+      if(ticks % (c.rate||3)===0 && !c.item){
+        c.item={kind:c.itype||'ore',age:0};
+      }
+    }
+  }
+  // 2) assemblers pull inputs
+  for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
+    const c=grid[y][x];
+    if(c.type==='asm'&&c.asm){
+      const outDir=c.dir;
+      const inDirs=[(outDir+2)%4,(outDir+3)%4]; // opposite and left
+      // check neighbors that feed into this cell
+      inDirs.forEach((d,idx)=>{
+        const nx=x+DIRS[d].x, ny=y+DIRS[d].y;
+        // Actually input comes from neighbor in opposite direction: neighbor's exit points to assembler
+        // So we look at neighbor cell that is adjacent and its exit is towards assembler
+        // Simpler: if neighbor has item and its exit dir points to assembler, pull
+        if(!inBounds(nx,ny)) return;
+        const nb=grid[ny][nx];
+        if(!nb.item) return;
+        const exits=getExits(nb);
+        // does nb point to assembler?
+        const needDir=(d+2)%4; // direction from nb to assembler is opposite of d
+        // Actually d is direction from assembler to neighbor, so from neighbor to assembler is (d+2)%4
+        // So check if nb's exit includes that
+        if(!exits.includes((d+2)%4)) return;
+        // also check assembler slot empty
+        if(idx===0 && !c.asm.inA){c.asm.inA=nb.item; nb.item=null;}
+        else if(idx===1 && !c.asm.inB){c.asm.inB=nb.item; nb.item=null;}
+      });
+      // progress
+      if(c.asm.inA && c.asm.inB){
+        c.asm.prog++;
+        if(c.asm.prog>=2){
+          // produce
+          if(!c.item) c.item={kind:'plate',age:0};
+          c.asm.inA=null; c.asm.inB=null; c.asm.prog=0;
+        }
+      }
+    }
+  }
+  // 3) move items (collect moves)
+  let moves=[];
+  for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
+    const c=grid[y][x];
+    if(!c.item) continue;
+    if(c.type==='asm' || c.type==='src'){
+      // they have exits
+      let exits=getExits(c);
+      // splitter alternates
+      if(c.type==='split'){
+        const choice=c.toggle%2;
+        exits=[exits[choice]];
+        c.toggle++;
+      }
+      for(let d of exits){
+        const nx=x+DIRS[d].x, ny=y+DIRS[d].y;
+        if(!inBounds(nx,ny)) continue;
+        const dest=grid[ny][nx];
+        if(dest.type==='block') continue;
+        if(dest.type==='sink'){
+          // sink accepts any
+          moves.push({sx:x,sy:y,dx:nx,dy:ny,toSink:true});
+          break;
+        }
+        if(dest.type==='asm'){
+          // assembler cell itself can hold item only if empty, but we already handled pulling; allow moving into assembler only if its item slot empty and it's output? Actually items shouldn't move into assembler except via pull logic. So skip.
+          continue;
+        }
+        if(dest.type==='buf'){
+          if(dest.storage.length<5){
+            moves.push({sx:x,sy:y,dx:nx,dy:ny,toBuf:true});
+            break;
+          }
+        } else if(isTraversable(dest) && !dest.item){
+          moves.push({sx:x,sy:y,dx:nx,dy:ny});
+          break;
+        }
+      }
+    } else if(c.type==='belt'||c.type==='split'||c.type==='buf'){
+      let exits=getExits(c);
+      if(c.type==='split'){
+        const choice=c.toggle%2;
+        exits=[exits[choice]];
+        c.toggle++;
+      }
+      // buffer: if it has storage, try to emit storage first? But we treat c.item as front
+      for(let d of exits){
+        const nx=x+DIRS[d].x, ny=y+DIRS[d].y;
+        if(!inBounds(nx,ny)) continue;
+        const dest=grid[ny][nx];
+        if(dest.type==='block') continue;
+        if(dest.type==='sink'){
+          moves.push({sx:x,sy:y,dx:nx,dy:ny,toSink:true});
+          break;
+        }
+        if(dest.type==='asm') continue;
+        if(dest.type==='buf'){
+          if(dest.storage.length<5){
+            moves.push({sx:x,sy:y,dx:nx,dy:ny,toBuf:true});
+            break;
+          }
+        } else if(isTraversable(dest) && !dest.item){
+          moves.push({sx:x,sy:y,dx:nx,dy:ny});
+          break;
+        }
+      }
+    }
+  }
+  // apply moves without collision (if two sources target same dest, first wins)
+  let occupied=new Set();
+  moves.forEach(m=>{
+    const key=m.dx+','+m.dy;
+    if(occupied.has(key)) return;
+    const src=grid[m.sy][m.sx];
+    const dest=grid[m.dy][m.dx];
+    if(!src.item) return;
+    if(m.toSink){
+      // deliver
+      if(!dest.need || dest.need===src.item.kind || dest.need==='ore'){
+        delivered++;
+        // for plate requirement, only plate counts
+        if(dest.need==='plate' && src.item.kind!=='plate'){
+          delivered--; // revert
+          return;
+        }
+      } else {
+        // wrong type still consumes? count but not quota? We'll just not count
+        // drop item
+      }
+      src.item=null;
+      occupied.add(key);
+    } else if(m.toBuf){
+      dest.storage.push(src.item);
+      src.item=null;
+      occupied.add(key);
+    } else {
+      if(!dest.item){
+        dest.item=src.item;
+        src.item=null;
+        occupied.add(key);
+      }
+    }
+  });
+  // buffers emit from storage if empty
+  for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
+    const c=grid[y][x];
+    if(c.type==='buf' && !c.item && c.storage.length){
+      c.item=c.storage.shift();
+    }
+  }
+  // check win/lose
+  if(delivered>=L.quota){
+    playing=false; clearInterval(timer); timer=null;
+    document.getElementById('playBtn').textContent='▶ Play';
+    const stars=calcStars();
+    if(!progress.done.includes(L.id)){progress.done.push(L.id); saveProgress();}
+    showInspect(stars);
+  } else if(ticks>=L.ticks){
+    playing=false; clearInterval(timer); timer=null;
+    document.getElementById('playBtn').textContent='▶ Play';
+    showInspect(0,true);
+  }
+  render(); saveState();
+}
+function calcStars(){
+  const L=LEVELS[curLevel];
+  let s=1;
+  if(costOf(grid)<=L.budget) s++;
+  if(ticks <= Math.floor(L.ticks*0.7)) s++;
+  return s;
+}
+function showInspect(stars,failed){
+  const el=document.getElementById('inspectModal');
+  const txt=document.getElementById('inspectText');
+  const st=document.getElementById('inspectStars');
+  if(failed){
+    txt.innerHTML=`Time's up! Delivered ${delivered}/${LEVELS[curLevel].quota}. Try a more efficient layout or add buffers.`;
+    st.textContent='☆☆☆';
+  } else {
+    txt.innerHTML=`Quota met in ${ticks} ticks! Budget used ${costOf(grid)}/${LEVELS[curLevel].budget}.<br>Efficiency bonus: ${stars===3?'Perfect!':stars===2?'Great':'Good'}`;
+    st.textContent='★'.repeat(stars)+'☆'.repeat(3-stars);
+  }
+  el.classList.add('open');
+}
+function togglePlay(){
+  if(playing){playing=false; clearInterval(timer); timer=null; document.getElementById('playBtn').textContent='▶ Play';}
+  else {playing=true; document.getElementById('playBtn').textContent='⏸ Pause'; timer=setInterval(doTick, speed===1?500:speed===2?250:120);}
+}
+function setSpeed(s){speed=s; document.querySelectorAll('.speed button').forEach(b=>b.classList.toggle('on', parseInt(b.dataset.spd)===s)); if(playing){clearInterval(timer); timer=setInterval(doTick, s===1?500:s===2?250:120);}}
+function showHintFn(){
+  showHint=!showHint;
+  hintCells=new Set();
+  if(showHint){
+    // naive hint: highlight shortest path cells (manhattan)
+    const L=LEVELS[curLevel];
+    // just highlight a corridor
+    for(let x=2;x<6;x++) hintCells.add(x+',3');
+    if(L.id===2){for(let y=2;y<6;y++) hintCells.add('5,'+y); for(let x=2;x<6;x++) hintCells.add(x+',1');}
+    if(L.id===4){hintCells.add('3,2');hintCells.add('3,4');}
+  }
+  render();
+}
+// Free zone
+function makeFreeEmpty(){return makeEmpty();}
+function renderFree(){
+  const gEl=document.getElementById('freeGrid');
+  if(!gEl) return;
+  gEl.innerHTML='';
+  for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
+    const c=freeGrid[y][x];
+    const d=document.createElement('button');
+    d.className='cell'+(c.fixed?' fixed':'')+(c.type==='block'?' block':'')+(c.item?' hasItem':'');
+    let icon='';
+    if(c.type==='miner') icon='⛏️';
+    else if(c.type==='seller') icon='📦';
+    else if(c.type==='furnace') icon='⚙️';
+    else if(c.type==='lab') icon='🔬';
+    else if(c.type==='belt') icon=ARW[c.dir];
+    else if(c.type==='split') icon='⑂';
+    else if(c.type==='buf') icon='▭';
+    else icon='';
+    let sub=c.fixed||c.type?`<span style="position:absolute;top:2px;right:4px;font-size:10px;color:#8fb0d6">${c.type==='miner'||c.type==='seller'||c.type==='furnace'||c.type==='lab'?'':ARW[c.dir]||''}</span>`:'';
+    if(c.type==='miner'||c.type==='seller'||c.type==='furnace'||c.type==='lab') sub=`<span style="position:absolute;top:2px;right:4px;font-size:10px;color:#8fb0d6">${ARW[c.dir]}</span>`;
+    d.innerHTML=icon+sub;
+    if(c.item){const dot=document.createElement('span');dot.className='dot '+(c.item.kind||'ore');d.appendChild(dot);}
+    if(c.type==='buf'&&c.storage.length){const bc=document.createElement('span');bc.className='bufCount';bc.textContent=c.storage.length;d.appendChild(bc);}
+    if(c.type==='furnace'&&c.asm){let t='';if(c.asm.inA) t+='●';if(c.asm.inB) t+='●'; if(t) d.innerHTML+=`<span style="position:absolute;bottom:2px;left:4px;font-size:9px;color:#7dd3a0">${t}</span>`;}
+    d.onclick=()=>handleFreeCell(x,y);
+    gEl.appendChild(d);
+  }
+  const pal=document.getElementById('freePalette');
+  pal.innerHTML='';
+  [['belt','Belt','1'],['split','Split','3'],['buf','Buffer','2'],['miner','Miner','20'],['furnace','Furnace','30'],['seller','Seller','10'],['lab','Lab','50']].forEach(([k,label,cost])=>{
+    const b=document.createElement('button');
+    b.className='pal'+(freeSel===k&&!freeErase?' active':'');
+    b.innerHTML=`${label}<small>${cost}¢</small>`;
+    b.onclick=()=>{freeSel=k;freeErase=false;renderFree();};
+    pal.appendChild(b);
+  });
+}
+function handleFreeCell(x,y){
+  const c=freeGrid[y][x];
+  freeUndoStack.push(cloneGrid(freeGrid));
+  if(freeUndoStack.length>40) freeUndoStack.shift();
+  if(freeErase){
+    if(!c.fixed && c.type){ // refund half
+      funds+=Math.floor((COST[c.type]||0)/2);
+    }
+    c.type=null;c.dir=1;c.item=null;c.storage=[];c.asm=null;c.fixed=false;
+  } else {
+    const cost=COST[freeSel]||0;
+    if(funds<cost){alert('Not enough funds! Sell plates to earn.');return;}
+    if(c.type===freeSel){c.dir=(c.dir+1)%4;}
+    else {
+      funds-=cost;
+      c.type=freeSel; c.dir=freeDir; c.item=null; c.storage=[]; c.fixed=false;
+      if(freeSel==='miner'){c.fixed=false; c.rate=3; c.itype='ore';}
+      if(freeSel==='furnace'){c.asm={inA:null,inB:null,prog:0};}
+      if(freeSel==='seller'){c.need='plate';}
+      if(freeSel==='lab'){mult+=0.5; c.fixed=true;}
+      if(freeSel==='buf'){c.storage=[];}
+    }
+  }
+  render(); renderFree(); saveState();
+}
+function freeTick(){
+  // miners generate
+  for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
+    const c=freeGrid[y][x];
+    if(c.type==='miner' && !c.item){
+      // simple counter via global ticks reuse
+      if(Math.random()<0.33) c.item={kind:'ore'};
+    }
+    if(c.type==='furnace'&&c.asm){
+      const outDir=c.dir;
+      const inDirs=[(outDir+2)%4,(outDir+3)%4];
+      inDirs.forEach((d,idx)=>{
+        const nx=x+DIRS[d].x, ny=y+DIRS[d].y;
+        if(!inBounds(nx,ny)) return;
+        const nb=freeGrid[ny][nx];
+        if(!nb.item) return;
+        const exits=nb.type==='belt'||nb.type==='split'||nb.type==='buf'||nb.type==='miner'? [nb.dir] : nb.type==='split'? [nb.dir,(nb.dir+1)%4] : [];
+        // check points to furnace
+        if(!exits.includes((d+2)%4)) return;
+        if(idx===0 && !c.asm.inA){c.asm.inA=nb.item; nb.item=null;}
+        else if(idx===1 && !c.asm.inB){c.asm.inB=nb.item; nb.item=null;}
+      });
+      if(c.asm.inA && c.asm.inB){
+        c.asm.prog++;
+        if(c.asm.prog>=2){
+          if(!c.item) c.item={kind:'plate'};
+          c.asm.inA=null; c.asm.inB=null; c.asm.prog=0;
+        }
+      }
+    }
+  }
+  // move
+  let moves=[];
+  for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
+    const c=freeGrid[y][x];
+    if(!c.item) continue;
+    let exits=[];
+    if(c.type==='belt') exits=[c.dir];
+    else if(c.type==='split') exits=[c.dir,(c.dir+1)%4];
+    else if(c.type==='buf') exits=[c.dir];
+    else if(c.type==='miner') exits=[c.dir];
+    else if(c.type==='furnace') exits=[c.dir];
+    else continue;
+    if(c.type==='split'){
+      const choice=c.toggle%2;
+      exits=[exits[choice]];
+      c.toggle=(c.toggle+1)%2;
+    }
+    for(let d of exits){
+      const nx=x+DIRS[d].x, ny=y+DIRS[d].y;
+      if(!inBounds(nx,ny)) continue;
+      const dest=freeGrid[ny][nx];
+      if(dest.type==='lab') continue;
+      if(dest.type==='seller'){
+        moves.push({sx:x,sy:y,dx:nx,dy:ny,toSink:true});
+        break;
+      }
+      if(dest.type==='furnace') continue;
+      if(dest.type==='buf'){
+        if(dest.storage.length<5){moves.push({sx:x,sy:y,dx:nx,dy:ny,toBuf:true});break;}
+      } else if((dest.type==='belt'||dest.type==='split'||dest.type==='buf'||dest.type==='seller') && !dest.item){
+        moves.push({sx:x,sy:y,dx:nx,dy:ny});break;
+      } else if(!dest.type && !dest.item){
+        // empty traversable? allow belt to go to empty? No, need belt. So skip.
+        continue;
+      }
+    }
+  }
+  let occupied=new Set();
+  moves.forEach(m=>{
+    const key=m.dx+','+m.dy;
+    if(occupied.has(key)) return;
+    const src=freeGrid[m.sy][m.sx];
+    const dest=freeGrid[m.dy][m.dx];
+    if(!src.item) return;
+    if(m.toSink){
+      // seller pays only for plate, ore pays less
+      let pay=src.item.kind==='plate'?10:2;
+      pay=Math.floor(pay*mult);
+      funds+=pay; freeDelivered++;
+      src.item=null; occupied.add(key);
+    } else if(m.toBuf){
+      dest.storage.push(src.item); src.item=null; occupied.add(key);
+    } else {
+      if(!dest.item){dest.item=src.item; src.item=null; occupied.add(key);}
+    }
+  });
+  for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
+    const c=freeGrid[y][x];
+    if(c.type==='buf' && !c.item && c.storage.length) c.item=c.storage.shift();
+  }
+  renderFree();
+  document.getElementById('funds').textContent=funds;
+  document.getElementById('freeDelivered').textContent=freeDelivered;
+  document.getElementById('mult').textContent='×'+mult.toFixed(1);
+  saveState();
+}
+function toggleFreePlay(){
+  if(freePlaying){freePlaying=false; clearInterval(freeTimer); freeTimer=null; document.getElementById('freePlay').textContent='▶ Play';}
+  else {freePlaying=true; document.getElementById('freePlay').textContent='⏸ Pause'; freeTimer=setInterval(freeTick, freeSpeed===1?400:200);}
+}
+// init
+(function init(){
+  // load saved state
+  const saved=JSON.parse(localStorage.getItem('tickworks_state')||'null');
+  if(saved && saved.freeGrid){freeGrid=saved.freeGrid; funds=saved.funds||100; freeDelivered=saved.freeDelivered||0; mult=saved.mult||1;}
+  else {freeGrid=makeFreeEmpty(); funds=100;}
+  if(saved && saved.curLevel!==undefined) curLevel=saved.curLevel;
+  loadLevel();
+  renderFree();
+  // events
+  document.getElementById('rotateBtn').onclick=()=>{dir=(dir+1)%4; document.getElementById('hintBadge').textContent='Dir '+ARW[dir];};
+  document.getElementById('eraseBtn').onclick=()=>{erase=!erase; updatePal();};
+  document.getElementById('undoBtn').onclick=()=>{if(undoStack.length){grid=undoStack.pop(); render(); saveState();}};
+  document.getElementById('hintBtn').onclick=showHintFn;
+  document.getElementById('stepBtn').onclick=doTick;
+  document.getElementById('playBtn').onclick=togglePlay;
+  document.getElementById('clearBtn').onclick=()=>{undoStack.push(cloneGrid(grid)); grid=buildLevel(curLevel); ticks=0; delivered=0; render(); saveState();};
+  document.getElementById('resetBtn').onclick=()=>{grid=buildLevel(curLevel); ticks=0; delivered=0; undoStack=[]; render(); saveState();};
+  document.querySelectorAll('.speed button').forEach(b=>b.onclick=()=>setSpeed(parseInt(b.dataset.spd)));
+  document.getElementById('codeBtn').onclick=()=>{
+    const code=btoa(unescape(encodeURIComponent(JSON.stringify({curLevel,ticks,delivered,grid,progress,funds,freeGrid})))); 
+    document.getElementById('modalTitle').textContent='Archive Code';
+    document.getElementById('modalText').textContent='Copy this code to save your factory. Paste to restore.';
+    document.getElementById('modalArea').value=code;
+    document.getElementById('modal').classList.add('open');
+  };
+  document.getElementById('inspectBtn').onclick=()=>{
+    const L=LEVELS[curLevel];
+    if(delivered>=L.quota) showInspect(calcStars());
+    else {
+      document.getElementById('inspectText').innerHTML=`Progress ${delivered}/${L.quota} in ${ticks}/${L.ticks} ticks. Keep building!`;
+      document.getElementById('inspectStars').textContent='☆☆☆';
+      document.getElementById('inspectModal').classList.add('open');
+    }
+  };
+  document.getElementById('modalClose').onclick=()=>document.getElementById('modal').classList.remove('open');
+  document.getElementById('modalCopy').onclick=()=>{navigator.clipboard.writeText(document.getElementById('modalArea').value).then(()=>alert('Copied!'));};
+  document.getElementById('modalLoad').onclick=()=>{
+    try{
+      const obj=JSON.parse(decodeURIComponent(escape(atob(document.getElementById('modalArea').value.trim()))));
+      if(obj.grid){grid=obj.grid; curLevel=obj.curLevel||0; ticks=obj.ticks||0; delivered=obj.delivered||0; if(obj.progress) progress=obj.progress; if(obj.freeGrid) freeGrid=obj.freeGrid; if(obj.funds) funds=obj.funds; saveProgress(); saveState(); render(); alert('Loaded!'); document.getElementById('modal').classList.remove('open');}
+    }catch(e){alert('Invalid code');}
+  };
+  document.getElementById('inspectClose').onclick=()=>document.getElementById('inspectModal').classList.remove('open');
+  document.getElementById('inspectNext').onclick=()=>{
+    document.getElementById('inspectModal').classList.remove('open');
+    if(curLevel<LEVELS.length-1){curLevel++; loadLevel();}
+  };
+  document.getElementById('tabContracts').onclick=()=>{
+    document.getElementById('tabContracts').classList.add('active'); document.getElementById('tabFree').classList.remove('active');
+    document.getElementById('contractsPanel').style.display=''; document.getElementById('freePanel').style.display='none'; document.getElementById('modeBadge').textContent='CONTRACTS';
+  };
+  document.getElementById('tabFree').onclick=()=>{
+    document.getElementById('tabFree').classList.add('active'); document.getElementById('tabContracts').classList.remove('active');
+    document.getElementById('freePanel').style.display=''; document.getElementById('contractsPanel').style.display='none'; document.getElementById('modeBadge').textContent='ENDLESS';
+  };
+  // free events
+  document.getElementById('freeRotate').onclick=()=>{freeDir=(freeDir+1)%4;};
+  document.getElementById('freeErase').onclick=()=>{freeErase=!freeErase; renderFree();};
+  document.getElementById('freeUndo').onclick=()=>{if(freeUndoStack.length){freeGrid=freeUndoStack.pop(); renderFree();}};
+  document.getElementById('freeClear').onclick=()=>{freeGrid=makeFreeEmpty(); funds=100; freeDelivered=0; mult=1; renderFree(); saveState();};
+  document.getElementById('freeStep').onclick=freeTick;
+  document.getElementById('freePlay').onclick=toggleFreePlay;
+  document.getElementById('freeSpeed1').onclick=()=>{freeSpeed=1;};
+  document.getElementById('freeSpeed2').onclick=()=>{freeSpeed=2;};
+  // close modals on backdrop
+  document.getElementById('modal').onclick=(e)=>{if(e.target.id==='modal') e.currentTarget.classList.remove('open');};
+  document.getElementById('inspectModal').onclick=(e)=>{if(e.target.id==='inspectModal') e.currentTarget.classList.remove('open');};
+})();
+</script>
+</body>
+</html>

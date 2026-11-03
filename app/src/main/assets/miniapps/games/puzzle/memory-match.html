@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Flip & Pair Memory</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f172a;
+  --card:#1e293b;
+  --card-front:#334155;
+  --accent:#38bdf8;
+  --accent2:#a78bfa;
+  --success:#22c55e;
+  --text:#f1f5f9;
+  --muted:#94a3b8;
+  --radius:16px;
+}
+body{
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height:100vh;
+  display:flex;
+  justify-content:center;
+  overflow-x:hidden;
+}
+.app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100vh;
+  padding:16px 16px 24px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+header{
+  text-align:center;
+  padding:8px 0 4px;
+}
+header h1{
+  font-size:22px;
+  font-weight:800;
+  letter-spacing:-0.5px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+header p{
+  font-size:13px;
+  color:var(--muted);
+  margin-top:4px;
+}
+.stats{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:10px;
+}
+.stat{
+  background:var(--card);
+  border-radius:12px;
+  padding:10px 8px;
+  text-align:center;
+  border:1px solid rgba(255,255,255,0.06);
+}
+.stat-label{
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:0.6px;
+  color:var(--muted);
+  font-weight:600;
+}
+.stat-value{
+  font-size:20px;
+  font-weight:800;
+  margin-top:2px;
+  color:var(--text);
+}
+.stat-value.accent{color:var(--accent)}
+.stat-value.success{color:var(--success)}
+.controls{
+  display:flex;
+  gap:10px;
+}
+.btn{
+  flex:1;
+  border:none;
+  border-radius:12px;
+  padding:14px 16px;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+  transition:transform 0.1s, opacity 0.2s;
+}
+.btn:active{transform:scale(0.97)}
+.btn-primary{
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color:#0f172a;
+}
+.btn-secondary{
+  background:var(--card);
+  color:var(--text);
+  border:1px solid rgba(255,255,255,0.1);
+}
+.board-wrap{
+  background:var(--card);
+  border-radius:var(--radius);
+  padding:14px;
+  border:1px solid rgba(255,255,255,0.06);
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(4, 1fr);
+  gap:10px;
+}
+.card{
+  aspect-ratio:1;
+  position:relative;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+  perspective:600px;
+  padding:0;
+  min-height:72px;
+}
+.card-inner{
+  width:100%;
+  height:100%;
+  position:relative;
+  transform-style:preserve-3d;
+  transition:transform 0.45s cubic-bezier(0.4,0,0.2,1);
+  border-radius:14px;
+}
+.card.flipped .card-inner{
+  transform:rotateY(180deg);
+}
+.card.matched{
+  pointer-events:none;
+}
+.card.matched .card-inner{
+  transform:rotateY(180deg);
+}
+.card-face{
+  position:absolute;
+  inset:0;
+  border-radius:14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+  border:1px solid rgba(255,255,255,0.08);
+}
+.card-back{
+  background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+  font-size:28px;
+  color:var(--accent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.card-back::after{
+  content:'?';
+  font-size:32px;
+  font-weight:800;
+  opacity:0.9;
+}
+.card-front{
+  background:#f8fafc;
+  transform:rotateY(180deg);
+  font-size:34px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.card.matched .card-front{
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  border-color: var(--success);
+  box-shadow: 0 0 0 2px var(--success), 0 4px 12px rgba(34,197,94,0.3);
+  animation: pop 0.4s ease;
+}
+.card.mismatch .card-front{
+  background:#fee2e2;
+  border-color:#f87171;
+  animation: shake 0.4s ease;
+}
+@keyframes pop{
+  0%{transform:rotateY(180deg) scale(1)}
+  50%{transform:rotateY(180deg) scale(1.08)}
+  100%{transform:rotateY(180deg) scale(1)}
+}
+@keyframes shake{
+  0%,100%{transform:rotateY(180deg) translateX(0)}
+  25%{transform:rotateY(180deg) translateX(-4px)}
+  75%{transform:rotateY(180deg) translateX(4px)}
+}
+.progress-wrap{
+  margin-top:12px;
+}
+.progress-label{
+  display:flex;
+  justify-content:space-between;
+  font-size:12px;
+  color:var(--muted);
+  margin-bottom:6px;
+  font-weight:600;
+}
+.progress-bar{
+  height:8px;
+  background:#0f172a;
+  border-radius:99px;
+  overflow:hidden;
+}
+.progress-fill{
+  height:100%;
+  background: linear-gradient(90deg, var(--accent), var(--success));
+  border-radius:99px;
+  transition:width 0.4s ease;
+  width:0%;
+}
+.overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,0.85);
+  backdrop-filter:blur(8px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 0.3s ease;
+  z-index:10;
+}
+.overlay.show{
+  opacity:1;
+  pointer-events:auto;
+}
+.modal{
+  background:#1e293b;
+  border-radius:20px;
+  padding:24px 20px;
+  width:100%;
+  max-width:340px;
+  text-align:center;
+  border:1px solid rgba(255,255,255,0.1);
+  transform:translateY(12px) scale(0.96);
+  transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
+.overlay.show .modal{
+  transform:translateY(0) scale(1);
+}
+.modal-emoji{font-size:48px; margin-bottom:8px}
+.modal h2{
+  font-size:22px;
+  font-weight:800;
+  margin-bottom:6px;
+}
+.modal p{
+  font-size:14px;
+  color:var(--muted);
+  line-height:1.5;
+  margin-bottom:16px;
+}
+.modal-stats{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-bottom:18px;
+}
+.modal-stat{
+  background:#0f172a;
+  border-radius:12px;
+  padding:12px;
+}
+.modal-stat strong{
+  display:block;
+  font-size:22px;
+  color:var(--accent);
+}
+.modal-stat span{
+  font-size:11px;
+  color:var(--muted);
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+  font-weight:600;
+}
+.modal-stat.best strong{color:var(--success)}
+canvas#confetti{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:11;
+}
+.footer{
+  text-align:center;
+  font-size:11px;
+  color:var(--muted);
+  opacity:0.7;
+  padding-top:4px;
+}
+</style>
+</head>
+<body>
+<canvas id="confetti"></canvas>
+<div class="app">
+  <header>
+    <h1>Flip & Pair</h1>
+    <p>Find all 8 pairs — tap to flip, match to clear</p>
+  </header>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Attempts</div>
+      <div class="stat-value accent" id="attempts">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Pairs</div>
+      <div class="stat-value success" id="pairs">0 / 8</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Best</div>
+      <div class="stat-value" id="best">—</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-secondary" id="restartBtn">Restart</button>
+    <button class="btn btn-primary" id="newBoardBtn">New Board</button>
+  </div>
+
+  <div class="board-wrap">
+    <div class="grid" id="grid"></div>
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>Progress</span>
+        <span id="progressText">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+  </div>
+
+  <div class="footer">Session: <span id="sessionGames">0</span> games • Tap two cards per move</div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-emoji">🎉</div>
+    <h2>Board Cleared!</h2>
+    <p id="modalMsg">You found all pairs</p>
+    <div class="modal-stats">
+      <div class="modal-stat">
+        <strong id="modalAttempts">0</strong>
+        <span>Attempts</span>
+      </div>
+      <div class="modal-stat best">
+        <strong id="modalBest">—</strong>
+        <span>Best Score</span>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="playAgainBtn" style="width:100%">Play Again</button>
+  </div>
+</div>
+
+<script>
+const SYMBOLS = ['🐶','🐱','🦊','🐻','🐼','🐨','🐯','🦁'];
+const grid = document.getElementById('grid');
+const attemptsEl = document.getElementById('attempts');
+const pairsEl = document.getElementById('pairs');
+const bestEl = document.getElementById('best');
+const progressFill = document.getElementById('progressFill');
+const progressText = document.getElementById('progressText');
+const overlay = document.getElementById('overlay');
+const modalAttempts = document.getElementById('modalAttempts');
+const modalBest = document.getElementById('modalBest');
+const modalMsg = document.getElementById('modalMsg');
+const sessionGamesEl = document.getElementById('sessionGames');
+
+let deck = [];
+let flipped = [];
+let matchedCount = 0;
+let attempts = 0;
+let lock = false;
+let sessionGames = 0;
+
+function loadStorage(){
+  try{
+    const b = localStorage.getItem('flipPairBest');
+    const g = localStorage.getItem('flipPairGames');
+    if(b) bestEl.textContent = b;
+    if(g) sessionGames = parseInt(g,10) || 0;
+    sessionGamesEl.textContent = sessionGames;
+  }catch(e){}
+}
+
+function saveBest(){
+  try{
+    const currentBest = localStorage.getItem('flipPairBest');
+    if(!currentBest || attempts < parseInt(currentBest,10)){
+      localStorage.setItem('flipPairBest', String(attempts));
+      bestEl.textContent = String(attempts);
+      modalBest.textContent = String(attempts) + ' ★';
+      return true;
+    } else {
+      modalBest.textContent = currentBest;
+    }
+  }catch(e){}
+  return false;
+}
+
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function buildDeck(){
+  const doubled = [...SYMBOLS, ...SYMBOLS];
+  const shuffled = shuffle(doubled);
+  deck = shuffled.map((sym, idx)=>({id: idx, sym, matched:false}));
+}
+
+function render(){
+  grid.innerHTML='';
+  deck.forEach((card, i)=>{
+    const btn = document.createElement('button');
+    btn.className='card';
+    btn.setAttribute('aria-label','Card '+(i+1));
+    btn.dataset.index=i;
+    btn.innerHTML=`
+      <div class="card-inner">
+        <div class="card-face card-back"></div>
+        <div class="card-face card-front">${card.sym}</div>
+      </div>
+    `;
+    btn.addEventListener('click', ()=> onFlip(i, btn));
+    // also touch for responsiveness
+    btn.addEventListener('touchstart', ()=>{}, {passive:true});
+    grid.appendChild(btn);
+  });
+  updateStats();
+}
+
+function updateStats(){
+  attemptsEl.textContent = attempts;
+  pairsEl.textContent = matchedCount + ' / 8';
+  const pct = Math.round((matchedCount/8)*100);
+  progressFill.style.width = pct + '%';
+  progressText.textContent = pct + '%';
+}
+
+function onFlip(index, el){
+  if(lock) return;
+  if(el.classList.contains('flipped')) return;
+  if(el.classList.contains('matched')) return;
+  if(flipped.length >=2) return;
+
+  el.classList.add('flipped');
+  flipped.push({index, el, sym: deck[index].sym});
+
+  if(flipped.length===2){
+    attempts++;
+    updateStats();
+    lock=true;
+    const [a,b] = flipped;
+    if(a.sym === b.sym){
+      // match
+      setTimeout(()=>{
+        a.el.classList.add('matched');
+        b.el.classList.add('matched');
+        deck[a.index].matched=true;
+        deck[b.index].matched=true;
+        matchedCount++;
+        flipped=[];
+        lock=false;
+        updateStats();
+        if(matchedCount===8){
+          win();
+        }
+      }, 380);
+    } else {
+      // mismatch
+      a.el.classList.add('mismatch');
+      b.el.classList.add('mismatch');
+      setTimeout(()=>{
+        a.el.classList.remove('flipped','mismatch');
+        b.el.classList.remove('flipped','mismatch');
+        flipped=[];
+        lock=false;
+      }, 850);
+    }
+  }
+}
+
+function win(){
+  sessionGames++;
+  try{ localStorage.setItem('flipPairGames', String(sessionGames)); }catch(e){}
+  sessionGamesEl.textContent = sessionGames;
+  const isNewBest = saveBest();
+  modalAttempts.textContent = attempts;
+  if(isNewBest){
+    modalMsg.textContent = 'New best! You cleared the board in ' + attempts + ' attempts.';
+  } else {
+    const best = bestEl.textContent;
+    if(best !== '—'){
+      modalMsg.textContent = 'Cleared in ' + attempts + ' attempts. Best is ' + best + ' — can you beat it?';
+    } else {
+      modalMsg.textContent = 'You found all 8 pairs in ' + attempts + ' attempts!';
+    }
+  }
+  overlay.classList.add('show');
+  fireConfetti();
+  // haptic if available
+  if(navigator.vibrate) navigator.vibrate([80,40,80]);
+}
+
+function resetBoard(newShuffle=true){
+  attempts=0;
+  matchedCount=0;
+  flipped=[];
+  lock=false;
+  overlay.classList.remove('show');
+  if(newShuffle) buildDeck();
+  // if not new shuffle, just reset matched flags but keep order? We'll reshuffle anyway for simplicity
+  // Actually for Restart we want same board? Spec says keep session pairs and attempts with restart - implies restart keeps same board but resets attempts. We'll do reshuffle for both for simplicity, but differentiate: Restart = same layout, New Board = new layout
+  render();
+  updateStats();
+}
+
+let currentLayout = [];
+function restartSameBoard(){
+  // keep same deck order, just flip back
+  attempts=0;
+  matchedCount=0;
+  flipped=[];
+  lock=false;
+  deck.forEach(c=>c.matched=false);
+  overlay.classList.remove('show');
+  // re-render with same deck order
+  grid.innerHTML='';
+  deck.forEach((card,i)=>{
+    const btn=document.createElement('button');
+    btn.className='card';
+    btn.dataset.index=i;
+    btn.innerHTML=`<div class="card-inner"><div class="card-face card-back"></div><div class="card-face card-front">${card.sym}</div></div>`;
+    btn.addEventListener('click', ()=> onFlip(i, btn));
+    grid.appendChild(btn);
+  });
+  updateStats();
+}
+
+function newBoard(){
+  attempts=0;
+  matchedCount=0;
+  flipped=[];
+  lock=false;
+  overlay.classList.remove('show');
+  buildDeck();
+  render();
+}
+
+// Confetti
+const canvas = document.getElementById('confetti');
+const ctx = canvas.getContext('2d');
+let confettiParticles=[];
+let confettiRunning=false;
+let confettiRAF=null;
+
+function resizeCanvas(){
+  canvas.width = window.innerWidth * window.devicePixelRatio;
+  canvas.height = window.innerHeight * window.devicePixelRatio;
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  ctx.setTransform(window.devicePixelRatio,0,0,window.devicePixelRatio,0,0);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function fireConfetti(){
+  confettiParticles=[];
+  const colors=['#38bdf8','#a78bfa','#22c55e','#facc15','#fb7185','#34d399'];
+  const count = 140;
+  for(let i=0;i<count;i++){
+    confettiParticles.push({
+      x: window.innerWidth/2 + (Math.random()-0.5)*120,
+      y: window.innerHeight/2 - 20 + (Math.random()-0.5)*40,
+      vx: (Math.random()-0.5)*12,
+      vy: -Math.random()*10 - 4,
+      r: Math.random()*6+4,
+      rot: Math.random()*360,
+      vr: (Math.random()-0.5)*12,
+      color: colors[Math.floor(Math.random()*colors.length)],
+      shape: Math.random()>0.5 ? 'rect' : 'circle',
+      life: 1
+    });
+  }
+  confettiRunning=true;
+  if(confettiRAF) cancelAnimationFrame(confettiRAF);
+  animateConfetti();
+}
+
+function animateConfetti(){
+  if(!confettiRunning) return;
+  ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
+  let alive=0;
+  confettiParticles.forEach(p=>{
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.35; // gravity
+    p.vx *= 0.99;
+    p.rot += p.vr;
+    p.life -= 0.008;
+    if(p.y < window.innerHeight + 20 && p.life>0){
+      alive++;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot * Math.PI/180);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = Math.max(0, p.life);
+      if(p.shape==='rect'){
+        ctx.fillRect(-p.r/2, -p.r/2, p.r, p.r*0.6);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0,0,p.r/2,0,Math.PI*2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  });
+  if(alive>0){
+    confettiRAF = requestAnimationFrame(animateConfetti);
+  } else {
+    confettiRunning=false;
+    ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
+  }
+}
+
+// Events
+document.getElementById('restartBtn').addEventListener('click', restartSameBoard);
+document.getElementById('newBoardBtn').addEventListener('click', newBoard);
+document.getElementById('playAgainBtn').addEventListener('click', newBoard);
+overlay.addEventListener('click', (e)=>{
+  if(e.target===overlay) overlay.classList.remove('show');
+});
+
+// Init
+loadStorage();
+buildDeck();
+render();
+</script>
+</body>
+</html>

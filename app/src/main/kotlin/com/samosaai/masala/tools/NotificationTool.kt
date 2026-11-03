@@ -99,8 +99,13 @@ class NotificationTool(private val context: Context) {
         if (!hasNotificationAccess()) return notEnabled()
         val parsed = MediaSelection.parseAction(action)
             ?: return ActionResult.error(
-                "Unknown media action '$action'. Use play, pause, toggle, next, previous, stop, " +
-                    "seek, fast_forward, or rewind."
+                if (action.contains("volume", ignoreCase = true)) {
+                    "media_control can't change the volume. Use set_volume with stream 'music' " +
+                        "and a percent from 0 to 100."
+                } else {
+                    "Unknown media action '$action'. Use play, pause, toggle, next, previous, stop, " +
+                        "seek, fast_forward, or rewind."
+                },
             )
         if (parsed == MediaAction.SEEK && positionSeconds == null) {
             return ActionResult.error("seek needs 'position_seconds'.")

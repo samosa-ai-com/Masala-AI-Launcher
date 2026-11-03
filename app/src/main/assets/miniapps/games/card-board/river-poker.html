@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Harbor Hold'em</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--felt:#0e3b2e;--felt2:#123f2f;--wood:#2b1a0e;--wood2:#3d2817;--gold:#d4af37;--gold2:#f0d27a;--smoke:#0a0f14;--card:#f8f6f0;--muted:#9fb0a8;--red:#c0392b;--green:#1e8449}
+html,body{height:100%;background:#060a0e;color:#e8e6e1;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;overflow-x:hidden}
+body{background:radial-gradient(900px 600px at 50% -10%, #1a2a3a 0%, #0a0f14 55%, #060a0e 100%)}
+.app{max-width:428px;min-height:100vh;margin:0 auto;background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.2));border-left:1px solid rgba(255,255,255,0.06);border-right:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;position:relative;overflow-x:hidden}
+.topbar{padding:12px 14px 10px;background:linear-gradient(180deg, #1a1208, #0f0a04);border-bottom:2px solid #3d2817;position:sticky;top:0;z-index:5}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.brand h1{font-size:18px;letter-spacing:0.12em;font-weight:900;color:var(--gold2);text-shadow:0 1px 0 #000, 0 0 12px rgba(212,175,55,0.35)}
+.brand h1 span{color:#fff;letter-spacing:0.06em}
+.badge{font-size:11px;padding:6px 8px;border-radius:999px;background:rgba(212,175,55,0.15);border:1px solid rgba(212,175,55,0.35);color:var(--gold2);font-weight:700}
+.statsbar{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:10px}
+.stat{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:8px 6px;text-align:center}
+.stat b{display:block;font-size:15px;color:#fff;line-height:1}
+.stat span{font-size:10px;letter-spacing:0.08em;color:var(--muted);text-transform:uppercase}
+.tabs{display:flex;gap:6px;padding:10px 12px;background:rgba(0,0,0,0.25);border-bottom:1px solid rgba(255,255,255,0.06)}
+.tab{flex:1;height:44px;border-radius:12px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.06);color:#cbd5d1;font-weight:800;font-size:13px;letter-spacing:0.06em}
+.tab.active{background:linear-gradient(180deg, #d4af37, #b8931f);color:#1a1208;border-color:#f0d27a;box-shadow:0 4px 12px rgba(212,175,55,0.35)}
+.view{flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 12px 18px}
+.card{background:linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.35)}
+.h2{font-size:13px;letter-spacing:0.1em;color:var(--gold2);font-weight:900;margin-bottom:8px}
+.p{font-size:13px;color:#cbd5d1;line-height:1.45}
+.tourGrid{display:grid;grid-template-columns:1fr;gap:10px}
+.tour{position:relative;overflow:hidden;border-radius:16px;border:1px solid rgba(255,255,255,0.08);background:linear-gradient(180deg, #142a22, #0e1f18);padding:12px;display:flex;flex-direction:column;gap:8px}
+.tour.locked{opacity:0.55;filter:grayscale(0.3)}
+.tourHead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tourName{font-weight:900;font-size:15px;color:#fff;letter-spacing:0.04em}
+.tourHarbor{font-size:11px;color:var(--gold2);letter-spacing:0.08em;text-transform:uppercase}
+.tourMeta{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:11px;padding:5px 8px;border-radius:999px;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.08);color:#e8e6e1;font-weight:700}
+.chip.gold{background:rgba(212,175,55,0.18);border-color:rgba(212,175,55,0.35);color:var(--gold2)}
+.stars{color:var(--gold2);letter-spacing:0.12em;font-size:13px}
+.rivalsRow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.rivalMini{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:999px;padding:4px 8px}
+.rivalMini i{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(180deg, #2a3a4a, #1a2530);font-size:12px;border:1px solid rgba(255,255,255,0.1)}
+.rivalMini b{font-size:11px;color:#fff}
+.rivalMini span{font-size:10px;color:var(--muted)}
+.btn{height:48px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:linear-gradient(180deg, #2a3a4a, #1e2d3a);color:#fff;font-weight:900;letter-spacing:0.06em;font-size:14px;padding:0 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation}
+.btn:active{transform:scale(0.98)}
+.btn.primary{background:linear-gradient(180deg, #d4af37, #b8931f);color:#1a1208;border-color:#f0d27a;box-shadow:0 6px 16px rgba(212,175,55,0.3)}
+.btn.ghost{background:rgba(255,255,255,0.06)}
+.btn.small{height:40px;font-size:13px;border-radius:10px}
+.btn.danger{background:linear-gradient(180deg, #c0392b, #922b21);border-color:#e74c3c;color:#fff}
+.btn.success{background:linear-gradient(180deg, #1e8449, #145a32);border-color:#27ae60}
+.felt{position:relative;background:radial-gradient(600px 400px at 50% 30%, #1a5a3a 0%, #0e3b2e 55%, #0a2a1f 100%);border:2px solid #3d2817;border-radius:18px;padding:10px;box-shadow:inset 0 0 0 2px rgba(212,175,55,0.15), 0 10px 30px rgba(0,0,0,0.5);overflow:hidden}
+.felt:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 40px), repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 40px);opacity:0.35;pointer-events:none}
+.potBar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:8px 10px;margin-bottom:8px;position:relative;z-index:1}
+.potBar b{color:var(--gold2);font-size:14px}
+.potBar span{font-size:11px;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase}
+.community{display:flex;justify-content:center;gap:6px;min-height:62px;align-items:center;position:relative;z-index:1}
+.cardSlot{width:46px;height:62px;border-radius:8px;background:rgba(0,0,0,0.25);border:1px dashed rgba(255,255,255,0.15);display:grid;place-items:center;position:relative}
+.playingCard{width:46px;height:62px;border-radius:8px;background:var(--card);border:1px solid #d8d0c0;color:#1a1a1a;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900;box-shadow:0 4px 10px rgba(0,0,0,0.35);position:relative;overflow:hidden}
+.playingCard.red{color:#c0392b}
+.playingCard.back{background:linear-gradient(135deg, #1a2a3a, #0f1a24);border-color:#2a3a4a;color:#d4af37}
+.playingCard.small{width:42px;height:56px;font-size:12px}
+.playingCard b{font-size:16px;line-height:1}
+.playingCard em{font-size:11px;font-style:normal;opacity:0.9}
+.opponents{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 0;position:relative;z-index:1}
+.opp{background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:8px;text-align:center;position:relative}
+.opp.folded{opacity:0.45;filter:grayscale(0.4)}
+.opp.active{border-color:var(--gold);box-shadow:0 0 0 2px rgba(212,175,55,0.25)}
+.opp .avatar{width:36px;height:36px;border-radius:50%;margin:0 auto 4px;display:grid;place-items:center;background:linear-gradient(180deg, #2a3a4a, #1a2530);border:1px solid rgba(255,255,255,0.1);font-size:16px}
+.opp b{font-size:11px;color:#fff;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opp span{font-size:10px;color:var(--muted);display:block}
+.opp .stack{font-size:11px;color:var(--gold2);font-weight:800;margin-top:2px}
+.opp .bet{margin-top:4px;background:rgba(212,175,55,0.15);border:1px solid rgba(212,175,55,0.3);border-radius:999px;padding:2px 6px;font-size:10px;color:var(--gold2);display:inline-block}
+.dealerChip{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:linear-gradient(180deg, #fff, #d8d0c0);border:1px solid #3d2817;color:#1a1208;font-size:9px;font-weight:900;display:grid;place-items:center;box-shadow:0 2px 6px rgba(0,0,0,0.4)}
+.playerArea{background:linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0.25));border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:10px;position:relative;z-index:1}
+.playerTop{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.posBadge{font-size:10px;letter-spacing:0.08em;padding:5px 8px;border-radius:999px;background:rgba(212,175,55,0.18);border:1px solid rgba(212,175,55,0.35);color:var(--gold2);font-weight:900}
+.hole{display:flex;justify-content:center;gap:8px;min-height:66px;align-items:center}
+.controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+.raisePanel{margin-top:10px;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:10px}
+.raiseRow{display:flex;gap:6px;margin-top:8px}
+.raiseRow .btn{flex:1;height:40px;font-size:12px}
+input[type=range]{width:100%;accent-color:#d4af37;height:28px}
+.handInfo{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;font-size:11px;color:var(--muted)}
+.handInfo b{color:#fff}
+.log{max-height:110px;overflow-y:auto;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:8px;font-size:11px;line-height:1.5;color:#cbd5d1}
+.log b{color:var(--gold2)}
+.rangeGrid{display:grid;grid-template-columns:repeat(13, 1fr);gap:2px;margin-top:8px}
+.rangeCell{aspect-ratio:1;border-radius:4px;display:grid;place-items:center;font-size:7px;font-weight:800;color:#fff;border:1px solid rgba(0,0,0,0.2);padding:1px;text-align:center;line-height:1}
+.rangeCell.fold{background:#2a2a2a;color:#8a8a8a}
+.rangeCell.call{background:#b7791f;color:#fff}
+.rangeCell.raise{background:#1e8449;color:#fff}
+.rangeCell.pair{outline:1px solid rgba(212,175,55,0.5)}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.legend span{font-size:11px;padding:4px 8px;border-radius:999px;border:1px solid rgba(255,255,255,0.08);background:rgba(0,0,0,0.25)}
+.posTabs{display:flex;gap:6px;margin-top:8px}
+.posTabs .btn{flex:1;height:40px;font-size:11px}
+.recordsGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.record{background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:10px;text-align:center}
+.record b{font-size:18px;color:var(--gold2);display:block}
+.record span{font-size:10px;letter-spacing:0.08em;color:var(--muted);text-transform:uppercase}
+.bracket{display:flex;gap:8px;margin-top:8px}
+.bracket div{flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:8px;text-align:center}
+.bracket b{font-size:11px;color:#fff;display:block}
+.bracket span{font-size:10px;color:var(--muted)}
+.bracket .won{border-color:rgba(30,132,73,0.5);background:rgba(30,132,73,0.15)}
+.bracket .activeB{border-color:var(--gold);box-shadow:0 0 0 2px rgba(212,175,55,0.2)}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#1a1208;color:var(--gold2);border:1px solid var(--gold);padding:10px 14px;border-radius:999px;font-weight:800;font-size:13px;box-shadow:0 10px 24px rgba(0,0,0,0.5);z-index:20;display:none}
+.divider{height:1px;background:rgba(255,255,255,0.06);margin:10px 0}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <h1>⚓ HARBOR <span>HOLD'EM</span></h1>
+      <div class="badge" id="titleBadge">ROOKIE</div>
+    </div>
+    <div class="statsbar">
+      <div class="stat"><b id="sTours">0/9</b><span>Tours Won</span></div>
+      <div class="stat"><b id="sStars">0★</b><span>Stars</span></div>
+      <div class="stat"><b id="sMedals">0</b><span>Medals</span></div>
+      <div class="stat"><b id="sPot">$0</b><span>Biggest Pot</span></div>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-tab="career">CAREER</button>
+    <button class="tab" data-tab="table">TABLE</button>
+    <button class="tab" data-tab="charts">RANGES</button>
+    <button class="tab" data-tab="records">RECORDS</button>
+  </div>
+  <div class="view" id="viewCareer"></div>
+  <div class="view" id="viewTable" style="display:none"></div>
+  <div class="view" id="viewCharts" style="display:none"></div>
+  <div class="view" id="viewRecords" style="display:none"></div>
+  <div class="toast" id="toast"></div>
+</div>
+<script>
+const STORAGE='harborHoldem_v2';
+const RANKS=['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
+const SUITS=['h','d','c','s'];
+const SUIT_SYM={h:'♥',d:'♦',c:'♣',s:'♠'};
+const RANK_VAL={ '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'T':10,'J':11,'Q':12,'K':13,'A':14 };
+
+const RIVALS=[
+  {id:'r1', name:'Mack "Anchor" Doyle', nick:'The Rock', style:'Tight', avatar:'🧔', agg:0.3, tight:0.85, bluff:0.05, bio:'Folds 80% — only premium.'},
+  {id:'r2', name:'Lena Voss', nick:'The Shark', style:'TAG', avatar:'🦈', agg:0.75, tight:0.6, bluff:0.15, bio:'Aggressive with strong hands.'},
+  {id:'r3', name:'Jin Park', nick:'Bluffer', style:'Loose Agg', avatar:'😏', agg:0.9, tight:0.25, bluff:0.35, bio:'Bluffs rivers constantly.'},
+  {id:'r4', name:'Rosa Delgado', nick:'Station', style:'Calling', avatar:'☎️', agg:0.2, tight:0.2, bluff:0.02, bio:'Never folds — calls down.'},
+  {id:'r5', name:'Tommy "Tide" Quinn', nick:'Maniac', style:'Maniac', avatar:'🤪', agg:0.95, tight:0.15, bluff:0.4, bio:'Raises any two.'},
+  {id:'r6', name:'Elias Crowe', nick:'The Grinder', style:'Tight Agg', avatar:'🎩', agg:0.6, tight:0.7, bluff:0.1, bio:'Patient, punishes mistakes.'},
+  {id:'r7', name:'Sofia Reyes', nick:'Ace Hunter', style:'Loose', avatar:'💄', agg:0.5, tight:0.35, bluff:0.12, bio:'Loves suited aces.'},
+  {id:'r8', name:'Hank Brine', nick:'Harbor King', style:'TAG', avatar:'👑', agg:0.7, tight:0.55, bluff:0.18, bio:'Final table regular.'},
+  {id:'r9', name:'Milo Finch', nick:'Fish', style:'Passive', avatar:'🐟', agg:0.15, tight:0.3, bluff:0.03, bio:'Checks and calls.'},
+  {id:'r10', name:'Kara Storm', nick:'Storm', style:'Aggro', avatar:'⛈️', agg:0.85, tight:0.4, bluff:0.25, bio:'Pressures blinds.'},
+  {id:'r11', name:'Dutch', nick:'Dutch', style:'Rock', avatar:'⚓', agg:0.25, tight:0.8, bluff:0.04, bio:'Waits for nuts.'},
+  {id:'r12', name:'Ivy Chen', nick:'Calculator', style:'Tight', avatar:'🧮', agg:0.55, tight:0.65, bluff:0.08, bio:'Math-perfect ranges.'}
+];
+
+const TOURS=[
+  {id:1, name:'Foggy Pier', harbor:'Misty Wharf • Tour 1', buyIn:500, sb:10, bb:20, desc:'Calm waters. Learn position.'},
+  {id:2, name:'Rustwater Dock', harbor:'Iron Harbor • Tour 2', buyIn:1000, sb:15, bb:30, desc:'Tighter regs arrive.'},
+  {id:3, name:'Amber Wharf', harbor:'Golden Quay • Tour 3', buyIn:2000, sb:25, bb:50, desc:'Bluffers test you.'},
+  {id:4, name:'Neon Harbor', harbor:'Neon Marina • Tour 4', buyIn:5000, sb:50, bb:100, desc:'Loose maniacs everywhere.'},
+  {id:5, name:'Stormbreak Quay', harbor:'Storm Harbor • Tour 5', buyIn:10000, sb:75, bb:150, desc:'Short stacks, fast blinds.'},
+  {id:6, name:"Smuggler's Cove", harbor:'Hidden Cove • Tour 6', buyIn:25000, sb:100, bb:200, desc:'Sharks circle.'},
+  {id:7, name:"Captain's Table", harbor:"Captain's Room • Tour 7", buyIn:50000, sb:150, bb:300, desc:'Only grinders remain.'},
+  {id:8, name:'Golden Anchorage', harbor:'Golden Anchorage • Tour 8', buyIn:100000, sb:250, bb:500, desc:'High rollers.'},
+  {id:9, name:'The Maelstrom', harbor:'The Maelstrom • Final', buyIn:250000, sb:500, bb:1000, desc:'Three-table knockout final.'}
+];
+
+let state = loadState();
+let game=null;
+let raiseAmt=0;
+let posChart='BTN';
+let aiTimer=null;
+
+function loadState(){
+  try{
+    const s=JSON.parse(localStorage.getItem(STORAGE));
+    if(s) return s;
+  }catch(e){}
+  return {
+    tours: TOURS.map(t=>({id:t.id, stars:0, medal:'', bestPot:0, won:false})),
+    totalStars:0, medals:{gold:0,silver:0,bronze:0}, biggestPot:0, titles:[], tourWins:0, totalHands:0, totalWinnings:0
+  };
+}
+function saveState(){ localStorage.setItem(STORAGE, JSON.stringify(state)); updateTopbar(); }
+function updateTopbar(){
+  const won = state.tours.filter(t=>t.won).length;
+  document.getElementById('sTours').textContent = won+'/9';
+  document.getElementById('sStars').textContent = state.totalStars+'★';
+  const med = (state.medals.gold+state.medals.silver+state.medals.bronze);
+  document.getElementById('sMedals').textContent = med;
+  document.getElementById('sPot').textContent = '$'+state.biggestPot.toLocaleString();
+  const titles=['ROOKIE','DOCK RAT','WHARF SHARK','HARBOUR REG','QUAY CRUSHER','COVE KING','CAPTAIN','ANCHORAGE ACE','MAELSTROM CHAMP'];
+  document.getElementById('titleBadge').textContent = titles[Math.min(won, titles.length-1)];
+}
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
+  clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',2200);
+}
+
+// Tabs
+document.querySelectorAll('.tab').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    const tab=b.dataset.tab;
+    document.getElementById('viewCareer').style.display= tab==='career'?'block':'none';
+    document.getElementById('viewTable').style.display= tab==='table'?'block':'none';
+    document.getElementById('viewCharts').style.display= tab==='charts'?'block':'none';
+    document.getElementById('viewRecords').style.display= tab==='records'?'block':'none';
+    if(tab==='career') renderCareer();
+    if(tab==='charts') renderCharts();
+    if(tab==='records') renderRecords();
+    if(tab==='table') renderTable();
+  });
+});
+
+function isTourUnlocked(id){
+  if(id===1) return true;
+  const prev=state.tours.find(t=>t.id===id-1);
+  return prev && prev.won;
+}
+
+function renderCareer(){
+  const el=document.getElementById('viewCareer');
+  let html=`<div class="card" style="margin-bottom:10px">
+    <div class="h2">HARBOR CAREER — 9 TOURS</div>
+    <div class="p">Three-table knockout each tour. Win Table A → B → Final to claim the harbor. Blinds rise, rivals profile you. Fold, Call or Raise with position.</div>
+    <div class="divider"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="chip gold">Blinds & Position matter</span>
+      <span class="chip">Profiling Rivals</span>
+      <span class="chip">Range Charts</span>
+    </div>
+  </div>`;
+  html+=`<div class="tourGrid">`;
+  TOURS.forEach(t=>{
+    const st=state.tours.find(x=>x.id===t.id);
+    const unlocked=isTourUnlocked(t.id);
+    const rivalsForTour = getRivalsForTour(t.id);
+    html+=`<div class="tour ${unlocked?'':'locked'}">
+      <div class="tourHead">
+        <div>
+          <div class="tourHarbor">${t.harbor}</div>
+          <div class="tourName">${t.name}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="stars">${'★'.repeat(st.stars)}<span style="color:#555">${'★'.repeat(3-st.stars)}</span></div>
+          <div style="font-size:10px;color:var(--muted)">${st.medal? '🏅 '+st.medal.toUpperCase(): unlocked?'READY':'LOCKED'}</div>
+        </div>
+      </div>
+      <div class="p" style="font-size:12px">${t.desc}</div>
+      <div class="tourMeta">
+        <span class="chip gold">Buy-in $${t.buyIn.toLocaleString()}</span>
+        <span class="chip">Blinds ${t.sb}/${t.bb}</span>
+        <span class="chip">${st.bestPot? 'Best pot $'+st.bestPot.toLocaleString() : '3 Tables'}</span>
+      </div>
+      <div class="rivalsRow">
+        ${rivalsForTour.slice(0,3).map(r=>`<div class="rivalMini"><i>${r.avatar}</i><b>${r.nick}</b><span>${r.style}</span></div>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:2px">
+        ${unlocked? `<button class="btn primary" style="flex:1" onclick="startTour(${t.id})">${st.won?'REPLAY':'PLAY'} — TABLE A</button>` : `<button class="btn ghost" style="flex:1" disabled>🔒 Win previous tour</button>`}
+        <button class="btn ghost small" onclick="showTourInfo(${t.id})">INFO</button>
+      </div>
+    </div>`;
+  });
+  html+=`</div>
+  <div class="card" style="margin-top:10px">
+    <div class="h2">HOW TO PLAY</div>
+    <div class="p" style="font-size:12px">
+      • You get 2 hole cards. 5 community cards come: Flop (3) → Turn (1) → River (1).<br>
+      • <b>Position:</b> BTN acts last (best), SB/BB post blinds. Play tighter early, looser late.<br>
+      • <b>Actions:</b> Fold (give up), Check/Call (match bet), Raise (increase).<br>
+      • Win chips by making best 5-card hand or making rivals fold. Knock out all 3 tables to win tour.<br>
+      • Use <b>Ranges</b> tab for starting-hand charts by position.
+    </div>
+  </div>`;
+  el.innerHTML=html;
+}
+function getRivalsForTour(tourId){
+  // deterministic pick 9 rivals for 3 tables
+  const pool=[...RIVALS];
+  // shuffle seeded by tourId
+  let seed=tourId*997;
+  function rnd(){ seed=(seed*9301+49297)%233280; return seed/233280; }
+  for(let i=pool.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+  return pool.slice(0,9);
+}
+function showTourInfo(id){
+  const t=TOURS.find(x=>x.id===id);
+  const st=state.tours.find(x=>x.id===id);
+  alert(`${t.name} — ${t.harbor}\nBuy-in $${t.buyIn}\nBlinds ${t.sb}/${t.bb}\n\nTables: A → B → Final (3 rivals each)\nStatus: ${st.won?'Won 🏆': isTourUnlocked(id)?'Unlocked':'Locked'}\nBest pot: $${st.bestPot}\n\nRivals profile your tendencies. Tighten up early, steal late.`);
+}
+window.startTour=startTour;
+window.showTourInfo=showTourInfo;
+
+function startTour(tourId){
+  const t=TOURS.find(x=>x.id===tourId);
+  // create game for table 0
+  const rivalsAll=getRivalsForTour(tourId);
+  game={
+    tourId, tableIndex:0, handNum:0, dealerPos:0,
+    tourRivals: rivalsAll,
+    sb:t.sb, bb:t.bb, buyIn:t.buyIn,
+    players:[], deck:[], community:[], pot:0, currentBet:0, round:'preflop', actor:0, log:[]
+  };
+  startTable();
+  document.querySelector('[data-tab="table"]').click();
+  toast(`Entered ${t.name} — Table A`);
+}
+function startTable(){
+  const t=TOURS.find(x=>x.id===game.tourId);
+  const tableNames=['Table A','Table B','Final Table'];
+  const startIdx=game.tableIndex*3;
+  const tableRivals=game.tourRivals.slice(startIdx, startIdx+3);
+  game.players=[
+    {id:'human', name:'You', isHuman:true, stack:1500, hole:[], folded:false, bet:0, hasActed:false, allIn:false},
+    ...tableRivals.map(r=>({id:r.id, name:r.nick, fullName:r.name, isHuman:false, rivalId:r.id, avatar:r.avatar, style:r.style, stack:1500, hole:[], folded:false, bet:0, hasActed:false, allIn:false}))
+  ];
+  game.dealerPos = Math.floor(Math.random()*game.players.length);
+  game.handNum=0;
+  game.log=[`— ${tableNames[game.tableIndex]} — Blinds ${t.sb}/${t.bb} —`];
+  nextHand();
+}
+function nextHand(){
+  if(!game) return;
+  // check table win
+  const alive = game.players.filter(p=>p.stack>0);
+  if(alive.length===1 && alive[0].isHuman){
+    // table won
+    game.log.push(`✓ Table won!`);
+    if(game.tableIndex<2){
+      game.tableIndex++;
+      const names=['Table A','Table B','Final Table'];
+      toast(`Table won → ${names[game.tableIndex]}`);
+      setTimeout(()=>{ startTable(); renderTable(); }, 900);
+      return;
+    } else {
+      // tour won
+      tourWon();
+      return;
+    }
+  }
+  if(!alive.find(p=>p.isHuman)){
+    tourLost();
+    return;
+  }
+  // remove busted players
+  game.players = game.players.filter(p=>p.stack>0 || p.isHuman);
+  if(game.players.length<2){ tourWon(); return; }
+  // rotate dealer
+  if(game.handNum>0) game.dealerPos = (game.dealerPos+1)%game.players.length;
+  game.handNum++;
+  game.deck = newDeck(); shuffle(game.deck);
+  game.community=[];
+  game.pot=0;
+  game.currentBet=0;
+  game.round='preflop';
+  game.players.forEach(p=>{ p.hole=[]; p.folded=false; p.bet=0; p.hasActed=false; p.allIn=false; });
+  // deal
+  for(let i=0;i<2;i++) game.players.forEach(p=> p.hole.push(game.deck.pop()));
+  // blinds
+  const n=game.players.length;
+  const sbIdx=(game.dealerPos+1)%n;
+  const bbIdx=(game.dealerPos+2)%n;
+  postBlind(sbIdx, game.sb);
+  postBlind(bbIdx, game.bb);
+  game.currentBet=game.bb;
+  // first actor preflop is UTG (dealer+3)
+  game.actor = (game.dealerPos+3)%n;
+  if(n===2) game.actor = sbIdx; // heads up dealer is SB
+  // if actor is blind and all-in? handle
+  game.log.push(`Hand #${game.handNum} — Dealer ${game.players[game.dealerPos].name}`);
+  raiseAmt = game.currentBet + game.bb;
+  renderTable();
+  setTimeout(processTurn, 600);
+}
+function postBlind(idx, amt){
+  const p=game.players[idx];
+  const pay=Math.min(amt, p.stack);
+  p.stack-=pay; p.bet+=pay; game.pot+=pay;
+  if(p.stack===0) p.allIn=true;
+}
+function newDeck(){
+  const d=[];
+  RANKS.forEach(r=> SUITS.forEach(s=> d.push({r,s, str:r+SUIT_SYM[s], val:RANK_VAL[r]})));
+  return d;
+}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
+
+function processTurn(){
+  if(!game) return;
+  const active = game.players.filter(p=>!p.folded && !p.allIn);
+  const notFolded = game.players.filter(p=>!p.folded);
+  if(notFolded.length===1){
+    // win by fold
+    const winner=notFolded[0];
+    winner.stack+=game.pot;
+    game.log.push(`${winner.name} wins $${game.pot} (folds)`);
+    updateBiggestPot(game.pot);
+    renderTable();
+    setTimeout(nextHand, 1200);
+    return;
+  }
+  // check if betting round complete
+  const allActed = active.every(p=>p.hasActed);
+  const betsEqual = active.every(p=>p.bet===game.currentBet);
+  const noBet = game.currentBet===0;
+  // if all acted and bets equal (or no bet) -> next round
+  if(allActed && (betsEqual || active.length===0)){
+    advanceRound();
+    return;
+  }
+  // find next actor who needs to act
+  let cur = game.players[game.actor];
+  // skip folded/allIn or already matched and acted? Actually need to loop
+  let loops=0;
+  while((cur.folded || cur.allIn || (cur.hasActed && cur.bet===game.currentBet && game.currentBet!==0) ) && loops<10){
+    // but if currentBet==0, hasActed still needs to act once
+    if(game.currentBet===0 && !cur.hasActed && !cur.folded && !cur.allIn) break;
+    if(cur.folded || cur.allIn) {
+      game.actor=(game.actor+1)%game.players.length;
+      cur=game.players[game.actor];
+      loops++;
+      continue;
+    }
+    if(cur.hasActed && cur.bet===game.currentBet) {
+      // this player is done, move on
+      game.actor=(game.actor+1)%game.players.length;
+      cur=game.players[game.actor];
+      loops++;
+      continue;
+    }
+    break;
+  }
+  // if current actor is done, check again for round end
+  if(cur.folded || cur.allIn){
+    // find next active who hasn't acted/matched
+    let found=false;
+    for(let i=0;i<game.players.length;i++){
+      const idx=(game.actor+1)%game.players.length;
+      const p=game.players[idx];
+      if(!p.folded && !p.allIn && (!p.hasActed || p.bet!==game.currentBet)){
+        game.actor=idx; found=true; break;
+      }
+      game.actor=idx;
+    }
+    if(!found){
+      advanceRound(); return;
+    }
+    cur=game.players[game.actor];
+  }
+
+  if(cur.isHuman){
+    renderTable(); // enable controls
+  } else {
+    // AI act
+    renderTable();
+    clearTimeout(aiTimer);
+    aiTimer=setTimeout(()=>{
+      const decision = aiDecision(cur);
+      applyAction(cur, decision);
+      renderTable();
+      setTimeout(processTurn, 700);
+    }, 600 + Math.random()*500);
+  }
+}
+
+function aiDecision(player){
+  const toCall = game.currentBet - player.bet;
+  const strength = estimateStrength(player);
+  const rival = RIVALS.find(r=>r.id===player.rivalId);
+  const agg = rival ? rival.agg : 0.5;
+  const tight = rival ? rival.tight : 0.5;
+  const bluff = rival ? rival.bluff : 0.1;
+
+  // preflop tightness adjustment
+  let threshFold = 0.32 + tight*0.18;
+  let threshRaise = 0.68 - agg*0.12;
+
+  if(toCall===0){
+    // can check
+    if(strength > threshRaise && Math.random() < 0.6 + agg*0.3){
+      const raiseTo = Math.min(player.stack + player.bet, game.currentBet + game.bb*2 + Math.floor(Math.random()*game.bb*2));
+      return {action:'raise', amount: Math.max(raiseTo, game.currentBet+game.bb)};
+    }
+    if(strength < 0.25 && Math.random() < bluff){
+      const raiseTo = game.currentBet + game.bb*2;
+      return {action:'raise', amount: raiseTo};
+    }
+    return {action:'check'};
+  } else {
+    if(strength < threshFold){
+      // weak: fold often, but calling stations call
+      if(rival && rival.style==='Calling' && Math.random()<0.6) return {action:'call'};
+      if(Math.random() < 0.75) return {action:'fold'};
+      return {action:'call'};
+    }
+    if(strength > threshRaise){
+      // strong raise
+      if(Math.random() < 0.7){
+        let raiseTo = game.currentBet + Math.floor(game.bb * (2 + Math.random()*3));
+        // cap by stack
+        raiseTo = Math.min(raiseTo, player.stack + player.bet);
+        if(raiseTo <= game.currentBet) return {action:'call'};
+        return {action:'raise', amount: raiseTo};
+      }
+      return {action:'call'};
+    }
+    // medium
+    if(Math.random() < bluff && strength>0.4){
+      let raiseTo = game.currentBet + game.bb*2;
+      raiseTo = Math.min(raiseTo, player.stack + player.bet);
+      return {action:'raise', amount: raiseTo};
+    }
+    // pot odds call
+    const potOdds = toCall / (game.pot + toCall + 1);
+    if(strength > 0.45 || potOdds < 0.3) return {action:'call'};
+    return {action:'fold'};
+  }
+}
+
+function estimateStrength(player){
+  // combine hole + community
+  const all = [...player.hole, ...game.community];
+  if(game.community.length===0){
+    // preflop
+    const r1=player.hole[0].val, r2=player.hole[1].val;
+    const suited = player.hole[0].s===player.hole[1].s;
+    const pair = r1===r2;
+    const high = Math.max(r1,r2), low=Math.min(r1,r2);
+    const gap = Math.abs(r1-r2);
+    let score = (r1+r2)/28; // 0.14 to 1
+    if(pair) score += 0.25 + (high-2)/26*0.15;
+    if(suited) score+=0.08;
+    if(gap===1) score+=0.06;
+    if(gap===0) {} // pair already
+    if(high>=11 && low>=10) score+=0.1;
+    if(high===14) score+=0.07;
+    return Math.min(1, Math.max(0.05, score));
+  } else {
+    // postflop evaluate best hand
+    const evalRes = evaluateBest(all);
+    // map rank to strength
+    const rankMap={1:0.15,2:0.38,3:0.58,4:0.68,5:0.78,6:0.82,7:0.88,8:0.94,9:0.98};
+    let base = rankMap[evalRes.rank] || 0.5;
+    // add kicker influence
+    if(evalRes.rank===1){
+      // high card: use high card value
+      const hc = Math.max(...all.map(c=>c.val));
+      base += (hc-2)/26*0.15;
+    }
+    // board texture: if community has pair, be cautious
+    return Math.min(0.99, base + (Math.random()*0.04-0.02));
+  }
+}
+
+function applyAction(player, dec){
+  const toCall = game.currentBet - player.bet;
+  if(dec.action==='fold'){
+    player.folded=true; player.hasActed=true;
+    game.log.push(`${player.name} folds`);
+  } else if(dec.action==='check'){
+    player.hasActed=true;
+    game.log.push(`${player.name} checks`);
+  } else if(dec.action==='call'){
+    const pay = Math.min(toCall, player.stack);
+    player.stack-=pay; player.bet+=pay; game.pot+=pay;
+    player.hasActed=true;
+    if(player.stack===0) player.allIn=true;
+    game.log.push(`${player.name} calls $${pay}`);
+  } else if(dec.action==='raise'){
+    let target = dec.amount;
+    // target is total bet this round
+    if(target <= game.currentBet) target = game.currentBet + game.bb;
+    const need = target - player.bet;
+    const pay = Math.min(need, player.stack);
+    const actualTarget = player.bet + pay;
+    player.stack-=pay; player.bet+=pay; game.pot+=pay;
+    if(actualTarget > game.currentBet){
+      game.currentBet = actualTarget;
+      // reset hasActed for others who need to respond (except raiser)
+      game.players.forEach(p=>{
+        if(p!==player && !p.folded && !p.allIn) p.hasActed=false;
+      });
+    }
+    player.hasActed=true;
+    if(player.stack===0) player.allIn=true;
+    game.log.push(`${player.name} raises to $${actualTarget}`);
+  }
+  // advance actor
+  game.actor = (game.actor+1)%game.players.length;
+}
+
+function advanceRound(){
+  // reset bets for next round
+  game.players.forEach(p=>{ p.bet=0; p.hasActed=false; });
+  game.currentBet=0;
+  if(game.round==='preflop'){
+    // flop
+    game.community.push(game.deck.pop(), game.deck.pop(), game.deck.pop());
+    game.round='flop';
+    game.log.push(`Flop: ${game.community.map(c=>c.str).join(' ')}`);
+  } else if(game.round==='flop'){
+    game.community.push(game.deck.pop());
+    game.round='turn';
+    game.log.push(`Turn: ${game.community[game.community.length-1].str}`);
+  } else if(game.round==='turn'){
+    game.community.push(game.deck.pop());
+    game.round='river';
+    game.log.push(`River: ${game.community[game.community.length-1].str}`);
+  } else if(game.round==='river'){
+    // showdown
+    doShowdown();
+    return;
+  }
+  // next round first actor is SB (dealer+1)
+  game.actor = (game.dealerPos+1)%game.players.length;
+  // if heads up, dealer acts first postflop? Actually SB first. That's dealer in HU.
+  renderTable();
+  setTimeout(processTurn, 600);
+}
+
+function doShowdown(){
+  const contenders = game.players.filter(p=>!p.folded);
+  // evaluate each
+  let best=null; let winners=[];
+  contenders.forEach(p=>{
+    const cards=[...p.hole, ...game.community];
+    const ev=evaluateBest(cards);
+    p._eval=ev;
+    if(!best || compareEval(ev,best)>0){ best=ev; winners=[p]; }
+    else if(compareEval(ev,best)===0){ winners.push(p); }
+  });
+  const share = Math.floor(game.pot / winners.length);
+  const remainder = game.pot % winners.length;
+  winners.forEach((w,i)=>{
+    const winAmt = share + (i===0? remainder:0);
+    w.stack+=winAmt;
+  });
+  const winNames=winners.map(w=>w.name).join(' & ');
+  const handName = handNameFor(best);
+  game.log.push(`Showdown: ${winNames} wins $${game.pot} with ${handName}`);
+  updateBiggestPot(game.pot);
+  state.totalHands++;
+  // reveal for a moment then next hand
+  game._showdown=true;
+  renderTable();
+  setTimeout(()=>{
+    game._showdown=false;
+    nextHand();
+    renderTable();
+  }, 2200);
+}
+
+function updateBiggestPot(pot){
+  if(pot>state.biggestPot) state.biggestPot=pot;
+  const st=state.tours.find(t=>t.id===game.tourId);
+  if(pot>st.bestPot) st.bestPot=pot;
+  saveState();
+}
+
+function tourWon(){
+  const st=state.tours.find(t=>t.id===game.tourId);
+  if(!st.won){
+    st.won=true; st.stars=3; st.medal='gold';
+    state.tourWins++; state.totalStars+=3; state.medals.gold++;
+    state.titles.push(TOURS.find(t=>t.id===game.tourId).name);
+    state.totalWinnings+=TOURS.find(t=>t.id===game.tourId).buyIn*3;
+    saveState();
+    toast(`🏆 Tour Won! +3★ Gold Medal`);
+  } else {
+    toast(`Tour replay won!`);
+  }
+  game=null;
+  renderCareer(); renderTable();
+}
+function tourLost(){
+  const st=state.tours.find(t=>t.id===game.tourId);
+  // award silver/bronze based on tableIndex
+  if(game.tableIndex===2 && !st.won){
+    // final table loss -> silver
+    if(!st.medal){ st.medal='silver'; state.medals.silver++; saveState(); }
+  } else if(game.tableIndex===1 && !st.medal){
+    st.medal='bronze'; state.medals.bronze++; saveState();
+  }
+  toast(`Busted on ${['Table A','Table B','Final'][game.tableIndex]} — Try again`);
+  game=null;
+  renderTable();
+}
+
+// Hand evaluator
+function evaluateBest(cards7){
+  // generate all 5-card combos
+  let best=null;
+  const n=cards7.length;
+  for(let a=0;a<n;a++) for(let b=a+1;b<n;b++) for(let c=b+1;c<n;c++) for(let d=c+1;d<n;d++) for(let e=d+1;e<n;e++){
+    const combo=[cards7[a],cards7[b],cards7[c],cards7[d],cards7[e]];
+    const ev=evaluateFive(combo);
+    if(!best || compareEval(ev,best)>0) best=ev;
+  }
+  return best;
+}
+function evaluateFive(cards){
+  const vals=cards.map(c=>c.val).sort((a,b)=>b-a);
+  const suits=cards.map(c=>c.s);
+  const isFlush = suits.every(s=>s===suits[0]);
+  // straight detection
+  const uniq=[...new Set(vals)].sort((a,b)=>b-a);
+  let isStraight=false, straightHigh=0;
+  // normal
+  for(let i=0;i<=uniq.length-5;i++){
+    if(uniq[i]-4===uniq[i+4] && uniq[i]-uniq[i+4]===4){
+      // check consecutive
+      let ok=true;
+      for(let k=0;k<4;k++) if(uniq[i+k]-1!==uniq[i+k+1]) ok=false;
+      if(ok){ isStraight=true; straightHigh=uniq[i]; break; }
+    }
+  }
+  // wheel A-5
+  if(!isStraight && uniq.includes(14) && uniq.includes(5) && uniq.includes(4) && uniq.includes(3) && uniq.includes(2)){
+    isStraight=true; straightHigh=5;
+  }
+  // counts
+  const cnt={};
+  vals.forEach(v=>cnt[v]=(cnt[v]||0)+1);
+  const groups=Object.entries(cnt).map(([v,c])=>({v:parseInt(v),c})).sort((a,b)=> b.c!==a.c ? b.c-a.c : b.v-a.v);
+  // straight flush
+  if(isStraight && isFlush) return {rank:9, tie:[straightHigh], name:'Straight Flush'};
+  if(groups[0].c===4) return {rank:8, tie:[groups[0].v, groups[1].v], name:'Four of a Kind'};
+  if(groups[0].c===3 && groups[1].c===2) return {rank:7, tie:[groups[0].v, groups[1].v], name:'Full House'};
+  if(isFlush) return {rank:6, tie: vals, name:'Flush'};
+  if(isStraight) return {rank:5, tie:[straightHigh], name:'Straight'};
+  if(groups[0].c===3) return {rank:4, tie:[groups[0].v, ...groups.slice(1).map(g=>g.v)], name:'Three of a Kind'};
+  if(groups[0].c===2 && groups[1].c===2) {
+    const pairs=[groups[0].v, groups[1].v].sort((a,b)=>b-a);
+    return {rank:3, tie:[...pairs, groups[2].v], name:'Two Pair'};
+  }
+  if(groups[0].c===2) return {rank:2, tie:[groups[0].v, ...groups.slice(1).map(g=>g.v)], name:'One Pair'};
+  return {rank:1, tie: vals, name:'High Card'};
+}
+function compareEval(a,b){
+  if(a.rank!==b.rank) return a.rank>b.rank?1:-1;
+  for(let i=0;i<Math.max(a.tie.length,b.tie.length);i++){
+    const av=a.tie[i]||0, bv=b.tie[i]||0;
+    if(av!==bv) return av>bv?1:-1;
+  }
+  return 0;
+}
+function handNameFor(ev){
+  const names={9:'Straight Flush',8:'Quads',7:'Full House',6:'Flush',5:'Straight',4:'Trips',3:'Two Pair',2:'Pair',1:'High Card'};
+  return names[ev.rank]||ev.name;
+}
+
+// Rendering Table
+function renderTable(){
+  const el=document.getElementById('viewTable');
+  if(!game){
+    el.innerHTML=`<div class="card">
+      <div class="h2">NO ACTIVE TABLE</div>
+      <div class="p">Go to Career and tap <b>PLAY</b> on an unlocked harbor tour. Each tour is a 3-table knockout — clear Table A, B and the Final to win the harbor.</div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn primary" style="flex:1" onclick="document.querySelector('[data-tab=career]').click()">GO TO CAREER</button>
+        <button class="btn ghost" onclick="resetCareer()">RESET CAREER</button>
+      </div>
+      <div class="divider"></div>
+      <div class="p" style="font-size:12px">Tip: Check <b>Ranges</b> for starting hands by position. BTN can play 40% of hands, UTG only 12%.</div>
+    </div>
+    <div class="card" style="margin-top:10px">
+      <div class="h2">LAST SESSION</div>
+      <div class="recordsGrid">
+        <div class="record"><b>${state.tourWins}</b><span>Tours Won</span></div>
+        <div class="record"><b>${state.totalStars}★</b><span>Total Stars</span></div>
+        <div class="record"><b>$${state.biggestPot.toLocaleString()}</b><span>Biggest Pot</span></div>
+        <div class="record"><b>${state.totalHands}</b><span>Hands Played</span></div>
+      </div>
+    </div>`;
+    return;
+  }
+  const t=TOURS.find(x=>x.id===game.tourId);
+  const tableNames=['Table A','Table B','Final Table'];
+  const posNames = getPositionNames();
+  const human = game.players.find(p=>p.isHuman);
+  const humanIdx = game.players.indexOf(human);
+  const isHumanTurn = game.players[game.actor] && game.players[game.actor].isHuman && !human.folded && !human.allIn;
+  const toCall = Math.max(0, game.currentBet - human.bet);
+  const canCheck = toCall===0;
+
+  let html=`<div class="card" style="padding:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div>
+        <div style="font-size:11px;letter-spacing:0.08em;color:var(--gold2);font-weight:900">${t.harbor.toUpperCase()}</div>
+        <div style="font-size:14px;font-weight:900;color:#fff">${t.name} — <span style="color:var(--gold2)">${tableNames[game.tableIndex]}</span></div>
+      </div>
+      <button class="btn ghost small" onclick="abandonTable()">EXIT</button>
+    </div>
+    <div class="bracket">
+      <div class="${game.tableIndex>0?'won':''} ${game.tableIndex===0?'activeB':''}"><b>Table A</b><span>${game.tableIndex>0?'✓ Won':'● Active'}</span></div>
+      <div class="${game.tableIndex>1?'won':''} ${game.tableIndex===1?'activeB':''}"><b>Table B</b><span>${game.tableIndex>1?'✓ Won': game.tableIndex===1?'● Active':'○ Locked'}</span></div>
+      <div class="${game.tableIndex===2?'activeB':''}"><b>Final</b><span>${game.tableIndex===2?'● Active':'○ Locked'}</span></div>
+    </div>
+  </div>`;
+
+  html+=`<div class="felt" style="margin-top:10px">
+    <div class="potBar">
+      <div><span>Pot</span><br><b>$${game.pot.toLocaleString()}</b></div>
+      <div style="text-align:center"><span>${game.round.toUpperCase()}</span><br><b style="color:#fff">${game.community.length? game.community.map(c=>c.str).join(' ') : 'Pre-flop'}</b></div>
+      <div style="text-align:right"><span>Blinds</span><br><b>${game.sb}/${game.bb}</b></div>
+    </div>
+    <div class="community">
+      ${[0,1,2,3,4].map(i=>{
+        const c=game.community[i];
+        if(c) return `<div class="playingCard ${c.s==='h'||c.s==='d'?'red':''}"><b>${c.r}</b><em>${SUIT_SYM[c.s]}</em></div>`;
+        return `<div class="cardSlot"><span style="font-size:10px;color:rgba(255,255,255,0.4)">${i<3?'FLOP': i===3?'TURN':'RIVER'}</span></div>`;
+      }).join('')}
+    </div>
+    <div class="opponents">
+      ${game.players.filter(p=>!p.isHuman).map(p=>{
+        const idx=game.players.indexOf(p);
+        const isDealer = idx===game.dealerPos;
+        const isActive = idx===game.actor && !p.folded;
+        const showCards = game._showdown && !p.folded;
+        return `<div class="opp ${p.folded?'folded':''} ${isActive?'active':''}">
+          ${isDealer?'<div class="dealerChip">D</div>':''}
+          <div class="avatar">${p.avatar}</div>
+          <b>${p.name}</b>
+          <span>${p.style}</span>
+          <div class="stack">$${p.stack}</div>
+          ${p.bet? `<div class="bet">$${p.bet}</div>`:''}
+          <div style="display:flex;justify-content:center;gap:2px;margin-top:4px">
+            ${showCards? p.hole.map(c=>`<div class="playingCard small ${c.s==='h'||c.s==='d'?'red':''}" style="width:28px;height:38px;font-size:10px"><b>${c.r}</b><em>${SUIT_SYM[c.s]}</em></div>`).join('') : `<div class="playingCard back small" style="width:28px;height:38px">🂠</div><div class="playingCard back small" style="width:28px;height:38px">🂠</div>`}
+          </div>
+          ${p.folded?'<div style="font-size:10px;color:#e74c3c;font-weight:800;margin-top:2px">FOLDED</div>':''}
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="playerArea">
+      <div class="playerTop">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(180deg, #d4af37, #b8931f);display:grid;place-items:center;font-weight:900;color:#1a1208">YOU</div>
+          <div>
+            <div style="font-size:12px;font-weight:900;color:#fff">You — $${human.stack} <span style="color:var(--gold2)">• Bet $${human.bet}</span></div>
+            <div style="font-size:10px;color:var(--muted)">${human.folded?'FOLDED': human.allIn?'ALL-IN': posNames[humanIdx]||''} ${isHumanTurn?'• YOUR TURN':''}</div>
+          </div>
+        </div>
+        <div class="posBadge">${posNames[humanIdx]||'BTN'}</div>
+      </div>
+      <div class="hole">
+        ${human.hole.map(c=>`<div class="playingCard ${c.s==='h'||c.s==='d'?'red':''}"><b>${c.r}</b><em>${SUIT_SYM[c.s]} ${c.s==='h'?'♥':c.s==='d'?'♦':c.s==='c'?'♣':'♠'}</em><span style="font-size:9px;opacity:0.6">${c.s==='h'||c.s==='d'?'RED':'BLACK'}</span></div>`).join('')}
+      </div>
+      ${human.folded? `<div style="text-align:center;margin-top:8px;color:#e74c3c;font-weight:800;font-size:12px">You folded — waiting for hand to end</div>` : ''}
+      ${game._showdown && !human.folded ? `<div style="text-align:center;margin-top:6px;font-size:11px;color:var(--gold2);font-weight:800">${handNameFor(human._eval||evaluateBest([...human.hole,...game.community]))} — ${human._eval? human._eval.tie.join(','):''}</div>`:''}
+    </div>
+    <div class="handInfo">
+      <span>Hand #${game.handNum} • Dealer: ${game.players[game.dealerPos].name}</span>
+      <span><b style="color:var(--gold2)">Pot $${game.pot}</b></span>
+    </div>
+  </div>`;
+
+  // Controls
+  if(!human.folded && !human.allIn && !game._showdown){
+    html+=`<div class="controls">
+      <button class="btn danger" ${!isHumanTurn?'disabled style="opacity:0.4"':''} onclick="humanAction('fold')">FOLD</button>
+      <button class="btn ${canCheck?'success':'primary'}" ${!isHumanTurn?'disabled style="opacity:0.4"':''} onclick="humanAction('${canCheck?'check':'call'}')">${canCheck?'CHECK':'CALL $'+toCall}</button>
+      <button class="btn primary" ${!isHumanTurn?'disabled style="opacity:0.4"':''} onclick="toggleRaise()">${isHumanTurn && raiseAmt>game.currentBet ? 'RAISE' : 'RAISE'}</button>
+    </div>
+    <div class="raisePanel" id="raisePanel" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;font-weight:800;color:var(--gold2)">RAISE TO</span>
+        <b id="raiseVal" style="color:#fff">$${raiseAmt}</b>
+      </div>
+      <input type="range" id="raiseSlider" min="${game.currentBet+game.bb}" max="${human.stack+human.bet}" step="${game.bb}" value="${raiseAmt}">
+      <div class="raiseRow">
+        <button class="btn ghost small" onclick="setRaise(${game.currentBet+game.bb*2})">2.5×</button>
+        <button class="btn ghost small" onclick="setRaise(${Math.floor(game.pot*0.75 + game.currentBet)})">POT</button>
+        <button class="btn ghost small" onclick="setRaise(${human.stack+human.bet})">ALL-IN</button>
+        <button class="btn primary small" onclick="confirmRaise()">CONFIRM</button>
+      </div>
+    </div>`;
+  } else if(human.allIn){
+    html+=`<div style="margin-top:10px;text-align:center;padding:10px;background:rgba(212,175,55,0.15);border:1px solid rgba(212,175,55,0.3);border-radius:12px;color:var(--gold2);font-weight:800">ALL-IN — cards will run out</div>`;
+  }
+
+  html+=`<div style="display:flex;gap:8px;margin-top:10px">
+    <button class="btn ghost small" style="flex:1" onclick="nextHand()">NEXT HAND</button>
+    <button class="btn ghost small" style="flex:1" onclick="restartTable()">RESTART TABLE</button>
+  </div>`;
+
+  html+=`<div class="log" style="margin-top:10px">${game.log.slice(-12).map(l=>`<div>${l}</div>`).join('')}</div>`;
+
+  el.innerHTML=html;
+  // bind slider
+  const slider=document.getElementById('raiseSlider');
+  if(slider){
+    slider.addEventListener('input', e=>{
+      raiseAmt=parseInt(e.target.value);
+      document.getElementById('raiseVal').textContent='$'+raiseAmt;
+    });
+  }
+  // auto raise panel if needed
+  if(isHumanTurn && toCall>0 && human.stack>toCall){
+    // keep raiseAmt valid
+    const minR = game.currentBet + game.bb;
+    const maxR = human.stack + human.bet;
+    if(raiseAmt < minR) raiseAmt=minR;
+    if(raiseAmt > maxR) raiseAmt=maxR;
+  }
+}
+function getPositionNames(){
+  const n=game.players.length;
+  const names={};
+  // dealer is BTN
+  for(let i=0;i<n;i++){
+    const offset=(i - game.dealerPos + n)%n;
+    if(n===2){
+      names[i]= offset===0? 'BTN/SB' : 'BB';
+    } else if(n===3){
+      names[i]= offset===0? 'BTN' : offset===1? 'SB' : 'BB';
+    } else if(n===4){
+      names[i]= offset===0? 'BTN' : offset===1? 'SB' : offset===2? 'BB' : 'UTG';
+    } else {
+      names[i]= offset===0? 'BTN' : offset===1? 'SB' : offset===2? 'BB' : 'MP';
+    }
+  }
+  return names;
+}
+window.humanAction=function(act){
+  if(!game) return;
+  const human=game.players.find(p=>p.isHuman);
+  if(game.players[game.actor]!==human) return;
+  if(act==='fold') applyAction(human, {action:'fold'});
+  else if(act==='check') applyAction(human, {action:'check'});
+  else if(act==='call') applyAction(human, {action:'call'});
+  renderTable();
+  setTimeout(processTurn, 400);
+}
+window.toggleRaise=function(){
+  const p=document.getElementById('raisePanel');
+  if(!p) return;
+  p.style.display = p.style.display==='none'?'block':'none';
+}
+window.setRaise=function(v){
+  const human=game.players.find(p=>p.isHuman);
+  const max=human.stack+human.bet;
+  const min=game.currentBet+game.bb;
+  raiseAmt=Math.max(min, Math.min(max, v));
+  const s=document.getElementById('raiseSlider');
+  if(s){ s.value=raiseAmt; document.getElementById('raiseVal').textContent='$'+raiseAmt; }
+}
+window.confirmRaise=function(){
+  const human=game.players.find(p=>p.isHuman);
+  if(game.players[game.actor]!==human) return;
+  applyAction(human, {action:'raise', amount: raiseAmt});
+  const p=document.getElementById('raisePanel');
+  if(p) p.style.display='none';
+  renderTable();
+  setTimeout(processTurn, 400);
+}
+window.abandonTable=function(){
+  if(confirm('Leave table? Progress on this table will be lost.')){
+    game=null; renderTable(); document.querySelector('[data-tab="career"]').click();
+  }
+}
+window.restartTable=function(){
+  if(!game) return;
+  if(confirm('Restart this table? Stacks reset.')){
+    startTable(); renderTable();
+  }
+}
+window.nextHand=function(){
+  if(!game) return;
+  // force next hand only if human folded and waiting? Just call processTurn
+  toast('Waiting for hand to finish');
+}
+window.resetCareer=function(){
+  if(confirm('Reset entire career? All stars, medals and records will be erased.')){
+    localStorage.removeItem(STORAGE);
+    state=loadState();
+    saveState();
+    renderCareer(); renderRecords(); renderTable();
+    toast('Career reset');
+  }
+}
+
+// Charts
+function renderCharts(){
+  const el=document.getElementById('viewCharts');
+  const posInfo={
+    'UTG':{name:'Early (UTG)', desc:'Tight — 12% hands. Only premiums.'},
+    'MP':{name:'Middle', desc:'18% hands. Add suited broadways.'},
+    'BTN':{name:'Late (BTN)', desc:'35% hands. Steal blinds wide.'},
+    'BB':{name:'Blinds', desc:'Defend 45% vs steal. Call many.'}
+  };
+  let html=`<div class="card">
+    <div class="h2">STARTING HAND RANGE CHARTS</div>
+    <div class="p">Green = Raise, Amber = Call, Dark = Fold. Position is everything in Hold'em.</div>
+    <div class="posTabs">
+      ${Object.keys(posInfo).map(k=>`<button class="btn ${posChart===k?'primary':'ghost'}" onclick="setPos('${k}')">${k}</button>`).join('')}
+    </div>
+    <div style="margin-top:8px;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:8px">
+      <div style="font-size:12px;font-weight:900;color:var(--gold2)">${posInfo[posChart].name}</div>
+      <div style="font-size:11px;color:var(--muted)">${posInfo[posChart].desc}</div>
+      <div class="rangeGrid" id="rangeGrid"></div>
+      <div class="legend">
+        <span style="background:#1e8449;color:#fff">● Raise</span>
+        <span style="background:#b7791f;color:#fff">● Call</span>
+        <span style="background:#2a2a2a;color:#8a8a8a">● Fold</span>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="p" style="font-size:11px">
+      <b style="color:var(--gold2)">How to read:</b> Diagonal = pairs (AA, KK...). Top-right = suited (AKs), bottom-left = offsuit (AKo).<br>
+      <b>Example BTN:</b> Raise 22+, A2s+, K9s+, Q9s+, J9s+, T9s, 98s, ATo+, KJo+.<br>
+      <b>UTG:</b> Only TT+, AJs+, KQs, AKo.
+    </div>
+  </div>
+  <div class="card" style="margin-top:10px">
+    <div class="h2">POSITIONAL TIPS</div>
+    <div class="p" style="font-size:12px">
+      • <b>Early:</b> Fold marginal hands. You'll act first post-flop.<br>
+      • <b>Late:</b> Raise to steal blinds. Rivals fold 60% to BTN raises.<br>
+      • <b>Blinds:</b> Defend with any pair, suited connectors, broadways.<br>
+      • <b>Profiling:</b> vs Rock — bluff less. vs Station — value bet thinner. vs Maniac — trap with strong hands.
+    </div>
+  </div>`;
+  el.innerHTML=html;
+  renderRangeGrid();
+}
+window.setPos=function(p){ posChart=p; renderCharts(); }
+function renderRangeGrid(){
+  const grid=document.getElementById('rangeGrid');
+  if(!grid) return;
+  const ranks=['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+  let html='';
+  for(let r=0;r<13;r++){
+    for(let c=0;c<13;c++){
+      const r1=ranks[r], r2=ranks[c];
+      let action='fold';
+      let label='';
+      if(r===c){ label=r1+r2; action=getRangeAction(r1,r2,true,true); }
+      else if(c>r){ label=r1+r2+'s'; action=getRangeAction(r1,r2,true,false); }
+      else { label=r2+r1+'o'; action=getRangeAction(r2,r1,false,false); }
+      html+=`<div class="rangeCell ${action} ${r===c?'pair':''}">${label}</div>`;
+    }
+  }
+  grid.innerHTML=html;
+}
+function getRangeAction(r1,r2,suited,isPair){
+  // r1 is higher rank? Our ranks array is high to low, but we pass correctly
+  const order={'A':14,'K':13,'Q':12,'J':11,'T':10,'9':9,'8':8,'7':7,'6':6,'5':5,'4':4,'3':3,'2':2};
+  const v1=order[r1], v2=order[r2];
+  const high=Math.max(v1,v2), low=Math.min(v1,v2);
+  const gap=Math.abs(v1-v2);
+  // thresholds per position
+  if(posChart==='UTG'){
+    if(isPair && high>=10) return 'raise';
+    if(!isPair && suited && ((high===14 && low>=10) || (high===13 && low===12))) return 'raise';
+    if(!isPair && !suited && high===14 && low===13) return 'raise';
+    return 'fold';
+  }
+  if(posChart==='MP'){
+    if(isPair && high>=7) return 'raise';
+    if(suited && high>=11 && low>=9) return 'raise';
+    if(suited && high===14 && low>=9) return 'raise';
+    if(!suited && high===14 && low>=11) return 'raise';
+    if(suited && gap===1 && high>=9) return 'call';
+    return 'fold';
+  }
+  if(posChart==='BTN'){
+    if(isPair) return 'raise';
+    if(suited && high>=9) return 'raise';
+    if(suited && gap<=2 && high>=7) return 'call';
+    if(!suited && high>=11) return 'raise';
+    if(!suited && high===14 && low>=7) return 'raise';
+    if(high>=10 && low>=9) return 'call';
+    return 'fold';
+  }
+  if(posChart==='BB'){
+    if(isPair) return 'call';
+    if(suited) return high>=8 ? 'call' : 'fold';
+    if(high>=10) return 'call';
+    if(high===14) return 'call';
+    return 'fold';
+  }
+  return 'fold';
+}
+
+function renderRecords(){
+  const el=document.getElementById('viewRecords');
+  const won=state.tours.filter(t=>t.won).length;
+  el.innerHTML=`<div class="card">
+    <div class="h2">CAREER RECORDS</div>
+    <div class="recordsGrid">
+      <div class="record"><b>${won}/9</b><span>Tours Won</span></div>
+      <div class="record"><b>${state.totalStars}★</b><span>Stars Earned</span></div>
+      <div class="record"><b style="color:#f0d27a">🥇 ${state.medals.gold}</b><span>Gold</span></div>
+      <div class="record"><b style="color:#c0c0c0">🥈 ${state.medals.silver}</b><span>Silver</span></div>
+      <div class="record"><b style="color:#cd7f32">🥉 ${state.medals.bronze}</b><span>Bronze</span></div>
+      <div class="record"><b>$${state.biggestPot.toLocaleString()}</b><span>Biggest Pot</span></div>
+      <div class="record"><b>$${state.totalWinnings.toLocaleString()}</b><span>Total Winnings</span></div>
+      <div class="record"><b>${state.totalHands}</b><span>Hands Played</span></div>
+    </div>
+    <div class="divider"></div>
+    <div class="h2">TITLES</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      ${state.titles.length? state.titles.map(t=>`<span class="chip gold">🏆 ${t}</span>`).join('') : '<span class="p">Win tours to earn harbor titles.</span>'}
+    </div>
+    <div class="divider"></div>
+    <div class="h2">TOUR MEDALS</div>
+    <div style="display:grid;gap:6px">
+      ${TOURS.map(t=>{
+        const st=state.tours.find(x=>x.id===t.id);
+        return `<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:8px 10px">
+          <div><b style="font-size:12px;color:#fff">${t.name}</b><div style="font-size:10px;color:var(--muted)">${t.harbor}</div></div>
+          <div style="text-align:right"><div style="font-size:12px">${st.medal? (st.medal==='gold'?'🥇 Gold': st.medal==='silver'?'🥈 Silver':'🥉 Bronze') : '—'}</div><div style="font-size:11px;color:var(--gold2)">${'★'.repeat(st.stars)}${'☆'.repeat(3-st.stars)}</div></div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button class="btn ghost" style="flex:1" onclick="resetCareer()">RESET CAREER</button>
+      <button class="btn primary" style="flex:1" onclick="document.querySelector('[data-tab=career]').click()">CONTINUE CAREER</button>
+    </div>
+  </div>`;
+}
+
+// init
+updateTopbar();
+renderCareer();
+renderTable();
+</script>
+</body>
+</html>

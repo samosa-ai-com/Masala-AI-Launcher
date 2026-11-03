@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Reversi Flip</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0f1410;--panel:#1a221c;--panel2:#222e24;--board:#2d7a3a;--board2:#256a31;--line:#1a4a22;--black:#0a0a0a;--white:#f0ede6;--accent:#7CFF7A;--accent2:#ffcc33;--muted:#8aa08e}
+html,body{height:100%;background:var(--bg);color:#e8efe9;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow:hidden}
+.app{height:100%;display:flex;flex-direction:column;max-width:480px;margin:0 auto;padding:10px 12px 12px;gap:10px}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#1a1a1a 50%,#f5f5f5 50%);border:2px solid #2a2a2a;display:grid;place-items:center;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.logo span{font-weight:900;font-size:14px;letter-spacing:.5px;color:#7CFF7A;text-shadow:0 1px 0 #000}
+h1{font-size:18px;letter-spacing:.8px;line-height:1}
+h1 b{color:var(--accent)}
+h1 i{font-style:normal;font-weight:400;color:var(--muted);font-size:11px;display:block;letter-spacing:.4px}
+.hdrBtns{display:flex;gap:6px}
+.iconBtn{width:36px;height:36px;border-radius:10px;border:1px solid #2e3d30;background:var(--panel);color:#dbe6dc;display:grid;place-items:center;font-size:16px;cursor:pointer}
+.iconBtn:active{transform:scale(.96)}
+.scoreBar{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
+.scoreCard{background:var(--panel);border:1px solid #2a3a2d;border-radius:14px;padding:8px 10px;display:flex;align-items:center;gap:8px;position:relative;overflow:hidden}
+.scoreCard.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(124,255,122,.25),0 4px 16px rgba(0,0,0,.3)}
+.scoreCard.active::after{content:"";position:absolute;inset:auto 0 0 0;height:3px;background:var(--accent)}
+.disc{width:28px;height:28px;border-radius:50%;flex-shrink:0;box-shadow:inset 0 2px 4px rgba(255,255,255,.3),inset 0 -3px 6px rgba(0,0,0,.4),0 2px 6px rgba(0,0,0,.4)}
+.disc.black{background:radial-gradient(circle at 30% 30%,#3a3a3a,#0a0a0a)}
+.disc.white{background:radial-gradient(circle at 30% 30%,#ffffff,#d8d2c2);border:1px solid #b8b0a0}
+.sInfo{flex:1}
+.sLabel{font-size:10px;letter-spacing:.7px;color:var(--muted);font-weight:700}
+.sCount{font-size:20px;font-weight:900;line-height:1}
+.sCount small{font-size:11px;font-weight:600;color:var(--muted)}
+.turnMid{background:var(--panel2);border:1px solid #2e3d30;border-radius:12px;padding:6px 10px;text-align:center;min-width:86px}
+.turnMid .tLab{font-size:9px;letter-spacing:.8px;color:var(--muted);font-weight:700}
+.turnMid .tVal{font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:middle}
+.dot.b{background:#0a0a0a;border:1px solid #333}
+.dot.w{background:#f0ede6;border:1px solid #aaa}
+.boardWrap{background:linear-gradient(180deg,#1e2a20,#121812);border:1px solid #2a3a2d;border-radius:18px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.boardFrame{background:linear-gradient(135deg,#3d2817,#5a3a1f);padding:8px;border-radius:14px;box-shadow:inset 0 2px 8px rgba(0,0,0,.5)}
+.board{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;background:var(--line);border-radius:8px;overflow:hidden;border:2px solid #1a2e1c;aspect-ratio:1}
+.cell{background:var(--board);position:relative;display:grid;place-items:center;cursor:pointer;user-select:none;touch-action:manipulation}
+.cell:nth-child(even){background:var(--board2)}
+.cell.valid{cursor:pointer}
+.cell.valid::after{content:"";width:14px;height:14px;border-radius:50%;background:rgba(124,255,122,.95);box-shadow:0 0 0 3px rgba(124,255,122,.25),0 2px 6px rgba(0,0,0,.3);position:absolute;animation:pulse 1.2s infinite}
+.cell.valid.hint::after{width:18px;height:18px;background:rgba(255,204,51,.95);box-shadow:0 0 0 4px rgba(255,204,51,.25)}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+.cell.lastMove{box-shadow:inset 0 0 0 2px var(--accent2)}
+.discWrap{width:84%;height:84%;border-radius:50%;position:relative;transform-style:preserve-3d;transition:transform .32s ease}
+.discWrap.flip{animation:flip .32s ease}
+@keyframes flip{0%{transform:scale(1) rotateY(0)}50%{transform:scale(1.15) rotateY(90deg)}100%{transform:scale(1) rotateY(0)}}
+.discInner{width:100%;height:100%;border-radius:50%;box-shadow:inset 0 3px 6px rgba(255,255,255,.35),inset 0 -4px 8px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.4);display:grid;place-items:center;font-size:10px}
+.discInner.black{background:radial-gradient(circle at 32% 28%,#4a4a4a 0%,#1a1a1a 45%,#000 100%)}
+.discInner.white{background:radial-gradient(circle at 32% 28%,#ffffff 0%,#f0ebe0 55%,#d5cfbe 100%);border:1px solid #b8b0a0;color:#222}
+.controls{display:flex;gap:8px}
+.btn{flex:1;height:42px;border-radius:12px;border:1px solid #2e3d30;background:var(--panel);color:#e8efe9;font-weight:700;font-size:13px;letter-spacing:.3px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn.primary{background:linear-gradient(180deg,#7CFF7A,#4ec94c);color:#0a1a0a;border-color:#4ec94c;box-shadow:0 4px 12px rgba(124,255,122,.3)}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.45;pointer-events:none}
+.matchBar{background:var(--panel);border:1px solid #2a3a2d;border-radius:12px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.matchBar .mTitle{font-size:10px;letter-spacing:.7px;color:var(--muted);font-weight:800}
+.matchScores{display:flex;gap:6px;align-items:center}
+.chip{background:var(--panel2);border:1px solid #2e3d30;border-radius:20px;padding:4px 8px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px}
+.chip b{font-size:12px}
+.chip.blackChip b{color:#fff}
+.chip.whiteChip b{color:#111;background:#f0ede6;border-radius:8px;padding:0 4px}
+.miniBtn{font-size:10px;padding:4px 8px;border-radius:8px;border:1px solid #2e3d30;background:transparent;color:var(--muted);font-weight:700;cursor:pointer}
+.status{font-size:11px;color:var(--muted);text-align:center;min-height:14px;font-weight:600}
+.status strong{color:var(--accent)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.62);backdrop-filter:blur(4px);display:none;place-items:center;padding:18px;z-index:10}
+.overlay.show{display:grid}
+.modal{background:linear-gradient(180deg,#1e2a20,#141d15);border:1px solid #2e4a30;border-radius:18px;padding:18px;width:100%;max-width:340px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.6)}
+.modal h2{font-size:20px;margin-bottom:6px}
+.modal p{font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.4}
+.bigScore{display:flex;justify-content:center;gap:12px;margin:10px 0}
+.bigScore div{background:var(--panel2);border:1px solid #2e3d30;border-radius:12px;padding:10px 14px;min-width:80px}
+.bigScore div b{font-size:22px;display:block}
+.bigScore div span{font-size:10px;letter-spacing:.6px;color:var(--muted);font-weight:700}
+.row{display:flex;gap:8px;margin-top:10px}
+.row .btn{height:44px}
+.toggleRow{display:flex;gap:6px;justify-content:center;margin-top:6px}
+.tog{font-size:11px;padding:6px 10px;border-radius:20px;border:1px solid #2e3d30;background:var(--panel2);color:var(--muted);font-weight:700;cursor:pointer}
+.tog.on{background:var(--accent);color:#0a1a0a;border-color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="logo"><span>◐</span></div>
+      <h1><b>REVERSI</b> FLIP <i>Outflank • Flip • Win</i></h1>
+    </div>
+    <div class="hdrBtns">
+      <button class="iconBtn" id="hintBtn" title="Hints">💡</button>
+      <button class="iconBtn" id="soundBtn" title="Sound">🔊</button>
+    </div>
+  </header>
+
+  <div class="scoreBar">
+    <div class="scoreCard active" id="cardB">
+      <div class="disc black"></div>
+      <div class="sInfo"><div class="sLabel">BLACK</div><div class="sCount" id="cntB">2</div></div>
+      <div style="font-size:10px;color:var(--muted);font-weight:700" id="arrowB">●</div>
+    </div>
+    <div class="turnMid">
+      <div class="tLab">TURN</div>
+      <div class="tVal" id="turnVal"><span class="dot b"></span> BLACK</div>
+      <div style="font-size:10px;color:var(--muted);font-weight:600" id="movesInfo">4 moves</div>
+    </div>
+    <div class="scoreCard" id="cardW">
+      <div class="disc white"></div>
+      <div class="sInfo"><div class="sLabel">WHITE</div><div class="sCount" id="cntW">2</div></div>
+      <div style="font-size:10px;color:var(--muted);font-weight:700" id="arrowW"></div>
+    </div>
+  </div>
+
+  <div class="boardWrap">
+    <div class="boardFrame">
+      <div class="board" id="board"></div>
+    </div>
+    <div class="status" id="status">Black to move — tap a highlighted square</div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="undoBtn">↩ Undo</button>
+    <button class="btn primary" id="newBtn">↻ Restart</button>
+    <button class="btn" id="passBtn" style="display:none">Pass →</button>
+  </div>
+
+  <div class="matchBar">
+    <div>
+      <div class="mTitle">MATCH SCORE</div>
+      <div style="font-size:10px;color:var(--muted)">Saved on this device</div>
+    </div>
+    <div class="matchScores">
+      <div class="chip blackChip">● <b id="mB">0</b></div>
+      <div class="chip" style="background:transparent;border-color:transparent;padding:2px 0">—</div>
+      <div class="chip whiteChip">○ <b id="mW">0</b></div>
+      <div class="chip" style="background:#1a221c">Draws <b id="mD">0</b></div>
+    </div>
+    <button class="miniBtn" id="resetMatch">Reset</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div style="font-size:32px" id="modalIcon">🏆</div>
+    <h2 id="modalTitle">Black Wins!</h2>
+    <p id="modalSub">32 — 32 discs on board</p>
+    <div class="bigScore">
+      <div><span>BLACK</span><b id="modalB">0</b></div>
+      <div><span>WHITE</span><b id="modalW">0</b></div>
+    </div>
+    <div class="row">
+      <button class="btn primary" id="playAgain">Play Again</button>
+      <button class="btn" id="closeModal">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SIZE=8;
+const EMPTY=0, BLACK=1, WHITE=2;
+let board, turn, history, lastMove, showHints=true, soundOn=true;
+let match={b:0,w:0,d:0};
+
+const boardEl=document.getElementById('board');
+const cntB=document.getElementById('cntB');
+const cntW=document.getElementById('cntW');
+const turnVal=document.getElementById('turnVal');
+const movesInfo=document.getElementById('movesInfo');
+const statusEl=document.getElementById('status');
+const cardB=document.getElementById('cardB');
+const cardW=document.getElementById('cardW');
+const overlay=document.getElementById('overlay');
+
+const DIRS=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+
+function loadMatch(){
+  try{
+    const s=JSON.parse(localStorage.getItem('reversi_match_v2')||'null');
+    if(s) match=s;
+  }catch(e){}
+  updateMatchUI();
+}
+function saveMatch(){
+  localStorage.setItem('reversi_match_v2', JSON.stringify(match));
+}
+function updateMatchUI(){
+  document.getElementById('mB').textContent=match.b;
+  document.getElementById('mW').textContent=match.w;
+  document.getElementById('mD').textContent=match.d;
+}
+
+function initBoard(){
+  board=Array.from({length:SIZE},()=>Array(SIZE).fill(EMPTY));
+  board[3][3]=WHITE; board[3][4]=BLACK;
+  board[4][3]=BLACK; board[4][4]=WHITE;
+  turn=BLACK;
+  history=[];
+  lastMove=null;
+  render();
+}
+
+function inBounds(r,c){return r>=0&&r<SIZE&&c>=0&&c<SIZE}
+function opponent(p){return p===BLACK?WHITE:BLACK}
+
+function getFlips(r,c,player){
+  if(board[r][c]!==EMPTY) return [];
+  const flips=[];
+  for(const [dr,dc] of DIRS){
+    let nr=r+dr, nc=c+dc;
+    const line=[];
+    while(inBounds(nr,nc) && board[nr][nc]===opponent(player)){
+      line.push([nr,nc]);
+      nr+=dr; nc+=dc;
+    }
+    if(line.length && inBounds(nr,nc) && board[nr][nc]===player){
+      flips.push(...line);
+    }
+  }
+  return flips;
+}
+function getValidMoves(player){
+  const moves=[];
+  for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++){
+    if(getFlips(r,c,player).length) moves.push([r,c]);
+  }
+  return moves;
+}
+function countDiscs(){
+  let b=0,w=0;
+  for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++){
+    if(board[r][c]===BLACK) b++;
+    else if(board[r][c]===WHITE) w++;
+  }
+  return {b,w};
+}
+function hasAnyMove(player){ return getValidMoves(player).length>0 }
+
+function makeMove(r,c){
+  const flips=getFlips(r,c,turn);
+  if(!flips.length) return false;
+  // save history for undo
+  history.push({board:board.map(row=>row.slice()), turn, lastMove});
+  if(history.length>20) history.shift();
+  board[r][c]=turn;
+  for(const [fr,fc] of flips) board[fr][fc]=turn;
+  lastMove=[r,c];
+  beep(turn===BLACK? 520: 680, 0.08);
+  // switch turn with pass handling
+  let next=opponent(turn);
+  if(hasAnyMove(next)){
+    turn=next;
+  } else if(hasAnyMove(turn)){
+    // opponent must pass, current player continues
+    turn=turn;
+    statusEl.innerHTML = `<strong>${next===BLACK?'Black':'White'} has no moves — pass!</strong> ${turn===BLACK?'Black':'White'} to move again`;
+    // show pass briefly then render
+    setTimeout(()=>{ render(); }, 400);
+    render();
+    checkGameOver();
+    return true;
+  } else {
+    // no moves for both -> game over
+    render();
+    checkGameOver();
+    return true;
+  }
+  render();
+  checkGameOver();
+  return true;
+}
+
+function checkGameOver(){
+  const bHas=hasAnyMove(BLACK);
+  const wHas=hasAnyMove(WHITE);
+  const {b,w}=countDiscs();
+  const filled = (b+w)===64;
+  if(!bHas && !wHas || filled){
+    // game over
+    let result='';
+    let icon='🏆';
+    if(b>w){ result='Black Wins!'; match.b++; icon='⚫🏆'; }
+    else if(w>b){ result='White Wins!'; match.w++; icon='⚪🏆'; }
+    else { result='Draw!'; match.d++; icon='🤝'; }
+    saveMatch(); updateMatchUI();
+    showModal(icon,result,`${b} — ${w} discs`,b,w);
+    statusEl.textContent = result + ' Tap Restart to play again';
+    beep(900,0.18);
+    setTimeout(()=>beep(1100,0.22),160);
+  }
+}
+
+function showModal(icon,title,sub,b,w){
+  document.getElementById('modalIcon').textContent=icon;
+  document.getElementById('modalTitle').textContent=title;
+  document.getElementById('modalSub').textContent=sub;
+  document.getElementById('modalB').textContent=b;
+  document.getElementById('modalW').textContent=w;
+  overlay.classList.add('show');
+}
+function hideModal(){ overlay.classList.remove('show'); }
+
+function render(){
+  const {b,w}=countDiscs();
+  cntB.textContent=b;
+  cntW.textContent=w;
+  const valid=getValidMoves(turn);
+  const validSet=new Set(valid.map(([r,c])=>r+','+c));
+  // turn UI
+  turnVal.innerHTML = turn===BLACK ? '<span class="dot b"></span> BLACK' : '<span class="dot w"></span> WHITE';
+  movesInfo.textContent = valid.length + ' move' + (valid.length!==1?'s':'');
+  cardB.classList.toggle('active', turn===BLACK);
+  cardW.classList.toggle('active', turn===WHITE);
+  document.getElementById('arrowB').textContent = turn===BLACK ? '●' : '';
+  document.getElementById('arrowW').textContent = turn===WHITE ? '●' : '';
+  // status
+  if(valid.length===0){
+    // will be handled as pass, but show message
+    const opp=opponent(turn);
+    if(hasAnyMove(opp)){
+      statusEl.innerHTML = `<strong>${turn===BLACK?'Black':'White'} has no moves — must pass</strong>`;
+      document.getElementById('passBtn').style.display='';
+    } else {
+      statusEl.textContent='No moves for either side';
+      document.getElementById('passBtn').style.display='none';
+    }
+  } else {
+    statusEl.textContent = (turn===BLACK?'Black':'White') + ' to move — tap a highlighted square';
+    document.getElementById('passBtn').style.display='none';
+  }
+  // board
+  boardEl.innerHTML='';
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      const cell=document.createElement('div');
+      cell.className='cell';
+      if(validSet.has(r+','+c)) cell.classList.add('valid');
+      if(lastMove && lastMove[0]===r && lastMove[1]===c) cell.classList.add('lastMove');
+      // hint: show best move (max flips)
+      if(showHints && validSet.has(r+','+c)){
+        // find max flips to highlight best
+        let max=0; for(const [vr,vc] of valid) max=Math.max(max, getFlips(vr,vc,turn).length);
+        if(getFlips(r,c,turn).length===max && valid.length>1) cell.classList.add('hint');
+      }
+      if(board[r][c]!==EMPTY){
+        const wrap=document.createElement('div');
+        wrap.className='discWrap';
+        const inner=document.createElement('div');
+        inner.className='discInner ' + (board[r][c]===BLACK?'black':'white');
+        wrap.appendChild(inner);
+        cell.appendChild(wrap);
+      } else if(validSet.has(r+','+c)){
+        // keep dot via CSS
+      }
+      cell.addEventListener('click', ()=> {
+        if(board[r][c]!==EMPTY) return;
+        if(!validSet.has(r+','+c)){
+          // illegal tap feedback
+          cell.animate([{transform:'translateX(0)'},{transform:'translateX(3px)'},{transform:'translateX(-3px)'},{transform:'translateX(0)'}],{duration:180});
+          beep(180,0.07);
+          return;
+        }
+        makeMove(r,c);
+      }, {passive:true});
+      // touch
+      cell.addEventListener('touchstart', (e)=>{ e.preventDefault(); cell.click(); }, {passive:false});
+      boardEl.appendChild(cell);
+    }
+  }
+  document.getElementById('undoBtn').disabled = history.length===0;
+}
+
+// controls
+document.getElementById('newBtn').addEventListener('click', ()=>{
+  beep(600,0.08);
+  initBoard();
+  hideModal();
+});
+document.getElementById('undoBtn').addEventListener('click', ()=>{
+  if(!history.length) return;
+  const prev=history.pop();
+  board=prev.board;
+  turn=prev.turn;
+  lastMove=prev.lastMove;
+  hideModal();
+  render();
+  beep(400,0.07);
+});
+document.getElementById('passBtn').addEventListener('click', ()=>{
+  turn=opponent(turn);
+  render();
+  checkGameOver();
+});
+document.getElementById('hintBtn').addEventListener('click', ()=>{
+  showHints=!showHints;
+  document.getElementById('hintBtn').style.opacity=showHints?'1':'.5';
+  render();
+});
+document.getElementById('soundBtn').addEventListener('click', ()=>{
+  soundOn=!soundOn;
+  document.getElementById('soundBtn').textContent=soundOn?'🔊':'🔇';
+  document.getElementById('soundBtn').style.opacity=soundOn?'1':'.5';
+});
+document.getElementById('resetMatch').addEventListener('click', ()=>{
+  if(confirm('Reset match score?')){
+    match={b:0,w:0,d:0}; saveMatch(); updateMatchUI();
+  }
+});
+document.getElementById('playAgain').addEventListener('click', ()=>{ hideModal(); initBoard(); });
+document.getElementById('closeModal').addEventListener('click', hideModal);
+overlay.addEventListener('click', (e)=>{ if(e.target===overlay) hideModal(); });
+
+// simple beep via WebAudio
+let audioCtx=null;
+function beep(freq, dur){
+  if(!soundOn) return;
+  try{
+    if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+    const o=audioCtx.createOscillator();
+    const g=audioCtx.createGain();
+    o.type='sine'; o.frequency.value=freq;
+    o.connect(g); g.connect(audioCtx.destination);
+    g.gain.value=0.12;
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+dur);
+    o.stop(audioCtx.currentTime+dur);
+  }catch(e){}
+}
+
+// init
+loadMatch();
+initBoard();
+document.getElementById('hintBtn').style.opacity='1';
+</script>
+</body>
+</html>

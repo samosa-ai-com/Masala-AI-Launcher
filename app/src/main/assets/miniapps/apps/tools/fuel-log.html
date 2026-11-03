@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MileTank Fuel Log</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#0f0d08;color:#f7f0e2}
+.wrap{max-width:430px;margin:0 auto;padding:16px 16px 40px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:22px;margin:0}
+.mutebtn{min-width:44px;min-height:44px;border-radius:12px;background:#221c10;color:#fff;font-size:19px;cursor:pointer;border:1px solid #3d3320}
+.cards{display:flex;gap:8px;margin:12px 0}
+.stat{flex:1;background:#221c10;border:1px solid #3d3320;border-radius:14px;padding:10px;text-align:center}
+.stat b{font-size:20px;display:block;font-variant-numeric:tabular-nums}
+.stat span{font-size:11px;opacity:.7}
+.card{background:#221c10;border:1px solid #3d3320;border-radius:16px;padding:14px;margin:12px 0}
+label{font-size:13px;opacity:.85}
+input{width:100%;min-height:48px;border-radius:12px;border:1px solid #3d3320;background:#0f0d08;color:#fff;font-size:16px;padding:0 12px;margin:4px 0 8px}
+.row3{display:flex;gap:8px}.row3 div{flex:1;min-width:0}
+button.add{width:100%;min-height:52px;border-radius:14px;border:none;background:#f59e0b;color:#221303;font-size:17px;font-weight:800;cursor:pointer}
+.entry{display:flex;justify-content:space-between;align-items:center;background:#0f0d08;border:1px solid #3d3320;border-radius:12px;padding:10px 12px;margin:8px 0}
+.entry b{font-variant-numeric:tabular-nums}
+.entry small{opacity:.7;display:block;font-size:12px}
+.del{min-width:44px;min-height:44px;border-radius:10px;border:1px solid #5b2323;background:transparent;color:#f87171;font-size:16px;cursor:pointer}
+.trend{font-size:13px;margin-top:4px}
+.up{color:#4ade80}.down{color:#f87171}
+.empty{text-align:center;opacity:.65;padding:16px;font-size:14px}
+h2{font-size:16px;margin:4px 0 8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>MileTank Fuel</h1><button class="mutebtn" id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="cards">
+<div class="stat"><b id="avgEff">–</b><span>avg km / liter</span></div>
+<div class="stat"><b id="monthCost">–</b><span>spent this month</span></div>
+<div class="stat"><b id="lastEff">–</b><span>last tank km/L</span></div>
+</div>
+<div class="card">
+<h2>New fill-up</h2>
+<div class="row3">
+<div><label for="odoIn">Odometer (km)</label><input id="odoIn" type="number" min="0" step="1" placeholder="45200"></div>
+<div><label for="litIn">Liters</label><input id="litIn" type="number" min="0.1" step="0.1" placeholder="32.5"></div>
+<div><label for="costIn">Cost ($)</label><input id="costIn" type="number" min="0" step="0.1" placeholder="45"></div>
+</div>
+<label for="dateIn">Date</label><input id="dateIn" type="date">
+<button class="add" id="addBtn">Log fill-up</button>
+<div class="trend" id="trend"></div>
+</div>
+<div class="card"><h2>History</h2><div id="list"></div></div>
+</div>
+<script>
+(function(){
+"use strict";
+var K="fuel-log-v1",MK="fuel-log-mute";
+var items=[];try{items=JSON.parse(localStorage.getItem(K)||"[]");if(!Array.isArray(items))items=[];}catch(e){items=[];}
+var muted=localStorage.getItem(MK)==="1",AC=null;
+var muteBtn=document.getElementById("muteBtn");
+function click(f){if(muted)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume();var o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.frequency.value=f||700;var t=AC.currentTime;g.gain.setValueAtTime(0.07,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.07);o.start(t);o.stop(t+0.07);}catch(e){}}
+function save(){localStorage.setItem(K,JSON.stringify(items));}
+muteBtn.textContent=muted?"🔇":"🔊";
+muteBtn.addEventListener("click",function(){muted=!muted;localStorage.setItem(MK,muted?"1":"0");muteBtn.textContent=muted?"🔇":"🔊";click(700);});
+document.getElementById("dateIn").value=new Date().toISOString().slice(0,10);
+function eff(i,arr){if(i===0)return null;var km=arr[i].odo-arr[i-1].odo;if(km<=0||arr[i].lit<=0)return null;return km/arr[i].lit;}
+function render(){
+var sorted=items.slice().sort(function(a,b){return a.odo-b.odo;});
+var effs=sorted.map(function(_,i){return eff(i,sorted);}).filter(function(x){return x!==null;});
+var avg=effs.length?(effs.reduce(function(a,b){return a+b;},0)/effs.length):null;
+document.getElementById("avgEff").textContent=avg===null?"–":avg.toFixed(1);
+document.getElementById("lastEff").textContent=effs.length?effs[effs.length-1].toFixed(1):"–";
+var now=new Date(),mk=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+var mc=sorted.filter(function(x){return (x.date||"").slice(0,7)===mk;}).reduce(function(a,b){return a+b.cost;},0);
+document.getElementById("monthCost").textContent="$"+Math.round(mc);
+var tr=document.getElementById("trend");
+if(effs.length>=2){var d=effs[effs.length-1]-effs[effs.length-2];tr.innerHTML=d>=0?'<span class="up">▲ Efficiency up '+d.toFixed(1)+' km/L vs previous tank. Nice driving.</span>':'<span class="down">▼ Efficiency down '+Math.abs(d).toFixed(1)+' km/L vs previous tank.</span>';}
+else tr.textContent=effs.length?"Log one more fill-up to see your trend.":"Efficiency appears after two fill-ups.";
+var list=document.getElementById("list");
+list.innerHTML=sorted.length?"":'<div class="empty">No fill-ups yet. Log your first one above.</div>';
+sorted.slice().reverse().forEach(function(x){
+var e=document.createElement("div");e.className="entry";
+var l=document.createElement("div");var b=document.createElement("b");b.textContent=x.odo.toLocaleString("en-US")+" km · "+x.lit+" L · $"+x.cost;l.appendChild(b);
+var sm=document.createElement("small");var idx=sorted.indexOf(x);var ee=eff(idx,sorted);sm.textContent=(x.date||"")+(ee!==null?(" · "+ee.toFixed(1)+" km/L"):" · first reading");l.appendChild(sm);
+var del=document.createElement("button");del.className="del";del.textContent="✕";del.setAttribute("aria-label","Delete fill-up");
+del.addEventListener("click",function(){if(confirm("Delete the "+x.odo+" km fill-up?")){click(440);items.splice(items.indexOf(x),1);save();render();}});
+e.appendChild(l);e.appendChild(del);list.appendChild(e);
+});
+}
+document.getElementById("addBtn").addEventListener("click",function(){
+var odo=+document.getElementById("odoIn").value,lit=+document.getElementById("litIn").value,cost=+document.getElementById("costIn").value||0;
+if(!(odo>0)||!(lit>0)){alert("Enter odometer and liters.");return;}
+if(items.some(function(x){return x.odo===odo;})){alert("That odometer reading is already logged.");return;}
+click(880);
+items.push({odo:Math.round(odo),lit:Math.round(lit*10)/10,cost:Math.round(cost*100)/100,date:document.getElementById("dateIn").value||new Date().toISOString().slice(0,10)});
+document.getElementById("odoIn").value="";document.getElementById("litIn").value="";document.getElementById("costIn").value="";
+save();render();
+});
+render();
+})();
+</script>
+</body>
+</html>

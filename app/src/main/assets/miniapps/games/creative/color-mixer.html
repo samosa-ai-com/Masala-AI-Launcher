@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Chroma Mix Studio</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;overflow-x:hidden;background:#f0f2f5;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1a1a2e}
+.wrap{max-width:428px;min-width:360px;margin:0 auto;min-height:100dvh;background:#f8f9fb;display:flex;flex-direction:column}
+header{background:#ffffff;border-bottom:1px solid #e5e7eb;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
+header h1{font-size:18px;font-weight:800;letter-spacing:-0.5px;color:#1a1a2e}
+header h1 span{color:#e63946}
+.scores{display:flex;gap:8px}
+.pill{background:#1a1a2e;color:#fff;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;min-width:72px;text-align:center}
+.pill em{font-style:normal;color:#ffd166}
+main{padding:16px;display:flex;flex-direction:column;gap:14px;flex:1}
+.card{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06);padding:14px;border:1px solid #eef0f3}
+.card h2{font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280;margin-bottom:10px;font-weight:700}
+.swatches{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.swatch{border-radius:14px;overflow:hidden;border:2px solid #e5e7eb;text-align:center}
+.swatch-top{height:96px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;letter-spacing:0.02em;transition:background 0.2s,color 0.2s}
+.swatch-label{padding:8px 6px;background:#fff;font-size:12px;font-weight:700;color:#374151}
+.swatch-label small{display:block;font-weight:600;color:#6b7280;font-size:11px;margin-top:2px;letter-spacing:0.02em}
+.hex-chip{display:inline-block;background:rgba(0,0,0,0.12);backdrop-filter:blur(4px);padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700}
+.meter-wrap{margin-top:2px}
+.meter-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.meter-head strong{font-size:14px}
+.meter-head span{font-size:13px;font-weight:800;color:#1a1a2e;background:#ffd166;padding:4px 10px;border-radius:999px}
+.bar{height:14px;background:#e5e7eb;border-radius:999px;overflow:hidden}
+.bar i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#e63946,#ff9f1c,#2ec4b6,#4361ee);border-radius:999px;transition:width 0.25s ease}
+.meter-msg{font-size:13px;color:#4b5563;margin-top:8px;min-height:18px;font-weight:600;text-align:center}
+.controls{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;align-items:center;gap:10px}
+.row-head{width:28px;height:28px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;flex-shrink:0}
+.row-head.r{background:#e63946}
+.row-head.g{background:#2a9d8f}
+.row-head.b{background:#4361ee}
+.row-main{flex:1}
+.row-main label{font-size:12px;font-weight:700;color:#374151;display:flex;justify-content:space-between;margin-bottom:6px}
+.row-main label b{font-size:13px;color:#111827}
+.slider{width:100%;height:8px;-webkit-appearance:none;appearance:none;background:#e5e7eb;border-radius:999px;outline:none}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;border-radius:50%;background:#fff;border:3px solid currentColor;box-shadow:0 2px 6px rgba(0,0,0,0.15);cursor:pointer}
+.slider.r{color:#e63946}
+.slider.g{color:#2a9d8f}
+.slider.b{color:#4361ee}
+.steppers{display:flex;gap:8px;flex-shrink:0}
+.btn-step{width:44px;height:44px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;font-size:18px;font-weight:800;color:#1a1a2e;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.btn-step:active{background:#f3f4f6;transform:scale(0.96)}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{height:52px;border-radius:14px;border:none;font-size:15px;font-weight:800;cursor:pointer;touch-action:manipulation;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-primary{background:#1a1a2e;color:#fff;box-shadow:0 4px 12px rgba(26,26,46,0.25)}
+.btn-primary:active{transform:scale(0.98)}
+.btn-ghost{background:#fff;color:#1a1a2e;border:2px solid #e5e7eb}
+.btn-ghost:active{background:#f9fafb}
+.btn-full{grid-column:1/-1;background:#ffd166;color:#1a1a2e;border:2px solid #f4a261}
+.btn-full:active{transform:scale(0.98)}
+.footer{padding:10px 16px 18px;text-align:center;font-size:11px;color:#9ca3af}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(80px);background:#1a1a2e;color:#fff;padding:12px 18px;border-radius:999px;font-size:14px;font-weight:700;opacity:0;transition:all 0.3s;pointer-events:none;z-index:99;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,0.2)}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.confetti{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:50}
+.confetti span{position:absolute;width:8px;height:12px;top:-10px;animation:fall 900ms ease-in forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg);opacity:0}}
+@media(max-width:380px){.swatches{gap:8px}.btn{font-size:14px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1><span>CHROMA</span> MIX STUDIO</h1>
+<div class="scores">
+<div class="pill">PTS <em id="pts">0</em></div>
+<div class="pill">BEST <em id="best">—</em></div>
+</div>
+</header>
+<main>
+<div class="card">
+<h2>Match the target</h2>
+<div class="swatches">
+<div class="swatch">
+<div class="swatch-top" id="targetSwatch"><span class="hex-chip" id="targetHex">#000000</span></div>
+<div class="swatch-label">TARGET <small id="targetRgb">rgb(0,0,0)</small></div>
+</div>
+<div class="swatch">
+<div class="swatch-top" id="mixSwatch"><span class="hex-chip" id="mixHex">#808080</span></div>
+<div class="swatch-label">YOUR MIX <small id="mixRgb">rgb(128,128,128)</small></div>
+</div>
+</div>
+</div>
+
+<div class="card meter-wrap">
+<div class="meter-head"><strong>Closeness</strong><span id="closeness">0%</span></div>
+<div class="bar"><i id="barFill"></i></div>
+<div class="meter-msg" id="meterMsg">Adjust sliders to get closer!</div>
+</div>
+
+<div class="card controls">
+<h2>Blend controls — tap ±5 or drag</h2>
+<div class="row">
+<div class="row-head r">R</div>
+<div class="row-main">
+<label>Red <b id="valR">128</b></label>
+<input type="range" min="0" max="255" value="128" class="slider r" id="sliderR" aria-label="Red">
+</div>
+<div class="steppers">
+<button class="btn-step" data-ch="r" data-dir="-1" aria-label="Decrease red">−</button>
+<button class="btn-step" data-ch="r" data-dir="1" aria-label="Increase red">+</button>
+</div>
+</div>
+<div class="row">
+<div class="row-head g">G</div>
+<div class="row-main">
+<label>Green <b id="valG">128</b></label>
+<input type="range" min="0" max="255" value="128" class="slider g" id="sliderG" aria-label="Green">
+</div>
+<div class="steppers">
+<button class="btn-step" data-ch="g" data-dir="-1" aria-label="Decrease green">−</button>
+<button class="btn-step" data-ch="g" data-dir="1" aria-label="Increase green">+</button>
+</div>
+</div>
+<div class="row">
+<div class="row-head b">B</div>
+<div class="row-main">
+<label>Blue <b id="valB">128</b></label>
+<input type="range" min="0" max="255" value="128" class="slider b" id="sliderB" aria-label="Blue">
+</div>
+<div class="steppers">
+<button class="btn-step" data-ch="b" data-dir="-1" aria-label="Decrease blue">−</button>
+<button class="btn-step" data-ch="b" data-dir="1" aria-label="Increase blue">+</button>
+</div>
+</div>
+</div>
+
+<div class="actions">
+<button class="btn btn-primary" id="checkBtn">✓ CHECK MATCH</button>
+<button class="btn btn-ghost" id="resetBtn">↺ RESET MIX</button>
+<button class="btn btn-full" id="newBtn">🎲 NEW TARGET</button>
+</div>
+
+</main>
+<div class="footer">Points: 70%+ 25pts • 80%+ 50pts • 90%+ 75pts • 95%+ 100pts • 98%+ 150pts<br>Progress saved on this device</div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="confetti" id="confetti"></div>
+<script>
+const $ = id => document.getElementById(id);
+const ptsEl = $('pts'), bestEl = $('best');
+const targetSwatch = $('targetSwatch'), mixSwatch = $('mixSwatch');
+const targetHexEl = $('targetHex'), mixHexEl = $('mixHex');
+const targetRgbEl = $('targetRgb'), mixRgbEl = $('mixRgb');
+const closenessEl = $('closeness'), barFill = $('barFill'), meterMsg = $('meterMsg');
+const sliders = {r:$('sliderR'), g:$('sliderG'), b:$('sliderB')};
+const vals = {r:$('valR'), g:$('valG'), b:$('valB')};
+
+let target = {r:0,g:0,b:0};
+let mix = {r:128,g:128,b:128};
+let totalPts = 0;
+let best = 0;
+
+function load(){
+  try{
+    const d = JSON.parse(localStorage.getItem('chroma-mix-v1')||'{}');
+    totalPts = d.totalPts||0;
+    best = d.best||0;
+  }catch(e){}
+  ptsEl.textContent = totalPts;
+  bestEl.textContent = best ? best+'%' : '—';
+}
+function save(){
+  localStorage.setItem('chroma-mix-v1', JSON.stringify({totalPts,best}));
+}
+function randTarget(){
+  // avoid too dark/grayish for fun - ensure at least one channel >80 and variance
+  let r,g,b;
+  do{
+    r = Math.floor(Math.random()*256);
+    g = Math.floor(Math.random()*256);
+    b = Math.floor(Math.random()*256);
+  } while(Math.max(r,g,b) < 90 || (Math.max(r,g,b)-Math.min(r,g,b) < 30 && Math.random()<0.7));
+  target = {r,g,b};
+  renderTarget();
+  updateMeter();
+}
+function toHex(c){ return '#'+[c.r,c.g,c.b].map(v=>v.toString(16).padStart(2,'0')).join('').toUpperCase(); }
+function contrastColor(c){
+  // luminance
+  const lum = 0.299*c.r + 0.587*c.g + 0.114*c.b;
+  return lum > 150 ? '#1a1a2e' : '#ffffff';
+}
+function renderTarget(){
+  const hex = toHex(target);
+  targetSwatch.style.background = hex;
+  targetSwatch.style.color = contrastColor(target);
+  targetHexEl.textContent = hex;
+  targetHexEl.style.background = contrastColor(target)==='#ffffff' ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.10)';
+  targetRgbEl.textContent = `rgb(${target.r}, ${target.g}, ${target.b})`;
+}
+function renderMix(){
+  const hex = toHex(mix);
+  mixSwatch.style.background = hex;
+  mixSwatch.style.color = contrastColor(mix);
+  mixHexEl.textContent = hex;
+  mixHexEl.style.background = contrastColor(mix)==='#ffffff' ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.10)';
+  mixRgbEl.textContent = `rgb(${mix.r}, ${mix.g}, ${mix.b})`;
+  vals.r.textContent = mix.r;
+  vals.g.textContent = mix.g;
+  vals.b.textContent = mix.b;
+  sliders.r.value = mix.r;
+  sliders.g.value = mix.g;
+  sliders.b.value = mix.b;
+}
+function closenessScore(){
+  const dr = target.r - mix.r, dg = target.g - mix.g, db = target.b - mix.b;
+  const dist = Math.sqrt(dr*dr + dg*dg + db*db);
+  const maxDist = Math.sqrt(3*255*255); // 441.67
+  const closeness = Math.max(0, 100 - (dist / maxDist * 100));
+  return {closeness, dist};
+}
+function updateMeter(){
+  renderMix();
+  const {closeness} = closenessScore();
+  const pct = Math.round(closeness*10)/10;
+  closenessEl.textContent = pct + '%';
+  barFill.style.width = pct + '%';
+  let msg = '';
+  if(pct < 40) msg = 'Keep mixing — you’re far off';
+  else if(pct < 60) msg = 'Getting warmer…';
+  else if(pct < 75) msg = 'Good — fine-tune it!';
+  else if(pct < 85) msg = 'Great match — almost there!';
+  else if(pct < 95) msg = 'Excellent — so close!';
+  else if(pct < 98) msg = '🔥 Near perfect!';
+  else msg = '💎 Perfect match!';
+  meterMsg.textContent = msg;
+  if(pct > best){
+    // don't auto-save best until check, but show live best preview? keep saved best only
+  }
+}
+function pointsFor(pct){
+  if(pct >= 98) return 150;
+  if(pct >= 95) return 100;
+  if(pct >= 90) return 75;
+  if(pct >= 80) return 50;
+  if(pct >= 70) return 25;
+  return 0;
+}
+function showToast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._hide);
+  t._hide = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function burstConfetti(){
+  const c = $('confetti');
+  c.innerHTML='';
+  const colors=['#e63946','#ffd166','#2ec4b6','#4361ee','#f4a261','#06d6a0'];
+  for(let i=0;i<18;i++){
+    const s=document.createElement('span');
+    s.style.left = (Math.random()*100)+'%';
+    s.style.background = colors[Math.floor(Math.random()*colors.length)];
+    s.style.animationDelay = (Math.random()*0.2)+'s';
+    s.style.transform = `rotate(${Math.random()*360}deg)`;
+    s.style.borderRadius = Math.random()>0.5?'50%':'2px';
+    c.appendChild(s);
+  }
+  setTimeout(()=>c.innerHTML='',1200);
+}
+function haptic(ms){ try{ navigator.vibrate && navigator.vibrate(ms);}catch(e){} }
+
+Object.keys(sliders).forEach(ch=>{
+  sliders[ch].addEventListener('input', e=>{
+    mix[ch] = parseInt(e.target.value,10);
+    updateMeter();
+  });
+});
+document.querySelectorAll('.btn-step').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const ch = btn.dataset.ch;
+    const dir = parseInt(btn.dataset.dir,10);
+    let v = mix[ch] + dir*5;
+    v = Math.max(0, Math.min(255, v));
+    mix[ch]=v;
+    updateMeter();
+    haptic(10);
+  });
+});
+$('checkBtn').addEventListener('click', ()=>{
+  const {closeness} = closenessScore();
+  const pct = Math.round(closeness*10)/10;
+  const pts = pointsFor(pct);
+  if(pts>0){
+    totalPts += pts;
+    ptsEl.textContent = totalPts;
+    if(pct > best){ best = pct; bestEl.textContent = best+'%'; }
+    save();
+    showToast(`+${pts} pts — ${pct}% close!`);
+    if(pct>=90){ burstConfetti(); haptic([30,40,30]); } else haptic(30);
+  } else {
+    showToast(`${pct}% — need 70%+ to score. Keep mixing!`);
+    haptic([20,30,20]);
+  }
+});
+$('resetBtn').addEventListener('click', ()=>{
+  mix = {r:128,g:128,b:128};
+  updateMeter();
+  showToast('Mix reset to gray');
+  haptic(10);
+});
+$('newBtn').addEventListener('click', ()=>{
+  randTarget();
+  showToast('New target ready!');
+  haptic(15);
+});
+
+// init
+load();
+randTarget();
+renderMix();
+updateMeter();
+</script>
+</body>
+</html>

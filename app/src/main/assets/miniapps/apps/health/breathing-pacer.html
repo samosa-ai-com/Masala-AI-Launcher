@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CalmLoop Breathing Pacer</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#0b1f22;color:#eaf6f4;transition:background .4s}
+body.flash{background:#134e4a}
+.wrap{max-width:430px;margin:0 auto;padding:16px 16px 40px;text-align:center}
+header{display:flex;align-items:center;justify-content:space-between;text-align:left}
+h1{font-size:22px;margin:0}
+.mutebtn{min-width:44px;min-height:44px;border-radius:12px;border:1px solid #234c48;background:#102e2c;color:#fff;font-size:19px;cursor:pointer}
+.patterns{display:flex;gap:8px;margin:14px 0}
+.patterns button{flex:1;min-height:48px;border-radius:12px;border:1px solid #234c48;background:#102e2c;color:#eaf6f4;font-size:14px;font-weight:600;cursor:pointer}
+.patterns button.on{background:#14b8a6;border-color:#14b8a6;color:#04211e}
+.orbit{height:280px;display:flex;align-items:center;justify-content:center}
+#circle{border-radius:50%;background:radial-gradient(circle at 35% 35%,#5eead4,#0d9488 70%);display:flex;align-items:center;justify-content:center;flex-direction:column;width:120px;height:120px;transition-property:width,height;transition-timing-function:ease-in-out;box-shadow:0 0 60px rgba(45,212,191,.35)}
+#phaseLbl{font-size:18px;font-weight:700;color:#04211e}
+#countLbl{font-size:34px;font-weight:800;color:#04211e;font-variant-numeric:tabular-nums}
+.stats{display:flex;gap:10px;margin:12px 0}
+.stat{flex:1;background:#102e2c;border:1px solid #234c48;border-radius:14px;padding:10px}
+.stat b{font-size:22px;display:block}
+.stat span{font-size:12px;opacity:.75}
+.row{display:flex;gap:10px}
+button.big{flex:1;min-height:52px;border-radius:14px;border:none;font-size:18px;font-weight:700;cursor:pointer}
+#startBtn{background:#14b8a6;color:#04211e}
+#stopBtn{background:transparent;border:1px solid #234c48;color:#eaf6f4}
+.desc{font-size:14px;opacity:.85;min-height:40px;margin:8px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>CalmLoop Breath</h1><button class="mutebtn" id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="patterns" role="tablist">
+<button data-p="box" class="on">Box 4·4·4·4</button>
+<button data-p="calm">Deep Calm 4·7·8</button>
+<button data-p="steady">Steady 5·5</button>
+</div>
+<p class="desc" id="desc">Box breathing: inhale, hold, exhale, hold — 4 seconds each.</p>
+<div class="orbit"><div id="circle"><div id="phaseLbl">Ready</div><div id="countLbl">–</div></div></div>
+<div class="stats">
+<div class="stat"><b id="cycleCt">0</b><span>cycles this session</span></div>
+<div class="stat"><b id="sessCt">0</b><span>total sessions</span></div>
+<div class="stat"><b id="breathCt">0</b><span>lifetime breaths</span></div>
+</div>
+<div class="row"><button class="big" id="startBtn">Begin</button><button class="big" id="stopBtn">Stop</button></div>
+</div>
+<script>
+(function(){
+"use strict";
+var MK="breathing-pacer-mute",K="breathing-pacer-v1";
+var PATTERNS={box:{steps:[["Breathe in",4,170],["Hold",4,170],["Breathe out",4,110],["Hold",4,110]],desc:"Box breathing: inhale, hold, exhale, hold — 4 seconds each."},calm:{steps:[["Breathe in",4,165],["Hold",7,165],["Breathe out",8,105]],desc:"Deep calm 4-7-8: inhale 4, hold 7, long exhale 8."},steady:{steps:[["Breathe in",5,170],["Breathe out",5,110]],desc:"Steady rhythm: 5 seconds in, 5 seconds out. No holds."}};
+var cur="box",data={sessions:0,breaths:0};
+try{var d=JSON.parse(localStorage.getItem(K)||"{}");if(typeof d.sessions==="number")data.sessions=d.sessions;if(typeof d.breaths==="number")data.breaths=d.breaths;}catch(e){}
+var muted=localStorage.getItem(MK)==="1",AC=null;
+var circle=document.getElementById("circle"),phaseLbl=document.getElementById("phaseLbl"),countLbl=document.getElementById("countLbl"),desc=document.getElementById("desc");
+var cycleCt=document.getElementById("cycleCt"),sessCt=document.getElementById("sessCt"),breathCt=document.getElementById("breathCt");
+var muteBtn=document.getElementById("muteBtn"),startBtn=document.getElementById("startBtn"),stopBtn=document.getElementById("stopBtn");
+function save(){localStorage.setItem(K,JSON.stringify(data));}
+function tick(f,dur){if(muted)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume();var o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.type="sine";o.frequency.value=f;var t=AC.currentTime;g.gain.setValueAtTime(0.1,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);o.start(t);o.stop(t+dur);}catch(e){}}
+function refresh(){sessCt.textContent=data.sessions;breathCt.textContent=data.breaths;}
+refresh();
+muteBtn.textContent=muted?"🔇":"🔊";
+muteBtn.addEventListener("click",function(){muted=!muted;localStorage.setItem(MK,muted?"1":"0");muteBtn.textContent=muted?"🔇":"🔊";tick(660,0.08);});
+document.querySelectorAll(".patterns button").forEach(function(b){b.addEventListener("click",function(){if(running)return;tick(660,0.07);document.querySelectorAll(".patterns button").forEach(function(x){x.classList.remove("on");});b.classList.add("on");cur=b.getAttribute("data-p");desc.textContent=PATTERNS[cur].desc;});});
+var running=false,timers=[],cycles=0;
+function flash(){document.body.classList.add("flash");setTimeout(function(){document.body.classList.remove("flash");},350);}
+function setCircle(size,dur){circle.style.transitionDuration=dur+"s";circle.style.width=size+"px";circle.style.height=size+"px";}
+function runStep(si){
+if(!running)return;
+var steps=PATTERNS[cur].steps,st=steps[si%steps.length];
+phaseLbl.textContent=st[0];setCircle(st[2],st[1]);
+flash();tick(st[0]==="Breathe out"?520:740,0.25);
+var left=st[1],t0=setInterval(function(){if(!running){clearInterval(t0);return;}left--;if(left<=0){clearInterval(t0);}else{countLbl.textContent=left;}},1000);
+countLbl.textContent=st[1];
+var t1=setTimeout(function(){
+if(!running)return;
+data.breaths++;breathCt.textContent=data.breaths;save();
+var next=(si+1)%steps.length;
+if(next===0){cycles++;cycleCt.textContent=cycles;}
+runStep(si+1);
+},st[1]*1000);
+timers.push(t0,t1);
+}
+startBtn.addEventListener("click",function(){tick(660,0.08);if(running)return;running=true;cycles=0;cycleCt.textContent="0";data.sessions++;save();refresh();runStep(0);});
+stopBtn.addEventListener("click",function(){tick(440,0.08);running=false;timers.forEach(clearTimeout);timers.forEach(clearInterval);timers=[];phaseLbl.textContent="Ready";countLbl.textContent="–";setCircle(120,0.6);});
+})();
+</script>
+</body>
+</html>

@@ -1,11 +1,14 @@
 package com.samosaai.masala.core.layout
 
+import com.samosaai.masala.core.contract.CellGridSection
+import com.samosaai.masala.core.contract.CellContent
 import com.samosaai.masala.core.contract.Condition
 import com.samosaai.masala.core.contract.DockSection
 import com.samosaai.masala.core.contract.Effect
 import com.samosaai.masala.core.contract.GridSection
 import com.samosaai.masala.core.contract.GroupSection
 import com.samosaai.masala.core.contract.HeaderSection
+import com.samosaai.masala.core.contract.HtmlSection
 import com.samosaai.masala.core.contract.IconRef
 import com.samosaai.masala.core.contract.Item
 import com.samosaai.masala.core.contract.ItemSection
@@ -17,10 +20,11 @@ import com.samosaai.masala.core.contract.Rule
 import com.samosaai.masala.core.contract.SizeRange
 import com.samosaai.masala.core.contract.SkillWidgetSection
 import com.samosaai.masala.core.contract.StackSection
-import com.samosaai.masala.core.contract.WidgetComponent
 import com.samosaai.masala.core.contract.WidgetSection
+import com.samosaai.masala.core.contract.WidgetRef
 import com.samosaai.masala.core.contract.WidgetSpec
 import com.samosaai.masala.core.migration.LayoutMigrations
+import com.samosaai.masala.core.widgets.WidgetChecker
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -45,6 +49,12 @@ object LayoutChecker {
         val toolNames: Set<String>? = null,
         /** Mode IDs `set_mode` may use; null skips the check. */
         val modeIds: Set<String>? = null,
+        /** The widget library, for refs (schema 3); null skips the check. */
+        val widgets: Map<String, WidgetSpec>? = null,
+        /** Stream source IDs `video`/`snapshot` may use; null skips the check. */
+        val streamSourceIds: Set<String>? = null,
+        /** Mini-app IDs `html` sections may show; null skips the check. */
+        val miniAppIds: Set<String>? = null,
     ) {
         fun installed(packageName: String, user: Long) = user in installedApps[packageName].orEmpty()
     }
@@ -60,8 +70,18 @@ object LayoutChecker {
     const val MAX_ITEMS_PER_SECTION = 48
     const val MAX_DOCK_ITEMS = 6
     const val MAX_COLUMNS = 6
+
+    /** How far down a cell grid may reach: a bound for imported and generated layouts. */
+    const val MAX_GRID_ROWS = 64
     const val MAX_WIDGETS_IN_STACK = 8
+    const val MAX_HTML_PER_PAGE = 2
+    /** Declared widget rows on one page (refs, overrides, inline defaults, HTML rows). */
+    const val MAX_WIDGET_ROWS_PER_PAGE = 8
+    /** Rendered rows on one page, for placement routing (header, grids, drawn widgets, HTML). */
+    const val MAX_PAGE_ROWS = 12
     const val MAX_ROWS = 8
+    const val MAX_FOLDER_ITEMS = 16
+    const val MAX_FOLDER_LABEL = 60
 
     /**
      * Reads layout JSON the strict way, migrating older schema versions first. A document that doesn't
@@ -101,6 +121,18 @@ object LayoutChecker {
             if (page.sections.size > MAX_SECTIONS_PER_PAGE) {
                 problems += Problem("$pagePath.sections", "At most $MAX_SECTIONS_PER_PAGE sections on a page")
             }
+            // An HTML widget is a live WebView: at most two per page, so home keeps its frame time.
+            val htmlCells = page.sections.filterIsInstance<CellGridSection>().sumOf { g -> g.cells.count { it.content is CellContent.HtmlCell } }
+            if (page.sections.filterIsInstance<HtmlSection>().size + htmlCells > MAX_HTML_PER_PAGE) {
+                problems += Problem("$pagePath.sections", "At most $MAX_HTML_PER_PAGE HTML widgets on a page")
+            }
+            // A page holds at most eight declared widget rows: the author's height intent stays
+            // coherent. Items are never counted, so existing grids keep editing. Rendered fit is
+            // the placer's job (estimates, overflow), since cards draw taller than their rows.
+            val sizes = env.widgets?.mapValues { it.value.size.default }.orEmpty()
+            if (LayoutEdits.declaredWidgetRows(page.sections, sizes) > MAX_WIDGET_ROWS_PER_PAGE) {
+                problems += Problem("$pagePath.sections", "At most $MAX_WIDGET_ROWS_PER_PAGE widget rows on a page")
+            }
             page.sections.forEachIndexed { s, section ->
                 val path = "$pagePath.sections[$s]"
                 id(section.id, path)
@@ -108,16 +140,18 @@ object LayoutChecker {
                 when (section) {
                     is HeaderSection -> Unit
                     is ItemSection -> checkItemSection(section, path, env, ::id, problems)
-                    is WidgetSection -> checkWidget(section.widget, "$path.widget", env, ::id, problems)
-                    is StackSection -> {
-                        if (section.widgets.isEmpty()) problems += Problem("$path.widgets", "A stack needs a widget")
-                        if (section.widgets.size > MAX_WIDGETS_IN_STACK) {
-                            problems += Problem("$path.widgets", "At most $MAX_WIDGETS_IN_STACK widgets in a stack")
-                        }
-                        section.widgets.forEachIndexed { w, widget -> checkWidget(widget, "$path.widgets[$w]", env, ::id, problems) }
+                    is WidgetSection -> when {
+                        section.widget != null && section.ref != null ->
+                            problems += Problem(path, "A widget section has 'ref' or 'widget', not both")
+                        section.ref != null -> checkRef(section.ref, "$path.ref", env, problems)
+                        section.widget != null -> checkWidget(section.widget, "$path.widget", env, ::id, problems)
+                        else -> problems += Problem("$path.ref", "A widget section needs 'ref'")
                     }
+                    is StackSection -> checkStack(section, path, env, ::id, problems)
                     is SkillWidgetSection ->
                         if (section.skillId !in env.skillIds) problems += Problem("$path.skillId", "Unknown skill '${section.skillId}'")
+                    is HtmlSection -> checkHtml(section, path, env, problems)
+                    is CellGridSection -> checkCells(section, path, env, ::id, problems)
                 }
             }
         }
@@ -138,23 +172,52 @@ object LayoutChecker {
                 problems += Problem("$path.columns", "columns must be 1 to $MAX_COLUMNS")
             }
             is ListSection, is GroupSection, is DockSection -> Unit
-            else -> Unit
         }
         section.items.forEachIndexed { i, item ->
             val itemPath = "$path.items[$i]"
             id(item.id, itemPath)
-            checkItem(item, itemPath, env, problems)
+            checkItem(item, itemPath, env, id, problems)
         }
     }
 
-    private fun checkItem(item: Item, path: String, env: Environment, problems: MutableList<Problem>) {
+    private fun checkItem(item: Item, path: String, env: Environment, id: (String, String) -> Unit, problems: MutableList<Problem>) {
         if (item.label.isBlank()) problems += Problem("$path.label", "label is empty")
+        if (item.action is MasalaAction.OpenFolder && item.label.length > MAX_FOLDER_LABEL) {
+            problems += Problem("$path.label", "A folder name has at most $MAX_FOLDER_LABEL characters")
+        }
         checkIcon(item.icon, "$path.icon", env, problems)
-        checkAction(item.action, "$path.action", env, problems)
+        checkAction(item.action, "$path.action", env, problems, id)
         checkRules(item.rules, "$path.rules", null, problems)
     }
 
-    private fun checkIcon(icon: IconRef, path: String, env: Environment, problems: MutableList<Problem>) {
+    /** One level only: a folder's children are plain items with no rules. */
+    private fun checkFolder(
+        folder: MasalaAction.OpenFolder,
+        path: String,
+        env: Environment,
+        id: ((String, String) -> Unit)?,
+        problems: MutableList<Problem>,
+    ) {
+        if (id == null) {
+            problems += Problem(path, "Folders can only be home items")
+            return
+        }
+        if (folder.items.size !in 1..MAX_FOLDER_ITEMS) {
+            problems += Problem("$path.items", "A folder holds 1 to $MAX_FOLDER_ITEMS items")
+        }
+        folder.items.forEachIndexed { i, child ->
+            val childPath = "$path.items[$i]"
+            id(child.id, childPath)
+            if (child.action is MasalaAction.OpenFolder) {
+                problems += Problem("$childPath.action", "Folders can't contain folders")
+            } else {
+                checkItem(child, childPath, env, id, problems)
+            }
+            if (child.rules.isNotEmpty()) problems += Problem("$childPath.rules", "Items in a folder can't have rules")
+        }
+    }
+
+    internal fun checkIcon(icon: IconRef, path: String, env: Environment, problems: MutableList<Problem>) {
         when (icon) {
             is IconRef.AppIcon ->
                 if (!env.installed(icon.packageName, icon.user)) {
@@ -166,8 +229,21 @@ object LayoutChecker {
         }
     }
 
-    fun checkAction(action: MasalaAction, path: String, env: Environment, problems: MutableList<Problem>) {
+    /** [id] registers folder children's ids; without it (a widget button) a folder is a problem. */
+    fun checkAction(
+        action: MasalaAction,
+        path: String,
+        env: Environment,
+        problems: MutableList<Problem>,
+        id: ((String, String) -> Unit)? = null,
+    ) {
         when (action) {
+            is MasalaAction.OpenFolder -> checkFolder(action, path, env, id, problems)
+            // The meeting app and its widget state need nothing from the layout environment.
+            MasalaAction.MeetingStart,
+            MasalaAction.MeetingToggle,
+            MasalaAction.MeetingStop,
+            is MasalaAction.OpenMeeting -> Unit
             is MasalaAction.LaunchApp -> if (!env.installed(action.packageName, action.user)) {
                 problems += Problem("$path.packageName", "${action.packageName} is not installed for user ${action.user}")
             }
@@ -195,6 +271,15 @@ object LayoutChecker {
             is MasalaAction.StartTimer -> if (action.seconds !in 1..MAX_TIMER_SECONDS) {
                 problems += Problem("$path.seconds", "seconds must be 1 to $MAX_TIMER_SECONDS")
             }
+            is MasalaAction.Flip -> {
+                if (action.kind != "coin" && action.kind != "dice") {
+                    problems += Problem("$path.kind", "Only a coin or a dice can be flipped")
+                }
+                if (action.key.isBlank()) problems += Problem("$path.key", "key is empty")
+            }
+            is MasalaAction.OpenSettings -> if (action.page !in SETTINGS_PAGES) {
+                problems += Problem("$path.page", "Unknown settings page '${action.page}'")
+            }
             is MasalaAction.SetMode -> if (env.modeIds != null && action.id !in env.modeIds) {
                 problems += Problem("$path.id", "Unknown mode '${action.id}'")
             }
@@ -204,12 +289,17 @@ object LayoutChecker {
             is MasalaAction.RunTool -> if (env.toolNames != null && action.name !in env.toolNames) {
                 problems += Problem("$path.name", "Unknown tool '${action.name}'")
             }
-            // An empty ask_masala prompt opens the ask box with nothing typed.
+            // An empty ask_masala prompt opens the ask box with nothing typed. A blank refresh_widget
+            // id means the widget holding the button; the renderer fills it in before dispatching.
+            is MasalaAction.OpenSettings,
+            is MasalaAction.Flip,
             MasalaAction.OpenDrawer, MasalaAction.ExpandNotifications, is MasalaAction.Search,
-            is MasalaAction.OpenMiniApp, is MasalaAction.AskMasala -> Unit
+            is MasalaAction.OpenMiniApp, is MasalaAction.AskMasala, is MasalaAction.RefreshWidget,
+            is MasalaAction.PlaySound -> Unit
         }
     }
 
+    /** An inline widget (schema 2 and older): its id is unique in the layout like any other. */
     private fun checkWidget(
         widget: WidgetSpec,
         path: String,
@@ -218,28 +308,126 @@ object LayoutChecker {
         problems: MutableList<Problem>,
     ) {
         id(widget.id, path)
-        checkSize(widget.size, "$path.size", problems)
-        checkRules(widget.rules, "$path.rules", widget.size, problems)
-        if (widget.components.isEmpty()) problems += Problem("$path.components", "A widget needs a component")
-        widget.components.forEachIndexed { c, component ->
-            val cPath = "$path.components[$c]"
-            when (component) {
-                is WidgetComponent.Button -> checkAction(component.action, "$cPath.action", env, problems)
-                is WidgetComponent.Image -> checkIcon(component.icon, "$cPath.icon", env, problems)
-                is WidgetComponent.Timer -> if (component.seconds <= 0) problems += Problem("$cPath.seconds", "seconds must be above 0")
-                is WidgetComponent.Counter -> if (component.step <= 0) problems += Problem("$cPath.step", "step must be above 0")
-                else -> Unit
+        WidgetChecker.checkInto(widget, path, env, problems)
+    }
+
+    /** A library widget. The same widget may sit in several places, so its id isn't registered. */
+    private fun checkRef(ref: WidgetRef, path: String, env: Environment, problems: MutableList<Problem>) {
+        if (ref.widgetId.isBlank()) {
+            problems += Problem("$path.widgetId", "widgetId is empty")
+            return
+        }
+        val spec = env.widgets?.get(ref.widgetId)
+        if (env.widgets != null && spec == null) problems += Problem("$path.widgetId", "Unknown widget '${ref.widgetId}'")
+        val rows = ref.rowsOverride ?: return
+        val range = spec?.size ?: SizeRange(1, 1, MAX_ROWS)
+        if (rows !in range.min..range.max) {
+            problems += Problem("$path.rowsOverride", "$rows is outside the widget's size range ${range.min}..${range.max}")
+        }
+    }
+
+    /** A generated HTML widget: a known mini app at widget size, same sandbox as its screen. */
+    private fun checkHtml(section: HtmlSection, path: String, env: Environment, problems: MutableList<Problem>) {
+        if (section.appId.isBlank()) {
+            problems += Problem("$path.appId", "An HTML widget needs an app")
+            return
+        }
+        if (env.miniAppIds != null && section.appId !in env.miniAppIds) {
+            problems += Problem("$path.appId", "Unknown mini app '${section.appId}'")
+        }
+        if (section.rows !in 1..MAX_ROWS) problems += Problem("$path.rows", "rows is 1..$MAX_ROWS")
+    }
+
+    /**
+     * A launcher grid: cells inside the columns, no two overlapping, icons 1 × 1, a widget's span
+     * inside its size range. Contents are checked like the section of the same kind.
+     */
+    private fun checkCells(
+        section: CellGridSection,
+        path: String,
+        env: Environment,
+        id: (String, String) -> Unit,
+        problems: MutableList<Problem>,
+    ) {
+        if (section.columns !in 1..MAX_COLUMNS) problems += Problem("$path.columns", "columns must be 1 to $MAX_COLUMNS")
+        if (section.cells.size > MAX_ITEMS_PER_SECTION) problems += Problem("$path.cells", "At most $MAX_ITEMS_PER_SECTION cells in a grid")
+        section.cells.forEachIndexed { c, cell ->
+            val cellPath = "$path.cells[$c]"
+            id(cell.id, cellPath)
+            checkRules(cell.rules, "$cellPath.rules", null, problems)
+            if (cell.x < 0 || cell.y < 0 || cell.w < 1 || cell.h < 1 || cell.x + cell.w > section.columns) {
+                problems += Problem(cellPath, "A cell needs x >= 0, y >= 0, w and h >= 1, and x + w <= ${section.columns}")
+            } else if (cell.y + cell.h > MAX_GRID_ROWS) {
+                problems += Problem(cellPath, "A cell ends at row ${cell.y + cell.h}; a grid has at most $MAX_GRID_ROWS rows")
+            }
+            section.cells.take(c).firstOrNull { CellGrid.overlaps(it, cell) }?.let {
+                problems += Problem(cellPath, "Cell '${cell.id}' overlaps '${it.id}'")
+            }
+            when (val content = cell.content) {
+                is CellContent.ItemCell -> {
+                    if (cell.w != 1 || cell.h != 1) problems += Problem(cellPath, "An icon cell is 1 x 1")
+                    id(content.item.id, "$cellPath.content.item")
+                    checkItem(content.item, "$cellPath.content.item", env, id, problems)
+                }
+                is CellContent.WidgetCell -> {
+                    checkRef(content.ref, "$cellPath.content.ref", env, problems)
+                    val size = env.widgets?.get(content.ref.widgetId)?.size
+                    if (size != null && cell.w !in size.minW..size.maxW) {
+                        problems += Problem("$cellPath.w", "${cell.w} is outside the widget's width range ${size.minW}..${size.maxW}")
+                    }
+                }
+                is CellContent.StackCell -> {
+                    if (content.refs.isEmpty()) problems += Problem("$cellPath.content.refs", "A stack needs a widget")
+                    if (content.refs.size > MAX_WIDGETS_IN_STACK) problems += Problem("$cellPath.content.refs", "At most $MAX_WIDGETS_IN_STACK widgets in a stack")
+                    content.refs.forEachIndexed { r, ref -> checkRef(ref, "$cellPath.content.refs[$r]", env, problems) }
+                }
+                is CellContent.HtmlCell -> when {
+                    content.appId.isBlank() -> problems += Problem("$cellPath.content.appId", "An HTML widget needs an app")
+                    env.miniAppIds != null && content.appId !in env.miniAppIds ->
+                        problems += Problem("$cellPath.content.appId", "Unknown mini app '${content.appId}'")
+                }
+                is CellContent.SkillCell -> if (content.skillId !in env.skillIds) {
+                    problems += Problem("$cellPath.content.skillId", "Unknown skill '${content.skillId}'")
+                }
             }
         }
     }
 
-    private fun checkSize(size: SizeRange, path: String, problems: MutableList<Problem>) {
-        if (size.min < 1 || size.max > MAX_ROWS || size.min > size.default || size.default > size.max) {
-            problems += Problem(path, "Sizes need 1 <= min <= default <= max <= $MAX_ROWS")
+    private fun checkStack(
+        section: StackSection,
+        path: String,
+        env: Environment,
+        id: (String, String) -> Unit,
+        problems: MutableList<Problem>,
+    ) {
+        if (section.widgets.isNotEmpty() && section.refs.isNotEmpty()) {
+            problems += Problem(path, "A stack has 'refs' or 'widgets', not both")
+            return
+        }
+        val count = section.widgets.size + section.refs.size
+        val field = if (section.widgets.isNotEmpty()) "widgets" else "refs"
+        if (count == 0) problems += Problem("$path.refs", "A stack needs a widget")
+        if (count > MAX_WIDGETS_IN_STACK) problems += Problem("$path.$field", "At most $MAX_WIDGETS_IN_STACK widgets in a stack")
+        section.widgets.forEachIndexed { w, widget -> checkWidget(widget, "$path.widgets[$w]", env, id, problems) }
+        val seen = HashMap<String, Int>()
+        section.refs.forEachIndexed { r, ref ->
+            checkRef(ref, "$path.refs[$r]", env, problems)
+            seen.putIfAbsent(ref.widgetId, r)?.let {
+                problems += Problem("$path.refs[$r].widgetId", "'${ref.widgetId}' is already in this stack at refs[$it]")
+            }
         }
     }
 
-    private fun checkRules(rules: List<Rule>, path: String, range: SizeRange?, problems: MutableList<Problem>) {
+    internal fun checkSize(size: SizeRange, path: String, problems: MutableList<Problem>) {
+        if (size.min < 1 || size.max > MAX_ROWS || size.min > size.default || size.default > size.max) {
+            problems += Problem(path, "Sizes need 1 <= min <= default <= max <= $MAX_ROWS")
+        }
+        if (size.minW < 1 || size.maxW > MAX_COLUMNS || size.minW > size.defaultW || size.defaultW > size.maxW) {
+            problems += Problem(path, "Widths need 1 <= minW <= defaultW <= maxW <= $MAX_COLUMNS")
+        }
+    }
+
+    internal fun checkRules(rules: List<Rule>, path: String, range: SizeRange?, problems: MutableList<Problem>) {
         rules.forEachIndexed { r, rule ->
             val rulePath = "$path[$r]"
             checkCondition(rule.condition, "$rulePath.condition", problems)
@@ -278,8 +466,11 @@ object LayoutChecker {
         }
     }
 
+    /** Settings pages a widget button may open: the ones that fix a card's missing data. */
+    val SETTINGS_PAGES = setOf("BRIEF", "WIDGETS", "PERMISSIONS", "MAIN")
+
     private val PHONE_NUMBER = Regex("""^\+?[0-9 ()\-.*#]{3,32}$""")
-    private const val MAX_TIMER_SECONDS = 24 * 60 * 60
+    private const val MAX_TIMER_SECONDS = WidgetChecker.MAX_TIMER_SECONDS
 
     /** kotlinx puts `at path: $.pages[0]...` at the end of the first line of a decoding error. */
     private fun pathOf(message: String?): String =
@@ -290,11 +481,24 @@ object LayoutChecker {
 
 /** Material Symbol names a layout may use; the app maps each to a drawable (a test keeps the two in step). */
 object KnownSymbols {
-    val names: Set<String> = setOf(
+    /**
+     * The set a layout may name, and the every-version list: the schema offers only [promptable], so a
+     * model can't wander into the long tail, while a layout imported from a newer build still draws.
+     */
+    val promptable: Set<String> = setOf(
         "alarm", "apps", "battery_full", "bedtime", "book", "calendar_today", "call", "camera", "chat", "checklist",
         "cloud", "directions_car", "email", "event", "fitness_center", "flag", "folder", "headphones", "home", "info",
         "language", "location_on", "mic", "music_note", "notifications", "photo", "play_arrow", "priority_high",
-        "queue_music", "restaurant", "school", "search", "settings", "shopping_cart", "star", "timer", "tune",
+        "queue_music", "restaurant", "school", "search", "settings", "shopping_cart", "sports_esports", "star", "timer", "tune",
         "wb_sunny", "widgets", "work",
     )
+
+    /** Everything the app can draw, offered by the icon picker and accepted by validation. */
+    val all: Set<String> = promptable + setOf(
+        "calculate", "contacts", "flight", "map", "movie", "newspaper", "palette", "pets", "public", "radio",
+        "sports_soccer", "task_alt", "translate", "videogame_asset", "wallet", "wifi",
+    )
+
+    /** The historical name for the whole catalog. */
+    val names: Set<String> get() = all
 }

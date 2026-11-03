@@ -1,0 +1,28 @@
+{
+  "id": "stand_hourly",
+  "name": "Stand up",
+  "description": "An hourly nudge that starts the next hour as soon as one ends.",
+  "category": "Health",
+  "widget": {
+    "id": "stand_hourly",
+    "title": "Stand up",
+    "components": [
+      {
+        "type": "timer",
+        "key": "stand",
+        "label": "Next stand",
+        "seconds": 3600,
+        "sound": true,
+        "autoStartKey": "stand"
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 1,
+      "max": 2,
+      "minW": 2,
+      "defaultW": 2,
+      "maxW": 2
+    }
+  }
+}

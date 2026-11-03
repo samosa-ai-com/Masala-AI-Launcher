@@ -57,14 +57,276 @@ object MasalaToolDefinitions {
 
     val setWallpaper = tool(
         "set_wallpaper",
-        "Set the home-screen wallpaper from an image URL, or a random image if no URL is given.",
+        "Set the phone's wallpaper from an image. Accepts a web link, a local file path " +
+            "(/sdcard/Download/photo.jpg), a file:// path, or a content:// URI from a picker. The " +
+            "image is fitted to the screen, not cropped, and the leftover edges are filled with a " +
+            "colour taken from the image. Omit the source for a random image.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("url") {
                     put("type", "string")
-                    put("description", "Direct image URL. Omit for a random wallpaper.")
+                    put(
+                        "description",
+                        "Image source: https://…, /sdcard/…, file://… or content://…. Omit for a " +
+                            "random wallpaper.",
+                    )
+                }
+                putJsonObject("target") {
+                    put("type", "string")
+                    put(
+                        "description",
+                        "Which screens: 'home' (default), 'lock', or 'both'.",
+                    )
+                    putJsonArray("enum") {
+                        add("home")
+                        add("lock")
+                        add("both")
+                    }
                 }
             }
+        }
+    )
+
+    val setWallpaperRoutine = tool(
+        "set_wallpaper_routine",
+        "Save a wallpaper routine: a named, ordered list of rules that changes the home wallpaper " +
+            "by itself. The first rule whose conditions all match wins; otherwise defaultSource " +
+            "applies. Conditions are AND-ed and all optional: a time window (from/to, 'HH:mm', a " +
+            "window may cross midnight), days (ISO 1=Mon..7=Sun), weather (clear, cloudy, rain, " +
+            "snow, storm, fog), charging, batteryBelow (%), minTempC/maxTempC. A source is " +
+            "'asset:<file>' for a bundled wallpaper, 'id:<n>' for one the user generated, or a " +
+            "/path or http(s) url. Only the home screen rotates (target 'home'). Prefer 3-5 rules " +
+            "with plain-language names. Reusing an id replaces that routine.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Short slug; omit to derive it from the name.")
+                }
+                putJsonObject("name") { put("type", "string") }
+                putJsonObject("enabled") { put("type", "boolean") }
+                putJsonObject("target") {
+                    put("type", "string")
+                    put("description", "Only 'home' for now.")
+                    putJsonArray("enum") { add("home") }
+                }
+                putJsonObject("defaultSource") {
+                    put("type", "string")
+                    put("description", "Shown when no rule matches.")
+                }
+                putJsonObject("rules") {
+                    put("type", "array")
+                    putJsonObject("items") {
+                        put("type", "object")
+                        putJsonObject("properties") {
+                            putJsonObject("source") { put("type", "string") }
+                            putJsonObject("when") {
+                                put("type", "object")
+                                putJsonObject("properties") {
+                                    putJsonObject("from") { put("type", "string"); put("description", "'HH:mm'") }
+                                    putJsonObject("to") { put("type", "string"); put("description", "'HH:mm'") }
+                                    putJsonObject("days") {
+                                        put("type", "array")
+                                        putJsonObject("items") { put("type", "integer") }
+                                    }
+                                    putJsonObject("weather") {
+                                        put("type", "array")
+                                        putJsonObject("items") {
+                                            put("type", "string")
+                                            putJsonArray("enum") {
+                                                add("clear"); add("cloudy"); add("rain")
+                                                add("snow"); add("storm"); add("fog")
+                                            }
+                                        }
+                                    }
+                                    putJsonObject("charging") { put("type", "boolean") }
+                                    putJsonObject("batteryBelow") { put("type", "integer") }
+                                    putJsonObject("minTempC") { put("type", "number") }
+                                    putJsonObject("maxTempC") { put("type", "number") }
+                                }
+                            }
+                        }
+                        putJsonArray("required") { add("source") }
+                    }
+                }
+            }
+            putJsonArray("required") { add("name"); add("rules") }
+        }
+    )
+
+    val wallpaperRoutineStatus = tool(
+        "wallpaper_routine_status",
+        "What the wallpaper routines are showing right now, which rule won, why the last attempt " +
+            "failed if it did, and when the next change is due. Use it to answer 'why is my " +
+            "wallpaper this?' or to check a routine you just saved.",
+        schema { }
+    )
+
+    val generateWallpaper = tool(
+        "generate_wallpaper",
+        "Generate a portrait phone wallpaper from a text description with the configured image " +
+            "model. The picture is saved to the wallpaper catalog with its prompt (searchable " +
+            "later) and returned as a preview. Pass target to apply it at once (home, lock or " +
+            "both); otherwise preview first and let set_wallpaper apply the kept file. Generated " +
+            "images are portrait with no text unless the description asks for it.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("prompt") {
+                    put("type", "string")
+                    put("description", "What the wallpaper shows, e.g. 'misty pine forest at dawn'.")
+                }
+                putJsonObject("style") {
+                    put("type", "string")
+                    put("description", "Optional style appended, e.g. 'minimalist, muted colours'.")
+                }
+                putJsonObject("target") {
+                    put("type", "string")
+                    put("description", "Apply at once: home, lock or both. Omit to preview only.")
+                    putJsonArray("enum") {
+                        add("home")
+                        add("lock")
+                        add("both")
+                    }
+                }
+            }
+            putJsonArray("required") { add("prompt") }
+        }
+    )
+
+    val generateImage = tool(
+        "generate_image",
+        "Generate a general image from a text description with the configured image " +
+            "model. The picture is saved under files and returned as a preview card. " +
+            "For a phone wallpaper use generate_wallpaper instead.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("prompt") {
+                    put("type", "string")
+                    put("description", "What the image shows, e.g. 'a red bicycle by a lake'.")
+                }
+                putJsonObject("style") {
+                    put("type", "string")
+                    put("description", "Optional style appended, e.g. 'watercolor'.")
+                }
+            }
+            putJsonArray("required") { add("prompt") }
+        }
+    )
+
+    val editImage = tool(
+        "edit_image",
+        "Small on-device edits to an image file already on disk: rotate (arg degrees, " +
+            "default 90), crop_square, resize (arg max side px, default 1024) or grayscale. " +
+            "No network, no extra setup. Returns the edited picture as a preview card.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("path") {
+                    put("type", "string")
+                    put("description", "Image file path from an earlier result.")
+                }
+                putJsonObject("action") {
+                    put("type", "string")
+                    put("description", "rotate, crop_square, resize or grayscale.")
+                }
+                putJsonObject("arg") {
+                    put("type", "string")
+                    put("description", "Degrees for rotate, max side for resize. Omit otherwise.")
+                }
+            }
+            putJsonArray("required") {
+                add("path")
+                add("action")
+            }
+        }
+    )
+
+    val segmentImage = tool(
+        "segment_image",
+        "Find one thing in an image with SAM 3.1 (configured image endpoint, no extra " +
+            "setup): pass an image file path and a short noun phrase like 'red bicycle'. " +
+            "Returns an annotated preview (boxes drawn) with match counts, plus the full " +
+            "box list in a text file.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("path") {
+                    put("type", "string")
+                    put("description", "Image file path, or an https URL Masala may fetch.")
+                }
+                putJsonObject("prompt") {
+                    put("type", "string")
+                    put("description", "One short noun phrase naming the thing, e.g. 'yellow school bus'.")
+                }
+            }
+            putJsonArray("required") {
+                add("path")
+                add("prompt")
+            }
+        }
+    )
+
+    val segmentVideo = tool(
+        "segment_video",
+        "Track one thing through a VIDEO file with SAM 3.1 (configured image endpoint, no extra " +
+            "setup): pass a video file path (e.g. /sdcard/DCIM/Camera/VID_0001.mp4) and a short " +
+            "noun phrase like 'red bicycle'. Returns an annotated MP4 (sampled frames with the " +
+            "object's masks/boxes burned in) plus the full frame-to-boxes list in a JSON file " +
+            "(a contact-sheet PNG only if video encoding fails). " +
+            "Clips must be 30 seconds or less and under 12 MB; for anything longer, trim or split " +
+            "it first with media_edit. Rendering is per frame, so it takes minutes. " +
+            "quality: 'fast' (720p, few frames), 'balanced' (default: 960p, more frames) or " +
+            "'best' (1080p, source-like smoothness, several times slower). If the user did not " +
+            "say which they want, ask once before running, with these three options and their " +
+            "trade-off. State the settings used in the answer. " +
+            "max_frames (default 8, max 16) is only a hint — the API samples its own frames. " +
+            "For a still image use segment_image instead.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("path") {
+                    put("type", "string")
+                    put("description", "Video file path, e.g. /sdcard/DCIM/Camera/VID_0001.mp4.")
+                }
+                putJsonObject("prompt") {
+                    put("type", "string")
+                    put("description", "One short noun phrase naming the thing, e.g. 'yellow school bus'.")
+                }
+                putJsonObject("max_frames") {
+                    put("type", "integer")
+                    put("description", "Hint for how many frames to report (default 8, max 16). The API samples its own frames.")
+                }
+                putJsonObject("quality") {
+                    put("type", "string")
+                    put("enum", kotlinx.serialization.json.buildJsonArray { add(kotlinx.serialization.json.JsonPrimitive("fast")); add(kotlinx.serialization.json.JsonPrimitive("balanced")); add(kotlinx.serialization.json.JsonPrimitive("best")) })
+                    put("description", "fast (720p, quickest) | balanced (default, 960p) | best (1080p, smoothest, several times slower).")
+                }
+                putJsonObject("mode") {
+                    put("type", "string")
+                    put("description", "Reserved for future tracking modes; recorded only, tracking is the same.")
+                }
+            }
+            putJsonArray("required") {
+                add("path")
+                add("prompt")
+            }
+        }
+    )
+
+    val speakText = tool(
+        "speak_text",
+        "Read text aloud with the configured voice and save the audio file. Uses the same " +
+            "voice output as reply Read-aloud; without an API voice it speaks on-device " +
+            "and keeps no file.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("text") {
+                    put("type", "string")
+                    put("description", "What to say (under 2000 characters).")
+                }
+                putJsonObject("voice") {
+                    put("type", "string")
+                    put("description", "Optional voice id; omit for the configured voice.")
+                }
+            }
+            putJsonArray("required") { add("text") }
         }
     )
 
@@ -96,10 +358,646 @@ object MasalaToolDefinitions {
         }
     )
 
+    val createMiniApp = tool(
+        "create_mini_app",
+        "Save a self-contained HTML mini-app (single file: inline CSS and JS, no external " +
+            "requests unless the user enabled network for it). Pass allow_media true only when the " +
+            "app needs Masala's image, segmentation or speech (masala://media/*); default false. " +
+            "Returns the new mini-app id and any console errors from loading it once; tell the user " +
+            "to open it from home once pinned.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("title") {
+                    put("type", "string")
+                    put("description", "Short title shown in the host and on home.")
+                }
+                putJsonObject("html") {
+                    put("type", "string")
+                    put("description", "Complete HTML document, inline style and script only.")
+                }
+                putJsonObject("icon") {
+                    put("type", "string")
+                    put(
+                        "description",
+                        "Optional icon: a built-in name (e.g. timer, music_note, checklist) or one small " +
+                            "inline SVG (<= 8 KB, viewBox, no scripts, no links).",
+                    )
+                }
+                putJsonObject("allow_media") {
+                    put("type", "boolean")
+                    put(
+                        "description",
+                        "true only when the app calls masala://media/* (generate/segment/speak). Default false.",
+                    )
+                }
+            }
+            putJsonArray("required") { add("html") }
+        }
+    )
+
+    val updateMiniApp = tool(
+        "update_mini_app",
+        "Replace a mini-app's HTML, keeping its title and settings. Returns console errors from " +
+            "loading the new version, and any the old one logged while the user had it open.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Mini-app id from create_mini_app.")
+                }
+                putJsonObject("html") {
+                    put("type", "string")
+                    put("description", "Complete replacement HTML document.")
+                }
+                putJsonObject("icon") {
+                    put("type", "string")
+                    put(
+                        "description",
+                        "Optional icon: a built-in name (e.g. timer, music_note, checklist) or one small " +
+                            "inline SVG (<= 8 KB, viewBox, no scripts, no links). Missing leaves the stored one alone.",
+                    )
+                }
+            }
+            putJsonArray("required") {
+                add("id")
+                add("html")
+            }
+        }
+    )
+
+    val listMiniApps = tool(
+        "list_mini_apps",
+        "List the HTML mini-apps stored on this phone: id, title, last update, whether it may use " +
+            "the internet, and whether it has an icon. To change one: read_mini_app, then update_mini_app.",
+        schema { putJsonObject("properties") {} }
+    )
+
+    val readMiniApp = tool(
+        "read_mini_app",
+        "Read a stored mini-app's full HTML, title and settings, to change it with update_mini_app. " +
+            "The user may name an app by its title: call list_mini_apps first to find the id.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Mini-app id from list_mini_apps.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        }
+    )
+
+    val openMiniAppTool = tool(
+        "open_mini_app",
+        "Open a stored mini-app on screen.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Mini-app id from list_mini_apps or create_mini_app.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        }
+    )
+
+    val pinMiniAppTool = tool(
+        "pin_mini_app",
+        "Put a stored mini-app on the home screen so the user can tap it. Use this after " +
+            "creating an app if it isn't on home yet.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Mini-app id.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        }
+    )
+
+    val deleteMiniAppTool = tool(
+        "delete_mini_app",
+        "Delete a stored mini-app. Home items pointing at it stop working.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Mini-app id.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        }
+    )
+
+    // Generated home widgets (plan docs/plans/widget-maker.md §7.2).
+    val listWidgets = tool(
+        "list_widgets",
+        "List the widget library: id, title, where each widget sits on home. " +
+            "Call it directly for read-only questions (what exists, is one on home), no consult. " +
+            "To change one: read_widget, then update_widget. To use a template as a start, read it too.",
+        schema { putJsonObject("properties") {} },
+    )
+
+    val readWidget = tool(
+        "read_widget",
+        "Read one library widget's full spec JSON, to change it with update_widget. " +
+            "The user may name a widget by its title: call list_widgets first to find the id.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Widget id from list_widgets.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
+    val widgetSchema = tool(
+        "widget_schema",
+        "How a widget spec is shaped: components, bindings, sources and limits. " +
+            "Read this before writing a spec by hand; create_widget from a sentence skips it.",
+        schema { putJsonObject("properties") {} },
+    )
+
+    val createWidget = tool(
+        "create_widget",
+        "Make a home-screen widget: either the full spec JSON, or one sentence and the maker " +
+            "writes the spec (checked, one repair turn). If a similar widget already exists, the call " +
+            "refuses and names it — offer to use, place or revise it instead of saving a duplicate. " +
+            "The answer names the widget id and any " +
+            "problems; a spec with problems is never saved. Nothing goes on home until place_widget, " +
+            "which always asks the user first.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("spec") {
+                    put("type", "string")
+                    put("description", "Complete WidgetSpec JSON. One of spec or sentence.")
+                }
+                putJsonObject("sentence") {
+                    put("type", "string")
+                    put("description", "What the widget should be, e.g. 'a water counter with a goal of 8'. One of spec or sentence.")
+                }
+            }
+        },
+    )
+
+    val updateWidget = tool(
+        "update_widget",
+        "Change a library widget: either the complete replacement spec JSON (same id), or a " +
+            "sentence and the maker revises it (checked, one repair turn). The look applies at " +
+            "once with Undo. Never moves it on home: place_widget does that.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Widget id from list_widgets.")
+                }
+                putJsonObject("spec") {
+                    put("type", "string")
+                    put("description", "Complete replacement WidgetSpec JSON with the same id. One of spec or sentence.")
+                }
+                putJsonObject("sentence") {
+                    put("type", "string")
+                    put("description", "What to change, e.g. 'make the goal 10'. One of spec or sentence.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
+    val placeWidget = tool(
+        "place_widget",
+        "Put a library widget on home. Always asks the user first, naming the widget. " +
+            "The same widget may sit on two pages.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Widget id from list_widgets or create_widget.")
+                }
+                putJsonObject("page") {
+                    put("type", "string")
+                    put("description", "Page id for the widget. Missing puts it on the first page.")
+                }
+                putJsonObject("rows") {
+                    put("type", "integer")
+                    put("description", "Height override in rows, inside the widget's own size range. Missing keeps its default.")
+                }
+                putJsonObject("approved") {
+                    put("type", "boolean")
+                    put("description", "Set true after the user agreed to the widget's web fetching (the error names the hosts). Missing asks first.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
+    val removeWidget = tool(
+        "remove_widget",
+        "Take a widget off home wherever it sits, keeping it in the library. " +
+            "Deleting it from the library instead is delete_widget.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Widget id from list_widgets.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
+    val deleteWidget = tool(
+        "delete_widget",
+        "Delete a widget from the library and take it off home everywhere. Lost for good.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Widget id from list_widgets.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
+    // Stream sources for live media widgets (plan docs/plans/widget-maker.md §7.2).
+    val listStreamSources = tool(
+        "list_stream_sources",
+        "The cameras and streams the phone knows: name, kind and whether it plays. " +
+            "A widget shows one by its source id; the URLs and their secrets never leave the phone.",
+        schema { putJsonObject("properties") {} },
+    )
+
+    val addStreamSource = tool(
+        "add_stream_source",
+        "Add a camera or stream by name and URL (rtsp, hls, dash, progressive mp4, mjpeg or " +
+            "snapshot jpeg). Never put a username or password in the URL or in chat: when one is " +
+            "needed the user types it into a sheet on screen. The answer names the source id for " +
+            "video and snapshot components.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("name") {
+                    put("type", "string")
+                    put("description", "Name shown in Settings, e.g. Front door.")
+                }
+                putJsonObject("url") {
+                    put("type", "string")
+                    put("description", "Stream or snapshot URL, without any username or password.")
+                }
+                putJsonObject("kind") {
+                    put("type", "string")
+                    put("description", "rtsp, hls, dash, progressive, mjpeg or snapshot. Guessed from the URL when missing.")
+                }
+                putJsonObject("username") {
+                    put("type", "string")
+                    put("description", "Camera login. The password is asked on screen, never in chat.")
+                }
+            }
+            putJsonArray("required") {
+                add("name")
+                add("url")
+            }
+        },
+    )
+
+    val testStream = tool(
+        "test_stream",
+        "Connect to a stream source for up to 8 seconds and report the codec, the resolution and " +
+            "the latency, or the error. Run it before placing a video or snapshot widget.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("id") {
+                    put("type", "string")
+                    put("description", "Source id from list_stream_sources.")
+                }
+            }
+            putJsonArray("required") { add("id") }
+        },
+    )
+
+    val createCalendarEvent = tool(
+        "create_calendar_event",
+        "Add an event to the phone's calendar. The answer names the event id for later edits.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("title") {
+                    put("type", "string")
+                    put("description", "Event title.")
+                }
+                putJsonObject("start") {
+                    put("type", "string")
+                    put(
+                        "description",
+                        "Start time, ISO local like 2026-11-02T09:00, or a date for an all-day event (2026-11-02).",
+                    )
+                }
+                putJsonObject("end") {
+                    put("type", "string")
+                    put("description", "End time in the same form. Defaults to one hour after start.")
+                }
+                putJsonObject("location") {
+                    put("type", "string")
+                    put("description", "Optional place.")
+                }
+                putJsonObject("notes") {
+                    put("type", "string")
+                    put("description", "Optional description.")
+                }
+                putJsonObject("calendar") {
+                    put("type", "string")
+                    put("description", "Optional calendar name; defaults to the primary calendar.")
+                }
+                putJsonObject("all_day") {
+                    put("type", "boolean")
+                    put("description", "Treat as an all-day event even when start has a time. Default false.")
+                }
+                putJsonObject("recurrence") {
+                    put("type", "string")
+                    put("description", "Repeat: daily, weekly, monthly or yearly. Omit for a one-time event.")
+                }
+                putJsonObject("recurrence_count") {
+                    put("type", "integer")
+                    put("description", "Stop after this many occurrences. Omit to repeat without end.")
+                }
+                putJsonObject("recurrence_until") {
+                    put("type", "string")
+                    put("description", "Last repeat, as a date (2026-12-31). Omit to repeat without end.")
+                }
+                putJsonObject("reminder_minutes") {
+                    put("type", "integer")
+                    put("description", "Remind this many minutes before, e.g. 30. Omit for no reminder.")
+                }
+                putJsonObject("attendees") {
+                    put("type", "string")
+                    put("description", "Invitees as comma-separated email addresses. Omit for none.")
+                }
+            }
+            putJsonArray("required") {
+                add("title")
+                add("start")
+            }
+        }
+    )
+
+    val editCalendarEvent = tool(
+        "edit_calendar_event",
+        "Change an event's fields; only the arguments passed are touched. Reminders and attendees " +
+            "replace the whole set when passed. Find the event id with list_calendar_events first.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("event_id") {
+                    put("type", "integer")
+                    put("description", "The event's id, from list_calendar_events.")
+                }
+                putJsonObject("title") {
+                    put("type", "string")
+                    put("description", "New title.")
+                }
+                putJsonObject("start") {
+                    put("type", "string")
+                    put("description", "New start, ISO local like 2026-11-02T09:00.")
+                }
+                putJsonObject("end") {
+                    put("type", "string")
+                    put("description", "New end in the same form.")
+                }
+                putJsonObject("location") {
+                    put("type", "string")
+                    put("description", "New place.")
+                }
+                putJsonObject("notes") {
+                    put("type", "string")
+                    put("description", "New description.")
+                }
+                putJsonObject("all_day") {
+                    put("type", "boolean")
+                    put("description", "true for all-day, false for timed.")
+                }
+                putJsonObject("recurrence") {
+                    put("type", "string")
+                    put("description", "Repeat: daily, weekly, monthly or yearly.")
+                }
+                putJsonObject("recurrence_count") {
+                    put("type", "integer")
+                    put("description", "Stop after this many occurrences.")
+                }
+                putJsonObject("recurrence_until") {
+                    put("type", "string")
+                    put("description", "Last repeat, as a date (2026-12-31).")
+                }
+                putJsonObject("clear_recurrence") {
+                    put("type", "boolean")
+                    put("description", "true to make a repeating event one-time again.")
+                }
+                putJsonObject("clear_reminder") {
+                    put("type", "boolean")
+                    put("description", "true to remove the event's reminders.")
+                }
+                putJsonObject("reminder_minutes") {
+                    put("type", "integer")
+                    put("description", "Replace the reminder set with one this many minutes before.")
+                }
+                putJsonObject("attendees") {
+                    put("type", "string")
+                    put("description", "Replace the invitee set with these comma-separated emails (empty clears it).")
+                }
+            }
+            putJsonArray("required") {
+                add("event_id")
+            }
+        }
+    )
+
+    val deleteCalendarEvent = tool(
+        "delete_calendar_event",
+        "Delete one event by id. The user is asked first, and reminders and attendees go with it. " +
+            "Find the id with list_calendar_events first.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("event_id") {
+                    put("type", "integer")
+                    put("description", "The event's id, from list_calendar_events.")
+                }
+            }
+            putJsonArray("required") {
+                add("event_id")
+            }
+        }
+    )
+
+    val scheduleAgentTask = tool(
+        "schedule_agent_task",
+        "Remind yourself of something later: Masala runs the prompt at the set time, even with the " +
+            "app closed. The user approves every task, and one-time tasks must start in the future. " +
+            "Alarms are inexact (a few minutes late at worst).",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("name") {
+                    put("type", "string")
+                    put("description", "Short name, e.g. 'Water the plants'.")
+                }
+                putJsonObject("prompt") {
+                    put("type", "string")
+                    put("description", "What Masala should do when the time comes, e.g. 'Remind me to water the plants'.")
+                }
+                putJsonObject("start") {
+                    put("type", "string")
+                    put("description", "First run, local like 2026-11-02T08:00, or a date for midnight.")
+                }
+                putJsonObject("repeat") {
+                    put("type", "string")
+                    put("description", "none (default), hourly, daily, weekly or monthly.")
+                }
+                putJsonObject("interval") {
+                    put("type", "integer")
+                    put("description", "Every N hours/days for hourly/daily repeats. Default 1.")
+                }
+                putJsonObject("weekdays") {
+                    put("type", "array")
+                    put("description", "Weekly repeats only: e.g. ['mon','wed'] or ['weekdays'].")
+                    putJsonObject("items") { put("type", "string") }
+                }
+                putJsonObject("skill_id") {
+                    put("type", "string")
+                    put("description", "Optional installed skill to run instead of a bare prompt.")
+                }
+                putJsonObject("memory_note") {
+                    put("type", "string")
+                    put("description", "Optional Second Brain note path this task belongs to.")
+                }
+            }
+            putJsonArray("required") {
+                add("name")
+                add("start")
+            }
+        }
+    )
+
+    val listScheduledTasks = tool(
+        "list_scheduled_tasks",
+        "List the scheduled tasks with their ids, next runs and repeats.",
+        schema { putJsonObject("properties") {} }
+    )
+
+    val editScheduledTask = tool(
+        "edit_scheduled_task",
+        "Change a scheduled task; only the arguments passed are touched. Find the id with " +
+            "list_scheduled_tasks first.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("task_id") {
+                    put("type", "string")
+                    put("description", "The task's id.")
+                }
+                putJsonObject("name") {
+                    put("type", "string")
+                    put("description", "New name.")
+                }
+                putJsonObject("prompt") {
+                    put("type", "string")
+                    put("description", "New prompt.")
+                }
+                putJsonObject("start") {
+                    put("type", "string")
+                    put("description", "New first run, local like 2026-11-02T08:00.")
+                }
+                putJsonObject("repeat") {
+                    put("type", "string")
+                    put("description", "New repeat: none, hourly, daily, weekly or monthly.")
+                }
+                putJsonObject("interval") {
+                    put("type", "integer")
+                    put("description", "New every-N for hourly/daily repeats.")
+                }
+                putJsonObject("weekdays") {
+                    put("type", "array")
+                    put("description", "New weekday set for weekly repeats.")
+                    putJsonObject("items") { put("type", "string") }
+                }
+                putJsonObject("enabled") {
+                    put("type", "boolean")
+                    put("description", "false pauses the task, true resumes it.")
+                }
+                putJsonObject("skill_id") {
+                    put("type", "string")
+                    put("description", "New skill to run (empty clears it).")
+                }
+                putJsonObject("memory_note") {
+                    put("type", "string")
+                    put("description", "New note path (empty clears it).")
+                }
+            }
+            putJsonArray("required") {
+                add("task_id")
+            }
+        }
+    )
+
+    val deleteScheduledTask = tool(
+        "delete_scheduled_task",
+        "Delete a scheduled task by id; its future runs are cancelled. The user is asked first.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("task_id") {
+                    put("type", "string")
+                    put("description", "The task's id, from list_scheduled_tasks.")
+                }
+            }
+            putJsonArray("required") {
+                add("task_id")
+            }
+        }
+    )
+
+    val searchContacts = tool(
+        "search_contacts",
+        "Look up phone numbers and email addresses in the phone's contacts by name or number.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("query") {
+                    put("type", "string")
+                    put("description", "Part of a name or a phone number. Empty lists the first few contacts.")
+                }
+                putJsonObject("limit") {
+                    put("type", "integer")
+                    put("description", "Maximum matches, default 10.")
+                }
+            }
+        }
+    )
+
+    val addContact = tool(
+        "add_contact",
+        "Add a contact through the Contacts app: it opens prefilled and the user reviews and saves " +
+            "it there, so nothing is added silently.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("name") {
+                    put("type", "string")
+                    put("description", "Full name for the new contact.")
+                }
+                putJsonObject("phone") {
+                    put("type", "string")
+                    put("description", "Optional phone number.")
+                }
+                putJsonObject("email") {
+                    put("type", "string")
+                    put("description", "Optional email address.")
+                }
+            }
+            putJsonArray("required") {
+                add("name")
+            }
+        }
+    )
+
     val setAlarm = tool(
         "set_alarm",
-        "Set an alarm in the system clock app. To change or remove alarms, use show_alarms to open " +
-            "the clock app's list.",
+        "Set an alarm in the system clock app. Android has no API to delete a scheduled alarm: to " +
+            "remove or change one, open the clock app with show_alarms and tell the user to tap it there.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("hour") {
@@ -136,7 +1034,7 @@ object MasalaToolDefinitions {
 
     val setTimer = tool(
         "set_timer",
-        "Start a countdown timer in the system clock app; dismiss_timer stops a ringing one.",
+        "Start a countdown timer in the system clock app. The user stops it there.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("seconds") {
@@ -180,32 +1078,40 @@ object MasalaToolDefinitions {
         }
     )
 
-    val dismissTimer = tool(
-        "dismiss_timer",
-        "Dismiss a currently ringing system-clock-app timer. Only has an effect if a timer is " +
-            "actively ringing there right now; support varies by clock app.",
-        schema { putJsonObject("properties") {} }
+    val openUrl = tool(
+        "open_url",
+        "Open a web link in the phone's browser.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("url") {
+                    put("type", "string")
+                    put("description", "Full http:// or https:// URL.")
+                }
+            }
+            putJsonArray("required") { add("url") }
+        }
     )
 
     val toggleTorch = tool(
         "toggle_torch",
-        "Turn the camera flashlight (torch) on or off. If the flashlight is already in the " +
-            "requested state, reports that without error.",
+        "Turn the phone's flashlight on or off. Pass on=true or on=false to set it; omit 'on' to " +
+            "flip whatever it is doing now. Use this for 'turn the torch on', 'turn it off' or " +
+            "'toggle the flashlight'.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("on") {
                     put("type", "boolean")
-                    put("description", "true to turn the flashlight on, false to turn it off.")
+                    put(
+                        "description",
+                        "true to turn the flashlight on, false to turn it off. Omit to flip the " +
+                            "current state, which is what a plain 'toggle' means.",
+                    )
                 }
                 putJsonObject("duration_seconds") {
                     put("type", "integer")
-                    put(
-                        "description",
-                        "Optional: auto-turn off after this many seconds (1-300). Only applies when turning on."
-                    )
+                    put("description", "Optional: switch it off again after this many seconds (1-300).")
                 }
             }
-            putJsonArray("required") { add("on") }
         }
     )
 
@@ -392,7 +1298,7 @@ object MasalaToolDefinitions {
 
     val webFetch = tool(
         "webfetch",
-        "Fetch content from an HTTP or HTTPS URL and return it as text. " +
+        "Fetch content from an HTTP or HTTPS URL and return it as text or Markdown. " +
             "Use this to look up documentation, read articles, or gather information from the web. " +
             "Only text responses (HTML, JSON, XML) are supported; binary content is rejected.",
         schema {
@@ -405,11 +1311,26 @@ object MasalaToolDefinitions {
                     put("type", "string")
                     put(
                         "description",
-                        "Optional output format: 'text' (default) or 'markdown'. Currently always returns text."
+                        "Output format: 'text' (default, page text) or 'markdown' (headings, links, lists, code kept as Markdown)."
                     )
                 }
             }
             putJsonArray("required") { add("url") }
+        }
+    )
+
+    val weather = tool(
+        "weather",
+        "Today's weather: conditions, temperature now, the high and low in °C, the chance of rain, " +
+            "and the coming hours. " +
+            "Without a place it is for the place the user set in Settings → Daily brief.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("place") {
+                    put("type", "string")
+                    put("description", "Optional city or town name, for weather somewhere else.")
+                }
+            }
         }
     )
 
@@ -423,7 +1344,8 @@ object MasalaToolDefinitions {
         "toggle_wifi",
         "Turn Wi-Fi on or off. Android 10 and newer forbid apps from toggling the radio, so on " +
             "any current device this opens the Wi-Fi panel for the user to flip instead — say so " +
-            "rather than claiming the radio changed. Direct toggling only works below Android 10.",
+            "rather than claiming the radio changed. Direct toggling only works below Android 10. " +
+            "For any other settings screen, use open_setting.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("enabled") {
@@ -432,6 +1354,64 @@ object MasalaToolDefinitions {
                 }
             }
             putJsonArray("required") { add("enabled") }
+        }
+    )
+
+    val takePhoto = tool(
+        "take_photo",
+        "Take a photo through the camera app: it opens, the user takes the picture, and the file " +
+            "lands in Masala's work folder. Needs no permission, because the camera app (not Masala) " +
+            "takes the picture. The answer names the file; read it with read_file on a LATER turn — " +
+            "never chain a read in the same turn, the user hasn't taken the photo yet and " +
+            "cancelling leaves no file. If they cancel, say what to rephrase and move on.",
+        schema { putJsonObject("properties") {} }
+    )
+
+    val getStorageInfo = tool(
+        "get_storage_info",
+        "Report free and total space: internal storage, plus the app's folder on shared storage.",
+        schema { putJsonObject("properties") {} }
+    )
+
+    val openSetting = tool(
+        "open_setting",
+        "Open a system settings screen by name — wifi, internet, volume, nfc, bluetooth, location, " +
+            "notifications, battery, display, sound, apps, storage, language, date, airplane or " +
+            "accessibility. Nothing is toggled by the tool itself; the user flips the switch on the " +
+            "screen that opens.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("name") {
+                    put("type", "string")
+                    put("description", "Which settings screen to open, e.g. 'wifi' or 'location'.")
+                }
+            }
+            putJsonArray("required") { add("name") }
+        }
+    )
+
+    val getLocation = tool(
+        "get_location",
+        "The phone's coarse location from its last known fix, rounded to about a kilometre. Needs " +
+            "the Location permission; asks for it when missing. Says plainly when there is no fix yet.",
+        schema { putJsonObject("properties") {} }
+    )
+
+    val shareFile = tool(
+        "share_file",
+        "Send a file to the share sheet: the user picks where it goes (a chat, Drive, an email " +
+            "draft). Nothing leaves the phone without that tap. Shares anything the file tools can " +
+            "read: transcriptions, edited media, PDFs, skill outputs.",
+        schema {
+            putJsonObject("properties") {
+                putJsonObject("path") {
+                    put("type", "string")
+                    put("description", "File path to share.")
+                }
+            }
+            putJsonArray("required") {
+                add("path")
+            }
         }
     )
 
@@ -776,7 +1756,8 @@ object MasalaToolDefinitions {
             "podcast player, anything with a media notification. Works without any per-service " +
             "API or account. When several apps hold a session, the one actually playing is " +
             "chosen; pass 'app' to target a specific one. Needs Notification access. " +
-            "Use get_now_playing first if you need to know what is playing.",
+            "Use get_now_playing first if you need to know what is playing. This does NOT change " +
+            "the volume: use set_volume with stream 'music' for that.",
         schema {
             putJsonObject("properties") {
                 putJsonObject("action") {
@@ -860,12 +1841,22 @@ object MasalaToolDefinitions {
         dialNumber,
         openApp,
         setWallpaper,
+        setWallpaperRoutine,
+        wallpaperRoutineStatus,
+        generateWallpaper,
+        generateImage,
+        editImage,
+        segmentImage,
+        segmentVideo,
+        speakText,
         listCalendarEvents,
+        createCalendarEvent,
+        searchContacts,
+        openUrl,
         setAlarm,
         setTimer,
         showAlarms,
         snoozeAlarm,
-        dismissTimer,
         toggleTorch,
         setVolume,
         getVolume,
@@ -879,6 +1870,7 @@ object MasalaToolDefinitions {
         setClipboard,
         webSearch,
         webFetch,
+        weather,
         getBatteryInfo,
         toggleWifi,
         nextAlarm,
@@ -896,5 +1888,23 @@ object MasalaToolDefinitions {
         getNowPlaying,
         getHealthSummary,
         getHealthRecords,
+        createMiniApp,
+        updateMiniApp,
+        listMiniApps,
+        readMiniApp,
+        openMiniAppTool,
+        pinMiniAppTool,
+        deleteMiniAppTool,
+        listWidgets,
+        readWidget,
+        widgetSchema,
+        createWidget,
+        updateWidget,
+        placeWidget,
+        removeWidget,
+        deleteWidget,
+        listStreamSources,
+        addStreamSource,
+        testStream,
     )
 }

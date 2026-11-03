@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Neon Stacker</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{background:#050510;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;overflow:hidden;touch-action:none}
+header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:rgba(15,15,35,0.9);border-bottom:1px solid #1e1e4a;backdrop-filter:blur(8px)}
+header h1{font-size:14px;letter-spacing:2px;color:#00f0ff;text-shadow:0 0 8px #00f0ff}
+.pills{display:flex;gap:6px}
+.pill{background:#0f0f2a;border:1px solid #2a2a6a;border-radius:999px;padding:4px 10px;font-size:11px;text-align:center;min-width:58px}
+.pill b{display:block;font-size:14px;color:#fff;text-shadow:0 0 6px currentColor}
+.pill.score b{color:#00f0ff}
+.pill.height b{color:#ff00e6}
+.pill.best b{color:#facc15}
+#wrap{flex:1;position:relative;display:flex;flex-direction:column;background:radial-gradient(ellipse at 50% 0%, #1a1a4a 0%, #050510 70%)}
+canvas{flex:1;width:100%;display:block}
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,5,16,0.75);backdrop-filter:blur(4px);z-index:5}
+.card{background:linear-gradient(180deg,#1a1a3a,#0f0f2a);border:1px solid #3a3aff;border-radius:20px;padding:20px;width:min(340px,90vw);text-align:center;box-shadow:0 0 30px rgba(0,240,255,0.3), inset 0 0 20px rgba(0,240,255,0.05)}
+.card h2{font-size:22px;letter-spacing:2px;color:#00f0ff;text-shadow:0 0 12px #00f0ff;margin-bottom:6px}
+.card p{font-size:12px;color:#94a3b8;line-height:1.5;margin:8px 0}
+.bigBtn{width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(90deg,#00f0ff,#7c3aed);color:#fff;font-weight:800;letter-spacing:2px;font-size:15px;box-shadow:0 0 20px rgba(0,240,255,0.5);margin-top:12px}
+.bigBtn:active{transform:scale(0.97)}
+.hint{font-size:11px;color:#64748b;margin-top:8px}
+#comboToast{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-weight:900;font-size:28px;letter-spacing:3px;color:#fff;text-shadow:0 0 10px #ff00e6,0 0 20px #ff00e6;opacity:0;pointer-events:none;transition:opacity 0.2s;z-index:4}
+#comboToast.show{opacity:1}
+#perfectFlash{position:absolute;inset:0;background:rgba(0,240,255,0.08);opacity:0;pointer-events:none;z-index:3}
+#perfectFlash.flash{animation:flash 0.35s ease}
+@keyframes flash{0%{opacity:1}100%{opacity:0}}
+#controls{display:flex;gap:8px;padding:10px;background:#0a0a1e;border-top:1px solid #1e1e4a}
+.cbtn{flex:1;padding:12px;border-radius:12px;border:1px solid #2a2a6a;font-weight:700;font-size:13px}
+.cbtn.sec{background:#1a1a3a;color:#94a3b8}
+.cbtn.pri{background:linear-gradient(90deg,#ff00e6,#7c3aed);color:#fff;box-shadow:0 0 15px rgba(255,0,230,0.4);border-color:#ff00e6}
+</style>
+</head>
+<body>
+<header>
+<h1>◈ NEON STACKER</h1>
+<div class="pills">
+<div class="pill score"><span>SCORE</span><b id="scoreEl">0</b></div>
+<div class="pill height"><span>HEIGHT</span><b id="heightEl">0</b></div>
+<div class="pill best"><span>BEST</span><b id="bestEl">0</b></div>
+</div>
+</header>
+<div id="wrap">
+<canvas id="c"></canvas>
+<div id="perfectFlash"></div>
+<div id="comboToast"></div>
+<div id="overlay">
+<div class="card">
+<h2 id="ovTitle">NEON STACKER</h2>
+<p id="ovDesc">Tap to drop the sliding block.<br>Overhangs get trimmed. Nail perfect drops to keep width & build combo!</p>
+<div style="display:flex;gap:8px;justify-content:center;margin:10px 0;font-size:11px;color:#64748b">
+<span>◼ Perfect ≤4px</span><span>•</span><span>✂ Trim overhang</span><span>•</span><span>∞ Endless</span>
+</div>
+<div id="ovStats" style="background:#050510;border-radius:12px;padding:10px;margin:8px 0;display:none">
+<div style="display:flex;justify-content:space-around;font-size:12px">
+<div><b id="ovScore" style="color:#00f0ff;font-size:16px">0</b><br><span style="color:#64748b">SCORE</span></div>
+<div><b id="ovHeight" style="color:#ff00e6;font-size:16px">0</b><br><span style="color:#64748b">HEIGHT</span></div>
+<div><b id="ovBest" style="color:#facc15;font-size:16px">0</b><br><span style="color:#64748b">BEST</span></div>
+</div>
+</div>
+<button class="bigBtn" id="playBtn">TAP TO STACK ▸</button>
+<div class="hint">One-tap play • Tap anywhere or press Space</div>
+</div>
+</div>
+</div>
+<div id="controls">
+<button class="cbtn sec" id="resetBtn">RESET ↺</button>
+<button class="cbtn pri" id="dropBtn">DROP ▾</button>
+</div>
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('scoreEl'), heightEl=document.getElementById('heightEl'), bestEl=document.getElementById('bestEl');
+const overlay=document.getElementById('overlay'), ovTitle=document.getElementById('ovTitle'), ovDesc=document.getElementById('ovDesc'), ovStats=document.getElementById('ovStats');
+const playBtn=document.getElementById('playBtn'), comboToast=document.getElementById('comboToast'), perfectFlash=document.getElementById('perfectFlash');
+
+const KEY='neonStackerBest_v1';
+let best=parseInt(localStorage.getItem(KEY)||'0',10);
+bestEl.textContent=best;
+
+let W=0,H=0,DPR=1;
+const BLOCK_H=18;
+let tower=[], cur=null, score=0, height=0, combo=0, camY=0, targetCamY=0, running=false, gameOver=false, particles=[], animId=null;
+let lastTime=0;
+
+function resize(){
+ DPR=Math.min(2, window.devicePixelRatio||1);
+ const rect=document.getElementById('wrap').getBoundingClientRect();
+ W=rect.width; H=rect.height;
+ canvas.width=W*DPR; canvas.height=H*DPR;
+ canvas.style.width=W+'px'; canvas.style.height=H+'px';
+ ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+function baseWidth(){ return Math.min(160, W*0.62); }
+function baseY(){ return H-70; }
+
+function colorFor(i){
+ const hue=(195 + i*18)%360;
+ return `hsl(${hue} 100% 60%)`;
+}
+
+function resetGame(){
+ tower=[];
+ const bw=baseWidth();
+ const by=baseY();
+ tower.push({x:(W-bw)/2, y:by, w:bw, h:BLOCK_H, color:colorFor(0)});
+ score=0; height=0; combo=0; camY=0; targetCamY=0; particles=[];
+ spawnBlock();
+ updateHUD();
+}
+
+function spawnBlock(){
+ const prev=tower[tower.length-1];
+ const w=prev.w;
+ const y=prev.y - 80;
+ const speed=Math.min(6.5, 2.2 + height*0.08 + score*0.01);
+ // alternate direction
+ const dir = (tower.length %2===0) ? 1 : -1;
+ const startX = dir===1 ? -w-10 : W+10;
+ cur={x:startX, y:y, w:w, h:BLOCK_H, dir:dir, speed:speed, color:colorFor(tower.length)};
+ targetCamY = Math.max(0, (baseY() - cur.y) - H*0.55);
+}
+
+function updateHUD(){
+ scoreEl.textContent=score;
+ heightEl.textContent=height;
+ bestEl.textContent=best;
+}
+
+function showCombo(text){
+ comboToast.textContent=text;
+ comboToast.classList.add('show');
+ clearTimeout(showCombo._t);
+ showCombo._t=setTimeout(()=>comboToast.classList.remove('show'), 600);
+}
+function flashPerfect(){
+ perfectFlash.classList.remove('flash');
+ void perfectFlash.offsetWidth;
+ perfectFlash.classList.add('flash');
+}
+
+function drop(){
+ if(!running || gameOver || !cur) return;
+ const prev=tower[tower.length-1];
+ const curL=cur.x, curR=cur.x+cur.w;
+ const prevL=prev.x, prevR=prev.x+prev.w;
+ const overlapL=Math.max(curL, prevL);
+ const overlapR=Math.min(curR, prevR);
+ const overlap=overlapR-overlapL;
+ if(overlap<=0){
+   // miss
+   // add falling particle for whole block
+   particles.push({x:cur.x, y:cur.y, w:cur.w, h:cur.h, vy:0, rot:0, vr:(Math.random()-0.5)*0.2, color:cur.color, alpha:1});
+   cur=null;
+   doGameOver();
+   return;
+ }
+ const perfectDist=Math.abs(cur.x - prev.x);
+ const isPerfect = perfectDist<=4;
+ let newW, newX;
+ if(isPerfect){
+   newW=prev.w;
+   newX=prev.x;
+   combo++;
+   score += 10 + combo*5;
+   showCombo(combo>=2 ? `PERFECT x${combo}!` : 'PERFECT!');
+   flashPerfect();
+   // no trim particles
+ } else {
+   combo=0;
+   newW=overlap;
+   newX=overlapL;
+   score += 1;
+   // create overhang particles
+   if(curL < overlapL){
+     particles.push({x:curL, y:cur.y, w:overlapL-curL, h:cur.h, vy:0, rot:0, vr:(Math.random()-0.5)*0.15, color:cur.color, alpha:1});
+   }
+   if(curR > overlapR){
+     particles.push({x:overlapR, y:cur.y, w:curR-overlapR, h:cur.h, vy:0, rot:0, vr:(Math.random()-0.5)*0.15, color:cur.color, alpha:1});
+   }
+ }
+ // place new block
+ const placed={x:newX, y:cur.y, w:newW, h:BLOCK_H, color:cur.color};
+ tower.push(placed);
+ height++;
+ if(height>best){ best=height; localStorage.setItem(KEY, String(best)); }
+ score += 0; // height already counted via perfect bonus; add base point for non-perfect already, for perfect we added bonus but also need base?
+ if(isPerfect) score += 1; // ensure perfect also gets base floor point
+ updateHUD();
+ spawnBlock();
+}
+
+function doGameOver(){
+ gameOver=true; running=false;
+ ovTitle.textContent='STACK CRASH';
+ ovDesc.innerHTML=`Tower collapsed at <b style="color:#ff00e6">${height} floors</b><br>Score ${score} • Best ${best}`;
+ ovStats.style.display='block';
+ document.getElementById('ovScore').textContent=score;
+ document.getElementById('ovHeight').textContent=height;
+ document.getElementById('ovBest').textContent=best;
+ playBtn.textContent='STACK AGAIN ▸';
+ overlay.style.display='flex';
+}
+
+function startGame(){
+ resetGame();
+ running=true; gameOver=false;
+ overlay.style.display='none';
+ lastTime=performance.now();
+ if(!animId) loop(lastTime);
+}
+
+function loop(t){
+ animId=requestAnimationFrame(loop);
+ const dt=Math.min(32, t-lastTime); lastTime=t;
+ const dtFactor=dt/16.66;
+
+ // update cur position
+ if(running && cur){
+   cur.x += cur.dir * cur.speed * dtFactor;
+   if(cur.x + cur.w > W - 2){ cur.x = W -2 - cur.w; cur.dir=-1; }
+   if(cur.x < 2){ cur.x=2; cur.dir=1; }
+ }
+
+ // camera lerp
+ camY += (targetCamY - camY)*0.08;
+
+ // particles
+ particles.forEach(p=>{ p.vy+=0.6*dtFactor; p.y+=p.vy*dtFactor; p.rot+=p.vr*dtFactor; p.alpha-=0.008*dtFactor; });
+ particles=particles.filter(p=>p.alpha>0 && p.y < H+100);
+
+ // draw
+ ctx.clearRect(0,0,W,H);
+ // grid
+ ctx.save();
+ ctx.strokeStyle='rgba(60,60,120,0.15)';
+ ctx.lineWidth=1;
+ const gridY = 40;
+ for(let x=0;x<W;x+=40){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+ for(let y= -Math.floor(camY)%40; y<H; y+=40){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+ // scanlines
+ ctx.fillStyle='rgba(0,240,255,0.02)';
+ for(let y=0;y<H;y+=4){ ctx.fillRect(0,y,W,1); }
+ ctx.restore();
+
+ // draw tower
+ tower.forEach((b,i)=>{
+   const sy=b.y - camY;
+   if(sy > H+20 || sy < -40) return;
+   drawBlock(b.x, sy, b.w, b.h, b.color, i===tower.length-1);
+ });
+ // draw cur
+ if(cur){
+   const sy=cur.y - camY;
+   drawBlock(cur.x, sy, cur.w, cur.h, cur.color, true, true);
+   // shadow on prev
+   const prev=tower[tower.length-1];
+   const prevSy=prev.y - camY;
+   ctx.fillStyle='rgba(0,240,255,0.12)';
+   ctx.fillRect(cur.x, prevSy - cur.h -2, cur.w, 2);
+ }
+ // particles
+ particles.forEach(p=>{
+   const sy=p.y - camY;
+   ctx.save();
+   ctx.globalAlpha=Math.max(0,p.alpha);
+   ctx.translate(p.x + p.w/2, sy + p.h/2);
+   ctx.rotate(p.rot);
+   ctx.shadowColor=p.color; ctx.shadowBlur=12;
+   ctx.fillStyle=p.color;
+   ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+   ctx.restore();
+ });
+
+ // height markers
+ ctx.fillStyle='rgba(255,255,255,0.25)';
+ ctx.font='10px monospace';
+ ctx.textAlign='right';
+ for(let i=1;i<20;i++){
+   const wy=baseY() - i*80;
+   const sy=wy - camY;
+   if(sy<0||sy>H) continue;
+   ctx.fillText(i+'F', W-6, sy-4);
+ }
+
+ // combo indicator
+ if(combo>1 && running){
+   ctx.fillStyle='#ff00e6';
+   ctx.font='bold 12px system-ui';
+   ctx.textAlign='center';
+   ctx.shadowColor='#ff00e6'; ctx.shadowBlur=8;
+   ctx.fillText('COMBO x'+combo, W/2, 22);
+   ctx.shadowBlur=0;
+ }
+}
+
+function drawBlock(x,y,w,h,color,isTop,isMoving){
+ ctx.save();
+ ctx.shadowColor=color;
+ ctx.shadowBlur=isMoving?18:12;
+ // gradient
+ const grad=ctx.createLinearGradient(x,y,x,y+h);
+ grad.addColorStop(0, color);
+ grad.addColorStop(1, 'rgba(0,0,0,0.35)');
+ ctx.fillStyle=grad;
+ // rounded rect
+ const r=4;
+ ctx.beginPath();
+ ctx.roundRect(x,y,w,h,r);
+ ctx.fill();
+ // top highlight
+ ctx.shadowBlur=0;
+ ctx.fillStyle='rgba(255,255,255,0.35)';
+ ctx.fillRect(x, y, w, 3);
+ // neon edge
+ ctx.strokeStyle=color;
+ ctx.lineWidth=1.2;
+ ctx.strokeRect(x+0.5,y+0.5,w-1,h-1);
+ // perfect indicator
+ if(isTop && !isMoving){
+   ctx.fillStyle='rgba(255,255,255,0.08)';
+   ctx.fillRect(x,y,w,h);
+ }
+ ctx.restore();
+}
+
+// input
+function handleDrop(e){
+ if(e) e.preventDefault();
+ if(overlay.style.display!=='none'){
+   startGame();
+ } else {
+   drop();
+ }
+}
+document.getElementById('wrap').addEventListener('pointerdown', handleDrop);
+document.getElementById('dropBtn').addEventListener('click', handleDrop);
+document.getElementById('playBtn').addEventListener('click', startGame);
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+ best=0; localStorage.setItem(KEY,'0'); bestEl.textContent=0;
+ if(!running){ document.getElementById('ovBest').textContent=0; }
+ resetGame();
+ overlay.style.display='flex';
+ ovTitle.textContent='NEON STACKER';
+ ovDesc.innerHTML='Tap to drop the sliding block.<br>Overhangs get trimmed. Nail perfect drops to keep width & build combo!';
+ ovStats.style.display='none';
+ playBtn.textContent='TAP TO STACK ▸';
+});
+window.addEventListener('keydown', e=>{
+ if(e.code==='Space'){ e.preventDefault(); handleDrop(); }
+});
+
+// initial draw
+resize();
+resetGame();
+loop(performance.now());
+</script>
+</body>
+</html>

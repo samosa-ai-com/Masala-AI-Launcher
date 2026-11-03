@@ -58,7 +58,9 @@ data class TaskRun(
     /** The run this firing started (a `skill_runs` row, Phase 4), when it started one. */
     val runId: String? = null,
     /** The error shown at the end of a failed run, or why it did not start. */
-    val detail: String? = null
+    val detail: String? = null,
+    /** The `skill_runs` row holding the transcript, for opening the run back up. */
+    val skillRunId: Long? = null
 )
 
 /**
@@ -98,6 +100,11 @@ data class ScheduledTask(
     val retriesUsed: Int = 0,
     /** When the current occurrence first found another run in progress. */
     val busySince: Long? = null,
+    /**
+     * The Second Brain note this task belongs to (vault path, e.g. `notes/2026-10-29-dentist.md`). The note
+     * names the task back in its `task_ref`; both sides are set and cleared together.
+     */
+    val memoryNote: String? = null,
     /** Newest last, capped at [MAX_HISTORY]. */
     val history: List<TaskRun> = emptyList()
 ) {

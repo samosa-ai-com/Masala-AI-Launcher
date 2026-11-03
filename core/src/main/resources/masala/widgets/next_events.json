@@ -1,0 +1,28 @@
+{
+  "id": "next_events",
+  "name": "Next events",
+  "description": "The next few things on your calendar.",
+  "category": "Calendar",
+  "widget": {
+    "id": "next_events",
+    "title": "Next up",
+    "components": [
+      {
+        "type": "list",
+        "binding": {
+          "source": "next_event"
+        },
+        "maxRows": 5,
+        "rowAction": {
+          "type": "ask_masala",
+          "prompt": "What are my upcoming events?"
+        }
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 2,
+      "max": 3
+    }
+  }
+}

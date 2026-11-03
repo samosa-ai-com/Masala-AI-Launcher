@@ -37,6 +37,14 @@ class TtsEngine(
     @Volatile
     private var androidReady = false
 
+    /**
+     * Set when [stop] interrupted Android speech; [speakAndroid] clears it on entry.
+     * Callers treat a false [speak] with this set as "the user stopped it", not a failure.
+     */
+    @Volatile
+    var androidInterrupted = false
+        private set
+
     @Volatile
     private var ttsInitGate = CompletableDeferred<Boolean>()
 
@@ -125,16 +133,19 @@ class TtsEngine(
         voice: String = "",
         language: Language = Language.ENGLISH,
         androidEngine: String = "",
-        androidVoice: String = ""
+        androidVoice: String = "",
+        /** Speaking rate, 1 = normal (Settings → Voice → Speed). */
+        rate: Float = 1f,
     ): Boolean = withContext(Dispatchers.IO) {
         lastLanguageUnavailable = null
         val sanitized = SpeechTextSanitizer.sanitize(text)
         if (sanitized.isBlank()) return@withContext true
+        androidInterrupted = false
         try {
             _isSpeaking.value = true
             when {
-                provider == AudioProvider.ANDROID -> speakAndroid(sanitized, language, androidEngine, androidVoice)
-                provider.isApiBased() -> speakApi(sanitized, apiModel, voice, language)
+                provider == AudioProvider.ANDROID -> speakAndroid(sanitized, language, androidEngine, androidVoice, rate)
+                provider.isApiBased() -> speakApi(sanitized, apiModel, voice, language, rate)
                 else -> false
             }
         } catch (_: Exception) {
@@ -144,9 +155,14 @@ class TtsEngine(
         }
     }
 
-    private suspend fun speakAndroid(text: String, language: Language, engine: String, voiceName: String): Boolean {
+    private suspend fun speakAndroid(text: String, language: Language, engine: String, voiceName: String, rate: Float = 1f): Boolean {
         if (engine != androidEngine) bindAndroidTts(engine)
-        val tts = readyAndroidTts() ?: return false
+        val tts = readyAndroidTts()
+        if (tts == null) {
+            android.util.Log.w(TAG, "speakAndroid: engine not ready (init failed or no default engine)")
+            lastLanguageUnavailable = null
+            return false
+        }
 
         val gate = CompletableDeferred<Boolean>()
         tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -160,7 +176,9 @@ class TtsEngine(
         })
         // A missing voice says nothing rather than reading the text with an
         // English one, which mangles it (#122); callers report why.
-        if (!isAvailable(tts.setLanguage(language.locale))) {
+        val langResult = tts.setLanguage(language.locale)
+        if (!isAvailable(langResult)) {
+            android.util.Log.w(TAG, "speakAndroid: no voice for ${language.locale.toLanguageTag()} (result=$langResult)")
             lastLanguageUnavailable = language
             return false
         }
@@ -170,7 +188,9 @@ class TtsEngine(
                 .firstOrNull { it.name == voiceName && language.matchesCode(it.locale.toLanguageTag()) }
                 ?.let(tts::setVoice)
         }
+        tts.setSpeechRate(rate)
         val result = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "tts_utterance")
+        if (result != TextToSpeech.SUCCESS) android.util.Log.w(TAG, "speakAndroid: speak() returned $result")
         return if (result == TextToSpeech.SUCCESS) gate.await() else false
     }
 
@@ -183,13 +203,13 @@ class TtsEngine(
     private fun isAvailable(result: Int): Boolean =
         result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
 
-    private suspend fun speakApi(text: String, model: String, voice: String, language: Language): Boolean {
+    private suspend fun speakApi(text: String, model: String, voice: String, language: Language, rate: Float = 1f): Boolean {
         val api = audioApi ?: return false
         if (model.isBlank()) return false
         val effectiveVoice = voice.ifBlank {
             apiTtsModels.firstOrNull { it.id == model }?.defaultVoiceFor(language) ?: "af_heart"
         }
-        val result = api.synthesize(text, model, effectiveVoice)
+        val result = api.synthesize(text, model, effectiveVoice, rate)
         if (result.isFailure) return false
         val audioBytes = result.getOrThrow()
         return playPcmAudio(audioBytes)
@@ -260,8 +280,15 @@ class TtsEngine(
         playbackGate = null
     }
 
+    /** The phone's voices for [language], for the voice picker (empty until the engine is ready). */
+    suspend fun androidVoices(language: Language): List<android.speech.tts.Voice> =
+        readyAndroidTts()?.voices.orEmpty()
+            .filter { language.matchesCode(it.locale.toLanguageTag()) && !it.isNetworkConnectionRequired }
+            .sortedBy { it.name }
+
     /** Stop any ongoing speech (both providers). Unblocks a suspended [speak]. */
     fun stop() {
+        androidInterrupted = true
         androidTts?.stop()
         try {
             currentTrack?.pause()
@@ -279,6 +306,7 @@ class TtsEngine(
     }
 
     private companion object {
+        const val TAG = "TtsEngine"
         const val SAMPLE_RATE_HZ = 24000
         const val PLAYBACK_TIMEOUT_SLACK_MS = 500L
     }

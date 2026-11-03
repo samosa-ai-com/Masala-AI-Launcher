@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>Neon Volley Survival</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden;background:#050a18;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e6f0ff}
+body{display:flex;justify-content:center;align-items:stretch;background:radial-gradient(1200px 600px at 50% -10%,#1a2a5a 0%,#070b18 55%,#040610 100%)}
+.app{
+  width:100%;
+  min-width:360px;
+  max-width:428px;
+  height:100dvh;
+  max-height:900px;
+  display:flex;
+  flex-direction:column;
+  background:linear-gradient(180deg,#0b122b 0%,#080d20 100%);
+  border-left:1px solid rgba(0,255,255,0.15);
+  border-right:1px solid rgba(255,0,255,0.15);
+  position:relative;
+  overflow:hidden;
+}
+.topbar{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 12px 8px;
+  background:rgba(0,0,0,0.35);
+  border-bottom:1px solid rgba(0,255,255,0.25);
+  backdrop-filter:blur(6px);
+  flex-shrink:0;
+}
+.brand{font-weight:900;letter-spacing:0.08em;font-size:13px;color:#7afcff;text-shadow:0 0 8px #00e5ff}
+.brand span{color:#ff6bff;text-shadow:0 0 8px #ff00ff}
+.stats{display:flex;gap:8px;align-items:center}
+.pill{
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.14);
+  border-radius:999px;
+  padding:6px 10px;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:0.04em;
+  display:flex;align-items:center;gap:6px;
+  min-height:32px;
+}
+.pill b{color:#fff;font-size:13px}
+.pill.lives{color:#ff6b8a}
+.pill.level{color:#7afcff}
+.pill.best{color:#ffe66b}
+.hud2{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 12px;
+  background:linear-gradient(90deg,rgba(0,255,255,0.08),rgba(255,0,255,0.08));
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  font-size:13px;
+  font-weight:700;
+  flex-shrink:0;
+}
+.hud2 .score{color:#fff;letter-spacing:0.06em}
+.hud2 .score em{color:#7afcff;font-style:normal}
+.hud2 .timer{color:#aab6d6;font-weight:600;font-size:12px}
+.canvas-wrap{
+  flex:1;
+  position:relative;
+  background:
+    linear-gradient(rgba(0,255,255,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,0,255,0.06) 1px, transparent 1px),
+    radial-gradient(600px 400px at 50% 30%, rgba(0,255,255,0.12), transparent 70%),
+    linear-gradient(180deg,#0a1433 0%,#060a1a 100%);
+  background-size:40px 40px,40px 40px,100% 100%,100% 100%;
+  overflow:hidden;
+  touch-action:none;
+}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.center-line{
+  position:absolute;left:50%;top:0;bottom:0;width:2px;
+  background:repeating-linear-gradient(to bottom, rgba(255,255,255,0.35) 0 10px, transparent 10px 18px);
+  transform:translateX(-50%);pointer-events:none;opacity:0.5;
+}
+.glow-left,.glow-right{
+  position:absolute;top:0;bottom:0;width:18px;pointer-events:none;opacity:0.5;
+}
+.glow-left{left:0;background:linear-gradient(90deg, rgba(0,255,255,0.35), transparent)}
+.glow-right{right:0;background:linear-gradient(270deg, rgba(255,0,255,0.35), transparent)}
+.controls{
+  display:flex;gap:10px;padding:10px 12px;
+  background:rgba(0,0,0,0.4);
+  border-top:1px solid rgba(255,255,255,0.1);
+  flex-shrink:0;
+}
+.btn{
+  flex:1;
+  min-height:48px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,0.14);
+  background:rgba(255,255,255,0.08);
+  color:#fff;
+  font-weight:800;
+  font-size:15px;
+  letter-spacing:0.04em;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  cursor:pointer;
+  user-select:none;
+  touch-action:manipulation;
+}
+.btn:active{transform:scale(0.98)}
+.btn.primary{
+  background:linear-gradient(180deg,#00e5ff,#00b8cc);
+  color:#00131a;
+  border-color:rgba(0,229,255,0.6);
+  box-shadow:0 0 18px rgba(0,229,255,0.5), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+.btn.ghost{
+  background:rgba(255,0,255,0.12);
+  border-color:rgba(255,0,255,0.35);
+  box-shadow:0 0 12px rgba(255,0,255,0.25);
+}
+.btn:disabled{opacity:0.45;pointer-events:none}
+.hint{
+  text-align:center;
+  font-size:12px;
+  color:#9fb0d6;
+  padding:6px 12px 8px;
+  background:rgba(0,0,0,0.25);
+  letter-spacing:0.02em;
+  line-height:1.4;
+}
+.overlay{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(600px 400px at 50% 40%, rgba(0,229,255,0.18), rgba(0,0,0,0.78) 70%);
+  backdrop-filter:blur(2px);
+  padding:20px;
+  text-align:center;
+  z-index:5;
+}
+.card{
+  width:100%;
+  max-width:340px;
+  background:linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+  border:1px solid rgba(0,255,255,0.35);
+  border-radius:20px;
+  padding:18px 16px;
+  box-shadow:0 10px 40px rgba(0,0,0,0.6), 0 0 30px rgba(0,229,255,0.25);
+}
+.card h1{
+  font-size:22px;
+  font-weight:900;
+  letter-spacing:0.06em;
+  color:#fff;
+  text-shadow:0 0 12px #00e5ff;
+  line-height:1.1;
+}
+.card h1 i{color:#ff6bff;text-shadow:0 0 12px #ff00ff;font-style:normal}
+.card p{font-size:13px;color:#cbd6f5;margin:10px 0 0;line-height:1.5}
+.badge-row{display:flex;gap:8px;justify-content:center;margin:12px 0;flex-wrap:wrap}
+.badge{font-size:11px;font-weight:800;letter-spacing:0.06em;padding:6px 10px;border-radius:999px;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.15);color:#fff}
+.badge.cyan{border-color:#00e5ff;color:#7afcff}
+.badge.pink{border-color:#ff00ff;color:#ff9bff}
+.big-btn{
+  width:100%;
+  min-height:52px;
+  margin-top:14px;
+  border-radius:14px;
+  border:none;
+  background:linear-gradient(180deg,#ffe66b,#ffb700);
+  color:#1a1200;
+  font-weight:900;
+  font-size:16px;
+  letter-spacing:0.05em;
+  box-shadow:0 0 20px rgba(255,230,107,0.5), inset 0 1px 0 rgba(255,255,255,0.8);
+  cursor:pointer;
+}
+.big-btn:active{transform:scale(0.98)}
+.small-row{display:flex;gap:8px;margin-top:10px}
+.small-row button{flex:1;min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:#fff;font-weight:700;font-size:13px}
+.hearts{letter-spacing:2px}
+.levelup{
+  position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);
+  background:linear-gradient(180deg,#00e5ff,#7a00ff);
+  color:#fff;
+  padding:10px 18px;
+  border-radius:999px;
+  font-weight:900;
+  letter-spacing:0.08em;
+  font-size:14px;
+  box-shadow:0 0 24px rgba(0,229,255,0.8);
+  z-index:4;
+  pointer-events:none;
+  animation:pop 900ms ease forwards;
+}
+@keyframes pop{0%{transform:translate(-50%,-50%) scale(0.7);opacity:0}20%{opacity:1}80%{opacity:1}100%{transform:translate(-50%,-70%) scale(1.05);opacity:0}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="brand">NEON <span>VOLLEY</span></div>
+    <div class="stats">
+      <div class="pill level">LVL <b id="lvl">1</b></div>
+      <div class="pill lives"><span class="hearts" id="hearts">♥♥♥</span></div>
+      <div class="pill best">★ <b id="best">0</b></div>
+    </div>
+  </div>
+  <div class="hud2">
+    <div class="score">SCORE <em id="score">0</em></div>
+    <div class="timer" id="timer">NEXT LVL 12s • BALLS 1 • AI x1.0</div>
+  </div>
+  <div class="canvas-wrap" id="wrap">
+    <canvas id="c"></canvas>
+    <div class="center-line"></div>
+    <div class="glow-left"></div>
+    <div class="glow-right"></div>
+    <div class="overlay" id="overlay">
+      <div class="card">
+        <h1>NEON <i>VOLLEY</i> SURVIVAL</h1>
+        <p>Drag <b style="color:#7afcff">anywhere</b> to move your <b style="color:#7afcff">LEFT-WALL</b> paddles. Volley every ball past the speeding AI on the right.</p>
+        <div class="badge-row">
+          <div class="badge cyan">3 LIVES</div>
+          <div class="badge pink">+1 BALL / LEVEL</div>
+          <div class="badge">AI SPEEDS UP</div>
+        </div>
+        <p style="font-size:12px;color:#9fb0d6">Level up every 12s. Miss = lose a heart. Survive as long as you can.</p>
+        <button class="big-btn" id="playBtn">▶ TAP TO SERVE</button>
+        <div class="small-row">
+          <button id="howBtn">HOW TO PLAY</button>
+          <button id="resetBestBtn">RESET BEST</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="controls">
+    <button class="btn ghost" id="pauseBtn">⏸ PAUSE</button>
+    <button class="btn primary" id="restartBtn">↻ RESTART</button>
+  </div>
+  <div class="hint">👆 Drag up/down to move • Large touch area • Best score saved automatically</div>
+</div>
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('wrap');
+  const overlay = document.getElementById('overlay');
+  const playBtn = document.getElementById('playBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const howBtn = document.getElementById('howBtn');
+  const resetBestBtn = document.getElementById('resetBestBtn');
+  const lvlEl = document.getElementById('lvl');
+  const heartsEl = document.getElementById('hearts');
+  const bestEl = document.getElementById('best');
+  const scoreEl = document.getElementById('score');
+  const timerEl = document.getElementById('timer');
+
+  const STORAGE_KEY = 'neonVolleyBest_v2';
+  let best = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10) || 0;
+  bestEl.textContent = best;
+
+  let W=360, H=640, dpr=1;
+  let player, ai, balls, particles;
+  let level=1, lives=3, score=0;
+  let levelTimer=12, levelProgress=0;
+  let state='idle'; // idle, playing, paused, gameover
+  let lastTime=0, animId=null;
+  let aiSpeedBase=3.2;
+  let ballBaseSpeed=3.6;
+
+  function resize(){
+    const rect = wrap.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio||1, 2);
+    W = rect.width;
+    H = rect.height;
+    canvas.width = Math.round(W*dpr);
+    canvas.height = Math.round(H*dpr);
+    canvas.style.width = W+'px';
+    canvas.style.height = H+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    if(player){
+      player.x = 14;
+      player.h = Math.max(78, Math.min(110, H*0.16));
+      ai.x = W - 14 - ai.w;
+      ai.h = player.h;
+    }
+  }
+
+  function createPaddles(){
+    const ph = Math.max(78, Math.min(110, H*0.16));
+    player = { x:14, y:H/2 - ph/2, w:14, h:ph, targetY: H/2 - ph/2 };
+    ai = { x:W-14-14, y:H/2 - ph/2, w:14, h:ph, vy:0 };
+  }
+
+  function rand(min,max){ return Math.random()*(max-min)+min; }
+
+  function spawnBall(speedMult=1, fromCenter=true){
+    const angle = rand(-0.55,0.55); // radians offset from horizontal
+    const dir = Math.random()<0.5 ? 1 : -1;
+    const speed = ballBaseSpeed * speedMult * rand(0.95,1.08);
+    const vx = Math.cos(angle)*speed*dir;
+    const vy = Math.sin(angle)*speed + rand(-0.6,0.6);
+    const r = 9;
+    const x = fromCenter ? W/2 + rand(-30,30) : W/2;
+    const y = rand(H*0.2, H*0.8);
+    const hue = Math.random()<0.5 ? 180 : 300; // cyan or magenta
+    balls.push({x,y,vx,vy,r,hue, trail:[]});
+  }
+
+  function initGame(){
+    resize();
+    createPaddles();
+    balls = [];
+    particles = [];
+    level=1; lives=3; score=0; levelTimer=12; levelProgress=0;
+    aiSpeedBase=3.2;
+    ballBaseSpeed=3.6;
+    spawnBall(1);
+    updateHUD();
+  }
+
+  function updateHUD(){
+    lvlEl.textContent = level;
+    heartsEl.textContent = '♥'.repeat(lives) + '♡'.repeat(3-lives);
+    heartsEl.style.color = lives===1 ? '#ff3b5c' : lives===2 ? '#ff8a9b' : '#ff6b8a';
+    scoreEl.textContent = score;
+    bestEl.textContent = best;
+    const aiMult = (1 + (level-1)*0.22).toFixed(1);
+    timerEl.textContent = `NEXT LVL ${Math.ceil(levelTimer)}s • BALLS ${balls.length} • AI x${aiMult}`;
+  }
+
+  function showOverlay(html){
+    overlay.innerHTML = html;
+    overlay.style.display='flex';
+  }
+  function hideOverlay(){ overlay.style.display='none'; }
+
+  function showStart(){
+    state='idle';
+    overlay.style.display='flex';
+    overlay.innerHTML = `
+      <div class="card">
+        <h1>NEON <i>VOLLEY</i> SURVIVAL</h1>
+        <p>Drag <b style="color:#7afcff">anywhere</b> to move your <b style="color:#7afcff">LEFT-WALL</b> paddles. Volley every ball past the speeding AI on the right.</p>
+        <div class="badge-row">
+          <div class="badge cyan">3 LIVES</div>
+          <div class="badge pink">+1 BALL / LEVEL</div>
+          <div class="badge">AI SPEEDS UP</div>
+        </div>
+        <p style="font-size:12px;color:#9fb0d6">Level up every 12s. Miss = lose a heart. Survive as long as you can.</p>
+        <button class="big-btn" id="playBtn2">▶ TAP TO SERVE</button>
+        <div class="small-row">
+          <button id="howBtn2">HOW TO PLAY</button>
+          <button id="resetBestBtn2">RESET BEST</button>
+        </div>
+        ${best>0?`<p style="margin-top:10px;font-size:12px;color:#ffe66b">★ BEST ${best}</p>`:''}
+      </div>`;
+    document.getElementById('playBtn2').onclick = startGame;
+    document.getElementById('howBtn2').onclick = showHow;
+    document.getElementById('resetBestBtn2').onclick = resetBest;
+  }
+
+  function showHow(){
+    showOverlay(`
+      <div class="card">
+        <h1>HOW TO <i>PLAY</i></h1>
+        <p style="text-align:left">
+        • <b>Drag anywhere</b> on the court — your left paddle follows your finger.<br>
+        • <b>Volley balls</b> to the right. If AI misses, you score +10.<br>
+        • If a ball passes your left wall, you lose a life.<br>
+        • Every <b>12 seconds</b> you level up: <b>+1 ball</b> and AI gets faster.<br>
+        • Survive with 3 lives. Best score is saved.
+        </p>
+        <button class="big-btn" id="backBtn">GOT IT → PLAY</button>
+      </div>`);
+    document.getElementById('backBtn').onclick = ()=>{ hideOverlay(); if(state==='idle') showStart(); };
+  }
+
+  function resetBest(){
+    localStorage.removeItem(STORAGE_KEY);
+    best=0; bestEl.textContent=0;
+    // feedback
+    const b = document.getElementById('resetBestBtn') || document.getElementById('resetBestBtn2');
+    if(b){ const t=b.textContent; b.textContent='CLEARED ✓'; setTimeout(()=>b.textContent=t,1200); }
+  }
+
+  function startGame(){
+    if(balls.length===0) initGame();
+    state='playing';
+    hideOverlay();
+    lastTime=performance.now();
+    if(!animId) loop(lastTime);
+    pauseBtn.textContent='⏸ PAUSE';
+  }
+
+  function gameOver(){
+    state='gameover';
+    if(score>best){ best=score; localStorage.setItem(STORAGE_KEY, String(best)); }
+    updateHUD();
+    showOverlay(`
+      <div class="card" style="border-color:#ff6b8a;box-shadow:0 0 30px rgba(255,107,138,0.4)">
+        <h1 style="text-shadow:0 0 12px #ff6b8a">GAME <i style="color:#ff6b8a;text-shadow:0 0 12px #ff3b5c">OVER</i></h1>
+        <p>Level <b>${level}</b> • Balls <b>${balls.length}</b> • Score <b style="color:#ffe66b">${score}</b></p>
+        <p style="color:${score>=best && score>0?'#7afcff':'#9fb0d6'}">${score>=best && score>0?'★ NEW BEST! ★':'Keep volleying to beat your best.'}</p>
+        <p style="font-size:12px;color:#cbd6f5">Best: <b style="color:#ffe66b">${best}</b> • AI was ${ (1+(level-1)*0.22).toFixed(1)}x speed</p>
+        <button class="big-btn" id="againBtn">↻ PLAY AGAIN</button>
+        <div class="small-row"><button id="menuBtn">MENU</button><button id="shareBtn">SHARE SCORE</button></div>
+      </div>`);
+    document.getElementById('againBtn').onclick = ()=>{ initGame(); startGame(); };
+    document.getElementById('menuBtn').onclick = ()=>{ initGame(); showStart(); };
+    const shareBtn=document.getElementById('shareBtn');
+    if(shareBtn) shareBtn.onclick = ()=>{
+      const text=`Neon Volley Survival — Score ${score} • Level ${level} • Best ${best}`;
+      if(navigator.share) navigator.share({title:'Neon Volley', text}).catch(()=>{});
+      else if(navigator.clipboard) navigator.clipboard.writeText(text).then(()=>{shareBtn.textContent='COPIED ✓'; setTimeout(()=>shareBtn.textContent='SHARE SCORE',1200)});
+    };
+  }
+
+  function levelUp(){
+    level++;
+    levelTimer=12;
+    // add ball
+    const speedMult = 1 + (level-1)*0.12;
+    spawnBall(speedMult);
+    // speed up existing balls slightly
+    balls.forEach(b=>{
+      const s = Math.hypot(b.vx,b.vy);
+      const ns = s*1.06;
+      const ang = Math.atan2(b.vy,b.vx);
+      b.vx = Math.cos(ang)*ns;
+      b.vy = Math.sin(ang)*ns;
+    });
+    // visual pop
+    const el=document.createElement('div');
+    el.className='levelup';
+    el.textContent=`LEVEL ${level} • +1 BALL!`;
+    wrap.appendChild(el);
+    setTimeout(()=>el.remove(),1000);
+    // haptic
+    if(navigator.vibrate) navigator.vibrate(60);
+    updateHUD();
+  }
+
+  function loseLife(){
+    lives--;
+    if(navigator.vibrate) navigator.vibrate([40,30,80]);
+    // particles burst at left wall
+    for(let i=0;i<18;i++) particles.push({x:18,y:player.y+player.h/2,vx:rand(1,5),vy:rand(-4,4),life:1,dec:0.04,color:'#ff6b8a'});
+    updateHUD();
+    if(lives<=0){
+      gameOver();
+    } else {
+      // reset balls to center after brief pause
+      balls.forEach(b=>{
+        b.x=W/2; b.y=rand(H*0.25,H*0.75);
+        const dir = Math.random()<0.5?1:-1;
+        const sp = ballBaseSpeed*(1+(level-1)*0.12);
+        const ang=rand(-0.5,0.5);
+        b.vx=Math.cos(ang)*sp*dir; b.vy=Math.sin(ang)*sp;
+        b.trail=[];
+      });
+    }
+  }
+
+  function scorePoint(ball){
+    score+=10;
+    if(score>best){ best=score; localStorage.setItem(STORAGE_KEY,String(best)); }
+    // particles at right wall
+    for(let i=0;i<12;i++) particles.push({x:W-18,y:ball.y,vx:rand(-5,-1),vy:rand(-3,3),life:1,dec:0.05,color:'#7afcff'});
+    // respawn ball to center going left
+    ball.x=W/2; ball.y=rand(H*0.2,H*0.8);
+    const sp = ballBaseSpeed*(1+(level-1)*0.12)*rand(0.95,1.05);
+    const ang=rand(-0.6,0.6);
+    const dir = -1; // towards player
+    ball.vx=Math.cos(ang)*sp*dir; ball.vy=Math.sin(ang)*sp;
+    ball.trail=[];
+    updateHUD();
+  }
+
+  // Input handling - drag anywhere
+  let dragging=false;
+  function setPlayerY(clientY){
+    const rect=wrap.getBoundingClientRect();
+    const y = clientY - rect.top;
+    const clamped = Math.max(0, Math.min(H - player.h, y - player.h/2));
+    player.targetY = clamped;
+  }
+  function onPointerDown(e){
+    if(state==='idle'){ startGame(); }
+    dragging=true;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    setPlayerY(y);
+    e.preventDefault();
+  }
+  function onPointerMove(e){
+    if(!dragging || !player) return;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    setPlayerY(y);
+    e.preventDefault();
+  }
+  function onPointerUp(){ dragging=false; }
+
+  wrap.addEventListener('touchstart', onPointerDown, {passive:false});
+  wrap.addEventListener('touchmove', onPointerMove, {passive:false});
+  wrap.addEventListener('touchend', onPointerUp);
+  wrap.addEventListener('mousedown', onPointerDown);
+  window.addEventListener('mousemove', onPointerMove);
+  window.addEventListener('mouseup', onPointerUp);
+
+  // Buttons
+  playBtn && playBtn.addEventListener('click', startGame);
+  howBtn && howBtn.addEventListener('click', showHow);
+  resetBestBtn && resetBestBtn.addEventListener('click', resetBest);
+  pauseBtn.addEventListener('click', ()=>{
+    if(state==='playing'){ state='paused'; pauseBtn.textContent='▶ RESUME'; showOverlay(`<div class="card"><h1>PAUSED</h1><p>Drag to move when you resume.</p><button class="big-btn" id="resumeBtn">▶ RESUME</button></div>`); document.getElementById('resumeBtn').onclick=()=>{ hideOverlay(); state='playing'; pauseBtn.textContent='⏸ PAUSE'; lastTime=performance.now(); }; }
+    else if(state==='paused'){ hideOverlay(); state='playing'; pauseBtn.textContent='⏸ PAUSE'; lastTime=performance.now(); }
+  });
+  restartBtn.addEventListener('click', ()=>{ initGame(); startGame(); });
+
+  function update(dt){
+    if(state!=='playing') return;
+    // level timer
+    levelTimer -= dt;
+    if(levelTimer<=0) levelUp();
+    // smooth player follow
+    player.y += (player.targetY - player.y)*0.35;
+    // AI: track nearest incoming ball
+    let targetBall=null, minDist=Infinity;
+    for(const b of balls){
+      if(b.vx>0){ // heading to AI
+        const d = Math.abs(b.x - ai.x);
+        if(d<minDist){ minDist=d; targetBall=b; }
+      }
+    }
+    if(!targetBall){
+      // if no incoming, track closest ball
+      let closest=null, cd=Infinity;
+      for(const b of balls){ const d=Math.abs(b.y - (ai.y+ai.h/2)); if(d<cd){cd=d; closest=b;} }
+      targetBall=closest;
+    }
+    if(targetBall){
+      const aiCenter = ai.y + ai.h/2;
+      const diff = targetBall.y - aiCenter;
+      const aiSpeed = aiSpeedBase + (level-1)*0.85; // speeding AI
+      // add slight prediction
+      const pred = targetBall.vy * 0.18;
+      const desired = diff + pred;
+      const move = Math.max(-aiSpeed, Math.min(aiSpeed, desired*0.12));
+      ai.y += move;
+      ai.y = Math.max(0, Math.min(H - ai.h, ai.y));
+    }
+
+    // balls
+    for(const b of balls){
+      b.trail.push({x:b.x,y:b.y});
+      if(b.trail.length>8) b.trail.shift();
+      b.x += b.vx;
+      b.y += b.vy;
+
+      // top/bottom bounce
+      if(b.y - b.r < 0){ b.y = b.r; b.vy *= -1; spawnHit(b.x,b.y,'#ffffff'); }
+      if(b.y + b.r > H){ b.y = H - b.r; b.vy *= -1; spawnHit(b.x,b.y,'#ffffff'); }
+
+      // paddle collisions
+      // player (left)
+      if(b.vx < 0 && b.x - b.r < player.x + player.w && b.x + b.r > player.x && b.y > player.y -2 && b.y < player.y + player.h +2){
+        b.x = player.x + player.w + b.r + 1;
+        const hitPos = (b.y - player.y)/player.h - 0.5; // -0.5 to 0.5
+        const speed = Math.hypot(b.vx,b.vy) * 1.02;
+        const angle = hitPos * 1.0; // add spin
+        const dir = 1;
+        const baseAng = Math.atan2(b.vy, Math.abs(b.vx));
+        const newAng = baseAng*0.5 + angle;
+        b.vx = Math.cos(newAng)*speed*dir;
+        b.vy = Math.sin(newAng)*speed;
+        // clamp vy
+        b.vy = Math.max(-7, Math.min(7, b.vy));
+        spawnHit(b.x,b.y,'#00e5ff');
+        if(navigator.vibrate) navigator.vibrate(12);
+      }
+      // ai (right)
+      if(b.vx > 0 && b.x + b.r > ai.x && b.x - b.r < ai.x + ai.w && b.y > ai.y -2 && b.y < ai.y + ai.h +2){
+        b.x = ai.x - b.r -1;
+        const hitPos = (b.y - ai.y)/ai.h -0.5;
+        const speed = Math.hypot(b.vx,b.vy) * 1.015;
+        const angle = hitPos * 0.9;
+        const baseAng = Math.atan2(b.vy, -b.vx);
+        const newAng = baseAng*0.5 + angle;
+        b.vx = -Math.cos(newAng)*speed;
+        b.vy = Math.sin(newAng)*speed;
+        b.vy = Math.max(-7, Math.min(7, b.vy));
+        spawnHit(b.x,b.y,'#ff00ff');
+      }
+
+      // out of bounds
+      if(b.x < -b.r*2){
+        // player missed
+        loseLife();
+        if(state==='gameover') break;
+        // after loseLife balls are reset, break to avoid double
+        break;
+      }
+      if(b.x > W + b.r*2){
+        scorePoint(b);
+      }
+    }
+
+    // particles
+    for(let i=particles.length-1;i>=0;i--){
+      const p=particles[i];
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.18; p.life-=p.dec;
+      if(p.life<=0) particles.splice(i,1);
+    }
+
+    // subtle score tick for survival
+    // add 1 point per second survived
+    // handled via timer accumulation
+    levelProgress += dt;
+    if(levelProgress >= 1){
+      levelProgress=0;
+      score += 1;
+      if(score>best){ best=score; localStorage.setItem(STORAGE_KEY,String(best)); }
+      updateHUD();
+    } else {
+      // still update timer display every frame
+      const aiMult = (1 + (level-1)*0.22).toFixed(1);
+      timerEl.textContent = `NEXT LVL ${Math.ceil(levelTimer)}s • BALLS ${balls.length} • AI x${aiMult}`;
+    }
+  }
+
+  function spawnHit(x,y,color){
+    for(let i=0;i<4;i++) particles.push({x,y,vx:rand(-2,2),vy:rand(-2,2),life:1,dec:0.08,color});
+  }
+
+  function draw(){
+    // clear
+    ctx.clearRect(0,0,W,H);
+
+    // court border glow
+    ctx.save();
+    ctx.strokeStyle='rgba(0,229,255,0.18)';
+    ctx.lineWidth=2;
+    ctx.strokeRect(1,1,W-2,H-2);
+    ctx.restore();
+
+    // center dashed line already via DOM, but also draw subtle
+    // paddles shadow
+    function drawPaddle(p, color, glow){
+      ctx.save();
+      ctx.shadowColor=glow;
+      ctx.shadowBlur=18;
+      // body
+      const grad = ctx.createLinearGradient(p.x,0,p.x+p.w,0);
+      if(color==='cyan'){
+        grad.addColorStop(0,'#00e5ff'); grad.addColorStop(1,'#7afcff');
+      } else {
+        grad.addColorStop(0,'#ff8aff'); grad.addColorStop(1,'#ff00ff');
+      }
+      ctx.fillStyle=grad;
+      // rounded rect
+      const r=7;
+      ctx.beginPath();
+      ctx.roundRect(p.x, p.y, p.w, p.h, r);
+      ctx.fill();
+      // inner highlight
+      ctx.shadowBlur=0;
+      ctx.fillStyle='rgba(255,255,255,0.35)';
+      ctx.fillRect(p.x+2, p.y+4, 2, p.h-8);
+      ctx.restore();
+      // neon edge
+      ctx.save();
+      ctx.strokeStyle= glow;
+      ctx.lineWidth=1.5;
+      ctx.strokeRect(p.x+0.5,p.y+0.5,p.w-1,p.h-1);
+      ctx.restore();
+    }
+    drawPaddle(player,'cyan','#00e5ff');
+    drawPaddle(ai,'pink','#ff00ff');
+
+    // balls with trail and glow
+    for(const b of balls){
+      // trail
+      for(let i=0;i<b.trail.length;i++){
+        const t=b.trail[i];
+        const a = (i+1)/b.trail.length * 0.25;
+        ctx.beginPath();
+        ctx.arc(t.x,t.y, b.r*(0.6 + a*0.4),0,Math.PI*2);
+        ctx.fillStyle = b.hue===180 ? `rgba(0,229,255,${a})` : `rgba(255,0,255,${a})`;
+        ctx.fill();
+      }
+      // glow
+      ctx.save();
+      ctx.shadowColor = b.hue===180 ? '#00e5ff' : '#ff00ff';
+      ctx.shadowBlur=16;
+      ctx.beginPath();
+      ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+      ctx.fillStyle = b.hue===180 ? '#e0ffff' : '#ffe0ff';
+      ctx.fill();
+      ctx.restore();
+      // core
+      ctx.beginPath();
+      ctx.arc(b.x,b.y,b.r*0.55,0,Math.PI*2);
+      ctx.fillStyle='#ffffff';
+      ctx.fill();
+    }
+
+    // particles
+    for(const p of particles){
+      ctx.globalAlpha = Math.max(0,p.life);
+      ctx.fillStyle=p.color;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y, 2.5,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha=1;
+
+    // vignette
+    const g = ctx.createRadialGradient(W/2,H/2, Math.min(W,H)*0.4, W/2,H/2, Math.max(W,H));
+    g.addColorStop(0,'transparent');
+    g.addColorStop(1,'rgba(0,0,0,0.35)');
+    ctx.fillStyle=g;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  function loop(now){
+    animId=requestAnimationFrame(loop);
+    const dt = Math.min(0.05, (now - lastTime)/1000);
+    lastTime=now;
+    if(state==='playing'){
+      update(dt);
+    }
+    draw();
+  }
+
+  // init
+  window.addEventListener('resize', resize);
+  initGame();
+  resize();
+  draw();
+  showStart();
+  // ensure pause button state
+  pauseBtn.textContent='⏸ PAUSE';
+
+  // prevent scroll on touch
+  document.body.addEventListener('touchmove', e=>{ if(e.target.closest('#wrap')) e.preventDefault(); }, {passive:false});
+
+})();
+</script>
+</body>
+</html>

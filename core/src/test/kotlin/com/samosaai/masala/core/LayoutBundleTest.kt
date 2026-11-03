@@ -4,6 +4,11 @@ import com.samosaai.masala.core.apps.Visibility
 import com.samosaai.masala.core.layout.LayoutBundle
 import com.samosaai.masala.core.layout.LayoutBundle.AppOverrideExport
 import com.samosaai.masala.core.layout.LayoutChecker
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -16,11 +21,24 @@ class LayoutBundleTest {
 
     @Test
     fun `a bundle round trips with its overrides`() {
-        val overrides = listOf(AppOverrideExport("com.a/.Main#0", "Mail", Visibility.SEARCH_ONLY))
+        val overrides = listOf(AppOverrideExport("com.a/.Main#0", "Mail", Visibility.SEARCH_ONLY, "symbol:email"))
         val imported = LayoutBundle.import(LayoutBundle.of(classic, overrides).encode(), env)
         assertEquals(classic, imported.layout)
         assertEquals(overrides, imported.appOverrides)
         assertEquals(emptyList(), imported.problems)
+    }
+
+    @Test
+    fun `an override without an icon still imports`() {
+        // Bundles written before icons existed carry no icon field.
+        val withIcon = Json.parseToJsonElement(
+            LayoutBundle.of(classic, listOf(AppOverrideExport("com.a/.Main#0", "Mail", Visibility.SEARCH_ONLY, "symbol:email"))).encode(),
+        ).jsonObject
+        val old = JsonObject(
+            withIcon + mapOf("appOverrides" to JsonArray(withIcon["appOverrides"]!!.jsonArray.map { JsonObject(it.jsonObject - "icon") })),
+        ).toString()
+        val imported = LayoutBundle.import(old, env)
+        assertEquals(listOf(AppOverrideExport("com.a/.Main#0", "Mail", Visibility.SEARCH_ONLY, null)), imported.appOverrides)
     }
 
     @Test

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Plain HTTP is allowed everywhere: the user's own MCP servers and model servers
+  commonly run on a home network or a dev machine and speak http only. A token
+  or header sent over http off the local network still earns a warning in
+  Settings → Connected tools, so the risk stays visible.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

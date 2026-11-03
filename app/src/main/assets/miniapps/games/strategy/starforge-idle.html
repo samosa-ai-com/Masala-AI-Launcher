@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Starforge Workshop - Idle Fleet</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#070b18;
+  --bg2:#0f1430;
+  --card:#151c3a;
+  --card2:#1c2450;
+  --border:#2a3566;
+  --cyan:#00e5ff;
+  --cyan2:#00b8d4;
+  --orange:#ff6b35;
+  --orange2:#ff8c42;
+  --green:#00e676;
+  --text:#e6eaff;
+  --muted:#8a94c0;
+  --red:#ff3b5c;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
+.app{
+  width:100%;max-width:428px;min-width:360px;height:100dvh;margin:0 auto;
+  display:flex;flex-direction:column;background:radial-gradient(1200px 600px at 50% -10%, #1a237e33 0%, transparent 60%), linear-gradient(180deg, #0a0f2a 0%, #070b18 100%);
+  border-left:1px solid #1a2250;border-right:1px solid #1a2250;
+  position:relative;overflow:hidden;
+}
+.header{
+  padding:10px 12px 8px;background:linear-gradient(180deg, #121a3d 0%, #0f1430 100%);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.header-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.logo{display:flex;align-items:center;gap:8px}
+.logo-icon{
+  width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg, var(--cyan), #7c4dff);
+  display:grid;place-items:center;font-size:18px;box-shadow:0 0 18px #00e5ff55;
+}
+.logo h1{font-size:14px;letter-spacing:0.08em;font-weight:900;line-height:1}
+.logo h1 span{color:var(--cyan)}
+.logo p{font-size:10px;color:var(--muted);letter-spacing:0.06em;margin-top:2px}
+.header-stats{display:flex;gap:6px}
+.stat-pill{
+  background:#0a0e24;border:1px solid var(--border);border-radius:999px;padding:6px 10px;
+  display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;white-space:nowrap;
+}
+.stat-pill b{color:var(--cyan)}
+.stat-pill.orange b{color:var(--orange)}
+.header-actions{display:flex;gap:6px;margin-top:8px}
+.btn-small{
+  flex:1;min-height:36px;border-radius:10px;border:1px solid var(--border);
+  background:linear-gradient(180deg, #1e2a6a, #16204d);color:var(--text);
+  font-size:11px;font-weight:800;letter-spacing:0.04em;display:flex;align-items:center;justify-content:center;gap:6px;
+  cursor:pointer;touch-action:manipulation;
+}
+.btn-small:active{transform:scale(0.98)}
+.btn-small.cyan{border-color:#00e5ff55;background:linear-gradient(180deg, #003a4a, #002a38);color:var(--cyan)}
+.btn-small.orange{border-color:#ff6b3555;background:linear-gradient(180deg, #4a1e0a, #3a1505);color:var(--orange)}
+.btn-small:disabled{opacity:0.45;pointer-events:none}
+.buff-bar{
+  display:flex;gap:6px;padding:6px 10px;background:#0a0e24;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.buff{
+  flex:1;border-radius:10px;padding:6px 8px;display:flex;align-items:center;justify-content:space-between;
+  border:1px solid var(--border);background:#11173a;font-size:11px;font-weight:700;
+}
+.buff.active{border-color:var(--cyan);background:linear-gradient(90deg, #002a38, #11173a);box-shadow:0 0 10px #00e5ff33}
+.buff.over.active{border-color:var(--orange);background:linear-gradient(90deg, #3a1505, #11173a);box-shadow:0 0 10px #ff6b3533}
+.buff .bar{height:4px;background:#0a0e24;border-radius:99px;overflow:hidden;margin-top:4px}
+.buff .fill{height:100%;background:var(--cyan);width:0%;transition:width 0.2s}
+.buff.over .fill{background:var(--orange)}
+.resources{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px 10px;
+  background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.res-card{
+  background:linear-gradient(180deg, var(--card2), var(--card));border:1px solid var(--border);
+  border-radius:12px;padding:7px 8px;display:flex;flex-direction:column;gap:2px;min-height:64px;
+}
+.res-top{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:0.06em;color:var(--muted)}
+.res-icon{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-size:12px;flex-shrink:0}
+.res-val{font-size:13px;font-weight:900;letter-spacing:-0.02em;line-height:1}
+.res-rate{font-size:10px;font-weight:700;color:var(--green)}
+.res-rate.neg{color:var(--red)}
+.content{flex:1;overflow-y:auto;overflow-x:hidden;padding:10px 10px 10px;-webkit-overflow-scrolling:touch}
+.content::-webkit-scrollbar{width:0}
+.tab{display:none}
+.tab.active{display:block}
+.card{
+  background:linear-gradient(180deg, var(--card2), var(--card));border:1px solid var(--border);
+  border-radius:16px;padding:12px;margin-bottom:10px;position:relative;overflow:hidden;
+}
+.card h3{font-size:13px;font-weight:900;letter-spacing:0.04em;display:flex;align-items:center;gap:8px}
+.card p{font-size:11px;color:var(--muted);line-height:1.4;margin-top:4px}
+.badge{font-size:10px;font-weight:900;padding:3px 7px;border-radius:999px;background:#0a0e24;border:1px solid var(--border);color:var(--muted)}
+.badge.owned{background:var(--cyan);color:#001a1f;border-color:var(--cyan)}
+.ship-row{display:flex;gap:10px;align-items:center}
+.ship-icon{width:48px;height:48px;border-radius:12px;background:#0a0e24;border:1px solid var(--border);display:grid;place-items:center;font-size:22px;flex-shrink:0}
+.ship-info{flex:1;min-width:0}
+.ship-name{font-size:13px;font-weight:900;display:flex;align-items:center;gap:6px}
+.ship-meta{font-size:10px;color:var(--muted);margin-top:2px}
+.cost-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.cost-chip{font-size:10px;font-weight:800;padding:4px 6px;border-radius:8px;background:#0a0e24;border:1px solid var(--border);display:flex;align-items:center;gap:4px}
+.cost-chip.ok{border-color:#00e67655;color:var(--green)}
+.cost-chip.no{border-color:#ff3b5c55;color:var(--red);opacity:0.9}
+.btn-buy{
+  min-width:72px;min-height:44px;padding:0 14px;border-radius:12px;border:none;
+  background:linear-gradient(180deg, var(--cyan), var(--cyan2));color:#001a1f;
+  font-size:12px;font-weight:900;cursor:pointer;touch-action:manipulation;white-space:nowrap;
+  box-shadow:0 4px 12px #00e5ff44;
+}
+.btn-buy:disabled{background:#1a234d;color:var(--muted);box-shadow:none;opacity:0.6}
+.btn-buy.orange{background:linear-gradient(180deg, var(--orange), #e65100);color:#fff;box-shadow:0 4px 12px #ff6b3544}
+.bulk-row{display:flex;gap:6px;margin-bottom:10px}
+.bulk-btn{
+  flex:1;min-height:44px;border-radius:12px;border:1px solid var(--border);background:#0a0e24;color:var(--muted);
+  font-size:12px;font-weight:900;cursor:pointer;
+}
+.bulk-btn.active{background:var(--cyan);color:#001a1f;border-color:var(--cyan);box-shadow:0 0 12px #00e5ff44}
+.research-grid{display:grid;grid-template-columns:1fr;gap:8px}
+.research-card{
+  display:flex;gap:10px;align-items:center;padding:10px;border-radius:14px;
+  background:linear-gradient(180deg, #1a2450, #151c3a);border:1px solid var(--border);
+}
+.research-card.purchased{border-color:var(--green);background:linear-gradient(180deg, #0a2a1a, #122a1e);opacity:0.95}
+.research-icon{width:40px;height:40px;border-radius:10px;background:#0a0e24;border:1px solid var(--border);display:grid;place-items:center;font-size:18px;flex-shrink:0}
+.crew-card{
+  display:flex;gap:10px;align-items:center;padding:12px;border-radius:16px;
+  background:linear-gradient(180deg, var(--card2), var(--card));border:1px solid var(--border);margin-bottom:8px;
+}
+.crew-icon{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg, #ff6b35, #ff8c42);display:grid;place-items:center;font-size:20px;flex-shrink:0}
+.crew-icon.vet{background:linear-gradient(135deg, #7c4dff, #00e5ff)}
+.crew-icon.ace{background:linear-gradient(135deg, #ffd600, #ff6b35)}
+.zone-card{
+  background:linear-gradient(180deg, #1a2450, #0f1430);border:1px solid var(--border);border-radius:16px;padding:12px;margin-bottom:10px;
+}
+.zone-card.boss{border-color:var(--orange);box-shadow:0 0 16px #ff6b3522}
+.zone-top{display:flex;justify-content:space-between;align-items:center}
+.zone-req{font-size:11px;font-weight:800;color:var(--muted)}
+.zone-req b{color:var(--text)}
+.progress{height:8px;background:#0a0e24;border-radius:99px;overflow:hidden;border:1px solid var(--border);margin-top:8px}
+.progress-fill{height:100%;background:linear-gradient(90deg, var(--cyan), #7c4dff);width:0%;transition:width 0.4s}
+.progress-fill.over{background:linear-gradient(90deg, var(--orange), #ff8c42)}
+.btn-assault{
+  width:100%;min-height:48px;border-radius:14px;border:none;
+  background:linear-gradient(180deg, var(--orange), #e65100);color:#fff;
+  font-size:13px;font-weight:900;letter-spacing:0.06em;cursor:pointer;margin-top:10px;
+  box-shadow:0 6px 16px #ff6b3544;touch-action:manipulation;
+}
+.btn-assault:disabled{background:#1a234d;color:var(--muted);box-shadow:none}
+.btn-assault.win{background:linear-gradient(180deg, var(--green), #00a152)}
+.bottom-nav{
+  display:flex;gap:6px;padding:8px 8px calc(8px + env(safe-area-inset-bottom));
+  background:linear-gradient(180deg, #0f1430, #0a0e24);border-top:1px solid var(--border);flex-shrink:0;
+}
+.nav-btn{
+  flex:1;min-height:52px;border-radius:14px;border:1px solid var(--border);
+  background:#11173a;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  font-size:10px;font-weight:800;letter-spacing:0.06em;cursor:pointer;touch-action:manipulation;
+}
+.nav-btn.active{background:linear-gradient(180deg, #1e2a6a, #16204d);color:var(--cyan);border-color:#00e5ff55;box-shadow:0 0 12px #00e5ff22}
+.nav-btn span{font-size:16px}
+.modal-bg{
+  position:absolute;inset:0;background:#020412cc;backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;padding:16px;z-index:20;
+}
+.modal-bg.open{display:flex}
+.modal{
+  width:100%;max-width:400px;background:linear-gradient(180deg, #1a2450, #0f1430);
+  border:1px solid var(--border);border-radius:18px;padding:16px;max-height:90dvh;overflow:auto;
+}
+.modal h2{font-size:14px;font-weight:900;letter-spacing:0.06em}
+.modal p{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5}
+.textarea{
+  width:100%;min-height:90px;background:#0a0e24;border:1px solid var(--border);border-radius:12px;
+  color:var(--text);padding:10px;font-size:11px;font-family:monospace;resize:vertical;margin-top:8px;
+}
+.btn-row{display:flex;gap:8px;margin-top:10px}
+.btn{
+  flex:1;min-height:44px;border-radius:12px;border:1px solid var(--border);
+  background:#11173a;color:var(--text);font-size:12px;font-weight:800;cursor:pointer;
+}
+.btn.primary{background:linear-gradient(180deg, var(--cyan), var(--cyan2));color:#001a1f;border:none}
+.btn.danger{background:linear-gradient(180deg, #ff3b5c, #c62828);color:#fff;border:none}
+.calib-track{
+  height:18px;background:#0a0e24;border:1px solid var(--border);border-radius:99px;overflow:hidden;position:relative;margin-top:12px;
+}
+.calib-zone{position:absolute;top:0;bottom:0;left:35%;right:35%;background:#00e67655;border-left:2px solid var(--green);border-right:2px solid var(--green)}
+.calib-dot{position:absolute;top:2px;bottom:2px;width:10px;background:var(--cyan);border-radius:99px;box-shadow:0 0 10px var(--cyan);left:0}
+.toast{
+  position:absolute;left:50%;top:14px;transform:translateX(-50%) translateY(-20px);
+  background:#0a0e24;border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:999px;
+  font-size:12px;font-weight:800;opacity:0;pointer-events:none;transition:all 0.25s;z-index:30;white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.overcharge-btn{
+  width:100%;min-height:52px;border-radius:14px;border:1px solid #ff6b3555;
+  background:linear-gradient(180deg, #4a1e0a, #2a0f05);color:var(--orange);
+  font-size:13px;font-weight:900;letter-spacing:0.08em;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation;
+  box-shadow:0 0 16px #ff6b3522;
+}
+.overcharge-btn.active{
+  background:linear-gradient(180deg, var(--orange), #e65100);color:#fff;
+  animation:pulse 0.6s infinite alternate;
+}
+@keyframes pulse{from{box-shadow:0 0 12px #ff6b3555} to{box-shadow:0 0 24px #ff6b3588}}
+.kbd{font-size:10px;background:#0a0e24;border:1px solid var(--border);padding:2px 6px;border-radius:6px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="header-top">
+      <div class="logo">
+        <div class="logo-icon">◈</div>
+        <div>
+          <h1>STARFORGE <span>WORKSHOP</span></h1>
+          <p>IDLE FLEET • SECTOR 7</p>
+        </div>
+      </div>
+      <div class="header-stats">
+        <div class="stat-pill"><span>⚡</span> <b id="hdrPower">0</b></div>
+        <div class="stat-pill orange"><span>◉</span> <b id="hdrZone">Z1</b></div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-small cyan" id="btnCalib">◎ CALIBRATE</button>
+      <button class="btn-small" id="btnSettings">⚙ SETTINGS</button>
+      <button class="btn-small" id="btnSaveNow">💾 SAVE</button>
+    </div>
+  </div>
+
+  <div class="buff-bar">
+    <div class="buff" id="buffCalib">
+      <div>
+        <div>◎ Calibration <span id="calibTime">—</span></div>
+        <div class="bar"><div class="fill" id="calibFill"></div></div>
+      </div>
+      <div style="font-size:16px">◐</div>
+    </div>
+    <div class="buff over" id="buffOver">
+      <div>
+        <div>⚡ Overcharge <span id="overTime">—</span></div>
+        <div class="bar"><div class="fill" id="overFill"></div></div>
+      </div>
+      <div style="font-size:16px">⚡</div>
+    </div>
+  </div>
+
+  <div class="resources" id="resGrid"></div>
+
+  <div class="content" id="content">
+    <!-- WORKSHOP -->
+    <div class="tab active" id="tab-workshop">
+      <div class="card" style="border-color:#00e5ff44">
+        <h3>⚡ OVERCHARGE BURST <span class="badge" id="overBadge">READY</span></h3>
+        <p>Consume <b style="color:var(--orange)">25 Energy</b> for 10s <b style="color:var(--orange)">3× production</b>. Stacks with Calibration!</p>
+        <div style="margin-top:10px">
+          <button class="overcharge-btn" id="btnOvercharge">⚡ ACTIVATE OVERCHARGE — 25 ENERGY</button>
+        </div>
+        <div class="progress" style="margin-top:8px"><div class="progress-fill over" id="overProgress" style="width:0%"></div></div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:4px 2px 8px">
+        <h3 style="font-size:12px;letter-spacing:0.08em">◆ WORKSHOP — BUILD SHIPS</h3>
+        <span class="kbd" id="fleetPowerLabel">POWER 0</span>
+      </div>
+      <div class="bulk-row">
+        <button class="bulk-btn active" data-bulk="1">×1</button>
+        <button class="bulk-btn" data-bulk="5">×5</button>
+        <button class="bulk-btn" data-bulk="10">×10</button>
+      </div>
+      <div id="shipList"></div>
+    </div>
+
+    <!-- RESEARCH -->
+    <div class="tab" id="tab-research">
+      <div class="card">
+        <h3>⬢ RESEARCH LAB</h3>
+        <p>One-time upgrades. Multipliers apply to all production. Unlock the fleet's true potential.</p>
+        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+          <span class="badge" id="researchCount">0/10 PURCHASED</span>
+          <span class="badge" style="color:var(--cyan);border-color:#00e5ff44">+15% ALL = AI CALIBRATION</span>
+        </div>
+      </div>
+      <div class="research-grid" id="researchList"></div>
+    </div>
+
+    <!-- CREW -->
+    <div class="tab" id="tab-crew">
+      <div class="card" style="border-color:#ff6b3544">
+        <h3>👨‍🚀 CREW COMMAND</h3>
+        <p>Train crew to boost <b>Fleet Power</b> and global production. Each tier adds power + multiplier.</p>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <span class="badge" id="crewPowerBadge">POWER +0</span>
+          <span class="badge" id="crewMultBadge">MULT ×1.00</span>
+        </div>
+      </div>
+      <div id="crewList"></div>
+      <div class="card">
+        <h3>◈ CREW STATS</h3>
+        <p id="crewStats">No crew yet. Train Rookies to begin.</p>
+      </div>
+    </div>
+
+    <!-- ASSAULT -->
+    <div class="tab" id="tab-assault">
+      <div class="card" style="border-color:#ff6b3544">
+        <h3>◎ ASSAULT SECTOR</h3>
+        <p>Push through zones. Each victory grants resources and unlocks the next. Power requirement grows exponentially.</p>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <span class="badge" id="assaultPowerBadge">FLEET 0</span>
+          <span class="badge" id="assaultZoneBadge">ZONE 1/20</span>
+          <span class="badge" id="assaultNextBadge">NEED 20</span>
+        </div>
+        <div class="progress"><div class="progress-fill" id="assaultProgress" style="width:0%"></div></div>
+      </div>
+      <div id="zoneList"></div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="workshop"><span>⬢</span>WORKSHOP</button>
+    <button class="nav-btn" data-tab="research"><span>⬣</span>RESEARCH</button>
+    <button class="nav-btn" data-tab="crew"><span>👨‍🚀</span>CREW</button>
+    <button class="nav-btn" data-tab="assault"><span>◎</span>ASSAULT</button>
+  </nav>
+
+  <!-- Calibration Modal -->
+  <div class="modal-bg" id="calibModal">
+    <div class="modal">
+      <h2>◎ CALIBRATION SEQUENCE</h2>
+      <p>Tap <b>STOP</b> when the indicator is in the green zone for <b>+25% production for 30s</b>. Cooldown 60s.</p>
+      <div class="calib-track" id="calibTrack">
+        <div class="calib-zone"></div>
+        <div class="calib-dot" id="calibDot"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" id="btnCalibStop" style="min-height:48px">◉ STOP</button>
+        <button class="btn" id="btnCalibCancel">CLOSE</button>
+      </div>
+      <p id="calibResult" style="text-align:center;font-weight:800;margin-top:8px"></p>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-bg" id="settingsModal">
+    <div class="modal">
+      <h2>⚙ SETTINGS & SAVE</h2>
+      <p>Auto-save every 5s to <b>starforge_save</b>. Offline progress up to 8h.</p>
+      <p id="lastSaved" style="color:var(--cyan);font-weight:800">Last saved: —</p>
+      <div class="btn-row">
+        <button class="btn primary" id="btnExport">⬇ EXPORT</button>
+        <button class="btn" id="btnImportLoad">⬆ IMPORT</button>
+      </div>
+      <textarea class="textarea" id="saveTextarea" placeholder="Export JSON appears here. Paste JSON to import, then tap IMPORT."></textarea>
+      <div class="btn-row">
+        <button class="btn" id="btnCopy">📋 COPY</button>
+        <button class="btn" id="btnDownload">💾 DOWNLOAD FILE</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn danger" id="btnWipe">🗑 WIPE SAVE</button>
+        <button class="btn" id="btnCloseSettings">CLOSE</button>
+      </div>
+      <p style="margin-top:10px">Export creates JSON with all progress — copy to clipboard, download, or paste on another device to Import.</p>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+const RES_DEFS = [
+  {id:'metal', name:'METAL', icon:'⬢', color:'#8ea0ff', bg:'#1a2250'},
+  {id:'fuel', name:'FUEL', icon:'⛽', color:'#ff8c42', bg:'#3a1e0a'},
+  {id:'circuits', name:'CIRCUITS', icon:'⊞', color:'#00e5ff', bg:'#003a4a'},
+  {id:'alloy', name:'ALLOY', icon:'⬣', color:'#b0bec5', bg:'#263238'},
+  {id:'plasma', name:'PLASMA', icon:'◎', color:'#e040fb', bg:'#2a0a3a'},
+  {id:'data', name:'DATA', icon:'▦', color:'#00e676', bg:'#0a2a1a'},
+  {id:'credits', name:'CREDITS', icon:'₵', color:'#ffd600', bg:'#3a2e00'},
+  {id:'crewXp', name:'CREW XP', icon:'★', color:'#ff6b35', bg:'#3a1505'},
+  {id:'energy', name:'ENERGY', icon:'⚡', color:'#ffea00', bg:'#3a3000'},
+];
+
+const SHIPS = [
+  {id:'scout', name:'Scout', icon:'🛰', power:6, prod:{metal:0.9,fuel:0.6,energy:0.06}, baseCost:{metal:30,fuel:15}, costMult:1.16, desc:'Light recon. Cheap metal/fuel engine.'},
+  {id:'frigate', name:'Frigate', icon:'🚀', power:18, prod:{circuits:0.7,alloy:0.35,data:0.12}, baseCost:{metal:120,circuits:40,fuel:30}, costMult:1.18, desc:'Escort vessel. Circuits & alloy.'},
+  {id:'cruiser', name:'Cruiser', icon:'🛸', power:45, prod:{plasma:0.9,alloy:0.6,fuel:0.5}, baseCost:{alloy:80,plasma:40,metal:200}, costMult:1.20, desc:'Plasma lance cruiser.'},
+  {id:'hauler', name:'Hauler', icon:'🚚', power:28, prod:{credits:1.6,metal:1.4,fuel:0.9}, baseCost:{metal:350,fuel:120,credits:80}, costMult:1.19, desc:'Freighter. Prints credits.'},
+  {id:'titan', name:'Titan', icon:'🏗', power:130, prod:{plasma:1.4,data:0.9,alloy:0.8,credits:1.2}, baseCost:{alloy:300,plasma:180,data:100,circuits:150}, costMult:1.22, desc:'Capital ship. Massive output.'},
+  {id:'leviathan', name:'Leviathan', icon:'🐋', power:320, prod:{metal:1.8,fuel:1.2,circuits:1.0,plasma:1.0,data:0.7,credits:1.5,energy:0.7,crewXp:0.45}, baseCost:{alloy:800,plasma:500,data:300,energy:150,credits:600}, costMult:1.25, desc:'Dreadnought. Generates everything.'},
+];
+
+const RESEARCH = [
+  {id:'smelt', name:'Efficient Smelting', icon:'🔥', desc:'+25% Metal production', mult:{metal:0.25}, cost:{metal:200,fuel:80}},
+  {id:'refinery', name:'Fuel Refinery', icon:'⛽', desc:'+25% Fuel production', mult:{fuel:0.25}, cost:{metal:250,fuel:150,circuits:30}},
+  {id:'weave', name:'Circuit Weave', icon:'⊞', desc:'+25% Circuits', mult:{circuits:0.25}, cost:{circuits:120,metal:300}},
+  {id:'forging', name:'Alloy Forging', icon:'⬣', desc:'+25% Alloy', mult:{alloy:0.25}, cost:{alloy:60,metal:400,circuits:60}},
+  {id:'conduits', name:'Plasma Conduits', icon:'◎', desc:'+30% Plasma', mult:{plasma:0.30}, cost:{plasma:80,alloy:120,energy:40}},
+  {id:'lattice', name:'Data Lattice', icon:'▦', desc:'+30% Data', mult:{data:0.30}, cost:{data:50,circuits:150,energy:50}},
+  {id:'mint', name:'Credit Mint', icon:'₵', desc:'+30% Credits', mult:{credits:0.30}, cost:{credits:300,metal:500,circuits:80}},
+  {id:'conditioning', name:'Crew Conditioning', icon:'💪', desc:'+20% Crew XP & +10% all', mult:{crewXp:0.20, all:0.10}, cost:{crewXp:80,credits:400,energy:30}},
+  {id:'ai', name:'AI Calibration', icon:'🤖', desc:'+15% ALL resources', mult:{all:0.15}, cost:{data:120,circuits:200,plasma:100,energy:60}},
+  {id:'quantum', name:'Quantum Overdrive', icon:'⚛', desc:'+50% Energy', mult:{energy:0.50}, cost:{energy:200,plasma:250,data:180,alloy:200}},
+];
+
+const CREW_DEFS = [
+  {id:'rookie', name:'Rookie Squad', icon:'🟧', power:8, mult:0.02, cost:{credits:120,crewXp:25}, desc:'+8 Power, +2% global'},
+  {id:'veteran', name:'Veteran Wing', icon:'🟦', power:28, mult:0.045, cost:{credits:650,crewXp:130}, baseNeed:{rookie:5}, desc:'+28 Power, +4.5% global'},
+  {id:'ace', name:'Ace Squadron', icon:'🟨', power:85, mult:0.09, cost:{credits:2800,crewXp:600}, baseNeed:{veteran:3}, desc:'+85 Power, +9% global'},
+];
+
+const BASE_RATES = {metal:0.9,fuel:0.55,circuits:0.28,alloy:0.12,plasma:0.10,data:0.06,credits:0.55,crewXp:0.12,energy:0.22};
+
+function fmt(n){
+  if(n>=1e9) return (n/1e9).toFixed(2)+'B';
+  if(n>=1e6) return (n/1e6).toFixed(2)+'M';
+  if(n>=1e3) return (n/1e3).toFixed(1)+'K';
+  if(n>=100) return Math.floor(n).toString();
+  if(n>=10) return n.toFixed(1);
+  return n.toFixed(1);
+}
+function fmtInt(n){ return Math.floor(n).toLocaleString(); }
+
+let state = {
+  resources:{metal:60,fuel:30,circuits:10,alloy:0,plasma:0,data:0,credits:40,crewXp:0,energy:15},
+  ships:{}, research:{}, crew:{rookie:0,veteran:0,ace:0},
+  zone:1, maxZone:1,
+  stats:{totalBuilt:0,totalResearch:0,totalAssaults:0},
+  buffs:{calibUntil:0, calibCdUntil:0, overUntil:0, overCdUntil:0},
+  lastSave: Date.now(),
+  bulk:1
+};
+SHIPS.forEach(s=> state.ships[s.id]=0);
+RESEARCH.forEach(r=> state.research[r.id]=false);
+
+function load(){
+  try{
+    const raw = localStorage.getItem('starforge_save');
+    if(raw){
+      const o = JSON.parse(raw);
+      if(o.resources) state.resources = {...state.resources, ...o.resources};
+      if(o.ships) state.ships = {...state.ships, ...o.ships};
+      if(o.research) state.research = {...state.research, ...o.research};
+      if(o.crew) state.crew = {...state.crew, ...o.crew};
+      if(o.zone) state.zone=o.zone;
+      if(o.maxZone) state.maxZone=o.maxZone;
+      if(o.stats) state.stats=o.stats;
+      if(o.buffs) state.buffs=o.buffs;
+      if(o.lastSave){
+        const delta = Math.min((Date.now()-o.lastSave)/1000, 28800);
+        if(delta>2){
+          const rates = calcRates();
+          for(const k in state.resources){
+            state.resources[k] += (rates[k]||0)*delta;
+          }
+          setTimeout(()=> toast(`Offline progress: +${fmt(delta)}s recovered`), 600);
+        }
+      }
+    }
+  }catch(e){}
+}
+function save(){
+  state.lastSave = Date.now();
+  localStorage.setItem('starforge_save', JSON.stringify(state));
+  const el=document.getElementById('lastSaved');
+  if(el) el.textContent='Last saved: '+new Date().toLocaleTimeString();
+}
+function calcMultipliers(){
+  let m={metal:1,fuel:1,circuits:1,alloy:1,plasma:1,data:1,credits:1,crewXp:1,energy:1};
+  RESEARCH.forEach(r=>{
+    if(state.research[r.id]){
+      for(const k in r.mult){
+        if(k==='all'){ for(const kk in m) m[kk]+=r.mult[k]; }
+        else m[k]+=r.mult[k];
+      }
+    }
+  });
+  // crew global mult
+  let crewMult=0;
+  CREW_DEFS.forEach(c=>{
+    const cnt=state.crew[c.id]||0;
+    crewMult += cnt * c.mult;
+  });
+  for(const k in m) m[k]+=crewMult;
+  // buffs
+  const now=Date.now();
+  let buffMult=1;
+  if(now < state.buffs.calibUntil) buffMult *= 1.25;
+  if(now < state.buffs.overUntil) buffMult *= 3;
+  for(const k in m) m[k]*=buffMult;
+  return m;
+}
+function calcRates(){
+  const mult=calcMultipliers();
+  let rates={};
+  for(const k in BASE_RATES) rates[k]=BASE_RATES[k]*mult[k];
+  SHIPS.forEach(s=>{
+    const cnt=state.ships[s.id]||0;
+    if(cnt>0){
+      for(const k in s.prod){
+        rates[k]=(rates[k]||0)+ s.prod[k]*cnt*mult[k];
+      }
+    }
+  });
+  return rates;
+}
+function calcPower(){
+  let p=0;
+  SHIPS.forEach(s=> p+= (state.ships[s.id]||0)*s.power);
+  CREW_DEFS.forEach(c=> p+= (state.crew[c.id]||0)*c.power);
+  return Math.floor(p);
+}
+function zoneRequirement(z){
+  return Math.floor(18 * Math.pow(1.48, z-1));
+}
+function zoneReward(z){
+  const base = 40 * Math.pow(1.35, z-1);
+  return {
+    metal: Math.floor(base*1.2),
+    fuel: Math.floor(base*0.9),
+    circuits: Math.floor(base*0.6),
+    alloy: Math.floor(base*0.4),
+    plasma: Math.floor(base*0.3),
+    data: Math.floor(base*0.25),
+    credits: Math.floor(base*1.5),
+    crewXp: Math.floor(12 * Math.pow(1.25, z-1)),
+    energy: Math.floor(8 + z*1.2)
+  };
+}
+function getShipCost(ship, owned){
+  let cost={};
+  for(const k in ship.baseCost){
+    cost[k]= Math.floor(ship.baseCost[k] * Math.pow(ship.costMult, owned));
+  }
+  return cost;
+}
+function getBulkCost(ship, bulk){
+  let total={};
+  let owned=state.ships[ship.id]||0;
+  for(let i=0;i<bulk;i++){
+    const c=getShipCost(ship, owned+i);
+    for(const k in c) total[k]=(total[k]||0)+c[k];
+  }
+  return total;
+}
+function canAfford(cost){
+  for(const k in cost) if((state.resources[k]||0) < cost[k]) return false;
+  return true;
+}
+function pay(cost){
+  for(const k in cost) state.resources[k]-=cost[k];
+}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), 2200);
+}
+
+// RENDER
+function renderResources(){
+  const grid=document.getElementById('resGrid');
+  const rates=calcRates();
+  grid.innerHTML='';
+  RES_DEFS.forEach(r=>{
+    const val=state.resources[r.id]||0;
+    const rate=rates[r.id]||0;
+    const card=document.createElement('div');
+    card.className='res-card';
+    card.innerHTML=`
+      <div class="res-top"><div class="res-icon" style="background:${r.bg};border:1px solid ${r.color}33;color:${r.color}">${r.icon}</div>${r.name}</div>
+      <div class="res-val">${fmt(val)}</div>
+      <div class="res-rate">+${fmt(rate)}/s</div>
+    `;
+    grid.appendChild(card);
+  });
+  document.getElementById('hdrPower').textContent=fmtInt(calcPower());
+  document.getElementById('hdrZone').textContent='Z'+state.zone;
+  document.getElementById('fleetPowerLabel').textContent='POWER '+fmtInt(calcPower());
+}
+function renderShips(){
+  const list=document.getElementById('shipList');
+  list.innerHTML='';
+  SHIPS.forEach(s=>{
+    const owned=state.ships[s.id]||0;
+    const bulk=state.bulk;
+    const cost=getBulkCost(s, bulk);
+    const afford=canAfford(cost);
+    const prodStr=Object.entries(s.prod).map(([k,v])=> `${k}+${v}/s`).join(' ');
+    const row=document.createElement('div');
+    row.className='card';
+    row.innerHTML=`
+      <div class="ship-row">
+        <div class="ship-icon">${s.icon}</div>
+        <div class="ship-info">
+          <div class="ship-name">${s.name} <span class="badge ${owned>0?'owned':''}">×${owned}</span> <span style="font-size:10px;color:var(--cyan)">⚡${s.power}</span></div>
+          <div class="ship-meta">${s.desc}</div>
+          <div class="ship-meta" style="color:var(--green)">${prodStr}</div>
+          <div class="cost-row">${Object.entries(cost).map(([k,v])=>{
+            const ok=(state.resources[k]||0)>=v;
+            return `<span class="cost-chip ${ok?'ok':'no'}">${k}:${fmt(v)}</span>`;
+          }).join('')}</div>
+        </div>
+        <button class="btn-buy" data-ship="${s.id}" ${afford?'':'disabled'}>BUY ×${bulk}</button>
+      </div>
+    `;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('.btn-buy').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const ship=SHIPS.find(x=>x.id===b.dataset.ship);
+      const bulk=state.bulk;
+      const cost=getBulkCost(ship, bulk);
+      if(!canAfford(cost)){ toast('Not enough resources'); return; }
+      pay(cost);
+      state.ships[ship.id]+=bulk;
+      state.stats.totalBuilt+=bulk;
+      save();
+      renderAll();
+      toast(`Built ${bulk}× ${ship.name} +${ship.power*bulk} Power`);
+    });
+  });
+}
+function renderResearch(){
+  const list=document.getElementById('researchList');
+  list.innerHTML='';
+  let purchased=0;
+  RESEARCH.forEach(r=>{
+    if(state.research[r.id]) purchased++;
+    const bought=state.research[r.id];
+    const afford=canAfford(r.cost);
+    const card=document.createElement('div');
+    card.className='research-card'+(bought?' purchased':'');
+    card.innerHTML=`
+      <div class="research-icon">${r.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:900">${r.name} ${bought?'<span style="color:var(--green)">✓</span>':''}</div>
+        <div style="font-size:11px;color:var(--muted)">${r.desc}</div>
+        <div class="cost-row">${Object.entries(r.cost).map(([k,v])=>{
+          const ok=(state.resources[k]||0)>=v;
+          return `<span class="cost-chip ${ok?'ok':'no'}">${k}:${fmt(v)}</span>`;
+        }).join('')}</div>
+      </div>
+      <button class="btn-buy ${bought?'':''}" data-res="${r.id}" ${bought?'disabled':''} style="min-width:64px">${bought?'DONE':'BUY'}</button>
+    `;
+    list.appendChild(card);
+  });
+  document.getElementById('researchCount').textContent=`${purchased}/${RESEARCH.length} PURCHASED`;
+  list.querySelectorAll('.btn-buy').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const r=RESEARCH.find(x=>x.id===b.dataset.res);
+      if(state.research[r.id]) return;
+      if(!canAfford(r.cost)){ toast('Not enough resources'); return; }
+      pay(r.cost);
+      state.research[r.id]=true;
+      state.stats.totalResearch++;
+      save();
+      renderAll();
+      toast(`Researched: ${r.name}`);
+    });
+  });
+}
+function renderCrew(){
+  const list=document.getElementById('crewList');
+  list.innerHTML='';
+  CREW_DEFS.forEach(c=>{
+    const cnt=state.crew[c.id]||0;
+    const afford=canAfford(c.cost);
+    const needOk = !c.baseNeed || Object.entries(c.baseNeed).every(([k,v])=> (state.crew[k]||0)>=v);
+    const card=document.createElement('div');
+    card.className='crew-card';
+    const iconClass = c.id==='rookie'?'':c.id==='veteran'?'vet':'ace';
+    card.innerHTML=`
+      <div class="crew-icon ${iconClass}">${c.id==='rookie'?'◉':c.id==='veteran'?'⬢':'⬣'}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:900">${c.name} <span class="badge ${cnt>0?'owned':''}">×${cnt}</span></div>
+        <div style="font-size:11px;color:var(--muted)">${c.desc}</div>
+        ${c.baseNeed?`<div style="font-size:10px;color:${needOk?'var(--green)':'var(--red)'}">Need: ${Object.entries(c.baseNeed).map(([k,v])=>`${v} ${k}`).join(', ')}</div>`:''}
+        <div class="cost-row">${Object.entries(c.cost).map(([k,v])=>{
+          const ok=(state.resources[k]||0)>=v;
+          return `<span class="cost-chip ${ok?'ok':'no'}">${k}:${fmt(v)}</span>`;
+        }).join('')}</div>
+      </div>
+      <button class="btn-buy orange" data-crew="${c.id}" ${(!afford||!needOk)?'disabled':''}>TRAIN</button>
+    `;
+    list.appendChild(card);
+  });
+  list.querySelectorAll('.btn-buy').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const c=CREW_DEFS.find(x=>x.id===b.dataset.crew);
+      if(!canAfford(c.cost)){ toast('Not enough resources'); return; }
+      if(c.baseNeed && !Object.entries(c.baseNeed).every(([k,v])=> (state.crew[k]||0)>=v)){ toast('Need more lower-tier crew'); return; }
+      pay(c.cost);
+      state.crew[c.id]++;
+      save();
+      renderAll();
+      toast(`Trained ${c.name}`);
+    });
+  });
+  const crewPower = CREW_DEFS.reduce((a,c)=> a + (state.crew[c.id]||0)*c.power,0);
+  const crewMult = CREW_DEFS.reduce((a,c)=> a + (state.crew[c.id]||0)*c.mult,0);
+  document.getElementById('crewPowerBadge').textContent=`POWER +${crewPower}`;
+  document.getElementById('crewMultBadge').textContent=`MULT ×${(1+crewMult).toFixed(2)}`;
+  document.getElementById('crewStats').textContent=`Total crew: ${Object.values(state.crew).reduce((a,b)=>a+b,0)} • Power ${crewPower} • Global +${Math.round(crewMult*100)}% production`;
+}
+function renderAssault(){
+  const power=calcPower();
+  const zoneReq=zoneRequirement(state.zone);
+  const pct=Math.min(100, Math.floor(power/zoneReq*100));
+  document.getElementById('assaultPowerBadge').textContent=`FLEET ${fmtInt(power)}`;
+  document.getElementById('assaultZoneBadge').textContent=`ZONE ${state.zone}/20`;
+  document.getElementById('assaultNextBadge').textContent=`NEED ${fmtInt(zoneReq)}`;
+  document.getElementById('assaultProgress').style.width=pct+'%';
+
+  const list=document.getElementById('zoneList');
+  list.innerHTML='';
+  for(let z=1; z<=Math.min(20, state.maxZone+3); z++){
+    const req=zoneRequirement(z);
+    const rew=zoneReward(z);
+    const isDone=z < state.zone;
+    const isCurrent=z===state.zone;
+    const canWin=power>=req;
+    const card=document.createElement('div');
+    card.className='zone-card'+(z%5===0?' boss':'');
+    card.style.opacity=isDone?0.6:'1';
+    card.innerHTML=`
+      <div class="zone-top">
+        <div style="font-size:12px;font-weight:900">${z%5===0?'⚠ BOSS ':''}ZONE ${z} ${isDone?'✓':isCurrent?'◉':''}</div>
+        <span class="badge" style="${canWin?'color:var(--green);border-color:#00e67655':''}">${fmtInt(req)} PWR</span>
+      </div>
+      <div class="zone-req">Reward: ${Object.entries(rew).slice(0,4).map(([k,v])=>`${k}+${fmt(v)}`).join(' • ')}</div>
+      <div class="zone-req" style="margin-top:2px">+ ${fmt(rew.crewXp)} XP • ${fmt(rew.energy)} Energy • ${fmt(rew.credits)} Credits</div>
+      ${isCurrent?`<button class="btn-assault ${canWin?'':' '}" data-zone="${z}" ${canWin?'':'disabled'}>${canWin?'▶ ASSAULT ZONE '+z:'NEED '+fmtInt(req - power)+' MORE POWER'}</button>`:
+        isDone?`<div style="margin-top:8px;font-size:11px;font-weight:800;color:var(--green)">✓ SECURED</div>`:
+        `<div style="margin-top:8px;font-size:11px;color:var(--muted)">🔒 Locked — clear Zone ${state.zone} first</div>`}
+    `;
+    list.appendChild(card);
+  }
+  list.querySelectorAll('.btn-assault').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const z=parseInt(b.dataset.zone);
+      const req=zoneRequirement(z);
+      const power=calcPower();
+      if(power < req){ toast('Fleet too weak!'); return; }
+      const rew=zoneReward(z);
+      for(const k in rew) state.resources[k]=(state.resources[k]||0)+rew[k];
+      state.zone = Math.max(state.zone+1, z+1);
+      state.maxZone = Math.max(state.maxZone, state.zone);
+      state.stats.totalAssaults++;
+      save();
+      renderAll();
+      toast(`Zone ${z} conquered! +${fmt(rew.credits)} Credits`);
+      if(z%5===0) setTimeout(()=> toast('★ BOSS DEFEATED! Bonus rewards!'), 800);
+    });
+  });
+}
+function renderBuffs(){
+  const now=Date.now();
+  const calibActive=now < state.buffs.calibUntil;
+  const overActive=now < state.buffs.overUntil;
+  const calibCd=now < state.buffs.calibCdUntil;
+  const overCd=now < state.buffs.overCdUntil;
+
+  const calibEl=document.getElementById('buffCalib');
+  const overEl=document.getElementById('buffOver');
+  calibEl.classList.toggle('active', calibActive);
+  overEl.classList.toggle('active', overActive);
+
+  if(calibActive){
+    const left=Math.ceil((state.buffs.calibUntil-now)/1000);
+    document.getElementById('calibTime').textContent=left+'s';
+    document.getElementById('calibFill').style.width=(left/30*100)+'%';
+  } else {
+    document.getElementById('calibTime').textContent=calibCd?`CD ${Math.ceil((state.buffs.calibCdUntil-now)/1000)}s`:'—';
+    document.getElementById('calibFill').style.width='0%';
+  }
+  if(overActive){
+    const left=Math.ceil((state.buffs.overUntil-now)/1000);
+    document.getElementById('overTime').textContent=left+'s';
+    document.getElementById('overFill').style.width=(left/10*100)+'%';
+    document.getElementById('overProgress').style.width=(left/10*100)+'%';
+  } else {
+    document.getElementById('overTime').textContent=overCd?`CD ${Math.ceil((state.buffs.overCdUntil-now)/1000)}s`:'—';
+    document.getElementById('overFill').style.width='0%';
+    document.getElementById('overProgress').style.width='0%';
+  }
+
+  const btnCalib=document.getElementById('btnCalib');
+  btnCalib.disabled=calibCd||calibActive;
+  btnCalib.textContent=calibActive?'◎ ACTIVE '+Math.ceil((state.buffs.calibUntil-now)/1000)+'s':calibCd?'◎ COOLDOWN':'◎ CALIBRATE';
+  btnCalib.style.opacity=(calibCd||calibActive)?0.6:1;
+
+  const btnOver=document.getElementById('btnOvercharge');
+  const overBadge=document.getElementById('overBadge');
+  if(overActive){
+    btnOver.classList.add('active');
+    btnOver.textContent=`⚡ OVERCHARGE ACTIVE ${Math.ceil((state.buffs.overUntil-now)/1000)}s`;
+    overBadge.textContent='ACTIVE'; overBadge.style.background='var(--orange)'; overBadge.style.color='#fff';
+  } else if(overCd){
+    btnOver.classList.remove('active');
+    btnOver.textContent=`⚡ COOLDOWN ${Math.ceil((state.buffs.overCdUntil-now)/1000)}s`;
+    btnOver.disabled=true;
+    overBadge.textContent='COOLDOWN'; overBadge.style.background='#1a234d'; overBadge.style.color='var(--muted)';
+  } else {
+    btnOver.classList.remove('active');
+    const canAffordEnergy=(state.resources.energy||0)>=25;
+    btnOver.textContent=`⚡ ACTIVATE OVERCHARGE — 25 ENERGY`;
+    btnOver.disabled=!canAffordEnergy;
+    btnOver.style.opacity=canAffordEnergy?1:0.5;
+    overBadge.textContent=canAffordEnergy?'READY':'NEED ENERGY'; overBadge.style.background=canAffordEnergy?'var(--green)':'#1a234d'; overBadge.style.color=canAffordEnergy?'#001a1f':'var(--muted)';
+  }
+  if(overCd) btnOver.disabled=true; else if(!overActive) btnOver.disabled=(state.resources.energy||0)<25;
+}
+
+function renderAll(){
+  renderResources();
+  renderShips();
+  renderResearch();
+  renderCrew();
+  renderAssault();
+  renderBuffs();
+}
+
+// TICK
+setInterval(()=>{
+  const rates=calcRates();
+  for(const k in rates){
+    state.resources[k]=(state.resources[k]||0)+rates[k];
+  }
+  renderResources();
+  renderBuffs();
+},1000);
+setInterval(save,5000);
+
+// NAV
+document.querySelectorAll('.nav-btn').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.getElementById('tab-'+b.dataset.tab).classList.add('active');
+  });
+});
+document.querySelectorAll('.bulk-btn').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('.bulk-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    state.bulk=parseInt(b.dataset.bulk);
+    renderShips();
+  });
+});
+
+// CALIBRATION
+let calibAnim=null, calibPos=0, calibDir=1;
+function openCalib(){
+  const now=Date.now();
+  if(now < state.buffs.calibCdUntil){ toast('Calibration on cooldown'); return; }
+  if(now < state.buffs.calibUntil){ toast('Calibration already active'); return; }
+  document.getElementById('calibModal').classList.add('open');
+  document.getElementById('calibResult').textContent='';
+  calibPos=0; calibDir=1;
+  if(calibAnim) cancelAnimationFrame(calibAnim);
+  const dot=document.getElementById('calibDot');
+  function frame(){
+    calibPos+= calibDir*1.8;
+    if(calibPos>=100) {calibPos=100; calibDir=-1}
+    if(calibPos<=0) {calibPos=0; calibDir=1}
+    dot.style.left=`calc(${calibPos}% - 5px)`;
+    calibAnim=requestAnimationFrame(frame);
+  }
+  frame();
+}
+function closeCalib(){
+  document.getElementById('calibModal').classList.remove('open');
+  if(calibAnim) cancelAnimationFrame(calibAnim);
+}
+document.getElementById('btnCalib').addEventListener('click', openCalib);
+document.getElementById('btnCalibCancel').addEventListener('click', closeCalib);
+document.getElementById('calibModal').addEventListener('click', (e)=>{ if(e.target.id==='calibModal') closeCalib(); });
+document.getElementById('btnCalibStop').addEventListener('click', ()=>{
+  if(calibAnim) cancelAnimationFrame(calibAnim);
+  // green zone 35-65%
+  const success = calibPos>=35 && calibPos<=65;
+  const resEl=document.getElementById('calibResult');
+  if(success){
+    state.buffs.calibUntil=Date.now()+30000;
+    state.buffs.calibCdUntil=Date.now()+60000;
+    resEl.textContent='✓ CALIBRATED! +25% for 30s';
+    resEl.style.color='var(--green)';
+    toast('◎ Calibration success! +25% 30s');
+    save();
+    setTimeout(closeCalib, 800);
+  } else {
+    state.buffs.calibCdUntil=Date.now()+15000;
+    resEl.textContent='✗ MISSED — 15s cooldown';
+    resEl.style.color='var(--red)';
+    toast('Calibration missed');
+    setTimeout(closeCalib, 900);
+  }
+  renderBuffs();
+});
+
+// OVERCHARGE
+document.getElementById('btnOvercharge').addEventListener('click', ()=>{
+  const now=Date.now();
+  if(now < state.buffs.overUntil){ toast('Already overcharged'); return; }
+  if(now < state.buffs.overCdUntil){ toast('Overcharge cooling down'); return; }
+  if((state.resources.energy||0) < 25){ toast('Need 25 Energy'); return; }
+  state.resources.energy-=25;
+  state.buffs.overUntil=Date.now()+10000;
+  state.buffs.overCdUntil=Date.now()+15000;
+  save();
+  renderAll();
+  toast('⚡ OVERCHARGE! 3× for 10s');
+  // visual flash
+  document.getElementById('app').animate([{filter:'brightness(1.4)'},{filter:'brightness(1)'}],{duration:400});
+});
+
+// SETTINGS
+document.getElementById('btnSettings').addEventListener('click', ()=> document.getElementById('settingsModal').classList.add('open'));
+document.getElementById('btnCloseSettings').addEventListener('click', ()=> document.getElementById('settingsModal').classList.remove('open'));
+document.getElementById('settingsModal').addEventListener('click', (e)=>{ if(e.target.id==='settingsModal') e.currentTarget.classList.remove('open'); });
+document.getElementById('btnSaveNow').addEventListener('click', ()=>{ save(); toast('Saved!'); renderAll(); });
+
+document.getElementById('btnExport').addEventListener('click', ()=>{
+  const data=JSON.stringify(state);
+  const ta=document.getElementById('saveTextarea');
+  ta.value=data;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(data).then(()=> toast('Exported & copied!')).catch(()=> toast('Export ready — copy manually'));
+  } else {
+    ta.select(); document.execCommand('copy');
+    toast('Export ready');
+  }
+});
+document.getElementById('btnCopy').addEventListener('click', ()=>{
+  const ta=document.getElementById('saveTextarea');
+  ta.select(); document.execCommand('copy');
+  if(navigator.clipboard) navigator.clipboard.writeText(ta.value);
+  toast('Copied to clipboard');
+});
+document.getElementById('btnDownload').addEventListener('click', ()=>{
+  const data=document.getElementById('saveTextarea').value || JSON.stringify(state);
+  const blob=new Blob([data],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='starforge_save.json'; a.click();
+  URL.revokeObjectURL(url);
+  toast('Downloaded starforge_save.json');
+});
+document.getElementById('btnImportLoad').addEventListener('click', ()=>{
+  const ta=document.getElementById('saveTextarea');
+  try{
+    const o=JSON.parse(ta.value.trim());
+    if(!o.resources || !o.ships) throw new Error('Invalid save');
+    localStorage.setItem('starforge_save', JSON.stringify(o));
+    // reload state
+    state.resources=o.resources; state.ships=o.ships; state.research=o.research||state.research;
+    state.crew=o.crew||state.crew; state.zone=o.zone||1; state.maxZone=o.maxZone||1;
+    state.stats=o.stats||state.stats; state.buffs=o.buffs||state.buffs; state.lastSave=o.lastSave||Date.now();
+    save(); renderAll();
+    toast('Import successful!');
+    document.getElementById('settingsModal').classList.remove('open');
+  }catch(e){ toast('Import failed: '+e.message); }
+});
+document.getElementById('btnWipe').addEventListener('click', ()=>{
+  if(!confirm('Wipe all progress? This cannot be undone.')) return;
+  localStorage.removeItem('starforge_save');
+  location.reload();
+});
+
+// INIT
+load();
+renderAll();
+setInterval(renderBuffs, 200);
+save();
+</script>
+</body>
+</html>

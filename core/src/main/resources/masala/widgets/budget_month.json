@@ -1,0 +1,30 @@
+{
+  "id": "budget_month",
+  "name": "Monthly budget",
+  "description": "How much of this month's budget you have spent.",
+  "category": "Money",
+  "widget": {
+    "id": "budget_month",
+    "title": "Budget",
+    "components": [
+      {
+        "type": "progress",
+        "label": "Spent",
+        "binding": {
+          "source": "storage",
+          "key": "spent"
+        },
+        "max": 1000,
+        "style": {
+          "tint": "green"
+        },
+        "reset": "monthly"
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 2,
+      "max": 3
+    }
+  }
+}

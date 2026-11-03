@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Garden Grid Sprint</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow-x:hidden}
+  body{
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background:#87CEEB;
+    background: linear-gradient(180deg, #87D3F8 0%, #B8E6FE 35%, #FEF9C3 100%);
+    display:flex;justify-content:center;min-height:100vh;
+    color:#1a2e05;
+  }
+  .app{
+    width:100%;max-width:428px;min-width:360px;
+    min-height:100vh;
+    background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+    display:flex;flex-direction:column;
+    position:relative;
+    overflow:hidden;
+    box-shadow:0 0 0 1px rgba(0,0,0,0.06);
+  }
+  /* Header */
+  .topbar{
+    background: linear-gradient(180deg, #65a30d 0%, #4d7c0f 100%);
+    color:white;
+    padding:10px 12px 12px;
+    position:sticky;top:0;z-index:10;
+    box-shadow:0 4px 12px rgba(0,0,0,0.15);
+  }
+  .topbar-row{
+    display:flex;justify-content:space-between;align-items:center;gap:8px;
+  }
+  .brand{
+    display:flex;align-items:center;gap:8px;
+    font-weight:900;font-size:18px;letter-spacing:-0.02em;
+    text-shadow:0 1px 0 rgba(0,0,0,0.2);
+  }
+  .brand .sun{
+    width:36px;height:36px;background:#facc15;border-radius:50%;
+    display:grid;place-items:center;font-size:20px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.2), inset 0 -3px 0 rgba(0,0,0,0.1);
+    flex-shrink:0;
+  }
+  .stats{
+    display:flex;gap:8px;align-items:center;
+  }
+  .pill{
+    background:rgba(255,255,255,0.95);color:#1a2e05;
+    padding:6px 10px;border-radius:999px;
+    font-weight:800;font-size:13px;
+    display:flex;align-items:center;gap:6px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.12);
+    min-height:32px;
+  }
+  .pill.score{background:#fef08a;border:2px solid #facc15}
+  .pill.time{background:white;border:2px solid #86efac}
+  .pill.time.warn{background:#fecaca;border-color:#f87171;animation:pulse 0.6s infinite alternate}
+  @keyframes pulse{from{transform:scale(1)}to{transform:scale(1.05)}}
+  .hearts{display:flex;gap:4px;align-items:center}
+  .heart{font-size:20px;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.2));transition:all 0.3s}
+  .heart.lost{opacity:0.25;filter:grayscale(1);transform:scale(0.8)}
+  .progress-wrap{
+    margin-top:10px;background:rgba(0,0,0,0.18);height:10px;border-radius:999px;overflow:hidden;
+    border:1px solid rgba(255,255,255,0.4);
+  }
+  .progress{height:100%;background:linear-gradient(90deg,#facc15,#f97316);width:100%;transition:width 0.1s linear;border-radius:999px}
+  .progress.low{background:linear-gradient(90deg,#ef4444,#dc2626)}
+
+  /* Screens */
+  .screen{flex:1;display:flex;flex-direction:column;padding:14px 12px 16px;gap:12px}
+  .hidden{display:none !important}
+
+  /* Start / GameOver card */
+  .card{
+    background:white;border-radius:20px;padding:18px 16px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.08);
+    border:2px solid #bbf7d0;
+    text-align:center;
+  }
+  .card h1{font-size:26px;line-height:1.1;font-weight:900;color:#14532d}
+  .card h1 span{color:#65a30d}
+  .card p{font-size:15px;line-height:1.5;color:#365314;margin-top:8px}
+  .badge-row{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+  .badge{
+    background:#f0fdf4;border:1.5px solid #86efac;border-radius:999px;
+    padding:8px 12px;font-weight:800;font-size:13px;display:flex;align-items:center;gap:6px
+  }
+  .badge.best{background:#fefce8;border-color:#facc15}
+  .howto{
+    display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;text-align:left;
+  }
+  .howto div{
+    background:#f7fee7;border:1.5px solid #d9f99d;border-radius:16px;padding:10px 10px;
+    display:flex;gap:8px;align-items:flex-start;
+  }
+  .howto .icon{font-size:22px;flex-shrink:0;margin-top:1px}
+  .howto strong{font-size:13px;display:block;line-height:1.2}
+  .howto span{font-size:12px;color:#4d7c0f;line-height:1.3}
+  .howto .bad{ background:#fef2f2;border-color:#fecaca}
+  .btn{
+    appearance:none;border:none;cursor:pointer;
+    font-weight:900;font-size:18px;letter-spacing:0.01em;
+    padding:16px 20px;border-radius:16px;
+    width:100%;min-height:56px;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    box-shadow:0 4px 0 rgba(0,0,0,0.15), 0 6px 16px rgba(0,0,0,0.12);
+    transition:transform 0.08s, box-shadow 0.08s;
+    user-select:none;
+  }
+  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,0.15)}
+  .btn-primary{background:linear-gradient(180deg,#84cc16 0%, #65a30d 100%);color:white;border:2px solid #4d7c0f}
+  .btn-secondary{background:white;color:#14532d;border:2px solid #86efac}
+  .btn-row{display:flex;gap:10px}
+  .btn-row .btn{flex:1}
+
+  /* Grid */
+  .grid-wrap{
+    background: linear-gradient(180deg, #86efac 0%, #4ade80 100%);
+    border-radius:18px;padding:10px;
+    border:2px solid #22c55e;
+    box-shadow:inset 0 2px 8px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.08);
+  }
+  .grid{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
+  }
+  .plot{
+    background: linear-gradient(180deg, #a16207 0%, #92400e 55%, #78350f 100%);
+    border-radius:16px;
+    min-height:112px;
+    position:relative;
+    overflow:hidden;
+    border:2px solid #78350f;
+    box-shadow:inset 0 3px 0 rgba(255,255,255,0.25), inset 0 -4px 0 rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.12);
+    touch-action:none;
+    user-select:none;
+    display:flex;flex-direction:column;
+  }
+  .plot-inner{
+    flex:1;
+    background: radial-gradient(ellipse at 50% 30%, #4ade80 0%, #22c55e 45%, #16a34a 100%);
+    margin:6px 6px 8px;
+    border-radius:12px;
+    position:relative;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    overflow:hidden;
+    border:1.5px solid rgba(0,0,0,0.08);
+    box-shadow:inset 0 2px 6px rgba(0,0,0,0.12);
+  }
+  .plot.empty .plot-inner{background: radial-gradient(ellipse at 50% 30%, #86efac 0%, #4ade80 60%, #15803d 100%);}
+  .plot.weed .plot-inner{background: radial-gradient(ellipse at 50% 35%, #bbf7d0 0%, #4ade80 50%, #16a34a 100%);}
+  .plot.flower .plot-inner{background: radial-gradient(ellipse at 50% 35%, #fce7f3 0%, #f9a8d4 40%, #86efac 100%);}
+  .soil-edge{
+    height:10px;background: linear-gradient(90deg, #a16207, #92400e, #a16207);
+    border-radius:0 0 10px 10px;
+    margin:0 4px;
+    position:relative;
+  }
+  .soil-edge::after{
+    content:"";position:absolute;left:6px;right:6px;top:2px;height:2px;background:rgba(255,255,255,0.2);border-radius:999px
+  }
+  .plant{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;pointer-events:none;
+    transition:transform 0.15s;
+    width:100%;height:100%;
+    padding:6px 4px 4px;
+  }
+  .plant-emoji{font-size:38px;line-height:1;filter:drop-shadow(0 2px 2px rgba(0,0,0,0.15));}
+  .plant-label{
+    font-weight:900;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;
+    padding:3px 7px;border-radius:999px;line-height:1;
+  }
+  .weed .plant-label{background:#14532d;color:#dcfce7;border:1px solid #15803d}
+  .flower .plant-label{background:#be185d;color:white;border:1px solid #9d174d}
+  .empty .plant{opacity:0.55}
+  .empty .plant-emoji{font-size:22px;opacity:0.7}
+  .empty .plant-label{background:rgba(0,0,0,0.08);color:#14532d;border:1px dashed rgba(0,0,0,0.12);font-size:10px}
+
+  .swipe-hint{
+    position:absolute;bottom:6px;left:50%;transform:translateX(-50%);
+    background:rgba(255,255,255,0.92);color:#14532d;
+    font-weight:800;font-size:10px;letter-spacing:0.05em;
+    padding:3px 8px;border-radius:999px;
+    display:flex;align-items:center;gap:4px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.12);
+    opacity:0;transition:opacity 0.2s;
+    pointer-events:none;
+    white-space:nowrap;
+  }
+  .plot.weed .swipe-hint{opacity:1;animation:floatHint 1s ease-in-out infinite alternate}
+  @keyframes floatHint{from{transform:translateX(-50%) translateY(0)}to{transform:translateX(-50%) translateY(-3px)}}
+
+  /* Animations */
+  .plot.plucked{pointer-events:none}
+  .plot.plucked .plant{animation:pluckUp 0.45s ease forwards}
+  @keyframes pluckUp{
+    0%{transform:translateY(0) scale(1);opacity:1}
+    30%{transform:translateY(-8px) scale(1.08)}
+    100%{transform:translateY(-90px) scale(0.7) rotate(-8deg);opacity:0}
+  }
+  .plot.shake{animation:shake 0.45s ease}
+  @keyframes shake{
+    0%,100%{transform:translateX(0)}
+    20%{transform:translateX(-6px) rotate(-1deg)}
+    40%{transform:translateX(6px) rotate(1deg)}
+    60%{transform:translateX(-4px)}
+    80%{transform:translateX(4px)}
+  }
+  .plot.wilt .plant{animation:wilt 0.5s ease forwards}
+  @keyframes wilt{to{transform:scale(0.6) rotate(12deg);opacity:0.3;filter:grayscale(0.6)}}
+
+  .float-score{
+    position:absolute;left:50%;top:38%;transform:translateX(-50%);
+    font-weight:900;font-size:18px;color:#14532d;
+    background:#fef08a;border:2px solid #facc15;
+    padding:4px 10px;border-radius:999px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.15);
+    pointer-events:none;z-index:5;
+    animation:floatUp 0.7s ease forwards;
+  }
+  .float-score.bad{background:#fecaca;border-color:#f87171;color:#7f1d1d}
+  @keyframes floatUp{
+    0%{transform:translateX(-50%) translateY(0) scale(0.8);opacity:0}
+    15%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}
+    100%{transform:translateX(-50%) translateY(-42px) scale(1);opacity:0}
+  }
+
+  .combo{
+    text-align:center;font-weight:900;font-size:13px;color:#14532d;
+    background:#fef08a;border:1.5px solid #facc15;
+    padding:6px 12px;border-radius:999px;
+    display:inline-flex;align-items:center;gap:6px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.08);
+    margin:0 auto;
+  }
+  .combo.hidden{visibility:hidden}
+
+  .footer-hint{
+    text-align:center;font-size:13px;font-weight:700;color:#14532d;
+    background:rgba(255,255,255,0.85);padding:10px 12px;border-radius:12px;
+    border:1.5px solid #bbf7d0;
+    line-height:1.4;
+  }
+  .footer-hint strong{color:#65a30d}
+
+  /* Confetti */
+  .confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:20px}
+  .confetti i{
+    position:absolute;top:-10px;width:8px;height:12px;border-radius:2px;
+    animation:fall linear forwards;
+  }
+  @keyframes fall{
+    to{transform:translateY(420px) rotate(720deg);opacity:0}
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="topbar-row">
+      <div class="brand"><div class="sun">☀️</div> Garden Sprint</div>
+      <div class="hearts" id="hearts"></div>
+    </div>
+    <div class="topbar-row" style="margin-top:10px">
+      <div class="pill score">⭐ <span id="score">0</span></div>
+      <div class="pill" style="background:#fefce8;border:2px solid #facc15">🏆 <span id="best">0</span></div>
+      <div class="pill time" id="timePill">⏱ <span id="time">45.0</span>s</div>
+    </div>
+    <div class="progress-wrap"><div class="progress" id="progress"></div></div>
+  </div>
+
+  <!-- START SCREEN -->
+  <div class="screen" id="startScreen">
+    <div class="card">
+      <h1>Pluck the <span>Weeds!</span> 🌿</h1>
+      <p>Swipe <strong>UP</strong> on green weeds to pluck them. <strong>Spare the pink flowers</strong> — wrong plucks cost a life!</p>
+      <div class="badge-row">
+        <div class="badge">⏱ 45s sprint</div>
+        <div class="badge">❤️ 3 lives</div>
+        <div class="badge best">🏆 Best: <span id="bestStart">0</span></div>
+      </div>
+      <div class="howto">
+        <div>
+          <div class="icon">🌿</div>
+          <div><strong>WEED = Swipe UP</strong><span>+10 pts • keep combo!</span></div>
+        </div>
+        <div class="bad">
+          <div class="icon">🌸</div>
+          <div><strong>FLOWER = Don't touch</strong><span>−1 life if plucked</span></div>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <button class="btn btn-primary" id="playBtn">▶ PLAY — Swipe to Pluck!</button>
+        <p style="font-size:12px;color:#6b7280;margin-top:8px">Big swipe targets • Portrait 360–428px • No zoom needed</p>
+      </div>
+    </div>
+    <div class="grid-wrap" style="opacity:0.9">
+      <div class="grid" id="previewGrid"></div>
+    </div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div class="screen hidden" id="gameScreen">
+    <div style="display:flex;justify-content:center"><div class="combo hidden" id="combo">🔥 Combo x<span id="comboN">0</span> +<span id="comboBonus">0</span></div></div>
+    <div class="grid-wrap">
+      <div class="grid" id="grid"></div>
+    </div>
+    <div class="footer-hint">👆 <strong>Swipe UP</strong> on <span style="color:#15803d;font-weight:900">WEEDS</span> only — spare the 🌸 flowers!</div>
+  </div>
+
+  <!-- GAME OVER SCREEN -->
+  <div class="screen hidden" id="overScreen">
+    <div class="card" style="position:relative;overflow:hidden">
+      <div class="confetti" id="confetti"></div>
+      <h1 id="overTitle">Time's Up! ⏰</h1>
+      <p id="overSub">Great sprint!</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
+        <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:16px;padding:12px">
+          <div style="font-size:12px;font-weight:800;letter-spacing:0.06em;color:#4d7c0f">SCORE</div>
+          <div style="font-size:28px;font-weight:900;color:#14532d" id="finalScore">0</div>
+        </div>
+        <div style="background:#fefce8;border:2px solid #facc15;border-radius:16px;padding:12px">
+          <div style="font-size:12px;font-weight:800;letter-spacing:0.06em;color:#a16207">BEST</div>
+          <div style="font-size:28px;font-weight:900;color:#713f12" id="finalBest">0</div>
+        </div>
+      </div>
+      <div id="newBestBadge" class="hidden" style="margin-top:10px;background:linear-gradient(90deg,#facc15,#f97316);color:white;font-weight:900;padding:8px 12px;border-radius:999px;display:inline-flex;gap:6px;align-items:center">🎉 NEW BEST SCORE!</div>
+      <div style="margin-top:14px" class="btn-row">
+        <button class="btn btn-primary" id="againBtn">↻ Play Again</button>
+        <button class="btn btn-secondary" id="homeBtn">⌂ Home</button>
+      </div>
+    </div>
+    <div class="grid-wrap" style="opacity:0.85">
+      <div class="grid" id="overGrid"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const GRID_SIZE = 12;
+const GAME_TIME = 45;
+const LIVES_MAX = 3;
+const SPAWN_INTERVAL = 820;
+const WEED_LIFETIME = 2200;
+const FLOWER_LIFETIME = 2600;
+
+let score=0, lives=LIVES_MAX, timeLeft=GAME_TIME, combo=0, best=0;
+let timerId=null, spawnId=null, tickId=null;
+let isPlaying=false;
+let cells=[]; // {type:'empty'|'weed'|'flower', timer: timeoutId}
+let startY=0, startX=0, startT=0, activeCell=null;
+
+const els={
+  score: document.getElementById('score'),
+  best: document.getElementById('best'),
+  bestStart: document.getElementById('bestStart'),
+  time: document.getElementById('time'),
+  timePill: document.getElementById('timePill'),
+  progress: document.getElementById('progress'),
+  hearts: document.getElementById('hearts'),
+  grid: document.getElementById('grid'),
+  previewGrid: document.getElementById('previewGrid'),
+  overGrid: document.getElementById('overGrid'),
+  startScreen: document.getElementById('startScreen'),
+  gameScreen: document.getElementById('gameScreen'),
+  overScreen: document.getElementById('overScreen'),
+  combo: document.getElementById('combo'),
+  comboN: document.getElementById('comboN'),
+  comboBonus: document.getElementById('comboBonus'),
+  finalScore: document.getElementById('finalScore'),
+  finalBest: document.getElementById('finalBest'),
+  overTitle: document.getElementById('overTitle'),
+  overSub: document.getElementById('overSub'),
+  newBestBadge: document.getElementById('newBestBadge'),
+  confetti: document.getElementById('confetti'),
+};
+
+function loadBest(){
+  try{ best = parseInt(localStorage.getItem('gardenSprintBest')||'0',10)||0; }catch(e){ best=0; }
+  els.best.textContent = best;
+  els.bestStart.textContent = best;
+}
+function saveBest(){
+  if(score>best){
+    best=score;
+    try{ localStorage.setItem('gardenSprintBest', String(best)); }catch(e){}
+    els.best.textContent = best;
+    return true;
+  }
+  return false;
+}
+
+function renderHearts(){
+  els.hearts.innerHTML='';
+  for(let i=0;i<LIVES_MAX;i++){
+    const s=document.createElement('span');
+    s.className='heart'+(i>=lives?' lost':'');
+    s.textContent = i<lives ? '❤️' : '🤍';
+    els.hearts.appendChild(s);
+  }
+}
+function updateHUD(){
+  els.score.textContent = score;
+  els.time.textContent = timeLeft.toFixed(1);
+  const pct = Math.max(0, (timeLeft/GAME_TIME)*100);
+  els.progress.style.width = pct+'%';
+  els.progress.classList.toggle('low', timeLeft<=10);
+  els.timePill.classList.toggle('warn', timeLeft<=10);
+  if(combo>=2){
+    els.combo.classList.remove('hidden');
+    els.comboN.textContent = combo;
+    els.comboBonus.textContent = Math.min(combo,5)*2;
+  } else {
+    els.combo.classList.add('hidden');
+  }
+}
+
+function makeCellHTML(type, idx){
+  let emoji='🌱', label='EMPTY', cls='empty';
+  if(type==='weed'){ emoji='🌿'; label='WEED'; cls='weed'; }
+  if(type==='flower'){ emoji='🌸'; label='FLOWER'; cls='flower'; }
+  // use different flower emojis for variety
+  if(type==='flower'){
+    const flowers=['🌸','🌷','🌼','🌺'];
+    emoji = flowers[idx % flowers.length];
+  }
+  if(type==='weed'){
+    const weeds=['🌿','☘️','🌱'];
+    emoji = weeds[idx % weeds.length];
+  }
+  return `
+    <div class="plot ${cls}" data-idx="${idx}">
+      <div class="plot-inner">
+        <div class="plant">
+          <div class="plant-emoji">${emoji}</div>
+          <div class="plant-label">${label}</div>
+        </div>
+        <div class="swipe-hint">↑ SWIPE UP</div>
+      </div>
+      <div class="soil-edge"></div>
+    </div>
+  `;
+}
+
+function buildGrid(container, types){
+  container.innerHTML='';
+  types.forEach((t,i)=>{
+    const wrap=document.createElement('div');
+    wrap.innerHTML = makeCellHTML(t,i);
+    const el = wrap.firstElementChild;
+    container.appendChild(el);
+  });
+}
+
+function buildPreview(){
+  const demo=['weed','flower','empty','flower','weed','weed','empty','weed','flower','weed','empty','flower'];
+  buildGrid(els.previewGrid, demo);
+  buildGrid(els.overGrid, demo);
+}
+
+function initCells(){
+  cells = Array.from({length:GRID_SIZE}, ()=>({type:'empty', despawn:null}));
+}
+
+function renderGameGrid(){
+  // rebuild DOM efficiently: update classes without full rebuild for animation continuity? For simplicity rebuild but keep plucked state via data.
+  // Instead we update existing DOM nodes if they exist.
+  if(els.grid.children.length !== GRID_SIZE){
+    buildGrid(els.grid, cells.map(c=>c.type));
+    attachSwipeHandlers();
+  } else {
+    for(let i=0;i<GRID_SIZE;i++){
+      const el = els.grid.children[i];
+      const c = cells[i];
+      // don't overwrite if currently animating plucked
+      if(el.classList.contains('plucked') || el.classList.contains('shake')) continue;
+      el.className = 'plot ' + (c.type==='empty'?'empty':c.type);
+      el.dataset.idx = i;
+      const emojiEl = el.querySelector('.plant-emoji');
+      const labelEl = el.querySelector('.plant-label');
+      if(c.type==='weed'){
+        const weeds=['🌿','☘️','🌱'];
+        emojiEl.textContent = weeds[i%weeds.length];
+        labelEl.textContent='WEED';
+      } else if(c.type==='flower'){
+        const flowers=['🌸','🌷','🌼','🌺'];
+        emojiEl.textContent = flowers[i%flowers.length];
+        labelEl.textContent='FLOWER';
+      } else {
+        emojiEl.textContent='· · ·';
+        labelEl.textContent='EMPTY';
+      }
+    }
+  }
+}
+
+function spawnTick(){
+  if(!isPlaying) return;
+  // count empties
+  const empties = cells.map((c,i)=>c.type==='empty'?i:null).filter(v=>v!==null);
+  if(empties.length===0) return;
+  // spawn 2-3 at a time, bias to weeds
+  const toSpawn = Math.min(empties.length, 2 + (Math.random()<0.5?1:0));
+  // shuffle empties
+  for(let i=empties.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [empties[i],empties[j]]=[empties[j],empties[i]]; }
+  for(let k=0;k<toSpawn;k++){
+    const idx = empties[k];
+    const isWeed = Math.random() < 0.62; // 62% weeds
+    const type = isWeed ? 'weed' : 'flower';
+    cells[idx].type = type;
+    // schedule despawn if not plucked
+    clearTimeout(cells[idx].despawn);
+    const life = type==='weed' ? WEED_LIFETIME + Math.random()*600 : FLOWER_LIFETIME + Math.random()*600;
+    cells[idx].despawn = setTimeout(()=>{
+      if(cells[idx].type===type){
+        // wilt animation
+        const el = els.grid.children[idx];
+        if(el){
+          el.classList.add('wilt');
+          setTimeout(()=>{
+            if(cells[idx].type===type){
+              cells[idx].type='empty';
+              el.classList.remove('wilt');
+              renderGameGrid();
+            }
+          }, 400);
+        } else {
+          cells[idx].type='empty';
+          renderGameGrid();
+        }
+      }
+    }, life);
+  }
+  renderGameGrid();
+}
+
+function showFloat(el, text, isBad){
+  const f=document.createElement('div');
+  f.className='float-score'+(isBad?' bad':'');
+  f.textContent=text;
+  el.querySelector('.plot-inner').appendChild(f);
+  setTimeout(()=>f.remove(), 750);
+}
+
+function handlePluck(idx){
+  if(!isPlaying) return;
+  const cell = cells[idx];
+  const el = els.grid.children[idx];
+  if(!el || cell.type==='empty' || el.classList.contains('plucked')) return;
+
+  if(cell.type==='weed'){
+    // success
+    clearTimeout(cell.despawn);
+    el.classList.add('plucked');
+    const bonus = Math.min(combo,5)*2;
+    const pts = 10 + bonus;
+    score += pts;
+    combo += 1;
+    showFloat(el, `+${pts}`, false);
+    // haptic
+    if(navigator.vibrate) navigator.vibrate(30);
+    updateHUD();
+    setTimeout(()=>{
+      cell.type='empty';
+      el.classList.remove('plucked');
+      renderGameGrid();
+    }, 420);
+  } else if(cell.type==='flower'){
+    // wrong
+    clearTimeout(cell.despawn);
+    lives -= 1;
+    combo = 0;
+    el.classList.add('shake');
+    showFloat(el, `-1 ❤️`, true);
+    if(navigator.vibrate) navigator.vibrate([40,30,40]);
+    renderHearts();
+    updateHUD();
+    setTimeout(()=>el.classList.remove('shake'), 500);
+    // wilt flower after shake
+    setTimeout(()=>{
+      const e2 = els.grid.children[idx];
+      if(e2) e2.classList.add('wilt');
+      setTimeout(()=>{
+        cell.type='empty';
+        if(e2) e2.classList.remove('wilt','shake');
+        renderGameGrid();
+        if(lives<=0) endGame(false);
+      }, 400);
+    }, 300);
+    if(lives<=0){
+      // will end after wilt
+    }
+  }
+}
+
+function attachSwipeHandlers(){
+  for(let i=0;i<els.grid.children.length;i++){
+    const el = els.grid.children[i];
+    // touch
+    el.addEventListener('touchstart', (e)=>{
+      if(!isPlaying) return;
+      const t=e.touches[0];
+      startX=t.clientX; startY=t.clientY; startT=Date.now(); activeCell=i;
+    }, {passive:true});
+    el.addEventListener('touchend', (e)=>{
+      if(activeCell!==i) return;
+      const t=e.changedTouches[0];
+      const dx=t.clientX-startX, dy=t.clientY-startY, dt=Date.now()-startT;
+      if(dy < -32 && Math.abs(dy) > Math.abs(dx)*1.2 && dt < 600){
+        handlePluck(i);
+      }
+      activeCell=null;
+    }, {passive:true});
+    el.addEventListener('touchmove', (e)=>{
+      // prevent scroll when swiping up on grid
+      if(activeCell===i) e.preventDefault();
+    }, {passive:false});
+
+    // mouse fallback
+    let mDown=false, mX=0,mY=0,mT=0;
+    el.addEventListener('mousedown', (e)=>{
+      mDown=true; mX=e.clientX; mY=e.clientY; mT=Date.now(); activeCell=i;
+    });
+    el.addEventListener('mouseup', (e)=>{
+      if(!mDown || activeCell!==i) return;
+      mDown=false;
+      const dx=e.clientX-mX, dy=e.clientY-mY, dt=Date.now()-mT;
+      if(dy < -32 && Math.abs(dy) > Math.abs(dx)*1.2 && dt < 600){
+        handlePluck(i);
+      }
+      activeCell=null;
+    });
+    el.addEventListener('mouseleave', ()=>{ mDown=false; });
+  }
+}
+
+function startGame(){
+  score=0; lives=LIVES_MAX; timeLeft=GAME_TIME; combo=0;
+  isPlaying=true;
+  initCells();
+  renderHearts();
+  updateHUD();
+  els.startScreen.classList.add('hidden');
+  els.overScreen.classList.add('hidden');
+  els.gameScreen.classList.remove('hidden');
+  renderGameGrid();
+  // immediate spawn
+  spawnTick();
+  spawnId = setInterval(spawnTick, SPAWN_INTERVAL);
+  // timer 100ms ticks
+  tickId = setInterval(()=>{
+    timeLeft = Math.max(0, timeLeft - 0.1);
+    updateHUD();
+    if(timeLeft<=0) endGame(true);
+  }, 100);
+}
+
+function endGame(timeUp){
+  if(!isPlaying) return;
+  isPlaying=false;
+  clearInterval(spawnId); clearInterval(tickId);
+  cells.forEach(c=>clearTimeout(c.despawn));
+  const isNewBest = saveBest();
+  els.finalScore.textContent = score;
+  els.finalBest.textContent = best;
+  els.best.textContent = best;
+  if(lives<=0){
+    els.overTitle.textContent = "Out of Lives! 💔";
+    els.overSub.textContent = "You plucked too many flowers. Try again!";
+  } else if(timeUp){
+    els.overTitle.textContent = "Time's Up! ⏰";
+    els.overSub.textContent = score >= 100 ? "Sunny harvest! Amazing sprint!" : "Great sprint! Can you beat your best?";
+  }
+  els.newBestBadge.classList.toggle('hidden', !isNewBest);
+  if(isNewBest) launchConfetti();
+  els.gameScreen.classList.add('hidden');
+  els.overScreen.classList.remove('hidden');
+  renderHearts();
+}
+
+function launchConfetti(){
+  els.confetti.innerHTML='';
+  const colors=['#facc15','#4ade80','#f97316','#38bdf8','#f472b6','#a3e635'];
+  for(let i=0;i<22;i++){
+    const el=document.createElement('i');
+    el.style.left = (Math.random()*100)+'%';
+    el.style.background = colors[Math.floor(Math.random()*colors.length)];
+    el.style.animationDuration = (0.8 + Math.random()*0.9)+'s';
+    el.style.animationDelay = (Math.random()*0.4)+'s';
+    el.style.transform = `rotate(${Math.random()*360}deg)`;
+    els.confetti.appendChild(el);
+  }
+}
+
+document.getElementById('playBtn').addEventListener('click', startGame);
+document.getElementById('againBtn').addEventListener('click', startGame);
+document.getElementById('homeBtn').addEventListener('click', ()=>{
+  isPlaying=false;
+  clearInterval(spawnId); clearInterval(tickId);
+  cells.forEach(c=>clearTimeout(c.despawn));
+  els.overScreen.classList.add('hidden');
+  els.gameScreen.classList.add('hidden');
+  els.startScreen.classList.remove('hidden');
+  loadBest();
+  renderHearts();
+  // reset HUD
+  score=0; timeLeft=GAME_TIME; combo=0;
+  updateHUD();
+});
+
+loadBest();
+renderHearts();
+updateHUD();
+buildPreview();
+
+// prevent pull-to-refresh / scroll bounce on game
+document.body.addEventListener('touchmove', (e)=>{
+  if(isPlaying) {
+    // allow only if not scrolling the app? keep simple: prevent when touching grid
+    const t=e.target.closest('.grid');
+    if(t) e.preventDefault();
+  }
+}, {passive:false});
+</script>
+</body>
+</html>
+

@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Dungeon Verdict RPG</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f1a;
+  --card:#1c1c2e;
+  --card2:#252540;
+  --accent:#ff3b6b;
+  --accent2:#7c5cff;
+  --green:#2ecc71;
+  --yellow:#f1c40f;
+  --blue:#3498db;
+  --text:#f5f5ff;
+  --muted:#9a9ab8;
+  --border:#2e2e4a;
+  --hp:#ff3b6b;
+  --hp-bg:#2a1a22;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center}
+.wrap{width:100%;max-width:428px;min-width:360px;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);position:relative;overflow-x:hidden}
+header{padding:12px 14px 10px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,#1a1a30 0%,#0f0f1a 100%);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
+.logo{display:flex;align-items:center;gap:8px}
+.logo-badge{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-size:18px;font-weight:900}
+.logo h1{font-size:13px;letter-spacing:0.08em;line-height:1.1}
+.logo h1 span{color:var(--accent);display:block;font-size:11px;letter-spacing:0.14em}
+.hdr-stats{display:flex;gap:8px}
+.stat{ background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px 10px;text-align:center;min-width:72px}
+.stat label{font-size:9px;letter-spacing:0.12em;color:var(--muted);display:block}
+.stat b{font-size:15px;color:var(--yellow)}
+.stat.best b{color:var(--green)}
+
+/* HP bar */
+.hp-row{padding:10px 14px 8px;display:flex;align-items:center;gap:10px}
+.hp-label{font-size:10px;letter-spacing:0.12em;color:var(--muted);white-space:nowrap}
+.hp-track{flex:1;height:14px;background:var(--hp-bg);border-radius:999px;overflow:hidden;border:1px solid #3a2030;position:relative}
+.hp-fill{height:100%;background:linear-gradient(90deg,#ff3b6b,#ff7a45);border-radius:999px;transition:width 0.4s ease;position:relative}
+.hp-fill.low{background:linear-gradient(90deg,#ff1a1a,#ff3b6b);animation:pulse 0.8s infinite alternate}
+@keyframes pulse{from{opacity:1}to{opacity:0.7}}
+.hp-text{font-size:11px;font-weight:800;min-width:42px;text-align:right}
+.combo-row{padding:0 14px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.combo-badge{background:var(--card2);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-size:12px;display:flex;align-items:center;gap:6px}
+.combo-badge.active{background:linear-gradient(135deg,#7c5cff22,#ff3b6b22);border-color:var(--accent2);color:var(--yellow)}
+.combo-badge.crit{background:linear-gradient(135deg,var(--yellow),#ff8c00);color:#1a1a00;font-weight:900;animation:critPop 0.3s ease}
+@keyframes critPop{0%{transform:scale(0.8)}50%{transform:scale(1.1)}100%{transform:scale(1)}}
+.dungeon-chips{padding:0 14px 10px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.dungeon-chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;padding:7px 12px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;transition:all 0.2s}
+.chip.active{background:linear-gradient(135deg,var(--accent2),var(--accent));color:white;border-color:transparent;box-shadow:0 4px 12px rgba(124,92,255,0.4)}
+.chip.locked{opacity:0.45;cursor:not-allowed}
+.chip.done{border-color:var(--green);color:var(--green)}
+
+/* Main */
+main{flex:1;padding:12px 14px 16px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.monster-card{padding:14px;display:flex;gap:12px;align-items:center;position:relative}
+.monster-avatar{width:64px;height:64px;border-radius:14px;background:var(--card2);display:grid;place-items:center;font-size:32px;flex-shrink:0;border:1px solid var(--border);position:relative}
+.monster-avatar.boss{border-color:var(--yellow);box-shadow:0 0 16px rgba(241,196,15,0.3)}
+.monster-avatar .lvl{position:absolute;bottom:-6px;right:-6px;background:var(--accent);color:white;font-size:9px;font-weight:800;padding:2px 6px;border-radius:999px;letter-spacing:0.06em}
+.monster-info{flex:1;min-width:0}
+.monster-info h2{font-size:15px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.monster-info h2 i{font-style:normal;font-size:10px;background:var(--accent);color:white;padding:2px 6px;border-radius:6px;letter-spacing:0.06em}
+.monster-info h2 i.boss{background:linear-gradient(135deg,var(--yellow),#ff8c00);color:#1a1a00}
+.monster-info p{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mob-hp{margin-top:8px;height:8px;background:#0f0f1a;border-radius:999px;overflow:hidden;border:1px solid var(--border)}
+.mob-hp-fill{height:100%;background:linear-gradient(90deg,var(--green),#27ae60);transition:width 0.3s}
+.mob-hp-fill.boss{background:linear-gradient(90deg,var(--yellow),#e67e22)}
+
+.expr-card{padding:14px}
+.expr-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.expr-head h3{font-size:10px;letter-spacing:0.14em;color:var(--muted)}
+.timer-badge{background:var(--card2);border:1px solid var(--border);border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:6px}
+.timer-badge.warn{color:var(--accent);border-color:var(--accent);animation:shake 0.4s infinite}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
+.timer-track{height:4px;background:var(--card2);border-radius:999px;overflow:hidden;margin-bottom:12px}
+.timer-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--accent2));transition:width 0.1s linear}
+.expr-box{background:#0a0a14;border:1px solid var(--border);border-radius:12px;padding:16px 12px;text-align:center;position:relative;overflow:hidden}
+.expr-box::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent2),transparent);opacity:0.5}
+.expr-code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:18px;font-weight:700;letter-spacing:0.02em;word-break:break-all;line-height:1.4}
+.expr-hint{margin-top:8px;font-size:11px;color:var(--muted)}
+.expr-result{margin-top:10px;font-size:12px;font-weight:800;padding:8px;border-radius:8px;display:none}
+.expr-result.show{display:block}
+.expr-result.correct{background:#2ecc7122;color:var(--green);border:1px solid #2ecc7144}
+.expr-result.wrong{background:#ff3b6b22;color:var(--accent);border:1px solid #ff3b6b44}
+
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn{height:62px;border-radius:14px;border:none;font-size:17px;font-weight:900;letter-spacing:0.06em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform 0.08s, box-shadow 0.2s;user-select:none;-webkit-tap-highlight-color:transparent}
+.btn:active{transform:scale(0.97)}
+.btn-true{background:linear-gradient(135deg,#2ecc71,#27ae60);color:white;box-shadow:0 6px 16px rgba(46,204,113,0.35)}
+.btn-false{background:linear-gradient(135deg,#ff3b6b,#e74c3c);color:white;box-shadow:0 6px 16px rgba(255,59,107,0.35)}
+.btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+.btn-crit{grid-column:1/-1;height:52px;background:linear-gradient(135deg,var(--yellow),#ff8c00);color:#1a1a00;font-size:15px;box-shadow:0 6px 16px rgba(241,196,15,0.4);display:none}
+.btn-crit.show{display:flex}
+
+.footer-actions{display:flex;gap:8px}
+.btn-small{flex:1;height:44px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:13px;font-weight:700;cursor:pointer}
+.btn-small.primary{background:linear-gradient(135deg,var(--accent2),var(--accent));border-color:transparent;color:white}
+
+/* Overlays */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.72);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
+.overlay.show{display:flex}
+.modal{width:100%;max-width:400px;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;text-align:center;max-height:90vh;overflow-y:auto}
+.modal h2{font-size:20px;margin-bottom:6px}
+.modal p{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:14px}
+.modal .big-emoji{font-size:48px;margin-bottom:10px}
+.modal-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0}
+.mini-stat{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 6px}
+.mini-stat b{font-size:18px;display:block}
+.mini-stat span{font-size:10px;color:var(--muted);letter-spacing:0.08em}
+.help-list{text-align:left;font-size:12px;line-height:1.6;color:var(--muted);margin:10px 0}
+.help-list b{color:var(--text)}
+.kbd{display:inline-block;background:var(--card2);border:1px solid var(--border);border-bottom-width:2px;border-radius:6px;padding:1px 6px;font-size:11px;font-weight:700;color:var(--text)}
+
+.damage-float{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-size:28px;font-weight:900;color:var(--yellow);pointer-events:none;animation:floatUp 0.7s ease forwards;z-index:5;text-shadow:0 2px 8px rgba(0,0,0,0.6)}
+@keyframes floatUp{0%{opacity:1;transform:translate(-50%,-50%) scale(0.8)}100%{opacity:0;transform:translate(-50%,-90%) scale(1.2)}}
+.hit-flash{position:absolute;inset:0;background:rgba(255,59,107,0.18);pointer-events:none;opacity:0;transition:opacity 0.15s}
+.hit-flash.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <div class="logo">
+      <div class="logo-badge">⚔️</div>
+      <h1>DUNGEON VERDICT<span>RPG QUIZ</span></h1>
+    </div>
+    <div class="hdr-stats">
+      <div class="stat"><label>SCORE</label><b id="scoreEl">0</b></div>
+      <div class="stat best"><label>BEST</label><b id="bestEl">0</b></div>
+    </div>
+  </header>
+
+  <div class="hp-row">
+    <span class="hp-label">❤️ HEALTH</span>
+    <div class="hp-track"><div class="hp-fill" id="hpFill" style="width:100%"></div></div>
+    <span class="hp-text" id="hpText">100 HP</span>
+  </div>
+
+  <div class="combo-row">
+    <div class="combo-badge" id="comboEl">🔥 Streak: 0</div>
+    <div class="combo-badge" id="critEl" style="display:none">⚡ CRITICAL READY!</div>
+    <div class="combo-badge" id="dmgEl">🗡️ DMG x1</div>
+  </div>
+
+  <div class="dungeon-chips" id="dungeonChips"></div>
+
+  <main>
+    <div class="card" style="position:relative">
+      <div class="hit-flash" id="hitFlash"></div>
+      <div class="monster-card">
+        <div class="monster-avatar" id="mobAvatar">👾<span class="lvl" id="mobLvl">LVL 1</span></div>
+        <div class="monster-info">
+          <h2><span id="mobName">Slime of Loose Equality</span> <i id="mobType">MOB</i></h2>
+          <p id="mobDesc">Weak to truth. Predict its verdict!</p>
+          <div class="mob-hp"><div class="mob-hp-fill" id="mobHpFill" style="width:100%"></div></div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:0.08em">KILLS</div>
+          <div style="font-size:18px;font-weight:900" id="killsEl">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card expr-card">
+      <div class="expr-head">
+        <h3>⚡ LIVE EXPRESSION</h3>
+        <div class="timer-badge" id="timerBadge">⏱ <span id="timerText">7.0s</span></div>
+      </div>
+      <div class="timer-track"><div class="timer-fill" id="timerFill" style="width:100%"></div></div>
+      <div class="expr-box" id="exprBox">
+        <div class="expr-code" id="exprCode">0 == false</div>
+        <div class="expr-hint" id="exprHint">What does JavaScript say? TRUE or FALSE?</div>
+        <div class="expr-result" id="exprResult"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-true" id="btnTrue">✓ TRUE</button>
+      <button class="btn btn-false" id="btnFalse">✕ FALSE</button>
+      <button class="btn btn-crit" id="btnCrit">⚡ CRITICAL STRIKE!</button>
+    </div>
+
+    <div class="footer-actions">
+      <button class="btn-small" id="btnHelp">❔ Help</button>
+      <button class="btn-small" id="btnRestart">↻ Restart Run</button>
+      <button class="btn-small primary" id="btnNext" style="display:none">Next →</button>
+    </div>
+  </main>
+</div>
+
+<!-- Start Overlay -->
+<div class="overlay show" id="startOverlay">
+  <div class="modal">
+    <div class="big-emoji">🏰</div>
+    <h2>Dungeon Verdict RPG</h2>
+    <p>Each monster <b style="color:var(--text)">IS</b> a live JavaScript equality.<br>Predict <b style="color:var(--green)">TRUE</b> or <b style="color:var(--accent)">FALSE</b> before it strikes!</p>
+    <div class="modal-stats">
+      <div class="mini-stat"><b id="mBest">0</b><span>BEST SCORE</span></div>
+      <div class="mini-stat"><b id="mKills">0</b><span>TOTAL KILLS</span></div>
+      <div class="mini-stat"><b id="mDungeons">1/4</b><span>UNLOCKED</span></div>
+    </div>
+    <div class="help-list">
+      <div>🔥 <b>3 correct in a row</b> → Critical ready (bonus damage + score x1.5)</div>
+      <div>💔 <b>Wrong / timeout</b> → -18 HP (-22 on bosses)</div>
+      <div>👹 <b>Bosses need 3 hits</b> and gate the next dungeon</div>
+      <div>⏱ <b>7s per monster</b> (10s for bosses) — decide fast!</div>
+    </div>
+    <button class="btn-small primary" id="btnStart" style="width:100%;height:52px;font-size:16px;margin-top:10px">⚔️ ENTER DUNGEON</button>
+    <p style="margin-top:10px;font-size:11px">Progress saves automatically on this device</p>
+  </div>
+</div>
+
+<!-- Game Over -->
+<div class="overlay" id="gameOverOverlay">
+  <div class="modal">
+    <div class="big-emoji" id="goEmoji">💀</div>
+    <h2 id="goTitle">You Fainted!</h2>
+    <p id="goDesc">The dungeon claimed another adventurer.</p>
+    <div class="modal-stats">
+      <div class="mini-stat"><b id="goScore">0</b><span>SCORE</span></div>
+      <div class="mini-stat"><b id="goKills">0</b><span>KILLS</span></div>
+      <div class="mini-stat"><b id="goStreak">0</b><span>BEST STREAK</span></div>
+    </div>
+    <button class="btn-small primary" id="btnRetry" style="width:100%;height:52px;font-size:16px">↻ Try Again</button>
+    <button class="btn-small" id="btnHome" style="width:100%;margin-top:8px">🏠 Home</button>
+  </div>
+</div>
+
+<!-- Dungeon Clear / Boss Defeated -->
+<div class="overlay" id="clearOverlay">
+  <div class="modal">
+    <div class="big-emoji" id="clearEmoji">👑</div>
+    <h2 id="clearTitle">Boss Vanquished!</h2>
+    <p id="clearDesc">You unlocked the next dungeon.</p>
+    <div class="modal-stats">
+      <div class="mini-stat"><b id="clearScore">0</b><span>SCORE</span></div>
+      <div class="mini-stat"><b id="clearKills">0</b><span>KILLS</span></div>
+      <div class="mini-stat"><b id="clearBonus">+500</b><span>BONUS</span></div>
+    </div>
+    <button class="btn-small primary" id="btnContinue" style="width:100%;height:52px;font-size:16px">➡️ Continue</button>
+  </div>
+</div>
+
+<!-- Help -->
+<div class="overlay" id="helpOverlay">
+  <div class="modal">
+    <h2>How to Play</h2>
+    <div class="help-list" style="text-align:left">
+      <p><b>Goal:</b> Survive the dungeon by judging live JS expressions.</p>
+      <p><b>1.</b> A monster appears with an expression like <span class="kbd">[] == ![]</span> — this is real JavaScript.</p>
+      <p><b>2.</b> Tap <span class="kbd" style="color:var(--green)">TRUE</span> if it evaluates to true, <span class="kbd" style="color:var(--accent)">FALSE</span> otherwise. You have 7s (10s for bosses).</p>
+      <p><b>3.</b> <b>Correct:</b> You damage the monster. Mobs die in 1 hit, bosses need 3. You gain score (100 base + streak bonus).</p>
+      <p><b>4.</b> <b>Combo:</b> Every 3 correct in a row arms a <b>CRITICAL</b> — next hit deals double damage and score x1.5 (stacks to x3 at 9 streak).</p>
+      <p><b>5.</b> <b>Wrong / timeout:</b> You lose 18 HP (22 vs boss) and your streak resets.</p>
+      <p><b>6.</b> <b>Bosses</b> gate progress. Defeat the boss to unlock the next dungeon. Your best score, kills and unlocks persist.</p>
+      <p style="margin-top:8px"><b>Dungeons:</b><br>
+        1. Novice Crypt — basics (== vs ===)<br>
+        2. Coercion Caverns — type coercion<br>
+        3. Abyss of NaN — NaN, null, undefined<br>
+        4. Citadel of Truth — Object.is & edge cases</p>
+    </div>
+    <button class="btn-small primary" id="btnCloseHelp" style="width:100%;height:44px;margin-top:12px">Got it</button>
+  </div>
+</div>
+
+<script>
+const DUNGEONS = [
+  { id:0, name:"Novice Crypt", short:"Crypt", icon:"🕯️", color:"#7c5cff", mobs:["Slime","Bat","Skeleton"], boss:"Crypt Keeper" },
+  { id:1, name:"Coercion Caverns", short:"Caverns", icon:"⛏️", color:"#ff3b6b", mobs:["Goblin","Troll","Specter"], boss:"Coercion Lord" },
+  { id:2, name:"Abyss of NaN", short:"Abyss", icon:"🌀", color:"#3498db", mobs:["Wraith","Voidling","Phantom"], boss:"NaN Leviathan" },
+  { id:3, name:"Citadel of Truth", short:"Citadel", icon:"🏛️", color:"#f1c40f", mobs:["Golem","Paladin","Archon"], boss:"Truth Titan" },
+];
+
+// Expression pools per dungeon: {code, answer (boolean), hint}
+const POOLS = [
+  // Dungeon 0 - Novice
+  [
+    {c:"0 == false", a:true, h:"Loose equality coerces"},
+    {c:"0 === false", a:false, h:"Strict checks type too"},
+    {c:"'' == false", a:true, h:"Empty string is falsy"},
+    {c:"'' === false", a:false, h:"Different types"},
+    {c:"1 == true", a:true, h:"1 coerces to true"},
+    {c:"1 === true", a:false, h:"Number vs Boolean"},
+    {c:"null == undefined", a:true, h:"Special loose case"},
+    {c:"null === undefined", a:false, h:"Strict: different types"},
+    {c:"'5' == 5", a:true, h:"String coerces to number"},
+    {c:"'5' === 5", a:false, h:"Strict: string ≠ number"},
+    {c:"0 == ''", a:true, h:"Both falsy when coerced"},
+    {c:"0 === ''", a:false, h:"Strict equality"},
+    {c:"true == 1", a:true, h:"true → 1"},
+    {c:"false == 0", a:true, h:"false → 0"},
+    {c:"'0' == false", a:true, h:"'0' → 0 → false"},
+    {c:"'0' === false", a:false, h:"Strict: string vs boolean"},
+  ],
+  // Dungeon 1 - Coercion
+  [
+    {c:"[] == false", a:true, h:"[] → '' → 0 → false"},
+    {c:"[] === false", a:false, h:"Object vs Boolean"},
+    {c:"[] == ![]", a:true, h:"Famous JS quirk!"},
+    {c:"[1] == 1", a:true, h:"[1] → '1' → 1"},
+    {c:"[1,2] == '1,2'", a:true, h:"Array to string"},
+    {c:"'\\n' == 0", a:true, h:"Whitespace → 0"},
+    {c:"'  ' == 0", a:true, h:"Spaces coerce to 0"},
+    {c:"true + true === 2", a:true, h:"true → 1, so 1+1=2"},
+    {c:"'5' - 3 == 2", a:true, h:"Minus coerces to number"},
+    {c:"'5' + 3 == '53'", a:true, h:"Plus prefers string concat"},
+    {c:"[] + [] == ''", a:true, h:"[]→'' so ''+''=''"},
+    {c:"[] + {} == '[object Object]'", a:true, h:"Coercion to string"},
+    {c:"0 == '0'", a:true, h:"Loose equality"},
+    {c:"Boolean('false') === true", a:true, h:"Non-empty string is truthy"},
+    {c:"!!'0' === true", a:true, h:"'0' is truthy!"},
+    {c:"!!'' === false", a:true, h:"Empty string is falsy"},
+  ],
+  // Dungeon 2 - NaN / null
+  [
+    {c:"NaN == NaN", a:false, h:"NaN is never equal to itself"},
+    {c:"NaN === NaN", a:false, h:"Even strict fails"},
+    {c:"typeof NaN === 'number'", a:true, h:"NaN is technically a number"},
+    {c:"isNaN('hello') === true", a:true, h:"isNaN coerces first"},
+    {c:"Number.isNaN('hello') === false", a:true, h:"No coercion version"},
+    {c:"null == 0", a:false, h:"null only == undefined"},
+    {c:"undefined == 0", a:false, h:"undefined is not 0"},
+    {c:"null + 1 === 1", a:true, h:"null → 0 in math"},
+    {c:"undefined + 1 !== undefined + 1", a:true, h:"undefined→NaN, NaN≠NaN"},
+    {c:"typeof null === 'object'", a:true, h:"Historic JS bug"},
+    {c:"typeof undefined === 'undefined'", a:true, h:"Correct type"},
+    {c:"void 0 === undefined", a:true, h:"void 0 is undefined"},
+    {c:"0/0 === NaN", a:false, h:"0/0 is NaN, NaN≠NaN"},
+    {c:"Infinity + 1 === Infinity", a:true, h:"Infinity math"},
+    {c:"Infinity == Infinity", a:true, h:"Infinity equals itself"},
+    {c:"-0 === 0", a:true, h:"Strict sees them equal"},
+  ],
+  // Dungeon 3 - Citadel
+  [
+    {c:"Object.is(0, -0) === false", a:true, h:"Object.is distinguishes -0"},
+    {c:"Object.is(NaN, NaN) === true", a:true, h:"Object.is fixes NaN"},
+    {c:"Object.is(0, -0) === true", a:false, h:"They are different!"},
+    {c:"-0 == 0", a:true, h:"Loose: -0 equals 0"},
+    {c:"1/0 === Infinity", a:true, h:"Division by zero"},
+    {c:"1/-0 === -Infinity", a:true, h:"Negative zero division"},
+    {c:"Math.max() === -Infinity", a:true, h:"No args → -Infinity"},
+    {c:"Math.min() === Infinity", a:true, h:"No args → Infinity"},
+    {c:"[] == 0", a:true, h:"[]→''→0"},
+    {c:"[0] == false", a:true, h:"[0]→'0'→0→false"},
+    {c:"'true' == true", a:false, h:"'true'→NaN, NaN≠1"},
+    {c:"!![] === true", a:true, h:"Empty array is truthy"},
+    {c:"!!{} === true", a:true, h:"Empty object is truthy"},
+    {c:"0n == 0", a:true, h:"BigInt 0 == Number 0"},
+    {c:"0n === 0", a:false, h:"BigInt vs Number strict"},
+    {c:"Symbol('a') === Symbol('a')", a:false, h:"Symbols are unique"},
+  ]
+];
+
+const MONSTER_EMOJI = {
+  Slime:"🟢", Bat:"🦇", Skeleton:"💀", Goblin:"👺", Troll:"👹", Specter:"👻",
+  Wraith:"🌫️", Voidling:"🕳️", Phantom:"🎭", Golem:"🗿", Paladin:"🛡️", Archon:"⚡",
+  "Crypt Keeper":"🧙", "Coercion Lord":"🧛", "NaN Leviathan":"🐙", "Truth Titan":"👑"
+};
+
+// State
+let state = {
+  hp:100, maxHp:100,
+  score:0, best:0,
+  streak:0, bestStreak:0,
+  kills:0, totalKills:0,
+  dungeon:0, unlocked:0,
+  bosses:0,
+  mobHp:1, mobMaxHp:1,
+  isBoss:false,
+  current:null,
+  timer:0, timerMax:7, timerId:null,
+  critReady:false,
+  gameOver:false
+};
+
+const $ = id => document.getElementById(id);
+
+function loadPersist(){
+  try{
+    state.best = parseInt(localStorage.getItem('dvr_bestScore')||'0',10);
+    state.unlocked = parseInt(localStorage.getItem('dvr_unlocked')||'0',10);
+    state.totalKills = parseInt(localStorage.getItem('dvr_totalKills')||'0',10);
+    state.bosses = parseInt(localStorage.getItem('dvr_bosses')||'0',10);
+  }catch(e){}
+}
+function savePersist(){
+  try{
+    localStorage.setItem('dvr_bestScore', String(state.best));
+    localStorage.setItem('dvr_unlocked', String(state.unlocked));
+    localStorage.setItem('dvr_totalKills', String(state.totalKills));
+    localStorage.setItem('dvr_bosses', String(state.bosses));
+  }catch(e){}
+}
+
+function renderHeader(){
+  $('scoreEl').textContent = state.score;
+  $('bestEl').textContent = state.best;
+  $('mBest').textContent = state.best;
+  $('mKills').textContent = state.totalKills;
+  $('mDungeons').textContent = (state.unlocked+1)+'/4';
+  $('killsEl').textContent = state.kills;
+  // HP
+  const pct = Math.max(0, state.hp / state.maxHp * 100);
+  $('hpFill').style.width = pct+'%';
+  $('hpFill').classList.toggle('low', pct < 30);
+  $('hpText').textContent = Math.max(0,state.hp)+' HP';
+  // combo
+  $('comboEl').textContent = '🔥 Streak: '+state.streak;
+  $('comboEl').classList.toggle('active', state.streak>=2);
+  const mult = state.streak>=9?3: state.streak>=6?2: state.streak>=3?1.5:1;
+  $('dmgEl').textContent = '🗡️ DMG x'+mult + (state.critReady?' • CRIT!':'');
+  $('dmgEl').style.color = state.critReady? 'var(--yellow)':'';
+  $('critEl').style.display = state.critReady? 'flex':'none';
+  $('btnCrit').classList.toggle('show', state.critReady);
+  // dungeon chips
+  const chips = $('dungeonChips');
+  chips.innerHTML='';
+  DUNGEONS.forEach(d=>{
+    const b=document.createElement('button');
+    b.className='chip'+(d.id===state.dungeon?' active':'')+(d.id>state.unlocked?' locked':'')+(d.id<state.unlocked?' done':'');
+    b.textContent=(d.id>state.unlocked?'🔒 ':'')+d.icon+' '+d.short;
+    b.onclick=()=>{ if(d.id<=state.unlocked){ state.dungeon=d.id; spawnMonster(); renderHeader(); } };
+    chips.appendChild(b);
+  });
+}
+
+function pickExpression(){
+  const pool = POOLS[state.dungeon];
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+function spawnMonster(isBossOverride=null){
+  clearInterval(state.timerId);
+  const dungeon = DUNGEONS[state.dungeon];
+  // Every 5 kills, boss appears (or if override)
+  const shouldBoss = isBossOverride!==null ? isBossOverride : (state.kills>0 && state.kills%5===4);
+  state.isBoss = shouldBoss;
+  state.current = pickExpression();
+  state.mobMaxHp = state.isBoss ? 3 : 1;
+  state.mobHp = state.mobMaxHp;
+  state.timerMax = state.isBoss ? 10 : 7;
+  state.timer = state.timerMax;
+
+  // Monster identity
+  let mobName, emoji;
+  if(state.isBoss){
+    mobName = dungeon.boss;
+    emoji = MONSTER_EMOJI[mobName]||'👹';
+  } else {
+    const pool = dungeon.mobs;
+    mobName = pool[state.kills % pool.length] + (state.dungeon>0? ' Mk.'+(state.dungeon+1):'');
+    emoji = MONSTER_EMOJI[pool[state.kills % pool.length]]||'👾';
+  }
+  $('mobAvatar').innerHTML = emoji + '<span class="lvl" id="mobLvl"></span>';
+  $('mobAvatar').classList.toggle('boss', state.isBoss);
+  $('mobLvl').textContent = 'LVL '+(state.kills+1);
+  $('mobName').textContent = mobName;
+  $('mobType').textContent = state.isBoss? 'BOSS':'MOB';
+  $('mobType').className = state.isBoss? 'boss':'';
+  $('mobDesc').textContent = state.isBoss? 'Boss! Needs 3 correct verdicts to fall.' : 'Predict its verdict before it strikes!';
+  $('mobHpFill').style.width='100%';
+  $('mobHpFill').classList.toggle('boss', state.isBoss);
+
+  $('exprCode').textContent = state.current.c;
+  $('exprHint').textContent = state.current.h;
+  $('exprResult').className='expr-result';
+  $('exprResult').style.display='none';
+  $('timerBadge').classList.remove('warn');
+  updateTimerUI();
+  startTimer();
+  renderHeader();
+  $('btnTrue').disabled=false;
+  $('btnFalse').disabled=false;
+}
+
+function updateTimerUI(){
+  const pct = Math.max(0, state.timer/state.timerMax*100);
+  $('timerFill').style.width=pct+'%';
+  $('timerText').textContent = state.timer.toFixed(1)+'s';
+  if(state.timer<3) $('timerBadge').classList.add('warn');
+  else $('timerBadge').classList.remove('warn');
+  // color shift
+  if(pct<30) $('timerFill').style.background='linear-gradient(90deg,#ff3b6b,#ff1a1a)';
+  else $('timerFill').style.background='linear-gradient(90deg,var(--blue),var(--accent2))';
+}
+
+function startTimer(){
+  clearInterval(state.timerId);
+  state.timerId = setInterval(()=>{
+    state.timer -= 0.1;
+    if(state.timer<=0){
+      state.timer=0;
+      updateTimerUI();
+      clearInterval(state.timerId);
+      handleAnswer(null); // timeout = wrong
+    } else {
+      updateTimerUI();
+    }
+  },100);
+}
+
+function handleAnswer(guess){
+  clearInterval(state.timerId);
+  $('btnTrue').disabled=true;
+  $('btnFalse').disabled=true;
+  const correct = state.current.a;
+  const isCorrect = guess===correct;
+  const isTimeout = guess===null;
+
+  if(isCorrect){
+    // damage monster
+    let dmg = 1;
+    let scoreGain = 100;
+    let mult = 1;
+    if(state.streak>=9) mult=3;
+    else if(state.streak>=6) mult=2;
+    else if(state.streak>=3) mult=1.5;
+
+    if(state.critReady){
+      dmg = 2;
+      scoreGain = Math.round(scoreGain * mult * 1.5);
+      state.critReady=false;
+      showFloat('CRITICAL! +'+scoreGain);
+    } else {
+      scoreGain = Math.round(scoreGain * mult);
+      showFloat('+'+scoreGain);
+    }
+
+    state.streak++;
+    state.bestStreak = Math.max(state.bestStreak, state.streak);
+    if(state.streak>=3 && state.streak%3===0){
+      state.critReady=true;
+    }
+
+    state.mobHp -= dmg;
+    const mobPct = Math.max(0, state.mobHp/state.mobMaxHp*100);
+    $('mobHpFill').style.width=mobPct+'%';
+
+    $('exprResult').textContent = '✓ Correct! '+(state.current.c)+' is '+correct;
+    $('exprResult').className='expr-result show correct';
+    $('exprResult').style.display='block';
+
+    state.score += scoreGain;
+    if(state.score>state.best){ state.best=state.score; }
+
+    if(state.mobHp<=0){
+      // killed
+      state.kills++;
+      state.totalKills++;
+      savePersist();
+      renderHeader();
+      setTimeout(()=>{
+        if(state.isBoss){
+          // boss defeated
+          state.bosses++;
+          const bonus = 500 + state.dungeon*250;
+          state.score += bonus;
+          if(state.score>state.best) state.best=state.score;
+          // unlock next dungeon
+          if(state.unlocked===state.dungeon && state.dungeon<3){
+            state.unlocked++;
+          }
+          savePersist();
+          showClear(bonus);
+        } else {
+          spawnMonster();
+        }
+      }, 700);
+    } else {
+      // boss needs more hits - next expression for same boss
+      renderHeader();
+      setTimeout(()=>{
+        // keep boss, new expression
+        state.current = pickExpression();
+        $('exprCode').textContent = state.current.c;
+        $('exprHint').textContent = state.current.h + ' ('+state.mobHp+'/'+state.mobMaxHp+' HP left)';
+        $('exprResult').style.display='none';
+        $('btnTrue').disabled=false;
+        $('btnFalse').disabled=false;
+        state.timer = state.timerMax;
+        updateTimerUI();
+        startTimer();
+      }, 700);
+    }
+  } else {
+    // wrong or timeout
+    const dmgToPlayer = state.isBoss? 22:18;
+    state.hp -= dmgToPlayer;
+    state.streak=0;
+    state.critReady=false;
+    $('hitFlash').classList.add('show');
+    setTimeout(()=>$('hitFlash').classList.remove('show'),250);
+    showFloat('-'+dmgToPlayer+' HP', true);
+    $('exprResult').textContent = (isTimeout?'⏱ Time! ':'✕ Wrong! ')+state.current.c+' is '+correct;
+    $('exprResult').className='expr-result show wrong';
+    $('exprResult').style.display='block';
+    renderHeader();
+    if(state.hp<=0){
+      state.hp=0;
+      renderHeader();
+      setTimeout(()=>showGameOver(), 600);
+    } else {
+      setTimeout(()=>{
+        spawnMonster();
+      }, 900);
+    }
+  }
+  renderHeader();
+}
+
+function showFloat(text, isDamage=false){
+  const box=$('exprBox');
+  const el=document.createElement('div');
+  el.className='damage-float';
+  el.textContent=text;
+  if(isDamage) el.style.color='var(--accent)';
+  box.appendChild(el);
+  setTimeout(()=>el.remove(),700);
+}
+
+function showGameOver(){
+  $('goScore').textContent=state.score;
+  $('goKills').textContent=state.kills;
+  $('goStreak').textContent=state.bestStreak;
+  $('goEmoji').textContent = state.kills>=5?'⚔️':'💀';
+  $('goTitle').textContent = state.kills>=5?'Valiant Effort!':'You Fainted!';
+  $('goDesc').textContent = state.score>=state.best && state.score>0 ? 'New best score! The dungeon remembers you.' : 'The dungeon claimed another adventurer.';
+  $('gameOverOverlay').classList.add('show');
+  savePersist();
+}
+
+function showClear(bonus){
+  $('clearScore').textContent=state.score;
+  $('clearKills').textContent=state.kills;
+  $('clearBonus').textContent='+'+bonus;
+  if(state.dungeon<3 && state.unlocked>state.dungeon){
+    $('clearTitle').textContent='Boss Vanquished!';
+    $('clearDesc').textContent=DUNGEONS[state.dungeon+1].name+' unlocked!';
+    $('clearEmoji').textContent='🔓';
+  } else if(state.dungeon===3){
+    $('clearTitle').textContent='Citadel Conquered!';
+    $('clearDesc').textContent='You mastered JavaScript truth. Play again for high score!';
+    $('clearEmoji').textContent='🏆';
+  } else {
+    $('clearTitle').textContent='Boss Vanquished!';
+    $('clearDesc').textContent='Bonus awarded. Onward!';
+    $('clearEmoji').textContent='👑';
+  }
+  $('clearOverlay').classList.add('show');
+}
+
+// Events
+$('btnTrue').onclick=()=>handleAnswer(true);
+$('btnFalse').onclick=()=>handleAnswer(false);
+$('btnCrit').onclick=()=>{
+  if(!state.critReady) return;
+  // crit is consumed on next correct answer, but allow clicking to hint
+  $('btnCrit').textContent='⚡ READY — next correct is CRITICAL!';
+  setTimeout(()=>{$('btnCrit').textContent='⚡ CRITICAL STRIKE!';},1200);
+};
+
+$('btnStart').onclick=()=>{
+  $('startOverlay').classList.remove('show');
+  resetRun();
+};
+$('btnRetry').onclick=()=>{
+  $('gameOverOverlay').classList.remove('show');
+  resetRun();
+};
+$('btnHome').onclick=()=>{
+  $('gameOverOverlay').classList.remove('show');
+  $('startOverlay').classList.add('show');
+  renderHeader();
+};
+$('btnContinue').onclick=()=>{
+  $('clearOverlay').classList.remove('show');
+  if(state.unlocked>state.dungeon){
+    state.dungeon++;
+  }
+  spawnMonster();
+};
+$('btnHelp').onclick=()=>$('helpOverlay').classList.add('show');
+$('btnCloseHelp').onclick=()=>$('helpOverlay').classList.remove('show');
+$('helpOverlay').onclick=(e)=>{ if(e.target===$('helpOverlay')) $('helpOverlay').classList.remove('show'); };
+$('btnRestart').onclick=()=>{
+  if(confirm('Restart run? Score will reset but best & unlocks stay.')){
+    resetRun();
+  }
+};
+
+function resetRun(){
+  clearInterval(state.timerId);
+  state.hp=100;
+  state.score=0;
+  state.streak=0;
+  state.bestStreak=0;
+  state.kills=0;
+  state.critReady=false;
+  state.gameOver=false;
+  // keep dungeon at current or 0? keep current dungeon selection
+  renderHeader();
+  spawnMonster(false);
+}
+
+// Init
+loadPersist();
+renderHeader();
+// prepare start screen values
+$('mBest').textContent=state.best;
+$('mKills').textContent=state.totalKills;
+$('mDungeons').textContent=(state.unlocked+1)+'/4';
+
+// Keyboard support for desktop testing
+document.addEventListener('keydown',e=>{
+  if($('startOverlay').classList.contains('show') && e.key==='Enter'){$('btnStart').click(); return;}
+  if($('gameOverOverlay').classList.contains('show') && e.key==='Enter'){$('btnRetry').click(); return;}
+  if($('clearOverlay').classList.contains('show') && e.key==='Enter'){$('btnContinue').click(); return;}
+  if(e.key==='ArrowLeft' || e.key==='t' || e.key==='T') { if(!$('btnTrue').disabled) handleAnswer(true); }
+  if(e.key==='ArrowRight' || e.key==='f' || e.key==='F') { if(!$('btnFalse').disabled) handleAnswer(false); }
+});
+</script>
+</body>
+</html>

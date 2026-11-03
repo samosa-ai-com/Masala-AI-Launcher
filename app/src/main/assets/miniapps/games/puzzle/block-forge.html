@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Falling-Mold Forge</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0b0f14;--panel:#121a24;--panel2:#162332;--line:#1e3a4f;--blue:#2ec4ff;--blue2:#0a7fb5;--orange:#ff7a18;--orange2:#ff3b1f;--slag:#ff3b1f;--text:#e6f0f7;--muted:#8aa0b5;--ok:#2eff7a;--warn:#ffcc33}
+html,body{height:100%;background:radial-gradient(1200px 600px at 50% -10%,#1a2a3a 0%,#0b0f14 55%,#070a0e 100%);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow-x:hidden}
+.app{width:100%;max-width:428px;min-width:360px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;position:relative}
+header{padding:12px 14px 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #1e2f40;background:linear-gradient(180deg,#0f1a26 0%,#0b121c 100%);position:sticky;top:0;z-index:10}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:9px;background:conic-gradient(from 0deg,#ff7a18,#ffcc33,#ff7a18);display:grid;place-items:center;box-shadow:0 0 0 1px #ff7a1840,0 4px 14px #ff7a1840}
+.logo span{width:22px;height:22px;border:2px solid #0b0f14;border-radius:6px;background:linear-gradient(180deg,#1e3a4f,#0b121c);display:grid;place-items:center;font-size:12px;font-weight:900;color:var(--blue)}
+.brand h1{font-size:15px;letter-spacing:.08em;line-height:1;font-weight:900}
+.brand h1 i{font-style:normal;color:var(--blue)}
+.brand p{font-size:10px;letter-spacing:.12em;color:var(--muted);margin-top:2px}
+.hdr-right{display:flex;gap:8px;align-items:center}
+.pill{padding:7px 10px;border-radius:999px;background:#0e1a28;border:1px solid #1e3a4f;font-size:11px;font-weight:800;letter-spacing:.06em;display:flex;align-items:center;gap:6px}
+.pill b{color:var(--orange)}
+.icon-btn{width:40px;height:40px;border-radius:10px;border:1px solid #24425c;background:#0e1e2f;color:var(--text);display:grid;place-items:center;font-size:16px}
+.topbar{padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+.contract-select{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.contract-select::-webkit-scrollbar{display:none}
+.cchip{min-width:92px;flex:0 0 auto;padding:8px 10px;border-radius:12px;border:1px solid #1e3a4f;background:linear-gradient(180deg,#132233,#0e1a28);text-align:left}
+.cchip.active{border-color:var(--orange);box-shadow:0 0 0 1px #ff7a1840,0 6px 16px #0008}
+.cchip strong{font-size:11px;letter-spacing:.06em;display:block}
+.cchip span{font-size:10px;color:var(--muted)}
+.cchip em{font-style:normal;font-size:10px;color:var(--orange);font-weight:800}
+.stats{display:flex;gap:8px}
+.stat{min-width:72px;padding:8px 10px;border-radius:12px;background:#0e1a28;border:1px solid #1e3a4f;text-align:center}
+.stat label{font-size:9px;letter-spacing:.12em;color:var(--muted);display:block}
+.stat strong{font-size:14px;letter-spacing:.04em}
+.slagbar{height:6px;background:#0a121c;border-radius:999px;overflow:hidden;border:1px solid #1e2f40;margin:0 12px}
+.slagfill{height:100%;width:0%;background:linear-gradient(90deg,#ff3b1f,#ff7a18);transition:width .3s}
+.main{padding:10px 12px 8px;display:grid;grid-template-columns:72px 1fr 72px;gap:10px;align-items:start}
+.side{ display:flex;flex-direction:column;gap:10px}
+.box{background:linear-gradient(180deg,#111d2b,#0d1726);border:1px solid #1e3a4f;border-radius:14px;overflow:hidden}
+.box h3{font-size:9px;letter-spacing:.14em;color:var(--muted);padding:8px 8px 6px;text-align:center;border-bottom:1px solid #1e2f40;background:#0e1a28}
+.mini-grid{--s:14px;display:grid;grid-template-columns:repeat(4,var(--s));grid-template-rows:repeat(4,var(--s));gap:2px;justify-content:center;padding:10px 6px}
+.mini-cell{width:var(--s);height:var(--s);border-radius:3px;background:#0a121c;border:1px solid #0a121c}
+.mini-cell.on{background:linear-gradient(180deg,#2ec4ff,#0a7fb5);border-color:#2ec4ff;box-shadow:0 0 6px #2ec4ff80}
+.mini-cell.slag{background:linear-gradient(180deg,#ff7a18,#ff3b1f);border-color:#ff7a18}
+.hold-hint{font-size:9px;color:var(--muted);text-align:center;padding:0 6px 8px;line-height:1.3}
+.well-wrap{position:relative;background:linear-gradient(180deg,#0a1a2a 0%,#08121e 100%);border:1px solid #2a4a64;border-radius:16px;padding:10px;box-shadow:inset 0 0 0 1px #2ec4ff18,0 10px 30px #0009}
+.well-wrap:before{content:"";position:absolute;inset:8px;border:1px dashed #2ec4ff30;border-radius:12px;pointer-events:none}
+.well-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;position:relative;z-index:1}
+.well-head span{font-size:9px;letter-spacing:.14em;color:var(--blue);font-weight:800}
+.well-head b{font-size:10px;color:var(--muted);letter-spacing:.08em}
+.board{--cols:10;--rows:20;display:grid;grid-template-columns:repeat(var(--cols),1fr);gap:2px;background:#07101a;border-radius:10px;padding:6px;border:1px solid #1a3247;position:relative;z-index:1}
+.cell{aspect-ratio:1;border-radius:4px;background:#0a1624;border:1px solid #0e2235;position:relative;overflow:hidden}
+.cell.filled{background:linear-gradient(180deg,#1a3a55,#0f2538);border-color:#2a5a7a;box-shadow:inset 0 1px 0 #ffffff14}
+.cell.filled.i{background:linear-gradient(180deg,#2ec4ff,#0a7fb5);border-color:#2ec4ff}
+.cell.filled.o{background:linear-gradient(180deg,#ffcc33,#d99a00);border-color:#ffcc33}
+.cell.filled.t{background:linear-gradient(180deg,#b07cff,#6a2ee6);border-color:#b07cff}
+.cell.filled.s{background:linear-gradient(180deg,#2eff7a,#0a9a4a);border-color:#2eff7a}
+.cell.filled.z{background:linear-gradient(180deg,#ff3b1f,#a81a0a);border-color:#ff3b1f}
+.cell.filled.j{background:linear-gradient(180deg,#2e7cff,#0a3a9a);border-color:#2e7cff}
+.cell.filled.l{background:linear-gradient(180deg,#ff7a18,#b84a00);border-color:#ff7a18}
+.cell.ghost{border-style:dashed;border-color:#2ec4ff80;background:#2ec4ff14}
+.cell.active{box-shadow:0 0 10px currentColor}
+.cell.slagcell{background:repeating-linear-gradient(45deg,#1a0f0a 0 4px,#2a1a0e 4px 8px);border-color:#ff7a1840}
+.mod-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;position:relative;z-index:1}
+.mod{font-size:9px;letter-spacing:.08em;font-weight:800;padding:6px 8px;border-radius:999px;border:1px solid #2a4a64;background:#0e1e2f;color:var(--blue)}
+.mod.hot{color:var(--orange);border-color:#ff7a1840;background:#1a120e}
+.controls{padding:8px 12px 12px;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:8px}
+.btn{flex:1;min-height:48px;border-radius:14px;border:1px solid #1e3a4f;background:linear-gradient(180deg,#132233,#0e1a28);color:var(--text);font-weight:900;letter-spacing:.06em;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;touch-action:manipulation;user-select:none}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:linear-gradient(180deg,#ff7a18,#ff3b1f);border-color:#ff7a18;color:#0b0f14;box-shadow:0 6px 16px #ff3b1f40}
+.btn.blue{background:linear-gradient(180deg,#2ec4ff,#0a7fb5);border-color:#2ec4ff;color:#061018}
+.btn.ghost{background:#0a121c}
+.btn.small{min-height:44px;font-size:11px}
+.btn:disabled{opacity:.45}
+.dpad{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.dpad .btn{font-size:18px}
+.hint{font-size:11px;color:var(--muted);text-align:center;line-height:1.4;padding:0 12px}
+.overlay{position:fixed;inset:0;background:#070a0ecc;backdrop-filter:blur(6px);display:none;place-items:center;padding:16px;z-index:50}
+.overlay.open{display:grid}
+.sheet{width:100%;max-width:428px;background:linear-gradient(180deg,#111d2b,#0d1726);border:1px solid #2a4a64;border-radius:18px;overflow:hidden;max-height:90vh;display:flex;flex-direction:column}
+.sheet-head{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e2f40;background:#0e1a28}
+.sheet-head h2{font-size:13px;letter-spacing:.08em}
+.sheet-body{padding:14px;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.contract-card{padding:12px;border-radius:14px;border:1px solid #1e3a4f;background:#0a1624;display:grid;gap:6px}
+.contract-card.done{border-color:#2eff7a40}
+.contract-card h4{font-size:12px;letter-spacing:.06em}
+.contract-card p{font-size:11px;color:var(--muted);line-height:1.4}
+.meta{display:flex;gap:6px;flex-wrap:wrap}
+.meta span{font-size:10px;padding:5px 8px;border-radius:999px;background:#0e1e2f;border:1px solid #1e3a4f}
+.stars{color:var(--warn);letter-spacing:.12em}
+textarea{width:100%;min-height:120px;background:#07101a;border:1px solid #1e3a4f;border-radius:12px;color:var(--text);padding:10px;font-size:12px}
+.kbd{font-size:10px;color:var(--muted);text-align:center}
+@media (max-width:380px){.main{grid-template-columns:64px 1fr 64px} .mini-grid{--s:12px}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+<header>
+  <div class="brand">
+    <div class="logo"><span>◈</span></div>
+    <div>
+      <h1>FALLING-MOLD <i>FORGE</i></h1>
+      <p>BLUEPRINT WELL • 12 CONTRACTS</p>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="pill">★ <b id="totalStars">0</b> /36</div>
+    <button class="icon-btn" id="btnArchive" aria-label="Archive">≡</button>
+  </div>
+</header>
+
+<div class="topbar">
+  <div class="contract-select" id="contractSelect"></div>
+  <div class="stats">
+    <div class="stat"><label>SCORE</label><strong id="score">0</strong></div>
+    <div class="stat"><label>LINES</label><strong id="lines">0/0</strong></div>
+  </div>
+</div>
+<div class="slagbar"><div class="slagfill" id="slagFill"></div></div>
+
+<div class="main">
+  <div class="side">
+    <div class="box">
+      <h3>HOLD</h3>
+      <div class="mini-grid" id="holdGrid"></div>
+      <div class="hold-hint" id="holdHint">TAP HOLD TO STORE</div>
+    </div>
+    <div class="box">
+      <h3>NEXT</h3>
+      <div class="mini-grid" id="nextGrid"></div>
+      <div class="hold-hint" id="nextHint">QUEUED MOLD</div>
+    </div>
+    <div class="box" style="padding:8px">
+      <h3 style="margin:-8px -8px 8px">FURNACE</h3>
+      <div id="furnaceMods" style="display:flex;flex-direction:column;gap:6px"></div>
+    </div>
+  </div>
+
+  <div class="well-wrap">
+    <div class="well-head"><span id="contractName">CONTRACT 01</span><b id="contractGoal">CLEAR 8 LINES</b></div>
+    <div class="board" id="board"></div>
+    <div class="mod-row" id="modRow"></div>
+  </div>
+
+  <div class="side">
+    <div class="box">
+      <h3>CHAIN</h3>
+      <div style="padding:10px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:var(--orange)" id="combo">x1</div>
+        <div style="font-size:9px;letter-spacing:.12em;color:var(--muted)">COMBO</div>
+        <div style="margin-top:8px;height:1px;background:#1e2f40"></div>
+        <div style="font-size:11px;margin-top:8px;font-weight:800" id="chainInfo">SEAL GAPS</div>
+        <div style="font-size:10px;color:var(--muted)" id="chainSub">NO SLAG</div>
+      </div>
+    </div>
+    <div class="box">
+      <h3>SLAG</h3>
+      <div style="padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:900" id="slagVal">0%</div>
+        <div style="font-size:9px;letter-spacing:.1em;color:var(--muted)">CONTAMINATION</div>
+        <div style="font-size:10px;margin-top:6px;color:var(--warn)" id="slagWarn">STABLE</div>
+      </div>
+    </div>
+    <button class="btn small" id="btnRework" style="width:100%">↺ REWORK</button>
+    <button class="btn small ghost" id="btnRestart">↻ RESTART</button>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="dpad">
+    <button class="btn" id="btnLeft">◀</button>
+    <button class="btn blue" id="btnRotate">↻ ROTATE</button>
+    <button class="btn" id="btnRight">▶</button>
+  </div>
+  <div class="row">
+    <button class="btn ghost" id="btnDown">▼ SOFT-DROP</button>
+    <button class="btn primary" id="btnHard">⬇ HARD-DROP</button>
+  </div>
+  <div class="row">
+    <button class="btn small" id="btnHold">HOLD ◈</button>
+    <button class="btn small ghost" id="btnContracts">CONTRACTS ▦</button>
+    <button class="btn small ghost" id="btnHelp">HELP ?</button>
+  </div>
+  <div class="hint" id="hint">Slide, rotate, soft-drop, hard-drop, hold & rework to seal gaps. Chain clears raise combo. Slag rises when you leave holes.</div>
+</div>
+</div>
+
+<div class="overlay" id="overlayContracts">
+  <div class="sheet">
+    <div class="sheet-head"><h2>CONTRACTS ARCHIVE</h2><button class="icon-btn" onclick="closeOverlay('overlayContracts')">✕</button></div>
+    <div class="sheet-body" id="contractsBody"></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlayArchive">
+  <div class="sheet">
+    <div class="sheet-head"><h2>ARCHIVE IMPORT / EXPORT</h2><button class="icon-btn" onclick="closeOverlay('overlayArchive')">✕</button></div>
+    <div class="sheet-body">
+      <div class="contract-card">
+        <h4>EXPORT</h4>
+        <p>Copy your forge archive to backup or move to another device. Includes stars, scores, and contract progress.</p>
+        <textarea id="exportArea" readonly></textarea>
+        <div class="row"><button class="btn blue" id="btnCopy">COPY JSON</button><button class="btn" id="btnDownload">DOWNLOAD .JSON</button></div>
+      </div>
+      <div class="contract-card">
+        <h4>IMPORT</h4>
+        <p>Paste a previously exported archive JSON to restore progress. This will overwrite current save.</p>
+        <textarea id="importArea" placeholder='Paste JSON here...'></textarea>
+        <button class="btn primary" id="btnImport">IMPORT ARCHIVE</button>
+        <div class="kbd">Stored locally • No server • Works offline</div>
+      </div>
+      <button class="btn ghost" id="btnWipe">WIPE ALL PROGRESS</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlayHelp">
+  <div class="sheet">
+    <div class="sheet-head"><h2>FORGE MANUAL</h2><button class="icon-btn" onclick="closeOverlay('overlayHelp')">✕</button></div>
+    <div class="sheet-body">
+      <div class="contract-card"><h4>HOW TO SEAL</h4><p>Fill every cell in a row to clear it. Chain clears (back-to-back) multiply score. Holes under overhangs raise <b>slag</b>. At 100% slag the mold fails.</p></div>
+      <div class="contract-card"><h4>CONTROLS</h4><p><b>◀ ▶</b> slide • <b>↻</b> rotate (tap again for counter) • <b>▼</b> soft-drop (+1) • <b>⬇</b> hard-drop • <b>HOLD</b> store one mold • <b>REWORK</b> pull current mold back to top (costs 50 pts, 1× per drop).</p></div>
+      <div class="contract-card"><h4>FURNACE MODIFIERS</h4><p>Each contract adds a modifier: Heat Surge (faster), Slag Vein (rising slag lines), Quench (short lock), Blind Queue, Drift, Brittle, Overheat, etc. Master them to earn 3★.</p></div>
+      <div class="contract-card"><h4>STARS</h4><p>★ Clear required lines • ★★ Beat target score • ★★★ Keep slag &lt;40% and no top-out. Stars unlock next contract.</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLS=10, ROWS=20;
+const PIECES={
+  I:{color:'i', mats:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]]},
+  O:{color:'o', mats:[[1,1],[1,1]]},
+  T:{color:'t', mats:[[0,1,0],[1,1,1],[0,0,0]]},
+  S:{color:'s', mats:[[0,1,1],[1,1,0],[0,0,0]]},
+  Z:{color:'z', mats:[[1,1,0],[0,1,1],[0,0,0]]},
+  J:{color:'j', mats:[[1,0,0],[1,1,1],[0,0,0]]},
+  L:{color:'l', mats:[[0,0,1],[1,1,1],[0,0,0]]}
+};
+const PIECE_KEYS=['I','O','T','S','Z','J','L'];
+const CONTRACTS=[
+  {id:1,name:'01 • FIRST POUR',goal:8,desc:'Learn the well. No modifiers.',mods:[],target:1200,speed:800,slagRate:0},
+  {id:2,name:'02 • HEAT SURGE',goal:10,desc:'Furnace runs hot. Drop speed +45%.',mods:['HEAT SURGE +45%'],target:1800,speed:520,slagRate:0},
+  {id:3,name:'03 • SLAG VEIN',goal:12,desc:'Every 6 molds a slag line rises with one gap.',mods:['SLAG VEIN'],target:2200,speed:700,slagRate:6},
+  {id:4,name:'04 • QUENCH CYCLE',goal:12,desc:'Short lock delay. Decide fast.',mods:['QUENCH • LOCK 300ms'],target:2400,speed:700,slagRate:0,lock:300},
+  {id:5,name:'05 • TWIN MOLDS',goal:15,desc:'Next mold hidden. Trust the blueprint.',mods:['BLIND QUEUE'],target:3000,speed:650,slagRate:0,blind:true},
+  {id:6,name:'06 • MAGNETIC DRIFT',goal:15,desc:'After lock, row may drift 1 cell.',mods:['MAGNETIC DRIFT'],target:3200,speed:620,slagRate:0,drift:true},
+  {id:7,name:'07 • BRITTLE CAST',goal:18,desc:'Single clears add 8% slag.',mods:['BRITTLE • SINGLES = SLAG'],target:3800,speed:600,slagRate:0,brittle:true},
+  {id:8,name:'08 • OVERHEAT',goal:18,desc:'After 10 lines, speed doubles.',mods:['OVERHEAT'],target:4000,speed:600,slagRate:0,overheat:true},
+  {id:9,name:'09 • COLD SHUT',goal:20,desc:'Hold disabled. Rework costs 100.',mods:['COLD SHUT • NO HOLD'],target:4600,speed:580,slagRate:4,noHold:true},
+  {id:10,name:'10 • MASTER ALLOY',goal:20,desc:'Heat + Slag + Drift combined.',mods:['HEAT','SLAG VEIN','DRIFT'],target:5000,speed:520,slagRate:5,drift:true},
+  {id:11,name:'11 • STARLIGHT FORGE',goal:25,desc:'After each clear, well flickers invisible 2s.',mods:['STARLIGHT • GHOST WELL'],target:6000,speed:540,slagRate:0,ghost:true},
+  {id:12,name:'12 • ETERNAL MOLD',goal:99,desc:'Endless scoring. Survive the eternal pour.',mods:['ETERNAL • ENDLESS'],target:8000,speed:500,slagRate:3,drift:true,overheat:true},
+];
+
+let state={
+  board:[], current:null, next:null, hold:null, canHold:true,
+  score:0, lines:0, combo:0, slag:0, bag:[], ghostY:0,
+  contractIdx:0, running:false, paused:false, lockTimer:null, gravityTimer:null,
+  reworkUsed:false, lastLines:0, stars:[], bestScores:[]
+};
+
+const boardEl=document.getElementById('board');
+const holdGrid=document.getElementById('holdGrid');
+const nextGrid=document.getElementById('nextGrid');
+const scoreEl=document.getElementById('score');
+const linesEl=document.getElementById('lines');
+const slagFill=document.getElementById('slagFill');
+const slagVal=document.getElementById('slagVal');
+const slagWarn=document.getElementById('slagWarn');
+const comboEl=document.getElementById('combo');
+const chainInfo=document.getElementById('chainInfo');
+const chainSub=document.getElementById('chainSub');
+const contractNameEl=document.getElementById('contractName');
+const contractGoalEl=document.getElementById('contractGoal');
+const furnaceMods=document.getElementById('furnaceMods');
+const modRow=document.getElementById('modRow');
+const totalStarsEl=document.getElementById('totalStars');
+
+function createBoard(){
+  boardEl.innerHTML='';
+  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){
+    const d=document.createElement('div'); d.className='cell'; d.dataset.x=x; d.dataset.y=y; boardEl.appendChild(d);
+  }
+}
+function newBoardArray(){ return Array.from({length:ROWS},()=>Array(COLS).fill(null)); }
+function shuffleBag(){ state.bag=[]; let a=[...PIECE_KEYS]; for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]} state.bag=a; }
+function nextPieceKey(){ if(state.bag.length===0) shuffleBag(); return state.bag.pop(); }
+function pieceFromKey(k){ const p=PIECES[k]; return {key:k,color:p.color,mat:p.mats.map(r=>[...r]),x:3,y:0}; }
+function rotateMat(mat,dir=1){
+  const N=mat.length, M=mat[0].length;
+  let res=Array.from({length:M},()=>Array(N).fill(0));
+  for(let y=0;y<N;y++) for(let x=0;x<M;x++) res[x][N-1-y]=mat[y][x];
+  if(dir===-1){ res=rotateMat(res,1); res=rotateMat(res,1); res=rotateMat(res,1); }
+  // trim empty rows/cols
+  return res;
+}
+function trimMat(mat){
+  let r0=mat.length, r1=-1,c0=mat[0].length,c1=-1;
+  for(let y=0;y<mat.length;y++) for(let x=0;x<mat[0].length;x++) if(mat[y][x]){r0=Math.min(r0,y);r1=Math.max(r1,y);c0=Math.min(c0,x);c1=Math.max(c1,x);}
+  if(r1===-1) return [[0]];
+  return mat.slice(r0,r1+1).map(r=>r.slice(c0,c1+1));
+}
+function isValid(board, piece, dx=0, dy=0, mat=null){
+  const m=mat||piece.mat;
+  for(let y=0;y<m.length;y++) for(let x=0;x<m[0].length;x++) if(m[y][x]){
+    let nx=piece.x+x+dx, ny=piece.y+y+dy;
+    if(nx<0||nx>=COLS||ny>=ROWS) return false;
+    if(ny>=0 && board[ny][nx]) return false;
+  }
+  return true;
+}
+function getGhostY(){
+  if(!state.current) return 0;
+  let gy=state.current.y;
+  while(isValid(state.board, state.current, 0, gy - state.current.y +1)) gy++;
+  return gy;
+}
+function lockPiece(){
+  const p=state.current; if(!p) return;
+  for(let y=0;y<p.mat.length;y++) for(let x=0;x<p.mat[0].length;x++) if(p.mat[y][x]){
+    let ny=p.y+y, nx=p.x+x;
+    if(ny<0){ gameOver(); return; }
+    state.board[ny][nx]=p.color;
+  }
+  // drift modifier
+  const contract=CONTRACTS[state.contractIdx];
+  if(contract.drift && Math.random()<0.35){
+    let dir=Math.random()<0.5?-1:1;
+    // try shift a random filled row
+    let rowsWithFill=[];
+    for(let y=0;y<ROWS;y++) if(state.board[y].some(c=>c)) rowsWithFill.push(y);
+    if(rowsWithFill.length){
+      let ry=rowsWithFill[Math.floor(Math.random()*rowsWithFill.length)];
+      let row=[...state.board[ry]];
+      if(dir===-1){ row.push(row.shift()); } else { row.unshift(row.pop()); }
+      // only if no collision with above? just apply
+      state.board[ry]=row;
+    }
+  }
+  clearLines();
+  // slag vein
+  if(contract.slagRate && state.lines>0 && state.lines % contract.slagRate===0){
+    addSlagLine();
+  }
+  // overheat
+  if(contract.overheat && state.lines>=10){
+    contract.speed=Math.max(180, contract.speed-8);
+  }
+  spawnNext();
+  state.canHold=true; state.reworkUsed=false;
+  save();
+}
+function clearLines(){
+  let cleared=0;
+  for(let y=ROWS-1;y>=0;y--){
+    if(state.board[y].every(c=>c)){
+      state.board.splice(y,1);
+      state.board.unshift(Array(COLS).fill(null));
+      cleared++; y++;
+    }
+  }
+  if(cleared>0){
+    let base=[0,100,300,500,800][cleared]||800;
+    let comboBonus=state.combo*50;
+    state.score+= base + comboBonus;
+    state.combo++;
+    state.lines+=cleared;
+    // slag reduction on clears
+    state.slag=Math.max(0, state.slag - cleared*7 - (cleared>=4?10:0));
+    // brittle penalty
+    const contract=CONTRACTS[state.contractIdx];
+    if(contract.brittle && cleared===1) state.slag=Math.min(100, state.slag+8);
+    // ghost well flicker
+    if(contract.ghost){
+      boardEl.style.opacity='0.15';
+      setTimeout(()=>boardEl.style.opacity='1', 1800);
+    }
+    // chain info
+    chainInfo.textContent= cleared>=4 ? 'MOLTEN CLEAR!' : cleared>1 ? 'CHAIN SEAL!' : 'SEALED';
+    chainSub.textContent= cleared>=4 ? '+'+(base+comboBonus)+' • x'+state.combo : '+'+base;
+    // check win
+    if(state.lines>=contract.goal && contract.goal!==99){
+      winContract();
+    }
+  } else {
+    state.combo=0;
+    // slag increase for holes
+    let holes=countHoles();
+    if(holes>4) state.slag=Math.min(100, state.slag+ Math.min(6, Math.floor(holes/3)));
+    if(state.slag>=100){ gameOver(true); return; }
+    chainInfo.textContent='GAPS DETECTED';
+    chainSub.textContent=holes>0? holes+' HOLES • SLAG +'+Math.floor(holes/3)+'%':'NO SLAG';
+  }
+  updateHUD();
+}
+function countHoles(){
+  let holes=0;
+  for(let x=0;x<COLS;x++){
+    let seen=false;
+    for(let y=0;y<ROWS;y++){
+      if(state.board[y][x]) seen=true;
+      else if(seen) holes++;
+    }
+  }
+  return holes;
+}
+function addSlagLine(){
+  // remove top row, add bottom slag line with one gap
+  state.board.shift();
+  let gap=Math.floor(Math.random()*COLS);
+  let line=Array(COLS).fill('slag');
+  line[gap]=null;
+  // randomize gap count 1-2
+  if(Math.random()<0.3){ let g2=(gap+3)%COLS; line[g2]=null; }
+  state.board.push(line);
+  state.slag=Math.min(100, state.slag+4);
+  updateHUD();
+}
+function spawnNext(){
+  if(!state.next) state.next=pieceFromKey(nextPieceKey());
+  state.current=state.next;
+  state.current.x=3; state.current.y=0;
+  state.next=pieceFromKey(nextPieceKey());
+  if(!isValid(state.board, state.current)){
+    gameOver();
+  }
+  renderNextHold();
+  resetGravity();
+}
+function resetGravity(){
+  clearInterval(state.gravityTimer);
+  const contract=CONTRACTS[state.contractIdx];
+  let speed=contract.speed;
+  // heat surge already in speed
+  state.gravityTimer=setInterval(()=>{
+    if(state.paused||!state.running) return;
+    if(isValid(state.board, state.current,0,1)){
+      state.current.y++;
+      render();
+    } else {
+      // lock delay
+      clearTimeout(state.lockTimer);
+      let lockDelay=contract.lock||500;
+      state.lockTimer=setTimeout(()=>{ lockPiece(); render(); }, lockDelay);
+    }
+  }, speed);
+}
+function move(dx){
+  if(!state.current||state.paused) return;
+  if(isValid(state.board, state.current,dx,0)){
+    state.current.x+=dx;
+    render();
+  }
+}
+function rotate(dir=1){
+  if(!state.current) return;
+  let newMat=trimMat(rotateMat(state.current.mat,dir));
+  // wall kicks simple
+  let kicks=[0,1,-1,2,-2];
+  for(let k of kicks){
+    if(isValid(state.board, state.current,k,0,newMat)){
+      state.current.mat=newMat; state.current.x+=k; render(); return;
+    }
+  }
+}
+function softDrop(){
+  if(!state.current) return;
+  if(isValid(state.board, state.current,0,1)){
+    state.current.y++; state.score+=1; updateHUD(); render();
+  } else {
+    lockPiece(); render();
+  }
+}
+function hardDrop(){
+  if(!state.current) return;
+  let dist=0;
+  while(isValid(state.board, state.current,0,1)){ state.current.y++; dist++; }
+  state.score+=dist*2;
+  lockPiece(); render();
+}
+function hold(){
+  const contract=CONTRACTS[state.contractIdx];
+  if(contract.noHold) { flash('COLD SHUT • HOLD DISABLED'); return; }
+  if(!state.canHold) return;
+  if(!state.hold){
+    state.hold=state.current;
+    state.current=state.next; state.next=pieceFromKey(nextPieceKey());
+    state.current.x=3; state.current.y=0;
+  } else {
+    let tmp=state.hold; state.hold=state.current; state.current=tmp; state.current.x=3; state.current.y=0;
+  }
+  state.canHold=false;
+  renderNextHold(); render();
+}
+function rework(){
+  if(!state.current) return;
+  if(state.reworkUsed){ flash('REWORK USED'); return; }
+  const contract=CONTRACTS[state.contractIdx];
+  let cost=contract.noHold?100:50;
+  if(state.score<cost && state.score>0){ flash('NEED '+cost+' PTS'); return; }
+  state.score=Math.max(0, state.score-cost);
+  state.current.x=3; state.current.y=0;
+  state.current.mat=PIECES[state.current.key].mats.map(r=>[...r]);
+  state.current.mat=trimMat(state.current.mat);
+  state.reworkUsed=true;
+  state.slag=Math.max(0, state.slag-5);
+  updateHUD(); render(); flash('REWORKED • -'+cost);
+}
+function flash(msg){
+  chainInfo.textContent=msg;
+  chainSub.textContent='FORGE SIGNAL';
+  setTimeout(()=>{ chainInfo.textContent='SEAL GAPS'; chainSub.textContent='NO SLAG'; },1200);
+}
+function updateHUD(){
+  scoreEl.textContent=state.score;
+  const contract=CONTRACTS[state.contractIdx];
+  linesEl.textContent=state.lines+'/'+(contract.goal===99?'∞':contract.goal);
+  slagFill.style.width=state.slag+'%';
+  slagVal.textContent=Math.round(state.slag)+'%';
+  slagVal.style.color= state.slag>70?'var(--slag)': state.slag>40?'var(--warn)':'var(--ok)';
+  slagWarn.textContent= state.slag>80?'CRITICAL': state.slag>60?'UNSTABLE': state.slag>35?'WARM':'STABLE';
+  slagWarn.style.color= state.slag>60?'var(--slag)':'var(--muted)';
+  comboEl.textContent='x'+(state.combo>0?state.combo:1);
+  contractNameEl.textContent=contract.name;
+  contractGoalEl.textContent='CLEAR '+ (contract.goal===99?'∞':contract.goal)+' LINES';
+  // furnace mods
+  furnaceMods.innerHTML='';
+  contract.mods.forEach(m=>{
+    let d=document.createElement('div'); d.className='mod'+(m.includes('HEAT')||m.includes('SLAG')||m.includes('OVER')?' hot':'');
+    d.textContent=m; furnaceMods.appendChild(d);
+  });
+  modRow.innerHTML='';
+  contract.mods.forEach(m=>{
+    let s=document.createElement('span'); s.className='mod'+(m.includes('HEAT')?' hot':''); s.textContent=m; modRow.appendChild(s);
+  });
+  totalStarsEl.textContent= state.stars.reduce((a,b)=>a+b,0);
+}
+function render(){
+  const cells=boardEl.children;
+  // clear
+  for(let i=0;i<cells.length;i++){ cells[i].className='cell'; cells[i].style.opacity='1'; }
+  // board
+  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){
+    let v=state.board[y][x];
+    if(v){
+      let idx=y*COLS+x;
+      cells[idx].classList.add('filled', v==='slag'?'slagcell':v);
+      if(v==='slag') cells[idx].classList.add('slagcell');
+    }
+  }
+  // ghost
+  if(state.current){
+    let gy=getGhostY();
+    let m=state.current.mat;
+    for(let y=0;y<m.length;y++) for(let x=0;x<m[0].length;x++) if(m[y][x]){
+      let nx=state.current.x+x, ny=gy+y;
+      if(ny>=0&&ny<ROWS&&nx>=0&&nx<COLS){
+        let idx=ny*COLS+nx;
+        if(!cells[idx].classList.contains('filled')) cells[idx].classList.add('ghost');
+      }
+    }
+    // active
+    for(let y=0;y<m.length;y++) for(let x=0;x<m[0].length;x++) if(m[y][x]){
+      let nx=state.current.x+x, ny=state.current.y+y;
+      if(ny>=0&&ny<ROWS&&nx>=0&&nx<COLS){
+        let idx=ny*COLS+nx;
+        cells[idx].classList.add('filled', state.current.color);
+        cells[idx].style.color= state.current.color==='i'?'#2ec4ff': state.current.color==='o'?'#ffcc33': state.current.color==='t'?'#b07cff': state.current.color==='s'?'#2eff7a': state.current.color==='z'?'#ff3b1f': state.current.color==='j'?'#2e7cff':'#ff7a18';
+      }
+    }
+  }
+}
+function renderNextHold(){
+  function drawGrid(el, piece, blind=false){
+    el.innerHTML='';
+    for(let i=0;i<16;i++){ let c=document.createElement('div'); c.className='mini-cell'; el.appendChild(c); }
+    if(!piece||blind) return;
+    let mat=piece.mat;
+    // center 4x4
+    let offY=Math.floor((4-mat.length)/2), offX=Math.floor((4-mat[0].length)/2);
+    for(let y=0;y<mat.length;y++) for(let x=0;x<mat[0].length;x++) if(mat[y][x]){
+      let idx=(offY+y)*4+offX+x;
+      if(el.children[idx]) el.children[idx].classList.add('on');
+    }
+  }
+  const contract=CONTRACTS[state.contractIdx];
+  drawGrid(nextGrid, state.next, contract.blind);
+  drawGrid(holdGrid, state.hold, false);
+  document.getElementById('nextHint').textContent= contract.blind ? 'CONCEALED' : 'QUEUED MOLD';
+}
+function startContract(idx){
+  state.contractIdx=idx;
+  state.board=newBoardArray();
+  state.score=0; state.lines=0; state.combo=0; state.slag=0; state.hold=null; state.next=null; state.canHold=true; state.reworkUsed=false;
+  shuffleBag();
+  state.running=true; state.paused=false;
+  spawnNext(); spawnNext(); // ensure next exists
+  // actually spawnNext already, need to reset
+  state.board=newBoardArray();
+  state.score=0; state.lines=0; state.combo=0; state.slag=0;
+  state.hold=null; state.next=pieceFromKey(nextPieceKey());
+  spawnNext();
+  updateHUD(); render(); save();
+  closeOverlay('overlayContracts');
+}
+function winContract(){
+  state.running=false; clearInterval(state.gravityTimer); clearTimeout(state.lockTimer);
+  let contract=CONTRACTS[state.contractIdx];
+  let stars=1;
+  if(state.score>=contract.target) stars=2;
+  if(state.score>=contract.target*1.4 && state.slag<40) stars=3;
+  let prev=state.stars[state.contractIdx]||0;
+  state.stars[state.contractIdx]=Math.max(prev, stars);
+  state.bestScores[state.contractIdx]=Math.max(state.bestScores[state.contractIdx]||0, state.score);
+  save();
+  // show win sheet
+  let msg= stars===3?'★ ★ ★ MASTERWORK': stars===2?'★ ★ EXCELLENT':'★ SEALED';
+  chainInfo.textContent=msg;
+  chainSub.textContent='CONTRACT COMPLETE';
+  updateHUD(); renderContracts();
+  setTimeout(()=>{
+    if(state.contractIdx<CONTRACTS.length-1){
+      if(confirm('Contract sealed! '+msg+'\nScore: '+state.score+'\nNext contract?')) startContract(state.contractIdx+1);
+    } else {
+      alert('Eternal Forge mastered! Final Score: '+state.score);
+    }
+  }, 600);
+}
+function gameOver(fromSlag=false){
+  state.running=false; clearInterval(state.gravityTimer); clearTimeout(state.lockTimer);
+  let reason= fromSlag ? 'SLAG OVERFLOW • MOLD FAILED' : 'TOP-OUT • MOLD JAMMED';
+  chainInfo.textContent=reason;
+  chainSub.textContent='TAP RESTART';
+  // keep score but not stars
+  save();
+  setTimeout(()=>{ if(confirm(reason+'\nScore: '+state.score+'\nRetry contract?')) startContract(state.contractIdx); }, 400);
+}
+function renderContractSelect(){
+  const el=document.getElementById('contractSelect');
+  el.innerHTML='';
+  CONTRACTS.forEach((c,i)=>{
+    let b=document.createElement('button');
+    b.className='cchip'+(i===state.contractIdx?' active':'');
+    let unlocked= i===0 || (state.stars[i-1]||0)>0;
+    b.disabled=!unlocked;
+    b.innerHTML=`<strong>${c.name}</strong><span>${c.desc}</span><em>${unlocked? (state.stars[i]? '★'.repeat(state.stars[i])+' • '+ (state.bestScores[i]||0) : 'UNLOCKED'):'LOCKED'}</em>`;
+    b.onclick=()=>startContract(i);
+    el.appendChild(b);
+  });
+}
+function renderContracts(){
+  renderContractSelect();
+  const body=document.getElementById('contractsBody');
+  body.innerHTML='';
+  CONTRACTS.forEach((c,i)=>{
+    let unlocked= i===0 || (state.stars[i-1]||0)>0;
+    let card=document.createElement('div'); card.className='contract-card'+(state.stars[i]?' done':'');
+    card.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center"><h4>${c.name}</h4><span class="stars">${'★'.repeat(state.stars[i]||0)}${'☆'.repeat(3-(state.stars[i]||0))}</span></div>
+      <p>${c.desc}</p>
+      <div class="meta"><span>GOAL ${c.goal===99?'∞':c.goal} LINES</span><span>TARGET ${c.target}</span>${c.mods.map(m=>`<span>${m}</span>`).join('')}</div>
+      <div style="display:flex;gap:8px;margin-top:6px"><button class="btn small ${unlocked?'blue':'ghost'}" ${unlocked?'':'disabled'} data-i="${i}">${unlocked?'ENTER FORGE':'LOCKED'}</button><span style="font-size:11px;color:var(--muted);align-self:center">BEST ${state.bestScores[i]||0}</span></div>
+    `;
+    body.appendChild(card);
+  });
+  body.querySelectorAll('button[data-i]').forEach(b=> b.onclick=()=> startContract(parseInt(b.dataset.i)));
+  updateHUD();
+}
+function openOverlay(id){ document.getElementById(id).classList.add('open'); if(id==='overlayArchive') refreshExport(); }
+function closeOverlay(id){ document.getElementById(id).classList.remove('open'); }
+function refreshExport(){
+  let data={stars:state.stars,bestScores:state.bestScores,contractIdx:state.contractIdx,version:1};
+  document.getElementById('exportArea').value=JSON.stringify(data,null,2);
+}
+function save(){
+  let data={stars:state.stars,bestScores:state.bestScores,contractIdx:state.contractIdx};
+  localStorage.setItem('forgeMoldSave', JSON.stringify(data));
+}
+function load(){
+  try{
+    let raw=localStorage.getItem('forgeMoldSave');
+    if(raw){ let d=JSON.parse(raw); state.stars=d.stars||[]; state.bestScores=d.bestScores||[]; state.contractIdx=d.contractIdx||0; }
+  }catch(e){}
+  if(!state.stars.length) state.stars=Array(CONTRACTS.length).fill(0);
+  if(!state.bestScores.length) state.bestScores=Array(CONTRACTS.length).fill(0);
+}
+
+// events
+document.getElementById('btnLeft').addEventListener('pointerdown',e=>{e.preventDefault(); move(-1)});
+document.getElementById('btnRight').addEventListener('pointerdown',e=>{e.preventDefault(); move(1)});
+document.getElementById('btnRotate').addEventListener('pointerdown',e=>{e.preventDefault(); rotate(1)});
+document.getElementById('btnRotate').addEventListener('dblclick',e=>{e.preventDefault(); rotate(-1)});
+let downHeld=null;
+document.getElementById('btnDown').addEventListener('pointerdown',e=>{e.preventDefault(); softDrop(); downHeld=setInterval(softDrop,80)});
+document.getElementById('btnDown').addEventListener('pointerup',()=>clearInterval(downHeld));
+document.getElementById('btnDown').addEventListener('pointerleave',()=>clearInterval(downHeld));
+document.getElementById('btnHard').addEventListener('pointerdown',e=>{e.preventDefault(); hardDrop()});
+document.getElementById('btnHold').addEventListener('click',hold);
+document.getElementById('btnRework').addEventListener('click',rework);
+document.getElementById('btnRestart').addEventListener('click',()=>startContract(state.contractIdx));
+document.getElementById('btnContracts').addEventListener('click',()=>{renderContracts(); openOverlay('overlayContracts')});
+document.getElementById('btnArchive').addEventListener('click',()=>openOverlay('overlayArchive'));
+document.getElementById('btnHelp').addEventListener('click',()=>openOverlay('overlayHelp'));
+document.getElementById('btnCopy').addEventListener('click',()=>{
+  let ta=document.getElementById('exportArea'); ta.select(); document.execCommand('copy');
+  chainInfo.textContent='ARCHIVE COPIED'; chainSub.textContent='CLIPBOARD';
+});
+document.getElementById('btnDownload').addEventListener('click',()=>{
+  let data=document.getElementById('exportArea').value;
+  let blob=new Blob([data],{type:'application/json'});
+  let url=URL.createObjectURL(blob);
+  let a=document.createElement('a'); a.href=url; a.download='forge-mold-archive.json'; a.click();
+  URL.revokeObjectURL(url);
+});
+document.getElementById('btnImport').addEventListener('click',()=>{
+  try{
+    let raw=document.getElementById('importArea').value.trim();
+    if(!raw) return alert('Paste JSON first');
+    let d=JSON.parse(raw);
+    if(!d.stars) throw new Error('Invalid archive');
+    state.stars=d.stars; state.bestScores=d.bestScores||[]; state.contractIdx=d.contractIdx||0;
+    save(); renderContracts(); updateHUD(); alert('Archive imported!');
+    closeOverlay('overlayArchive');
+  }catch(e){ alert('Import failed: '+e.message); }
+});
+document.getElementById('btnWipe').addEventListener('click',()=>{
+  if(confirm('Wipe all progress? This cannot be undone.')){
+    localStorage.removeItem('forgeMoldSave');
+    state.stars=Array(CONTRACTS.length).fill(0); state.bestScores=Array(CONTRACTS.length).fill(0); state.contractIdx=0;
+    save(); renderContracts(); startContract(0);
+  }
+});
+// keyboard
+window.addEventListener('keydown',e=>{
+  if(!state.running) return;
+  if(e.key==='ArrowLeft') move(-1);
+  else if(e.key==='ArrowRight') move(1);
+  else if(e.key==='ArrowDown') softDrop();
+  else if(e.key==='ArrowUp') rotate(1);
+  else if(e.key===' ') { e.preventDefault(); hardDrop(); }
+  else if(e.key==='c'||e.key==='C') hold();
+  else if(e.key==='z'||e.key==='Z') rotate(-1);
+  else if(e.key==='r'||e.key==='R') rework();
+});
+
+// swipe on board
+let touchX=0, touchY=0;
+boardEl.addEventListener('touchstart',e=>{ touchX=e.touches[0].clientX; touchY=e.touches[0].clientY; },{passive:true});
+boardEl.addEventListener('touchend',e=>{
+  let dx=e.changedTouches[0].clientX - touchX;
+  let dy=e.changedTouches[0].clientY - touchY;
+  if(Math.abs(dx)>30 && Math.abs(dx)>Math.abs(dy)){
+    if(dx>0) move(1); else move(-1);
+  } else if(dy<-30) rotate(1);
+  else if(dy>40) softDrop();
+},{passive:true});
+boardEl.addEventListener('click',()=>rotate(1));
+
+// init
+createBoard(); load(); renderContractSelect(); renderContracts(); startContract(state.contractIdx);
+updateHUD(); render();
+</script>
+</body>
+</html>

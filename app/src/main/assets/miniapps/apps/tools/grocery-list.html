@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CartCheck — Grocery List</title>
+<style>
+:root{--bg:#fbf6ec;--card:#fff;--acc:#c2410c;--txt:#2b2118;--mut:#8a7a68}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;min-height:100vh}
+.wrap{max-width:480px;margin:0 auto;padding:16px 14px 32px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}
+.sub{color:var(--mut);font-size:13px;margin:2px 0 0}
+#muteBtn{background:var(--card);border:1px solid #e8dcc6;color:var(--txt);border-radius:12px;min-width:48px;min-height:44px;font-size:18px}
+.card{background:var(--card);border:1px solid #e8dcc6;border-radius:18px;padding:14px;margin:12px 0}
+.addrow{display:flex;gap:8px}
+#iname{flex:1;min-height:52px;border-radius:12px;border:1px solid #d9cbae;font-size:16px;padding:0 12px;min-width:0}
+#icat{min-height:52px;border-radius:12px;border:1px solid #d9cbae;font-size:14px;background:#fff}
+#addBtn{width:100%;min-height:52px;border:0;border-radius:12px;background:var(--acc);color:#fff;font-size:17px;font-weight:700;margin-top:8px}
+.ghead{font-size:12px;color:var(--mut);text-transform:uppercase;margin:12px 0 4px;letter-spacing:.5px}
+.item{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #f0e7d3}
+.item .box{width:32px;height:44px;font-size:20px;border:1px solid #d9cbae;border-radius:10px;background:#fff}
+.item.done .nm{text-decoration:line-through;color:var(--mut)}
+.nm{flex:1;font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qty{display:flex;align-items:center;gap:4px}
+.qty button{width:44px;height:44px;border-radius:10px;border:1px solid #d9cbae;background:#faf3e5;font-size:18px;font-weight:800}
+.qty b{min-width:26px;text-align:center;font-variant-numeric:tabular-nums}
+.row2{display:flex;gap:8px;margin-top:10px}
+.row2 button{flex:1;min-height:48px;border-radius:12px;border:1px solid #d9cbae;background:#faf3e5;font-size:15px;font-weight:700}
+.empty{text-align:center;color:var(--mut);font-size:14px;padding:16px}
+#count{font-size:13px;color:var(--mut);text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div><h1>CartCheck</h1><p class="sub">Never forget the milk</p></div><button id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="card">
+<div class="addrow"><input type="text" id="iname" placeholder="Add item…" maxlength="50"><select id="icat"><option>Produce</option><option>Dairy</option><option>Bakery</option><option>Pantry</option><option>Frozen</option><option>Other</option></select></div>
+<button id="addBtn">Add to list</button>
+</div>
+<div id="count"></div>
+<div id="groups"></div>
+<div class="card"><div class="row2"><button id="clearBtn">Clear checked</button><button id="shareBtn">Share list</button></div></div>
+</div>
+<script>
+(function(){
+"use strict";
+var KEY="cartcheck-v1";
+var store={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+var muted=store.get("muted-grocery-list",false);
+var muteBtn=document.getElementById("muteBtn");
+function paintMute(){muteBtn.textContent=muted?"🔇":"🔊";}paintMute();
+var actx=null;
+function beep(f){if(muted)return;try{var C=window.AudioContext||window.webkitAudioContext;if(!C)return;if(!actx)actx=new C();if(actx.state==="suspended")actx.resume();var o=actx.createOscillator(),g=actx.createGain();o.type="sine";o.frequency.value=f||660;g.gain.value=0.05;o.connect(g);g.connect(actx.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.08);o.stop(actx.currentTime+0.09);}catch(e){}}
+muteBtn.addEventListener("click",function(){muted=!muted;store.set("muted-grocery-list",muted);paintMute();beep(720);});
+var items=store.get(KEY,[]);
+if(!Array.isArray(items))items=[];
+var ORDER=["Produce","Dairy","Bakery","Pantry","Frozen","Other"];
+document.getElementById("addBtn").addEventListener("click",function(){
+var n=document.getElementById("iname").value.trim();
+if(!n){beep(300);document.getElementById("iname").focus();return;}
+items.push({id:Date.now(),name:n,cat:document.getElementById("icat").value,qty:1,done:false});
+store.set(KEY,items);document.getElementById("iname").value="";beep(780);draw();});
+document.getElementById("iname").addEventListener("keydown",function(e){if(e.key==="Enter")document.getElementById("addBtn").click();});
+document.getElementById("clearBtn").addEventListener("click",function(){
+if(!items.some(function(i){return i.done;})){beep(400);return;}
+if(!window.confirm("Remove all checked items?"))return;
+items=items.filter(function(i){return !i.done;});store.set(KEY,items);beep(420);draw();});
+document.getElementById("shareBtn").addEventListener("click",function(){
+if(!items.length){beep(300);return;}
+var lines=["Grocery list:"];
+ORDER.forEach(function(c){var g=items.filter(function(i){return i.cat===c;});if(g.length){lines.push("["+c+"]");g.forEach(function(i){lines.push((i.done?"[x] ":"[ ] ")+i.name+(i.qty>1?" x"+i.qty:""));});}});
+var txt=lines.join("\n");
+if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){beep(840);},function(){});}
+else{try{var ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta);beep(840);}catch(e){}}});
+function draw(){
+var g=document.getElementById("groups");g.innerHTML="";
+var left=items.filter(function(i){return !i.done;}).length;
+document.getElementById("count").textContent=items.length?left+" of "+items.length+" still to buy":"List is empty.";
+if(!items.length){g.innerHTML="<div class='empty'>Your list is empty — add items above.</div>";return;}
+ORDER.forEach(function(c){
+var grp=items.filter(function(i){return i.cat===c;});
+if(!grp.length)return;
+var h=document.createElement("div");h.className="ghead";h.textContent=c;g.appendChild(h);
+grp.forEach(function(it){
+var d=document.createElement("div");d.className="item"+(it.done?" done":"");
+var box=document.createElement("button");box.className="box";box.textContent=it.done?"☑":"☐";box.setAttribute("aria-label","Check off "+it.name);
+box.addEventListener("click",function(){it.done=!it.done;store.set(KEY,items);beep(it.done?820:480);draw();});
+var nm=document.createElement("span");nm.className="nm";nm.textContent=it.name;
+var q=document.createElement("div");q.className="qty";
+var mn=document.createElement("button");mn.textContent="−";mn.setAttribute("aria-label","Decrease quantity");
+mn.addEventListener("click",function(){if(it.qty>1){it.qty--;store.set(KEY,items);beep(500);draw();}});
+var qb=document.createElement("b");qb.textContent=it.qty;
+var pl=document.createElement("button");pl.textContent="+";pl.setAttribute("aria-label","Increase quantity");
+pl.addEventListener("click",function(){if(it.qty<99){it.qty++;store.set(KEY,items);beep(680);draw();}});
+q.appendChild(mn);q.appendChild(qb);q.appendChild(pl);
+d.appendChild(box);d.appendChild(nm);d.appendChild(q);g.appendChild(d);});});
+}
+draw();
+})();
+</script>
+</body>
+</html>

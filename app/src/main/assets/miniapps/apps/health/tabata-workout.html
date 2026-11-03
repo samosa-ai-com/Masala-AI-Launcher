@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PulseRep Tabata Timer</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#101418;color:#f2f5f7}
+.wrap{max-width:430px;margin:0 auto;padding:16px 16px 40px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+h1{font-size:22px;margin:0}
+.mutebtn{min-width:44px;min-height:44px;border-radius:12px;border:1px solid #2c353d;background:#1a2129;color:#fff;font-size:19px;cursor:pointer}
+.stage{border-radius:20px;padding:28px 16px;text-align:center;margin:12px 0;background:#1a2129;border:1px solid #2c353d;transition:background .3s}
+.stage.work{background:#3d1418;border-color:#e5484d}
+.stage.rest{background:#0f2f26;border-color:#30a46c}
+.phase{font-size:15px;letter-spacing:3px;text-transform:uppercase;opacity:.85}
+.clock{font-size:84px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.round{font-size:16px;opacity:.9;margin-top:4px}
+.bar{height:10px;border-radius:6px;background:#2c353d;margin-top:14px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:#ffb224;border-radius:6px}
+.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:12px 0}
+label{font-size:13px;display:block}
+input{width:100%;min-height:48px;border-radius:12px;border:1px solid #2c353d;background:#0c1116;color:#fff;font-size:18px;text-align:center;margin-top:4px}
+.row{display:flex;gap:10px;margin-top:10px}
+button.big{flex:1;min-height:52px;border-radius:14px;border:none;font-size:18px;font-weight:700;cursor:pointer}
+#startBtn{background:#46a758;color:#fff}
+#pauseBtn{background:#2c353d;color:#fff}
+#resetBtn{background:transparent;border:1px solid #2c353d;color:#fff}
+button.big:disabled{opacity:.4}
+.hint{font-size:13px;opacity:.7;text-align:center;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>PulseRep Tabata</h1><button class="mutebtn" id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="stage" id="stage">
+<div class="phase" id="phase">Ready</div>
+<div class="clock" id="clock">0:20</div>
+<div class="round" id="roundLbl">Round – / 8</div>
+<div class="bar"><i id="barFill"></i></div>
+</div>
+<div class="grid">
+<label>Work (s)<input id="workIn" type="number" min="5" max="600" value="20"></label>
+<label>Rest (s)<input id="restIn" type="number" min="5" max="600" value="10"></label>
+<label>Rounds<input id="roundsIn" type="number" min="1" max="30" value="8"></label>
+</div>
+<div class="row">
+<button class="big" id="startBtn">Start</button>
+<button class="big" id="pauseBtn" disabled>Pause</button>
+<button class="big" id="resetBtn">Reset</button>
+</div>
+<p class="hint">Beeps on every phase change. Settings save automatically.</p>
+</div>
+<script>
+(function(){
+"use strict";
+var K="tabata-workout-v1", MK="tabata-workout-mute";
+var workIn=document.getElementById("workIn"),restIn=document.getElementById("restIn"),roundsIn=document.getElementById("roundsIn");
+var stage=document.getElementById("stage"),phase=document.getElementById("phase"),clock=document.getElementById("clock"),roundLbl=document.getElementById("roundLbl"),barFill=document.getElementById("barFill");
+var startBtn=document.getElementById("startBtn"),pauseBtn=document.getElementById("pauseBtn"),resetBtn=document.getElementById("resetBtn"),muteBtn=document.getElementById("muteBtn");
+var muted=localStorage.getItem(MK)==="1";
+var AC=null;
+function tick(f,d){if(muted)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume();var o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.type="sine";o.frequency.value=f||660;var t=AC.currentTime;g.gain.setValueAtTime(0.12,t);g.gain.exponentialRampToValueAtTime(0.001,t+(d||0.12));o.start(t);o.stop(t+(d||0.12));}catch(e){}}
+function phaseBeep(){tick(880,0.35);setTimeout(function(){tick(880,0.35);},220);}
+function setMute(m){muted=m;localStorage.setItem(MK,m?"1":"0");muteBtn.textContent=m?"🔇":"🔊";}
+muteBtn.textContent=muted?"🔇":"🔊";
+muteBtn.addEventListener("click",function(){setMute(!muted);tick(660,0.08);});
+try{var s=JSON.parse(localStorage.getItem(K)||"{}");if(s.w)workIn.value=s.w;if(s.r)restIn.value=s.r;if(s.n)roundsIn.value=s.n;}catch(e){}
+function save(){localStorage.setItem(K,JSON.stringify({w:workIn.value,r:restIn.value,n:roundsIn.value}));}
+[workIn,restIn,roundsIn].forEach(function(el){el.addEventListener("change",save);});
+var timer=null,seq=[],idx=0,remain=0,paused=false,lastWhole=-1;
+function fmt(s){s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");}
+function build(){var w=Math.min(600,Math.max(5,+workIn.value||20)),r=Math.min(600,Math.max(5,+restIn.value||10)),n=Math.min(30,Math.max(1,+roundsIn.value||8));seq=[{name:"Get Ready",dur:5,cls:""}];for(var i=1;i<=n;i++){seq.push({name:"Work",dur:w,cls:"work",round:i,of:n});if(i<n)seq.push({name:"Rest",dur:r,cls:"rest",round:i,of:n});}return n;}
+function render(){var cur=seq[idx];if(!cur){phase.textContent="Done!";clock.textContent="0:00";roundLbl.textContent="Finished";barFill.style.width="100%";stage.className="stage rest";return;}phase.textContent=cur.name;clock.textContent=fmt(remain);roundLbl.textContent=cur.round?("Round "+cur.round+" / "+cur.of):"Get set…";var done=0,total=0;seq.forEach(function(p,i){total+=p.dur;if(i<idx)done+=p.dur;else if(i===idx)done+=p.dur-remain;});barFill.style.width=Math.round(done/total*100)+"%";}
+function step(){if(paused)return;remain-=0.2;var whole=Math.ceil(remain);if(whole!==lastWhole){lastWhole=whole;if(whole<=3&&whole>0)tick(660,0.12);}if(remain<=0){idx++;if(idx>=seq.length){stop(true);phase.textContent="Done!";clock.textContent="0:00";roundLbl.textContent="All rounds complete";barFill.style.width="100%";stage.className="stage rest";phaseBeep();return;}remain=seq[idx].dur;lastWhole=-1;stage.className="stage "+seq[idx].cls;phaseBeep();}render();}
+function stop(finished){if(timer){clearInterval(timer);timer=null;}startBtn.disabled=false;pauseBtn.disabled=true;pauseBtn.textContent="Pause";paused=false;if(!finished){}}
+startBtn.addEventListener("click",function(){tick(660,0.08);save();var n=build();idx=0;remain=seq[0].dur;lastWhole=-1;paused=false;stage.className="stage";render();phaseBeep();stop(false);startBtn.disabled=true;pauseBtn.disabled=false;timer=setInterval(step,200);});
+pauseBtn.addEventListener("click",function(){tick(520,0.08);paused=!paused;pauseBtn.textContent=paused?"Resume":"Pause";});
+resetBtn.addEventListener("click",function(){tick(440,0.08);stop(false);idx=0;seq=[];build();remain=seq.length?seq[0].dur:(+workIn.value||20);stage.className="stage";phase.textContent="Ready";clock.textContent=fmt(+workIn.value||20);roundLbl.textContent="Round – / "+(+roundsIn.value||8);barFill.style.width="0";});
+clock.textContent=fmt(+workIn.value||20);roundLbl.textContent="Round – / "+(+roundsIn.value||8);
+})();
+</script>
+</body>
+</html>

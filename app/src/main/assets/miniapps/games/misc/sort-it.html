@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Recycling Rush</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0f1e14;
+  --card:#1a2e1f;
+  --card2:#223d29;
+  --accent:#22c55e;
+  --accent2:#16a34a;
+  --text:#f0fdf4;
+  --muted:#a7c4b0;
+  --danger:#ef4444;
+  --warn:#f59e0b;
+}
+html,body{height:100%;background:#0a150d;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;color:var(--text);overflow-x:hidden}
+body{display:flex;justify-content:center}
+#app{
+  width:100%;max-width:428px;min-width:360px;min-height:100dvh;
+  background:linear-gradient(180deg,#0f2315 0%,#0a150d 100%);
+  display:flex;flex-direction:column;position:relative;overflow:hidden;
+  border-left:1px solid #1e3a24;border-right:1px solid #1e3a24;
+}
+/* Header */
+.header{
+  padding:10px 12px 8px;background:rgba(0,0,0,0.25);backdrop-filter:blur(8px);
+  border-bottom:1px solid #1e3a24;position:sticky;top:0;z-index:10;
+}
+.topRow{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.logo{font-weight:900;font-size:18px;letter-spacing:-0.5px;display:flex;align-items:center;gap:6px}
+.logo span{font-size:20px}
+.stats{display:flex;gap:8px}
+.stat{
+  background:var(--card);border:1px solid #2a4a32;border-radius:12px;padding:6px 10px;min-width:72px;text-align:center;
+}
+.statLabel{font-size:10px;letter-spacing:0.8px;color:var(--muted);font-weight:700;text-transform:uppercase}
+.statVal{font-size:16px;font-weight:900;line-height:1}
+.statVal.best{color:#facc15}
+.statVal.score{color:#fff}
+.streakBadge{
+  background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800;
+  display:flex;align-items:center;gap:4px;box-shadow:0 2px 8px rgba(245,158,11,0.4)
+}
+.timerWrap{margin-top:8px}
+.timerBarBg{height:10px;background:#1a2e1f;border-radius:999px;overflow:hidden;border:1px solid #2a4a32;position:relative}
+.timerBar{height:100%;width:100%;background:linear-gradient(90deg,#22c55e,#16a34a);border-radius:999px;transition:width 0.3s linear, background 0.3s}
+.timerBar.warn{background:linear-gradient(90deg,#f59e0b,#ef4444)}
+.timerBar.danger{background:#ef4444;animation:pulseBar 0.6s infinite alternate}
+@keyframes pulseBar{from{opacity:1}to{opacity:0.7}}
+.timerText{display:flex;justify-content:space-between;margin-top:4px;font-size:11px;font-weight:700;color:var(--muted)}
+.timerText b{color:var(--text);font-size:13px}
+
+/* Game Area */
+#fallZone{
+  flex:1;position:relative;overflow:hidden;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(34,197,94,0.08) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+  min-height:360px;touch-action:none;
+}
+.fallBgGrid{
+  position:absolute;inset:0;opacity:0.04;
+  background-image:linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px);
+  background-size:40px 40px;
+}
+.dropHint{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  text-align:center;color:var(--muted);font-size:13px;font-weight:600;pointer-events:none;opacity:0.6;
+}
+.dropHint span{font-size:28px;display:block;margin-bottom:6px}
+
+/* Falling Item */
+.trashItem{
+  position:absolute;width:110px;min-height:64px;
+  background:#fff;color:#111;border-radius:16px;
+  display:flex;align-items:center;gap:8px;padding:8px 10px;
+  box-shadow:0 6px 16px rgba(0,0,0,0.35), 0 1px 0 rgba(0,0,0,0.1);
+  border:2px solid #e5e7eb;cursor:grab;touch-action:none;user-select:none;
+  z-index:2;will-change:transform, top, left;
+}
+.trashItem:active{cursor:grabbing}
+.trashItem.dragging{box-shadow:0 12px 28px rgba(0,0,0,0.45);transform:scale(1.05) rotate(1deg);z-index:20;border-color:var(--accent)}
+.trashEmoji{font-size:28px;line-height:1;flex-shrink:0;width:36px;height:36px;display:grid;place-items:center;background:#f3f4f6;border-radius:10px}
+.trashInfo{flex:1;min-width:0}
+.trashName{font-size:12px;font-weight:800;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trashBinHint{font-size:10px;color:#6b7280;font-weight:600}
+.trashItem.correct{animation:popCorrect 0.4s ease}
+.trashItem.wrong{animation:shake 0.4s ease}
+@keyframes popCorrect{0%{transform:scale(1)}50%{transform:scale(1.15)}100%{transform:scale(0);opacity:0}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+
+/* Bins */
+#binsWrap{
+  background:var(--card);border-top:2px solid #2a4a32;padding:10px 8px 10px;
+  box-shadow:0 -8px 24px rgba(0,0,0,0.3);
+}
+.binsLabel{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:0 2px}
+.binsLabel h3{font-size:11px;letter-spacing:0.8px;color:var(--muted);text-transform:uppercase;font-weight:800}
+.roundInfo{font-size:11px;font-weight:800;background:#0f2315;border:1px solid #2a4a32;border-radius:999px;padding:3px 8px;color:var(--accent)}
+#bins{
+  display:flex;flex-wrap:wrap;gap:8px;justify-content:center;
+}
+.bin{
+  flex:1 1 calc(33% - 8px);min-width:108px;max-width:140px;
+  min-height:84px;border-radius:16px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  padding:10px 6px;position:relative;
+  border:2px solid rgba(255,255,255,0.12);cursor:pointer;
+  transition:transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  touch-action:manipulation;user-select:none;
+}
+.bin:active{transform:scale(0.96)}
+.bin.dragOver{transform:scale(1.05);border-color:#fff;box-shadow:0 0 0 4px rgba(255,255,255,0.2), 0 8px 20px rgba(0,0,0,0.3);z-index:5}
+.bin.hintPulse{animation:hintPulse 0.8s ease infinite alternate; border-color:#facc15; box-shadow:0 0 0 4px rgba(250,204,21,0.4)}
+@keyframes hintPulse{from{transform:scale(1)}to{transform:scale(1.06)}}
+.binIcon{font-size:26px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.2))}
+.binName{font-size:12px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:0.5px;text-shadow:0 1px 2px rgba(0,0,0,0.3)}
+.binCount{font-size:10px;font-weight:700;color:rgba(255,255,255,0.85);background:rgba(0,0,0,0.2);padding:2px 6px;border-radius:999px}
+.bin.paper{background:linear-gradient(135deg,#3b82f6,#1d4ed8)}
+.bin.plastic{background:linear-gradient(135deg,#f59e0b,#d97706)}
+.bin.organic{background:linear-gradient(135deg,#10b981,#047857)}
+.bin.glass{background:linear-gradient(135deg,#06b6d4,#0891b2)}
+.bin.ewaste{background:linear-gradient(135deg,#8b5cf6,#6d28d9)}
+.bin.metal{background:linear-gradient(135deg,#6b7280,#374151)}
+
+/* Controls */
+.controls{
+  display:flex;gap:8px;padding:10px 12px;background:#0f2315;border-top:1px solid #1e3a24;align-items:center;
+}
+.btn{
+  flex:1;min-height:48px;border-radius:14px;border:none;font-weight:800;font-size:14px;
+  display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;
+  touch-action:manipulation;transition:transform 0.1s, opacity 0.2s;
+}
+.btn:active{transform:scale(0.97)}
+.btnHint{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
+.btnHint:disabled{opacity:0.45}
+.btnPause{background:var(--card2);color:var(--text);border:1px solid #2a4a32}
+.btnPrimary{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 4px 12px rgba(34,197,94,0.35);border:1px solid #22c55e}
+.btnSmall{flex:0 0 auto;padding:0 14px;min-width:64px}
+
+/* Overlays */
+.overlay{
+  position:absolute;inset:0;background:rgba(6,18,10,0.92);backdrop-filter:blur(6px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:20px;z-index:30;text-align:center;
+}
+.overlayCard{
+  background:linear-gradient(180deg,#1a2e1f,#14261a);border:1px solid #2a4a32;border-radius:20px;
+  padding:20px 16px;width:100%;max-width:340px;box-shadow:0 16px 40px rgba(0,0,0,0.5);
+}
+.overlayCard h1{font-size:26px;font-weight:900;line-height:1.1;margin-bottom:6px}
+.overlayCard h1 span{color:var(--accent)}
+.overlayCard p{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:14px}
+.badgeRow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}
+.badge{background:#0f2315;border:1px solid #2a4a32;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:4px}
+.badge b{color:var(--text)}
+.howTo{text-align:left;background:#0f2315;border-radius:14px;padding:12px;border:1px solid #1e3a24;margin-bottom:14px}
+.howTo h4{font-size:12px;font-weight:800;margin-bottom:8px;color:var(--text)}
+.howTo ol{padding-left:18px;font-size:12px;color:var(--muted);line-height:1.6}
+.howTo ol b{color:var(--text)}
+.statsGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.statBox{background:#0f2315;border:1px solid #2a4a32;border-radius:12px;padding:10px;text-align:center}
+.statBox .v{font-size:20px;font-weight:900;color:#fff}
+.statBox .k{font-size:10px;letter-spacing:0.7px;color:var(--muted);font-weight:700;text-transform:uppercase}
+.roundBanner{
+  position:absolute;top:46%;left:50%;transform:translate(-50%,-50%) scale(0.8);
+  background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;
+  padding:14px 18px;border-radius:16px;font-weight:900;font-size:16px;
+  box-shadow:0 12px 32px rgba(34,197,94,0.4);z-index:15;
+  opacity:0;pointer-events:none;transition:all 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  text-align:center;min-width:220px;border:2px solid rgba(255,255,255,0.2)
+}
+.roundBanner.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.roundBanner small{display:block;font-size:11px;font-weight:700;opacity:0.9;margin-top:2px}
+.floatingScore{
+  position:absolute;z-index:12;font-weight:900;font-size:18px;pointer-events:none;
+  text-shadow:0 2px 8px rgba(0,0,0,0.5);animation:floatUp 0.8s ease forwards;
+}
+@keyframes floatUp{0%{transform:translateY(0) scale(1);opacity:1}100%{transform:translateY(-40px) scale(1.1);opacity:0}}
+.multiplierPop{
+  position:absolute;top:12px;left:50%;transform:translateX(-50%);
+  background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;
+  padding:6px 12px;border-radius:999px;font-weight:900;font-size:13px;
+  box-shadow:0 4px 16px rgba(239,68,68,0.4);z-index:12;pointer-events:none;
+  animation:multPop 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes multPop{0%{transform:translateX(-50%) scale(0)}100%{transform:translateX(-50%) scale(1)}}
+.hidden{display:none !important}
+.shakeScreen{animation:shakeScreen 0.3s ease}
+@keyframes shakeScreen{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="topRow">
+      <div class="logo"><span>♻️</span> RECYCLING RUSH</div>
+      <div class="stats">
+        <div class="stat"><div class="statLabel">Best</div><div class="statVal best" id="bestVal">0</div></div>
+        <div class="stat"><div class="statLabel">Score</div><div class="statVal score" id="scoreVal">0</div></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+      <div class="streakBadge" id="streakBadge">🔥 <span id="streakVal">0</span> streak <span id="multVal" style="background:rgba(0,0,0,0.2);padding:2px 6px;border-radius:999px;margin-left:2px">x1</span></div>
+      <div style="flex:1"></div>
+      <div style="font-size:11px;color:var(--muted);font-weight:700" id="roundLabel">ROUND 1 • 3 BINS</div>
+    </div>
+    <div class="timerWrap">
+      <div class="timerBarBg"><div class="timerBar" id="timerBar"></div></div>
+      <div class="timerText"><span>TIME LEFT</span><b id="timerText">60.0s</b></div>
+    </div>
+  </div>
+
+  <div id="fallZone">
+    <div class="fallBgGrid"></div>
+    <div class="dropHint" id="dropHint"><span>👆</span>Trash falls — drag to the right bin!<br>Don't let it hit the bottom</div>
+    <div class="roundBanner" id="roundBanner"></div>
+  </div>
+
+  <div id="binsWrap">
+    <div class="binsLabel"><h3>Drag into bin</h3><span class="roundInfo" id="binsInfo">3 bins • Round 1/4</span></div>
+    <div id="bins"></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btnHint" id="hintBtn">💡 Hint <span id="hintCount" style="background:#f59e0b;color:#fff;padding:2px 7px;border-radius:999px;font-size:12px">3</span></button>
+    <button class="btn btnPause" id="pauseBtn">⏸️ Pause</button>
+  </div>
+
+  <!-- Start Overlay -->
+  <div class="overlay" id="startOverlay">
+    <div class="overlayCard">
+      <h1>♻️ RECYCLING <span>RUSH</span></h1>
+      <p>Drag falling trash into the correct bin before it hits the bottom. Survive 60 seconds as bins multiply!</p>
+      <div class="badgeRow">
+        <div class="badge">🏆 Best <b id="startBest">0</b></div>
+        <div class="badge">⏱️ 60s Rush</div>
+        <div class="badge">🔥 Streak x5</div>
+      </div>
+      <div class="howTo">
+        <h4>How to play</h4>
+        <ol>
+          <li><b>Touch & drag</b> each falling item into its bin</li>
+          <li><b>Streak</b> builds multiplier: x1 → x2 → x3 → x4 → <b>x5</b></li>
+          <li>Every <b>15s</b> a new bin appears & bins shuffle!</li>
+          <li>Use <b>💡 Hint</b> (3×) to highlight the right bin</li>
+          <li>Miss or wrong = streak reset & points lost</li>
+        </ol>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btnPrimary" id="playBtn" style="flex:1;min-height:52px;font-size:16px">▶ PLAY — 60s RUSH</button>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--muted)">Rounds: 3 → 4 → 5 → 6 bins • Bins shuffle each round</div>
+    </div>
+  </div>
+
+  <!-- Pause Overlay -->
+  <div class="overlay hidden" id="pauseOverlay">
+    <div class="overlayCard">
+      <h1>⏸️ Paused</h1>
+      <p>Take a breath — trash is waiting.</p>
+      <div style="display:flex;gap:8px">
+        <button class="btn btnPrimary" id="resumeBtn" style="flex:1">▶ Resume</button>
+        <button class="btn btnPause" id="restartBtn2" style="flex:1">Restart</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Over Overlay -->
+  <div class="overlay hidden" id="gameOverOverlay">
+    <div class="overlayCard">
+      <h1 id="gameOverTitle">⏱️ Time's Up!</h1>
+      <p id="gameOverSub">Great sorting!</p>
+      <div class="statsGrid">
+        <div class="statBox"><div class="v" id="finalScore">0</div><div class="k">Score</div></div>
+        <div class="statBox"><div class="v" id="finalBest">0</div><div class="k">Best</div></div>
+        <div class="statBox"><div class="v" id="finalStreak">0</div><div class="k">Best Streak</div></div>
+        <div class="statBox"><div class="v" id="finalSorted">0</div><div class="k">Sorted</div></div>
+      </div>
+      <div id="newBestBadge" class="hidden" style="background:linear-gradient(135deg,#facc15,#f59e0b);color:#422006;padding:8px 12px;border-radius:999px;font-weight:900;font-size:13px;margin-bottom:12px">🎉 NEW BEST SCORE!</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btnPrimary" id="playAgainBtn" style="flex:1;min-height:52px">🔄 Play Again</button>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn btnPause" id="shareBtn" style="flex:1">Share Score</button>
+        <button class="btn btnPause" id="menuBtn" style="flex:1">Menu</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const BIN_DEFS = {
+  Paper: {cls:'paper', icon:'📄', color:'#3b82f6'},
+  Plastic: {cls:'plastic', icon:'🧴', color:'#f59e0b'},
+  Organic: {cls:'organic', icon:'🍎', color:'#10b981'},
+  Glass: {cls:'glass', icon:'🫙', color:'#06b6d4'},
+  'E-Waste': {cls:'ewaste', icon:'🔋', color:'#8b5cf6'},
+  Metal: {cls:'metal', icon:'🥫', color:'#6b7280'}
+};
+
+const ROUNDS = [
+  {bins:['Paper','Plastic','Organic'], spawnEvery:1400, fallSpeed:0.55},
+  {bins:['Paper','Plastic','Organic','Glass'], spawnEvery:1150, fallSpeed:0.70},
+  {bins:['Paper','Plastic','Organic','Glass','E-Waste'], spawnEvery:950, fallSpeed:0.85},
+  {bins:['Paper','Plastic','Organic','Glass','E-Waste','Metal'], spawnEvery:800, fallSpeed:1.00},
+];
+
+const ITEMS = [
+  // Paper
+  {name:'Newspaper', bin:'Paper', emoji:'📰'},
+  {name:'Cardboard Box', bin:'Paper', emoji:'📦'},
+  {name:'Magazine', bin:'Paper', emoji:'📚'},
+  {name:'Paper Bag', bin:'Paper', emoji:'🛍️'},
+  {name:'Envelope', bin:'Paper', emoji:'✉️'},
+  {name:'Notebook', bin:'Paper', emoji:'📓'},
+  // Plastic
+  {name:'Water Bottle', bin:'Plastic', emoji:'🧴'},
+  {name:'Plastic Bag', bin:'Plastic', emoji:'👜'},
+  {name:'Yogurt Cup', bin:'Plastic', emoji:'🥤'},
+  {name:'Shampoo Bottle', bin:'Plastic', emoji:'🧴'},
+  {name:'Straw Pack', bin:'Plastic', emoji:'🥤'},
+  {name:'Bubble Wrap', bin:'Plastic', emoji:'🫧'},
+  // Organic
+  {name:'Apple Core', bin:'Organic', emoji:'🍎'},
+  {name:'Banana Peel', bin:'Organic', emoji:'🍌'},
+  {name:'Coffee Grounds', bin:'Organic', emoji:'☕'},
+  {name:'Eggshells', bin:'Organic', emoji:'🥚'},
+  {name:'Leaves', bin:'Organic', emoji:'🍂'},
+  {name:'Veg Scraps', bin:'Organic', emoji:'🥬'},
+  // Glass
+  {name:'Wine Bottle', bin:'Glass', emoji:'🍾'},
+  {name:'Jam Jar', bin:'Glass', emoji:'🫙'},
+  {name:'Broken Glass', bin:'Glass', emoji:'🔍'},
+  {name:'Perfume Bottle', bin:'Glass', emoji:'🧪'},
+  {name:'Glass Cup', bin:'Glass', emoji:'🥃'},
+  // E-Waste
+  {name:'Battery', bin:'E-Waste', emoji:'🔋'},
+  {name:'Old Phone', bin:'E-Waste', emoji:'📱'},
+  {name:'USB Cable', bin:'E-Waste', emoji:'🔌'},
+  {name:'Headphones', bin:'E-Waste', emoji:'🎧'},
+  {name:'Light Bulb', bin:'E-Waste', emoji:'💡'},
+  {name:'Remote', bin:'E-Waste', emoji:'🎮'},
+  // Metal
+  {name:'Soda Can', bin:'Metal', emoji:'🥫'},
+  {name:'Tin Can', bin:'Metal', emoji:'🥫'},
+  {name:'Foil Wrap', bin:'Metal', emoji:'🍽️'},
+  {name:'Nails', bin:'Metal', emoji:'🔩'},
+  {name:'Keys', bin:'Metal', emoji:'🔑'},
+  {name:'Pan', bin:'Metal', emoji:'🍳'},
+];
+
+const GAME_DURATION = 60;
+const STORAGE_KEY = 'recyclingRushBest_v2';
+
+let state = {
+  score:0, best:0, streak:0, bestStreak:0, sorted:0, wrong:0, missed:0,
+  timeLeft:GAME_DURATION, round:1, hints:3,
+  isPlaying:false, isPaused:false,
+  spawnTimer:0, spawnEvery:1400, fallSpeed:0.55,
+  items:[], // {el, bin, x, y, isDragging}
+  dragging:null,
+  raf:0, lastT:0
+};
+
+const els = {
+  app: document.getElementById('app'),
+  fallZone: document.getElementById('fallZone'),
+  bins: document.getElementById('bins'),
+  binsInfo: document.getElementById('binsInfo'),
+  roundLabel: document.getElementById('roundLabel'),
+  scoreVal: document.getElementById('scoreVal'),
+  bestVal: document.getElementById('bestVal'),
+  streakVal: document.getElementById('streakVal'),
+  multVal: document.getElementById('multVal'),
+  streakBadge: document.getElementById('streakBadge'),
+  timerBar: document.getElementById('timerBar'),
+  timerText: document.getElementById('timerText'),
+  hintBtn: document.getElementById('hintBtn'),
+  hintCount: document.getElementById('hintCount'),
+  pauseBtn: document.getElementById('pauseBtn'),
+  startOverlay: document.getElementById('startOverlay'),
+  pauseOverlay: document.getElementById('pauseOverlay'),
+  gameOverOverlay: document.getElementById('gameOverOverlay'),
+  roundBanner: document.getElementById('roundBanner'),
+  dropHint: document.getElementById('dropHint'),
+  startBest: document.getElementById('startBest'),
+};
+
+function loadBest(){
+  try{ state.best = parseInt(localStorage.getItem(STORAGE_KEY)||'0',10)||0; }catch(e){ state.best=0; }
+  els.bestVal.textContent = state.best;
+  els.startBest.textContent = state.best;
+}
+function saveBest(){
+  if(state.score > state.best){
+    state.best = state.score;
+    try{ localStorage.setItem(STORAGE_KEY, String(state.best)); }catch(e){}
+  }
+  els.bestVal.textContent = state.best;
+}
+
+function getMultiplier(){
+  const s = state.streak;
+  if(s>=15) return 5;
+  if(s>=10) return 4;
+  if(s>=6) return 3;
+  if(s>=3) return 2;
+  return 1;
+}
+function updateHUD(){
+  els.scoreVal.textContent = state.score;
+  els.streakVal.textContent = state.streak;
+  const m = getMultiplier();
+  els.multVal.textContent = 'x'+m;
+  els.streakBadge.style.opacity = state.streak>0 ? '1' : '0.85';
+  els.hintCount.textContent = state.hints;
+  els.hintBtn.disabled = state.hints<=0 || !state.isPlaying || state.isPaused;
+  els.binsInfo.textContent = ROUNDS[state.round-1].bins.length + ' bins • Round ' + state.round + '/4';
+  els.roundLabel.textContent = 'ROUND ' + state.round + ' • ' + ROUNDS[state.round-1].bins.length + ' BINS';
+  // timer
+  const pct = (state.timeLeft / GAME_DURATION)*100;
+  els.timerBar.style.width = pct + '%';
+  els.timerText.textContent = state.timeLeft.toFixed(1) + 's';
+  els.timerBar.classList.remove('warn','danger');
+  if(state.timeLeft < 10) els.timerBar.classList.add('danger');
+  else if(state.timeLeft < 20) els.timerBar.classList.add('warn');
+}
+
+function shuffle(a){
+  const arr=[...a];
+  for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  return arr;
+}
+
+function buildBins(){
+  const bins = ROUNDS[state.round-1].bins;
+  const shuffled = shuffle(bins);
+  els.bins.innerHTML='';
+  shuffled.forEach(name=>{
+    const def = BIN_DEFS[name];
+    const div = document.createElement('div');
+    div.className = 'bin ' + def.cls;
+    div.dataset.bin = name;
+    div.innerHTML = `<div class="binIcon">${def.icon}</div><div class="binName">${name}</div><div class="binCount">0 sorted</div>`;
+    els.bins.appendChild(div);
+  });
+  updateBinCounts();
+}
+let binCounts = {};
+function updateBinCounts(){
+  // count sorted per bin type
+  els.bins.querySelectorAll('.bin').forEach(b=>{
+    const name=b.dataset.bin;
+    const c = binCounts[name]||0;
+    b.querySelector('.binCount').textContent = c + ' sorted';
+  });
+}
+
+function showRoundBanner(){
+  const r = state.round;
+  const added = r===1 ? 'Sort the trash!' : ROUNDS[r-1].bins[ROUNDS[r-1].bins.length-1] + ' added!';
+  const names = ROUNDS[r-1].bins.join(' • ');
+  els.roundBanner.innerHTML = `ROUND ${r} <small>${added}</small><small style="opacity:0.8;font-weight:600">${names}</small>`;
+  els.roundBanner.classList.add('show');
+  setTimeout(()=> els.roundBanner.classList.remove('show'), 1800);
+}
+
+function spawnItem(){
+  const allowedBins = ROUNDS[state.round-1].bins;
+  const pool = ITEMS.filter(it=> allowedBins.includes(it.bin));
+  const pick = pool[Math.floor(Math.random()*pool.length)];
+  const zoneRect = els.fallZone.getBoundingClientRect();
+  const w = 110;
+  const maxX = zoneRect.width - w - 8;
+  const x = 8 + Math.random()*Math.max(0,maxX);
+  const y = -70;
+
+  const el = document.createElement('div');
+  el.className = 'trashItem';
+  el.dataset.bin = pick.bin;
+  el.innerHTML = `<div class="trashEmoji">${pick.emoji}</div><div class="trashInfo"><div class="trashName">${pick.name}</div><div class="trashBinHint">${pick.bin}</div></div>`;
+  el.style.left = x+'px';
+  el.style.top = y+'px';
+  els.fallZone.appendChild(el);
+
+  const item = {el, bin:pick.bin, name:pick.name, x, y, isDragging:false, w, h:64};
+  state.items.push(item);
+
+  // pointer events
+  el.addEventListener('pointerdown', (e)=> startDrag(e, item));
+  // prevent context menu
+  el.addEventListener('contextmenu', e=> e.preventDefault());
+
+  if(state.items.length===1) els.dropHint.style.display='none';
+}
+
+function startDrag(e, item){
+  if(!state.isPlaying || state.isPaused) return;
+  e.preventDefault();
+  item.isDragging = true;
+  state.dragging = item;
+  item.el.classList.add('dragging');
+  item.el.setPointerCapture(e.pointerId);
+  // bring to front
+  item.el.style.zIndex = 20;
+  // store offset
+  const rect = item.el.getBoundingClientRect();
+  item.dragOffsetX = e.clientX - rect.left;
+  item.dragOffsetY = e.clientY - rect.top;
+  // haptic
+  if(navigator.vibrate) navigator.vibrate(10);
+}
+
+function onPointerMove(e){
+  if(!state.dragging) return;
+  const item = state.dragging;
+  const zoneRect = els.fallZone.getBoundingClientRect();
+  let nx = e.clientX - zoneRect.left - item.dragOffsetX;
+  let ny = e.clientY - zoneRect.top - item.dragOffsetY;
+  // clamp
+  nx = Math.max(0, Math.min(nx, zoneRect.width - item.w));
+  ny = Math.max(-20, Math.min(ny, zoneRect.height - 20));
+  item.x = nx; item.y = ny;
+  item.el.style.left = nx+'px';
+  item.el.style.top = ny+'px';
+
+  // highlight bin under pointer
+  const bins = [...els.bins.querySelectorAll('.bin')];
+  let over = null;
+  for(const b of bins){
+    const r=b.getBoundingClientRect();
+    if(e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom) over=b;
+    b.classList.remove('dragOver');
+  }
+  if(over) over.classList.add('dragOver');
+}
+
+function onPointerUp(e){
+  if(!state.dragging) return;
+  const item = state.dragging;
+  item.isDragging = false;
+  item.el.classList.remove('dragging');
+  item.el.style.zIndex = 2;
+  // check drop
+  const bins = [...els.bins.querySelectorAll('.bin')];
+  let target = null;
+  for(const b of bins){
+    const r=b.getBoundingClientRect();
+    if(e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom) target=b;
+    b.classList.remove('dragOver');
+  }
+  if(target){
+    handleDrop(item, target.dataset.bin, target);
+  } else {
+    // if dropped near bottom bins area but not exactly, still check proximity to binsWrap
+    // otherwise let it continue falling from current position
+  }
+  state.dragging = null;
+}
+
+function handleDrop(item, binName, binEl){
+  const correct = item.bin === binName;
+  const mult = getMultiplier();
+  const zoneRect = els.fallZone.getBoundingClientRect();
+  const binRect = binEl ? binEl.getBoundingClientRect() : null;
+
+  // remove from state
+  const idx = state.items.indexOf(item);
+  if(idx>=0) state.items.splice(idx,1);
+
+  if(correct){
+    const pts = 100 * mult;
+    state.score += pts;
+    state.streak += 1;
+    state.bestStreak = Math.max(state.bestStreak, state.streak);
+    state.sorted += 1;
+    binCounts[binName] = (binCounts[binName]||0)+1;
+    updateBinCounts();
+    // floating score
+    showFloating('+'+pts, item.el, '#22c55e', mult>1 ? ' x'+mult : '');
+    if(mult>1) showMultiplier(mult);
+    item.el.classList.add('correct');
+    setTimeout(()=> item.el.remove(), 300);
+    if(navigator.vibrate) navigator.vibrate(20);
+    // small bin pop
+    binEl.animate([{transform:'scale(1)'},{transform:'scale(1.08)'},{transform:'scale(1)'}],{duration:250,easing:'ease-out'});
+  } else {
+    state.streak = 0;
+    state.wrong += 1;
+    state.score = Math.max(0, state.score - 50);
+    showFloating('-50', item.el, '#ef4444', '');
+    item.el.classList.add('wrong');
+    els.app.classList.add('shakeScreen');
+    setTimeout(()=> els.app.classList.remove('shakeScreen'), 300);
+    // highlight correct bin briefly
+    const correctBinEl = [...els.bins.querySelectorAll('.bin')].find(b=> b.dataset.bin===item.bin);
+    if(correctBinEl){
+      correctBinEl.classList.add('hintPulse');
+      setTimeout(()=> correctBinEl.classList.remove('hintPulse'), 1200);
+    }
+    setTimeout(()=> item.el.remove(), 400);
+    if(navigator.vibrate) navigator.vibrate([30,30,30]);
+  }
+  updateHUD();
+  saveBest();
+}
+
+function showFloating(text, anchorEl, color, extra){
+  const zoneRect = els.fallZone.getBoundingClientRect();
+  const r = anchorEl.getBoundingClientRect();
+  const div = document.createElement('div');
+  div.className='floatingScore';
+  div.style.left = (r.left - zoneRect.left + r.width/2) + 'px';
+  div.style.top = (r.top - zoneRect.top) + 'px';
+  div.style.color = color;
+  div.textContent = text + (extra||'');
+  div.style.transform = 'translateX(-50%)';
+  els.fallZone.appendChild(div);
+  setTimeout(()=> div.remove(), 800);
+}
+function showMultiplier(m){
+  const existing = els.fallZone.querySelector('.multiplierPop');
+  if(existing) existing.remove();
+  const div=document.createElement('div');
+  div.className='multiplierPop';
+  div.textContent='🔥 x'+m+' STREAK!';
+  els.fallZone.appendChild(div);
+  setTimeout(()=> div.remove(), 800);
+}
+
+function doHint(){
+  if(state.hints<=0 || !state.isPlaying || state.isPaused) return;
+  // find oldest non-dragging item, or if none, hint next spawn's bin? For now hint oldest
+  let targetItem = state.items.find(it=> !it.isDragging);
+  if(!targetItem){
+    // no items, flash a random bin? just consume hint? don't
+    return;
+  }
+  state.hints -= 1;
+  updateHUD();
+  const correctBin = targetItem.bin;
+  const binEl = [...els.bins.querySelectorAll('.bin')].find(b=> b.dataset.bin===correctBin);
+  if(binEl){
+    binEl.classList.add('hintPulse');
+    // also add arrow
+    const tip = document.createElement('div');
+    tip.textContent='👇 '+correctBin;
+    tip.style.position='absolute';
+    tip.style.left='50%';
+    tip.style.top='-28px';
+    tip.style.transform='translateX(-50%)';
+    tip.style.background='#facc15';
+    tip.style.color='#422006';
+    tip.style.padding='4px 8px';
+    tip.style.borderRadius='999px';
+    tip.style.fontSize='11px';
+    tip.style.fontWeight='900';
+    tip.style.whiteSpace='nowrap';
+    tip.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)';
+    tip.style.pointerEvents='none';
+    binEl.style.position='relative';
+    binEl.appendChild(tip);
+    setTimeout(()=>{
+      binEl.classList.remove('hintPulse');
+      tip.remove();
+    }, 1500);
+  }
+  // also highlight item border
+  targetItem.el.style.borderColor='#facc15';
+  targetItem.el.style.boxShadow='0 0 0 4px rgba(250,204,21,0.4), 0 6px 16px rgba(0,0,0,0.35)';
+  setTimeout(()=>{
+    targetItem.el.style.borderColor='#e5e7eb';
+    targetItem.el.style.boxShadow='0 6px 16px rgba(0,0,0,0.35)';
+  },1500);
+  if(navigator.vibrate) navigator.vibrate(15);
+}
+
+function gameLoop(t){
+  if(!state.isPlaying || state.isPaused){
+    state.lastT = t;
+    state.raf = requestAnimationFrame(gameLoop);
+    return;
+  }
+  const dt = Math.min(50, t - state.lastT);
+  state.lastT = t;
+
+  // timer
+  state.timeLeft -= dt/1000;
+  if(state.timeLeft <= 0){
+    state.timeLeft = 0;
+    updateHUD();
+    endGame();
+    return;
+  }
+
+  // round progression every 15s
+  const newRound = Math.max(1, Math.min(4, Math.floor((GAME_DURATION - state.timeLeft)/15)+1));
+  if(newRound !== state.round){
+    state.round = newRound;
+    const cfg = ROUNDS[state.round-1];
+    state.spawnEvery = cfg.spawnEvery;
+    state.fallSpeed = cfg.fallSpeed;
+    buildBins();
+    showRoundBanner();
+    updateHUD();
+  }
+
+  // spawn
+  state.spawnTimer += dt;
+  if(state.spawnTimer >= state.spawnEvery){
+    state.spawnTimer = 0;
+    // limit max items on screen to avoid clutter
+    if(state.items.length < 4) spawnItem();
+  }
+
+  // move items
+  const zoneH = els.fallZone.clientHeight;
+  for(let i=state.items.length-1;i>=0;i--){
+    const it = state.items[i];
+    if(it.isDragging) continue;
+    // fall speed scaled by dt (60fps baseline)
+    it.y += state.fallSpeed * (dt/16.67) * 1.8;
+    it.el.style.top = it.y + 'px';
+    // miss check: hit bottom (above bins)
+    if(it.y > zoneH - 70){
+      // missed
+      state.items.splice(i,1);
+      it.el.classList.add('wrong');
+      setTimeout(()=> it.el.remove(), 300);
+      state.streak = 0;
+      state.missed += 1;
+      state.score = Math.max(0, state.score - 30);
+      showFloating('MISS -30', it.el, '#ef4444','');
+      els.app.classList.add('shakeScreen');
+      setTimeout(()=> els.app.classList.remove('shakeScreen'), 250);
+      updateHUD();
+    }
+  }
+
+  updateHUD();
+  state.raf = requestAnimationFrame(gameLoop);
+}
+
+function startGame(){
+  // reset
+  state.score=0; state.streak=0; state.bestStreak=0; state.sorted=0; state.wrong=0; state.missed=0;
+  state.timeLeft=GAME_DURATION; state.round=1; state.hints=3;
+  state.spawnTimer=0;
+  const cfg=ROUNDS[0];
+  state.spawnEvery=cfg.spawnEvery; state.fallSpeed=cfg.fallSpeed;
+  binCounts={};
+  // clear items
+  state.items.forEach(it=> it.el.remove());
+  state.items=[];
+  state.dragging=null;
+  buildBins();
+  updateHUD();
+  saveBest();
+  els.startOverlay.classList.add('hidden');
+  els.gameOverOverlay.classList.add('hidden');
+  els.pauseOverlay.classList.add('hidden');
+  els.dropHint.style.display='none';
+  state.isPlaying=true; state.isPaused=false;
+  els.pauseBtn.textContent='⏸️ Pause';
+  showRoundBanner();
+  state.lastT = performance.now();
+  cancelAnimationFrame(state.raf);
+  state.raf = requestAnimationFrame(gameLoop);
+  // initial spawn quickly
+  setTimeout(()=> { if(state.isPlaying) spawnItem(); }, 400);
+}
+
+function pauseGame(){
+  if(!state.isPlaying) return;
+  state.isPaused = !state.isPaused;
+  if(state.isPaused){
+    els.pauseOverlay.classList.remove('hidden');
+    els.pauseBtn.textContent='▶️ Resume';
+  } else {
+    els.pauseOverlay.classList.add('hidden');
+    els.pauseBtn.textContent='⏸️ Pause';
+    state.lastT = performance.now();
+  }
+  updateHUD();
+}
+
+function endGame(){
+  state.isPlaying=false;
+  state.isPaused=false;
+  cancelAnimationFrame(state.raf);
+  // clear items
+  state.items.forEach(it=> it.el.remove());
+  state.items=[];
+  saveBest();
+  // fill game over
+  document.getElementById('finalScore').textContent = state.score;
+  document.getElementById('finalBest').textContent = state.best;
+  document.getElementById('finalStreak').textContent = state.bestStreak;
+  document.getElementById('finalSorted').textContent = state.sorted;
+  const isNewBest = state.score>0 && state.score===state.best && state.score>0;
+  // check if actually new best by comparing to stored before? simple: if score == best and sorted>0
+  const prevBest = parseInt(localStorage.getItem(STORAGE_KEY)||'0',10);
+  // we already updated best, so need to check if score >= prevBest and score>0
+  const newBestEl = document.getElementById('newBestBadge');
+  if(state.score>0 && state.score>=prevBest && state.score===state.best && state.sorted>2){
+    // but if prevBest was 0 and score 0 not new
+    if(state.score>prevBest || (prevBest===0 && state.score>0)){
+      newBestEl.classList.remove('hidden');
+    } else {
+      newBestEl.classList.add('hidden');
+    }
+  } else {
+    newBestEl.classList.add('hidden');
+  }
+  // title based on performance
+  const titleEl=document.getElementById('gameOverTitle');
+  const subEl=document.getElementById('gameOverSub');
+  if(state.score>=1800){ titleEl.textContent='🌟 Eco Legend!'; subEl.textContent='Incredible sorting — planet saved!'; }
+  else if(state.score>=1200){ titleEl.textContent='🔥 Super Sorter!'; subEl.textContent='Amazing streaks and speed!'; }
+  else if(state.score>=600){ titleEl.textContent='♻️ Great Job!'; subEl.textContent='You kept the planet cleaner!'; }
+  else { titleEl.textContent='⏱️ Time\'s Up!'; subEl.textContent='Keep practicing — you\'ll get faster!'; }
+
+  els.gameOverOverlay.classList.remove('hidden');
+  els.pauseBtn.textContent='⏸️ Pause';
+}
+
+// Events
+document.getElementById('playBtn').addEventListener('click', startGame);
+document.getElementById('playAgainBtn').addEventListener('click', startGame);
+document.getElementById('menuBtn').addEventListener('click', ()=>{
+  els.gameOverOverlay.classList.add('hidden');
+  els.startOverlay.classList.remove('hidden');
+  // clear fall zone
+  state.items.forEach(it=> it.el.remove());
+  state.items=[];
+  els.dropHint.style.display='block';
+  loadBest();
+});
+document.getElementById('restartBtn2').addEventListener('click', startGame);
+document.getElementById('resumeBtn').addEventListener('click', pauseGame);
+els.pauseBtn.addEventListener('click', pauseGame);
+els.hintBtn.addEventListener('click', doHint);
+document.getElementById('shareBtn').addEventListener('click', ()=>{
+  const text = `♻️ Recycling Rush: I scored ${state.score} pts! Sorted ${state.sorted} items with best streak ${state.bestStreak} 🔥 Can you beat it?`;
+  if(navigator.share){ navigator.share({title:'Recycling Rush', text}).catch(()=>{}); }
+  else if(navigator.clipboard){ navigator.clipboard.writeText(text).then(()=>{ const b=document.getElementById('shareBtn'); const o=b.textContent; b.textContent='Copied!'; setTimeout(()=> b.textContent=o,1200); }); }
+});
+
+// pointer move/up on window
+window.addEventListener('pointermove', onPointerMove);
+window.addEventListener('pointerup', onPointerUp);
+window.addEventListener('pointercancel', onPointerUp);
+
+// prevent scrolling while dragging
+els.fallZone.addEventListener('touchmove', (e)=>{ if(state.dragging) e.preventDefault(); }, {passive:false});
+
+// init
+loadBest();
+buildBins();
+updateHUD();
+
+// handle visibility change -> pause
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden && state.isPlaying && !state.isPaused) pauseGame();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Cozy Contract</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--cream:#FFF8EC;--paper:#FFFDF6;--ink:#2E2A24;--muted:#8A7E6B;--line:#EDE3CF;--terra:#D96C4A;--sage:#7A9E7E;--mustard:#E9B44C;--sky:#6B8CAE;--plum:#9B7EB8;--shadow:0 8px 24px rgba(46,42,36,.10);--r12:12px;--r16:16px;--r20:20px}
+html,body{height:100%;background:var(--cream);color:var(--ink);font-family: ui-sans-system, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;overflow-x:hidden}
+button{font:inherit}
+#app{max-width:428px;min-height:100dvh;margin:0 auto;background:var(--cream);display:flex;flex-direction:column;position:relative;padding:0 12px 12px}
+.topbar{position:sticky;top:0;z-index:5;background:var(--cream);padding:10px 0 8px;margin:0 -12px;padding-left:12px;padding-right:12px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand h1{font-family: Georgia, serif;font-size:18px;letter-spacing:.02em;line-height:1}
+.brand h1 span{color:var(--terra)}
+.pill{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:var(--ink);color:#fff;padding:6px 8px;border-radius:999px}
+.phaseRow{display:flex;align-items:center;gap:6px;margin-top:10px}
+.dot{flex:1;height:8px;border-radius:999px;background:#E8DDC2;position:relative;overflow:hidden}
+.dot.active{background:var(--mustard)}
+.dot.done{background:var(--sage)}
+.dot i{position:absolute;inset:0;background:var(--terra);width:0%}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+.stat{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:8px 10px;box-shadow:var(--shadow)}
+.stat label{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block}
+.stat strong{font-size:16px;line-height:1.1}
+.stat em{font-style:normal;font-size:11px;color:var(--muted)}
+.quotaWrap{margin-top:10px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:10px;box-shadow:var(--shadow)}
+.quotaHead{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700}
+.quotaHead span:last-child{color:var(--muted);font-weight:600}
+.bar{height:10px;background:#F0E6D3;border-radius:999px;overflow:hidden;margin-top:8px;border:1px solid #E8DCC6}
+.bar>i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--mustard),var(--terra));border-radius:999px;transition:width .4s ease}
+.quotaMeta{display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--muted);font-weight:600}
+.boardCard{margin-top:12px;background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:12px;box-shadow:var(--shadow)}
+.boardHead{display:flex;justify-content:space-between;align-items:center}
+.boardHead h2{font-family:Georgia, serif;font-size:15px}
+.boardHead button{font-size:12px;font-weight:800;padding:8px 10px;border-radius:999px;border:1px solid var(--line);background:#fff;min-height:36px}
+.board{margin-top:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;background:#F3EAD6;border:1px solid #E8DCC6;border-radius:16px;padding:10px}
+.cell{aspect-ratio:1;background:#fff;border:1.5px solid #EDE3CF;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;overflow:hidden;min-height:0;transition:transform .15s}
+.cell.empty{background:repeating-linear-gradient(45deg,#fff,#fff 6px,#FFF6DD 6px,#FFF6DD 12px);border-style:dashed;color:#C2B59B}
+.cell.pop{animation:pop .35s ease}
+@keyframes pop{0%{transform:scale(.85)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+.cell .emo{font-size:22px;line-height:1}
+.cell .nm{font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center;line-height:1}
+.cell .val{position:absolute;bottom:4px;right:6px;background:var(--ink);color:#fff;font-size:11px;font-weight:800;padding:2px 6px;border-radius:999px}
+.cell.bonus{border-color:var(--mustard);box-shadow:0 0 0 2px rgba(233,180,76,.25) inset}
+.log{margin-top:10px;background:#2E2A24;color:#FFF8EC;border-radius:14px;padding:10px 12px;font-size:12px;line-height:1.4;min-height:44px}
+.log b{color:var(--mustard)}
+.controls{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
+.btn{border:none;border-radius:16px;padding:16px 14px;font-weight:900;font-size:16px;min-height:56px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:var(--shadow);cursor:pointer;touch-action:manipulation}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--ink);color:#fff}
+.btn.primary:disabled{opacity:.45}
+.btn.ghost{background:var(--paper);border:1px solid var(--line);color:var(--ink)}
+.btn.terra{background:var(--terra);color:#fff}
+.btn.sage{background:var(--sage);color:#fff}
+.btn.mustard{background:var(--mustard);color:var(--ink)}
+.subgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.smallBtns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+.smallBtns button{border:1px solid var(--line);background:var(--paper);border-radius:14px;padding:10px 6px;font-size:12px;font-weight:800;min-height:44px}
+.bagRow{margin-top:12px;background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:var(--shadow)}
+.bagRow h3{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 8px;font-size:12px;font-weight:700}
+.chip i{font-style:normal}
+.overlay{position:fixed;inset:0;background:rgba(46,42,36,.42);backdrop-filter:blur(4px);display:none;align-items:flex-end;justify-content:center;padding:12px;z-index:20}
+.overlay.open{display:flex}
+.sheet{width:100%;max-width:428px;background:var(--paper);border-radius:20px 20px 16px 16px;box-shadow:0 20px 40px rgba(0,0,0,.25);max-height:86dvh;overflow:auto;border:1px solid var(--line)}
+.sheetHead{position:sticky;top:0;background:var(--paper);padding:14px 14px 10px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;z-index:1;border-radius:20px 20px 0 0}
+.sheetHead h3{font-family:Georgia, serif;font-size:16px}
+.sheetHead button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 10px;font-weight:800;min-height:36px}
+.sheetBody{padding:12px 12px 16px}
+.contractorGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cCard{border:2px solid var(--line);border-radius:16px;padding:10px;background:#fff;text-align:left;cursor:pointer}
+.cCard.sel{border-color:var(--ink);box-shadow:0 0 0 3px rgba(46,42,36,.08)}
+.cCard h4{font-size:13px;line-height:1.1}
+.cCard p{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.3}
+.cCard .rule{margin-top:8px;background:var(--cream);border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:11px;font-weight:700}
+.cCard .kit{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px}
+.kitTag{font-size:10px;font-weight:800;background:var(--ink);color:#fff;padding:3px 6px;border-radius:999px}
+.draftGrid{display:grid;grid-template-columns:1fr;gap:10px}
+.draftCard{border:2px solid var(--line);border-radius:16px;padding:12px;background:#fff;display:flex;gap:12px;align-items:center;text-align:left;cursor:pointer}
+.draftCard:hover{border-color:var(--mustard)}
+.draftIcon{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;flex:0 0 56px;border:1px solid var(--line)}
+.draftMeta h4{font-size:14px}
+.draftMeta p{font-size:12px;color:var(--muted);line-height:1.3;margin-top:2px}
+.draftMeta .base{margin-top:6px;font-size:11px;font-weight:800;background:var(--cream);display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid var(--line)}
+.codexGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.codexItem{border:1px solid var(--line);border-radius:14px;padding:10px;background:#fff}
+.codexItem h4{font-size:12px}
+.codexItem p{font-size:11px;color:var(--muted);line-height:1.3;margin-top:4px}
+.codexItem .emo2{font-size:20px}
+.achList{display:grid;gap:8px}
+.ach{border:1px solid var(--line);border-radius:14px;padding:10px;background:#fff;display:flex;gap:10px;align-items:center}
+.ach.done{border-color:var(--sage);background:#F0F7F1}
+.ach .ic{width:36px;height:36px;border-radius:999px;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:16px;border:1px solid var(--line)}
+.ach strong{font-size:13px}
+.ach span{font-size:11px;color:var(--muted)}
+.saveBox{border:1px solid var(--line);border-radius:14px;padding:10px;background:#fff}
+.saveBox textarea{width:100%;min-height:84px;border:1px solid var(--line);border-radius:12px;padding:10px;font-size:12px;font-family:ui-monospace,monospace;background:var(--cream)}
+.saveBox input{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:13px;margin-top:8px}
+.hint{font-size:11px;color:var(--muted);line-height:1.4;margin-top:8px}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 14px;border-radius:999px;font-size:13px;font-weight:800;box-shadow:var(--shadow);display:none;z-index:30}
+.toast.show{display:block}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="brand">
+      <h1>COZY <span>CONTRACT</span> — Spin & Build</h1>
+      <div class="pill" id="contractPill">Contract 1/8</div>
+    </div>
+    <div class="phaseRow" id="phaseDots"></div>
+    <div class="stats">
+      <div class="stat"><label>Phase Coins</label><strong id="phaseCoins">0</strong><em id="quotaLabel">/ 12 quota</em></div>
+      <div class="stat"><label>Spins Left</label><strong id="spinsLeft">3</strong><em>per phase</em></div>
+      <div class="stat"><label>Bag</label><strong id="bagCount">0</strong><em id="bagDetail">tokens</em></div>
+    </div>
+    <div class="quotaWrap">
+      <div class="quotaHead"><span>Quota Progress</span><span id="quotaPct">0%</span></div>
+      <div class="bar"><i id="quotaBar"></i></div>
+      <div class="quotaMeta"><span id="quotaMetaL">Need 12</span><span id="quotaMetaR">Phase 1 • 3 spins max</span></div>
+    </div>
+  </div>
+
+  <div class="boardCard">
+    <div class="boardHead">
+      <h2 id="boardTitle">Your Workbench</h2>
+      <button id="btnHow">How to Play</button>
+    </div>
+    <div class="board" id="board"></div>
+    <div class="log" id="log">Pick a contractor to start your cozy contract. Each spin drops tokens — neighbors chain bonuses!</div>
+  </div>
+
+  <div class="controls">
+    <button class="btn primary" id="btnSpin">🎰 SPIN — Drop Tokens</button>
+    <div class="subgrid">
+      <button class="btn ghost" id="btnDraft">🎁 Draft Preview</button>
+      <button class="btn ghost" id="btnBag">🎒 Bag</button>
+    </div>
+  </div>
+
+  <div class="smallBtns">
+    <button id="btnCodex">📖 Codex</button>
+    <button id="btnAch">🏆 Achievements</button>
+    <button id="btnSave">💾 Save Code</button>
+  </div>
+
+  <div class="bagRow" id="bagRow">
+    <h3>Bag Contents <span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted)" id="contractorName"></span></h3>
+    <div class="chips" id="bagChips"></div>
+    <div class="hint">Bag shuffles when empty. Draft adds new quirky tokens. Neighbor bonuses: orthogonal + diagonal count.</div>
+  </div>
+
+  <div style="height:12px"></div>
+</div>
+
+<!-- Contractor Picker -->
+<div class="overlay open" id="ovContractor">
+  <div class="sheet">
+    <div class="sheetHead"><h3>Choose Your Contractor</h3><button id="xContractor">Close</button></div>
+    <div class="sheetBody">
+      <p class="hint" style="margin-top:0">Each contractor brings a starting kit and a cozy house rule. 8 phases, rising quotas. 3 spins per phase to meet quota.</p>
+      <div class="contractorGrid" id="contractorGrid"></div>
+      <div style="margin-top:12px;display:grid;gap:8px">
+        <button class="btn terra" id="btnStartRun">Start Contract →</button>
+        <button class="btn ghost" id="btnLoadFromCode">Load Run Code</button>
+        <div class="hint">Quotas: 12 • 22 • 35 • 50 • 70 • 95 • 125 • 160. Draft a new token between spins.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Draft -->
+<div class="overlay" id="ovDraft">
+  <div class="sheet">
+    <div class="sheetHead"><h3>Draft a Token</h3><button id="xDraft">Skip</button></div>
+    <div class="sheetBody">
+      <p class="hint" style="margin-top:0" id="draftHint">Pick one to add to your bag. It will appear in future spins.</p>
+      <div class="draftGrid" id="draftGrid"></div>
+      <button class="btn ghost" id="btnSkipDraft" style="margin-top:10px;width:100%">Skip this draft</button>
+    </div>
+  </div>
+</div>
+
+<!-- Codex -->
+<div class="overlay" id="ovCodex">
+  <div class="sheet">
+    <div class="sheetHead"><h3>Token Codex</h3><button id="xCodex">Close</button></div>
+    <div class="sheetBody">
+      <div class="codexGrid" id="codexGrid"></div>
+      <div class="hint">Neighbor = any of 8 surrounding cells. Clover gives +2 to all neighbors. Bonuses stack!</div>
+    </div>
+  </div>
+</div>
+
+<!-- Achievements -->
+<div class="overlay" id="ovAch">
+  <div class="sheet">
+    <div class="sheetHead"><h3>Achievements</h3><button id="xAch">Close</button></div>
+    <div class="sheetBody"><div class="achList" id="achList"></div></div>
+  </div>
+</div>
+
+<!-- Save -->
+<div class="overlay" id="ovSave">
+  <div class="sheet">
+    <div class="sheetHead"><h3>Run Save Code</h3><button id="xSave">Close</button></div>
+    <div class="sheetBody">
+      <div class="saveBox">
+        <label style="font-size:12px;font-weight:800">Your Run Code (copy to keep)</label>
+        <textarea id="saveCode" readonly placeholder="Start a run to generate a code"></textarea>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <button class="btn mustard" id="btnCopy">Copy Code</button>
+          <button class="btn ghost" id="btnNewCode">Refresh</button>
+        </div>
+        <input id="loadCode" placeholder="Paste a run code here">
+        <button class="btn sage" id="btnImport" style="width:100%;margin-top:8px">Load Pasted Code</button>
+        <div class="hint">Codes are offline — share them, save them in notes, or paste to resume on this device. Progress also auto-saves locally.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bag Detail -->
+<div class="overlay" id="ovBag">
+  <div class="sheet">
+    <div class="sheetHead"><h3>Bag & Discard</h3><button id="xBag">Close</button></div>
+    <div class="sheetBody">
+      <div class="saveBox">
+        <div style="font-size:12px;font-weight:800">In Bag: <span id="bagDetailCount"></span></div>
+        <div class="chips" id="bagChips2" style="margin-top:8px"></div>
+        <div style="margin-top:10px;font-size:12px;font-weight:800">Discard Pile: <span id="discardCount"></span></div>
+        <div class="chips" id="discardChips" style="margin-top:8px"></div>
+        <div class="hint">Each spin draws 6–8 tokens. When bag empties, discard shuffles back in.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- How -->
+<div class="overlay" id="ovHow">
+  <div class="sheet">
+    <div class="sheetHead"><h3>How to Play</h3><button id="xHow">Close</button></div>
+    <div class="sheetBody">
+      <div class="saveBox" style="line-height:1.5;font-size:13px">
+        <strong>Goal:</strong> Meet the coin quota in each of 8 phases. You have 3 spins per phase.<br><br>
+        <strong>Spin:</strong> Drops 6–8 random tokens from your bag onto the 4×4 workbench. Neighbors (including diagonals) trigger bonuses and chain together.<br><br>
+        <strong>Draft:</strong> Between spins, pick 1 of 3 quirky tokens to permanently add to your bag. Build synergies!<br><br>
+        <strong>Contractors:</strong> Each has a starting kit and a house rule that buffs one token type.<br><br>
+        <strong>Tips:</strong> Clover gives +2 to every neighbor. Piggy loves coins. Chest wants variety. Star loves empty space. Mushroom hates stars.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const TOKENS={
+  copper:{name:"Copper Penny",emo:"🪙",base:1,desc:"+1 per adjacent Copper",color:"#FFF1B8"},
+  gear:{name:"Rusty Gear",emo:"⚙️",base:2,desc:"+2 per adjacent Gear",color:"#FFE4C7"},
+  clover:{name:"Lucky Clover",emo:"🍀",base:0,desc:"Gives +2 to each neighbor",color:"#DFF2DC"},
+  piggy:{name:"Piggy Bank",emo:"🐷",base:0,desc:"+2 per adjacent Coin (Copper/Silver)",color:"#FFD9E2"},
+  silver:{name:"Silver Shilling",emo:"🪙",base:3,desc:"+1 per adjacent Coin",color:"#E8ECF2"},
+  sprout:{name:"Sproutling",emo:"🌱",base:1,desc:"+3 if next to Clover",color:"#E2F5D3"},
+  dice:{name:"Wonky Dice",emo:"🎲",base:3,desc:"Rolls 1–6, +1 per adjacent Dice",color:"#E3E8FF"},
+  chest:{name:"Tiny Chest",emo:"📦",base:0,desc:"+5 if 2+ different neighbor types",color:"#FFE9B8"},
+  magnet:{name:"Junk Magnet",emo:"🧲",base:1,desc:"+2 per adjacent Gear/Magnet",color:"#FFD8D8"},
+  star:{name:"Fallen Star",emo:"⭐",base:4,desc:"+1 per empty neighbor cell",color:"#FFF6CC"},
+  mushroom:{name:"Gloomy Shroom",emo:"🍄",base:2,desc:"+2 per Shroom, -1 per Star nearby",color:"#E8D8F0"},
+  heart:{name:"Cozy Heart",emo:"💛",base:2,desc:"+2 per adjacent Heart/Sprout",color:"#FFF0C2"}
+};
+const CONTRACTORS={
+  scrapper:{name:"Mara the Scrapper",emo:"🔧",desc:"Loves the clank of metal.",rule:"Gears +1 extra",color:"#D96C4A",kit:{gear:4,copper:3,magnet:1}},
+  gambler:{name:"Jax the Gambler",emo:"🎲",desc:"Every roll is a story.",rule:"Dice rolls +1 (2–7)",color:"#6B8CAE",kit:{dice:3,copper:3,chest:2}},
+  hoarder:{name:"Brindle the Hoarder",emo:"🐷",desc:"Counts coins in his sleep.",rule:"Piggy +1 per Coin",color:"#E9B44C",kit:{piggy:3,silver:3,copper:2}},
+  gardener:{name:"Lila the Gardener",emo:"🌿",desc:"Grows luck from sprouts.",rule:"Sprout +1 near Clover",color:"#7A9E7E",kit:{clover:3,sprout:3,heart:2}}
+};
+const QUOTAS=[12,22,35,50,70,95,125,160];
+const ACH_DEFS=[
+  {id:"first_spin",name:"First Spin",desc:"Do your first spin",icon:"🎰"},
+  {id:"phase3",name:"Getting Cozy",desc:"Reach Phase 3",icon:"🌱"},
+  {id:"phase5",name:"Halfway Home",desc:"Reach Phase 5",icon:"🏡"},
+  {id:"win",name:"Contract Complete",desc:"Finish all 8 phases",icon:"📜"},
+  {id:"big30",name:"Big Haul",desc:"Score 30+ in one spin",icon:"💰"},
+  {id:"big50",name:"Jackpot!",desc:"Score 50+ in one spin",icon:"🪙"},
+  {id:"collector",name:"Curious Collector",desc:"Own 6+ token types",icon:"📦"},
+  {id:"cloverfield",name:"Cloverfield",desc:"Score with 3+ Clovers on board",icon:"🍀"},
+];
+
+let state={
+  contractor:null,
+  phase:1,
+  phaseCoins:0,
+  totalCoins:0,
+  spinsUsed:0,
+  bag:[],
+  discard:[],
+  board:Array(16).fill(null),
+  lastScore:0,
+  seenTypes:new Set(),
+  achievements:{},
+  runId:0
+};
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function neighbors(idx){
+  const r=Math.floor(idx/4),c=idx%4,res=[];
+  for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+    if(dr===0&&dc===0)continue;
+    const nr=r+dr,nc=c+dc;
+    if(nr>=0&&nr<4&&nc>=0&&nc<4)res.push(nr*4+nc);
+  }
+  return res;
+}
+function bagCounts(arr){
+  const m={};arr.forEach(t=>m[t]=(m[t]||0)+1);return m;
+}
+function expandKit(kit){
+  const a=[];Object.entries(kit).forEach(([k,v])=>{for(let i=0;i<v;i++)a.push(k)});return a;
+}
+function saveLocal(){
+  try{
+    localStorage.setItem('cozyContract_state', JSON.stringify({...state, seenTypes:[...state.seenTypes]}));
+    localStorage.setItem('cozyContract_ach', JSON.stringify(state.achievements));
+  }catch(e){}
+}
+function loadLocal(){
+  try{
+    const s=localStorage.getItem('cozyContract_state');
+    const a=localStorage.getItem('cozyContract_ach');
+    if(a) state.achievements=JSON.parse(a);
+    if(s){
+      const p=JSON.parse(s);
+      if(p && p.contractor){
+        state={...state,...p, seenTypes:new Set(p.seenTypes||[])};
+        // ensure board length
+        if(!state.board || state.board.length!==16) state.board=Array(16).fill(null);
+        return true;
+      }
+    }
+  }catch(e){}
+  return false;
+}
+function genCode(){
+  const payload={v:1, contractor:state.contractor, phase:state.phase, phaseCoins:state.phaseCoins, totalCoins:state.totalCoins, spinsUsed:state.spinsUsed, bag:state.bag, discard:state.discard, seen:[...state.seenTypes], ach:state.achievements, ts:Date.now()};
+  return btoa(unescape(encodeURIComponent(JSON.stringify(payload)))).replace(/=+$/,'');
+}
+function parseCode(code){
+  try{
+    let b=code.trim().replace(/\s/g,'');
+    // pad
+    while(b.length%4) b+='=';
+    const j=JSON.parse(decodeURIComponent(escape(atob(b))));
+    if(!j.v || !j.contractor) throw 0;
+    return j;
+  }catch(e){return null}
+}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1800);
+  try{navigator.vibrate&&navigator.vibrate(30)}catch(e){}
+}
+
+function renderPhaseDots(){
+  const c=document.getElementById('phaseDots');
+  c.innerHTML='';
+  for(let i=1;i<=8;i++){
+    const d=document.createElement('div');
+    d.className='dot'+(i<state.phase?' done': i===state.phase?' active':'');
+    if(i===state.phase){
+      const pct=Math.min(100, Math.round(state.phaseCoins/QUOTAS[i-1]*100));
+      const inner=document.createElement('i');
+      inner.style.width=pct+'%';
+      d.appendChild(inner);
+    }
+    if(i<state.phase){
+      const inner=document.createElement('i');
+      inner.style.width='100%'; inner.style.background='var(--sage)';
+      d.appendChild(inner);
+    }
+    c.appendChild(d);
+  }
+  document.getElementById('contractPill').textContent=`Contract ${state.phase}/8`;
+}
+function renderStats(){
+  const quota=QUOTAS[state.phase-1];
+  document.getElementById('phaseCoins').textContent=state.phaseCoins;
+  document.getElementById('quotaLabel').textContent=`/ ${quota} quota`;
+  document.getElementById('spinsLeft').textContent=Math.max(0,3-state.spinsUsed);
+  document.getElementById('bagCount').textContent=state.bag.length + state.discard.length;
+  document.getElementById('bagDetail').textContent=`${state.bag.length} in bag`;
+  document.getElementById('quotaPct').textContent=Math.min(100,Math.round(state.phaseCoins/quota*100))+'%';
+  document.getElementById('quotaBar').style.width=Math.min(100, state.phaseCoins/quota*100)+'%';
+  document.getElementById('quotaMetaL').textContent=`Need ${quota} • Have ${state.phaseCoins}`;
+  document.getElementById('quotaMetaR').textContent=`Phase ${state.phase} • 3 spins max`;
+  document.getElementById('contractorName').textContent= state.contractor ? `• ${CONTRACTORS[state.contractor].name}` : '';
+  renderPhaseDots();
+  renderBagChips();
+}
+function renderBagChips(){
+  const chips=document.getElementById('bagChips');
+  chips.innerHTML='';
+  const counts=bagCounts([...state.bag, ...state.discard]);
+  const totalTypes=Object.keys(counts).length;
+  if(totalTypes===0){chips.innerHTML='<span class="hint">No tokens yet</span>';return}
+  Object.entries(counts).sort((a,b)=>b[1]-a[1]).forEach(([k,c])=>{
+    const d=TOKENS[k];
+    const el=document.createElement('div');
+    el.className='chip';
+    el.innerHTML=`<span>${d.emo}</span> ${d.name} <span style="background:var(--ink);color:#fff;padding:2px 6px;border-radius:999px;font-size:11px">×${c}</span>`;
+    chips.appendChild(el);
+  });
+}
+function renderBoard(){
+  const board=document.getElementById('board');
+  board.innerHTML='';
+  for(let i=0;i<16;i++){
+    const cell=document.createElement('div');
+    cell.className='cell'+(state.board[i]?'':' empty');
+    if(state.board[i]){
+      const t=TOKENS[state.board[i]];
+      cell.style.background=t.color;
+      cell.innerHTML=`<div class="emo">${t.emo}</div><div class="nm">${t.name}</div>`;
+      // value badge will be added after scoring
+      if(state._scores && state._scores[i]!=null){
+        const v=document.createElement('div');
+        v.className='val';
+        v.textContent=state._scores[i];
+        cell.appendChild(v);
+        if(state._scores[i] > t.base) cell.classList.add('bonus');
+      }
+    } else {
+      cell.innerHTML=`<div style="font-size:14px;opacity:.5">·</div>`;
+    }
+    board.appendChild(cell);
+  }
+}
+function renderContractors(){
+  const g=document.getElementById('contractorGrid');
+  g.innerHTML='';
+  Object.entries(CONTRACTORS).forEach(([id,c])=>{
+    const b=document.createElement('button');
+    b.className='cCard'+(state.contractor===id?' sel':'');
+    b.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><h4>${c.emo} ${c.name}</h4><span style="background:${c.color};color:#fff;padding:3px 7px;border-radius:999px;font-size:10px;font-weight:800">${c.rule}</span></div>
+    <p>${c.desc}</p>
+    <div class="rule">House Rule: ${c.rule}</div>
+    <div class="kit">${Object.entries(c.kit).map(([k,v])=>`<span class="kitTag">${TOKENS[k].emo} ${TOKENS[k].name} ×${v}</span>`).join('')}</div>`;
+    b.onclick=()=>{
+      state.contractor=id;
+      document.querySelectorAll('.cCard').forEach(x=>x.classList.remove('sel'));
+      b.classList.add('sel');
+    };
+    g.appendChild(b);
+  });
+}
+function renderCodex(){
+  const g=document.getElementById('codexGrid');
+  g.innerHTML='';
+  Object.entries(TOKENS).forEach(([id,t])=>{
+    const seen=state.seenTypes.has(id);
+    const el=document.createElement('div');
+    el.className='codexItem';
+    el.style.opacity=seen?1:.55;
+    el.innerHTML=`<div class="emo2">${t.emo}</div><h4>${t.name} ${seen?'':'• ?'}</h4><p>${t.desc}</p><p style="margin-top:6px;font-weight:800">Base: ${t.base}</p>`;
+    g.appendChild(el);
+  });
+}
+function renderAch(){
+  const list=document.getElementById('achList');
+  list.innerHTML='';
+  ACH_DEFS.forEach(a=>{
+    const done=!!state.achievements[a.id];
+    const el=document.createElement('div');
+    el.className='ach'+(done?' done':'');
+    el.innerHTML=`<div class="ic">${a.icon}</div><div><strong>${a.name}</strong><br><span>${a.desc}</span></div><div style="margin-left:auto;font-size:12px">${done?'✅':'○'}</div>`;
+    list.appendChild(el);
+  });
+}
+function checkAchievements(lastScore){
+  let changed=false;
+  const unlock=(id)=>{
+    if(!state.achievements[id]){state.achievements[id]=1; changed=true; toast('Achievement: '+ACH_DEFS.find(x=>x.id===id).name)}
+  };
+  if(state.spinsUsed>0 || lastScore>0) unlock('first_spin');
+  if(state.phase>=3) unlock('phase3');
+  if(state.phase>=5) unlock('phase5');
+  if(state.phase>8) unlock('win');
+  if(lastScore>=30) unlock('big30');
+  if(lastScore>=50) unlock('big50');
+  const types=new Set([...state.bag,...state.discard, ...state.board.filter(Boolean)]);
+  if(types.size>=6) unlock('collector');
+  const clovers=state.board.filter(x=>x==='clover').length;
+  if(clovers>=3) unlock('cloverfield');
+  if(changed) saveLocal();
+}
+
+function ensureBag(){
+  if(state.bag.length===0 && state.discard.length>0){
+    state.bag=shuffle([...state.discard]);
+    state.discard=[];
+    toast('Bag reshuffled ♻️');
+  }
+}
+function drawTokens(n){
+  ensureBag();
+  const drawn=[];
+  for(let i=0;i<n;i++){
+    if(state.bag.length===0){
+      ensureBag();
+      if(state.bag.length===0) break;
+    }
+    // draw random from bag
+    const idx=Math.floor(Math.random()*state.bag.length);
+    drawn.push(state.bag.splice(idx,1)[0]);
+  }
+  return drawn;
+}
+function calculateScores(board, contractor){
+  const scores=Array(16).fill(null);
+  let total=0;
+  const details=[];
+  for(let i=0;i<16;i++){
+    const type=board[i];
+    if(!type) continue;
+    const def=TOKENS[type];
+    let base=def.base;
+    // dice random
+    let diceRoll=null;
+    if(type==='dice'){
+      diceRoll=1+Math.floor(Math.random()*6);
+      if(contractor==='gambler') diceRoll+=1;
+      base=diceRoll;
+    }
+    const neigh=neighbors(i);
+    const neighTypes=neigh.map(n=>board[n]).filter(Boolean);
+    const emptyNeighbors=neigh.length - neighTypes.length;
+    let bonus=0;
+    let reason=[];
+    if(type==='copper'){
+      const c=neighTypes.filter(t=>t==='copper').length;
+      if(c){bonus+=c*1; reason.push(`+${c} Copper`)}
+    } else if(type==='gear'){
+      const c=neighTypes.filter(t=>t==='gear').length;
+      if(c){bonus+=c*2; reason.push(`+${c*2} Gear`)}
+      if(contractor==='scrapper'){bonus+=1; reason.push('+1 Scrapper')}
+    } else if(type==='clover'){
+      // clover itself gives no self bonus, but we show 0
+    } else if(type==='piggy'){
+      const c=neighTypes.filter(t=>['copper','silver'].includes(t)).length;
+      if(c){bonus+=c*2; reason.push(`+${c*2} Coins`)}
+      if(contractor==='hoarder' && c){bonus+=c*1; reason.push(`+${c} Hoarder`)}
+    } else if(type==='silver'){
+      const c=neighTypes.filter(t=>['copper','silver'].includes(t)).length;
+      if(c){bonus+=c*1; reason.push(`+${c} Coin`)}
+    } else if(type==='sprout'){
+      if(neighTypes.includes('clover')){bonus+=3; reason.push('+3 Clover')}
+      if(contractor==='gardener' && neighTypes.includes('clover')){bonus+=1; reason.push('+1 Gardener')}
+    } else if(type==='dice'){
+      const c=neighTypes.filter(t=>t==='dice').length;
+      if(c){bonus+=c*1; reason.push(`+${c} Dice`)}
+    } else if(type==='chest'){
+      const uniq=new Set(neighTypes).size;
+      if(uniq>=2){bonus+=5; reason.push('+5 Variety')}
+    } else if(type==='magnet'){
+      const c=neighTypes.filter(t=>['gear','magnet'].includes(t)).length;
+      if(c){bonus+=c*2; reason.push(`+${c*2} Metal`)}
+    } else if(type==='star'){
+      if(emptyNeighbors){bonus+=emptyNeighbors*1; reason.push(`+${emptyNeighbors} Space`)}
+    } else if(type==='mushroom'){
+      const sh=neighTypes.filter(t=>t==='mushroom').length;
+      const st=neighTypes.filter(t=>t==='star').length;
+      if(sh){bonus+=sh*2; reason.push(`+${sh*2} Shroom`)}
+      if(st){bonus-=st*1; reason.push(`-${st} Star`)}
+    } else if(type==='heart'){
+      const c=neighTypes.filter(t=>['heart','sprout'].includes(t)).length;
+      if(c){bonus+=c*2; reason.push(`+${c*2} Love`)}
+    }
+    // Clover global buff: each adjacent clover gives +2 (except clover itself doesn't get it from itself)
+    const cloverAdj=neighTypes.filter(t=>t==='clover').length;
+    if(cloverAdj && type!=='clover'){
+      bonus+=cloverAdj*2;
+      reason.push(`+${cloverAdj*2} Clover aura`);
+    }
+    let totalFor=base+bonus;
+    if(totalFor<0) totalFor=0;
+    scores[i]=totalFor;
+    total+=totalFor;
+    details.push({idx:i,type,base,bonus,totalFor,reason,diceRoll});
+  }
+  return {scores,total,details};
+}
+
+function doSpin(){
+  if(!state.contractor){document.getElementById('ovContractor').classList.add('open'); toast('Pick a contractor first'); return}
+  if(state.phase>8){toast('Contract already complete! Start new.');return}
+  if(state.spinsUsed>=3){toast('No spins left this phase');return}
+  const n=6 + Math.min(2, Math.floor((state.phase-1)/2)+ (state.spinsUsed===2?1:0));
+  const drawn=drawTokens(n);
+  if(drawn.length===0){toast('Bag empty!');return}
+  // place on board: clear board first
+  state.board=Array(16).fill(null);
+  // choose random empty cells
+  const empties=[...Array(16).keys()];
+  shuffle(empties);
+  drawn.forEach((tok,i)=>{
+    const pos=empties[i % empties.length];
+    state.board[pos]=tok;
+    state.seenTypes.add(tok);
+  });
+  // move drawn to discard after scoring? Actually they are already removed from bag, will go to discard after spin
+  // calculate
+  const res=calculateScores(state.board, state.contractor);
+  state._scores=res.scores;
+  state.lastScore=res.total;
+  state.phaseCoins+=res.total;
+  state.totalCoins+=res.total;
+  state.spinsUsed+=1;
+  // move drawn tokens to discard (they were already removed from bag, now add to discard)
+  state.discard.push(...drawn);
+  // log
+  const quota=QUOTAS[state.phase-1];
+  let msg=`Spin scored <b>${res.total} coins</b> with ${drawn.length} tokens. `;
+  // find best token
+  if(res.details.length){
+    const best=res.details.reduce((a,b)=>a.totalFor>b.totalFor?a:b);
+    msg+=`Best: ${TOKENS[best.type].name} (${best.totalFor}). `;
+  }
+  if(state.phaseCoins>=quota){
+    msg+=`Quota met! ${state.phaseCoins}/${quota} ✅`;
+  } else {
+    msg+=`Progress ${state.phaseCoins}/${quota}. ${3-state.spinsUsed} spins left.`;
+  }
+  document.getElementById('log').innerHTML=msg;
+  renderBoard();
+  // animate pop
+  setTimeout(()=>{
+    document.querySelectorAll('.cell').forEach((c,i)=>{
+      if(state.board[i]){c.classList.add('pop'); setTimeout(()=>c.classList.remove('pop'),400)}
+    });
+  },20);
+  renderStats();
+  checkAchievements(res.total);
+  saveLocal();
+  updateSaveCodeField();
+
+  // check phase completion
+  if(state.phaseCoins>=quota){
+    // phase complete
+    if(state.phase===8){
+      // win
+      state.phase=9;
+      state.achievements['win']=1;
+      saveLocal();
+      setTimeout(()=>{
+        document.getElementById('log').innerHTML=`<b>Contract Complete! 🎉</b> You finished all 8 phases with ${state.totalCoins} total coins. Start a new contract or share your save code!`;
+        toast('Contract Complete! 📜');
+        renderPhaseDots();
+        renderAch();
+      },400);
+      return;
+    } else {
+      // advance phase
+      const excess=state.phaseCoins-quota;
+      // carry over 1/3 excess as bonus to next phase for cozy feel
+      const carry=Math.floor(excess/3);
+      state.phase+=1;
+      state.phaseCoins=carry;
+      state.spinsUsed=0;
+      renderStats();
+      document.getElementById('log').innerHTML+=` <b>→ Phase ${state.phase}!</b> Carried ${carry} bonus.`;
+      // trigger draft
+      setTimeout(()=>showDraft(true),600);
+    }
+  } else {
+    // not yet complete, but if spins exhausted -> fail
+    if(state.spinsUsed>=3){
+      document.getElementById('log').innerHTML=`<b>Contract Failed</b> — Phase ${state.phase} quota ${quota} not met (${state.phaseCoins}/${quota}). Your bag was close! Try a new contractor or load a save code.`;
+      toast('Contract failed — try again');
+      // allow continue? For cozy, let player keep drafting and retry? We'll reset phase spins but keep phaseCoins? Instead game over: offer restart
+      // keep state but disable spin until restart? We'll just allow reset via contractor picker
+    } else {
+      // draft between spins
+      setTimeout(()=>showDraft(false),500);
+    }
+  }
+}
+
+function showDraft(isPhaseAdvance){
+  const opts=[];
+  const allTypes=Object.keys(TOKENS);
+  // weight: prefer types not yet owned
+  const owned=new Set([...state.bag,...state.discard]);
+  // generate 3 distinct
+  const pool=shuffle([...allTypes]);
+  // bias: put unseen first
+  pool.sort((a,b)=> (owned.has(a)?1:0) - (owned.has(b)?1:0));
+  for(let i=0;i<3;i++) opts.push(pool[i % pool.length]);
+  // ensure distinct
+  const uniq=[...new Set(opts)];
+  while(uniq.length<3){
+    const extra=allTypes[Math.floor(Math.random()*allTypes.length)];
+    if(!uniq.includes(extra)) uniq.push(extra);
+  }
+  const grid=document.getElementById('draftGrid');
+  grid.innerHTML='';
+  document.getElementById('draftHint').textContent=isPhaseAdvance ? `Phase ${state.phase} unlocked! Pick a token to add to your bag.` : `Between spins — pick a token to grow your bag.`;
+  uniq.slice(0,3).forEach(id=>{
+    const t=TOKENS[id];
+    const btn=document.createElement('button');
+    btn.className='draftCard';
+    btn.innerHTML=`<div class="draftIcon" style="background:${t.color}">${t.emo}</div><div class="draftMeta"><h4>${t.name}</h4><p>${t.desc}</p><div class="base">Base ${t.base} • ${t.desc}</div></div><div style="margin-left:auto;font-weight:900">＋</div>`;
+    btn.onclick=()=>{
+      state.bag.push(id);
+      state.seenTypes.add(id);
+      // also add to discard? No, bag only
+      document.getElementById('ovDraft').classList.remove('open');
+      document.getElementById('log').innerHTML+=` Drafted <b>${t.name}</b> ${t.emo} into bag.`;
+      renderStats();
+      saveLocal();
+      updateSaveCodeField();
+      toast(`Added ${t.name}`);
+      checkAchievements(0);
+    };
+    grid.appendChild(btn);
+  });
+  document.getElementById('ovDraft').classList.add('open');
+}
+
+function updateSaveCodeField(){
+  const code=state.contractor? genCode() : '';
+  document.getElementById('saveCode').value=code;
+}
+function initBoardEmpty(){
+  state.board=Array(16).fill(null);
+  state._scores=null;
+  renderBoard();
+}
+
+// Event wiring
+document.getElementById('btnSpin').onclick=doSpin;
+document.getElementById('btnDraft').onclick=()=>showDraft(false);
+document.getElementById('btnBag').onclick=()=>{
+  // update bag detail
+  const bc=bagCounts(state.bag);
+  const dc=bagCounts(state.discard);
+  document.getElementById('bagDetailCount').textContent=state.bag.length;
+  document.getElementById('discardCount').textContent=state.discard.length;
+  const c1=document.getElementById('bagChips2');
+  const c2=document.getElementById('discardChips');
+  c1.innerHTML=''; c2.innerHTML='';
+  Object.entries(bc).forEach(([k,v])=>{const d=TOKENS[k]; const el=document.createElement('div'); el.className='chip'; el.innerHTML=`${d.emo} ${d.name} ×${v}`; c1.appendChild(el)});
+  Object.entries(dc).forEach(([k,v])=>{const d=TOKENS[k]; const el=document.createElement('div'); el.className='chip'; el.innerHTML=`${d.emo} ${d.name} ×${v}`; c2.appendChild(el)});
+  if(!Object.keys(bc).length) c1.innerHTML='<span class="hint">Bag empty — will reshuffle</span>';
+  if(!Object.keys(dc).length) c2.innerHTML='<span class="hint">No discard yet</span>';
+  document.getElementById('ovBag').classList.add('open');
+};
+document.getElementById('btnCodex').onclick=()=>{renderCodex(); document.getElementById('ovCodex').classList.add('open')};
+document.getElementById('btnAch').onclick=()=>{renderAch(); document.getElementById('ovAch').classList.add('open')};
+document.getElementById('btnSave').onclick=()=>{updateSaveCodeField(); document.getElementById('ovSave').classList.add('open')};
+document.getElementById('btnHow').onclick=()=>document.getElementById('ovHow').classList.add('open');
+
+document.getElementById('xContractor').onclick=()=>document.getElementById('ovContractor').classList.remove('open');
+document.getElementById('xDraft').onclick=()=>document.getElementById('ovDraft').classList.remove('open');
+document.getElementById('btnSkipDraft').onclick=()=>document.getElementById('ovDraft').classList.remove('open');
+document.getElementById('xCodex').onclick=()=>document.getElementById('ovCodex').classList.remove('open');
+document.getElementById('xAch').onclick=()=>document.getElementById('ovAch').classList.remove('open');
+document.getElementById('xSave').onclick=()=>document.getElementById('ovSave').classList.remove('open');
+document.getElementById('xBag').onclick=()=>document.getElementById('ovBag').classList.remove('open');
+document.getElementById('xHow').onclick=()=>document.getElementById('ovHow').classList.remove('open');
+
+document.getElementById('btnStartRun').onclick=()=>{
+  if(!state.contractor){toast('Pick a contractor');return}
+  const kit=CONTRACTORS[state.contractor].kit;
+  state.bag=shuffle(expandKit(kit));
+  state.discard=[];
+  state.phase=1;
+  state.phaseCoins=0;
+  state.totalCoins=0;
+  state.spinsUsed=0;
+  state.board=Array(16).fill(null);
+  state._scores=null;
+  state.seenTypes=new Set([...state.bag]);
+  state.runId=Date.now();
+  document.getElementById('ovContractor').classList.remove('open');
+  document.getElementById('log').innerHTML=`Contract started with <b>${CONTRACTORS[state.contractor].name}</b> ${CONTRACTORS[state.contractor].emo}. Quota ${QUOTAS[0]} — spin to begin!`;
+  renderStats(); renderBoard(); saveLocal(); updateSaveCodeField();
+  toast('Contract started!');
+};
+document.getElementById('btnCopy').onclick=async()=>{
+  const v=document.getElementById('saveCode').value;
+  if(!v){toast('No code yet');return}
+  try{await navigator.clipboard.writeText(v); toast('Code copied!')}catch(e){
+    document.getElementById('saveCode').select(); document.execCommand('copy'); toast('Copied');
+  }
+};
+document.getElementById('btnNewCode').onclick=()=>{updateSaveCodeField(); toast('Code refreshed')};
+document.getElementById('btnImport').onclick=()=>{
+  const code=document.getElementById('loadCode').value.trim() || document.getElementById('saveCode').value.trim();
+  const p=parseCode(code);
+  if(!p){toast('Invalid code');return}
+  state.contractor=p.contractor;
+  state.phase=p.phase;
+  state.phaseCoins=p.phaseCoins;
+  state.totalCoins=p.totalCoins;
+  state.spinsUsed=p.spinsUsed;
+  state.bag=p.bag||[];
+  state.discard=p.discard||[];
+  state.seenTypes=new Set(p.seen||[]);
+  state.achievements=p.ach||state.achievements;
+  state.board=Array(16).fill(null);
+  state._scores=null;
+  document.getElementById('ovSave').classList.remove('open');
+  document.getElementById('ovContractor').classList.remove('open');
+  renderStats(); renderBoard(); saveLocal(); updateSaveCodeField();
+  document.getElementById('log').innerHTML=`Run loaded! Phase ${state.phase} • ${state.phaseCoins}/${QUOTAS[state.phase-1]||'—'} coins.`;
+  toast('Run loaded');
+};
+document.getElementById('btnLoadFromCode').onclick=()=>{
+  document.getElementById('ovContractor').classList.remove('open');
+  document.getElementById('ovSave').classList.add('open');
+  setTimeout(()=>document.getElementById('loadCode').focus(),100);
+};
+
+// close overlays on backdrop click
+document.querySelectorAll('.overlay').forEach(o=>{
+  o.addEventListener('click',e=>{if(e.target===o) o.classList.remove('open')});
+});
+
+// init
+renderContractors();
+if(loadLocal() && state.contractor){
+  document.getElementById('ovContractor').classList.remove('open');
+  document.getElementById('log').innerHTML=`Welcome back! <b>${CONTRACTORS[state.contractor].name}</b> — Phase ${state.phase} • ${state.phaseCoins}/${QUOTAS[state.phase-1]||160} coins.`;
+  renderStats(); renderBoard(); updateSaveCodeField();
+} else {
+  initBoardEmpty(); renderStats();
+}
+renderCodex(); renderAch();
+</script>
+</body>
+</html>

@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Block Escape - Wooden Slide</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#1a1207;
+  --bg2:#2c1e0f;
+  --wood:#8b5a2b;
+  --wood-light:#c19a6b;
+  --wood-dark:#5d3a1a;
+  --board-bg:#e8d5b5;
+  --board-line:#d4b896;
+  --hero:#dc2626;
+  --hero-dark:#991b1b;
+  --block-h:#3b82f6;
+  --block-h2:#1d4ed8;
+  --block-v:#f59e0b;
+  --block-v2:#d97706;
+  --block-v3:#10b981;
+  --text:#fef3c7;
+  --muted:#a78a6a;
+}
+body{
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height:100vh;
+  display:flex;
+  justify-content:center;
+  overflow-x:hidden;
+}
+.app{
+  width:100%;
+  max-width:428px;
+  min-width:360px;
+  min-height:100vh;
+  padding:14px 14px 20px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  background:
+    radial-gradient(ellipse at top, rgba(193,154,107,0.15) 0%, transparent 60%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+}
+header{
+  text-align:center;
+  padding:6px 0 2px;
+}
+header h1{
+  font-size:21px;
+  font-weight:900;
+  letter-spacing:-0.5px;
+  color:var(--text);
+  text-shadow: 0 2px 0 var(--wood-dark);
+}
+header h1 span{color:#fbbf24}
+header p{
+  font-size:12px;
+  color:var(--muted);
+  margin-top:3px;
+  font-weight:500;
+}
+.stats{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:8px;
+}
+.stat{
+  background: linear-gradient(180deg, #2c1e0f 0%, #1f1408 100%);
+  border:1px solid rgba(193,154,107,0.2);
+  border-radius:12px;
+  padding:9px 6px;
+  text-align:center;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 8px rgba(0,0,0,0.3);
+}
+.stat-label{
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:0.7px;
+  color:var(--muted);
+  font-weight:700;
+}
+.stat-value{
+  font-size:19px;
+  font-weight:800;
+  margin-top:1px;
+  color:var(--text);
+}
+.stat-value.accent{color:#38bdf8}
+.stat-value.success{color:#fbbf24}
+.level-dots{
+  display:flex;
+  justify-content:center;
+  gap:8px;
+  padding:2px 0;
+}
+.dot{
+  width:32px;
+  height:32px;
+  border-radius:50%;
+  border:2px solid rgba(193,154,107,0.3);
+  background:#1f1408;
+  color:var(--muted);
+  font-size:13px;
+  font-weight:800;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  touch-action:manipulation;
+  transition:all 0.2s;
+}
+.dot.active{
+  background:#fbbf24;
+  color:#1a1207;
+  border-color:#fbbf24;
+  box-shadow:0 0 0 3px rgba(251,191,36,0.3);
+}
+.dot.done{
+  background:#22c55e;
+  color:white;
+  border-color:#22c55e;
+}
+.boardWrap{
+  background:
+    linear-gradient(90deg, rgba(0,0,0,0.15) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.15) 100%),
+    repeating-linear-gradient(90deg, #8b5a2b 0px, #a67c52 20px, #8b5a2b 40px, #7a4a1f 60px),
+    linear-gradient(180deg, #c19a6b, #8b5a2b);
+  border-radius:16px;
+  padding:10px;
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,0.15),
+    inset 0 -3px 0 rgba(0,0,0,0.3),
+    0 8px 24px rgba(0,0,0,0.5);
+  border:2px solid var(--wood-dark);
+}
+.boardFrame{
+  background: var(--board-bg);
+  border-radius:12px;
+  padding:6px;
+  position:relative;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.15);
+  border:2px solid #b8956a;
+}
+.board{
+  width:100%;
+  aspect-ratio:1;
+  position:relative;
+  background:
+    linear-gradient(rgba(212,184,150,0.5) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212,184,150,0.5) 1px, transparent 1px),
+    linear-gradient(180deg, #f5e6c8 0%, #e8d5b5 100%);
+  background-size: calc(100% / 6) calc(100% / 6), calc(100% / 6) calc(100% / 6), 100% 100%;
+  border-radius:8px;
+  overflow:hidden;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.exit{
+  position:absolute;
+  right:-6px;
+  top:calc(100% / 6 * 2);
+  width:10px;
+  height:calc(100% / 6);
+  background: linear-gradient(180deg, #22c55e, #16a34a);
+  border-radius:0 6px 6px 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  z-index:2;
+}
+.exit::after{
+  content:'→';
+  font-size:14px;
+  color:white;
+  font-weight:900;
+  writing-mode:horizontal-tb;
+  margin-left:1px;
+}
+.exit-label{
+  position:absolute;
+  right:4px;
+  top:50%;
+  transform:translateY(-50%) rotate(0deg);
+  font-size:8px;
+  font-weight:800;
+  color:white;
+  letter-spacing:0.5px;
+  writing-mode:vertical-rl;
+  text-orientation:mixed;
+  opacity:0.9;
+}
+.block{
+  position:absolute;
+  border-radius:8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:grab;
+  touch-action:none;
+  user-select:none;
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,0.25),
+    inset 0 -2px 0 rgba(0,0,0,0.2),
+    0 3px 8px rgba(0,0,0,0.3);
+  border:1.5px solid rgba(0,0,0,0.15);
+  transition: box-shadow 0.15s, transform 0.15s;
+  will-change: left, top;
+}
+.block:active{
+  cursor:grabbing;
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,0.3),
+    inset 0 -2px 0 rgba(0,0,0,0.2),
+    0 6px 16px rgba(0,0,0,0.4);
+  z-index:5 !important;
+}
+.block.dragging{
+  z-index:10 !important;
+  transform:scale(1.02);
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,0.3),
+    0 8px 20px rgba(0,0,0,0.45);
+}
+.block.hero{
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%);
+  border-color:#7f1d1d;
+  color:white;
+}
+.block.hero::before{
+  content:'';
+  position:absolute;
+  inset:4px;
+  border-radius:6px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.2), transparent);
+  pointer-events:none;
+}
+.block.horiz{
+  background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 50%, #2563eb 100%);
+}
+.block.vert{
+  background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+}
+.block.vert.alt{
+  background: linear-gradient(180deg, #34d399 0%, #10b981 50%, #059669 100%);
+}
+.block.vert.alt2{
+  background: linear-gradient(180deg, #a78bfa 0%, #8b5cf6 50%, #7c3aed 100%);
+}
+.block-grain{
+  position:absolute;
+  inset:0;
+  border-radius:8px;
+  opacity:0.15;
+  background: repeating-linear-gradient(90deg, transparent 0px, transparent 6px, rgba(0,0,0,0.4) 7px);
+  pointer-events:none;
+}
+.block.hero .block-grain{opacity:0}
+.block-label{
+  font-size:11px;
+  font-weight:900;
+  letter-spacing:0.5px;
+  text-shadow:0 1px 0 rgba(0,0,0,0.3);
+  pointer-events:none;
+  position:relative;
+  z-index:1;
+}
+.block.hero .block-label{font-size:12px}
+.block-arrows{
+  position:absolute;
+  font-size:10px;
+  opacity:0.7;
+  pointer-events:none;
+  z-index:1;
+}
+.block.horiz .block-arrows{right:6px}
+.block.vert .block-arrows{bottom:4px}
+.controls{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:8px;
+}
+.btn{
+  border:none;
+  border-radius:12px;
+  padding:13px 8px;
+  font-size:13px;
+  font-weight:800;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+  transition:transform 0.1s, opacity 0.2s;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+}
+.btn:active{transform:scale(0.96)}
+.btn-primary{
+  background: linear-gradient(180deg, #fbbf24, #f59e0b);
+  color:#1a1207;
+  box-shadow: 0 3px 0 #92400e, 0 4px 12px rgba(245,158,11,0.3);
+}
+.btn-secondary{
+  background: linear-gradient(180deg, #2c1e0f, #1f1408);
+  color:var(--text);
+  border:1px solid rgba(193,154,107,0.25);
+  box-shadow: 0 2px 0 rgba(0,0,0,0.3);
+}
+.btn:disabled{opacity:0.4; pointer-events:none}
+.hint{
+  background: rgba(44,30,15,0.8);
+  border:1px solid rgba(193,154,107,0.15);
+  border-radius:10px;
+  padding:10px 12px;
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+.hint-icon{
+  width:28px;
+  height:28px;
+  border-radius:8px;
+  background:rgba(251,191,36,0.15);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:14px;
+  flex-shrink:0;
+}
+.hint-text{
+  font-size:12px;
+  line-height:1.4;
+  color:var(--muted);
+}
+.hint-text strong{color:var(--text)}
+.overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(26,18,7,0.88);
+  backdrop-filter:blur(8px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 0.3s;
+  z-index:20;
+}
+.overlay.show{opacity:1; pointer-events:auto}
+.modal{
+  background: linear-gradient(180deg, #2c1e0f 0%, #1a1207 100%);
+  border:2px solid rgba(193,154,107,0.3);
+  border-radius:20px;
+  padding:22px 18px;
+  width:100%;
+  max-width:340px;
+  text-align:center;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
+  transform:translateY(12px) scale(0.96);
+  transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+.overlay.show .modal{transform:translateY(0) scale(1)}
+.modal-emoji{font-size:44px; margin-bottom:6px}
+.modal h2{font-size:20px; font-weight:900; color:var(--text); margin-bottom:4px}
+.modal p{font-size:13px; color:var(--muted); line-height:1.5; margin-bottom:14px}
+.modal-stats{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-bottom:16px;
+}
+.modal-stat{
+  background:#1a1207;
+  border:1px solid rgba(193,154,107,0.15);
+  border-radius:12px;
+  padding:10px;
+}
+.modal-stat strong{display:block; font-size:20px; color:#fbbf24}
+.modal-stat span{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; font-weight:700}
+.modal-stat.best strong{color:#22c55e}
+canvas#confetti{position:fixed; inset:0; pointer-events:none; z-index:21}
+.footer{
+  text-align:center;
+  font-size:11px;
+  color:var(--muted);
+  opacity:0.6;
+}
+</style>
+</head>
+<body>
+<canvas id="confetti"></canvas>
+<div class="app">
+  <header>
+    <h1>🪵 BLOCK <span>ESCAPE</span></h1>
+    <p>Slide blocks to free the red HERO to the exit →</p>
+  </header>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Moves</div>
+      <div class="stat-value accent" id="moves">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Escapes</div>
+      <div class="stat-value success" id="escapes">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Best</div>
+      <div class="stat-value" id="best">—</div>
+    </div>
+  </div>
+
+  <div class="level-dots" id="dots"></div>
+
+  <div class="boardWrap">
+    <div class="boardFrame">
+      <div class="board" id="board">
+        <div class="exit"><span class="exit-label">EXIT</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-secondary" id="undoBtn">↩ Undo</button>
+    <button class="btn btn-secondary" id="restartBtn">↻ Restart</button>
+    <button class="btn btn-primary" id="nextBtn">Next →</button>
+  </div>
+
+  <div class="hint">
+    <div class="hint-icon">💡</div>
+    <div class="hint-text"><strong>Drag along the grain:</strong> horizontal blocks slide ↔, vertical blocks slide ↕. Clear the row for HERO!</div>
+  </div>
+
+  <div class="footer">Level <span id="levelNum">1</span> of 5 • Wooden Board • Session saves automatically</div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-emoji">🎉</div>
+    <h2>Escaped!</h2>
+    <p id="modalMsg">HERO broke free!</p>
+    <div class="modal-stats">
+      <div class="modal-stat">
+        <strong id="modalMoves">0</strong>
+        <span>Moves</span>
+      </div>
+      <div class="modal-stat best">
+        <strong id="modalBest">—</strong>
+        <span>Best</span>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="continueBtn" style="width:100%; justify-content:center">Continue →</button>
+  </div>
+</div>
+
+<script>
+const LEVELS = [
+  // Level 1 - Easy intro
+  {
+    hero:{r:2,c:0,len:2,ori:'h'},
+    blocks:[
+      {r:0,c:0,len:2,ori:'h'},
+      {r:0,c:3,len:3,ori:'v'},
+      {r:1,c:2,len:2,ori:'v'},
+      {r:3,c:1,len:2,ori:'h'},
+      {r:3,c:4,len:2,ori:'v'},
+      {r:4,c:0,len:2,ori:'v'},
+      {r:5,c:3,len:3,ori:'h'},
+    ]
+  },
+  // Level 2
+  {
+    hero:{r:2,c:1,len:2,ori:'h'},
+    blocks:[
+      {r:0,c:0,len:3,ori:'v'},
+      {r:0,c:1,len:2,ori:'h'},
+      {r:0,c:4,len:2,ori:'v'},
+      {r:1,c:3,len:3,ori:'v'},
+      {r:3,c:0,len:2,ori:'h'},
+      {r:3,c:2,len:2,ori:'v'},
+      {r:4,c:4,len:2,ori:'v'},
+      {r:5,c:1,len:3,ori:'h'},
+    ]
+  },
+  // Level 3
+  {
+    hero:{r:2,c:0,len:2,ori:'h'},
+    blocks:[
+      {r:0,c:2,len:2,ori:'h'},
+      {r:0,c:4,len:2,ori:'v'},
+      {r:1,c:2,len:3,ori:'v'},
+      {r:1,c:5,len:2,ori:'v'},
+      {r:3,c:0,len:3,ori:'h'},
+      {r:3,c:3,len:2,ori:'v'},
+      {r:4,c:1,len:2,ori:'h'},
+      {r:5,c:3,len:2,ori:'h'},
+    ]
+  },
+  // Level 4 - Harder
+  {
+    hero:{r:2,c:0,len:2,ori:'h'},
+    blocks:[
+      {r:0,c:0,len:2,ori:'h'},
+      {r:0,c:2,len:3,ori:'v'},
+      {r:0,c:5,len:3,ori:'v'},
+      {r:1,c:3,len:2,ori:'h'},
+      {r:3,c:1,len:2,ori:'v'},
+      {r:3,c:2,len:3,ori:'h'},
+      {r:4,c:0,len:2,ori:'v'},
+      {r:5,c:3,len:2,ori:'h'},
+    ]
+  },
+  // Level 5 - Expert
+  {
+    hero:{r:2,c:1,len:2,ori:'h'},
+    blocks:[
+      {r:0,c:0,len:2,ori:'v'},
+      {r:0,c:1,len:3,ori:'h'},
+      {r:0,c:4,len:2,ori:'v'},
+      {r:1,c:3,len:2,ori:'v'},
+      {r:2,c:5,len:3,ori:'v'},
+      {r:3,c:0,len:2,ori:'h'},
+      {r:3,c:2,len:2,ori:'v'},
+      {r:4,c:3,len:2,ori:'h'},
+      {r:5,c:0,len:3,ori:'h'},
+    ]
+  },
+];
+
+const board = document.getElementById('board');
+const movesEl = document.getElementById('moves');
+const escapesEl = document.getElementById('escapes');
+const bestEl = document.getElementById('best');
+const dotsEl = document.getElementById('dots');
+const levelNumEl = document.getElementById('levelNum');
+const overlay = document.getElementById('overlay');
+const modalMoves = document.getElementById('modalMoves');
+const modalBest = document.getElementById('modalBest');
+const modalMsg = document.getElementById('modalMsg');
+
+let currentLevel = 0;
+let moves = 0;
+let escapes = 0;
+let bestMoves = {}; // level -> best
+let blocks = []; // current blocks including hero
+let history = [];
+let cellSize = 0;
+let dragging = null;
+
+function loadStorage(){
+  try{
+    const e = localStorage.getItem('be_escapes');
+    const b = localStorage.getItem('be_bestMoves');
+    const l = localStorage.getItem('be_level');
+    if(e) escapes = parseInt(e,10)||0;
+    if(b) bestMoves = JSON.parse(b)||{};
+    if(l) currentLevel = Math.min(4, parseInt(l,10)||0);
+  }catch(e){}
+  updateStats();
+}
+
+function saveStorage(){
+  try{
+    localStorage.setItem('be_escapes', String(escapes));
+    localStorage.setItem('be_bestMoves', JSON.stringify(bestMoves));
+    localStorage.setItem('be_level', String(currentLevel));
+  }catch(e){}
+}
+
+function updateStats(){
+  movesEl.textContent = moves;
+  escapesEl.textContent = escapes;
+  const best = bestMoves[currentLevel];
+  bestEl.textContent = best ? best : '—';
+  levelNumEl.textContent = currentLevel+1;
+  renderDots();
+}
+
+function renderDots(){
+  dotsEl.innerHTML='';
+  for(let i=0;i<5;i++){
+    const d=document.createElement('button');
+    d.className='dot';
+    if(i===currentLevel) d.classList.add('active');
+    else if(bestMoves[i]) d.classList.add('done');
+    d.textContent=i+1;
+    d.addEventListener('click', ()=>{ currentLevel=i; loadLevel(); });
+    dotsEl.appendChild(d);
+  }
+}
+
+function loadLevel(){
+  const lvl = LEVELS[currentLevel];
+  blocks = [];
+  // hero
+  blocks.push({id:'hero', r:lvl.hero.r, c:lvl.hero.c, len:lvl.hero.len, ori:lvl.hero.ori, isHero:true});
+  lvl.blocks.forEach((b,i)=>{
+    blocks.push({id:'b'+i, r:b.r, c:b.c, len:b.len, ori:b.ori, isHero:false});
+  });
+  moves=0;
+  history=[];
+  updateStats();
+  renderBoard();
+  saveStorage();
+}
+
+function renderBoard(){
+  // clear old blocks
+  board.querySelectorAll('.block').forEach(el=>el.remove());
+  cellSize = board.clientWidth / 6;
+  blocks.forEach(block=>{
+    const el=document.createElement('div');
+    el.className='block ' + (block.isHero?'hero': (block.ori==='h'?'horiz':'vert'));
+    if(!block.isHero && block.ori==='v'){
+      // alternate colors for variety
+      const idx = parseInt(block.id.slice(1)||0);
+      if(idx%3===1) el.classList.add('alt');
+      if(idx%3===2) el.classList.add('alt2');
+    }
+    el.dataset.id=block.id;
+    positionBlockEl(el, block);
+    el.innerHTML = `
+      <div class="block-grain"></div>
+      <span class="block-label">${block.isHero?'HERO':''}</span>
+      <span class="block-arrows">${block.ori==='h'?'↔':'↕'}</span>
+    `;
+    // pointer events
+    el.addEventListener('pointerdown', onPointerDown);
+    board.appendChild(el);
+  });
+  updateUndoBtn();
+}
+
+function positionBlockEl(el, block){
+  const pad=3;
+  if(block.ori==='h'){
+    el.style.left = (block.c * cellSize + pad) + 'px';
+    el.style.top = (block.r * cellSize + pad) + 'px';
+    el.style.width = (block.len * cellSize - pad*2) + 'px';
+    el.style.height = (cellSize - pad*2) + 'px';
+  } else {
+    el.style.left = (block.c * cellSize + pad) + 'px';
+    el.style.top = (block.r * cellSize + pad) + 'px';
+    el.style.width = (cellSize - pad*2) + 'px';
+    el.style.height = (block.len * cellSize - pad*2) + 'px';
+  }
+}
+
+function getBlockById(id){
+  return blocks.find(b=>b.id===id);
+}
+
+function isOccupied(r,c, ignoreId){
+  for(const b of blocks){
+    if(b.id===ignoreId) continue;
+    for(let k=0;k<b.len;k++){
+      const br = b.ori==='h' ? b.r : b.r + k;
+      const bc = b.ori==='h' ? b.c + k : b.c;
+      if(br===r && bc===c) return true;
+    }
+  }
+  return false;
+}
+
+function canMove(block, newR, newC){
+  // bounds
+  if(newR<0 || newC<0) return false;
+  if(block.ori==='h'){
+    if(newC + block.len > 6) return false;
+    if(newR !== block.r) return false;
+  } else {
+    if(newR + block.len > 6) return false;
+    if(newC !== block.c) return false;
+  }
+  // check each cell of new position
+  for(let k=0;k<block.len;k++){
+    const r = block.ori==='h' ? newR : newR + k;
+    const c = block.ori==='h' ? newC + k : newC;
+    if(isOccupied(r,c, block.id)) return false;
+  }
+  return true;
+}
+
+function maxSlide(block, dir){
+  // dir: -1 or +1 along orientation
+  let steps=0;
+  let testR=block.r, testC=block.c;
+  while(true){
+    const nr = block.ori==='h' ? testR : testR + dir;
+    const nc = block.ori==='h' ? testC + dir : testC;
+    // Actually for h, moving left/right changes c; for v, moving up/down changes r
+    let nextR = block.r, nextC = block.c;
+    if(block.ori==='h') nextC = block.c + dir*(steps+1);
+    else nextR = block.r + dir*(steps+1);
+    if(canMove(block, nextR, nextC)) steps++;
+    else break;
+    if(steps>6) break;
+  }
+  return steps;
+}
+
+function onPointerDown(e){
+  e.preventDefault();
+  const el=e.currentTarget;
+  const id=el.dataset.id;
+  const block=getBlockById(id);
+  if(!block) return;
+  dragging={
+    id, el, block,
+    startX:e.clientX, startY:e.clientY,
+    origR:block.r, origC:block.c,
+    currentR:block.r, currentC:block.c
+  };
+  el.classList.add('dragging');
+  el.setPointerCapture(e.pointerId);
+  el.addEventListener('pointermove', onPointerMove);
+  el.addEventListener('pointerup', onPointerUp);
+  el.addEventListener('pointercancel', onPointerUp);
+}
+
+function onPointerMove(e){
+  if(!dragging) return;
+  const dx = e.clientX - dragging.startX;
+  const dy = e.clientY - dragging.startY;
+  const block=dragging.block;
+  let deltaCells=0;
+  if(block.ori==='h'){
+    deltaCells = Math.round(dx / cellSize);
+  } else {
+    deltaCells = Math.round(dy / cellSize);
+  }
+  // clamp to max slide in that direction
+  let targetR = dragging.origR;
+  let targetC = dragging.origC;
+  if(block.ori==='h') targetC = dragging.origC + deltaCells;
+  else targetR = dragging.origR + deltaCells;
+
+  // check if target is reachable via step-by-step (can't jump over blocks)
+  // We need to ensure path is clear: we can only move if all intermediate positions are valid
+  // So we clamp deltaCells to max achievable in that direction
+  if(deltaCells!==0){
+    const dir = deltaCells>0?1:-1;
+    const maxSteps = maxSlide({r:dragging.origR,c:dragging.origC,len:block.len,ori:block.ori,id:block.id}, dir);
+    const clampedDelta = Math.max(-maxSteps, Math.min(maxSteps, deltaCells));
+    if(block.ori==='h') targetC = dragging.origC + clampedDelta;
+    else targetR = dragging.origR + clampedDelta;
+  }
+
+  // also ensure within bounds via canMove
+  if(!canMove(block, targetR, targetC)){
+    // if not valid, keep at orig (shouldn't happen due to clamp)
+    targetR=dragging.origR; targetC=dragging.origC;
+  }
+
+  dragging.currentR=targetR;
+  dragging.currentC=targetC;
+  // update visual position live
+  const pad=3;
+  if(block.ori==='h'){
+    dragging.el.style.left = (targetC * cellSize + pad) + 'px';
+  } else {
+    dragging.el.style.top = (targetR * cellSize + pad) + 'px';
+  }
+}
+
+function onPointerUp(e){
+  if(!dragging) return;
+  const el=dragging.el;
+  el.classList.remove('dragging');
+  el.removeEventListener('pointermove', onPointerMove);
+  el.removeEventListener('pointerup', onPointerUp);
+  el.removeEventListener('pointercancel', onPointerUp);
+  try{ el.releasePointerCapture(e.pointerId); }catch{}
+
+  const block=dragging.block;
+  const moved = dragging.currentR!==dragging.origR || dragging.currentC!==dragging.origC;
+  if(moved){
+    // save history
+    history.push({id:block.id, r:dragging.origR, c:dragging.origC});
+    block.r=dragging.currentR;
+    block.c=dragging.currentC;
+    moves++;
+    movesEl.textContent=moves;
+    updateUndoBtn();
+    checkWin();
+    if(navigator.vibrate) navigator.vibrate(20);
+  } else {
+    // snap back
+    positionBlockEl(el, block);
+  }
+  dragging=null;
+}
+
+function updateUndoBtn(){
+  document.getElementById('undoBtn').disabled = history.length===0;
+}
+
+function undo(){
+  if(history.length===0) return;
+  const last=history.pop();
+  const block=getBlockById(last.id);
+  if(block){
+    block.r=last.r;
+    block.c=last.c;
+    const el=board.querySelector(`[data-id="${last.id}"]`);
+    if(el) positionBlockEl(el, block);
+    moves=Math.max(0,moves-1);
+    movesEl.textContent=moves;
+    updateUndoBtn();
+  }
+}
+
+function checkWin(){
+  const hero=blocks.find(b=>b.isHero);
+  if(hero && hero.r===2 && hero.c + hero.len === 6){
+    // escaped!
+    escapes++;
+    const prevBest=bestMoves[currentLevel];
+    if(!prevBest || moves < prevBest){
+      bestMoves[currentLevel]=moves;
+    }
+    saveStorage();
+    updateStats();
+    // celebrate
+    modalMoves.textContent=moves;
+    modalBest.textContent=bestMoves[currentLevel];
+    if(!prevBest) modalMsg.textContent=`HERO escaped in ${moves} moves! First clear of level ${currentLevel+1}.`;
+    else if(moves < prevBest) modalMsg.textContent=`New best for level ${currentLevel+1}! Beat ${prevBest} with ${moves} moves.`;
+    else if(moves===prevBest) modalMsg.textContent=`Perfect! Matched your best of ${moves} moves.`;
+    else modalMsg.textContent=`Escaped in ${moves} moves. Best is ${prevBest} — can you beat it?`;
+    overlay.classList.add('show');
+    fireConfetti();
+    if(navigator.vibrate) navigator.vibrate([60,40,60]);
+  }
+}
+
+function restart(){
+  loadLevel();
+}
+
+function nextLevel(){
+  currentLevel=(currentLevel+1)%5;
+  loadLevel();
+}
+
+// Confetti
+const canvas=document.getElementById('confetti');
+const ctx=canvas.getContext('2d');
+let particles=[], running=false, raf=null;
+function resizeCanvas(){
+  canvas.width=window.innerWidth*window.devicePixelRatio;
+  canvas.height=window.innerHeight*window.devicePixelRatio;
+  canvas.style.width=window.innerWidth+'px';
+  canvas.style.height=window.innerHeight+'px';
+  ctx.setTransform(window.devicePixelRatio,0,0,window.devicePixelRatio,0,0);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+function fireConfetti(){
+  particles=[];
+  const colors=['#fbbf24','#f59e0b','#22c55e','#38bdf8','#a78bfa','#ef4444'];
+  for(let i=0;i<120;i++){
+    particles.push({
+      x:window.innerWidth/2 + (Math.random()-0.5)*100,
+      y:window.innerHeight/2 - 40,
+      vx:(Math.random()-0.5)*10,
+      vy:-Math.random()*9 -3,
+      r:Math.random()*6+4,
+      rot:Math.random()*360,
+      vr:(Math.random()-0.5)*10,
+      color:colors[Math.floor(Math.random()*colors.length)],
+      shape:Math.random()>0.5?'rect':'circle',
+      life:1
+    });
+  }
+  running=true;
+  if(raf) cancelAnimationFrame(raf);
+  animate();
+}
+function animate(){
+  if(!running) return;
+  ctx.clearRect(0,0,window.innerWidth,window.innerHeight);
+  let alive=0;
+  particles.forEach(p=>{
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.32; p.vx*=0.99; p.rot+=p.vr; p.life-=0.007;
+    if(p.y < window.innerHeight+20 && p.life>0){
+      alive++;
+      ctx.save();
+      ctx.translate(p.x,p.y);
+      ctx.rotate(p.rot*Math.PI/180);
+      ctx.fillStyle=p.color;
+      ctx.globalAlpha=Math.max(0,p.life);
+      if(p.shape==='rect') ctx.fillRect(-p.r/2,-p.r/2,p.r,p.r*0.6);
+      else {ctx.beginPath(); ctx.arc(0,0,p.r/2,0,Math.PI*2); ctx.fill();}
+      ctx.restore();
+    }
+  });
+  if(alive>0) raf=requestAnimationFrame(animate);
+  else {running=false; ctx.clearRect(0,0,window.innerWidth,window.innerHeight);}
+}
+
+// Events
+document.getElementById('undoBtn').addEventListener('click', undo);
+document.getElementById('restartBtn').addEventListener('click', restart);
+document.getElementById('nextBtn').addEventListener('click', nextLevel);
+document.getElementById('continueBtn').addEventListener('click', ()=>{
+  overlay.classList.remove('show');
+  nextLevel();
+});
+overlay.addEventListener('click', e=>{ if(e.target===overlay) overlay.classList.remove('show'); });
+window.addEventListener('resize', ()=>{ cellSize=board.clientWidth/6; blocks.forEach(b=>{
+  const el=board.querySelector(`[data-id="${b.id}"]`);
+  if(el) positionBlockEl(el,b);
+}); });
+
+// Init
+loadStorage();
+loadLevel();
+</script>
+</body>
+</html>

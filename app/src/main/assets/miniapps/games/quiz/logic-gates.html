@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Logic Gate Lab</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden;background:#f6f7f9}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;justify-content:center;color:#1a2332}
+.app{width:100%;max-width:428px;min-width:360px;background:#f6f7f9;min-height:100vh;display:flex;flex-direction:column;position:relative}
+.header{padding:12px 14px 10px;display:flex;justify-content:space-between;align-items:center;gap:10px;background:#fff;border-bottom:1px solid #e6e8ec;position:sticky;top:0;z-index:2}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:38px;height:38px;border-radius:10px;background:#1a2332;display:grid;place-items:center;font-size:18px;color:#fff}
+.brand h1{font-size:12px;letter-spacing:.06em;line-height:1}
+.brand p{font-size:10px;opacity:.6;letter-spacing:.06em}
+.stats{display:flex;gap:6px}
+.stat{background:#f0f2f5;border:1px solid #e6e8ec;border-radius:10px;padding:6px 8px;text-align:center;min-width:58px}
+.stat b{font-size:13px;display:block}
+.stat span{font-size:9px;opacity:.6;letter-spacing:.06em}
+.view{padding:10px;flex:1;display:flex;flex-direction:column;gap:10px}
+.card{background:#fff;border:1px solid #e6e8ec;border-radius:16px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.card h3{font-size:12px;letter-spacing:.06em;margin-bottom:8px}
+.inputs{display:flex;gap:10px}
+.inputBtn{flex:1;min-height:52px;border-radius:12px;border:2px solid #d8dde6;background:#f0f2f5;color:#1a2332;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:.15s}
+.inputBtn.on{background:#ffcc33;border-color:#e6b800;box-shadow:0 2px 8px rgba(255,204,51,.4)}
+.inputBtn:active{transform:scale(.97)}
+.gates{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.gate{padding:10px 6px;border-radius:12px;border:2px solid #e6e8ec;background:#f6f7f9;text-align:center;cursor:pointer;transition:.15s;min-height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.gate.active{background:#1a2332;color:#fff;border-color:#1a2332;box-shadow:0 4px 12px rgba(26,35,50,.2)}
+.gate:active{transform:scale(.97)}
+.gate b{font-size:12px}
+.gate span{font-size:10px;opacity:.7}
+.gate.active span{opacity:.9;color:#ffcc33}
+.lab{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.wire{flex:1;height:4px;background:#d8dde6;border-radius:20px;position:relative;overflow:hidden}
+.wire.on{background:#ffcc33;box-shadow:0 0 8px rgba(255,204,51,.6)}
+.wire.on::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent);animation:flow 1s linear infinite}
+@keyframes flow{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.chip{width:80px;height:60px;background:#1a2332;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:13px;position:relative;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.chip.on{box-shadow:0 0 16px rgba(255,204,51,.6);border:2px solid #ffcc33}
+.lamp{width:64px;height:64px;border-radius:50%;background:#eef1f5;border:3px solid #d8dde6;display:grid;place-items:center;font-size:28px;transition:.2s}
+.lamp.on{background:#ffcc33;border-color:#e6b800;box-shadow:0 0 20px rgba(255,204,51,.7)}
+.rule{font-size:12px;line-height:1.5;background:#f0f2f5;border:1px solid #e6e8ec;border-radius:10px;padding:8px}
+.truth{width:100%;border-collapse:collapse;font-size:12px}
+.truth th{background:#1a2332;color:#fff;padding:6px;font-size:10px;letter-spacing:.06em}
+.truth td{padding:6px;text-align:center;border:1px solid #e6e8ec}
+.truth tr.active{background:#fff8cc}
+.quiz{display:flex;gap:8px}
+.quizBtn{flex:1;min-height:48px;border-radius:12px;border:2px solid #d8dde6;background:#fff;font-weight:800;font-size:16px;cursor:pointer}
+.quizBtn:active{transform:scale(.97)}
+.quizBtn.correct{background:#0a7a42;color:#fff;border-color:#0a7a42}
+.quizBtn.wrong{background:#c0392b;color:#fff;border-color:#c0392b}
+.mode{display:flex;gap:8px}
+.modeBtn{flex:1;min-height:44px;border-radius:12px;border:1px solid #d8dde6;background:#fff;font-weight:700;font-size:12px;cursor:pointer}
+.modeBtn.active{background:#1a2332;color:#fff;border-color:#1a2332}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="header">
+<div class="brand"><div class="logo">◈</div><div><h1>LOGIC GATE LAB</h1><p>TOGGLE • SWITCH • OBSERVE</p></div></div>
+<div class="stats"><div class="stat"><b id="score">0</b><span>SCORE</span></div><div class="stat"><b id="streak">0</b><span>STREAK</span></div></div>
+</div>
+
+<div class="view">
+<div class="mode">
+<button class="modeBtn active" id="modeLab">🔬 Free Lab</button>
+<button class="modeBtn" id="modeQuiz">🧠 Quiz</button>
+</div>
+
+<div class="card">
+<h3>INPUTS — TAP TO TOGGLE</h3>
+<div class="inputs">
+<button class="inputBtn" id="btnA">A • 0</button>
+<button class="inputBtn" id="btnB">B • 0</button>
+</div>
+</div>
+
+<div class="card">
+<h3>GATE TYPE</h3>
+<div class="gates" id="gates"></div>
+</div>
+
+<div class="card">
+<h3>LAB BENCH — LIVE WIRES</h3>
+<div class="lab">
+<div style="text-align:center"><div style="font-size:10px;opacity:.6;letter-spacing:.06em">INPUT A</div><div class="wire" id="wireA"></div><div style="font-size:11px;font-weight:800" id="valA">0</div></div>
+<div class="chip" id="chip">AND</div>
+<div style="text-align:center"><div class="wire" id="wireOut"></div><div style="font-size:10px;opacity:.6;letter-spacing:.06em">OUTPUT</div></div>
+<div class="lamp" id="lamp">○</div>
+</div>
+<div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+<div style="flex:1"><div style="font-size:10px;opacity:.6;letter-spacing:.06em">RULE</div><div class="rule" id="rule">AND: 1 only when A and B are both 1</div></div>
+<div style="text-align:center;min-width:70px"><div style="font-size:10px;opacity:.6;letter-spacing:.06em">OUTPUT</div><div style="font-size:18px;font-weight:800" id="outVal">0</div><div style="font-size:10px;opacity:.6" id="outLabel">OFF</div></div>
+</div>
+</div>
+
+<div class="card">
+<h3>TRUTH-TABLE HINT</h3>
+<table class="truth" id="truth"></table>
+</div>
+
+<div class="card" id="quizCard" style="display:none">
+<h3>PREDICT OUTPUT</h3>
+<p style="font-size:12px;opacity:.7;margin-bottom:8px">What will the lamp show? Tap 0 or 1.</p>
+<div class="quiz">
+<button class="quizBtn" id="predict0">0</button>
+<button class="quizBtn" id="predict1">1</button>
+</div>
+<div style="font-size:11px;text-align:center;margin-top:8px;opacity:.6" id="quizFeedback">Make a prediction to score</div>
+</div>
+
+<div style="display:flex;gap:8px">
+<button class="btn" style="flex:1;min-height:44px;border:1px solid #d8dde6;background:#fff;border-radius:12px;font-weight:700" id="btnReset">↺ Reset Score</button>
+<button class="btn" style="flex:1;min-height:44px;background:#1a2332;color:#fff;border-radius:12px;font-weight:700" id="btnRandom">🎲 Randomize</button>
+</div>
+<p style="font-size:10px;opacity:.5;text-align:center;line-height:1.4">Toggle A/B, switch gates, watch lamp live • Quiz mode tests predictions • Score & streak persist in session</p>
+</div>
+</div>
+<script>
+const GATES=[
+ {id:'AND',rule:'AND: 1 only when A and B are both 1',fn:(a,b)=>a&b},
+ {id:'OR',rule:'OR: 1 when A or B is 1',fn:(a,b)=>a|b},
+ {id:'NOT',rule:'NOT: 1 when A is 0 (ignores B)',fn:(a,b)=>a?0:1},
+ {id:'NAND',rule:'NAND: 0 only when A and B are both 1',fn:(a,b)=> (a&b)?0:1},
+ {id:'NOR',rule:'NOR: 1 only when A and B are both 0',fn:(a,b)=> (a|b)?0:1},
+ {id:'XOR',rule:'XOR: 1 when A and B differ',fn:(a,b)=>a^b},
+ {id:'XNOR',rule:'XNOR: 1 when A and B are same',fn:(a,b)=>a===b?1:0},
+];
+let A=0,B=0,gate='AND',score=0,streak=0,bestStreak=0,mode='lab';
+const STORAGE_KEY='logicLab_v1';
+try{const s=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null'); if(s){score=s.score||0; streak=s.streak||0; bestStreak=s.bestStreak||0}}catch(e){}
+
+const $=id=>document.getElementById(id);
+const gatesEl=$('gates'), truthEl=$('truth');
+
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify({score,streak,bestStreak}))}
+
+function renderGates(){
+ gatesEl.innerHTML='';
+ GATES.forEach(g=>{
+  const div=document.createElement('div');
+  div.className='gate'+(g.id===gate?' active':'');
+  div.innerHTML=`<b>${g.id}</b><span>${g.id==='NOT'?'¬A':'A '+symbol(g.id)+' B'}</span>`;
+  div.onclick=()=>{gate=g.id; renderAll();};
+  gatesEl.appendChild(div);
+ });
+}
+function symbol(id){
+ if(id==='AND') return '·';
+ if(id==='OR') return '+';
+ if(id==='NAND') return '⊼';
+ if(id==='NOR') return '⊽';
+ if(id==='XOR') return '⊕';
+ if(id==='XNOR') return '⊙';
+ return '';
+}
+
+function compute(){ const g=GATES.find(x=>x.id===gate); return g.fn(A,B); }
+
+function renderAll(){
+ $('btnA').textContent=`A • ${A}`; $('btnA').className='inputBtn'+(A?' on':'');
+ $('btnB').textContent=`B • ${B}`; $('btnB').className='inputBtn'+(B?' on':'');
+ $('valA').textContent=A; $('wireA').className='wire'+(A?' on':'');
+ const out=compute();
+ $('chip').textContent=gate; $('chip').className='chip'+(out?' on':'');
+ $('wireOut').className='wire'+(out?' on':'');
+ $('lamp').textContent= out?'💡':'○'; $('lamp').className='lamp'+(out?' on':'');
+ $('outVal').textContent=out; $('outLabel').textContent= out?'ON • 1':'OFF • 0';
+ $('outVal').style.color= out?'#0a7a42':'#1a2332';
+ const g=GATES.find(x=>x.id===gate);
+ $('rule').textContent=g.rule;
+ renderGates(); renderTruth();
+ $('score').textContent=score; $('streak').textContent=streak;
+}
+
+function renderTruth(){
+ const g=GATES.find(x=>x.id===gate);
+ let html='<tr><th>A</th><th>B</th><th>Q</th></tr>';
+ for(let a=0;a<=1;a++) for(let b=0;b<=1;b++){
+  const q=g.fn(a,b);
+  const active= (a===A && b===B) ? ' class="active"' : '';
+  html+=`<tr${active}><td>${a}</td><td>${b}</td><td style="font-weight:800;color:${q?'#0a7a42':'#c0392b'}">${q}</td></tr>`;
+ }
+ truthEl.innerHTML=html;
+}
+
+$('btnA').onclick=()=>{A^=1; renderAll(); if(mode==='quiz') resetQuiz();};
+$('btnB').onclick=()=>{B^=1; renderAll(); if(mode==='quiz') resetQuiz();};
+$('btnRandom').onclick=()=>{
+ A=Math.random()<0.5?0:1; B=Math.random()<0.5?0:1;
+ gate=GATES[Math.floor(Math.random()*GATES.length)].id;
+ renderAll(); if(mode==='quiz') resetQuiz();
+};
+$('btnReset').onclick=()=>{score=0; streak=0; save(); renderAll();};
+
+$('modeLab').onclick=()=>{
+ mode='lab'; $('modeLab').classList.add('active'); $('modeQuiz').classList.remove('active');
+ $('quizCard').style.display='none';
+};
+$('modeQuiz').onclick=()=>{
+ mode='quiz'; $('modeQuiz').classList.add('active'); $('modeLab').classList.remove('active');
+ $('quizCard').style.display='block';
+ // randomize for quiz
+ A=Math.random()<0.5?0:1; B=Math.random()<0.5?0:1;
+ gate=GATES[Math.floor(Math.random()*GATES.length)].id;
+ renderAll(); resetQuiz();
+};
+function resetQuiz(){
+ $('predict0').className='quizBtn'; $('predict1').className='quizBtn';
+ $('quizFeedback').textContent='What will the lamp show? Tap 0 or 1.';
+ $('quizFeedback').style.color='#1a2332';
+}
+function predict(val){
+ const out=compute();
+ const correct= val===out;
+ if(correct){ score++; streak++; if(streak>bestStreak) bestStreak=streak; $('quizFeedback').textContent=`Correct! ${gate} with A=${A} B=${B} → ${out} ★ Streak ${streak}`; $('quizFeedback').style.color='#0a7a42'; }
+ else { streak=0; $('quizFeedback').textContent=`Wrong — ${gate} with A=${A} B=${B} → ${out}. Streak reset.`; $('quizFeedback').style.color='#c0392b'; }
+ save(); renderAll();
+ // highlight
+ if(val===0) $('predict0').className='quizBtn'+(correct?' correct':' wrong');
+ else $('predict1').className='quizBtn'+(correct?' correct':' wrong');
+ try{navigator.vibrate&&navigator.vibrate(correct?30:60)}catch(e){}
+ setTimeout(()=>{
+  if(mode==='quiz'){
+   A=Math.random()<0.5?0:1; B=Math.random()<0.5?0:1;
+   gate=GATES[Math.floor(Math.random()*GATES.length)].id;
+   renderAll(); resetQuiz();
+  }
+ }, 900);
+}
+$('predict0').onclick=()=>predict(0);
+$('predict1').onclick=()=>predict(1);
+
+renderAll();
+</script>
+</body>
+</html>

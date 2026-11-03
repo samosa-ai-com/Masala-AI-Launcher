@@ -26,6 +26,23 @@ android {
     namespace = "com.samosaai.masala"
     compileSdk = 36
 
+    // The suite is a thousand small pure tests: two JVMs halve the wait on CI and are safe
+    // (each test uses its own temp folders).
+    lint {
+        // Unit-test and androidTest sources are checked by the compiler and the tests themselves;
+        // linting them again cost three and a half minutes per CI run.
+        checkTestSources = false
+    }
+
+    testOptions {
+        // android.util.Log is a stub in JVM tests; return its defaults instead of throwing, so a
+        // test can exercise a failed save (which logs) without Robolectric.
+        unitTests.isReturnDefaultValues = true
+        unitTests.all { test ->
+            test.maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 2)
+        }
+    }
+
     defaultConfig {
         // Placeholder until the real app ID is chosen (plan §8).
         applicationId = "com.samosaai.masala"
@@ -47,6 +64,19 @@ android {
         buildConfigField("String", "MASALA_STT_BASE_URL", "\"${samosaConfig("MASALA_STT_BASE_URL", llmBase)}\"")
         buildConfigField("String", "MASALA_STT_API_KEY", "\"${samosaConfig("MASALA_STT_API_KEY", samosaConfig("MASALA_LLM_API_KEY", ""))}\"")
         buildConfigField("String", "MASALA_STT_MODEL", "\"${samosaConfig("MASALA_STT_MODEL", "")}\"")
+    }
+
+    buildTypes {
+        // What frame times are measured on (plan UI refresh U0): R8 and resource shrinking like a
+        // release, but signed with the debug key so it installs over a debug build and keeps its data.
+        create("profile") {
+            initWith(getByName("release"))
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
     }
 
     buildFeatures {
@@ -85,7 +115,12 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons)
+    implementation(libs.compose.material.icons.extended)
+    implementation(libs.androidx.webkit)
     implementation(libs.compose.ui.tooling.preview)
+    // Installs the start-up profiles Compose and the other AndroidX libraries ship.
+    implementation(libs.androidx.profileinstaller)
     debugImplementation(libs.compose.ui.tooling)
 
     implementation(libs.room.runtime)
@@ -97,15 +132,25 @@ dependencies {
     implementation(libs.retrofit.kotlinx.serialization)
     implementation(libs.okhttp.logging)
     implementation(libs.jsoup)
+    implementation(libs.workmanager)
+    implementation(libs.richtext.material3)
+    implementation(libs.richtext.commonmark)
     implementation(libs.media3.transformer)
     implementation(libs.media3.effect)
     implementation(libs.media3.common)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.exoplayer.rtsp)
+    implementation(libs.media3.exoplayer.hls)
+    implementation(libs.media3.exoplayer.dash)
+    implementation(libs.media3.ui)
     implementation(libs.health.connect)
     implementation(libs.pdfbox.android)
+    implementation(libs.androidsvg)
 
     testImplementation(kotlin("test-junit"))
     testImplementation(libs.okhttp.mockwebserver)
 
+    androidTestImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.runner)

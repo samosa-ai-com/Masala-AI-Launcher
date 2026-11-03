@@ -43,7 +43,7 @@ data class ModelInfo(
 )
 
 /** Categorization of a model from the API. */
-enum class ModelCategory { TTS, STT, LLM, UNKNOWN }
+enum class ModelCategory { TTS, STT, LLM, IMAGE, UNKNOWN }
 
 /** Detailed voice metadata for TTS models. */
 data class VoiceInfo(
@@ -111,6 +111,11 @@ data class AudioModel(
             "speech-to-text",
             "transcription"
         )
+        private val IMAGE_HINTS = setOf(
+            "image-generation",
+            "text-to-image",
+            "image"
+        )
         private val LLM_HINTS = setOf(
             "llm",
             "chat",
@@ -140,6 +145,7 @@ data class AudioModel(
             return when (normalized) {
                 in TTS_HINTS -> ModelCategory.TTS
                 in STT_HINTS -> ModelCategory.STT
+                in IMAGE_HINTS -> ModelCategory.IMAGE
                 in LLM_HINTS -> ModelCategory.LLM
                 else -> null
             }
@@ -148,10 +154,11 @@ data class AudioModel(
         private fun classifyByName(id: String): ModelCategory {
             val lower = id.lowercase()
             return when {
-                lower.contains("whisper") -> ModelCategory.STT
-                lower.contains("stt") -> ModelCategory.STT
-                lower.contains("transcription") -> ModelCategory.STT
-                lower.contains("translate") -> ModelCategory.STT
+                lower.contains("image") -> ModelCategory.IMAGE
+                // Transcription wins over "voice": a model called "voice-transcribe" records
+                // speech, it does not speak (it was being classified as TTS and never selected).
+                lower.contains("transcri") || lower.contains("whisper") || lower.contains("stt") ||
+                    lower.contains("asr") || lower.contains("translate") -> ModelCategory.STT
                 lower.contains("tts") -> ModelCategory.TTS
                 lower.contains("speech") -> ModelCategory.TTS
                 lower.contains("kokoro") -> ModelCategory.TTS

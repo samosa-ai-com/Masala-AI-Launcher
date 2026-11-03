@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+<title>Deep Sea Descender</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#020B14;color:#E6F6FF;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif;overflow-x:hidden;overscroll-behavior:none}
+body{display:flex;justify-content:center;background:radial-gradient(1200px 600px at 50% -10%, #0a2a4a 0%, #020B14 60%)}
+.wrap{width:100%;max-width:428px;min-width:360px;min-height:100vh;display:flex;flex-direction:column;padding:10px 10px 12px;gap:8px}
+.topbar{display:flex;align-items:center;justify-content:space-between;background:rgba(6,22,40,0.95);border:1px solid #16425f;border-radius:14px;padding:8px 10px;backdrop-filter:blur(6px)}
+.brand{display:flex;align-items:center;gap:8px}
+.logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(180deg,#0ea5e9,#0c4a6e);display:grid;place-items:center;font-size:16px;border:1px solid #38bdf8}
+.brand h1{font-size:13px;letter-spacing:0.6px;line-height:1}
+.brand p{font-size:10px;opacity:0.7;letter-spacing:0.4px}
+.top-actions{display:flex;gap:6px}
+.icon-btn{width:38px;height:38px;border-radius:10px;border:1px solid #1e4a6e;background:#0b2238;color:#cfe8ff;font-size:16px;display:grid;place-items:center}
+.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.hud-card{background:rgba(6,22,40,0.95);border:1px solid #16425f;border-radius:12px;padding:7px 8px;text-align:center}
+.hud-label{font-size:9px;letter-spacing:0.8px;opacity:0.65;text-transform:uppercase}
+.hud-value{font-size:16px;font-weight:800;margin-top:2px;letter-spacing:0.3px}
+.hud-sub{font-size:10px;opacity:0.7;margin-top:1px}
+.lives{display:flex;justify-content:center;gap:4px;margin-top:4px}
+.heart{width:14px;height:14px;border-radius:50%;background:#0ea5e9;border:1px solid #7dd3fc;box-shadow:0 0 8px rgba(14,165,233,0.6)}
+.heart.off{background:transparent;border-color:#334155;box-shadow:none;opacity:0.35}
+.heart.grace{animation:blink 0.2s infinite alternate}
+@keyframes blink{from{opacity:1}to{opacity:0.25}}
+.canvas-wrap{position:relative;flex:1;min-height:520px;border-radius:18px;overflow:hidden;border:1px solid #1e4a6e;background:#001525;box-shadow:0 12px 30px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(56,189,248,0.08)}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;text-align:center;background:linear-gradient(180deg, rgba(2,11,20,0.55), rgba(2,11,20,0.85));backdrop-filter:blur(2px)}
+.overlay.hidden{display:none}
+.badge{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;background:rgba(14,165,233,0.15);border:1px solid rgba(56,189,248,0.4);color:#7dd3fc;padding:6px 10px;border-radius:999px}
+.overlay h2{font-size:26px;margin:12px 0 6px;letter-spacing:0.5px;text-shadow:0 2px 12px rgba(56,189,248,0.5)}
+.overlay p{font-size:13px;line-height:1.5;opacity:0.85;max-width:300px}
+.cta{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.btn{height:48px;padding:0 18px;border-radius:14px;border:none;font-weight:800;font-size:15px;letter-spacing:0.3px;min-width:120px}
+.btn-primary{background:linear-gradient(180deg,#38bdf8,#0284c7);color:white;box-shadow:0 6px 18px rgba(2,132,199,0.4);border:1px solid #7dd3fc}
+.btn-ghost{background:rgba(255,255,255,0.08);color:#e0f2fe;border:1px solid #1e4a6e}
+.hint{margin-top:10px;font-size:11px;opacity:0.6}
+.controls{display:flex;flex-direction:column;gap:8px}
+.hold-area{position:relative}
+.hold-btn{width:100%;height:76px;border-radius:18px;border:1px solid #0ea5e9;background:linear-gradient(180deg,#0ea5e9 0%, #0369a1 100%);color:white;font-size:18px;font-weight:900;letter-spacing:0.8px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 8px 20px rgba(14,165,233,0.35), inset 0 1px 0 rgba(255,255,255,0.25)}
+.hold-btn.holding{background:linear-gradient(180deg,#38bdf8 0%, #0284c7 100%);box-shadow:0 0 24px rgba(56,189,248,0.7), 0 8px 20px rgba(14,165,233,0.4);transform:scale(0.99)}
+.hold-btn span{font-size:22px}
+.hold-label{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;display:flex;align-items:center;gap:8px}
+.dir{display:flex;justify-content:space-between;font-size:10px;letter-spacing:0.8px;opacity:0.6;text-transform:uppercase;padding:0 4px}
+.dir b{color:#7dd3fc}
+.bottom-stats{display:flex;gap:8px}
+.mini{flex:1;background:rgba(6,22,40,0.95);border:1px solid #16425f;border-radius:12px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center}
+.mini-label{font-size:10px;opacity:0.65;letter-spacing:0.6px;text-transform:uppercase}
+.mini-val{font-size:14px;font-weight:800}
+.streak-bar{height:6px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;margin-top:6px}
+.streak-fill{height:100%;width:0%;background:linear-gradient(90deg,#facc15,#f97316);transition:width 0.2s}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">◈</div>
+      <div>
+        <h1>DEEP DESCENDER</h1>
+        <p>HOLD → RELEASE ←</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="pauseBtn" aria-label="Pause">⏸</button>
+      <button class="icon-btn" id="restartBtn" aria-label="Restart">↻</button>
+    </div>
+  </div>
+
+  <div class="hud">
+    <div class="hud-card">
+      <div class="hud-label">Depth</div>
+      <div class="hud-value" id="depthVal">0 m</div>
+      <div class="hud-sub" id="speedVal">90 m/s</div>
+    </div>
+    <div class="hud-card">
+      <div class="hud-label">Score</div>
+      <div class="hud-value" id="scoreVal">0</div>
+      <div class="hud-sub">Best <span id="bestVal">0</span></div>
+    </div>
+    <div class="hud-card">
+      <div class="hud-label">Lives</div>
+      <div class="lives" id="livesEl"></div>
+      <div class="hud-sub" id="graceVal" style="margin-top:4px">● READY</div>
+    </div>
+  </div>
+
+  <div class="canvas-wrap" id="gameWrap">
+    <canvas id="c" width="400" height="560"></canvas>
+    <div class="overlay" id="startOverlay">
+      <div class="badge">Breathing Corridor • 3 Lives • Grace Shield</div>
+      <h2>PLUNGE INTO<br>THE ABYSS</h2>
+      <p><b style="color:#7dd3fc">HOLD</b> to drift right, <b style="color:#7dd3fc">RELEASE</b> to drift left. Stay inside the breathing walls, collect glowing orbs, build streaks.</p>
+      <div class="cta">
+        <button class="btn btn-primary" id="playBtn">DIVE — HOLD TO START</button>
+        <button class="btn btn-ghost" id="howBtn">HOW TO PLAY</button>
+      </div>
+      <div class="hint">Tip: corridor narrows with depth • walls breathe • streaks multiply points</div>
+    </div>
+    <div class="overlay hidden" id="pauseOverlay">
+      <div class="badge">Paused</div>
+      <h2> HOLD POSITION</h2>
+      <p>Depth frozen. Release to resume the plunge.</p>
+      <div class="cta">
+        <button class="btn btn-primary" id="resumeBtn">RESUME</button>
+        <button class="btn btn-ghost" id="restartBtn2">RESTART</button>
+      </div>
+    </div>
+    <div class="overlay hidden" id="overOverlay">
+      <div class="badge" style="border-color:#f87171;color:#fecaca;background:rgba(248,113,113,0.12)">Signal Lost</div>
+      <h2 id="overTitle">CRUSH DEPTH</h2>
+      <p id="overDesc">You reached 0 m • Score 0</p>
+      <div class="cta">
+        <button class="btn btn-primary" id="againBtn">DIVE AGAIN</button>
+        <button class="btn btn-ghost" id="shareBtn">BEST: 0</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="dir"><span>◀ RELEASE = LEFT</span><span>HOLD = RIGHT ▶</span></div>
+    <div class="hold-area">
+      <button class="hold-btn" id="holdBtn"><span>⬢</span> HOLD TO DRIFT RIGHT</button>
+    </div>
+    <div class="bottom-stats">
+      <div class="mini" style="flex:1.2">
+        <div>
+          <div class="mini-label">Streak</div>
+          <div class="mini-val" id="streakVal">0×</div>
+          <div class="streak-bar"><div class="streak-fill" id="streakFill"></div></div>
+        </div>
+        <div style="text-align:right">
+          <div class="mini-label">Multiplier</div>
+          <div class="mini-val" id="multVal">×1.0</div>
+          <div class="mini-label" id="nextOrb">+100 next</div>
+        </div>
+      </div>
+      <div class="mini" style="flex:0.8;flex-direction:column;align-items:stretch;gap:4px">
+        <div style="display:flex;justify-content:space-between;width:100%"><span class="mini-label">Orbs</span><span class="mini-val" id="orbsVal">0</span></div>
+        <div style="display:flex;justify-content:space-between;width:100%"><span class="mini-label">Walls Hit</span><span class="mini-val" id="hitsVal">0</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('gameWrap');
+const holdBtn = document.getElementById('holdBtn');
+const depthVal = document.getElementById('depthVal');
+const speedVal = document.getElementById('speedVal');
+const scoreVal = document.getElementById('scoreVal');
+const bestVal = document.getElementById('bestVal');
+const livesEl = document.getElementById('livesEl');
+const graceVal = document.getElementById('graceVal');
+const streakVal = document.getElementById('streakVal');
+const multVal = document.getElementById('multVal');
+const nextOrb = document.getElementById('nextOrb');
+const orbsVal = document.getElementById('orbsVal');
+const hitsVal = document.getElementById('hitsVal');
+const streakFill = document.getElementById('streakFill');
+const startOverlay = document.getElementById('startOverlay');
+const pauseOverlay = document.getElementById('pauseOverlay');
+const overOverlay = document.getElementById('overOverlay');
+const overTitle = document.getElementById('overTitle');
+const overDesc = document.getElementById('overDesc');
+
+let W=400,H=560,dpr=1;
+function resize(){
+  const rect = wrap.getBoundingClientRect();
+  W = rect.width;
+  H = rect.height;
+  dpr = Math.min(2, window.devicePixelRatio||1);
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W+'px';
+  canvas.style.height = H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Game state
+let running=false, paused=false, gameOver=false;
+let time=0, depth=0, score=0, orbScore=0, best=0, lives=3, grace=0, streak=0, orbsCollected=0, hits=0;
+let scrollSpeed=95;
+let shake=0;
+let holding=false;
+let player={x:0,y:0,r:13,vx:0};
+let orbs=[], particles=[], bubbles=[];
+let spawnTimer=0;
+let wallPhase=0;
+
+try{ best = parseInt(localStorage.getItem('deepSeaBest')||'0',10)||0 }catch(e){}
+bestVal.textContent = best;
+
+function resetGame(){
+  time=0; depth=0; score=0; orbScore=0; lives=3; grace=0; streak=0; orbsCollected=0; hits=0;
+  scrollSpeed=95; shake=0; spawnTimer=0.4; orbs=[]; particles=[]; bubbles=[];
+  player.x = W/2; player.y = H*0.62; player.vx=0;
+  for(let i=0;i<12;i++) bubbles.push({x:Math.random()*W,y:Math.random()*H, r:1+Math.random()*2.5, vy:20+Math.random()*40, alpha:0.15+Math.random()*0.35});
+  updateHUD();
+  renderLives();
+}
+
+function corridorAt(t, d){
+  // breathing + narrowing logic
+  const baseW = W*0.68;
+  const minW = W*0.30;
+  const narrowT = Math.min(1, d/7000); // fully narrow at 7000m
+  const baseWidth = baseW - (baseW - minW) * narrowT;
+  // breathing: two sines for organic feel
+  const breathe = Math.sin(t*0.85)* (14 + narrowT*10) + Math.sin(t*1.65)*6 + Math.cos(t*0.55)*4;
+  const width = Math.max(minW*0.85, baseWidth + breathe);
+  // center drift slowly with depth
+  const drift = Math.sin(t*0.38)* (12 + d*0.003) + Math.sin(t*0.21)*8;
+  const cx = W/2 + drift;
+  return {left: cx - width/2, right: cx + width/2, width, cx, narrowT};
+}
+
+function updateHUD(){
+  depthVal.textContent = Math.floor(depth) + ' m';
+  speedVal.textContent = Math.floor(scrollSpeed) + ' m/s';
+  scoreVal.textContent = score;
+  bestVal.textContent = best;
+  orbsVal.textContent = orbsCollected;
+  hitsVal.textContent = hits;
+  streakVal.textContent = streak + '×';
+  const mult = 1 + Math.floor(streak/3)*0.5;
+  multVal.textContent = '×' + mult.toFixed(1);
+  nextOrb.textContent = '+' + Math.floor(100*mult) + ' next';
+  streakFill.style.width = Math.min(100, (streak%3)/3*100 + Math.floor(streak/3)*12) + '%';
+  if(grace>0) graceVal.textContent = '◉ GRACE ' + grace.toFixed(1)+'s';
+  else if(lives>0) graceVal.textContent = '● READY';
+  else graceVal.textContent = '○ LOST';
+  graceVal.style.color = grace>0 ? '#facc15' : '#7dd3fc';
+}
+
+function renderLives(){
+  livesEl.innerHTML='';
+  for(let i=0;i<3;i++){
+    const h=document.createElement('div');
+    h.className='heart' + (i>=lives?' off':'') + (grace>0 && i<lives ? ' grace':'');
+    livesEl.appendChild(h);
+  }
+}
+
+function spawnOrb(corridor){
+  const pad=22;
+  const x = corridor.left + pad + Math.random()*(corridor.width - pad*2);
+  const y = -18;
+  const type = Math.random()<0.12 ? 'rare' : 'common';
+  orbs.push({x,y, r: type==='rare'?11:8, vy: scrollSpeed*0.95, type, rot:Math.random()*Math.PI, pulse:Math.random()*Math.PI*2, collected:false});
+}
+
+function addParticles(x,y,color,count=8){
+  for(let i=0;i<count;i++){
+    particles.push({x,y, vx:(Math.random()-0.5)*180, vy:(Math.random()-0.5)*180 -20, r:2+Math.random()*3, life:0.5+Math.random()*0.4, t:0, color});
+  }
+}
+
+let last=0;
+function loop(now){
+  requestAnimationFrame(loop);
+  if(!last) last=now;
+  let dt = (now-last)/1000;
+  last=now;
+  dt = Math.min(dt, 0.033);
+  if(paused || !running) { draw(); return; }
+  time += dt;
+
+  // depth & speed
+  depth += scrollSpeed * dt;
+  scrollSpeed = 95 + depth*0.018 + streak*1.8;
+  // corridor
+  const corr = corridorAt(time, depth);
+
+  // hold/release physics
+  const accel = 1450;
+  const maxSpeed = 300 + depth*0.01;
+  const friction = 0.88;
+  if(holding) player.vx += accel * dt;
+  else player.vx -= accel * dt;
+  // damping
+  player.vx *= Math.pow(friction, dt*60);
+  player.vx = Math.max(-maxSpeed, Math.min(maxSpeed, player.vx));
+  player.x += player.vx * dt;
+  // clamp inside corridor with soft bounce
+  const minX = corr.left + player.r + 4;
+  const maxX = corr.right - player.r - 4;
+  if(player.x < minX){ player.x = minX; if(player.vx<0) player.vx *= -0.25; }
+  if(player.x > maxX){ player.x = maxX; if(player.vx>0) player.vx *= -0.25; }
+
+  // grace timer
+  if(grace>0){ grace -= dt; if(grace<=0){ grace=0; renderLives(); } }
+
+  // spawn orbs
+  spawnTimer -= dt;
+  if(spawnTimer<=0){
+    spawnOrb(corr);
+    // spawn rate increases with depth
+    const rate = Math.max(0.35, 0.85 - depth*0.00006 - streak*0.01);
+    spawnTimer = rate + Math.random()*0.35;
+    // occasional double spawn at depth
+    if(depth>1200 && Math.random()<0.18) spawnOrb(corr);
+  }
+
+  // update orbs
+  for(let i=orbs.length-1;i>=0;i--){
+    const o=orbs[i];
+    o.y += o.vy * dt + scrollSpeed*0.15*dt;
+    o.vy = scrollSpeed*0.9;
+    o.rot += dt*1.2;
+    o.pulse += dt*4;
+    // collect
+    const dx=o.x-player.x, dy=o.y-player.y;
+    const dist=Math.hypot(dx,dy);
+    if(dist < o.r + player.r -1){
+      // collect
+      const mult = 1 + Math.floor(streak/3)*0.5;
+      const pts = Math.floor((o.type==='rare'?250:100)*mult);
+      orbScore += pts;
+      score = Math.floor(depth/6) + orbScore;
+      if(score>best){ best=score; try{localStorage.setItem('deepSeaBest', best)}catch(e){} }
+      streak++; orbsCollected++;
+      addParticles(o.x,o.y, o.type==='rare'?'#facc15':'#38bdf8', o.type==='rare'?14:9);
+      orbs.splice(i,1);
+      // haptic
+      if(navigator.vibrate) navigator.vibrate(20);
+      updateHUD();
+      continue;
+    }
+    if(o.y > H+30) orbs.splice(i,1);
+  }
+
+  // wall collision (only if not in grace)
+  const hitWall = (player.x - player.r <= corr.left + 2) || (player.x + player.r >= corr.right -2);
+  if(hitWall && grace<=0){
+    lives--; hits++; grace=1.4; shake=16;
+    streak=0;
+    addParticles(player.x, player.y, '#f87171', 12);
+    if(navigator.vibrate) navigator.vibrate([40,30,40]);
+    renderLives();
+    updateHUD();
+    if(lives<=0){
+      gameOver=true; running=false;
+      overDesc.textContent = `You reached ${Math.floor(depth)} m • Score ${score} • Orbs ${orbsCollected}`;
+      document.getElementById('shareBtn').textContent = 'BEST: ' + best;
+      overTitle.textContent = depth>4000 ? 'ABYSS CLAIMED' : depth>2000 ? 'CRUSH DEPTH' : 'SIGNAL LOST';
+      overOverlay.classList.remove('hidden');
+      try{ if(score>=best) localStorage.setItem('deepSeaBest', best)}catch(e){}
+    }
+  }
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.t+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+= 80*dt; p.life-=dt;
+    if(p.life<=0) particles.splice(i,1);
+  }
+  // bubbles
+  for(let b of bubbles){
+    b.y -= b.vy*dt;
+    b.x += Math.sin(time*0.8 + b.r)*0.4;
+    if(b.y < -10){ b.y = H+10; b.x = Math.random()*W; }
+  }
+
+  // shake decay
+  if(shake>0) shake *= Math.pow(0.82, dt*60);
+  if(shake<0.3) shake=0;
+
+  // score from depth
+  score = Math.floor(depth/6) + orbScore;
+  if(score>best){ best=score; try{localStorage.setItem('deepSeaBest', best)}catch(e){} }
+  updateHUD();
+  draw(corr);
+}
+
+function draw(passedCorr){
+  const corr = passedCorr || corridorAt(time, depth);
+  ctx.save();
+  if(shake>0){
+    ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+  }
+  // background
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#02182e');
+  g.addColorStop(0.5,'#031a33');
+  g.addColorStop(1,'#020b14');
+  ctx.fillStyle=g;
+  ctx.fillRect(0,0,W,H);
+
+  // depth lines
+  ctx.strokeStyle='rgba(56,189,248,0.07)';
+  ctx.lineWidth=1;
+  for(let y=0;y<H;y+=28){
+    const off = (depth*0.4 + y) % 28;
+    ctx.beginPath();
+    ctx.moveTo(0, y - off);
+    ctx.lineTo(W, y - off);
+    ctx.stroke();
+  }
+
+  // corridor walls with breathing
+  // left wall
+  ctx.fillStyle='#0a2a4a';
+  ctx.beginPath();
+  ctx.moveTo(0,0);
+  ctx.lineTo(corr.left,0);
+  // wavy edge
+  for(let y=0;y<=H;y+=12){
+    const wob = Math.sin(y*0.04 + time*1.1)*3 + Math.cos(y*0.02 - time*0.9)*2;
+    ctx.lineTo(corr.left + wob, y);
+  }
+  ctx.lineTo(0,H);
+  ctx.closePath();
+  ctx.fill();
+  // right wall
+  ctx.beginPath();
+  ctx.moveTo(W,0);
+  ctx.lineTo(corr.right,0);
+  for(let y=0;y<=H;y+=12){
+    const wob = Math.sin(y*0.04 + time*1.1 + 1.2)*3 + Math.cos(y*0.02 - time*0.9 +0.8)*2;
+    ctx.lineTo(corr.right + wob, y);
+  }
+  ctx.lineTo(W,H);
+  ctx.closePath();
+  ctx.fill();
+
+  // wall inner glow
+  ctx.strokeStyle='rgba(56,189,248,0.9)';
+  ctx.lineWidth=2.5;
+  ctx.shadowColor='rgba(56,189,248,0.6)';
+  ctx.shadowBlur=12;
+  ctx.beginPath();
+  for(let y=0;y<=H;y+=10){
+    const wob = Math.sin(y*0.04 + time*1.1)*3;
+    if(y===0) ctx.moveTo(corr.left + wob, y);
+    else ctx.lineTo(corr.left + wob, y);
+  }
+  ctx.stroke();
+  ctx.beginPath();
+  for(let y=0;y<=H;y+=10){
+    const wob = Math.sin(y*0.04 + time*1.1 +1.2)*3;
+    if(y===0) ctx.moveTo(corr.right + wob, y);
+    else ctx.lineTo(corr.right + wob, y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur=0;
+
+  // corridor center faint line
+  ctx.strokeStyle='rgba(125,211,252,0.08)';
+  ctx.setLineDash([6,8]);
+  ctx.beginPath();
+  ctx.moveTo(corr.cx,0);
+  ctx.lineTo(corr.cx,H);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // bubbles
+  ctx.fillStyle='rgba(186,230,253,0.9)';
+  for(let b of bubbles){
+    ctx.globalAlpha = b.alpha*0.6;
+    ctx.beginPath();
+    ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // orbs
+  for(let o of orbs){
+    const pulse = 1 + Math.sin(o.pulse)*0.12;
+    // glow
+    const glow = ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r*3.5);
+    if(o.type==='rare'){
+      glow.addColorStop(0,'rgba(250,204,21,0.55)');
+      glow.addColorStop(0.5,'rgba(250,204,21,0.18)');
+      glow.addColorStop(1,'rgba(250,204,21,0)');
+    } else {
+      glow.addColorStop(0,'rgba(56,189,248,0.5)');
+      glow.addColorStop(0.5,'rgba(56,189,248,0.15)');
+      glow.addColorStop(1,'rgba(56,189,248,0)');
+    }
+    ctx.fillStyle=glow;
+    ctx.beginPath();
+    ctx.arc(o.x,o.y,o.r*3.2*pulse,0,Math.PI*2);
+    ctx.fill();
+    // core
+    ctx.fillStyle = o.type==='rare' ? '#facc15' : '#38bdf8';
+    ctx.shadowColor = o.type==='rare' ? '#facc15' : '#38bdf8';
+    ctx.shadowBlur=10;
+    ctx.beginPath();
+    ctx.arc(o.x,o.y,o.r*pulse,0,Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur=0;
+    // highlight
+    ctx.fillStyle='rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    ctx.arc(o.x - o.r*0.3, o.y - o.r*0.3, o.r*0.28,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  // player - submersible
+  const px=player.x, py=player.y;
+  const isGrace = grace>0 && Math.floor(grace*10)%2===0;
+  if(!isGrace){
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(px, py+10, 18, 6, 0,0,Math.PI*2);
+    ctx.fill();
+    // body
+    ctx.fillStyle='#0ea5e9';
+    ctx.strokeStyle='#7dd3fc';
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.roundRect(px-16, py-9, 32, 18, 9);
+    ctx.fill();
+    ctx.stroke();
+    // cockpit
+    ctx.fillStyle='#e0f2fe';
+    ctx.beginPath();
+    ctx.arc(px+6, py, 7, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='#0ea5e9';
+    ctx.beginPath();
+    ctx.arc(px+7, py-1.5, 2.2, 0, Math.PI*2);
+    ctx.fill();
+    // fins
+    ctx.fillStyle='#0284c7';
+    ctx.beginPath();
+    ctx.moveTo(px-14, py-7); ctx.lineTo(px-20, py-12); ctx.lineTo(px-12, py-2); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(px-14, py+7); ctx.lineTo(px-20, py-6); ctx.lineTo(px-12, py+2); ctx.closePath(); ctx.fill();
+    // thruster
+    const thrust = holding ? 1 : 0.3;
+    ctx.fillStyle=`rgba(250,204,21,${0.6+thrust*0.4})`;
+    ctx.shadowColor='#facc15'; ctx.shadowBlur=8*thrust;
+    ctx.beginPath();
+    ctx.ellipse(px-16, py, 4+thrust*4, 5, 0,0,Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur=0;
+    // direction indicator
+    ctx.fillStyle='rgba(125,211,252,0.9)';
+    ctx.font='10px system-ui';
+    ctx.textAlign='center';
+    ctx.fillText(holding ? '▶' : '◀', px, py-16);
+  } else {
+    // grace ghost
+    ctx.globalAlpha=0.35;
+    ctx.fillStyle='#facc15';
+    ctx.beginPath();
+    ctx.arc(px,py,player.r+4,0,Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha=1;
+  }
+
+  // particles
+  for(let p of particles){
+    ctx.globalAlpha = Math.max(0, p.life*1.8);
+    ctx.fillStyle=p.color;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // vignette
+  const vg = ctx.createRadialGradient(W/2,H/2, W*0.4, W/2,H/2, W*0.9);
+  vg.addColorStop(0,'rgba(0,0,0,0)');
+  vg.addColorStop(1,'rgba(0,0,0,0.55)');
+  ctx.fillStyle=vg;
+  ctx.fillRect(0,0,W,H);
+
+  // depth markers on side
+  ctx.fillStyle='rgba(186,230,253,0.5)';
+  ctx.font='9px system-ui';
+  ctx.textAlign='left';
+  for(let y=80;y<H;y+=90){
+    const m = Math.floor(depth + (y - player.y)*0.6);
+    if(m>0) ctx.fillText(m+'m', 6, y);
+  }
+
+  ctx.restore();
+}
+
+// Input handling
+function setHolding(v){
+  holding=v;
+  holdBtn.classList.toggle('holding', v);
+  holdBtn.innerHTML = v ? '<span>⬢</span> DRIFTING RIGHT — HOLD' : '<span>⬢</span> HOLD TO DRIFT RIGHT';
+}
+holdBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); setHolding(true); if(!running && !gameOver) startGame(); });
+holdBtn.addEventListener('pointerup', e=>{ e.preventDefault(); setHolding(false); });
+holdBtn.addEventListener('pointercancel', ()=>setHolding(false));
+holdBtn.addEventListener('pointerleave', ()=>setHolding(false));
+window.addEventListener('pointerup', ()=>setHolding(false));
+// also allow holding anywhere on canvas
+wrap.addEventListener('pointerdown', e=>{
+  if(e.target.closest('button')) return;
+  setHolding(true);
+});
+wrap.addEventListener('pointerup', ()=>setHolding(false));
+document.addEventListener('keydown', e=>{
+  if(e.code==='Space'){ e.preventDefault(); setHolding(true); }
+});
+document.addEventListener('keyup', e=>{
+  if(e.code==='Space') setHolding(false);
+});
+
+function startGame(){
+  resetGame();
+  running=true; paused=false; gameOver=false;
+  startOverlay.classList.add('hidden');
+  pauseOverlay.classList.add('hidden');
+  overOverlay.classList.add('hidden');
+}
+function togglePause(){
+  if(gameOver || !running) return;
+  paused=!paused;
+  pauseOverlay.classList.toggle('hidden', !paused);
+}
+document.getElementById('playBtn').addEventListener('click', startGame);
+document.getElementById('pauseBtn').addEventListener('click', togglePause);
+document.getElementById('resumeBtn').addEventListener('click', togglePause);
+document.getElementById('restartBtn').addEventListener('click', ()=>{ resetGame(); startGame(); });
+document.getElementById('restartBtn2').addEventListener('click', ()=>{ resetGame(); startGame(); });
+document.getElementById('againBtn').addEventListener('click', ()=>{ resetGame(); startGame(); });
+document.getElementById('howBtn').addEventListener('click', ()=>{
+  alert('HOW TO PLAY:\n\n• HOLD the big button to drift RIGHT\n• RELEASE to drift LEFT\n• Stay inside the glowing corridor\n• Corridor BREATHES and NARROWS with depth\n• Collect orbs: 100 pts (gold 250)\n• 3 in a row = ×1.5 multiplier, 6 = ×2.0 etc.\n• Hit wall = lose life + 1.4s grace shield\n• Depth = score too!');
+});
+document.getElementById('shareBtn').addEventListener('click', ()=>{
+  if(navigator.share) navigator.share({title:'Deep Descender', text:`I reached ${Math.floor(depth)}m with ${score} pts!`}).catch(()=>{});
+});
+
+// init draw
+resetGame();
+draw();
+requestAnimationFrame(loop);
+
+// prevent scroll
+document.body.addEventListener('touchmove', e=>{ if(e.target.closest('#c')||e.target.closest('#holdBtn')) e.preventDefault(); }, {passive:false});
+})();
+</script>
+</body>
+</html>
+

@@ -1,0 +1,33 @@
+{
+  "id": "stock_ticker",
+  "name": "Crypto price",
+  "description": "One coin in dollars, refreshed every 15 minutes. Replace the url and path for another asset.",
+  "category": "Money",
+  "widget": {
+    "id": "stock_ticker",
+    "title": "ETH",
+    "components": [
+      {
+        "type": "web_value",
+        "label": "Ethereum",
+        "http": {
+          "url": "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
+          "jsonPath": "$.ethereum.usd",
+          "every": 900
+        },
+        "suffix": "USD",
+        "style": {
+          "emphasis": "large"
+        }
+      }
+    ],
+    "size": {
+      "min": 1,
+      "default": 1,
+      "max": 2,
+      "minW": 2,
+      "defaultW": 2,
+      "maxW": 2
+    }
+  }
+}

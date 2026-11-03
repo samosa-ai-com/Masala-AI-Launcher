@@ -1,0 +1,31 @@
+{
+  "id": "week_plan",
+  "name": "Week plan",
+  "description": "A strip of the week to tick off as it goes.",
+  "category": "Calendar",
+  "widget": {
+    "id": "week_plan",
+    "title": "This week",
+    "components": [
+      {
+        "type": "checklist",
+        "key": "week",
+        "items": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri",
+          "Sat",
+          "Sun"
+        ],
+        "reset": "weekly"
+      }
+    ],
+    "size": {
+      "min": 2,
+      "default": 3,
+      "max": 4
+    }
+  }
+}

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pantry List Quest</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f1410;--panel:#1a241a;--panel2:#223322;--line:#2d4a2d;--accent:#f0c040;--accent2:#3ee0a0;--accent3:#ff8c42;--bad:#ff6b6b;--text:#e8f0e8;--muted:#8aa08a;--pan:#1a0f00}
+body{font-family:ui-sans-system,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#1a2a1a,#0f1410);position:sticky;top:0;z-index:10}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#f0c040,#ff8c42);display:grid;place-items:center;font-size:18px;box-shadow:0 0 16px rgba(240,192,64,.3)}
+.brand h1{font-size:14px;letter-spacing:.08em;text-transform:uppercase}
+.brand p{font-size:11px;color:var(--muted)}
+.stats{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 10px;min-width:70px;text-align:center}
+.stat b{display:block;font-size:14px;color:var(--accent)}
+.stat span{font-size:10px;letter-spacing:.07em;color:var(--muted);text-transform:uppercase}
+.btn{padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-weight:700;font-size:12px;cursor:pointer}
+.btn.primary{background:var(--accent);color:#1a1200;border-color:var(--accent)}
+.btn.ghost{background:transparent}
+.btn.small{padding:6px 10px;font-size:11px}
+.btn:disabled{opacity:.4;pointer-events:none}
+.container{max-width:1400px;margin:0 auto;padding:14px;display:grid;grid-template-columns:260px 1fr 320px;gap:14px}
+@media(max-width:1100px){.container{grid-template-columns:260px 1fr}}
+@media(max-width:760px){.container{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.panel-head{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.03)}
+.panel-head h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.badge{font-size:10px;padding:4px 8px;border-radius:999px;background:#1a2e0a;color:var(--accent2);border:1px solid rgba(62,224,160,.3)}
+.order-list{padding:8px;display:grid;gap:8px;overflow:auto}
+.order-btn{display:flex;gap:10px;align-items:center;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;text-align:left;transition:.15s}
+.order-btn.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(240,192,64,.2)}
+.order-btn.locked{opacity:.45;pointer-events:none}
+.order-icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:18px;background:var(--bg);border:1px solid var(--line);flex-shrink:0}
+.order-meta h3{font-size:12px}
+.order-meta p{font-size:10px;color:var(--muted);margin-top:2px}
+.order-meta i{font-style:normal;font-size:10px;color:var(--accent)}
+.recipe-card{margin:10px;padding:12px;background:linear-gradient(180deg,#fdf6e3,#f5e6c8);color:#3d2b00;border-radius:12px;border:1px solid #d4b87a;position:relative;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+.recipe-card h3{font-size:13px;margin-bottom:6px;color:#5a3e00}
+.recipe-card p{font-size:12px;line-height:1.5;color:#5a3e00}
+.recipe-card code{background:#e8d5a3;padding:1px 5px;border-radius:4px;font-size:11px;border:1px solid #d4b87a}
+.obj{margin-top:8px;padding:8px;background:rgba(90,62,0,.08);border-radius:8px;border:1px dashed #b89a4a;font-size:11px}
+.obj b{color:#7a5200}
+.pantry{padding:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px}
+.ingredient{padding:10px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);cursor:grab;text-align:center;transition:.15s;user-select:none}
+.ingredient:active{cursor:grabbing;transform:scale(.96)}
+.ingredient:hover{border-color:var(--accent);box-shadow:0 0 0 2px rgba(240,192,64,.15)}
+.ingredient .emoji{font-size:22px;display:block;margin-bottom:4px}
+.ingredient .name{font-size:11px;font-weight:700}
+.ingredient .type{font-size:9px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.pan-area{margin:10px;padding:12px;background:radial-gradient(ellipse at center,#2a1a00,#1a0f00);border:2px dashed #5a3e00;border-radius:16px;min-height:140px;position:relative;transition:.2s}
+.pan-area.drag-over{border-color:var(--accent);background:radial-gradient(ellipse at center,#3a2a00,#2a1a00)}
+.pan-area h4{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);text-align:center;margin-bottom:8px}
+.pan-items{display:flex;gap:8px;flex-wrap:wrap;min-height:60px;align-items:center;justify-content:center}
+.pan-item{padding:8px 10px;border-radius:10px;background:var(--panel);border:1px solid var(--line);font-size:11px;display:flex;gap:6px;align-items:center;cursor:grab;animation:pop .2s}
+@keyframes pop{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+.pan-item .remove{width:18px;height:18px;border-radius:50%;background:rgba(255,90,106,.15);border:1px solid rgba(255,90,106,.3);color:var(--bad);font-size:10px;display:grid;place-items:center;cursor:pointer}
+.pan-empty{font-size:11px;color:var(--muted);text-align:center;padding:20px}
+.chips{padding:10px;display:grid;gap:6px}
+.chip{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);font-size:11px}
+.chip.ok{border-color:rgba(62,224,160,.4);background:rgba(62,224,160,.08);color:var(--accent2)}
+.chip.no{border-color:rgba(255,90,106,.25);background:rgba(255,90,106,.06);color:var(--muted)}
+.meter{height:8px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.meter i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--bad),var(--accent),var(--accent2));transition:.3s}
+.guide{padding:10px}
+.guide h4{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.guide-item{padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);margin-bottom:6px;font-size:11px}
+.guide-item b{color:var(--accent)}
+.guide-item code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:10px;border:1px solid var(--line)}
+.hint-box{margin:0 10px 10px;padding:9px 10px;border-radius:10px;background:var(--panel2);border:1px dashed #2a4a7a;color:var(--muted);font-size:11px;line-height:1.5;display:none}
+.hint-box.show{display:block}
+.actions{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.footer{padding:8px 12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted)}
+.footer a{color:var(--accent2);text-decoration:none}
+.toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%) translateY(16px);background:#1a2a1a;color:#e8f0e8;border:1px solid #2d4a2d;padding:10px 14px;border-radius:999px;font-size:12px;opacity:0;pointer-events:none;transition:.25s;z-index:20}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">🍳</div><div><h1>Pantry List Quest</h1><p>Drag • Transform • Score • Local Save</p></div></div>
+  <div class="stats">
+    <div class="stat"><b id="score">0</b><span>Points</span></div>
+    <div class="stat"><b id="progress">1/6</b><span>Orders</span></div>
+    <div class="stat"><b id="completed">0/6</b><span>Done</span></div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="panel">
+    <div class="panel-head"><h2>Recipe Orders</h2><span class="badge" id="orderBadge">Order 1</span></div>
+    <div class="order-list" id="orderList"></div>
+    <div class="footer"><span>Local save</span><a href="#" id="resetBtn">Reset</a></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>Kitchen</h2><span style="font-size:10px;color:var(--muted)">Drag to pan</span></div>
+    <div class="recipe-card" id="recipeCard"></div>
+    <div style="padding:0 10px"><h4 style="font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Pantry — drag or tap</h4><div class="pantry" id="pantry"></div></div>
+    <div class="pan-area" id="panArea"><h4>🍳 Pan — drop in sequence</h4><div class="pan-items" id="panItems"></div></div>
+    <div class="chips" id="chips"></div>
+    <div style="padding:0 10px"><div class="meter"><i id="meter"></i></div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px"><span>Match</span><b id="pct" style="color:var(--accent)">0%</b></div></div>
+    <div class="hint-box" id="hintBox"></div>
+    <div class="actions">
+      <button class="btn ghost" id="hintBtn">💡 Hint</button>
+      <button class="btn ghost" id="clearBtn">🗑️ Clear</button>
+      <button class="btn primary" id="checkBtn" style="flex:1">Check Order ✓</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>Field Guide</h2><span class="badge" style="background:#102a4a;color:#5aa8ff;border-color:#1e3a6a">Reference</span></div>
+    <div class="guide" id="guide"></div>
+    <div style="padding:10px;border-top:1px solid var(--line)">
+      <h4 style="font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Per-Order Scoring</h4>
+      <div style="font-size:11px;line-height:1.5;color:var(--muted)">• Exact sequence = 100 pts (70 if hint used)<br>• Best score kept per order<br>• Complete to unlock next<br>• Progress saved locally</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const LEVELS = [
+  {
+    id:1, title:"Adding — Stock Up", icon:"➕", op:"ADD", color:"#3ee0a0",
+    desc:"The soup needs more! <b>Add</b> ingredients to the list.",
+    story:"Start with <code>[tomato, onion]</code> — add <code>garlic</code> and <code>basil</code> to the end.",
+    input:["🍅 tomato","🧅 onion"],
+    pantry:["🍅 tomato","🧅 onion","🧄 garlic","🌿 basil","🥕 carrot","🧀 cheese"],
+    expected:["🍅 tomato","🧅 onion","🧄 garlic","🌿 basil"],
+    js:"let list = ['tomato','onion'];\nlist.push('garlic','basil'); // → 4 items",
+    hint:"Add in order: garlic then basil after onion. Expected: tomato → onion → garlic → basil",
+    guide:{title:"Adding (push)", code:"list.push('garlic')", desc:"Appends to end. Use push() or [...list, 'new']"}
+  },
+  {
+    id:2, title:"Filtering — Veg Only", icon:"🥦", op:"FILTER", color:"#5aa8ff",
+    desc:"Pick only vegetables from the mixed pantry.",
+    story:"From <code>[tomato, cheese, carrot, chicken, basil, beef]</code> — <b>filter</b> to keep only veggies.",
+    input:["🍅 tomato","🧀 cheese","🥕 carrot","🍗 chicken","🌿 basil","🥩 beef"],
+    pantry:["🍅 tomato","🧀 cheese","🥕 carrot","🍗 chicken","🌿 basil","🥩 beef"],
+    expected:["🍅 tomato","🥕 carrot","🌿 basil"],
+    js:"let veggies = pantry.filter(i => isVeg(i));\n// → tomato, carrot, basil",
+    hint:"Keep only veg: tomato, carrot, basil — skip cheese, chicken, beef",
+    guide:{title:"Filtering", code:"list.filter(i => isVeg(i))", desc:"Keeps items where test is true. Removes others."}
+  },
+  {
+    id:3, title:"Reshaping — Chop It", icon:"🔪", op:"MAP", color:"#ffb84d",
+    desc:"Transform each ingredient — chop them!",
+    story:"Take <code>[tomato, onion, carrot]</code> and <b>reshape</b> each to chopped form.",
+    input:["🍅 tomato","🧅 onion","🥕 carrot"],
+    pantry:["🍅 tomato","🧅 onion","🥕 carrot","🔪 chopped tomato","🔪 chopped onion","🔪 chopped carrot","🧀 cheese"],
+    expected:["🔪 chopped tomato","🔪 chopped onion","🔪 chopped carrot"],
+    js:"let chopped = list.map(i => 'chopped ' + i);\n// → transforms each element",
+    hint:"Map each to chopped version: chopped tomato → chopped onion → chopped carrot",
+    guide:{title:"Reshaping (map)", code:"list.map(i => 'chopped '+i)", desc:"Transforms each element. Same length, new values."}
+  },
+  {
+    id:4, title:"Combining — Fusion", icon:"🔗", op:"COMBINE", color:"#a78bfa",
+    desc:"Combine two lists into one feast.",
+    story:"Merge <code>[tomato, onion]</code> + <code>[cheese, basil]</code> — <b>combine</b> in order.",
+    input:["🍅 tomato","🧅 onion","🧀 cheese","🌿 basil"],
+    pantry:["🍅 tomato","🧅 onion","🧀 cheese","🌿 basil","🥕 carrot","🍗 chicken"],
+    expected:["🍅 tomato","🧅 onion","🧀 cheese","🌿 basil"],
+    js:"let feast = [...veg, ...dairy];\n// or veg.concat(dairy)",
+    hint:"Combine first list then second: tomato, onion, cheese, basil",
+    guide:{title:"Combining (concat)", code:"[...a, ...b] or a.concat(b)", desc:"Joins lists end-to-end. Order matters!"}
+  },
+  {
+    id:5, title:"Finding — Secret Spice", icon:"🔍", op:"FIND", color:"#f472b6",
+    desc:"Find the hidden spice in the pantry.",
+    story:"Search <code>[tomato, onion, saffron, carrot, basil]</code> — <b>find</b> the rare spice.",
+    input:["🍅 tomato","🧅 onion","🌸 saffron","🥕 carrot","🌿 basil"],
+    pantry:["🍅 tomato","🧅 onion","🌸 saffron","🥕 carrot","🌿 basil","🧄 garlic"],
+    expected:["🌸 saffron"],
+    js:"let spice = list.find(i => i==='saffron');\n// → first match",
+    hint:"Only saffron is the rare spice — drag just saffron to pan",
+    guide:{title:"Finding", code:"list.find(i => i==='saffron')", desc:"Returns first item matching test. Use find() or filter()[0]"}
+  },
+  {
+    id:6, title:"Sorting — Alphabet Soup", icon:"📊", op:"SORT", color:"#f0c040",
+    desc:"Sort ingredients alphabetically for the menu.",
+    story:"Take <code>[basil, tomato, carrot, onion]</code> — <b>sort</b> A→Z.",
+    input:["🌿 basil","🍅 tomato","🥕 carrot","🧅 onion"],
+    pantry:["🌿 basil","🍅 tomato","🥕 carrot","🧅 onion","🧀 cheese","🍗 chicken"],
+    expected:["🌿 basil","🥕 carrot","🧅 onion","🍅 tomato"],
+    js:"let sorted = [...list].sort();\n// → basil, carrot, onion, tomato",
+    hint:"Alphabetical: basil → carrot → onion → tomato",
+    guide:{title:"Sorting", code:"[...list].sort()", desc:"Orders A→Z. Copy first with [...list] to avoid mutating."}
+  }
+];
+
+const LS_KEY="pantry-list-quest-v1";
+let state={level:0, scores:Array(6).fill(0), completed:[], hintsUsed:{}, total:0, unlocked:1};
+function load(){ try{ const s=JSON.parse(localStorage.getItem(LS_KEY)); if(s) Object.assign(state,s); }catch(e){} }
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+
+let panItems=[];
+
+const els={
+  orderList:document.getElementById('orderList'),
+  orderBadge:document.getElementById('orderBadge'),
+  recipeCard:document.getElementById('recipeCard'),
+  pantry:document.getElementById('pantry'),
+  panArea:document.getElementById('panArea'),
+  panItems:document.getElementById('panItems'),
+  chips:document.getElementById('chips'),
+  meter:document.getElementById('meter'),
+  pct:document.getElementById('pct'),
+  hintBox:document.getElementById('hintBox'),
+  guide:document.getElementById('guide'),
+  score:document.getElementById('score'),
+  progress:document.getElementById('progress'),
+  completed:document.getElementById('completed'),
+  toast:document.getElementById('toast')
+};
+
+function renderOrders(){
+  els.orderList.innerHTML="";
+  LEVELS.forEach((lvl,i)=>{
+    const btn=document.createElement('button');
+    btn.className='order-btn'+(i===state.level?' active':'')+(i+1>state.unlocked?' locked':'');
+    const done=state.completed.includes(lvl.id);
+    const best=state.scores[i]||0;
+    btn.innerHTML=`<div class="order-icon" style="border-color:${lvl.color};color:${lvl.color}">${lvl.icon}</div><div class="order-meta"><h3>${lvl.title}</h3><p>${lvl.op} • ${done? '★ '+best+' pts' : i+1>state.unlocked?'🔒 Locked':'○ Ready'}</p>${done?'<i style="color:var(--accent2)">✓ Completed</i>':''}</div><div style="margin-left:auto">${done?'✓': i===state.level?'◉':'○'}</div>`;
+    btn.onclick=()=>{ state.level=i; save(); loadOrder(); };
+    els.orderList.appendChild(btn);
+  });
+  els.progress.textContent=`${state.unlocked}/6`;
+  els.completed.textContent=`${state.completed.length}/6`;
+  els.score.textContent=state.total;
+  els.orderBadge.textContent=`Order ${LEVELS[state.level].id}`;
+}
+
+function loadOrder(){
+  const lvl=LEVELS[state.level];
+  els.recipeCard.innerHTML=`<h3>${lvl.title}</h3><p>${lvl.story}</p><div class="obj"><b>Goal:</b> Drag to pan in exact sequence: <code>${lvl.expected.join(' → ')}</code></div><div style="margin-top:8px;font-size:11px;color:#7a5200"><b>JS:</b> <code>${lvl.js.replace(/\n/g,'<br>')}</code></div>`;
+  els.guide.innerHTML=`<div class="guide-item"><b>${lvl.guide.title}</b><br><code>${lvl.guide.code}</code><br><span style="color:var(--muted)">${lvl.guide.desc}</span></div><div class="guide-item"><b>All Operations</b><br><span style="font-size:10px;line-height:1.6">➕ Add: push/concat<br>🥦 Filter: keep matching<br>🔪 Map: transform each<br>🔗 Combine: join lists<br>🔍 Find: first match<br>📊 Sort: order A→Z</span></div>`;
+  // pantry
+  els.pantry.innerHTML="";
+  lvl.pantry.forEach(name=>{
+    const div=document.createElement('div');
+    div.className='ingredient';
+    div.draggable=true;
+    const [emoji,...rest]=name.split(' ');
+    const label=rest.join(' ');
+    div.innerHTML=`<span class="emoji">${emoji}</span><span class="name">${label}</span><span class="type">${name.includes('chopped')?'reshaped':'raw'}</span>`;
+    div.dataset.value=name;
+    div.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/plain', name); });
+    div.addEventListener('click', ()=> addToPan(name));
+    els.pantry.appendChild(div);
+  });
+  panItems=[];
+  els.hintBox.classList.remove('show');
+  renderPan();
+  updateChips();
+  renderOrders();
+}
+
+function addToPan(name){
+  panItems.push(name);
+  renderPan();
+  updateChips();
+}
+
+function renderPan(){
+  if(panItems.length===0){
+    els.panItems.innerHTML=`<div class="pan-empty">Drag or tap ingredients here in order</div>`;
+    return;
+  }
+  els.panItems.innerHTML="";
+  panItems.forEach((name,i)=>{
+    const [emoji,...rest]=name.split(' ');
+    const div=document.createElement('div');
+    div.className='pan-item';
+    div.draggable=true;
+    div.innerHTML=`<span>${emoji} ${rest.join(' ')}</span><span class="remove" data-i="${i}">×</span>`;
+    div.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/plain', 'reorder:'+i); });
+    div.querySelector('.remove').onclick=()=>{ panItems.splice(i,1); renderPan(); updateChips(); };
+    els.panItems.appendChild(div);
+  });
+}
+
+function updateChips(){
+  const lvl=LEVELS[state.level];
+  const exp=lvl.expected;
+  let correct=0;
+  let chips=[];
+  const maxLen=Math.max(exp.length, panItems.length);
+  for(let i=0;i<maxLen;i++){
+    const e=exp[i], p=panItems[i];
+    if(p===undefined) chips.push({label:`Pos ${i+1}: — vs ${e}`, ok:false});
+    else if(e===undefined) chips.push({label:`Pos ${i+1}: ${p} vs — (extra)`, ok:false});
+    else if(p===e){ chips.push({label:`Pos ${i+1}: ${p} ✓`, ok:true}); correct++; }
+    else chips.push({label:`Pos ${i+1}: ${p} ✗ (need ${e})`, ok:false});
+  }
+  // length chip
+  const lenOk = panItems.length===exp.length;
+  chips.unshift({label:`Length: ${panItems.length} vs ${exp.length} ${lenOk?'✓':'✗'}`, ok:lenOk});
+  els.chips.innerHTML=chips.map(c=> `<div class="chip ${c.ok?'ok':'no'}"><span>${c.label}</span><b>${c.ok?'✓':'○'}</b></div>`).join('');
+  const pct = exp.length===0?0: Math.round((correct/exp.length)*100 * (lenOk?1:0.7));
+  // Actually exact match required: if length wrong, cap
+  let finalPct = 0;
+  if(panItems.length===exp.length && correct===exp.length) finalPct=100;
+  else finalPct = Math.round((correct/exp.length)*100 * (lenOk?1:0.5));
+  if(panItems.length===0) finalPct=0;
+  els.meter.style.width=finalPct+"%";
+  els.pct.textContent=finalPct+"%";
+  els.pct.style.color=finalPct===100?'var(--accent2)': finalPct>=50?'var(--accent)':'var(--bad)';
+  document.getElementById('checkBtn').disabled = finalPct!==100;
+  document.getElementById('checkBtn').textContent = finalPct===100 ? "✓ Check Order — Ready!" : `Check Order — ${finalPct}%`;
+}
+
+// drag over pan
+els.panArea.addEventListener('dragover', e=>{ e.preventDefault(); els.panArea.classList.add('drag-over'); });
+els.panArea.addEventListener('dragleave', ()=> els.panArea.classList.remove('drag-over'));
+els.panArea.addEventListener('drop', e=>{
+  e.preventDefault(); els.panArea.classList.remove('drag-over');
+  const data=e.dataTransfer.getData('text/plain');
+  if(data.startsWith('reorder:')){
+    const from=parseInt(data.split(':')[1]);
+    // simple: move to end
+    const item=panItems.splice(from,1)[0];
+    panItems.push(item);
+    renderPan(); updateChips();
+  } else if(data){
+    addToPan(data);
+  }
+});
+
+function showToast(msg){
+  els.toast.textContent=msg;
+  els.toast.classList.add('show');
+  setTimeout(()=>els.toast.classList.remove('show'),2200);
+}
+
+document.getElementById('checkBtn').onclick=()=>{
+  const lvl=LEVELS[state.level];
+  const isExact = panItems.length===lvl.expected.length && panItems.every((v,i)=> v===lvl.expected[i]);
+  if(!isExact){ showToast("Not exact — check chips"); return; }
+  const usedHint=!!state.hintsUsed[state.level];
+  const pts=usedHint?70:100;
+  if(!state.completed.includes(lvl.id)){
+    state.completed.push(lvl.id);
+    state.scores[state.level]=pts;
+    state.total+=pts;
+    showToast(`✓ Order cleared! +${pts} pts`);
+    if(state.unlocked < 6 && state.unlocked===lvl.id) state.unlocked+=1;
+  } else {
+    // update best if higher
+    if(pts > state.scores[state.level]){
+      state.total += pts - state.scores[state.level];
+      state.scores[state.level]=pts;
+      showToast(`✓ New best! ${pts} pts`);
+    } else {
+      showToast(`✓ Order already completed`);
+    }
+  }
+  save();
+  if(state.level < LEVELS.length-1 && state.unlocked > state.level+1){
+    state.level+=1;
+    panItems=[];
+    loadOrder();
+  } else {
+    renderOrders();
+    if(state.completed.length===6) showToast(`🏆 All orders mastered! Total ${state.total} pts`);
+  }
+  save();
+};
+
+document.getElementById('hintBtn').onclick=()=>{
+  const lvl=LEVELS[state.level];
+  state.hintsUsed[state.level]=true;
+  save();
+  els.hintBox.innerHTML=`💡 <b>Hint:</b> ${lvl.hint}<br><code style="display:block;margin-top:6px;background:var(--bg);padding:6px 8px;border-radius:6px">${lvl.expected.join(' → ')}</code><span style="color:var(--accent)">(Hint = 70 pts max)</span>`;
+  els.hintBox.classList.add('show');
+};
+document.getElementById('clearBtn').onclick=()=>{ panItems=[]; renderPan(); updateChips(); };
+document.getElementById('resetBtn').onclick=(e)=>{
+  e.preventDefault();
+  if(confirm("Reset all orders and progress?")){
+    localStorage.removeItem(LS_KEY);
+    state={level:0, scores:Array(6).fill(0), completed:[], hintsUsed:{}, total:0, unlocked:1};
+    panItems=[];
+    loadOrder();
+    showToast("Progress reset");
+  }
+};
+
+// init
+load();
+loadOrder();
+</script>
+</body>
+</html>

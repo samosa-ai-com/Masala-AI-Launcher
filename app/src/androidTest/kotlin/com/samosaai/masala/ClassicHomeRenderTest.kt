@@ -63,4 +63,34 @@ class ClassicHomeRenderTest {
         compose.onNodeWithContentDescription("All apps").performClick()
         assertEquals(listOf<MasalaAction>(MasalaAction.OpenDrawer), actions)
     }
+
+    /** UI refresh U3: the mode chip over the clock and the search-or-ask pill above the dock. */
+    @Test
+    fun modeChipAndSearchPillShow() {
+        val now = LocalDateTime.parse("2026-10-27T18:02")
+        val resolved = LayoutResolver.resolve(classic(), emptyList(), ContextSnapshot(now = now))
+        var searched = 0
+        var modeTaps = 0
+
+        compose.setContent {
+            MasalaTheme(LauncherSettings()) {
+                LayoutRenderer(
+                    resolved,
+                    RenderContext(
+                        app.icons, emptyList(), { now }, locked = false, onAction = {}, onAppMenu = {}, onClockClick = {},
+                        modeName = "Evening", onModeChip = { modeTaps++ },
+                    ),
+                    aboveDock = {
+                        com.samosaai.masala.ui.home.SearchPill(onSearch = { searched++ }, mic = {})
+                    },
+                )
+            }
+        }
+
+        compose.onNode(androidx.compose.ui.test.hasText("Evening")).assertIsDisplayed().performClick()
+        compose.onNode(androidx.compose.ui.test.hasText("Search or ask Masala")).assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("Phone").assertIsDisplayed()
+        assertEquals(1, modeTaps)
+        assertEquals(1, searched)
+    }
 }

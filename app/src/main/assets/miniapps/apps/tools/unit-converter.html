@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SwapScale — Unit Converter</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--acc:#2456e6;--txt:#16213a;--mut:#6b7a99}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;min-height:100vh}
+.wrap{max-width:480px;margin:0 auto;padding:16px 14px 32px}
+header{display:flex;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:0}
+.sub{color:var(--mut);font-size:13px;margin:2px 0 0}
+#muteBtn{background:var(--card);border:1px solid #d7deee;color:var(--txt);border-radius:12px;min-width:48px;min-height:44px;font-size:18px}
+.cats{display:flex;gap:8px;overflow-x:auto;padding:12px 0}
+.cats button{flex:0 0 auto;min-height:44px;padding:0 14px;border-radius:999px;border:1px solid #d7deee;background:var(--card);font-size:14px;color:var(--txt)}
+.cats button.on{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:700}
+.card{background:var(--card);border:1px solid #d7deee;border-radius:18px;padding:16px;margin:4px 0 12px}
+label{font-size:12px;color:var(--mut);text-transform:uppercase;display:block;margin:8px 0 4px}
+input[type=number],select{width:100%;min-height:48px;border-radius:12px;border:1px solid #c9d3e8;font-size:17px;padding:0 12px;background:#fff;color:var(--txt)}
+#swapBtn{width:100%;min-height:48px;border-radius:12px;border:0;background:#16213a;color:#fff;font-size:16px;font-weight:700;margin-top:12px}
+#out{font-size:30px;font-weight:800;margin:12px 0 2px;font-variant-numeric:tabular-nums;word-break:break-word}
+#formula{color:var(--mut);font-size:14px}
+h2{font-size:15px;margin:14px 0 8px}
+#recent{display:flex;flex-wrap:wrap;gap:8px}
+#recent button{min-height:44px;padding:0 12px;border-radius:999px;border:1px solid #d7deee;background:#eef2fd;font-size:13px}
+.empty{color:var(--mut);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div><h1>SwapScale</h1><p class="sub">Convert units in a tap</p></div><button id="muteBtn" aria-label="Toggle sound">🔊</button></header>
+<div class="cats" id="cats" role="tablist"></div>
+<div class="card">
+<label for="val">Value</label><input type="number" id="val" value="1" inputmode="decimal">
+<label for="from">From</label><select id="from"></select>
+<button id="swapBtn">⇅ Swap units</button>
+<label for="to">To</label><select id="to"></select>
+<div id="out">–</div><div id="formula"></div>
+</div>
+<h2>Recent picks</h2><div id="recent"></div>
+</div>
+<script>
+(function(){
+"use strict";
+var store={get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+var muted=store.get("muted-unit-converter",false);
+var muteBtn=document.getElementById("muteBtn");
+function paintMute(){muteBtn.textContent=muted?"🔇":"🔊";}paintMute();
+var actx=null;
+function beep(f){if(muted)return;try{var C=window.AudioContext||window.webkitAudioContext;if(!C)return;if(!actx)actx=new C();if(actx.state==="suspended")actx.resume();var o=actx.createOscillator(),g=actx.createGain();o.type="sine";o.frequency.value=f||660;g.gain.value=0.05;o.connect(g);g.connect(actx.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.08);o.stop(actx.currentTime+0.09);}catch(e){}}
+muteBtn.addEventListener("click",function(){muted=!muted;store.set("muted-unit-converter",muted);paintMute();beep(720);});
+var UNITS={
+length:{label:"Length",units:{Millimeter:0.001,Centimeter:0.01,Meter:1,Kilometer:1000,Inch:0.0254,Foot:0.3048,Yard:0.9144,Mile:1609.344}},
+weight:{label:"Weight",units:{Gram:0.001,Kilogram:1,Tonne:1000,Ounce:0.0283495,Pound:0.453592,Stone:6.35029}},
+speed:{label:"Speed",units:{"m/s":1,"km/h":0.2777778,"mph":0.44704,Knot:0.514444}},
+data:{label:"Data",units:{Byte:1,KB:1024,MB:1048576,GB:1073741824,TB:1099511627776}},
+temp:{label:"Temp",units:{Celsius:1,Fahrenheit:1,Kelvin:1}}};
+var TEMP={Celsius:{toC:function(v){return v;},fromC:function(v){return v;}},Fahrenheit:{toC:function(v){return (v-32)*5/9;},fromC:function(v){return v*9/5+32;}},Kelvin:{toC:function(v){return v-273.15;},fromC:function(v){return v+273.15;}}};
+var saved=store.get("swapsacle-v1",{cat:"length",from:"Kilometer",to:"Mile",recent:[]});
+var cat=saved.cat||"length",recent=Array.isArray(saved.recent)?saved.recent:[];
+var catsEl=document.getElementById("cats"),fromEl=document.getElementById("from"),toEl=document.getElementById("to"),
+valEl=document.getElementById("val"),outEl=document.getElementById("out"),formEl=document.getElementById("formula"),recentEl=document.getElementById("recent");
+function save(){store.set("swapsacle-v1",{cat:cat,from:fromEl.value,to:toEl.value,recent:recent});}
+Object.keys(UNITS).forEach(function(k){var b=document.createElement("button");b.textContent=UNITS[k].label;b.dataset.cat=k;if(k===cat)b.classList.add("on");b.addEventListener("click",function(){beep(600);cat=k;var bs=catsEl.querySelectorAll("button");for(var i=0;i<bs.length;i++)bs[i].classList.remove("on");b.classList.add("on");fillUnits();convert();});catsEl.appendChild(b);});
+function fillUnits(){var names=Object.keys(UNITS[cat].units);fromEl.innerHTML="";toEl.innerHTML="";names.forEach(function(n){var o1=document.createElement("option");o1.value=n;o1.textContent=n;fromEl.appendChild(o1);var o2=document.createElement("option");o2.value=n;o2.textContent=n;toEl.appendChild(o2);});if(UNITS[cat].units.hasOwnProperty(saved.from))fromEl.value=saved.from;if(UNITS[cat].units.hasOwnProperty(saved.to))toEl.value=saved.to;if(fromEl.value===toEl.value&&names.length>1)toEl.value=names[1];}
+function convert(){var v=parseFloat(valEl.value);if(isNaN(v)){outEl.textContent="–";formEl.textContent="Enter a number.";return;}var f=fromEl.value,t=toEl.value,r;if(cat==="temp"){r=TEMP[t].fromC(TEMP[f].toC(v));}else{r=v*UNITS[cat].units[f]/UNITS[cat].units[t];}var disp=Math.abs(r)<0.000001&&r!==0?r.toExponential(4):(+r.toFixed(6)).toString();outEl.textContent=disp+" "+t;formEl.textContent=v+" "+f+" = "+disp+" "+t;pushRecent(v+" "+f+" → "+t);}
+function pushRecent(label){if(recent[0]===label)return;recent.unshift(label);recent=recent.slice(0,6);renderRecent();save();}
+function renderRecent(){recentEl.innerHTML="";if(!recent.length){recentEl.innerHTML="<span class='empty'>Conversions you make will appear here.</span>";return;}recent.forEach(function(r){var b=document.createElement("button");b.textContent=r;b.addEventListener("click",function(){beep(520);var m=r.match(/^(.+) (.+) → (.+)$/);if(!m)return;if(!UNITS[cat].units.hasOwnProperty(m[2])||!UNITS[cat].units.hasOwnProperty(m[3]))return;valEl.value=m[1];fromEl.value=m[2];toEl.value=m[3];convert();});recentEl.appendChild(b);});}
+fromEl.addEventListener("change",function(){beep(500);convert();});
+toEl.addEventListener("change",function(){beep(500);convert();});
+valEl.addEventListener("input",convert);
+document.getElementById("swapBtn").addEventListener("click",function(){beep(700);var t=fromEl.value;fromEl.value=toEl.value;toEl.value=t;convert();});
+fillUnits();renderRecent();convert();
+})();
+</script>
+</body>
+</html>

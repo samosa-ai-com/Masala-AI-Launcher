@@ -1,12 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.com/masala/schema/layout-v1.json",
-  "title": "Masala layout, version 1",
+  "$id": "https://example.com/masala/schema/layout-v4.json",
+  "title": "Masala layout, version 4",
   "description": "Kept by hand to match the Kotlin contracts in com.samosaai.masala.core.contract. LayoutSchemaTest keeps them in step. $defs/ModePatch is the mode patch schema.",
   "type": "object",
   "properties": {
     "schemaVersion": {
-      "const": 1
+      "enum": [
+        1,
+        2,
+        3,
+        4
+      ]
     },
     "pages": {
       "type": "array",
@@ -230,7 +235,11 @@
               "minLength": 1
             },
             "widget": {
-              "$ref": "#/$defs/WidgetSpec"
+              "$ref": "#/$defs/WidgetSpec",
+              "description": "Inline widget, read for one schema so older exports import. New layouts use ref."
+            },
+            "ref": {
+              "$ref": "#/$defs/WidgetRef"
             },
             "rules": {
               "type": "array",
@@ -242,8 +251,19 @@
           "additionalProperties": false,
           "required": [
             "type",
-            "id",
-            "widget"
+            "id"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "ref"
+              ]
+            },
+            {
+              "required": [
+                "widget"
+              ]
+            }
           ]
         },
         {
@@ -261,6 +281,14 @@
               "items": {
                 "$ref": "#/$defs/WidgetSpec"
               },
+              "minItems": 1,
+              "description": "Inline widgets, read for one schema. New layouts use refs."
+            },
+            "refs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/WidgetRef"
+              },
               "minItems": 1
             },
             "rules": {
@@ -273,8 +301,19 @@
           "additionalProperties": false,
           "required": [
             "type",
-            "id",
-            "widgets"
+            "id"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "refs"
+              ]
+            },
+            {
+              "required": [
+                "widgets"
+              ]
+            }
           ]
         },
         {
@@ -310,6 +349,41 @@
             "type",
             "id",
             "skillId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "cells"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "columns": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "cells": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Cell"
+              }
+            },
+            "rules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Rule"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "cells"
           ]
         }
       ]
@@ -693,6 +767,104 @@
             "type",
             "name"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "open_settings"
+            },
+            "page": {
+              "type": "string",
+              "enum": [
+                "BRIEF",
+                "WIDGETS",
+                "PERMISSIONS",
+                "MAIN"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "page"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "flip"
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "coin",
+                "dice"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "key",
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "meeting_start"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "meeting_toggle"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "meeting_stop"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "open_meeting"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -1029,6 +1201,18 @@
         "max": {
           "type": "integer",
           "minimum": 1
+        },
+        "minW": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "defaultW": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxW": {
+          "type": "integer",
+          "minimum": 1
         }
       },
       "additionalProperties": false
@@ -1045,11 +1229,19 @@
             "sleep",
             "steps",
             "weather",
-            "urgent_count"
+            "urgent_count",
+            "http",
+            "stream_status",
+            "skill_result",
+            "second_brain",
+            "meeting"
           ]
         },
         "key": {
           "type": "string"
+        },
+        "http": {
+          "$ref": "#/$defs/HttpBinding"
         }
       },
       "additionalProperties": false,
@@ -1070,6 +1262,9 @@
             },
             "binding": {
               "$ref": "#/$defs/Binding"
+            },
+            "style": {
+              "$ref": "#/$defs/WidgetStyle"
             }
           },
           "additionalProperties": false,
@@ -1095,6 +1290,27 @@
             },
             "goal": {
               "type": "integer"
+            },
+            "style": {
+              "$ref": "#/$defs/WidgetStyle"
+            },
+            "date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "reset": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly"
+              ]
+            },
+            "repeat": {
+              "type": "string",
+              "enum": [
+                "monthly"
+              ]
             }
           },
           "additionalProperties": false,
@@ -1119,6 +1335,14 @@
               "items": {
                 "type": "string"
               }
+            },
+            "reset": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly"
+              ]
             }
           },
           "additionalProperties": false,
@@ -1144,6 +1368,13 @@
             "seconds": {
               "type": "integer",
               "minimum": 1
+            },
+            "sound": {
+              "type": "boolean"
+            },
+            "autoStartKey": {
+              "type": "string",
+              "minLength": 1
             }
           },
           "additionalProperties": false,
@@ -1168,6 +1399,17 @@
             },
             "max": {
               "type": "number"
+            },
+            "style": {
+              "$ref": "#/$defs/WidgetStyle"
+            },
+            "reset": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly"
+              ]
             }
           },
           "additionalProperties": false,
@@ -1237,6 +1479,186 @@
           "required": [
             "type",
             "icon"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "list"
+            },
+            "binding": {
+              "$ref": "#/$defs/Binding"
+            },
+            "maxRows": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "rowAction": {
+              "$ref": "#/$defs/MasalaAction"
+            },
+            "style": {
+              "$ref": "#/$defs/WidgetStyle"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "binding"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "gauge"
+            },
+            "label": {
+              "type": "string"
+            },
+            "binding": {
+              "$ref": "#/$defs/Binding"
+            },
+            "max": {
+              "type": "number"
+            },
+            "style": {
+              "$ref": "#/$defs/WidgetStyle"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "label",
+            "binding",
+            "max"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "row"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/WidgetComponent"
+              },
+              "minItems": 1,
+              "maxItems": 4
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "children"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "column"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/WidgetComponent"
+              },
+              "minItems": 1,
+              "maxItems": 4
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "children"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "video"
+            },
+            "stream": {
+              "$ref": "#/$defs/StreamRef"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "stream"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "snapshot"
+            },
+            "sourceId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "everySeconds": {
+              "type": "integer",
+              "minimum": 2
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "sourceId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "web_value"
+            },
+            "label": {
+              "type": "string"
+            },
+            "http": {
+              "$ref": "#/$defs/HttpBinding"
+            },
+            "suffix": {
+              "type": "string"
+            },
+            "style": {
+              "$ref": "#/$defs/WidgetStyle"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "label",
+            "http"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "globe"
+            },
+            "label": {
+              "type": "string"
+            },
+            "binding": {
+              "$ref": "#/$defs/Binding"
+            },
+            "style": {
+              "$ref": "#/$defs/WidgetStyle"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
           ]
         }
       ]
@@ -1404,6 +1826,236 @@
       "required": [
         "id",
         "name"
+      ]
+    },
+    "WidgetRef": {
+      "type": "object",
+      "properties": {
+        "widgetId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rowsOverride": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "widgetId"
+      ]
+    },
+    "HttpBinding": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jsonPath": {
+          "type": "string"
+        },
+        "every": {
+          "type": "integer",
+          "minimum": 30
+        },
+        "background": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "url"
+      ]
+    },
+    "StreamRef": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "enum": [
+            "live",
+            "snapshot"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "sourceId"
+      ]
+    },
+    "WidgetStyle": {
+      "type": "object",
+      "properties": {
+        "tint": {
+          "enum": [
+            "orange",
+            "teal",
+            "blue",
+            "green",
+            "red",
+            "purple",
+            "pink",
+            "yellow",
+            "gray"
+          ]
+        },
+        "emphasis": {
+          "enum": [
+            "normal",
+            "large"
+          ]
+        },
+        "align": {
+          "enum": [
+            "start",
+            "center",
+            "end"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "CellContent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "item"
+            },
+            "item": {
+              "$ref": "#/$defs/Item"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "widget"
+            },
+            "ref": {
+              "$ref": "#/$defs/WidgetRef"
+            },
+            "widget": {
+              "$ref": "#/$defs/WidgetSpec"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "ref"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "stack"
+            },
+            "refs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/WidgetRef"
+              }
+            },
+            "widgets": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/WidgetSpec"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "refs"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "html"
+            },
+            "appId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "appId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "skill"
+            },
+            "skillId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "skillId"
+          ]
+        }
+      ]
+    },
+    "Cell": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "x": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "w": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "h": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "content": {
+          "$ref": "#/$defs/CellContent"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Rule"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "x",
+        "y",
+        "content"
       ]
     }
   }

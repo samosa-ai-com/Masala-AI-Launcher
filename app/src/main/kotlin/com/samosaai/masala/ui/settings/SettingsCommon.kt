@@ -1,5 +1,15 @@
 package com.samosaai.masala.ui.settings
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,6 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -27,18 +38,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.samosaai.masala.R
 
-// Adapted from the private prototype's ui/SettingsCommon.kt: the scaffold, navigation row and toggle row, without
-// the overlay messages, search highlighting and account rows.
 
 /** The frame every settings page shares: a titled top bar with Back and a scrolling column. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScaffold(title: String, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+fun SettingsScaffold(title: String, onBack: () -> Unit, close: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
+    // UI refresh U5: a round arrow (or, on the settings home, a close button) instead of a text button.
+    val back: @Composable () -> Unit = {
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier.padding(horizontal = 8.dp).size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)),
+        ) {
+            Icon(
+                if (close) Icons.Rounded.Close else Icons.AutoMirrored.Rounded.ArrowBack,
+                stringResource(if (close) R.string.settings_close else R.string.action_back),
+            )
+        }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title) },
-                navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.action_back)) } },
+                title = { Text(title, style = if (close) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.headlineSmall) },
+                navigationIcon = { if (!close) back() },
+                actions = { if (close) back() },
             )
         },
     ) { padding ->
@@ -64,7 +86,7 @@ fun SettingsSectionTitle(text: String) {
     )
 }
 
-/** A row that opens a sub-page, with the private prototype's text chevron. */
+/** A row that opens a sub-page, with a chevron. */
 @Composable
 fun SettingsNavRow(title: String, summary: String, onClick: () -> Unit) {
     Row(
@@ -79,13 +101,24 @@ fun SettingsNavRow(title: String, summary: String, onClick: () -> Unit) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
             Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Text(text = "›", style = MaterialTheme.typography.titleLarge)
+        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
     }
+}
+
+/** One search field for every settings list (skills, mini apps, scheduled tasks). */
+@Composable
+fun ListSearchField(value: String, onValue: (String) -> Unit, hint: String) {
+    OutlinedTextField(
+        value, onValue,
+        label = { Text(hint) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 /** A label and a switch. The whole row toggles, so the touch target is the full width. */
 @Composable
-fun SettingsToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+fun SettingsToggleRow(label: String, checked: Boolean, summary: String? = null, onCheckedChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -94,7 +127,10 @@ fun SettingsToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            summary?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
         // The row handles the tap; the switch only shows the state.
         Switch(checked = checked, onCheckedChange = null)
     }
