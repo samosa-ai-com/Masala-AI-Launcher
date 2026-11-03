@@ -24,20 +24,27 @@ import java.time.ZoneId
  * aggregate is a single query per metric, cheap enough for a 15-minute refresh.
  */
 object HealthSignals {
-    data class Reading(val steps: Int?, val sleepHours: Double?)
+    data class Reading(
+        val steps: Int?,
+        val sleepHours: Double?,
+        val stepsAccess: Boolean,
+        val sleepAccess: Boolean,
+    )
 
     suspend fun read(context: Context): Reading = withContext(Dispatchers.IO) {
         if (HealthConnectClient.getSdkStatus(context) != HealthConnectClient.SDK_AVAILABLE) {
-            return@withContext Reading(null, null)
+            return@withContext Reading(null, null, stepsAccess = false, sleepAccess = false)
         }
         val client = runCatching { HealthConnectClient.getOrCreate(context) }.getOrNull()
-            ?: return@withContext Reading(null, null)
+            ?: return@withContext Reading(null, null, stepsAccess = false, sleepAccess = false)
         val granted = runCatching { client.permissionController.getGrantedPermissions() }.getOrDefault(emptySet())
         HealthPermissionState.set(granted.isNotEmpty())
         val zone = ZoneId.systemDefault()
         val now = Instant.now()
 
-        val steps = if (HealthPermission.getReadPermission(StepsRecord::class) in granted) {
+        val stepsAccess = HealthPermission.getReadPermission(StepsRecord::class) in granted
+        val sleepAccess = HealthPermission.getReadPermission(SleepSessionRecord::class) in granted
+        val steps = if (stepsAccess) {
             runCatching {
                 val start = LocalDate.now(zone).atStartOfDay(zone).toInstant()
                 client.aggregate(
@@ -51,7 +58,7 @@ object HealthSignals {
             null
         }
 
-        val sleep = if (HealthPermission.getReadPermission(SleepSessionRecord::class) in granted) {
+        val sleep = if (sleepAccess) {
             runCatching {
                 // "Last night": from 18:00 yesterday to now (or noon, so a late refresh does not
                 // count tonight's nap as last night).
@@ -67,6 +74,6 @@ object HealthSignals {
         } else {
             null
         }
-        Reading(steps, sleep)
+        Reading(steps, sleep, stepsAccess, sleepAccess)
     }
 }

@@ -1253,6 +1253,12 @@
                 "weekly",
                 "monthly"
               ]
+            },
+            "repeat": {
+              "type": "string",
+              "enum": [
+                "monthly"
+              ]
             }
           },
           "additionalProperties": false,

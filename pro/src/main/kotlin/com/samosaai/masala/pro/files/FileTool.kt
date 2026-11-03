@@ -189,7 +189,8 @@ class FileTool(private val files: ToolFiles) {
             if (opts.outWidth <= 0 || opts.outHeight <= 0) {
                 return ActionResult.error("File '${file.name}' could not be decoded as an image.")
             }
-            val displayName = file.name
+            // The protocol is colon-separated; a name like "camera:01.jpg" would shift the payload.
+            val displayName = file.name.replace(':', '_')
             // An image is handed to the model as an attached picture by the agent, not as text:
             // a 500 KB JPEG is ~700 KB of base64, and four of them took a request past the
             // model's window and failed the whole turn (seen on device, 2026-11-03).

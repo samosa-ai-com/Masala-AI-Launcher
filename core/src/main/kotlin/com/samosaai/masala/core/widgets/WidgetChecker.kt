@@ -106,10 +106,20 @@ object WidgetChecker {
                 ownKey(component.key, "$path.key")
                 if (component.step <= 0) problems += Problem("$path.step", "step must be above 0")
                 if (component.goal != null && component.goal <= 0) problems += Problem("$path.goal", "goal must be above 0")
+                component.date?.let { date ->
+                    if (runCatching { java.time.LocalDate.parse(date) }.isFailure) {
+                        problems += Problem("$path.date", "date must be yyyy-MM-dd")
+                    }
+                }
+                if (component.repeat != null && component.repeat != "monthly") {
+                    problems += Problem("$path.repeat", "repeat is 'monthly' or absent")
+                }
+                checkReset(component.reset, "$path.reset", problems)
                 checkStyle(component.style, "$path.style", problems)
             }
             is WidgetComponent.Checklist -> {
                 ownKey(component.key, "$path.key")
+                checkReset(component.reset, "$path.reset", problems)
                 if (component.items.size !in 1..MAX_CHECKLIST_ITEMS) {
                     problems += Problem("$path.items", "A checklist has 1 to $MAX_CHECKLIST_ITEMS items")
                 }
@@ -123,6 +133,7 @@ object WidgetChecker {
             }
             is WidgetComponent.Progress -> {
                 if (component.max <= 0) problems += Problem("$path.max", "max must be above 0")
+                checkReset(component.reset, "$path.reset", problems)
                 checkBinding(component.binding, "$path.binding", env, problems)
                 checkStyle(component.style, "$path.style", problems)
             }
@@ -262,6 +273,13 @@ object WidgetChecker {
 
     /** Widget buttons may only run safe tools; taps are explicit, so the gate stays as the tool defines it. */
     val WIDGET_RUN_TOOL_ALLOWLIST = setOf("toggle_torch", "toggle_wifi", "set_timer")
+
+    /** `never` is the explicit "do not reset" override a template default can be turned off with. */
+    private fun checkReset(reset: String?, path: String, problems: MutableList<Problem>) {
+        if (reset != null && reset !in setOf("daily", "weekly", "monthly", "never")) {
+            problems += Problem(path, "reset is daily, weekly, monthly, never or absent")
+        }
+    }
 
     private fun checkButtonAction(action: MasalaAction, path: String, problems: MutableList<Problem>) {
         if (action is MasalaAction.RunTool && action.name !in WIDGET_RUN_TOOL_ALLOWLIST) {

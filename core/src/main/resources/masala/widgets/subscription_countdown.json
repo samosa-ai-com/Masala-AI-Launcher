@@ -15,7 +15,8 @@
         "style": {
           "tint": "orange",
           "emphasis": "large"
-        }
+        },
+        "repeat": "monthly"
       }
     ],
     "size": {

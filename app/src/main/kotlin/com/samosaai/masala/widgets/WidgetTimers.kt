@@ -11,9 +11,15 @@ import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import com.samosaai.masala.MasalaApp
 import com.samosaai.masala.R
 import com.samosaai.masala.core.contract.WidgetComponent
+import com.samosaai.masala.core.contract.timerComponents
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.samosaai.masala.core.contract.resolved
 
 /**
@@ -57,8 +63,11 @@ object WidgetTimers {
 
     fun start(context: Context, store: WidgetStateStore, widgetId: String, component: WidgetComponent.Timer) {
         val at = System.currentTimeMillis() + component.seconds * 1_000L
-        store.set(widgetId, component.key, at.toString())
-        store.set(widgetId, leftKey(component.key), "")
+        // One map write: a deadline and a cleared remainder must land together.
+        store.setAll(
+            widgetId,
+            store.values(widgetId) + (component.key to at.toString()) + (leftKey(component.key) to ""),
+        )
         WidgetTimerScheduler.schedule(context, widgetId, component.key, at, component.sound)
     }
 
@@ -71,8 +80,10 @@ object WidgetTimers {
             return
         }
         val at = System.currentTimeMillis() + left
-        store.set(widgetId, component.key, at.toString())
-        store.set(widgetId, leftKey(component.key), "")
+        store.setAll(
+            widgetId,
+            store.values(widgetId) + (component.key to at.toString()) + (leftKey(component.key) to ""),
+        )
         WidgetTimerScheduler.schedule(context, widgetId, component.key, at, component.sound)
     }
 
@@ -80,14 +91,18 @@ object WidgetTimers {
         val state = state(store, widgetId, component.key)
         val deadline = state.deadline ?: return
         val left = (deadline - System.currentTimeMillis()).coerceAtLeast(0)
-        store.set(widgetId, component.key, "")
-        store.set(widgetId, leftKey(component.key), left.toString())
+        store.setAll(
+            widgetId,
+            store.values(widgetId) + (component.key to "") + (leftKey(component.key) to left.toString()),
+        )
         WidgetTimerScheduler.cancel(context, widgetId, component.key)
     }
 
     fun stop(context: Context, store: WidgetStateStore, widgetId: String, component: WidgetComponent.Timer) {
-        store.set(widgetId, component.key, "")
-        store.set(widgetId, leftKey(component.key), "")
+        store.setAll(
+            widgetId,
+            store.values(widgetId) + (component.key to "") + (leftKey(component.key) to ""),
+        )
         WidgetTimerScheduler.cancel(context, widgetId, component.key)
     }
 
@@ -106,17 +121,21 @@ object WidgetTimers {
         val values = store.values(widgetId)
         val deadline = values[key]?.toLongOrNull() ?: return
         val alreadyRang = values[rangKey(key)] == deadline.toString()
-        store.set(widgetId, key, "")
-        store.set(widgetId, leftKey(key), "")
+        store.setAll(
+            widgetId,
+            values + (key to "") + (leftKey(key) to "") +
+                if (alreadyRang) emptyMap() else mapOf(rangKey(key) to deadline.toString()),
+        )
         if (alreadyRang) return
-        store.set(widgetId, rangKey(key), deadline.toString())
         if (sound) {
-            val app = context.applicationContext as? MasalaApp
-            if (app?.contextService?.homeVisible?.value == true) {
-                WidgetSounds.chime(context)
-            } else {
-                WidgetTimerNotification.post(context, widgetId, key)
-            }
+            // Home visible: the card's own chime. Away: a notification whose channel sound is the
+            // alarm tone. If notifications are denied (Android 13+), ring here instead of dying
+            // silently — that was the "Pomodoro finished with no sound" report.
+            val visible = runCatching {
+                (context.applicationContext as? MasalaApp)?.contextService?.homeVisible?.value
+            }.getOrNull() == true
+            val posted = !visible && WidgetTimerNotification.post(context, widgetId, key)
+            if (visible || !posted) WidgetSounds.chime(context)
         }
         val timers = chain()
         val current = timers.firstOrNull { it.key == key } ?: return
@@ -124,12 +143,24 @@ object WidgetTimers {
         start(context, store, widgetId, next)
     }
 
-    /** What a Pomodoro card says above its timer: the phase of the cycle rather than a bare clock. */
-    fun phaseLabel(component: WidgetComponent.Timer, others: List<WidgetComponent.Timer>): String? {
-        if (component.autoStartKey == null) return null
-        val target = others.firstOrNull { it.key == component.autoStartKey } ?: return null
-        return target.label
+    /**
+     * Re-arms every persisted deadline after a reboot, an app update or a clock change: an alarm
+     * dies with the process, the deadline does not. Called from the boot receiver.
+     */
+    suspend fun rearmAll(context: Context) {
+        val app = context.applicationContext as? MasalaApp ?: return
+        val store = app.widgetStates
+        store.loadAll()
+        app.widgetLibrary.current().values.forEach { spec ->
+            val resolved = spec.resolved(WidgetPrefsStore.of(store.values(spec.id)))
+            resolved.timerComponents().forEach { timer ->
+                val deadline = store.values(spec.id)[timer.key]?.toLongOrNull()?.takeIf { it > 0 }
+                    ?: return@forEach
+                WidgetTimerScheduler.schedule(context, spec.id, timer.key, deadline, timer.sound)
+            }
+        }
     }
+
 }
 
 /** Arms the one alarm that makes a widget timer ring away from home. */
@@ -181,13 +212,31 @@ class WidgetTimerReceiver : BroadcastReceiver() {
         if (intent.action != WidgetTimerScheduler.ACTION) return
         val widgetId = intent.getStringExtra(WidgetTimerScheduler.EXTRA_WIDGET) ?: return
         val key = intent.getStringExtra(WidgetTimerScheduler.EXTRA_KEY) ?: return
-        val app = context.applicationContext as? MasalaApp ?: return
-        val store = app.widgetStates
-        val spec = app.widgetLibrary.current()[widgetId] ?: return
-        val resolved = spec.resolved(WidgetPrefsStore.of(store.values(widgetId)))
-        val chain = resolved.components.filterIsInstance<WidgetComponent.Timer>()
         val sound = intent.getBooleanExtra(WidgetTimerScheduler.EXTRA_SOUND, true)
-        WidgetTimers.fire(context, store, widgetId, key, sound) { chain }
+        // A fire-and-forget receiver dies with onReceive. After the process was killed the widget's
+        // state is not in memory either, so it has to be read from Room before the deadline exists.
+        val pending = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val app = context.applicationContext as? MasalaApp ?: return@launch
+                val store = app.widgetStates
+                store.load(listOf(widgetId))
+                // The library is loaded asynchronously by the launcher; in a cold receiver process
+                // it is still empty. Read this widget's spec straight from the database.
+                val row = runCatching { app.database.widgets().get(widgetId) }.getOrNull() ?: return@launch
+                val spec = runCatching {
+                    com.samosaai.masala.core.contract.MasalaJson.strict
+                        .decodeFromString(com.samosaai.masala.core.contract.WidgetSpec.serializer(), row.specJson)
+                }.getOrNull() ?: return@launch
+                val resolved = spec.resolved(WidgetPrefsStore.of(store.values(widgetId)))
+                val chain = resolved.timerComponents()
+                withContext(Dispatchers.Main) {
+                    WidgetTimers.fire(context, store, widgetId, key, sound) { chain }
+                }
+            } finally {
+                pending.finish()
+            }
+        }
     }
 }
 
@@ -196,8 +245,10 @@ object WidgetTimerNotification {
     private const val CHANNEL = "widget_timers"
     private const val ID_BASE = 8_100
 
-    fun post(context: Context, widgetId: String, key: String) {
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+    /** True when a notification was actually posted; false when Android would not show it. */
+    fun post(context: Context, widgetId: String, key: String): Boolean {
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && manager.getNotificationChannel(CHANNEL) == null) {
             val audio = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ALARM)
@@ -228,6 +279,6 @@ object WidgetTimerNotification {
             .setAutoCancel(true)
             .setContentIntent(content)
             .build()
-        runCatching { manager.notify(ID_BASE + widgetId.hashCode(), notification) }
+        return runCatching { manager.notify(ID_BASE + widgetId.hashCode(), notification) }.isSuccess
     }
 }

@@ -365,6 +365,7 @@
     <string name="widget_settings_daily">Daily</string>
     <string name="widget_settings_weekly">Weekly</string>
     <string name="widget_settings_monthly">Monthly</string>
+    <string name="widget_settings_monthly_repeat">Repeats monthly</string>
     <string name="widget_settings_counter">Counter</string>
     <string name="widget_settings_checklist">Checklist</string>
     <string name="widget_settings_reset_now">Reset now</string>

@@ -5,6 +5,7 @@ import com.samosaai.masala.data.WidgetStateDao
 import com.samosaai.masala.data.WidgetStateEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +30,21 @@ class WidgetStateStore(
     val states: StateFlow<Map<String, Map<String, String>>> = _states.asStateFlow()
 
     fun values(widgetId: String): Map<String, String> = _states.value[widgetId].orEmpty()
+
+    /**
+     * Every widget's state, for a process that has no cards composed (the boot re-arm): one query
+     * rather than a load per id.
+     */
+    suspend fun loadAll() {
+        val dao = dao ?: return
+        val rows = withContext(Dispatchers.IO) { runCatching { dao.all() }.getOrNull() }.orEmpty()
+        val decoded = rows.mapNotNull { row ->
+            runCatching {
+                row.widgetId to MasalaJson.strict.decodeFromString(MapSerializer(String.serializer(), String.serializer()), row.json)
+            }.getOrNull()
+        }.toMap()
+        if (decoded.isNotEmpty()) _states.value = _states.value + decoded
+    }
 
     suspend fun load(ids: Collection<String>) {
         val dao = dao ?: return
@@ -66,12 +82,32 @@ class WidgetStateStore(
         set(widgetId, key, MasalaJson.strict.encodeToString(BooleanArraySerializer, next.toBooleanArray()))
     }
 
+    /** Replace a widget's whole map in one write (a timer transition changes several keys at once). */
+    fun setAll(widgetId: String, values: Map<String, String>) = update(widgetId, values)
+
     private fun update(widgetId: String, map: Map<String, String>) {
         _states.value = _states.value + (widgetId to map)
-        val dao = dao ?: return
-        scope.launch(Dispatchers.IO) {
-            runCatching {
-                dao.upsert(WidgetStateEntity(widgetId, MasalaJson.strict.encodeToString(MapSerializer(String.serializer(), String.serializer()), map), System.currentTimeMillis()))
+        val queue = writes ?: return
+        // One consumer in submission order: two quick transitions (a pause right after a start)
+        // used to race as separate upserts and could persist the older map last.
+        queue.trySend(
+            WidgetStateEntity(
+                widgetId,
+                MasalaJson.strict.encodeToString(MapSerializer(String.serializer(), String.serializer()), map),
+                System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    /** Null without a DAO (a preview or a test): there is nothing to persist. */
+    private val writes: Channel<WidgetStateEntity>? = if (dao != null) Channel(Channel.UNLIMITED) else null
+
+    init {
+        val dao = dao
+        val queue = writes
+        if (dao != null && queue != null) {
+            scope.launch(Dispatchers.IO) {
+                for (entity in queue) runCatching { dao.upsert(entity) }
             }
         }
     }

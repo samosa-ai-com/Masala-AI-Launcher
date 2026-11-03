@@ -33,7 +33,8 @@ object WidgetRules {
                     is WidgetComponent.Progress -> component.reset
                     else -> null
                 }
-                ?: return@forEach
+            // "never" is an explicit override of a template's default (null means "inherit").
+            if (reset == null || reset == "never") return@forEach
             val period = periodKey(reset, today) ?: return@forEach
             val marker = "@reset.$path"
             val values = store.values(widgetId)
@@ -52,10 +53,10 @@ object WidgetRules {
                 }
                 else -> Unit
             }
-            // Only record the period once the value was actually cleared.
-            if (store.values(widgetId) != values || component is WidgetComponent.Progress) {
-                store.set(widgetId, marker, period)
-            }
+            // Always record the period, even when the value was already at the reset state: a
+            // missing marker is re-evaluated on the next composition and would wipe a value the
+            // user entered later the same day.
+            store.set(widgetId, marker, period)
         }
     }
 

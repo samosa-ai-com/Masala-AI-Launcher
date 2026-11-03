@@ -64,9 +64,28 @@ object AgentHistory {
      */
     fun capOversized(history: List<ChatMessage>, maxChars: Int = MAX_MESSAGE_CHARS): List<ChatMessage> =
         history.map { message ->
-            val text = message.textContent
-            if (text.length <= maxChars || message.content !is JsonPrimitive) message
-            else message.copy(content = JsonPrimitive(text.take(maxChars) + TRUNCATED))
+            when (val content = message.content) {
+                is JsonPrimitive -> {
+                    val text = content.content
+                    if (text.length <= maxChars) message
+                    else message.copy(content = JsonPrimitive(text.take(maxChars) + TRUNCATED))
+                }
+                // A vision message is an array: its text part must still be capped, while the
+                // image parts stay (they are already bounded and cost pixels, not characters).
+                is JsonArray -> {
+                    var remaining = maxChars
+                    val parts = content.map { part ->
+                        val obj = part as? JsonObject ?: return@map part
+                        val text = (obj["text"] as? JsonPrimitive)?.content ?: return@map part
+                        val keep = text.take(remaining.coerceAtLeast(0))
+                        remaining -= keep.length
+                        if (keep.length == text.length) part
+                        else JsonObject(obj + ("text" to JsonPrimitive(keep + TRUNCATED)))
+                    }
+                    message.copy(content = JsonArray(parts))
+                }
+                else -> message
+            }
         }
 
     /**

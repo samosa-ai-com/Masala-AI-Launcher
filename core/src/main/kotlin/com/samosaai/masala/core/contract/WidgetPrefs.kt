@@ -41,6 +41,8 @@ data class ComponentPrefs(
     val items: List<String>? = null,
     /** The target date of a countdown counter, ISO `yyyy-MM-dd`. */
     val date: String? = null,
+    /** `monthly`: a countdown advances to the next month after its date passes. */
+    val repeat: String? = null,
     val httpUrl: String? = null,
     val jsonPath: String? = null,
     val every: Int? = null,
@@ -65,6 +67,10 @@ fun WidgetSpec.resolved(prefs: WidgetPrefs): WidgetSpec {
     }
     return copy(title = prefs.title ?: title, components = components.map(::apply))
 }
+
+/** Every timer in the widget, nested rows and columns included (a Pomodoro puts its pair in a row). */
+fun WidgetSpec.timerComponents(): List<WidgetComponent.Timer> =
+    componentsWithPaths().mapNotNull { it.second as? WidgetComponent.Timer }
 
 /** Every component in draw order with the path its settings live under. */
 fun WidgetSpec.componentsWithPaths(): List<Pair<String, WidgetComponent>> {
@@ -97,6 +103,7 @@ private fun WidgetComponent.withPrefs(p: ComponentPrefs): WidgetComponent = when
         step = p.step ?: step,
         date = p.date ?: date,
         reset = p.reset ?: reset,
+        repeat = p.repeat ?: repeat,
     )
     is WidgetComponent.Checklist -> copy(items = p.items ?: items, reset = p.reset ?: reset)
     is WidgetComponent.Timer -> copy(

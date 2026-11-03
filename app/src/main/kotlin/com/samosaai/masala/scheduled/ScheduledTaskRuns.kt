@@ -211,6 +211,8 @@ class ScheduledTaskRebootReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 ScheduledTaskScheduler.reschedule(app)
+                // Alarms die with a reboot or a clock change; deadlines live on in widget state.
+                com.samosaai.masala.widgets.WidgetTimers.rearmAll(app)
             } catch (e: Exception) {
                 Log.w(TAG, "Re-arming scheduled tasks failed", e)
             } finally {

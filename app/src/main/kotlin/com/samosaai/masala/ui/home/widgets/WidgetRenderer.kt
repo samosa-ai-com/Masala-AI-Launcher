@@ -63,6 +63,7 @@ import com.samosaai.masala.core.contract.MasalaAction
 import com.samosaai.masala.core.contract.WidgetComponent
 import com.samosaai.masala.core.contract.WidgetSpec
 import com.samosaai.masala.core.contract.resolved
+import com.samosaai.masala.core.contract.timerComponents
 import com.samosaai.masala.core.contract.WidgetStyle
 import com.samosaai.masala.core.widgets.WidgetValues
 import com.samosaai.masala.ui.home.SymbolIcons
@@ -111,15 +112,20 @@ fun WidgetCard(spec: WidgetSpec, rows: Int?, source: WidgetSource, modifier: Mod
     val snapshot = source.snapshot()
     val extra = source.extra()
     val states by source.store.states.collectAsState()
-    // New values (a counter tap, a checklist tick) recompose this card alone.
-    LaunchedEffect(spec.id) { source.store.load(listOf(spec.id)) }
     val storage = states[spec.id].orEmpty()
     val longPress = source.onLongPress
     // The widget's own settings (goal, duration, place, items) apply to a copy of the spec, so a
     // shared template can be configured per placement without rewriting the library row.
     val prefs = remember(storage) { com.samosaai.masala.widgets.WidgetPrefsStore.of(storage) }
     val shown = remember(spec, prefs) { spec.resolved(prefs) }
-    LaunchedEffect(spec.id, prefs, snapshot.now.toLocalDate()) {
+    // Resets must run on the persisted values, not on an empty map that the load would overwrite.
+    var stateLoaded by remember(spec.id) { mutableStateOf(false) }
+    LaunchedEffect(spec.id) {
+        source.store.load(listOf(spec.id))
+        stateLoaded = true
+    }
+    LaunchedEffect(spec.id, prefs, snapshot.now.toLocalDate(), stateLoaded) {
+        if (!stateLoaded) return@LaunchedEffect
         com.samosaai.masala.widgets.WidgetRules.apply(source.store, spec.id, spec, prefs, snapshot.now.toLocalDate())
     }
     WallpaperCard(
@@ -131,13 +137,11 @@ fun WidgetCard(spec: WidgetSpec, rows: Int?, source: WidgetSource, modifier: Mod
             Text(it, style = MaterialTheme.typography.titleMedium, color = OnWallpaper, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Column(if (shown.title != null) Modifier.padding(top = 4.dp) else Modifier) {
-            shown.components.forEachIndexed { index, component ->
+            shown.components.forEach { component ->
                 Component(
                     component, spec.id, storage, snapshot, source, depth = 0, enabled = enabled,
                     title = shown.title, extra = extra,
-                    // Keyed paths so a component keeps its settings when the template moves.
-                    prefs = prefs.components[com.samosaai.masala.core.contract.prefsKey(component, index)],
-                    timers = shown.components.filterIsInstance<WidgetComponent.Timer>(),
+                    timers = shown.timerComponents(),
                 )
             }
         }
@@ -161,8 +165,6 @@ private fun Component(
     title: String? = null,
     /** App-supplied values for `second_brain` bindings. */
     extra: Map<String, String> = emptyMap(),
-    /** The widget's override for this component; null keeps the spec. */
-    prefs: com.samosaai.masala.core.contract.ComponentPrefs? = null,
     /** Every timer in this widget, so a finished phase can start the next one. */
     timers: List<WidgetComponent.Timer> = emptyList(),
     /** A child of a Row shares the width; a full-width button would squeeze its siblings to zero. */
@@ -180,8 +182,10 @@ private fun Component(
     when (component) {
         is WidgetComponent.Text -> {
             val bound = component.binding?.let { WidgetValues.textOf(it, storage, snapshot, extra) }
-            if (component.text == null && bound == null) {
-                SetupNote(component.binding?.source) { fire(it) }
+            if (component.text == null && bound == null &&
+                component.binding?.source != com.samosaai.masala.core.contract.BindingSource.STORAGE
+            ) {
+                SetupNote(component.binding?.source, snapshot) { fire(it) }
                 return
             }
             // A binding with a value shows it; a static line is its own text.
@@ -197,7 +201,16 @@ private fun Component(
             )
         }
         is WidgetComponent.Counter -> {
-            val target = component.date?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }
+            val storedTarget = component.date?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }
+            // A monthly renewal rolls forward instead of showing "12 days ago" forever.
+            val target = if (storedTarget != null && component.repeat == "monthly") {
+                var next: java.time.LocalDate = storedTarget
+                val today = java.time.LocalDate.now()
+                while (next.isBefore(today)) next = next.plusMonths(1)
+                next
+            } else {
+                storedTarget
+            }
             if (target != null) {
                 // A countdown is a date, not a number to tap: the days left are computed, and the
                 // bar fills as the date approaches (goal = the window it was set for).
@@ -264,7 +277,9 @@ private fun Component(
                     // its label wrapped one letter per line (seen in the gallery preview).
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                         StepChip(if (component.step == 1) "−" else "−${component.step}") {
-                            if (value > 0) source.store.increment(widgetId, component.key, -component.step)
+                            if (value > 0) {
+                                source.store.set(widgetId, component.key, (value - component.step).coerceAtLeast(0).toString())
+                            }
                         }
                         StepChip(if (component.step == 1) "+" else "+${component.step}") {
                             source.store.increment(widgetId, component.key, component.step)
@@ -287,7 +302,7 @@ private fun Component(
         is WidgetComponent.Progress -> {
             val value = component.binding.let { WidgetValues.numberOf(it, storage, snapshot, extra) }
             if (value == null && component.binding.source != com.samosaai.masala.core.contract.BindingSource.STORAGE) {
-                SetupNote(component.binding.source) { fire(it) }
+                SetupNote(component.binding.source, snapshot) { fire(it) }
                 return
             }
             val storageKey = component.binding.key?.takeIf {
@@ -319,7 +334,8 @@ private fun Component(
                 AmountDialog(
                     title = component.label,
                     onAdd = { amount ->
-                        source.store.set(widgetId, storageKey, (source.store.values(widgetId)[storageKey]?.toDoubleOrNull() ?: 0.0 + amount).toString())
+                        val current = source.store.values(widgetId)[storageKey]?.toDoubleOrNull() ?: 0.0
+                        source.store.set(widgetId, storageKey, (current + amount).toString())
                         adding = false
                     },
                     onSet = { amount ->
@@ -358,7 +374,7 @@ private fun Component(
         is WidgetComponent.ListRows -> {
             val rows = component.binding.let { WidgetValues.rowsOf(it, storage, snapshot, component.maxRows, extra) }
             if (rows.isEmpty()) {
-                SetupNote(component.binding.source) { fire(it) }
+                SetupNote(component.binding.source, snapshot) { fire(it) }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     rows.forEach { row ->
@@ -378,7 +394,7 @@ private fun Component(
         is WidgetComponent.Gauge -> {
             val value = component.binding.let { WidgetValues.numberOf(it, storage, snapshot, extra) }
             if (value == null) {
-                SetupNote(component.binding.source) { fire(it) }
+                SetupNote(component.binding.source, snapshot) { fire(it) }
                 return
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -394,7 +410,7 @@ private fun Component(
             val raw = binding?.let { WidgetValues.numberOf(it, storage, snapshot, extra) }
             val text = binding?.let { WidgetValues.textOf(it, storage, snapshot, extra) }
             if (binding != null && raw == null && text == null) {
-                SetupNote(binding.source) { fire(it) }
+                SetupNote(binding.source, snapshot) { fire(it) }
                 return
             }
             val accent = tinted(component.style)
@@ -484,12 +500,22 @@ private fun Component(
                 )
             } else {
                 val host = com.samosaai.masala.widgets.HttpApproval.hostOf(component.http.url)
-                com.samosaai.masala.widgets.media.WebValueView(
-                    component, widgetId, component.suffix, store, component.style,
-                    allowed = host != null && host in source.approved(widgetId),
-                    enabled = enabled,
-                    showLabel = labelShown(component.label, title),
-                )
+                val allowed = host != null && host in source.approved(widgetId)
+                Column {
+                    com.samosaai.masala.widgets.media.WebValueView(
+                        component, widgetId, component.suffix, store, component.style,
+                        allowed = allowed,
+                        enabled = enabled,
+                        showLabel = labelShown(component.label, title),
+                    )
+                    // A changed URL has a new host: the approval lives in the manager, so give the
+                    // card a way there instead of leaving "waiting for a value" forever.
+                    if (!allowed && host != null) {
+                        TextButton(onClick = {
+                            fire(com.samosaai.masala.core.contract.MasalaAction.OpenSettings("WIDGETS"))
+                        }) { Text(stringResource(R.string.widget_set_up)) }
+                    }
+                }
             }
         }
     }
@@ -501,15 +527,29 @@ private fun Component(
  * told the user nothing and offered no way forward.
  */
 @Composable
-private fun SetupNote(source: com.samosaai.masala.core.contract.BindingSource?, fire: (com.samosaai.masala.core.contract.MasalaAction) -> Unit) {
-    val text = when (source) {
-        com.samosaai.masala.core.contract.BindingSource.WEATHER -> R.string.widget_needs_weather
-        com.samosaai.masala.core.contract.BindingSource.STEPS,
-        com.samosaai.masala.core.contract.BindingSource.SLEEP -> R.string.widget_needs_health
-        com.samosaai.masala.core.contract.BindingSource.NEXT_EVENT -> R.string.widget_needs_calendar
+private fun SetupNote(
+    source: com.samosaai.masala.core.contract.BindingSource?,
+    snapshot: ContextSnapshot,
+    fire: (com.samosaai.masala.core.contract.MasalaAction) -> Unit,
+) {
+    // A granted source with no value is "nothing today", not "set this up". Only a missing
+    // permission or a missing place earns the setup action.
+    val unavailable = when (source) {
+        com.samosaai.masala.core.contract.BindingSource.WEATHER -> true
+        com.samosaai.masala.core.contract.BindingSource.STEPS -> snapshot.stepsAccess == false
+        com.samosaai.masala.core.contract.BindingSource.SLEEP -> snapshot.sleepAccess == false
+        com.samosaai.masala.core.contract.BindingSource.NEXT_EVENT -> snapshot.calendarAccess == false
+        else -> false
+    }
+    val text = when {
+        !unavailable -> R.string.widget_nothing_yet
+        source == com.samosaai.masala.core.contract.BindingSource.WEATHER -> R.string.widget_needs_weather
+        source == com.samosaai.masala.core.contract.BindingSource.STEPS ||
+            source == com.samosaai.masala.core.contract.BindingSource.SLEEP -> R.string.widget_needs_health
+        source == com.samosaai.masala.core.contract.BindingSource.NEXT_EVENT -> R.string.widget_needs_calendar
         else -> R.string.widget_nothing_yet
     }
-    val page = when (source) {
+    val page = if (!unavailable) null else when (source) {
         com.samosaai.masala.core.contract.BindingSource.WEATHER -> "BRIEF"
         com.samosaai.masala.core.contract.BindingSource.STEPS,
         com.samosaai.masala.core.contract.BindingSource.SLEEP -> "PERMISSIONS"
@@ -602,7 +642,14 @@ private fun TimerRow(
                 when {
                     running -> WidgetTimers.pause(context, source.store, widgetId, component)
                     paused -> WidgetTimers.resume(context, source.store, widgetId, component)
-                    else -> WidgetTimers.start(context, source.store, widgetId, component)
+                    else -> {
+                        // A Pomodoro has two phases; starting one while the other runs would leave
+                        // two countdowns and two chimes.
+                        chain.filter { it.key != component.key }.forEach {
+                            WidgetTimers.stop(context, source.store, widgetId, it)
+                        }
+                        WidgetTimers.start(context, source.store, widgetId, component)
+                    }
                 }
             },
             modifier = Modifier.size(44.dp),

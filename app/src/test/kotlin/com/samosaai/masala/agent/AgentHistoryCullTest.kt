@@ -26,6 +26,13 @@ class AgentHistoryCullTest {
         assertEquals(small, AgentHistory.capOversized(listOf(small)).single())
     }
 
+    @Test fun `a long text part in a vision message is capped, the image stays`() {
+        val huge = visionUserMessage("x".repeat(AgentHistory.MAX_MESSAGE_CHARS + 1_000), "abc")
+        val capped = AgentHistory.capOversized(listOf(huge)).single()
+        assertTrue(capped.textContent.length <= AgentHistory.MAX_MESSAGE_CHARS + 100)
+        assertEquals(1, capped.imageCount)
+    }
+
     @Test fun `a context overflow is recognised from the server body`() {
         val real = "{\"error\":{\"code\":\"context_length_exceeded\",\"message\":\"The input (1771021 tokens) " +
             "exceeds the model's context window of 1048576 tokens. Reduce the length of the input.\"}}"

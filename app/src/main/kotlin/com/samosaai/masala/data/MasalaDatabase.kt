@@ -350,6 +350,9 @@ interface WidgetStateDao {
     @Query("SELECT * FROM widget_state WHERE widgetId = :widgetId")
     suspend fun get(widgetId: String): WidgetStateEntity?
 
+    @Query("SELECT * FROM widget_state")
+    suspend fun all(): List<WidgetStateEntity>
+
     @Upsert
     suspend fun upsert(entity: WidgetStateEntity)
 }

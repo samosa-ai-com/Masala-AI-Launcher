@@ -132,6 +132,8 @@ sealed interface WidgetComponent {
         val date: String? = null,
         /** `daily` / `weekly` / `monthly`: what the value starts over by itself. */
         val reset: String? = null,
+        /** `monthly`: a countdown to a renewal rolls to the next month once the date passes. */
+        val repeat: String? = null,
         val style: WidgetStyle? = null,
     ) : WidgetComponent
 

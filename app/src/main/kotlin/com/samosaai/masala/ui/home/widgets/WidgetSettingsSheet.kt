@@ -111,11 +111,17 @@ fun WidgetSettingsSheet(
                                 current.date ?: component.date ?: "",
                                 "2026-12-31",
                             ) { v -> set(path) { it.copy(date = v.ifBlank { null }) } }
-                            ResetChips(current.reset ?: component.reset, listOf(null to R.string.widget_settings_never, "daily" to R.string.widget_settings_daily)) { r -> set(path) { it.copy(reset = r) } }
+                            ResetChips(current.reset ?: component.reset ?: "never", listOf("never" to R.string.widget_settings_never, "daily" to R.string.widget_settings_daily)) { r -> set(path) { it.copy(reset = r) } }
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(R.string.widget_settings_monthly_repeat), modifier = Modifier.weight(1f))
+                                Switch(checked = (current.repeat ?: component.repeat) == "monthly", onCheckedChange = { on ->
+                                    set(path) { it.copy(repeat = if (on) "monthly" else "never") }
+                                })
+                            }
                         }
                         is WidgetComponent.Checklist -> {
                             SectionTitle(stringResource(R.string.widget_settings_checklist))
-                            ResetChips(current.reset ?: component.reset, listOf(null to R.string.widget_settings_never, "daily" to R.string.widget_settings_daily, "weekly" to R.string.widget_settings_weekly)) { r -> set(path) { it.copy(reset = r) } }
+                            ResetChips(current.reset ?: component.reset ?: "never", listOf("never" to R.string.widget_settings_never, "daily" to R.string.widget_settings_daily, "weekly" to R.string.widget_settings_weekly)) { r -> set(path) { it.copy(reset = r) } }
                             TextButton(onClick = {
                                 // Start a fresh list now; the tick pattern is this key's value.
                                 store.set(spec.id, component.key, component.items.joinToString(",") { "false" })
@@ -136,7 +142,7 @@ fun WidgetSettingsSheet(
                             SectionTitle(stringResource(R.string.widget_settings_progress))
                             SettingText(stringResource(R.string.widget_settings_label), current.label ?: component.label, null) { v -> set(path) { it.copy(label = v.ifBlank { null }) } }
                             NumberSetting(stringResource(R.string.widget_settings_max), (current.max ?: component.max).toInt(), Modifier.fillMaxWidth()) { v -> if (v != null && v > 0) set(path) { it.copy(max = v.toDouble()) } }
-                            ResetChips(current.reset ?: component.reset, listOf(null to R.string.widget_settings_never, "monthly" to R.string.widget_settings_monthly)) { r -> set(path) { it.copy(reset = r) } }
+                            ResetChips(current.reset ?: component.reset ?: "never", listOf("never" to R.string.widget_settings_never, "monthly" to R.string.widget_settings_monthly)) { r -> set(path) { it.copy(reset = r) } }
                         }
                         is WidgetComponent.Gauge -> {
                             SectionTitle(stringResource(R.string.widget_settings_gauge))
@@ -207,9 +213,16 @@ private fun SettingText(
 
 @Composable
 private fun NumberSetting(label: String, value: Int?, modifier: Modifier = Modifier, onValue: (Int?) -> Unit) {
+    // The field owns its text while typing: clearing it must not snap back to the stored value,
+    // and only a complete number updates the widget.
+    var text by remember(value) { mutableStateOf(value?.toString().orEmpty()) }
     OutlinedTextField(
-        value = value?.toString().orEmpty(),
-        onValueChange = { text -> onValue(text.filter { it.isDigit() }.toIntOrNull()) },
+        value = text,
+        onValueChange = { raw ->
+            val digits = raw.filter { it.isDigit() }.take(9)
+            text = digits
+            digits.toIntOrNull()?.let(onValue)
+        },
         label = { Text(label) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

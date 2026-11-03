@@ -7,6 +7,7 @@ import com.samosaai.masala.data.WidgetVersionEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -90,6 +91,33 @@ class WidgetLibraryTest {
         lib.load(seedIfEmpty = false)
         assertTrue("expected pomodoro, had ${lib.current().keys}", "pomodoro" in lib.current().keys)
         assertTrue("second_brain" in lib.current().keys)
+    }
+
+    @Test
+    fun `an explicit user save promotes a template so a refresh does not revert it`() = runBlocking {
+        val seeds = FakeSeeds()
+        val dao = FakeDao()
+        val lib = WidgetLibrary(dao, FakeVersions(), seeds)
+        lib.load(seedIfEmpty = true)
+        val water = lib.current()["water"]!!
+        lib.save(water.copy(title = "My water"))
+        assertEquals("user", dao.rows["water"]!!.createdBy)
+
+        // The next start refreshes bundled templates; this row is the user's now.
+        lib.load(seedIfEmpty = false)
+        assertEquals("My water", lib.current()["water"]!!.title)
+    }
+
+    @Test
+    fun `a deleted non-legacy template stays deleted when the offered set is rewritten`() = runBlocking {
+        val seeds = FakeSeeds()
+        val dao = FakeDao()
+        val lib = WidgetLibrary(dao, FakeVersions(), seeds)
+        lib.load(seedIfEmpty = true)
+        lib.delete("pomodoro")
+        // A later template seeding must not forget that pomodoro was offered (and deleted).
+        lib.load(seedIfEmpty = false)
+        assertFalse("pomodoro" in lib.current().keys)
     }
 
     @Test

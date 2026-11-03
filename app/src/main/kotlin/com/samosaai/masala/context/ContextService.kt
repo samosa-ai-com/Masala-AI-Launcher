@@ -71,6 +71,9 @@ class ContextService(
         val weather: com.samosaai.masala.core.contract.WeatherNow? = null,
         val steps: Int? = null,
         val sleepHours: Double? = null,
+        val stepsAccess: Boolean? = null,
+        val sleepAccess: Boolean? = null,
+        val calendarAccess: Boolean? = null,
     )
 
     private val real = MutableStateFlow(Real())
@@ -104,6 +107,9 @@ class ContextService(
                 weather = real.weather,
                 steps = real.steps,
                 sleepHours = real.sleepHours,
+                stepsAccess = real.stepsAccess,
+                sleepAccess = real.sleepAccess,
+                calendarAccess = real.calendarAccess,
             ),
         )
     }.distinctUntilChanged().stateIn(scope, SharingStarted.Eagerly, overrideState.value.initial())
@@ -267,8 +273,12 @@ class ContextService(
             return
         }
         // today() returns a Result of its own; only a success that carried a temperature counts.
+        // A transient failure keeps the last reading: flashing "set a place" on a weak connection
+        // looked like the widget had lost its configuration.
         runCatching { client.today(place).getOrNull() }
-            .onSuccess { daily -> real.value = real.value.copy(weather = daily?.now) }
+            .onSuccess { daily ->
+                daily?.now?.let { now -> real.value = real.value.copy(weather = now) }
+            }
             .onFailure { Log.w(TAG, "Weather refresh failed", it) }
     }
 
@@ -281,7 +291,7 @@ class ContextService(
         if (healthJob != null) return
         healthJob = scope.launch {
             while (isActive) {
-                refreshHealth()
+                if (homeVisible.value) refreshHealth()
                 delay(15 * 60_000L)
             }
         }
@@ -289,15 +299,26 @@ class ContextService(
 
     private suspend fun refreshHealth() {
         val reading = runCatching { com.samosaai.masala.health.HealthSignals.read(context) }.getOrNull() ?: return
-        real.value = real.value.copy(steps = reading.steps, sleepHours = reading.sleepHours)
+        real.value = real.value.copy(
+            steps = reading.steps,
+            sleepHours = reading.sleepHours,
+            stepsAccess = reading.stepsAccess,
+            sleepAccess = reading.sleepAccess,
+        )
     }
 
     // ---- calendar ----
 
     private fun refreshCalendar() {
         scope.launch {
-            val events = withContext(Dispatchers.IO) { queryNextEvents() }
-            real.value = real.value.copy(nextEvent = events.firstOrNull(), nextEvents = events)
+            val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) ==
+                PackageManager.PERMISSION_GRANTED
+            val events = if (granted) withContext(Dispatchers.IO) { queryNextEvents() } else emptyList()
+            real.value = real.value.copy(
+                nextEvent = events.firstOrNull(),
+                nextEvents = events,
+                calendarAccess = granted,
+            )
         }
     }
 

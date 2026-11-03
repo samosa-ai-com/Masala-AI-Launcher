@@ -139,12 +139,24 @@ class MasalaAgent(
                     }
                     emit(AgentEvent.ToolCall(name, args))
                     val result = tools.run(name, args)
+                    val output = (result as? ToolResult.Success)?.output.orEmpty()
                     val image = (result as? ToolResult.Success)?.let { readImage(it.output) }
-                    if (image != null) {
-                        readImages += image
-                        messages = messages + toolMessage(call.id, ToolResult.Success(image.summary))
-                    } else {
-                        messages = messages + toolMessage(call.id, result)
+                    when {
+                        image != null -> {
+                            readImages += image
+                            messages = messages + toolMessage(call.id, ToolResult.Success(image.summary))
+                        }
+                        // Too large to attach: say so. Keeping the base64 would put megabytes of
+                        // noise into history and the model still could not see the picture.
+                        output.startsWith("IMAGE_DATA:") ->
+                            messages = messages + toolMessage(
+                                call.id,
+                                ToolResult.Success(
+                                    "Read an image, but it is too large to attach. Ask for a smaller " +
+                                        "image, or downscale it first.",
+                                ),
+                            )
+                        else -> messages = messages + toolMessage(call.id, result)
                     }
                     emit(AgentEvent.ToolDone(name, result))
                     if (result is ToolResult.Success) result.results().takeIf { it.isNotEmpty() }?.let { emit(AgentEvent.Results(it)) }

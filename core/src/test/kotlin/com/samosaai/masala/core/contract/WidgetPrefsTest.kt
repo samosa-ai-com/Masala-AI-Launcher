@@ -54,4 +54,17 @@ class WidgetPrefsTest {
         val paths = spec().componentsWithPaths().map { it.first }
         assertEquals(listOf("counter:glasses", "index:1", "timer:work", "timer:break"), paths)
     }
+
+    @Test fun `timers nested in a row are part of the widget chain`() {
+        val keys = spec().timerComponents().map { it.key }
+        // A Pomodoro puts its two phases in a row; a top-level filter would find none.
+        assertEquals(listOf("work", "break"), keys)
+    }
+
+    @Test fun `a monthly renewal keeps its repeat when settings change the date`() {
+        val resolved = spec().resolved(WidgetPrefs(components = mapOf("counter:glasses" to ComponentPrefs(date = "2026-12-01", repeat = "monthly"))))
+        val counter = resolved.components[0] as WidgetComponent.Counter
+        assertEquals("2026-12-01", counter.date)
+        assertEquals("monthly", counter.repeat)
+    }
 }

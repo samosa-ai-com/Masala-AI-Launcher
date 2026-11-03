@@ -68,6 +68,8 @@ object WidgetSchema {
             put("label", string())
             put("step", int("Added per tap"))
             put("goal", int("Optional target shown as n / goal"))
+            put("date", string("ISO yyyy-MM-dd target: the counter shows the days left instead of tapping"))
+            put("reset", enumOf("daily", "weekly", "monthly"))
             putJsonObject("style") { merge(style()) }
         }
         putJsonArray("required") { add("type"); add("key"); add("label") }
@@ -83,6 +85,7 @@ object WidgetSchema {
                 put("type", "array")
                 putJsonObject("items") { merge(string()) }
             }
+            put("reset", enumOf("daily", "weekly", "monthly"))
         }
         putJsonArray("required") { add("type"); add("key"); add("items") }
         put("additionalProperties", false)
@@ -96,6 +99,7 @@ object WidgetSchema {
             put("label", string())
             put("seconds", int("Countdown length"))
             put("sound", bool("Ring when it reaches zero (default false)"))
+            put("autoStartKey", string("Timer key in this widget to start when this one ends (a Pomodoro's break)"))
         }
         putJsonArray("required") { add("type"); add("key"); add("label"); add("seconds") }
         put("additionalProperties", false)
@@ -108,6 +112,7 @@ object WidgetSchema {
             put("label", string())
             putJsonObject("binding") { merge(binding()) }
             put("max", number("Full bar value"))
+            put("reset", enumOf("daily", "weekly", "monthly"))
             putJsonObject("style") { merge(style()) }
         }
         putJsonArray("required") { add("type"); add("label"); add("binding"); add("max") }
@@ -151,6 +156,7 @@ object WidgetSchema {
                     addJsonObject { merge(refreshWidget()) }
                     addJsonObject { merge(runTool()) }
                     addJsonObject { merge(playSound()) }
+                    addJsonObject { merge(flip()) }
                 }
             }
         }
@@ -385,6 +391,17 @@ object WidgetSchema {
             put("kind", enumOf("click", "chime"))
         }
         putJsonArray("required") { add("type") }
+        put("additionalProperties", false)
+    }
+
+    private fun flip(): JsonObject = buildJsonObject {
+        put("type", "object")
+        putJsonObject("properties") {
+            put("type", const("flip"))
+            put("key", string("Storage key the result is written to"))
+            put("kind", enumOf("coin", "dice"))
+        }
+        putJsonArray("required") { add("type"); add("key"); add("kind") }
         put("additionalProperties", false)
     }
 

@@ -62,9 +62,9 @@ class WidgetLibrary(
         if (rows.isEmpty()) {
             if (seedIfEmpty) {
                 seedTemplates()
-                // Every bundled template counts as offered from here on: deleting one later must
-                // not bring it back on the next start.
-                seeds?.remember(WidgetTemplates.ids.toSet())
+                // Only what actually reached the library counts as offered: a failed save is
+                // retried on the next start instead of disappearing forever.
+                seeds?.remember(_widgets.value.keys)
             } else {
                 // An upgrade can arrive with an empty library (custom widgets only, from before
                 // templates seeded) but a saved layout. Remembering every id here marked all of
@@ -133,7 +133,9 @@ class WidgetLibrary(
         // camera_tile, two_cameras, countdown) were missing from a real install that way.
         if (missing.isNotEmpty() || known.isEmpty()) {
             store.remember(
-                (if (known.isEmpty()) WidgetTemplates.legacyIds.toSet() else emptySet()) + existing + saved,
+                // Never forget what was already offered: a template the user deleted must stay
+                // deleted, and it is only in `known`, not in `existing`.
+                (if (known.isEmpty()) WidgetTemplates.legacyIds.toSet() else known) + existing + saved,
             )
         }
     }
@@ -150,7 +152,9 @@ class WidgetLibrary(
                     specJson = json,
                     tier = "spec",
                     title = spec.title,
-                    createdBy = existing?.createdBy ?: createdBy,
+                    // An explicit user save promotes a template row, so the template refresher
+                    // will not revert the user's (or the agent's) edit on the next start.
+                    createdBy = if (createdBy == "user") "user" else existing?.createdBy ?: createdBy,
                     createdAt = existing?.createdAt ?: now,
                     updatedAt = now,
                 ),
