@@ -342,6 +342,9 @@ class CommandController(
                 PttEngine.TakeAutoEnd.CapReached -> pauseTake()
             }
         }
+        // Talking is coming back: home's pill (and mic) stays up over a minimized chat, which
+        // would otherwise keep the listening surface hidden.
+        _minimized.value = false
         _state.value = CommandState.Listening
         startTicker()
         return true

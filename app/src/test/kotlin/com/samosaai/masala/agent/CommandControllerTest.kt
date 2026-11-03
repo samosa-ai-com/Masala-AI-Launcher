@@ -677,6 +677,19 @@ class CommandControllerTest {
         assertIs<CommandState.Idle>(c.state.value)
     }
 
+    @Test fun listeningFromAMinimizedChatBringsItBack() = runBlocking<Unit> {
+        val speech = object : SpeechInput {
+            override fun start(onFailure: (String) -> Unit) = true
+            override suspend fun stop() = Result.success("")
+            override fun cancel() = Unit
+        }
+        val c = controller(speech)
+        c.minimize()
+        assertTrue(c.startListening())
+        assertEquals(CommandState.Listening, c.state.value)
+        assertFalse(c.minimized.value)
+    }
+
     @Test fun textWithImageSendsBoth() = runBlocking<Unit> {
         replies += reply("A red bicycle on a street.")
         val c = controller()
