@@ -132,11 +132,12 @@ private fun UpdatesCard() {
             }
             scope.launch {
                 ui = UpdateUi.Downloading(manifest, 0)
-                val apk = checker.download(context, manifest) { ui = UpdateUi.Downloading(manifest, it) }
-                    .getOrElse { ui = UpdateUi.Failed(manifest, it.message ?: it.javaClass.simpleName); return@launch }
-                ui = UpdateUi.Installing(manifest)
                 // On success Android replaces Masala and this process ends.
-                ProTools.installApk(context, apk)?.let { ui = UpdateUi.Failed(manifest, it) }
+                checker.downloadAndInstall(
+                    context, manifest,
+                    onProgress = { ui = UpdateUi.Downloading(manifest, it) },
+                    onInstalling = { ui = UpdateUi.Installing(manifest) },
+                ) { apk -> ProTools.installApk(context, apk) }?.let { ui = UpdateUi.Failed(manifest, it) }
             }
         }
 
