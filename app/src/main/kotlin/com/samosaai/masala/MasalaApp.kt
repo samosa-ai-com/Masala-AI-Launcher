@@ -758,6 +758,7 @@ class MasalaApp : Application() {
         // orphaned — not only the ones older than the heartbeat window.
         scope.launch { runCatching { meetings.recoverStale(olderThanMs = 0) } }
         com.samosaai.masala.widgets.WidgetHttpWorker.ensure(this)
+        com.samosaai.masala.update.UpdateCheckWorker.ensure(this)
         catalog = AppCatalog(this, scope)
         icons = IconCache(this, catalog)
         actions = AppActions(this, catalog) { usage.record(it) }
