@@ -67,7 +67,12 @@ Signed APKs are published as [GitHub releases](../../releases) by `.github/workf
 2. Write the release notes under `## [Unreleased]` in [`CHANGELOG.md`](CHANGELOG.md).
 3. Push to `main`. The workflow runs CI's checks, builds and verifies the signed APK, tags
    `v<versionName>`, publishes `Masala-<versionName>.apk` (as a pre-release while the version is
-   `0.x`) and commits `CHANGELOG.md` with the notes moved under the new version.
+   `0.x`) and commits `update.json` and `CHANGELOG.md` (notes moved under the new version).
+
+Release builds read `update.json` from `main`: **Settings → About → Updates** shows the notes and
+downloads, verifies (sha256 from `update.json`, links only to this repository's releases) and
+installs the update; a background check every 12 hours posts one notification per new version.
+Debug and profile builds are signed with another key, so they don't check.
 
 **Actions → Release → Run workflow** with *dry run* on builds and verifies without publishing, and keeps
 the APK as a one-day workflow artifact.

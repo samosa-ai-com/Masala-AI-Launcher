@@ -18,6 +18,8 @@ First public preview. Expect rough edges: layouts, settings and data may change 
 - **Bring your own model.** Masala ships with no AI account and no key. Choose a provider (OpenAI,
   Anthropic, Gemini, Groq, OpenRouter, Mistral, LM Studio, and others) and paste your own key under
   Settings → Models & keys. Keys are encrypted on the phone.
+- **Updates inside the app.** Settings → About shows when a new version is out, with what's new, and
+  installs it after you confirm. You get one notification per new version (you can turn it off).
 - **Changes ask first.** Anything that changes your phone asks for confirmation and is logged.
 
 ### Note
