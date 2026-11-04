@@ -5,8 +5,8 @@ import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -15,37 +15,37 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.SystemUpdate
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.samosaai.masala.BuildConfig
 import com.samosaai.masala.R
 import com.samosaai.masala.core.update.UpdateManifest
 import com.samosaai.masala.pro.ProTools
+import com.samosaai.masala.ui.brand.MasalaWordmark
 import com.samosaai.masala.ui.components.Markdown
+import com.samosaai.masala.ui.components.SectionCard
+import com.samosaai.masala.ui.components.SettingsRow
+import com.samosaai.masala.ui.theme.MasalaMono
 import com.samosaai.masala.update.UpdateCheckWorker
 import com.samosaai.masala.update.UpdateChecker
 import com.samosaai.masala.update.UpdatePrefs
 import kotlinx.coroutines.launch
-import com.samosaai.masala.ui.brand.MasalaWordmark
-import com.samosaai.masala.ui.components.SectionCard
-import com.samosaai.masala.ui.components.SettingsRow
-import com.samosaai.masala.ui.theme.MasalaMono
 
 /** What a licence file in `assets/licenses` covers, by its name. */
 internal fun licenceTitle(file: String): String = when (file.substringBeforeLast('.')) {
